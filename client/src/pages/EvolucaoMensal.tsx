@@ -279,18 +279,26 @@ export default function EvolucaoMensal() {
       });
     } else {
       return mesesUnicos.map(mes => {
-        const mrrMes = mrrData.filter(d => d.mes === mes);
-        const churnMes = churnData.filter(d => d.mes === mes);
-        
+        const mrrMesAll = mrrData.filter(d => d.mes === mes);
+        const churnMesAll = churnData.filter(d => d.mes === mes);
+
+        // Quando há squad selecionado, restringe operador apenas aos do squad
+        const mrrMes = squadSelecionado === "todos"
+          ? mrrMesAll
+          : mrrMesAll.filter(d => d.squad === squadSelecionado);
+        const churnMes = squadSelecionado === "todos"
+          ? churnMesAll
+          : churnMesAll.filter(d => d.squad === squadSelecionado);
+
         const operadoresUnicos = Array.from(new Set([...mrrMes.map(d => d.responsavel), ...churnMes.map(d => d.responsavel)].filter(Boolean)));
-        
+
         const row: Record<string, any> = {
           mes: formatMesLabel(mes),
           mesOriginal: mes,
         };
-        
+
         let totalMrr = 0;
-        
+
         for (const operador of operadoresUnicos) {
           if (operadorSelecionado === "todos" || operadorSelecionado === operador) {
             const mrrOperador = mrrMes
@@ -400,6 +408,19 @@ export default function EvolucaoMensal() {
   const squads = data?.squads || [];
   const operadores = data?.operadores || [];
 
+  // Operadores que aparecem no squad selecionado (preserva ordem alfabética do backend)
+  const operadoresDoSquad = useMemo(() => {
+    if (squadSelecionado === "todos") return operadores;
+    const presentes = new Set<string>();
+    for (const d of (data?.mrr || [])) {
+      if (d.squad === squadSelecionado && d.responsavel) presentes.add(d.responsavel);
+    }
+    for (const d of (data?.churns || [])) {
+      if (d.squad === squadSelecionado && d.responsavel) presentes.add(d.responsavel);
+    }
+    return operadores.filter(op => presentes.has(op));
+  }, [data, operadores, squadSelecionado]);
+
   function formatMesLabel(mes: string): string {
     const [ano, mesNum] = mes.split("-");
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -508,7 +529,15 @@ export default function EvolucaoMensal() {
           </SelectContent>
         </Select>
         
-        <Select value={squadSelecionado} onValueChange={setSquadSelecionado}>
+        <Select value={squadSelecionado} onValueChange={(novoSquad) => {
+          setSquadSelecionado(novoSquad);
+          // Se o operador atual não pertence ao novo squad, reseta para "todos"
+          if (operadorSelecionado !== "todos" && novoSquad !== "todos") {
+            const pertence = (data?.mrr || []).some(d => d.squad === novoSquad && d.responsavel === operadorSelecionado)
+              || (data?.churns || []).some(d => d.squad === novoSquad && d.responsavel === operadorSelecionado);
+            if (!pertence) setOperadorSelecionado("todos");
+          }
+        }}>
           <SelectTrigger className="w-[180px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50" data-testid="select-squad">
             <SelectValue placeholder="Squad" />
           </SelectTrigger>
@@ -527,7 +556,7 @@ export default function EvolucaoMensal() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="todos">Todos os Operadores</SelectItem>
-              {operadores.map(op => (
+              {operadoresDoSquad.map(op => (
                 <SelectItem key={op} value={op}>{op}</SelectItem>
               ))}
             </SelectContent>
@@ -1057,7 +1086,7 @@ export default function EvolucaoMensal() {
                     </tr>
                   </thead>
                   <tbody>
-                    {operadores
+                    {operadoresDoSquad
                       .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
                       .filter(op => {
                         if (tableMode === "churn") {
@@ -1189,7 +1218,7 @@ export default function EvolucaoMensal() {
                       {tableMode === "mrr" ? (
                         <>
                           {chartData.map((row) => {
-                            const total = operadores
+                            const total = operadoresDoSquad
                               .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
                               .reduce((acc, op) => acc + (Number(row[op]) || 0), 0);
                             const churnTotal = Number(row.churn) || 0;
@@ -1207,7 +1236,7 @@ export default function EvolucaoMensal() {
                           <td className="text-right py-2 px-4 font-mono font-bold text-cyan-600 dark:text-cyan-300 border-l border-gray-200 dark:border-zinc-700/50">
                             {formatCurrencyNoDecimals(
                               chartData.reduce((acc, row) => {
-                                return acc + operadores
+                                return acc + operadoresDoSquad
                                   .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
                                   .reduce((sum, op) => sum + (Number(row[op]) || 0), 0);
                               }, 0)
@@ -1222,7 +1251,7 @@ export default function EvolucaoMensal() {
                       ) : (
                         <>
                           {chartData.map((row) => {
-                            const totalMrr = operadores
+                            const totalMrr = operadoresDoSquad
                               .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
                               .reduce((acc, op) => acc + (Number(row[op]) || 0), 0);
                             const totalChurn = Number(row.churn) || 0;
@@ -1244,7 +1273,7 @@ export default function EvolucaoMensal() {
                               // Média ponderada: soma_churn / soma_mrr_base * 100
                               let totalChurnFooter = 0, totalMrrBaseFooter = 0;
                               for (let idx = 1; idx < chartData.length; idx++) {
-                                const prevMrr = operadores
+                                const prevMrr = operadoresDoSquad
                                   .filter(op => operadorSelecionado === "todos" || op === operadorSelecionado)
                                   .reduce((a, op) => a + (Number(chartData[idx - 1][op]) || 0), 0);
                                 const churn = Number(chartData[idx].churn) || 0;
