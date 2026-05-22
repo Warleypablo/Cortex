@@ -114,3 +114,15 @@ export const BASES_DISPONIVEIS = Object.keys(BASE_TAG_MAP);
 export function getBaseFiltro(base: string): BaseFiltro | null {
   return BASE_TAG_MAP[base] || null;
 }
+
+/**
+ * Avalia se um contato (representado pelo array de tags dele) satisfaz uma base.
+ * Útil pra preview no frontend ou pra filtros JS-side.
+ */
+export function contatoSatisfazBase(contactTags: string[] | null | undefined, filtro: BaseFiltro): boolean {
+  const tags = new Set((contactTags ?? []).map((t) => t.toLowerCase()));
+  if (filtro.tagsAll && !filtro.tagsAll.every((t) => tags.has(t.toLowerCase()))) return false;
+  if (filtro.tagsAny && !filtro.tagsAny.some((t) => tags.has(t.toLowerCase()))) return false;
+  if (filtro.tagsNot && filtro.tagsNot.some((t) => tags.has(t.toLowerCase()))) return false;
+  return true;
+}

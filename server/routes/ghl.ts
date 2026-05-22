@@ -12,8 +12,9 @@
  */
 
 import type { Express, Request, Response } from "express";
-import { sql } from "drizzle-orm";
+import { sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
+import { BASE_TAG_MAP, type BaseFiltro } from "@shared/ghl-broadcast/base-tag-map";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -255,6 +256,76 @@ async function getTags(req: Request, res: Response) {
 }
 
 /**
+ * Monta um SQL fragment WHERE pra filtrar contatos da tabela
+ * `cortex_core.ghl_contacts` (coluna `tags TEXT[]`) por um BaseFiltro.
+ * Usa operadores nativos de array do Postgres (@> e &&).
+ *
+ *   tagsAll → tags @> ARRAY[...]    (precisa ter todas)
+ *   tagsAny → tags && ARRAY[...]    (precisa ter pelo menos uma)
+ *   tagsNot → NOT (tags && ARRAY[...])  (não pode ter nenhuma)
+ */
+function buildTagFilterSql(filtro: BaseFiltro): SQL<unknown> {
+  const parts: SQL<unknown>[] = [];
+  if (filtro.tagsAll && filtro.tagsAll.length) {
+    parts.push(sql`tags @> ${filtro.tagsAll}::text[]`);
+  }
+  if (filtro.tagsAny && filtro.tagsAny.length) {
+    parts.push(sql`tags && ${filtro.tagsAny}::text[]`);
+  }
+  if (filtro.tagsNot && filtro.tagsNot.length) {
+    parts.push(sql`NOT (tags && ${filtro.tagsNot}::text[])`);
+  }
+  if (parts.length === 0) return sql`true`;
+  // join with AND
+  return parts.reduce((acc, part, i) => (i === 0 ? part : sql`${acc} AND ${part}`));
+}
+
+/**
+ * GET /api/ghl/diagnostico?from=...&to=...
+ * Performance de cada base nominal Turbo no período.
+ * Pra cada base do BASE_TAG_MAP, calcula: contatos, msgs WA out/in, msgs email out.
+ * Roda 1 query por base em paralelo.
+ */
+async function getDiagnostico(req: Request, res: Response) {
+  try {
+    const { from, to } = parsePeriod(req);
+    const bases = Object.entries(BASE_TAG_MAP);
+
+    const results = await Promise.all(
+      bases.map(async ([baseName, filtro]) => {
+        const whereTags = buildTagFilterSql(filtro);
+        try {
+          const r = await db.execute(sql`
+            WITH base_contacts AS (
+              SELECT id FROM cortex_core.ghl_contacts WHERE ${whereTags}
+            )
+            SELECT
+              (SELECT COUNT(*)::int FROM base_contacts) AS contacts,
+              COUNT(*) FILTER (WHERE m.message_type = 'TYPE_WHATSAPP' AND m.direction = 'outbound')::int AS wa_sent,
+              COUNT(*) FILTER (WHERE m.message_type = 'TYPE_WHATSAPP' AND m.direction = 'inbound')::int AS wa_received,
+              COUNT(*) FILTER (WHERE m.message_type = 'TYPE_EMAIL' AND m.direction = 'outbound')::int AS email_sent,
+              COUNT(DISTINCT m.contact_id) FILTER (WHERE m.message_type = 'TYPE_WHATSAPP' AND m.direction = 'outbound')::int AS wa_contacts_reached
+            FROM base_contacts bc
+            LEFT JOIN cortex_core.ghl_messages m
+              ON m.contact_id = bc.id
+              AND m.date_added BETWEEN ${from} AND ${to}
+          `);
+          const row = (r as any).rows?.[0] ?? {};
+          return { base: baseName, ...row };
+        } catch (e: any) {
+          return { base: baseName, error: e.message, contacts: 0, wa_sent: 0, wa_received: 0, email_sent: 0, wa_contacts_reached: 0 };
+        }
+      }),
+    );
+
+    res.json({ period: { from, to }, bases: results });
+  } catch (err: any) {
+    console.error("[GHL] diagnostico error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
  * GET /api/ghl/overview
  * Counts gerais + última sync por resource.
  */
@@ -298,4 +369,5 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/whatsapp-metrics", getWhatsappMetrics);
   app.get("/api/ghl/tags", getTags);
   app.get("/api/ghl/overview", getOverview);
+  app.get("/api/ghl/diagnostico", getDiagnostico);
 }
