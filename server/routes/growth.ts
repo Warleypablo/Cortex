@@ -2486,13 +2486,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         visualizacoesPagina = parseInt(metaRow.visualizacoes_pagina) || 0;
       }
 
-      // Query Google Ads (skip when funnel is selected — no campaign-to-funnel mapping available;
-      // also skip when platform filter excludes Google)
+      // Query Google Ads (skip when platform filter excludes Google).
+      // Funnel filter aplicado via JOIN com google_ads.campaigns parsing do c.name
+      // (mesmo padrão `[NomeFunil]` usado em Meta).
       let googleInvestimento = 0;
       let googleImpressoes = 0;
       let googleCliques = 0;
-      if (funilValues.length > 0 || !includeGoogle) {
-        // Skip Google Ads when filtering by funnel or when platform filter excludes Google
+      if (!includeGoogle) {
+        // Skip Google Ads when platform filter excludes Google
       } else try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
@@ -2506,13 +2507,30 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                            columns.includes('segments_date') ? 'segments_date' : null;
 
         if (dateColumn && columns.includes('cost_micros')) {
+          // Build funnel filter for Google (parse c.name by [NomeFunil])
+          let googleFunnelFilter = '';
+          const escape = (v: string) => v.replace(/'/g, "''");
+          if (realFunilValues.length > 0) {
+            const conds = realFunilValues
+              .map(v => `c.name ILIKE '%[${escape(v)}]%' OR c.name ILIKE '%${escape(v)}%'`)
+              .join(' OR ');
+            let inner = `(${conds})`;
+            if (hasVazio) {
+              inner = `(${inner} OR c.name NOT LIKE '%[%]%')`;
+            }
+            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE ${inner})`;
+          } else if (hasVazio) {
+            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
+          }
+
           const googleResult = await db.execute(sql.raw(`
             SELECT
               COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
               COALESCE(SUM(impressions), 0) as impressoes,
               COALESCE(SUM(clicks), 0) as cliques
-            FROM google_ads.campaign_daily_metrics
+            FROM google_ads.campaign_daily_metrics m
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
+              ${googleFunnelFilter}
           `));
           const gRow = googleResult.rows[0] as any;
           googleInvestimento = parseFloat(gRow.investimento) || 0;
@@ -2780,10 +2798,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const includeGoogle = utmValues.length === 0
         || utmValues.some(v => v.includes('google') || v.includes('adwords') || v === 'gads');
 
-      // Funnel filter: Google Ads has no campaign→funnel mapping, so any funnel selection
-      // means we cannot match Google spend to that funnel — return zeros (matches /ads behavior).
+      // Funnel filter — Google Ads usa o mesmo padrão `[NomeFunil]` no `c.name`
+      // que o Meta. Parseamos via JOIN com google_ads.campaigns.
       const funilNgcRaw = req.query.funilNgc as string | undefined;
-      const hasFunilFilter = !!(funilNgcRaw && funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean).length > 0);
+      const funilValues = funilNgcRaw
+        ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
+        : [];
+      const hasVazio = funilValues.includes('(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
 
       const zeroResponse = {
         investimento: 0, impressoes: 0, cliques: 0,
@@ -2792,7 +2814,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         conversoes: 0, valorConversoes: 0, custoConversao: 0,
         sessoes: 0, sessoesAvailable: false,
       };
-      if (!includeGoogle || hasFunilFilter) {
+      if (!includeGoogle) {
         return res.json(zeroResponse);
       }
 
@@ -2818,6 +2840,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const hasConversions = columns.includes('conversions');
           const hasConversionsValue = columns.includes('conversions_value');
 
+          // Build funnel filter for Google (parse c.name by [NomeFunil])
+          let googleFunnelFilter = '';
+          const escape = (v: string) => v.replace(/'/g, "''");
+          if (realFunilValues.length > 0) {
+            const conds = realFunilValues
+              .map(v => `c.name ILIKE '%[${escape(v)}]%' OR c.name ILIKE '%${escape(v)}%'`)
+              .join(' OR ');
+            let inner = `(${conds})`;
+            if (hasVazio) {
+              inner = `(${inner} OR c.name NOT LIKE '%[%]%')`;
+            }
+            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE ${inner})`;
+          } else if (hasVazio) {
+            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
+          }
+
           const googleResult = await db.execute(sql.raw(`
             SELECT
               COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
@@ -2825,8 +2863,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(clicks), 0) as cliques
               ${hasConversions ? ', COALESCE(SUM(conversions), 0) as conversoes' : ''}
               ${hasConversionsValue ? ', COALESCE(SUM(conversions_value), 0) as valor_conversoes' : ''}
-            FROM google_ads.campaign_daily_metrics
+            FROM google_ads.campaign_daily_metrics m
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
+              ${googleFunnelFilter}
           `));
           const gRow = googleResult.rows[0] as any;
           investimento = parseFloat(gRow.investimento) || 0;

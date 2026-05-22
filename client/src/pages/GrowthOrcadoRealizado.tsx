@@ -2256,7 +2256,7 @@ export default function GrowthOrcadoRealizado() {
       </div>
 
       {/* Tabs de Seção + Filtros */}
-      <div className="flex items-center justify-between gap-4 flex-wrap">
+      <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-1 bg-muted/50 rounded-lg p-1 w-fit">
           {([
             { key: 'consolidado', label: 'Consolidado' },
