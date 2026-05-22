@@ -15,6 +15,7 @@ import type { Express, Request, Response } from "express";
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
 import { BASE_TAG_MAP, type BaseFiltro } from "@shared/ghl-broadcast/base-tag-map";
+import { analisarCopy, gerarCopies, buscarTopPerformers } from "../services/ghlCopyAi";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -483,6 +484,57 @@ async function getCalendar(req: Request, res: Response) {
 }
 
 /**
+ * POST /api/ghl/copy/analyze
+ * Body: { texto: string, canal?: "WhatsApp" | "Email" }
+ */
+async function postCopyAnalyze(req: Request, res: Response) {
+  try {
+    const { texto, canal } = req.body ?? {};
+    if (!texto || typeof texto !== "string") return res.status(400).json({ error: 'Campo "texto" obrigatório' });
+    const result = await analisarCopy(texto, canal === "Email" ? "Email" : "WhatsApp");
+    res.json(result);
+  } catch (err: any) {
+    console.error("[GHL] copy/analyze error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * POST /api/ghl/copy/generate
+ * Body: { objetivo, base, tom, tamanho, contexto?, padraoAlvo?, usarTopPerformers?: bool }
+ */
+async function postCopyGenerate(req: Request, res: Response) {
+  try {
+    const { objetivo, base, tom, tamanho, contexto, padraoAlvo, usarTopPerformers, topPerformers } = req.body ?? {};
+    if (!objetivo || !base || !tom || !tamanho) {
+      return res.status(400).json({ error: "Campos obrigatórios: objetivo, base, tom, tamanho" });
+    }
+    let exemplos = topPerformers;
+    if (!exemplos && usarTopPerformers) {
+      exemplos = await buscarTopPerformers(5);
+    }
+    const result = await gerarCopies({ objetivo, base, tom, tamanho, contexto, padraoAlvo, topPerformers: exemplos });
+    res.json(result);
+  } catch (err: any) {
+    console.error("[GHL] copy/generate error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * GET /api/ghl/copy/top-performers — sample de mensagens com mais respostas.
+ */
+async function getTopPerformers(_req: Request, res: Response) {
+  try {
+    const items = await buscarTopPerformers(5);
+    res.json({ topPerformers: items });
+  } catch (err: any) {
+    console.error("[GHL] copy/top-performers error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
  * GET /api/ghl/messages/:id — detalhe completo (body inteiro).
  */
 async function getMessageDetail(req: Request, res: Response) {
@@ -554,4 +606,7 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/messages", listMessages);
   app.get("/api/ghl/messages/:id", getMessageDetail);
   app.get("/api/ghl/calendar", getCalendar);
+  app.post("/api/ghl/copy/analyze", postCopyAnalyze);
+  app.post("/api/ghl/copy/generate", postCopyGenerate);
+  app.get("/api/ghl/copy/top-performers", getTopPerformers);
 }

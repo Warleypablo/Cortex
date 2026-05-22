@@ -10,7 +10,9 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from "lucide-react";
+import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Wand2, ShieldCheck, ShieldAlert, ShieldX, Copy, Check } from "lucide-react";
+import { useMutation } from "@tanstack/react-query";
+import { Textarea } from "@/components/ui/textarea";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths } from "date-fns";
 import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
 import { format, subDays } from "date-fns";
@@ -1072,6 +1074,308 @@ function CalendarioTab() {
 }
 
 // ────────────────────────────────────────────────────────────────────────
+// Tab: Gerador IA (Claude API)
+// ────────────────────────────────────────────────────────────────────────
+
+interface AnaliseCopy {
+  score_geral: number;
+  veredicto: "Aprovado" | "Pode melhorar" | "Reescrever";
+  criterios: Record<string, { pontos: number; max: number; feedback: string }>;
+  pontos_fortes: string[];
+  pontos_atencao: string[];
+  sugestao_melhoria: string;
+}
+
+interface VariacaoCopy {
+  titulo: string;
+  padrao: string;
+  copy: string;
+  raciocinio: string;
+}
+
+function GeradorTab() {
+  const [mode, setMode] = useState<"analisar" | "gerar">("analisar");
+
+  // ── Modo Analisar ─────────────────────────────────────────────────
+  const [texto, setTexto] = useState("");
+  const [canal, setCanal] = useState<"WhatsApp" | "Email">("WhatsApp");
+
+  const analyzeMut = useMutation<AnaliseCopy, Error, void>({
+    mutationFn: async () => {
+      const res = await fetch("/api/ghl/copy/analyze", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ texto, canal }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Erro");
+      return res.json();
+    },
+  });
+
+  // ── Modo Gerar ────────────────────────────────────────────────────
+  const [objetivo, setObjetivo] = useState("Agendar reunião");
+  const [base, setBase] = useState("Geral - MQLs");
+  const [tom, setTom] = useState("Direto e provocativo");
+  const [tamanho, setTamanho] = useState("Médio (400-800 caracteres)");
+  const [contexto, setContexto] = useState("");
+  const [padraoAlvo, setPadraoAlvo] = useState("");
+  const [usarTop, setUsarTop] = useState(true);
+
+  const generateMut = useMutation<{ variacoes: VariacaoCopy[] }, Error, void>({
+    mutationFn: async () => {
+      const res = await fetch("/api/ghl/copy/generate", {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ objetivo, base, tom, tamanho, contexto, padraoAlvo: padraoAlvo || undefined, usarTopPerformers: usarTop }),
+      });
+      if (!res.ok) throw new Error((await res.json()).error || "Erro");
+      return res.json();
+    },
+  });
+
+  return (
+    <div className="space-y-4">
+      <div className="flex gap-2">
+        <button onClick={() => setMode("analisar")} className={cn("px-4 py-2 rounded text-sm font-medium", mode === "analisar" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70")}>
+          <ShieldCheck className="w-4 h-4 inline mr-1" /> Analisar uma copy
+        </button>
+        <button onClick={() => setMode("gerar")} className={cn("px-4 py-2 rounded text-sm font-medium", mode === "gerar" ? "bg-primary text-primary-foreground" : "bg-muted hover:bg-muted/70")}>
+          <Wand2 className="w-4 h-4 inline mr-1" /> Gerar copies novas
+        </button>
+      </div>
+
+      {mode === "analisar" ? (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Sua copy</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div>
+                <Label className="text-xs">Canal</Label>
+                <Select value={canal} onValueChange={(v) => setCanal(v as any)}>
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                    <SelectItem value="Email">Email</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-xs">Mensagem</Label>
+                <Textarea
+                  value={texto}
+                  onChange={(e) => setTexto(e.target.value)}
+                  placeholder="Cola aqui a copy que você quer avaliar..."
+                  className="min-h-[260px] text-sm font-mono"
+                />
+                <div className="text-xs text-muted-foreground mt-1">{texto.length} caracteres</div>
+              </div>
+              <button
+                onClick={() => analyzeMut.mutate()}
+                disabled={!texto.trim() || analyzeMut.isPending}
+                className="w-full bg-primary text-primary-foreground rounded px-3 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-2"
+              >
+                {analyzeMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                Analisar com IA
+              </button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Análise</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {analyzeMut.isError && <div className="text-destructive text-sm">{analyzeMut.error.message}</div>}
+              {!analyzeMut.data && !analyzeMut.isPending && (
+                <div className="text-muted-foreground text-sm">Cole uma copy ao lado e clique em <strong>Analisar com IA</strong>.</div>
+              )}
+              {analyzeMut.data && (
+                <div className="space-y-4">
+                  <div className={cn("p-3 rounded border flex items-center gap-3",
+                    analyzeMut.data.veredicto === "Aprovado" && "border-emerald-300 bg-emerald-50 dark:bg-emerald-950/30",
+                    analyzeMut.data.veredicto === "Pode melhorar" && "border-amber-300 bg-amber-50 dark:bg-amber-950/30",
+                    analyzeMut.data.veredicto === "Reescrever" && "border-rose-300 bg-rose-50 dark:bg-rose-950/30",
+                  )}>
+                    {analyzeMut.data.veredicto === "Aprovado" ? <ShieldCheck className="w-6 h-6 text-emerald-600" /> :
+                     analyzeMut.data.veredicto === "Pode melhorar" ? <ShieldAlert className="w-6 h-6 text-amber-600" /> :
+                     <ShieldX className="w-6 h-6 text-rose-600" />}
+                    <div>
+                      <div className="text-2xl font-bold">{analyzeMut.data.score_geral}<span className="text-base text-muted-foreground">/100</span></div>
+                      <div className="text-sm">{analyzeMut.data.veredicto}</div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="text-xs font-medium mb-1">Critérios</div>
+                    <div className="space-y-1.5">
+                      {Object.entries(analyzeMut.data.criterios).map(([k, v]) => (
+                        <div key={k} className="text-xs">
+                          <div className="flex justify-between">
+                            <span className="capitalize">{k}</span>
+                            <span><strong>{v.pontos}</strong>/{v.max}</span>
+                          </div>
+                          <div className="text-muted-foreground">{v.feedback}</div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {analyzeMut.data.pontos_fortes.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium mb-1 text-emerald-700 dark:text-emerald-400">Pontos fortes</div>
+                      <ul className="text-xs text-muted-foreground list-disc ml-5">
+                        {analyzeMut.data.pontos_fortes.map((p, i) => <li key={i}>{p}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  {analyzeMut.data.pontos_atencao.length > 0 && (
+                    <div>
+                      <div className="text-xs font-medium mb-1 text-amber-700 dark:text-amber-400">Atenção</div>
+                      <ul className="text-xs text-muted-foreground list-disc ml-5">
+                        {analyzeMut.data.pontos_atencao.map((p, i) => <li key={i}>{p}</li>)}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div>
+                    <div className="text-xs font-medium mb-1">Sugestão de melhoria</div>
+                    <pre className="whitespace-pre-wrap text-xs bg-muted/40 p-3 rounded font-sans">{analyzeMut.data.sugestao_melhoria}</pre>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Briefing</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Objetivo</Label>
+                  <Select value={objetivo} onValueChange={setObjetivo}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Agendar reunião">Agendar reunião</SelectItem>
+                      <SelectItem value="Convite p/ evento">Convite p/ evento</SelectItem>
+                      <SelectItem value="Nutrição">Nutrição</SelectItem>
+                      <SelectItem value="Reativação">Reativação</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Base-alvo</Label>
+                  <Select value={base} onValueChange={setBase}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {BASES_DISPONIVEIS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Tom</Label>
+                  <Select value={tom} onValueChange={setTom}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Direto e provocativo">Direto e provocativo</SelectItem>
+                      <SelectItem value="Consultivo e educativo">Consultivo e educativo</SelectItem>
+                      <SelectItem value="Urgente e oportuno">Urgente e oportuno</SelectItem>
+                      <SelectItem value="Empático e conversacional">Empático e conversacional</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Tamanho</Label>
+                  <Select value={tamanho} onValueChange={setTamanho}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Curto (até 400 caracteres)">Curto</SelectItem>
+                      <SelectItem value="Médio (400-800 caracteres)">Médio</SelectItem>
+                      <SelectItem value="Longo (800+ caracteres)">Longo</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Padrão preferido (opcional)</Label>
+                <Input value={padraoAlvo} onChange={(e) => setPadraoAlvo(e.target.value)} placeholder="ex: HOOK_PROVOCATIVO" />
+              </div>
+              <div>
+                <Label className="text-xs">Contexto adicional (opcional)</Label>
+                <Textarea value={contexto} onChange={(e) => setContexto(e.target.value)} placeholder="ex: Lançamento workshop dia 30/05, vagas limitadas" className="min-h-[80px] text-sm" />
+              </div>
+              <label className="flex items-center gap-2 text-xs cursor-pointer">
+                <input type="checkbox" checked={usarTop} onChange={(e) => setUsarTop(e.target.checked)} className="rounded" />
+                Usar como referência as 5 mensagens com mais respostas (últimos 90 dias)
+              </label>
+              <button
+                onClick={() => generateMut.mutate()}
+                disabled={generateMut.isPending}
+                className="w-full bg-primary text-primary-foreground rounded px-3 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-50 inline-flex items-center justify-center gap-2"
+              >
+                {generateMut.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Wand2 className="w-4 h-4" />}
+                Gerar 3 variações
+              </button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-base">Variações geradas</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {generateMut.isError && <div className="text-destructive text-sm">{generateMut.error.message}</div>}
+              {!generateMut.data && !generateMut.isPending && (
+                <div className="text-muted-foreground text-sm">Preencha o briefing ao lado e clique em <strong>Gerar 3 variações</strong>. Demora ~10-20s.</div>
+              )}
+              {generateMut.isPending && (
+                <div className="text-muted-foreground text-sm flex items-center gap-2"><Loader2 className="w-4 h-4 animate-spin" /> Gerando variações com Claude…</div>
+              )}
+              {generateMut.data && (
+                <div className="space-y-3">
+                  {generateMut.data.variacoes.map((v, i) => <VariacaoCard key={i} v={v} />)}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function VariacaoCard({ v }: { v: VariacaoCopy }) {
+  const [copied, setCopied] = useState(false);
+  return (
+    <div className="border rounded p-3 space-y-2">
+      <div className="flex justify-between items-start gap-2">
+        <div>
+          <div className="font-medium text-sm">{v.titulo}</div>
+          <Badge variant="outline" className="text-xs mt-0.5">{v.padrao}</Badge>
+        </div>
+        <button
+          onClick={() => { navigator.clipboard.writeText(v.copy); setCopied(true); setTimeout(() => setCopied(false), 1500); }}
+          className="p-1.5 hover:bg-muted rounded shrink-0"
+          title="Copiar"
+        >
+          {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+        </button>
+      </div>
+      <pre className="whitespace-pre-wrap text-xs bg-muted/40 p-2 rounded font-sans">{v.copy}</pre>
+      <div className="text-xs text-muted-foreground italic">{v.raciocinio}</div>
+    </div>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
 // Page
 // ────────────────────────────────────────────────────────────────────────
 
@@ -1132,6 +1436,9 @@ export default function GhlMarketing() {
           <TabsTrigger value="calendario" data-testid="tab-calendario">
             <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
           </TabsTrigger>
+          <TabsTrigger value="gerador" data-testid="tab-gerador">
+            <Sparkles className="w-4 h-4 mr-2" /> Gerador IA
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="email" className="mt-6">
@@ -1151,6 +1458,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="calendario" className="mt-6">
           <CalendarioTab />
+        </TabsContent>
+        <TabsContent value="gerador" className="mt-6">
+          <GeradorTab />
         </TabsContent>
       </Tabs>
     </div>
