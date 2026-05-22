@@ -66,6 +66,18 @@ export interface AdsMetrics {
   cliques: number;
   cpm: number;
   ctr: number;
+  ra?: number;
+  raMql?: number;
+  raNmql?: number;
+  rr?: number;
+  rrMql?: number;
+  rrNmql?: number;
+  cpra?: number | null;
+  cpraMql?: number | null;
+  cpraNmql?: number | null;
+  cprr?: number | null;
+  cprrMql?: number | null;
+  cprrNmql?: number | null;
   videoHook: number;
   videoHold: number;
   connectRate: number;
@@ -224,6 +236,8 @@ export const DEFAULT_ORCADO_ADS = {
   mqls: 0,
   cpl: 0,
   cpmql: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percMqls: 0,
 };
 
@@ -231,6 +245,8 @@ export const DEFAULT_ORCADO_META_ADS = {
   investimento: 0, cpm: 0, ctr: 0, videoHook: 0, videoHold: 0, videoP75: 0, videoP100: 0,
   visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -243,6 +259,8 @@ export const DEFAULT_ORCADO_GOOGLE_ADS = {
   investimento: 0, cpm: 0, ctr: 0,
   visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -261,6 +279,8 @@ export const DEFAULT_ORCADO_INSTAGRAM = {
   percEngajamento: 0, interacoes: 0, ctrAlcanceCliques: 0,
   ctrVisitasCliques: 0, cliquesLinkBio: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -274,6 +294,8 @@ export const DEFAULT_ORCADO_YOUTUBE = {
   ctrImpressoes: 0, retencaoMedia: 0, curtidas: 0, comentarios: 0,
   compartilhamentos: 0, videosPublicados: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -287,6 +309,8 @@ export const DEFAULT_ORCADO_LINKEDIN = {
   taxaEngajamento: 0, postsPublicados: 0, reacoes: 0, comentarios: 0,
   compartilhamentos: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -344,17 +368,23 @@ export const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }>
   mqls: { segment: 'ads', key: 'mqls' },
   cpl: { segment: 'ads', key: 'cpl' },
   cpmql: { segment: 'ads', key: 'cpmql' },
+  cpra: { segment: 'ads', key: 'cpra' },
+  cpra_mql: { segment: 'ads', key: 'cpraMql' },
+  cpra_nmql: { segment: 'ads', key: 'cpraNmql' },
+  cprr: { segment: 'ads', key: 'cprr' },
+  cprr_mql: { segment: 'ads', key: 'cprrMql' },
+  cprr_nmql: { segment: 'ads', key: 'cprrNmql' },
   perc_mqls: { segment: 'ads', key: 'percMqls' },
   // Meta Ads (platform-specific)
-  ...Object.fromEntries(['investimento','cpm','ctr','videoHook','videoHold','videoP75','videoP100','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`meta_${k}`, { segment: 'meta_ads', key: k }])),
+  ...Object.fromEntries(['investimento','cpm','ctr','videoHook','videoHold','videoP75','videoP100','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`meta_${k}`, { segment: 'meta_ads', key: k }])),
   // Google Ads (platform-specific)
-  ...Object.fromEntries(['investimento','cpm','ctr','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`gads_${k}`, { segment: 'google_ads', key: k }])),
+  ...Object.fromEntries(['investimento','cpm','ctr','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`gads_${k}`, { segment: 'google_ads', key: k }])),
   // Instagram (platform-specific)
-  ...Object.fromEntries(['comecaramSeguir','deixaramSeguir','percPerdaSeguidores','deltaSeguidores','totalSeguidores','percCrescimentoSeguidores','visualizacoesTotais','percVisualizacoesOrganicas','visualizacoesOrganicas','percVisualizacoesPagas','visualizacoesPagas','alcanceTotal','alcanceOrganico','alcancePago','frequenciaAlcance','ctrAlcanceVisitas','visitasPerfil','percEngajamento','interacoes','ctrAlcanceCliques','ctrVisitasCliques','cliquesLinkBio','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`ig_${k}`, { segment: 'instagram', key: k }])),
+  ...Object.fromEntries(['comecaramSeguir','deixaramSeguir','percPerdaSeguidores','deltaSeguidores','totalSeguidores','percCrescimentoSeguidores','visualizacoesTotais','percVisualizacoesOrganicas','visualizacoesOrganicas','percVisualizacoesPagas','visualizacoesPagas','alcanceTotal','alcanceOrganico','alcancePago','frequenciaAlcance','ctrAlcanceVisitas','visitasPerfil','percEngajamento','interacoes','ctrAlcanceCliques','ctrVisitasCliques','cliquesLinkBio','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`ig_${k}`, { segment: 'instagram', key: k }])),
   // YouTube (platform-specific)
-  ...Object.fromEntries(['inscritos','crescimentoInscritos','visualizacoes','horasAssistidas','ctrImpressoes','retencaoMedia','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`yt_${k}`, { segment: 'youtube', key: k }])),
+  ...Object.fromEntries(['inscritos','crescimentoInscritos','visualizacoes','horasAssistidas','ctrImpressoes','retencaoMedia','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`yt_${k}`, { segment: 'youtube', key: k }])),
   // LinkedIn (platform-specific)
-  ...Object.fromEntries(['seguidores','crescimentoSeguidores','impressoes','cliquesPost','taxaEngajamento','postsPublicados','reacoes','comentarios','compartilhamentos','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`li_${k}`, { segment: 'linkedin', key: k }])),
+  ...Object.fromEntries(['seguidores','crescimentoSeguidores','impressoes','cliquesPost','taxaEngajamento','postsPublicados','reacoes','comentarios','compartilhamentos','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`li_${k}`, { segment: 'linkedin', key: k }])),
 };
 
 // ===== Percent Metrics =====

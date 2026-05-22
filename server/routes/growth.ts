@@ -1152,6 +1152,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const cacUnico = clientesUnicos > 0 ? investimento / clientesUnicos : null;
           const contratos = deal.contratos;
           const cacContrato = contratos > 0 ? investimento / contratos : null;
+          // CPRA = invest / RA (rm), CPRR = invest / RR. Splits MQL/nMQL idem.
+          const cpra = investimento > 0 && rm > 0 ? investimento / rm : null;
+          const cpraMql = investimento > 0 && rmMql > 0 ? investimento / rmMql : null;
+          const cpraNmql = investimento > 0 && rmNmql > 0 ? investimento / rmNmql : null;
+          const cprr = investimento > 0 && rr > 0 ? investimento / rr : null;
+          const cprrMql = investimento > 0 && rrMql > 0 ? investimento / rrMql : null;
+          const cprrNmql = investimento > 0 && rrNmql > 0 ? investimento / rrNmql : null;
 
           // Determinar status baseado no effective_status (reflete estado real atual)
           let adStatus = row.ad_status || 'Desconhecido';
@@ -1180,6 +1187,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             cpl: cpl ? Math.round(cpl) : null,
             mql: mqls,
             cpmql: cpmql ? parseFloat(cpmql.toFixed(2)) : null,
+            cpra: cpra !== null ? Math.round(cpra) : null,
+            cpraMql: cpraMql !== null ? Math.round(cpraMql) : null,
+            cpraNmql: cpraNmql !== null ? Math.round(cpraNmql) : null,
+            cprr: cprr !== null ? Math.round(cprr) : null,
+            cprrMql: cprrMql !== null ? Math.round(cprrMql) : null,
+            cprrNmql: cprrNmql !== null ? Math.round(cprrNmql) : null,
             percMql,
             descartadoPerc,
             descartadoMqlPerc,
@@ -1552,6 +1565,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             mqls,
             cpl: investimento !== null && investimento > 0 && leads > 0 ? Math.round(investimento / leads) : null,
             cpmql: investimento !== null && investimento > 0 && mqls > 0 ? Math.round(investimento / mqls) : null,
+            cpra: investimento !== null && investimento > 0 && ra > 0 ? Math.round(investimento / ra) : null,
+            cprr: investimento !== null && investimento > 0 && rr > 0 ? Math.round(investimento / rr) : null,
             percMql: leads > 0 ? parseFloat(((mqls / leads) * 100).toFixed(1)) : null,
             percRa: leads > 0 ? parseFloat(((ra / leads) * 100).toFixed(1)) : null,
             percRaMql: mqls > 0 ? parseFloat(((raMql / mqls) * 100).toFixed(1)) : null,
@@ -2619,6 +2634,43 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const leads = parseInt(leadsRow.total_leads) || 0;
       const mqls = parseInt(leadsRow.total_mqls) || 0;
 
+      // RA por data_reuniao_agendada e RR por data_reuniao_realizada (event-time).
+      // Necessário pra calcular CPRA = investimento/RA e CPRR = investimento/RR.
+      const raResult = await db.execute(sql`
+        SELECT
+          COUNT(*) as total_ra,
+          COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as ra_mql,
+          COUNT(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 END) as ra_nmql
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_reuniao_agendada IS NOT NULL
+          AND d.data_reuniao_agendada::date >= ${startDate}::date
+          AND d.data_reuniao_agendada::date <= ${endDate}::date
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          ${funilFilter}
+          ${utmSourceFilter}
+      `);
+      const rrResult = await db.execute(sql`
+        SELECT
+          COUNT(*) as total_rr,
+          COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as rr_mql,
+          COUNT(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 END) as rr_nmql
+        FROM "Bitrix".crm_deal d
+        WHERE d.data_reuniao_realizada IS NOT NULL
+          AND d.data_reuniao_realizada::date >= ${startDate}::date
+          AND d.data_reuniao_realizada::date <= ${endDate}::date
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          ${funilFilter}
+          ${utmSourceFilter}
+      `);
+      const raRow = raResult.rows[0] as any;
+      const rrRow = rrResult.rows[0] as any;
+      const ra = parseInt(raRow.total_ra) || 0;
+      const raMql = parseInt(raRow.ra_mql) || 0;
+      const raNmql = parseInt(raRow.ra_nmql) || 0;
+      const rr = parseInt(rrRow.total_rr) || 0;
+      const rrMql = parseInt(rrRow.rr_mql) || 0;
+      const rrNmql = parseInt(rrRow.rr_nmql) || 0;
+
       // Quando o filtro é EXATAMENTE Instagram (sozinho), não atribuímos investimento
       // pago à plataforma — gasto agregado fica na seção "Meta Ads". Visualizações/Alcance
       // pagos do IG continuam aparecendo nos cards específicos do Instagram.
@@ -2637,6 +2689,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpl = onlyInstagram ? 0 : (leads > 0 ? investimento / leads : 0);
       const cpmql = onlyInstagram ? 0 : (mqls > 0 ? investimento / mqls : 0);
       const percMqls = leads > 0 ? (mqls / leads) : 0;
+      // CPRA = invest / RA; CPRR = invest / RR. Null quando RA/RR=0 ou invest=0.
+      const cpra = onlyInstagram || ra === 0 || investimento === 0 ? null : investimento / ra;
+      const cpraMql = onlyInstagram || raMql === 0 || investimento === 0 ? null : investimento / raMql;
+      const cpraNmql = onlyInstagram || raNmql === 0 || investimento === 0 ? null : investimento / raNmql;
+      const cprr = onlyInstagram || rr === 0 || investimento === 0 ? null : investimento / rr;
+      const cprrMql = onlyInstagram || rrMql === 0 || investimento === 0 ? null : investimento / rrMql;
+      const cprrNmql = onlyInstagram || rrNmql === 0 || investimento === 0 ? null : investimento / rrNmql;
 
       res.json({
         investimento: investimentoExposto,
@@ -2655,6 +2714,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cpl,
         cpmql,
         percMqls,
+        ra, raMql, raNmql,
+        rr, rrMql, rrNmql,
+        cpra, cpraMql, cpraNmql,
+        cprr, cprrMql, cprrNmql,
       });
     } catch (error) {
       console.error("[api] Error fetching Ads metrics:", error);
@@ -3176,6 +3239,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
         result[platKey] = {
           leads, mqls,
+          ra, raMql, raNmql,
+          rr, rrMql, rrNmql,
           cpl: null, // Will be calculated on frontend with platform investimento
           cpmql: null,
           percMqls: leads > 0 ? mqls / leads : 0,

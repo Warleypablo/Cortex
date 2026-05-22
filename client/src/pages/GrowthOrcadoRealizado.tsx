@@ -100,6 +100,18 @@ interface AdsMetrics {
   cpl: number;
   cpmql: number;
   percMqls: number;
+  ra?: number;
+  raMql?: number;
+  raNmql?: number;
+  rr?: number;
+  rrMql?: number;
+  rrNmql?: number;
+  cpra?: number | null;
+  cpraMql?: number | null;
+  cpraNmql?: number | null;
+  cprr?: number | null;
+  cprrMql?: number | null;
+  cprrNmql?: number | null;
 }
 
 function formatValue(value: number | string | null, format: 'currency' | 'number' | 'percent'): string {
@@ -1098,6 +1110,8 @@ export default function GrowthOrcadoRealizado() {
 
   interface PlatformFunnelData {
     leads: number; mqls: number; cpl: number | null; cpmql: number | null; percMqls: number;
+    ra: number; raMql: number; raNmql: number;
+    rr: number; rrMql: number; rrNmql: number;
     percRa: number; percRaMql: number; percRaNmql: number;
     percRr: number; percRrMql: number; percRrNmql: number;
     percRrVendas: number; percRrMqlVendas: number; percRrNmqlVendas: number;
@@ -1385,6 +1399,12 @@ export default function GrowthOrcadoRealizado() {
       { id: 'mqls', name: 'MQLs', type: 'formula', orcado: ORCADO_ADS.mqls, realizado: data.mqls ?? 0, percentual: calcPercentual(ORCADO_ADS.mqls, data.mqls), format: 'number' },
       { id: 'cpl', name: 'CPL', type: 'formula', orcado: ORCADO_ADS.cpl, realizado: data.cpl ?? null, percentual: calcPercentual(ORCADO_ADS.cpl, data.cpl), format: 'currency' },
       { id: 'cpmql', name: 'CPMQL', type: 'formula', orcado: ORCADO_ADS.cpmql, realizado: data.cpmql ?? null, percentual: calcPercentual(ORCADO_ADS.cpmql, data.cpmql), format: 'currency' },
+      { id: 'cpra', name: 'CPRA', type: 'formula', orcado: ORCADO_ADS.cpra, realizado: data.cpra ?? null, percentual: calcPercentual(ORCADO_ADS.cpra, data.cpra ?? null), format: 'currency' },
+      { id: 'cpra_mql', name: 'CPRA MQL', type: 'formula', orcado: ORCADO_ADS.cpraMql, realizado: data.cpraMql ?? null, percentual: calcPercentual(ORCADO_ADS.cpraMql, data.cpraMql ?? null), format: 'currency' },
+      { id: 'cpra_nmql', name: 'CPRA nMQL', type: 'formula', orcado: ORCADO_ADS.cpraNmql, realizado: data.cpraNmql ?? null, percentual: calcPercentual(ORCADO_ADS.cpraNmql, data.cpraNmql ?? null), format: 'currency' },
+      { id: 'cprr', name: 'CPRR', type: 'formula', orcado: ORCADO_ADS.cprr, realizado: data.cprr ?? null, percentual: calcPercentual(ORCADO_ADS.cprr, data.cprr ?? null), format: 'currency' },
+      { id: 'cprr_mql', name: 'CPRR MQL', type: 'formula', orcado: ORCADO_ADS.cprrMql, realizado: data.cprrMql ?? null, percentual: calcPercentual(ORCADO_ADS.cprrMql, data.cprrMql ?? null), format: 'currency' },
+      { id: 'cprr_nmql', name: 'CPRR nMQL', type: 'formula', orcado: ORCADO_ADS.cprrNmql, realizado: data.cprrNmql ?? null, percentual: calcPercentual(ORCADO_ADS.cprrNmql, data.cprrNmql ?? null), format: 'currency' },
       { id: 'perc_mqls', name: '% MQLs', type: 'formula', orcado: ORCADO_ADS.percMqls, realizado: data.percMqls ?? null, percentual: calcPercentual(ORCADO_ADS.percMqls, data.percMqls), format: 'percent' },
     ];
 
@@ -1407,13 +1427,30 @@ export default function GrowthOrcadoRealizado() {
   // Helper: build lead/MQL metrics for a platform (rest of funnel comes from MQL/NMQL/Total sections)
   const buildFunnelMetrics = (prefix: string, funnel: PlatformFunnelData | undefined, orcado: any, investimento: number | null): Metric[] => {
     const f = funnel || {} as PlatformFunnelData;
-    const cpl = investimento !== null && investimento > 0 && (f.leads || 0) > 0 ? investimento / f.leads : null;
-    const cpmql = investimento !== null && investimento > 0 && (f.mqls || 0) > 0 ? investimento / f.mqls : null;
+    const invest = investimento !== null && investimento > 0 ? investimento : 0;
+    const cpl = invest > 0 && (f.leads || 0) > 0 ? invest / f.leads : null;
+    const cpmql = invest > 0 && (f.mqls || 0) > 0 ? invest / f.mqls : null;
+    // Funnel `ra` e `rr` vêm via /funnel-by-platform (created_at). Splits MQL/nMQL
+    // já são inferíveis a partir de ra/mqls. Mas pra CPRA/CPRR de MQL/nMQL
+    // específicos precisaria do split por estágio MQL — temos f.percRaMql etc.
+    // Conservador: ra = ra_total da plataforma, então CPRA aqui é geral.
+    const cpra = invest > 0 && (f.ra || 0) > 0 ? invest / f.ra : null;
+    const cpraMql = invest > 0 && (f.raMql || 0) > 0 ? invest / f.raMql : null;
+    const cpraNmql = invest > 0 && (f.raNmql || 0) > 0 ? invest / f.raNmql : null;
+    const cprr = invest > 0 && (f.rr || 0) > 0 ? invest / f.rr : null;
+    const cprrMql = invest > 0 && (f.rrMql || 0) > 0 ? invest / f.rrMql : null;
+    const cprrNmql = invest > 0 && (f.rrNmql || 0) > 0 ? invest / f.rrNmql : null;
     return [
       { id: `${prefix}_leads`, name: 'Leads', type: 'formula', orcado: orcado.leads, realizado: f.leads ?? 0, percentual: calcPercentual(orcado.leads, f.leads), format: 'number' },
       { id: `${prefix}_mqls`, name: 'MQLs', type: 'formula', orcado: orcado.mqls, realizado: f.mqls ?? 0, percentual: calcPercentual(orcado.mqls, f.mqls), format: 'number' },
       { id: `${prefix}_cpl`, name: 'CPL', type: 'formula', orcado: orcado.cpl, realizado: cpl, percentual: calcPercentual(orcado.cpl, cpl), format: 'currency' },
       { id: `${prefix}_cpmql`, name: 'CPMQL', type: 'formula', orcado: orcado.cpmql, realizado: cpmql, percentual: calcPercentual(orcado.cpmql, cpmql), format: 'currency' },
+      { id: `${prefix}_cpra`, name: 'CPRA', type: 'formula', orcado: orcado.cpra, realizado: cpra, percentual: calcPercentual(orcado.cpra, cpra), format: 'currency' },
+      { id: `${prefix}_cpraMql`, name: 'CPRA MQL', type: 'formula', orcado: orcado.cpraMql, realizado: cpraMql, percentual: calcPercentual(orcado.cpraMql, cpraMql), format: 'currency' },
+      { id: `${prefix}_cpraNmql`, name: 'CPRA nMQL', type: 'formula', orcado: orcado.cpraNmql, realizado: cpraNmql, percentual: calcPercentual(orcado.cpraNmql, cpraNmql), format: 'currency' },
+      { id: `${prefix}_cprr`, name: 'CPRR', type: 'formula', orcado: orcado.cprr, realizado: cprr, percentual: calcPercentual(orcado.cprr, cprr), format: 'currency' },
+      { id: `${prefix}_cprrMql`, name: 'CPRR MQL', type: 'formula', orcado: orcado.cprrMql, realizado: cprrMql, percentual: calcPercentual(orcado.cprrMql, cprrMql), format: 'currency' },
+      { id: `${prefix}_cprrNmql`, name: 'CPRR nMQL', type: 'formula', orcado: orcado.cprrNmql, realizado: cprrNmql, percentual: calcPercentual(orcado.cprrNmql, cprrNmql), format: 'currency' },
       { id: `${prefix}_percMqls`, name: '% MQLs', type: 'formula', orcado: orcado.percMqls, realizado: f.percMqls ?? null, percentual: calcPercentual(orcado.percMqls, f.percMqls), format: 'percent' },
     ];
   };
@@ -1812,7 +1849,9 @@ export default function GrowthOrcadoRealizado() {
     return [
       { id: 'total_perc_ra', name: '% RA', type: 'formula', orcado: ORCADO_TOTAL.percRA, realizado: percRA, percentual: calcPercentual(ORCADO_TOTAL.percRA, percRA), format: 'percent' },
       { id: 'total_ra', name: 'RA', type: 'formula', orcado: ORCADO_TOTAL.reunioesAgendadas, realizado: totalReunioesAgendadas, percentual: calcPercentual(ORCADO_TOTAL.reunioesAgendadas, totalReunioesAgendadas), format: 'number' },
+      { id: 'total_cpra', name: 'CPRA', type: 'formula', orcado: null, realizado: investimento > 0 && totalReunioesAgendadas > 0 ? investimento / totalReunioesAgendadas : null, percentual: null, format: 'currency' },
       { id: 'total_rr', name: 'RR', type: 'formula', orcado: ORCADO_TOTAL.reunioesRealizadas, realizado: totalReunioesRealizadas, percentual: calcPercentual(ORCADO_TOTAL.reunioesRealizadas, totalReunioesRealizadas), format: 'number' },
+      { id: 'total_cprr', name: 'CPRR', type: 'formula', orcado: null, realizado: investimento > 0 && totalReunioesRealizadas > 0 ? investimento / totalReunioesRealizadas : null, percentual: null, format: 'currency' },
       { id: 'total_noshow', name: 'No show', type: 'formula', orcado: ORCADO_TOTAL.percNoShow, realizado: percNoShowReal, percentual: calcPercentual(ORCADO_TOTAL.percNoShow, percNoShowReal), format: 'percent' },
       { id: 'total_perc_rr', name: '% RR', type: 'formula', orcado: ORCADO_TOTAL.percRr ?? null, realizado: totalLeads > 0 ? totalReunioesRealizadas / totalLeads : null, percentual: calcPercentual(ORCADO_TOTAL.percRr ?? null, totalLeads > 0 ? totalReunioesRealizadas / totalLeads : null), format: 'percent' },
       { id: 'total_conv_rrv', name: 'RR→V%', type: 'formula', orcado: ORCADO_TOTAL.percConversaoRRV, realizado: percConversaoRRV, percentual: calcPercentual(ORCADO_TOTAL.percConversaoRRV, percConversaoRRV), format: 'percent' },

@@ -27,6 +27,8 @@ interface PlatformData {
   mqls: number;
   cpl: number | null;
   cpmql: number | null;
+  cpra: number | null;
+  cprr: number | null;
   percMql: number | null;
   percRa: number | null;
   percRaMql: number | null;
@@ -128,6 +130,8 @@ function aggregateRows(rows: PlatformData[]): PlatformData {
     mqls,
     cpl: investimento !== null && investimento > 0 && leads > 0 ? Math.round(investimento / leads) : null,
     cpmql: investimento !== null && investimento > 0 && mqls > 0 ? Math.round(investimento / mqls) : null,
+    cpra: investimento !== null && investimento > 0 && raTotal > 0 ? Math.round(investimento / raTotal) : null,
+    cprr: investimento !== null && investimento > 0 && rrTotal > 0 ? Math.round(investimento / rrTotal) : null,
     percMql: leads > 0 ? parseFloat(((mqls / leads) * 100).toFixed(1)) : null,
     percRa: leads > 0 && raTotal > 0 ? parseFloat(((raTotal / leads) * 100).toFixed(1)) : null,
     percRaMql: avgNonNull('percRaMql'),
@@ -421,6 +425,8 @@ export default function PerformancePlataformas() {
       {renderCell(row.mqls, comp?.mqls ?? null, 'mqls', formatNumber)}
       {renderCell(row.cpl, comp?.cpl ?? null, 'cpl', formatCurrency, getCellClassName('cpl', row.cpl), true)}
       {renderCell(row.cpmql, comp?.cpmql ?? null, 'cpmql', formatCurrency, getCellClassName('cpmql', row.cpmql), true)}
+      {renderCell(row.cpra, comp?.cpra ?? null, 'cpra', formatCurrency, getCellClassName('cpmql', row.cpra), true)}
+      {renderCell(row.cprr, comp?.cprr ?? null, 'cprr', formatCurrency, getCellClassName('cpmql', row.cprr), true)}
       {renderCell(row.percMql, comp?.percMql ?? null, 'percMql', formatPercent, getCellClassName('percMql', row.percMql))}
       {/* RA % (grupo expansível) */}
       {renderCell(row.percRa, comp?.percRa ?? null, 'percRa', formatPercent, getCellClassName('percRa', row.percRa))}
@@ -520,6 +526,8 @@ export default function PerformancePlataformas() {
                     <SortableHeader column="mqls" label="MQLs" />
                     <SortableHeader column="cpl" label="CPL" />
                     <SortableHeader column="cpmql" label="CPMQL" />
+                    <SortableHeader column="cpra" label="CPRA" />
+                    <SortableHeader column="cprr" label="CPRR" />
                     <SortableHeader column="percMql" label="%MQLs" />
                     <GroupableHeader group="ra" label="RA %" column="percRa">
                       <SortableHeader column="percRaMql" label="RA MQL %" />

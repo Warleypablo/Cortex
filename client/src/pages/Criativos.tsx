@@ -40,6 +40,12 @@ interface CriativoData {
   cpl: number | null;
   mql: number;
   cpmql: number | null;
+  cpra: number | null;
+  cpraMql: number | null;
+  cpraNmql: number | null;
+  cprr: number | null;
+  cprrMql: number | null;
+  cprrNmql: number | null;
   percMql: number | null;
   descartadoPerc: number | null;
   descartadoMqlPerc: number | null;
@@ -429,6 +435,12 @@ export default function Criativos() {
       cpl: avg('cpl'),
       mql: totalMql,
       cpmql: avg('cpmql'),
+      cpra: avg('cpra'),
+      cpraMql: avg('cpraMql'),
+      cpraNmql: avg('cpraNmql'),
+      cprr: avg('cprr'),
+      cprrMql: avg('cprrMql'),
+      cprrNmql: avg('cprrNmql'),
       percMql: avg('percMql'),
       percRa: avg('percRa'),
       percRaMql: avg('percRaMql'),
@@ -858,9 +870,17 @@ export default function Criativos() {
                         <SortableHeader column="percRaMql" label="RA MQL %" />
                         <SortableHeader column="percRaNmql" label="RA NMQL %" />
                       </GroupableHeader>
+                      <GroupableHeader group="cpra" label="CPRA" column="cpra">
+                        <SortableHeader column="cpraMql" label="CPRA MQL" />
+                        <SortableHeader column="cpraNmql" label="CPRA NMQL" />
+                      </GroupableHeader>
                       <GroupableHeader group="rr" label="RR %" column="percRr">
                         <SortableHeader column="percRrMql" label="RR MQL %" />
                         <SortableHeader column="percRrNmql" label="RR NMQL %" />
+                      </GroupableHeader>
+                      <GroupableHeader group="cprr" label="CPRR" column="cprr">
+                        <SortableHeader column="cprrMql" label="CPRR MQL" />
+                        <SortableHeader column="cprrNmql" label="CPRR NMQL" />
                       </GroupableHeader>
                       <GroupableHeader group="rrv" label="RR→V %" column="percRrVendas">
                         <SortableHeader column="percRrMqlVendas" label="RR MQL→V %" />
@@ -911,8 +931,12 @@ export default function Criativos() {
                               {expandedGroups.has('desc') && <>{avgCell('-', 'descartadoMqlPerc')}{avgCell('-', 'descartadoNmqlPerc')}</>}
                               {avgCell(formatPercent(averages.percRa), 'percRa')}
                               {expandedGroups.has('ra') && <>{avgCell(formatPercent(averages.percRaMql), 'percRaMql')}{avgCell(formatPercent(averages.percRaNmql), 'percRaNmql')}</>}
+                              {avgCell(formatCurrency(averages.cpra), 'cpra')}
+                              {expandedGroups.has('cpra') && <>{avgCell(formatCurrency(averages.cpraMql), 'cpraMql')}{avgCell(formatCurrency(averages.cpraNmql), 'cpraNmql')}</>}
                               {avgCell(formatPercent(averages.percRr), 'percRr')}
                               {expandedGroups.has('rr') && <>{avgCell(formatPercent(averages.percRrMql), 'percRrMql')}{avgCell(formatPercent(averages.percRrNmql), 'percRrNmql')}</>}
+                              {avgCell(formatCurrency(averages.cprr), 'cprr')}
+                              {expandedGroups.has('cprr') && <>{avgCell(formatCurrency(averages.cprrMql), 'cprrMql')}{avgCell(formatCurrency(averages.cprrNmql), 'cprrNmql')}</>}
                               {avgCell(formatPercent(averages.percRrVendas), 'percRrVendas')}
                               {expandedGroups.has('rrv') && <>{avgCell(formatPercent(averages.percRrMqlVendas), 'percRrMqlVendas')}{avgCell(formatPercent(averages.percRrNmqlVendas), 'percRrNmqlVendas')}</>}
                               {avgCell(formatNumber(averages.clientesUnicos), 'clientesUnicos')}
@@ -985,12 +1009,28 @@ export default function Criativos() {
                                   {renderCell(item.percRaNmql, c?.percRaNmql ?? null, 'percRaNmql', formatPercent, getCellColor(item.percRaNmql, 'percRaNmql'))}
                                 </>
                               )}
+                              {/* CPRA (grupo) */}
+                              {renderCell(item.cpra, c?.cpra ?? null, 'cpra', formatCurrency, getCellColor(item.cpra, 'cpmql'), true)}
+                              {expandedGroups.has('cpra') && (
+                                <>
+                                  {renderCell(item.cpraMql, c?.cpraMql ?? null, 'cpraMql', formatCurrency, getCellColor(item.cpraMql, 'cpmql'), true)}
+                                  {renderCell(item.cpraNmql, c?.cpraNmql ?? null, 'cpraNmql', formatCurrency, getCellColor(item.cpraNmql, 'cpmql'), true)}
+                                </>
+                              )}
                               {/* RR % (grupo) */}
                               {renderCell(item.percRr, c?.percRr ?? null, 'percRr', formatPercent, getCellColor(item.percRr, 'percRr'))}
                               {expandedGroups.has('rr') && (
                                 <>
                                   {renderCell(item.percRrMql, c?.percRrMql ?? null, 'percRrMql', formatPercent, getCellColor(item.percRrMql, 'percRrMql'))}
                                   {renderCell(item.percRrNmql, c?.percRrNmql ?? null, 'percRrNmql', formatPercent, getCellColor(item.percRrNmql, 'percRrNmql'))}
+                                </>
+                              )}
+                              {/* CPRR (grupo) */}
+                              {renderCell(item.cprr, c?.cprr ?? null, 'cprr', formatCurrency, getCellColor(item.cprr, 'cpmql'), true)}
+                              {expandedGroups.has('cprr') && (
+                                <>
+                                  {renderCell(item.cprrMql, c?.cprrMql ?? null, 'cprrMql', formatCurrency, getCellColor(item.cprrMql, 'cpmql'), true)}
+                                  {renderCell(item.cprrNmql, c?.cprrNmql ?? null, 'cprrNmql', formatCurrency, getCellColor(item.cprrNmql, 'cpmql'), true)}
                                 </>
                               )}
                               {/* RR→V % (grupo) */}
