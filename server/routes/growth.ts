@@ -63,6 +63,36 @@ const FUNNEL_ALIASES: Record<string, string[]> = {
   'ecommerce': ['Ecommerce', 'E-commerce', 'ecommerce'],
 };
 
+/**
+ * Constrói um filtro SQL pra utm_source/plataforma consistente com PLATFORM_CASE_SQL_BASIC.
+ *
+ * Diferente do filtro estrito `LOWER(utm_source) LIKE 'instagram%'`, este filtro:
+ *   - Para `instagram`: também aceita source='WEB' (Contato IG), source='UC_4VCKGM'
+ *     (Social Selling IG), utm_term='linktree', utm_campaign+content='linktree' (legado).
+ *   - Para outras plataformas: mantém o LIKE 'platform%' (já cobre 'facebook', 'fb_ads', etc).
+ *
+ * Usa o alias da tabela `d` (todos os endpoints chamadores já fazem FROM "Bitrix".crm_deal d).
+ */
+function buildPlatformFilterSql(utmValues: string[]) {
+  if (utmValues.length === 0) return sql``;
+  const expressions = utmValues.map((v) => {
+    if (v === 'instagram') {
+      return sql`(
+        LOWER(d.utm_source) LIKE 'instagram%'
+        OR LOWER(d.utm_source) = 'ig'
+        OR d.source IN ('WEB', 'UC_4VCKGM')
+        OR LOWER(TRIM(COALESCE(d.utm_term, ''))) = 'linktree'
+        OR (
+          LOWER(TRIM(COALESCE(d.utm_campaign, ''))) = 'linktree'
+          AND LOWER(TRIM(COALESCE(d.utm_content, ''))) = 'linktree'
+        )
+      )`;
+    }
+    return sql`LOWER(d.utm_source) LIKE ${v + '%'}`;
+  });
+  return sql`AND (${sql.join(expressions, sql` OR `)})`;
+}
+
 // Expand funnel values: if a normalized name has aliases, expand to all variants
 function expandFunilValues(values: string[]): string[] {
   const expanded: string[] = [];
@@ -1393,6 +1423,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const MQL_COND = `(mql::text = '1' OR LOWER(mql::text) = 'true')`;
       const NMQL_COND = `NOT (mql::text = '1' OR LOWER(mql::text) = 'true')`;
 
+      // Janela temporal por métrica (alinhada com /mql e /nao-mql do top card):
+      //   - Leads, MQLs, RA, RR → created_at no período
+      //   - Negócio Ganho, Receita, Contratos → data_fechamento no período
+      // Duas queries separadas, mergidas em JS por platform.
+
       const dealsResult = await db.execute(sql.raw(`
         SELECT
           ${platformCaseExpr} as platform,
@@ -1403,7 +1438,17 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as ra_nmql,
           SUM(CASE WHEN data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
           SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${MQL_COND} THEN 1 ELSE 0 END) as rr_mql,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql
+        FROM "Bitrix".crm_deal
+        WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+        GROUP BY platform
+      `));
+
+      // Query 1b: wins/receita/contratos por data_fechamento
+      const winsResult = await db.execute(sql.raw(`
+        SELECT
+          ${platformCaseExpr} as platform,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${MQL_COND} THEN 1 ELSE 0 END) as vendas_mql,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${NMQL_COND} THEN 1 ELSE 0 END) as vendas_nmql,
@@ -1415,10 +1460,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(produtos, '[', ''), ']', ''), ','), 1), 1) END
           ELSE 0 END) as contratos
         FROM "Bitrix".crm_deal
-        WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
+        WHERE data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
+          AND stage_name = 'Negócio Ganho'
           AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
         GROUP BY platform
       `));
+      const winsMapPerf = new Map<string, any>();
+      for (const row of winsResult.rows as any[]) winsMapPerf.set(row.platform, row);
 
       // Query 2: Lead time por plataforma
       const leadTimeResult = await db.execute(sql.raw(`
@@ -1440,23 +1488,32 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // Criar mapas de dados CRM
       const crmDataMap = new Map<string, any>();
-      for (const row of dealsResult.rows as any[]) {
-        crmDataMap.set(row.platform, {
-          leads: parseInt(row.leads) || 0,
-          mqls: parseInt(row.mqls) || 0,
-          ra: parseInt(row.ra) || 0,
-          raMql: parseInt(row.ra_mql) || 0,
-          raNmql: parseInt(row.ra_nmql) || 0,
-          rr: parseInt(row.rr) || 0,
-          rrMql: parseInt(row.rr_mql) || 0,
-          rrNmql: parseInt(row.rr_nmql) || 0,
-          vendas: parseInt(row.vendas) || 0,
-          vendasMql: parseInt(row.vendas_mql) || 0,
-          vendasNmql: parseInt(row.vendas_nmql) || 0,
-          clientesUnicos: parseInt(row.clientes_unicos) || 0,
-          receitaPontual: parseFloat(row.receita_pontual) || 0,
-          receitaRecorrente: parseFloat(row.receita_recorrente) || 0,
-          contratos: parseInt(row.contratos) || 0,
+      // Coletar todas as plataformas que apareceram em qualquer das duas queries
+      const allPlatforms = new Set<string>([
+        ...(dealsResult.rows as any[]).map(r => r.platform),
+        ...(winsResult.rows as any[]).map(r => r.platform),
+      ]);
+      const dealsRowMap = new Map<string, any>();
+      for (const row of dealsResult.rows as any[]) dealsRowMap.set(row.platform, row);
+      for (const platform of allPlatforms) {
+        const row = dealsRowMap.get(platform);
+        const won = winsMapPerf.get(platform);
+        crmDataMap.set(platform, {
+          leads: row ? parseInt(row.leads) || 0 : 0,
+          mqls: row ? parseInt(row.mqls) || 0 : 0,
+          ra: row ? parseInt(row.ra) || 0 : 0,
+          raMql: row ? parseInt(row.ra_mql) || 0 : 0,
+          raNmql: row ? parseInt(row.ra_nmql) || 0 : 0,
+          rr: row ? parseInt(row.rr) || 0 : 0,
+          rrMql: row ? parseInt(row.rr_mql) || 0 : 0,
+          rrNmql: row ? parseInt(row.rr_nmql) || 0 : 0,
+          vendas: won ? parseInt(won.vendas) || 0 : 0,
+          vendasMql: won ? parseInt(won.vendas_mql) || 0 : 0,
+          vendasNmql: won ? parseInt(won.vendas_nmql) || 0 : 0,
+          clientesUnicos: won ? parseInt(won.clientes_unicos) || 0 : 0,
+          receitaPontual: won ? parseFloat(won.receita_pontual) || 0 : 0,
+          receitaRecorrente: won ? parseFloat(won.receita_recorrente) || 0 : 0,
+          contratos: won ? parseInt(won.contratos) || 0 : 0,
         });
       }
 
@@ -1986,16 +2043,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      // UTM Source filter (supports comma-separated values for multi-platform)
+      // UTM Source filter — usa buildPlatformFilterSql pra incluir Contato IG / Social Selling
+      // quando 'instagram' for selecionado (consistente com PLATFORM_CASE_SQL_BASIC).
       const utmSourceParam = req.query.utmSource as string | undefined;
       let utmSourceFilter = sql``;
       if (utmSourceParam && utmSourceParam !== 'todos') {
         const utmValues = utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
-        if (utmValues.length === 1) {
-          utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
-        } else if (utmValues.length > 1) {
-          utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
-        }
+        utmSourceFilter = buildPlatformFilterSql(utmValues);
       }
 
       // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
@@ -2188,16 +2242,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      // UTM Source filter (supports comma-separated values for multi-platform)
+      // UTM Source filter — usa buildPlatformFilterSql pra incluir Contato IG / Social Selling
+      // quando 'instagram' for selecionado (consistente com PLATFORM_CASE_SQL_BASIC).
       const utmSourceParam = req.query.utmSource as string | undefined;
       let utmSourceFilter = sql``;
       if (utmSourceParam && utmSourceParam !== 'todos') {
         const utmValues = utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean);
-        if (utmValues.length === 1) {
-          utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
-        } else if (utmValues.length > 1) {
-          utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
-        }
+        utmSourceFilter = buildPlatformFilterSql(utmValues);
       }
 
       // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
@@ -2930,6 +2981,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         frequenciaAlcance: 0, ctrAlcanceVisitas: 0, visitasPerfil: 0,
         percEngajamento: 0, interacoes: 0, ctrAlcanceCliques: 0,
         ctrVisitasCliques: 0, cliquesLinkBio: 0,
+        leadsPorOrigem: [] as Array<{ origem: string; label: string; leads: number; mqls: number; negocioGanho: number; receita: number }>,
         investimentoPago: 0,
       };
       if (connections.rows.length === 0) {
@@ -3055,6 +3107,104 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctrAlcanceCliques = alcanceTotalAjustado > 0 ? cliquesLinkBio / alcanceTotalAjustado : 0;
       const ctrVisitasCliques = visitasPerfil > 0 ? cliquesLinkBio / visitasPerfil : 0;
 
+      // Breakdown de leads/MQLs/vendas por sub-origem dentro do canal Instagram.
+      // Buckets:
+      //   - linktree: utm_term='linktree' OU utm_campaign+content='linktree' (legado).
+      //     Captura também leads com utm_source=facebook que vieram pelo Linktree
+      //     (bug de marcação conhecido em LPs pages.turbopartners.com.br).
+      //   - contato_instagram: source='WEB' (formulário "Contato - Instagram" no Bitrix).
+      //   - social_selling: source='UC_4VCKGM' (trabalho ativo do SDR no DM do IG).
+      //   - outros: catch-all (utm_source LIKE %instagram% sem se encaixar acima).
+      //
+      // Janela temporal por métrica (consistente com o top card do dashboard):
+      //   - Leads e MQLs → created_at no período (lead entrou no funil)
+      //   - Negócio Ganho e Receita → data_fechamento no período (venda fechou)
+      // Por isso são duas queries separadas, mergidas em JS por origem.
+      const igOrigemExpr = `CASE
+        WHEN source = 'UC_4VCKGM' THEN 'social_selling'
+        WHEN source = 'WEB' THEN 'contato_instagram'
+        WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'linktree'
+        WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree'
+             AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'linktree'
+        ELSE 'outros'
+      END`;
+      const igOrigemMatchFilter = `(
+        source IN ('UC_4VCKGM','WEB')
+        OR LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree'
+        OR (
+          LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree'
+          AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree'
+        )
+        OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%'
+        OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig'
+      )`;
+      let leadsPorOrigem: Array<{
+        origem: string;
+        label: string;
+        leads: number;
+        mqls: number;
+        negocioGanho: number;
+        receita: number;
+      }> = [];
+      try {
+        // Query 1: leads + MQLs por created_at
+        const leadsResult = await db.execute(sql.raw(`
+          SELECT
+            ${igOrigemExpr} AS origem,
+            COUNT(*) AS leads,
+            SUM(CASE WHEN (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) AS mqls
+          FROM "Bitrix".crm_deal
+          WHERE created_at >= '${startDate}'::date
+            AND created_at <= '${endDate}'::date + INTERVAL '1 day'
+            AND source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM')
+            AND ${igOrigemMatchFilter}
+          GROUP BY origem
+        `));
+        // Query 2: negócios ganhos + receita por data_fechamento
+        const wonResult = await db.execute(sql.raw(`
+          SELECT
+            ${igOrigemExpr} AS origem,
+            SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) AS negocio_ganho,
+            SUM(CASE WHEN stage_name = 'Negócio Ganho'
+                     THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0)
+                     ELSE 0 END) AS receita
+          FROM "Bitrix".crm_deal
+          WHERE data_fechamento >= '${startDate}'::date
+            AND data_fechamento <= '${endDate}'::date
+            AND stage_name = 'Negócio Ganho'
+            AND source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM')
+            AND ${igOrigemMatchFilter}
+          GROUP BY origem
+        `));
+        const labelMap: Record<string, string> = {
+          linktree: 'Linktree (bio)',
+          contato_instagram: 'Contato Instagram',
+          social_selling: 'Social Selling',
+          outros: 'Outros Instagram',
+        };
+        const order = ['linktree', 'contato_instagram', 'social_selling', 'outros'];
+        const leadsMap = new Map<string, any>();
+        for (const r of leadsResult.rows as any[]) leadsMap.set(r.origem, r);
+        const wonMap = new Map<string, any>();
+        for (const r of wonResult.rows as any[]) wonMap.set(r.origem, r);
+        leadsPorOrigem = order
+          .map((origem) => {
+            const l = leadsMap.get(origem);
+            const w = wonMap.get(origem);
+            return {
+              origem,
+              label: labelMap[origem],
+              leads: l ? parseInt(l.leads) || 0 : 0,
+              mqls: l ? parseInt(l.mqls) || 0 : 0,
+              negocioGanho: w ? parseInt(w.negocio_ganho) || 0 : 0,
+              receita: w ? parseFloat(w.receita) || 0 : 0,
+            };
+          })
+          .filter((r) => r.leads > 0 || r.mqls > 0 || r.negocioGanho > 0);
+      } catch (err: any) {
+        console.warn('[orcado-realizado/instagram] sub-source breakdown query failed:', err?.message || err);
+      }
+
       res.json({
         comecaramSeguir, deixaramSeguir, percPerdaSeguidores,
         deltaSeguidores, totalSeguidores: lastFollowers, percCrescimentoSeguidores,
@@ -3067,6 +3217,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cliquesLinkBioFonte,
         cliquesPorLink,
         cliquesPorDominio,
+        leadsPorOrigem,
         investimentoPago,
         hasConnection: true,
         snapshotCount: snapshots.length,
@@ -3101,6 +3252,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const MQL_COND = `(mql::text = '1' OR LOWER(mql::text) = 'true')`;
       const NMQL_COND = `NOT (mql::text = '1' OR LOWER(mql::text) = 'true')`;
 
+      // Janela temporal por métrica (alinhada com /mql e /nao-mql do top card):
+      //   - Leads, MQLs, RA, RR → created_at no período (lead entrou no funil em X)
+      //   - Negócio Ganho, Receita, Contratos → data_fechamento no período (venda fechou em X)
+      // Duas queries separadas, mergidas em JS por platform.
+
+      // Query 1: lead journey (leads → RA → RR) por created_at
       const dealsResult = await db.execute(sql.raw(`
         SELECT
           ${platformCaseExpr} as platform,
@@ -3111,7 +3268,17 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as ra_nmql,
           SUM(CASE WHEN data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
           SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${MQL_COND} THEN 1 ELSE 0 END) as rr_mql,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql,
+          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql
+        FROM "Bitrix".crm_deal
+        WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+        GROUP BY platform
+      `));
+
+      // Query 2: wins/receita/contratos por data_fechamento
+      const winsResult = await db.execute(sql.raw(`
+        SELECT
+          ${platformCaseExpr} as platform,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${MQL_COND} THEN 1 ELSE 0 END) as vendas_mql,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${NMQL_COND} THEN 1 ELSE 0 END) as vendas_nmql,
@@ -3123,10 +3290,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(produtos, '[', ''), ']', ''), ','), 1), 1) END
           ELSE 0 END) as contratos
         FROM "Bitrix".crm_deal
-        WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
+        WHERE data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
+          AND stage_name = 'Negócio Ganho'
           AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
         GROUP BY platform
       `));
+      const winsMap = new Map<string, any>();
+      for (const row of winsResult.rows as any[]) winsMap.set(row.platform, row);
 
       const leadTimeResult = await db.execute(sql.raw(`
         SELECT platform, AVG(lead_time_days) as avg_lead_time
@@ -3156,6 +3326,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       for (const platKey of platforms) {
         const row = (dealsResult.rows as any[]).find(r => r.platform === platKey);
+        const won = winsMap.get(platKey);
         const leads = row ? parseInt(row.leads) || 0 : 0;
         const mqls = row ? parseInt(row.mqls) || 0 : 0;
         const ra = row ? parseInt(row.ra) || 0 : 0;
@@ -3164,13 +3335,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const rr = row ? parseInt(row.rr) || 0 : 0;
         const rrMql = row ? parseInt(row.rr_mql) || 0 : 0;
         const rrNmql = row ? parseInt(row.rr_nmql) || 0 : 0;
-        const vendas = row ? parseInt(row.vendas) || 0 : 0;
-        const vendasMql = row ? parseInt(row.vendas_mql) || 0 : 0;
-        const vendasNmql = row ? parseInt(row.vendas_nmql) || 0 : 0;
-        const clientesUnicos = row ? parseInt(row.clientes_unicos) || 0 : 0;
-        const receitaPontual = row ? parseFloat(row.receita_pontual) || 0 : 0;
-        const receitaRecorrente = row ? parseFloat(row.receita_recorrente) || 0 : 0;
-        const contratos = row ? parseInt(row.contratos) || 0 : 0;
+        const vendas = won ? parseInt(won.vendas) || 0 : 0;
+        const vendasMql = won ? parseInt(won.vendas_mql) || 0 : 0;
+        const vendasNmql = won ? parseInt(won.vendas_nmql) || 0 : 0;
+        const clientesUnicos = won ? parseInt(won.clientes_unicos) || 0 : 0;
+        const receitaPontual = won ? parseFloat(won.receita_pontual) || 0 : 0;
+        const receitaRecorrente = won ? parseFloat(won.receita_recorrente) || 0 : 0;
+        const contratos = won ? parseInt(won.contratos) || 0 : 0;
         const receita = receitaPontual + receitaRecorrente;
         const lt = leadTimeMap.get(platKey) || null;
 
