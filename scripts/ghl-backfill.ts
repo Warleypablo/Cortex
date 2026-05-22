@@ -62,7 +62,7 @@ async function backfillTags() {
   const today = new Date().toISOString().slice(0, 10);
   for (const tag of tags) {
     await db.execute(sql`
-      INSERT INTO ghl.tags_snapshot (snapshot_date, tag, contact_count)
+      INSERT INTO cortex_core.ghl_tags_snapshot (snapshot_date, tag, contact_count)
       VALUES (${today}, ${tag.name}, 0)
       ON CONFLICT DO NOTHING
     `);
@@ -103,9 +103,9 @@ async function backfillContacts() {
     // Atualiza tags_snapshot do dia com contagem real por tag (unnest)
     const today = new Date().toISOString().slice(0, 10);
     await db.execute(sql`
-      INSERT INTO ghl.tags_snapshot (snapshot_date, tag, contact_count)
+      INSERT INTO cortex_core.ghl_tags_snapshot (snapshot_date, tag, contact_count)
       SELECT ${today}::date, t.tag, COUNT(*)::int
-      FROM ghl.contacts c, UNNEST(c.tags) AS t(tag)
+      FROM cortex_core.ghl_contacts c, UNNEST(c.tags) AS t(tag)
       GROUP BY t.tag
       ON CONFLICT (snapshot_date, tag) DO UPDATE
         SET contact_count = EXCLUDED.contact_count
@@ -200,7 +200,7 @@ async function backfillMessages(opts: { maxConversations?: number; days?: number
   // Lê conversas já no banco (ordenadas por lastMessageDate desc) e baixa mensagens
   const limit = opts.maxConversations ?? 5000;
   const result = await db.execute(sql`
-    SELECT id, last_message_date FROM ghl.conversations
+    SELECT id, last_message_date FROM cortex_core.ghl_conversations
     WHERE last_message_date IS NOT NULL
       AND last_message_date >= ${new Date(sinceMs)}
     ORDER BY last_message_date DESC

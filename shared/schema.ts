@@ -9,7 +9,6 @@ export const clickupSchema = pgSchema("Clickup");
 export const contaAzulSchema = pgSchema("Conta Azul");
 export const bitrixSchema = pgSchema("Bitrix");
 export const inhireSchema = pgSchema("Inhire");
-export const ghlSchema = pgSchema("ghl");
 
 export const users = pgTable("users", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
@@ -3568,7 +3567,7 @@ export type InsertYoutubeSyncRun = typeof youtubeSyncRuns.$inferInsert;
 // Ver docs/handover-ghl-integracao.md
 // ============================================================
 
-export const ghlContacts = ghlSchema.table("contacts", {
+export const ghlContacts = cortexCoreSchema.table("ghl_contacts", {
   id: text("id").primaryKey(),
   locationId: text("location_id").notNull(),
   email: text("email"),
@@ -3595,7 +3594,7 @@ export const ghlContacts = ghlSchema.table("contacts", {
   dateUpdatedIdx: index("ghl_contacts_date_updated_idx").on(table.dateUpdated),
 }));
 
-export const ghlConversations = ghlSchema.table("conversations", {
+export const ghlConversations = cortexCoreSchema.table("ghl_conversations", {
   id: text("id").primaryKey(),
   locationId: text("location_id").notNull(),
   contactId: text("contact_id"),
@@ -3613,7 +3612,7 @@ export const ghlConversations = ghlSchema.table("conversations", {
   typeIdx: index("ghl_conversations_type_idx").on(table.lastMessageType),
 }));
 
-export const ghlMessages = ghlSchema.table("messages", {
+export const ghlMessages = cortexCoreSchema.table("ghl_messages", {
   id: text("id").primaryKey(),
   conversationId: text("conversation_id").notNull(),
   contactId: text("contact_id"),
@@ -3637,7 +3636,7 @@ export const ghlMessages = ghlSchema.table("messages", {
   emailMsgIdIdx: index("ghl_messages_email_msg_id_idx").on(table.emailMessageId),
 }));
 
-export const ghlEmailCampaigns = ghlSchema.table("email_campaigns", {
+export const ghlEmailCampaigns = cortexCoreSchema.table("ghl_email_campaigns", {
   id: text("id").primaryKey(),
   locationId: text("location_id").notNull(),
   name: text("name"),
@@ -3666,7 +3665,7 @@ export const ghlEmailCampaigns = ghlSchema.table("email_campaigns", {
 }));
 
 // Open/Click/Bounce vêm por webhook do GHL (NÃO existem via REST)
-export const ghlEmailEvents = ghlSchema.table("email_events", {
+export const ghlEmailEvents = cortexCoreSchema.table("ghl_email_events", {
   id: serial("id").primaryKey(),
   eventId: text("event_id").unique(),
   messageId: text("message_id"),
@@ -3683,7 +3682,7 @@ export const ghlEmailEvents = ghlSchema.table("email_events", {
   contactIdx: index("ghl_email_events_contact_idx").on(table.contactId),
 }));
 
-export const ghlTagsSnapshot = ghlSchema.table("tags_snapshot", {
+export const ghlTagsSnapshot = cortexCoreSchema.table("ghl_tags_snapshot", {
   snapshotDate: date("snapshot_date").notNull(),
   tag: text("tag").notNull(),
   contactCount: integer("contact_count").notNull(),
@@ -3691,7 +3690,7 @@ export const ghlTagsSnapshot = ghlSchema.table("tags_snapshot", {
   pk: uniqueIndex("ghl_tags_snapshot_pk").on(table.snapshotDate, table.tag),
 }));
 
-export const ghlSyncRuns = ghlSchema.table("sync_runs", {
+export const ghlSyncRuns = cortexCoreSchema.table("ghl_sync_runs", {
   id: serial("id").primaryKey(),
   resource: text("resource").notNull(),
   startedAt: timestamp("started_at").notNull(),

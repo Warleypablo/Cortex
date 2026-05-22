@@ -303,7 +303,7 @@ function tsFromUnixMs(v: number | string | undefined | null): Date | null {
 
 export async function upsertContact(c: GhlContactApi): Promise<void> {
   await db.execute(sql`
-    INSERT INTO ghl.contacts (
+    INSERT INTO cortex_core.ghl_contacts (
       id, location_id, email, phone, contact_name, first_name, last_name,
       company_name, type, source, tags, country, city, state,
       date_added, date_updated, attributions, custom_fields, raw, synced_at
@@ -339,7 +339,7 @@ export async function upsertContact(c: GhlContactApi): Promise<void> {
 
 export async function upsertConversation(c: GhlConversationApi): Promise<void> {
   await db.execute(sql`
-    INSERT INTO ghl.conversations (
+    INSERT INTO cortex_core.ghl_conversations (
       id, location_id, contact_id, last_message_type, last_message_direction,
       last_message_date, unread_count, date_added, date_updated, raw, synced_at
     ) VALUES (
@@ -364,7 +364,7 @@ export async function upsertMessage(m: GhlMessageApi): Promise<void> {
   const emailMessageId = m.meta?.email?.messageIds?.[0] ?? null;
   const subject = m.meta?.email?.subject ?? null;
   await db.execute(sql`
-    INSERT INTO ghl.messages (
+    INSERT INTO cortex_core.ghl_messages (
       id, conversation_id, contact_id, location_id, direction, message_type,
       status, source, body, subject, email_message_id, content_type,
       date_added, meta, synced_at
@@ -385,7 +385,7 @@ export async function upsertMessage(m: GhlMessageApi): Promise<void> {
 
 export async function upsertEmailCampaign(c: GhlEmailScheduleApi): Promise<void> {
   await db.execute(sql`
-    INSERT INTO ghl.email_campaigns (
+    INSERT INTO cortex_core.ghl_email_campaigns (
       id, location_id, name, subject, campaign_type, status, template_id, template_type,
       total_count, success_count, failed_count, error_count, processed_count, queued_count,
       has_tracking, has_utm_tracking, is_plain_text, scheduled_at, date_added, date_updated,
@@ -426,7 +426,7 @@ export async function logSyncRun(params: {
   cursor?: string;
 }): Promise<void> {
   await db.execute(sql`
-    INSERT INTO ghl.sync_runs (
+    INSERT INTO cortex_core.ghl_sync_runs (
       resource, started_at, finished_at, status, records_processed, error_message, cursor
     ) VALUES (
       ${params.resource}, ${params.startedAt}, ${params.finishedAt},
@@ -438,7 +438,7 @@ export async function logSyncRun(params: {
 
 export async function getLastSyncedAt(resource: string): Promise<Date | null> {
   const r = await db.execute<{ finished_at: Date | null }>(sql`
-    SELECT finished_at FROM ghl.sync_runs
+    SELECT finished_at FROM cortex_core.ghl_sync_runs
     WHERE resource = ${resource} AND status = 'success'
     ORDER BY finished_at DESC LIMIT 1
   `);
