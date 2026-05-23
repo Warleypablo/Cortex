@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -18,6 +18,7 @@ import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
+import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { avaliarPerformance, CLASSIFICACAO_TAILWIND, CLASSIFICACAO_LABEL, BENCHMARKS_TURBO, type Classificacao } from "@shared/ghl-broadcast/benchmarks";
 
 // ────────────────────────────────────────────────────────────────────────
@@ -58,8 +59,7 @@ interface WhatsappDaily {
 interface TagRow {
   tag: string;
   current_count: number;
-  week_ago_count: number;
-  delta_7d: number;
+  new_leads_7d: number;
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -312,80 +312,167 @@ function WhatsappTab({ from, to }: { from: string; to: string }) {
 // Tab: Tags
 // ────────────────────────────────────────────────────────────────────────
 
+function ListDefinition({ tagsAll, tagsAny, tagsNot }: { tagsAll: string[]; tagsAny: string[]; tagsNot: string[] }) {
+  if (!tagsAll.length && !tagsAny.length && !tagsNot.length) {
+    return <span className="text-muted-foreground italic">sem definição</span>;
+  }
+  return (
+    <div className="space-y-1.5">
+      {tagsAll.length > 0 && (
+        <div>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">Precisa ter todas:</span>
+          <span className="inline-flex flex-wrap gap-1">
+            {tagsAll.map((t) => (
+              <Badge key={t} variant="outline" className="font-mono text-[10px] bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800">{t}</Badge>
+            ))}
+          </span>
+        </div>
+      )}
+      {tagsAny.length > 0 && (
+        <div>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">Pelo menos uma:</span>
+          <span className="inline-flex flex-wrap gap-1">
+            {tagsAny.map((t) => (
+              <Badge key={t} variant="outline" className="font-mono text-[10px] bg-blue-50 dark:bg-blue-950/40 border-blue-200 dark:border-blue-800">{t}</Badge>
+            ))}
+          </span>
+        </div>
+      )}
+      {tagsNot.length > 0 && (
+        <div>
+          <span className="text-[10px] uppercase tracking-wide text-muted-foreground mr-1">Exclui se tem:</span>
+          <span className="inline-flex flex-wrap gap-1">
+            {tagsNot.map((t) => (
+              <Badge key={t} variant="outline" className="font-mono text-[10px] bg-rose-50 dark:bg-rose-950/40 border-rose-200 dark:border-rose-800">{t}</Badge>
+            ))}
+          </span>
+        </div>
+      )}
+    </div>
+  );
+}
+
+interface ListRow {
+  list: string;
+  contacts: number;
+  new_leads_7d: number;
+  tags_all: string[];
+  tags_any: string[];
+  tags_not: string[];
+}
+
 function TagsTab() {
-  const { data, isLoading, error } = useQuery<{ tags: TagRow[] }>({
+  const lists = useQuery<{ lists: ListRow[] }>({
+    queryKey: ["/api/ghl/lists"],
+    queryFn: () => fetchJson("/api/ghl/lists"),
+  });
+  const tags = useQuery<{ tags: TagRow[] }>({
     queryKey: ["/api/ghl/tags"],
-    queryFn: () => fetchJson("/api/ghl/tags?limit=100"),
+    queryFn: () => fetchJson("/api/ghl/tags?limit=500"),
   });
 
-  if (isLoading) return <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Carregando tags...</div>;
-  if (error) return <div className="text-destructive">Erro: {(error as Error).message}</div>;
+  if (lists.isLoading || tags.isLoading) {
+    return (
+      <div className="flex items-center gap-2 text-muted-foreground">
+        <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+      </div>
+    );
+  }
+  if (lists.error) return <div className="text-destructive">Erro: {(lists.error as Error).message}</div>;
 
-  const rows = data?.tags ?? [];
-  const top20 = rows.slice(0, 20);
-  const chartData = top20.map((t) => ({ tag: t.tag.length > 25 ? t.tag.slice(0, 23) + "…" : t.tag, contatos: t.current_count }));
+  const listRows = lists.data?.lists ?? [];
+  const tagRows = tags.data?.tags ?? [];
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Top 20 tags por contatos</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="h-96">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={chartData} layout="vertical" margin={{ left: 180 }}>
-                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
-                <XAxis type="number" fontSize={11} />
-                <YAxis type="category" dataKey="tag" width={180} fontSize={10} interval={0} />
-                <Tooltip />
-                <Bar dataKey="contatos" fill="#7c3aed" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </CardContent>
-      </Card>
+    <Tabs defaultValue="listas" className="w-full">
+      <TabsList>
+        <TabsTrigger value="listas" data-testid="subtab-listas">Listas</TabsTrigger>
+        <TabsTrigger value="tags" data-testid="subtab-tags">Tags</TabsTrigger>
+      </TabsList>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Todas as tags ({rows.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Tag</TableHead>
-                <TableHead className="text-right">Contatos</TableHead>
-                <TableHead className="text-right">7 dias atrás</TableHead>
-                <TableHead className="text-right">Δ 7d</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {rows.map((r) => (
-                <TableRow key={r.tag}>
-                  <TableCell className="font-mono text-xs">{r.tag}</TableCell>
-                  <TableCell className="text-right">{fmtInt(r.current_count)}</TableCell>
-                  <TableCell className="text-right text-muted-foreground">{r.week_ago_count > 0 ? fmtInt(r.week_ago_count) : "—"}</TableCell>
-                  <TableCell className="text-right">
-                    {r.delta_7d === 0 || r.week_ago_count === 0 ? (
-                      <span className="text-muted-foreground">—</span>
-                    ) : r.delta_7d > 0 ? (
-                      <span className="text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
-                        <TrendingUp className="w-3 h-3" /> +{fmtInt(r.delta_7d)}
-                      </span>
-                    ) : (
-                      <span className="text-rose-600 dark:text-rose-400 inline-flex items-center gap-1">
-                        <TrendingDown className="w-3 h-3" /> {fmtInt(r.delta_7d)}
-                      </span>
-                    )}
-                  </TableCell>
+      <TabsContent value="listas" className="mt-4 space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Todas as listas ({listRows.length})</CardTitle>
+            <div className="text-xs text-muted-foreground mt-1">
+              Listas nominais da Turbo, definidas pelo mapeamento de tags do CRM. A coluna "Definição" mostra
+              quais tags incluem ou excluem contatos de cada lista.
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="min-w-[200px]">Lista</TableHead>
+                  <TableHead className="min-w-[420px]">Definição (tags)</TableHead>
+                  <TableHead className="text-right">Contatos</TableHead>
+                  <TableHead className="text-right" title="Novos contatos criados nos últimos 7 dias">Leads (7d)</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </CardContent>
-      </Card>
-    </div>
+              </TableHeader>
+              <TableBody>
+                {listRows.map((r) => (
+                  <TableRow key={r.list}>
+                    <TableCell className="text-sm font-medium align-top">{r.list}</TableCell>
+                    <TableCell className="text-xs align-top">
+                      <ListDefinition tagsAll={r.tags_all} tagsAny={r.tags_any} tagsNot={r.tags_not} />
+                    </TableCell>
+                    <TableCell className="text-right align-top">{fmtInt(r.contacts)}</TableCell>
+                    <TableCell className="text-right align-top">
+                      {r.new_leads_7d > 0 ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" /> +{fmtInt(r.new_leads_7d)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </TabsContent>
+
+      <TabsContent value="tags" className="mt-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Todas as tags brutas ({tagRows.length})</CardTitle>
+            <div className="text-xs text-muted-foreground mt-1">
+              Tags individuais do CRM. Cada contato pode ter múltiplas tags.
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Tag</TableHead>
+                  <TableHead className="text-right">Contatos</TableHead>
+                  <TableHead className="text-right">Leads (últimos 7d)</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {tagRows.map((r) => (
+                  <TableRow key={r.tag}>
+                    <TableCell className="font-mono text-xs">{r.tag}</TableCell>
+                    <TableCell className="text-right">{fmtInt(r.current_count)}</TableCell>
+                    <TableCell className="text-right">
+                      {r.new_leads_7d > 0 ? (
+                        <span className="text-emerald-600 dark:text-emerald-400 inline-flex items-center gap-1">
+                          <TrendingUp className="w-3 h-3" /> +{fmtInt(r.new_leads_7d)}
+                        </span>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </TabsContent>
+    </Tabs>
   );
 }
 
@@ -599,138 +686,211 @@ function DiagnosticoTab({ from, to }: { from: string; to: string }) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Tab: Biblioteca (histórico de mensagens com filtros)
+// Tab: Biblioteca (1 linha por broadcast — padrão Criativos)
 // ────────────────────────────────────────────────────────────────────────
 
-interface MessageRow {
+interface BroadcastRow {
   id: string;
-  conversation_id: string;
-  contact_id: string | null;
-  direction: string;
-  message_type: string;
-  status: string;
-  source: string | null;
+  channel: "Email" | "WhatsApp";
+  date: string | null;
+  status: string | null;
+  name: string | null;
   subject: string | null;
-  email_message_id: string | null;
-  date_added: string;
-  body_preview: string;
-  body_length: number;
-  contact_name: string | null;
-  contact_email: string | null;
-  contact_phone: string | null;
-  contact_tags: string[] | null;
+  preview: string | null;
+  campaign_type: string | null;
+  source: string | null;
+  top_tags: Array<{ tag: string; pct: number }>;
+  list_size: number;
+  delivered: number;
+  delivery_pct: number | null;
+  open_pct: number | null;
+  conversations_generated: number;
+  meetings_scheduled: number | null;
+  has_open_tracking: boolean;
+  spend_brl: number | null;
+  spend_is_manual: boolean;
+  sdr_feedback: string | null;
 }
+
+type SortKey =
+  | "date"
+  | "channel"
+  | "name"
+  | "list_size"
+  | "delivered"
+  | "delivery_pct"
+  | "open_pct"
+  | "conversations_generated";
 
 function BibliotecaTab({ from, to }: { from: string; to: string }) {
   const [channel, setChannel] = useState<string>("all");
-  const [direction, setDirection] = useState<string>("outbound");
-  const [source, setSource] = useState<string>("workflow,bulk");
-  const [base, setBase] = useState<string>("");
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [page, setPage] = useState(0);
-  const [detail, setDetail] = useState<MessageRow | null>(null);
+  const [sortKey, setSortKey] = useState<SortKey>("date");
+  const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [detail, setDetail] = useState<BroadcastRow | null>(null);
   const limit = 50;
+  // Status fixo em "complete" — mostra só broadcasts efetivamente enviados (como na planilha do Marketing).
+  const status = "complete";
 
-  // Reset page quando filtros mudam
-  useEffect(() => { setPage(0); }, [channel, direction, source, base, search, from, to]);
+  useEffect(() => {
+    setPage(0);
+  }, [channel, search, from, to]);
 
-  const params = new URLSearchParams({ from, to, channel, direction, source, limit: String(limit), offset: String(page * limit) });
-  if (base) params.set("base", base);
+  const params = new URLSearchParams({
+    from,
+    to,
+    channel,
+    status,
+    limit: String(limit),
+    offset: String(page * limit),
+  });
   if (search) params.set("search", search);
 
-  const { data, isLoading, error } = useQuery<{ messages: MessageRow[]; total: number }>({
-    queryKey: ["/api/ghl/messages", params.toString()],
-    queryFn: () => fetchJson(`/api/ghl/messages?${params.toString()}`),
+  const { data, isLoading, error } = useQuery<{
+    broadcasts: BroadcastRow[];
+    total: number;
+    totals: {
+      email_count: number;
+      wa_count: number;
+      total_sent: number;
+      total_delivered: number;
+      avg_delivery_pct: number | null;
+      total_conversations: number;
+    };
+  }>({
+    queryKey: ["/api/ghl/broadcasts", params.toString()],
+    queryFn: () => fetchJson(`/api/ghl/broadcasts?${params.toString()}`),
   });
 
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
 
+  // Ordenação local (em cima da página atual, já que a paginação é no servidor por data desc)
+  const sorted = useMemo(() => {
+    if (!data?.broadcasts) return [];
+    const rows = [...data.broadcasts];
+    rows.sort((a, b) => {
+      const av = (a as any)[sortKey];
+      const bv = (b as any)[sortKey];
+      if (av == null && bv == null) return 0;
+      if (av == null) return 1;
+      if (bv == null) return -1;
+      if (typeof av === "number" && typeof bv === "number") return sortDir === "asc" ? av - bv : bv - av;
+      const as = String(av).toLowerCase();
+      const bs = String(bv).toLowerCase();
+      return sortDir === "asc" ? as.localeCompare(bs) : bs.localeCompare(as);
+    });
+    return rows;
+  }, [data, sortKey, sortDir]);
+
+  // KPIs: tudo vem do agregado do filtro inteiro (backend `totals`).
+  const kpis = useMemo(() => {
+    return {
+      emailCount: data?.totals?.email_count ?? 0,
+      waCount: data?.totals?.wa_count ?? 0,
+      avgDelivery: data?.totals?.avg_delivery_pct ?? null,
+      conversations: data?.totals?.total_conversations ?? 0,
+    };
+  }, [data]);
+
+  function toggleSort(k: SortKey) {
+    if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
+    else {
+      setSortKey(k);
+      setSortDir("desc");
+    }
+  }
+
   return (
     <div className="space-y-4">
+      {/* KPI cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <StatCard label="E-mails enviados" value={fmtInt(kpis.emailCount)} hint="campanhas no período" />
+        <StatCard label="Broadcasts WhatsApp" value={fmtInt(kpis.waCount)} hint="disparos no período" />
+        <StatCard
+          label="% Entrega média"
+          value={kpis.avgDelivery != null ? `${kpis.avgDelivery.toFixed(1)}%` : "—"}
+        />
+        <StatCard label="Conversas" value={fmtInt(kpis.conversations)} hint="janela 7d após envio" />
+        <StatCard label="Reuniões" value="—" hint="Fase 2 — requer cruzamento Bitrix" />
+      </div>
+
       {/* Filtros */}
       <Card>
-        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3 items-end">
+        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
           <div>
             <Label className="text-xs">Canal</Label>
             <Select value={channel} onValueChange={setChannel}>
               <SelectTrigger><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="TYPE_WHATSAPP">WhatsApp</SelectItem>
-                <SelectItem value="TYPE_EMAIL">Email</SelectItem>
-                <SelectItem value="TYPE_SMS">SMS</SelectItem>
+                <SelectItem value="Email">Email</SelectItem>
+                <SelectItem value="WhatsApp">WhatsApp</SelectItem>
               </SelectContent>
             </Select>
           </div>
-          <div>
-            <Label className="text-xs">Direção</Label>
-            <Select value={direction} onValueChange={setDirection}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas</SelectItem>
-                <SelectItem value="outbound">Outbound (enviada)</SelectItem>
-                <SelectItem value="inbound">Inbound (recebida)</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs">Origem</Label>
-            <Select value={source} onValueChange={setSource}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="workflow,bulk">Marketing (workflow + bulk)</SelectItem>
-                <SelectItem value="workflow">Workflow só</SelectItem>
-                <SelectItem value="bulk">Bulk só</SelectItem>
-                <SelectItem value="manual">Manual (SDR/closer)</SelectItem>
-                <SelectItem value="all">Todas</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs">Base</Label>
-            <Select value={base || "__none__"} onValueChange={(v) => setBase(v === "__none__" ? "" : v)}>
-              <SelectTrigger><SelectValue placeholder="Todas as bases" /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="__none__">Todas as bases</SelectItem>
-                {BASES_DISPONIVEIS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-xs">Busca</Label>
+          <div className="md:col-span-2">
+            <Label className="text-xs">Busca (nome, assunto ou corpo)</Label>
             <div className="flex gap-1">
               <Input
                 value={searchInput}
                 onChange={(e) => setSearchInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === "Enter") setSearch(searchInput); }}
-                placeholder="Texto da mensagem..."
+                placeholder="Ex.: convite, workshop, black friday..."
                 className="text-sm"
               />
-              <button onClick={() => setSearch(searchInput)} className="px-2 hover:bg-muted rounded" title="Buscar">
+              <button
+                onClick={() => setSearch(searchInput)}
+                className="px-2 hover:bg-muted rounded"
+                title="Buscar"
+                aria-label="Buscar"
+              >
                 <Search className="w-4 h-4" />
               </button>
+              {search && (
+                <button
+                  onClick={() => { setSearch(""); setSearchInput(""); }}
+                  className="px-2 hover:bg-muted rounded"
+                  title="Limpar busca"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Resultados */}
-      {isLoading && <div className="flex items-center gap-2 text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Carregando...</div>}
+      {isLoading && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+        </div>
+      )}
       {error && <div className="text-destructive">Erro: {(error as Error).message}</div>}
 
       {data && (
         <Card>
           <CardHeader>
             <CardTitle className="text-base flex justify-between items-baseline">
-              <span>Mensagens ({fmtInt(data.total)})</span>
+              <span>Broadcasts ({fmtInt(data.total)})</span>
               {totalPages > 1 && (
                 <div className="flex items-center gap-2 text-sm font-normal">
-                  <button onClick={() => setPage((p) => Math.max(0, p - 1))} disabled={page === 0} className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30">
+                  <button
+                    onClick={() => setPage((p) => Math.max(0, p - 1))}
+                    disabled={page === 0}
+                    className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
+                    aria-label="Página anterior"
+                  >
                     <ChevronLeft className="w-4 h-4" />
                   </button>
                   <span className="text-muted-foreground">Página {page + 1} de {totalPages}</span>
-                  <button onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))} disabled={page >= totalPages - 1} className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30">
+                  <button
+                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                    disabled={page >= totalPages - 1}
+                    className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
+                    aria-label="Próxima página"
+                  >
                     <ChevronRight className="w-4 h-4" />
                   </button>
                 </div>
@@ -742,36 +902,117 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Canal</TableHead>
-                    <TableHead>Origem</TableHead>
-                    <TableHead>Contato</TableHead>
-                    <TableHead>Preview</TableHead>
+                    <SortableTh label="Data" k="date" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="sticky left-0 bg-background z-10" />
+                    <SortableTh label="Canal" k="channel" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                    <SortableTh label="Nome / Template" k="name" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="min-w-[240px]" />
+                    <TableHead className="min-w-[280px]">Mensagem (preview)</TableHead>
+                    <TableHead className="min-w-[200px]" title="Top 3 tags mais frequentes nos recipients do broadcast">Tags disparadas</TableHead>
+                    <SortableTh label="Tamanho lista" k="list_size" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Entregues" k="delivered" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Entrega %" k="delivery_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Abertura %" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Conversas (7d)" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <TableHead className="text-right text-muted-foreground" title="Depende de cruzamento Bitrix — Fase 2">Reuniões (7d)</TableHead>
+                    <TableHead className="text-right">Gasto</TableHead>
+                    <TableHead className="min-w-[160px]">Feedback SDR</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.messages.map((m) => (
-                    <TableRow key={m.id} onClick={() => setDetail(m)} className="cursor-pointer hover:bg-muted/40">
-                      <TableCell className="text-xs whitespace-nowrap">{format(new Date(m.date_added), "dd/MM/yy HH:mm", { locale: ptBR })}</TableCell>
+                  {sorted.map((b) => (
+                    <TableRow
+                      key={b.id}
+                      onClick={() => setDetail(b)}
+                      className="cursor-pointer hover:bg-muted/40"
+                    >
+                      <TableCell className="text-xs whitespace-nowrap sticky left-0 bg-background z-10">
+                        {b.date ? format(new Date(b.date), "dd/MM/yy HH:mm", { locale: ptBR }) : "—"}
+                      </TableCell>
                       <TableCell>
                         <Badge variant="outline" className="text-xs">
-                          {m.message_type === "TYPE_WHATSAPP" ? "WA" : m.message_type === "TYPE_EMAIL" ? "Email" : m.message_type === "TYPE_SMS" ? "SMS" : m.message_type}
-                          <span className={cn("ml-1", m.direction === "outbound" ? "text-blue-600" : "text-emerald-600")}>{m.direction === "outbound" ? "↑" : "↓"}</span>
+                          {b.channel === "WhatsApp" ? (
+                            <><MessageCircle className="w-3 h-3 mr-1" /> WhatsApp</>
+                          ) : (
+                            <><Mail className="w-3 h-3 mr-1" /> Email</>
+                          )}
                         </Badge>
                       </TableCell>
-                      <TableCell className="text-xs"><Badge variant="outline">{m.source ?? "—"}</Badge></TableCell>
-                      <TableCell className="max-w-[180px] truncate text-xs">
-                        <div className="font-medium truncate">{m.contact_name ?? "—"}</div>
-                        <div className="text-muted-foreground truncate">{m.contact_email ?? m.contact_phone ?? ""}</div>
+                      <TableCell className="max-w-[260px] truncate text-xs">
+                        {b.channel === "Email" ? (
+                          <div>
+                            <div className="font-medium truncate" title={b.name ?? undefined}>{b.name ?? "Sem nome"}</div>
+                            <div className="text-muted-foreground truncate" title={b.subject ?? undefined}>{b.subject ?? "—"}</div>
+                          </div>
+                        ) : (
+                          <div>
+                            <div className="font-medium">WhatsApp broadcast</div>
+                            <div className="text-muted-foreground text-xs">
+                              {b.source ?? "—"} · {b.date ? format(new Date(b.date), "dd/MM/yyyy", { locale: ptBR }) : ""}
+                            </div>
+                          </div>
+                        )}
                       </TableCell>
-                      <TableCell className="max-w-md text-xs">
-                        {m.subject && <div className="font-medium truncate">{m.subject}</div>}
-                        <div className="truncate text-muted-foreground">{m.body_preview?.replace(/\s+/g, " ").slice(0, 120) || "—"}</div>
+                      <TableCell className="max-w-[320px] text-xs">
+                        <div className="truncate text-muted-foreground" title={b.preview ?? undefined}>
+                          {b.preview?.replace(/\s+/g, " ").slice(0, 140) || "—"}
+                        </div>
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        {b.top_tags.length ? (
+                          <div className="flex flex-col gap-0.5">
+                            {b.top_tags.map((t) => (
+                              <div key={t.tag} className="flex items-center gap-1.5">
+                                <span className="font-mono text-[10px] truncate max-w-[140px]" title={t.tag}>{t.tag}</span>
+                                <span className="text-muted-foreground text-[10px]">{t.pct.toFixed(0)}%</span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground" title="Email broadcasts sem webhook não têm lista de recipients">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-right whitespace-nowrap">{fmtInt(b.list_size)}</TableCell>
+                      <TableCell className="text-xs text-right whitespace-nowrap">{fmtInt(b.delivered)}</TableCell>
+                      <TableCell className="text-xs text-right whitespace-nowrap">
+                        <PctBadge value={b.delivery_pct} />
+                      </TableCell>
+                      <TableCell className="text-xs text-right whitespace-nowrap">
+                        {b.channel === "WhatsApp" ? (
+                          <span className="text-muted-foreground" title="GHL não envia opens de WhatsApp via API">—</span>
+                        ) : b.has_open_tracking ? (
+                          <PctBadge value={b.open_pct} />
+                        ) : (
+                          <span className="text-muted-foreground" title="Webhook GHL não cadastrado em prod">sem webhook</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-right whitespace-nowrap">{fmtInt(b.conversations_generated)}</TableCell>
+                      <TableCell className="text-xs text-right whitespace-nowrap text-muted-foreground" title="Depende de cruzamento GHL ↔ Bitrix — Fase 2">—</TableCell>
+                      <TableCell className="text-xs text-right whitespace-nowrap">
+                        {b.spend_brl != null ? (
+                          <span title={b.spend_is_manual ? "Valor manual" : "Calculado: tamanho × preço unitário do canal"}>
+                            R$ {b.spend_brl.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                            {b.spend_is_manual && <span className="ml-1 text-[10px] text-muted-foreground">man.</span>}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs max-w-[200px]">
+                        {b.sdr_feedback ? (
+                          <span className="truncate block text-muted-foreground" title={b.sdr_feedback}>
+                            {b.sdr_feedback}
+                          </span>
+                        ) : (
+                          <span className="text-muted-foreground text-[10px] italic">— (clique pra editar)</span>
+                        )}
                       </TableCell>
                     </TableRow>
                   ))}
-                  {data.messages.length === 0 && (
-                    <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground py-6">Nenhuma mensagem encontrada com esses filtros</TableCell></TableRow>
+                  {sorted.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={13} className="text-center text-muted-foreground py-6">
+                        Nenhum broadcast encontrado com esses filtros
+                      </TableCell>
+                    </TableRow>
                   )}
                 </TableBody>
               </Table>
@@ -782,65 +1023,220 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
 
       {/* Modal de detalhes */}
       {detail && (
-        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => setDetail(null)}>
-          <Card className="max-w-3xl w-full max-h-[85vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
-            <CardHeader className="flex flex-row justify-between items-start">
-              <div>
-                <CardTitle className="text-base">
-                  {detail.subject || `Mensagem ${detail.message_type}`}
-                </CardTitle>
-                <div className="text-sm text-muted-foreground mt-1">
-                  {format(new Date(detail.date_added), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })} · {detail.contact_name ?? "Sem nome"} · <Badge variant="outline">{detail.source ?? "—"}</Badge>
-                </div>
-              </div>
-              <button onClick={() => setDetail(null)} className="p-1 hover:bg-muted rounded"><X className="w-4 h-4" /></button>
-            </CardHeader>
-            <CardContent>
-              <DetailLoader messageId={detail.id} />
-            </CardContent>
-          </Card>
-        </div>
+        <BroadcastDetailModal broadcast={detail} onClose={() => setDetail(null)} />
       )}
     </div>
   );
 }
 
-function DetailLoader({ messageId }: { messageId: string }) {
-  const { data, isLoading } = useQuery<{ message: any }>({
-    queryKey: ["/api/ghl/messages", messageId],
-    queryFn: () => fetchJson(`/api/ghl/messages/${messageId}`),
-  });
-  if (isLoading) return <div className="flex items-center gap-2 text-muted-foreground py-4"><Loader2 className="w-4 h-4 animate-spin" /> Carregando...</div>;
-  if (!data?.message) return <div className="text-muted-foreground py-4">Não foi possível carregar.</div>;
-  const m = data.message;
+// ─── Subcomponentes da Biblioteca ─────────────────────────────────────────
+
+function SortableTh({
+  label,
+  k,
+  sortKey,
+  sortDir,
+  onClick,
+  align,
+  className,
+}: {
+  label: string;
+  k: SortKey;
+  sortKey: SortKey;
+  sortDir: "asc" | "desc";
+  onClick: (k: SortKey) => void;
+  align?: "right" | "left";
+  className?: string;
+}) {
+  const active = sortKey === k;
   return (
-    <div className="space-y-3 text-sm">
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        <div><span className="text-muted-foreground">Direção:</span> <strong>{m.direction}</strong></div>
-        <div><span className="text-muted-foreground">Status:</span> <strong>{m.status}</strong></div>
-        <div><span className="text-muted-foreground">Contato:</span> {m.contact_name ?? "—"}</div>
-        <div><span className="text-muted-foreground">Email:</span> {m.contact_email ?? "—"}</div>
-        <div><span className="text-muted-foreground">Phone:</span> {m.contact_phone ?? "—"}</div>
-        <div><span className="text-muted-foreground">Source:</span> {m.source ?? "—"}</div>
-        {m.email_message_id && <div className="col-span-2"><span className="text-muted-foreground">Email Msg ID:</span> <code className="text-xs">{m.email_message_id}</code></div>}
-      </div>
-      {m.contact_tags && m.contact_tags.length > 0 && (
-        <div>
-          <div className="text-xs text-muted-foreground mb-1">Tags do contato:</div>
-          <div className="flex flex-wrap gap-1">
-            {m.contact_tags.slice(0, 15).map((t: string) => <Badge key={t} variant="outline" className="text-xs">{t}</Badge>)}
-            {m.contact_tags.length > 15 && <span className="text-xs text-muted-foreground">+{m.contact_tags.length - 15}</span>}
-          </div>
-        </div>
+    <TableHead
+      className={cn(
+        "cursor-pointer select-none hover:bg-muted/50 whitespace-nowrap",
+        align === "right" && "text-right",
+        className,
       )}
-      <div className="border-t pt-3">
-        <div className="text-xs text-muted-foreground mb-2">Conteúdo da mensagem:</div>
-        {m.content_type === "text/html" ? (
-          <iframe srcDoc={m.body || ""} sandbox="" className="w-full h-96 border rounded bg-white" title="Email content" />
-        ) : (
-          <pre className="whitespace-pre-wrap font-sans text-sm bg-muted/40 p-3 rounded max-h-96 overflow-auto">{m.body || "(sem corpo)"}</pre>
-        )}
-      </div>
+      onClick={() => onClick(k)}
+    >
+      <span className="inline-flex items-center gap-1">
+        {label}
+        {active && <span className="text-xs">{sortDir === "asc" ? "▲" : "▼"}</span>}
+      </span>
+    </TableHead>
+  );
+}
+
+function StatusBadge({ status }: { status: string | null }) {
+  if (!status) return <span className="text-muted-foreground text-xs">—</span>;
+  const lower = status.toLowerCase();
+  const variant: { className: string; label: string } =
+    lower === "complete" || lower === "concluido"
+      ? { className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300", label: "Concluído" }
+      : lower === "scheduled"
+      ? { className: "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300", label: "Agendado" }
+      : lower === "draft"
+      ? { className: "bg-muted text-muted-foreground", label: "Rascunho" }
+      : { className: "bg-muted text-muted-foreground", label: status };
+  return <Badge variant="outline" className={cn("text-xs", variant.className)}>{variant.label}</Badge>;
+}
+
+function PctBadge({ value }: { value: number | null }) {
+  if (value == null) return <span className="text-muted-foreground">—</span>;
+  // Coloração leve baseada em faixas razoáveis pra delivery/open rate
+  const cls =
+    value >= 50 ? "text-emerald-600 dark:text-emerald-400"
+    : value >= 10 ? "text-yellow-600 dark:text-yellow-400"
+    : value > 0 ? "text-orange-600 dark:text-orange-400"
+    : "text-muted-foreground";
+  return <span className={cn("font-medium", cls)}>{value.toFixed(1)}%</span>;
+}
+
+function BroadcastDetailModal({ broadcast, onClose }: { broadcast: BroadcastRow; onClose: () => void }) {
+  const { data, isLoading } = useQuery<{ broadcast: any }>({
+    queryKey: ["/api/ghl/broadcasts", broadcast.id],
+    queryFn: () => fetchJson(`/api/ghl/broadcasts/${encodeURIComponent(broadcast.id)}`),
+  });
+  const d = data?.broadcast;
+  const queryClient = useQueryClient();
+  const [feedback, setFeedback] = useState(broadcast.sdr_feedback ?? "");
+  const [saving, setSaving] = useState(false);
+  const [saveOk, setSaveOk] = useState(false);
+
+  async function saveAnnotation() {
+    setSaving(true);
+    setSaveOk(false);
+    try {
+      const res = await fetch(`/api/ghl/broadcasts/${encodeURIComponent(broadcast.id)}/annotations`, {
+        method: "PATCH",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sdr_feedback: feedback || null }),
+      });
+      if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+      setSaveOk(true);
+      // Invalida queries pra recarregar a tabela com novo feedback
+      queryClient.invalidateQueries({ queryKey: ["/api/ghl/broadcasts"] });
+      setTimeout(() => setSaveOk(false), 2000);
+    } catch (e) {
+      console.error(e);
+      alert("Erro ao salvar feedback: " + (e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  }
+  return (
+    <div
+      className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4"
+      onClick={onClose}
+    >
+      <Card
+        className="max-w-3xl w-full max-h-[85vh] overflow-y-auto"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <CardHeader className="flex flex-row justify-between items-start">
+          <div>
+            <CardTitle className="text-base">
+              {broadcast.channel === "Email"
+                ? broadcast.name ?? broadcast.subject ?? `Campanha ${broadcast.id.slice(0, 8)}`
+                : "WhatsApp broadcast"}
+            </CardTitle>
+            <div className="text-sm text-muted-foreground mt-1 flex flex-wrap gap-x-2 items-center">
+              {broadcast.date && (
+                <span>{format(new Date(broadcast.date), "dd 'de' MMMM 'de' yyyy 'às' HH:mm", { locale: ptBR })}</span>
+              )}
+              <span>·</span>
+              <Badge variant="outline" className="text-xs">
+                {broadcast.channel === "Email" ? <Mail className="w-3 h-3 mr-1" /> : <MessageCircle className="w-3 h-3 mr-1" />}
+                {broadcast.channel}
+              </Badge>
+              {broadcast.source && <Badge variant="outline" className="text-xs">{broadcast.source}</Badge>}
+              <StatusBadge status={broadcast.status} />
+            </div>
+          </div>
+          <button onClick={onClose} className="p-1 hover:bg-muted rounded" aria-label="Fechar">
+            <X className="w-4 h-4" />
+          </button>
+        </CardHeader>
+        <CardContent>
+          {isLoading && (
+            <div className="flex items-center gap-2 text-muted-foreground py-4">
+              <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+            </div>
+          )}
+          {!isLoading && !d && <div className="text-muted-foreground py-4">Não foi possível carregar.</div>}
+          {d && (
+            <div className="space-y-4 text-sm">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-xs">
+                <KV label="Tamanho lista" value={fmtInt(broadcast.list_size)} />
+                <KV label="Entregues" value={fmtInt(broadcast.delivered)} />
+                <KV label="Entrega %" value={broadcast.delivery_pct != null ? `${broadcast.delivery_pct.toFixed(1)}%` : "—"} />
+                <KV label="Abertura %" value={broadcast.open_pct != null ? `${broadcast.open_pct.toFixed(1)}%` : "—"} />
+                <KV label="Conversas (7d)" value={fmtInt(broadcast.conversations_generated)} />
+                <KV label="Gasto" value={broadcast.spend_brl != null ? `R$ ${broadcast.spend_brl.toLocaleString("pt-BR", { minimumFractionDigits: 2 })}` : "—"} />
+                {broadcast.channel === "Email" && d.events && (
+                  <>
+                    <KV label="Clicks únicos" value={fmtInt(d.events.unique_clicks)} />
+                    <KV label="Bounces" value={fmtInt(d.events.bounced)} />
+                    <KV label="Unsubs" value={fmtInt(d.events.unsubscribed)} />
+                  </>
+                )}
+              </div>
+              <div className="border-t pt-3">
+                <Label htmlFor="sdr-feedback" className="text-xs text-muted-foreground">Feedback do SDR</Label>
+                <Textarea
+                  id="sdr-feedback"
+                  value={feedback}
+                  onChange={(e) => setFeedback(e.target.value)}
+                  placeholder="Anota aqui as observações do SDR sobre esse broadcast: qualidade dos leads, contexto, problemas..."
+                  className="mt-1 text-sm"
+                  rows={3}
+                />
+                <div className="flex items-center gap-2 mt-2">
+                  <button
+                    onClick={saveAnnotation}
+                    disabled={saving}
+                    className="px-3 py-1.5 text-xs bg-primary text-primary-foreground rounded hover:opacity-90 disabled:opacity-50"
+                  >
+                    {saving ? "Salvando..." : "Salvar feedback"}
+                  </button>
+                  {saveOk && <span className="text-emerald-600 text-xs inline-flex items-center gap-1"><Check className="w-3 h-3" /> Salvo</span>}
+                </div>
+              </div>
+              <div className="border-t pt-3">
+                <div className="text-xs text-muted-foreground mb-2">Conteúdo da mensagem:</div>
+                {broadcast.channel === "Email" && d.sample_content_type === "text/html" && d.sample_body ? (
+                  <iframe srcDoc={d.sample_body} sandbox="" className="w-full h-96 border rounded bg-white" title="Email content" />
+                ) : (
+                  <pre className="whitespace-pre-wrap font-sans text-sm bg-muted/40 p-3 rounded max-h-96 overflow-auto">
+                    {d.body ?? d.sample_body ?? broadcast.preview ?? "(sem corpo)"}
+                  </pre>
+                )}
+              </div>
+              {broadcast.channel === "Email" && (
+                <div className="text-xs text-muted-foreground">
+                  {broadcast.has_open_tracking
+                    ? "Eventos de abertura/click vêm via webhook GHL (cadastrado em produção)."
+                    : "Sem dados de abertura/click — cadastrar webhook GHL em prod para popular esses números."}
+                </div>
+              )}
+              {broadcast.channel === "WhatsApp" && (
+                <div className="text-xs text-muted-foreground">
+                  Tamanho calculado por agrupamento heurístico (dia + source + hash do corpo). Status individual não atualiza via API do GHL.
+                </div>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function KV({ label, value }: { label: string; value: string | number }) {
+  return (
+    <div>
+      <div className="text-muted-foreground text-[10px] uppercase tracking-wide">{label}</div>
+      <div className="font-medium">{value}</div>
     </div>
   );
 }
@@ -1380,11 +1776,15 @@ function VariacaoCard({ v }: { v: VariacaoCopy }) {
 // ────────────────────────────────────────────────────────────────────────
 
 export default function GhlMarketing() {
-  usePageTitle("GHL Marketing");
-  useSetPageInfo("GHL Marketing", "Email, WhatsApp e Tags do GoHighLevel");
+  usePageTitle("CRM Marketing");
+  useSetPageInfo("CRM Marketing", "Email, WhatsApp e Tags do CRM");
 
-  const [from, setFrom] = useState(format(subDays(new Date(), 30), "yyyy-MM-dd"));
-  const [to, setTo] = useState(format(new Date(), "yyyy-MM-dd"));
+  const [dateRange, setDateRange] = useState<{ from: Date; to: Date }>({
+    from: subDays(new Date(), 30),
+    to: new Date(),
+  });
+  const from = format(dateRange.from, "yyyy-MM-dd");
+  const to = format(dateRange.to, "yyyy-MM-dd");
 
   const { data: overview } = useQuery<{ counts: any; lastSyncs: any[] }>({
     queryKey: ["/api/ghl/overview"],
@@ -1394,16 +1794,15 @@ export default function GhlMarketing() {
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
       <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
-        <div className="flex gap-3 items-end">
-          <div>
-            <Label htmlFor="ghl-from" className="text-xs">De</Label>
-            <Input id="ghl-from" type="date" value={from} onChange={(e) => setFrom(e.target.value)} className="w-40" />
-          </div>
-          <div>
-            <Label htmlFor="ghl-to" className="text-xs">Até</Label>
-            <Input id="ghl-to" type="date" value={to} onChange={(e) => setTo(e.target.value)} className="w-40" />
-          </div>
-        </div>
+        <DateRangePicker
+          value={dateRange}
+          onChange={(range) => {
+            if (range?.from) {
+              setDateRange({ from: range.from, to: range.to || range.from });
+            }
+          }}
+          align="start"
+        />
         {overview?.counts && (
           <div className="text-xs text-muted-foreground flex flex-wrap gap-3">
             <span><strong>{fmtInt(overview.counts.contacts)}</strong> contatos</span>
@@ -1416,22 +1815,13 @@ export default function GhlMarketing() {
         )}
       </div>
 
-      <Tabs defaultValue="email" className="w-full">
+      <Tabs defaultValue="biblioteca" className="w-full">
         <TabsList>
-          <TabsTrigger value="email" data-testid="tab-email">
-            <Mail className="w-4 h-4 mr-2" /> Email Marketing
-          </TabsTrigger>
-          <TabsTrigger value="whatsapp" data-testid="tab-whatsapp">
-            <MessageCircle className="w-4 h-4 mr-2" /> WhatsApp Marketing
+          <TabsTrigger value="biblioteca" data-testid="tab-biblioteca">
+            <BookOpen className="w-4 h-4 mr-2" /> Broadcast
           </TabsTrigger>
           <TabsTrigger value="tags" data-testid="tab-tags">
-            <TagIcon className="w-4 h-4 mr-2" /> Tags
-          </TabsTrigger>
-          <TabsTrigger value="diagnostico" data-testid="tab-diagnostico">
-            <BarChart2 className="w-4 h-4 mr-2" /> Diagnóstico
-          </TabsTrigger>
-          <TabsTrigger value="biblioteca" data-testid="tab-biblioteca">
-            <BookOpen className="w-4 h-4 mr-2" /> Biblioteca
+            <TagIcon className="w-4 h-4 mr-2" /> Listas
           </TabsTrigger>
           <TabsTrigger value="calendario" data-testid="tab-calendario">
             <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
@@ -1441,20 +1831,11 @@ export default function GhlMarketing() {
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="email" className="mt-6">
-          <EmailTab from={from} to={to} />
-        </TabsContent>
-        <TabsContent value="whatsapp" className="mt-6">
-          <WhatsappTab from={from} to={to} />
+        <TabsContent value="biblioteca" className="mt-6">
+          <BibliotecaTab from={from} to={to} />
         </TabsContent>
         <TabsContent value="tags" className="mt-6">
           <TagsTab />
-        </TabsContent>
-        <TabsContent value="diagnostico" className="mt-6">
-          <DiagnosticoTab from={from} to={to} />
-        </TabsContent>
-        <TabsContent value="biblioteca" className="mt-6">
-          <BibliotecaTab from={from} to={to} />
         </TabsContent>
         <TabsContent value="calendario" className="mt-6">
           <CalendarioTab />
