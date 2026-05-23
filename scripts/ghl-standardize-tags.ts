@@ -143,22 +143,37 @@ async function* iterateContactsWithOldTags(
         .filter(([oldT, newT]) => newT === null || newT !== oldT)
         .map(([oldT]) => oldT);
 
-  const BATCH = 1000;
-  let offset = 0;
+  const tagsArrSql = sql`ARRAY[${sql.join(
+    oldTagsToTouch.map((t) => sql`${t}`),
+    sql`,`,
+  )}]::text[]`;
+
+  // Worklist: sempre pega o próximo lote a partir do "topo" porque o caller
+  // remove a tag antiga do contato a cada iteração — usar OFFSET pula linhas
+  // que deslizaram pra cima após cada UPDATE.
+  const BATCH = 200;
+  const seen = new Set<string>();
   while (true) {
     const r = await db.execute<{ id: string; tags: string[] }>(sql`
       SELECT id, tags
       FROM cortex_core.ghl_contacts
-      WHERE tags && ${oldTagsToTouch}::text[]
+      WHERE tags && ${tagsArrSql}
       ORDER BY id
-      OFFSET ${offset}
       LIMIT ${BATCH}
     `);
     const rows = (r as any).rows as { id: string; tags: string[] }[];
     if (!rows.length) return;
-    for (const row of rows) yield row;
-    if (rows.length < BATCH) return;
-    offset += BATCH;
+    // Defesa contra loop infinito: se o lote inteiro já foi visto sem progresso,
+    // algo está errado (UPDATE não persistiu, condição WHERE não exclui contato).
+    let progressed = false;
+    for (const row of rows) {
+      if (!seen.has(row.id)) {
+        seen.add(row.id);
+        progressed = true;
+      }
+      yield row;
+    }
+    if (!progressed) return;
   }
 }
 
@@ -197,9 +212,14 @@ async function applyMigration(only: string | null): Promise<void> {
       }
       // Atualiza o array local imediatamente — o sync diário recoloca,
       // mas mantém o Cortex consistente durante a janela.
-      const newTags = [...new Set([...contact.tags.filter((t) => !remove.includes(t)), ...add])];
+      const newTags = Array.from(
+        new Set([...contact.tags.filter((t) => !remove.includes(t)), ...add]),
+      );
+      const newTagsSql = newTags.length
+        ? sql`ARRAY[${sql.join(newTags.map((t) => sql`${t}`), sql`,`)}]::text[]`
+        : sql`ARRAY[]::text[]`;
       await db.execute(sql`
-        UPDATE cortex_core.ghl_contacts SET tags = ${newTags}::text[] WHERE id = ${contact.id}
+        UPDATE cortex_core.ghl_contacts SET tags = ${newTagsSql} WHERE id = ${contact.id}
       `);
 
       processed++;
@@ -318,8 +338,11 @@ async function rollback(label: string): Promise<void> {
           body: JSON.stringify({ tags: remove }),
         });
       }
+      const origSql = originalTags.length
+        ? sql`ARRAY[${sql.join(originalTags.map((t) => sql`${t}`), sql`,`)}]::text[]`
+        : sql`ARRAY[]::text[]`;
       await db.execute(sql`
-        UPDATE cortex_core.ghl_contacts SET tags = ${originalTags}::text[] WHERE id = ${b.contact_id}
+        UPDATE cortex_core.ghl_contacts SET tags = ${origSql} WHERE id = ${b.contact_id}
       `);
       processed++;
       if (processed % 100 === 0) {
