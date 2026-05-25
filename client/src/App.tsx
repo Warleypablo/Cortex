@@ -62,6 +62,7 @@ const Patrimonio = lazyWithRetry(() => import("@/pages/Patrimonio"));
 const PatrimonioDetail = lazyWithRetry(() => import("@/pages/PatrimonioDetail"));
 const Ferramentas = lazyWithRetry(() => import("@/pages/Ferramentas"));
 const UtmBuilder = lazyWithRetry(() => import("@/pages/UtmBuilder"));
+const GhlMarketing = lazyWithRetry(() => import("@/pages/GhlMarketing"));
 const TurboZap = lazyWithRetry(() => import("@/pages/TurboZap"));
 const Atendimento = lazyWithRetry(() => import("@/pages/Atendimento"));
 const ChatAtendimento = lazyWithRetry(() => import("@/pages/ChatAtendimento"));
@@ -320,6 +321,7 @@ function ProtectedRouter() {
       </Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       <Route path="/utm-builder">{() => <ProtectedRoute path="/utm-builder" component={UtmBuilder} />}</Route>
+      <Route path="/ghl-marketing">{() => <ProtectedRoute path="/ghl-marketing" component={GhlMarketing} />}</Route>
 
       {/* Financeiro */}
       <Route path="/dashboard/dfc">{() => <ProtectedRoute path="/dashboard/dfc" component={DashboardDFC} />}</Route>
