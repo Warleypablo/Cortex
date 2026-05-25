@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Wand2, ShieldCheck, ShieldAlert, ShieldX, Copy, Check } from "lucide-react";
+import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Wand2, ShieldCheck, ShieldAlert, ShieldX, Copy, Check, Zap } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths } from "date-fns";
@@ -359,6 +359,7 @@ interface ListRow {
   tags_all: string[];
   tags_any: string[];
   tags_not: string[];
+  top_origins: Array<{ medium: string; count: number }>;
 }
 
 function TagsTab() {
@@ -404,7 +405,8 @@ function TagsTab() {
               <TableHeader>
                 <TableRow>
                   <TableHead className="min-w-[200px]">Lista</TableHead>
-                  <TableHead className="min-w-[420px]">Definição (tags)</TableHead>
+                  <TableHead className="min-w-[380px]">Definição (tags)</TableHead>
+                  <TableHead className="min-w-[140px]" title="Top 3 origens dos contatos (campo medium dos attributions do GHL)">Origem (top 3)</TableHead>
                   <TableHead className="text-right">Contatos</TableHead>
                   <TableHead className="text-right" title="Novos contatos criados nos últimos 7 dias">Leads (7d)</TableHead>
                 </TableRow>
@@ -415,6 +417,20 @@ function TagsTab() {
                     <TableCell className="text-sm font-medium align-top">{r.list}</TableCell>
                     <TableCell className="text-xs align-top">
                       <ListDefinition tagsAll={r.tags_all} tagsAny={r.tags_any} tagsNot={r.tags_not} />
+                    </TableCell>
+                    <TableCell className="text-xs align-top">
+                      {r.top_origins.length ? (
+                        <div className="flex flex-col gap-0.5">
+                          {r.top_origins.map((o) => (
+                            <div key={o.medium} className="flex items-center gap-1.5">
+                              <span className="truncate">{o.medium}</span>
+                              <span className="text-muted-foreground text-[10px]">({fmtInt(o.count)})</span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span className="text-muted-foreground">—</span>
+                      )}
                     </TableCell>
                     <TableCell className="text-right align-top">{fmtInt(r.contacts)}</TableCell>
                     <TableCell className="text-right align-top">
@@ -473,6 +489,146 @@ function TagsTab() {
         </Card>
       </TabsContent>
     </Tabs>
+  );
+}
+
+// ────────────────────────────────────────────────────────────────────────
+// Tab: Automações (workflows do GHL)
+// ────────────────────────────────────────────────────────────────────────
+
+interface WorkflowRow {
+  id: string;
+  name: string | null;
+  status: string | null;
+  version: number | null;
+  created_at: string | null;
+  updated_at: string | null;
+  synced_at: string | null;
+}
+
+function AutomacoesTab() {
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [search, setSearch] = useState("");
+  const { data, isLoading, error } = useQuery<{
+    workflows: WorkflowRow[];
+    counts: Record<string, number>;
+    total: number;
+  }>({
+    queryKey: ["/api/ghl/workflows"],
+    queryFn: () => fetchJson("/api/ghl/workflows"),
+  });
+
+  const filtered = useMemo(() => {
+    let rows = data?.workflows ?? [];
+    if (statusFilter !== "all") rows = rows.filter((w) => w.status === statusFilter);
+    if (search) {
+      const s = search.toLowerCase();
+      rows = rows.filter((w) => (w.name ?? "").toLowerCase().includes(s));
+    }
+    return rows;
+  }, [data, statusFilter, search]);
+
+  return (
+    <div className="space-y-4">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+        <StatCard label="Total automações" value={fmtInt(data?.total ?? 0)} />
+        <StatCard label="Publicadas" value={fmtInt(data?.counts?.published ?? 0)} />
+        <StatCard label="Rascunho" value={fmtInt(data?.counts?.draft ?? 0)} />
+        <StatCard label="Outras" value={fmtInt((data?.total ?? 0) - (data?.counts?.published ?? 0) - (data?.counts?.draft ?? 0))} />
+      </div>
+
+      <Card>
+        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
+          <div>
+            <Label className="text-xs">Status</Label>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="published">Publicadas</SelectItem>
+                <SelectItem value="draft">Rascunho</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="md:col-span-2">
+            <Label className="text-xs">Busca por nome</Label>
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Ex.: DM, Newsletter, Creators..."
+              className="text-sm"
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {isLoading && (
+        <div className="flex items-center gap-2 text-muted-foreground">
+          <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+        </div>
+      )}
+      {error && <div className="text-destructive">Erro: {(error as Error).message}</div>}
+
+      {data && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">
+              Automações ({fmtInt(filtered.length)}{filtered.length !== data.total && ` de ${fmtInt(data.total)}`})
+            </CardTitle>
+            <div className="text-xs text-muted-foreground mt-1">
+              Workflows do GHL. A API não expõe contagem de contatos por workflow nem stats — só metadata.
+              Pra rastrear leads gerados, configure uma ação de Webhook em cada workflow apontando pro Cortex (Fase 2).
+            </div>
+          </CardHeader>
+          <CardContent>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Nome</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead className="text-right">Versão</TableHead>
+                  <TableHead>Criada</TableHead>
+                  <TableHead>Atualizada</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filtered.map((w) => (
+                  <TableRow key={w.id}>
+                    <TableCell className="text-sm font-medium">{w.name ?? "—"}</TableCell>
+                    <TableCell>
+                      <Badge
+                        variant="outline"
+                        className={cn(
+                          "text-xs",
+                          w.status === "published" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
+                          w.status === "draft" && "bg-muted text-muted-foreground",
+                        )}
+                      >
+                        {w.status === "published" ? "Publicada" : w.status === "draft" ? "Rascunho" : w.status ?? "—"}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-xs text-right">v{w.version ?? "?"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {w.created_at ? format(new Date(w.created_at), "dd/MM/yyyy", { locale: ptBR }) : "—"}
+                    </TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {w.updated_at ? format(new Date(w.updated_at), "dd/MM/yyyy", { locale: ptBR }) : "—"}
+                    </TableCell>
+                  </TableRow>
+                ))}
+                {filtered.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
+                      Nenhuma automação encontrada
+                    </TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      )}
+    </div>
   );
 }
 
@@ -1823,6 +1979,9 @@ export default function GhlMarketing() {
           <TabsTrigger value="tags" data-testid="tab-tags">
             <TagIcon className="w-4 h-4 mr-2" /> Listas
           </TabsTrigger>
+          <TabsTrigger value="automacoes" data-testid="tab-automacoes">
+            <Zap className="w-4 h-4 mr-2" /> Automações
+          </TabsTrigger>
           <TabsTrigger value="calendario" data-testid="tab-calendario">
             <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
           </TabsTrigger>
@@ -1836,6 +1995,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="tags" className="mt-6">
           <TagsTab />
+        </TabsContent>
+        <TabsContent value="automacoes" className="mt-6">
+          <AutomacoesTab />
         </TabsContent>
         <TabsContent value="calendario" className="mt-6">
           <CalendarioTab />

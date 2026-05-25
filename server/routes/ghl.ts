@@ -237,6 +237,25 @@ async function getLists(_req: Request, res: Response) {
             WHERE ${whereTags}
           `);
           const row = (r as any).rows?.[0] ?? {};
+
+          // Top 3 origens (campo `medium` dos attributions do GHL)
+          const origRes = await db.execute(sql`
+            SELECT
+              COALESCE(attributions->0->>'medium', 'sem origem') AS medium,
+              COUNT(*)::int AS n
+            FROM cortex_core.ghl_contacts
+            WHERE ${whereTags}
+              AND jsonb_typeof(attributions) = 'array'
+              AND attributions != '[]'::jsonb
+            GROUP BY 1
+            ORDER BY n DESC
+            LIMIT 3
+          `);
+          const top_origins = ((origRes as any).rows ?? []).map((o: any) => ({
+            medium: o.medium,
+            count: o.n,
+          }));
+
           return {
             list: baseName,
             contacts: row.contacts ?? 0,
@@ -244,6 +263,7 @@ async function getLists(_req: Request, res: Response) {
             tags_all: filtro.tagsAll ?? [],
             tags_any: filtro.tagsAny ?? [],
             tags_not: filtro.tagsNot ?? [],
+            top_origins,
           };
         } catch (e: any) {
           return {
@@ -253,6 +273,7 @@ async function getLists(_req: Request, res: Response) {
             tags_all: filtro.tagsAll ?? [],
             tags_any: filtro.tagsAny ?? [],
             tags_not: filtro.tagsNot ?? [],
+            top_origins: [],
             error: e.message,
           };
         }
@@ -1229,6 +1250,31 @@ async function patchBroadcastAnnotation(req: Request, res: Response) {
 }
 
 /**
+ * GET /api/ghl/workflows
+ * Lista de automações (workflows) do GHL — sincronizada via script.
+ */
+async function getWorkflows(_req: Request, res: Response) {
+  try {
+    const r = await db.execute(sql`
+      SELECT id, name, status, version, created_at, updated_at, synced_at
+      FROM cortex_core.ghl_workflows
+      ORDER BY
+        CASE status WHEN 'published' THEN 0 WHEN 'draft' THEN 1 ELSE 2 END,
+        name ASC
+    `);
+    const workflows = (r as any).rows ?? [];
+    const counts: Record<string, number> = {};
+    for (const w of workflows) {
+      counts[w.status ?? "unknown"] = (counts[w.status ?? "unknown"] ?? 0) + 1;
+    }
+    res.json({ workflows, counts, total: workflows.length });
+  } catch (err: any) {
+    console.error("[GHL] workflows error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
  * GET /api/ghl/overview
  * Counts gerais + última sync por resource.
  */
@@ -1272,6 +1318,7 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/whatsapp-metrics", getWhatsappMetrics);
   app.get("/api/ghl/tags", getTags);
   app.get("/api/ghl/lists", getLists);
+  app.get("/api/ghl/workflows", getWorkflows);
   app.get("/api/ghl/overview", getOverview);
   app.get("/api/ghl/diagnostico", getDiagnostico);
   app.get("/api/ghl/messages", listMessages);
