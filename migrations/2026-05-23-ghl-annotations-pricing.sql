@@ -30,10 +30,5 @@ WHERE NOT EXISTS (
   WHERE channel = 'WhatsApp' AND effective_from = '2025-07-01'::date
 );
 
-INSERT INTO cortex_core.ghl_pricing (channel, message_category, unit_cost_brl, effective_from, notes)
-SELECT 'Email', NULL, 0.01, '2025-07-01'::date,
-       'Estimativa inicial — ajustar com valor real cobrado pelo GHL/Mailgun'
-WHERE NOT EXISTS (
-  SELECT 1 FROM cortex_core.ghl_pricing
-  WHERE channel = 'Email' AND effective_from = '2025-07-01'::date
-);
+-- Email NÃO entra aqui: a Turbo paga ao GHL um valor mensal fixo, não por mensagem.
+-- Coluna "Gasto" pra email mostra "—" porque não há custo unitário por envio.

@@ -1144,10 +1144,12 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                       <TableCell className="text-xs text-right whitespace-nowrap text-muted-foreground" title="Depende de cruzamento GHL ↔ Bitrix — Fase 2">—</TableCell>
                       <TableCell className="text-xs text-right whitespace-nowrap">
                         {b.spend_brl != null ? (
-                          <span title={b.spend_is_manual ? "Valor manual" : "Calculado: tamanho × preço unitário do canal"}>
+                          <span title={b.spend_is_manual ? "Valor manual" : "Calculado: entregues × preço unitário do canal"}>
                             R$ {b.spend_brl.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                             {b.spend_is_manual && <span className="ml-1 text-[10px] text-muted-foreground">man.</span>}
                           </span>
+                        ) : b.channel === "Email" ? (
+                          <span className="text-muted-foreground" title="Email tem custo mensal fixo no GHL, não por mensagem">—</span>
                         ) : (
                           <span className="text-muted-foreground">—</span>
                         )}
