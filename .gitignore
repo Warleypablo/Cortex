@@ -16,3 +16,4 @@ credentials/
 contracts.db/
 attached_assets/
 .claude/worktrees/
+out/

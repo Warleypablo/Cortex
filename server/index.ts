@@ -608,6 +608,62 @@ app.use((req, res, next) => {
   setInterval(() => runInternalTrainingsSync(), INTERNAL_TRAININGS_SYNC_INTERVAL);
   console.log(`[internal-trainings-sync-job] Scheduled every ${INTERNAL_TRAININGS_SYNC_INTERVAL / 60000} min`);
 
+  // GoHighLevel (GHL) — delta sync a cada 1 hora + tags snapshot diário
+  const GHL_SYNC_INTERVAL = 60 * 60 * 1000; // 1h
+  const runGhlSync = async () => {
+    if (!process.env.GHL_PIT_TOKEN || !process.env.GHL_LOCATION_ID) {
+      console.warn("[ghl-sync-job] Skipping — GHL_PIT_TOKEN/GHL_LOCATION_ID não configurados");
+      return;
+    }
+    try {
+      console.log("[ghl-sync-job] Starting hourly delta sync...");
+      const { runGhlHourlySync } = await import('./services/goHighLevelSync');
+      const r = await runGhlHourlySync();
+      console.log(
+        `[ghl-sync-job] Done: ${r.contacts} contacts, ${r.campaigns} campaigns, ` +
+        `${r.conversations} conversations, ${r.errors.length} errors`,
+      );
+      (globalThis as any).__ghlSyncStatus = {
+        lastSync: new Date().toISOString(),
+        report: r,
+      };
+    } catch (err: any) {
+      console.error("[ghl-sync-job] Failed:", err.message);
+      (globalThis as any).__ghlSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  // Primeira execução 2min após startup, depois a cada 1h
+  setTimeout(() => runGhlSync(), 2 * 60 * 1000);
+  setInterval(() => runGhlSync(), GHL_SYNC_INTERVAL);
+  console.log(`[ghl-sync-job] Scheduled every ${GHL_SYNC_INTERVAL / 60000} min`);
+
+  // GHL tags snapshot diário às 00:10
+  const scheduleNextGhlTagsSnapshot = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setDate(next.getDate() + 1);
+    next.setHours(0, 10, 0, 0);
+    const msUntilNext = next.getTime() - now.getTime();
+    setTimeout(async () => {
+      try {
+        if (process.env.GHL_PIT_TOKEN && process.env.GHL_LOCATION_ID) {
+          const { runGhlDailyTagsSnapshot } = await import('./services/goHighLevelSync');
+          const r = await runGhlDailyTagsSnapshot();
+          console.log(`[ghl-tags-snapshot] Done: ${r.tags} tags`);
+        }
+      } catch (err: any) {
+        console.error("[ghl-tags-snapshot] Failed:", err.message);
+      }
+      scheduleNextGhlTagsSnapshot();
+    }, msUntilNext);
+    console.log(`[ghl-tags-snapshot] Próximo snapshot agendado para ${next.toISOString()}`);
+  };
+  scheduleNextGhlTagsSnapshot();
+
   // Agendar snapshot diário às 00:05
   const scheduleNextSnapshot = () => {
     const now = new Date();

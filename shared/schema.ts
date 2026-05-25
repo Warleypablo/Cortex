@@ -3560,3 +3560,175 @@ export type YoutubeChannelDailyMetric = typeof youtubeChannelDailyMetrics.$infer
 export type InsertYoutubeChannelDailyMetric = typeof youtubeChannelDailyMetrics.$inferInsert;
 export type YoutubeSyncRun = typeof youtubeSyncRuns.$inferSelect;
 export type InsertYoutubeSyncRun = typeof youtubeSyncRuns.$inferInsert;
+
+// ============================================================
+// GoHighLevel (GHL) — sublocation única "Turbo Partners"
+// Integração via Private Integration Token (PIT)
+// Ver docs/handover-ghl-integracao.md
+// ============================================================
+
+export const ghlContacts = cortexCoreSchema.table("ghl_contacts", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  contactName: text("contact_name"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  companyName: text("company_name"),
+  type: text("type"),
+  source: text("source"),
+  tags: text("tags").array(),
+  country: text("country"),
+  city: text("city"),
+  state: text("state"),
+  dateAdded: timestamp("date_added"),
+  dateUpdated: timestamp("date_updated"),
+  attributions: jsonb("attributions"),
+  customFields: jsonb("custom_fields"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  emailIdx: index("ghl_contacts_email_idx").on(table.email),
+  phoneIdx: index("ghl_contacts_phone_idx").on(table.phone),
+  dateUpdatedIdx: index("ghl_contacts_date_updated_idx").on(table.dateUpdated),
+}));
+
+export const ghlConversations = cortexCoreSchema.table("ghl_conversations", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id").notNull(),
+  contactId: text("contact_id"),
+  lastMessageType: text("last_message_type"),
+  lastMessageDirection: text("last_message_direction"),
+  lastMessageDate: timestamp("last_message_date"),
+  unreadCount: integer("unread_count"),
+  dateAdded: timestamp("date_added"),
+  dateUpdated: timestamp("date_updated"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  contactIdx: index("ghl_conversations_contact_idx").on(table.contactId),
+  lastMsgDateIdx: index("ghl_conversations_last_msg_date_idx").on(table.lastMessageDate),
+  typeIdx: index("ghl_conversations_type_idx").on(table.lastMessageType),
+}));
+
+export const ghlMessages = cortexCoreSchema.table("ghl_messages", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id").notNull(),
+  contactId: text("contact_id"),
+  locationId: text("location_id").notNull(),
+  direction: text("direction"),
+  messageType: text("message_type"),
+  status: text("status"),
+  source: text("source"),
+  body: text("body"),
+  subject: text("subject"),
+  emailMessageId: text("email_message_id"),
+  contentType: text("content_type"),
+  dateAdded: timestamp("date_added"),
+  meta: jsonb("meta"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  convIdx: index("ghl_messages_conv_idx").on(table.conversationId),
+  dateIdx: index("ghl_messages_date_idx").on(table.dateAdded),
+  typeDirIdx: index("ghl_messages_type_dir_idx").on(table.messageType, table.direction),
+  sourceIdx: index("ghl_messages_source_idx").on(table.source),
+  emailMsgIdIdx: index("ghl_messages_email_msg_id_idx").on(table.emailMessageId),
+}));
+
+export const ghlEmailCampaigns = cortexCoreSchema.table("ghl_email_campaigns", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id").notNull(),
+  name: text("name"),
+  subject: text("subject"),
+  campaignType: text("campaign_type"),
+  status: text("status"),
+  templateId: text("template_id"),
+  templateType: text("template_type"),
+  totalCount: integer("total_count"),
+  successCount: integer("success_count"),
+  failedCount: integer("failed_count"),
+  errorCount: integer("error_count"),
+  processedCount: integer("processed_count"),
+  queuedCount: integer("queued_count"),
+  hasTracking: boolean("has_tracking"),
+  hasUtmTracking: boolean("has_utm_tracking"),
+  isPlainText: boolean("is_plain_text"),
+  scheduledAt: timestamp("scheduled_at"),
+  dateAdded: timestamp("date_added"),
+  dateUpdated: timestamp("date_updated"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  scheduledIdx: index("ghl_email_campaigns_scheduled_idx").on(table.scheduledAt),
+  statusIdx: index("ghl_email_campaigns_status_idx").on(table.status),
+}));
+
+// Open/Click/Bounce vêm por webhook do GHL (NÃO existem via REST)
+export const ghlEmailEvents = cortexCoreSchema.table("ghl_email_events", {
+  id: serial("id").primaryKey(),
+  eventId: text("event_id").unique(),
+  messageId: text("message_id"),
+  contactId: text("contact_id"),
+  campaignId: text("campaign_id"),
+  eventType: text("event_type"),
+  occurredAt: timestamp("occurred_at"),
+  clickedLink: text("clicked_link"),
+  payload: jsonb("payload"),
+  receivedAt: timestamp("received_at").defaultNow(),
+}, (table) => ({
+  messageIdx: index("ghl_email_events_message_idx").on(table.messageId),
+  typeDateIdx: index("ghl_email_events_type_date_idx").on(table.eventType, table.occurredAt),
+  contactIdx: index("ghl_email_events_contact_idx").on(table.contactId),
+}));
+
+export const ghlTagsSnapshot = cortexCoreSchema.table("ghl_tags_snapshot", {
+  snapshotDate: date("snapshot_date").notNull(),
+  tag: text("tag").notNull(),
+  contactCount: integer("contact_count").notNull(),
+}, (table) => ({
+  pk: uniqueIndex("ghl_tags_snapshot_pk").on(table.snapshotDate, table.tag),
+}));
+
+export const ghlWorkflows = cortexCoreSchema.table("ghl_workflows", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id").notNull(),
+  name: text("name"),
+  status: text("status"),
+  version: integer("version"),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  statusIdx: index("ghl_workflows_status_idx").on(table.status),
+  updatedIdx: index("ghl_workflows_updated_idx").on(table.updatedAt),
+}));
+
+export const ghlSyncRuns = cortexCoreSchema.table("ghl_sync_runs", {
+  id: serial("id").primaryKey(),
+  resource: text("resource").notNull(),
+  startedAt: timestamp("started_at").notNull(),
+  finishedAt: timestamp("finished_at"),
+  status: text("status").notNull(),
+  recordsProcessed: integer("records_processed"),
+  errorMessage: text("error_message"),
+  cursor: text("cursor"),
+}, (table) => ({
+  resourceIdx: index("ghl_sync_runs_resource_idx").on(table.resource, table.startedAt),
+}));
+
+export type GhlContact = typeof ghlContacts.$inferSelect;
+export type InsertGhlContact = typeof ghlContacts.$inferInsert;
+export type GhlConversation = typeof ghlConversations.$inferSelect;
+export type InsertGhlConversation = typeof ghlConversations.$inferInsert;
+export type GhlMessage = typeof ghlMessages.$inferSelect;
+export type InsertGhlMessage = typeof ghlMessages.$inferInsert;
+export type GhlEmailCampaign = typeof ghlEmailCampaigns.$inferSelect;
+export type InsertGhlEmailCampaign = typeof ghlEmailCampaigns.$inferInsert;
+export type GhlEmailEvent = typeof ghlEmailEvents.$inferSelect;
+export type InsertGhlEmailEvent = typeof ghlEmailEvents.$inferInsert;
+export type GhlTagsSnapshot = typeof ghlTagsSnapshot.$inferSelect;
+export type InsertGhlTagsSnapshot = typeof ghlTagsSnapshot.$inferInsert;
+export type GhlSyncRun = typeof ghlSyncRuns.$inferSelect;
+export type InsertGhlSyncRun = typeof ghlSyncRuns.$inferInsert;
