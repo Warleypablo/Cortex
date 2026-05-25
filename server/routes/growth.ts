@@ -2621,8 +2621,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const impressoes = metaImpressoes + googleImpressoes;
       const cliques = metaCliques + googleCliques;
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
-      // CTR consolidado: cliques totais / impressões totais (não cliques_saida Meta-only)
-      const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
+      // CTR de saída = cliques_saida / impressões (Meta outbound_clicks + Google clicks).
+      // Padrão da casa — alinhado com Criativos e Aprofundado por plataforma.
+      const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
 
       // CPS = Custo por Sessão (Investimento / Visualizações de Página)
       const cps = visualizacoesPagina > 0 ? investimento / visualizacoesPagina : 0;

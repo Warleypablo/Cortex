@@ -219,7 +219,8 @@ export default function GrowthOrcamentoCampanhas() {
       if (c.platform === "meta") metaRows.push(c);
       else if (SHOW_GOOGLE) googleRows.push(c);
       else continue; // Google escondido — não soma aos totais.
-      totalDaily += c.dailyBudgetAtual;
+      const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
+      totalDaily += isActive ? c.dailyBudgetAtual : 0;
       totalDailyMeta += c.orcamentoDiarioMeta ?? 0;
       totalMensalMeta += c.investimentoMensalMeta ?? 0;
       totalProjecao += c.projecaoAsIs;
@@ -256,7 +257,11 @@ export default function GrowthOrcamentoCampanhas() {
           )}
         </div>
       </TableCell>
-      <TableCell className="text-right font-mono">{formatCurrency(c.dailyBudgetAtual)}</TableCell>
+      <TableCell className="text-right font-mono">
+        {c.status === "ACTIVE" || c.status === "ENABLED"
+          ? formatCurrency(c.dailyBudgetAtual)
+          : <span className="text-muted-foreground">—</span>}
+      </TableCell>
       <TableCell className="text-right font-mono">
         {c.orcamentoDiarioMeta !== null ? formatCurrency(c.orcamentoDiarioMeta) : <span className="text-muted-foreground">—</span>}
       </TableCell>
