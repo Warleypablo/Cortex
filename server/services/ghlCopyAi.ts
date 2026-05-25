@@ -191,7 +191,7 @@ export async function buscarTopPerformers(limit = 5): Promise<TopPerformer[]> {
       FROM cortex_core.ghl_messages m
       WHERE m.direction = 'outbound'
         AND m.message_type = 'TYPE_WHATSAPP'
-        AND m.source IN ('workflow', 'bulk', 'campaign')
+        AND m.source IN ('workflow', 'bulk_actions', 'campaign')
         AND LENGTH(m.body) BETWEEN 100 AND 800
         AND m.date_added >= NOW() - INTERVAL '90 days'
     ),

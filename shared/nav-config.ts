@@ -488,7 +488,7 @@ export const NAV_CONFIG = {
         { title: 'Growth AI', url: '/growth/ai', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
         { title: 'Instagram', url: '/growth/instagram', icon: 'Instagram', permissionKey: PERMISSION_KEYS.GROWTH.INSTAGRAM },
         { title: 'Gerador de UTMs', url: '/utm-builder', icon: 'Link2', permissionKey: PERMISSION_KEYS.GROWTH.UTM_BUILDER },
-        { title: 'GHL Marketing', url: '/ghl-marketing', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.GROWTH.GHL_MARKETING },
+        { title: 'CRM Marketing', url: '/ghl-marketing', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.GROWTH.GHL_MARKETING },
       ],
     },
     {
