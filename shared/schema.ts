@@ -3690,6 +3690,21 @@ export const ghlTagsSnapshot = cortexCoreSchema.table("ghl_tags_snapshot", {
   pk: uniqueIndex("ghl_tags_snapshot_pk").on(table.snapshotDate, table.tag),
 }));
 
+export const ghlWorkflows = cortexCoreSchema.table("ghl_workflows", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id").notNull(),
+  name: text("name"),
+  status: text("status"),
+  version: integer("version"),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  statusIdx: index("ghl_workflows_status_idx").on(table.status),
+  updatedIdx: index("ghl_workflows_updated_idx").on(table.updatedAt),
+}));
+
 export const ghlSyncRuns = cortexCoreSchema.table("ghl_sync_runs", {
   id: serial("id").primaryKey(),
   resource: text("resource").notNull(),
