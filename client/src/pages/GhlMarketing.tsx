@@ -20,6 +20,7 @@ import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { avaliarPerformance, CLASSIFICACAO_TAILWIND, CLASSIFICACAO_LABEL, BENCHMARKS_TURBO, type Classificacao } from "@shared/ghl-broadcast/benchmarks";
+import FunilTab from "@/components/FunilBroadcast";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -950,6 +951,17 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
     };
   }, [data]);
 
+  // Resumo executivo: entrega WhatsApp por status + funil atribuído (causalidade pós-resposta).
+  const summary = useQuery<{
+    whatsapp: { total: number; enviado: number; entregue: number; lida: number; erro: number; entrega_pct: number | null; leitura_pct: number | null; erro_pct: number | null };
+    funil: { responderam: number; positivas: number; reuniao_marcada: number; compareceu: number; venda: number };
+  }>({
+    queryKey: ["/api/ghl/broadcasts/summary", from, to],
+    queryFn: () => fetchJson(`/api/ghl/broadcasts/summary?from=${from}&to=${to}`),
+  });
+  const wa = summary.data?.whatsapp;
+  const fnl = summary.data?.funil;
+
   function toggleSort(k: SortKey) {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -964,12 +976,26 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
         <StatCard label="E-mails enviados" value={fmtInt(kpis.emailCount)} hint="campanhas no período" />
         <StatCard label="Broadcasts WhatsApp" value={fmtInt(kpis.waCount)} hint="disparos no período" />
-        <StatCard
-          label="% Entrega média"
-          value={kpis.avgDelivery != null ? `${kpis.avgDelivery.toFixed(1)}%` : "—"}
-        />
         <StatCard label="Conversas" value={fmtInt(kpis.conversations)} hint="janela 7d após envio" />
-        <StatCard label="Reuniões" value="—" hint="Fase 2 — requer cruzamento Bitrix" />
+        <StatCard
+          label="Reuniões atribuídas"
+          value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"}
+          hint="agendadas após resposta ao broadcast"
+        />
+        <StatCard
+          label="Vendas atribuídas"
+          value={fnl ? fmtInt(fnl.venda) : "—"}
+          hint="fechadas após resposta ao broadcast"
+        />
+      </div>
+
+      {/* Resumo de entrega WhatsApp (status WABA) */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <StatCard label="Enviadas (WA)" value={wa ? fmtInt(wa.enviado) : "—"} hint={wa ? `${fmtInt(wa.total)} no total` : undefined} />
+        <StatCard label="Taxa de entrega" value={wa?.entrega_pct != null ? `${wa.entrega_pct}%` : "—"} hint={wa ? `${fmtInt(wa.entregue)} entregues` : undefined} />
+        <StatCard label="Taxa de leitura" value={wa?.leitura_pct != null ? `${wa.leitura_pct}%` : "—"} hint={wa ? `${fmtInt(wa.lida)} lidas` : undefined} />
+        <StatCard label="Taxa de erro" value={wa?.erro_pct != null ? `${wa.erro_pct}%` : "—"} hint={wa ? `${fmtInt(wa.erro)} falhas` : undefined} />
+        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint={fnl ? `${fmtInt(fnl.positivas)} positivas` : undefined} />
       </div>
 
       {/* Filtros */}
@@ -1984,6 +2010,9 @@ export default function GhlMarketing() {
           <TabsTrigger value="automacoes" data-testid="tab-automacoes">
             <Zap className="w-4 h-4 mr-2" /> Automações
           </TabsTrigger>
+          <TabsTrigger value="funil" data-testid="tab-funil">
+            <Activity className="w-4 h-4 mr-2" /> Funil
+          </TabsTrigger>
           <TabsTrigger value="calendario" data-testid="tab-calendario">
             <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
           </TabsTrigger>
@@ -2000,6 +2029,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="automacoes" className="mt-6">
           <AutomacoesTab />
+        </TabsContent>
+        <TabsContent value="funil" className="mt-6">
+          <FunilTab from={from} to={to} />
         </TabsContent>
         <TabsContent value="calendario" className="mt-6">
           <CalendarioTab />
