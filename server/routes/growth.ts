@@ -4,6 +4,7 @@ import type { IStorage } from "../storage";
 import { format } from "date-fns";
 import { getLinktreeMetrics } from "../services/linktreeGa4";
 import { getSessionsByPlatform } from "../services/ga4Sessions";
+import { UTM_SOURCES_BY_MEDIUM, UTM_SOURCE_LABELS, type UtmMedium } from "@shared/utm-vocabulary";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
@@ -59,6 +60,62 @@ const PLATFORM_CASE_SQL_BASIC = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
   ELSE COALESCE((SELECT normalized FROM public.utm_source_map WHERE raw_source = LOWER(TRIM(COALESCE(utm_source, '')))), 'outros')
+END`;
+
+/**
+ * Medium da Constituição UTM (paid | organic | crm | eventos | referral | outbound).
+ * Nível superior da aba "Por Plataforma".
+ *
+ * Regra: se o deal já tem utm_medium válido (tráfego pós-cutover de 21/05/2026),
+ * usa ele. Caso contrário (histórico), DERIVA o medium do utm_source — mesma
+ * heurística do PLATFORM_CASE_SQL. Assim a aba mostra histórico completo sem
+ * esperar utm_medium acumular.
+ */
+const MEDIUM_CASE_SQL = `CASE
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound') THEN LOWER(TRIM(utm_medium))
+  WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'organic'
+  WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'organic'
+  WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'organic'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'organic'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' THEN 'paid'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'organic'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'organic'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%' THEN 'paid'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt' THEN 'organic'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'paid'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'paid'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%email%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%e-mail%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%mailchimp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%rdstation%' THEN 'crm'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%whatsapp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%wpp%' THEN 'crm'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%evento%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%event%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%webinar%' THEN 'eventos'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('organic','organico','direct','(direct)','(none)','') THEN 'organic'
+  ELSE 'outros'
+END`;
+
+/**
+ * Source canônico da Constituição UTM (facebook, google, instagram, email, whatsapp, ...).
+ *
+ * Para deals com utm_medium válido, usa o utm_source cru (cobre sources de
+ * referral/outbound: cliente, colaborador, influencer, etc). Para o histórico,
+ * normaliza via heurística — ads e orgânico do mesmo canal colapsam no mesmo
+ * source (ex: linkedin_ads e linkedin → 'linkedin'); o medium é quem distingue.
+ */
+const SOURCE_CANON_SQL = `CASE
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound')
+       AND NULLIF(LOWER(TRIM(COALESCE(utm_source, ''))), '') IS NOT NULL THEN LOWER(TRIM(utm_source))
+  WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt' THEN 'tiktok'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'facebook'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%email%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%e-mail%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%mailchimp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%rdstation%' THEN 'email'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%whatsapp%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%wpp%' THEN 'whatsapp'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%evento%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%event%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%webinar%' THEN COALESCE(NULLIF(LOWER(TRIM(utm_source)), ''), 'eventos')
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('organic','organico','direct','(direct)','(none)','') THEN 'direto'
+  ELSE COALESCE(NULLIF(LOWER(TRIM(utm_source)), ''), 'outros')
 END`;
 
 // Funnel name aliases: normalized name → all DB variations
@@ -1383,70 +1440,24 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
       }
 
-      // Configuração de canais e plataformas
-      const CHANNEL_CONFIG: Record<string, { name: string; platforms: Record<string, { name: string; utmSources: string[] }> }> = {
-        midia_paga: {
-          name: 'Mídia Paga',
-          platforms: {
-            meta_ads: { name: 'Meta Ads', utmSources: ['facebook', 'fb', 'meta'] },
-            google_ads: { name: 'Google Ads', utmSources: ['google', 'gads', 'google_ads', 'adwords'] },
-            tiktok_ads: { name: 'TikTok Ads', utmSources: ['tiktok'] },
-            linkedin_ads: { name: 'LinkedIn Ads', utmSources: ['linkedin_ads'] },
-          }
-        },
-        social_media: {
-          name: 'Social Media',
-          platforms: {
-            youtube: { name: 'YouTube', utmSources: ['youtube', 'yt'] },
-            linkedin_social: { name: 'LinkedIn', utmSources: ['linkedin', 'linkedin_social'] },
-            instagram: { name: 'Instagram', utmSources: ['instagram', 'ig'] },
-          }
-        },
-        crm_channel: {
-          name: 'CRM',
-          platforms: {
-            email: { name: 'E-mail Marketing', utmSources: ['email', 'e-mail', 'mailchimp', 'rdstation'] },
-            whatsapp: { name: 'WhatsApp Marketing', utmSources: ['whatsapp', 'wpp'] },
-          }
-        },
-        organico: {
-          name: 'Orgânico',
-          platforms: {
-            organico: { name: 'Orgânico', utmSources: ['organic', 'organico', 'direct', '(direct)', '(none)', ''] },
-          }
-        },
-        eventos: {
-          name: 'Eventos',
-          platforms: {
-            eventos: { name: 'Eventos', utmSources: ['evento', 'eventos', 'event', 'webinar'] },
-          }
-        },
-      };
-
-      // Classificação de plataforma centralizada (ver constante PLATFORM_CASE_SQL no topo do arquivo)
-      const platformCaseExpr = PLATFORM_CASE_SQL;
-
-      // Query 1: CRM deals agrupados por plataforma (com splits MQL/NMQL)
-      const RA_STAGES = `'reunião marcada', 'rm', 'rm - reunião marcada', 'agendado', 'reunião agendada', 'agendamento direto',
-            'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
-            'confecção de proposta', 'em negociação', 'aguardado os dados',
-            'aguardando assinatura', 'subir/ajustar cobrança',
-            'proposta enviada', 'negócio ganho', 'negócio perdido'`;
-      const RR_STAGES = `'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
-            'confecção de proposta', 'em negociação', 'aguardado os dados',
-            'aguardando assinatura', 'subir/ajustar cobrança',
-            'proposta enviada', 'negócio ganho', 'negócio perdido'`;
+      // Condições MQL e filtro de source (mantidos do funil)
       const MQL_COND = `(mql::text = '1' OR LOWER(mql::text) = 'true')`;
       const NMQL_COND = `NOT (mql::text = '1' OR LOWER(mql::text) = 'true')`;
+      const SRC_FILTER = `source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')`;
 
-      // Janela temporal por métrica (alinhada com /mql e /nao-mql do top card):
-      //   - Leads, MQLs, RA, RR → created_at no período
-      //   - Negócio Ganho, Receita, Contratos → data_fechamento no período
-      // Duas queries separadas, mergidas em JS por platform.
+      // Hierarquia: medium → source → campaign → term → content.
+      // medium e source são classificados (Constituição UTM, ver constantes no topo);
+      // campaign/term/content são os valores crus normalizados (vazio → "(sem ...)").
+      const DIM_SELECT = `
+        ${MEDIUM_CASE_SQL} as medium,
+        ${SOURCE_CANON_SQL} as source,
+        COALESCE(NULLIF(TRIM(utm_campaign), ''), '(sem campaign)') as campaign,
+        COALESCE(NULLIF(TRIM(utm_term), ''), '(sem term)') as term,
+        COALESCE(NULLIF(TRIM(utm_content), ''), '(sem content)') as content`;
 
+      // Query A: leads/MQL/RA/RR por dimensão (janela created_at)
       const dealsResult = await db.execute(sql.raw(`
-        SELECT
-          ${platformCaseExpr} as platform,
+        SELECT ${DIM_SELECT},
           COUNT(*) as leads,
           SUM(CASE WHEN ${MQL_COND} THEN 1 ELSE 0 END) as mqls,
           SUM(CASE WHEN data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as ra,
@@ -1457,90 +1468,133 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql
         FROM "Bitrix".crm_deal
         WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
-          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
-        GROUP BY platform
+          AND ${SRC_FILTER}
+        GROUP BY 1, 2, 3, 4, 5
       `));
 
-      // Query 1b: wins/receita/contratos por data_fechamento
+      // Query B: vendas/receita/contratos por dimensão (janela data_fechamento)
       const winsResult = await db.execute(sql.raw(`
-        SELECT
-          ${platformCaseExpr} as platform,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${MQL_COND} THEN 1 ELSE 0 END) as vendas_mql,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' AND ${NMQL_COND} THEN 1 ELSE 0 END) as vendas_nmql,
-          COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(company_name, contact_name, title) END) as clientes_unicos,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) ELSE 0 END) as receita_pontual,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_recorrente, 0) ELSE 0 END) as receita_recorrente,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN
-            CASE WHEN produtos IS NULL OR produtos = '' OR produtos = '[]' THEN 1
-            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(produtos, '[', ''), ']', ''), ','), 1), 1) END
-          ELSE 0 END) as contratos
+        SELECT ${DIM_SELECT},
+          COUNT(*) as vendas,
+          SUM(CASE WHEN ${MQL_COND} THEN 1 ELSE 0 END) as vendas_mql,
+          SUM(CASE WHEN ${NMQL_COND} THEN 1 ELSE 0 END) as vendas_nmql,
+          COUNT(DISTINCT COALESCE(company_name, contact_name, title)) as clientes_unicos,
+          SUM(COALESCE(valor_pontual, 0)) as receita_pontual,
+          SUM(COALESCE(valor_recorrente, 0)) as receita_recorrente,
+          SUM(CASE WHEN produtos IS NULL OR produtos = '' OR produtos = '[]' THEN 1
+            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(produtos, '[', ''), ']', ''), ','), 1), 1) END) as contratos
         FROM "Bitrix".crm_deal
         WHERE data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
           AND stage_name = 'Negócio Ganho'
-          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
-        GROUP BY platform
+          AND ${SRC_FILTER}
+        GROUP BY 1, 2, 3, 4, 5
       `));
-      const winsMapPerf = new Map<string, any>();
-      for (const row of winsResult.rows as any[]) winsMapPerf.set(row.platform, row);
 
-      // Query 2: Lead time por plataforma
+      // Query C: lead time por dimensão (soma + contagem de clientes p/ agregar bem)
       const leadTimeResult = await db.execute(sql.raw(`
-        SELECT platform, AVG(lead_time_days) as avg_lead_time
+        SELECT medium, source, campaign, term, content,
+          SUM(lt) as lt_sum, COUNT(*) as lt_count
         FROM (
-          SELECT
-            ${platformCaseExpr} as platform,
+          SELECT ${DIM_SELECT},
             COALESCE(company_name, contact_name, title) as cliente,
-            MIN(EXTRACT(EPOCH FROM (data_fechamento::timestamp - date_create)) / 86400) as lead_time_days
+            MIN(EXTRACT(EPOCH FROM (data_fechamento::timestamp - date_create)) / 86400) as lt
           FROM "Bitrix".crm_deal
           WHERE stage_name = 'Negócio Ganho'
             AND data_fechamento IS NOT NULL
             AND data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
-            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
-          GROUP BY platform, cliente
+            AND ${SRC_FILTER}
+          GROUP BY 1, 2, 3, 4, 5, cliente
         ) sub
-        GROUP BY platform
+        GROUP BY 1, 2, 3, 4, 5
       `));
 
-      // Criar mapas de dados CRM
-      const crmDataMap = new Map<string, any>();
-      // Coletar todas as plataformas que apareceram em qualquer das duas queries
-      const allPlatforms = new Set<string>([
-        ...(dealsResult.rows as any[]).map(r => r.platform),
-        ...(winsResult.rows as any[]).map(r => r.platform),
-      ]);
-      const dealsRowMap = new Map<string, any>();
-      for (const row of dealsResult.rows as any[]) dealsRowMap.set(row.platform, row);
-      for (const platform of allPlatforms) {
-        const row = dealsRowMap.get(platform);
-        const won = winsMapPerf.get(platform);
-        crmDataMap.set(platform, {
-          leads: row ? parseInt(row.leads) || 0 : 0,
-          mqls: row ? parseInt(row.mqls) || 0 : 0,
-          ra: row ? parseInt(row.ra) || 0 : 0,
-          raMql: row ? parseInt(row.ra_mql) || 0 : 0,
-          raNmql: row ? parseInt(row.ra_nmql) || 0 : 0,
-          rr: row ? parseInt(row.rr) || 0 : 0,
-          rrMql: row ? parseInt(row.rr_mql) || 0 : 0,
-          rrNmql: row ? parseInt(row.rr_nmql) || 0 : 0,
-          vendas: won ? parseInt(won.vendas) || 0 : 0,
-          vendasMql: won ? parseInt(won.vendas_mql) || 0 : 0,
-          vendasNmql: won ? parseInt(won.vendas_nmql) || 0 : 0,
-          clientesUnicos: won ? parseInt(won.clientes_unicos) || 0 : 0,
-          receitaPontual: won ? parseFloat(won.receita_pontual) || 0 : 0,
-          receitaRecorrente: won ? parseFloat(won.receita_recorrente) || 0 : 0,
-          contratos: won ? parseInt(won.contratos) || 0 : 0,
-        });
-      }
+      // ---- Acumuladores brutos por folha (medium|source|campaign|term|content) ----
+      type Raw = {
+        leads: number; mqls: number; ra: number; raMql: number; raNmql: number;
+        rr: number; rrMql: number; rrNmql: number;
+        vendas: number; vendasMql: number; vendasNmql: number; clientesUnicos: number;
+        receitaPontual: number; receitaRecorrente: number; contratos: number;
+        investimento: number | null; sessoes: number | null;
+        leadTimeSum: number; leadTimeCount: number;
+      };
+      const emptyRaw = (): Raw => ({
+        leads: 0, mqls: 0, ra: 0, raMql: 0, raNmql: 0, rr: 0, rrMql: 0, rrNmql: 0,
+        vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0,
+        receitaPontual: 0, receitaRecorrente: 0, contratos: 0,
+        investimento: null, sessoes: null, leadTimeSum: 0, leadTimeCount: 0,
+      });
+      const sumN = (a: number | null, b: number | null): number | null =>
+        (a === null && b === null) ? null : (a ?? 0) + (b ?? 0);
+      const addRaw = (acc: Raw, x: Raw) => {
+        acc.leads += x.leads; acc.mqls += x.mqls; acc.ra += x.ra; acc.raMql += x.raMql; acc.raNmql += x.raNmql;
+        acc.rr += x.rr; acc.rrMql += x.rrMql; acc.rrNmql += x.rrNmql;
+        acc.vendas += x.vendas; acc.vendasMql += x.vendasMql; acc.vendasNmql += x.vendasNmql;
+        acc.clientesUnicos += x.clientesUnicos;
+        acc.receitaPontual += x.receitaPontual; acc.receitaRecorrente += x.receitaRecorrente; acc.contratos += x.contratos;
+        acc.investimento = sumN(acc.investimento, x.investimento); acc.sessoes = sumN(acc.sessoes, x.sessoes);
+        acc.leadTimeSum += x.leadTimeSum; acc.leadTimeCount += x.leadTimeCount;
+      };
 
-      // Debug: log platform keys and their CRM data
-      for (const [key, val] of crmDataMap.entries()) {
-        console.log(`[api] CRM platform '${key}': leads=${val.leads}, mqls=${val.mqls}, ra=${val.ra}, raMql=${val.raMql}, rr=${val.rr}, rrMql=${val.rrMql}, vendas=${val.vendas}, vendasMql=${val.vendasMql}`);
-      }
+      // Deriva as métricas exibidas a partir dos contadores brutos agregados.
+      const deriveMetrics = (r: Raw) => {
+        const inv = r.investimento;
+        const receita = r.receitaPontual + r.receitaRecorrente;
+        return {
+          investimento: inv !== null ? Math.round(inv) : null,
+          sessoes: r.sessoes !== null ? Math.round(r.sessoes) : null,
+          taxaConversao: r.sessoes && r.sessoes > 0 && r.leads > 0 ? parseFloat(((r.leads / r.sessoes) * 100).toFixed(2)) : null,
+          leads: r.leads,
+          mqls: r.mqls,
+          cpl: inv !== null && inv > 0 && r.leads > 0 ? Math.round(inv / r.leads) : null,
+          cpmql: inv !== null && inv > 0 && r.mqls > 0 ? Math.round(inv / r.mqls) : null,
+          cpra: inv !== null && inv > 0 && r.ra > 0 ? Math.round(inv / r.ra) : null,
+          cprr: inv !== null && inv > 0 && r.rr > 0 ? Math.round(inv / r.rr) : null,
+          percMql: r.leads > 0 ? parseFloat(((r.mqls / r.leads) * 100).toFixed(1)) : null,
+          percRa: r.leads > 0 ? parseFloat(((r.ra / r.leads) * 100).toFixed(1)) : null,
+          percRaMql: r.mqls > 0 ? parseFloat(((r.raMql / r.mqls) * 100).toFixed(1)) : null,
+          percRaNmql: (r.leads - r.mqls) > 0 ? parseFloat(((r.raNmql / (r.leads - r.mqls)) * 100).toFixed(1)) : null,
+          percRr: r.ra > 0 ? parseFloat(((r.rr / r.ra) * 100).toFixed(1)) : null,
+          percRrMql: r.raMql > 0 ? parseFloat(((r.rrMql / r.raMql) * 100).toFixed(1)) : null,
+          percRrNmql: r.raNmql > 0 ? parseFloat(((r.rrNmql / r.raNmql) * 100).toFixed(1)) : null,
+          percRrVendas: r.rr > 0 ? parseFloat(((r.vendas / r.rr) * 100).toFixed(1)) : null,
+          percRrMqlVendas: r.rrMql > 0 ? parseFloat(((r.vendasMql / r.rrMql) * 100).toFixed(1)) : null,
+          percRrNmqlVendas: r.rrNmql > 0 ? parseFloat(((r.vendasNmql / r.rrNmql) * 100).toFixed(1)) : null,
+          negocioGanho: r.vendas,
+          leadTime: r.leadTimeCount > 0 ? parseFloat((r.leadTimeSum / r.leadTimeCount).toFixed(1)) : null,
+          aov: r.clientesUnicos > 0 ? Math.round(receita / r.clientesUnicos) : null,
+          receita: receita > 0 ? Math.round(receita) : null,
+          receitaPontual: r.receitaPontual > 0 ? Math.round(r.receitaPontual) : null,
+          receitaRecorrente: r.receitaRecorrente > 0 ? Math.round(r.receitaRecorrente) : null,
+          cac: inv !== null && inv > 0 && r.clientesUnicos > 0 ? Math.round(inv / r.clientesUnicos) : null,
+          cacUnico: inv !== null && inv > 0 && r.clientesUnicos > 0 ? Math.round(inv / r.clientesUnicos) : null,
+          cacContrato: inv !== null && inv > 0 && r.contratos > 0 ? Math.round(inv / r.contratos) : null,
+        };
+      };
 
-      const leadTimeMap = new Map<string, number>();
+      const leafMap = new Map<string, { parts: string[]; raw: Raw }>();
+      const leafRaw = (row: any): Raw => {
+        const parts = [String(row.medium), String(row.source), String(row.campaign), String(row.term), String(row.content)];
+        const k = parts.join('');
+        let e = leafMap.get(k);
+        if (!e) { e = { parts, raw: emptyRaw() }; leafMap.set(k, e); }
+        return e.raw;
+      };
+      for (const row of dealsResult.rows as any[]) {
+        const r = leafRaw(row);
+        r.leads += parseInt(row.leads) || 0; r.mqls += parseInt(row.mqls) || 0;
+        r.ra += parseInt(row.ra) || 0; r.raMql += parseInt(row.ra_mql) || 0; r.raNmql += parseInt(row.ra_nmql) || 0;
+        r.rr += parseInt(row.rr) || 0; r.rrMql += parseInt(row.rr_mql) || 0; r.rrNmql += parseInt(row.rr_nmql) || 0;
+      }
+      for (const row of winsResult.rows as any[]) {
+        const r = leafRaw(row);
+        r.vendas += parseInt(row.vendas) || 0; r.vendasMql += parseInt(row.vendas_mql) || 0; r.vendasNmql += parseInt(row.vendas_nmql) || 0;
+        r.clientesUnicos += parseInt(row.clientes_unicos) || 0;
+        r.receitaPontual += parseFloat(row.receita_pontual) || 0; r.receitaRecorrente += parseFloat(row.receita_recorrente) || 0;
+        r.contratos += parseInt(row.contratos) || 0;
+      }
       for (const row of leadTimeResult.rows as any[]) {
-        if (row.avg_lead_time) leadTimeMap.set(row.platform, parseFloat(row.avg_lead_time));
+        const r = leafRaw(row);
+        r.leadTimeSum += parseFloat(row.lt_sum) || 0; r.leadTimeCount += parseInt(row.lt_count) || 0;
       }
 
       // Query 3: Investimento + sessões do Meta Ads
@@ -1593,66 +1647,95 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.log("[api] Google Ads data not available for performance-plataformas");
       }
 
-      // Mapa de investimento/sessões por plataforma (apenas para plataformas de ads)
-      const adsPlatformData: Record<string, { investimento: number | null; sessoes: number | null }> = {
-        meta_ads: { investimento: metaInvestimento, sessoes: metaSessoes },
-        google_ads: { investimento: googleInvestimento, sessoes: googleSessoes },
+      // ---- Montar árvore: medium → source → campaign → term → content ----
+      const MEDIUM_LABELS: Record<string, string> = {
+        paid: 'Mídia Paga', organic: 'Orgânico', crm: 'CRM',
+        eventos: 'Eventos', referral: 'Referral', outbound: 'Outbound', outros: 'Outros',
       };
+      const MEDIUM_ORDER = ['paid', 'organic', 'crm', 'eventos', 'referral', 'outbound', 'outros'];
+      const mediumOrderOf = (m: string) => { const i = MEDIUM_ORDER.indexOf(m); return i >= 0 ? i : 998; };
+      const sourceLabel = (s: string): string =>
+        UTM_SOURCE_LABELS[s]
+        || (s === 'direto' ? 'Direto / Sem UTM' : s === 'outros' ? 'Outros' : s.charAt(0).toUpperCase() + s.slice(1));
 
-      // Montar resposta: todas as plataformas com métricas
-      const platformRows: any[] = [];
+      type TNode = {
+        key: string; name: string; level: 'medium' | 'source' | 'campaign' | 'term' | 'content';
+        own: Raw; order: number; children: Map<string, TNode>;
+      };
+      const SEP = '';
+      const makeNode = (key: string, name: string, level: TNode['level'], order: number): TNode =>
+        ({ key, name, level, own: emptyRaw(), order, children: new Map() });
 
-      for (const [catKey, cat] of Object.entries(CHANNEL_CONFIG)) {
-        for (const [platKey, plat] of Object.entries(cat.platforms)) {
-          const crm = crmDataMap.get(platKey) || { leads: 0, mqls: 0, ra: 0, raMql: 0, raNmql: 0, rr: 0, rrMql: 0, rrNmql: 0, vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0, receitaPontual: 0, receitaRecorrente: 0, contratos: 0 };
-          const adsData = adsPlatformData[platKey] || { investimento: null, sessoes: null };
-          const lt = leadTimeMap.get(platKey) || null;
+      const rootChildren = new Map<string, TNode>();
 
-          const investimento = adsData.investimento;
-          const sessoes = adsData.sessoes;
-          const { leads, mqls, ra, raMql, raNmql, rr, rrMql, rrNmql, vendas, vendasMql, vendasNmql, clientesUnicos, receitaPontual, receitaRecorrente, contratos } = crm;
-          const receita = receitaPontual + receitaRecorrente;
+      // Esqueleto: todos os mediums (exceto "outros") + sources canônicos, mesmo zerados.
+      MEDIUM_ORDER.forEach((m, mi) => {
+        if (m === 'outros') return;
+        const medNode = makeNode(`m${SEP}${m}`, MEDIUM_LABELS[m] || m, 'medium', mi);
+        rootChildren.set(m, medNode);
+        const canon = (UTM_SOURCES_BY_MEDIUM[m as UtmMedium] || []) as readonly string[];
+        canon.forEach((s, si) => {
+          medNode.children.set(s, makeNode(`s${SEP}${m}${SEP}${s}`, sourceLabel(s), 'source', si));
+        });
+      });
 
-          platformRows.push({
-            id: platKey,
-            name: plat.name,
-            category: catKey,
-            categoryName: cat.name,
-            investimento: investimento !== null ? Math.round(investimento) : null,
-            sessoes: sessoes !== null ? sessoes : null,
-            taxaConversao: sessoes && sessoes > 0 && leads > 0 ? parseFloat(((leads / sessoes) * 100).toFixed(2)) : null,
-            leads,
-            mqls,
-            cpl: investimento !== null && investimento > 0 && leads > 0 ? Math.round(investimento / leads) : null,
-            cpmql: investimento !== null && investimento > 0 && mqls > 0 ? Math.round(investimento / mqls) : null,
-            cpra: investimento !== null && investimento > 0 && ra > 0 ? Math.round(investimento / ra) : null,
-            cprr: investimento !== null && investimento > 0 && rr > 0 ? Math.round(investimento / rr) : null,
-            percMql: leads > 0 ? parseFloat(((mqls / leads) * 100).toFixed(1)) : null,
-            percRa: leads > 0 ? parseFloat(((ra / leads) * 100).toFixed(1)) : null,
-            percRaMql: mqls > 0 ? parseFloat(((raMql / mqls) * 100).toFixed(1)) : null,
-            percRaNmql: (leads - mqls) > 0 ? parseFloat(((raNmql / (leads - mqls)) * 100).toFixed(1)) : null,
-            percRr: ra > 0 ? parseFloat(((rr / ra) * 100).toFixed(1)) : null,
-            percRrMql: raMql > 0 ? parseFloat(((rrMql / raMql) * 100).toFixed(1)) : null,
-            percRrNmql: raNmql > 0 ? parseFloat(((rrNmql / raNmql) * 100).toFixed(1)) : null,
-            percRrVendas: rr > 0 ? parseFloat(((vendas / rr) * 100).toFixed(1)) : null,
-            percRrMqlVendas: rrMql > 0 ? parseFloat(((vendasMql / rrMql) * 100).toFixed(1)) : null,
-            percRrNmqlVendas: rrNmql > 0 ? parseFloat(((vendasNmql / rrNmql) * 100).toFixed(1)) : null,
-            negocioGanho: vendas,
-            leadTime: lt ? parseFloat(lt.toFixed(1)) : null,
-            aov: clientesUnicos > 0 ? Math.round(receita / clientesUnicos) : null,
-            receita: receita > 0 ? Math.round(receita) : null,
-            receitaPontual: receitaPontual > 0 ? Math.round(receitaPontual) : null,
-            receitaRecorrente: receitaRecorrente > 0 ? Math.round(receitaRecorrente) : null,
-            cac: investimento !== null && investimento > 0 && clientesUnicos > 0 ? Math.round(investimento / clientesUnicos) : null,
-            cacUnico: investimento !== null && investimento > 0 && clientesUnicos > 0 ? Math.round(investimento / clientesUnicos) : null,
-            cacContrato: investimento !== null && investimento > 0 && contratos > 0 ? Math.round(investimento / contratos) : null,
-          });
-        }
+      // Inserir folhas reais (cria nós faltantes: sources não-canônicos + campaign/term/content)
+      for (const { parts, raw } of Array.from(leafMap.values())) {
+        const [m, s, c, t, ct] = parts;
+        let medNode = rootChildren.get(m);
+        if (!medNode) { medNode = makeNode(`m${SEP}${m}`, MEDIUM_LABELS[m] || m, 'medium', mediumOrderOf(m)); rootChildren.set(m, medNode); }
+        let srcNode = medNode.children.get(s);
+        if (!srcNode) { srcNode = makeNode(`s${SEP}${m}${SEP}${s}`, sourceLabel(s), 'source', 997); medNode.children.set(s, srcNode); }
+        let campNode = srcNode.children.get(c);
+        if (!campNode) { campNode = makeNode(`c${SEP}${m}${SEP}${s}${SEP}${c}`, c, 'campaign', 0); srcNode.children.set(c, campNode); }
+        let termNode = campNode.children.get(t);
+        if (!termNode) { termNode = makeNode(`t${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}`, t, 'term', 0); campNode.children.set(t, termNode); }
+        let contentNode = termNode.children.get(ct);
+        if (!contentNode) { contentNode = makeNode(`x${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}${SEP}${ct}`, ct, 'content', 0); termNode.children.set(ct, contentNode); }
+        addRaw(contentNode.own, raw);
       }
 
-      console.log("[api] Growth Performance Plataformas - Platforms:", platformRows.length, "with CRM data:", crmDataMap.size);
+      // Investimento/sessões de mídia paga entram no nível de source (Meta→facebook, Google→google).
+      const injectSpend = (sourceKey: string, investimento: number, sessoes: number) => {
+        if (investimento <= 0 && sessoes <= 0) return;
+        let medNode = rootChildren.get('paid');
+        if (!medNode) { medNode = makeNode(`m${SEP}paid`, MEDIUM_LABELS.paid, 'medium', mediumOrderOf('paid')); rootChildren.set('paid', medNode); }
+        let srcNode = medNode.children.get(sourceKey);
+        if (!srcNode) { srcNode = makeNode(`s${SEP}paid${SEP}${sourceKey}`, sourceLabel(sourceKey), 'source', 997); medNode.children.set(sourceKey, srcNode); }
+        srcNode.own.investimento = (srcNode.own.investimento ?? 0) + investimento;
+        srcNode.own.sessoes = (srcNode.own.sessoes ?? 0) + sessoes;
+      };
+      injectSpend('facebook', metaInvestimento, metaSessoes);
+      injectSpend('google', googleInvestimento, googleSessoes);
 
-      res.json(platformRows);
+      // Agregar bottom-up (soma os contadores brutos) e derivar métricas em cada nível.
+      const buildNode = (node: TNode): { out: any; agg: Raw } => {
+        const agg = emptyRaw();
+        addRaw(agg, node.own);
+        const built = Array.from(node.children.values()).map((child) => {
+          const r = buildNode(child);
+          addRaw(agg, r.agg);
+          return { child, out: r.out, leads: r.agg.leads };
+        });
+        built.sort((a, b) => (a.child.order - b.child.order) || (b.leads - a.leads) || a.child.name.localeCompare(b.child.name));
+        const out = {
+          id: node.key, name: node.name, level: node.level,
+          ...deriveMetrics(agg),
+          children: built.length ? built.map((b) => b.out) : undefined,
+        };
+        return { out, agg };
+      };
+
+      const mediums = Array.from(rootChildren.values()).map((n) => ({ n, built: buildNode(n) }));
+      mediums.sort((a, b) => (a.n.order - b.n.order) || (b.built.agg.leads - a.built.agg.leads));
+      const totalRaw = emptyRaw();
+      for (const m of mediums) addRaw(totalRaw, m.built.agg);
+
+      const rows = mediums.map((m) => m.built.out);
+      const total = { id: 'total', name: 'TOTAL GERAL', level: 'total', ...deriveMetrics(totalRaw) };
+
+      console.log(`[api] Performance Plataformas: ${rows.length} mediums, ${leafMap.size} folhas`);
+      res.json({ rows, total });
     } catch (error) {
       console.error("[api] Error fetching growth performance plataformas:", error);
       res.status(500).json({ error: "Failed to fetch growth performance plataformas" });
