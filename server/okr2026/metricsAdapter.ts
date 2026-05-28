@@ -707,30 +707,44 @@ export interface VendasMrrBreakdown {
 }
 
 function buildVendasMrrQuery(startDate?: string, endDate?: string) {
-  // Cross-sell = source 'PARTNER' no Bitrix CRM
-  if (startDate && endDate) {
-    return sql`
-      SELECT
-        COALESCE(SUM(d.valor_recorrente::numeric), 0) as total,
-        COALESCE(SUM(CASE WHEN d.source != 'PARTNER' OR d.source IS NULL THEN d.valor_recorrente::numeric ELSE 0 END), 0) as novo,
-        COALESCE(SUM(CASE WHEN d.source = 'PARTNER' THEN d.valor_recorrente::numeric ELSE 0 END), 0) as crosssell,
-        COALESCE(SUM(CASE WHEN d.source = 'PARTNER' THEN d.valor_pontual::numeric ELSE 0 END), 0) as crosssell_pontual
-      FROM "Bitrix".crm_deal d
-      WHERE d.stage_name = 'Negócio Ganho'
-        AND d.data_fechamento IS NOT NULL
-        AND d.data_fechamento >= ${startDate}::date AND d.data_fechamento <= ${endDate}::date`;
-  }
+  // Cross-sell = deal com source 'PARTNER' (indicação/parceiro) E cliente PRÉ-EXISTENTE,
+  // ou seja, cujo primeiro contrato começou ANTES do mês de fechamento do deal.
+  // Clientes cujo primeiro contrato começa no próprio mês da venda são aquisição nova
+  // (vieram por indicação de parceiro), não cross-sell — entram em "novo".
+  // Cruzamento deal->cliente por CNPJ normalizado (só dígitos).
+  const dateFilter = (startDate && endDate)
+    ? sql`d.data_fechamento >= ${startDate}::date AND d.data_fechamento <= ${endDate}::date`
+    : sql`TO_CHAR(d.data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')`;
 
   return sql`
+    WITH cliente_inicio AS (
+      SELECT REGEXP_REPLACE(COALESCE(c.cnpj, ''), '[^0-9]', '', 'g') AS cnpj_norm,
+             MIN(ct.data_inicio)::date AS primeiro_contrato
+      FROM "Clickup".cup_clientes c
+      JOIN "Clickup".cup_contratos ct ON ct.id_task = c.task_id
+      WHERE COALESCE(c.cnpj, '') <> ''
+      GROUP BY 1
+    ),
+    deals AS (
+      SELECT
+        d.valor_recorrente::numeric AS rec,
+        d.valor_pontual::numeric AS pont,
+        (d.source = 'PARTNER'
+          AND ci.primeiro_contrato IS NOT NULL
+          AND ci.primeiro_contrato < date_trunc('month', d.data_fechamento)::date) AS is_crosssell
+      FROM "Bitrix".crm_deal d
+      LEFT JOIN cliente_inicio ci
+        ON REGEXP_REPLACE(COALESCE(d.cnpj, ''), '[^0-9]', '', 'g') = ci.cnpj_norm
+      WHERE d.stage_name = 'Negócio Ganho'
+        AND d.data_fechamento IS NOT NULL
+        AND ${dateFilter}
+    )
     SELECT
-      COALESCE(SUM(d.valor_recorrente::numeric), 0) as total,
-      COALESCE(SUM(CASE WHEN d.source != 'PARTNER' OR d.source IS NULL THEN d.valor_recorrente::numeric ELSE 0 END), 0) as novo,
-      COALESCE(SUM(CASE WHEN d.source = 'PARTNER' THEN d.valor_recorrente::numeric ELSE 0 END), 0) as crosssell,
-      COALESCE(SUM(CASE WHEN d.source = 'PARTNER' THEN d.valor_pontual::numeric ELSE 0 END), 0) as crosssell_pontual
-    FROM "Bitrix".crm_deal d
-    WHERE d.stage_name = 'Negócio Ganho'
-      AND d.data_fechamento IS NOT NULL
-      AND TO_CHAR(d.data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')`;
+      COALESCE(SUM(rec), 0) as total,
+      COALESCE(SUM(rec) FILTER (WHERE NOT is_crosssell), 0) as novo,
+      COALESCE(SUM(rec) FILTER (WHERE is_crosssell), 0) as crosssell,
+      COALESCE(SUM(pont) FILTER (WHERE is_crosssell), 0) as crosssell_pontual
+    FROM deals`;
 }
 
 export async function getVendasMrrBreakdown(startDate?: string, endDate?: string): Promise<VendasMrrBreakdown> {
