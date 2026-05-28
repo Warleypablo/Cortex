@@ -1988,7 +1988,7 @@ export default function GhlMarketing() {
             <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
           </TabsTrigger>
           <TabsTrigger value="gerador" data-testid="tab-gerador">
-            <Sparkles className="w-4 h-4 mr-2" /> Gerador IA
+            <Sparkles className="w-4 h-4 mr-2" /> Copy com IA
           </TabsTrigger>
         </TabsList>
 
