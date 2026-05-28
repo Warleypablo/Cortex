@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -18,8 +18,6 @@ import { cn } from "@/lib/utils";
 interface PlatformData {
   id: string;
   name: string;
-  category: string;
-  categoryName: string;
   investimento: number | null;
   sessoes: number | null;
   taxaConversao: number | null;
@@ -50,14 +48,17 @@ interface PlatformData {
   cacContrato: number | null;
 }
 
-interface CategoryGroup {
-  key: string;
-  name: string;
-  platforms: PlatformData[];
-  totals: PlatformData;
+type NodeLevel = 'medium' | 'source' | 'campaign' | 'term' | 'content' | 'total';
+
+interface PlatformNode extends PlatformData {
+  level: NodeLevel;
+  children?: PlatformNode[];
 }
 
-const CATEGORY_ORDER = ['midia_paga', 'social_media', 'crm_channel', 'organico', 'eventos'];
+interface PlatformResponse {
+  rows: PlatformNode[];
+  total: PlatformData;
+}
 
 const formatNumber = (value: number | null): string => {
   if (value === null || value === undefined) return "-";
@@ -79,79 +80,39 @@ const formatCurrency = (value: number | null): string => {
   return formatCurrencyUtil(value);
 };
 
-function aggregateRows(rows: PlatformData[]): PlatformData {
-  const sumNum = (key: keyof PlatformData) =>
-    rows.reduce((s, r) => s + ((r[key] as number) || 0), 0);
-  const sumNullable = (key: keyof PlatformData) => {
-    const vals = rows.filter(r => r[key] !== null);
-    if (vals.length === 0) return null;
-    return vals.reduce((s, r) => s + ((r[key] as number) || 0), 0);
-  };
-  const avgNonNull = (key: keyof PlatformData) => {
-    const vals = rows.map(r => r[key] as number | null).filter((v): v is number => v !== null);
-    if (vals.length === 0) return null;
-    return parseFloat((vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(1));
-  };
+function flattenNodes(nodes: PlatformNode[], map: Map<string, PlatformNode>) {
+  for (const n of nodes) {
+    map.set(n.id, n);
+    if (n.children) flattenNodes(n.children, map);
+  }
+}
 
-  const investimento = sumNullable('investimento');
-  const sessoes = sumNullable('sessoes');
-  const leads = sumNum('leads');
-  const mqls = sumNum('mqls');
-  const vendas = sumNum('negocioGanho');
-  const receita = sumNullable('receita');
-  const receitaPontual = sumNullable('receitaPontual');
-  const receitaRecorrente = sumNullable('receitaRecorrente');
-
-  const raTotal = rows.reduce((s, r) => {
-    if (r.percRa !== null && r.leads > 0) return s + Math.round(r.percRa * r.leads / 100);
-    return s;
-  }, 0);
-  const rrTotal = rows.reduce((s, r) => {
-    if (r.percRr !== null && r.percRa !== null && r.leads > 0) {
-      const ra = Math.round(r.percRa * r.leads / 100);
-      return s + Math.round(r.percRr * ra / 100);
+function pruneTree(nodes: PlatformNode[], term: string): PlatformNode[] {
+  const out: PlatformNode[] = [];
+  for (const n of nodes) {
+    if (n.name.toLowerCase().includes(term)) {
+      out.push(n);
+      continue;
     }
-    return s;
-  }, 0);
-  const clientesUnicos = rows.reduce((s, r) => {
-    if (r.aov !== null && r.receita !== null && r.aov > 0) return s + Math.round(r.receita / r.aov);
-    return s + r.negocioGanho;
-  }, 0);
+    const prunedChildren = n.children ? pruneTree(n.children, term) : [];
+    if (prunedChildren.length > 0) out.push({ ...n, children: prunedChildren });
+  }
+  return out;
+}
 
-  return {
-    id: 'aggregate',
-    name: 'Total',
-    category: '',
-    categoryName: '',
-    investimento: investimento !== null ? Math.round(investimento) : null,
-    sessoes: sessoes !== null ? Math.round(sessoes) : null,
-    taxaConversao: sessoes && sessoes > 0 && leads > 0 ? parseFloat(((leads / sessoes) * 100).toFixed(2)) : null,
-    leads,
-    mqls,
-    cpl: investimento !== null && investimento > 0 && leads > 0 ? Math.round(investimento / leads) : null,
-    cpmql: investimento !== null && investimento > 0 && mqls > 0 ? Math.round(investimento / mqls) : null,
-    cpra: investimento !== null && investimento > 0 && raTotal > 0 ? Math.round(investimento / raTotal) : null,
-    cprr: investimento !== null && investimento > 0 && rrTotal > 0 ? Math.round(investimento / rrTotal) : null,
-    percMql: leads > 0 ? parseFloat(((mqls / leads) * 100).toFixed(1)) : null,
-    percRa: leads > 0 && raTotal > 0 ? parseFloat(((raTotal / leads) * 100).toFixed(1)) : null,
-    percRaMql: avgNonNull('percRaMql'),
-    percRaNmql: avgNonNull('percRaNmql'),
-    percRr: raTotal > 0 && rrTotal > 0 ? parseFloat(((rrTotal / raTotal) * 100).toFixed(1)) : null,
-    percRrMql: avgNonNull('percRrMql'),
-    percRrNmql: avgNonNull('percRrNmql'),
-    percRrVendas: rrTotal > 0 && vendas > 0 ? parseFloat(((vendas / rrTotal) * 100).toFixed(1)) : null,
-    percRrMqlVendas: avgNonNull('percRrMqlVendas'),
-    percRrNmqlVendas: avgNonNull('percRrNmqlVendas'),
-    negocioGanho: vendas,
-    leadTime: avgNonNull('leadTime'),
-    aov: clientesUnicos > 0 && receita ? Math.round(receita / clientesUnicos) : null,
-    receita: receita !== null ? Math.round(receita) : null,
-    receitaPontual: receitaPontual !== null ? Math.round(receitaPontual) : null,
-    receitaRecorrente: receitaRecorrente !== null ? Math.round(receitaRecorrente) : null,
-    cac: investimento !== null && investimento > 0 && clientesUnicos > 0 ? Math.round(investimento / clientesUnicos) : null,
-    cacUnico: investimento !== null && investimento > 0 && clientesUnicos > 0 ? Math.round(investimento / clientesUnicos) : null,
-    cacContrato: avgNonNull('cacContrato'),
-  };
+function sortTree(nodes: PlatformNode[], key: keyof PlatformData, direction: 'asc' | 'desc'): PlatformNode[] {
+  const dir = direction === 'asc' ? 1 : -1;
+  const sorted = [...nodes].sort((a, b) => {
+    const av = a[key] as number | string | null;
+    const bv = b[key] as number | string | null;
+    if (av === null || av === undefined) return 1;
+    if (bv === null || bv === undefined) return -1;
+    if (typeof av === 'string' || typeof bv === 'string') {
+      return String(av).localeCompare(String(bv)) * dir;
+    }
+    return (av - bv) * dir;
+  });
+  return sorted.map((n) => (n.children ? { ...n, children: sortTree(n.children, key, direction) } : n));
 }
 
 export default function PerformancePlataformas() {
@@ -165,15 +126,15 @@ export default function PerformancePlataformas() {
   const [compareEnabled, setCompareEnabled] = useState(false);
   const [compareRange, setCompareRange] = useState<DateRange | undefined>();
   const [searchTerm, setSearchTerm] = useState("");
-  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
-  const [sortConfig, setSortConfig] = useState<{ key: keyof PlatformData; direction: 'asc' | 'desc' }>({ key: 'leads', direction: 'desc' });
+  const [sortConfig, setSortConfig] = useState<{ key: keyof PlatformData; direction: 'asc' | 'desc' } | null>(null);
 
   const startDate = format(dateRange.from, "yyyy-MM-dd");
   const endDate = format(dateRange.to, "yyyy-MM-dd");
 
-  const { data: platforms = [], isLoading } = useQuery<PlatformData[]>({
+  const { data, isLoading } = useQuery<PlatformResponse>({
     queryKey: ["/api/growth/performance-plataformas", { startDate, endDate }],
     queryFn: async () => {
       const params = new URLSearchParams({ startDate, endDate });
@@ -182,15 +143,16 @@ export default function PerformancePlataformas() {
       return res.json();
     },
   });
+  const rows = data?.rows ?? [];
+  const total = data?.total ?? null;
 
   // Dados do período de comparação
   const compareStartDate = compareEnabled && compareRange?.from ? format(compareRange.from, 'yyyy-MM-dd') : '';
   const compareEndDate = compareEnabled && compareRange?.to ? format(compareRange.to, 'yyyy-MM-dd') : '';
 
-  const { data: compareData = [] } = useQuery<PlatformData[]>({
+  const { data: compareData } = useQuery<PlatformResponse>({
     queryKey: ["/api/growth/performance-plataformas/compare", { startDate: compareStartDate, endDate: compareEndDate }],
     queryFn: async () => {
-      if (!compareStartDate || !compareEndDate) return [];
       const params = new URLSearchParams({ startDate: compareStartDate, endDate: compareEndDate });
       const res = await fetch(`/api/growth/performance-plataformas?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch compare data');
@@ -199,33 +161,14 @@ export default function PerformancePlataformas() {
     enabled: compareEnabled && !!compareStartDate && !!compareEndDate,
   });
 
-  // Mapa de comparação por platform id
+  // Mapa de comparação por id de nó (qualquer nível)
   const compareMap = useMemo(() => {
-    const map = new Map<string, PlatformData>();
-    compareData.forEach(item => map.set(item.id, item));
+    const map = new Map<string, PlatformNode>();
+    if (compareData?.rows) flattenNodes(compareData.rows, map);
     return map;
   }, [compareData]);
 
-  // Agregar dados de comparação por categoria
-  const compareCategoryMap = useMemo(() => {
-    const grouped = new Map<string, PlatformData[]>();
-    for (const p of compareData) {
-      if (!grouped.has(p.category)) grouped.set(p.category, []);
-      grouped.get(p.category)!.push(p);
-    }
-    const map = new Map<string, PlatformData>();
-    for (const [key, plats] of grouped) {
-      map.set(key, aggregateRows(plats));
-    }
-    return map;
-  }, [compareData]);
-
-  const compareGrandTotal = useMemo(() => {
-    if (compareData.length === 0) return null;
-    return aggregateRows(compareData);
-  }, [compareData]);
-
-  const isCompareActive = compareEnabled && compareData.length > 0;
+  const isCompareActive = compareEnabled && !!compareData?.rows?.length;
 
   const { data: metricRules = [] } = useQuery<MetricRulesetWithThresholds[]>({
     queryKey: ["/api/metric-rules"],
@@ -238,12 +181,12 @@ export default function PerformancePlataformas() {
     return getColorClasses(color);
   };
 
-  const toggleCategory = (catKey: string) => {
-    setExpandedCategories(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(catKey)) newSet.delete(catKey);
-      else newSet.add(catKey);
-      return newSet;
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
     });
   };
 
@@ -266,48 +209,23 @@ export default function PerformancePlataformas() {
   };
 
   const handleSort = (key: keyof PlatformData) => {
-    setSortConfig(prev => ({
-      key,
-      direction: prev.key === key && prev.direction === 'desc' ? 'asc' : 'desc',
-    }));
+    setSortConfig(prev =>
+      prev && prev.key === key && prev.direction === 'desc'
+        ? { key, direction: 'asc' }
+        : { key, direction: 'desc' }
+    );
   };
 
-  const categoryGroups = useMemo((): CategoryGroup[] => {
-    const grouped = new Map<string, PlatformData[]>();
-    for (const p of platforms) {
-      if (!grouped.has(p.category)) grouped.set(p.category, []);
-      grouped.get(p.category)!.push(p);
-    }
+  // Árvore exibida: aplica ordenação (se houver) e busca textual (poda).
+  const displayRows = useMemo(() => {
+    let result = rows;
+    if (sortConfig) result = sortTree(result, sortConfig.key, sortConfig.direction);
+    if (searchTerm) result = pruneTree(result, searchTerm.toLowerCase());
+    return result;
+  }, [rows, sortConfig, searchTerm]);
 
-    return CATEGORY_ORDER
-      .filter(key => grouped.has(key))
-      .map(key => {
-        const plats = grouped.get(key)!;
-        return {
-          key,
-          name: plats[0]?.categoryName || key,
-          platforms: plats,
-          totals: aggregateRows(plats),
-        };
-      });
-  }, [platforms]);
-
-  const filteredGroups = useMemo(() => {
-    if (!searchTerm) return categoryGroups;
-    const term = searchTerm.toLowerCase();
-    return categoryGroups
-      .map(g => ({
-        ...g,
-        platforms: g.platforms.filter(p =>
-          p.name.toLowerCase().includes(term) || g.name.toLowerCase().includes(term)
-        ),
-      }))
-      .filter(g => g.platforms.length > 0 || g.name.toLowerCase().includes(term));
-  }, [categoryGroups, searchTerm]);
-
-  const grandTotal = useMemo(() => {
-    return aggregateRows(platforms);
-  }, [platforms]);
+  const searching = !!searchTerm;
+  const isExpanded = (id: string) => searching || expandedRows.has(id);
 
   // Renderizar célula com variação expandida
   const renderCell = (
@@ -318,11 +236,11 @@ export default function PerformancePlataformas() {
     colorClass = '',
     invertPositive = false,
   ) => {
-    const isExpanded = expandedColumns.has(column);
+    const colExpanded = expandedColumns.has(column);
     return (
       <>
         <td className={cn("p-2 text-right whitespace-nowrap", colorClass)}>{formatter(value)}</td>
-        {isCompareActive && isExpanded && (
+        {isCompareActive && colExpanded && (
           <td className="p-2 text-right text-xs whitespace-nowrap bg-muted/10">
             {value !== null && compareValue !== null && compareValue !== 0 ? (
               <div className="flex flex-col items-end">
@@ -349,7 +267,7 @@ export default function PerformancePlataformas() {
 
   // Header components
   const SortableHeader = ({ column, label }: { column: keyof PlatformData; label: string }) => {
-    const isExpanded = expandedColumns.has(column as string);
+    const colExpanded = expandedColumns.has(column as string);
     return (
       <>
         <th
@@ -362,14 +280,13 @@ export default function PerformancePlataformas() {
                 onClick={(e) => { e.stopPropagation(); toggleColumn(column as string); }}
                 className="hover:text-foreground text-muted-foreground"
               >
-                {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                {colExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
               </button>
             )}
             {label}
-
           </div>
         </th>
-        {isCompareActive && isExpanded && (
+        {isCompareActive && colExpanded && (
           <th className="whitespace-nowrap text-xs text-muted-foreground italic p-2">
             <div className="text-center">Var.</div>
           </th>
@@ -403,7 +320,6 @@ export default function PerformancePlataformas() {
               </button>
             )}
             {label}
-
           </div>
         </th>
         {isCompareActive && isColExpanded && (
@@ -474,6 +390,57 @@ export default function PerformancePlataformas() {
     </>
   );
 
+  const renderNodeRows = (nodes: PlatformNode[], depth: number): React.ReactNode[] => {
+    const out: React.ReactNode[] = [];
+    for (const node of nodes) {
+      const hasChildren = !!(node.children && node.children.length > 0);
+      const expanded = isExpanded(node.id);
+      const comp = compareMap.get(node.id) || null;
+      out.push(
+        <tr
+          key={node.id}
+          className={cn(
+            "border-b border-border",
+            depth === 0 ? "bg-muted/30 font-semibold" : "hover:bg-muted/10",
+            hasChildren && "cursor-pointer",
+          )}
+          onClick={hasChildren ? () => toggleRow(node.id) : undefined}
+        >
+          <td
+            className={cn("p-2 sticky left-0 z-10", depth === 0 ? "bg-muted/30" : "bg-background")}
+            style={{ paddingLeft: `${8 + depth * 18}px` }}
+          >
+            <div className="flex items-center gap-1.5">
+              {hasChildren ? (
+                expanded
+                  ? <ChevronDown className="w-4 h-4 text-muted-foreground shrink-0" />
+                  : <ChevronRight className="w-4 h-4 text-muted-foreground shrink-0" />
+              ) : (
+                <div className="w-4 shrink-0" />
+              )}
+              <span className={cn(
+                depth === 0 ? "text-sm font-semibold" : "text-sm",
+                depth >= 2 && "text-muted-foreground",
+              )}>
+                {node.name}
+              </span>
+              {hasChildren && (
+                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
+                  {node.children!.length}
+                </Badge>
+              )}
+            </div>
+          </td>
+          {renderMetricCells(node, comp)}
+        </tr>
+      );
+      if (hasChildren && expanded) {
+        out.push(...renderNodeRows(node.children!, depth + 1));
+      }
+    }
+    return out;
+  };
+
   return (
     <div className="p-6 space-y-6">
       <Card>
@@ -482,7 +449,7 @@ export default function PerformancePlataformas() {
             <div className="relative flex-1 min-w-[200px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar canal ou plataforma..."
+                placeholder="Buscar canal, source, campanha..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -518,7 +485,7 @@ export default function PerformancePlataformas() {
               <table className="w-full text-sm">
                 <thead className="bg-muted/50 sticky top-0 z-20">
                   <tr>
-                    <th className="p-2 text-left sticky left-0 bg-muted/50 z-30 min-w-[240px]">Canal / Plataforma</th>
+                    <th className="p-2 text-left sticky left-0 bg-muted/50 z-30 min-w-[260px]">Canal / Source / Campanha</th>
                     <SortableHeader column="investimento" label="Investimento" />
                     <SortableHeader column="sessoes" label="Sessões" />
                     <SortableHeader column="taxaConversao" label="Taxa Conv." />
@@ -555,63 +522,17 @@ export default function PerformancePlataformas() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredGroups.map((group) => {
-                    const isExpanded = expandedCategories.has(group.key);
-                    const hasMultiplePlatforms = group.platforms.length > 1;
-                    const catComp = compareCategoryMap.get(group.key) || null;
-
-                    return (
-                      <Fragment key={group.key}>
-                        {/* Category header row */}
-                        <tr
-                          className={cn(
-                            "border-b border-border bg-muted/30 font-semibold",
-                            hasMultiplePlatforms && "cursor-pointer hover:bg-muted/50"
-                          )}
-                          onClick={() => hasMultiplePlatforms && toggleCategory(group.key)}
-                        >
-                          <td className="p-2 sticky left-0 bg-muted/30 z-10">
-                            <div className="flex items-center gap-2">
-                              {hasMultiplePlatforms ? (
-                                isExpanded
-                                  ? <ChevronDown className="w-4 h-4 text-muted-foreground" />
-                                  : <ChevronRight className="w-4 h-4 text-muted-foreground" />
-                              ) : (
-                                <div className="w-4" />
-                              )}
-                              <span className="text-sm font-semibold">{group.name}</span>
-                              {hasMultiplePlatforms && (
-                                <Badge variant="secondary" className="text-[10px] px-1.5 py-0">
-                                  {group.platforms.length}
-                                </Badge>
-                              )}
-                            </div>
-                          </td>
-                          {renderMetricCells(group.totals, catComp)}
-                        </tr>
-                        {/* Platform rows (when expanded) */}
-                        {isExpanded && hasMultiplePlatforms && group.platforms.map((platform) => (
-                          <tr
-                            key={`plat-${platform.id}`}
-                            className="border-b border-border hover:bg-muted/10"
-                          >
-                            <td className="p-2 sticky left-0 bg-background z-10" style={{ paddingLeft: '40px' }}>
-                              <span className="text-sm text-muted-foreground">{platform.name}</span>
-                            </td>
-                            {renderMetricCells(platform, compareMap.get(platform.id) || null)}
-                          </tr>
-                        ))}
-                      </Fragment>
-                    );
-                  })}
+                  {renderNodeRows(displayRows, 0)}
 
                   {/* Grand total row */}
-                  <tr className="border-t-2 border-border bg-muted/50 font-bold">
-                    <td className="p-2 sticky left-0 bg-muted/50 z-10">
-                      <span className="text-sm font-bold">TOTAL GERAL</span>
-                    </td>
-                    {renderMetricCells(grandTotal, compareGrandTotal)}
-                  </tr>
+                  {total && (
+                    <tr className="border-t-2 border-border bg-muted/50 font-bold">
+                      <td className="p-2 sticky left-0 bg-muted/50 z-10">
+                        <span className="text-sm font-bold">TOTAL GERAL</span>
+                      </td>
+                      {renderMetricCells(total, compareData?.total ?? null)}
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
