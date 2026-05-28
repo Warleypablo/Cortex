@@ -1,0 +1,343 @@
+import { useState } from "react";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
+import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
+import {
+  Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import {
+  MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, UserPlus, Trash2,
+} from "lucide-react";
+
+type Profile = {
+  id: number;
+  igUsername: string;
+  bio: string | null;
+  followersCount: number | null;
+  profilePictureUrl: string | null;
+  lastMediaPermalink: string | null;
+  stage: string;
+  subcategory: string | null;
+  ownerUserId: string | null;
+  lockedBy: string | null;
+  isLocked: boolean;
+  bitrixDealId: number | null;
+  ghlContactId: string | null;
+  isExistingContact: boolean;
+  lastInteractionAt: string | null;
+  commentCount: number;
+  dmCount: number;
+  lastText: string | null;
+  temperature: "hot" | "warm" | "cold";
+};
+
+const STAGES = [
+  { key: "engajador", label: "Engajador" },
+  { key: "oportunidade", label: "Oportunidade" },
+  { key: "negocio", label: "Negócio" },
+];
+
+const TEMP_EMOJI: Record<string, string> = { hot: "🔥", warm: "🌡️", cold: "❄️" };
+
+const SUBCATS = [
+  { key: "creator_ugc", label: "Creator/UGC" },
+  { key: "job_candidate", label: "Candidato a vaga" },
+  { key: "competitor", label: "Concorrente" },
+  { key: "poor_fit", label: "Fora do perfil" },
+];
+
+export default function Pipeline() {
+  const qc = useQueryClient();
+  const { toast } = useToast();
+  const { user } = useAuth();
+  const [bitrixTarget, setBitrixTarget] = useState<Profile | null>(null);
+
+  const { data: profiles, isLoading } = useQuery<Profile[]>({
+    queryKey: ["/api/crm-instagram/profiles"],
+  });
+
+  const invalidate = () => qc.invalidateQueries({ queryKey: ["/api/crm-instagram/profiles"] });
+
+  const act = (verb: string) =>
+    useMutation({
+      mutationFn: async ({ id, body }: { id: number; body?: any }) => {
+        const res = await apiRequest("POST", `/api/crm-instagram/profiles/${id}/${verb}`, body || {});
+        return res.json();
+      },
+      onSuccess: () => invalidate(),
+      onError: (e: any) => toast({ title: "Ops", description: e.message, variant: "destructive" }),
+    });
+
+  const moveM = act("stage");
+  const claimM = act("claim");
+  const lockM = act("lock");
+  const subM = act("subcategory");
+
+  const move = (p: Profile, toStage: string) => {
+    if (toStage === "negocio" && !p.bitrixDealId) { setBitrixTarget(p); return; }
+    moveM.mutate({ id: p.id, body: { toStage } });
+  };
+
+  if (isLoading) {
+    return (
+      <div className="grid grid-cols-3 gap-4">
+        {STAGES.map((s) => <Skeleton key={s.key} className="h-96 w-full" />)}
+      </div>
+    );
+  }
+
+  const byStage = (stage: string) => (profiles || []).filter((p) => p.stage === stage);
+
+  return (
+    <>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        {STAGES.map((col) => {
+          const items = byStage(col.key);
+          return (
+            <div
+              key={col.key}
+              onDragOver={(e) => e.preventDefault()}
+              onDrop={(e) => {
+                const id = Number(e.dataTransfer.getData("text/plain"));
+                const p = (profiles || []).find((x) => x.id === id);
+                if (p && p.stage !== col.key) move(p, col.key);
+              }}
+              className="rounded-lg bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 p-3 min-h-[60vh]"
+            >
+              <div className="flex items-center justify-between mb-3 px-1">
+                <h3 className="font-semibold text-gray-900 dark:text-white">{col.label}</h3>
+                <Badge variant="secondary">{items.length}</Badge>
+              </div>
+              <div className="space-y-3">
+                {items.map((p) => (
+                  <ProfileCard
+                    key={p.id}
+                    p={p}
+                    meId={user?.id}
+                    onClaim={() => claimM.mutate({ id: p.id })}
+                    onLock={() => lockM.mutate({ id: p.id })}
+                    onMove={(to) => move(p, to)}
+                    onDiscard={(sub) => subM.mutate({ id: p.id, body: { subcategory: sub } })}
+                    onBitrix={() => setBitrixTarget(p)}
+                  />
+                ))}
+                {items.length === 0 && (
+                  <div className="text-center text-xs text-gray-400 py-8">Vazio</div>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+
+      <BitrixModal
+        target={bitrixTarget}
+        onClose={() => setBitrixTarget(null)}
+        onCreated={() => { setBitrixTarget(null); invalidate(); }}
+      />
+    </>
+  );
+}
+
+function ProfileCard({
+  p, meId, onClaim, onLock, onMove, onDiscard, onBitrix,
+}: {
+  p: Profile;
+  meId?: string;
+  onClaim: () => void;
+  onLock: () => void;
+  onMove: (toStage: string) => void;
+  onDiscard: (sub: string) => void;
+  onBitrix: () => void;
+}) {
+  const lockedByOther = p.isLocked && p.lockedBy && p.lockedBy !== meId;
+  const idx = STAGES.findIndex((s) => s.key === p.stage);
+
+  return (
+    <div
+      draggable={!lockedByOther}
+      onDragStart={(e) => e.dataTransfer.setData("text/plain", String(p.id))}
+      className="rounded-lg bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-3 shadow-sm hover:shadow-md transition-shadow"
+    >
+      <div className="flex items-start gap-2">
+        <Avatar className="h-9 w-9">
+          {p.profilePictureUrl && <AvatarImage src={p.profilePictureUrl} alt={p.igUsername} />}
+          <AvatarFallback>{p.igUsername.slice(0, 2).toUpperCase()}</AvatarFallback>
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-1.5">
+            <span className="font-medium text-gray-900 dark:text-white truncate">@{p.igUsername}</span>
+            <span title={p.temperature}>{TEMP_EMOJI[p.temperature]}</span>
+          </div>
+          <div className="text-xs text-gray-500 dark:text-zinc-400">
+            {p.followersCount != null ? `${p.followersCount.toLocaleString("pt-BR")} seg · ` : ""}
+            {p.lastInteractionAt ? new Date(p.lastInteractionAt).toLocaleDateString("pt-BR") : ""}
+          </div>
+        </div>
+      </div>
+
+      {p.lastText && (
+        <p className="mt-2 text-xs text-gray-600 dark:text-zinc-300 line-clamp-2">"{p.lastText}"</p>
+      )}
+
+      <div className="mt-2 flex flex-wrap gap-1">
+        {p.dmCount > 0 && (
+          <Badge variant="secondary" className="gap-1"><Mail className="h-3 w-3" />DM {p.dmCount}</Badge>
+        )}
+        {p.commentCount > 0 && (
+          <Badge variant="secondary" className="gap-1"><MessageCircle className="h-3 w-3" />{p.commentCount}</Badge>
+        )}
+        {p.isExistingContact && (
+          <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white gap-1">
+            <CheckCircle2 className="h-3 w-3" />Já é contato
+          </Badge>
+        )}
+        {p.bitrixDealId && (
+          <Badge className="bg-blue-600 hover:bg-blue-600 text-white">No Bitrix</Badge>
+        )}
+        {lockedByOther && (
+          <Badge variant="outline" className="gap-1 text-amber-600 border-amber-400">
+            <Lock className="h-3 w-3" />em uso
+          </Badge>
+        )}
+        {p.ownerUserId && (
+          <Badge variant="outline" className="gap-1"><UserPlus className="h-3 w-3" />dono</Badge>
+        )}
+      </div>
+
+      <div className="mt-3 flex flex-wrap items-center gap-1.5">
+        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" asChild>
+          <a href={`https://instagram.com/${p.igUsername}`} target="_blank" rel="noreferrer">
+            <ExternalLink className="h-3 w-3" />Abrir conversa
+          </a>
+        </Button>
+        {!p.ownerUserId && (
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onClaim}>Pegar</Button>
+        )}
+        {idx < STAGES.length - 1 && (
+          <Button
+            size="sm" variant="default" className="h-7 text-xs"
+            disabled={!!lockedByOther}
+            onClick={() => onMove(STAGES[idx + 1].key)}
+          >
+            {STAGES[idx + 1].key === "negocio" ? "Criar no Bitrix →" : `→ ${STAGES[idx + 1].label}`}
+          </Button>
+        )}
+        {p.stage === "negocio" && !p.bitrixDealId && (
+          <Button size="sm" variant="default" className="h-7 text-xs" onClick={onBitrix}>Criar no Bitrix</Button>
+        )}
+        <DiscardMenu onDiscard={onDiscard} />
+        {!p.isLocked && (
+          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Travar para mim" onClick={onLock}>
+            <Lock className="h-3 w-3" />
+          </Button>
+        )}
+      </div>
+
+      {p.subcategory && (
+        <div className="mt-2 text-xs text-gray-400">
+          Descartado: {SUBCATS.find((s) => s.key === p.subcategory)?.label || p.subcategory}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function DiscardMenu({ onDiscard }: { onDiscard: (sub: string) => void }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="relative">
+      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400" title="Descartar" onClick={() => setOpen((o) => !o)}>
+        <Trash2 className="h-3 w-3" />
+      </Button>
+      {open && (
+        <div className="absolute z-10 mt-1 right-0 w-44 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
+          {SUBCATS.map((s) => (
+            <button
+              key={s.key}
+              className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
+              onClick={() => { onDiscard(s.key); setOpen(false); }}
+            >
+              {s.label}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BitrixModal({
+  target, onClose, onCreated,
+}: {
+  target: Profile | null;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const { toast } = useToast();
+  const [form, setForm] = useState({ nome: "", telefone: "", email: "", valor: "", responsavel: "" });
+
+  const createM = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", `/api/crm-instagram/profiles/${target!.id}/bitrix`, form);
+      return res.json();
+    },
+    onSuccess: (data) => {
+      toast({ title: data.alreadyExists ? "Já estava no Bitrix" : "Criado no Bitrix", description: `Deal #${data.dealId}` });
+      setForm({ nome: "", telefone: "", email: "", valor: "", responsavel: "" });
+      onCreated();
+    },
+    onError: (e: any) => toast({ title: "Erro ao criar no Bitrix", description: e.message, variant: "destructive" }),
+  });
+
+  const set = (k: string) => (e: React.ChangeEvent<HTMLInputElement>) => setForm((f) => ({ ...f, [k]: e.target.value }));
+
+  return (
+    <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
+      <DialogContent className="bg-white dark:bg-zinc-900">
+        <DialogHeader>
+          <DialogTitle>Criar no Bitrix — @{target?.igUsername}</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3 text-sm">
+          <p className="text-xs text-gray-500 dark:text-zinc-400">
+            Origem e link do Instagram já vão preenchidos. Complete o que souber:
+          </p>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="col-span-2">
+              <label className="text-xs text-gray-600 dark:text-zinc-400">Nome</label>
+              <Input value={form.nome} onChange={set("nome")} placeholder="Nome real do lead" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600 dark:text-zinc-400">Telefone</label>
+              <Input value={form.telefone} onChange={set("telefone")} placeholder="(11) 9..." />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600 dark:text-zinc-400">Email</label>
+              <Input value={form.email} onChange={set("email")} placeholder="email@..." />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600 dark:text-zinc-400">Valor estimado (R$)</label>
+              <Input value={form.valor} onChange={set("valor")} type="number" placeholder="0" />
+            </div>
+            <div>
+              <label className="text-xs text-gray-600 dark:text-zinc-400">Responsável</label>
+              <Input value={form.responsavel} onChange={set("responsavel")} placeholder="quem vai tocar" />
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="ghost" onClick={onClose}>Cancelar</Button>
+          <Button onClick={() => createM.mutate()} disabled={createM.isPending}>
+            {createM.isPending ? "Criando..." : "Criar deal no Bitrix"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}

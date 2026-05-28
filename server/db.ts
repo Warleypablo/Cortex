@@ -2379,3 +2379,70 @@ export async function initializeItemAliasMapTable(): Promise<void> {
     console.error('[database] erro ao inicializar item_alias_map:', error);
   }
 }
+
+// CRM Instagram (Garimpo de Engajamento → Social Selling)
+export async function initializeCrmInstagramTables(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.prospecting_profiles (
+        id SERIAL PRIMARY KEY,
+        ig_username TEXT NOT NULL,
+        ig_user_id TEXT,
+        bio TEXT,
+        followers_count INTEGER,
+        profile_picture_url TEXT,
+        last_media_permalink TEXT,
+        stage TEXT NOT NULL DEFAULT 'engajador',
+        subcategory TEXT,
+        owner_user_id TEXT,
+        locked_by TEXT,
+        locked_at TIMESTAMP,
+        bitrix_deal_id INTEGER,
+        ghl_contact_id TEXT,
+        is_existing_contact BOOLEAN DEFAULT FALSE,
+        icp_tags TEXT[],
+        first_seen TIMESTAMP DEFAULT NOW(),
+        last_interaction_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_ig_username ON cortex_core.prospecting_profiles (ig_username)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_stage ON cortex_core.prospecting_profiles (stage)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_owner ON cortex_core.prospecting_profiles (owner_user_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_last_interaction ON cortex_core.prospecting_profiles (last_interaction_at)`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.prospecting_interactions (
+        id SERIAL PRIMARY KEY,
+        profile_id INTEGER NOT NULL REFERENCES cortex_core.prospecting_profiles(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        ig_media_id TEXT,
+        text TEXT,
+        source TEXT,
+        external_ref TEXT NOT NULL,
+        occurred_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_int_external_ref ON cortex_core.prospecting_interactions (external_ref)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_int_profile ON cortex_core.prospecting_interactions (profile_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_int_occurred ON cortex_core.prospecting_interactions (occurred_at)`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.prospecting_status_log (
+        id SERIAL PRIMARY KEY,
+        profile_id INTEGER NOT NULL REFERENCES cortex_core.prospecting_profiles(id) ON DELETE CASCADE,
+        from_stage TEXT,
+        to_stage TEXT NOT NULL,
+        by_user TEXT,
+        at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_log_profile ON cortex_core.prospecting_status_log (profile_id)`);
+
+    console.log('[database] CRM Instagram tables initialized');
+  } catch (error) {
+    console.error('[database] erro ao inicializar CRM Instagram tables:', error);
+  }
+}
