@@ -3390,6 +3390,41 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Classificação de plataforma centralizada (ver constante PLATFORM_CASE_SQL_BASIC no topo do arquivo)
       const platformCaseExpr = PLATFORM_CASE_SQL_BASIC;
 
+      // Filtros de produto (funilNgc) e plataforma (utmSource), espelhando /ads (2613-2799).
+      // Necessário para o Aprofundado do Orçado x Realizado reconciliar com Evolução Temporal.
+      const funilNgcRaw = req.query.funilNgc as string | undefined;
+      const funilValues = funilNgcRaw
+        ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
+        : [];
+      const hasVazio = funilValues.includes('(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
+
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      const utmValues = utmSourceParam && utmSourceParam !== 'todos'
+        ? utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean)
+        : [];
+
+      const escapeSql = (v: string) => v.replace(/'/g, "''");
+
+      let funilFilterSql = '';
+      if (funilValues.length > 0) {
+        if (hasVazio && realFunilValues.length > 0) {
+          const conds = realFunilValues.map(v => `fnl_ngc ILIKE '${escapeSql(v)}'`).join(' OR ');
+          funilFilterSql = `AND (${conds} OR fnl_ngc IS NULL OR fnl_ngc = '')`;
+        } else if (hasVazio) {
+          funilFilterSql = `AND (fnl_ngc IS NULL OR fnl_ngc = '')`;
+        } else {
+          const conds = realFunilValues.map(v => `fnl_ngc ILIKE '${escapeSql(v)}'`).join(' OR ');
+          funilFilterSql = `AND (${conds})`;
+        }
+      }
+
+      let utmSourceFilterSql = '';
+      if (utmValues.length > 0) {
+        const conds = utmValues.map(v => `LOWER(utm_source) LIKE '${escapeSql(v)}%'`).join(' OR ');
+        utmSourceFilterSql = `AND (${conds})`;
+      }
+
       const RA_STAGES = `'reunião marcada', 'rm', 'rm - reunião marcada', 'agendado', 'reunião agendada', 'agendamento direto',
             'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
             'confecção de proposta', 'em negociação', 'aguardado os dados',
@@ -3422,6 +3457,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM "Bitrix".crm_deal
         WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
           AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          ${funilFilterSql}
+          ${utmSourceFilterSql}
         GROUP BY platform
       `));
 
@@ -3443,6 +3480,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
           AND stage_name = 'Negócio Ganho'
           AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          ${funilFilterSql}
+          ${utmSourceFilterSql}
         GROUP BY platform
       `));
       const winsMap = new Map<string, any>();
@@ -3460,6 +3499,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             AND data_fechamento IS NOT NULL
             AND data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
             AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${funilFilterSql}
+            ${utmSourceFilterSql}
           GROUP BY platform, cliente
         ) sub
         GROUP BY platform
@@ -3600,6 +3641,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let metaImpressions = 0, metaClicks = 0, metaSpend = 0;
       let googleImpressions = 0, googleClicks = 0, googleSpend = 0;
 
+      // Campaign filter aplicado tanto na mídia quanto no Bitrix.
+      // Sem isso, leads filtravam por campanha e impressões/cliques somavam tudo — universos diferentes.
+      const metaCampaignFilter = campaign
+        ? sql`AND campaign_id IN (
+            SELECT campaign_id::text FROM meta_ads.meta_campaigns
+            WHERE campaign_name ILIKE ${'%' + campaign + '%'}
+          )`
+        : sql``;
+
       if (plataforma === 'Todos' || plataforma === 'Meta') {
         const metaResult = await db.execute(sql`
           SELECT
@@ -3609,6 +3659,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           FROM meta_ads.meta_insights_daily
           WHERE date_start >= ${startDate}::date AND date_stop <= ${endDate}::date
             AND account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+            ${metaCampaignFilter}
         `);
         const mr = metaResult.rows[0] as any;
         metaImpressions = parseInt(mr.impressions) || 0;
@@ -3618,6 +3669,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       if (plataforma === 'Todos' || plataforma === 'Google') {
         try {
+          const googleCampaignFilter = campaign
+            ? sql`AND campaign_key IN (
+                SELECT campaign_key FROM google_ads.campaigns
+                WHERE name ILIKE ${'%' + campaign + '%'}
+              )`
+            : sql``;
           const googleResult = await db.execute(sql`
             SELECT
               COALESCE(SUM(impressions), 0)::bigint as impressions,
@@ -3625,6 +3682,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(cost_micros), 0)::bigint as cost_micros
             FROM google_ads.campaign_daily_metrics
             WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+              ${googleCampaignFilter}
           `);
           const gr = googleResult.rows[0] as any;
           googleImpressions = parseInt(gr.impressions) || 0;
@@ -3703,30 +3761,74 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         rate: stages[i].value > 0 ? (stage.value / stages[i].value * 100) : 0,
       }));
 
-      // 4. Monthly trend
+      // 4. Monthly trend — event-time por métrica.
+      // Cada métrica é agrupada pelo mês do SEU próprio evento, não pelo mês do lead.
+      // Ex.: RA de março feita por lead criado em fevereiro entra em março.
       const trendResult = await db.execute(sql`
+        WITH leads_m AS (
+          SELECT TO_CHAR(created_at, 'YYYY-MM') as month,
+                 COUNT(*) as leads,
+                 SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls
+          FROM "Bitrix".crm_deal
+          WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${utmFilter}
+            ${campaignFilter}
+          GROUP BY 1
+        ),
+        rm_m AS (
+          SELECT TO_CHAR(data_reuniao_agendada, 'YYYY-MM') as month, COUNT(*) as rm
+          FROM "Bitrix".crm_deal
+          WHERE data_reuniao_agendada IS NOT NULL
+            AND data_reuniao_agendada::date >= ${startDate}::date
+            AND data_reuniao_agendada::date <= ${endDate}::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${utmFilter}
+            ${campaignFilter}
+          GROUP BY 1
+        ),
+        rr_m AS (
+          SELECT TO_CHAR(data_reuniao_realizada, 'YYYY-MM') as month, COUNT(*) as rr
+          FROM "Bitrix".crm_deal
+          WHERE data_reuniao_realizada IS NOT NULL
+            AND data_reuniao_realizada::date >= ${startDate}::date
+            AND data_reuniao_realizada::date <= ${endDate}::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${utmFilter}
+            ${campaignFilter}
+          GROUP BY 1
+        ),
+        vendas_m AS (
+          SELECT TO_CHAR(data_fechamento, 'YYYY-MM') as month, COUNT(*) as vendas
+          FROM "Bitrix".crm_deal
+          WHERE stage_name = 'Negócio Ganho'
+            AND data_fechamento IS NOT NULL
+            AND data_fechamento >= ${startDate}::date
+            AND data_fechamento <= ${endDate}::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${utmFilter}
+            ${campaignFilter}
+          GROUP BY 1
+        ),
+        all_months AS (
+          SELECT month FROM leads_m
+          UNION SELECT month FROM rm_m
+          UNION SELECT month FROM rr_m
+          UNION SELECT month FROM vendas_m
+        )
         SELECT
-          TO_CHAR(created_at, 'YYYY-MM') as month,
-          COUNT(*) as leads,
-          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL
-                   AND data_reuniao_agendada::date >= ${startDate}::date
-                   AND data_reuniao_agendada::date <= ${endDate}::date
-                   THEN 1 ELSE 0 END) as rm,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL
-                   AND data_reuniao_realizada::date >= ${startDate}::date
-                   AND data_reuniao_realizada::date <= ${endDate}::date
-                   THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho'
-                   AND data_fechamento >= ${startDate}::date
-                   AND data_fechamento <= ${endDate}::date
-                   THEN 1 ELSE 0 END) as vendas
-        FROM "Bitrix".crm_deal
-        WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
-          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
-          ${utmFilter}
-          ${campaignFilter}
-        GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+          a.month,
+          COALESCE(l.leads, 0) as leads,
+          COALESCE(l.mqls, 0) as mqls,
+          COALESCE(rm.rm, 0) as rm,
+          COALESCE(rr.rr, 0) as rr,
+          COALESCE(v.vendas, 0) as vendas
+        FROM all_months a
+        LEFT JOIN leads_m l ON a.month = l.month
+        LEFT JOIN rm_m rm ON a.month = rm.month
+        LEFT JOIN rr_m rr ON a.month = rr.month
+        LEFT JOIN vendas_m v ON a.month = v.month
+        WHERE a.month IS NOT NULL
         ORDER BY 1
       `);
 
