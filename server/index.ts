@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable, initializeBroadcastLeadEventsTable, initializeBroadcastClassificationTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 import { runAllForecasts } from "./services/predictiveEngine";
@@ -146,6 +146,8 @@ app.use((req, res, next) => {
     initializeMetricRulesetsTables(),
     initializeItemAliasMapTable(),
     initializeSaldoDiarioSnapshotsTable(),
+    initializeBroadcastLeadEventsTable(),
+    initializeBroadcastClassificationTable(),
   ]);
 
   // Phase 1.5: Migrations that depend on tables existing
@@ -540,6 +542,34 @@ app.use((req, res, next) => {
   setTimeout(() => runMotivoPerdaSync(), 120000); // 2min após boot
   setInterval(() => runMotivoPerdaSync(), MOTIVO_PERDA_SYNC_INTERVAL);
   console.log(`[motivo-perda-sync-job] Scheduled every ${MOTIVO_PERDA_SYNC_INTERVAL / 3600000}h`);
+
+  // Bitrix contatos sync diário (telefone → match com respondedores de broadcast)
+  const BITRIX_CONTACTS_SYNC_INTERVAL = 24 * 60 * 60 * 1000; // 24h
+  const runBitrixContactsSync = async () => {
+    try {
+      console.log("[bitrix-contacts-sync-job] Starting scheduled Bitrix contacts sync...");
+      const { syncBitrixContacts } = await import("../scripts/sync-bitrix-contacts");
+      const { totalSynced, totalSeen, semTelefone } = await syncBitrixContacts();
+      (globalThis as any).__bitrixContactsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        totalSynced,
+        totalSeen,
+        semTelefone,
+        status: "success",
+      };
+      console.log(`[bitrix-contacts-sync-job] Sync complete: ${totalSynced}/${totalSeen} contatos (${semTelefone} sem telefone)`);
+    } catch (err: any) {
+      console.error("[bitrix-contacts-sync-job] Sync failed:", err.message);
+      (globalThis as any).__bitrixContactsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  setTimeout(() => runBitrixContactsSync(), 180000); // 3min após boot
+  setInterval(() => runBitrixContactsSync(), BITRIX_CONTACTS_SYNC_INTERVAL);
+  console.log(`[bitrix-contacts-sync-job] Scheduled every ${BITRIX_CONTACTS_SYNC_INTERVAL / 3600000}h`);
 
   // Google Ads keywords sync a cada 12 horas
   const GOOGLE_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h

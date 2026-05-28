@@ -16,6 +16,7 @@ import { sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
 import { BASE_TAG_MAP, contatoSatisfazBase, expandLegacyAliases, type BaseFiltro } from "@shared/ghl-broadcast/base-tag-map";
 import { analisarCopy, gerarCopies, buscarTopPerformers } from "../services/ghlCopyAi";
+import { attributeBroadcastReplies } from "../services/broadcastAttribution";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -1305,6 +1306,204 @@ async function getOverview(_req: Request, res: Response) {
   }
 }
 
+// ─── Funil lead-a-lead (atribuição de broadcast → resposta → Bitrix) ────────
+
+/** Parseia o broadcast_id `wa-YYYYMMDD-source-hash8`. null se não for um broadcast WhatsApp. */
+function parseWaBroadcastId(id: string): { day: string; source: string; hash: string } | null {
+  const parts = id.split("-");
+  if (parts.length !== 4 || parts[0] !== "wa") return null;
+  const d = parts[1];
+  if (!/^\d{8}$/.test(d)) return null;
+  const day = `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6, 8)}`;
+  return { day, source: parts[2], hash: parts[3] };
+}
+
+/**
+ * GET /api/ghl/broadcasts/:id/funnel
+ * Funil do disparo: enviadas → responderam → (pos/neg/neutra/opt-out) → reunião marcada
+ * → compareceu → venda. Etapas de reunião/venda vêm live de "Bitrix".crm_deal.
+ * Roda a atribuição (idempotente) antes de ler, então o número fica sempre fresco.
+ */
+async function getBroadcastFunnel(req: Request, res: Response) {
+  try {
+    const id = req.params.id;
+    const parsed = parseWaBroadcastId(id);
+    if (!parsed) {
+      return res.status(400).json({ error: "Funil disponível apenas para broadcasts de WhatsApp (id wa-...)." });
+    }
+
+    // Atribuição lazy: do dia do disparo até agora (respostas chegam dias depois).
+    const from = new Date(`${parsed.day}T00:00:00.000Z`);
+    const to = new Date();
+    try {
+      await attributeBroadcastReplies({ from, to, broadcastId: id });
+    } catch (e: any) {
+      console.error("[GHL] funnel attribution falhou (segue com dados existentes):", e.message);
+    }
+
+    // Enviadas = contatos distintos do disparo (mesma reconstrução de listBroadcasts).
+    const sentRes = await db.execute(sql`
+      SELECT COUNT(DISTINCT contact_id)::int AS sent
+      FROM cortex_core.ghl_messages
+      WHERE direction = 'outbound'
+        AND source = ${parsed.source}
+        AND DATE_TRUNC('day', date_added) = ${parsed.day}::date
+        AND SUBSTR(MD5(COALESCE(body, '')), 1, 8) = ${parsed.hash}
+    `);
+    const sent = (sentRes as any).rows?.[0]?.sent ?? 0;
+
+    const funnelRes = await db.execute(sql`
+      SELECT
+        COUNT(DISTINCT e.ghl_contact_id)::int AS responderam,
+        COUNT(*) FILTER (WHERE e.sentiment = 'positiva')::int AS positivas,
+        COUNT(*) FILTER (WHERE e.sentiment = 'negativa')::int AS negativas,
+        COUNT(*) FILTER (WHERE e.sentiment = 'neutra')::int AS neutras,
+        COUNT(*) FILTER (WHERE e.sentiment = 'opt_out')::int AS opt_out,
+        -- Causalidade: só conta a etapa se ela ocorreu APÓS a resposta ao broadcast
+        -- (lead que já estava em reunião/venda antes do disparo NÃO é atribuído).
+        COUNT(DISTINCT e.bitrix_deal_id) FILTER (
+          WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date
+        )::int AS reuniao_marcada,
+        COUNT(DISTINCT e.bitrix_deal_id) FILTER (
+          WHERE d.data_reuniao_realizada IS NOT NULL AND d.data_reuniao_realizada >= e.reply_at::date
+        )::int AS compareceu,
+        COUNT(DISTINCT e.bitrix_deal_id) FILTER (
+          WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date
+        )::int AS venda
+      FROM cortex_core.broadcast_lead_events e
+      LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
+      WHERE e.broadcast_id = ${id}
+    `);
+    const f = (funnelRes as any).rows?.[0] ?? {};
+    res.json({
+      broadcast_id: id,
+      funnel: {
+        enviadas: sent,
+        responderam: f.responderam ?? 0,
+        positivas: f.positivas ?? 0,
+        negativas: f.negativas ?? 0,
+        neutras: f.neutras ?? 0,
+        opt_out: f.opt_out ?? 0,
+        reuniao_marcada: f.reuniao_marcada ?? 0,
+        compareceu: f.compareceu ?? 0,
+        venda: f.venda ?? 0,
+      },
+    });
+  } catch (err: any) {
+    console.error("[GHL] getBroadcastFunnel error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * GET /api/ghl/broadcasts/:id/leads
+ * Lista lead-a-lead do disparo: identidade (nome, telefone, empresa, e-mail) + sentimento
+ * + etapa atual no Bitrix + bitrix_deal_id (pra deep-link no card).
+ */
+async function getBroadcastLeads(req: Request, res: Response) {
+  try {
+    const id = req.params.id;
+    if (!parseWaBroadcastId(id)) {
+      return res.status(400).json({ error: "Leads disponíveis apenas para broadcasts de WhatsApp (id wa-...)." });
+    }
+    const r = await db.execute(sql`
+      SELECT
+        e.reply_message_id, e.lead_phone, e.sentiment, e.sentiment_motivo, e.sentiment_fonte,
+        e.reply_body, e.reply_at, e.bitrix_deal_id,
+        COALESCE(c.contact_name, ct.name) AS nome,
+        COALESCE(c.company_name, d.company_name) AS empresa,
+        COALESCE(c.email, ct.email) AS email,
+        d.stage_name, d.data_reuniao_agendada, d.data_reuniao_realizada, d.data_fechamento,
+        d.valor_recorrente, d.valor_pontual
+      FROM cortex_core.broadcast_lead_events e
+      LEFT JOIN cortex_core.ghl_contacts c ON c.id = e.ghl_contact_id
+      LEFT JOIN "Bitrix".crm_contact ct ON ct.id = e.bitrix_contact_id
+      LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
+      WHERE e.broadcast_id = ${id}
+      ORDER BY e.reply_at DESC NULLS LAST
+    `);
+    const leads = (r as any).rows ?? [];
+    res.json({ broadcast_id: id, leads, count: leads.length });
+  } catch (err: any) {
+    console.error("[GHL] getBroadcastLeads error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * GET /api/ghl/broadcasts/summary?from=&to=
+ * Resumo executivo do período pra aba Broadcast:
+ *  - entrega WhatsApp por status (enviado/entregue/lida/erro/pendente)
+ *  - funil atribuído (responderam/positivas/reunião/compareceu/venda) com causalidade pós-resposta
+ * Roda a atribuição (idempotente) antes de agregar, pra o número ficar fresco.
+ */
+async function getBroadcastsSummary(req: Request, res: Response) {
+  try {
+    const { from, to } = parsePeriod(req);
+    try {
+      await attributeBroadcastReplies({ from, to });
+    } catch (e: any) {
+      console.error("[GHL] summary attribution falhou (segue com dados existentes):", e.message);
+    }
+
+    const waSource = sql`source IN ('workflow', 'bulk_actions', 'campaign')`;
+
+    const entregaRes = await db.execute(sql`
+      SELECT
+        count(*)::int AS total,
+        count(*) FILTER (WHERE status = 'queued')::int AS pendente,
+        count(*) FILTER (WHERE status IN ('sent','delivered','read'))::int AS enviado,
+        count(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
+        count(*) FILTER (WHERE status = 'read')::int AS lida,
+        count(*) FILTER (WHERE status = 'failed')::int AS erro
+      FROM cortex_core.ghl_messages
+      WHERE message_type = 'TYPE_WHATSAPP' AND direction = 'outbound' AND ${waSource}
+        AND date_added BETWEEN ${from} AND ${to}
+    `);
+
+    const disparosRes = await db.execute(sql`
+      SELECT count(*)::int AS disparos FROM (
+        SELECT 1 FROM cortex_core.ghl_messages
+        WHERE message_type = 'TYPE_WHATSAPP' AND direction = 'outbound' AND ${waSource}
+          AND date_added BETWEEN ${from} AND ${to} AND body IS NOT NULL AND body <> ''
+        GROUP BY DATE_TRUNC('day', date_added), source, MD5(COALESCE(body, ''))
+        HAVING count(DISTINCT contact_id) >= 10
+      ) g
+    `);
+
+    const funilRes = await db.execute(sql`
+      SELECT
+        count(DISTINCT e.ghl_contact_id)::int AS responderam,
+        count(*) FILTER (WHERE e.sentiment = 'positiva')::int AS positivas,
+        count(*) FILTER (WHERE e.sentiment = 'opt_out')::int AS opt_out,
+        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reuniao_marcada,
+        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_realizada IS NOT NULL AND d.data_reuniao_realizada >= e.reply_at::date)::int AS compareceu,
+        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS venda
+      FROM cortex_core.broadcast_lead_events e
+      LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
+      WHERE e.reply_at BETWEEN ${from} AND ${to}
+    `);
+
+    const entrega = (entregaRes as any).rows?.[0] ?? {};
+    const funil = (funilRes as any).rows?.[0] ?? {};
+    const disparos = (disparosRes as any).rows?.[0]?.disparos ?? 0;
+    res.json({
+      period: { from, to },
+      whatsapp: {
+        disparos,
+        ...entrega,
+        entrega_pct: entrega.total ? +(100 * entrega.entregue / entrega.total).toFixed(1) : null,
+        leitura_pct: entrega.entregue ? +(100 * entrega.lida / entrega.entregue).toFixed(1) : null,
+        erro_pct: entrega.total ? +(100 * entrega.erro / entrega.total).toFixed(1) : null,
+      },
+      funil,
+    });
+  } catch (err: any) {
+    console.error("[GHL] getBroadcastsSummary error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────
 
 export function registerGhlPublicRoutes(app: Express) {
@@ -1324,7 +1523,10 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/messages", listMessages);
   app.get("/api/ghl/messages/:id", getMessageDetail);
   app.get("/api/ghl/broadcasts", listBroadcasts);
+  app.get("/api/ghl/broadcasts/summary", getBroadcastsSummary); // antes de /:id (senão "summary" vira id)
   app.get("/api/ghl/broadcasts/:id", getBroadcastDetail);
+  app.get("/api/ghl/broadcasts/:id/funnel", getBroadcastFunnel);
+  app.get("/api/ghl/broadcasts/:id/leads", getBroadcastLeads);
   app.patch("/api/ghl/broadcasts/:id/annotations", patchBroadcastAnnotation);
   app.get("/api/ghl/calendar", getCalendar);
   app.post("/api/ghl/copy/analyze", postCopyAnalyze);
