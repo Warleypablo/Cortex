@@ -1223,9 +1223,9 @@ export default function GrowthOrcadoRealizado() {
   });
 
   const { data: funnelByPlatformData } = useQuery<Record<string, PlatformFunnelData>>({
-    queryKey: ['/api/growth/orcado-realizado/funnel-by-platform', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/growth/orcado-realizado/funnel-by-platform', dateRange.startDate, dateRange.endDate, selectedProdutos, selectedPlataformas],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/funnel-by-platform?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await fetch(`/api/growth/orcado-realizado/funnel-by-platform?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${funilParam}${utmSourceParam}`);
       if (!res.ok) throw new Error('Failed to fetch funnel by platform');
       return res.json();
     },
@@ -1271,10 +1271,10 @@ export default function GrowthOrcadoRealizado() {
   });
 
   const { data: prevFunnelByPlatformData } = useQuery<Record<string, PlatformFunnelData> | null>({
-    queryKey: ['/api/growth/orcado-realizado/funnel-by-platform', prevDateRange?.startDate, prevDateRange?.endDate, 'prev'],
+    queryKey: ['/api/growth/orcado-realizado/funnel-by-platform', prevDateRange?.startDate, prevDateRange?.endDate, selectedProdutos, selectedPlataformas, 'prev'],
     queryFn: async () => {
       if (!prevDateRange) return null;
-      const res = await fetch(`/api/growth/orcado-realizado/funnel-by-platform?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
+      const res = await fetch(`/api/growth/orcado-realizado/funnel-by-platform?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}${funilParam}${utmSourceParam}`);
       if (!res.ok) return null;
       return res.json();
     },
