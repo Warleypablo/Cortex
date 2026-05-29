@@ -9,6 +9,8 @@ export const UTM_MEDIUMS = [
   'referral',
   'crm',
   'outbound',
+  'victor',
+  'andre',
 ] as const;
 
 export type UtmMedium = typeof UTM_MEDIUMS[number];
@@ -20,6 +22,8 @@ export const UTM_MEDIUM_LABELS: Record<UtmMedium, string> = {
   referral: 'Referral — Alguém externo trazendo lead',
   crm: 'CRM — Comunicação ativa para base própria',
   outbound: 'Outbound — Prospecção fria via SDR',
+  victor: 'Victor — Canal próprio (figura-exceção)',
+  andre: 'André — Canal próprio (figura-exceção)',
 };
 
 export const UTM_SOURCES_BY_MEDIUM: Record<UtmMedium, readonly string[]> = {
@@ -29,6 +33,8 @@ export const UTM_SOURCES_BY_MEDIUM: Record<UtmMedium, readonly string[]> = {
   referral: ['cliente', 'colaborador', 'afiliado', 'influencer', 'marketplace'],
   crm: ['email', 'whatsapp', 'sms'],
   outbound: ['email', 'whatsapp', 'linkedin'],
+  victor: ['instagram', 'youtube', 'linkedin', 'tiktok'],
+  andre: ['instagram', 'youtube', 'linkedin', 'tiktok'],
 };
 
 export const UTM_SOURCE_LABELS: Record<string, string> = {

@@ -12,6 +12,7 @@
 > - `facebook` removido de `organic` (Turbo não opera Facebook orgânico)
 > - Slugs oficiais de produto fixados: `creators`, `ecommerce`, `comercial`, `flash`
 > - Convenção de `content` em organic: `{slug-curto}-{aaaa-mm-dd}` sem repetir formato
+> - **`victor` e `andre` adicionados como mediums-exceção** (figuras-chave com canal próprio robusto — ver §3.7 e §4.7)
 
 > **Versão 1.1 — refinamentos** (19/05/2026):
 > - `bio`, `destaques-fixados` movidos de campaign → term em organic
@@ -69,7 +70,7 @@ Mesmo que uma iniciativa (ex: social selling) seja conceitualmente "diferente", 
 
 ---
 
-## 2. Mediums permitidos (6 categorias)
+## 2. Mediums permitidos (6 categorias + 2 exceções)
 
 | medium | descrição |
 |---|---|
@@ -79,8 +80,12 @@ Mesmo que uma iniciativa (ex: social selling) seja conceitualmente "diferente", 
 | `referral` | Alguém externo trazendo lead (cliente, colaborador, influencer, parceiro, marketplace) |
 | `crm` | Comunicação ativa para base própria (email, WhatsApp broadcast, SMS) |
 | `outbound` | Prospecção fria via SDR (lead que nunca interagiu antes) |
+| `victor` | **Exceção** — canal próprio do Victor (ver §3.7) |
+| `andre` | **Exceção** — canal próprio do André (ver §3.7) |
 
 **Nota conceitual:** `paid` e `organic` descrevem **como o link foi distribuído** (compra ou postagem própria). `eventos`, `referral`, `crm`, `outbound` descrevem **o tipo de relação ou contexto** em que o link foi entregue. Naturezas diferentes, mas todas respondem à pergunta "como esse lead chegou aqui?".
+
+**Sobre `victor` e `andre`:** são exceções deliberadas à Lei 1 (vocabulário fechado). São figuras-chave de distribuição com canal próprio robusto, tratadas como dimensão de primeira ordem no relatório. Toda nova figura nesse formato exige aprovação Growth + Pre-Sales (caso a caso, não automático).
 
 ---
 
@@ -160,6 +165,28 @@ Vocabulário **aberto**, mas com regra: `nome-do-evento` em slug (lowercase, sem
 **Sobre os nomes dos sources:** os sources de outbound usam os mesmos slugs que crm (`email`, `linkedin`, `whatsapp`) porque o medium já distingue a natureza. Sufixos como `-frio` ou `-outreach` seriam redundantes e dificultariam relatórios cross-medium.
 
 **Sobre ligações:** ligações telefônicas (cold calls) **não entram aqui** porque o link nunca sai de uma ligação — ele é enviado depois por email/WhatsApp. Esses cliques devem ser registrados com o canal de envio efetivo (`email` ou `whatsapp`) e podem usar `term=pos-ligacao` ou `content=follow-up-call-X` para indicar que veio de cold call.
+
+### 3.7 `victor` e `andre` (mediums-exceção)
+
+Figuras-chave da Turbo com canal próprio robusto e distribuição independente. Tratadas como **mediums** (não como `campaign` dentro de `organic`) porque:
+
+1. Operam ecossistemas próprios (canal no YouTube, perfil no Instagram, LinkedIn etc) com audiência e marca pessoal — não são apenas peças de uma iniciativa Turbo
+2. Devem aparecer como **dimensão de primeira ordem** no relatório, lado a lado com `paid`/`organic`, pra leitura imediata de performance por canal
+3. Quando o Victor um dia rodar mídia paga apontando pra Turbo, o medium continua `victor` (a natureza "distribuição via canal-próprio do Victor" é preservada); informação de pago vs orgânico fica em `campaign`/`content`
+
+| source | quando usar |
+|---|---|
+| `instagram` | Perfil do Instagram da figura (posts, reels, stories, bio, linktree, DM) |
+| `youtube` | Canal do YouTube da figura (descrição, bio, banner, card) |
+| `linkedin` | Perfil pessoal no LinkedIn |
+| `tiktok` | Perfil no TikTok |
+
+**Quando NÃO usar `victor`/`andre`:**
+- Conteúdo orgânico da página/canal **da Turbo** (mesmo que cite o Victor) → `organic`
+- Anúncio pago **da Turbo** que tem o Victor como rosto do criativo → `paid` (a figura aparece no `content` do ad, não no medium)
+- Indicação informal do Victor por WhatsApp pessoal pra um amigo → `referral/colaborador/victor`
+
+**Crescimento do vocabulário:** abrir exceção pra nova figura (ex: Camila) exige aprovação Growth + Pre-Sales caso a caso. NÃO é regra automática — manter o vocabulário enxuto evita inflação de mediums.
 
 ---
 
@@ -313,6 +340,21 @@ A decisão depende de **onde a pessoa está fisicamente colando o link com UTM n
 | term | perfil do lead: `agencia-50-funcionarios`, `dono-clinica-odonto` |
 | content | touchpoint ou template: `email-2-quebra-objecao`, `linkedin-msg-1` |
 
+### 4.7 Mediums-exceção `victor` e `andre`
+
+Mesma lógica de naming que `organic` (ver §4.2), porque a natureza do conteúdo é orgânica — o que muda é só quem distribui (a figura, não a Turbo).
+
+| campo | valor |
+|---|---|
+| campaign | `always-on` (default presença contínua) · `lancamento-{slug}-{aaaa-mm}` (parceria pontual com Turbo) · `paid-{{campaign.id}}` (se a figura rodar anúncio próprio apontando pra Turbo) |
+| term | mesmo vocabulário por plataforma de organic: `bio`, `linktree`, `descricao-video`, `feed`, `stories`, `reels`, etc |
+| content | `{slug-curto}-{aaaa-mm-dd}` — ex: `canal-victor`, `link-creators-2026-05`, `video-creators-2026-05-28` |
+
+**Exemplo:**
+```
+?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=descricao-video&utm_content=video-creators-2026-05-28
+```
+
 ---
 
 ## 5. Padrões de URL completos por plataforma
@@ -445,6 +487,31 @@ https://turbopartners.com.br/creators?utm_source=facebook&utm_medium=paid&utm_ca
 **Evento (palestra com QR code no slide):**
 ```
 ?utm_source=rd-summit-2026&utm_medium=eventos&utm_campaign=presencial-2026&utm_term=palestra&utm_content=slide-final-cta
+```
+
+**Victor — bio do canal no YouTube apontando pra Turbo:**
+```
+?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=bio&utm_content=canal-victor
+```
+
+**Victor — descrição de vídeo no canal dele:**
+```
+?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=descricao-video&utm_content=video-creators-2026-05-28
+```
+
+**Victor — link da Turbo dentro da Linktree do Instagram dele:**
+```
+?utm_source=instagram&utm_medium=victor&utm_campaign=always-on&utm_term=linktree&utm_content=link-turbo
+```
+
+**André — descrição de vídeo no canal dele:**
+```
+?utm_source=youtube&utm_medium=andre&utm_campaign=always-on&utm_term=descricao-video&utm_content=video-creators-2026-05-28
+```
+
+**André — link da Turbo dentro da Linktree do Instagram dele:**
+```
+?utm_source=instagram&utm_medium=andre&utm_campaign=always-on&utm_term=linktree&utm_content=link-turbo
 ```
 
 ---
@@ -666,6 +733,7 @@ Se as 4 respostas forem "sim", entra. Se alguma for "não", o caso provavelmente
 - `facebook` removido de organic (Turbo não opera Facebook orgânico)
 - Slugs oficiais de produto fixados: `creators`, `ecommerce`, `comercial`, `flash`
 - Convenção de `content` em organic: `{slug-curto}-{aaaa-mm-dd}` sem repetir o formato
+- **`victor` e `andre` adicionados como mediums-exceção** (figuras-chave de distribuição com canal próprio robusto — §3.7 + §4.7 + exemplos em §5.3). Decisão deliberada de tratá-los como dimensão de primeira ordem no relatório, fugindo da Lei 1 (vocabulário fechado). Toda nova figura nesse formato exige aprovação Growth+Pre-Sales caso a caso.
 
 ---
 
