@@ -2059,9 +2059,6 @@ export default function GhlMarketing() {
           <TabsTrigger value="planejamento" data-testid="tab-planejamento">
             <Wand2 className="w-4 h-4 mr-2" /> Planejamento
           </TabsTrigger>
-          <TabsTrigger value="calendario" data-testid="tab-calendario">
-            <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
-          </TabsTrigger>
           <TabsTrigger value="gerador" data-testid="tab-gerador">
             <Sparkles className="w-4 h-4 mr-2" /> Gerador IA
           </TabsTrigger>
@@ -2087,9 +2084,6 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="planejamento" className="mt-6">
           <PlanejamentoMensal />
-        </TabsContent>
-        <TabsContent value="calendario" className="mt-6">
-          <CalendarioTab />
         </TabsContent>
         <TabsContent value="gerador" className="mt-6">
           <GeradorTab />

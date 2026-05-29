@@ -75,6 +75,7 @@ interface LeadRow {
   data_fechamento: string | null;
   valor_recorrente: string | null;
   valor_pontual: string | null;
+  n_respostas: number;
 }
 
 /** Uma data Bitrix (YYYY-MM-DD) é causada pelo broadcast se for >= dia da resposta. */
@@ -296,6 +297,11 @@ export default function FunilTab({ from, to }: { from: string; to: string }) {
                               <span className="text-sm" title={l.reply_body || ""}>
                                 {(l.reply_body || "—").slice(0, 80)}
                               </span>
+                              {l.n_respostas > 1 && (
+                                <span className="ml-1 text-[10px] text-muted-foreground" title="respostas dessa pessoa neste disparo">
+                                  +{l.n_respostas - 1}
+                                </span>
+                              )}
                             </TableCell>
                             <TableCell>
                               {l.sentiment ? (
