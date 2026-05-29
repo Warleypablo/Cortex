@@ -1561,17 +1561,25 @@ async function getBroadcastsSummary(req: Request, res: Response) {
       ) g
     `);
 
+    // Por RESPONDEDOR (1ª resposta), pra bater com o funil: pos+neg+neutras+opt = responderam.
     const funilRes = await db.execute(sql`
+      WITH fr AS (
+        SELECT DISTINCT ON (COALESCE(ghl_contact_id, lead_phone, reply_message_id))
+          ghl_contact_id, sentiment, bitrix_deal_id, reply_at
+        FROM cortex_core.broadcast_lead_events
+        WHERE reply_at BETWEEN ${from} AND ${to}
+        ORDER BY COALESCE(ghl_contact_id, lead_phone, reply_message_id), reply_at ASC
+      )
       SELECT
-        count(DISTINCT e.ghl_contact_id)::int AS responderam,
-        count(*) FILTER (WHERE e.sentiment = 'positiva')::int AS positivas,
-        count(*) FILTER (WHERE e.sentiment = 'opt_out')::int AS opt_out,
-        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reuniao_marcada,
-        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
-        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS venda
-      FROM cortex_core.broadcast_lead_events e
-      LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
-      WHERE e.reply_at BETWEEN ${from} AND ${to}
+        count(*)::int AS responderam,
+        count(*) FILTER (WHERE fr.sentiment = 'positiva')::int AS positivas,
+        count(*) FILTER (WHERE fr.sentiment = 'negativa')::int AS negativas,
+        count(*) FILTER (WHERE fr.sentiment = 'neutra')::int AS neutras,
+        count(*) FILTER (WHERE fr.sentiment = 'opt_out')::int AS opt_out,
+        count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)::int AS reuniao_marcada,
+        count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
+        count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)::int AS venda
+      FROM fr LEFT JOIN "Bitrix".crm_deal d ON d.id = fr.bitrix_deal_id
     `);
 
     const entrega = (entregaRes as any).rows?.[0] ?? {};

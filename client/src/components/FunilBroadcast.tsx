@@ -233,18 +233,23 @@ export default function FunilTab({ from, to }: { from: string; to: string }) {
                 <p className="text-sm text-rose-600 dark:text-rose-400">Erro ao carregar o funil.</p>
               ) : f ? (
                 <div className="space-y-4">
+                  {/* Funil sequencial (cada etapa é subconjunto da anterior).
+                      Positivas/negativas/neutras NÃO são degrau — são o detalhamento dos
+                      respondedores, mostrado nos chips abaixo. */}
                   <FunnelBar label="Enviadas" value={f.enviadas} base={f.enviadas} color="bg-sky-500" />
                   <FunnelBar label="Responderam" value={f.responderam} base={f.enviadas} prev={f.enviadas} color="bg-cyan-500" />
-                  <FunnelBar label="Respostas positivas" value={f.positivas} base={f.enviadas} prev={f.responderam} color="bg-emerald-500" />
                   <FunnelBar label="Reunião marcada" value={f.reuniao_marcada} base={f.enviadas} prev={f.responderam} color="bg-violet-500" />
                   <FunnelBar label="Compareceu" value={f.compareceu} base={f.enviadas} prev={f.reuniao_marcada} color="bg-blue-500" />
                   <FunnelBar label="Venda" value={f.venda} base={f.enviadas} prev={f.compareceu} color="bg-amber-500" />
 
-                  <div className="flex flex-wrap gap-2 pt-2 text-xs">
-                    <Badge variant="outline" className={SENTIMENT_BADGE.positiva}>Positivas {fmtInt(f.positivas)}</Badge>
-                    <Badge variant="outline" className={SENTIMENT_BADGE.negativa}>Negativas {fmtInt(f.negativas)}</Badge>
-                    <Badge variant="outline" className={SENTIMENT_BADGE.neutra}>Neutras {fmtInt(f.neutras)}</Badge>
-                    <Badge variant="outline" className={SENTIMENT_BADGE.opt_out}>Opt-out {fmtInt(f.opt_out)}</Badge>
+                  <div className="pt-2">
+                    <div className="text-xs text-muted-foreground mb-1">Detalhamento dos {fmtInt(f.responderam)} respondedores (por sentimento da 1ª resposta):</div>
+                    <div className="flex flex-wrap gap-2 text-xs">
+                      <Badge variant="outline" className={SENTIMENT_BADGE.positiva}>Positivas {fmtInt(f.positivas)}</Badge>
+                      <Badge variant="outline" className={SENTIMENT_BADGE.negativa}>Negativas {fmtInt(f.negativas)}</Badge>
+                      <Badge variant="outline" className={SENTIMENT_BADGE.neutra}>Neutras {fmtInt(f.neutras)}</Badge>
+                      <Badge variant="outline" className={SENTIMENT_BADGE.opt_out}>Opt-out {fmtInt(f.opt_out)}</Badge>
+                    </div>
                   </div>
                 </div>
               ) : null}
