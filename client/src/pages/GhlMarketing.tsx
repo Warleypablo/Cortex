@@ -1397,6 +1397,18 @@ function BroadcastDetailModal({ broadcast, onClose }: { broadcast: BroadcastRow;
                   {saveOk && <span className="text-emerald-600 text-xs inline-flex items-center gap-1"><Check className="w-3 h-3" /> Salvo</span>}
                 </div>
               </div>
+              {broadcast.top_tags?.length > 0 && (
+                <div className="border-t pt-3">
+                  <div className="text-xs text-muted-foreground mb-2">Tags disparadas (top {broadcast.top_tags.length} nos recipients):</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {broadcast.top_tags.map((t) => (
+                      <span key={t.tag} className="text-xs rounded bg-muted px-2 py-0.5 font-mono" title={`${t.pct.toFixed(0)}% dos recipients têm essa tag`}>
+                        {t.tag} <span className="text-muted-foreground">{t.pct.toFixed(0)}%</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="border-t pt-3">
                 <div className="text-xs text-muted-foreground mb-2">Conteúdo da mensagem:</div>
                 {broadcast.channel === "Email" && d.sample_content_type === "text/html" && d.sample_body ? (
@@ -2000,9 +2012,6 @@ export default function GhlMarketing() {
           <TabsTrigger value="biblioteca" data-testid="tab-biblioteca">
             <BookOpen className="w-4 h-4 mr-2" /> Broadcast
           </TabsTrigger>
-          <TabsTrigger value="tags" data-testid="tab-tags">
-            <TagIcon className="w-4 h-4 mr-2" /> Listas
-          </TabsTrigger>
           <TabsTrigger value="automacoes" data-testid="tab-automacoes">
             <Zap className="w-4 h-4 mr-2" /> Automações
           </TabsTrigger>
@@ -2025,9 +2034,6 @@ export default function GhlMarketing() {
 
         <TabsContent value="biblioteca" className="mt-6">
           <BibliotecaTab from={from} to={to} />
-        </TabsContent>
-        <TabsContent value="tags" className="mt-6">
-          <TagsTab />
         </TabsContent>
         <TabsContent value="automacoes" className="mt-6">
           <AutomacoesTab />
