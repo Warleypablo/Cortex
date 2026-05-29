@@ -111,6 +111,20 @@ export interface VariacaoCopy {
   raciocinio: string;
 }
 
+/** Traduz o nome da base no PERFIL real da audiência (sempre o empresário, não o profissional). */
+function audienciaDaBase(base: string): string {
+  const b = (base || "").toLowerCase();
+  if (b.includes("creator"))
+    return "EMPRESÁRIO/dono de negócio que demonstrou interesse em CONTRATAR o serviço de Creators/UGC da Turbo (vídeos de criadores pra divulgar a empresa DELE). ATENÇÃO: ele NÃO é um creator/influencer — é o cliente que quer comprar esse serviço pro negócio dele.";
+  if (b.includes("crm"))
+    return "EMPRESÁRIO interessado em implementar/melhorar CRM e processo comercial no negócio dele.";
+  if (b.includes("estrutura") || b.includes("comercial"))
+    return "EMPRESÁRIO interessado em estruturar a área comercial/marketing do negócio dele.";
+  if (b.includes("ecommerce") || b.includes("e-commerce") || b.includes("shopify"))
+    return "EMPRESÁRIO dono de e-commerce interessado em escalar as vendas online.";
+  return "EMPRESÁRIO/dono de negócio (fatura 30-500k/mês) interessado nos serviços de marketing/performance da Turbo.";
+}
+
 function buildGerarPrompt(opts: GerarOptions): string {
   const examples = (opts.topPerformers ?? []).map((m, i) => `
 Exemplo ${i + 1}${m.aberturaPct ? ` — ${m.aberturaPct} de engajamento` : ""}${m.reunioes ? ` / ${m.reunioes} reuniões` : ""}:
@@ -148,11 +162,13 @@ Sua tarefa: gerar 3 VARIAÇÕES de copy com base nas melhores mensagens da Turbo
 - Mensagem muito longa sem escaneabilidade
 - Reenvio frio sem novo hook
 - Evento sem pain point inicial
+- ERRO GRAVE: falar como se o destinatário fosse o profissional do nicho da base (ex.: tratar como "creator" quando a base é Creators). Ele é SEMPRE o EMPRESÁRIO que quer COMPRAR aquele serviço pro negócio dele — escreva pra ele, sobre a dor/oportunidade da EMPRESA dele.
 
 ${examples ? `## EXEMPLOS REAIS DA TURBO\n${examples}\n` : ""}
 ## BRIEFING DA NOVA MENSAGEM
 - Objetivo: ${opts.objetivo}
-- Base-alvo: ${opts.base}
+- AUDIÊNCIA (pra quem você escreve): ${audienciaDaBase(opts.base)}
+- Base interna (referência): ${opts.base}
 - Tom: ${opts.tom}
 - Tamanho esperado: ${opts.tamanho}
 ${opts.padraoAlvo ? `- Padrão preferido: ${opts.padraoAlvo}` : ""}
