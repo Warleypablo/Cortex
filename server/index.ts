@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable, initializeBroadcastLeadEventsTable, initializeBroadcastClassificationTable } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable, initializeBroadcastLeadEventsTable, initializeBroadcastClassificationTable, initializeBroadcastPlanTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 import { runAllForecasts } from "./services/predictiveEngine";
@@ -148,6 +148,7 @@ app.use((req, res, next) => {
     initializeSaldoDiarioSnapshotsTable(),
     initializeBroadcastLeadEventsTable(),
     initializeBroadcastClassificationTable(),
+    initializeBroadcastPlanTable(),
   ]);
 
   // Phase 1.5: Migrations that depend on tables existing

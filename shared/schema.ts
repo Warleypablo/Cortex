@@ -3731,6 +3731,24 @@ export const broadcastClassification = cortexCoreSchema.table("broadcast_classif
   classifiedAt: timestamp("classified_at").defaultNow(),
 });
 
+// Plano editorial de broadcasts (planejamento mensal). Populado pela aba Planejamento.
+export const broadcastPlan = cortexCoreSchema.table("broadcast_plan", {
+  id: serial("id").primaryKey(),
+  planDate: date("plan_date").notNull(),
+  canal: text("canal").default("WhatsApp"),
+  base: text("base"),
+  objetivo: text("objetivo"),
+  padrao: text("padrao"),
+  titulo: text("titulo"),
+  copyText: text("copy_text"),
+  status: text("status").default("backlog"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  dateIdx: index("broadcast_plan_date_idx").on(table.planDate),
+}));
+
 export const ghlTagsSnapshot = cortexCoreSchema.table("ghl_tags_snapshot", {
   snapshotDate: date("snapshot_date").notNull(),
   tag: text("tag").notNull(),

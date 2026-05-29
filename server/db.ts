@@ -2268,6 +2268,33 @@ export async function initializeBroadcastClassificationTable(): Promise<void> {
   }
 }
 
+// Plano editorial de broadcasts (planejamento do mês): slots com base/data/objetivo/
+// padrão/status + copy gerada. Planejamento interno (não dispara no Funnels nesta fase).
+export async function initializeBroadcastPlanTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_plan (
+        id          SERIAL PRIMARY KEY,
+        plan_date   DATE NOT NULL,
+        canal       TEXT DEFAULT 'WhatsApp',
+        base        TEXT,
+        objetivo    TEXT,
+        padrao      TEXT,
+        titulo      TEXT,
+        copy_text   TEXT,
+        status      TEXT DEFAULT 'backlog',
+        created_by  TEXT,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_plan_date_idx ON cortex_core.broadcast_plan (plan_date)`);
+    console.log('[database] broadcast_plan table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_plan table:', error);
+  }
+}
+
 export async function initializePredictionsTable(): Promise<void> {
   try {
     await db.execute(sql`
