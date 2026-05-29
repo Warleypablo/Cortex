@@ -1136,116 +1136,75 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortableTh label="Data" k="date" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="sticky left-0 bg-background z-10" />
-                    <SortableTh label="Canal" k="channel" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                    <SortableTh label="Nome / Template" k="name" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="min-w-[240px]" />
-                    <TableHead className="min-w-[280px]">Mensagem (preview)</TableHead>
-                    <TableHead className="min-w-[200px]" title="Top 3 tags mais frequentes nos recipients do broadcast">Tags disparadas</TableHead>
-                    <SortableTh label="Tamanho lista" k="list_size" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <SortableTh label="Entregues" k="delivered" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <SortableTh label="Entrega %" k="delivery_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <SortableTh label="Abertura %" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <SortableTh label="Conversas (7d)" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <TableHead className="text-right text-muted-foreground" title="Depende de cruzamento Bitrix — Fase 2">Reuniões (7d)</TableHead>
+                    <SortableTh label="Data" k="date" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                    <TableHead className="min-w-[340px]">Disparo</TableHead>
+                    <SortableTh label="Lista" k="list_size" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Entrega" k="delivery_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Abertura" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Conversas" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <TableHead className="text-right" title="Reuniões atribuídas ao disparo (agendadas após a resposta)">Reuniões</TableHead>
                     <TableHead className="text-right">Gasto</TableHead>
-                    <TableHead className="min-w-[160px]">Feedback SDR</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sorted.map((b) => (
-                    <TableRow
-                      key={b.id}
-                      onClick={() => setDetail(b)}
-                      className="cursor-pointer hover:bg-muted/40"
-                    >
-                      <TableCell className="text-xs whitespace-nowrap sticky left-0 bg-background z-10">
-                        {b.date ? format(new Date(b.date), "dd/MM/yy HH:mm", { locale: ptBR }) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {b.channel === "WhatsApp" ? (
-                            <><MessageCircle className="w-3 h-3 mr-1" /> WhatsApp</>
-                          ) : (
-                            <><Mail className="w-3 h-3 mr-1" /> Email</>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[260px] truncate text-xs">
-                        {b.channel === "Email" ? (
-                          <div>
-                            <div className="font-medium truncate" title={b.name ?? undefined}>{b.name ?? "Sem nome"}</div>
-                            <div className="text-muted-foreground truncate" title={b.subject ?? undefined}>{b.subject ?? "—"}</div>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="font-medium">WhatsApp broadcast</div>
-                            <div className="text-muted-foreground text-xs">
-                              {b.source ?? "—"} · {b.date ? format(new Date(b.date), "dd/MM/yyyy", { locale: ptBR }) : ""}
-                            </div>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[320px] text-xs">
-                        <div className="truncate text-muted-foreground" title={b.preview ?? undefined}>
-                          {b.preview?.replace(/\s+/g, " ").slice(0, 140) || "—"}
+                    <TableRow key={b.id} onClick={() => setDetail(b)} className="cursor-pointer hover:bg-muted/40">
+                      <TableCell className="align-top whitespace-nowrap py-3">
+                        <div className="flex items-center gap-1.5 text-sm font-medium">
+                          {b.channel === "WhatsApp"
+                            ? <MessageCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            : <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
+                          {b.date ? format(new Date(b.date), "dd/MM/yy", { locale: ptBR }) : "—"}
                         </div>
+                        <div className="text-[10px] text-muted-foreground pl-5">{b.date ? format(new Date(b.date), "HH:mm", { locale: ptBR }) : ""}</div>
                       </TableCell>
-                      <TableCell className="text-xs">
-                        {b.top_tags.length ? (
-                          <div className="flex flex-col gap-0.5">
-                            {b.top_tags.map((t) => (
-                              <div key={t.tag} className="flex items-center gap-1.5">
-                                <span className="font-mono text-[10px] truncate max-w-[140px]" title={t.tag}>{t.tag}</span>
-                                <span className="text-muted-foreground text-[10px]">{t.pct.toFixed(0)}%</span>
-                              </div>
+                      <TableCell className="max-w-[440px] align-top py-3">
+                        {b.channel === "Email" && b.name && (
+                          <div className="text-sm font-medium truncate" title={b.name}>{b.name}</div>
+                        )}
+                        <div className="text-sm text-foreground/90 line-clamp-2" title={b.preview ?? undefined}>
+                          {b.preview?.replace(/\s+/g, " ") || (b.subject ?? "—")}
+                        </div>
+                        {b.top_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {b.top_tags.slice(0, 2).map((t) => (
+                              <span key={t.tag} className="text-[10px] rounded bg-muted px-1.5 py-0.5 text-muted-foreground font-mono" title={`${t.tag} · ${t.pct.toFixed(0)}%`}>
+                                {t.tag}
+                              </span>
                             ))}
+                            {b.top_tags.length > 2 && <span className="text-[10px] text-muted-foreground self-center">+{b.top_tags.length - 2}</span>}
                           </div>
-                        ) : (
-                          <span className="text-muted-foreground" title="Email broadcasts sem webhook não têm lista de recipients">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">{fmtInt(b.list_size)}</TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">{fmtInt(b.delivered)}</TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">
+                      <TableCell className="text-right tabular-nums align-top py-3">{fmtInt(b.list_size)}</TableCell>
+                      <TableCell className="text-right align-top py-3">
                         <PctBadge value={b.delivery_pct} />
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{fmtInt(b.delivered)} entregues</div>
                       </TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">
-                        {b.channel === "WhatsApp" ? (
-                          <span className="text-muted-foreground" title="GHL não envia opens de WhatsApp via API">—</span>
-                        ) : b.has_open_tracking ? (
+                      <TableCell className="text-right align-top py-3">
+                        {b.channel === "WhatsApp" || b.has_open_tracking ? (
                           <PctBadge value={b.open_pct} />
                         ) : (
-                          <span className="text-muted-foreground" title="Webhook GHL não cadastrado em prod">sem webhook</span>
+                          <span className="text-muted-foreground text-[11px]" title="Webhook GHL não cadastrado em prod">sem webhook</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">{fmtInt(b.conversations_generated)}</TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap text-muted-foreground" title="Depende de cruzamento GHL ↔ Bitrix — Fase 2">—</TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">
+                      <TableCell className="text-right tabular-nums align-top py-3">{fmtInt(b.conversations_generated)}</TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3">
+                        {b.meetings_scheduled != null ? <span className="font-medium">{fmtInt(b.meetings_scheduled)}</span> : "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3 whitespace-nowrap">
                         {b.spend_brl != null ? (
-                          <span title={b.spend_is_manual ? "Valor manual" : "Calculado: entregues × preço unitário do canal"}>
-                            R$ {b.spend_brl.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <span title={b.spend_is_manual ? "Valor manual" : "Calculado: entregues × preço unitário"}>
+                            {fmtBRL(b.spend_brl)}
                             {b.spend_is_manual && <span className="ml-1 text-[10px] text-muted-foreground">man.</span>}
                           </span>
-                        ) : b.channel === "Email" ? (
-                          <span className="text-muted-foreground" title="Email tem custo mensal fixo no GHL, não por mensagem">—</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-xs max-w-[200px]">
-                        {b.sdr_feedback ? (
-                          <span className="truncate block text-muted-foreground" title={b.sdr_feedback}>
-                            {b.sdr_feedback}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-[10px] italic">— (clique pra editar)</span>
-                        )}
+                        ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                     </TableRow>
                   ))}
                   {sorted.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={13} className="text-center text-muted-foreground py-6">
+                      <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
                         Nenhum broadcast encontrado com esses filtros
                       </TableCell>
                     </TableRow>
