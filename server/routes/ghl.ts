@@ -1325,6 +1325,7 @@ async function getBroadcastEvolucao(req: Request, res: Response) {
 
     const aberturaRes = await db.execute(sql`
       SELECT TO_CHAR(DATE_TRUNC(${trunc}, date_added), 'YYYY-MM-DD') AS bucket,
+        COUNT(*)::int AS total,
         COUNT(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
         COUNT(*) FILTER (WHERE status = 'read')::int AS lida
       FROM cortex_core.ghl_messages
@@ -1346,7 +1347,7 @@ async function getBroadcastEvolucao(req: Request, res: Response) {
 
     const map = new Map<string, { bucket: string; abertura_pct: number | null; reunioes: number }>();
     for (const r of (aberturaRes as any).rows ?? []) {
-      map.set(r.bucket, { bucket: r.bucket, abertura_pct: r.entregue ? +(100 * r.lida / r.entregue).toFixed(1) : null, reunioes: 0 });
+      map.set(r.bucket, { bucket: r.bucket, abertura_pct: r.total ? +(100 * r.lida / r.total).toFixed(1) : null, reunioes: 0 });
     }
     for (const r of (reuniaoRes as any).rows ?? []) {
       const ex = map.get(r.bucket) ?? { bucket: r.bucket, abertura_pct: null, reunioes: 0 };
@@ -1420,10 +1421,10 @@ async function getBroadcastFunnel(req: Request, res: Response) {
           WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date
         )::int AS reuniao_marcada,
         COUNT(DISTINCT e.bitrix_deal_id) FILTER (
-          WHERE d.data_reuniao_realizada IS NOT NULL AND d.data_reuniao_realizada >= e.reply_at::date
+          WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.data_reuniao_realizada IS NOT NULL
         )::int AS compareceu,
         COUNT(DISTINCT e.bitrix_deal_id) FILTER (
-          WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date
+          WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date
         )::int AS venda
       FROM cortex_core.broadcast_lead_events e
       LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
@@ -1532,8 +1533,8 @@ async function getBroadcastsSummary(req: Request, res: Response) {
         count(*) FILTER (WHERE e.sentiment = 'positiva')::int AS positivas,
         count(*) FILTER (WHERE e.sentiment = 'opt_out')::int AS opt_out,
         count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reuniao_marcada,
-        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_realizada IS NOT NULL AND d.data_reuniao_realizada >= e.reply_at::date)::int AS compareceu,
-        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS venda
+        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
+        count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS venda
       FROM cortex_core.broadcast_lead_events e
       LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
       WHERE e.reply_at BETWEEN ${from} AND ${to}
@@ -1565,7 +1566,7 @@ async function getBroadcastsSummary(req: Request, res: Response) {
         disparos,
         ...entrega,
         entrega_pct: entrega.total ? +(100 * entrega.entregue / entrega.total).toFixed(1) : null,
-        leitura_pct: entrega.entregue ? +(100 * entrega.lida / entrega.entregue).toFixed(1) : null,
+        leitura_pct: entrega.total ? +(100 * entrega.lida / entrega.total).toFixed(1) : null,
         erro_pct: entrega.total ? +(100 * entrega.erro / entrega.total).toFixed(1) : null,
       },
       funil,
@@ -1620,7 +1621,7 @@ async function getBasesPerformance(req: Request, res: Response) {
         SELECT e.broadcast_id,
           COUNT(DISTINCT e.ghl_contact_id)::int AS responderam,
           COUNT(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
-          COUNT(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
+          COUNT(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
         FROM cortex_core.broadcast_lead_events e
         LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
         GROUP BY 1
@@ -1649,7 +1650,7 @@ async function getBasesPerformance(req: Request, res: Response) {
         disparos: r.disparos,
         leads_totais: r.leads_totais,
         entrega_pct: r.total_msgs ? +(100 * r.entregue / r.total_msgs).toFixed(1) : null,
-        abertura_pct: r.entregue ? +(100 * r.lida / r.entregue).toFixed(1) : null,
+        abertura_pct: r.total_msgs ? +(100 * r.lida / r.total_msgs).toFixed(1) : null,
         conv_pct: r.entregue ? +(100 * r.responderam / r.entregue).toFixed(1) : null,
         responderam: r.responderam,
         reunioes: r.reunioes,
@@ -1665,7 +1666,7 @@ async function getBasesPerformance(req: Request, res: Response) {
       WITH msg AS (
         SELECT
           'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS broadcast_id,
-          COUNT(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
+          COUNT(*)::int AS total,
           COUNT(*) FILTER (WHERE status = 'read')::int AS lida
         FROM cortex_core.ghl_messages
         WHERE direction = 'outbound' AND source IN ('workflow','bulk_actions','campaign')
@@ -1674,7 +1675,7 @@ async function getBasesPerformance(req: Request, res: Response) {
       )
       SELECT bc.base, bc.padrao,
         COUNT(*)::int AS disparos,
-        CASE WHEN SUM(msg.entregue) > 0 THEN ROUND(100.0 * SUM(msg.lida) / SUM(msg.entregue), 1) END AS abertura_pct
+        CASE WHEN SUM(msg.total) > 0 THEN ROUND(100.0 * SUM(msg.lida) / SUM(msg.total), 1) END AS abertura_pct
       FROM cortex_core.broadcast_classification bc
       JOIN msg ON msg.broadcast_id = bc.broadcast_id
       WHERE bc.base IS NOT NULL
@@ -1718,7 +1719,7 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
   const fun = await db.execute(sql`
     SELECT count(DISTINCT e.ghl_contact_id)::int AS respostas,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
-      count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
+      count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
     FROM cortex_core.broadcast_lead_events e
     LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
     WHERE e.reply_at BETWEEN ${from} AND ${to}
@@ -1728,7 +1729,7 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
   return {
     disparos: (disp as any).rows?.[0]?.disparos ?? 0,
     leads: e.leads ?? 0,
-    abertura_pct: e.entregue ? +(100 * e.lida / e.entregue).toFixed(1) : null,
+    abertura_pct: e.total_msgs ? +(100 * e.lida / e.total_msgs).toFixed(1) : null,
     respostas: f.respostas ?? 0,
     reunioes: f.reunioes ?? 0,
     vendas: f.vendas ?? 0,
@@ -1761,7 +1762,7 @@ async function getRelatorio(req: Request, res: Response) {
     const ctes = sql`
       WITH msg AS (
         SELECT 'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS broadcast_id,
-          count(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
+          count(*)::int AS total,
           count(*) FILTER (WHERE status = 'read')::int AS lida
         FROM cortex_core.ghl_messages
         WHERE direction = 'outbound' AND source IN ('workflow','bulk_actions','campaign')
@@ -1771,13 +1772,13 @@ async function getRelatorio(req: Request, res: Response) {
       resp AS (
         SELECT e.broadcast_id,
           count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
-          count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
+          count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
         FROM cortex_core.broadcast_lead_events e LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id GROUP BY 1
       )`;
     const basesRes = await db.execute(sql`
       ${ctes}
       SELECT bc.base,
-        CASE WHEN SUM(msg.entregue) > 0 THEN ROUND(100.0 * SUM(msg.lida) / SUM(msg.entregue), 1) END AS abertura_pct,
+        CASE WHEN SUM(msg.total) > 0 THEN ROUND(100.0 * SUM(msg.lida) / SUM(msg.total), 1) END AS abertura_pct,
         COALESCE(SUM(resp.reunioes), 0)::int AS reunioes, COALESCE(SUM(resp.vendas), 0)::int AS vendas
       FROM cortex_core.broadcast_classification bc JOIN msg ON msg.broadcast_id = bc.broadcast_id
       LEFT JOIN resp ON resp.broadcast_id = bc.broadcast_id
@@ -1786,7 +1787,7 @@ async function getRelatorio(req: Request, res: Response) {
     const padroesRes = await db.execute(sql`
       ${ctes}
       SELECT bc.padrao,
-        CASE WHEN SUM(msg.entregue) > 0 THEN ROUND(100.0 * SUM(msg.lida) / SUM(msg.entregue), 1) END AS abertura_pct,
+        CASE WHEN SUM(msg.total) > 0 THEN ROUND(100.0 * SUM(msg.lida) / SUM(msg.total), 1) END AS abertura_pct,
         COALESCE(SUM(resp.reunioes), 0)::int AS reunioes
       FROM cortex_core.broadcast_classification bc JOIN msg ON msg.broadcast_id = bc.broadcast_id
       LEFT JOIN resp ON resp.broadcast_id = bc.broadcast_id
@@ -1930,14 +1931,14 @@ async function postGerarCopyPlano(req: Request, res: Response) {
     const padraoRes = await db.execute(sql`
       WITH msg AS (
         SELECT 'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS broadcast_id,
-          count(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
+          count(*)::int AS total,
           count(*) FILTER (WHERE status = 'read')::int AS lida
         FROM cortex_core.ghl_messages
         WHERE direction = 'outbound' AND source IN ('workflow','bulk_actions','campaign') AND body IS NOT NULL AND body <> ''
         GROUP BY 1
       )
       SELECT bc.padrao,
-        CASE WHEN SUM(msg.entregue) > 0 THEN 100.0 * SUM(msg.lida) / SUM(msg.entregue) ELSE 0 END AS abertura
+        CASE WHEN SUM(msg.total) > 0 THEN 100.0 * SUM(msg.lida) / SUM(msg.total) ELSE 0 END AS abertura
       FROM cortex_core.broadcast_classification bc JOIN msg ON msg.broadcast_id = bc.broadcast_id
       WHERE bc.base = ${base} AND bc.padrao IS NOT NULL
       GROUP BY bc.padrao ORDER BY abertura DESC LIMIT 1
