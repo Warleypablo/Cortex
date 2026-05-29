@@ -18,8 +18,10 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Loader2, Trophy, TrendingUp, AlertTriangle, Sparkles } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { compatibilidadePadroes, compatibilidadeOfertas, type NivelCompat } from "@shared/ghl-broadcast/matriz-validacao";
 import { PADROES_COPY_LABEL, type PadraoKey } from "@shared/ghl-broadcast/types";
+import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
 
 const fmtInt = (n: number | null | undefined) => (n ?? 0).toLocaleString("pt-BR");
 const fmtPct = (n: number | null | undefined) => (n == null ? "—" : `${n}%`);
@@ -127,6 +129,19 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
 
   return (
     <div className="space-y-6">
+      {/* Seletor de base (controla matriz + segmentação; funciona pra qualquer base,
+          inclusive as sem disparo no período) */}
+      <div className="flex items-center gap-2 flex-wrap">
+        <span className="text-sm text-muted-foreground">Base selecionada:</span>
+        <Select value={baseAtiva ?? undefined} onValueChange={setBaseSel}>
+          <SelectTrigger className="w-[280px]"><SelectValue placeholder="Selecione uma base…" /></SelectTrigger>
+          <SelectContent>
+            {BASES_DISPONIVEIS.map((b) => <SelectItem key={b} value={b}>{b}</SelectItem>)}
+          </SelectContent>
+        </Select>
+        <span className="text-xs text-muted-foreground">— ou clique numa linha do ranking</span>
+      </div>
+
       {/* Ranking de bases */}
       <Card>
         <CardHeader className="pb-3 flex flex-row items-center justify-between gap-2">
