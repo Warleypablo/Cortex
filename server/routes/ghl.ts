@@ -705,7 +705,8 @@ async function listBroadcasts(req: Request, res: Response) {
           NULL::text AS source,
           NULL::text AS body_hash,
           c.total_count::int AS list_size,
-          COALESCE(c.success_count, 0)::int AS delivered
+          COALESCE(c.success_count, 0)::int AS delivered,
+          NULL::int AS open_count
         FROM cortex_core.ghl_email_campaigns c
         WHERE ${wantEmail ? emailWhere : sql`false`}
       ),
@@ -716,7 +717,9 @@ async function listBroadcasts(req: Request, res: Response) {
           MD5(COALESCE(body, '')) AS body_hash,
           MIN(date_added) AS first_date,
           MIN(body) AS sample_body,
-          COUNT(DISTINCT contact_id)::int AS distinct_contacts
+          COUNT(DISTINCT contact_id)::int AS distinct_contacts,
+          COUNT(DISTINCT contact_id) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
+          COUNT(DISTINCT contact_id) FILTER (WHERE status = 'read')::int AS lida
         FROM cortex_core.ghl_messages
         WHERE ${wantWa ? waWhere : sql`false`}
         GROUP BY DATE_TRUNC('day', date_added), source, MD5(COALESCE(body, ''))
@@ -735,7 +738,8 @@ async function listBroadcasts(req: Request, res: Response) {
           source,
           body_hash,
           distinct_contacts AS list_size,
-          distinct_contacts AS delivered
+          entregue AS delivered,
+          lida AS open_count
         FROM wa_grouped
       ),
       all_b AS (
@@ -752,7 +756,7 @@ async function listBroadcasts(req: Request, res: Response) {
       id: string; channel: string; date: Date | string | null; status: string | null;
       name: string | null; subject: string | null; preview: string | null;
       campaign_type: string | null; source: string | null; body_hash: string | null;
-      list_size: number; delivered: number; total_count: number;
+      list_size: number; delivered: number; open_count: number | null; total_count: number;
     }>;
     const total = rows[0]?.total_count ?? 0;
 
@@ -771,7 +775,8 @@ async function listBroadcasts(req: Request, res: Response) {
         SELECT
           DATE_TRUNC('day', date_added) AS bday, source,
           MD5(COALESCE(body, '')) AS body_hash,
-          COUNT(DISTINCT contact_id)::int AS distinct_contacts
+          COUNT(DISTINCT contact_id)::int AS distinct_contacts,
+          COUNT(DISTINCT contact_id) FILTER (WHERE status IN ('delivered','read'))::int AS entregue
         FROM cortex_core.ghl_messages
         WHERE ${wantWa ? waWhere : sql`false`}
         GROUP BY DATE_TRUNC('day', date_added), source, MD5(COALESCE(body, ''))
@@ -783,7 +788,7 @@ async function listBroadcasts(req: Request, res: Response) {
         (SELECT COALESCE(SUM(list_size), 0)::int FROM email_broadcasts) AS email_sent,
         (SELECT COALESCE(SUM(distinct_contacts), 0)::int FROM wa_grouped) AS wa_sent,
         (SELECT COALESCE(SUM(delivered), 0)::int FROM email_broadcasts) AS email_delivered,
-        (SELECT COALESCE(SUM(distinct_contacts), 0)::int FROM wa_grouped) AS wa_delivered
+        (SELECT COALESCE(SUM(entregue), 0)::int FROM wa_grouped) AS wa_delivered
     `);
     const t = (totalsRes as any).rows?.[0] ?? {};
     const total_sent = (t.email_sent ?? 0) + (t.wa_sent ?? 0);
@@ -1046,6 +1051,24 @@ async function listBroadcasts(req: Request, res: Response) {
         .slice(0, 3);
     };
 
+    // Reuniões ATRIBUÍDAS por broadcast (causalidade: reunião agendada após a resposta).
+    // Depende da atribuição já ter rodado no período (o /summary da própria aba dispara isso).
+    const meetingsMap = new Map<string, number>();
+    const waIds = waRows.map((r) => r.id);
+    if (waIds.length) {
+      const mRes = await db.execute(sql`
+        SELECT e.broadcast_id,
+          COUNT(DISTINCT e.bitrix_deal_id) FILTER (
+            WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date
+          )::int AS reunioes
+        FROM cortex_core.broadcast_lead_events e
+        LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
+        WHERE e.broadcast_id IN (${sql.join(waIds.map((id) => sql`${id}`), sql`,`)})
+        GROUP BY e.broadcast_id
+      `);
+      for (const row of ((mRes as any).rows ?? [])) meetingsMap.set(row.broadcast_id, row.reunioes ?? 0);
+    }
+
     // Monta o response final
     const broadcasts = rows.map((r) => {
       const isEmail = r.channel === "Email";
@@ -1055,10 +1078,9 @@ async function listBroadcasts(req: Request, res: Response) {
         ? (evt && evt.delivered_events > 0 ? evt.delivered_events : r.delivered)
         : r.delivered;
       const delivery_pct = list > 0 ? (delivered / list) * 100 : null;
-      const open_pct =
-        isEmail && evt && evt.delivered_events > 0
-          ? (evt.unique_opens / evt.delivered_events) * 100
-          : null;
+      const open_pct = isEmail
+        ? (evt && evt.delivered_events > 0 ? (evt.unique_opens / evt.delivered_events) * 100 : null)
+        : (r.open_count != null && list > 0 ? (r.open_count / list) * 100 : null); // WA: lidas ÷ lista (Read/Total, ~Funnels)
       const topTags = topTagsForBroadcast(r.id);
       const annotation = annotationMap.get(r.id);
       const unitCost = priceMap.get(r.channel) ?? 0;
@@ -1083,8 +1105,8 @@ async function listBroadcasts(req: Request, res: Response) {
         delivery_pct,
         open_pct,
         conversations_generated: conversationsMap.get(r.id) ?? 0,
-        meetings_scheduled: null as number | null, // Fase 2 — depende de cruzamento Bitrix
-        has_open_tracking: isEmail ? (evt?.delivered_events ?? 0) > 0 : false,
+        meetings_scheduled: isEmail ? null : (meetingsMap.get(r.id) ?? 0), // reuniões atribuídas (pós-resposta)
+        has_open_tracking: isEmail ? (evt?.delivered_events ?? 0) > 0 : true, // WA tem read receipt
       };
     });
 
