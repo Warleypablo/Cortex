@@ -1409,27 +1409,33 @@ async function getBroadcastFunnel(req: Request, res: Response) {
     `);
     const sent = (sentRes as any).rows?.[0]?.sent ?? 0;
 
+    // Uma linha por RESPONDEDOR (primeira resposta dele ao disparo) — sentimento e funil
+    // contam por pessoa, não por mensagem. Assim positivas+neg+neutras+opt_out = responderam.
     const funnelRes = await db.execute(sql`
+      WITH fr AS (
+        SELECT DISTINCT ON (COALESCE(ghl_contact_id, lead_phone, reply_message_id))
+          ghl_contact_id, sentiment, bitrix_deal_id, reply_at
+        FROM cortex_core.broadcast_lead_events
+        WHERE broadcast_id = ${id}
+        ORDER BY COALESCE(ghl_contact_id, lead_phone, reply_message_id), reply_at ASC
+      )
       SELECT
-        COUNT(DISTINCT e.ghl_contact_id)::int AS responderam,
-        COUNT(*) FILTER (WHERE e.sentiment = 'positiva')::int AS positivas,
-        COUNT(*) FILTER (WHERE e.sentiment = 'negativa')::int AS negativas,
-        COUNT(*) FILTER (WHERE e.sentiment = 'neutra')::int AS neutras,
-        COUNT(*) FILTER (WHERE e.sentiment = 'opt_out')::int AS opt_out,
-        -- Causalidade: só conta a etapa se ela ocorreu APÓS a resposta ao broadcast
-        -- (lead que já estava em reunião/venda antes do disparo NÃO é atribuído).
-        COUNT(DISTINCT e.bitrix_deal_id) FILTER (
-          WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date
+        COUNT(*)::int AS responderam,
+        COUNT(*) FILTER (WHERE fr.sentiment = 'positiva')::int AS positivas,
+        COUNT(*) FILTER (WHERE fr.sentiment = 'negativa')::int AS negativas,
+        COUNT(*) FILTER (WHERE fr.sentiment = 'neutra')::int AS neutras,
+        COUNT(*) FILTER (WHERE fr.sentiment = 'opt_out')::int AS opt_out,
+        -- Causalidade: etapa só conta se ocorreu APÓS a (primeira) resposta ao broadcast.
+        COUNT(DISTINCT fr.bitrix_deal_id) FILTER (
+          WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date
         )::int AS reuniao_marcada,
-        COUNT(DISTINCT e.bitrix_deal_id) FILTER (
-          WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.data_reuniao_realizada IS NOT NULL
+        COUNT(DISTINCT fr.bitrix_deal_id) FILTER (
+          WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.data_reuniao_realizada IS NOT NULL
         )::int AS compareceu,
-        COUNT(DISTINCT e.bitrix_deal_id) FILTER (
-          WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date
+        COUNT(DISTINCT fr.bitrix_deal_id) FILTER (
+          WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date
         )::int AS venda
-      FROM cortex_core.broadcast_lead_events e
-      LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
-      WHERE e.broadcast_id = ${id}
+      FROM fr LEFT JOIN "Bitrix".crm_deal d ON d.id = fr.bitrix_deal_id
     `);
     const f = (funnelRes as any).rows?.[0] ?? {};
     res.json({
@@ -1463,21 +1469,26 @@ async function getBroadcastLeads(req: Request, res: Response) {
     if (!parseWaBroadcastId(id)) {
       return res.status(400).json({ error: "Leads disponíveis apenas para broadcasts de WhatsApp (id wa-...)." });
     }
+    // Uma linha por RESPONDEDOR: a PRIMEIRA resposta dele ao disparo + nº de respostas.
     const r = await db.execute(sql`
-      SELECT
-        e.reply_message_id, e.lead_phone, e.sentiment, e.sentiment_motivo, e.sentiment_fonte,
-        e.reply_body, e.reply_at, e.bitrix_deal_id,
-        COALESCE(c.contact_name, ct.name) AS nome,
-        COALESCE(c.company_name, d.company_name) AS empresa,
-        COALESCE(c.email, ct.email) AS email,
-        d.stage_name, d.data_reuniao_agendada, d.data_reuniao_realizada, d.data_fechamento,
-        d.valor_recorrente, d.valor_pontual
-      FROM cortex_core.broadcast_lead_events e
-      LEFT JOIN cortex_core.ghl_contacts c ON c.id = e.ghl_contact_id
-      LEFT JOIN "Bitrix".crm_contact ct ON ct.id = e.bitrix_contact_id
-      LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
-      WHERE e.broadcast_id = ${id}
-      ORDER BY e.reply_at DESC NULLS LAST
+      SELECT * FROM (
+        SELECT DISTINCT ON (COALESCE(e.ghl_contact_id, e.lead_phone, e.reply_message_id))
+          e.reply_message_id, e.lead_phone, e.sentiment, e.sentiment_motivo, e.sentiment_fonte,
+          e.reply_body, e.reply_at, e.bitrix_deal_id,
+          COALESCE(c.contact_name, ct.name) AS nome,
+          COALESCE(c.company_name, d.company_name) AS empresa,
+          COALESCE(c.email, ct.email) AS email,
+          d.stage_name, d.data_reuniao_agendada, d.data_reuniao_realizada, d.data_fechamento,
+          d.valor_recorrente, d.valor_pontual,
+          COUNT(*) OVER (PARTITION BY COALESCE(e.ghl_contact_id, e.lead_phone, e.reply_message_id))::int AS n_respostas
+        FROM cortex_core.broadcast_lead_events e
+        LEFT JOIN cortex_core.ghl_contacts c ON c.id = e.ghl_contact_id
+        LEFT JOIN "Bitrix".crm_contact ct ON ct.id = e.bitrix_contact_id
+        LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
+        WHERE e.broadcast_id = ${id}
+        ORDER BY COALESCE(e.ghl_contact_id, e.lead_phone, e.reply_message_id), e.reply_at ASC
+      ) x
+      ORDER BY x.reply_at DESC NULLS LAST
     `);
     const leads = (r as any).rows ?? [];
     res.json({ broadcast_id: id, leads, count: leads.length });
