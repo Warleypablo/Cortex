@@ -21,6 +21,8 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, L
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { avaliarPerformance, CLASSIFICACAO_TAILWIND, CLASSIFICACAO_LABEL, BENCHMARKS_TURBO, type Classificacao } from "@shared/ghl-broadcast/benchmarks";
 import FunilTab from "@/components/FunilBroadcast";
+import BasesInteligencia from "@/components/BasesInteligencia";
+import EvolucaoBroadcast from "@/components/EvolucaoBroadcast";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -955,12 +957,16 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
   const summary = useQuery<{
     whatsapp: { total: number; enviado: number; entregue: number; lida: number; erro: number; entrega_pct: number | null; leitura_pct: number | null; erro_pct: number | null };
     funil: { responderam: number; positivas: number; reuniao_marcada: number; compareceu: number; venda: number };
+    custos: { gasto_total: number; gasto_por_disparo: number | null; custo_reuniao: number | null; cac: number | null; estimado: boolean; unit_cost: number; n_manual: number };
   }>({
     queryKey: ["/api/ghl/broadcasts/summary", from, to],
     queryFn: () => fetchJson(`/api/ghl/broadcasts/summary?from=${from}&to=${to}`),
   });
   const wa = summary.data?.whatsapp;
   const fnl = summary.data?.funil;
+  const custos = summary.data?.custos;
+  const fmtBRL = (n: number | null | undefined) =>
+    n == null ? "—" : n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
   function toggleSort(k: SortKey) {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
@@ -972,31 +978,75 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
 
   return (
     <div className="space-y-4">
-      {/* KPI cards */}
+      {/* KPI cards — enxuto: disparos, respostas, reuniões, custo/reunião, vendas */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatCard label="E-mails enviados" value={fmtInt(kpis.emailCount)} hint="campanhas no período" />
-        <StatCard label="Broadcasts WhatsApp" value={fmtInt(kpis.waCount)} hint="disparos no período" />
-        <StatCard label="Conversas" value={fmtInt(kpis.conversations)} hint="janela 7d após envio" />
-        <StatCard
-          label="Reuniões atribuídas"
-          value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"}
-          hint="agendadas após resposta ao broadcast"
-        />
-        <StatCard
-          label="Vendas atribuídas"
-          value={fnl ? fmtInt(fnl.venda) : "—"}
-          hint="fechadas após resposta ao broadcast"
-        />
+        <StatCard label="Disparos feitos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp no período" />
+        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint={fnl ? `${fmtInt(fnl.positivas)} positivas` : undefined} />
+        <StatCard label="Reuniões" value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"} hint="atribuídas (pós-resposta)" />
+        <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="gasto ÷ reuniões atribuídas" />
+        <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
       </div>
 
-      {/* Resumo de entrega WhatsApp (status WABA) */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatCard label="Enviadas (WA)" value={wa ? fmtInt(wa.enviado) : "—"} hint={wa ? `${fmtInt(wa.total)} no total` : undefined} />
-        <StatCard label="Taxa de entrega" value={wa?.entrega_pct != null ? `${wa.entrega_pct}%` : "—"} hint={wa ? `${fmtInt(wa.entregue)} entregues` : undefined} />
-        <StatCard label="Taxa de leitura" value={wa?.leitura_pct != null ? `${wa.leitura_pct}%` : "—"} hint={wa ? `${fmtInt(wa.lida)} lidas` : undefined} />
-        <StatCard label="Taxa de erro" value={wa?.erro_pct != null ? `${wa.erro_pct}%` : "—"} hint={wa ? `${fmtInt(wa.erro)} falhas` : undefined} />
-        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint={fnl ? `${fmtInt(fnl.positivas)} positivas` : undefined} />
+      {/* Evolução do período (2/3) + Gastos (1/3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <EvolucaoBroadcast from={from} to={to} />
+        </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Gastos</CardTitle>
+            <p className="text-xs text-muted-foreground">Investimento no período</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="text-3xl font-bold">{custos ? fmtBRL(custos.gasto_total) : "—"}</div>
+              <div className="text-xs text-muted-foreground">
+                {custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : `inclui ${custos.n_manual} override(s) manual(is)`) : "gasto total"}
+              </div>
+            </div>
+            <div className="space-y-2 text-sm border-t border-border pt-3">
+              <div className="flex justify-between"><span className="text-muted-foreground">Gasto / disparo</span><span className="font-medium">{custos ? fmtBRL(custos.gasto_por_disparo) : "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Custo / reunião</span><span className="font-medium">{custos ? fmtBRL(custos.custo_reuniao) : "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">CAC (custo / venda)</span><span className="font-medium">{custos ? fmtBRL(custos.cac) : "—"}</span></div>
+            </div>
+          </CardContent>
+        </Card>
       </div>
+
+      {/* Status de entrega / taxa de abertura (distribuição WABA) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Status de entrega</CardTitle>
+          <p className="text-xs text-muted-foreground">Distribuição das mensagens e taxa de abertura</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[
+            { label: "Enviadas", value: wa?.enviado ?? 0, color: "bg-sky-500" },
+            { label: "Entregues", value: wa?.entregue ?? 0, color: "bg-cyan-500" },
+            { label: "Lidas (abertura)", value: wa?.lida ?? 0, color: "bg-emerald-500" },
+            { label: "Erro", value: wa?.erro ?? 0, color: "bg-rose-500" },
+          ].map((row) => {
+            const total = wa?.total ?? 0;
+            const pct = total ? (100 * row.value) / total : 0;
+            return (
+              <div key={row.label} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span>{row.label}</span>
+                  <span className="text-muted-foreground"><strong className="text-foreground">{fmtInt(row.value)}</strong> · {pct.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 w-full rounded bg-muted/40 overflow-hidden">
+                  <div className={`h-full ${row.color}`} style={{ width: `${Math.max(pct, 1)}%` }} />
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex gap-4 pt-2 text-sm border-t border-border">
+            <div><span className="text-muted-foreground">Taxa de entrega: </span><strong>{wa?.entrega_pct != null ? `${wa.entrega_pct}%` : "—"}</strong></div>
+            <div><span className="text-muted-foreground">Taxa de leitura: </span><strong>{wa?.leitura_pct != null ? `${wa.leitura_pct}%` : "—"}</strong></div>
+            <div><span className="text-muted-foreground">Taxa de erro: </span><strong>{wa?.erro_pct != null ? `${wa.erro_pct}%` : "—"}</strong></div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filtros */}
       <Card>
@@ -1970,11 +2020,6 @@ export default function GhlMarketing() {
   const from = format(dateRange.from, "yyyy-MM-dd");
   const to = format(dateRange.to, "yyyy-MM-dd");
 
-  const { data: overview } = useQuery<{ counts: any; lastSyncs: any[] }>({
-    queryKey: ["/api/ghl/overview"],
-    queryFn: () => fetchJson("/api/ghl/overview"),
-  });
-
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
       <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
@@ -1987,16 +2032,6 @@ export default function GhlMarketing() {
           }}
           align="start"
         />
-        {overview?.counts && (
-          <div className="text-xs text-muted-foreground flex flex-wrap gap-3">
-            <span><strong>{fmtInt(overview.counts.contacts)}</strong> contatos</span>
-            <span><strong>{fmtInt(overview.counts.conversations)}</strong> conversas</span>
-            <span><strong>{fmtInt(overview.counts.messages)}</strong> mensagens</span>
-            <span><strong>{fmtInt(overview.counts.email_campaigns)}</strong> campanhas</span>
-            <span><strong>{fmtInt(overview.counts.tags)}</strong> tags</span>
-            <span><strong>{fmtInt(overview.counts.email_events)}</strong> events</span>
-          </div>
-        )}
       </div>
 
       <Tabs defaultValue="biblioteca" className="w-full">
@@ -2012,6 +2047,9 @@ export default function GhlMarketing() {
           </TabsTrigger>
           <TabsTrigger value="funil" data-testid="tab-funil">
             <Activity className="w-4 h-4 mr-2" /> Funil
+          </TabsTrigger>
+          <TabsTrigger value="bases" data-testid="tab-bases">
+            <BarChart2 className="w-4 h-4 mr-2" /> Bases
           </TabsTrigger>
           <TabsTrigger value="calendario" data-testid="tab-calendario">
             <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
@@ -2032,6 +2070,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="funil" className="mt-6">
           <FunilTab from={from} to={to} />
+        </TabsContent>
+        <TabsContent value="bases" className="mt-6">
+          <BasesInteligencia from={from} to={to} />
         </TabsContent>
         <TabsContent value="calendario" className="mt-6">
           <CalendarioTab />
