@@ -23,6 +23,7 @@ import { avaliarPerformance, CLASSIFICACAO_TAILWIND, CLASSIFICACAO_LABEL, BENCHM
 import FunilTab from "@/components/FunilBroadcast";
 import BasesInteligencia from "@/components/BasesInteligencia";
 import EvolucaoBroadcast from "@/components/EvolucaoBroadcast";
+import RelatorioBroadcast from "@/components/RelatorioBroadcast";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -2051,6 +2052,9 @@ export default function GhlMarketing() {
           <TabsTrigger value="bases" data-testid="tab-bases">
             <BarChart2 className="w-4 h-4 mr-2" /> Bases
           </TabsTrigger>
+          <TabsTrigger value="relatorio" data-testid="tab-relatorio">
+            <TrendingUp className="w-4 h-4 mr-2" /> Relatório
+          </TabsTrigger>
           <TabsTrigger value="calendario" data-testid="tab-calendario">
             <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
           </TabsTrigger>
@@ -2073,6 +2077,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="bases" className="mt-6">
           <BasesInteligencia from={from} to={to} />
+        </TabsContent>
+        <TabsContent value="relatorio" className="mt-6">
+          <RelatorioBroadcast from={from} to={to} />
         </TabsContent>
         <TabsContent value="calendario" className="mt-6">
           <CalendarioTab />
