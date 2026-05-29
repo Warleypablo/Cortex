@@ -84,17 +84,23 @@ export async function attributeBroadcastReplies(opts: {
     return { replies: 0, classified: 0, matchedDeals: 0, unmatchedPhones: 0 };
   }
 
-  // 2) Pula as já gravadas (a menos que reclassify).
+  // 2) Pula as já gravadas — MAS reprocessa as que ficaram com sentimento de fallback
+  //    (classificação IA falhou no passado, ex.: chave inválida). Self-heal.
   let pending = rows;
   if (!reclassify) {
     const ids = rows.map((x) => x.reply_message_id);
     // node-pg liga o array como $1::text[] (o template sql do drizzle não casa array em ANY()).
     const existing = await pool.query(
-      `SELECT reply_message_id FROM cortex_core.broadcast_lead_events WHERE reply_message_id = ANY($1::text[])`,
+      `SELECT reply_message_id, sentiment_motivo FROM cortex_core.broadcast_lead_events WHERE reply_message_id = ANY($1::text[])`,
       [ids],
     );
-    const seen = new Set((existing.rows ?? []).map((x: any) => x.reply_message_id));
-    pending = rows.filter((x) => !seen.has(x.reply_message_id));
+    // "OK" = já gravada E o sentimento não veio de uma falha de IA.
+    const okSeen = new Set(
+      (existing.rows ?? [])
+        .filter((x: any) => !/falha|indispon/i.test(x.sentiment_motivo ?? ""))
+        .map((x: any) => x.reply_message_id),
+    );
+    pending = rows.filter((x) => !okSeen.has(x.reply_message_id));
   }
 
   // 3) Resolve telefone → Bitrix em lote (telefone normalizado → contact_id + deal mais recente).
