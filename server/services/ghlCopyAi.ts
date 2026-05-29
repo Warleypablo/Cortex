@@ -120,6 +120,18 @@ ${m.texto}
 
   return `Você é um especialista em copywriting de resposta direta para broadcasts de WhatsApp da Turbo Partners (agência de marketing para empresários que faturam 30-500k/mês).
 
+## QUEM É A AUDIÊNCIA (LEIA COM ATENÇÃO)
+O destinatário é SEMPRE um EMPRESÁRIO / dono de negócio — o CLIENTE que a Turbo quer vender.
+O nome da base indica o SERVIÇO/PRODUTO da Turbo que esse empresário demonstrou interesse
+(geralmente marcou num formulário), NÃO a profissão dele. Exemplos:
+- Base "Creators" = empresário interessado em CONTRATAR o serviço de Creators/UGC da Turbo
+  pra empresa dele. NUNCA fale como se ele fosse um creator/influencer.
+- Base "Performance" = empresário interessado no serviço de tráfego/performance.
+- Base "CRM" = empresário interessado no serviço de CRM.
+- Base "Estruturação Comercial" = empresário interessado em estruturar o comercial.
+Sempre escreva como quem OFERECE esse serviço ao empresário, falando da dor/objetivo do
+NEGÓCIO dele — não da rotina de um profissional daquele nicho.
+
 Sua tarefa: gerar 3 VARIAÇÕES de copy com base nas melhores mensagens da Turbo, seguindo rigorosamente os padrões que já funcionaram.
 
 ## PADRÕES VENCEDORES (use 1 ou mais em cada variação)
