@@ -276,56 +276,51 @@ export default function FunilTab({ from, to }: { from: string; to: string }) {
                     <TableHeader>
                       <TableRow>
                         <TableHead>Lead</TableHead>
-                        <TableHead>Empresa</TableHead>
                         <TableHead>Telefone</TableHead>
                         <TableHead>Resposta</TableHead>
                         <TableHead>Sentimento</TableHead>
                         <TableHead>Etapa Bitrix</TableHead>
-                        <TableHead className="text-right">Valor</TableHead>
-                        <TableHead></TableHead>
+                        <TableHead className="w-10"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {(leads.data?.leads ?? []).map((l) => {
                         const etapa = etapaBitrix(l);
-                        // Valor só conta como receita do broadcast se a venda foi pós-resposta.
-                        const valor =
-                          l.stage_name === "Negócio Ganho" && etapa.atribuido
-                            ? fmtBRL(l.valor_recorrente || l.valor_pontual)
-                            : "—";
+                        const venda = l.stage_name === "Negócio Ganho" && etapa.atribuido;
+                        const valor = venda ? fmtBRL(l.valor_recorrente || l.valor_pontual) : null;
                         return (
-                          <TableRow key={l.reply_message_id}>
-                            <TableCell className="font-medium">{l.nome || "—"}</TableCell>
-                            <TableCell className="text-muted-foreground">{l.empresa || "—"}</TableCell>
-                            <TableCell className="text-muted-foreground tabular-nums">{l.lead_phone || "—"}</TableCell>
-                            <TableCell className="max-w-[280px]">
-                              <span className="text-sm" title={l.reply_body || ""}>
-                                {(l.reply_body || "—").slice(0, 80)}
-                              </span>
+                          <TableRow key={l.reply_message_id} className="hover:bg-muted/30">
+                            <TableCell className="align-top py-3">
+                              <div className="font-medium">{l.nome || "—"}</div>
+                              {l.empresa && <div className="text-xs text-muted-foreground">{l.empresa}</div>}
+                            </TableCell>
+                            <TableCell className="align-top py-3 text-sm text-muted-foreground tabular-nums whitespace-nowrap">{l.lead_phone || "—"}</TableCell>
+                            <TableCell className="align-top py-3 max-w-[340px]">
+                              <span className="text-sm line-clamp-2" title={l.reply_body || ""}>{l.reply_body || "—"}</span>
                               {l.n_respostas > 1 && (
-                                <span className="ml-1 text-[10px] text-muted-foreground" title="respostas dessa pessoa neste disparo">
+                                <span className="ml-1 align-middle text-[10px] rounded bg-muted px-1.5 py-0.5 text-muted-foreground" title="follow-ups dessa pessoa neste disparo">
                                   +{l.n_respostas - 1}
                                 </span>
                               )}
                             </TableCell>
-                            <TableCell>
+                            <TableCell className="align-top py-3">
                               {l.sentiment ? (
                                 <Badge variant="outline" className={SENTIMENT_BADGE[l.sentiment]} title={l.sentiment_motivo || ""}>
                                   {SENTIMENT_LABEL[l.sentiment]}
                                 </Badge>
-                              ) : (
-                                "—"
-                              )}
+                              ) : <span className="text-muted-foreground">—</span>}
                             </TableCell>
-                            <TableCell className={etapa.tone}>{etapa.label}</TableCell>
-                            <TableCell className="text-right tabular-nums">{valor}</TableCell>
-                            <TableCell>
+                            <TableCell className="align-top py-3">
+                              <span className={`text-sm ${etapa.tone}`}>{etapa.label}</span>
+                              {valor && <div className="text-xs font-semibold text-emerald-600 dark:text-emerald-400">{valor}</div>}
+                            </TableCell>
+                            <TableCell className="align-top py-3 text-right">
                               {l.bitrix_deal_id ? (
                                 <a
                                   href={`${BITRIX_BASE}/crm/deal/details/${l.bitrix_deal_id}/`}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  className="inline-flex items-center text-primary hover:underline"
+                                  className="inline-flex items-center text-muted-foreground hover:text-primary"
                                   title="Abrir card no Bitrix"
                                 >
                                   <ExternalLink className="w-4 h-4" />
