@@ -1069,6 +1069,26 @@ async function listBroadcasts(req: Request, res: Response) {
       for (const row of ((mRes as any).rows ?? [])) meetingsMap.set(row.broadcast_id, row.reunioes ?? 0);
     }
 
+    // Negócios ganhos + receita atribuída por disparo (causalidade: reunião agendada pós-resposta).
+    // DISTINCT por deal pra não somar receita duplicada quando há várias respostas do mesmo lead.
+    const salesMap = new Map<string, { ganhos: number; receita: number }>();
+    if (waIds.length) {
+      const sRes = await db.execute(sql`
+        WITH won AS (
+          SELECT DISTINCT e.broadcast_id, e.bitrix_deal_id,
+            COALESCE(d.valor_recorrente, d.valor_pontual, 0)::float AS valor
+          FROM cortex_core.broadcast_lead_events e
+          JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
+          WHERE e.broadcast_id IN (${sql.join(waIds.map((id) => sql`${id}`), sql`,`)})
+            AND d.stage_name = 'Negócio Ganho'
+            AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date
+        )
+        SELECT broadcast_id, COUNT(*)::int AS ganhos, COALESCE(SUM(valor), 0)::float AS receita
+        FROM won GROUP BY broadcast_id
+      `);
+      for (const row of ((sRes as any).rows ?? [])) salesMap.set(row.broadcast_id, { ganhos: row.ganhos ?? 0, receita: row.receita ?? 0 });
+    }
+
     // Monta o response final
     const broadcasts = rows.map((r) => {
       const isEmail = r.channel === "Email";
@@ -1106,6 +1126,8 @@ async function listBroadcasts(req: Request, res: Response) {
         open_pct,
         conversations_generated: conversationsMap.get(r.id) ?? 0,
         meetings_scheduled: isEmail ? null : (meetingsMap.get(r.id) ?? 0), // reuniões atribuídas (pós-resposta)
+        ganhos: isEmail ? null : (salesMap.get(r.id)?.ganhos ?? 0), // negócios ganhos atribuídos
+        receita: isEmail ? null : (salesMap.get(r.id)?.receita ?? 0), // receita atribuída (R$)
         has_open_tracking: isEmail ? (evt?.delivered_events ?? 0) > 0 : true, // WA tem read receipt
       };
     });

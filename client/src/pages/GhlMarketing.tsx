@@ -867,6 +867,8 @@ interface BroadcastRow {
   open_pct: number | null;
   conversations_generated: number;
   meetings_scheduled: number | null;
+  ganhos: number | null;
+  receita: number | null;
   has_open_tracking: boolean;
   spend_brl: number | null;
   spend_is_manual: boolean;
@@ -980,13 +982,14 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
 
   return (
     <div className="space-y-4">
-      {/* KPI cards — enxuto: disparos, respostas, reuniões, custo/reunião, vendas */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatCard label="Disparos feitos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp no período" />
+      {/* KPI cards: Investimento · Disparos · Respostas · Reuniões · Vendas · CAC */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"} />
+        <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp" />
         <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint={fnl ? `${fmtInt(fnl.positivas)} positivas` : undefined} />
         <StatCard label="Reuniões" value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"} hint="atribuídas (pós-resposta)" />
-        <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="gasto ÷ reuniões atribuídas" />
         <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
+        <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas" />
       </div>
 
       {/* Evolução do período (2/3) + Gastos (1/3) */}
@@ -1143,7 +1146,11 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                     <SortableTh label="Abertura" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <SortableTh label="Conversas" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <TableHead className="text-right" title="Reuniões atribuídas ao disparo (agendadas após a resposta)">Reuniões</TableHead>
+                    <TableHead className="text-right" title="Negócios ganhos atribuídos (venda após resposta)">Ganhos</TableHead>
+                    <TableHead className="text-right" title="Receita dos negócios ganhos atribuídos">Receita</TableHead>
+                    <TableHead className="text-right" title="Ticket médio = receita ÷ negócios ganhos">AOV</TableHead>
                     <TableHead className="text-right">Gasto</TableHead>
+                    <TableHead className="text-right" title="Custo de aquisição = gasto ÷ negócios ganhos">CAC</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1192,6 +1199,15 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                       <TableCell className="text-right tabular-nums align-top py-3">
                         {b.meetings_scheduled != null ? <span className="font-medium">{fmtInt(b.meetings_scheduled)}</span> : "—"}
                       </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3">
+                        {b.ganhos != null && b.ganhos > 0 ? <span className="font-medium text-emerald-600 dark:text-emerald-400">{fmtInt(b.ganhos)}</span> : "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3 whitespace-nowrap">
+                        {b.receita != null && b.receita > 0 ? fmtBRL(b.receita) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3 whitespace-nowrap">
+                        {b.ganhos != null && b.ganhos > 0 && b.receita ? fmtBRL(b.receita / b.ganhos) : "—"}
+                      </TableCell>
                       <TableCell className="text-right tabular-nums align-top py-3 whitespace-nowrap">
                         {b.spend_brl != null ? (
                           <span title={b.spend_is_manual ? "Valor manual" : "Calculado: entregues × preço unitário"}>
@@ -1200,11 +1216,14 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                           </span>
                         ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3 whitespace-nowrap">
+                        {b.ganhos != null && b.ganhos > 0 && b.spend_brl != null ? fmtBRL(b.spend_brl / b.ganhos) : "—"}
+                      </TableCell>
                     </TableRow>
                   ))}
                   {sorted.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={8} className="text-center text-muted-foreground py-6">
+                      <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
                         Nenhum broadcast encontrado com esses filtros
                       </TableCell>
                     </TableRow>
