@@ -36,6 +36,50 @@ const OPT_OUT = [
   "nao quero receber",
   "remover",
   "unsubscribe",
+  "me exclua",
+  "me exclui",
+  "exclua meu",
+  "me remova",
+  "me remove",
+  "me tire",
+  "tira meu",
+  "tire meu",
+  "para de mandar",
+  "parem de mandar",
+  "não me mande",
+  "nao me mande",
+  "pare de enviar",
+];
+
+// Auto-respostas / chatbots do negócio do lead (NÃO são resposta genuína) → neutra.
+// Detectadas por frases típicas de saudação/atendimento automático.
+const AUTO_REPLY = [
+  "como posso ajudar",
+  "como posso te ajudar",
+  "como podemos ajudar",
+  "agradeço seu contato",
+  "agradeço o contato",
+  "obrigado pelo contato",
+  "obrigada pelo contato",
+  "recebemos sua mensagem",
+  "recebi sua msg",
+  "recebi sua mensagem",
+  "respondo em breve",
+  "retornaremos",
+  "retorno em breve",
+  "já te respondo",
+  "ja te respondo",
+  "um momento",
+  "seja bem vindo",
+  "seja bem-vindo",
+  "bem vindo",
+  "horário de atendimento",
+  "horario de atendimento",
+  "fora do horário",
+  "fora do horario",
+  "mensagem automática",
+  "mensagem automatica",
+  "responder em breve",
 ];
 
 // Botões/expressões de interesse claro.
@@ -55,7 +99,7 @@ const POSITIVAS = [
   "sim",
 ];
 
-// Recusas/negativas claras.
+// Recusas/negativas claras (inclui reclamações/insultos).
 const NEGATIVAS = [
   "não tenho interesse",
   "nao tenho interesse",
@@ -64,8 +108,19 @@ const NEGATIVAS = [
   "sem interesse",
   "não quero",
   "nao quero",
-  "para de mandar",
   "não, obrigado",
+  "péssima",
+  "pessima",
+  "horrível",
+  "horrivel",
+  "não gostei",
+  "nao gostei",
+  "que saco",
+  "golpe",
+  "spam",
+  "chato",
+  "para com isso",
+  "parem com isso",
 ];
 
 function matchAny(texto: string, termos: string[]): boolean {
@@ -81,7 +136,11 @@ export function classificarPorRegra(body: string): Classificacao | null {
     return { sentiment: "opt_out", motivo: "Pediu opt-out / sair da lista.", fonte: "regra" };
   }
   if (matchAny(t, NEGATIVAS)) {
-    return { sentiment: "negativa", motivo: "Recusa explícita.", fonte: "regra" };
+    return { sentiment: "negativa", motivo: "Recusa / reclamação explícita.", fonte: "regra" };
+  }
+  // Auto-resposta do negócio do lead (saudação/chatbot) → neutra, ANTES de positiva.
+  if (matchAny(t, AUTO_REPLY)) {
+    return { sentiment: "neutra", motivo: "Resposta automática (saudação/chatbot do lead).", fonte: "regra" };
   }
   // Curto e bate uma positiva → quick-reply de interesse (ex.: clique no botão).
   if (matchAny(t, POSITIVAS)) {
@@ -91,18 +150,22 @@ export function classificarPorRegra(body: string): Classificacao | null {
 }
 
 function buildPrompt(body: string): string {
-  return `Você classifica a resposta de um lead a uma mensagem de marketing no WhatsApp (mercado B2B brasileiro).
+  return `Você classifica a resposta de um EMPRESÁRIO a um broadcast de marketing da Turbo no WhatsApp (B2B brasileiro). A Turbo MANDOU a mensagem; isto é a resposta que voltou.
 
 Responda APENAS um JSON válido, sem texto antes ou depois:
-{ "sentiment": "positiva" | "negativa" | "neutra" | "opt_out", "motivo": "<frase curta explicando>" }
+{ "sentiment": "positiva" | "negativa" | "neutra" | "opt_out", "motivo": "<frase curta>" }
 
-Critérios:
-- "positiva": demonstra interesse, faz pergunta sobre a oferta, quer conversar/agendar.
-- "negativa": recusa, desinteresse, reclamação.
-- "opt_out": pede pra parar de receber / sair da lista.
-- "neutra": resposta automática, ausência, dúvida não relacionada, ou ambíguo.
+Critérios (leia com atenção):
+- "positiva": demonstra interesse REAL na oferta, faz pergunta sobre o serviço, quer conversar/agendar, pede mais info. Ex.: "quero saber mais", "podemos marcar?", "como funciona o serviço de vocês?".
+- "negativa": recusa, desinteresse, irritação ou RECLAMAÇÃO. Ex.: "não tenho interesse", "péssima empresa", "que saco", "isso é spam".
+- "opt_out": pede pra parar de receber / ser excluído. Ex.: "me exclua", "para de mandar", "sair da lista".
+- "neutra": NÃO é uma resposta genuína de interesse. Inclui:
+  • AUTO-RESPOSTA / CHATBOT do negócio do lead — saudação ou aviso automático. Ex.: "Olá, como posso ajudar?", "Agradeço seu contato, respondo em breve", "Recebi sua msg, já te respondo", "Seja bem-vindo ao atendimento". ISSO É SEMPRE NEUTRA, nunca positiva.
+  • resposta vaga/ambígua, número solto, dúvida não relacionada, ausência.
 
-Mensagem do lead:
+ATENÇÃO: saudações automáticas tipo "como posso ajudar?" são o ATENDENTE/BOT do lead respondendo — NÃO é interesse. Classifique como neutra.
+
+Mensagem que voltou:
 ${body}`;
 }
 

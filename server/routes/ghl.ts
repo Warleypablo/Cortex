@@ -1750,30 +1750,34 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
       AND date_added BETWEEN ${from} AND ${to}
   `);
   const disp = await db.execute(sql`
-    SELECT count(*)::int AS disparos FROM (
-      SELECT 1 FROM cortex_core.ghl_messages
+    SELECT count(*)::int AS disparos, COALESCE(SUM(c), 0)::int AS enviadas FROM (
+      SELECT COUNT(DISTINCT contact_id) AS c FROM cortex_core.ghl_messages
       WHERE direction = 'outbound' AND message_type = 'TYPE_WHATSAPP' AND ${waSource}
         AND date_added BETWEEN ${from} AND ${to} AND body IS NOT NULL AND body <> ''
       GROUP BY DATE_TRUNC('day', date_added), source, MD5(COALESCE(body, ''))
-      HAVING count(DISTINCT contact_id) >= 10
+      HAVING COUNT(DISTINCT contact_id) >= 10
     ) g
   `);
   const fun = await db.execute(sql`
     SELECT count(DISTINCT e.ghl_contact_id)::int AS respostas,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
+      count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
     FROM cortex_core.broadcast_lead_events e
     LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
     WHERE e.reply_at BETWEEN ${from} AND ${to}
   `);
   const e = (ent as any).rows?.[0] ?? {}, f = (fun as any).rows?.[0] ?? {};
+  const d0 = (disp as any).rows?.[0] ?? {};
   const total = e.total_msgs ?? 0;
   return {
-    disparos: (disp as any).rows?.[0]?.disparos ?? 0,
+    disparos: d0.disparos ?? 0,
+    enviadas: d0.enviadas ?? 0,
     leads: e.leads ?? 0,
     abertura_pct: e.total_msgs ? +(100 * e.lida / e.total_msgs).toFixed(1) : null,
     respostas: f.respostas ?? 0,
     reunioes: f.reunioes ?? 0,
+    compareceu: f.compareceu ?? 0,
     vendas: f.vendas ?? 0,
     gasto: +(total * unitCost).toFixed(2),
   };

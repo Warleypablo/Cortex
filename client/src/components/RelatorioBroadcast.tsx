@@ -18,7 +18,7 @@ function fetchJson<T>(url: string): Promise<T> {
   });
 }
 
-type Metrics = { disparos: number; leads: number; abertura_pct: number | null; respostas: number; reunioes: number; vendas: number; gasto: number };
+type Metrics = { disparos: number; enviadas: number; leads: number; abertura_pct: number | null; respostas: number; reunioes: number; compareceu: number; vendas: number; gasto: number };
 interface RelatorioData {
   atual: Metrics; anterior: Metrics;
   bases: Array<{ base: string; abertura_pct: number | null; reunioes: number; vendas: number }>;
@@ -69,6 +69,39 @@ export default function RelatorioBroadcast({ from, to }: { from: string; to: str
         </CardHeader>
         <CardContent>
           <p className="text-sm leading-relaxed">{narrativa.resumo}</p>
+        </CardContent>
+      </Card>
+
+      {/* Funil agregado do período (qualquer data) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Funil do período</CardTitle>
+          <p className="text-xs text-muted-foreground">Agregado de todos os disparos no intervalo selecionado</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {([
+            { label: "Enviadas", value: atual.enviadas, prev: null as number | null, color: "bg-sky-500" },
+            { label: "Responderam", value: atual.respostas, prev: atual.enviadas, color: "bg-cyan-500" },
+            { label: "Reunião marcada", value: atual.reunioes, prev: atual.respostas, color: "bg-violet-500" },
+            { label: "Compareceu", value: atual.compareceu, prev: atual.reunioes, color: "bg-blue-500" },
+            { label: "Venda", value: atual.vendas, prev: atual.compareceu, color: "bg-amber-500" },
+          ]).map((s) => {
+            const widthPct = atual.enviadas > 0 ? Math.max(2, (s.value / atual.enviadas) * 100) : 0;
+            return (
+              <div key={s.label} className="space-y-1">
+                <div className="flex items-baseline justify-between text-sm">
+                  <span className="font-medium">{s.label}</span>
+                  <span className="text-muted-foreground">
+                    <strong className="text-foreground">{fmtInt(s.value)}</strong>
+                    {s.prev != null && <span className="ml-2 text-xs">({s.prev > 0 ? `${((s.value / s.prev) * 100).toFixed(1)}%` : "—"} da etapa anterior)</span>}
+                  </span>
+                </div>
+                <div className="h-6 w-full rounded bg-muted/40 overflow-hidden">
+                  <div className={`h-full ${s.color}`} style={{ width: `${widthPct}%` }} />
+                </div>
+              </div>
+            );
+          })}
         </CardContent>
       </Card>
 
