@@ -14,3 +14,4 @@ export * from "./benchmarks";
 export * from "./regras-calendario";
 export * from "./base-tag-map";
 export * from "./phone";
+export * from "./datas-comerciais";

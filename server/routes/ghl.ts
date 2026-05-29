@@ -18,6 +18,8 @@ import { BASE_TAG_MAP, contatoSatisfazBase, expandLegacyAliases, type BaseFiltro
 import { analisarCopy, gerarCopies, buscarTopPerformers } from "../services/ghlCopyAi";
 import { attributeBroadcastReplies } from "../services/broadcastAttribution";
 import { enrichBroadcasts } from "../services/broadcastClassifier";
+import { gerarNarrativaRelatorio } from "../services/broadcastReport";
+import { proximasDatasComerciais } from "@shared/ghl-broadcast/datas-comerciais";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -1689,6 +1691,124 @@ async function getBasesPerformance(req: Request, res: Response) {
   }
 }
 
+/**
+ * Métricas-núcleo de um período (reaproveitado pra mês atual e anterior no relatório).
+ */
+async function periodoMetrics(from: Date, to: Date, unitCost: number) {
+  const waSource = sql`source IN ('workflow','bulk_actions','campaign')`;
+  const ent = await db.execute(sql`
+    SELECT count(*)::int AS total_msgs, count(DISTINCT contact_id)::int AS leads,
+      count(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
+      count(*) FILTER (WHERE status = 'read')::int AS lida
+    FROM cortex_core.ghl_messages
+    WHERE direction = 'outbound' AND message_type = 'TYPE_WHATSAPP' AND ${waSource}
+      AND date_added BETWEEN ${from} AND ${to}
+  `);
+  const disp = await db.execute(sql`
+    SELECT count(*)::int AS disparos FROM (
+      SELECT 1 FROM cortex_core.ghl_messages
+      WHERE direction = 'outbound' AND message_type = 'TYPE_WHATSAPP' AND ${waSource}
+        AND date_added BETWEEN ${from} AND ${to} AND body IS NOT NULL AND body <> ''
+      GROUP BY DATE_TRUNC('day', date_added), source, MD5(COALESCE(body, ''))
+      HAVING count(DISTINCT contact_id) >= 10
+    ) g
+  `);
+  const fun = await db.execute(sql`
+    SELECT count(DISTINCT e.ghl_contact_id)::int AS respostas,
+      count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
+      count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
+    FROM cortex_core.broadcast_lead_events e
+    LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
+    WHERE e.reply_at BETWEEN ${from} AND ${to}
+  `);
+  const e = (ent as any).rows?.[0] ?? {}, f = (fun as any).rows?.[0] ?? {};
+  const total = e.total_msgs ?? 0;
+  return {
+    disparos: (disp as any).rows?.[0]?.disparos ?? 0,
+    leads: e.leads ?? 0,
+    abertura_pct: e.entregue ? +(100 * e.lida / e.entregue).toFixed(1) : null,
+    respostas: f.respostas ?? 0,
+    reunioes: f.reunioes ?? 0,
+    vendas: f.vendas ?? 0,
+    gasto: +(total * unitCost).toFixed(2),
+  };
+}
+
+/**
+ * GET /api/ghl/relatorio?from=&to=
+ * Relatório do período: métricas atual vs anterior + top bases/padrões + datas
+ * comerciais à frente + narrativa estratégica por IA.
+ */
+async function getRelatorio(req: Request, res: Response) {
+  try {
+    const { from, to } = parsePeriod(req);
+    const lenMs = to.getTime() - from.getTime();
+    const prevTo = new Date(from.getTime() - 86400000);
+    const prevFrom = new Date(prevTo.getTime() - lenMs);
+
+    try { await enrichBroadcasts({ from: prevFrom, to }); } catch (e: any) { console.error("[GHL] relatorio enrich:", e.message); }
+    try { await attributeBroadcastReplies({ from: prevFrom, to }); } catch (e: any) { console.error("[GHL] relatorio attribution:", e.message); }
+
+    const priceRes = await db.execute(sql`SELECT unit_cost_brl FROM cortex_core.ghl_pricing WHERE channel = 'WhatsApp' ORDER BY effective_from DESC LIMIT 1`);
+    const unitCost = Number((priceRes as any).rows?.[0]?.unit_cost_brl ?? 0);
+
+    const atual = await periodoMetrics(from, to, unitCost);
+    const anterior = await periodoMetrics(prevFrom, prevTo, unitCost);
+
+    // Top bases + padrões (período atual) — reaproveita CTEs msg/resp.
+    const ctes = sql`
+      WITH msg AS (
+        SELECT 'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS broadcast_id,
+          count(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
+          count(*) FILTER (WHERE status = 'read')::int AS lida
+        FROM cortex_core.ghl_messages
+        WHERE direction = 'outbound' AND source IN ('workflow','bulk_actions','campaign')
+          AND date_added BETWEEN ${from} AND ${to} AND body IS NOT NULL AND body <> ''
+        GROUP BY 1 HAVING count(DISTINCT contact_id) >= 10
+      ),
+      resp AS (
+        SELECT e.broadcast_id,
+          count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
+          count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
+        FROM cortex_core.broadcast_lead_events e LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id GROUP BY 1
+      )`;
+    const basesRes = await db.execute(sql`
+      ${ctes}
+      SELECT bc.base,
+        CASE WHEN SUM(msg.entregue) > 0 THEN ROUND(100.0 * SUM(msg.lida) / SUM(msg.entregue), 1) END AS abertura_pct,
+        COALESCE(SUM(resp.reunioes), 0)::int AS reunioes, COALESCE(SUM(resp.vendas), 0)::int AS vendas
+      FROM cortex_core.broadcast_classification bc JOIN msg ON msg.broadcast_id = bc.broadcast_id
+      LEFT JOIN resp ON resp.broadcast_id = bc.broadcast_id
+      WHERE bc.base IS NOT NULL GROUP BY bc.base ORDER BY reunioes DESC, abertura_pct DESC NULLS LAST
+    `);
+    const padroesRes = await db.execute(sql`
+      ${ctes}
+      SELECT bc.padrao,
+        CASE WHEN SUM(msg.entregue) > 0 THEN ROUND(100.0 * SUM(msg.lida) / SUM(msg.entregue), 1) END AS abertura_pct,
+        COALESCE(SUM(resp.reunioes), 0)::int AS reunioes
+      FROM cortex_core.broadcast_classification bc JOIN msg ON msg.broadcast_id = bc.broadcast_id
+      LEFT JOIN resp ON resp.broadcast_id = bc.broadcast_id
+      WHERE bc.padrao IS NOT NULL GROUP BY bc.padrao ORDER BY reunioes DESC, abertura_pct DESC NULLS LAST
+    `);
+    const bases = (basesRes as any).rows ?? [];
+    const padroes = (padroesRes as any).rows ?? [];
+    const datas = proximasDatasComerciais(to, 60).map((d) => `${d.nome} (${d.data})`);
+
+    const narrativa = await gerarNarrativaRelatorio({
+      periodo: { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) },
+      atual, anterior,
+      topBases: bases.slice(0, 5),
+      topPadroes: padroes.slice(0, 5),
+      datasComerciaisProximas: datas,
+    });
+
+    res.json({ periodo: { from, to }, atual, anterior, bases, padroes, datasComerciais: datas, narrativa });
+  } catch (err: any) {
+    console.error("[GHL] getRelatorio error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────
 
 export function registerGhlPublicRoutes(app: Express) {
@@ -1711,6 +1831,7 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/broadcasts/summary", getBroadcastsSummary); // antes de /:id (senão "summary" vira id)
   app.get("/api/ghl/broadcasts/evolucao", getBroadcastEvolucao); // idem, antes de /:id
   app.get("/api/ghl/bases/performance", getBasesPerformance);
+  app.get("/api/ghl/relatorio", getRelatorio);
   app.get("/api/ghl/broadcasts/:id", getBroadcastDetail);
   app.get("/api/ghl/broadcasts/:id/funnel", getBroadcastFunnel);
   app.get("/api/ghl/broadcasts/:id/leads", getBroadcastLeads);
