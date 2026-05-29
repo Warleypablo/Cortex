@@ -189,6 +189,7 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
                 <TableHead className="text-right">Entrega</TableHead>
                 <TableHead className="text-right">Abertura</TableHead>
                 <TableHead className="text-right">Reun.</TableHead>
+                <TableHead className="text-right" title="Negócios ganhos atribuídos (venda após resposta)">Ganhos</TableHead>
                 <TableHead className="text-right">Custo/reun.</TableHead>
               </TableRow>
             </TableHeader>
@@ -204,6 +205,7 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
                     <TableCell className="text-right tabular-nums">{fmtPct(r.entrega_pct)}</TableCell>
                     <TableCell className="text-right tabular-nums font-semibold">{fmtPct(r.abertura_pct)}</TableCell>
                     <TableCell className="text-right tabular-nums">{r.disparos ? fmtInt(r.reunioes) : "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{r.disparos && r.vendas ? <span className="text-emerald-600 dark:text-emerald-400 font-medium">{fmtInt(r.vendas)}</span> : "—"}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtBRL(r.custo_reuniao)}</TableCell>
                   </TableRow>
                 );
