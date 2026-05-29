@@ -24,6 +24,7 @@ import FunilTab from "@/components/FunilBroadcast";
 import BasesInteligencia from "@/components/BasesInteligencia";
 import EvolucaoBroadcast from "@/components/EvolucaoBroadcast";
 import RelatorioBroadcast from "@/components/RelatorioBroadcast";
+import PlanejamentoMensal from "@/components/PlanejamentoMensal";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -2055,6 +2056,9 @@ export default function GhlMarketing() {
           <TabsTrigger value="relatorio" data-testid="tab-relatorio">
             <TrendingUp className="w-4 h-4 mr-2" /> Relatório
           </TabsTrigger>
+          <TabsTrigger value="planejamento" data-testid="tab-planejamento">
+            <Wand2 className="w-4 h-4 mr-2" /> Planejamento
+          </TabsTrigger>
           <TabsTrigger value="calendario" data-testid="tab-calendario">
             <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
           </TabsTrigger>
@@ -2080,6 +2084,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="relatorio" className="mt-6">
           <RelatorioBroadcast from={from} to={to} />
+        </TabsContent>
+        <TabsContent value="planejamento" className="mt-6">
+          <PlanejamentoMensal />
         </TabsContent>
         <TabsContent value="calendario" className="mt-6">
           <CalendarioTab />

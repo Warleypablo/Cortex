@@ -19,7 +19,9 @@ import { analisarCopy, gerarCopies, buscarTopPerformers } from "../services/ghlC
 import { attributeBroadcastReplies } from "../services/broadcastAttribution";
 import { enrichBroadcasts } from "../services/broadcastClassifier";
 import { gerarNarrativaRelatorio } from "../services/broadcastReport";
-import { proximasDatasComerciais } from "@shared/ghl-broadcast/datas-comerciais";
+import { proximasDatasComerciais, datasComerciaisDoAno } from "@shared/ghl-broadcast/datas-comerciais";
+import { validarCadencia, type DisparoHistorico } from "@shared/ghl-broadcast/regras-calendario";
+import { gerarCopies, buscarTopPerformers } from "../services/ghlCopyAi";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -1809,6 +1811,150 @@ async function getRelatorio(req: Request, res: Response) {
   }
 }
 
+// ─── Planejamento mensal ────────────────────────────────────────────────
+
+/** Histórico de disparos (enviados reais + planejados) pra validação de cadência. */
+async function buildDisparosHistoricos(): Promise<DisparoHistorico[]> {
+  const sent = await db.execute(sql`
+    SELECT base, padrao, TO_CHAR(TO_DATE(SPLIT_PART(broadcast_id, '-', 2), 'YYYYMMDD'), 'YYYY-MM-DD') AS data
+    FROM cortex_core.broadcast_classification
+    WHERE base IS NOT NULL AND broadcast_id LIKE 'wa-%'
+  `);
+  const planned = await db.execute(sql`
+    SELECT base, padrao, TO_CHAR(plan_date, 'YYYY-MM-DD') AS data, status
+    FROM cortex_core.broadcast_plan WHERE base IS NOT NULL AND status IN ('agendada', 'pronta', 'enviada')
+  `);
+  const hist: DisparoHistorico[] = [];
+  for (const r of (sent as any).rows ?? []) hist.push({ base: r.base, padrao: r.padrao || undefined, data: r.data, status: "enviada" });
+  for (const r of (planned as any).rows ?? []) hist.push({ base: r.base, padrao: r.padrao || undefined, data: r.data, status: r.status });
+  return hist;
+}
+
+/** GET /api/ghl/plano?from=&to= — slots do período + cadência por slot + datas comerciais. */
+async function getPlano(req: Request, res: Response) {
+  try {
+    const { from, to } = parsePeriod(req);
+    const r = await db.execute(sql`
+      SELECT id, TO_CHAR(plan_date, 'YYYY-MM-DD') AS plan_date, canal, base, objetivo, padrao, titulo, copy_text, status
+      FROM cortex_core.broadcast_plan
+      WHERE plan_date BETWEEN ${from}::date AND ${to}::date
+      ORDER BY plan_date, id
+    `);
+    const slots = (r as any).rows ?? [];
+    const hist = await buildDisparosHistoricos();
+    const enriched = slots.map((s: any) => {
+      if (!s.base) return { ...s, cadencia: { status: "ok", alertas: [] } };
+      // exclui o próprio slot do histórico pra não auto-violar
+      const outros = hist.filter((h) => !(h.base === s.base && h.data === s.plan_date));
+      const cad = validarCadencia({ base: s.base, padrao: s.padrao || undefined, data: s.plan_date, disparosHistoricos: outros });
+      return { ...s, cadencia: { status: cad.status, alertas: cad.alertas } };
+    });
+    const fromYmd = from.toISOString().slice(0, 10), toYmd = to.toISOString().slice(0, 10);
+    const anos = Array.from(new Set([from.getFullYear(), to.getFullYear()]));
+    const datas = anos.flatMap((a) => datasComerciaisDoAno(a)).filter((d) => d.data >= fromYmd && d.data <= toYmd);
+    res.json({ slots: enriched, datasComerciais: datas });
+  } catch (err: any) {
+    console.error("[GHL] getPlano error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/** POST /api/ghl/plano — cria slot. */
+async function postPlano(req: Request, res: Response) {
+  try {
+    const { plan_date, canal, base, objetivo, padrao, titulo, copy_text, status } = req.body ?? {};
+    if (!plan_date) return res.status(400).json({ error: "plan_date obrigatório" });
+    const userEmail = ((req as any).user?.email as string) || null;
+    const r = await db.execute(sql`
+      INSERT INTO cortex_core.broadcast_plan (plan_date, canal, base, objetivo, padrao, titulo, copy_text, status, created_by)
+      VALUES (${plan_date}::date, ${canal ?? "WhatsApp"}, ${base ?? null}, ${objetivo ?? null}, ${padrao ?? null},
+              ${titulo ?? null}, ${copy_text ?? null}, ${status ?? "backlog"}, ${userEmail})
+      RETURNING id
+    `);
+    res.json({ ok: true, id: (r as any).rows?.[0]?.id });
+  } catch (err: any) {
+    console.error("[GHL] postPlano error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/** PATCH /api/ghl/plano/:id — atualiza campos do slot. */
+async function patchPlano(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "id inválido" });
+    const b = req.body ?? {};
+    await db.execute(sql`
+      UPDATE cortex_core.broadcast_plan SET
+        plan_date = COALESCE(${b.plan_date ?? null}::date, plan_date),
+        base      = COALESCE(${b.base ?? null}, base),
+        objetivo  = COALESCE(${b.objetivo ?? null}, objetivo),
+        padrao    = COALESCE(${b.padrao ?? null}, padrao),
+        titulo    = COALESCE(${b.titulo ?? null}, titulo),
+        copy_text = COALESCE(${b.copy_text ?? null}, copy_text),
+        status    = COALESCE(${b.status ?? null}, status),
+        updated_at = NOW()
+      WHERE id = ${id}
+    `);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[GHL] patchPlano error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/** DELETE /api/ghl/plano/:id */
+async function deletePlano(req: Request, res: Response) {
+  try {
+    const id = parseInt(req.params.id, 10);
+    if (!Number.isFinite(id)) return res.status(400).json({ error: "id inválido" });
+    await db.execute(sql`DELETE FROM cortex_core.broadcast_plan WHERE id = ${id}`);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[GHL] deletePlano error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+/**
+ * POST /api/ghl/plano/gerar-copy — gera 3 variações de copy pra um slot, usando o
+ * padrão que mais converteu naquela base (cruzamento real) + exemplos top performers.
+ * Body: { base, objetivo, tom?, tamanho?, contexto? }
+ */
+async function postGerarCopyPlano(req: Request, res: Response) {
+  try {
+    const { base, objetivo, tom, tamanho, contexto } = req.body ?? {};
+    if (!base || !objetivo) return res.status(400).json({ error: "base e objetivo obrigatórios" });
+
+    // Padrão vencedor real da base (melhor abertura entre os classificados); fallback null.
+    const padraoRes = await db.execute(sql`
+      WITH msg AS (
+        SELECT 'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS broadcast_id,
+          count(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
+          count(*) FILTER (WHERE status = 'read')::int AS lida
+        FROM cortex_core.ghl_messages
+        WHERE direction = 'outbound' AND source IN ('workflow','bulk_actions','campaign') AND body IS NOT NULL AND body <> ''
+        GROUP BY 1
+      )
+      SELECT bc.padrao,
+        CASE WHEN SUM(msg.entregue) > 0 THEN 100.0 * SUM(msg.lida) / SUM(msg.entregue) ELSE 0 END AS abertura
+      FROM cortex_core.broadcast_classification bc JOIN msg ON msg.broadcast_id = bc.broadcast_id
+      WHERE bc.base = ${base} AND bc.padrao IS NOT NULL
+      GROUP BY bc.padrao ORDER BY abertura DESC LIMIT 1
+    `);
+    const padraoAlvo = (padraoRes as any).rows?.[0]?.padrao ?? undefined;
+    const topPerformers = await buscarTopPerformers(5);
+    const { variacoes } = await gerarCopies({
+      objetivo, base, tom: tom || "Direto e consultivo", tamanho: tamanho || "Curto (WhatsApp)",
+      contexto, padraoAlvo, topPerformers,
+    });
+    res.json({ padraoAlvo: padraoAlvo ?? null, variacoes });
+  } catch (err: any) {
+    console.error("[GHL] postGerarCopyPlano error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────
 
 export function registerGhlPublicRoutes(app: Express) {
@@ -1832,6 +1978,11 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/broadcasts/evolucao", getBroadcastEvolucao); // idem, antes de /:id
   app.get("/api/ghl/bases/performance", getBasesPerformance);
   app.get("/api/ghl/relatorio", getRelatorio);
+  app.get("/api/ghl/plano", getPlano);
+  app.post("/api/ghl/plano", postPlano);
+  app.post("/api/ghl/plano/gerar-copy", postGerarCopyPlano);
+  app.patch("/api/ghl/plano/:id", patchPlano);
+  app.delete("/api/ghl/plano/:id", deletePlano);
   app.get("/api/ghl/broadcasts/:id", getBroadcastDetail);
   app.get("/api/ghl/broadcasts/:id/funnel", getBroadcastFunnel);
   app.get("/api/ghl/broadcasts/:id/leads", getBroadcastLeads);
