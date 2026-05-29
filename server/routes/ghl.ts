@@ -14,7 +14,8 @@
 import type { Express, Request, Response } from "express";
 import { sql, type SQL } from "drizzle-orm";
 import { db } from "../db";
-import { BASE_TAG_MAP, contatoSatisfazBase, expandLegacyAliases, type BaseFiltro } from "@shared/ghl-broadcast/base-tag-map";
+import { BASE_TAG_MAP, contatoSatisfazBase, expandLegacyAliases, getBaseFiltroComAliases, type BaseFiltro } from "@shared/ghl-broadcast/base-tag-map";
+import { PRODUTO_TAGS, PRODUTOS_DISPONIVEIS, contatoTemProduto } from "@shared/ghl-broadcast/produtos";
 import { analisarCopy, gerarCopies, buscarTopPerformers } from "../services/ghlCopyAi";
 import { attributeBroadcastReplies } from "../services/broadcastAttribution";
 import { enrichBroadcasts } from "../services/broadcastClassifier";
@@ -1956,6 +1957,43 @@ async function postGerarCopyPlano(req: Request, res: Response) {
   }
 }
 
+/**
+ * GET /api/ghl/segmento?base=
+ * Tamanho do público por produto dentro de uma base (ex.: Congelados × E-commerce).
+ * Cruza o filtro da base (base-tag-map) com as tags de interesse por produto (produtos.ts).
+ */
+async function getSegmento(req: Request, res: Response) {
+  try {
+    const base = (req.query.base as string) || "";
+    const baseFiltro = base ? getBaseFiltroComAliases(base) : null;
+
+    // Tags de todos os produtos (union), em minúsculo, pra buscar só quem tem interesse.
+    const todasTags = Array.from(
+      new Set(PRODUTOS_DISPONIVEIS.flatMap((p) => PRODUTO_TAGS[p].tagsAny).map((t) => t.toLowerCase())),
+    );
+    const r = await pool.query(
+      `SELECT tags FROM cortex_core.ghl_contacts
+       WHERE EXISTS (SELECT 1 FROM unnest(tags) t WHERE lower(t) = ANY($1::text[]))`,
+      [todasTags],
+    );
+    const rows = (r.rows ?? []) as Array<{ tags: string[] | null }>;
+
+    // Filtra pela base (em JS, reaproveitando contatoSatisfazBase com aliases).
+    const naBase = baseFiltro ? rows.filter((c) => contatoSatisfazBase(c.tags, baseFiltro)) : rows;
+
+    const produtos = PRODUTOS_DISPONIVEIS.map((p) => {
+      const filtro = PRODUTO_TAGS[p];
+      const size = naBase.filter((c) => contatoTemProduto(c.tags, filtro)).length;
+      return { produto: p, label: filtro.label, size, tags: filtro.tagsAny };
+    }).sort((a, b) => b.size - a.size);
+
+    res.json({ base: base || null, baseTotal: naBase.length, produtos });
+  } catch (err: any) {
+    console.error("[GHL] getSegmento error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────
 
 export function registerGhlPublicRoutes(app: Express) {
@@ -1978,6 +2016,7 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/broadcasts/summary", getBroadcastsSummary); // antes de /:id (senão "summary" vira id)
   app.get("/api/ghl/broadcasts/evolucao", getBroadcastEvolucao); // idem, antes de /:id
   app.get("/api/ghl/bases/performance", getBasesPerformance);
+  app.get("/api/ghl/segmento", getSegmento);
   app.get("/api/ghl/relatorio", getRelatorio);
   app.get("/api/ghl/plano", getPlano);
   app.post("/api/ghl/plano", postPlano);

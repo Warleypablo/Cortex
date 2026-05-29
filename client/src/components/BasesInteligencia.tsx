@@ -91,6 +91,13 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
   const baseAtiva = baseSel ?? ranking[0]?.base ?? null;
   const temPadrao = (q.data?.cruzamento ?? []).some((c) => c.padrao);
 
+  // Segmentação por produto da base selecionada (Congelados × E-commerce/Creators…).
+  const seg = useQuery<{ baseTotal: number; produtos: Array<{ produto: string; label: string; size: number; tags: string[] }> }>({
+    queryKey: ["/api/ghl/segmento", baseAtiva],
+    queryFn: () => fetchJson(`/api/ghl/segmento?base=${encodeURIComponent(baseAtiva!)}`),
+    enabled: !!baseAtiva,
+  });
+
   // Insights automáticos (dos dados reais; combinação vencedora depende de padrão).
   const insights = useMemo(() => {
     const r = ranking;
@@ -205,6 +212,36 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
                 {Object.keys(compatibilidadeOfertas(baseAtiva)).length === 0 && <p className="text-xs text-muted-foreground">Sem matriz definida para esta base.</p>}
               </div>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Segmentação por produto da base selecionada */}
+      {baseAtiva && (
+        <Card>
+          <CardHeader className="pb-3">
+            <CardTitle className="text-base">{baseAtiva} — segmentação por produto</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Quem nessa base tem interesse em cada produto (pra disparo segmentado). {seg.data ? `${fmtInt(seg.data.baseTotal)} com algum interesse mapeado.` : ""}
+            </p>
+          </CardHeader>
+          <CardContent>
+            {seg.isLoading ? (
+              <div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="w-4 h-4 animate-spin" /> Calculando segmentos…</div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                {(seg.data?.produtos ?? []).map((p) => (
+                  <div key={p.produto} className="rounded border border-border p-3" title={`Tags: ${p.tags.join(", ")}`}>
+                    <div className="text-2xl font-bold">{fmtInt(p.size)}</div>
+                    <div className="text-sm">{p.label}</div>
+                    <div className="text-[10px] text-muted-foreground truncate mt-1">{p.tags.join(" · ")}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            <p className="text-[11px] text-muted-foreground mt-3">
+              No Funnels, monte o público combinando as tags da base <strong>{baseAtiva}</strong> + a tag do produto acima.
+            </p>
           </CardContent>
         </Card>
       )}
