@@ -1965,6 +1965,8 @@ async function patchPlano(req: Request, res: Response) {
         titulo    = COALESCE(${b.titulo ?? null}, titulo),
         copy_text = COALESCE(${b.copy_text ?? null}, copy_text),
         status    = COALESCE(${b.status ?? null}, status),
+        -- ao editar um slot gerado pela IA, marca como editado pra NÃO ser apagado numa regeneração futura
+        created_by = CASE WHEN created_by = 'auto-IA' THEN 'auto-IA·editado' ELSE created_by END,
         updated_at = NOW()
       WHERE id = ${id}
     `);
@@ -2083,7 +2085,8 @@ function melhorPadraoMatriz(base: string): PadraoKey | undefined {
  *  - datas comerciais do mês (com gancho de copy),
  *  - regras de cadência (1×/semana por base, limite mensal).
  * Gera copy por slot (gerarCopies; degrada pra brief sem créditos) e salva como slots
- * editáveis (created_by='auto-IA'). Re-rodar substitui só os auto-gerados (preserva os manuais).
+ * editáveis (created_by='auto-IA'). Re-rodar substitui só os auto-gerados intactos —
+ * preserva os manuais E os slots da IA que o usuário já editou (created_by='auto-IA·editado').
  */
 async function getPlanoGerarMes(req: Request, res: Response) {
   try {
