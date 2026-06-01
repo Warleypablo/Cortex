@@ -823,7 +823,7 @@ function DiagnosticoTab({ from, to }: { from: string; to: string }) {
             <div>
               <div className="font-medium mb-1">WhatsApp — open rate esperado</div>
               <ul className="text-muted-foreground space-y-0.5 ml-3">
-                <li>Premium (Clientes, Mix da Nata, SMTM): <strong>{BENCHMARKS_TURBO.wpp.premium}%</strong></li>
+                <li>Premium (Clientes): <strong>{BENCHMARKS_TURBO.wpp.premium}%</strong></li>
                 <li>MQLs (Geral, Creators, CRM): <strong>{BENCHMARKS_TURBO.wpp.mql}%</strong></li>
                 <li>Congelados: <strong>{BENCHMARKS_TURBO.wpp.congelados}%</strong></li>
                 <li>Leads 30-100k: <strong>{BENCHMARKS_TURBO.wpp.leads_30_100k}%</strong></li>

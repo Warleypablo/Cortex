@@ -2142,11 +2142,13 @@ async function getPlanoGerarMes(req: Request, res: Response) {
 
     // Pool de bases: melhores do mês anterior primeiro (por reuniões → abertura),
     // depois o RESTANTE do catálogo, pra ter ≥5 bases distintas e preencher seg-sex sem repetir na semana.
-    const ranked = ((perfRes as any).rows ?? []).map((r: any) => ({
-      base: r.base as string,
-      reunioes: r.reunioes as number,
-      padrao: (padraoVencedor.get(r.base) || melhorPadraoMatriz(r.base) || "CONTRASTE") as string,
-    }));
+    const ranked = ((perfRes as any).rows ?? [])
+      .filter((r: any) => BASE_TAG_MAP[r.base]) // só bases que ainda existem no catálogo (ignora bases descontinuadas no histórico)
+      .map((r: any) => ({
+        base: r.base as string,
+        reunioes: r.reunioes as number,
+        padrao: (padraoVencedor.get(r.base) || melhorPadraoMatriz(r.base) || "CONTRASTE") as string,
+      }));
     const jaNoPool = new Set(ranked.map((b: any) => b.base));
     const resto = Object.keys(BASE_TAG_MAP)
       .filter((b) => !jaNoPool.has(b))
