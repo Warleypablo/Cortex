@@ -21,8 +21,11 @@ import { attributeBroadcastReplies } from "../services/broadcastAttribution";
 import { enrichBroadcasts } from "../services/broadcastClassifier";
 import { gerarNarrativaRelatorio } from "../services/broadcastReport";
 import { proximasDatasComerciais, datasComerciaisDoAno } from "@shared/ghl-broadcast/datas-comerciais";
-import { validarCadencia, type DisparoHistorico } from "@shared/ghl-broadcast/regras-calendario";
+import { validarCadencia, limiteMensal, type DisparoHistorico } from "@shared/ghl-broadcast/regras-calendario";
+import { compatibilidadePadroes } from "@shared/ghl-broadcast/matriz-validacao";
+import { PADROES_COPY_LABEL, type PadraoKey } from "@shared/ghl-broadcast/types";
 import { gerarCopies, buscarTopPerformers } from "../services/ghlCopyAi";
+import pLimit from "p-limit";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
 
@@ -2061,6 +2064,187 @@ async function getSegmento(req: Request, res: Response) {
   }
 }
 
+/** Melhor padrão da base pela matriz Turbo (fallback quando não há dado real). */
+function melhorPadraoMatriz(base: string): PadraoKey | undefined {
+  const compat = compatibilidadePadroes(base);
+  const ordem = ["++", "+", "~"];
+  let melhor: { k: string; r: number } | null = null;
+  for (const [k, nivel] of Object.entries(compat)) {
+    const r = ordem.indexOf(nivel as string);
+    if (r >= 0 && (!melhor || r < melhor.r)) melhor = { k, r };
+  }
+  return melhor?.k as PadraoKey | undefined;
+}
+
+/**
+ * POST /api/ghl/plano/gerar-mes  { month?: "YYYY-MM" }
+ * Gera o planejamento do mês inteiro (seg-sex) cruzando:
+ *  - melhores bases + padrões do MÊS ANTERIOR (dados reais),
+ *  - datas comerciais do mês (com gancho de copy),
+ *  - regras de cadência (1×/semana por base, limite mensal).
+ * Gera copy por slot (gerarCopies; degrada pra brief sem créditos) e salva como slots
+ * editáveis (created_by='auto-IA'). Re-rodar substitui só os auto-gerados (preserva os manuais).
+ */
+async function getPlanoGerarMes(req: Request, res: Response) {
+  try {
+    const monthStr = (req.body?.month as string) || "";
+    const m = /^\d{4}-\d{2}$/.test(monthStr) ? monthStr : null;
+    const base0 = m ? new Date(`${m}-01T00:00:00Z`) : new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1);
+    const ano = base0.getUTCFullYear ? base0.getUTCFullYear() : base0.getFullYear();
+    const mes = (base0.getUTCMonth ? base0.getUTCMonth() : base0.getMonth()) + 1;
+    const inicio = new Date(Date.UTC(ano, mes - 1, 1));
+    const fim = new Date(Date.UTC(ano, mes, 0)); // último dia do mês
+
+    // Mês anterior (fonte de aprendizado)
+    const prevFim = new Date(Date.UTC(ano, mes - 1, 0));
+    const prevIni = new Date(Date.UTC(prevFim.getUTCFullYear(), prevFim.getUTCMonth(), 1));
+    try { await enrichBroadcasts({ from: prevIni, to: prevFim }); } catch (e: any) { console.error("[gerar-mes] enrich:", e.message); }
+    try { await attributeBroadcastReplies({ from: prevIni, to: prevFim }); } catch (e: any) { console.error("[gerar-mes] attr:", e.message); }
+
+    // Ranking de bases do mês anterior (reuniões → abertura) + padrão vencedor por base.
+    const perfRes = await db.execute(sql`
+      WITH msg AS (
+        SELECT 'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS broadcast_id,
+          count(*)::int AS total, count(*) FILTER (WHERE status = 'read')::int AS lida
+        FROM cortex_core.ghl_messages
+        WHERE direction = 'outbound' AND source IN ('workflow','bulk_actions','campaign')
+          AND date_added BETWEEN ${prevIni} AND ${prevFim} AND body IS NOT NULL AND body <> ''
+        GROUP BY 1 HAVING count(DISTINCT contact_id) >= 10
+      ),
+      resp AS (
+        SELECT e.broadcast_id, count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes
+        FROM cortex_core.broadcast_lead_events e LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id GROUP BY 1
+      )
+      SELECT bc.base,
+        COALESCE(SUM(resp.reunioes), 0)::int AS reunioes,
+        CASE WHEN SUM(msg.total) > 0 THEN ROUND(100.0 * SUM(msg.lida) / SUM(msg.total), 1) END AS abertura
+      FROM cortex_core.broadcast_classification bc JOIN msg ON msg.broadcast_id = bc.broadcast_id
+      LEFT JOIN resp ON resp.broadcast_id = bc.broadcast_id
+      WHERE bc.base IS NOT NULL
+      GROUP BY bc.base ORDER BY reunioes DESC, abertura DESC NULLS LAST
+    `);
+    const padRes = await db.execute(sql`
+      WITH msg AS (
+        SELECT 'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS broadcast_id,
+          count(*)::int AS total, count(*) FILTER (WHERE status = 'read')::int AS lida
+        FROM cortex_core.ghl_messages
+        WHERE direction = 'outbound' AND source IN ('workflow','bulk_actions','campaign')
+          AND date_added BETWEEN ${prevIni} AND ${prevFim} AND body IS NOT NULL AND body <> ''
+        GROUP BY 1 HAVING count(DISTINCT contact_id) >= 10
+      )
+      SELECT bc.base, bc.padrao, CASE WHEN SUM(msg.total) > 0 THEN 100.0 * SUM(msg.lida) / SUM(msg.total) ELSE 0 END AS abertura
+      FROM cortex_core.broadcast_classification bc JOIN msg ON msg.broadcast_id = bc.broadcast_id
+      WHERE bc.base IS NOT NULL AND bc.padrao IS NOT NULL
+      GROUP BY bc.base, bc.padrao ORDER BY bc.base, abertura DESC
+    `);
+    const padraoVencedor = new Map<string, string>();
+    for (const r of ((padRes as any).rows ?? [])) if (!padraoVencedor.has(r.base)) padraoVencedor.set(r.base, r.padrao);
+
+    // Pool de bases: melhores do mês anterior primeiro (por reuniões → abertura),
+    // depois o RESTANTE do catálogo, pra ter ≥5 bases distintas e preencher seg-sex sem repetir na semana.
+    const ranked = ((perfRes as any).rows ?? []).map((r: any) => ({
+      base: r.base as string,
+      reunioes: r.reunioes as number,
+      padrao: (padraoVencedor.get(r.base) || melhorPadraoMatriz(r.base) || "CONTRASTE") as string,
+    }));
+    const jaNoPool = new Set(ranked.map((b: any) => b.base));
+    const resto = Object.keys(BASE_TAG_MAP)
+      .filter((b) => !jaNoPool.has(b))
+      .map((b) => ({ base: b, reunioes: 0, padrao: (padraoVencedor.get(b) || melhorPadraoMatriz(b) || "CONTRASTE") as string }));
+    const pool = [...ranked, ...resto];
+    const temHistorico = ranked.length > 0;
+    if (pool.length === 0) {
+      return res.status(200).json({ ok: false, motivo: "Sem catálogo de bases disponível.", criados: 0 });
+    }
+
+    // Dias úteis (seg-sex) do mês alvo
+    const dias: string[] = [];
+    for (let d = new Date(inicio); d <= fim; d.setUTCDate(d.getUTCDate() + 1)) {
+      const wd = d.getUTCDay();
+      if (wd >= 1 && wd <= 5) dias.push(d.toISOString().slice(0, 10));
+    }
+
+    // Datas comerciais do mês → casa cada uma num dia útil (na data ou no útil anterior)
+    const datasMes = datasComerciaisDoAno(ano).filter((dc) => dc.data.slice(0, 7) === `${ano}-${String(mes).padStart(2, "0")}`);
+    const sazonalPorDia = new Map<string, { nome: string; gancho?: string }>();
+    for (const dc of datasMes) {
+      let alvo = dias.includes(dc.data) ? dc.data : [...dias].reverse().find((x) => x <= dc.data) ?? dias.find((x) => x >= dc.data);
+      if (alvo && !sazonalPorDia.has(alvo)) sazonalPorDia.set(alvo, { nome: dc.nome, gancho: dc.gancho || dc.dica });
+    }
+
+    // Cronograma: seg-sex preenchido, rodízio pelo pool inteiro (cursor persistente, prioriza top),
+    // REGRA DURA: nenhuma base repete na mesma semana ISO. Limite mensal é teto suave (relaxa antes de deixar dia vazio).
+    const mondayOf = (s: string) => {
+      const d = new Date(`${s}T00:00:00Z`);
+      d.setUTCDate(d.getUTCDate() - ((d.getUTCDay() + 6) % 7)); // recua até a segunda-feira
+      return d.toISOString().slice(0, 10);
+    };
+    const monthCount = new Map<string, number>();
+    interface Slot { plan_date: string; base: string; padrao: string; objetivo: string; titulo: string; gancho?: string; seasonal: boolean }
+    const slots: Slot[] = [];
+    let cursor = 0;
+    let semanaAtual = "";
+    let usadasNaSemana = new Set<string>();
+    for (const dia of dias) {
+      const semana = mondayOf(dia);
+      if (semana !== semanaAtual) { semanaAtual = semana; usadasNaSemana = new Set(); }
+      let escolhida: { base: string; padrao: string } | undefined;
+      // 1ª passada respeita limite mensal; 2ª ignora pra não deixar dia útil vazio.
+      for (let relaxar = 0; relaxar < 2 && !escolhida; relaxar++) {
+        for (let i = 0; i < pool.length; i++) {
+          const cand = pool[(cursor + i) % pool.length];
+          if (usadasNaSemana.has(cand.base)) continue; // nunca a mesma base 2× na semana
+          if (!relaxar && (monthCount.get(cand.base) ?? 0) >= limiteMensal(cand.base)) continue;
+          escolhida = cand; cursor = (cursor + i + 1) % pool.length; break;
+        }
+      }
+      if (!escolhida) continue; // só se a semana já consumiu todas as bases do pool (impossível com 18)
+      usadasNaSemana.add(escolhida.base);
+      monthCount.set(escolhida.base, (monthCount.get(escolhida.base) ?? 0) + 1);
+      const sz = sazonalPorDia.get(dia);
+      if (sz) {
+        slots.push({ plan_date: dia, base: escolhida.base, padrao: "URGENCIA_SAZONAL", objetivo: "Agendar reunião", titulo: sz.nome, gancho: sz.gancho, seasonal: true });
+      } else {
+        slots.push({ plan_date: dia, base: escolhida.base, padrao: escolhida.padrao, objetivo: "Agendar reunião", titulo: `${escolhida.base} · ${PADROES_COPY_LABEL[escolhida.padrao as PadraoKey] ?? escolhida.padrao}`, seasonal: false });
+      }
+    }
+
+    // Gera copy por slot (concorrência limitada; degrada pra brief se a IA falhar/sem créditos)
+    const tops = await buscarTopPerformers(5).catch(() => []);
+    const limit = pLimit(4);
+    await Promise.all(slots.map((s) => limit(async () => {
+      try {
+        const { variacoes } = await gerarCopies({
+          objetivo: s.objetivo, base: s.base, tom: "Direto e consultivo", tamanho: "Curto (WhatsApp)",
+          padraoAlvo: s.padrao, contexto: s.gancho, topPerformers: tops,
+        });
+        const v = variacoes?.[0];
+        if (v?.copy) { (s as any).copy = v.copy; if (v.titulo && !s.seasonal) s.titulo = v.titulo; }
+      } catch { /* sem créditos → brief */ }
+    })));
+
+    // Persiste: remove os auto-gerados anteriores do mês e insere os novos (preserva manuais)
+    await db.execute(sql`
+      DELETE FROM cortex_core.broadcast_plan
+      WHERE created_by = 'auto-IA' AND plan_date BETWEEN ${inicio.toISOString().slice(0, 10)}::date AND ${fim.toISOString().slice(0, 10)}::date
+    `);
+    let criados = 0;
+    for (const s of slots) {
+      const copyText = (s as any).copy ?? (s.gancho ? `⚠ gerar copy — Gancho: ${s.gancho}` : `⚠ gerar copy — base ${s.base} · padrão ${s.padrao}`);
+      await db.execute(sql`
+        INSERT INTO cortex_core.broadcast_plan (plan_date, canal, base, objetivo, padrao, titulo, copy_text, status, created_by, created_at, updated_at)
+        VALUES (${s.plan_date}::date, 'WhatsApp', ${s.base}, ${s.objetivo}, ${s.padrao}, ${s.titulo}, ${copyText}, 'pronta', 'auto-IA', NOW(), NOW())
+      `);
+      criados++;
+    }
+    const comCopy = slots.filter((s) => (s as any).copy).length;
+    res.json({ ok: true, mes: `${ano}-${String(mes).padStart(2, "0")}`, criados, dias_uteis: dias.length, com_copy: comCopy, sazonais: slots.filter((s) => s.seasonal).length, sem_credito: criados - comCopy, sem_historico: !temHistorico });
+  } catch (err: any) {
+    console.error("[GHL] getPlanoGerarMes error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────
 
 export function registerGhlPublicRoutes(app: Express) {
@@ -2088,6 +2272,7 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/plano", getPlano);
   app.post("/api/ghl/plano", postPlano);
   app.post("/api/ghl/plano/gerar-copy", postGerarCopyPlano);
+  app.post("/api/ghl/plano/gerar-mes", getPlanoGerarMes);
   app.patch("/api/ghl/plano/:id", patchPlano);
   app.delete("/api/ghl/plano/:id", deletePlano);
   app.get("/api/ghl/broadcasts/:id", getBroadcastDetail);
