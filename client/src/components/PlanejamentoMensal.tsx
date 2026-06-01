@@ -54,6 +54,8 @@ export default function PlanejamentoMensal() {
   const [variacoes, setVariacoes] = useState<Array<{ titulo: string; padrao: string; copy: string }>>([]);
   const [gerando, setGerando] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [gerandoMes, setGerandoMes] = useState(false);
+  const [msgMes, setMsgMes] = useState<string | null>(null);
 
   const from = format(startOfMonth(ref), "yyyy-MM-dd");
   const to = format(endOfMonth(ref), "yyyy-MM-dd");
@@ -108,6 +110,19 @@ export default function PlanejamentoMensal() {
     finally { setGerando(false); }
   }
 
+  async function gerarMes() {
+    const mesLabel = format(ref, "MMMM yyyy", { locale: ptBR });
+    if (!confirm(`Gerar o planejamento de ${mesLabel}?\n\nIsso cria disparos seg-sex baseados nas melhores bases/padrões do mês anterior + datas comerciais. Substitui apenas os gerados automaticamente (seus disparos manuais são preservados).`)) return;
+    setGerandoMes(true); setMsgMes(null);
+    try {
+      const r = await jsonReq("/api/ghl/plano/gerar-mes", "POST", { month: format(ref, "yyyy-MM") });
+      if (r.ok === false) setMsgMes(r.motivo || "Sem dados suficientes pra gerar.");
+      else setMsgMes(`✓ ${r.criados}/${r.dias_uteis} dias úteis preenchidos (${r.com_copy} com copy, ${r.sazonais} em datas comerciais${r.sem_credito ? `, ${r.sem_credito} aguardando créditos Claude` : ""}).${r.sem_historico ? " Sem histórico do mês anterior — baseado na matriz Turbo." : ""}`);
+      refetch();
+    } catch (e: any) { setMsgMes("Erro ao gerar o planejamento."); }
+    finally { setGerandoMes(false); }
+  }
+
   return (
     <div className="space-y-4">
       {/* Navegação de mês */}
@@ -117,10 +132,17 @@ export default function PlanejamentoMensal() {
         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setRef((r) => addMonths(r, 1))}><ChevronRight className="w-4 h-4" /></Button>
         {q.isLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
         <div className="flex-1" />
+        <Button size="sm" variant="outline" onClick={gerarMes} disabled={gerandoMes} title="Gera o mês inteiro com IA: melhores bases/padrões do mês anterior + datas comerciais + cadência">
+          {gerandoMes ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />} Gerar planejamento do mês (IA)
+        </Button>
         <Button size="sm" onClick={() => { setEditing(novoSlot(format(startOfMonth(ref), "yyyy-MM-dd"))); setVariacoes([]); }}>
           <Plus className="w-4 h-4 mr-1" /> Novo disparo
         </Button>
       </div>
+
+      {msgMes && (
+        <div className="text-xs rounded border border-border bg-muted/30 px-3 py-2 text-muted-foreground">{msgMes}</div>
+      )}
 
       {/* Grade do mês */}
       <div className="grid grid-cols-7 gap-1.5">
