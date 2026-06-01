@@ -149,19 +149,6 @@ const FAT_0_A_30K = ["[faturamento]_0_30k"];
 const FAT_50K_MAIS = [...FAT_50K_A_100K, ...FAT_100K_A_500K, ...FAT_500K_MAIS];
 
 export const BASE_TAG_MAP: Record<string, BaseFiltro> = {
-  // ── Premium / MQL ─────────────────────────────────────────────────────
-  "Mix da Nata": {
-    tagsAll: ["[status]_mql"],
-    tagsAny: FAT_500K_MAIS,
-  },
-  "Show me the money": {
-    tagsAll: ["[status]_mql"],
-    tagsAny: FAT_100K_A_500K,
-  },
-  "Show me the money expandido": {
-    tagsAll: ["[status]_mql"],
-    tagsAny: FAT_50K_MAIS,
-  },
   Clientes: {
     tagsAny: ["[status]_cliente"],
   },
