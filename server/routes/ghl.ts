@@ -13,7 +13,7 @@
 
 import type { Express, Request, Response } from "express";
 import { sql, type SQL } from "drizzle-orm";
-import { db } from "../db";
+import { db, pool } from "../db";
 import { BASE_TAG_MAP, contatoSatisfazBase, expandLegacyAliases, getBaseFiltroComAliases, type BaseFiltro } from "@shared/ghl-broadcast/base-tag-map";
 import { PRODUTO_TAGS, PRODUTOS_DISPONIVEIS, contatoTemProduto } from "@shared/ghl-broadcast/produtos";
 import { analisarCopy, gerarCopies, buscarTopPerformers } from "../services/ghlCopyAi";
@@ -24,7 +24,6 @@ import { proximasDatasComerciais, datasComerciaisDoAno } from "@shared/ghl-broad
 import { validarCadencia, limiteMensal, type DisparoHistorico } from "@shared/ghl-broadcast/regras-calendario";
 import { compatibilidadePadroes } from "@shared/ghl-broadcast/matriz-validacao";
 import { PADROES_COPY_LABEL, type PadraoKey } from "@shared/ghl-broadcast/types";
-import { gerarCopies, buscarTopPerformers } from "../services/ghlCopyAi";
 import pLimit from "p-limit";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────
