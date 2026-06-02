@@ -220,9 +220,10 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           SELECT id_task,
             BOOL_OR(is_ativo) AS ativo,
             SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv_total,
-            CASE WHEN BOOL_OR(is_ativo) THEN (CURRENT_DATE - MIN(data_inicio))::numeric / 30.44
-                 WHEN MAX(data_fim) FILTER (WHERE NOT data_inconsistente) >= MIN(data_inicio)
-                   THEN (MAX(data_fim) FILTER (WHERE NOT data_inconsistente) - MIN(data_inicio))::numeric / 30.44
+            -- LT do cliente = span SO dos contratos recorrentes (consistente com a tela de contratos)
+            CASE WHEN BOOL_OR(is_ativo) FILTER (WHERE tipo_receita='recorrente') THEN (CURRENT_DATE - MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente'))::numeric / 30.44
+                 WHEN MAX(data_fim) FILTER (WHERE tipo_receita='recorrente' AND NOT data_inconsistente) >= MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente')
+                   THEN (MAX(data_fim) FILTER (WHERE tipo_receita='recorrente' AND NOT data_inconsistente) - MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente'))::numeric / 30.44
                  ELSE NULL END AS lt_meses
           FROM cortex_core.vw_lt_contratos
           WHERE data_inicio IS NOT NULL
@@ -283,9 +284,9 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
         SELECT id_task,
           BOOL_OR(is_ativo) AS ativo,
           SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv,
-          CASE WHEN BOOL_OR(is_ativo) THEN (CURRENT_DATE - MIN(data_inicio))::numeric/30.44
-               WHEN MAX(data_fim) FILTER (WHERE NOT data_inconsistente) >= MIN(data_inicio)
-                 THEN (MAX(data_fim) FILTER (WHERE NOT data_inconsistente) - MIN(data_inicio))::numeric/30.44
+          CASE WHEN BOOL_OR(is_ativo) FILTER (WHERE tipo_receita='recorrente') THEN (CURRENT_DATE - MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente'))::numeric/30.44
+               WHEN MAX(data_fim) FILTER (WHERE tipo_receita='recorrente' AND NOT data_inconsistente) >= MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente')
+                 THEN (MAX(data_fim) FILTER (WHERE tipo_receita='recorrente' AND NOT data_inconsistente) - MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente'))::numeric/30.44
                ELSE NULL END AS lt
         FROM cortex_core.vw_lt_contratos
         WHERE data_inicio IS NOT NULL
@@ -338,10 +339,10 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           ROUND(SUM(COALESCE(valorp,0))::numeric, 0) AS ltv_pontual,
           ROUND((SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)))::numeric, 0) AS ltv_total,
           CASE
-            WHEN BOOL_OR(is_ativo)
-              THEN ROUND((CURRENT_DATE - MIN(data_inicio))::numeric / 30.44, 1)
-            WHEN MAX(data_fim) FILTER (WHERE NOT data_inconsistente) >= MIN(data_inicio)
-              THEN ROUND((MAX(data_fim) FILTER (WHERE NOT data_inconsistente) - MIN(data_inicio))::numeric / 30.44, 1)
+            WHEN BOOL_OR(is_ativo) FILTER (WHERE tipo_receita='recorrente')
+              THEN ROUND((CURRENT_DATE - MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente'))::numeric / 30.44, 1)
+            WHEN MAX(data_fim) FILTER (WHERE tipo_receita='recorrente' AND NOT data_inconsistente) >= MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente')
+              THEN ROUND((MAX(data_fim) FILTER (WHERE tipo_receita='recorrente' AND NOT data_inconsistente) - MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente'))::numeric / 30.44, 1)
             ELSE NULL
           END AS lt_meses,
           BOOL_OR(is_ativo) AS ativo
