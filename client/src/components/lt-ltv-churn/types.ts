@@ -44,11 +44,9 @@ export interface ContratoRow {
 
 export interface OverviewClientesData {
   totalClientes: number;
-  clientesAtivos: number;
-  clientesCancelados: number;
   ltvMedioCliente: number;
-  ltMedioClienteAtivo: number;
-  ltMedioClienteCancelado: number;
+  ltMedioCliente: number;
+  ltvTotalClientes: number;
 }
 
 export interface ClienteRow {

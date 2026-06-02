@@ -95,15 +95,13 @@ describe("GET /api/lt-ltv-churn/contratos", () => {
 describe("GET /api/lt-ltv-churn/overview-clientes", () => {
   it("retorna KPIs agregados por cliente", async () => {
     mockExecute.mockResolvedValueOnce({
-      rows: [{
-        total_clientes: 1387, clientes_ativos: 350, clientes_cancelados: 1037,
-        ltv_medio_cliente: 15296, lt_medio_ativo: 5.7, lt_medio_cancelado: 4.9,
-      }],
+      rows: [{ total_clientes: 1387, ltv_medio_cliente: 15296, lt_medio_cliente: 5.2, ltv_total_clientes: 21215000 }],
     });
     const res = await request(makeApp()).get("/api/lt-ltv-churn/overview-clientes");
     expect(res.status).toBe(200);
     expect(res.body.totalClientes).toBe(1387);
-    expect(res.body.clientesAtivos).toBe(350);
+    expect(res.body.ltvMedioCliente).toBe(15296);
+    expect(res.body.ltMedioCliente).toBe(5.2);
   });
 });
 

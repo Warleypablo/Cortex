@@ -11,14 +11,16 @@ import type { OverviewClientesData, ProdutoBenchmark } from "@/components/lt-ltv
 export default function LtvClientes() {
   useSetPageInfo("LTV por Cliente", "Lifetime value e retenção por cliente");
   const [produto, setProduto] = useState<string>("todos");
+  const [situacao, setSituacao] = useState<"todos" | "ativo" | "cancelado">("todos");
 
   const produtoParam = produto === "todos" ? undefined : produto;
+  const statusParam = situacao === "todos" ? undefined : situacao;
 
   const { data: overview } = useQuery({
-    queryKey: ["/api/lt-ltv-churn/overview-clientes", produto],
+    queryKey: ["/api/lt-ltv-churn/overview-clientes", produto, situacao],
     queryFn: () =>
       fetchJson<OverviewClientesData>(
-        buildUrl("/api/lt-ltv-churn/overview-clientes", { produto: produtoParam })
+        buildUrl("/api/lt-ltv-churn/overview-clientes", { produto: produtoParam, status: statusParam })
       ),
   });
 
@@ -32,7 +34,18 @@ export default function LtvClientes() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-2">
+        <Select value={situacao} onValueChange={(v) => setSituacao(v as "todos" | "ativo" | "cancelado")}>
+          <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+            <SelectValue placeholder="Situação" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Ativos e cancelados</SelectItem>
+            <SelectItem value="ativo">Apenas ativos</SelectItem>
+            <SelectItem value="cancelado">Apenas cancelados</SelectItem>
+          </SelectContent>
+        </Select>
+
         <Select value={produto} onValueChange={setProduto}>
           <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
             <SelectValue placeholder="Produto" />
@@ -53,8 +66,8 @@ export default function LtvClientes() {
       ) : (
         <OverviewClientesCards data={overview} />
       )}
-      <DistClientesCharts produto={produtoParam} />
-      <ClientesTable produto={produtoParam} />
+      <DistClientesCharts produto={produtoParam} status={statusParam} />
+      <ClientesTable produto={produtoParam} status={statusParam} />
     </div>
   );
 }
