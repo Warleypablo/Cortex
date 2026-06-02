@@ -21,6 +21,9 @@ export function ChurnMensalChart({ serie }: { serie: ChurnMensalPonto[] }) {
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
       <CardHeader>
         <CardTitle className="text-base">Revenue churn mensal (%)</CardTitle>
+        <p className="text-xs text-gray-500 dark:text-zinc-400">
+          Toda a operação · MRR do snapshot diário ÷ churn ajustado (exclui abonados e meses incompletos)
+        </p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={260}>

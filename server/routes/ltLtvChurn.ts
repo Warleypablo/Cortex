@@ -93,7 +93,9 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
   app.get("/api/lt-ltv-churn/churn-mensal", async (req, res) => {
     try {
       const meses = Math.min(Math.max(parseInt(req.query.meses as string) || 8, 1), 24);
-      const produto = (req.query.produto as string) || undefined;
+      // Sem filtro de produto: cup_data_hist e vw_cup_churn_ajustado usam taxonomias de
+      // produto incompativeis (nomes limpos vs compostos com ';'), entao o revenue churn
+      // mensal e sempre da OPERACAO INTEIRA (geral), como o benchmark.
 
       // MRR do inicio do mes vem do SNAPSHOT diario (cup_data_hist) — dado historico real,
       // nao reconstruido por datas. Churn vem da view curada vw_cup_churn_ajustado (por
@@ -118,7 +120,6 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
             ROUND(SUM(h.valorr) FILTER (WHERE h.status IN ('ativo','onboarding','triagem'))::numeric, 0) AS mrr
           FROM snap_ref sr
           JOIN "Clickup".cup_data_hist h ON h.data_snapshot = sr.snap
-          WHERE 1=1 ${produto ? sql`AND h.produto = ${produto}` : sql``}
           GROUP BY sr.m
         ),
         churn AS (
@@ -128,7 +129,6 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           WHERE valor_r > 0
             AND COALESCE(abonar_churn,'') != 'Sim'
             AND COALESCE(motivo_cancelamento,'') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
-            ${produto ? sql`AND produto = ${produto}` : sql``}
           GROUP BY 1
         )
         SELECT to_char(mi.m,'YYYY-MM') AS mes,
