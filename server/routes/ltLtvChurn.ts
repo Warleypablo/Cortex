@@ -11,6 +11,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
 
       const kpis = await db.execute(sql`
         SELECT
+          -- status='ativo' = MRR realizado; is_ativo = todos nao-churnados (LT em curso)
           ROUND(SUM(valorr) FILTER (WHERE status='ativo')::numeric, 0) AS mrr_ativo,
           ROUND(AVG(lt_meses) FILTER (WHERE tipo_receita='recorrente' AND is_ativo), 1) AS lt_medio_ativo,
           ROUND(AVG(lt_meses) FILTER (WHERE tipo_receita='recorrente' AND is_churned AND NOT data_inconsistente), 1) AS lt_medio_cancelado,
@@ -27,6 +28,9 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           SELECT id_task,
             SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv_total
           FROM cortex_core.vw_lt_contratos
+          WHERE 1=1
+            ${produto ? sql`AND produto = ${produto}` : sql``}
+            ${squad ? sql`AND squad = ${squad}` : sql``}
           GROUP BY id_task
         ) t
       `);
@@ -52,6 +56,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       const rows = (await db.execute(sql`
         SELECT
           produto,
+          -- status='ativo' = MRR realizado; is_ativo = todos nao-churnados (LT em curso)
           COUNT(*) FILTER (WHERE status='ativo') AS n_ativos,
           COUNT(*) FILTER (WHERE is_churned) AS n_cancelados,
           ROUND(AVG(lt_meses) FILTER (WHERE is_churned AND NOT data_inconsistente), 1) AS lt_medio_cancelado,
@@ -92,7 +97,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       const squad = (req.query.squad as string) || undefined;
 
       const rows = (await db.execute(sql`
-        WITH meses AS (
+        WITH serie_meses AS (
           SELECT generate_series(
             date_trunc('month', CURRENT_DATE) - (${meses - 1} || ' months')::interval,
             date_trunc('month', CURRENT_DATE), '1 month')::date AS m
@@ -104,13 +109,13 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
             ${produto ? sql`AND produto = ${produto}` : sql``}
             ${squad ? sql`AND squad = ${squad}` : sql``}
         )
-        SELECT to_char(meses.m,'YYYY-MM') AS mes,
-          ROUND(SUM(rec.valorr) FILTER (WHERE rec.data_inicio < meses.m AND (rec.data_fim IS NULL OR rec.data_fim >= meses.m))::numeric, 0) AS mrr_ativo_inicio,
-          ROUND(SUM(rec.valorr) FILTER (WHERE rec.is_churned AND rec.data_fim >= meses.m AND rec.data_fim < meses.m + interval '1 month')::numeric, 0) AS mrr_perdido,
-          ROUND((SUM(rec.valorr) FILTER (WHERE rec.is_churned AND rec.data_fim >= meses.m AND rec.data_fim < meses.m + interval '1 month')
-                / NULLIF(SUM(rec.valorr) FILTER (WHERE rec.data_inicio < meses.m AND (rec.data_fim IS NULL OR rec.data_fim >= meses.m)),0) * 100)::numeric, 1) AS rev_churn_pct
-        FROM meses CROSS JOIN rec
-        GROUP BY meses.m ORDER BY meses.m
+        SELECT to_char(serie_meses.m,'YYYY-MM') AS mes,
+          ROUND(SUM(rec.valorr) FILTER (WHERE rec.data_inicio < serie_meses.m AND (rec.data_fim IS NULL OR rec.data_fim >= serie_meses.m))::numeric, 0) AS mrr_ativo_inicio,
+          ROUND(SUM(rec.valorr) FILTER (WHERE rec.is_churned AND rec.data_fim >= serie_meses.m AND rec.data_fim < serie_meses.m + interval '1 month')::numeric, 0) AS mrr_perdido,
+          ROUND((SUM(rec.valorr) FILTER (WHERE rec.is_churned AND rec.data_fim >= serie_meses.m AND rec.data_fim < serie_meses.m + interval '1 month')
+                / NULLIF(SUM(rec.valorr) FILTER (WHERE rec.data_inicio < serie_meses.m AND (rec.data_fim IS NULL OR rec.data_fim >= serie_meses.m)),0) * 100)::numeric, 1) AS rev_churn_pct
+        FROM serie_meses CROSS JOIN rec
+        GROUP BY serie_meses.m ORDER BY serie_meses.m
       `)).rows;
 
       res.json({
@@ -175,6 +180,8 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
   app.get("/api/lt-ltv-churn/clientes", async (req, res) => {
     try {
       const apenas = (req.query.status as string) || undefined; // 'ativo' | 'cancelado'
+      const produto = (req.query.produto as string) || undefined;
+      const squad = (req.query.squad as string) || undefined;
       const page = Math.max(parseInt(req.query.page as string) || 1, 1);
       const pageSize = 50;
       const offset = (page - 1) * pageSize;
@@ -195,6 +202,8 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           BOOL_OR(is_ativo) AS ativo
         FROM cortex_core.vw_lt_contratos
         WHERE data_inicio IS NOT NULL
+          ${produto ? sql`AND produto = ${produto}` : sql``}
+          ${squad ? sql`AND squad = ${squad}` : sql``}
         GROUP BY id_task ${havingClause}`;
 
       const totalRes = await db.execute(sql`SELECT COUNT(*) AS total FROM (${baseAgg}) t`);
