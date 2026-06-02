@@ -51,6 +51,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsColaboradoresRestrito } from "@/hooks/useIsColaboradoresRestrito";
 
 // Map old nivel format (with "X " prefix) to new format (without prefix)
 function mapNivelToNew(nivel: string | null): string {
@@ -344,16 +345,17 @@ const addPromocaoSchema = z.object({
 
 type AddPromocaoForm = z.infer<typeof addPromocaoSchema>;
 
-function AddPromocaoDialog({ 
-  colaborador, 
-  open, 
-  onOpenChange 
-}: { 
-  colaborador: ColaboradorDetail; 
-  open: boolean; 
-  onOpenChange: (open: boolean) => void 
+function AddPromocaoDialog({
+  colaborador,
+  open,
+  onOpenChange
+}: {
+  colaborador: ColaboradorDetail;
+  open: boolean;
+  onOpenChange: (open: boolean) => void
 }) {
   const { toast } = useToast();
+  const isRestrito = useIsColaboradoresRestrito();
 
   const { data: cargos = [] } = useQuery<CargoOption[]>({
     queryKey: ["/api/rh/cargos"],
@@ -452,6 +454,7 @@ function AddPromocaoDialog({
               )}
             />
 
+            {!isRestrito && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -460,12 +463,12 @@ function AddPromocaoDialog({
                   <FormItem>
                     <FormLabel>Salário Anterior</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0.00" 
-                        {...field} 
-                        data-testid="input-promocao-salario-anterior" 
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-promocao-salario-anterior"
                       />
                     </FormControl>
                     <FormMessage />
@@ -479,12 +482,12 @@ function AddPromocaoDialog({
                   <FormItem>
                     <FormLabel>Salário Novo</FormLabel>
                     <FormControl>
-                      <Input 
-                        type="number" 
-                        step="0.01" 
-                        placeholder="0.00" 
-                        {...field} 
-                        data-testid="input-promocao-salario-novo" 
+                      <Input
+                        type="number"
+                        step="0.01"
+                        placeholder="0.00"
+                        {...field}
+                        data-testid="input-promocao-salario-novo"
                       />
                     </FormControl>
                     <FormMessage />
@@ -492,6 +495,7 @@ function AddPromocaoDialog({
                 )}
               />
             </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
@@ -3860,6 +3864,7 @@ interface PagamentoCazItem {
 // Card compacto de Financeiro para a aba de Informações
 function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string; colaborador: Colaborador }) {
   const { toast } = useToast();
+  const isRestrito = useIsColaboradoresRestrito();
   const [uploadDialogOpen, setUploadDialogOpen] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [selectedMonth, setSelectedMonth] = useState<number>(new Date().getMonth() + 1);
@@ -4074,12 +4079,14 @@ function FinanceiroCard({ colaboradorId, colaborador }: { colaboradorId: string;
 
       {/* Resumo financeiro */}
       <div className="grid grid-cols-2 gap-3 mb-4">
+        {!isRestrito && (
         <div className="p-3 rounded-lg bg-muted/50">
           <p className="text-xs text-muted-foreground mb-1">Salário Atual</p>
           <p className="text-base font-bold text-green-600 dark:text-green-400">
             {colaborador.salario ? `R$ ${parseFloat(colaborador.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
           </p>
         </div>
+        )}
         <div className="p-3 rounded-lg bg-muted/50">
           <p className="text-xs text-muted-foreground mb-1">NFs Enviadas</p>
           <p className="text-base font-bold">
@@ -5672,6 +5679,7 @@ export default function DetailColaborador() {
   usePageTitle("Detalhes do Colaborador");
   const { setPageInfo } = usePageInfo();
   const { user } = useAuth();
+  const isRestrito = useIsColaboradoresRestrito();
   const [, params] = useRoute("/colaborador/:id");
   const [, perfilParams] = useRoute("/meu-perfil/:id");
   const colaboradorId = params?.id || perfilParams?.id || "";
@@ -5937,13 +5945,15 @@ export default function DetailColaborador() {
             iconBgColor="bg-teal-100 dark:bg-teal-900/30"
             iconColor="text-teal-600 dark:text-teal-400"
           />
-          <InfoCard 
-            icon={DollarSign} 
-            label="Salário" 
+          {!isRestrito && (
+          <InfoCard
+            icon={DollarSign}
+            label="Salário"
             value={colaborador.salario ? `R$ ${Math.floor(parseFloat(colaborador.salario)).toLocaleString('pt-BR')}` : null}
             iconBgColor="bg-emerald-100 dark:bg-emerald-900/30"
             iconColor="text-emerald-600 dark:text-emerald-400"
           />
+          )}
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
@@ -6099,6 +6109,7 @@ export default function DetailColaborador() {
                 </div>
               )}
               <div className="grid grid-cols-3 gap-4 pb-4 border-b border-border/50">
+                {!isRestrito && (
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Salário</p>
                   <p className="font-semibold flex items-center gap-2 text-green-600 dark:text-green-400" data-testid="text-prof-salario">
@@ -6106,6 +6117,7 @@ export default function DetailColaborador() {
                     {colaborador.salario ? `R$ ${parseFloat(colaborador.salario).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}` : "-"}
                   </p>
                 </div>
+                )}
                 <div>
                   <p className="text-xs text-muted-foreground uppercase tracking-wide mb-1">Último Aumento</p>
                   <p className="font-semibold flex items-center gap-2 text-foreground" data-testid="text-prof-ultimo-aumento">
