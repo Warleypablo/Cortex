@@ -4,11 +4,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { OverviewCards } from "@/components/lt-ltv-churn/OverviewCards";
 import { BenchmarkProduto } from "@/components/lt-ltv-churn/BenchmarkProduto";
-import { ChurnMensalChart } from "@/components/lt-ltv-churn/ChurnMensalChart";
+import { LtLtvPorProduto } from "@/components/lt-ltv-churn/LtLtvPorProduto";
 import { ContratosTable } from "@/components/lt-ltv-churn/ContratosTable";
 import { DistLtContratos } from "@/components/lt-ltv-churn/DistLtContratos";
 import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
-import type { OverviewData, ProdutoBenchmark, ChurnMensalPonto } from "@/components/lt-ltv-churn/types";
+import type { OverviewData, ProdutoBenchmark } from "@/components/lt-ltv-churn/types";
 
 export default function LtLtvChurn() {
   useSetPageInfo("LT, LTV & Churn", "Lifetime, valor e churn por contrato e cliente");
@@ -26,14 +26,6 @@ export default function LtLtvChurn() {
     queryKey: ["/api/lt-ltv-churn/benchmark"],
     queryFn: () =>
       fetchJson<{ produtos: ProdutoBenchmark[] }>("/api/lt-ltv-churn/benchmark"),
-  });
-
-  const { data: churn } = useQuery({
-    queryKey: ["/api/lt-ltv-churn/churn-mensal"],
-    queryFn: () =>
-      fetchJson<{ serie: ChurnMensalPonto[] }>(
-        buildUrl("/api/lt-ltv-churn/churn-mensal", { meses: "8" })
-      ),
   });
 
   const produtos = benchmark?.produtos.map((p) => p.produto).filter(Boolean) ?? [];
@@ -61,15 +53,13 @@ export default function LtLtvChurn() {
       ) : (
         <OverviewCards data={overview} />
       )}
-      {!churn ? (
-        <div className="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
-      ) : (
-        <ChurnMensalChart serie={churn.serie} />
-      )}
       {!benchmark ? (
         <div className="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
       ) : (
-        <BenchmarkProduto produtos={benchmark.produtos} />
+        <>
+          <LtLtvPorProduto produtos={benchmark.produtos} />
+          <BenchmarkProduto produtos={benchmark.produtos} />
+        </>
       )}
       <DistLtContratos produto={produtoParam} />
       <ContratosTable produto={produtoParam} />
