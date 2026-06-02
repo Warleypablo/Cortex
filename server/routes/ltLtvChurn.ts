@@ -177,6 +177,47 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
     }
   });
 
+  app.get("/api/lt-ltv-churn/overview-clientes", async (req, res) => {
+    try {
+      const produto = (req.query.produto as string) || undefined;
+      const r = (await db.execute(sql`
+        SELECT
+          COUNT(*) AS total_clientes,
+          COUNT(*) FILTER (WHERE ativo) AS clientes_ativos,
+          COUNT(*) FILTER (WHERE NOT ativo) AS clientes_cancelados,
+          ROUND(AVG(ltv_total)::numeric, 0) AS ltv_medio_cliente,
+          ROUND(AVG(lt_meses) FILTER (WHERE ativo)::numeric, 1) AS lt_medio_ativo,
+          ROUND(AVG(lt_meses) FILTER (WHERE NOT ativo)::numeric, 1) AS lt_medio_cancelado
+        FROM (
+          SELECT id_task,
+            BOOL_OR(is_ativo) AS ativo,
+            SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv_total,
+            CASE
+              WHEN BOOL_OR(is_ativo) THEN (CURRENT_DATE - MIN(data_inicio))::numeric / 30.44
+              WHEN MAX(data_fim) FILTER (WHERE NOT data_inconsistente) >= MIN(data_inicio)
+                THEN (MAX(data_fim) FILTER (WHERE NOT data_inconsistente) - MIN(data_inicio))::numeric / 30.44
+              ELSE NULL
+            END AS lt_meses
+          FROM cortex_core.vw_lt_contratos
+          WHERE data_inicio IS NOT NULL
+            ${produto ? sql`AND produto = ${produto}` : sql``}
+          GROUP BY id_task
+        ) cli
+      `)).rows[0] || {};
+      res.json({
+        totalClientes: Number(r.total_clientes) || 0,
+        clientesAtivos: Number(r.clientes_ativos) || 0,
+        clientesCancelados: Number(r.clientes_cancelados) || 0,
+        ltvMedioCliente: Number(r.ltv_medio_cliente) || 0,
+        ltMedioClienteAtivo: Number(r.lt_medio_ativo) || 0,
+        ltMedioClienteCancelado: Number(r.lt_medio_cancelado) || 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching lt-ltv-churn overview-clientes:", error);
+      res.status(500).json({ error: "Failed to fetch overview-clientes" });
+    }
+  });
+
   app.get("/api/lt-ltv-churn/clientes", async (req, res) => {
     try {
       const apenas = (req.query.status as string) || undefined; // 'ativo' | 'cancelado'
