@@ -163,6 +163,7 @@ const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 const LtLtvChurn = lazyWithRetry(() => import("@/pages/LtLtvChurn"));
 const LtvClientes = lazyWithRetry(() => import("@/pages/LtvClientes"));
 const EstoquePontual = lazyWithRetry(() => import("@/pages/EstoquePontual"));
+const CreatorsPontual = lazyWithRetry(() => import("@/pages/CreatorsPontual"));
 
 // Error boundary to catch silent crashes in the portal.
 // The lazyWithRetry wrapper handles the first auto-reload attempt at the
@@ -318,6 +319,7 @@ function ProtectedRouter() {
       <Route path="/lt-ltv-churn">{() => <ProtectedRoute path="/lt-ltv-churn" component={LtLtvChurn} />}</Route>
       <Route path="/ltv-clientes">{() => <ProtectedRoute path="/ltv-clientes" component={LtvClientes} />}</Route>
       <Route path="/estoque-pontual">{() => <ProtectedRoute path="/estoque-pontual" component={EstoquePontual} />}</Route>
+      <Route path="/creators-pontual">{() => <ProtectedRoute path="/creators-pontual" component={CreatorsPontual} />}</Route>
       <Route path="/dashboard/evolucao-mensal">{() => <ProtectedRoute path="/dashboard/evolucao-mensal" component={EvolucaoMensal} />}</Route>
       <Route path="/dashboard/analise-squads">{() => <ProtectedRoute path="/dashboard/analise-squads" component={AnaliseSquads} />}</Route>
       <Route path="/dashboard/saude-base-ativa">{() => <ProtectedRoute path="/dashboard/saude-base-ativa" component={SaudeBaseAtiva} />}</Route>
