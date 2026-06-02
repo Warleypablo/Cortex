@@ -15,16 +15,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-} from "recharts";
-import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import type { ProdutoBenchmark } from "./types";
 
@@ -37,16 +27,7 @@ function pick(p: ProdutoBenchmark, situacao: Situacao) {
 }
 
 export function BenchmarkProduto({ produtos }: { produtos: ProdutoBenchmark[] }) {
-  const { theme } = useTheme();
-  const isDark = theme === "dark";
-  const grid = isDark ? "#27272a" : "#e5e7eb";
-  const axis = isDark ? "#a1a1aa" : "#6b7280";
   const [situacao, setSituacao] = useState<Situacao>("ambos");
-
-  const chartData = produtos.slice(0, 10).map((p) => ({
-    produto: p.produto,
-    ltvMedio: pick(p, situacao).ltv,
-  }));
 
   return (
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
@@ -70,34 +51,7 @@ export function BenchmarkProduto({ produtos }: { produtos: ProdutoBenchmark[] })
           </Select>
         </div>
       </CardHeader>
-      <CardContent className="space-y-6">
-        <ResponsiveContainer width="100%" height={280}>
-          <BarChart data={chartData} margin={{ top: 8, right: 8, left: 8, bottom: 8 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={grid} />
-            <XAxis
-              dataKey="produto"
-              tick={{ fill: axis, fontSize: 11 }}
-              angle={-20}
-              textAnchor="end"
-              height={60}
-            />
-            <YAxis
-              tick={{ fill: axis, fontSize: 11 }}
-              tickFormatter={(v: number) => formatCurrencyNoDecimals(v)}
-            />
-            <Tooltip
-              contentStyle={{
-                backgroundColor: isDark ? "#18181b" : "#ffffff",
-                border: `1px solid ${isDark ? "#3f3f46" : "#e5e7eb"}`,
-                borderRadius: 8,
-                color: isDark ? "#f4f4f5" : "#111827",
-              }}
-              formatter={(v: number) => formatCurrencyNoDecimals(v)}
-            />
-            <Bar dataKey="ltvMedio" fill="#6366f1" radius={[4, 4, 0, 0]} name="LTV médio" />
-          </BarChart>
-        </ResponsiveContainer>
-
+      <CardContent>
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
