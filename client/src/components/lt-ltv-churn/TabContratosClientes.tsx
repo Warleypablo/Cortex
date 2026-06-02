@@ -81,7 +81,7 @@ export function TabContratosClientes({ produto }: { produto?: string }) {
                         <TableCell className="text-right">
                           {formatCurrencyNoDecimals(c.valorr)}
                         </TableCell>
-                        <TableCell className="text-right">{c.ltMeses ?? "—"}</TableCell>
+                        <TableCell className="text-right">{c.ltMeses != null ? Number(c.ltMeses).toFixed(1) : "—"}</TableCell>
                         <TableCell className="text-right">
                           {c.ltvRecorrente != null
                             ? formatCurrencyNoDecimals(c.ltvRecorrente)
@@ -125,7 +125,7 @@ export function TabContratosClientes({ produto }: { produto?: string }) {
                         <TableCell>
                           <Badge variant="outline">{c.ativo ? "Ativo" : "Cancelado"}</Badge>
                         </TableCell>
-                        <TableCell className="text-right">{c.ltMeses}</TableCell>
+                        <TableCell className="text-right">{c.ltMeses != null ? c.ltMeses : "—"}</TableCell>
                         <TableCell className="text-right">
                           {formatCurrencyNoDecimals(c.ltvRecorrente)}
                         </TableCell>

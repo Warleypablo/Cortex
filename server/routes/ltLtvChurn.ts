@@ -13,7 +13,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
         SELECT
           -- status='ativo' = MRR realizado; is_ativo = todos nao-churnados (LT em curso)
           ROUND(SUM(valorr) FILTER (WHERE status='ativo')::numeric, 0) AS mrr_ativo,
-          ROUND(AVG(lt_meses) FILTER (WHERE tipo_receita='recorrente' AND is_ativo), 1) AS lt_medio_ativo,
+          ROUND(AVG(lt_meses) FILTER (WHERE tipo_receita='recorrente' AND is_ativo AND NOT data_inconsistente), 1) AS lt_medio_ativo,
           ROUND(AVG(lt_meses) FILTER (WHERE tipo_receita='recorrente' AND is_churned AND NOT data_inconsistente), 1) AS lt_medio_cancelado,
           COUNT(*) FILTER (WHERE tipo_receita='recorrente') AS total_recorrentes,
           COUNT(*) FILTER (WHERE data_inconsistente) AS total_inconsistentes
@@ -60,7 +60,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           COUNT(*) FILTER (WHERE status='ativo') AS n_ativos,
           COUNT(*) FILTER (WHERE is_churned) AS n_cancelados,
           ROUND(AVG(lt_meses) FILTER (WHERE is_churned AND NOT data_inconsistente), 1) AS lt_medio_cancelado,
-          ROUND(AVG(lt_meses) FILTER (WHERE is_ativo), 1) AS lt_medio_ativo,
+          ROUND(AVG(lt_meses) FILTER (WHERE is_ativo AND NOT data_inconsistente), 1) AS lt_medio_ativo,
           ROUND(AVG(ltv_recorrente) FILTER (WHERE is_churned AND NOT data_inconsistente), 0) AS ltv_medio,
           ROUND(SUM(valorr) FILTER (WHERE status='ativo')::numeric, 0) AS mrr_ativo,
           ROUND(SUM(valorr) FILTER (WHERE is_churned)::numeric, 0) AS mrr_perdido
@@ -196,9 +196,15 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           MAX(nome_cliente) AS nome_cliente,
           COUNT(*) FILTER (WHERE tipo_receita='recorrente') AS n_contratos_rec,
           ROUND(SUM(COALESCE(ltv_recorrente,0))::numeric, 0) AS ltv_recorrente,
-          ROUND(SUM(CASE WHEN tipo_receita='pontual' THEN valorp ELSE 0 END)::numeric, 0) AS ltv_pontual,
-          ROUND((SUM(COALESCE(ltv_recorrente,0)) + SUM(CASE WHEN tipo_receita='pontual' THEN valorp ELSE 0 END))::numeric, 0) AS ltv_total,
-          ROUND(GREATEST(MAX(CASE WHEN is_ativo THEN (CURRENT_DATE - data_inicio) ELSE (data_fim - data_inicio) END),0)::numeric / 30.44, 1) AS lt_meses,
+          ROUND(SUM(COALESCE(valorp,0))::numeric, 0) AS ltv_pontual,
+          ROUND((SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)))::numeric, 0) AS ltv_total,
+          CASE
+            WHEN BOOL_OR(is_ativo)
+              THEN ROUND((CURRENT_DATE - MIN(data_inicio))::numeric / 30.44, 1)
+            WHEN MAX(data_fim) FILTER (WHERE NOT data_inconsistente) >= MIN(data_inicio)
+              THEN ROUND((MAX(data_fim) FILTER (WHERE NOT data_inconsistente) - MIN(data_inicio))::numeric / 30.44, 1)
+            ELSE NULL
+          END AS lt_meses,
           BOOL_OR(is_ativo) AS ativo
         FROM cortex_core.vw_lt_contratos
         WHERE data_inicio IS NOT NULL
@@ -220,7 +226,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           ltvRecorrente: Number(r.ltv_recorrente) || 0,
           ltvPontual: Number(r.ltv_pontual) || 0,
           ltvTotal: Number(r.ltv_total) || 0,
-          ltMeses: Number(r.lt_meses) || 0, ativo: r.ativo,
+          ltMeses: r.lt_meses != null ? Number(r.lt_meses) : null, ativo: r.ativo,
         })),
       });
     } catch (error) {
