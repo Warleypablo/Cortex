@@ -11,9 +11,9 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
 
       const kpis = await db.execute(sql`
         SELECT
-          -- status='ativo' = MRR realizado; is_ativo = todos nao-churnados (LT em curso)
-          ROUND(SUM(valorr) FILTER (WHERE status='ativo')::numeric, 0) AS mrr_ativo,
-          ROUND(AVG(lt_meses) FILTER (WHERE tipo_receita='recorrente' AND is_ativo AND NOT data_inconsistente), 1) AS lt_medio_ativo,
+          -- "ativo faturando" = ativo + onboarding + triagem (carteira recorrente viva); is_churned = cancelado/inativo
+          ROUND(SUM(valorr) FILTER (WHERE status IN ('ativo','onboarding','triagem'))::numeric, 0) AS mrr_ativo,
+          ROUND(AVG(lt_meses) FILTER (WHERE tipo_receita='recorrente' AND status IN ('ativo','onboarding','triagem') AND NOT data_inconsistente), 1) AS lt_medio_ativo,
           ROUND(AVG(lt_meses) FILTER (WHERE tipo_receita='recorrente' AND is_churned AND NOT data_inconsistente), 1) AS lt_medio_cancelado,
           COUNT(*) FILTER (WHERE tipo_receita='recorrente') AS total_recorrentes,
           COUNT(*) FILTER (WHERE data_inconsistente) AS total_inconsistentes
@@ -56,13 +56,13 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       const rows = (await db.execute(sql`
         SELECT
           produto,
-          -- status='ativo' = MRR realizado; is_ativo = todos nao-churnados (LT em curso)
-          COUNT(*) FILTER (WHERE status='ativo') AS n_ativos,
+          -- "ativo faturando" = ativo + onboarding + triagem (carteira recorrente viva); is_churned = cancelado/inativo
+          COUNT(*) FILTER (WHERE status IN ('ativo','onboarding','triagem')) AS n_ativos,
           COUNT(*) FILTER (WHERE is_churned) AS n_cancelados,
           ROUND(AVG(lt_meses) FILTER (WHERE is_churned AND NOT data_inconsistente), 1) AS lt_medio_cancelado,
-          ROUND(AVG(lt_meses) FILTER (WHERE is_ativo AND NOT data_inconsistente), 1) AS lt_medio_ativo,
+          ROUND(AVG(lt_meses) FILTER (WHERE status IN ('ativo','onboarding','triagem') AND NOT data_inconsistente), 1) AS lt_medio_ativo,
           ROUND(AVG(ltv_recorrente) FILTER (WHERE is_churned AND NOT data_inconsistente), 0) AS ltv_medio,
-          ROUND(SUM(valorr) FILTER (WHERE status='ativo')::numeric, 0) AS mrr_ativo,
+          ROUND(SUM(valorr) FILTER (WHERE status IN ('ativo','onboarding','triagem'))::numeric, 0) AS mrr_ativo,
           ROUND(SUM(valorr) FILTER (WHERE is_churned)::numeric, 0) AS mrr_perdido
         FROM cortex_core.vw_lt_contratos
         WHERE tipo_receita='recorrente'
