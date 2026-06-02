@@ -5,6 +5,7 @@ import { useSetPageInfo } from "@/contexts/PageContext";
 import { OverviewClientesCards } from "@/components/lt-ltv-churn/OverviewClientesCards";
 import { ClientesTable } from "@/components/lt-ltv-churn/ClientesTable";
 import { DistClientesCharts } from "@/components/lt-ltv-churn/DistClientesCharts";
+import { EvolucaoClientes } from "@/components/lt-ltv-churn/EvolucaoClientes";
 import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import type { OverviewClientesData, ProdutoBenchmark } from "@/components/lt-ltv-churn/types";
 
@@ -67,6 +68,7 @@ export default function LtvClientes() {
         <OverviewClientesCards data={overview} />
       )}
       <DistClientesCharts produto={produtoParam} status={statusParam} />
+      <EvolucaoClientes />
       <ClientesTable produto={produtoParam} status={statusParam} />
     </div>
   );

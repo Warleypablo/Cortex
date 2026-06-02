@@ -420,4 +420,43 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       res.status(500).json({ error: "Failed to fetch clientes" });
     }
   });
+
+  app.get("/api/lt-ltv-churn/evolucao-clientes", async (req, res) => {
+    try {
+      const rows = (await db.execute(sql`
+        WITH meses AS (
+          SELECT generate_series(date_trunc('month',CURRENT_DATE) - interval '12 months', date_trunc('month',CURRENT_DATE) - interval '1 month', '1 month')::date m
+        ),
+        snap_ref AS (
+          SELECT meses.m, COALESCE(
+            (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = meses.m LIMIT 1),
+            (SELECT MIN(data_snapshot) FROM "Clickup".cup_data_hist WHERE date_trunc('month',data_snapshot)=meses.m)
+          ) snap FROM meses
+        ),
+        cli AS (
+          SELECT sr.m, sr.snap, h.id_task,
+            BOOL_OR(h.status IN ('ativo','onboarding','triagem') AND h.valorr>0) AS ativo,
+            (sr.snap - MIN(h.data_inicio) FILTER (WHERE h.valorr>0 AND sr.snap>=h.data_inicio))::numeric/30.44 AS lt,
+            COALESCE(SUM(h.valorr*(sr.snap-h.data_inicio)::numeric/30.44) FILTER (WHERE h.valorr>0 AND sr.snap>=h.data_inicio),0)
+              + COALESCE(SUM(h.valorp) FILTER (WHERE h.valorp>0),0) AS ltv
+          FROM snap_ref sr JOIN "Clickup".cup_data_hist h ON h.data_snapshot=sr.snap
+          GROUP BY sr.m, sr.snap, h.id_task
+        )
+        SELECT to_char(m,'YYYY-MM') AS mes,
+          ROUND(AVG(lt) FILTER (WHERE ativo)::numeric,1) AS lt,
+          ROUND(AVG(ltv) FILTER (WHERE ativo)::numeric,0) AS ltv
+        FROM cli GROUP BY m ORDER BY m
+      `)).rows;
+      res.json({
+        serie: rows.map((r: any) => ({
+          mes: r.mes,
+          lt: Number(r.lt) || 0,
+          ltv: Number(r.ltv) || 0,
+        })),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching lt-ltv-churn evolucao-clientes:", error);
+      res.status(500).json({ error: "Failed to fetch evolucao-clientes" });
+    }
+  });
 }
