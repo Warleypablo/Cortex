@@ -4,6 +4,8 @@ import { groupAging } from "./estoquePontual.helpers";
 
 // Estoque = pontual vendido, não entregue, não cancelado.
 const ESTOQUE_WHERE = sql`valorp > 0 AND status NOT IN ('entregue','cancelado/inativo','não usar')`;
+// Mesma definição de ESTOQUE_WHERE, com alias de tabela (c.) para o endpoint /itens.
+const ESTOQUE_WHERE_C = sql`c.valorp > 0 AND c.status NOT IN ('entregue','cancelado/inativo','não usar')`;
 
 export function registerEstoquePontualRoutes(app: Express, db: any) {
   // KPIs do estoque atual
@@ -52,6 +54,8 @@ export function registerEstoquePontualRoutes(app: Express, db: any) {
           COUNT(*) FILTER (WHERE ${ESTOQUE_WHERE}) AS qtd_estoque,
           ROUND(SUM(h.valorp) FILTER (WHERE ${ESTOQUE_WHERE})::numeric, 0) AS valor_estoque
         FROM snap s
+        -- INNER JOIN intencional: meses sem snapshot são omitidos da série
+        -- (mostrar R$0 seria enganoso — não é estoque zero, é ausência de dado).
         JOIN "Clickup".cup_data_hist h ON h.data_snapshot = s.snap_ref
         GROUP BY s.m
         ORDER BY s.m
@@ -79,6 +83,8 @@ export function registerEstoquePontualRoutes(app: Express, db: any) {
             date_trunc('month', CURRENT_DATE) - (${meses - 1} || ' months')::interval,
             date_trunc('month', CURRENT_DATE), '1 month')::date AS m
         )
+        -- entradas/entregas contam o FLUXO do mês (todos os pontuais criados/entregues,
+        -- inclusive os depois cancelados) — é fluxo, não saldo de estoque.
         SELECT to_char(meses.m, 'YYYY-MM') AS mes,
           (SELECT COUNT(*) FROM "Clickup".cup_contratos
            WHERE valorp > 0 AND date_trunc('month', data_criado) = meses.m) AS entradas,
@@ -194,8 +200,7 @@ export function registerEstoquePontualRoutes(app: Express, db: any) {
       const totalRes = await db.execute(sql`
         SELECT COUNT(*) AS total
         FROM "Clickup".cup_contratos c
-        WHERE c.valorp > 0
-          AND c.status NOT IN ('entregue','cancelado/inativo','não usar')
+        WHERE ${ESTOQUE_WHERE_C}
           ${whereExtra}`);
 
       const rows = (await db.execute(sql`
@@ -206,8 +211,7 @@ export function registerEstoquePontualRoutes(app: Express, db: any) {
           c.status
         FROM "Clickup".cup_contratos c
         LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
-        WHERE c.valorp > 0
-          AND c.status NOT IN ('entregue','cancelado/inativo','não usar')
+        WHERE ${ESTOQUE_WHERE_C}
           ${whereExtra}
         ORDER BY GREATEST(CURRENT_DATE - c.data_criado, 0) DESC NULLS LAST
         LIMIT ${pageSize} OFFSET ${offset}`)).rows;
