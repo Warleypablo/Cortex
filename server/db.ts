@@ -773,6 +773,7 @@ export async function initializeSysSchema(): Promise<void> {
     
     // Create canonical view
     await createCanonicalContractsView();
+    await initializeLtLtvChurnViews();
 
     console.log('[database] cortex_core schema fully initialized');
   } catch (error) {
@@ -1322,6 +1323,53 @@ async function createCanonicalContractsView(): Promise<void> {
   `);
   
   console.log('[database] vw_contratos_canon view created');
+}
+
+export async function initializeLtLtvChurnViews(): Promise<void> {
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW cortex_core.vw_lt_contratos AS
+    WITH base AS (
+      SELECT
+        co.id_subtask,
+        co.id_task,
+        cl.nome AS nome_cliente,
+        co.servico, co.produto, co.squad, co.vendedor,
+        co.cs_responsavel, co.responsavel,
+        co.status, co.valorr, co.valorp,
+        co.data_inicio, co.data_encerramento,
+        ch.ultimo_dia_operacao,
+        ch.data_solicitacao_encerramento,
+        ch.motivo_cancelamento, ch.submotivo_cancelamento,
+        ch.evitabilidade_churn, ch.possibilidade_retencao, ch.reteve,
+        ch.cluster, ch.tipo_negocio, ch.plano,
+        CASE WHEN co.valorr > 0 THEN 'recorrente'
+             WHEN co.valorp > 0 THEN 'pontual'
+             ELSE 'sem_valor' END AS tipo_receita,
+        COALESCE(co.data_encerramento, ch.ultimo_dia_operacao) AS data_fim,
+        (co.status IN ('ativo','onboarding','pausado','em cancelamento','triagem')) AS is_ativo,
+        (co.status = 'cancelado/inativo') AS is_churned
+      FROM "Clickup".cup_contratos co
+      LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = co.id_task
+      LEFT JOIN "Clickup".cup_churn ch ON ch.task_id = co.id_subtask
+    ),
+    calc AS (
+      SELECT b.*,
+        (b.data_fim IS NOT NULL AND b.data_fim < b.data_inicio) AS data_inconsistente,
+        CASE
+          WHEN b.data_inicio IS NULL THEN NULL
+          WHEN b.is_ativo THEN (CURRENT_DATE - b.data_inicio)
+          WHEN b.data_fim IS NOT NULL AND b.data_fim >= b.data_inicio THEN (b.data_fim - b.data_inicio)
+          ELSE NULL
+        END AS lt_dias
+      FROM base b
+    )
+    SELECT c.*,
+      ROUND((c.lt_dias / 30.44)::numeric, 2) AS lt_meses,
+      CASE WHEN c.tipo_receita = 'recorrente' AND c.lt_dias IS NOT NULL
+           THEN ROUND((c.valorr * c.lt_dias / 30.44)::numeric, 2) END AS ltv_recorrente
+    FROM calc c
+  `);
+  console.log("[db] View cortex_core.vw_lt_contratos criada/atualizada");
 }
 
 export async function initializeDashboardTables(): Promise<void> {
