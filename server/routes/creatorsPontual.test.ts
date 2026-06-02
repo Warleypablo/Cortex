@@ -83,6 +83,18 @@ describe("GET /api/creators-pontual/operadores", () => {
     expect(res.body.operadores[0].operador).toBe("Mariana Dalto");
     expect(res.body.operadores[0].cicloMedioDias).toBe(52);
   });
+
+  it("preserva null em ciclo/idade quando operador sem entregas", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [{ operador: "Novato Silva", aberto: 3, val_aberto: 15000,
+        entregue: 0, ciclo_medio_dias: null, idade_backlog_dias: 12 }],
+    });
+    const res = await request(makeApp()).get("/api/creators-pontual/operadores");
+    expect(res.status).toBe(200);
+    expect(res.body.operadores[0].cicloMedioDias).toBeNull();
+    expect(res.body.operadores[0].entregue).toBe(0);
+    expect(res.body.operadores[0].idadeBacklogDias).toBe(12);
+  });
 });
 
 describe("GET /api/creators-pontual/vendedores", () => {

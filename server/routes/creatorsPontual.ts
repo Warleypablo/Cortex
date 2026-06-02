@@ -17,7 +17,7 @@ export function registerCreatorsPontualRoutes(app: Express, db: any) {
           ROUND(SUM(valorp)::numeric, 0) AS valor_estoque,
           COUNT(*) AS qtd_itens,
           ROUND(AVG(valorp)::numeric, 0) AS ticket_medio,
-          ROUND(AVG(GREATEST(CURRENT_DATE - data_criado, 0))::numeric, 0) AS idade_media,
+          ROUND(AVG(GREATEST(CURRENT_DATE - data_criado, 0)) FILTER (WHERE data_criado IS NOT NULL), 0) AS idade_media,
           ROUND(SUM(valorp) FILTER (WHERE status = 'triagem')::numeric, 0) AS valor_triagem,
           ROUND(100.0 * SUM(valorp) FILTER (WHERE status = 'triagem') / NULLIF(SUM(valorp), 0), 1) AS pct_triagem
         FROM "Clickup".cup_contratos
