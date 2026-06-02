@@ -98,9 +98,10 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
 
       const rows = (await db.execute(sql`
         WITH serie_meses AS (
+          -- exclui o mes corrente (incompleto): vai ate o ultimo mes FECHADO
           SELECT generate_series(
-            date_trunc('month', CURRENT_DATE) - (${meses - 1} || ' months')::interval,
-            date_trunc('month', CURRENT_DATE), '1 month')::date AS m
+            date_trunc('month', CURRENT_DATE) - (${meses} || ' months')::interval,
+            date_trunc('month', CURRENT_DATE) - interval '1 month', '1 month')::date AS m
         ),
         rec AS (
           SELECT valorr, data_inicio, data_fim, is_churned
