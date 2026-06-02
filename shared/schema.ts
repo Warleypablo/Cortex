@@ -937,6 +937,7 @@ export const crmDeal = bitrixSchema.table("crm_deal", {
   closer: text("closer"),
   sdr: text("sdr"),
   funil: varchar("funil", { length: 255 }),
+  dataReuniaoAgendada: date("data_reuniao_agendada"),
   dataReuniaoRealizada: date("data_reuniao_realizada"),
   faturamentoMensal: varchar("faturamento_mensal", { length: 255 }),
   lpDaConversao: varchar("lp_da_conversao", { length: 255 }),
@@ -961,6 +962,22 @@ export const crmDeal = bitrixSchema.table("crm_deal", {
   ip: varchar("ip", { length: 45 }),
   fnlNgc: text("fnl_ngc"),
 });
+
+// Contatos do Bitrix — traz o telefone que crm_deal não tem, pra casar respondedores
+// de broadcast (telefone) com o deal (via crm_deal.contact_id). Populado por
+// scripts/sync-bitrix-contacts.ts.
+export const crmContact = bitrixSchema.table("crm_contact", {
+  id: integer("id").primaryKey(),
+  name: text("name"),
+  phoneRaw: text("phone_raw"),
+  phoneNormalized: varchar("phone_normalized", { length: 20 }),
+  email: text("email"),
+  companyName: text("company_name"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  phoneNormIdx: index("crm_contact_phone_norm_idx").on(table.phoneNormalized),
+}));
 
 // Meta Ads + CRM types
 export type MetaAccount = typeof metaAccounts.$inferSelect;
@@ -3680,6 +3697,57 @@ export const ghlEmailEvents = cortexCoreSchema.table("ghl_email_events", {
   messageIdx: index("ghl_email_events_message_idx").on(table.messageId),
   typeDateIdx: index("ghl_email_events_type_date_idx").on(table.eventType, table.occurredAt),
   contactIdx: index("ghl_email_events_contact_idx").on(table.contactId),
+}));
+
+// Atribuição lead-a-lead: resposta de broadcast → disparo de origem (conversationId)
+// + deal do Bitrix (telefone). Populado por server/services/broadcastAttribution.ts.
+export const broadcastLeadEvents = cortexCoreSchema.table("broadcast_lead_events", {
+  id: serial("id").primaryKey(),
+  broadcastId: text("broadcast_id").notNull(),
+  conversationId: text("conversation_id"),
+  ghlContactId: text("ghl_contact_id"),
+  leadPhone: text("lead_phone"),
+  leadPhoneNorm: varchar("lead_phone_norm", { length: 20 }),
+  replyMessageId: text("reply_message_id").notNull().unique(),
+  replyBody: text("reply_body"),
+  replyAt: timestamp("reply_at"),
+  sentiment: text("sentiment"),
+  sentimentMotivo: text("sentiment_motivo"),
+  sentimentFonte: text("sentiment_fonte"),
+  bitrixContactId: integer("bitrix_contact_id"),
+  bitrixDealId: integer("bitrix_deal_id"),
+  attributedAt: timestamp("attributed_at").defaultNow(),
+}, (table) => ({
+  broadcastIdx: index("broadcast_lead_events_broadcast_idx").on(table.broadcastId),
+  phoneIdx: index("broadcast_lead_events_phone_idx").on(table.leadPhoneNorm),
+}));
+
+// Classificação por disparo: padrão de copy (IA) + base inferida pelas tags. Cache.
+export const broadcastClassification = cortexCoreSchema.table("broadcast_classification", {
+  broadcastId: text("broadcast_id").primaryKey(),
+  padrao: text("padrao"),
+  padraoMotivo: text("padrao_motivo"),
+  base: text("base"),
+  baseMatchPct: doublePrecision("base_match_pct"),
+  classifiedAt: timestamp("classified_at").defaultNow(),
+});
+
+// Plano editorial de broadcasts (planejamento mensal). Populado pela aba Planejamento.
+export const broadcastPlan = cortexCoreSchema.table("broadcast_plan", {
+  id: serial("id").primaryKey(),
+  planDate: date("plan_date").notNull(),
+  canal: text("canal").default("WhatsApp"),
+  base: text("base"),
+  objetivo: text("objetivo"),
+  padrao: text("padrao"),
+  titulo: text("titulo"),
+  copyText: text("copy_text"),
+  status: text("status").default("backlog"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  dateIdx: index("broadcast_plan_date_idx").on(table.planDate),
 }));
 
 export const ghlTagsSnapshot = cortexCoreSchema.table("ghl_tags_snapshot", {

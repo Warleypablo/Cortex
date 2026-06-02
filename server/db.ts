@@ -2216,6 +2216,85 @@ export async function initializeCapacityTable(): Promise<void> {
   }
 }
 
+// Atribuição lead-a-lead de broadcast: cada resposta de WhatsApp ligada ao disparo de
+// origem (via conversationId) + ao deal do Bitrix (via telefone). Etapas de funil
+// (reunião/comparecimento/venda) NÃO são guardadas aqui — vêm live de "Bitrix".crm_deal.
+export async function initializeBroadcastLeadEventsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_lead_events (
+        id                SERIAL PRIMARY KEY,
+        broadcast_id      TEXT NOT NULL,
+        conversation_id   TEXT,
+        ghl_contact_id    TEXT,
+        lead_phone        TEXT,
+        lead_phone_norm   VARCHAR(20),
+        reply_message_id  TEXT NOT NULL UNIQUE,
+        reply_body        TEXT,
+        reply_at          TIMESTAMPTZ,
+        sentiment         TEXT,
+        sentiment_motivo  TEXT,
+        sentiment_fonte   TEXT,
+        bitrix_contact_id INTEGER,
+        bitrix_deal_id    INTEGER,
+        attributed_at     TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_lead_events_broadcast_idx ON cortex_core.broadcast_lead_events (broadcast_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_lead_events_phone_idx ON cortex_core.broadcast_lead_events (lead_phone_norm)`);
+    console.log('[database] broadcast_lead_events table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_lead_events table:', error);
+  }
+}
+
+// Classificação por disparo: padrão de copy (Claude) + base inferida pelas tags dos
+// destinatários. Cache pra não reprocessar a IA. Alimenta Resumo e Inteligência.
+export async function initializeBroadcastClassificationTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_classification (
+        broadcast_id   TEXT PRIMARY KEY,
+        padrao         TEXT,
+        padrao_motivo  TEXT,
+        base           TEXT,
+        base_match_pct NUMERIC,
+        classified_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('[database] broadcast_classification table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_classification table:', error);
+  }
+}
+
+// Plano editorial de broadcasts (planejamento do mês): slots com base/data/objetivo/
+// padrão/status + copy gerada. Planejamento interno (não dispara no Funnels nesta fase).
+export async function initializeBroadcastPlanTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_plan (
+        id          SERIAL PRIMARY KEY,
+        plan_date   DATE NOT NULL,
+        canal       TEXT DEFAULT 'WhatsApp',
+        base        TEXT,
+        objetivo    TEXT,
+        padrao      TEXT,
+        titulo      TEXT,
+        copy_text   TEXT,
+        status      TEXT DEFAULT 'backlog',
+        created_by  TEXT,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_plan_date_idx ON cortex_core.broadcast_plan (plan_date)`);
+    console.log('[database] broadcast_plan table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_plan table:', error);
+  }
+}
+
 export async function initializePredictionsTable(): Promise<void> {
   try {
     await db.execute(sql`
