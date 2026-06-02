@@ -94,29 +94,50 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
     try {
       const meses = Math.min(Math.max(parseInt(req.query.meses as string) || 8, 1), 24);
       const produto = (req.query.produto as string) || undefined;
-      const squad = (req.query.squad as string) || undefined;
 
+      // MRR do inicio do mes vem do SNAPSHOT diario (cup_data_hist) — dado historico real,
+      // nao reconstruido por datas. Churn vem da view curada vw_cup_churn_ajustado (por
+      // data_solicitacao_encerramento; exclui churn abonado e motivos que nao sao churn de
+      // cliente retido). O mes corrente (incompleto) e excluido.
       const rows = (await db.execute(sql`
-        WITH serie_meses AS (
-          -- exclui o mes corrente (incompleto): vai ate o ultimo mes FECHADO
+        WITH meses AS (
           SELECT generate_series(
             date_trunc('month', CURRENT_DATE) - (${meses} || ' months')::interval,
             date_trunc('month', CURRENT_DATE) - interval '1 month', '1 month')::date AS m
         ),
-        rec AS (
-          SELECT valorr, data_inicio, data_fim, is_churned
-          FROM cortex_core.vw_lt_contratos
-          WHERE tipo_receita='recorrente'
+        snap_ref AS (
+          SELECT meses.m,
+            COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = meses.m LIMIT 1),
+              (SELECT MIN(data_snapshot) FROM "Clickup".cup_data_hist WHERE date_trunc('month', data_snapshot) = meses.m)
+            ) AS snap
+          FROM meses
+        ),
+        mrr_ini AS (
+          SELECT sr.m,
+            ROUND(SUM(h.valorr) FILTER (WHERE h.status IN ('ativo','onboarding','triagem'))::numeric, 0) AS mrr
+          FROM snap_ref sr
+          JOIN "Clickup".cup_data_hist h ON h.data_snapshot = sr.snap
+          WHERE 1=1 ${produto ? sql`AND h.produto = ${produto}` : sql``}
+          GROUP BY sr.m
+        ),
+        churn AS (
+          SELECT date_trunc('month', data_solicitacao_encerramento)::date AS m,
+            ROUND(SUM(valor_r)::numeric, 0) AS perdido
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE valor_r > 0
+            AND COALESCE(abonar_churn,'') != 'Sim'
+            AND COALESCE(motivo_cancelamento,'') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
             ${produto ? sql`AND produto = ${produto}` : sql``}
-            ${squad ? sql`AND squad = ${squad}` : sql``}
+          GROUP BY 1
         )
-        SELECT to_char(serie_meses.m,'YYYY-MM') AS mes,
-          ROUND(SUM(rec.valorr) FILTER (WHERE rec.data_inicio < serie_meses.m AND (rec.data_fim IS NULL OR rec.data_fim >= serie_meses.m))::numeric, 0) AS mrr_ativo_inicio,
-          ROUND(SUM(rec.valorr) FILTER (WHERE rec.is_churned AND rec.data_fim >= serie_meses.m AND rec.data_fim < serie_meses.m + interval '1 month')::numeric, 0) AS mrr_perdido,
-          ROUND((SUM(rec.valorr) FILTER (WHERE rec.is_churned AND rec.data_fim >= serie_meses.m AND rec.data_fim < serie_meses.m + interval '1 month')
-                / NULLIF(SUM(rec.valorr) FILTER (WHERE rec.data_inicio < serie_meses.m AND (rec.data_fim IS NULL OR rec.data_fim >= serie_meses.m)),0) * 100)::numeric, 1) AS rev_churn_pct
-        FROM serie_meses CROSS JOIN rec
-        GROUP BY serie_meses.m ORDER BY serie_meses.m
+        SELECT to_char(mi.m,'YYYY-MM') AS mes,
+          mi.mrr AS mrr_ativo_inicio,
+          COALESCE(c.perdido, 0) AS mrr_perdido,
+          ROUND((COALESCE(c.perdido,0)::numeric / NULLIF(mi.mrr,0) * 100), 1) AS rev_churn_pct
+        FROM mrr_ini mi
+        LEFT JOIN churn c ON c.m = mi.m
+        ORDER BY mi.m
       `)).rows;
 
       res.json({
