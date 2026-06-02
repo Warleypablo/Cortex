@@ -39,6 +39,21 @@ function parsePeriod(req: Request): { from: Date; to: Date } {
 // Sources que contam como "marketing" (broadcast/automação) vs 1:1
 const MARKETING_SOURCES = ["workflow", "bulk_actions", "campaign"] as const;
 
+// ─── Política de causalidade (atribuição de reunião/comparecimento/venda) ───
+// As colunas d.data_reuniao_agendada/realizada do Bitrix são `date` (sem hora).
+// Atribuímos uma etapa ao broadcast quando ela cai no MESMO DIA da resposta ou
+// depois: `d.data_reuniao_agendada >= reply_at::date`.
+//
+// Decisão (alinhada com o time, jun/2026): manter `>=`, não `>`.
+//   • `>=` inclui reuniões/vendas marcadas no mesmo dia do reply — o caso comum
+//     (o SDR responde e agenda no mesmo dia). Risco aceito: super-contar uma
+//     reunião já agendada ANTES do reply naquele dia (raro; a origem `date` não
+//     tem hora pra distinguir 9h de 15h do mesmo dia).
+//   • `>` seria conservador, mas descartaria conversões legítimas do mesmo dia.
+// Este filtro se repete em listBroadcasts, getBroadcastEvolucao, getBroadcastFunnel,
+// getBroadcastsSummary, getBasesPerformance, periodoMetrics, getRelatorio e
+// postPlanoGerarMes — todas seguem esta mesma política.
+
 // ─── Handlers ─────────────────────────────────────────────────────────────
 
 /**
@@ -1386,6 +1401,7 @@ async function getBroadcastEvolucao(req: Request, res: Response) {
         COUNT(DISTINCT e.bitrix_deal_id)::int AS reunioes
       FROM cortex_core.broadcast_lead_events e
       JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
+      -- causalidade (>=): inclui reunião no mesmo dia da resposta (ver nota no topo)
       WHERE d.data_reuniao_agendada IS NOT NULL
         AND d.data_reuniao_agendada >= e.reply_at::date
         AND d.data_reuniao_agendada BETWEEN ${from}::date AND ${to}::date
@@ -1471,7 +1487,8 @@ async function getBroadcastFunnel(req: Request, res: Response) {
         COUNT(*) FILTER (WHERE fr.sentiment = 'negativa')::int AS negativas,
         COUNT(*) FILTER (WHERE fr.sentiment = 'neutra')::int AS neutras,
         COUNT(*) FILTER (WHERE fr.sentiment = 'opt_out')::int AS opt_out,
-        -- Causalidade: etapa só conta se ocorreu APÓS a (primeira) resposta ao broadcast.
+        -- Causalidade (>=): etapa conta se ocorreu no dia da (primeira) resposta ou depois
+        -- (inclui o mesmo dia — política documentada no topo do arquivo).
         COUNT(DISTINCT fr.bitrix_deal_id) FILTER (
           WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date
         )::int AS reuniao_marcada,
@@ -1600,6 +1617,7 @@ async function getBroadcastsSummary(req: Request, res: Response) {
         count(*) FILTER (WHERE fr.sentiment = 'negativa')::int AS negativas,
         count(*) FILTER (WHERE fr.sentiment = 'neutra')::int AS neutras,
         count(*) FILTER (WHERE fr.sentiment = 'opt_out')::int AS opt_out,
+        -- causalidade (>=): inclui etapas no mesmo dia da resposta (ver nota no topo)
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)::int AS reuniao_marcada,
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)::int AS venda
@@ -1686,6 +1704,7 @@ async function getBasesPerformance(req: Request, res: Response) {
       resp AS (
         SELECT e.broadcast_id,
           COUNT(DISTINCT e.ghl_contact_id)::int AS responderam,
+          -- causalidade (>=): inclui reunião/venda no mesmo dia da resposta (ver nota no topo)
           COUNT(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
           COUNT(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
         FROM cortex_core.broadcast_lead_events e
@@ -1784,6 +1803,7 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
   `);
   const fun = await db.execute(sql`
     SELECT count(DISTINCT e.ghl_contact_id)::int AS respostas,
+      -- causalidade (>=): inclui reunião/venda no mesmo dia da resposta (ver nota no topo)
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
@@ -1841,6 +1861,7 @@ async function getRelatorio(req: Request, res: Response) {
       ),
       resp AS (
         SELECT e.broadcast_id,
+          -- causalidade (>=): inclui reunião/venda no mesmo dia da resposta (ver nota no topo)
           count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
           count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
         FROM cortex_core.broadcast_lead_events e LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id GROUP BY 1
@@ -2087,7 +2108,7 @@ function melhorPadraoMatriz(base: string): PadraoKey | undefined {
  * editáveis (created_by='auto-IA'). Re-rodar substitui só os auto-gerados intactos —
  * preserva os manuais E os slots da IA que o usuário já editou (created_by='auto-IA·editado').
  */
-async function getPlanoGerarMes(req: Request, res: Response) {
+async function postPlanoGerarMes(req: Request, res: Response) {
   try {
     const monthStr = (req.body?.month as string) || "";
     const m = /^\d{4}-\d{2}$/.test(monthStr) ? monthStr : null;
@@ -2244,7 +2265,7 @@ async function getPlanoGerarMes(req: Request, res: Response) {
     const comCopy = slots.filter((s) => (s as any).copy).length;
     res.json({ ok: true, mes: `${ano}-${String(mes).padStart(2, "0")}`, criados, dias_uteis: dias.length, com_copy: comCopy, sazonais: slots.filter((s) => s.seasonal).length, sem_credito: criados - comCopy, sem_historico: !temHistorico });
   } catch (err: any) {
-    console.error("[GHL] getPlanoGerarMes error:", err);
+    console.error("[GHL] postPlanoGerarMes error:", err);
     res.status(500).json({ error: err.message });
   }
 }
@@ -2276,7 +2297,7 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/plano", getPlano);
   app.post("/api/ghl/plano", postPlano);
   app.post("/api/ghl/plano/gerar-copy", postGerarCopyPlano);
-  app.post("/api/ghl/plano/gerar-mes", getPlanoGerarMes);
+  app.post("/api/ghl/plano/gerar-mes", postPlanoGerarMes);
   app.patch("/api/ghl/plano/:id", patchPlano);
   app.delete("/api/ghl/plano/:id", deletePlano);
   app.get("/api/ghl/broadcasts/:id", getBroadcastDetail);
