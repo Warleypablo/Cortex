@@ -92,6 +92,7 @@ export const PERMISSION_KEYS = {
   GG: {
     VISAO_GERAL: 'gg.visao_geral',
     COLABORADORES: 'gg.colaboradores',
+    COLABORADORES_RESTRITO: 'gg.colaboradores_restrito',
     RECRUTAMENTO: 'gg.recrutamento',
     ONBOARDING: 'gg.onboarding',
     PESQUISAS: 'gg.pesquisas',
@@ -311,6 +312,9 @@ Object.entries(ROUTE_TO_PERMISSION).forEach(([route, permission]) => {
   }
   PERMISSION_TO_ROUTES[permission].push(route);
 });
+
+// Rota de acesso restrito a colaboradores (sem salário)
+PERMISSION_TO_ROUTES['gg.colaboradores_restrito'] = ['/colaboradores', '/colaboradores/analise'];
 
 // Helper to convert old allowedRoutes to new permission keys
 export function routesToPermissions(routes: string[]): string[] {
