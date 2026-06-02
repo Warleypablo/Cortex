@@ -134,15 +134,20 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
 
   app.get("/api/lt-ltv-churn/contratos", async (req, res) => {
     try {
-      const status = (req.query.status as string) || undefined;
+      const situacao = (req.query.status as string) || undefined; // 'ativo' | 'cancelado'
       const produto = (req.query.produto as string) || undefined;
       const squad = (req.query.squad as string) || undefined;
       const page = Math.max(parseInt(req.query.page as string) || 1, 1);
       const pageSize = 50;
       const offset = (page - 1) * pageSize;
 
+      const situacaoClause =
+        situacao === "ativo" ? sql`AND is_ativo`
+        : situacao === "cancelado" ? sql`AND is_churned`
+        : sql``;
+
       const whereExtra = sql`
-        ${status ? sql`AND status = ${status}` : sql``}
+        ${situacaoClause}
         ${produto ? sql`AND produto = ${produto}` : sql``}
         ${squad ? sql`AND squad = ${squad}` : sql``}`;
 
