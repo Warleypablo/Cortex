@@ -11,7 +11,7 @@ import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import type { OverviewData, ProdutoBenchmark } from "@/components/lt-ltv-churn/types";
 
 export default function LtLtvChurn() {
-  useSetPageInfo("LT, LTV & Churn", "Lifetime, valor e churn por contrato e cliente");
+  useSetPageInfo("LTV por Contrato", "Lifetime e valor por contrato");
   const [produto, setProduto] = useState<string>("todos");
 
   const produtoParam = produto === "todos" ? undefined : produto;
