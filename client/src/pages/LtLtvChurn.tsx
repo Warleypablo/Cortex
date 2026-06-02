@@ -12,8 +12,6 @@ import type { OverviewData, ProdutoBenchmark, ChurnMensalPonto } from "@/compone
 export default function LtLtvChurn() {
   useSetPageInfo("LT, LTV & Churn", "Lifetime, valor e churn por contrato e cliente");
   const [produto, setProduto] = useState<string>("todos");
-  const [granularidade, setGranularidade] = useState<"contrato" | "cliente">("contrato");
-  const [situacao, setSituacao] = useState<"todos" | "ativo" | "cancelado">("todos");
 
   const produtoParam = produto === "todos" ? undefined : produto;
 
@@ -41,32 +39,7 @@ export default function LtLtvChurn() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-end gap-3">
-        <Select
-          value={granularidade}
-          onValueChange={(v) => setGranularidade(v as "contrato" | "cliente")}
-        >
-          <SelectTrigger className="w-[150px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="contrato">Por contrato</SelectItem>
-            <SelectItem value="cliente">Por cliente</SelectItem>
-          </SelectContent>
-        </Select>
-        <Select
-          value={situacao}
-          onValueChange={(v) => setSituacao(v as "todos" | "ativo" | "cancelado")}
-        >
-          <SelectTrigger className="w-[170px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="todos">Ativos e cancelados</SelectItem>
-            <SelectItem value="ativo">Apenas ativos</SelectItem>
-            <SelectItem value="cancelado">Apenas cancelados</SelectItem>
-          </SelectContent>
-        </Select>
+      <div className="flex items-center justify-end">
         <Select value={produto} onValueChange={setProduto}>
           <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
             <SelectValue placeholder="Produto" />
@@ -97,7 +70,7 @@ export default function LtLtvChurn() {
       ) : (
         <BenchmarkProduto produtos={benchmark.produtos} />
       )}
-      <TabContratosClientes produto={produtoParam} granularidade={granularidade} situacao={situacao} />
+      <TabContratosClientes produto={produtoParam} />
     </div>
   );
 }
