@@ -1,3 +1,4 @@
+import type { ElementType } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { DollarSign, Clock, Users, TrendingDown, AlertTriangle } from "lucide-react";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
@@ -9,7 +10,7 @@ function Kpi({
   value,
   sub,
 }: {
-  icon: React.ElementType;
+  icon: ElementType;
   label: string;
   value: string;
   sub?: string;
