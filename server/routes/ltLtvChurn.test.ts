@@ -120,3 +120,25 @@ describe("GET /api/lt-ltv-churn/clientes", () => {
     expect(res.body.clientes[0].ltvTotal).toBe(18000);
   });
 });
+
+describe("GET /api/lt-ltv-churn/dist-lt-contratos", () => {
+  it("retorna buckets de LT com ativos e cancelados", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [{ faixa: "0-3m", ativos: 130, cancelados: 343 }],
+    });
+    const res = await request(makeApp()).get("/api/lt-ltv-churn/dist-lt-contratos");
+    expect(res.status).toBe(200);
+    expect(res.body.buckets[0].cancelados).toBe(343);
+  });
+});
+
+describe("GET /api/lt-ltv-churn/dist-clientes", () => {
+  it("retorna distribuicoes de LTV e LT por cliente", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ faixa: "0-5k", qtd: 480 }] });
+    mockExecute.mockResolvedValueOnce({ rows: [{ faixa: "0-3m", qtd: 395 }] });
+    const res = await request(makeApp()).get("/api/lt-ltv-churn/dist-clientes");
+    expect(res.status).toBe(200);
+    expect(res.body.ltv[0].qtd).toBe(480);
+    expect(res.body.lt[0].qtd).toBe(395);
+  });
+});

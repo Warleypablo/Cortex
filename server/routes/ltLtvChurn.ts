@@ -218,6 +218,76 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
     }
   });
 
+  // Histograma de LT dos contratos (ativos vs cancelados por faixa)
+  app.get("/api/lt-ltv-churn/dist-lt-contratos", async (req, res) => {
+    try {
+      const produto = (req.query.produto as string) || undefined;
+      const rows = (await db.execute(sql`
+        WITH f AS (
+          SELECT is_ativo, is_churned,
+            CASE WHEN lt_meses<3 THEN 1 WHEN lt_meses<6 THEN 2 WHEN lt_meses<12 THEN 3 WHEN lt_meses<24 THEN 4 ELSE 5 END AS ord
+          FROM cortex_core.vw_lt_contratos
+          WHERE tipo_receita='recorrente' AND lt_meses IS NOT NULL AND NOT data_inconsistente
+            ${produto ? sql`AND produto = ${produto}` : sql``}
+        )
+        SELECT ord, (ARRAY['0-3m','3-6m','6-12m','12-24m','24m+'])[ord] AS faixa,
+          COUNT(*) FILTER (WHERE is_ativo) AS ativos,
+          COUNT(*) FILTER (WHERE is_churned) AS cancelados
+        FROM f GROUP BY ord ORDER BY ord
+      `)).rows;
+      res.json({
+        buckets: rows.map((r: any) => ({
+          faixa: r.faixa,
+          ativos: Number(r.ativos) || 0,
+          cancelados: Number(r.cancelados) || 0,
+        })),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching lt-ltv-churn dist-lt-contratos:", error);
+      res.status(500).json({ error: "Failed to fetch dist-lt-contratos" });
+    }
+  });
+
+  // Distribuicoes por cliente: LTV por faixa e LT por faixa
+  app.get("/api/lt-ltv-churn/dist-clientes", async (req, res) => {
+    try {
+      const produto = (req.query.produto as string) || undefined;
+      const cli = sql`
+        SELECT id_task,
+          SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv,
+          CASE WHEN BOOL_OR(is_ativo) THEN (CURRENT_DATE - MIN(data_inicio))::numeric/30.44
+               WHEN MAX(data_fim) FILTER (WHERE NOT data_inconsistente) >= MIN(data_inicio)
+                 THEN (MAX(data_fim) FILTER (WHERE NOT data_inconsistente) - MIN(data_inicio))::numeric/30.44
+               ELSE NULL END AS lt
+        FROM cortex_core.vw_lt_contratos
+        WHERE data_inicio IS NOT NULL
+          ${produto ? sql`AND produto = ${produto}` : sql``}
+        GROUP BY id_task`;
+
+      const ltvRows = (await db.execute(sql`
+        SELECT ord, (ARRAY['0-5k','5-10k','10-20k','20-50k','50k+'])[ord] AS faixa, COUNT(*) AS qtd FROM (
+          SELECT CASE WHEN ltv<5000 THEN 1 WHEN ltv<10000 THEN 2 WHEN ltv<20000 THEN 3 WHEN ltv<50000 THEN 4 ELSE 5 END AS ord
+          FROM (${cli}) c
+        ) a GROUP BY ord ORDER BY ord
+      `)).rows;
+
+      const ltRows = (await db.execute(sql`
+        SELECT ord, (ARRAY['0-3m','3-6m','6-12m','12-24m','24m+'])[ord] AS faixa, COUNT(*) AS qtd FROM (
+          SELECT CASE WHEN lt<3 THEN 1 WHEN lt<6 THEN 2 WHEN lt<12 THEN 3 WHEN lt<24 THEN 4 ELSE 5 END AS ord
+          FROM (${cli}) c WHERE lt IS NOT NULL
+        ) a GROUP BY ord ORDER BY ord
+      `)).rows;
+
+      res.json({
+        ltv: ltvRows.map((r: any) => ({ faixa: r.faixa, qtd: Number(r.qtd) || 0 })),
+        lt: ltRows.map((r: any) => ({ faixa: r.faixa, qtd: Number(r.qtd) || 0 })),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching lt-ltv-churn dist-clientes:", error);
+      res.status(500).json({ error: "Failed to fetch dist-clientes" });
+    }
+  });
+
   app.get("/api/lt-ltv-churn/clientes", async (req, res) => {
     try {
       const apenas = (req.query.status as string) || undefined; // 'ativo' | 'cancelado'
