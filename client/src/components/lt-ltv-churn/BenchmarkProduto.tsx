@@ -36,6 +36,7 @@ export function BenchmarkProduto({ produtos }: { produtos: ProdutoBenchmark[] })
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
       <CardHeader>
         <CardTitle className="text-base">Benchmark por produto</CardTitle>
+        <p className="text-xs text-gray-500 dark:text-zinc-400">Comparação entre todos os produtos (não afetada pelo filtro de produto acima)</p>
       </CardHeader>
       <CardContent className="space-y-6">
         <ResponsiveContainer width="100%" height={280}>
@@ -52,7 +53,15 @@ export function BenchmarkProduto({ produtos }: { produtos: ProdutoBenchmark[] })
               tick={{ fill: axis, fontSize: 11 }}
               tickFormatter={(v: number) => formatCurrencyNoDecimals(v)}
             />
-            <Tooltip formatter={(v: number) => formatCurrencyNoDecimals(v)} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: isDark ? "#18181b" : "#ffffff",
+                border: `1px solid ${isDark ? "#3f3f46" : "#e5e7eb"}`,
+                borderRadius: 8,
+                color: isDark ? "#f4f4f5" : "#111827",
+              }}
+              formatter={(v: number) => formatCurrencyNoDecimals(v)}
+            />
             <Bar dataKey="ltvMedio" fill="#6366f1" radius={[4, 4, 0, 0]} name="LTV médio" />
           </BarChart>
         </ResponsiveContainer>

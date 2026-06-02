@@ -28,7 +28,15 @@ export function ChurnMensalChart({ serie }: { serie: ChurnMensalPonto[] }) {
             <CartesianGrid strokeDasharray="3 3" stroke={grid} />
             <XAxis dataKey="mes" tick={{ fill: axis, fontSize: 11 }} />
             <YAxis tick={{ fill: axis, fontSize: 11 }} tickFormatter={(v: number) => `${v}%`} />
-            <Tooltip formatter={(v: number) => `${v}%`} />
+            <Tooltip
+              contentStyle={{
+                backgroundColor: isDark ? "#18181b" : "#ffffff",
+                border: `1px solid ${isDark ? "#3f3f46" : "#e5e7eb"}`,
+                borderRadius: 8,
+                color: isDark ? "#f4f4f5" : "#111827",
+              }}
+              formatter={(v: number) => `${v}%`}
+            />
             <Line
               type="monotone"
               dataKey="revChurnPct"

@@ -6,22 +6,8 @@ import { OverviewCards } from "@/components/lt-ltv-churn/OverviewCards";
 import { BenchmarkProduto } from "@/components/lt-ltv-churn/BenchmarkProduto";
 import { ChurnMensalChart } from "@/components/lt-ltv-churn/ChurnMensalChart";
 import { TabContratosClientes } from "@/components/lt-ltv-churn/TabContratosClientes";
+import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import type { OverviewData, ProdutoBenchmark, ChurnMensalPonto } from "@/components/lt-ltv-churn/types";
-
-async function fetchJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Erro ao buscar ${url}`);
-  return res.json();
-}
-
-function buildUrl(base: string, params: Record<string, string | undefined>): string {
-  const search = new URLSearchParams();
-  Object.entries(params).forEach(([k, v]) => {
-    if (v !== undefined && v !== "") search.set(k, v);
-  });
-  const qs = search.toString();
-  return qs ? `${base}?${qs}` : base;
-}
 
 export default function LtLtvChurn() {
   useSetPageInfo("LT, LTV & Churn", "Lifetime, valor e churn por contrato e cliente");
@@ -53,8 +39,7 @@ export default function LtLtvChurn() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-gray-900 dark:text-white">LT, LTV &amp; Churn</h1>
+      <div className="flex items-center justify-end">
         <Select value={produto} onValueChange={setProduto}>
           <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
             <SelectValue placeholder="Produto" />
@@ -70,9 +55,21 @@ export default function LtLtvChurn() {
         </Select>
       </div>
 
-      {overview && <OverviewCards data={overview} />}
-      {churn && <ChurnMensalChart serie={churn.serie} />}
-      {benchmark && <BenchmarkProduto produtos={benchmark.produtos} />}
+      {!overview ? (
+        <div className="h-24 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
+      ) : (
+        <OverviewCards data={overview} />
+      )}
+      {!churn ? (
+        <div className="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
+      ) : (
+        <ChurnMensalChart serie={churn.serie} />
+      )}
+      {!benchmark ? (
+        <div className="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
+      ) : (
+        <BenchmarkProduto produtos={benchmark.produtos} />
+      )}
       <TabContratosClientes produto={produtoParam} />
     </div>
   );
