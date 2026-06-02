@@ -32,7 +32,7 @@ export function FluxoMensal() {
   const isDark = theme === "dark";
   const grid = isDark ? "#27272a" : "#e5e7eb";
   const axis = isDark ? "#a1a1aa" : "#6b7280";
-  const [metrica, setMetrica] = useState<Metrica>("qtd");
+  const [metrica, setMetrica] = useState<Metrica>("valor");
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/estoque-pontual/fluxo"],
