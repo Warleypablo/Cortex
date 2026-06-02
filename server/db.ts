@@ -1369,7 +1369,7 @@ export async function initializeLtLtvChurnViews(): Promise<void> {
            THEN ROUND((c.valorr * c.lt_dias / 30.44)::numeric, 2) END AS ltv_recorrente
     FROM calc c
   `);
-  console.log("[db] View cortex_core.vw_lt_contratos criada/atualizada");
+  console.log('[database] vw_lt_contratos view created');
 }
 
 export async function initializeDashboardTables(): Promise<void> {
