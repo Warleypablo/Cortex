@@ -50,6 +50,7 @@ export const PERMISSION_KEYS = {
     LT_LTV_CHURN: 'gestao.lt_ltv_churn',
     LTV_CLIENTES: 'gestao.ltv_clientes',
     ESTOQUE_PONTUAL: 'gestao.estoque_pontual',
+    CREATORS_PONTUAL: 'gestao.creators_pontual',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -239,6 +240,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/lt-ltv-churn': PERMISSION_KEYS.GESTAO.LT_LTV_CHURN,
   '/ltv-clientes': PERMISSION_KEYS.GESTAO.LTV_CLIENTES,
   '/estoque-pontual': PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL,
+  '/creators-pontual': PERMISSION_KEYS.GESTAO.CREATORS_PONTUAL,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
   '/triagem': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
@@ -469,6 +471,7 @@ export const NAV_CONFIG = {
         { title: 'LTV por Contrato', url: '/lt-ltv-churn', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.LT_LTV_CHURN },
         { title: 'LTV por Cliente', url: '/ltv-clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.LTV_CLIENTES },
         { title: 'Estoque de Pontual', url: '/estoque-pontual', icon: 'Package', permissionKey: PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL },
+        { title: 'Creators Pontual', url: '/creators-pontual', icon: 'Clapperboard', permissionKey: PERMISSION_KEYS.GESTAO.CREATORS_PONTUAL },
       ],
     },
     {
@@ -702,6 +705,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GESTAO.LT_LTV_CHURN]: 'LTV por Contrato',
   [PERMISSION_KEYS.GESTAO.LTV_CLIENTES]: 'LTV por Cliente',
   [PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL]: 'Estoque de Pontual',
+  [PERMISSION_KEYS.GESTAO.CREATORS_PONTUAL]: 'Creators Pontual',
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
   [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',

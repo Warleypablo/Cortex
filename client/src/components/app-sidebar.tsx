@@ -6,7 +6,7 @@ import {
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut, Lock, Bell, Moon, Sun,
   ChevronRight, ChevronDown, Presentation, Activity, Palette, Sliders, Lightbulb, Megaphone, Ticket,
-  Star, Gauge, Bot, Link2, Package
+  Star, Gauge, Bot, Link2, Package, Clapperboard
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogo from "@assets/logo-branca.png";
@@ -46,7 +46,7 @@ const ICONS: Record<string, any> = {
   Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Activity, Palette,
-  Sliders, Bell, Lightbulb, Megaphone, Ticket, Gauge, Bot, Link2, Package,
+  Sliders, Bell, Lightbulb, Megaphone, Ticket, Gauge, Bot, Link2, Package, Clapperboard,
 };
 
 const getIcon = (iconName: string) => ICONS[iconName] || FileText;
