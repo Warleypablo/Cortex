@@ -55,3 +55,18 @@ describe("GET /api/lt-ltv-churn/benchmark", () => {
     expect(res.body.produtos[0].revChurnPct).toBe(77.4);
   });
 });
+
+describe("GET /api/lt-ltv-churn/churn-mensal", () => {
+  it("retorna a serie mensal", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [
+        { mes: "2026-04", mrr_ativo_inicio: 1059611, mrr_perdido: 159274, rev_churn_pct: 15.0 },
+        { mes: "2026-05", mrr_ativo_inicio: 1079394, mrr_perdido: 98833, rev_churn_pct: 9.2 },
+      ],
+    });
+    const res = await request(makeApp()).get("/api/lt-ltv-churn/churn-mensal?meses=2");
+    expect(res.status).toBe(200);
+    expect(res.body.serie).toHaveLength(2);
+    expect(res.body.serie[1].revChurnPct).toBe(9.2);
+  });
+});
