@@ -1,6 +1,6 @@
 import type { ElementType } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { DollarSign, Clock, Users, TrendingDown } from "lucide-react";
+import { DollarSign, Clock, TrendingDown } from "lucide-react";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import type { OverviewData } from "./types";
 
@@ -33,18 +33,13 @@ function Kpi({
 
 export function OverviewCards({ data }: { data: OverviewData }) {
   return (
-    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-3">
       <Kpi icon={DollarSign} label="MRR Ativo" value={formatCurrencyNoDecimals(data.mrrAtivo)} />
       <Kpi
         icon={Clock}
         label="LT Médio (ativos)"
         value={`${data.ltMedioAtivo} m`}
         sub={`Cancelados: ${data.ltMedioCancelado} m`}
-      />
-      <Kpi
-        icon={Users}
-        label="LTV Médio / Cliente"
-        value={formatCurrencyNoDecimals(data.ltvMedioCliente)}
       />
       <Kpi
         icon={TrendingDown}
