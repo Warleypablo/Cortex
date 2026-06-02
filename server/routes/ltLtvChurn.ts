@@ -317,6 +317,52 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
     }
   });
 
+  app.get("/api/lt-ltv-churn/evolucao-produto", async (req, res) => {
+    try {
+      const rows = (await db.execute(sql`
+        WITH meses AS (
+          SELECT generate_series(date_trunc('month',CURRENT_DATE) - interval '12 months', date_trunc('month',CURRENT_DATE) - interval '1 month', '1 month')::date m
+        ),
+        snap_ref AS (
+          SELECT meses.m, COALESCE(
+            (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = meses.m LIMIT 1),
+            (SELECT MIN(data_snapshot) FROM "Clickup".cup_data_hist WHERE date_trunc('month',data_snapshot)=meses.m)
+          ) snap FROM meses
+        ),
+        base AS (
+          SELECT sr.m, h.produto, h.valorr, (h.data_snapshot - h.data_inicio)::numeric/30.44 AS lt
+          FROM snap_ref sr JOIN "Clickup".cup_data_hist h ON h.data_snapshot = sr.snap
+          WHERE h.status IN ('ativo','onboarding','triagem') AND h.valorr>0 AND h.data_snapshot >= h.data_inicio
+        ),
+        cobertura AS (
+          SELECT m, COUNT(*) FILTER (WHERE produto IS NOT NULL)::numeric / NULLIF(COUNT(*),0) cob FROM base GROUP BY m
+        )
+        SELECT to_char(b.m,'YYYY-MM') AS mes, b.produto,
+          ROUND(AVG(b.lt)::numeric,1) AS lt,
+          ROUND(AVG(b.valorr*b.lt)::numeric,0) AS ltv
+        FROM base b JOIN cobertura c ON c.m=b.m AND c.cob>=0.5
+        WHERE b.produto IN ('Creators','Performance','Social Media')
+        GROUP BY b.m, b.produto ORDER BY b.m, b.produto
+      `)).rows as any[];
+
+      const produtos = Array.from(new Set(rows.map((r) => r.produto)));
+      const mesesList = Array.from(new Set(rows.map((r) => r.mes))).sort();
+      const pivot = (campo: "lt" | "ltv") =>
+        mesesList.map((mes) => {
+          const ponto: Record<string, any> = { mes };
+          for (const p of produtos) {
+            const r = rows.find((x) => x.mes === mes && x.produto === p);
+            if (r) ponto[p] = Number(r[campo]);
+          }
+          return ponto;
+        });
+      res.json({ produtos, lt: pivot("lt"), ltv: pivot("ltv") });
+    } catch (error) {
+      console.error("[api] Error fetching lt-ltv-churn evolucao-produto:", error);
+      res.status(500).json({ error: "Failed to fetch evolucao-produto" });
+    }
+  });
+
   app.get("/api/lt-ltv-churn/clientes", async (req, res) => {
     try {
       const apenas = (req.query.status as string) || undefined; // 'ativo' | 'cancelado'
@@ -372,6 +418,45 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error fetching lt-ltv-churn clientes:", error);
       res.status(500).json({ error: "Failed to fetch clientes" });
+    }
+  });
+
+  app.get("/api/lt-ltv-churn/evolucao-clientes", async (req, res) => {
+    try {
+      const rows = (await db.execute(sql`
+        WITH meses AS (
+          SELECT generate_series(date_trunc('month',CURRENT_DATE) - interval '12 months', date_trunc('month',CURRENT_DATE) - interval '1 month', '1 month')::date m
+        ),
+        snap_ref AS (
+          SELECT meses.m, COALESCE(
+            (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = meses.m LIMIT 1),
+            (SELECT MIN(data_snapshot) FROM "Clickup".cup_data_hist WHERE date_trunc('month',data_snapshot)=meses.m)
+          ) snap FROM meses
+        ),
+        cli AS (
+          SELECT sr.m, sr.snap, h.id_task,
+            BOOL_OR(h.status IN ('ativo','onboarding','triagem') AND h.valorr>0) AS ativo,
+            (sr.snap - MIN(h.data_inicio) FILTER (WHERE h.valorr>0 AND sr.snap>=h.data_inicio))::numeric/30.44 AS lt,
+            COALESCE(SUM(h.valorr*(sr.snap-h.data_inicio)::numeric/30.44) FILTER (WHERE h.valorr>0 AND sr.snap>=h.data_inicio),0)
+              + COALESCE(SUM(h.valorp) FILTER (WHERE h.valorp>0),0) AS ltv
+          FROM snap_ref sr JOIN "Clickup".cup_data_hist h ON h.data_snapshot=sr.snap
+          GROUP BY sr.m, sr.snap, h.id_task
+        )
+        SELECT to_char(m,'YYYY-MM') AS mes,
+          ROUND(AVG(lt) FILTER (WHERE ativo)::numeric,1) AS lt,
+          ROUND(AVG(ltv) FILTER (WHERE ativo)::numeric,0) AS ltv
+        FROM cli GROUP BY m ORDER BY m
+      `)).rows;
+      res.json({
+        serie: rows.map((r: any) => ({
+          mes: r.mes,
+          lt: Number(r.lt) || 0,
+          ltv: Number(r.ltv) || 0,
+        })),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching lt-ltv-churn evolucao-clientes:", error);
+      res.status(500).json({ error: "Failed to fetch evolucao-clientes" });
     }
   });
 }

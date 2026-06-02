@@ -140,3 +140,35 @@ describe("GET /api/lt-ltv-churn/dist-clientes", () => {
     expect(res.body.lt[0].qtd).toBe(395);
   });
 });
+
+describe("GET /api/lt-ltv-churn/evolucao-produto", () => {
+  it("retorna pivot de LT e LTV por produto/mes", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [
+        { mes: "2025-12", produto: "Performance", lt: 5.8, ltv: 14121 },
+        { mes: "2026-03", produto: "Performance", lt: 6.2, ltv: 16360 },
+      ],
+    });
+    const res = await request(makeApp()).get("/api/lt-ltv-churn/evolucao-produto");
+    expect(res.status).toBe(200);
+    expect(res.body.produtos).toContain("Performance");
+    expect(res.body.lt).toHaveLength(2);
+    expect(res.body.lt[0]).toHaveProperty("Performance");
+    expect(res.body.lt[1]).toHaveProperty("Performance");
+  });
+});
+
+describe("GET /api/lt-ltv-churn/evolucao-clientes", () => {
+  it("retorna serie mensal de LT e LTV medio dos clientes ativos", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [
+        { mes: "2025-11", lt: 5.0, ltv: 20289 },
+        { mes: "2026-05", lt: 6.4, ltv: 33284 },
+      ],
+    });
+    const res = await request(makeApp()).get("/api/lt-ltv-churn/evolucao-clientes");
+    expect(res.status).toBe(200);
+    expect(res.body.serie).toHaveLength(2);
+    expect(res.body.serie[1].lt).toBe(6.4);
+  });
+});
