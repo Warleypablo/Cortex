@@ -39,3 +39,19 @@ describe("GET /api/lt-ltv-churn/overview", () => {
     expect(res.status).toBe(500);
   });
 });
+
+describe("GET /api/lt-ltv-churn/benchmark", () => {
+  it("retorna lista por produto com revenue churn %", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [{
+        produto: "Performance", n_ativos: 134, n_cancelados: 697,
+        lt_medio_cancelado: 4.6, lt_medio_ativo: 6.3, ltv_medio: 10686,
+        mrr_ativo: 448114, mrr_perdido: 1536188,
+      }],
+    });
+    const res = await request(makeApp()).get("/api/lt-ltv-churn/benchmark");
+    expect(res.status).toBe(200);
+    expect(res.body.produtos[0].produto).toBe("Performance");
+    expect(res.body.produtos[0].revChurnPct).toBe(77.4);
+  });
+});
