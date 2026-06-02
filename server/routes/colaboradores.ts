@@ -17,12 +17,23 @@ function isAuthenticated(req: any, res: any, next: any) {
   next();
 }
 
+function isColaboradoresRestrito(req: any): boolean {
+  const routes: string[] = req.user?.allowedRoutes ?? [];
+  return routes.includes('gg.colaboradores_restrito') &&
+    !routes.includes('gg.colaboradores') &&
+    req.user?.role !== 'admin';
+}
+
 export function registerColaboradoresRoutes(app: Express, db: any, storage: IStorage) {
   app.get("/api/colaboradores", async (req, res) => {
     try {
       const colaboradores = await storage.getColaboradores();
       console.log(`[DEBUG] Colaboradores encontrados no banco: ${colaboradores.length} total, ${colaboradores.filter(c => c.status === 'Ativo').length} ativos`);
-      res.json(colaboradores);
+      const restricted = isColaboradoresRestrito(req);
+      const result = restricted
+        ? colaboradores.map(({ salario, ...rest }: any) => rest)
+        : colaboradores;
+      res.json(result);
     } catch (error) {
       console.error("[api] Error fetching colaboradores:", error);
       res.status(500).json({ error: "Failed to fetch colaboradores" });
@@ -116,9 +127,12 @@ export function registerColaboradoresRoutes(app: Express, db: any, storage: ISto
           ? colunasParam.split(",").map((col: string) => col.trim()).filter(Boolean)
           : [];
       const requestedSet = new Set(requestedKeys);
-      const selectedColumns = requestedKeys.length > 0
-        ? exportColumns.filter((col) => requestedSet.has(col.key))
+      const effectiveColumns = isColaboradoresRestrito(req)
+        ? exportColumns.filter((col) => col.key !== 'salario')
         : exportColumns;
+      const selectedColumns = requestedKeys.length > 0
+        ? effectiveColumns.filter((col) => requestedSet.has(col.key))
+        : effectiveColumns;
 
       if (requestedKeys.length > 0 && selectedColumns.length === 0) {
         return res.status(400).json({ error: "Nenhuma coluna válida selecionada" });
@@ -576,16 +590,17 @@ export function registerColaboradoresRoutes(app: Express, db: any, storage: ISto
       const salarioMedio = salarios.length > 0 ? Math.round(salarios.reduce((a, b) => a + b, 0) / salarios.length) : 0;
       const tempoMedio = colaboradores.reduce((acc, c) => acc + (c.mesesDeTurbo ?? 0), 0) / (totalColaboradores || 1);
 
+      const restricted = isColaboradoresRestrito(req);
       res.json({
         healthDistribution,
         headcountBySquad,
         nivelDistribution,
-        salarioByTempo,
-        salarioBySquad,
+        salarioByTempo: restricted ? null : salarioByTempo,
+        salarioBySquad: restricted ? null : salarioBySquad,
         tempoBySquad,
         estatisticas: {
           totalColaboradores,
-          salarioMedio,
+          salarioMedio: restricted ? null : salarioMedio,
           tempoMedioMeses: Math.round(tempoMedio * 10) / 10,
         },
       });
@@ -727,6 +742,10 @@ export function registerColaboradoresRoutes(app: Express, db: any, storage: ISto
         promocoes: promocoesResult.rows || [],
         linkedUser: linkedUser,
       };
+
+      if (isColaboradoresRestrito(req)) {
+        delete (colaborador as any).salario;
+      }
 
       res.json(colaborador);
     } catch (error) {
