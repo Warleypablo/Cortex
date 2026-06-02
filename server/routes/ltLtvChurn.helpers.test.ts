@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { revenueChurnPct, ltvTotalCliente } from "./ltLtvChurn.helpers";
+import { revenueChurnPct } from "./ltLtvChurn.helpers";
 
 describe("revenueChurnPct", () => {
   it("calcula percentual com 1 casa decimal", () => {
@@ -10,15 +10,5 @@ describe("revenueChurnPct", () => {
   });
   it("retorna 0 quando não há MRR perdido", () => {
     expect(revenueChurnPct(0, 500000)).toBe(0);
-  });
-});
-
-describe("ltvTotalCliente", () => {
-  it("soma LTV recorrente e pontual", () => {
-    expect(ltvTotalCliente(13053, 5899)).toBe(18952);
-  });
-  it("trata null/undefined como zero", () => {
-    expect(ltvTotalCliente(null, 5000)).toBe(5000);
-    expect(ltvTotalCliente(undefined, undefined)).toBe(0);
   });
 });

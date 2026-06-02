@@ -84,6 +84,12 @@ describe("GET /api/lt-ltv-churn/contratos", () => {
     expect(res.body.total).toBe(1514);
     expect(res.body.contratos[0].produto).toBe("Performance");
   });
+
+  it("retorna 500 em erro de banco", async () => {
+    mockExecute.mockRejectedValueOnce(new Error("db down"));
+    const res = await request(makeApp()).get("/api/lt-ltv-churn/contratos");
+    expect(res.status).toBe(500);
+  });
 });
 
 describe("GET /api/lt-ltv-churn/clientes", () => {
