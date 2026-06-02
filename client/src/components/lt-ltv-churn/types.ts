@@ -13,7 +13,10 @@ export interface ProdutoBenchmark {
   nCancelados: number;
   ltMedioCancelado: number;
   ltMedioAtivo: number;
+  ltMedioGeral: number;
   ltvMedio: number;
+  ltvMedioAtivo: number;
+  ltvMedioGeral: number;
   mrrAtivo: number;
   mrrPerdido: number;
   revChurnPct: number;

@@ -61,7 +61,10 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           COUNT(*) FILTER (WHERE is_churned) AS n_cancelados,
           ROUND(AVG(lt_meses) FILTER (WHERE is_churned AND NOT data_inconsistente), 1) AS lt_medio_cancelado,
           ROUND(AVG(lt_meses) FILTER (WHERE status IN ('ativo','onboarding','triagem') AND NOT data_inconsistente), 1) AS lt_medio_ativo,
+          ROUND(AVG(lt_meses) FILTER (WHERE (status IN ('ativo','onboarding','triagem') OR is_churned) AND NOT data_inconsistente), 1) AS lt_medio_geral,
           ROUND(AVG(ltv_recorrente) FILTER (WHERE is_churned AND NOT data_inconsistente), 0) AS ltv_medio,
+          ROUND(AVG(ltv_recorrente) FILTER (WHERE status IN ('ativo','onboarding','triagem') AND NOT data_inconsistente), 0) AS ltv_medio_ativo,
+          ROUND(AVG(ltv_recorrente) FILTER (WHERE (status IN ('ativo','onboarding','triagem') OR is_churned) AND NOT data_inconsistente), 0) AS ltv_medio_geral,
           ROUND(SUM(valorr) FILTER (WHERE status IN ('ativo','onboarding','triagem'))::numeric, 0) AS mrr_ativo,
           ROUND(SUM(valorr) FILTER (WHERE is_churned)::numeric, 0) AS mrr_perdido
         FROM cortex_core.vw_lt_contratos
@@ -77,7 +80,10 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
         nCancelados: Number(r.n_cancelados) || 0,
         ltMedioCancelado: Number(r.lt_medio_cancelado) || 0,
         ltMedioAtivo: Number(r.lt_medio_ativo) || 0,
+        ltMedioGeral: Number(r.lt_medio_geral) || 0,
         ltvMedio: Number(r.ltv_medio) || 0,
+        ltvMedioAtivo: Number(r.ltv_medio_ativo) || 0,
+        ltvMedioGeral: Number(r.ltv_medio_geral) || 0,
         mrrAtivo: Number(r.mrr_ativo) || 0,
         mrrPerdido: Number(r.mrr_perdido) || 0,
         revChurnPct: revenueChurnPct(Number(r.mrr_perdido) || 0,
