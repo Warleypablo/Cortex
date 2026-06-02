@@ -341,9 +341,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           ROUND(AVG(b.lt)::numeric,1) AS lt,
           ROUND(AVG(b.valorr*b.lt)::numeric,0) AS ltv
         FROM base b JOIN cobertura c ON c.m=b.m AND c.cob>=0.5
-        WHERE b.produto IS NOT NULL AND b.produto IN (
-          SELECT produto FROM "Clickup".cup_contratos WHERE valorr>0 AND produto IS NOT NULL GROUP BY produto ORDER BY COUNT(*) DESC LIMIT 5
-        )
+        WHERE b.produto IN ('Creators','Performance','Social Media')
         GROUP BY b.m, b.produto ORDER BY b.m, b.produto
       `)).rows as any[];
 
