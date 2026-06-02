@@ -66,6 +66,7 @@ import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
 import { registerInternalTrainingsRoutes } from "./routes/internalTrainings";
 import { registerLtLtvChurnRoutes } from "./routes/ltLtvChurn";
+import { registerEstoquePontualRoutes } from "./routes/estoquePontual";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
@@ -8144,6 +8145,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // LT/LTV/Churn Dashboard - registered from separate file
   registerLtLtvChurnRoutes(app, db);
+  registerEstoquePontualRoutes(app, db);
 
   // ============================================
   // Sugestões API

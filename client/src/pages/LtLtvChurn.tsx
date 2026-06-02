@@ -7,6 +7,7 @@ import { BenchmarkProduto } from "@/components/lt-ltv-churn/BenchmarkProduto";
 import { LtLtvPorProduto } from "@/components/lt-ltv-churn/LtLtvPorProduto";
 import { ContratosTable } from "@/components/lt-ltv-churn/ContratosTable";
 import { DistLtContratos } from "@/components/lt-ltv-churn/DistLtContratos";
+import { EvolucaoProduto } from "@/components/lt-ltv-churn/EvolucaoProduto";
 import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import type { OverviewData, ProdutoBenchmark } from "@/components/lt-ltv-churn/types";
 
@@ -58,6 +59,7 @@ export default function LtLtvChurn() {
       ) : (
         <>
           <LtLtvPorProduto produtos={benchmark.produtos} />
+          <EvolucaoProduto />
           <BenchmarkProduto produtos={benchmark.produtos} />
         </>
       )}

@@ -62,3 +62,15 @@ export interface ClienteRow {
 
 export interface BucketLtContrato { faixa: string; ativos: number; cancelados: number; }
 export interface BucketDist { faixa: string; qtd: number; }
+
+export interface EvolucaoProdutoData {
+  produtos: string[];
+  lt: Array<Record<string, number | string>>;
+  ltv: Array<Record<string, number | string>>;
+}
+
+export interface EvolucaoClientePonto {
+  mes: string;
+  lt: number;
+  ltv: number;
+}
