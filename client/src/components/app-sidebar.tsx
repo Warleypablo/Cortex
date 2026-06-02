@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { 
-  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound,
+import {
+  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, TrendingDown, UsersRound,
   Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase,
   Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
@@ -41,7 +41,7 @@ interface User {
 }
 
 const ICONS: Record<string, any> = {
-  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound,
+  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, TrendingDown, UsersRound,
   Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, Monitor,
   Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,

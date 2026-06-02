@@ -46,6 +46,6 @@ export interface ClienteRow {
   ltvRecorrente: number;
   ltvPontual: number;
   ltvTotal: number;
-  ltMeses: number;
+  ltMeses: number | null;
   ativo: boolean;
 }
