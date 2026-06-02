@@ -6,6 +6,7 @@ import { OverviewCards } from "@/components/lt-ltv-churn/OverviewCards";
 import { BenchmarkProduto } from "@/components/lt-ltv-churn/BenchmarkProduto";
 import { ChurnMensalChart } from "@/components/lt-ltv-churn/ChurnMensalChart";
 import { ContratosTable } from "@/components/lt-ltv-churn/ContratosTable";
+import { DistLtContratos } from "@/components/lt-ltv-churn/DistLtContratos";
 import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import type { OverviewData, ProdutoBenchmark, ChurnMensalPonto } from "@/components/lt-ltv-churn/types";
 
@@ -70,6 +71,7 @@ export default function LtLtvChurn() {
       ) : (
         <BenchmarkProduto produtos={benchmark.produtos} />
       )}
+      <DistLtContratos produto={produtoParam} />
       <ContratosTable produto={produtoParam} />
     </div>
   );
