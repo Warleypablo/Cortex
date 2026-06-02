@@ -39,6 +39,15 @@ export interface ContratoRow {
   dataInconsistente: boolean;
 }
 
+export interface OverviewClientesData {
+  totalClientes: number;
+  clientesAtivos: number;
+  clientesCancelados: number;
+  ltvMedioCliente: number;
+  ltMedioClienteAtivo: number;
+  ltMedioClienteCancelado: number;
+}
+
 export interface ClienteRow {
   idTask: string;
   nomeCliente: string | null;
