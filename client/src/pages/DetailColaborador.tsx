@@ -1195,6 +1195,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {!isRestrito && (
               <FormField
                 control={form.control}
                 name="salario"
@@ -1202,10 +1203,10 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                   <FormItem>
                     <FormLabel>Salário</FormLabel>
                     <FormControl>
-                      <Input 
-                        {...field} 
-                        value={field.value || ""} 
-                        data-testid="input-edit-salario" 
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-edit-salario"
                         type="number"
                         step="0.01"
                         placeholder="0.00"
@@ -1215,6 +1216,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
                   </FormItem>
                 )}
               />
+              )}
               <FormField
                 control={form.control}
                 name="cnpj"
