@@ -68,3 +68,9 @@ export interface EvolucaoProdutoData {
   lt: Array<Record<string, number | string>>;
   ltv: Array<Record<string, number | string>>;
 }
+
+export interface EvolucaoClientePonto {
+  mes: string;
+  lt: number;
+  ltv: number;
+}
