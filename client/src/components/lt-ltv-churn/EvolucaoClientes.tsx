@@ -1,13 +1,5 @@
-import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import {
   LineChart,
   Line,
@@ -15,6 +7,7 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
+  Legend,
   ResponsiveContainer,
 } from "recharts";
 import { useTheme } from "@/components/ThemeProvider";
@@ -32,8 +25,6 @@ export function EvolucaoClientes() {
   const grid = isDark ? "#27272a" : "#e5e7eb";
   const axis = isDark ? "#a1a1aa" : "#6b7280";
 
-  const [metrica, setMetrica] = useState<"lt" | "ltv">("lt");
-
   const { data: evolucao, isLoading } = useQuery({
     queryKey: ["/api/lt-ltv-churn/evolucao-clientes"],
     queryFn: () => fetchJson<EvolucaoClientesData>("/api/lt-ltv-churn/evolucao-clientes"),
@@ -46,37 +37,26 @@ export function EvolucaoClientes() {
   return (
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
       <CardHeader>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <CardTitle className="text-base">Evolução de LT/LTV dos clientes</CardTitle>
-            <p className="text-xs text-gray-500 dark:text-zinc-400">
-              Média mensal da carteira ativa de clientes (snapshots)
-            </p>
-          </div>
-          <Select value={metrica} onValueChange={(v) => setMetrica(v as "lt" | "ltv")}>
-            <SelectTrigger className="w-[170px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="lt">LT médio (meses)</SelectItem>
-              <SelectItem value="ltv">LTV médio (R$)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+        <CardTitle className="text-base">Evolução de LT/LTV dos clientes</CardTitle>
+        <p className="text-xs text-gray-500 dark:text-zinc-400">
+          Média mensal da carteira ativa de clientes (snapshots) · LT (meses, esq.) e LTV (R$, dir.)
+        </p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={300}>
           <LineChart data={evolucao.serie} margin={{ top: 8, right: 12, left: 8, bottom: 8 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={grid} />
-            <XAxis
-              dataKey="mes"
+            <XAxis dataKey="mes" tick={{ fill: axis, fontSize: 11 }} />
+            <YAxis
+              yAxisId="lt"
               tick={{ fill: axis, fontSize: 11 }}
+              tickFormatter={(v) => `${v}m`}
             />
             <YAxis
+              yAxisId="ltv"
+              orientation="right"
               tick={{ fill: axis, fontSize: 11 }}
-              tickFormatter={(v) =>
-                metrica === "lt" ? `${v}m` : formatCurrencyNoDecimals(v)
-              }
+              tickFormatter={(v) => formatCurrencyNoDecimals(v)}
             />
             <Tooltip
               contentStyle={{
@@ -85,18 +65,30 @@ export function EvolucaoClientes() {
                 borderRadius: 8,
                 color: isDark ? "#f4f4f5" : "#111827",
               }}
-              formatter={(v: number) =>
-                metrica === "lt" ? `${v}m` : formatCurrencyNoDecimals(v)
+              formatter={(v: number, name: string) =>
+                name.includes("LTV") ? formatCurrencyNoDecimals(v) : `${v} m`
               }
             />
+            <Legend />
             <Line
-              dataKey={metrica}
+              yAxisId="lt"
+              dataKey="lt"
+              stroke="#0ea5e9"
+              strokeWidth={2}
+              dot={{ r: 3 }}
+              type="monotone"
+              connectNulls
+              name="LT médio (m)"
+            />
+            <Line
+              yAxisId="ltv"
+              dataKey="ltv"
               stroke="#6366f1"
               strokeWidth={2}
               dot={{ r: 3 }}
               type="monotone"
               connectNulls
-              name={metrica === "lt" ? "LT médio (m)" : "LTV médio"}
+              name="LTV médio"
             />
           </LineChart>
         </ResponsiveContainer>
