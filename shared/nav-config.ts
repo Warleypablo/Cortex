@@ -47,6 +47,7 @@ export const PERMISSION_KEYS = {
     CAPACITY: 'gestao.capacity',
     ANALISE_PREDITIVA: 'gestao.analise_preditiva',
     TV_LEADERBOARD: 'gestao.tv_leaderboard',
+    LT_LTV_CHURN: 'gestao.lt_ltv_churn',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -233,6 +234,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
   '/gestao/tv-leaderboard': PERMISSION_KEYS.GESTAO.TV_LEADERBOARD,
+  '/lt-ltv-churn': PERMISSION_KEYS.GESTAO.LT_LTV_CHURN,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
   '/triagem': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
@@ -460,6 +462,7 @@ export const NAV_CONFIG = {
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
         { title: 'Triagem Inteligente', url: '/triagem', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
         { title: 'TV Leaderboard', url: '/gestao/tv-leaderboard', icon: 'Tv', permissionKey: PERMISSION_KEYS.GESTAO.TV_LEADERBOARD },
+        { title: 'LT, LTV & Churn', url: '/lt-ltv-churn', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.LT_LTV_CHURN },
       ],
     },
     {
@@ -690,6 +693,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GESTAO.SAUDE_BASE]: 'Saúde da Base Ativa',
   [PERMISSION_KEYS.GESTAO.BP_PRODUTOS]: 'BP Produtos',
   [PERMISSION_KEYS.GESTAO.ANALISE_PREDITIVA]: 'Análise Preditiva',
+  [PERMISSION_KEYS.GESTAO.LT_LTV_CHURN]: 'LT, LTV & Churn',
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
   [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',
