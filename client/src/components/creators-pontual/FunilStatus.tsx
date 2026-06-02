@@ -55,7 +55,7 @@ export function FunilStatus() {
             />
             <Bar dataKey="valor" name="Valor" radius={[0, 4, 4, 0]}>
               {data.status.map((s) => (
-                <Cell key={s.status} fill={COR[s.status] ?? "#6366f1"} />
+                <Cell key={s.status} fill={COR[s.status?.toLowerCase()] ?? "#6366f1"} />
               ))}
             </Bar>
           </BarChart>
