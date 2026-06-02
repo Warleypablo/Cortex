@@ -160,6 +160,7 @@ const CrossSellDashboard = lazyWithRetry(() => import("@/pages/CrossSellDashboar
 const ReceitaRecorrente = lazyWithRetry(() => import("@/pages/financeiro/ReceitaRecorrente"));
 const MixReceita = lazyWithRetry(() => import("@/pages/financeiro/MixReceita"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
+const LtLtvChurn = lazyWithRetry(() => import("@/pages/LtLtvChurn"));
 
 // Error boundary to catch silent crashes in the portal.
 // The lazyWithRetry wrapper handles the first auto-reload attempt at the
@@ -312,6 +313,7 @@ function ProtectedRouter() {
       <Route path="/visao-geral">{() => <ProtectedRoute path="/visao-geral" component={VisaoGeral} />}</Route>
       <Route path="/dashboard/churn-detalhamento">{() => <ProtectedRoute path="/dashboard/churn-detalhamento" component={ChurnDetalhamento} />}</Route>
       <Route path="/dashboard/churn-predicao">{() => <ProtectedRoute path="/dashboard/churn-predicao" component={ChurnPredicao} />}</Route>
+      <Route path="/lt-ltv-churn">{() => <ProtectedRoute path="/lt-ltv-churn" component={LtLtvChurn} />}</Route>
       <Route path="/dashboard/evolucao-mensal">{() => <ProtectedRoute path="/dashboard/evolucao-mensal" component={EvolucaoMensal} />}</Route>
       <Route path="/dashboard/analise-squads">{() => <ProtectedRoute path="/dashboard/analise-squads" component={AnaliseSquads} />}</Route>
       <Route path="/dashboard/saude-base-ativa">{() => <ProtectedRoute path="/dashboard/saude-base-ativa" component={SaudeBaseAtiva} />}</Route>
