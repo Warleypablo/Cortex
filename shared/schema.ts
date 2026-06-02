@@ -937,6 +937,7 @@ export const crmDeal = bitrixSchema.table("crm_deal", {
   closer: text("closer"),
   sdr: text("sdr"),
   funil: varchar("funil", { length: 255 }),
+  dataReuniaoAgendada: date("data_reuniao_agendada"),
   dataReuniaoRealizada: date("data_reuniao_realizada"),
   faturamentoMensal: varchar("faturamento_mensal", { length: 255 }),
   lpDaConversao: varchar("lp_da_conversao", { length: 255 }),
