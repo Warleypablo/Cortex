@@ -126,6 +126,16 @@ describe("GET /api/estoque-pontual/itens", () => {
     expect(res.body.itens[0].idadeDias).toBe(368);
   });
 
+  it("propaga a página solicitada na resposta", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ total: 244 }] });
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    const res = await request(makeApp()).get("/api/estoque-pontual/itens?page=2&squad=%E2%9C%A8%20Aura");
+    expect(res.status).toBe(200);
+    expect(res.body.page).toBe(2);
+    expect(res.body.pageSize).toBe(50);
+    expect(res.body.itens).toEqual([]);
+  });
+
   it("retorna 500 em erro de banco", async () => {
     mockExecute.mockRejectedValueOnce(new Error("db down"));
     const res = await request(makeApp()).get("/api/estoque-pontual/itens");
