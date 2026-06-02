@@ -9,15 +9,18 @@ import {
 } from "@/components/ui/table";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import type { DistRow } from "./types";
+import { Link } from "wouter";
 
 export function DistribuicaoTabela({
   titulo,
   colChave,
   itens,
+  getLink,
 }: {
   titulo: string;
   colChave: string;
   itens: DistRow[];
+  getLink?: (chave: string) => string | undefined;
 }) {
   return (
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
@@ -45,7 +48,15 @@ export function DistribuicaoTabela({
               )}
               {itens.map((r) => (
                 <TableRow key={r.chave}>
-                  <TableCell className="font-medium">{r.chave}</TableCell>
+                  <TableCell className="font-medium">
+                    {getLink?.(r.chave) ? (
+                      <Link href={getLink(r.chave)!} className="text-primary hover:underline">
+                        {r.chave}
+                      </Link>
+                    ) : (
+                      r.chave
+                    )}
+                  </TableCell>
                   <TableCell className="text-right">{r.qtd}</TableCell>
                   <TableCell className="text-right">{formatCurrencyNoDecimals(r.valor)}</TableCell>
                   <TableCell className="text-right">{r.idadeMedia} d</TableCell>

@@ -55,7 +55,12 @@ export default function EstoquePontual() {
       </div>
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-        <DistribuicaoTabela titulo="Por produto" colChave="Produto" itens={produtosRows} />
+        <DistribuicaoTabela
+          titulo="Por produto"
+          colChave="Produto"
+          itens={produtosRows}
+          getLink={(chave) => (chave === "Creators" ? "/creators-pontual" : undefined)}
+        />
         <DistribuicaoTabela titulo="Por squad" colChave="Squad" itens={squadsRows} />
       </div>
 
