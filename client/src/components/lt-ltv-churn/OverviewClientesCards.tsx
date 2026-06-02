@@ -1,7 +1,7 @@
 import type { ElementType } from "react";
 import { Card, CardContent } from "@/components/ui/card";
-import { Users, Clock, DollarSign, UserCheck } from "lucide-react";
-import { formatCurrencyNoDecimals } from "@/lib/utils";
+import { Users, Clock, DollarSign, Wallet } from "lucide-react";
+import { formatCurrencyNoDecimals, formatCurrencyCompact } from "@/lib/utils";
 import type { OverviewClientesData } from "./types";
 
 function Kpi({
@@ -38,13 +38,6 @@ export function OverviewClientesCards({ data }: { data: OverviewClientesData }) 
         icon={Users}
         label="Clientes"
         value={String(data.totalClientes)}
-        sub={`${data.clientesAtivos} ativos · ${data.clientesCancelados} cancelados`}
-      />
-      <Kpi
-        icon={Clock}
-        label="LT Médio Cliente (ativos)"
-        value={`${data.ltMedioClienteAtivo} m`}
-        sub={`Cancelados: ${data.ltMedioClienteCancelado} m`}
       />
       <Kpi
         icon={DollarSign}
@@ -52,9 +45,14 @@ export function OverviewClientesCards({ data }: { data: OverviewClientesData }) 
         value={formatCurrencyNoDecimals(data.ltvMedioCliente)}
       />
       <Kpi
-        icon={UserCheck}
-        label="Clientes Ativos"
-        value={String(data.clientesAtivos)}
+        icon={Clock}
+        label="LT Médio Cliente"
+        value={`${data.ltMedioCliente} m`}
+      />
+      <Kpi
+        icon={Wallet}
+        label="LTV Total"
+        value={formatCurrencyCompact(data.ltvTotalClientes)}
       />
     </div>
   );

@@ -15,9 +15,10 @@ import type { BucketDist } from "./types";
 
 interface Props {
   produto?: string;
+  status?: string;
 }
 
-export function DistClientesCharts({ produto }: Props) {
+export function DistClientesCharts({ produto, status }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const grid = isDark ? "#27272a" : "#e5e7eb";
@@ -31,10 +32,10 @@ export function DistClientesCharts({ produto }: Props) {
   };
 
   const { data } = useQuery({
-    queryKey: ["/api/lt-ltv-churn/dist-clientes", produto],
+    queryKey: ["/api/lt-ltv-churn/dist-clientes", produto, status],
     queryFn: () =>
       fetchJson<{ ltv: BucketDist[]; lt: BucketDist[] }>(
-        buildUrl("/api/lt-ltv-churn/dist-clientes", { produto })
+        buildUrl("/api/lt-ltv-churn/dist-clientes", { produto, status })
       ),
   });
 

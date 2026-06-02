@@ -13,7 +13,10 @@ export interface ProdutoBenchmark {
   nCancelados: number;
   ltMedioCancelado: number;
   ltMedioAtivo: number;
+  ltMedioGeral: number;
   ltvMedio: number;
+  ltvMedioAtivo: number;
+  ltvMedioGeral: number;
   mrrAtivo: number;
   mrrPerdido: number;
   revChurnPct: number;
@@ -41,11 +44,9 @@ export interface ContratoRow {
 
 export interface OverviewClientesData {
   totalClientes: number;
-  clientesAtivos: number;
-  clientesCancelados: number;
   ltvMedioCliente: number;
-  ltMedioClienteAtivo: number;
-  ltMedioClienteCancelado: number;
+  ltMedioCliente: number;
+  ltvTotalClientes: number;
 }
 
 export interface ClienteRow {
