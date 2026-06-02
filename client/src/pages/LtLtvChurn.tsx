@@ -29,10 +29,10 @@ export default function LtLtvChurn() {
   });
 
   const { data: churn } = useQuery({
-    queryKey: ["/api/lt-ltv-churn/churn-mensal", produto],
+    queryKey: ["/api/lt-ltv-churn/churn-mensal"],
     queryFn: () =>
       fetchJson<{ serie: ChurnMensalPonto[] }>(
-        buildUrl("/api/lt-ltv-churn/churn-mensal", { meses: "8", produto: produtoParam })
+        buildUrl("/api/lt-ltv-churn/churn-mensal", { meses: "8" })
       ),
   });
 
