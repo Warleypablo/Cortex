@@ -65,6 +65,7 @@ import { registerNegativacaoRoutes } from "./routes/negativacao";
 import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
 import { registerInternalTrainingsRoutes } from "./routes/internalTrainings";
+import { registerLtLtvChurnRoutes } from "./routes/ltLtvChurn";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
@@ -8140,6 +8141,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Treinamentos Internos Module - registered from separate file
   registerInternalTrainingsRoutes(app);
+
+  // LT/LTV/Churn Dashboard - registered from separate file
+  registerLtLtvChurnRoutes(app, db);
 
   // ============================================
   // Sugestões API
