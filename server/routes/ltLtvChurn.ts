@@ -208,37 +208,34 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
   app.get("/api/lt-ltv-churn/overview-clientes", async (req, res) => {
     try {
       const produto = (req.query.produto as string) || undefined;
+      const status = (req.query.status as string) || undefined; // 'ativo' | 'cancelado'
+      const situacao = status === "ativo" ? sql`ativo` : status === "cancelado" ? sql`NOT ativo` : sql`TRUE`;
       const r = (await db.execute(sql`
         SELECT
           COUNT(*) AS total_clientes,
-          COUNT(*) FILTER (WHERE ativo) AS clientes_ativos,
-          COUNT(*) FILTER (WHERE NOT ativo) AS clientes_cancelados,
           ROUND(AVG(ltv_total)::numeric, 0) AS ltv_medio_cliente,
-          ROUND(AVG(lt_meses) FILTER (WHERE ativo)::numeric, 1) AS lt_medio_ativo,
-          ROUND(AVG(lt_meses) FILTER (WHERE NOT ativo)::numeric, 1) AS lt_medio_cancelado
+          ROUND(AVG(lt_meses)::numeric, 1) AS lt_medio_cliente,
+          ROUND(SUM(ltv_total)::numeric, 0) AS ltv_total_clientes
         FROM (
           SELECT id_task,
             BOOL_OR(is_ativo) AS ativo,
             SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv_total,
-            CASE
-              WHEN BOOL_OR(is_ativo) THEN (CURRENT_DATE - MIN(data_inicio))::numeric / 30.44
-              WHEN MAX(data_fim) FILTER (WHERE NOT data_inconsistente) >= MIN(data_inicio)
-                THEN (MAX(data_fim) FILTER (WHERE NOT data_inconsistente) - MIN(data_inicio))::numeric / 30.44
-              ELSE NULL
-            END AS lt_meses
+            CASE WHEN BOOL_OR(is_ativo) THEN (CURRENT_DATE - MIN(data_inicio))::numeric / 30.44
+                 WHEN MAX(data_fim) FILTER (WHERE NOT data_inconsistente) >= MIN(data_inicio)
+                   THEN (MAX(data_fim) FILTER (WHERE NOT data_inconsistente) - MIN(data_inicio))::numeric / 30.44
+                 ELSE NULL END AS lt_meses
           FROM cortex_core.vw_lt_contratos
           WHERE data_inicio IS NOT NULL
             ${produto ? sql`AND produto = ${produto}` : sql``}
           GROUP BY id_task
         ) cli
+        WHERE ${situacao}
       `)).rows[0] || {};
       res.json({
         totalClientes: Number(r.total_clientes) || 0,
-        clientesAtivos: Number(r.clientes_ativos) || 0,
-        clientesCancelados: Number(r.clientes_cancelados) || 0,
         ltvMedioCliente: Number(r.ltv_medio_cliente) || 0,
-        ltMedioClienteAtivo: Number(r.lt_medio_ativo) || 0,
-        ltMedioClienteCancelado: Number(r.lt_medio_cancelado) || 0,
+        ltMedioCliente: Number(r.lt_medio_cliente) || 0,
+        ltvTotalClientes: Number(r.ltv_total_clientes) || 0,
       });
     } catch (error) {
       console.error("[api] Error fetching lt-ltv-churn overview-clientes:", error);
@@ -280,8 +277,11 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
   app.get("/api/lt-ltv-churn/dist-clientes", async (req, res) => {
     try {
       const produto = (req.query.produto as string) || undefined;
+      const status = (req.query.status as string) || undefined;
+      const situacao = status === "ativo" ? sql`ativo` : status === "cancelado" ? sql`NOT ativo` : sql`TRUE`;
       const cli = sql`
         SELECT id_task,
+          BOOL_OR(is_ativo) AS ativo,
           SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv,
           CASE WHEN BOOL_OR(is_ativo) THEN (CURRENT_DATE - MIN(data_inicio))::numeric/30.44
                WHEN MAX(data_fim) FILTER (WHERE NOT data_inconsistente) >= MIN(data_inicio)
@@ -295,14 +295,14 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       const ltvRows = (await db.execute(sql`
         SELECT ord, (ARRAY['0-5k','5-10k','10-20k','20-50k','50k+'])[ord] AS faixa, COUNT(*) AS qtd FROM (
           SELECT CASE WHEN ltv<5000 THEN 1 WHEN ltv<10000 THEN 2 WHEN ltv<20000 THEN 3 WHEN ltv<50000 THEN 4 ELSE 5 END AS ord
-          FROM (${cli}) c
+          FROM (${cli}) c WHERE ${situacao}
         ) a GROUP BY ord ORDER BY ord
       `)).rows;
 
       const ltRows = (await db.execute(sql`
         SELECT ord, (ARRAY['0-3m','3-6m','6-12m','12-24m','24m+'])[ord] AS faixa, COUNT(*) AS qtd FROM (
           SELECT CASE WHEN lt<3 THEN 1 WHEN lt<6 THEN 2 WHEN lt<12 THEN 3 WHEN lt<24 THEN 4 ELSE 5 END AS ord
-          FROM (${cli}) c WHERE lt IS NOT NULL
+          FROM (${cli}) c WHERE ${situacao} AND lt IS NOT NULL
         ) a GROUP BY ord ORDER BY ord
       `)).rows;
 

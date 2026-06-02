@@ -13,12 +13,12 @@ import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { fetchJson, buildUrl } from "./utils";
 import type { ClienteRow } from "./types";
 
-export function ClientesTable({ produto }: { produto?: string }) {
+export function ClientesTable({ produto, status }: { produto?: string; status?: string }) {
   const { data: clientes } = useQuery({
-    queryKey: ["/api/lt-ltv-churn/clientes", produto],
+    queryKey: ["/api/lt-ltv-churn/clientes", produto, status],
     queryFn: () =>
       fetchJson<{ clientes: ClienteRow[]; total: number }>(
-        buildUrl("/api/lt-ltv-churn/clientes", { page: "1", produto })
+        buildUrl("/api/lt-ltv-churn/clientes", { page: "1", produto, status })
       ),
   });
 
