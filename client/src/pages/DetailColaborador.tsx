@@ -818,6 +818,7 @@ function EditColaboradorDialog({ colaborador, open, onOpenChange }: { colaborado
   const { toast } = useToast();
   const { user } = useAuth();
   const isAdmin = user?.role === 'admin';
+  const isRestrito = useIsColaboradoresRestrito();
 
   const { data: cargos = [], isLoading: cargosLoading } = useQuery<CargoOption[]>({
     queryKey: ["/api/rh/cargos"],
