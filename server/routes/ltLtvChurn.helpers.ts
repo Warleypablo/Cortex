@@ -26,11 +26,3 @@ export function resolveClienteSort(
   const col = CLIENTE_SORT_COLS[sort ?? ""] ?? "ltv_total";
   return { col, dir: dir === "asc" ? "ASC" : "DESC" };
 }
-
-/** Sugere o tier (cluster "1".."4") a partir do MRR ativo do cliente. */
-export function sugerirTier(mrr: number | null | undefined): "1" | "2" | "3" | "4" {
-  if (!mrr || mrr < 2000) return "1"; // NFNC
-  if (mrr < 4000) return "2"; // Regulares
-  if (mrr < 7000) return "3"; // Chaves
-  return "4"; // Imperdíveis
-}

@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
-import { revenueChurnPct, resolveClienteSort, sugerirTier } from "./ltLtvChurn.helpers";
+import { revenueChurnPct, resolveClienteSort } from "./ltLtvChurn.helpers";
 
 export function registerLtLtvChurnRoutes(app: Express, db: any) {
   // KPIs gerais
@@ -368,7 +368,6 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       const apenas = (req.query.status as string) || undefined; // 'ativo' | 'cancelado'
       const produto = (req.query.produto as string) || undefined;
       const squad = (req.query.squad as string) || undefined;
-      const cluster = (req.query.cluster as string) || undefined;
       const page = Math.max(parseInt(req.query.page as string) || 1, 1);
       const pageSize = 50;
       const offset = (page - 1) * pageSize;
@@ -385,7 +384,6 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           ROUND(SUM(COALESCE(ltv_recorrente,0))::numeric, 0) AS ltv_recorrente,
           ROUND(SUM(COALESCE(valorp,0))::numeric, 0) AS ltv_pontual,
           ROUND((SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)))::numeric, 0) AS ltv_total,
-          ROUND(SUM(valorr) FILTER (WHERE tipo_receita='recorrente' AND status IN ('ativo','onboarding','triagem'))::numeric, 0) AS mrr_ativo,
           CASE
             WHEN BOOL_OR(is_ativo) FILTER (WHERE tipo_receita='recorrente')
               THEN ROUND((CURRENT_DATE - MIN(data_inicio) FILTER (WHERE tipo_receita='recorrente'))::numeric / 30.44, 1)
@@ -405,87 +403,27 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
         req.query.dir as string,
       );
 
-      // Filtro por tier filtra apenas tiers JÁ ATRIBUÍDOS (cc.cluster); clientes sem tier
-      // atribuído não aparecem ao filtrar por um tier específico.
-      const withCluster = sql`
-        SELECT t.*, cc.cluster, COALESCE(cc.cluster_manual, false) AS cluster_manual
-        FROM (${baseAgg}) t
-        LEFT JOIN "Clickup".cup_clientes cc ON cc.task_id = t.id_task
-        WHERE 1=1 ${cluster ? sql`AND cc.cluster = ${cluster}` : sql``}`;
-
-      const totalRes = await db.execute(sql`SELECT COUNT(*) AS total FROM (${withCluster}) f`);
+      const totalRes = await db.execute(sql`SELECT COUNT(*) AS total FROM (${baseAgg}) t`);
       const rows = (await db.execute(sql`
-        SELECT * FROM (${withCluster}) f
+        SELECT * FROM (${baseAgg}) t
         ORDER BY ${sql.raw(sortCol)} ${sql.raw(sortDir)} NULLS LAST
         LIMIT ${pageSize} OFFSET ${offset}`)).rows;
 
       res.json({
         total: Number(totalRes.rows[0]?.total) || 0,
         page, pageSize,
-        clientes: rows.map((r: any) => {
-          const mrrAtivo = Number(r.mrr_ativo) || 0;
-          return {
-            idTask: r.id_task, nomeCliente: r.nome_cliente,
-            nContratosRec: Number(r.n_contratos_rec) || 0,
-            ltvRecorrente: Number(r.ltv_recorrente) || 0,
-            ltvPontual: Number(r.ltv_pontual) || 0,
-            ltvTotal: Number(r.ltv_total) || 0,
-            ltMeses: r.lt_meses != null ? Number(r.lt_meses) : null, ativo: r.ativo,
-            mrrAtivo,
-            cluster: r.cluster || null,
-            clusterManual: !!r.cluster_manual,
-            clusterSugerido: sugerirTier(mrrAtivo),
-          };
-        }),
+        clientes: rows.map((r: any) => ({
+          idTask: r.id_task, nomeCliente: r.nome_cliente,
+          nContratosRec: Number(r.n_contratos_rec) || 0,
+          ltvRecorrente: Number(r.ltv_recorrente) || 0,
+          ltvPontual: Number(r.ltv_pontual) || 0,
+          ltvTotal: Number(r.ltv_total) || 0,
+          ltMeses: r.lt_meses != null ? Number(r.lt_meses) : null, ativo: r.ativo,
+        })),
       });
     } catch (error) {
       console.error("[api] Error fetching lt-ltv-churn clientes:", error);
       res.status(500).json({ error: "Failed to fetch clientes" });
-    }
-  });
-
-  app.patch("/api/lt-ltv-churn/clientes/:idTask/tier", async (req, res) => {
-    try {
-      const idTask = req.params.idTask;
-      const cluster = (req.body?.cluster ?? null) as string | null;
-      if (cluster !== null && !["1", "2", "3", "4"].includes(cluster)) {
-        return res.status(400).json({ error: "Invalid cluster" });
-      }
-      await db.execute(sql`
-        UPDATE "Clickup".cup_clientes
-        SET cluster = ${cluster}, cluster_manual = ${cluster !== null}
-        WHERE task_id = ${idTask}`);
-      res.json({ ok: true });
-    } catch (error) {
-      console.error("[api] Error updating cliente tier:", error);
-      res.status(500).json({ error: "Failed to update tier" });
-    }
-  });
-
-  app.post("/api/lt-ltv-churn/clientes/aplicar-tiers-auto", async (_req, res) => {
-    try {
-      // Atualiza os clientes que têm contratos (presentes em vw_lt_contratos) e que não
-      // têm override manual. Clientes sem contratos não aparecem na tela e não recebem tier.
-      const r = await db.execute(sql`
-        WITH upd AS (
-          UPDATE "Clickup".cup_clientes cc SET cluster = CASE
-              WHEN m.mrr >= 7000 THEN '4'
-              WHEN m.mrr >= 4000 THEN '3'
-              WHEN m.mrr >= 2000 THEN '2'
-              ELSE '1' END
-          FROM (
-            SELECT id_task, SUM(valorr) FILTER (WHERE tipo_receita='recorrente'
-                     AND status IN ('ativo','onboarding','triagem')) AS mrr
-            FROM cortex_core.vw_lt_contratos GROUP BY id_task
-          ) m
-          WHERE cc.task_id = m.id_task AND COALESCE(cc.cluster_manual, false) = false
-          RETURNING 1
-        )
-        SELECT COUNT(*) AS atualizados FROM upd`);
-      res.json({ atualizados: Number(r.rows[0]?.atualizados) || 0 });
-    } catch (error) {
-      console.error("[api] Error applying auto tiers:", error);
-      res.status(500).json({ error: "Failed to apply tiers" });
     }
   });
 
