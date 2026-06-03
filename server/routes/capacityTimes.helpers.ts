@@ -1,4 +1,7 @@
-export type Categoria = "cs" | "vendedor" | "account" | "gestor";
+// Categorias comerciais (papel). Para operacionais, a categoria é o nome da squad (ex.: "Pulse").
+export const COMMERCIAL_CATEGORIAS = ["vendedor", "account", "gestor"] as const;
+export type CommercialCategoria = (typeof COMMERCIAL_CATEGORIAS)[number];
+export type Categoria = CommercialCategoria | string;
 
 export interface CapacityAggRow {
   nome: string;
@@ -41,8 +44,13 @@ export interface ComercialRow {
   util_pct: number | null;
 }
 
+export interface SquadGroup {
+  squad: string;
+  rows: CsRow[];
+}
+
 export interface CapacityTimesResponse {
-  cs: CsRow[];
+  squads: SquadGroup[];
   vendedor: ComercialRow[];
   account: ComercialRow[];
   gestor: ComercialRow[];
@@ -122,12 +130,22 @@ export function toComercialRow(r: CapacityAggRow): ComercialRow {
 }
 
 export function buildResponse(rows: CapacityAggRow[]): CapacityTimesResponse {
-  const out: CapacityTimesResponse = { cs: [], vendedor: [], account: [], gestor: [] };
+  const out: CapacityTimesResponse = { squads: [], vendedor: [], account: [], gestor: [] };
+  const squadIndex = new Map<string, SquadGroup>();
   for (const r of rows) {
-    if (r.categoria === "cs") out.cs.push(toCsRow(r));
-    else if (r.categoria === "vendedor") out.vendedor.push(toComercialRow(r));
+    if (r.categoria === "vendedor") out.vendedor.push(toComercialRow(r));
     else if (r.categoria === "account") out.account.push(toComercialRow(r));
     else if (r.categoria === "gestor") out.gestor.push(toComercialRow(r));
+    else {
+      // Operacional: agrupa por squad (categoria), preservando a ordem de primeira aparição.
+      let group = squadIndex.get(r.categoria);
+      if (!group) {
+        group = { squad: r.categoria, rows: [] };
+        squadIndex.set(r.categoria, group);
+        out.squads.push(group);
+      }
+      group.rows.push(toCsRow(r));
+    }
   }
   return out;
 }

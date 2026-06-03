@@ -159,7 +159,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
           GROUP BY m.nome, m.categoria, m.ordem,
                    m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas
         )
-        SELECT * FROM agg ORDER BY categoria, ordem, nome
+        SELECT * FROM agg ORDER BY ordem, nome
       `);
 
       const rows = result.rows.map(parseAggRow);
