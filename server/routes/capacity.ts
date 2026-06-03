@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
+import { parseAggRow, buildResponse } from "./capacityTimes.helpers";
 
 // Tabela de referência: nível do Gestor de Performance → metas
 const GESTOR_LEVELS: Record<string, { mrr_alvo: number; ticket_alvo: number }> = {
@@ -115,6 +116,58 @@ export function registerCapacityRoutes(app: Express, db: any) {
   // GET /api/capacity/levels — referência de níveis
   app.get("/api/capacity/levels", async (_req, res) => {
     res.json(GESTOR_LEVELS);
+  });
+
+  // GET /api/capacity-times — ocupação atual vs capacidade por pessoa/time
+  app.get("/api/capacity-times", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        WITH m AS (
+          SELECT nome, categoria, match_responsavel,
+                 cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem
+          FROM cortex_core.capacity_metas
+          WHERE ativo = TRUE
+        ),
+        agg AS (
+          SELECT
+            m.nome, m.categoria, m.ordem,
+            m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas,
+            COUNT(*) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0
+                AND c.status IN ('ativo','onboarding','em cancelamento')
+            ) AS op_recorrente,
+            COALESCE(SUM(c.valorr) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0
+                AND c.status IN ('ativo','onboarding','em cancelamento')
+            ), 0) AS mrr_operando,
+            COALESCE(SUM(c.valorr) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0 AND c.status = 'ativo'
+            ), 0) AS mrr_ativo,
+            COALESCE(SUM(c.valorr) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0 AND c.status = 'onboarding'
+            ), 0) AS mrr_onboarding,
+            COALESCE(SUM(c.valorr) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0 AND c.status = 'em cancelamento'
+            ), 0) AS mrr_cancelamento,
+            COUNT(*) FILTER (
+              WHERE COALESCE(c.valorp, 0) > 0
+                AND c.status IN ('ativo','onboarding')
+            ) AS op_pontual
+          FROM m
+          LEFT JOIN "Clickup".cup_contratos c
+            ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
+          GROUP BY m.nome, m.categoria, m.ordem,
+                   m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas
+        )
+        SELECT * FROM agg ORDER BY categoria, ordem, nome
+      `);
+
+      const rows = result.rows.map(parseAggRow);
+      res.json(buildResponse(rows));
+    } catch (error) {
+      console.error("[api] Error fetching capacity-times:", error);
+      res.status(500).json({ error: "Failed to fetch capacity-times" });
+    }
   });
 
   // ── Endpoints legados (mantidos para compatibilidade) ──
