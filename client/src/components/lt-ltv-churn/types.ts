@@ -58,6 +58,10 @@ export interface ClienteRow {
   ltvTotal: number;
   ltMeses: number | null;
   ativo: boolean;
+  mrrAtivo: number;
+  cluster: string | null;
+  clusterManual: boolean;
+  clusterSugerido: string;
 }
 
 export interface BucketLtContrato { faixa: string; ativos: number; cancelados: number; }
