@@ -98,8 +98,8 @@ function CsTable({ rows }: { rows: CsRow[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.nome} className="border-gray-200 dark:border-zinc-700">
+          {rows.map((r, i) => (
+            <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
               <TableCell className={td("font-medium")}>{r.nome}</TableCell>
               <TableCell className={td("text-right")}>{r.op_recorrente}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_recorrente)}</TableCell>
@@ -137,15 +137,15 @@ function ComercialTable({ rows }: { rows: ComercialRow[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r) => (
-            <TableRow key={r.nome} className="border-gray-200 dark:border-zinc-700">
+          {rows.map((r, i) => (
+            <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
               <TableCell className={td("font-medium")}>{r.nome}</TableCell>
               <TableCell className={td("text-right")}>{formatCurrency(r.mrr_atual)}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_mrr)}</TableCell>
-              <TableCell className={cn("text-right", (r.dif_mrr ?? 0) < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{r.dif_mrr === null ? "—" : formatCurrency(r.dif_mrr)}</TableCell>
+              <TableCell className={cn("text-right", r.dif_mrr === null ? "text-gray-400 dark:text-zinc-500" : r.dif_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{r.dif_mrr === null ? "—" : formatCurrency(r.dif_mrr)}</TableCell>
               <TableCell className={td("text-right")}>{r.contas_ativas}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_contas)}</TableCell>
-              <TableCell className={cn("text-right", (r.dif_contas ?? 0) < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_contas)}</TableCell>
+              <TableCell className={cn("text-right", r.dif_contas === null ? "text-gray-400 dark:text-zinc-500" : r.dif_contas < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_contas)}</TableCell>
               <TableCell className="text-right"><UtilBar pct={r.util_pct} /></TableCell>
             </TableRow>
           ))}
