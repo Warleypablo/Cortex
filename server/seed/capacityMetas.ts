@@ -80,6 +80,15 @@ export async function seedCapacityMetas(): Promise<void> {
           atualizado_em = NOW()
       `);
     }
+
+    // Remove metas que não estão mais no seed (ex.: match_responsavel renomeado).
+    // CAPACITY_METAS_SEED é a fonte autoritativa — não há edição manual de metas.
+    const pares = CAPACITY_METAS_SEED.map((m) => sql`(${m.match_responsavel}, ${m.categoria})`);
+    await db.execute(sql`
+      DELETE FROM cortex_core.capacity_metas
+      WHERE (match_responsavel, categoria) NOT IN (${sql.join(pares, sql`, `)})
+    `);
+
     console.log(`[database] capacity_metas seeded (${CAPACITY_METAS_SEED.length} rows)`);
   } catch (error) {
     console.error('[database] Error seeding capacity_metas:', error);
