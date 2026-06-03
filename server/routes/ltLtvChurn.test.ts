@@ -151,6 +151,15 @@ describe("PATCH /api/lt-ltv-churn/clientes/:idTask/tier", () => {
       .send({ cluster: "9" });
     expect(res.status).toBe(400);
   });
+
+  it("aceita cluster=null (limpar → volta a ser automático)", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    const res = await request(makeApp())
+      .patch("/api/lt-ltv-churn/clientes/86abc/tier")
+      .send({ cluster: null });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
 });
 
 describe("POST /api/lt-ltv-churn/clientes/aplicar-tiers-auto", () => {

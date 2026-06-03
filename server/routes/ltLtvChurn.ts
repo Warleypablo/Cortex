@@ -405,6 +405,8 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
         req.query.dir as string,
       );
 
+      // Filtro por tier filtra apenas tiers JÁ ATRIBUÍDOS (cc.cluster); clientes sem tier
+      // atribuído não aparecem ao filtrar por um tier específico.
       const withCluster = sql`
         SELECT t.*, cc.cluster, COALESCE(cc.cluster_manual, false) AS cluster_manual
         FROM (${baseAgg}) t
@@ -462,6 +464,8 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
 
   app.post("/api/lt-ltv-churn/clientes/aplicar-tiers-auto", async (_req, res) => {
     try {
+      // Atualiza os clientes que têm contratos (presentes em vw_lt_contratos) e que não
+      // têm override manual. Clientes sem contratos não aparecem na tela e não recebem tier.
       const r = await db.execute(sql`
         WITH upd AS (
           UPDATE "Clickup".cup_clientes cc SET cluster = CASE
