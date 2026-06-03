@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
-import { revenueChurnPct } from "./ltLtvChurn.helpers";
+import { revenueChurnPct, resolveClienteSort } from "./ltLtvChurn.helpers";
 
 export function registerLtLtvChurnRoutes(app: Express, db: any) {
   // KPIs gerais
@@ -398,9 +398,15 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           ${squad ? sql`AND squad = ${squad}` : sql``}
         GROUP BY id_task ${havingClause}`;
 
+      const { col: sortCol, dir: sortDir } = resolveClienteSort(
+        req.query.sort as string,
+        req.query.dir as string,
+      );
+
       const totalRes = await db.execute(sql`SELECT COUNT(*) AS total FROM (${baseAgg}) t`);
       const rows = (await db.execute(sql`
-        SELECT * FROM (${baseAgg}) t ORDER BY ltv_total DESC NULLS LAST
+        SELECT * FROM (${baseAgg}) t
+        ORDER BY ${sql.raw(sortCol)} ${sql.raw(sortDir)} NULLS LAST
         LIMIT ${pageSize} OFFSET ${offset}`)).rows;
 
       res.json({
@@ -444,7 +450,9 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
         )
         SELECT to_char(m,'YYYY-MM') AS mes,
           ROUND(AVG(lt) FILTER (WHERE ativo)::numeric,1) AS lt,
-          ROUND(AVG(ltv) FILTER (WHERE ativo)::numeric,0) AS ltv
+          ROUND(AVG(ltv) FILTER (WHERE ativo)::numeric,0) AS ltv,
+          ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY lt) FILTER (WHERE ativo))::numeric,1) AS lt_mediana,
+          ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ltv) FILTER (WHERE ativo))::numeric,0) AS ltv_mediana
         FROM cli GROUP BY m ORDER BY m
       `)).rows;
       res.json({
@@ -452,6 +460,8 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           mes: r.mes,
           lt: Number(r.lt) || 0,
           ltv: Number(r.ltv) || 0,
+          ltMediana: Number(r.lt_mediana) || 0,
+          ltvMediana: Number(r.ltv_mediana) || 0,
         })),
       });
     } catch (error) {
