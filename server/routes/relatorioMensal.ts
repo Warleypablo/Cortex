@@ -152,7 +152,7 @@ export function registerRelatorioMensalRoutes(app: Express, db: any) {
       // ===== 7. Churn Receita =====
       const churnResult = await db.execute(sql`
         SELECT COALESCE(SUM(valor_r), 0) as churn_mrr
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${mesInicio}::date
           AND data_solicitacao_encerramento < ${mesFim}::date

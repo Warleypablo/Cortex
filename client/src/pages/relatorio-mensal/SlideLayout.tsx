@@ -1,5 +1,5 @@
 import type { ReactNode } from "react";
-import turboLogo from "@assets/logo-turbo-branca.svg";
+import turboLogo from "@assets/logo-branca.png";
 
 export type SlideSection = "intro" | "people" | "comercial" | "commerce" | "tech" | "closing";
 

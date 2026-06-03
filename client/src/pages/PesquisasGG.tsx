@@ -366,7 +366,7 @@ export default function PesquisasGG() {
           <Card className="p-5">
             <h3 className="text-sm font-semibold mb-4">Comentários Anônimos</h3>
             <div className="space-y-4 max-h-[500px] overflow-y-auto">
-              {(npsRespostas || []).slice(0, 30).map((r: any) => (
+              {(npsRespostas || []).map((r: any) => (
                 <div key={r.id} className="border-b border-border pb-4 last:border-0 space-y-2">
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="outline" className="text-xs">{r.area}</Badge>

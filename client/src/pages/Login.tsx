@@ -5,7 +5,7 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { motion, AnimatePresence } from "framer-motion";
 import { WebGLShader } from "@/components/ui/web-gl-shader";
 import { Input } from "@/components/ui/input";
-import turboLogo from "@assets/logo-turbo-branca.svg";
+import turboLogo from "@assets/logo-branca.png";
 
 
 function GlassFilter() {

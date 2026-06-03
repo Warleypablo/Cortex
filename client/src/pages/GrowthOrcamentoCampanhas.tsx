@@ -20,9 +20,7 @@ const ALLOWED_EDITOR_EMAILS = new Set([
 
 type Platform = "meta" | "google";
 
-// Google Ads sync está travado em 2025-11. Esconder da UI até sync voltar.
-// Backend continua preparado — basta alternar para true quando o sync estiver ok.
-const SHOW_GOOGLE = false;
+const SHOW_GOOGLE = true;
 
 interface Campanha {
   platform: Platform;
@@ -34,6 +32,7 @@ interface Campanha {
   investimentoMensalMeta: number | null;
   orcamentoDiarioMeta: number | null;
   projecaoAsIs: number;
+  isDelivering: boolean;
 }
 
 interface ApiResponse {
@@ -220,7 +219,8 @@ export default function GrowthOrcamentoCampanhas() {
       if (c.platform === "meta") metaRows.push(c);
       else if (SHOW_GOOGLE) googleRows.push(c);
       else continue; // Google escondido — não soma aos totais.
-      totalDaily += c.dailyBudgetAtual;
+      const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
+      totalDaily += isActive ? c.dailyBudgetAtual : 0;
       totalDailyMeta += c.orcamentoDiarioMeta ?? 0;
       totalMensalMeta += c.investimentoMensalMeta ?? 0;
       totalProjecao += c.projecaoAsIs;
@@ -250,9 +250,18 @@ export default function GrowthOrcamentoCampanhas() {
           <PlatformIcon platform={c.platform} />
           <span className="truncate max-w-[360px]" title={c.name}>{c.name}</span>
           {c.status === "PAUSED" && <Badge variant="outline" className="text-xs">Pausada</Badge>}
+          {c.status !== "PAUSED" && !c.isDelivering && (
+            <Badge variant="outline" className="text-xs" title="Sem gasto nos últimos 3 dias — projeção não extrapola.">
+              Sem entrega
+            </Badge>
+          )}
         </div>
       </TableCell>
-      <TableCell className="text-right font-mono">{formatCurrency(c.dailyBudgetAtual)}</TableCell>
+      <TableCell className="text-right font-mono">
+        {c.status === "ACTIVE" || c.status === "ENABLED"
+          ? formatCurrency(c.dailyBudgetAtual)
+          : <span className="text-muted-foreground">—</span>}
+      </TableCell>
       <TableCell className="text-right font-mono">
         {c.orcamentoDiarioMeta !== null ? formatCurrency(c.orcamentoDiarioMeta) : <span className="text-muted-foreground">—</span>}
       </TableCell>

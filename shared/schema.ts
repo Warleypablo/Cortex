@@ -891,6 +891,8 @@ export const metaInsightsDaily = pgTable("meta_insights_daily", {
   videoP50WatchedActions: integer("video_p50_watched_actions"),
   videoP75WatchedActions: integer("video_p75_watched_actions"),
   videoP100WatchedActions: integer("video_p100_watched_actions"),
+  video3SecWatchedActions: integer("video_3_sec_watched_actions"),
+  videoThruplayWatchedActions: integer("video_thruplay_watched_actions"),
   videoAvgTimeWatchedActions: decimal("video_avg_time_watched_actions", { precision: 10, scale: 2 }),
   purchaseRoas: decimal("purchase_roas", { precision: 10, scale: 4 }),
   websitePurchaseRoas: decimal("website_purchase_roas", { precision: 10, scale: 4 }),
@@ -1012,6 +1014,12 @@ export const crmDeal = bitrixSchema.table("crm_deal", {
   utmCampaign: varchar("utm_campaign", { length: 255 }),
   utmTerm: varchar("utm_term", { length: 255 }),
   utmContent: varchar("utm_content", { length: 255 }),
+  utmMedium: varchar("utm_medium", { length: 64 }),
+  fbclid: varchar("fbclid", { length: 255 }),
+  gclid: varchar("gclid", { length: 255 }),
+  referrer: text("referrer"),
+  userAgent: text("user_agent"),
+  ip: varchar("ip", { length: 45 }),
   fnlNgc: text("fnl_ngc"),
 });
 
@@ -3326,6 +3334,7 @@ export const crosssellOportunidades = cortexCoreSchema.table("crosssell_oportuni
   valorRNegociacao: decimal("valor_r_negociacao", { precision: 12, scale: 2 }).default("0"),
   valorPNegociacao: decimal("valor_p_negociacao", { precision: 12, scale: 2 }).default("0"),
   cxResponsavel: text("cx_responsavel").notNull(),
+  vendedor: text("vendedor"),
   ultimoContato: date("ultimo_contato"),
   criadoEm: timestamp("criado_em").defaultNow(),
   atualizadoEm: timestamp("atualizado_em").defaultNow(),
@@ -3460,3 +3469,331 @@ export type InsertInternalVideo = typeof internalVideos.$inferInsert;
 export type InsertInternalVideoCompletion = typeof internalVideoCompletions.$inferInsert;
 export type InsertInternalVideoLike = typeof internalVideoLikes.$inferInsert;
 export type InsertInternalVideoComment = typeof internalVideoComments.$inferInsert;
+
+// ============== UTM BUILDER ==============
+// Constituição UTM Turbo v1 — gerador de UTMs com vocabulário fechado
+
+export const utmVocabulary = cortexCoreSchema.table("utm_vocabulary", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  field: varchar("field", { length: 20 }).notNull(), // 'campaign' | 'term'
+  medium: varchar("medium", { length: 20 }).notNull(),
+  source: varchar("source", { length: 40 }), // NULL = vale pra qualquer source do medium
+  value: varchar("value", { length: 120 }).notNull(),
+  labelPt: text("label_pt").notNull(),
+  isActive: boolean("is_active").notNull().default(true),
+  createdBy: varchar("created_by"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const generatedUtmLinks = cortexCoreSchema.table("generated_utm_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  userId: varchar("user_id").notNull(),
+  baseUrl: text("base_url").notNull(),
+  utmSource: varchar("utm_source", { length: 40 }).notNull(),
+  utmMedium: varchar("utm_medium", { length: 20 }).notNull(),
+  utmCampaign: varchar("utm_campaign", { length: 120 }),
+  utmTerm: varchar("utm_term", { length: 120 }),
+  utmContent: varchar("utm_content", { length: 200 }),
+  fullUrl: text("full_url").notNull(),
+  isAdhoc: boolean("is_adhoc").notNull().default(false),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export type UtmVocabulary = typeof utmVocabulary.$inferSelect;
+export type InsertUtmVocabulary = typeof utmVocabulary.$inferInsert;
+export type GeneratedUtmLink = typeof generatedUtmLinks.$inferSelect;
+export type InsertGeneratedUtmLink = typeof generatedUtmLinks.$inferInsert;
+
+// ============================================================
+// YouTube — sync de dados orgânicos (Data API v3 + Analytics API)
+// Padrão idêntico ao Instagram: schema cortex_core + prefixo youtube_.
+// access_token/refresh_token gravados encriptados (via utils/encryption).
+// ============================================================
+
+export const youtubeCredentials = cortexCoreSchema.table("youtube_credentials", {
+  id: serial("id").primaryKey(),
+  googleUserId: varchar("google_user_id", { length: 100 }).notNull().unique(),
+  googleEmail: varchar("google_email", { length: 255 }),
+  refreshTokenEnc: text("refresh_token_enc").notNull(), // encriptado com encryptToken()
+  scopes: text("scopes").notNull(),
+  authorizedAt: timestamp("authorized_at", { withTimezone: true }).notNull().defaultNow(),
+  lastUsedAt: timestamp("last_used_at", { withTimezone: true }),
+  active: boolean("active").notNull().default(true),
+});
+
+export const youtubeChannels = cortexCoreSchema.table("youtube_channels", {
+  channelId: varchar("channel_id", { length: 50 }).primaryKey(),
+  title: varchar("title", { length: 255 }),
+  customUrl: varchar("custom_url", { length: 255 }),
+  description: text("description"),
+  thumbnailUrl: text("thumbnail_url"),
+  country: varchar("country", { length: 10 }),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  subscriberCount: bigint("subscriber_count", { mode: "number" }),
+  viewCount: bigint("view_count", { mode: "number" }),
+  videoCount: integer("video_count"),
+  hiddenSubscriberCount: boolean("hidden_subscriber_count"),
+  credentialId: integer("credential_id"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export const youtubeVideos = cortexCoreSchema.table("youtube_videos", {
+  videoId: varchar("video_id", { length: 50 }).primaryKey(),
+  channelId: varchar("channel_id", { length: 50 }).notNull(),
+  title: varchar("title", { length: 500 }),
+  description: text("description"),
+  publishedAt: timestamp("published_at", { withTimezone: true }),
+  thumbnailUrl: text("thumbnail_url"),
+  durationSeconds: integer("duration_seconds"),
+  tags: jsonb("tags"),
+  categoryId: varchar("category_id", { length: 20 }),
+  defaultLanguage: varchar("default_language", { length: 10 }),
+  liveBroadcastContent: varchar("live_broadcast_content", { length: 20 }),
+  viewCount: bigint("view_count", { mode: "number" }),
+  likeCount: bigint("like_count", { mode: "number" }),
+  commentCount: bigint("comment_count", { mode: "number" }),
+  favoriteCount: bigint("favorite_count", { mode: "number" }),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  index("idx_yt_videos_channel").on(table.channelId),
+  index("idx_yt_videos_published").on(table.publishedAt),
+]);
+
+export const youtubeVideoDailyMetrics = cortexCoreSchema.table("youtube_video_daily_metrics", {
+  id: serial("id").primaryKey(),
+  videoId: varchar("video_id", { length: 50 }).notNull(),
+  channelId: varchar("channel_id", { length: 50 }).notNull(),
+  reportDate: date("report_date").notNull(),
+  views: integer("views"),
+  estimatedMinutesWatched: integer("estimated_minutes_watched"),
+  averageViewDuration: integer("average_view_duration"),
+  averageViewPercentage: decimal("average_view_percentage", { precision: 5, scale: 2 }),
+  likes: integer("likes"),
+  dislikes: integer("dislikes"),
+  comments: integer("comments"),
+  shares: integer("shares"),
+  subscribersGained: integer("subscribers_gained"),
+  subscribersLost: integer("subscribers_lost"),
+  cardClicks: integer("card_clicks"),
+  cardImpressions: integer("card_impressions"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("uq_yt_video_daily_video_date").on(table.videoId, table.reportDate),
+  index("idx_yt_video_daily_date").on(table.reportDate),
+  index("idx_yt_video_daily_channel").on(table.channelId),
+]);
+
+export const youtubeChannelDailyMetrics = cortexCoreSchema.table("youtube_channel_daily_metrics", {
+  id: serial("id").primaryKey(),
+  channelId: varchar("channel_id", { length: 50 }).notNull(),
+  reportDate: date("report_date").notNull(),
+  views: integer("views"),
+  estimatedMinutesWatched: integer("estimated_minutes_watched"),
+  averageViewDuration: integer("average_view_duration"),
+  subscribersGained: integer("subscribers_gained"),
+  subscribersLost: integer("subscribers_lost"),
+  likes: integer("likes"),
+  comments: integer("comments"),
+  shares: integer("shares"),
+  syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => [
+  uniqueIndex("uq_yt_channel_daily_channel_date").on(table.channelId, table.reportDate),
+  index("idx_yt_channel_daily_date").on(table.reportDate),
+]);
+
+export const youtubeSyncRuns = cortexCoreSchema.table("youtube_sync_runs", {
+  id: serial("id").primaryKey(),
+  jobType: varchar("job_type", { length: 50 }).notNull(),
+  channelId: varchar("channel_id", { length: 50 }),
+  status: varchar("status", { length: 20 }).notNull(),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+  itemsProcessed: integer("items_processed"),
+  errorMessage: text("error_message"),
+});
+
+export type YoutubeCredential = typeof youtubeCredentials.$inferSelect;
+export type InsertYoutubeCredential = typeof youtubeCredentials.$inferInsert;
+export type YoutubeChannel = typeof youtubeChannels.$inferSelect;
+export type InsertYoutubeChannel = typeof youtubeChannels.$inferInsert;
+export type YoutubeVideo = typeof youtubeVideos.$inferSelect;
+export type InsertYoutubeVideo = typeof youtubeVideos.$inferInsert;
+export type YoutubeVideoDailyMetric = typeof youtubeVideoDailyMetrics.$inferSelect;
+export type InsertYoutubeVideoDailyMetric = typeof youtubeVideoDailyMetrics.$inferInsert;
+export type YoutubeChannelDailyMetric = typeof youtubeChannelDailyMetrics.$inferSelect;
+export type InsertYoutubeChannelDailyMetric = typeof youtubeChannelDailyMetrics.$inferInsert;
+export type YoutubeSyncRun = typeof youtubeSyncRuns.$inferSelect;
+export type InsertYoutubeSyncRun = typeof youtubeSyncRuns.$inferInsert;
+
+// ============================================================
+// GoHighLevel (GHL) — sublocation única "Turbo Partners"
+// Integração via Private Integration Token (PIT)
+// Ver docs/handover-ghl-integracao.md
+// ============================================================
+
+export const ghlContacts = cortexCoreSchema.table("ghl_contacts", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id").notNull(),
+  email: text("email"),
+  phone: text("phone"),
+  contactName: text("contact_name"),
+  firstName: text("first_name"),
+  lastName: text("last_name"),
+  companyName: text("company_name"),
+  type: text("type"),
+  source: text("source"),
+  tags: text("tags").array(),
+  country: text("country"),
+  city: text("city"),
+  state: text("state"),
+  dateAdded: timestamp("date_added"),
+  dateUpdated: timestamp("date_updated"),
+  attributions: jsonb("attributions"),
+  customFields: jsonb("custom_fields"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  emailIdx: index("ghl_contacts_email_idx").on(table.email),
+  phoneIdx: index("ghl_contacts_phone_idx").on(table.phone),
+  dateUpdatedIdx: index("ghl_contacts_date_updated_idx").on(table.dateUpdated),
+}));
+
+export const ghlConversations = cortexCoreSchema.table("ghl_conversations", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id").notNull(),
+  contactId: text("contact_id"),
+  lastMessageType: text("last_message_type"),
+  lastMessageDirection: text("last_message_direction"),
+  lastMessageDate: timestamp("last_message_date"),
+  unreadCount: integer("unread_count"),
+  dateAdded: timestamp("date_added"),
+  dateUpdated: timestamp("date_updated"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  contactIdx: index("ghl_conversations_contact_idx").on(table.contactId),
+  lastMsgDateIdx: index("ghl_conversations_last_msg_date_idx").on(table.lastMessageDate),
+  typeIdx: index("ghl_conversations_type_idx").on(table.lastMessageType),
+}));
+
+export const ghlMessages = cortexCoreSchema.table("ghl_messages", {
+  id: text("id").primaryKey(),
+  conversationId: text("conversation_id").notNull(),
+  contactId: text("contact_id"),
+  locationId: text("location_id").notNull(),
+  direction: text("direction"),
+  messageType: text("message_type"),
+  status: text("status"),
+  source: text("source"),
+  body: text("body"),
+  subject: text("subject"),
+  emailMessageId: text("email_message_id"),
+  contentType: text("content_type"),
+  dateAdded: timestamp("date_added"),
+  meta: jsonb("meta"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  convIdx: index("ghl_messages_conv_idx").on(table.conversationId),
+  dateIdx: index("ghl_messages_date_idx").on(table.dateAdded),
+  typeDirIdx: index("ghl_messages_type_dir_idx").on(table.messageType, table.direction),
+  sourceIdx: index("ghl_messages_source_idx").on(table.source),
+  emailMsgIdIdx: index("ghl_messages_email_msg_id_idx").on(table.emailMessageId),
+}));
+
+export const ghlEmailCampaigns = cortexCoreSchema.table("ghl_email_campaigns", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id").notNull(),
+  name: text("name"),
+  subject: text("subject"),
+  campaignType: text("campaign_type"),
+  status: text("status"),
+  templateId: text("template_id"),
+  templateType: text("template_type"),
+  totalCount: integer("total_count"),
+  successCount: integer("success_count"),
+  failedCount: integer("failed_count"),
+  errorCount: integer("error_count"),
+  processedCount: integer("processed_count"),
+  queuedCount: integer("queued_count"),
+  hasTracking: boolean("has_tracking"),
+  hasUtmTracking: boolean("has_utm_tracking"),
+  isPlainText: boolean("is_plain_text"),
+  scheduledAt: timestamp("scheduled_at"),
+  dateAdded: timestamp("date_added"),
+  dateUpdated: timestamp("date_updated"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  scheduledIdx: index("ghl_email_campaigns_scheduled_idx").on(table.scheduledAt),
+  statusIdx: index("ghl_email_campaigns_status_idx").on(table.status),
+}));
+
+// Open/Click/Bounce vêm por webhook do GHL (NÃO existem via REST)
+export const ghlEmailEvents = cortexCoreSchema.table("ghl_email_events", {
+  id: serial("id").primaryKey(),
+  eventId: text("event_id").unique(),
+  messageId: text("message_id"),
+  contactId: text("contact_id"),
+  campaignId: text("campaign_id"),
+  eventType: text("event_type"),
+  occurredAt: timestamp("occurred_at"),
+  clickedLink: text("clicked_link"),
+  payload: jsonb("payload"),
+  receivedAt: timestamp("received_at").defaultNow(),
+}, (table) => ({
+  messageIdx: index("ghl_email_events_message_idx").on(table.messageId),
+  typeDateIdx: index("ghl_email_events_type_date_idx").on(table.eventType, table.occurredAt),
+  contactIdx: index("ghl_email_events_contact_idx").on(table.contactId),
+}));
+
+export const ghlTagsSnapshot = cortexCoreSchema.table("ghl_tags_snapshot", {
+  snapshotDate: date("snapshot_date").notNull(),
+  tag: text("tag").notNull(),
+  contactCount: integer("contact_count").notNull(),
+}, (table) => ({
+  pk: uniqueIndex("ghl_tags_snapshot_pk").on(table.snapshotDate, table.tag),
+}));
+
+export const ghlWorkflows = cortexCoreSchema.table("ghl_workflows", {
+  id: text("id").primaryKey(),
+  locationId: text("location_id").notNull(),
+  name: text("name"),
+  status: text("status"),
+  version: integer("version"),
+  createdAt: timestamp("created_at"),
+  updatedAt: timestamp("updated_at"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  statusIdx: index("ghl_workflows_status_idx").on(table.status),
+  updatedIdx: index("ghl_workflows_updated_idx").on(table.updatedAt),
+}));
+
+export const ghlSyncRuns = cortexCoreSchema.table("ghl_sync_runs", {
+  id: serial("id").primaryKey(),
+  resource: text("resource").notNull(),
+  startedAt: timestamp("started_at").notNull(),
+  finishedAt: timestamp("finished_at"),
+  status: text("status").notNull(),
+  recordsProcessed: integer("records_processed"),
+  errorMessage: text("error_message"),
+  cursor: text("cursor"),
+}, (table) => ({
+  resourceIdx: index("ghl_sync_runs_resource_idx").on(table.resource, table.startedAt),
+}));
+
+export type GhlContact = typeof ghlContacts.$inferSelect;
+export type InsertGhlContact = typeof ghlContacts.$inferInsert;
+export type GhlConversation = typeof ghlConversations.$inferSelect;
+export type InsertGhlConversation = typeof ghlConversations.$inferInsert;
+export type GhlMessage = typeof ghlMessages.$inferSelect;
+export type InsertGhlMessage = typeof ghlMessages.$inferInsert;
+export type GhlEmailCampaign = typeof ghlEmailCampaigns.$inferSelect;
+export type InsertGhlEmailCampaign = typeof ghlEmailCampaigns.$inferInsert;
+export type GhlEmailEvent = typeof ghlEmailEvents.$inferSelect;
+export type InsertGhlEmailEvent = typeof ghlEmailEvents.$inferInsert;
+export type GhlTagsSnapshot = typeof ghlTagsSnapshot.$inferSelect;
+export type InsertGhlTagsSnapshot = typeof ghlTagsSnapshot.$inferInsert;
+export type GhlSyncRun = typeof ghlSyncRuns.$inferSelect;
+export type InsertGhlSyncRun = typeof ghlSyncRuns.$inferInsert;

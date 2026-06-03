@@ -27,24 +27,36 @@ function Avatar({ nome, fotoUrl }: { nome: string; fotoUrl: string | null }) {
   );
 }
 
+// Colaboradores ocultos do slide (nome normalizado: lower + accents removidos + trim)
+const COLABORADORES_OCULTOS = new Set([
+  "thiago andrey da silva marinho",
+  "fabiely laurett gums",
+]);
+
+// Range U+0300–U+036F: Combining Diacritical Marks
+const normalize = (s: string): string =>
+  (s || "").normalize("NFD").replace(/[̀-ͯ]/g, "").trim().toLowerCase();
+
 export default function SlideAniversarioEmpresa({ aniversarios }: Props) {
+  const visiveis = aniversarios.filter((c) => !COLABORADORES_OCULTOS.has(normalize(c.nome)));
+
   return (
     <SlideLayout section="people" padding="40px">
       <SlideHeader
         icon={Award}
         iconColor="text-amber-400"
         title="Aniversarios de Empresa"
-        subtitle={`(${aniversarios.length})`}
+        subtitle={`(${visiveis.length})`}
         gradientColor="#f59e0b"
       />
 
-      {aniversarios.length === 0 ? (
+      {visiveis.length === 0 ? (
         <div className="flex-1 flex items-center justify-center">
           <p className="text-zinc-500">Nenhum aniversario de empresa neste mes</p>
         </div>
       ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 auto-rows-min">
-          {aniversarios.map((c) => (
+          {visiveis.map((c) => (
             <div key={c.id} className="flex flex-col items-center gap-3 bg-white/[0.04] rounded-2xl p-5 border border-white/[0.08] shadow-lg shadow-black/20 text-center">
               <Avatar nome={c.nome} fotoUrl={c.fotoUrl} />
               <div>

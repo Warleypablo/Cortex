@@ -25,6 +25,19 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import {
+  Command,
+  CommandEmpty,
+  CommandGroup,
+  CommandInput,
+  CommandItem,
+  CommandList,
+} from "@/components/ui/command";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,6 +52,8 @@ import {
   Briefcase,
   Clock,
   Sparkles,
+  Check,
+  X,
 } from "lucide-react";
 
 // ---------------------------------------------------------------------------
@@ -105,6 +120,7 @@ interface Oportunidade {
   valorRNegociacao: number | null;
   valorPNegociacao: number | null;
   cxResponsavel: string;
+  vendedor: string | null;
   ultimoContato: string | null;
   origem: "manual" | "sistema";
   prioridade: "alta" | "media" | "baixa" | null;
@@ -130,7 +146,7 @@ interface ClienteCrossSell {
 }
 
 interface ClienteSearch {
-  task_id: string;
+  taskId: string;
   cnpj: string;
   nome: string;
   status: string;
@@ -255,6 +271,17 @@ export default function CrossSellPipeline() {
     },
   });
 
+  // Lista unificada de vendedores (cup_clientes.vendedor ∪ responsavel_geral ∪ responsavel)
+  const { data: vendedoresList = [] } = useQuery<string[]>({
+    queryKey: ["/api/comercial/crosssell/vendedores"],
+    queryFn: async () => {
+      const res = await fetch("/api/comercial/crosssell/vendedores");
+      if (!res.ok) throw new Error("Erro ao carregar vendedores");
+      return res.json();
+    },
+    staleTime: 5 * 60 * 1000, // 5 min — dado quase estático
+  });
+
   // Derived: list of distinct CX responsáveis (entre todas oportunidades)
   const cxResponsaveis = useMemo(() => {
     const set = new Set<string>();
@@ -335,6 +362,21 @@ export default function CrossSellPipeline() {
         body: JSON.stringify({ [field]: value, alteradoPor: user?.name }),
       });
       if (!res.ok) throw new Error("Erro ao atualizar valor");
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/comercial/crosssell"] });
+    },
+  });
+
+  const changeVendedor = useMutation({
+    mutationFn: async ({ id, vendedor }: { id: number; vendedor: string | null }) => {
+      const res = await fetch(`/api/comercial/crosssell/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ vendedor, alteradoPor: user?.name }),
+      });
+      if (!res.ok) throw new Error("Erro ao atualizar vendedor");
       return res.json();
     },
     onSuccess: () => {
@@ -498,6 +540,8 @@ export default function CrossSellPipeline() {
             ordenacao={ordenacao}
             onChangeEtapa={(opId, e) => changeEtapa.mutate({ id: opId, etapa: e })}
             onChangeValor={(opId, field, value) => changeValor.mutate({ id: opId, field, value })}
+            onChangeVendedor={(opId, vendedor) => changeVendedor.mutate({ id: opId, vendedor })}
+            vendedoresList={vendedoresList}
             onGanho={(op) => {
               const grupo = grupos.get(etapa)?.find((g) => g.oportunidades.some((o) => o.id === op.id));
               if (grupo) setGanhoCtx({ op, clienteNome: grupo.cliente.nome ?? grupo.cliente.cnpj });
@@ -561,6 +605,8 @@ function EtapaSection({
   ordenacao,
   onChangeEtapa,
   onChangeValor,
+  onChangeVendedor,
+  vendedoresList,
   onGanho,
   onComments,
 }: {
@@ -572,6 +618,8 @@ function EtapaSection({
   ordenacao: "score" | "mrr" | "recente" | "nome";
   onChangeEtapa: (opId: number, etapa: string) => void;
   onChangeValor: (opId: number, field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
+  onChangeVendedor: (opId: number, vendedor: string | null) => void;
+  vendedoresList: string[];
   onGanho: (op: Oportunidade) => void;
   onComments: (op: Oportunidade) => void;
 }) {
@@ -646,6 +694,8 @@ function EtapaSection({
               }}
               onChangeEtapa={onChangeEtapa}
               onChangeValor={onChangeValor}
+              onChangeVendedor={onChangeVendedor}
+              vendedoresList={vendedoresList}
               onGanho={onGanho}
               onComments={onComments}
             />
@@ -668,6 +718,8 @@ function ClienteRow({
   onToggle,
   onChangeEtapa,
   onChangeValor,
+  onChangeVendedor,
+  vendedoresList,
   onGanho,
   onComments,
 }: {
@@ -677,6 +729,8 @@ function ClienteRow({
   onToggle: () => void;
   onChangeEtapa: (opId: number, etapa: string) => void;
   onChangeValor: (opId: number, field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
+  onChangeVendedor: (opId: number, vendedor: string | null) => void;
+  vendedoresList: string[];
   onGanho: (op: Oportunidade) => void;
   onComments: (op: Oportunidade) => void;
 }) {
@@ -756,6 +810,22 @@ function ClienteRow({
               <p className="text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500 mb-0.5">
                 Oportunidades mapeadas ({oportunidadesVisiveis.length})
               </p>
+              <div
+                className="grid items-center gap-2 px-1 pb-1 text-[10px] uppercase tracking-wider text-gray-400 dark:text-zinc-500"
+                style={{
+                  gridTemplateColumns:
+                    "16px 200px 130px 130px 90px 90px 32px 56px",
+                }}
+              >
+                <span />
+                <span>Produto</span>
+                <span>Vendedor</span>
+                <span>Etapa</span>
+                <span className="text-right">R</span>
+                <span className="text-right">P</span>
+                <span />
+                <span />
+              </div>
               <div className="divide-y divide-gray-100 dark:divide-zinc-800">
                 {oportunidadesVisiveis.map((op) => (
                   <OportunidadeRow
@@ -763,6 +833,8 @@ function ClienteRow({
                     op={op}
                     onChangeEtapa={(etapa) => onChangeEtapa(op.id, etapa)}
                     onChangeValor={(field, value) => onChangeValor(op.id, field, value)}
+                    onChangeVendedor={(vendedor) => onChangeVendedor(op.id, vendedor)}
+                    vendedoresList={vendedoresList}
                     onGanho={() => onGanho(op)}
                     onComments={() => onComments(op)}
                   />
@@ -842,6 +914,89 @@ function InlineValorInput({
 }
 
 // ---------------------------------------------------------------------------
+// VendedorCombobox — combobox pesquisável para selecionar vendedor da
+// oportunidade. Lista vinda da união de cup_clientes (vendedor, responsavel_geral,
+// responsavel). Aceita null (mostra "—").
+// ---------------------------------------------------------------------------
+
+function VendedorCombobox({
+  value,
+  options,
+  onChange,
+}: {
+  value: string | null;
+  options: string[];
+  onChange: (v: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <button
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Selecionar vendedor"
+          className="flex items-center gap-1 text-xs text-left w-full max-w-[130px] px-1.5 py-0.5 rounded border border-transparent hover:border-gray-300 dark:hover:border-zinc-600 hover:bg-white dark:hover:bg-zinc-800 transition-colors"
+          title={value ?? "Selecionar vendedor"}
+        >
+          <User className="h-3 w-3 text-gray-400 dark:text-zinc-500 shrink-0" />
+          <span
+            className={`truncate ${
+              value
+                ? "text-gray-700 dark:text-zinc-300"
+                : "text-gray-400 dark:text-zinc-600"
+            }`}
+          >
+            {value ?? "—"}
+          </span>
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        className="p-0 w-64 bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700"
+        align="start"
+      >
+        <Command className="bg-transparent">
+          <CommandInput placeholder="Buscar vendedor..." className="h-9" />
+          <CommandList>
+            <CommandEmpty>Nenhum vendedor encontrado.</CommandEmpty>
+            <CommandGroup>
+              <CommandItem
+                value="__limpar__"
+                onSelect={() => {
+                  onChange(null);
+                  setOpen(false);
+                }}
+                className="text-gray-500 dark:text-zinc-400"
+              >
+                <X className="mr-2 h-3.5 w-3.5" />
+                Limpar
+              </CommandItem>
+              {options.map((nome) => (
+                <CommandItem
+                  key={nome}
+                  value={nome}
+                  onSelect={() => {
+                    onChange(nome === value ? null : nome);
+                    setOpen(false);
+                  }}
+                >
+                  <Check
+                    className={`mr-2 h-3.5 w-3.5 ${
+                      value === nome ? "opacity-100" : "opacity-0"
+                    }`}
+                  />
+                  {nome}
+                </CommandItem>
+              ))}
+            </CommandGroup>
+          </CommandList>
+        </Command>
+      </PopoverContent>
+    </Popover>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // OportunidadeRow
 // ---------------------------------------------------------------------------
 
@@ -849,12 +1004,16 @@ function OportunidadeRow({
   op,
   onChangeEtapa,
   onChangeValor,
+  onChangeVendedor,
+  vendedoresList,
   onGanho,
   onComments,
 }: {
   op: Oportunidade;
   onChangeEtapa: (etapa: string) => void;
   onChangeValor: (field: "valorRNegociacao" | "valorPNegociacao", value: number) => void;
+  onChangeVendedor: (vendedor: string | null) => void;
+  vendedoresList: string[];
   onGanho: () => void;
   onComments: () => void;
 }) {
@@ -878,13 +1037,19 @@ function OportunidadeRow({
         className="grid items-center gap-2"
         style={{
           gridTemplateColumns:
-            "16px 220px 140px 100px 100px 32px 56px",
+            "16px 200px 130px 130px 90px 90px 32px 56px",
         }}
       >
         <span className={`h-2 w-2 rounded-full ${dotColor}`} />
         <span className="text-sm font-medium text-gray-900 dark:text-white truncate">
           {op.produto}
         </span>
+
+        <VendedorCombobox
+          value={op.vendedor}
+          options={vendedoresList}
+          onChange={onChangeVendedor}
+        />
 
         <Select
           value={etapa}
@@ -1007,7 +1172,7 @@ function NewOpDialog({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          clienteId: selectedCliente.task_id,
+          clienteId: selectedCliente.taskId,
           cnpj: selectedCliente.cnpj,
           produtoMapeado: produto,
           cxResponsavel: userName || selectedCliente.responsavel,
@@ -1077,7 +1242,7 @@ function NewOpDialog({
                   <div className="absolute z-50 mt-1 w-full max-h-48 overflow-y-auto rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg">
                     {clientes.map((c) => (
                       <button
-                        key={c.task_id}
+                        key={c.taskId}
                         className="w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-zinc-800 text-sm"
                         onClick={() => {
                           setSelectedCliente(c);

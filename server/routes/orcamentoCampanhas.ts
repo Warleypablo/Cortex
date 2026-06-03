@@ -21,6 +21,7 @@ interface CampanhaRow {
   investimentoMensalMeta: number | null;
   orcamentoDiarioMeta: number | null;
   projecaoAsIs: number;
+  isDelivering: boolean;
 }
 
 function parseMonthParam(param: string | undefined): { firstDay: string; lastDay: string; year: number; month1Based: number } {
@@ -66,7 +67,9 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
       const monthStart = firstDay; // DATE, primeiro dia do mês
 
       // ===== Meta Ads =====
-      // Mostra apenas campanhas relevantes: ACTIVE, ou com spend no mês, ou com meta definida.
+      // Mostra campanhas relevantes: ACTIVE, ou com spend no mês, ou com meta definida.
+      // Inclui campanhas arquivadas/deletadas que tiveram gasto no mês — sem filtro
+      // por effective_status no CTE, o WHERE final (spend > 0 OR ACTIVE OR meta) decide.
       // Para ABO, soma o daily_budget dos adsets com effective_status ACTIVE.
       const metaRes = await db.execute(sql`
         WITH campaign_budget AS (
@@ -85,12 +88,18 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
             ) AS daily_budget_atual
           FROM meta_ads.meta_campaigns c
           WHERE c.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
-            AND c.effective_status IN ('ACTIVE', 'PAUSED')
         ),
         spend_agg AS (
           SELECT campaign_id, SUM(spend)::float AS investido_total
           FROM meta_ads.meta_insights_daily
           WHERE date_start BETWEEN ${firstDay}::date AND ${lastDay}::date
+          GROUP BY campaign_id
+        ),
+        recent_spend_agg AS (
+          SELECT campaign_id, SUM(spend)::float AS recent_spend
+          FROM meta_ads.meta_insights_daily
+          WHERE date_start >= (CURRENT_DATE - INTERVAL '3 days')
+            AND date_start < CURRENT_DATE
           GROUP BY campaign_id
         ),
         metas_meta AS (
@@ -102,9 +111,11 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           cb.campaign_name AS name,
           cb.effective_status AS status,
           COALESCE(cb.daily_budget_atual, 0)::float AS daily_budget_atual,
-          COALESCE(s.investido_total, 0)::float AS investido_total
+          COALESCE(s.investido_total, 0)::float AS investido_total,
+          COALESCE(rs.recent_spend, 0)::float AS recent_spend
         FROM campaign_budget cb
         LEFT JOIN spend_agg s ON s.campaign_id = cb.campaign_id
+        LEFT JOIN recent_spend_agg rs ON rs.campaign_id = cb.campaign_id
         WHERE cb.effective_status = 'ACTIVE'
            OR COALESCE(s.investido_total, 0) > 0
            OR cb.campaign_id IN (SELECT campaign_id FROM metas_meta)
@@ -134,6 +145,13 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
             WHERE ${gaDateCol} BETWEEN '${firstDay}'::date AND '${lastDay}'::date
             GROUP BY campaign_key
           ),
+          recent_spend_agg AS (
+            SELECT campaign_key, SUM(cost_micros)::numeric AS recent_cost_sum
+            FROM google_ads.campaign_daily_metrics
+            WHERE ${gaDateCol} >= (CURRENT_DATE - INTERVAL '3 days')
+              AND ${gaDateCol} < CURRENT_DATE
+            GROUP BY campaign_key
+          ),
           metas_google AS (
             SELECT campaign_id FROM cortex_core.campaign_monthly_budget
             WHERE platform = 'google' AND month = '${monthStart}'::date
@@ -143,10 +161,12 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
             c.name AS name,
             c.status AS status,
             COALESCE(b.amount_micros::numeric / 1000000, 0)::float AS daily_budget_atual,
-            COALESCE(s.cost_sum / 1000000, 0)::float AS investido_total
+            COALESCE(s.cost_sum / 1000000, 0)::float AS investido_total,
+            COALESCE(rs.recent_cost_sum / 1000000, 0)::float AS recent_spend
           FROM google_ads.campaigns c
           LEFT JOIN google_ads.campaign_budgets b ON b.budget_key = c.budget_key
           LEFT JOIN spend_agg s ON s.campaign_key = c.campaign_key
+          LEFT JOIN recent_spend_agg rs ON rs.campaign_key = c.campaign_key
           WHERE COALESCE(s.cost_sum, 0) > 0
              OR c.campaign_id::text IN (SELECT campaign_id FROM metas_google)
           ORDER BY c.name;
@@ -169,8 +189,16 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         const campaignId = String(row.campaign_id);
         const dailyBudgetAtual = Number(row.daily_budget_atual) || 0;
         const investidoTotal = Number(row.investido_total) || 0;
+        const recentSpend = Number(row.recent_spend) || 0;
         const investimentoMensalMeta = metasMap.get(`${platform}:${campaignId}`) ?? null;
-        const projecaoAsIs = investidoTotal + dailyBudgetAtual * diasRestantes;
+        // Só projeta gasto futuro se a campanha está ativa E houve entrega real
+        // nos últimos 3 dias (status ACTIVE/ENABLED por si só não garante delivery —
+        // ex: ABO ativa sem nenhum adset rodando, ou ativa mas sem orçamento entregando).
+        const isActiveStatus = row.status === "ACTIVE" || row.status === "ENABLED";
+        const isDelivering = isActiveStatus && recentSpend > 0;
+        const projecaoAsIs = isDelivering
+          ? investidoTotal + dailyBudgetAtual * diasRestantes
+          : investidoTotal;
         let orcamentoDiarioMeta: number | null = null;
         if (investimentoMensalMeta !== null && diasRestantes > 0) {
           orcamentoDiarioMeta = Math.max(0, (investimentoMensalMeta - investidoTotal) / diasRestantes);
@@ -187,6 +215,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           investimentoMensalMeta,
           orcamentoDiarioMeta,
           projecaoAsIs,
+          isDelivering,
         };
       };
 

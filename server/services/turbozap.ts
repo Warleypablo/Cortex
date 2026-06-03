@@ -61,11 +61,30 @@ export interface TurboZapConfiguracao {
   atualizado_em: string;
 }
 
+export interface TurboZapTemplate {
+  id: number;
+  nome: string;
+  conteudo: string;
+  nivel: string | null;
+  criado_por: string | null;
+  criado_em: string;
+}
+
+export interface NivelCustomizado {
+  id: number;
+  tipo: string;
+  label: string;
+  dias: number;
+  instancia: "financeiro" | "juridico";
+  criado_por: string | null;
+  criado_em: string;
+}
+
 // ============================================
 // Níveis de escalação
 // ============================================
 
-interface NivelCobranca {
+export interface NivelCobranca {
   tipo: string;
   label: string;
   dias: number;
@@ -73,12 +92,13 @@ interface NivelCobranca {
   condicional?: string;
 }
 
-const NIVEIS_COBRANCA: NivelCobranca[] = [
+export const NIVEIS_COBRANCA: NivelCobranca[] = [
   { tipo: "D-3", label: "D-3 (Lembrete)", dias: -3, instancia: "financeiro" },
   { tipo: "D+0", label: "D+0 (Vencimento)", dias: 0, instancia: "financeiro" },
   { tipo: "D+3", label: "D+3 (3 dias)", dias: 3, instancia: "financeiro" },
   { tipo: "D+7", label: "D+7 (Suspensão)", dias: 7, instancia: "financeiro" },
   { tipo: "D+10", label: "D+10 (Rescisão)", dias: 10, instancia: "financeiro" },
+  { tipo: "D+14", label: "D+14 (Cancelamento)", dias: 14, instancia: "financeiro" },
   { tipo: "D+15", label: "D+15 (Encerramento)", dias: 15, instancia: "financeiro" },
   { tipo: "D+20", label: "D+20 (Cancelado)", dias: 20, instancia: "financeiro" },
   { tipo: "D+30", label: "D+30 (Formalização Jurídica)", dias: 30, instancia: "juridico" },
@@ -137,6 +157,12 @@ Caso haja interesse na regularização do débito, segue abaixo o boleto atualiz
 Qualquer dúvida, estamos à disposição.\n
 
 — Time Financeiro | Turbo Partners`,
+
+  "D+14": `Olá, {nome} tudo bem?\n
+Identificamos que o pagamento de R$ {valor}, com vencimento em {vencimento} referente ao contrato em aberto permanece pendente há 14 dias. Até o momento, não houve a regularização do débito.\n
+Diante disso, informamos que, conforme previsto em contrato, diante da ausência de regularização do pagamento, estamos procedendo com o cancelamento do contrato por inadimplência.\n
+Caso tenha interesse em regularizar a situação ou verificar a possibilidade de reativação, pedimos que entre em contato o quanto antes.\n
+Permanecemos à disposição.`,
 
   "D+15": `Prezado(a), {nome}\n
 
@@ -265,6 +291,7 @@ export async function initTurboZapTables(): Promise<void> {
       { chave: "template_D+3", valor: DEFAULT_TEMPLATES["D+3"] },
       { chave: "template_D+7", valor: DEFAULT_TEMPLATES["D+7"] },
       { chave: "template_D+10", valor: DEFAULT_TEMPLATES["D+10"] },
+      { chave: "template_D+14", valor: DEFAULT_TEMPLATES["D+14"] },
       { chave: "template_D+15", valor: DEFAULT_TEMPLATES["D+15"] },
       { chave: "template_D+20", valor: DEFAULT_TEMPLATES["D+20"] },
       { chave: "delay_min", valor: "10" },
@@ -276,6 +303,7 @@ export async function initTurboZapTables(): Promise<void> {
       { chave: "template_D+50", valor: DEFAULT_TEMPLATES["D+50"] },
       { chave: "template_D+55", valor: DEFAULT_TEMPLATES["D+55"] },
       { chave: "dry_run_juridico", valor: "true" },
+      { chave: "niveis_desativados", valor: "[]" },
     ];
 
     for (const cfg of seedConfigs) {
@@ -285,6 +313,35 @@ export async function initTurboZapTables(): Promise<void> {
         ON CONFLICT (chave) DO NOTHING
       `);
     }
+
+    // Create templates library table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.turbozap_templates (
+        id         SERIAL PRIMARY KEY,
+        nome       TEXT NOT NULL,
+        conteudo   TEXT NOT NULL,
+        nivel      TEXT,
+        criado_por TEXT,
+        criado_em  TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`
+      ALTER TABLE cortex_core.turbozap_templates
+        ADD COLUMN IF NOT EXISTS nivel TEXT
+    `);
+
+    // Create custom levels table
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.turbozap_niveis_customizados (
+        id         SERIAL PRIMARY KEY,
+        tipo       TEXT NOT NULL UNIQUE,
+        label      TEXT NOT NULL,
+        dias       INTEGER NOT NULL,
+        instancia  TEXT NOT NULL DEFAULT 'financeiro',
+        criado_por TEXT,
+        criado_em  TIMESTAMP DEFAULT NOW()
+      )
+    `);
 
     // Create pipeline juridico table
     await db.execute(sql`
@@ -431,9 +488,22 @@ export async function previewCobrancas(): Promise<PreviewNivel[]> {
     skipNumerosRaw ? JSON.parse(skipNumerosRaw) : DEFAULT_SKIP_NUMEROS,
   );
 
+  const desativados = await getNiveisDesativados();
+  const customizados = await getNiveisCustomizados();
+  const todosOsNiveis: NivelCobranca[] = [
+    ...NIVEIS_COBRANCA,
+    ...customizados.map((c) => ({
+      tipo: c.tipo,
+      label: c.label,
+      dias: c.dias,
+      instancia: c.instancia as "financeiro" | "juridico",
+    })),
+  ];
+  const niveisAtivos = todosOsNiveis.filter((n) => !desativados.includes(n.tipo));
+
   const niveis: PreviewNivel[] = [];
 
-  for (const nivel of NIVEIS_COBRANCA) {
+  for (const nivel of niveisAtivos) {
     const dataVencimento = calcularDataVencimento(nivel.dias);
     let clientes = await buscarClientesPorVencimento(dataVencimento);
 
@@ -1006,4 +1076,158 @@ export async function updatePipelineJuridico(
     throw new Error(`Pipeline record #${id} não encontrado`);
   }
   return result.rows[0] as PipelineJuridico;
+}
+
+// ============================================
+// Níveis customizados
+// ============================================
+
+export async function getNiveisCustomizados(): Promise<NivelCustomizado[]> {
+  const result = await db.execute(sql`
+    SELECT id, tipo, label, dias, instancia, criado_por, criado_em
+    FROM cortex_core.turbozap_niveis_customizados
+    ORDER BY dias
+  `);
+  return result.rows as NivelCustomizado[];
+}
+
+export function getNiveisInfo(
+  customizados: NivelCustomizado[],
+  desativados: string[],
+): Array<{ tipo: string; label: string; ativo: boolean; instancia: "financeiro" | "juridico"; is_custom: boolean; dias: number }> {
+  const sistema = NIVEIS_COBRANCA.map((n) => ({
+    tipo: n.tipo,
+    label: n.label,
+    ativo: !desativados.includes(n.tipo),
+    instancia: n.instancia,
+    is_custom: false,
+    dias: n.dias,
+  }));
+  const custom = customizados.map((c) => ({
+    tipo: c.tipo,
+    label: c.label,
+    ativo: !desativados.includes(c.tipo),
+    instancia: c.instancia,
+    is_custom: true,
+    dias: c.dias,
+  }));
+  return [...sistema, ...custom].sort((a, b) => a.dias - b.dias);
+}
+
+export async function createNivelCustomizado(
+  dias: number,
+  criadoPor: string | null,
+): Promise<NivelCustomizado> {
+  const tipo = dias >= 0 ? `D+${dias}` : `D${dias}`;
+  if (NIVEIS_COBRANCA.some((n) => n.tipo === tipo)) {
+    throw new Error(`Nível ${tipo} já existe como nível de sistema`);
+  }
+  const label = `${tipo} (Customizado)`;
+  const result = await db.execute(sql`
+    INSERT INTO cortex_core.turbozap_niveis_customizados (tipo, label, dias, instancia, criado_por)
+    VALUES (${tipo}, ${label}, ${dias}, 'financeiro', ${criadoPor})
+    RETURNING id, tipo, label, dias, instancia, criado_por, criado_em
+  `);
+  if (result.rows.length === 0) {
+    throw new Error("Falha ao criar nível");
+  }
+  const chave = `template_${tipo}`;
+  await db.execute(sql`
+    INSERT INTO cortex_core.turbozap_configuracoes (chave, valor)
+    VALUES (${chave}, '')
+    ON CONFLICT (chave) DO NOTHING
+  `);
+  return result.rows[0] as NivelCustomizado;
+}
+
+export async function deleteNivelCustomizado(tipo: string): Promise<void> {
+  if (NIVEIS_COBRANCA.some((n) => n.tipo === tipo)) {
+    throw new Error(`Nível ${tipo} é um nível de sistema e não pode ser deletado`);
+  }
+  const result = await db.execute(sql`
+    DELETE FROM cortex_core.turbozap_niveis_customizados
+    WHERE tipo = ${tipo}
+    RETURNING id
+  `);
+  if (result.rows.length === 0) {
+    throw new Error(`Nível customizado ${tipo} não encontrado`);
+  }
+  const chave = `template_${tipo}`;
+  await db.execute(sql`
+    DELETE FROM cortex_core.turbozap_configuracoes
+    WHERE chave = ${chave}
+  `);
+}
+
+// ============================================
+// Templates biblioteca
+// ============================================
+
+export async function getTemplates(): Promise<TurboZapTemplate[]> {
+  const result = await db.execute(sql`
+    SELECT id, nome, conteudo, nivel, criado_por, criado_em
+    FROM cortex_core.turbozap_templates
+    ORDER BY criado_em DESC
+  `);
+  return result.rows as TurboZapTemplate[];
+}
+
+export async function createTemplate(
+  nome: string,
+  conteudo: string,
+  criadoPor: string | null,
+  nivel: string | null,
+): Promise<TurboZapTemplate> {
+  const result = await db.execute(sql`
+    INSERT INTO cortex_core.turbozap_templates (nome, conteudo, criado_por, nivel)
+    VALUES (${nome}, ${conteudo}, ${criadoPor}, ${nivel})
+    RETURNING id, nome, conteudo, nivel, criado_por, criado_em
+  `);
+  if (result.rows.length === 0) {
+    throw new Error("Falha ao criar template");
+  }
+  return result.rows[0] as TurboZapTemplate;
+}
+
+export async function getNiveisDesativados(): Promise<string[]> {
+  const raw = await getConfiguracao("niveis_desativados");
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return [];
+  }
+}
+
+export async function toggleNivel(
+  tipo: string,
+  ativo: boolean,
+  atualizadoPor: string,
+): Promise<string[]> {
+  const customizados = await getNiveisCustomizados();
+  const todosOsTipos = [
+    ...NIVEIS_COBRANCA.map((n) => n.tipo),
+    ...customizados.map((c) => c.tipo),
+  ];
+  if (!todosOsTipos.includes(tipo)) {
+    throw new Error(`Nível desconhecido: ${tipo}`);
+  }
+  const desativados = await getNiveisDesativados();
+  const updated = ativo
+    ? desativados.filter((t) => t !== tipo)
+    : Array.from(new Set([...desativados, tipo]));
+  await updateConfiguracao("niveis_desativados", JSON.stringify(updated), atualizadoPor);
+  return updated;
+}
+
+export async function deleteTemplate(id: number): Promise<void> {
+  const result = await db.execute(sql`
+    DELETE FROM cortex_core.turbozap_templates
+    WHERE id = ${id}
+    RETURNING id
+  `);
+  if (result.rows.length === 0) {
+    throw new Error(`Template #${id} não encontrado`);
+  }
 }

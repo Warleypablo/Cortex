@@ -66,10 +66,23 @@ export interface AdsMetrics {
   cliques: number;
   cpm: number;
   ctr: number;
+  ra?: number;
+  raMql?: number;
+  raNmql?: number;
+  rr?: number;
+  rrMql?: number;
+  rrNmql?: number;
+  cpra?: number | null;
+  cpraMql?: number | null;
+  cpraNmql?: number | null;
+  cprr?: number | null;
+  cprrMql?: number | null;
+  cprrNmql?: number | null;
   videoHook: number;
   videoHold: number;
   connectRate: number;
   visualizacoesPagina: number;
+  sessoes: number;
   leads: number;
   mqls: number;
   cpl: number;
@@ -118,11 +131,24 @@ export function calcPrevisaoAsIs(realizado: number | null, propDias: number): nu
   return realizado / propDias;
 }
 
+// Retorna o % de aceleração necessária a partir de hoje para fechar o orçado.
+// Ex: +80,9% significa que precisa performar 80,9% acima do ritmo planejado nos
+// dias restantes para bater a meta no fim do mês.
 export function calcRecalculoMeta(orcado: number | null, realizado: number | null, diasRestantes: number, totalDias: number): number | null {
-  if (orcado === null || realizado === null || diasRestantes <= 0 || totalDias === 0) return null;
+  if (orcado === null || realizado === null) return null;
+  if (orcado === 0 || totalDias === 0) return null;
+  if (diasRestantes <= 0) return null;
   const falta = orcado - realizado;
   if (falta <= 0) return 0;
-  return (falta / diasRestantes) * totalDias;
+  const esperadoNoRestante = orcado * (diasRestantes / totalDias);
+  if (esperadoNoRestante === 0) return null;
+  return (falta / esperadoNoRestante - 1) * 100;
+}
+
+// Gap em pontos percentuais para métricas-taxa. Valores em decimal (0,30 = 30%).
+export function calcRecalculoMetaPercent(orcado: number | null, realizado: number | null): number | null {
+  if (orcado === null || realizado === null) return null;
+  return (orcado - realizado) * 100;
 }
 
 // ===== Platform Config =====
@@ -147,7 +173,9 @@ export const PLATFORM_MULTISELECT_OPTIONS = [
   { value: 'google_ads', label: 'Google Ads' },
   { value: 'instagram', label: 'Instagram' },
   { value: 'youtube', label: 'YouTube' },
-  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'linkedin', label: 'LinkedIn', badge: 'integração pendente' },
+  { value: 'tiktok_ads', label: 'TikTok Ads', badge: 'integração pendente' },
+  { value: 'tiktok', label: 'TikTok', badge: 'integração pendente' },
 ];
 
 export const PLATFORM_TO_UTM: Record<string, string> = {
@@ -156,6 +184,8 @@ export const PLATFORM_TO_UTM: Record<string, string> = {
   instagram: 'instagram',
   youtube: 'youtube',
   linkedin: 'linkedin',
+  tiktok_ads: 'tiktok_ads',
+  tiktok: 'tiktok',
 };
 
 // ===== Default Orçado Values =====
@@ -203,19 +233,24 @@ export const DEFAULT_ORCADO_ADS = {
   videoHook: 0,
   videoHold: 0,
   visualizacoesPagina: 0,
+  sessoes: 0,
   taxaConversaoPagina: 0,
   connectRate: 0,
   leads: 0,
   mqls: 0,
   cpl: 0,
   cpmql: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percMqls: 0,
 };
 
 export const DEFAULT_ORCADO_META_ADS = {
   investimento: 0, cpm: 0, ctr: 0, videoHook: 0, videoHold: 0, videoP75: 0, videoP100: 0,
-  visualizacoesPagina: 0, taxaConversaoPagina: 0, connectRate: 0,
+  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -226,8 +261,10 @@ export const DEFAULT_ORCADO_META_ADS = {
 
 export const DEFAULT_ORCADO_GOOGLE_ADS = {
   investimento: 0, cpm: 0, ctr: 0,
-  visualizacoesPagina: 0, taxaConversaoPagina: 0, connectRate: 0,
+  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -246,6 +283,8 @@ export const DEFAULT_ORCADO_INSTAGRAM = {
   percEngajamento: 0, interacoes: 0, ctrAlcanceCliques: 0,
   ctrVisitasCliques: 0, cliquesLinkBio: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -259,6 +298,8 @@ export const DEFAULT_ORCADO_YOUTUBE = {
   ctrImpressoes: 0, retencaoMedia: 0, curtidas: 0, comentarios: 0,
   compartilhamentos: 0, videosPublicados: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -272,6 +313,8 @@ export const DEFAULT_ORCADO_LINKEDIN = {
   taxaEngajamento: 0, postsPublicados: 0, reacoes: 0, comentarios: 0,
   compartilhamentos: 0,
   leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
   percRa: 0, percRaMql: 0, percRaNmql: 0,
   percRr: 0, percRrMql: 0, percRrNmql: 0,
   percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
@@ -322,23 +365,30 @@ export const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }>
   video_hook: { segment: 'ads', key: 'videoHook' },
   video_hold: { segment: 'ads', key: 'videoHold' },
   visualizacoes_pagina: { segment: 'ads', key: 'visualizacoesPagina' },
+  sessoes: { segment: 'ads', key: 'sessoes' },
   taxa_conversao_pagina: { segment: 'ads', key: 'taxaConversaoPagina' },
   connect_rate: { segment: 'ads', key: 'connectRate' },
   leads: { segment: 'ads', key: 'leads' },
   mqls: { segment: 'ads', key: 'mqls' },
   cpl: { segment: 'ads', key: 'cpl' },
   cpmql: { segment: 'ads', key: 'cpmql' },
+  cpra: { segment: 'ads', key: 'cpra' },
+  cpra_mql: { segment: 'ads', key: 'cpraMql' },
+  cpra_nmql: { segment: 'ads', key: 'cpraNmql' },
+  cprr: { segment: 'ads', key: 'cprr' },
+  cprr_mql: { segment: 'ads', key: 'cprrMql' },
+  cprr_nmql: { segment: 'ads', key: 'cprrNmql' },
   perc_mqls: { segment: 'ads', key: 'percMqls' },
   // Meta Ads (platform-specific)
-  ...Object.fromEntries(['investimento','cpm','ctr','videoHook','videoHold','videoP75','videoP100','visualizacoesPagina','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`meta_${k}`, { segment: 'meta_ads', key: k }])),
+  ...Object.fromEntries(['investimento','cpm','ctr','videoHook','videoHold','videoP75','videoP100','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`meta_${k}`, { segment: 'meta_ads', key: k }])),
   // Google Ads (platform-specific)
-  ...Object.fromEntries(['investimento','cpm','ctr','visualizacoesPagina','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`gads_${k}`, { segment: 'google_ads', key: k }])),
+  ...Object.fromEntries(['investimento','cpm','ctr','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`gads_${k}`, { segment: 'google_ads', key: k }])),
   // Instagram (platform-specific)
-  ...Object.fromEntries(['comecaramSeguir','deixaramSeguir','percPerdaSeguidores','deltaSeguidores','totalSeguidores','percCrescimentoSeguidores','visualizacoesTotais','percVisualizacoesOrganicas','visualizacoesOrganicas','percVisualizacoesPagas','visualizacoesPagas','alcanceTotal','alcanceOrganico','alcancePago','frequenciaAlcance','ctrAlcanceVisitas','visitasPerfil','percEngajamento','interacoes','ctrAlcanceCliques','ctrVisitasCliques','cliquesLinkBio','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`ig_${k}`, { segment: 'instagram', key: k }])),
+  ...Object.fromEntries(['comecaramSeguir','deixaramSeguir','percPerdaSeguidores','deltaSeguidores','totalSeguidores','percCrescimentoSeguidores','visualizacoesTotais','percVisualizacoesOrganicas','visualizacoesOrganicas','percVisualizacoesPagas','visualizacoesPagas','alcanceTotal','alcanceOrganico','alcancePago','frequenciaAlcance','ctrAlcanceVisitas','visitasPerfil','percEngajamento','interacoes','ctrAlcanceCliques','ctrVisitasCliques','cliquesLinkBio','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`ig_${k}`, { segment: 'instagram', key: k }])),
   // YouTube (platform-specific)
-  ...Object.fromEntries(['inscritos','crescimentoInscritos','visualizacoes','horasAssistidas','ctrImpressoes','retencaoMedia','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`yt_${k}`, { segment: 'youtube', key: k }])),
+  ...Object.fromEntries(['inscritos','crescimentoInscritos','visualizacoes','horasAssistidas','ctrImpressoes','retencaoMedia','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`yt_${k}`, { segment: 'youtube', key: k }])),
   // LinkedIn (platform-specific)
-  ...Object.fromEntries(['seguidores','crescimentoSeguidores','impressoes','cliquesPost','taxaEngajamento','postsPublicados','reacoes','comentarios','compartilhamentos','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`li_${k}`, { segment: 'linkedin', key: k }])),
+  ...Object.fromEntries(['seguidores','crescimentoSeguidores','impressoes','cliquesPost','taxaEngajamento','postsPublicados','reacoes','comentarios','compartilhamentos','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`li_${k}`, { segment: 'linkedin', key: k }])),
 };
 
 // ===== Percent Metrics =====
@@ -349,7 +399,7 @@ export const PERCENT_METRICS = new Set([
   'nmql_ra_perc', 'nmql_noshow', 'nmql_taxa_vendas', 'nmql_rr_perc', 'nmql_taxa_conversao',
   'ctr', 'perc_mqls',
   // Meta Ads
-  'meta_ctr', 'meta_videoHook', 'meta_videoHold', 'meta_videoP75', 'meta_videoP100',
+  'meta_ctr', 'meta_videoP75', 'meta_videoP100',
   'meta_taxaConversaoPagina', 'meta_connectRate', 'meta_percMqls',
   'meta_percRa', 'meta_percRaMql', 'meta_percRaNmql', 'meta_percRr', 'meta_percRrMql', 'meta_percRrNmql',
   'meta_percRrVendas', 'meta_percRrMqlVendas', 'meta_percRrNmqlVendas',
@@ -437,6 +487,7 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: '_header_marketing', name: 'Marketing', format: 'number', isSubHeader: true },
       { id: 'investimento', name: 'Investimento', format: 'currency' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', format: 'number' },
+      { id: 'sessoes', name: 'Sessões', format: 'number' },
       { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', format: 'percent' },
       { id: 'connect_rate', name: 'Connect Rate', format: 'percent' },
       { id: 'leads', name: 'Leads', format: 'number' },
@@ -447,31 +498,31 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       // — Vendas MQL
       { id: '_header_mql', name: 'Vendas MQL', format: 'number', isSubHeader: true },
       { id: 'mql_ra_perc', name: '%RA MQL', format: 'percent' },
-      { id: 'mql_noshow', name: '%No-show MQL', format: 'percent' },
+      { id: 'mql_noshow', name: '% No-show MQL', format: 'percent' },
       { id: 'mql_rr_perc', name: '%RR MQL', format: 'percent' },
       { id: 'mql_taxa_vendas', name: 'RR→V% MQL', format: 'percent' },
       { id: 'mql_novos_clientes', name: 'Negócios Ganhos MQL', format: 'number' },
-      { id: 'mql_aov', name: 'AOV MQL', format: 'currency' },
-      { id: 'mql_ticket_impl', name: 'AOV Pontual MQL', format: 'currency' },
-      { id: 'mql_ticket_acel', name: 'AOV Recorrente MQL', format: 'currency' },
-      { id: 'mql_faturamento', name: 'Faturamento MQL', format: 'currency' },
-      { id: 'mql_fat_impl', name: 'Faturamento Pontual MQL', format: 'currency' },
-      { id: 'mql_fat_acel', name: 'Faturamento Recorrente MQL', format: 'currency' },
-      { id: 'mql_taxa_conversao', name: 'Taxa de Conversão MQL', format: 'percent' },
+      { id: 'mql_aov', name: 'Ticket Médio Geral MQL', format: 'currency' },
+      { id: 'mql_ticket_impl', name: 'Ticket Médio Implantação MQL', format: 'currency' },
+      { id: 'mql_ticket_acel', name: 'Ticket Médio Aceleração MQL', format: 'currency' },
+      { id: 'mql_faturamento', name: 'Faturamento Total MQL', format: 'currency' },
+      { id: 'mql_fat_impl', name: 'Faturamento Implantação MQL', format: 'currency' },
+      { id: 'mql_fat_acel', name: 'Faturamento Aceleração (MRR novo) de MQL', format: 'currency' },
+      { id: 'mql_taxa_conversao', name: 'Tx de Conversão MQL', format: 'percent' },
       // — Vendas Não-MQL
-      { id: '_header_nmql', name: 'Vendas Não-MQL', format: 'number', isSubHeader: true },
-      { id: 'nmql_ra_perc', name: '%RA NMQL', format: 'percent' },
-      { id: 'nmql_noshow', name: '%No-show NMQL', format: 'percent' },
-      { id: 'nmql_rr_perc', name: '%RR NMQL', format: 'percent' },
-      { id: 'nmql_taxa_vendas', name: 'RR→V% NMQL', format: 'percent' },
-      { id: 'nmql_novos_clientes', name: 'Negócios Ganhos NMQL', format: 'number' },
-      { id: 'nmql_aov', name: 'AOV NMQL', format: 'currency' },
-      { id: 'nmql_ticket_impl', name: 'AOV Pontual NMQL', format: 'currency' },
-      { id: 'nmql_ticket_acel', name: 'AOV Recorrente NMQL', format: 'currency' },
-      { id: 'nmql_faturamento', name: 'Faturamento NMQL', format: 'currency' },
-      { id: 'nmql_fat_impl', name: 'Faturamento Pontual NMQL', format: 'currency' },
-      { id: 'nmql_fat_acel', name: 'Faturamento Recorrente NMQL', format: 'currency' },
-      { id: 'nmql_taxa_conversao', name: 'Taxa de Conversão NMQL', format: 'percent' },
+      { id: '_header_nmql', name: 'Vendas não-MQL', format: 'number', isSubHeader: true },
+      { id: 'nmql_ra_perc', name: '%RA não-MQL', format: 'percent' },
+      { id: 'nmql_noshow', name: '% No-show não-MQL', format: 'percent' },
+      { id: 'nmql_rr_perc', name: '%RR não-MQL', format: 'percent' },
+      { id: 'nmql_taxa_vendas', name: 'RR→V% não-MQL', format: 'percent' },
+      { id: 'nmql_novos_clientes', name: 'Negócios Ganhos não-MQL', format: 'number' },
+      { id: 'nmql_aov', name: 'Ticket Médio Geral não-MQL', format: 'currency' },
+      { id: 'nmql_ticket_impl', name: 'Ticket Médio Implantação não-MQL', format: 'currency' },
+      { id: 'nmql_ticket_acel', name: 'Ticket Médio Aceleração não-MQL', format: 'currency' },
+      { id: 'nmql_faturamento', name: 'Faturamento Total não-MQL', format: 'currency' },
+      { id: 'nmql_fat_impl', name: 'Faturamento Implantação não-MQL', format: 'currency' },
+      { id: 'nmql_fat_acel', name: 'Faturamento Aceleração (MRR novo) de não-MQL', format: 'currency' },
+      { id: 'nmql_taxa_conversao', name: 'Tx de Conversão não-MQL', format: 'percent' },
     ],
   },
   meta_ads: {
@@ -481,10 +532,9 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'meta_investimento', name: 'Investimento', format: 'currency', tier: 1 },
       { id: 'meta_cpm', name: 'CPM', format: 'currency', tier: 1 },
       { id: 'meta_ctr', name: 'CTR', format: 'percent', tier: 1 },
-      { id: 'meta_videoHook', name: 'Vídeo Hook', format: 'percent', tier: 1 },
-      { id: 'meta_videoHold', name: 'Vídeo Hold', format: 'percent', tier: 1 },
       { id: 'meta_connectRate', name: 'Connect Rate', format: 'percent', tier: 1 },
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', format: 'number', tier: 2 },
+      { id: 'meta_sessoes', name: 'Sessões', format: 'number', tier: 2 },
       { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página', format: 'percent', tier: 1 },
       { id: 'meta_leads', name: 'Leads', format: 'number', tier: 2 },
       { id: 'meta_cpl', name: 'CPL', format: 'currency', tier: 2 },
@@ -493,13 +543,13 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'meta_cpmql', name: 'CPMQL', format: 'currency', tier: 2 },
       { id: 'meta_percRa', name: '% RA', format: 'percent', tier: 1 },
       { id: 'meta_percRr', name: '% RR', format: 'percent', tier: 2 },
-      { id: 'meta_percRrVendas', name: '% RR→Vendas', format: 'percent', tier: 1 },
+      { id: 'meta_percRrVendas', name: 'RR→V%', format: 'percent', tier: 1 },
       { id: 'meta_negocioGanho', name: 'Negócios Ganhos', format: 'number', tier: 2 },
       { id: 'meta_leadTime', name: 'Lead Time (dias)', format: 'number', tier: 1 },
-      { id: 'meta_aov', name: 'AOV', format: 'currency', tier: 1 },
-      { id: 'meta_receita', name: 'Receita', format: 'currency', tier: 2 },
-      { id: 'meta_cacUnico', name: 'CAC Único', format: 'currency', tier: 2 },
-      { id: 'meta_cacContrato', name: 'CAC Contrato', format: 'currency', tier: 2 },
+      { id: 'meta_aov', name: 'Ticket Médio Geral', format: 'currency', tier: 1 },
+      { id: 'meta_receita', name: 'Faturamento Total', format: 'currency', tier: 2 },
+      { id: 'meta_cacUnico', name: 'CAC - Negócios', format: 'currency', tier: 2 },
+      { id: 'meta_cacContrato', name: 'CAC - Contrato', format: 'currency', tier: 2 },
     ],
   },
   google_ads: {
@@ -511,6 +561,7 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'gads_ctr', name: 'CTR', format: 'percent', tier: 1 },
       { id: 'gads_connectRate', name: 'Connect Rate', format: 'percent', tier: 1 },
       { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', format: 'number', tier: 2 },
+      { id: 'gads_sessoes', name: 'Sessões', format: 'number', tier: 2 },
       { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página', format: 'percent', tier: 1 },
       { id: 'gads_leads', name: 'Leads', format: 'number', tier: 2 },
       { id: 'gads_cpl', name: 'CPL', format: 'currency', tier: 2 },
@@ -519,31 +570,31 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'gads_cpmql', name: 'CPMQL', format: 'currency', tier: 2 },
       { id: 'gads_percRa', name: '% RA', format: 'percent', tier: 1 },
       { id: 'gads_percRr', name: '% RR', format: 'percent', tier: 2 },
-      { id: 'gads_percRrVendas', name: '% RR→Vendas', format: 'percent', tier: 1 },
+      { id: 'gads_percRrVendas', name: 'RR→V%', format: 'percent', tier: 1 },
       { id: 'gads_negocioGanho', name: 'Negócios Ganhos', format: 'number', tier: 2 },
       { id: 'gads_leadTime', name: 'Lead Time (dias)', format: 'number', tier: 1 },
-      { id: 'gads_aov', name: 'AOV', format: 'currency', tier: 1 },
-      { id: 'gads_receita', name: 'Receita', format: 'currency', tier: 2 },
-      { id: 'gads_cacUnico', name: 'CAC Único', format: 'currency', tier: 2 },
-      { id: 'gads_cacContrato', name: 'CAC Contrato', format: 'currency', tier: 2 },
+      { id: 'gads_aov', name: 'Ticket Médio Geral', format: 'currency', tier: 1 },
+      { id: 'gads_receita', name: 'Faturamento Total', format: 'currency', tier: 2 },
+      { id: 'gads_cacUnico', name: 'CAC - Negócios', format: 'currency', tier: 2 },
+      { id: 'gads_cacContrato', name: 'CAC - Contrato', format: 'currency', tier: 2 },
     ],
   },
   instagram: {
     label: 'Instagram',
     metrics: [
       // Ordem: Seguidores → Engajamento → Alcance → Visitas → Cliques → Leads → MQLs
-      { id: 'ig_totalSeguidores', name: 'Total Seguidores', format: 'number', tier: 1 },
+      { id: 'ig_totalSeguidores', name: 'Total de Seguidores', format: 'number', tier: 1 },
       { id: 'ig_comecaramSeguir', name: 'Começaram a Seguir', format: 'number', tier: 2 },
       { id: 'ig_deixaramSeguir', name: 'Deixaram de Seguir', format: 'number', tier: 3 },
-      { id: 'ig_deltaSeguidores', name: 'Delta Seguidores', format: 'number', tier: 2 },
+      { id: 'ig_deltaSeguidores', name: 'Delta de Seguidores', format: 'number', tier: 2 },
       { id: 'ig_alcanceTotal', name: 'Alcance Total', format: 'number', tier: 3 },
       { id: 'ig_visualizacoesTotais', name: 'Visualizações Totais', format: 'number', tier: 3 },
-      { id: 'ig_percEngajamento', name: '% Engajamento', format: 'percent', tier: 1 },
+      { id: 'ig_percEngajamento', name: '% Engajamento (Alcance > Interações)', format: 'percent', tier: 1 },
       { id: 'ig_interacoes', name: 'Interações', format: 'number', tier: 2 },
       { id: 'ig_ctrAlcanceVisitas', name: 'CTR Alcance > Visitas', format: 'percent', tier: 1 },
       { id: 'ig_ctrAlcanceCliques', name: 'CTR Alcance > Cliques', format: 'percent', tier: 1 },
       { id: 'ig_ctrVisitasCliques', name: 'CTR Visitas > Cliques', format: 'percent', tier: 1 },
-      { id: 'ig_cliquesLinkBio', name: 'Cliques Link Bio', format: 'number', tier: 1 },
+      { id: 'ig_cliquesLinkBio', name: 'Cliques no Link Bio', format: 'number', tier: 1 },
       { id: 'ig_leads', name: 'Leads', format: 'number', tier: 1 },
       { id: 'ig_percMqls', name: '% MQLs', format: 'percent', tier: 2 },
       { id: 'ig_mqls', name: 'MQLs', format: 'number', tier: 1 },
@@ -559,7 +610,7 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'yt_crescimentoInscritos', name: 'Crescimento Inscritos', format: 'number', tier: 2 },
       { id: 'yt_visualizacoes', name: 'Visualizações', format: 'number', tier: 3 },
       { id: 'yt_horasAssistidas', name: 'Horas Assistidas', format: 'number', tier: 3 },
-      { id: 'yt_ctrImpressoes', name: 'CTR Impressões', format: 'percent', tier: 1 },
+      { id: 'yt_ctrImpressoes', name: 'CTR Impressões (Thumbnail)', format: 'percent', tier: 1 },
       { id: 'yt_retencaoMedia', name: 'Retenção Média', format: 'percent', tier: 1 },
       { id: 'yt_leads', name: 'Leads', format: 'number', tier: 1 },
       { id: 'yt_mqls', name: 'MQLs', format: 'number', tier: 1 },
@@ -661,24 +712,9 @@ export const TIER3_METRIC_IDS = new Set<string>([
   'li_reacoes', 'li_comentarios', 'li_compartilhamentos',
 ]);
 
-// ===== Simulation Engine =====
-// Defines which metrics are user inputs vs derived (auto-calculated),
-// and the formulas to compute derived metrics from inputs.
-
-/**
- * Metrics the user sets directly in simulation mode.
- * All other Inbound metrics are derived from these.
- */
-export const SIMULATION_INPUT_METRICS = new Set([
-  // Marketing inputs
-  'investimento', 'visualizacoes_pagina', 'connect_rate', 'taxa_conversao_pagina', 'perc_mqls',
-  // MQL funnel inputs (rates & tickets)
-  'mql_ra_perc', 'mql_noshow', 'mql_taxa_vendas',
-  'mql_ticket_acel', 'mql_ticket_impl',
-  // Não-MQL funnel inputs (rates & tickets)
-  'nmql_ra_perc', 'nmql_noshow', 'nmql_taxa_vendas',
-  'nmql_ticket_acel', 'nmql_ticket_impl',
-]);
+// ===== Inbound Derivation Engine =====
+// Formulas to compute derived Inbound metrics from user-input metrics.
+// Used by PlanejamentoMetas to auto-calculate derived values in real-time.
 
 type SimFormulaFn = (v: Record<string, number>) => number;
 
@@ -686,7 +722,7 @@ type SimFormulaFn = (v: Record<string, number>) => number;
  * Evaluation order matters — each formula can reference metrics computed before it.
  * The array defines [metricId, formulaFn] in topological order.
  */
-export const SIMULATION_EVAL_ORDER: Array<[string, SimFormulaFn]> = [
+const INBOUND_EVAL_ORDER: Array<[string, SimFormulaFn]> = [
   // Marketing derived
   ['leads', (v) => Math.round(v.visualizacoes_pagina * v.taxa_conversao_pagina)],
   ['mqls', (v) => Math.round(v.leads * v.perc_mqls)],
@@ -722,17 +758,12 @@ export const SIMULATION_EVAL_ORDER: Array<[string, SimFormulaFn]> = [
   }],
 ];
 
-/** Set of all derived metric IDs (for quick lookup) */
-export const SIMULATION_DERIVED_METRICS = new Set(
-  SIMULATION_EVAL_ORDER.map(([id]) => id)
-);
-
 /**
- * Given a flat map of metric values for one month, recalculate all derived metrics.
+ * Given a flat map of Inbound metric values for one month, recalculate all derived metrics.
  * Mutates and returns the same object for efficiency.
  */
-export function simulateMonth(values: Record<string, number>): Record<string, number> {
-  for (const [metricId, formula] of SIMULATION_EVAL_ORDER) {
+export function deriveInboundMetrics(values: Record<string, number>): Record<string, number> {
+  for (const [metricId, formula] of INBOUND_EVAL_ORDER) {
     values[metricId] = formula(values);
   }
   return values;

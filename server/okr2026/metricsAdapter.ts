@@ -382,7 +382,7 @@ export async function getGrossChurnMrr(): Promise<number> {
     if (currentMonth >= '2026-02') {
       const result = await db.execute(sql`
         SELECT COALESCE(SUM(valor_r), 0) as churn_mrr
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
           AND COALESCE(abonar_churn, '') != 'Sim'
@@ -493,7 +493,7 @@ export async function getLogoChurn(): Promise<number> {
       const result = await db.execute(sql`
         WITH churned_parents AS (
           SELECT DISTINCT COALESCE(c.parent_id, c.task_id) as client_id
-          FROM "Clickup".cup_churn c
+          FROM cortex_core.vw_cup_churn_ajustado c
           WHERE c.data_solicitacao_encerramento IS NOT NULL
             AND TO_CHAR(c.data_solicitacao_encerramento::date, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')
             AND COALESCE(c.abonar_churn, '') != 'Sim'
@@ -798,7 +798,7 @@ export async function getNrrForPeriod(startDate: string, endDate: string): Promi
       // Gross churn no período (excluindo abonados)
       db.execute(sql`
         SELECT COALESCE(SUM(valor_r::numeric), 0) as gross_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE valor_r > 0
           AND data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento::date >= ${startDate}::date
@@ -1615,7 +1615,7 @@ async function getChurnSeriesForRange(startDate: string, endDate: string): Promi
         SELECT
           TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') as date,
           COALESCE(SUM(valor_r), 0) as value
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= '2026-02-01'::date
           AND data_solicitacao_encerramento <= ${endDate}::date
@@ -2025,7 +2025,7 @@ async function getNetMrrChurnPctSeriesForRange(startDate: string, endDate: strin
           SELECT
             TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') as month,
             COALESCE(SUM(valor_r), 0) as churn_mrr
-          FROM "Clickup".cup_churn
+          FROM cortex_core.vw_cup_churn_ajustado
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= '2026-02-01'::date
             AND data_solicitacao_encerramento <= ${endDate}::date
@@ -2120,7 +2120,7 @@ async function getLogoChurnPctSeriesForRange(startDate: string, endDate: string)
           SELECT
             TO_CHAR(data_solicitacao_encerramento::date, 'YYYY-MM') as date,
             COUNT(DISTINCT COALESCE(parent_id, task_id)) as logos_churned
-          FROM "Clickup".cup_churn
+          FROM cortex_core.vw_cup_churn_ajustado
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= '2026-02-01'::date
             AND data_solicitacao_encerramento <= ${endDate}::date

@@ -46,6 +46,8 @@ interface ParsedInsightRow {
   videoP50: number;
   videoP75: number;
   videoP100: number;
+  video3Sec: number;
+  videoThruplay: number;
   conversions: number;
   landingPageViews: number;
 }
@@ -54,6 +56,7 @@ function parseInsightRow(row: any): ParsedInsightRow {
   let actionsLead = 0;
   let actionsPurchase = 0;
   let landingPageViews = 0;
+  let video3Sec = 0;
 
   if (row.actions) {
     for (const a of row.actions) {
@@ -65,6 +68,10 @@ function parseInsightRow(row: any): ParsedInsightRow {
       }
       if (a.action_type === 'landing_page_view') {
         landingPageViews += parseInt(a.value || '0');
+      }
+      // Meta UI "Reproduções do vídeo" = action_type 'video_view' = 3+ second video plays
+      if (a.action_type === 'video_view') {
+        video3Sec += parseInt(a.value || '0');
       }
     }
   }
@@ -94,6 +101,8 @@ function parseInsightRow(row: any): ParsedInsightRow {
     videoP50: getVideoMetric(row.video_p50_watched_actions),
     videoP75: getVideoMetric(row.video_p75_watched_actions),
     videoP100: getVideoMetric(row.video_p100_watched_actions),
+    video3Sec,
+    videoThruplay: getVideoMetric(row.video_thruplay_watched_actions),
     conversions: actionsLead + actionsPurchase,
     landingPageViews,
   };
@@ -125,6 +134,8 @@ async function ensureByPlatformTable(pool: Pool): Promise<void> {
       video_p50_watched_actions INTEGER DEFAULT 0,
       video_p75_watched_actions INTEGER DEFAULT 0,
       video_p100_watched_actions INTEGER DEFAULT 0,
+      video_3_sec_watched_actions BIGINT DEFAULT 0,
+      video_thruplay_watched_actions BIGINT DEFAULT 0,
       conversions INTEGER DEFAULT 0,
       landing_page_views INTEGER DEFAULT 0,
       data_importacao TIMESTAMP DEFAULT NOW(),
@@ -167,27 +178,32 @@ async function fetchMetaApi(endpoint: string, params: Record<string, string> = {
 }
 
 /**
- * Fetch all pages from a paginated Meta API endpoint
+ * Fetch all pages from a paginated Meta API endpoint.
+ * Throws on pagination errors — silent breaks would return partial data and cause data gaps.
  */
 async function fetchAllPages(endpoint: string, params: Record<string, string> = {}, pageLimit = 200): Promise<any[]> {
   const allData: any[] = [];
-  let url: string | null = null;
+  let pageCount = 0;
 
-  // First request
   const firstPage = await fetchMetaApi(endpoint, { ...params, limit: String(pageLimit) });
   allData.push(...(firstPage.data || []));
+  pageCount++;
 
-  url = firstPage.paging?.next || null;
+  let url: string | null = firstPage.paging?.next || null;
 
-  // Paginate
   while (url) {
     const response = await fetch(url);
-    if (!response.ok) break;
+    if (!response.ok) {
+      const errorBody = await response.text().catch(() => '');
+      throw new Error(`Meta API pagination failed on page ${pageCount + 1} (HTTP ${response.status}): ${errorBody.slice(0, 200)}`);
+    }
     const data = await response.json();
     allData.push(...(data.data || []));
     url = data.paging?.next || null;
+    pageCount++;
   }
 
+  console.log(`[MetaSync] fetchAllPages: ${pageCount} pages, ${allData.length} total rows`);
   return allData;
 }
 
@@ -352,7 +368,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
 
   const timeRange = JSON.stringify({ since, until });
   const insights = await fetchAllPages(`${TURBO_ACCOUNT_ID}/insights`, {
-    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions',
+    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_thruplay_watched_actions',
     time_range: timeRange,
     level: 'ad',
     time_increment: '1',
@@ -368,8 +384,9 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         inline_link_clicks, outbound_clicks,
         video_play_actions, video_p25_watched_actions, video_p50_watched_actions,
         video_p75_watched_actions, video_p100_watched_actions,
+        video_3_sec_watched_actions, video_thruplay_watched_actions,
         conversions, landing_page_views, data_importacao
-      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,NOW())
       ON CONFLICT ON CONSTRAINT meta_insights_daily_account_id_campaign_id_adset_id_ad_id_d_key
       DO UPDATE SET
         impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
@@ -381,6 +398,8 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         video_p50_watched_actions=EXCLUDED.video_p50_watched_actions,
         video_p75_watched_actions=EXCLUDED.video_p75_watched_actions,
         video_p100_watched_actions=EXCLUDED.video_p100_watched_actions,
+        video_3_sec_watched_actions=EXCLUDED.video_3_sec_watched_actions,
+        video_thruplay_watched_actions=EXCLUDED.video_thruplay_watched_actions,
         conversions=EXCLUDED.conversions, landing_page_views=EXCLUDED.landing_page_views,
         data_importacao=NOW()
     `, [
@@ -391,6 +410,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
       p.inlineLinkClicks, p.outboundClicks,
       p.videoPlay,
       p.videoP25, p.videoP50, p.videoP75, p.videoP100,
+      p.video3Sec, p.videoThruplay,
       p.conversions, p.landingPageViews,
     ]);
     count++;
@@ -405,7 +425,7 @@ async function syncInsightsDailyByPlatform(pool: Pool, since: string, until: str
 
   const timeRange = JSON.stringify({ since, until });
   const insights = await fetchAllPages(`${TURBO_ACCOUNT_ID}/insights`, {
-    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions',
+    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_thruplay_watched_actions',
     time_range: timeRange,
     level: 'ad',
     time_increment: '1',
@@ -423,8 +443,9 @@ async function syncInsightsDailyByPlatform(pool: Pool, since: string, until: str
         inline_link_clicks, outbound_clicks,
         video_p25_watched_actions, video_p50_watched_actions,
         video_p75_watched_actions, video_p100_watched_actions,
+        video_3_sec_watched_actions, video_thruplay_watched_actions,
         conversions, landing_page_views, data_importacao
-      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,NOW())
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,NOW())
       ON CONFLICT ON CONSTRAINT meta_insights_by_platform_unique
       DO UPDATE SET
         impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
@@ -435,6 +456,8 @@ async function syncInsightsDailyByPlatform(pool: Pool, since: string, until: str
         video_p50_watched_actions=EXCLUDED.video_p50_watched_actions,
         video_p75_watched_actions=EXCLUDED.video_p75_watched_actions,
         video_p100_watched_actions=EXCLUDED.video_p100_watched_actions,
+        video_3_sec_watched_actions=EXCLUDED.video_3_sec_watched_actions,
+        video_thruplay_watched_actions=EXCLUDED.video_thruplay_watched_actions,
         conversions=EXCLUDED.conversions, landing_page_views=EXCLUDED.landing_page_views,
         data_importacao=NOW()
     `, [
@@ -444,6 +467,7 @@ async function syncInsightsDailyByPlatform(pool: Pool, since: string, until: str
       p.frequency, p.cpm, p.cpc, p.ctr,
       p.inlineLinkClicks, p.outboundClicks,
       p.videoP25, p.videoP50, p.videoP75, p.videoP100,
+      p.video3Sec, p.videoThruplay,
       p.conversions, p.landingPageViews,
     ]);
     count++;
@@ -460,10 +484,10 @@ export async function syncMetaAds(pool: Pool, options?: { since?: string; until?
   const errors: string[] = [];
   const result: SyncResult = { accounts: 0, campaigns: 0, adsets: 0, ads: 0, creatives: 0, insights: 0, byPlatformInsights: 0, errors: [], duration_ms: 0 };
 
-  // Default: last 90 days
+  // Default: last 7 days for insights (90/30 days caused too many API pages → HTTP 500 on page 8+)
   const today = new Date();
   const defaultSince = new Date(today);
-  defaultSince.setDate(today.getDate() - 90);
+  defaultSince.setDate(today.getDate() - 7);
 
   const since = options?.since || defaultSince.toISOString().split('T')[0];
   const until = options?.until || today.toISOString().split('T')[0];
@@ -543,4 +567,53 @@ export async function syncMetaAds(pool: Pool, options?: { since?: string; until?
   if (errors.length > 0) console.log(`[MetaSync] Errors: ${errors.join('; ')}`);
 
   return result;
+}
+
+/**
+ * Detects gaps in meta_insights_daily and backfills them from the Meta API.
+ * Scans the last `lookbackDays` days and syncs any date that is missing data.
+ */
+export async function backfillMetaInsightsGaps(pool: Pool, lookbackDays = 14): Promise<{ filled: string[]; errors: string[] }> {
+  const today = new Date();
+  const filled: string[] = [];
+  const errors: string[] = [];
+
+  // Find which dates have data in the last N days
+  const result = await pool.query(`
+    SELECT DISTINCT date_start::text FROM meta_ads.meta_insights_daily
+    WHERE date_start >= (CURRENT_DATE - INTERVAL '${lookbackDays} days')::date
+    ORDER BY date_start
+  `);
+  const datesWithData = new Set(result.rows.map((r: any) => r.date_start));
+
+  // Find missing dates (including today)
+  const missingDates: string[] = [];
+  for (let i = lookbackDays; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(today.getDate() - i);
+    const dateStr = d.toISOString().split('T')[0];
+    if (!datesWithData.has(dateStr)) missingDates.push(dateStr);
+  }
+
+  if (missingDates.length === 0) {
+    console.log('[MetaSync] Backfill: no gaps detected');
+    return { filled, errors };
+  }
+
+  console.log(`[MetaSync] Backfill: found ${missingDates.length} missing dates: ${missingDates.join(', ')}`);
+
+  // Sync each missing date individually to avoid large API windows
+  for (const date of missingDates) {
+    try {
+      const count = await syncInsightsDaily(pool, date, date);
+      const countPlatform = await syncInsightsDailyByPlatform(pool, date, date);
+      console.log(`[MetaSync] Backfill ${date}: ${count} insight rows, ${countPlatform} by-platform rows`);
+      filled.push(date);
+    } catch (e: any) {
+      console.error(`[MetaSync] Backfill ${date} failed:`, e.message);
+      errors.push(`${date}: ${e.message}`);
+    }
+  }
+
+  return { filled, errors };
 }
