@@ -23,8 +23,12 @@ interface ComercialRow {
   contas_ativas: number; cap_contas: number | null; dif_contas: number | null;
   util_pct: number | null;
 }
+interface SquadGroup {
+  squad: string;
+  rows: CsRow[];
+}
 interface CapacityTimesResponse {
-  cs: CsRow[]; vendedor: ComercialRow[]; account: ComercialRow[]; gestor: ComercialRow[];
+  squads: SquadGroup[]; vendedor: ComercialRow[]; account: ComercialRow[]; gestor: ComercialRow[];
 }
 
 function formatCurrency(value: number): string {
@@ -163,6 +167,9 @@ export default function CapacityTimes() {
     queryKey: ["/api/capacity-times"],
   });
 
+  const squads = data?.squads ?? [];
+  const defaultTab = squads[0]?.squad ?? "vendedor";
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex items-center gap-3">
@@ -176,20 +183,24 @@ export default function CapacityTimes() {
       {isLoading ? (
         <Skeleton className="h-96" />
       ) : (
-        <Tabs defaultValue="cs">
+        <Tabs defaultValue={defaultTab}>
           <TabsList>
-            <TabsTrigger value="cs">CS ({data?.cs.length ?? 0})</TabsTrigger>
+            {squads.map((s) => (
+              <TabsTrigger key={s.squad} value={s.squad}>{s.squad} ({s.rows.length})</TabsTrigger>
+            ))}
             <TabsTrigger value="vendedor">Vendedores ({data?.vendedor.length ?? 0})</TabsTrigger>
             <TabsTrigger value="account">Accounts ({data?.account.length ?? 0})</TabsTrigger>
             <TabsTrigger value="gestor">Gestores ({data?.gestor.length ?? 0})</TabsTrigger>
           </TabsList>
 
-          <TabsContent value="cs">
-            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardHeader><CardTitle className="text-gray-900 dark:text-white">CS</CardTitle></CardHeader>
-              <CardContent><CsTable rows={data?.cs ?? []} /></CardContent>
-            </Card>
-          </TabsContent>
+          {squads.map((s) => (
+            <TabsContent key={s.squad} value={s.squad}>
+              <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+                <CardHeader><CardTitle className="text-gray-900 dark:text-white">Squad {s.squad}</CardTitle></CardHeader>
+                <CardContent><CsTable rows={s.rows} /></CardContent>
+              </Card>
+            </TabsContent>
+          ))}
           <TabsContent value="vendedor">
             <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
               <CardHeader><CardTitle className="text-gray-900 dark:text-white">Vendedores / Closers</CardTitle></CardHeader>

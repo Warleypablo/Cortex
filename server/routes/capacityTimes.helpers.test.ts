@@ -52,30 +52,32 @@ describe("parseAggRow", () => {
 
 describe("buildResponse", () => {
   const rows: CapacityAggRow[] = [
-    { nome: "Brenda", categoria: "cs", cap_recorrente: 15, cap_mrr: 45000, cap_pontual: 0, cap_contas: null,
+    { nome: "Brenda", categoria: "Pulse", cap_recorrente: 15, cap_mrr: 45000, cap_pontual: 0, cap_contas: null,
       op_recorrente: 10, mrr_operando: 30238, mrr_ativo: 30238, mrr_onboarding: 0, mrr_cancelamento: 0, op_pontual: 0 },
-    { nome: "Mariana Dalto", categoria: "cs", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null,
+    { nome: "Mariana Dalto", categoria: "Aura", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null,
       op_recorrente: 6, mrr_operando: 36488, mrr_ativo: 29488, mrr_onboarding: 0, mrr_cancelamento: 7000, op_pontual: 11 },
     { nome: "Gabriel Taufner", categoria: "vendedor", cap_recorrente: null, cap_mrr: 107510, cap_pontual: null, cap_contas: 30,
       op_recorrente: 12, mrr_operando: 43004, mrr_ativo: 43004, mrr_onboarding: 0, mrr_cancelamento: 0, op_pontual: 0 },
   ];
 
-  it("agrupa por categoria", () => {
+  it("agrupa operacionais por squad (na ordem de aparição) e comerciais por papel", () => {
     const out = buildResponse(rows);
-    expect(out.cs).toHaveLength(2);
+    expect(out.squads.map((s) => s.squad)).toEqual(["Pulse", "Aura"]);
+    expect(out.squads[0].rows).toHaveLength(1);
+    expect(out.squads[1].rows).toHaveLength(1);
     expect(out.vendedor).toHaveLength(1);
     expect(out.account).toHaveLength(0);
     expect(out.gestor).toHaveLength(0);
   });
 
-  it("CS com cap_mrr usa utilização por MRR", () => {
-    const brenda = buildResponse(rows).cs.find((r) => r.nome === "Brenda")!;
+  it("squad com cap_mrr usa utilização por MRR", () => {
+    const brenda = buildResponse(rows).squads.find((s) => s.squad === "Pulse")!.rows[0];
     expect(brenda.util_pct).toBe(utilPct(30238, 45000));
     expect(brenda.op_total).toBe(10);
   });
 
-  it("CS sem cap_mrr usa utilização por total de contas (rec+pont)", () => {
-    const mari = buildResponse(rows).cs.find((r) => r.nome === "Mariana Dalto")!;
+  it("squad sem cap_mrr usa utilização por total de contas (rec+pont)", () => {
+    const mari = buildResponse(rows).squads.find((s) => s.squad === "Aura")!.rows[0];
     expect(mari.op_total).toBe(17);
     expect(mari.util_pct).toBe(utilPct(17, 20));
   });
@@ -90,7 +92,7 @@ describe("buildResponse", () => {
 
 describe("toCsRow", () => {
   const base = {
-    nome: "X", categoria: "cs" as const, cap_recorrente: 20, cap_pontual: null, cap_contas: null,
+    nome: "X", categoria: "Pulse" as const, cap_recorrente: 20, cap_pontual: null, cap_contas: null,
     op_recorrente: 6, mrr_operando: 36488, mrr_ativo: 36488, mrr_onboarding: 0, mrr_cancelamento: 0, op_pontual: 11,
   };
   it("usa MRR quando cap_mrr > 0", () => {
