@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeMetaActionsLogTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 import { runAllForecasts } from "./services/predictiveEngine";
@@ -144,6 +144,7 @@ app.use((req, res, next) => {
     initializeContratoTemplatesTable(),
     initializePredictionsTable(),
     initializeMetricRulesetsTables(),
+    initializeMetaActionsLogTable(),
   ]);
 
   // Phase 1.5: Migrations that depend on tables existing
@@ -166,7 +167,13 @@ app.use((req, res, next) => {
   
   // Register Object Storage routes
   registerObjectStorageRoutes(app);
-  
+
+  // Meta Ads actions + Criativos AI agent (Fase 1 enxuta — rotas aditivas)
+  const { default: metaActionsRouter } = await import('./routes/metaActions');
+  const { default: criativosAgentRouter } = await import('./routes/criativosAgent');
+  app.use('/api/meta/actions', metaActionsRouter);
+  app.use('/api/criativos/agent', criativosAgentRouter);
+
   const server = await registerRoutes(app);
 
   // Job automático para criar snapshot diário de contratos

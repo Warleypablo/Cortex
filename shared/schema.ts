@@ -81,6 +81,34 @@ export const predictionsAccuracy = cortexCoreSchema.table("predictions_accuracy"
 
 export type PredictionAccuracy = typeof predictionsAccuracy.$inferSelect;
 
+// ============== META ACTIONS LOG ==============
+
+export const metaActionsLog = cortexCoreSchema.table("meta_actions_log", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  actorType: varchar("actor_type", { length: 16 }).notNull(),
+  actorUserId: varchar("actor_user_id", { length: 64 }),
+  actorEmail: varchar("actor_email", { length: 255 }),
+  level: varchar("level", { length: 16 }).notNull(),
+  entityId: varchar("entity_id", { length: 64 }).notNull(),
+  entityName: text("entity_name"),
+  action: varchar("action", { length: 32 }).notNull(),
+  payloadJson: jsonb("payload_json").notNull(),
+  previousValueJson: jsonb("previous_value_json"),
+  reason: text("reason").notNull(),
+  agentRationaleText: text("agent_rationale_text"),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  metaErrorJson: jsonb("meta_error_json"),
+  confirmedByUserId: varchar("confirmed_by_user_id", { length: 64 }),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+}, (table) => ({
+  entityStatusIdx: index("idx_meta_actions_log_entity").on(table.entityId, table.status),
+}));
+
+export type MetaActionLog = typeof metaActionsLog.$inferSelect;
+export type InsertMetaActionLog = typeof metaActionsLog.$inferInsert;
+
 export const cazClientes = contaAzulSchema.table("caz_clientes", {
   id: integer("id").primaryKey(),
   nome: text("nome"),

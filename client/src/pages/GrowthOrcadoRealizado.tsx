@@ -12,8 +12,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { cn } from "@/lib/utils";
-import { MultiSelect } from "@/components/ui/multi-select";
-import { TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
 import { startOfMonth, endOfMonth, format, parse, differenceInCalendarDays, subDays } from "date-fns";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DateRange } from "react-day-picker";
@@ -921,9 +919,9 @@ export default function GrowthOrcadoRealizado() {
   const needsPlatformData = activeSection === 'aprofundado' || selectedPlataformas.length > 0;
 
   const { data: metaAdsDetailData } = useQuery<MetaAdsDetailMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/meta-ads', dateRange.startDate, dateRange.endDate, selectedProdutos],
+    queryKey: ['/api/growth/orcado-realizado/meta-ads', dateRange.startDate, dateRange.endDate, selectedProdutos, selectedPlataformas],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/meta-ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${funilParam}`);
+      const res = await fetch(`/api/growth/orcado-realizado/meta-ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${funilParam}${utmSourceParam}`);
       if (!res.ok) throw new Error('Failed to fetch Meta Ads metrics');
       return res.json();
     },
@@ -932,9 +930,9 @@ export default function GrowthOrcadoRealizado() {
   });
 
   const { data: googleAdsDetailData } = useQuery<GoogleAdsDetailMetrics>({
-    queryKey: ['/api/growth/orcado-realizado/google-ads', dateRange.startDate, dateRange.endDate],
+    queryKey: ['/api/growth/orcado-realizado/google-ads', dateRange.startDate, dateRange.endDate, selectedProdutos, selectedPlataformas],
     queryFn: async () => {
-      const res = await fetch(`/api/growth/orcado-realizado/google-ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      const res = await fetch(`/api/growth/orcado-realizado/google-ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}${funilParam}${utmSourceParam}`);
       if (!res.ok) throw new Error('Failed to fetch Google Ads metrics');
       return res.json();
     },
