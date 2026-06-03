@@ -221,73 +221,125 @@ export async function syncInsights(igUserId: string, accessToken: string, period
   return allData;
 }
 
-// Fetch historical daily insights (reach, views) for a date range
+// Fetch historical daily insights for a date range.
+// Graph API v21 only supports time_series for `reach` and `follower_count` — the rest
+// (views, total_interactions, accounts_engaged, follows_and_unfollows, profile_links_taps,
+// likes, comments, saves, shares) only return values via `total_value` for a single-day
+// since/until window. So we make ONE time_series call for reach/followers covering the
+// whole range, then loop day-by-day for the others.
+type IgDayData = { reach: number; views: number; followers: number; followsDay: number; unfollowsDay: number; accountsEngaged: number; totalInteractions: number; likesDay: number; commentsDay: number; savesDay: number; sharesDay: number; profileLinksTaps: number };
+
+function emptyDay(): IgDayData {
+  return { reach: 0, views: 0, followers: 0, followsDay: 0, unfollowsDay: 0, accountsEngaged: 0, totalInteractions: 0, likesDay: 0, commentsDay: 0, savesDay: 0, sharesDay: 0, profileLinksTaps: 0 };
+}
+
 export async function syncInsightsHistorical(
   igUserId: string,
   accessToken: string,
   sinceDaysAgo: number = 30
-): Promise<Array<{ date: string; reach: number; views: number; followers: number; followsDay: number; unfollowsDay: number; accountsEngaged: number; totalInteractions: number; likesDay: number; commentsDay: number; savesDay: number; sharesDay: number; profileLinksTaps: number }>> {
-  const results: Array<{ date: string; reach: number; views: number; followers: number; followsDay: number; unfollowsDay: number; accountsEngaged: number; totalInteractions: number; likesDay: number; commentsDay: number; savesDay: number; sharesDay: number; profileLinksTaps: number }> = [];
-
-  // Instagram API allows max 30 days per request for time_series
+): Promise<Array<{ date: string } & IgDayData>> {
   const now = new Date();
   const since = new Date(now);
-  since.setDate(since.getDate() - sinceDaysAgo);
-  // Subtract 48h for data lag
+  since.setUTCDate(since.getUTCDate() - sinceDaysAgo);
+  since.setUTCHours(0, 0, 0, 0);
+  // Subtract 48h for data lag (IG aggregates take ~2 days to settle)
   const until = new Date(now);
-  until.setDate(until.getDate() - 2);
+  until.setUTCDate(until.getUTCDate() - 2);
+  until.setUTCHours(23, 59, 59, 999);
 
-  if (until <= since) return results;
+  if (until <= since) return [];
 
-  const sinceTs = Math.floor(since.getTime() / 1000);
-  const untilTs = Math.floor(until.getTime() / 1000);
+  const dailyMap: Record<string, IgDayData> = {};
 
-  console.log("[Instagram] Fetching historical insights:", sinceDaysAgo, "days ago →", until.toISOString().split("T")[0]);
-
+  // Step 1 — single time_series call for reach + follower_count (only metrics that support it)
   try {
-    const insights = await callGraphAPI(`/me/insights`, accessToken, {
-      metric: "reach,follower_count,views,follows_and_unfollows,accounts_engaged,total_interactions,likes,comments,saves,shares,profile_links_taps",
+    const sinceTs = Math.floor(since.getTime() / 1000);
+    const untilTs = Math.floor(until.getTime() / 1000);
+    const ts = await callGraphAPI(`/me/insights`, accessToken, {
+      metric: "reach,follower_count",
       period: "day",
       metric_type: "time_series",
       since: String(sinceTs),
       until: String(untilTs),
     });
-
-    // Build daily map from time_series data
-    const dailyMap: Record<string, { reach: number; views: number; followers: number; followsDay: number; unfollowsDay: number; accountsEngaged: number; totalInteractions: number; likesDay: number; commentsDay: number; savesDay: number; sharesDay: number; profileLinksTaps: number }> = {};
-
-    for (const metric of insights.data || []) {
+    for (const metric of ts.data || []) {
       for (const point of metric.values || []) {
         const date = point.end_time?.split("T")[0];
         if (!date) continue;
-        if (!dailyMap[date]) dailyMap[date] = { reach: 0, views: 0, followers: 0, followsDay: 0, unfollowsDay: 0, accountsEngaged: 0, totalInteractions: 0, likesDay: 0, commentsDay: 0, savesDay: 0, sharesDay: 0, profileLinksTaps: 0 };
+        if (!dailyMap[date]) dailyMap[date] = emptyDay();
         if (metric.name === "reach") dailyMap[date].reach = point.value || 0;
-        if (metric.name === "views") dailyMap[date].views = point.value || 0;
         if (metric.name === "follower_count") dailyMap[date].followers = point.value || 0;
-        if (metric.name === "follows_and_unfollows") {
-          const val = point.value || 0;
-          if (val >= 0) { dailyMap[date].followsDay = val; dailyMap[date].unfollowsDay = 0; }
-          else { dailyMap[date].followsDay = 0; dailyMap[date].unfollowsDay = Math.abs(val); }
-        }
-        if (metric.name === "accounts_engaged") dailyMap[date].accountsEngaged = point.value || 0;
-        if (metric.name === "total_interactions") dailyMap[date].totalInteractions = point.value || 0;
-        if (metric.name === "likes") dailyMap[date].likesDay = point.value || 0;
-        if (metric.name === "comments") dailyMap[date].commentsDay = point.value || 0;
-        if (metric.name === "saves") dailyMap[date].savesDay = point.value || 0;
-        if (metric.name === "shares") dailyMap[date].sharesDay = point.value || 0;
-        if (metric.name === "profile_links_taps") dailyMap[date].profileLinksTaps = point.value || 0;
       }
     }
-
-    for (const [date, data] of Object.entries(dailyMap).sort()) {
-      results.push({ date, ...data });
-    }
-
-    console.log("[Instagram] Historical insights:", results.length, "days of data");
   } catch (err: any) {
-    console.error("[Instagram] Historical insights error:", err.message);
+    console.error("[Instagram] Historical reach/followers error:", err.message);
   }
 
+  // Step 2 — loop day-by-day for total_value metrics
+  const dayMs = 24 * 60 * 60 * 1000;
+  let dayCount = 0;
+  for (let t = since.getTime(); t <= until.getTime(); t += dayMs) {
+    const dayStart = new Date(t);
+    dayStart.setUTCHours(0, 0, 0, 0);
+    const dayEnd = new Date(t);
+    dayEnd.setUTCHours(23, 59, 59, 999);
+    const dateKey = dayStart.toISOString().split("T")[0];
+    if (!dailyMap[dateKey]) dailyMap[dateKey] = emptyDay();
+    const sinceTs = Math.floor(dayStart.getTime() / 1000);
+    const untilTs = Math.floor(dayEnd.getTime() / 1000);
+
+    // Group A — engagement
+    try {
+      const r = await callGraphAPI(`/me/insights`, accessToken, {
+        metric: "views,accounts_engaged,total_interactions,likes,comments,saves,shares",
+        period: "day",
+        metric_type: "total_value",
+        since: String(sinceTs),
+        until: String(untilTs),
+      });
+      for (const m of r.data || []) {
+        const v = m.total_value?.value ?? 0;
+        if (m.name === "views") dailyMap[dateKey].views = v;
+        if (m.name === "accounts_engaged") dailyMap[dateKey].accountsEngaged = v;
+        if (m.name === "total_interactions") dailyMap[dateKey].totalInteractions = v;
+        if (m.name === "likes") dailyMap[dateKey].likesDay = v;
+        if (m.name === "comments") dailyMap[dateKey].commentsDay = v;
+        if (m.name === "saves") dailyMap[dateKey].savesDay = v;
+        if (m.name === "shares") dailyMap[dateKey].sharesDay = v;
+      }
+    } catch (err: any) {
+      console.warn("[Instagram] Historical engagement error", dateKey, err.message);
+    }
+
+    // Group B — follows + profile link taps
+    try {
+      const r = await callGraphAPI(`/me/insights`, accessToken, {
+        metric: "follows_and_unfollows,profile_links_taps",
+        period: "day",
+        metric_type: "total_value",
+        since: String(sinceTs),
+        until: String(untilTs),
+      });
+      for (const m of r.data || []) {
+        const v = m.total_value?.value ?? 0;
+        if (m.name === "follows_and_unfollows") {
+          if (v >= 0) { dailyMap[dateKey].followsDay = v; dailyMap[dateKey].unfollowsDay = 0; }
+          else { dailyMap[dateKey].followsDay = 0; dailyMap[dateKey].unfollowsDay = Math.abs(v); }
+        }
+        if (m.name === "profile_links_taps") dailyMap[dateKey].profileLinksTaps = v;
+      }
+    } catch (err: any) {
+      console.warn("[Instagram] Historical follows/taps error", dateKey, err.message);
+    }
+
+    dayCount++;
+  }
+
+  const results = Object.entries(dailyMap)
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([date, data]) => ({ date, ...data }));
+
+  console.log("[Instagram] Historical insights:", results.length, "days,", dayCount, "API loops");
   return results;
 }
 

@@ -742,6 +742,21 @@ export async function initializeSysSchema(): Promise<void> {
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_churn_risk_score ON cortex_core.churn_risk_scores(score DESC)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_churn_risk_contrato ON cortex_core.churn_risk_scores(contrato_id)`);
 
+    // Campaign Monthly Budget — metas mensais de investimento por campanha (Meta + Google Ads)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.campaign_monthly_budget (
+        id SERIAL PRIMARY KEY,
+        platform TEXT NOT NULL CHECK (platform IN ('meta', 'google')),
+        campaign_id TEXT NOT NULL,
+        month DATE NOT NULL,
+        monthly_budget_target NUMERIC(12, 2) NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT,
+        UNIQUE (platform, campaign_id, month)
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_campaign_monthly_budget_month ON cortex_core.campaign_monthly_budget(month)`);
+
     console.log('[database] cortex_core schema tables created');
 
     // Apply spec - UPSERT catalogs
@@ -1921,6 +1936,21 @@ export async function initializeDfcSnapshotsTable(): Promise<void> {
   }
 }
 
+export async function initializeSaldoDiarioSnapshotsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.saldo_diario_snapshots (
+        data        DATE            PRIMARY KEY,
+        saldo_total NUMERIC(15,2)   NOT NULL,
+        criado_em   TIMESTAMPTZ     DEFAULT NOW()
+      )
+    `);
+    console.log('[database] saldo_diario_snapshots table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing saldo_diario_snapshots:', error);
+  }
+}
+
 export async function initializeSalesGoalsTable(): Promise<void> {
   try {
     await db.execute(sql`
@@ -2341,5 +2371,50 @@ export async function initializeMetaActionsLogTable(): Promise<void> {
     console.log('[database] Meta actions log table initialized');
   } catch (error) {
     console.error('[database] Error initializing meta actions log table:', error);
+  }
+}
+
+export async function initializeItemAliasMapTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.item_alias_map (
+        id SERIAL PRIMARY KEY,
+        item_pattern VARCHAR(255) NOT NULL,
+        target_token VARCHAR(100) NOT NULL,
+        notes TEXT,
+        active BOOLEAN DEFAULT true,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+
+    await db.execute(sql`
+      CREATE UNIQUE INDEX IF NOT EXISTS idx_item_alias_map_pattern_active
+      ON cortex_core.item_alias_map (item_pattern) WHERE active = true
+    `);
+
+    // Seed inicial — só insere se a tabela estiver vazia
+    const existing = await db.execute(sql`
+      SELECT COUNT(*)::int AS qtd FROM cortex_core.item_alias_map
+    `);
+    const count = Number((existing.rows[0] as any)?.qtd) || 0;
+    if (count === 0) {
+      await db.execute(sql`
+        INSERT INTO cortex_core.item_alias_map (item_pattern, target_token, notes) VALUES
+          ('aceleracao', 'performance', 'Aceleração Scale/Enterprise são variantes de Performance'),
+          ('trafego pago', 'performance', 'Nome alternativo no CAZ'),
+          ('trafego', 'performance', 'Nome alternativo no CAZ'),
+          ('referente a aceleracao mensal', 'performance', 'Texto livre recorrente'),
+          ('contrato personalizado', 'performance', 'Grupo Tommasi — cliente só tem squads Performance'),
+          ('variavel mensal', 'performance', 'Tipo de cobrança — sempre Performance em 2026'),
+          ('gameplan', 'gameplan', 'Mantém o termo para desambiguar'),
+          ('desenvolvimento de e commerce', 'ecommerce', 'Mesma coisa no Tech'),
+          ('sustentacao de site e ecommerce', 'ecommerce', 'Idem')
+      `);
+      console.log('[database] item_alias_map seeded com 9 aliases iniciais');
+    }
+    console.log('[database] item_alias_map table initialized');
+  } catch (error) {
+    console.error('[database] erro ao inicializar item_alias_map:', error);
   }
 }

@@ -120,7 +120,7 @@ export function registerBpProdutosRoutes(app: Express) {
           ${sql.raw(churnSegmentCase("produto"))} as segmento,
           COUNT(*)::int as churns,
           COALESCE(SUM(valor_r), 0)::numeric as mrr_perdido
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE status IN ('cancelado/inativo', 'em cancelamento')
           AND ultimo_dia_operacao >= '2025-11-01'
           AND COALESCE(abonar_churn, '') != 'Sim'

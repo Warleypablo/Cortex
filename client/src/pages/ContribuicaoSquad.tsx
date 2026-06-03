@@ -45,11 +45,16 @@ interface SalarioDetalhe {
   total: number;
 }
 
+type ParcelaCausa = 'match' | 'fallback_maior_valor' | 'cnpj_sem_contrato_clickup' | 'item_nao_casou';
+
 interface ReceitaDetalhe {
   cliente: string;
   porMes: number[];
   total: number;
 }
+
+// Lookup: squad -> clienteNome -> Set<causa> (derived from meses[].data.receitas parcelas)
+type CausaLookup = Map<string, Map<string, Set<ParcelaCausa>>>;
 
 interface DespesasPorSquadMensais {
   [squad: string]: {
@@ -71,9 +76,19 @@ interface BulkResponse {
   despesasPorSquadMensais?: DespesasPorSquadMensais;
   salariosDetalhesPorSquad?: Record<string, SalarioDetalhe[]>;
   receitasDetalhesPorSquad?: Record<string, ReceitaDetalhe[]>;
+  fonteDados?: {
+    totalParcelasElegiveis: number;
+    viaItens: number;
+    viaSimuladorA3: number;
+    pctViaItens: number;
+    fallbackUsed: boolean;
+  };
 }
 
 const isOffSquad = (squad: string) => /\bOFF\b/i.test(squad);
+// ⚠️ Keep in sync with SEM_SQUAD_LABEL in server/contribuicaoSquad/receitaPorItens.ts
+const SEM_SQUAD_LABEL = '⚠️ Sem Squad';
+const isSemSquad = (squad: string) => squad === SEM_SQUAD_LABEL;
 
 export default function ContribuicaoSquad() {
   usePageTitle("Contribuição por Squad");
@@ -134,6 +149,31 @@ export default function ContribuicaoSquad() {
     [squadsData]
   );
   const monthlyResults = bulkData?.meses || [];
+
+  // Build lookup: squad -> clienteNome -> Set<causa>
+  // Derived from meses[].data.receitas nivel-3 parcelas (which carry 'causa' from Task 6)
+  const causaLookup = useMemo<CausaLookup>(() => {
+    const lookup: CausaLookup = new Map();
+    for (const m of monthlyResults) {
+      if (!m.data) continue;
+      const receitas = m.data.receitas as Array<{
+        nivel: number;
+        categoriaNome: string;
+        parcelas?: Array<{ clienteNome: string; squad: string; causa?: ParcelaCausa }>;
+      }>;
+      for (const item of receitas) {
+        if (item.nivel !== 3 || !item.parcelas) continue;
+        for (const p of item.parcelas) {
+          if (!p.causa || p.causa === 'match') continue;
+          if (!lookup.has(p.squad)) lookup.set(p.squad, new Map());
+          const byCliente = lookup.get(p.squad)!;
+          if (!byCliente.has(p.clienteNome)) byCliente.set(p.clienteNome, new Set());
+          byCliente.get(p.clienteNome)!.add(p.causa);
+        }
+      }
+    }
+    return lookup;
+  }, [monthlyResults]);
 
   const isSquadCollapsed = (squad: string) =>
     collapsedSquads === "all" || collapsedSquads.has(squad);
@@ -247,6 +287,33 @@ export default function ContribuicaoSquad() {
         <div>
           <h1 className="text-xl font-bold" data-testid="text-page-title">Contribuição por Squad</h1>
           <p className="text-sm text-muted-foreground">Receitas, despesas e margem de contribuição por squad</p>
+          {bulkData?.fonteDados && (
+            <div className="flex flex-wrap items-center gap-2 text-xs mt-2" data-testid="fonte-dados-badges">
+              <span
+                className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-400"
+                title={`${bulkData.fonteDados.viaItens} de ${bulkData.fonteDados.totalParcelasElegiveis} parcelas elegíveis atribuídas via itens de venda`}
+              >
+                <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
+                {bulkData.fonteDados.pctViaItens.toFixed(1)}% via itens de venda
+              </span>
+              {bulkData.fonteDados.viaSimuladorA3 > 0 && (
+                <span
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-gray-50 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400"
+                  title={`${bulkData.fonteDados.viaSimuladorA3} parcelas atribuídas via simulador A3 (fallback)`}
+                >
+                  {(100 - bulkData.fonteDados.pctViaItens).toFixed(1)}% via simulador (fallback)
+                </span>
+              )}
+              {bulkData.fonteDados.fallbackUsed && (
+                <span
+                  className="inline-flex items-center gap-1.5 px-2 py-1 rounded bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-400"
+                  title="Pipeline de itens falhou, usando apenas A3"
+                >
+                  ⚠️ Pipeline de itens indisponível
+                </span>
+              )}
+            </div>
+          )}
           {squadSelecionado !== "todos" && (
             <button onClick={() => setSquadSelecionado("todos")} className="text-xs text-primary hover:underline flex items-center gap-1 mt-1">
               ← Voltar para todos os squads
@@ -266,7 +333,9 @@ export default function ContribuicaoSquad() {
               <SelectItem value="todos">Todos os squads</SelectItem>
               {visibleSquads.map((sq) => (
                 <SelectItem key={sq} value={sq}>
-                  {sq}
+                  <span className={cn(isSemSquad(sq) && "text-amber-600 dark:text-amber-400 font-medium")}>
+                    {sq}
+                  </span>
                 </SelectItem>
               ))}
             </SelectContent>
@@ -375,21 +444,31 @@ export default function ContribuicaoSquad() {
                       const totalMargemSquad = sq.receitaTotal - totalDespesaSquad;
                       const totalMargemPctSquad = sq.receitaTotal > 0 ? (totalMargemSquad / sq.receitaTotal) * 100 : 0;
 
+                      const semSquad = isSemSquad(sq.squad);
+
                       return (
                         <Fragment key={sq.squad}>
                           {/* Squad header row */}
                           <tr
-                            className="border-b border-border bg-muted cursor-pointer hover:bg-muted/50 transition-colors"
+                            className={cn(
+                              "border-b border-border bg-muted cursor-pointer hover:bg-muted/50 transition-colors",
+                              semSquad && "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30"
+                            )}
                             onClick={() => toggleSquadCollapse(sq.squad)}
                           >
-                            <td className="py-2 px-3 font-semibold text-sm sticky left-0 z-10 bg-muted hover:bg-muted/50 transition-colors">
+                            <td className={cn(
+                              "py-2 px-3 font-semibold text-sm sticky left-0 z-10 bg-muted hover:bg-muted/50 transition-colors",
+                              semSquad && "bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/30 text-amber-700 dark:text-amber-400"
+                            )}>
                               <span className="flex items-center gap-1.5">
                                 {isCollapsed ? (
-                                  <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <ChevronRight className={cn("h-3.5 w-3.5 text-muted-foreground", semSquad && "text-amber-600 dark:text-amber-400")} />
                                 ) : (
-                                  <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+                                  <ChevronDown className={cn("h-3.5 w-3.5 text-muted-foreground", semSquad && "text-amber-600 dark:text-amber-400")} />
                                 )}
-                                {sq.squad}
+                                <span className={cn(semSquad && "text-amber-700 dark:text-amber-400")}>
+                                  {sq.squad}
+                                </span>
                               </span>
                             </td>
                             {/* When collapsed, show receita per month */}
@@ -433,10 +512,45 @@ export default function ContribuicaoSquad() {
                                 </td>
                                 <td />
                               </tr>
-                              {expandedReceitas.has(sq.squad) && (bulkData?.receitasDetalhesPorSquad?.[sq.squad] || []).map((cliente, idx) => (
+                              {expandedReceitas.has(sq.squad) && (bulkData?.receitasDetalhesPorSquad?.[sq.squad] || []).map((cliente, idx) => {
+                                const clienteCausas = causaLookup.get(sq.squad)?.get(cliente.cliente);
+                                // Pick the most actionable causa to display (priority: cnpj > item_nao_casou > fallback)
+                                const dominantCausa: ParcelaCausa | undefined = clienteCausas?.has('cnpj_sem_contrato_clickup')
+                                  ? 'cnpj_sem_contrato_clickup'
+                                  : clienteCausas?.has('item_nao_casou')
+                                  ? 'item_nao_casou'
+                                  : clienteCausas?.has('fallback_maior_valor')
+                                  ? 'fallback_maior_valor'
+                                  : undefined;
+                                return (
                                 <tr key={`${cliente.cliente}-${idx}`} className="border-b border-border/10">
                                   <td className="py-0.5 px-3 pl-12 text-[10px] text-emerald-500/70 dark:text-emerald-400/50 sticky left-0 z-10 bg-background truncate max-w-[200px]" title={cliente.cliente}>
-                                    {cliente.cliente}
+                                    <span className="flex items-center gap-1 flex-wrap">
+                                    <span className="truncate">{cliente.cliente}</span>
+                                    {dominantCausa && (
+                                      <span
+                                        className={
+                                          "shrink-0 px-1.5 py-0.5 text-[9px] rounded inline-flex items-center font-medium " +
+                                          (dominantCausa === 'cnpj_sem_contrato_clickup'
+                                            ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                                            : dominantCausa === 'item_nao_casou'
+                                            ? 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300'
+                                            : 'bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300')
+                                        }
+                                        title={
+                                          dominantCausa === 'cnpj_sem_contrato_clickup'
+                                            ? 'Este cliente paga via Conta Azul mas não está cadastrado como cliente com contrato no Clickup.'
+                                            : dominantCausa === 'item_nao_casou'
+                                            ? 'O nome do item no Conta Azul não casou com nenhum contrato deste cliente no Clickup.'
+                                            : 'Item atribuído ao squad do contrato de maior valor do cliente (não houve match exato por nome).'
+                                        }
+                                      >
+                                        {dominantCausa === 'cnpj_sem_contrato_clickup' && 'Cadastrar no Clickup'}
+                                        {dominantCausa === 'item_nao_casou' && 'Item sem match'}
+                                        {dominantCausa === 'fallback_maior_valor' && 'Atribuído por fallback'}
+                                      </span>
+                                    )}
+                                    </span>
                                   </td>
                                   {monthlyResults.map((_, i) => (
                                     <td key={i} className="py-0.5 px-2 text-right text-[10px] text-emerald-500/70 dark:text-emerald-400/50">
@@ -448,7 +562,8 @@ export default function ContribuicaoSquad() {
                                   </td>
                                   <td />
                                 </tr>
-                              ))}
+                                );
+                              })}
 
                               {/* Despesas (expandível) */}
                               <tr className="border-b border-border/30 cursor-pointer hover:bg-muted/30" onClick={() => toggleDespesasExpand(sq.squad)}>

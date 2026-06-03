@@ -19,7 +19,7 @@ const SQUAD_COLORS: Record<string, string> = {
   "Aurea":      "#fbbf24",
   "Supreme":    "#8b5cf6",
   "Bloomfield": "#10b981",
-  "Black":      "#475569",
+  "Black":      "#94a3b8",
   "Ventures":   "#f59e0b",
   "Vendas":     "#f97316",
   "CX&CS":      "#14b8a6",
@@ -43,6 +43,8 @@ const MEDAL_COLORS: Record<number, { ring: string; text: string }> = {
   3: { ring: "#f97316", text: "text-orange-400" },
   4: { ring: "#71717a", text: "text-zinc-400" },
   5: { ring: "#71717a", text: "text-zinc-400" },
+  6: { ring: "#71717a", text: "text-zinc-400" },
+  7: { ring: "#71717a", text: "text-zinc-400" },
 };
 
 /** Extract emoji prefix and base name from squad name like "🪖 Selva" */
@@ -82,16 +84,16 @@ export default function SlideRankingSquads({ ranking }: Props) {
     );
   }
 
-  // Podium display order: 4th, 2nd, 1st, 3rd, 5th
+  // Podium display order: 4° 2° 1° 3° 5° (centro = 1°)
   const podiumOrder = top.length >= 5
     ? [top[3], top[1], top[0], top[2], top[4]]
     : top.length >= 3
       ? [top[1], top[0], top[2]]
       : top;
 
-  const heightMap: Record<number, number> = { 1: 260, 2: 215, 3: 180, 4: 145, 5: 115 };
-  const iconSize: Record<number, number> = { 1: 80, 2: 68, 3: 64, 4: 60, 5: 56 };
-  const emojiSize: Record<number, number> = { 1: 42, 2: 34, 3: 32, 4: 28, 5: 26 };
+  const heightMap: Record<number, number> = { 1: 260, 2: 215, 3: 180, 4: 145, 5: 115, 6: 90, 7: 75 };
+  const iconSize: Record<number, number> = { 1: 80, 2: 68, 3: 64, 4: 60, 5: 56, 6: 52, 7: 48 };
+  const emojiSize: Record<number, number> = { 1: 42, 2: 34, 3: 32, 4: 28, 5: 26, 6: 24, 7: 22 };
 
   return (
     <SlideLayout section="commerce" className="items-center justify-center">
@@ -104,7 +106,7 @@ export default function SlideRankingSquads({ ranking }: Props) {
       </div>
 
       {/* Podium */}
-      <div className="flex items-end justify-center" style={{ gap: 14 }}>
+      <div className="flex items-end justify-center" style={{ gap: 12 }}>
         {podiumOrder.map((squad) => {
           const { emoji, name } = parseSquadName(squad.squad);
           const color = getSquadColor(name);
@@ -140,11 +142,18 @@ export default function SlideRankingSquads({ ranking }: Props) {
                 )}
               </div>
 
-              {/* Squad name + MRR */}
+              {/* Squad name + Total + Recorrente + Pontual */}
               <p className={`font-bold text-white text-center ${isFirst ? "text-base" : "text-sm"}`}>
                 {name}
               </p>
-              <p className="text-xs text-zinc-400 mb-2">{fmtBRL(squad.mrr)}</p>
+              <div className="grid grid-cols-[auto_auto] gap-x-1.5 gap-y-0 mt-0.5 mb-2 text-[11px] leading-tight">
+                <span className="text-zinc-500 text-right">Total</span>
+                <span className="text-white font-semibold tabular-nums text-right">{fmtBRL(squad.mrr + squad.pontual)}</span>
+                <span className="text-zinc-500 text-right">Rec.</span>
+                <span className="text-cyan-400 tabular-nums text-right">{fmtBRL(squad.mrr)}</span>
+                <span className="text-zinc-500 text-right">Pont.</span>
+                <span className="text-amber-400 tabular-nums text-right">{fmtBRL(squad.pontual)}</span>
+              </div>
 
               {/* Colored bar */}
               <div

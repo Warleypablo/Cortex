@@ -366,12 +366,12 @@ export default function AutoReport() {
         }}
         onOpenJobs={() => setJobsDrawerOpen(true)}
         isRefreshing={isLoading}
+        tabCounts={tabCounts}
+        activeTab={activeTab}
+        onTabChange={setActiveTab}
       />
 
       <AutoReportFilters
-        activeTab={activeTab}
-        onTabChange={setActiveTab}
-        tabCounts={tabCounts}
         searchTerm={searchTerm}
         onSearchChange={setSearchTerm}
         filtroGestor={filtroGestor}
@@ -380,6 +380,8 @@ export default function AutoReport() {
         onSquadChange={setFiltroSquad}
         gestores={gestores}
         squads={squads}
+        activeTab={activeTab}
+        onClearStatusFilter={() => setActiveTab('todos')}
       />
 
       <AutoReportTable
@@ -395,6 +397,13 @@ export default function AutoReport() {
         isError={isError}
         onRetryLoad={() => refetchClientes()}
         totalClientes={clientesValidos.length}
+        periodStart={dateRange?.from}
+        onClearAllFilters={() => {
+          setSearchTerm('');
+          setFiltroGestor('todos');
+          setFiltroSquad('todos');
+          setActiveTab('todos');
+        }}
       />
 
       <AutoReportActionBar
@@ -410,6 +419,8 @@ export default function AutoReport() {
         onVerDetalhes={() => setJobsDrawerOpen(true)}
         onDismiss={handleDismissBatch}
         outputFormat={outputFormat}
+        jobs={jobs}
+        batchClientNames={batchClientNames}
       />
 
       <AutoReportJobsDrawer

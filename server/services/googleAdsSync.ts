@@ -11,6 +11,12 @@ export interface GoogleAdsSyncResult {
   errors: string[];
 }
 
+export interface GoogleAdsCampaignSyncResult {
+  campaigns: number;
+  campaignMetrics: number;
+  errors: string[];
+}
+
 async function getAccessToken(): Promise<string> {
   const creds = getGoogleAdsCredentials();
   const oauth2Client = new google.auth.OAuth2(creds.clientId, creds.clientSecret);
@@ -232,6 +238,220 @@ export async function syncGoogleAdsKeywords(
   } catch (err: any) {
     result.errors.push(`Fatal: ${err.message}`);
     console.error('[google-ads-sync] Fatal error:', err.message);
+  }
+
+  return result;
+}
+
+// ============================================================
+// Sync de CAMPANHAS (metadata + métricas diárias)
+//
+// Popula:
+//   - google_ads.campaigns (1 linha por campanha)
+//   - google_ads.campaign_daily_metrics (1 linha por dia × campanha × device × network)
+//
+// Schema esperado:
+//   campaigns: campaign_key (serial), account_key, campaign_id (unique),
+//              name, status, advertising_channel_type, ...
+//   campaign_daily_metrics: report_date, campaign_key, device_type, network_type,
+//              impressions, clicks, cost_micros, conversions, conversion_value, ...
+// ============================================================
+
+export async function syncGoogleAdsCampaigns(
+  pool: Pool,
+  options?: { customerId?: string; since?: string; until?: string },
+): Promise<GoogleAdsCampaignSyncResult> {
+  const result: GoogleAdsCampaignSyncResult = { campaigns: 0, campaignMetrics: 0, errors: [] };
+
+  try {
+    const creds = getGoogleAdsCredentials();
+    const accessToken = await getAccessToken();
+
+    // 1. Resolve customers a sincronizar (default: todos ativos)
+    const customerQuery = options?.customerId
+      ? `SELECT account_key, customer_id FROM google_ads.accounts WHERE customer_id = '${options.customerId}'`
+      : `SELECT account_key, customer_id FROM google_ads.accounts WHERE status != 'REMOVED'`;
+    const accountsRes = await pool.query(customerQuery);
+    if (accountsRes.rows.length === 0) {
+      result.errors.push('Nenhum account encontrado');
+      return result;
+    }
+    console.log(`[google-ads-sync] Campanhas: ${accountsRes.rows.length} account(s) a processar`);
+
+    // 2. Sync metadata das campanhas por account
+    for (const acct of accountsRes.rows) {
+      const customerId = String(acct.customer_id);
+      const accountKey = acct.account_key;
+      try {
+        const query = `
+          SELECT
+            campaign.id,
+            campaign.resource_name,
+            campaign.name,
+            campaign.status,
+            campaign.serving_status,
+            campaign.advertising_channel_type,
+            campaign.advertising_channel_sub_type,
+            campaign.bidding_strategy_type,
+            campaign.base_campaign,
+            campaign.start_date,
+            campaign.end_date
+          FROM campaign
+          WHERE campaign.status != 'REMOVED'
+        `;
+        const rows = await gaqlSearch(customerId, query, accessToken, creds.developerToken, creds.loginCustomerId);
+        console.log(`[google-ads-sync] Customer ${customerId}: ${rows.length} campanhas`);
+
+        for (const row of rows) {
+          const c = row.campaign || {};
+          const campaignId = c.id;
+          if (!campaignId) continue;
+          const baseCampaignId = c.baseCampaign
+            ? String(c.baseCampaign).split('/').pop()
+            : null;
+          await pool.query(
+            `INSERT INTO google_ads.campaigns
+               (account_key, campaign_id, resource_name, name, status, serving_status,
+                advertising_channel_type, advertising_channel_subtype, bidding_strategy_type,
+                base_campaign_id, start_date, end_date, updated_at)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, NOW())
+             ON CONFLICT (campaign_id) DO UPDATE
+               SET name = EXCLUDED.name,
+                   status = EXCLUDED.status,
+                   serving_status = EXCLUDED.serving_status,
+                   advertising_channel_type = EXCLUDED.advertising_channel_type,
+                   advertising_channel_subtype = EXCLUDED.advertising_channel_subtype,
+                   bidding_strategy_type = EXCLUDED.bidding_strategy_type,
+                   base_campaign_id = EXCLUDED.base_campaign_id,
+                   start_date = EXCLUDED.start_date,
+                   end_date = EXCLUDED.end_date,
+                   updated_at = NOW()`,
+            [
+              accountKey,
+              campaignId,
+              c.resourceName || null,
+              c.name || '(sem nome)',
+              c.status || 'UNKNOWN',
+              c.servingStatus || null,
+              c.advertisingChannelType || 'UNSPECIFIED',
+              c.advertisingChannelSubType || null,
+              c.biddingStrategyType || null,
+              baseCampaignId,
+              c.startDate || null,
+              c.endDate || null,
+            ],
+          );
+          result.campaigns++;
+        }
+      } catch (err: any) {
+        result.errors.push(`Campanhas ${customerId}: ${err.message}`);
+        console.error(`[google-ads-sync] Campanhas error ${customerId}:`, err.message);
+      }
+    }
+
+    // 3. Build campaign mapping (campaign_id -> campaign_key) pra métricas
+    const customerIds = accountsRes.rows.map((r: any) => String(r.customer_id));
+    const accountKeys = accountsRes.rows.map((r: any) => r.account_key);
+    const campMapRes = await pool.query(
+      `SELECT campaign_key, campaign_id FROM google_ads.campaigns WHERE account_key = ANY($1)`,
+      [accountKeys],
+    );
+    const campMap = new Map<string, number>();
+    for (const row of campMapRes.rows) {
+      campMap.set(String(row.campaign_id), row.campaign_key);
+    }
+    if (campMap.size === 0) {
+      console.log('[google-ads-sync] sem campanhas → pulando métricas');
+      return result;
+    }
+
+    // 4. Sync métricas diárias por campanha (default últimos 90 dias)
+    const since = options?.since || new Date(Date.now() - 90 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const until = options?.until || new Date().toISOString().split('T')[0];
+    console.log(`[google-ads-sync] Métricas campanhas: ${since} → ${until}`);
+
+    for (const customerId of customerIds) {
+      try {
+        const metricsQuery = `
+          SELECT
+            segments.date,
+            segments.device,
+            segments.ad_network_type,
+            campaign.id,
+            metrics.impressions,
+            metrics.clicks,
+            metrics.cost_micros,
+            metrics.conversions,
+            metrics.conversions_value,
+            metrics.all_conversions,
+            metrics.view_through_conversions,
+            metrics.interactions,
+            metrics.engagement_rate,
+            metrics.video_views
+          FROM campaign
+          WHERE segments.date BETWEEN '${since}' AND '${until}'
+            AND campaign.status != 'REMOVED'
+            AND metrics.impressions > 0
+        `;
+        const rows = await gaqlSearch(customerId, metricsQuery, accessToken, creds.developerToken, creds.loginCustomerId);
+        console.log(`[google-ads-sync] Customer ${customerId}: ${rows.length} linhas de métricas`);
+
+        for (const row of rows) {
+          const campaignId = row.campaign?.id;
+          const campaignKey = campMap.get(String(campaignId));
+          if (!campaignKey) continue;
+
+          const reportDate = row.segments?.date;
+          const deviceType = row.segments?.device || 'UNSPECIFIED';
+          const networkType = row.segments?.adNetworkType || 'UNSPECIFIED';
+          const m = row.metrics || {};
+
+          await pool.query(
+            `INSERT INTO google_ads.campaign_daily_metrics
+               (report_date, campaign_key, device_type, network_type,
+                impressions, clicks, cost_micros, conversions, conversion_value,
+                all_conversions, view_through_conversions, interactions, engagement_rate, video_views)
+             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+             ON CONFLICT (report_date, campaign_key, device_type, network_type)
+             DO UPDATE SET impressions = EXCLUDED.impressions,
+                           clicks = EXCLUDED.clicks,
+                           cost_micros = EXCLUDED.cost_micros,
+                           conversions = EXCLUDED.conversions,
+                           conversion_value = EXCLUDED.conversion_value,
+                           all_conversions = EXCLUDED.all_conversions,
+                           view_through_conversions = EXCLUDED.view_through_conversions,
+                           interactions = EXCLUDED.interactions,
+                           engagement_rate = EXCLUDED.engagement_rate,
+                           video_views = EXCLUDED.video_views`,
+            [
+              reportDate,
+              campaignKey,
+              deviceType,
+              networkType,
+              parseInt(m.impressions || '0', 10),
+              parseInt(m.clicks || '0', 10),
+              parseInt(m.costMicros || '0', 10),
+              parseFloat(m.conversions || '0'),
+              parseFloat(m.conversionsValue || '0'),
+              parseFloat(m.allConversions || '0'),
+              parseInt(m.viewThroughConversions || '0', 10),
+              parseInt(m.interactions || '0', 10),
+              parseFloat(m.engagementRate || '0'),
+              parseInt(m.videoViews || '0', 10),
+            ],
+          );
+          result.campaignMetrics++;
+        }
+      } catch (err: any) {
+        result.errors.push(`Métricas ${customerId}: ${err.message}`);
+        console.error(`[google-ads-sync] Métricas error ${customerId}:`, err.message);
+      }
+    }
+
+    console.log(`[google-ads-sync] Campanhas: ${result.campaigns} upserts, ${result.campaignMetrics} métricas, ${result.errors.length} erros`);
+  } catch (err: any) {
+    result.errors.push(`Fatal: ${err.message}`);
+    console.error('[google-ads-sync] Fatal error campanhas:', err.message);
   }
 
   return result;
