@@ -9,6 +9,7 @@ import { registerLtLtvChurnRoutes } from "./ltLtvChurn";
 
 function makeApp() {
   const app = express();
+  app.use(express.json());
   app.use((req, _res, next) => { (req as any).user = { email: "t@t.com" }; next(); });
   registerLtLtvChurnRoutes(app, { execute: mockExecute } as any);
   return app;
@@ -106,27 +107,64 @@ describe("GET /api/lt-ltv-churn/overview-clientes", () => {
 });
 
 describe("GET /api/lt-ltv-churn/clientes", () => {
-  it("retorna clientes agregados", async () => {
+  it("retorna clientes agregados com tier e sugestão", async () => {
     mockExecute.mockResolvedValueOnce({ rows: [{ total: 1387 }] });
     mockExecute.mockResolvedValueOnce({
       rows: [{ id_task: "t1", nome_cliente: "Cliente X", n_contratos_rec: 2,
         ltv_recorrente: 13000, ltv_pontual: 5000, ltv_total: 18000,
-        lt_meses: 6.6, ativo: true }],
+        lt_meses: 6.6, ativo: true, mrr_ativo: 8000, cluster: null, cluster_manual: false }],
     });
     const res = await request(makeApp()).get("/api/lt-ltv-churn/clientes");
     expect(res.status).toBe(200);
     expect(res.body.clientes[0].ltvTotal).toBe(18000);
+    expect(res.body.clientes[0].mrrAtivo).toBe(8000);
+    expect(res.body.clientes[0].cluster).toBeNull();
+    expect(res.body.clientes[0].clusterSugerido).toBe("4"); // 8000 >= 7000 → Imperdíveis
   });
 
   it("aceita ordenação por coluna (sort/dir) sem quebrar", async () => {
     mockExecute.mockResolvedValueOnce({ rows: [{ total: 1387 }] });
     mockExecute.mockResolvedValueOnce({
       rows: [{ id_task: "t2", nome_cliente: "Cliente Y", n_contratos_rec: 1,
-        ltv_recorrente: 1000, ltv_pontual: 0, ltv_total: 1000, lt_meses: 2.0, ativo: false }],
+        ltv_recorrente: 1000, ltv_pontual: 0, ltv_total: 1000, lt_meses: 2.0, ativo: false,
+        mrr_ativo: 0, cluster: null, cluster_manual: false }],
     });
     const res = await request(makeApp()).get("/api/lt-ltv-churn/clientes?sort=lt&dir=asc");
     expect(res.status).toBe(200);
     expect(res.body.clientes[0].ltMeses).toBe(2.0);
+  });
+});
+
+describe("PATCH /api/lt-ltv-churn/clientes/:idTask/tier", () => {
+  it("salva o cluster manual", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    const res = await request(makeApp())
+      .patch("/api/lt-ltv-churn/clientes/86abc/tier")
+      .send({ cluster: "3" });
+    expect(res.status).toBe(200);
+    expect(res.body.ok).toBe(true);
+  });
+
+  it("rejeita cluster inválido", async () => {
+    const res = await request(makeApp())
+      .patch("/api/lt-ltv-churn/clientes/86abc/tier")
+      .send({ cluster: "9" });
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/lt-ltv-churn/clientes/aplicar-tiers-auto", () => {
+  it("retorna a contagem de atualizados", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ atualizados: 1180 }] });
+    const res = await request(makeApp()).post("/api/lt-ltv-churn/clientes/aplicar-tiers-auto");
+    expect(res.status).toBe(200);
+    expect(res.body.atualizados).toBe(1180);
+  });
+
+  it("retorna 500 em erro de banco", async () => {
+    mockExecute.mockRejectedValueOnce(new Error("db down"));
+    const res = await request(makeApp()).post("/api/lt-ltv-churn/clientes/aplicar-tiers-auto");
+    expect(res.status).toBe(500);
   });
 });
 
