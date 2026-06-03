@@ -150,6 +150,7 @@ const AutoReport = lazyWithRetry(() => import("@/pages/AutoReport"));
 const Chamados = lazyWithRetry(() => import("@/pages/Chamados"));
 const SolicitacaoFerramentas = lazyWithRetry(() => import("@/pages/SolicitacaoFerramentas"));
 const Capacity = lazyWithRetry(() => import("@/pages/Capacity"));
+const CapacityTimes = lazyWithRetry(() => import("@/pages/CapacityTimes"));
 const PortalCliente = PortalClientePage;
 const PortalCreator = lazyWithRetry(() => import("@/pages/PortalCreator"));
 const TestWorkflow = lazyWithRetry(() => import("@/pages/TestWorkflow"));
@@ -415,6 +416,7 @@ function ProtectedRouter() {
       <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>
       <Route path="/bp-produtos">{() => <ProtectedRoute path="/bp-produtos" component={BpProdutos} />}</Route>
       <Route path="/capacity">{() => <ProtectedRoute path="/capacity" component={Capacity} />}</Route>
+      <Route path="/capacity-times">{() => <ProtectedRoute path="/capacity-times" component={CapacityTimes} />}</Route>
 
       {/* Calendário */}
       <Route path="/calendario">{() => <ProtectedRoute path="/calendario" component={Calendario} />}</Route>

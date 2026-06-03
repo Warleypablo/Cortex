@@ -51,6 +51,7 @@ export const PERMISSION_KEYS = {
     LTV_CLIENTES: 'gestao.ltv_clientes',
     ESTOQUE_PONTUAL: 'gestao.estoque_pontual',
     CREATORS_PONTUAL: 'gestao.creators_pontual',
+    CAPACITY_TIMES: 'gestao.capacity_times',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -241,6 +242,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/ltv-clientes': PERMISSION_KEYS.GESTAO.LTV_CLIENTES,
   '/estoque-pontual': PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL,
   '/creators-pontual': PERMISSION_KEYS.GESTAO.CREATORS_PONTUAL,
+  '/capacity-times': PERMISSION_KEYS.GESTAO.CAPACITY_TIMES,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
   '/triagem': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
@@ -472,6 +474,7 @@ export const NAV_CONFIG = {
         { title: 'LTV por Cliente', url: '/ltv-clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.LTV_CLIENTES },
         { title: 'Estoque de Pontual', url: '/estoque-pontual', icon: 'Package', permissionKey: PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL },
         { title: 'Creators Pontual', url: '/creators-pontual', icon: 'Clapperboard', permissionKey: PERMISSION_KEYS.GESTAO.CREATORS_PONTUAL },
+        { title: 'Capacity Times', url: '/capacity-times', icon: 'Gauge', permissionKey: PERMISSION_KEYS.GESTAO.CAPACITY_TIMES },
       ],
     },
     {
