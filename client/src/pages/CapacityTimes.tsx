@@ -188,9 +188,9 @@ export default function CapacityTimes() {
             {squads.map((s) => (
               <TabsTrigger key={s.squad} value={s.squad}>{s.squad} ({s.rows.length})</TabsTrigger>
             ))}
-            <TabsTrigger value="vendedor">Vendedores ({data?.vendedor.length ?? 0})</TabsTrigger>
+            <TabsTrigger value="vendedor">Selca ({data?.vendedor.length ?? 0})</TabsTrigger>
             <TabsTrigger value="account">Accounts ({data?.account.length ?? 0})</TabsTrigger>
-            <TabsTrigger value="gestor">Gestores ({data?.gestor.length ?? 0})</TabsTrigger>
+            <TabsTrigger value="gestor">Squadra ({data?.gestor.length ?? 0})</TabsTrigger>
           </TabsList>
 
           {squads.map((s) => (
@@ -203,7 +203,7 @@ export default function CapacityTimes() {
           ))}
           <TabsContent value="vendedor">
             <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardHeader><CardTitle className="text-gray-900 dark:text-white">Vendedores / Closers</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-gray-900 dark:text-white">Selca</CardTitle></CardHeader>
               <CardContent><ComercialTable rows={data?.vendedor ?? []} /></CardContent>
             </Card>
           </TabsContent>
@@ -215,7 +215,7 @@ export default function CapacityTimes() {
           </TabsContent>
           <TabsContent value="gestor">
             <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardHeader><CardTitle className="text-gray-900 dark:text-white">Gestores</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-gray-900 dark:text-white">Squadra</CardTitle></CardHeader>
               <CardContent><ComercialTable rows={data?.gestor ?? []} /></CardContent>
             </Card>
           </TabsContent>
