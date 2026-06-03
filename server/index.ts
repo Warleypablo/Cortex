@@ -13,6 +13,7 @@ import { initTurbodashTable } from "./services/turbodash";
 import { runAllForecasts } from "./services/predictiveEngine";
 import rateLimit from "express-rate-limit";
 import path from "path";
+import { seedCapacityMetas } from "./seed/capacityMetas";
 
 function requireEnv(name: string): string {
   const val = process.env[name];
@@ -162,6 +163,7 @@ app.use((req, res, next) => {
   await Promise.all([
     seedDefaultDashboardViews(),
     seedChamadoCategories(),
+    seedCapacityMetas(),
   ]);
   
   // Phase 4: Create performance indexes on external database tables
