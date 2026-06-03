@@ -150,6 +150,7 @@ const ALL_ROUTES = [
   '/cases/chat',
   '/sugestoes',
   '/visao-geral',
+  '/gestao/tv-leaderboard',
   '/okr-2026',
   '/dashboard/geg',
   '/dashboard/inhire',
@@ -170,6 +171,9 @@ const ALL_ROUTES = [
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/apresentacao',
+  '/dashboard/comercial/sdr-assistant',
+  '/dashboard/comercial/crosssell',
+  '/dashboard/comercial/crosssell-dashboard',
   '/presentation',
   '/growth/visao-geral',
   '/growth/criativos',
@@ -224,6 +228,9 @@ const DEFAULT_USER_ROUTES = [
   '/dashboard/comercial/analise-vendas',
   '/dashboard/comercial/detalhamento-vendas',
   '/dashboard/comercial/apresentacao',
+  '/dashboard/comercial/sdr-assistant',
+  '/dashboard/comercial/crosssell',
+  '/dashboard/comercial/crosssell-dashboard',
   '/presentation',
   // Growth
   '/growth/visao-geral',
@@ -260,6 +267,9 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
     if (!migratedRoutes.includes('/presentation')) {
       migratedRoutes.push('/presentation');
     }
+    if (!migratedRoutes.includes('/dashboard/comercial/sdr-assistant')) {
+      migratedRoutes.push('/dashboard/comercial/sdr-assistant');
+    }
   }
   
   // Auto-adicionar /sugestoes para todos os usuários (rota padrão)
@@ -275,6 +285,21 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
   // Auto-adicionar /growth/instagram para todos os usuários
   if (!migratedRoutes.includes('/growth/instagram')) {
     migratedRoutes.push('/growth/instagram');
+  }
+
+  // Auto-adicionar /conhecimentos para todos os usuários
+  if (!migratedRoutes.includes('/conhecimentos')) {
+    migratedRoutes.push('/conhecimentos');
+  }
+
+  // Auto-adicionar crosssell para todos os usuários com rotas comerciais
+  if (migratedRoutes.some(r => r.includes('/dashboard/comercial/'))) {
+    if (!migratedRoutes.includes('/dashboard/comercial/crosssell')) {
+      migratedRoutes.push('/dashboard/comercial/crosssell');
+    }
+    if (!migratedRoutes.includes('/dashboard/comercial/crosssell-dashboard')) {
+      migratedRoutes.push('/dashboard/comercial/crosssell-dashboard');
+    }
   }
 
   // Migrar Contratos Freelancers de Jurídico → Social

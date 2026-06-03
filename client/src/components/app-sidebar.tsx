@@ -6,11 +6,10 @@ import {
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut, Lock, Bell, Moon, Sun,
   ChevronRight, ChevronDown, Presentation, Activity, Palette, Sliders, Lightbulb, Megaphone, Ticket,
-  Star, Gauge, Bot
+  Star, Gauge, Bot, Link2
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
-import turboLogoLight from "@assets/logo-turbo-light.svg";
-import turboLogoDark from "@assets/logo-turbo-dark.svg";
+import turboLogo from "@assets/logo-branca.png";
 import {
   Sidebar,
   SidebarContent,
@@ -47,7 +46,7 @@ const ICONS: Record<string, any> = {
   Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Activity, Palette,
-  Sliders, Bell, Lightbulb, Megaphone, Ticket, Gauge, Bot,
+  Sliders, Bell, Lightbulb, Megaphone, Ticket, Gauge, Bot, Link2,
 };
 
 const getIcon = (iconName: string) => ICONS[iconName] || FileText;
@@ -57,7 +56,6 @@ export function AppSidebar() {
   const { theme, toggleTheme } = useTheme();
   const { state, setOpen } = useSidebar();
   const isCollapsed = state === "collapsed";
-  const turboLogo = theme === "dark" ? turboLogoDark : turboLogoLight;
 
   // Track open categories - all closed by default on page load
   const [openCategories, setOpenCategories] = useState<Record<string, boolean>>({});

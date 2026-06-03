@@ -6,6 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Trash2, Plus, Save, Loader2 } from "lucide-react";
 import type { MetricRulesetWithThresholds } from "@shared/schema";
+import { AVAILABLE_METRICS } from "@/lib/metricFormatting";
 
 const COLOR_OPTIONS = [
   { value: "green", label: "Verde", className: "bg-green-500" },
@@ -55,10 +56,6 @@ export function MetricFormattingSheet({
     { minValue: "", maxValue: "", color: "red", label: "Ruim" },
   ]);
 
-  const uniqueMetrics = Array.from(
-    new Set(metricRules.map((r) => r.metricKey))
-  );
-
   const loadRule = (metricKey: string) => {
     setSelectedMetric(metricKey);
     const rule = metricRules.find(
@@ -68,8 +65,10 @@ export function MetricFormattingSheet({
         (selectedPlataforma === "all" ? !r.plataforma : r.plataforma === selectedPlataforma)
     ) || metricRules.find((r) => r.metricKey === metricKey);
 
+    const metricDef = AVAILABLE_METRICS.find((m) => m.key === metricKey);
+
     if (rule) {
-      setDisplayLabel(rule.displayLabel || metricKey);
+      setDisplayLabel(rule.displayLabel || metricDef?.label || metricKey);
       setThresholds(
         rule.thresholds.length > 0
           ? rule.thresholds.map((t) => ({
@@ -81,7 +80,7 @@ export function MetricFormattingSheet({
           : [{ minValue: "", maxValue: "", color: "green", label: "Bom" }]
       );
     } else {
-      setDisplayLabel(metricKey);
+      setDisplayLabel(metricDef?.label || metricKey);
       setThresholds([
         { minValue: "", maxValue: "", color: "green", label: "Bom" },
         { minValue: "", maxValue: "", color: "yellow", label: "Médio" },
@@ -133,8 +132,8 @@ export function MetricFormattingSheet({
                 <SelectValue placeholder="Selecione uma métrica" />
               </SelectTrigger>
               <SelectContent>
-                {uniqueMetrics.map((m) => (
-                  <SelectItem key={m} value={m}>{m}</SelectItem>
+                {AVAILABLE_METRICS.map((m) => (
+                  <SelectItem key={m.key} value={m.key}>{m.label}</SelectItem>
                 ))}
               </SelectContent>
             </Select>

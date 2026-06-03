@@ -59,8 +59,10 @@ export function configurePassport() {
             '/dashboard/dfc',
             '/dashboard/auditoria-sistemas',
             '/admin/usuarios',
-            '/admin/regras-notificacoes'
-          ]
+            '/admin/regras-notificacoes',
+            '/dashboard/comercial/sdr-assistant',
+          ],
+          department: 'admin',
         };
         return done(null, devUser);
       }

@@ -72,6 +72,7 @@ import {
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { RevisarClausulasModal } from "@/components/RevisarClausulasModal";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -295,6 +296,11 @@ export default function Creators() {
     chave_pix: "", tipo_pix: "", observacoes: ""
   });
 
+  const [revisarClausulas, setRevisarClausulas] = useState<{
+    contratoId: number;
+    creatorNome: string;
+  } | null>(null);
+
   // Todos contratos state
   const [todosStatusFilter, setTodosStatusFilter] = useState("");
   const [todosSearch, setTodosSearch] = useState("");
@@ -418,8 +424,9 @@ export default function Creators() {
   });
 
   const enviarAssinatura = useMutation({
-    mutationFn: async (contratoId: number) => {
-      const res = await apiRequest("POST", `/api/creators/contratos/${contratoId}/enviar-assinatura`);
+    mutationFn: async ({ contratoId, clausulasEditadas }: { contratoId: number; clausulasEditadas: Record<number, string> }) => {
+      const body = Object.keys(clausulasEditadas).length > 0 ? { clausulasEditadas } : undefined;
+      const res = await apiRequest("POST", `/api/creators/contratos/${contratoId}/enviar-assinatura`, body);
       return res.json();
     },
     onSuccess: (data: any) => {
@@ -428,6 +435,7 @@ export default function Creators() {
       queryClient.invalidateQueries({ queryKey: ["/api/creators", selectedCreator?.id, "contratos"] });
       setContratoDialogOpen(false);
       setContratoCriadoId(null);
+      setRevisarClausulas(null);
     },
     onError: (err: any) => {
       toast({ title: "Erro ao enviar", description: err.message, variant: "destructive" });
@@ -739,7 +747,7 @@ export default function Creators() {
                           variant="outline"
                           size="sm"
                           className="gap-1"
-                          onClick={() => window.open(`/api/creators/contratos/${ct.id}/preview-pdf`, "_blank")}
+                          onClick={() => window.open(`/api/creators/contratos/${ct.id}/pdf`, "_blank")}
                         >
                           <Eye className="w-3.5 h-3.5" />
                           PDF
@@ -773,7 +781,7 @@ export default function Creators() {
                             size="sm"
                             className="gap-1"
                             disabled={enviarAssinatura.isPending}
-                            onClick={() => enviarAssinatura.mutate(ct.id)}
+                            onClick={() => setRevisarClausulas({ contratoId: ct.id, creatorNome: ct.creator_nome })}
                           >
                             {enviarAssinatura.isPending ? (
                               <Loader2 className="w-3.5 h-3.5 animate-spin" />
@@ -886,7 +894,7 @@ export default function Creators() {
                               variant="outline"
                               size="sm"
                               className="gap-1"
-                              onClick={() => window.open(`/api/creators/contratos/${ct.id}/preview-pdf`, '_blank')}
+                              onClick={() => window.open(`/api/creators/contratos/${ct.id}/pdf`, '_blank')}
                             >
                               <Eye className="w-3.5 h-3.5" />
                               PDF
@@ -920,7 +928,7 @@ export default function Creators() {
                                 size="sm"
                                 className="gap-1"
                                 disabled={enviarAssinatura.isPending}
-                                onClick={() => enviarAssinatura.mutate(ct.id)}
+                                onClick={() => setRevisarClausulas({ contratoId: ct.id, creatorNome: selectedCreator?.nome ?? '' })}
                               >
                                 {enviarAssinatura.isPending ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Send className="w-3.5 h-3.5" />}
                                 Enviar
@@ -1046,7 +1054,7 @@ export default function Creators() {
                 <Button
                   variant="outline"
                   className="gap-2 h-auto py-4 flex-col"
-                  onClick={() => window.open(`/api/creators/contratos/${contratoCriadoId}/preview-pdf`, '_blank')}
+                  onClick={() => window.open(`/api/creators/contratos/${contratoCriadoId}/pdf`, '_blank')}
                 >
                   <Eye className="w-5 h-5" />
                   Visualizar PDF
@@ -1054,7 +1062,11 @@ export default function Creators() {
                 <Button
                   className="gap-2 h-auto py-4 flex-col"
                   disabled={enviarAssinatura.isPending}
-                  onClick={() => enviarAssinatura.mutate(contratoCriadoId)}
+                  onClick={() => {
+                    if (contratoCriadoId) {
+                      setRevisarClausulas({ contratoId: contratoCriadoId, creatorNome: selectedCreator?.nome ?? '' });
+                    }
+                  }}
                 >
                   {enviarAssinatura.isPending ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                   Enviar para Assinatura
@@ -1285,6 +1297,19 @@ export default function Creators() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <RevisarClausulasModal
+        contratoId={revisarClausulas?.contratoId ?? null}
+        creatorNome={revisarClausulas?.creatorNome ?? ''}
+        open={revisarClausulas !== null}
+        onClose={() => setRevisarClausulas(null)}
+        onConfirmar={(clausulasEditadas) => {
+          if (revisarClausulas) {
+            enviarAssinatura.mutate({ contratoId: revisarClausulas.contratoId, clausulasEditadas });
+          }
+        }}
+        isPending={enviarAssinatura.isPending}
+      />
 
       {/* Dialog: Portal Link */}
       <Dialog open={portalLinkUrl !== null} onOpenChange={(open) => { if (!open) setPortalLinkUrl(null); }}>

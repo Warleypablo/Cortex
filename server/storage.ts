@@ -209,9 +209,9 @@ export interface IStorage {
   getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
   getTopClientesByLTV(limit?: number): Promise<{ nome: string; ltv: number; ltMeses: number; servicos: string }[]>;
   getDfc(dataInicio?: string, dataFim?: string, empresa?: string): Promise<DfcHierarchicalResponse>;
-  getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
-  getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
-  getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
+  getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any>;
+  getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any>;
+  getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any>;
   getGegTempoPromocao(squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
   getGegAniversariantesMes(squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
   getGegAniversariosEmpresa(squad: string, setor: string, nivel: string, cargo: string): Promise<any>;
@@ -228,7 +228,7 @@ export interface IStorage {
   getGegCustoPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<{ setor: string; custoTotal: number; totalColaboradores: number }[]>;
   getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null }>>;
   getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null } | null>;
-  upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
+  upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string | null; evidencias?: string | null; acao?: string | null; statusFinanceiro?: string | null; detalheFinanceiro?: string | null; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
   upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; tipoInadimplencia?: string; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; tipoInadimplencia: string | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>;
   getGegDemissoesPorTipo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDemissoesPorTipo[]>;
   getGegUltimasDemissoes(squad: string, setor: string, nivel: string, cargo: string, limit?: number): Promise<{ id: number; nome: string; cargo: string | null; squad: string | null; dataDesligamento: string; tempoDeEmpresa: number }[]>;
@@ -832,15 +832,15 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
+  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
+  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
+  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -1121,7 +1121,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string | null; evidencias?: string | null; acao?: string | null; statusFinanceiro?: string | null; detalheFinanceiro?: string | null; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -2073,99 +2073,14 @@ export class DbStorage implements IStorage {
       .orderBy(desc(schema.cazReceber.dataCriacao))
       .limit(limit);
     
-    // Generate future installments based on existing payment patterns
-    const allReceitas: ContaReceber[] = [...result];
-    const parcelamentoMap = new Map<string, { parcelas: typeof result; totalParcelas: number; valorMedio: number }>();
-    
-    // Identify installment patterns (format: "X/Y - Venda NNNN" or "X/Y - Description")
-    for (const receita of result) {
-      if (!receita.descricao) continue;
-      const match = receita.descricao.match(/^(\d+)\/(\d+)\s*-\s*(.+)$/);
-      if (match) {
-        const parcelaAtual = parseInt(match[1]);
-        const totalParcelas = parseInt(match[2]);
-        const baseDescricao = match[3].trim();
-        
-        if (!parcelamentoMap.has(baseDescricao)) {
-          parcelamentoMap.set(baseDescricao, { parcelas: [], totalParcelas, valorMedio: 0 });
-        }
-        parcelamentoMap.get(baseDescricao)!.parcelas.push(receita);
-      }
-    }
-    
-    // Generate missing future installments
-    const today = new Date();
-    
-    for (const [baseDescricao, info] of parcelamentoMap.entries()) {
-      const { parcelas, totalParcelas } = info;
-      if (parcelas.length === 0) continue;
-      
-      // Find existing installment numbers
-      const existingNumbers = new Set<number>();
-      let lastVencimento: Date | null = null;
-      let valorTotal: number = 0;
-      let count = 0;
-      
-      for (const p of parcelas) {
-        const match = p.descricao?.match(/^(\d+)\/(\d+)/);
-        if (match) {
-          existingNumbers.add(parseInt(match[1]));
-        }
-        if (p.dataVencimento) {
-          if (!lastVencimento || new Date(p.dataVencimento) > new Date(lastVencimento)) {
-            lastVencimento = new Date(p.dataVencimento);
-          }
-        }
-        if (p.total) {
-          valorTotal += parseFloat(String(p.total));
-          count++;
-        }
-      }
-      
-      const valorMedio = count > 0 ? valorTotal / count : 0;
-      if (!lastVencimento || valorMedio === 0) continue;
-      
-      // Generate missing future installments
-      let futureCount = 0;
-      for (let i = 1; i <= totalParcelas; i++) {
-        if (!existingNumbers.has(i)) {
-          // Calculate expected vencimento date (1 month after last known vencimento per missing installment)
-          futureCount++;
-          const vencimentoPrevisto = new Date(lastVencimento);
-          vencimentoPrevisto.setMonth(vencimentoPrevisto.getMonth() + futureCount);
-          
-          // Determine status: first future = "Em Aberto", rest = "Prevista"
-          const isFirstFuture = futureCount === 1;
-          const statusFuturo = isFirstFuture ? "Em Aberto" : "Prevista";
-          
-          const parcelaFutura: ContaReceber = {
-            id: -(i * 1000 + parcelas[0].id), // Negative ID to indicate synthetic
-            status: statusFuturo,
-            total: String(valorMedio.toFixed(2)),
-            descricao: `${i}/${totalParcelas} - ${baseDescricao}`,
-            dataVencimento: vencimentoPrevisto,
-            naoPago: String(valorMedio.toFixed(2)),
-            pago: "0",
-            dataCriacao: parcelas[0].dataCriacao,
-            dataAlteracao: null,
-            clienteId: parcelas[0].clienteId,
-            clienteNome: parcelas[0].clienteNome,
-            empresa: parcelas[0].empresa,
-            urlCobranca: null,
-          };
-          
-          allReceitas.push(parcelaFutura);
-        }
-      }
-    }
-    
     // Sort by vencimento descending (most recent first)
+    const allReceitas = [...result];
     allReceitas.sort((a, b) => {
       const dateA = a.dataVencimento ? new Date(a.dataVencimento).getTime() : 0;
       const dateB = b.dataVencimento ? new Date(b.dataVencimento).getTime() : 0;
       return dateB - dateA;
     });
-    
+
     return allReceitas;
   }
 
@@ -4464,11 +4379,11 @@ export class DbStorage implements IStorage {
     if (mesAno >= '2026-02') {
       const cupChurnQuery = await db.execute(sql`
         SELECT COALESCE(SUM(valor_r), 0) as churn_total
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${inicioMes}::timestamp
           AND data_solicitacao_encerramento <= ${fimMes}::timestamp
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
       `);
       churnBase = parseFloat((cupChurnQuery.rows[0] as any)?.churn_total || '0');
     }
@@ -4835,7 +4750,7 @@ export class DbStorage implements IStorage {
     
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
     
-    const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status IN ('QUITADO', 'RECEBIDO_PARCIAL')"];
+    const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status = 'QUITADO'"];
 
     // Filtrar por empresa se especificado
     if (empresa && empresa !== 'todas') {
@@ -4941,7 +4856,7 @@ export class DbStorage implements IStorage {
 
         const categoriaId = codeMatch[1];
         const categoriaNome = codeMatch[2];
-        
+        
         const twoDigitPrefix = categoriaId.substring(0, 2);
         const isCategoriaReceita = (twoDigitPrefix === '03' || twoDigitPrefix === '04');
         const isCategoriaDespesa = (twoDigitPrefix === '05' || twoDigitPrefix === '06' || twoDigitPrefix === '07' || twoDigitPrefix === '08');
@@ -5019,8 +4934,8 @@ export class DbStorage implements IStorage {
     return result;
   }
 
-  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
-    const { dataInicio, dataFim } = this.calcularPeriodo(periodo);
+  async getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicioCustom?: string, dataFimCustom?: string): Promise<any> {
+    const { dataInicio, dataFim } = this.calcularPeriodo(periodo, dataInicioCustom, dataFimCustom);
     
     let whereCurrentConditions = [sql`status = 'Ativo'`];
     if (squad !== 'todos') {
@@ -5131,8 +5046,8 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
-    const { dataInicio } = this.calcularPeriodo(periodo);
+  async getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicioCustom?: string, dataFimCustom?: string): Promise<any> {
+    const { dataInicio } = this.calcularPeriodo(periodo, dataInicioCustom, dataFimCustom);
     
     let joinConditions = [sql`1=1`];
     if (squad !== 'todos') {
@@ -5193,8 +5108,8 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string): Promise<any> {
-    const { dataInicio } = this.calcularPeriodo(periodo);
+  async getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicioCustom?: string, dataFimCustom?: string): Promise<any> {
+    const { dataInicio } = this.calcularPeriodo(periodo, dataInicioCustom, dataFimCustom);
     
     let joinConditions = [sql`1=1`];
     if (squad !== 'todos') {
@@ -6367,13 +6282,15 @@ export class DbStorage implements IStorage {
       ORDER BY name
     `);
 
-    // Get distinct UTM terms (adset IDs) with names from meta_adsets
+    // Get distinct UTM terms (adset IDs) with names from meta_adsets.
+    // SPLIT_PART suporta o novo formato Constituição UTM v1: `{{adset.id}}-{{placement}}`
+    // (ex: `120242625739510450-instagram_stories`). Sem hífen, retorna o valor cru — compatível com legado.
     const utmTermsResult = await db.execute(sql`
-      SELECT DISTINCT 
-        d.utm_term as id,
-        COALESCE(a.adset_name, d.utm_term) as name
+      SELECT DISTINCT
+        SPLIT_PART(d.utm_term, '-', 1) as id,
+        COALESCE(a.adset_name, SPLIT_PART(d.utm_term, '-', 1)) as name
       FROM ${schema.crmDeal} d
-      LEFT JOIN ${schema.metaAdsets} a ON d.utm_term = a.adset_id
+      LEFT JOIN ${schema.metaAdsets} a ON SPLIT_PART(d.utm_term, '-', 1) = a.adset_id
       WHERE d.utm_term IS NOT NULL
       ORDER BY name
     `);
@@ -6589,8 +6506,10 @@ export class DbStorage implements IStorage {
         GROUP BY a.adset_id, a.adset_name, a.status, a.optimization_goal, a.targeting_age_min, a.targeting_age_max, c.campaign_name
       ),
       adset_crm AS (
-        SELECT 
-          utm_term as adset_id,
+        -- SPLIT_PART suporta Constituicao UTM v1: utm_term no formato adsetId-placement.
+        -- Sem hifen, retorna o valor cru, compativel com legado.
+        SELECT
+          SPLIT_PART(utm_term, '-', 1) as adset_id,
           COUNT(*) as leads,
           COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as won,
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) END), 0) as won_value
@@ -6602,8 +6521,8 @@ export class DbStorage implements IStorage {
           ${leadFilters?.stageNames?.length ? sql`AND stage_name = ANY(${leadFilters.stageNames})` : sql``}
           ${leadFilters?.utmSources?.length ? sql`AND utm_source = ANY(${leadFilters.utmSources})` : sql``}
           ${leadFilters?.utmCampaigns?.length ? sql`AND utm_campaign = ANY(${leadFilters.utmCampaigns})` : sql``}
-          ${leadFilters?.utmTerms?.length ? sql`AND utm_term = ANY(${leadFilters.utmTerms})` : sql``}
-        GROUP BY utm_term
+          ${leadFilters?.utmTerms?.length ? sql`AND SPLIT_PART(utm_term, '-', 1) = ANY(${leadFilters.utmTerms})` : sql``}
+        GROUP BY SPLIT_PART(utm_term, '-', 1)
       )
       SELECT 
         am.adset_id as "adsetId",
@@ -7072,11 +6991,15 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  private calcularPeriodo(periodo: string): { dataInicio: string; dataFim: string } {
+  private calcularPeriodo(periodo: string, dataInicioCustom?: string, dataFimCustom?: string): { dataInicio: string; dataFim: string } {
+    if (periodo === 'custom' && dataInicioCustom && dataFimCustom) {
+      return { dataInicio: dataInicioCustom, dataFim: dataFimCustom };
+    }
+
     const hoje = new Date();
     const ano = hoje.getFullYear();
     const mes = hoje.getMonth();
-    
+
     let dataInicio: Date;
     let dataFim: Date = hoje;
 
@@ -9176,6 +9099,8 @@ export class DbStorage implements IStorage {
       diasAtrasoMax: number;
       empresa: string;
       cnpj: string | null;
+      email: string | null;
+      endereco: string | null;
       statusClickup: string | null;
       responsavel: string | null;
       cluster: string | null;
@@ -9274,6 +9199,8 @@ export class DbStorage implements IStorage {
         SELECT DISTINCT ON (TRIM(cc.ids::text))
           TRIM(cc.ids::text) as id_cliente,
           cc.cnpj,
+          cc.email,
+          cc.endereco,
           cup.nome as nome_clickup,
           cup.status as status_clickup,
           cup.responsavel,
@@ -9281,7 +9208,7 @@ export class DbStorage implements IStorage {
           cup.task_id,
           cup.telefone
         FROM "Conta Azul".caz_clientes cc
-        LEFT JOIN "Clickup".cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text) 
+        LEFT JOIN "Clickup".cup_clientes cup ON TRIM(cc.cnpj::text) = TRIM(cup.cnpj::text)
           AND cc.cnpj IS NOT NULL AND cc.cnpj::text != ''
         WHERE cc.ids IS NOT NULL
         ORDER BY TRIM(cc.ids::text), cup.status DESC NULLS LAST
@@ -9307,7 +9234,7 @@ export class DbStorage implements IStorage {
         WHERE cont.id_task IS NOT NULL AND cont.id_task::text != ''
         ORDER BY TRIM(cont.id_task::text), cont.data_inicio DESC NULLS LAST
       )
-      SELECT 
+      SELECT
         parcelas.id_cliente,
         caz.nome_caz as nome_cliente,
         parcelas.valor_total,
@@ -9316,6 +9243,8 @@ export class DbStorage implements IStorage {
         parcelas.dias_atraso_max,
         parcelas.empresa,
         cliente_info.cnpj,
+        cliente_info.email,
+        cliente_info.endereco,
         cliente_info.nome_clickup,
         cliente_info.status_clickup,
         cliente_info.responsavel,
@@ -9343,6 +9272,8 @@ export class DbStorage implements IStorage {
       diasAtrasoMax: parseInt(row.dias_atraso_max || '0'),
       empresa: row.empresa || '',
       cnpj: row.cnpj || null,
+      email: row.email || null,
+      endereco: row.endereco || null,
       statusClickup: row.status_clickup || null,
       responsavel: row.responsavel || null,
       cluster: row.cluster || null,
@@ -10122,7 +10053,7 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string | null; evidencias?: string | null; acao?: string | null; statusFinanceiro?: string | null; detalheFinanceiro?: string | null; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
     const result = await db.execute(sql`
       INSERT INTO cortex_core.inadimplencia_contextos (cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em)
       VALUES (${data.clienteId}, ${data.contexto || ''}, ${data.evidencias || ''}, NULLIF(${data.acao || ''}, ''), NULLIF(${data.statusFinanceiro || ''}, ''), NULLIF(${data.detalheFinanceiro || ''}, ''), ${data.atualizadoPor}, NOW())

@@ -1886,7 +1886,7 @@ export default function ChurnDetalhamento() {
       </Card>
 
       {/* Tabs de nível superior */}
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio" | "consolidado")}>
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio")}>
         <TabsList>
           <TabsTrigger value="analise" className="gap-2" data-testid="main-tab-analise">
             <BarChart3 className="h-4 w-4" />
@@ -1895,10 +1895,6 @@ export default function ChurnDetalhamento() {
           <TabsTrigger value="contratos" className="gap-2" data-testid="main-tab-contratos">
             <FileText className="h-4 w-4" />
             Contratos
-          </TabsTrigger>
-          <TabsTrigger value="consolidado" className="gap-2" data-testid="main-tab-consolidado">
-            <Target className="h-4 w-4" />
-            Consolidado Trimestral
           </TabsTrigger>
           <TabsTrigger value="relatorio" className="gap-2" data-testid="main-tab-relatorio">
             <CalendarRange className="h-4 w-4" />
@@ -1909,8 +1905,6 @@ export default function ChurnDetalhamento() {
 
       {mainTab === "relatorio" ? (
         <RelatorioSemanalChurn />
-      ) : mainTab === "consolidado" ? (
-        <ChurnConsolidadoTrimestral />
       ) : mainTab === "analise" ? (
       <>
 
@@ -1951,9 +1945,6 @@ export default function ChurnDetalhamento() {
               <div className="flex flex-col items-center justify-center p-4 bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50">
                 <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Taxa de Churn</h3>
                 <ChurnGauge value={filteredTaxaChurn || 0} statusOverride={gaugeStatusOverride} />
-                <p className="text-xs text-muted-foreground mt-3 text-center">
-                  Base: {format(BASE_REFERENCE_DATE, "MMMM/yyyy", { locale: ptBR })}
-                </p>
                 {churnPlanejado.taxaPlanejada > 0 && (
                   <p className="text-[11px] text-muted-foreground text-center mt-1">
                     Planejado até hoje: <span className="font-semibold">{churnPlanejado.taxaPlanejada.toFixed(2)}%</span>
@@ -1966,6 +1957,15 @@ export default function ChurnDetalhamento() {
               
               {/* Coluna 2: Métricas principais */}
               <div className="flex flex-col gap-3">
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 flex flex-col justify-center">
+                  <div className="flex items-center justify-between mb-1">
+                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">MRR Base</span>
+                    <DollarSign className="h-4 w-4 text-blue-500" />
+                  </div>
+                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(mrrBaseReal)}</div>
+                  <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">base de referência do período</div>
+                </div>
+
                 <div className="flex-1 p-4 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase">MRR Perdido</span>
@@ -2023,13 +2023,13 @@ export default function ChurnDetalhamento() {
                     <span className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase">Churn Total</span>
                     <Target className="h-4 w-4 text-purple-500" />
                   </div>
-                  <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(filteredMetricas.mrr_perdido + (data?.metricas?.mrr_abonado ?? 0))}</div>
+                  <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(filteredMetricas.mrr_perdido + filteredMetricas.mrr_abonado)}</div>
                   <div className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
-                    {filteredMetricas.total_churned + (data?.metricas?.total_abonado ?? 0)} contratos (MRR Perdido + Abonado)
+                    {filteredMetricas.total_churned + filteredMetricas.total_abonado} contratos (MRR Perdido + Abonado)
                   </div>
                   <div className="flex items-center gap-3 text-xs mt-2">
                     <span className="text-red-500">Perdido: {formatCurrency(filteredMetricas.mrr_perdido)}</span>
-                    <span className="text-amber-500">Abonado: {formatCurrency(data?.metricas?.mrr_abonado ?? 0)}</span>
+                    <span className="text-amber-500">Abonado: {formatCurrency(filteredMetricas.mrr_abonado)}</span>
                   </div>
                 </div>
               </div>

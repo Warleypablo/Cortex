@@ -3,7 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import type { Course, InsertCourse } from "@shared/schema";
 import { insertCourseSchema, courseStatusEnum } from "@shared/schema";
 import { Input } from "@/components/ui/input";
-import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, GraduationCap, BookOpen, LayoutGrid, Table2, ArrowUpDown, Star, Tag, Gift, Percent, Store, ShoppingBag, Sparkles } from "lucide-react";
+import { Search, Plus, Eye, EyeOff, Copy, Edit, Trash2, ExternalLink, Loader2, ChevronDown, ChevronRight, GraduationCap, BookOpen, LayoutGrid, Table2, ArrowUpDown, Star, Tag, Gift, Percent, Store, ShoppingBag, Sparkles, PlayCircle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -60,6 +60,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { TreinamentoInternoTab } from "@/components/treinamento-interno/TreinamentoInternoTab";
 
 interface Benefit {
   id: string;
@@ -1139,7 +1140,7 @@ export default function Conhecimentos() {
     <div className="p-6 space-y-6">
       <Tabs defaultValue="cursos" className="w-full">
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
-          <TabsList className="grid w-full sm:w-auto grid-cols-2 h-11">
+          <TabsList className="grid w-full sm:w-auto grid-cols-3 h-11">
             <TabsTrigger value="cursos" className="flex items-center gap-2 px-6" data-testid="tab-cursos">
               <GraduationCap className="w-4 h-4" />
               Cursos
@@ -1147,6 +1148,10 @@ export default function Conhecimentos() {
             <TabsTrigger value="beneficios" className="flex items-center gap-2 px-6" data-testid="tab-beneficios">
               <Gift className="w-4 h-4" />
               Benefícios
+            </TabsTrigger>
+            <TabsTrigger value="treinamento-interno" className="flex items-center gap-2 px-6" data-testid="tab-treinamento-interno">
+              <PlayCircle className="w-4 h-4" />
+              Treinamento Interno
             </TabsTrigger>
           </TabsList>
         </div>
@@ -1488,6 +1493,10 @@ export default function Conhecimentos() {
 
         <TabsContent value="beneficios" className="mt-0">
           <BenefitsTab />
+        </TabsContent>
+
+        <TabsContent value="treinamento-interno" className="mt-0">
+          <TreinamentoInternoTab />
         </TabsContent>
       </Tabs>
     </div>

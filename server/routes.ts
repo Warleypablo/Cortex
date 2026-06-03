@@ -18,11 +18,16 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import * as path from "path";
 import * as fs from "fs";
-import { registerAcessosRoutes, registerAcessosPublicRoutes } from "./routes/acessos";
+import { registerAcessosRoutes } from "./routes/acessos";
 import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
+import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
+import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
+import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
+import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
+import { registerMixReceitaRoutes } from "./routes/mixReceita";
 import { registerMetasRoutes } from "./routes/metas";
 import { registerContratosRoutes } from "./routes/contratos";
 import { registerTechRoutes } from "./routes/tech";
@@ -31,29 +36,38 @@ import { registerRelatorioMensalRoutes } from "./routes/relatorioMensal";
 import { registerRelatorioMensalSlidesRoutes } from "./routes/relatorioMensalSlides";
 import { registerChatRoutes } from "./routes/chat";
 import { registerChamadosRoutes } from "./routes/chamados";
+import { registerFcaRoutes } from "./routes/fca";
 import { registerTurboZapRoutes, initTurboZapTables } from "./routes/turbozap";
 import { registerJuridicoAssistenteRoutes } from "./routes/juridico-assistente";
 import { registerIaHubRoutes } from "./routes/ia-hub";
 import { registerJuridicoRelatoriosRoutes } from "./routes/juridico-relatorios";
 import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
+import { registerSaldoDiarioRoutes } from "./routes/saldoDiario";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
+import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
+import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
 import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
 import { registerGrowthAiRoutes } from "./routes/growth-ai";
+import { registerSdrAssistantRoutes } from "./routes/sdr-assistant";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
+import { registerUtmRoutes } from "./routes/utm";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerGhlPublicRoutes, registerGhlApiRoutes } from "./routes/ghl";
 import { registerNegativacaoRoutes } from "./routes/negativacao";
+import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
+import { registerInternalTrainingsRoutes } from "./routes/internalTrainings";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
-import { simulateCliente, ContratoSim, ClienteSim } from "./contribuicaoSquad/simulator";
+import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
 
 const gpturboOpenAI = new OpenAI({
   apiKey: process.env.AI_INTEGRATIONS_OPENAI_API_KEY,
@@ -430,10 +444,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Instagram Module (before isAuthenticated — OAuth routes need to be accessible)
   registerInstagramRoutes(app, db, storage);
 
-  // Acessos public routes (before isAuthenticated — token-based approval links)
-  registerAcessosPublicRoutes(app);
+  // FCA Report — auth via bearer token (não usa sessão)
+  registerFcaRoutes(app);
+
+  // GHL webhook (público — chamado pelo GHL quando eventos de email/WA acontecem)
+  registerGhlPublicRoutes(app);
 
   app.use("/api", isAuthenticated);
+
+  // GHL APIs internas (sob /api → autenticadas pelo isAuthenticated acima)
+  registerGhlApiRoutes(app);
 
   app.get("/api/debug/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
@@ -2160,7 +2180,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           responsavel_geral as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
@@ -2201,6 +2221,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching evolução mensal:", error);
       res.status(500).json({ error: "Failed to fetch evolução mensal" });
+    }
+  });
+
+  // Endpoint leve dedicado ao TV Leaderboard de Gestão.
+  // Retorna por operador (responsavel_geral): MRR ativo atual, MRR no início do
+  // mês atual (snapshot), MRR no início do mês anterior, e churn acumulado 3m.
+  // Squads internos excluídos.
+  app.get("/api/tv-leaderboard/operadores", async (req, res) => {
+    try {
+      const SQUADS_EXCLUIDOS_LIST = sql`('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')`;
+
+      const result = await db.execute(sql`
+        WITH atual AS (
+          SELECT responsavel, squad, SUM(valorr) AS mrr
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel IS NOT NULL
+          GROUP BY responsavel, squad
+        ),
+        snap_inicio_mes_atual AS (
+          SELECT responsavel, squad, SUM(valorr) AS mrr
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot = DATE_TRUNC('month', CURRENT_DATE)::date
+            AND status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel IS NOT NULL
+          GROUP BY responsavel, squad
+        ),
+        snap_inicio_mes_anterior AS (
+          SELECT responsavel, squad, SUM(valorr) AS mrr
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date
+            AND status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel IS NOT NULL
+          GROUP BY responsavel, squad
+        ),
+        churn_3m AS (
+          SELECT responsavel_geral AS responsavel, squad, SUM(valor_r) AS total
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE data_solicitacao_encerramento >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '2 months')
+            AND valor_r > 0
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel_geral IS NOT NULL
+          GROUP BY responsavel_geral, squad
+        )
+        SELECT
+          COALESCE(a.responsavel, sa.responsavel, sb.responsavel, c.responsavel) AS responsavel,
+          COALESCE(a.squad, sa.squad, sb.squad, c.squad) AS squad,
+          COALESCE(a.mrr, 0) AS mrr_atual,
+          COALESCE(sa.mrr, 0) AS mrr_mes_atual_inicio,
+          COALESCE(sb.mrr, 0) AS mrr_mes_anterior_inicio,
+          COALESCE(c.total, 0) AS churn_3m
+        FROM atual a
+        FULL OUTER JOIN snap_inicio_mes_atual sa
+          ON LOWER(TRIM(a.responsavel)) = LOWER(TRIM(sa.responsavel))
+        FULL OUTER JOIN snap_inicio_mes_anterior sb
+          ON LOWER(TRIM(COALESCE(a.responsavel, sa.responsavel))) = LOWER(TRIM(sb.responsavel))
+        FULL OUTER JOIN churn_3m c
+          ON LOWER(TRIM(COALESCE(a.responsavel, sa.responsavel, sb.responsavel))) = LOWER(TRIM(c.responsavel))
+      `);
+
+      const operadores = result.rows.map((r: any) => ({
+        responsavel: String(r.responsavel ?? '').trim(),
+        squad: String(r.squad ?? '').trim(),
+        mrrAtual: Number(r.mrr_atual) || 0,
+        mrrMesAtualInicio: Number(r.mrr_mes_atual_inicio) || 0,
+        mrrMesAnteriorInicio: Number(r.mrr_mes_anterior_inicio) || 0,
+        churn3m: Number(r.churn_3m) || 0,
+      }));
+
+      res.json({ operadores });
+    } catch (error) {
+      console.error("[api] Error fetching tv-leaderboard/operadores:", error);
+      res.status(500).json({ error: "Failed to fetch tv-leaderboard operadores" });
     }
   });
 
@@ -2269,7 +2367,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           responsavel_geral as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
@@ -4608,7 +4706,7 @@ Estruture sua resposta em:
           c.evitabilidade_churn,
           c.reteve,
           c.abonar_churn
-        FROM "Clickup".cup_churn c
+        FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND ${dateFilter}
@@ -4702,28 +4800,43 @@ Estruture sua resposta em:
         cursor.setMonth(cursor.getMonth() + 1);
       }
 
-      // Para cada mês no range, buscar MRR base do mês anterior (último snapshot)
+      // Para cada mês no range, buscar MRR base: primeiro snapshot do mês atual, fallback último do mês anterior
       const mrrBasePorMes: Record<string, { total: number; por_squad: Record<string, number> }> = {};
 
       for (const mesKey of mesesNoRange) {
         const [ano, mes] = mesKey.split('-').map(Number);
-        // Mês anterior = mês de referência para o MRR base
+        // Primeiro: tentar primeiro snapshot do próprio mês
+        const inicioMesAtual = new Date(ano, mes - 1, 1);
+        const fimMesAtual = new Date(ano, mes - 1, 5, 23, 59, 59); // primeiros 5 dias
+        // Fallback: último snapshot do mês anterior
         const refMonth = mes === 1 ? 12 : mes - 1;
         const refYear = mes === 1 ? ano - 1 : ano;
         const inicioRef = new Date(refYear, refMonth - 1, 1);
         const fimRef = new Date(refYear, refMonth, 0, 23, 59, 59);
 
         const mrrResult = await db.execute(sql`
-          WITH ultimo_snapshot AS (
-            SELECT MAX(data_snapshot) as data_ultimo_snapshot
+          WITH snapshot_atual AS (
+            SELECT MIN(data_snapshot) as data_snapshot
+            FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioMesAtual}::timestamp
+              AND data_snapshot <= ${fimMesAtual}::timestamp
+          ),
+          snapshot_anterior AS (
+            SELECT MAX(data_snapshot) as data_snapshot
             FROM "Clickup".cup_data_hist
             WHERE data_snapshot >= ${inicioRef}::timestamp
               AND data_snapshot <= ${fimRef}::timestamp
+          ),
+          snapshot_ref AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM snapshot_atual WHERE data_snapshot IS NOT NULL),
+              (SELECT data_snapshot FROM snapshot_anterior)
+            ) as data_ultimo_snapshot
           )
           SELECT
             COALESCE(h.squad, 'Não especificado') as squad,
             COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
-          FROM ultimo_snapshot us
+          FROM snapshot_ref us
           JOIN "Clickup".cup_data_hist h
             ON h.data_snapshot = us.data_ultimo_snapshot
             AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
@@ -4926,7 +5039,7 @@ Estruture sua resposta em:
           'Q' || EXTRACT(QUARTER FROM ultimo_dia_operacao)::int || ' ' || EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS label,
           COUNT(*) AS total_churns,
           SUM(COALESCE(valor_r, 0)) AS valor_total
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE ultimo_dia_operacao IS NOT NULL
           AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
@@ -4942,7 +5055,7 @@ Estruture sua resposta em:
       // = ativos atuais + tudo que churou DEPOIS do início desse trimestre
       const mrrAtualResult = await db.execute(sql`
         SELECT squad, SUM(COALESCE(valor_r, 0)) AS mrr_ativo
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE squad IS NOT NULL AND status = 'ativo' AND valor_r > 0
         GROUP BY squad
       `);
@@ -4955,7 +5068,7 @@ Estruture sua resposta em:
           EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS ano,
           EXTRACT(QUARTER FROM ultimo_dia_operacao)::int AS trimestre,
           SUM(COALESCE(valor_r, 0)) AS valor_churn_posterior
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE ultimo_dia_operacao IS NOT NULL AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND valor_r > 0
@@ -5028,7 +5141,7 @@ Estruture sua resposta em:
           ultimo_dia_operacao,
           EXTRACT(MONTH FROM ultimo_dia_operacao)::int AS mes,
           TO_CHAR(ultimo_dia_operacao, 'Mon') AS mes_label
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE squad = ${squad}
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND ultimo_dia_operacao IS NOT NULL
@@ -5350,10 +5463,24 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
       const squad = req.query.squad as string | undefined;
       const squadFilter = squad && squad !== 'todos' ? squad : null;
-      
+
       const dataInicio = `${ano}-01-01`;
       const dataFim = `${ano}-12-31 23:59:59`;
-      
+
+      // Normaliza variantes de "Sem Squad" para o label único exibido no frontend.
+      // Evita que contratos com squad vazio (legacy) apareçam como bucket separado
+      // do bucket de órfãos do pipeline de itens.
+      const normalizeSquadLabel = (raw: any): string => {
+        const v = (raw ?? '').toString().trim();
+        if (v === '' || v === 'Sem Squad') return SEM_SQUAD_LABEL;
+        return v;
+      };
+
+      // ──── Receita via caz_vendas_itens (pipeline de itens) ─────────────────
+      // Pipeline que atribui cada item da venda ao contrato/squad certo.
+      // Cobre 100% das parcelas RECEITA QUITADO/RECEBIDO_PARCIAL do ano (Task 11).
+      const receitaItens: ReceitaItemLinha[] = await getReceitaPorItens(ano);
+
       // ──── RECEITAS: Reconciliação cumulativa A3 ────────────────────────────
       // Spec: docs/superpowers/specs/2026-04-10-receitas-pontuais-reconciliacao-design.md
 
@@ -5383,113 +5510,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return isNaN(d.getTime()) ? null : new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()));
       };
 
-      const FALLBACK_DATA_INICIO = new Date(Date.UTC(1900, 0, 1));
-
-      // Query 1: contratos relevantes (sem filtro de ano nem squad — JS aplica)
-      const contratosResult = await db.execute(sql`
-        WITH cnpj_norm AS (
-          SELECT
-            cl.task_id,
-            REPLACE(REPLACE(REPLACE(COALESCE(cl.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo
-          FROM "Clickup".cup_clientes cl
-          WHERE cl.cnpj IS NOT NULL AND TRIM(cl.cnpj) != ''
-        )
-        SELECT
-          cn.cnpj_limpo,
-          ct.id_subtask,
-          COALESCE(NULLIF(TRIM(ct.squad), ''), 'Sem Squad') AS squad,
-          COALESCE(ct.servico, 'Serviço não identificado') AS servico,
-          CASE
-            WHEN COALESCE(ct.valorr::numeric, 0) > 0 THEN 'recorrente'
-            WHEN COALESCE(ct.valorp::numeric, 0) > 0 THEN 'pontual'
-          END AS tipo,
-          GREATEST(COALESCE(ct.valorr::numeric, 0), COALESCE(ct.valorp::numeric, 0)) AS valor,
-          ct.data_inicio,
-          COALESCE(ct.data_solicitacao_encerramento, ct.data_encerramento) AS data_fim,
-          COALESCE(ct.status, '') AS status
-        FROM cnpj_norm cn
-        INNER JOIN "Clickup".cup_contratos ct ON cn.task_id = ct.id_task
-        WHERE (COALESCE(ct.valorr::numeric, 0) > 0 OR COALESCE(ct.valorp::numeric, 0) > 0)
-          AND ct.squad IS NOT NULL AND TRIM(ct.squad) != ''
-      `);
-
-      // Query 2: pagamentos cronológicos (histórico inteiro, todos os clientes)
-      const pagamentosResult = await db.execute(sql`
-        SELECT
-          REPLACE(REPLACE(REPLACE(COALESCE(caz.cnpj, ''), '.', ''), '-', ''), '/', '') AS cnpj_limpo,
-          MAX(caz.nome) AS cliente_nome,
-          TO_CHAR(p.data_quitacao, 'YYYY-MM') AS mes,
-          SUM(p.valor_pago::numeric) AS total_pago_mes
-        FROM "Conta Azul".caz_parcelas p
-        INNER JOIN "Conta Azul".caz_clientes caz ON TRIM(p.id_cliente::text) = TRIM(caz.ids::text)
-        WHERE p.tipo_evento = 'RECEITA'
-          AND p.status = 'QUITADO'
-          AND p.valor_pago::numeric > 0
-          AND caz.cnpj IS NOT NULL AND TRIM(caz.cnpj) != ''
-        GROUP BY cnpj_limpo, TO_CHAR(p.data_quitacao, 'YYYY-MM')
-        ORDER BY cnpj_limpo, mes
-      `);
-
-      // ──── Montar Map<cnpj, ClienteSim> ─────────────────────────────────────
-      const clientesMap = new Map<string, ClienteSim>();
-
-      // Primeiro: criar entrada por cliente a partir dos pagamentos
-      for (const row of pagamentosResult.rows as any[]) {
-        const cnpj = row.cnpj_limpo;
-        if (!cnpj) continue;
-        let cliente = clientesMap.get(cnpj);
-        if (!cliente) {
-          cliente = {
-            cnpj,
-            cliente_nome: row.cliente_nome || 'Cliente não identificado',
-            contratos: [],
-            pagamentos_por_mes: new Map(),
-          };
-          clientesMap.set(cnpj, cliente);
-        }
-        const mes = row.mes as string;
-        const valor = Number(row.total_pago_mes) || 0;
-        cliente.pagamentos_por_mes.set(mes, (cliente.pagamentos_por_mes.get(mes) || 0) + valor);
-      }
-
-      // Depois: anexar contratos a cada cliente que tem pagamentos
-      for (const row of contratosResult.rows as any[]) {
-        const cnpj = row.cnpj_limpo;
-        if (!cnpj) continue;
-        const cliente = clientesMap.get(cnpj);
-        if (!cliente) continue; // cliente sem pagamento — ignorar
-        if (!row.tipo) continue; // contrato sem valor — pulado pela CASE da query
-
-        const dataInicioParsed = parseDbDate(row.data_inicio) || FALLBACK_DATA_INICIO;
-        const dataFimParsed = parseDbDate(row.data_fim);
-
-        const contrato: ContratoSim = {
-          id_subtask: row.id_subtask,
-          cnpj,
-          squad: row.squad || 'Sem Squad',
-          servico: row.servico || 'Serviço não identificado',
-          tipo: row.tipo as 'recorrente' | 'pontual',
-          valor: Number(row.valor) || 0,
-          data_inicio: dataInicioParsed,
-          data_fim: dataFimParsed,
-          status: row.status || '',
-          saldo_devedor: 0,
-          recebido_por_mes: new Map(),
-        };
-        cliente.contratos.push(contrato);
-      }
-
-      // ──── Rodar simulação para cada cliente ─────────────────────────────────
-      const hojeSim = new Date();
-      const mesAtualYYYYMM = `${hojeSim.getUTCFullYear()}-${String(hojeSim.getUTCMonth() + 1).padStart(2, '0')}`;
-
-      for (const cliente of Array.from(clientesMap.values())) {
-        // Cliente sem contratos é ignorado (decisão #6)
-        if (cliente.contratos.length === 0) continue;
-        simulateCliente(cliente, mesAtualYYYYMM);
-      }
-
-      // ──── Agregar resultados em estruturas legacy (mesesMap) ───────────────
+      // ──── Estruturas de dados para agregação ──────────────────────────────
       type ParcelaInfo = {
         id: string | null;
         valor: number;
@@ -5500,6 +5521,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         clienteNome: string;
         servicoNome: string;
         squad: string;
+        causa?: 'match' | 'fallback_maior_valor' | 'cnpj_sem_contrato_clickup' | 'item_nao_casou';
       };
       type ServicoInfo = { valor: number; squad: string; parcelas: ParcelaInfo[] };
       type ClienteInfo = { valorTotal: number; servicos: Map<string, ServicoInfo> };
@@ -5513,65 +5535,59 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const mesesMap = new Map<string, MesData>();
       const squadsSet = new Set<string>();
 
-      // Iterar contratos simulados, somando recebido_por_mes nos meses do ano selecionado
-      for (const cliente of Array.from(clientesMap.values())) {
-        for (const contrato of cliente.contratos) {
-          const sqNorm = contrato.squad;
+      // ──── Populando mesesMap via pipeline de itens ──────────────────────
+      // Órfãos (SEM_SQUAD_LABEL) são mantidos mesmo quando um squad filter é aplicado,
+      // para que fiquem visíveis no dashboard (e o usuário possa agir sobre eles).
+      for (const linha of receitaItens) {
+        const sqNorm = linha.squad;
 
-          if (!matchesSquadFilter(sqNorm)) continue;
+        if (!matchesSquadFilter(sqNorm) && sqNorm !== SEM_SQUAD_LABEL) continue;
 
-          squadsSet.add(sqNorm);
+        squadsSet.add(sqNorm);
 
-          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
-            // Filtrar só meses do ano selecionado
-            if (!mes.startsWith(`${ano}-`)) continue;
-            if (valor <= 0) continue;
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
 
-            if (!mesesMap.has(mes)) {
-              mesesMap.set(mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
-            }
-            const mesData = mesesMap.get(mes)!;
-            mesData.receitaTotal += valor;
-            mesData.totalParcelas += 1;
-
-            const categoriaNome = 'Sem Categoria';
-            if (!mesData.categorias.has(categoriaNome)) {
-              mesData.categorias.set(categoriaNome, {
-                nome: categoriaNome,
-                valorTotal: 0,
-                clientes: new Map(),
-              });
-            }
-            const cat = mesData.categorias.get(categoriaNome)!;
-            cat.valorTotal += valor;
-
-            if (!cat.clientes.has(cliente.cliente_nome)) {
-              cat.clientes.set(cliente.cliente_nome, { valorTotal: 0, servicos: new Map() });
-            }
-            const cli = cat.clientes.get(cliente.cliente_nome)!;
-            cli.valorTotal += valor;
-
-            const chaveServico = `${contrato.servico}|${sqNorm}`;
-            if (!cli.servicos.has(chaveServico)) {
-              cli.servicos.set(chaveServico, { valor: 0, squad: sqNorm, parcelas: [] });
-            }
-            const srv = cli.servicos.get(chaveServico)!;
-            srv.valor += valor;
-            srv.parcelas.push({
-              id: contrato.id_subtask,
-              valor,
-              dataQuitacao: null,
-              linkNfse: null,
-              numNfse: null,
-              urlCobranca: null,
-              clienteNome: cliente.cliente_nome,
-              servicoNome: contrato.servico,
-              squad: sqNorm,
-            });
-          }
+        if (!mesesMap.has(linha.mes)) {
+          mesesMap.set(linha.mes, { categorias: new Map(), receitaTotal: 0, totalParcelas: 0 });
         }
+        const mesData = mesesMap.get(linha.mes)!;
+        mesData.receitaTotal += linha.itemTotal;
+        mesData.totalParcelas += 1;
+
+        const categoriaNome = 'Sem Categoria';
+        if (!mesData.categorias.has(categoriaNome)) {
+          mesData.categorias.set(categoriaNome, { nome: categoriaNome, valorTotal: 0, clientes: new Map() });
+        }
+        const cat = mesData.categorias.get(categoriaNome)!;
+        cat.valorTotal += linha.itemTotal;
+
+        if (!cat.clientes.has(linha.clienteNome)) {
+          cat.clientes.set(linha.clienteNome, { valorTotal: 0, servicos: new Map() });
+        }
+        const cli = cat.clientes.get(linha.clienteNome)!;
+        cli.valorTotal += linha.itemTotal;
+
+        const chaveServico = `${linha.itemRaw}|${sqNorm}`;
+        if (!cli.servicos.has(chaveServico)) {
+          cli.servicos.set(chaveServico, { valor: 0, squad: sqNorm, parcelas: [] });
+        }
+        const srv = cli.servicos.get(chaveServico)!;
+        srv.valor += linha.itemTotal;
+        srv.parcelas.push({
+          id: linha.idSubtask,
+          valor: linha.itemTotal,
+          dataQuitacao: null,
+          linkNfse: null,
+          numNfse: null,
+          urlCobranca: null,
+          clienteNome: linha.clienteNome,
+          servicoNome: linha.itemRaw,
+          squad: sqNorm,
+          causa: linha.causa,
+        });
       }
-      
+
       // Converter para formato de resposta
       const mesesLabels = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
       
@@ -5750,7 +5766,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         if (!salariosPorColab.has(id)) {
           salariosPorColab.set(id, {
             nome: row.colaborador_nome,
-            squad: row.squad || 'Sem Squad',
+            squad: normalizeSquadLabel(row.squad),
             porMes: new Array(12).fill(0),
             total: 0,
           });
@@ -5841,33 +5857,22 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         };
       }
 
-      // ──── Agregar resumo por squad a partir dos contratos simulados ──────
+      // ──── Agregar resumo por squad a partir do pipeline de itens ──────
       const squadSummaryMap = new Map<string, { total: number; porMes: number[]; contratos: Set<string> }>();
-      for (const cliente of Array.from(clientesMap.values())) {
-        for (const contrato of cliente.contratos) {
-          const sq = contrato.squad;
+      for (const linha of receitaItens) {
+        const sq = linha.squad;
+        if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
 
-          if (!matchesSquadFilter(sq)) continue;
-
-          if (!squadSummaryMap.has(sq)) {
-            squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
-          }
-          const entry = squadSummaryMap.get(sq)!;
-
-          let teveValorNoAno = false;
-          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
-            if (!mes.startsWith(`${ano}-`)) continue;
-            if (valor <= 0) continue;
-            const monthIdx = parseInt(mes.split('-')[1]) - 1;
-            entry.total += valor;
-            entry.porMes[monthIdx] += valor;
-            teveValorNoAno = true;
-          }
-
-          if (teveValorNoAno) {
-            entry.contratos.add(`${cliente.cliente_nome}|${contrato.servico}|${sq}`);
-          }
+        if (!squadSummaryMap.has(sq)) {
+          squadSummaryMap.set(sq, { total: 0, porMes: new Array(12).fill(0), contratos: new Set() });
         }
+        const entry = squadSummaryMap.get(sq)!;
+        const monthIdx = parseInt(linha.mes.split('-')[1]) - 1;
+        entry.total += linha.itemTotal;
+        entry.porMes[monthIdx] += linha.itemTotal;
+        entry.contratos.add(`${linha.clienteNome}|${linha.itemRaw}|${sq}`);
       }
 
       const resumoPorSquad = Array.from(squadSummaryMap.entries())
@@ -5951,28 +5956,24 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
       // ──── Detalhes de receita por squad → cliente → mês ─────────────────
       const receitasDetalhesPorSquad: Record<string, { cliente: string; porMes: number[]; total: number }[]> = {};
-      for (const cliente of Array.from(clientesMap.values())) {
-        for (const contrato of cliente.contratos) {
-          const sq = contrato.squad;
-          if (/\bOFF\b/i.test(sq)) continue;
-          if (!matchesSquadFilter(sq)) continue;
+      for (const linha of receitaItens) {
+        const sq = linha.squad;
+        if (/\bOFF\b/i.test(sq)) continue;
+        if (!matchesSquadFilter(sq) && sq !== SEM_SQUAD_LABEL) continue;
+        if (!linha.mes.startsWith(`${ano}-`)) continue;
+        if (linha.itemTotal <= 0) continue;
 
-          for (const [mes, valor] of Array.from(contrato.recebido_por_mes.entries())) {
-            if (!mes.startsWith(`${ano}-`)) continue;
-            if (valor <= 0) continue;
-            const monthIdx = parseInt(mes.split('-')[1]) - 1;
-
-            if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
-            let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === cliente.cliente_nome);
-            if (!entry) {
-              entry = { cliente: cliente.cliente_nome, porMes: new Array(12).fill(0), total: 0 };
-              receitasDetalhesPorSquad[sq].push(entry);
-            }
-            entry.porMes[monthIdx] += valor;
-            entry.total += valor;
-          }
+        const monthIdx = parseInt(linha.mes.split('-')[1]) - 1;
+        if (!receitasDetalhesPorSquad[sq]) receitasDetalhesPorSquad[sq] = [];
+        let entry = receitasDetalhesPorSquad[sq].find(e => e.cliente === linha.clienteNome);
+        if (!entry) {
+          entry = { cliente: linha.clienteNome, porMes: new Array(12).fill(0), total: 0 };
+          receitasDetalhesPorSquad[sq].push(entry);
         }
+        entry.porMes[monthIdx] += linha.itemTotal;
+        entry.total += linha.itemTotal;
       }
+
       // Ordenar clientes por total desc dentro de cada squad
       for (const sq of Object.keys(receitasDetalhesPorSquad)) {
         receitasDetalhesPorSquad[sq].sort((a, b) => b.total - a.total);
@@ -6322,7 +6323,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesStr}::date
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
@@ -6378,7 +6379,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
@@ -6543,7 +6544,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável') as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesStr}::date
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
@@ -6613,7 +6614,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável') as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesAnteriorStr}::date
           AND data_solicitacao_encerramento <= ${fimMesAnteriorStr}::date
@@ -6717,7 +6718,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           END as lt_meses,
           COALESCE(NULLIF(TRIM(c.tipo_negocio), ''), '') as tipo_negocio,
           c.parent_id
-        FROM "Clickup".cup_churn c
+        FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND c.data_solicitacao_encerramento >= ${evolucaoStartStr}::date
@@ -6771,7 +6772,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const evolucaoChurnResult = await db.execute(sql`
         SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           COUNT(*) as churns, COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
@@ -6785,7 +6786,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           COALESCE(NULLIF(TRIM(motivo_cancelamento), ''), 'Sem Motivo') as motivo,
           COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
@@ -7563,6 +7564,28 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
+  // Meta Ads Backfill — detects and fills gaps in the last 14 days
+  app.post("/api/meta-ads/backfill", async (req, res) => {
+    try {
+      const { backfillMetaInsightsGaps } = await import("./services/metaAdsSync");
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        database: process.env.DB_NAME || 'dados_turbo',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
+        ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
+      });
+      const result = await backfillMetaInsightsGaps(pool);
+      await pool.end();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[api] Error running Meta Ads backfill:", error);
+      res.status(500).json({ error: error.message || "Failed to run backfill" });
+    }
+  });
+
   // Meta Ads Sync status (freshness indicator)
   app.get("/api/meta-ads/sync-status", async (req, res) => {
     try {
@@ -7999,14 +8022,32 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
 
+  // Growth — Orçamento por Campanha
+  registerOrcamentoCampanhasRoutes(app, db);
+
+  // Growth — Evolução Temporal (matriz métricas × meses/semanas)
+  registerGrowthTimeseriesRoutes(app, db);
+
+  // YouTube OAuth (autorização dos canais Turbocast/TurboPartners/André/Vitor)
+  registerYoutubeOAuthRoutes(app, db);
+
+  // Google Ads — admin: sync de campanhas + métricas + status
+  registerGoogleAdsAdminRoutes(app);
+
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
+
+  // SDR Assistant Module - registered from separate file
+  registerSdrAssistantRoutes(app, db);
 
   // Capacity Module - registered from separate file
   registerCapacityRoutes(app, db);
 
   // DRE (Demonstrativo de Resultado) - registered from separate file
   registerDRERoutes(app, db, storage);
+
+  // Mix de Receita por Produto (Pontual vs Recorrente)
+  registerMixReceitaRoutes(app, db);
 
   // Metas & Notifications Module - registered from separate file
   await registerMetasRoutes(app, db, storage);
@@ -8046,14 +8087,23 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Inadimplência Module - registered from separate file
   registerInadimplenciaRoutes(app);
 
+  // Saldo Diário Snapshot - registered from separate file
+  registerSaldoDiarioRoutes(app, isAuthenticated, isAdmin);
+
   // GEG (Gestão Estratégica de Gente) - registered from separate file
   registerGEGRoutes(app, db, storage);
 
   // Comercial (Closers, SDRs, Vendas) - registered from separate file
   registerComercialRoutes(app);
 
+  // Cross-Sell Management - registered from separate file
+  registerCrossSellRoutes(app);
+
   // OKR 2026 - registered from separate file
   registerOKR2026Routes(app);
+
+  // Receita Recorrente por Centro de Custo
+  registerReceitaRecorrenteRoutes(app, db, storage);
 
   // Jurídico Module - registered from separate file
   registerJuridicoRoutes(app);
@@ -8070,6 +8120,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Favorites Module - registered from separate file
   registerFavoritesRoutes(app);
 
+  // UTM Builder - registered from separate file
+  registerUtmRoutes(app);
+
   // BP Produtos Module
   registerBpProdutosRoutes(app);
 
@@ -8079,8 +8132,14 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Negativação Module
   registerNegativacaoRoutes(app, db);
 
+  // Triagem Inteligente Module
+  registerTriagemRoutes(app, db);
+
   // Predictions Module - Análise Preditiva
   registerPredictionRoutes(app);
+
+  // Treinamentos Internos Module - registered from separate file
+  registerInternalTrainingsRoutes(app);
 
   // ============================================
   // Sugestões API
@@ -9863,30 +9922,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         }
       }
       
-      // Buscar próximos eventos (próximos 30 dias)
-      const hoje = new Date();
-      const em30Dias = new Date();
-      em30Dias.setDate(em30Dias.getDate() + 30);
-      
-      const eventosQuery = await db.execute(sql`
-        SELECT id, titulo, tipo, data_inicio, data_fim, local, cor
-        FROM cortex_core.turbo_eventos
-        WHERE data_inicio >= ${hoje.toISOString()}
-          AND data_inicio <= ${em30Dias.toISOString()}
-        ORDER BY data_inicio ASC
-        LIMIT 5
-      `);
-      
-      const proximosEventos = eventosQuery.rows.map((row: any) => ({
-        id: row.id,
-        titulo: row.titulo,
-        tipo: row.tipo,
-        dataInicio: row.data_inicio,
-        dataFim: row.data_fim,
-        local: row.local,
-        cor: row.cor,
-      }));
-      
       // Buscar alertas e pendências (com tratamento de erro para tabelas que podem não existir)
       let alertasRows: any[] = [];
       let contratosVencendoRows: any[] = [];
@@ -9998,7 +10033,6 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         mrrVariacao,
         ticketMedioVariacao,
         clientes: meusClientes,
-        proximosEventos,
         alertas,
       });
     } catch (error) {
@@ -11777,6 +11811,35 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
   
+  app.get("/api/unavailability-requests/today", isAuthenticated, async (req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          ur.id,
+          ur.colaborador_nome,
+          ur.colaborador_email,
+          ur.data_fim
+        FROM cortex_core.unavailability_requests ur
+        WHERE ur.status_rh = 'aprovado'
+          AND ur.status_lider = 'aprovado'
+          AND CURRENT_DATE BETWEEN ur.data_inicio AND ur.data_fim
+        ORDER BY ur.colaborador_nome ASC
+      `);
+
+      const items = result.rows.map((row: any) => ({
+        id: row.id,
+        nome: row.colaborador_nome,
+        email: row.colaborador_email,
+        dataFim: row.data_fim,
+      }));
+
+      res.json(items);
+    } catch (error: any) {
+      console.error("[unavailability-today] Error fetching today list:", error);
+      res.json([]);
+    }
+  });
+
   app.get("/api/unavailability-requests", isAuthenticated, async (req, res) => {
     try {
       const { status, colaboradorId, squadNome } = req.query;
