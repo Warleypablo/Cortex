@@ -1,5 +1,69 @@
 # Handoff — Feature "Subir Campanhas no Meta Ads"
 
+---
+
+## 👉 COMECE AQUI — onboarding do estagiário (atualizado 2026-06-03)
+
+> Esta seção é o resumo do estado ATUAL da branch. O resto do documento (abaixo) é
+> a referência técnica detalhada da feature — leia depois, conforme precisar.
+
+### O que é esta feature
+Permitir criar **campanha + conjunto + anúncios em PAUSED** no Meta Ads direto pelo Cortex,
+a partir de um briefing curto + uma pasta do Google Drive com os criativos. Tudo nasce
+PAUSED pra revisão manual no Gerenciador antes de ativar. **Seu foco é só isso** (criação) —
+a parte de "otimização / agente gestor" foi separada pra outra branch e não é seu escopo.
+
+### Estado da branch agora
+- A branch `feature/criar-campanhas-meta-ads` já está **alinhada com a `main`** (merge feito em 2026-06-03, commit `58dd1ca1`). Você continua a partir daqui.
+- O trabalho desta feature vivia só em `git stash` (nunca tinha sido commitado). Foi restaurado, separado da otimização, commitado e mergeado com a main nesta sessão.
+- **A camada de otimização foi REMOVIDA daqui** (foi pra branch `feature/agente-gestor-meta-ads`). Esta branch é criação pura.
+
+### ⚠️ Antes de mexer em qualquer coisa — 2 verificações
+1. **Buildar/rodar.** O merge foi resolvido manualmente e **NÃO foi rodado typecheck nem build** (foi feito num worktree sem `node_modules`). Então seu **primeiro passo**:
+   ```bash
+   npm install        # package.json mudou (heic-convert)
+   npm run dev        # confirmar que compila e sobe (porta 3000)
+   ```
+   Se der erro de tipo/import, conserta antes de seguir — provavelmente algum ajuste pequeno de import por causa do merge.
+2. **Variáveis de ambiente + migrations** (ver seções detalhadas abaixo). Em local já estavam preenchidas; confirma com `grep META_DEFAULT .env` e roda as migrations idempotentes:
+   ```bash
+   npx tsx scripts/create-meta-creation-drafts-table.ts
+   npx tsx scripts/create-creatives-library-table.ts
+   npx tsx scripts/grant-creatives-library.ts
+   ```
+
+### 🎯 Sua tarefa nº 1 (o bloqueador real): validar END-TO-END
+**Nunca foi subida uma campanha de verdade de ponta a ponta.** Esse é o teste que falta.
+1. Sobe o app, loga como aprovador (`ferramentas@turbopartners.com.br`, `vinicius.ichino@turbopartners.com.br` ou `warleyreserva4@gmail.com`).
+2. Vai na página **Criativos** → botão **"Subir nova campanha"** (canto da toolbar, ao lado do ícone de config).
+3. Preenche o briefing, cola uma pasta de teste do Drive, clica "Criar em PAUSED no Meta".
+4. Confere no Gerenciador de Anúncios se a campanha+conjunto+anúncios apareceram em PAUSED.
+5. **Apaga a campanha de teste no Gerenciador depois** (pra não acumular órfãs).
+- Pré-requisito: a pasta do Drive (e o Sheet, se usar) precisa estar compartilhada com a Service Account `report-job-sa@auto-report-turbo.iam.gserviceaccount.com`.
+
+### Onde está o código (mapa rápido)
+- **Backend criação:** `server/services/adsCreation/` (orquestra tudo via Batch API), rotas em `server/routes/ads-creation.ts`.
+- **Biblioteca de criativos:** `server/routes/creatives.ts` + página `client/src/pages/CriativosBiblioteca.tsx` (rota `/growth/criativos/biblioteca`).
+- **UI de subir campanha:** `client/src/components/criativos/criar-campanha/NovaCampanhaSheet.tsx` (aberto pelo botão em `client/src/pages/Criativos.tsx`).
+- **Tabelas:** `meta_creation_drafts` e `creatives_library` (em `shared/schema.ts`).
+
+### Decisões tomadas no merge (pra você não se assustar)
+- A página **Criativos** (de analytics) ficou na versão da **main** (design "flat"). Um redesign em árvore que existia no WIP antigo foi **descartado** no merge (dependia de um modelo de dados de vídeo que a main não usa mais). Não procure por ele.
+- Existiam controles manuais de pausar/ativar anúncio na tabela que dependiam da otimização — **não vieram** pra esta branch. Se precisar deles, é decisão separada (pegar da branch do agente-gestor).
+
+### Pendências de refino (DEPOIS do E2E passar — alinhar com o Ichino antes)
+1. Agrupar posicionamentos no nome do conjunto em **Feed / Reels / Stories**.
+2. **Abreviar** o nome do público no nome do conjunto (regra ainda a definir).
+3. Apagar `server/services/adsCreation/sheetReader.ts` (sem referências, espera só o E2E).
+4. Escala: a conta Meta está em tier "Development" → pode bater rate limit. App Review eleva (processo de semanas, é burocracia, não código).
+
+### Como pedir ajuda
+Fala com o Ichino (`ferramentas@turbopartners.com.br`). Ele tem pouca experiência com dev,
+então explique as coisas técnicas de forma simples. **Sempre peça permissão antes de
+commitar/pushar.**
+
+---
+
 **Branch:** `feature/criar-campanhas-meta-ads`
 **Derivada de:** `feature/otimizacao-de-ads`
 **Estratégia de merge:** ambas vão num **único PR pra `main`** (não mergear separado).
