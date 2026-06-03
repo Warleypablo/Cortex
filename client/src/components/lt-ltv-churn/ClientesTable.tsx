@@ -59,7 +59,9 @@ export function ClientesTable({ produto, status }: { produto?: string; status?: 
       });
       if (!res.ok) throw new Error("falha ao salvar tier");
     },
+    onMutate: () => setMsg(""),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/lt-ltv-churn/clientes"] }),
+    onError: () => setMsg("Erro ao salvar o tier — tente novamente"),
   });
 
   const aplicarMut = useMutation({
@@ -68,10 +70,12 @@ export function ClientesTable({ produto, status }: { produto?: string; status?: 
       if (!res.ok) throw new Error("falha ao aplicar");
       return (await res.json()) as { atualizados: number };
     },
+    onMutate: () => setMsg(""),
     onSuccess: (d) => {
       setMsg(`${d.atualizados} clientes atualizados`);
       qc.invalidateQueries({ queryKey: ["/api/lt-ltv-churn/clientes"] });
     },
+    onError: () => setMsg("Erro ao aplicar — tente novamente"),
   });
 
   function toggleSort(col: string) {
