@@ -29,7 +29,7 @@ Decisões do brainstorming:
 |---|---|
 | **Tier** | `cup_clientes.cluster` ∈ {"1","2","3","4"} (NFNC, Regulares, Chaves, Imperdíveis) |
 | **MRR ativo do cliente** | `SUM(valorr) FILTER (WHERE tipo_receita='recorrente' AND status IN ('ativo','onboarding','triagem'))` por `id_task` |
-| **Tier sugerido (auto)** | `mrr ≥ 5000 → "4"` · `3000–4999 → "3"` · `1500–2999 → "2"` · `< 1500 ou sem MRR (cancelado) → "1"` |
+| **Tier sugerido (auto)** | `mrr ≥ 7000 → "4"` · `4000–6999 → "3"` · `2000–3999 → "2"` · `< 2000 ou sem MRR (cancelado) → "1"` |
 | **Override manual** | `cup_clientes.cluster_manual = true` — o "aplicar automático" NÃO sobrescreve estes |
 
 A ordem de valor dos clusters é crescente: NFNC(1) < Regulares(2) < Chaves(3) < Imperdíveis(4).
@@ -52,8 +52,8 @@ Aplicar no banco de produção E no local (ver [[reference_databases]]). Idempot
 - **`POST /api/lt-ltv-churn/clientes/aplicar-tiers-auto`** — UPDATE set-based: para cada `id_task` com `COALESCE(cluster_manual,false)=false`, seta `cluster` pela faixa de MRR (CASE). Retorna `{ atualizados: n }`. SQL:
   ```sql
   UPDATE "Clickup".cup_clientes cc SET cluster = CASE
-      WHEN m.mrr >= 5000 THEN '4' WHEN m.mrr >= 3000 THEN '3'
-      WHEN m.mrr >= 1500 THEN '2' ELSE '1' END
+      WHEN m.mrr >= 7000 THEN '4' WHEN m.mrr >= 4000 THEN '3'
+      WHEN m.mrr >= 2000 THEN '2' ELSE '1' END
   FROM (SELECT id_task, SUM(valorr) FILTER (WHERE tipo_receita='recorrente'
           AND status IN ('ativo','onboarding','triagem')) mrr
         FROM cortex_core.vw_lt_contratos GROUP BY id_task) m
@@ -90,7 +90,7 @@ Reusa `CLUSTER_OPTIONS`/`CLUSTER_MAP` de `@shared/constants`. React Query.
 
 - Helper `sugerirTier`: faixas de MRR (boundaries 1499/1500/2999/3000/4999/5000, null → "1").
 - Endpoints com mock de `db.execute`: `/clientes` retorna cluster+clusterSugerido; PATCH valida cluster e seta manual; aplicar-auto retorna contagem; 500 em erro.
-- Sanidade: faixas batem com a distribuição (Imperdíveis ~58, Chaves ~47, Regulares ~98 dos ativos).
+- Sanidade: faixas batem com a distribuição (Imperdíveis ~33, Chaves ~41, Regulares ~105 dos ativos).
 
 ## 8. Próximos passos
 
