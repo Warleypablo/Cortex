@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { revenueChurnPct, resolveClienteSort, sugerirTier } from "./ltLtvChurn.helpers";
+import { revenueChurnPct, resolveClienteSort } from "./ltLtvChurn.helpers";
 
 describe("revenueChurnPct", () => {
   it("calcula percentual com 1 casa decimal", () => {
@@ -25,22 +25,5 @@ describe("resolveClienteSort", () => {
   });
   it("nunca retorna entrada não-whitelisted (anti-injection)", () => {
     expect(resolveClienteSort("ltv_total; DROP TABLE", "asc").col).toBe("ltv_total");
-  });
-});
-
-describe("sugerirTier", () => {
-  it("classifica por faixa de MRR (NFNC/Regulares/Chaves/Imperdíveis)", () => {
-    expect(sugerirTier(0)).toBe("1");
-    expect(sugerirTier(1999)).toBe("1");
-    expect(sugerirTier(2000)).toBe("2");
-    expect(sugerirTier(3999)).toBe("2");
-    expect(sugerirTier(4000)).toBe("3");
-    expect(sugerirTier(6999)).toBe("3");
-    expect(sugerirTier(7000)).toBe("4");
-    expect(sugerirTier(30000)).toBe("4");
-  });
-  it("trata null/undefined como NFNC (cliente sem MRR ativo)", () => {
-    expect(sugerirTier(null)).toBe("1");
-    expect(sugerirTier(undefined)).toBe("1");
   });
 });
