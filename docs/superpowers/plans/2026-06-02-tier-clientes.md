@@ -73,12 +73,12 @@ Append to `server/routes/ltLtvChurn.helpers.test.ts` (add `sugerirTier` to the e
 describe("sugerirTier", () => {
   it("classifica por faixa de MRR (NFNC/Regulares/Chaves/Imperdíveis)", () => {
     expect(sugerirTier(0)).toBe("1");
-    expect(sugerirTier(1499)).toBe("1");
-    expect(sugerirTier(1500)).toBe("2");
-    expect(sugerirTier(2999)).toBe("2");
-    expect(sugerirTier(3000)).toBe("3");
-    expect(sugerirTier(4999)).toBe("3");
-    expect(sugerirTier(5000)).toBe("4");
+    expect(sugerirTier(1999)).toBe("1");
+    expect(sugerirTier(2000)).toBe("2");
+    expect(sugerirTier(3999)).toBe("2");
+    expect(sugerirTier(4000)).toBe("3");
+    expect(sugerirTier(6999)).toBe("3");
+    expect(sugerirTier(7000)).toBe("4");
     expect(sugerirTier(30000)).toBe("4");
   });
   it("trata null/undefined como NFNC (cliente sem MRR ativo)", () => {
@@ -105,9 +105,9 @@ Append to `server/routes/ltLtvChurn.helpers.ts`:
 ```ts
 /** Sugere o tier (cluster "1".."4") a partir do MRR ativo do cliente. */
 export function sugerirTier(mrr: number | null | undefined): "1" | "2" | "3" | "4" {
-  if (!mrr || mrr < 1500) return "1"; // NFNC
-  if (mrr < 3000) return "2"; // Regulares
-  if (mrr < 5000) return "3"; // Chaves
+  if (!mrr || mrr < 2000) return "1"; // NFNC
+  if (mrr < 4000) return "2"; // Regulares
+  if (mrr < 7000) return "3"; // Chaves
   return "4"; // Imperdíveis
 }
 ```
@@ -144,14 +144,14 @@ First, update the existing test inside `describe("GET /api/lt-ltv-churn/clientes
     mockExecute.mockResolvedValueOnce({
       rows: [{ id_task: "t1", nome_cliente: "Cliente X", n_contratos_rec: 2,
         ltv_recorrente: 13000, ltv_pontual: 5000, ltv_total: 18000,
-        lt_meses: 6.6, ativo: true, mrr_ativo: 6000, cluster: null, cluster_manual: false }],
+        lt_meses: 6.6, ativo: true, mrr_ativo: 8000, cluster: null, cluster_manual: false }],
     });
     const res = await request(makeApp()).get("/api/lt-ltv-churn/clientes");
     expect(res.status).toBe(200);
     expect(res.body.clientes[0].ltvTotal).toBe(18000);
-    expect(res.body.clientes[0].mrrAtivo).toBe(6000);
+    expect(res.body.clientes[0].mrrAtivo).toBe(8000);
     expect(res.body.clientes[0].cluster).toBeNull();
-    expect(res.body.clientes[0].clusterSugerido).toBe("4"); // 6000 >= 5000 → Imperdíveis
+    expect(res.body.clientes[0].clusterSugerido).toBe("4"); // 8000 >= 7000 → Imperdíveis
   });
 ```
 
@@ -284,9 +284,9 @@ Immediately after the `/clientes` handler closes (after its `});`), add:
       const r = await db.execute(sql`
         WITH upd AS (
           UPDATE "Clickup".cup_clientes cc SET cluster = CASE
-              WHEN m.mrr >= 5000 THEN '4'
-              WHEN m.mrr >= 3000 THEN '3'
-              WHEN m.mrr >= 1500 THEN '2'
+              WHEN m.mrr >= 7000 THEN '4'
+              WHEN m.mrr >= 4000 THEN '3'
+              WHEN m.mrr >= 2000 THEN '2'
               ELSE '1' END
           FROM (
             SELECT id_task, SUM(valorr) FILTER (WHERE tipo_receita='recorrente'
