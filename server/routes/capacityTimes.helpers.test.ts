@@ -82,11 +82,13 @@ describe("buildResponse", () => {
     expect(mari.util_pct).toBe(utilPct(17, 20));
   });
 
-  it("comercial calcula diferenças e utilização por MRR", () => {
+  it("comercial calcula diferenças, utilização por MRR e quebra por status", () => {
     const g = buildResponse(rows).vendedor[0];
     expect(g.dif_mrr).toBe(107510 - 43004);
     expect(g.dif_contas).toBe(30 - 12);
     expect(g.util_pct).toBe(utilPct(43004, 107510));
+    expect(g.mrr_ativo).toBe(43004);
+    expect(g.mrr_cancelamento).toBe(0);
   });
 });
 
