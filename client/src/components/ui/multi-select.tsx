@@ -12,9 +12,9 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 
-type OptionItem = string | { value: string; label: string };
+type OptionItem = string | { value: string; label: string; badge?: string };
 
-function normalizeOption(opt: OptionItem): { value: string; label: string } {
+function normalizeOption(opt: OptionItem): { value: string; label: string; badge?: string } {
   return typeof opt === 'string' ? { value: opt, label: opt } : opt;
 }
 
@@ -167,13 +167,18 @@ export function MultiSelect({
                       onCheckedChange={() => handleToggle(opt.value)}
                     />
                     <span
-                      className="flex-1 text-sm"
+                      className="flex-1 text-sm inline-flex items-center gap-1.5"
                       onClick={(e) => {
                         e.stopPropagation();
                         handleToggle(opt.value);
                       }}
                     >
-                      {opt.label}
+                      <span>{opt.label}</span>
+                      {opt.badge && (
+                        <span className="text-[10px] font-normal text-amber-700 dark:text-amber-400 px-1.5 py-0.5 rounded bg-amber-100 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-900/60">
+                          {opt.badge}
+                        </span>
+                      )}
                     </span>
                   </div>
                 ))}

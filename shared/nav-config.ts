@@ -32,6 +32,7 @@ export const PERMISSION_KEYS = {
     DRE: 'fin.dre',
     NOTAS_FISCAIS: 'fin.notas_fiscais',
     RECEITA_RECORRENTE: 'fin.receita_recorrente',
+    MIX_RECEITA: 'fin.mix_receita',
   },
   // Gestão (antigo Operação)
   GESTAO: {
@@ -45,6 +46,7 @@ export const PERMISSION_KEYS = {
     BP_PRODUTOS: 'gestao.bp_produtos',
     CAPACITY: 'gestao.capacity',
     ANALISE_PREDITIVA: 'gestao.analise_preditiva',
+    TV_LEADERBOARD: 'gestao.tv_leaderboard',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -84,6 +86,8 @@ export const PERMISSION_KEYS = {
     FUNIL_CONVERSAO: 'growth.funil_conversao',
     INSTAGRAM: 'growth.instagram',
     PLANEJAMENTO_METAS: 'growth.planejamento_metas',
+    UTM_BUILDER: 'growth.utm_builder',
+    GHL_MARKETING: 'growth.ghl_marketing',
   },
   // G&G (Pessoas)
   GG: {
@@ -221,12 +225,14 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/notas-fiscais': PERMISSION_KEYS.FIN.NOTAS_FISCAIS,
   '/financeiro/negativacao': PERMISSION_KEYS.FIN.INADIMPLENCIA,
   '/financeiro/receita-recorrente': PERMISSION_KEYS.FIN.RECEITA_RECORRENTE,
+  '/financeiro/mix-receita': PERMISSION_KEYS.FIN.MIX_RECEITA,
   // Gestão
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
   '/dashboard/churn-predicao': PERMISSION_KEYS.GESTAO.CHURN_PREDICAO,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
+  '/gestao/tv-leaderboard': PERMISSION_KEYS.GESTAO.TV_LEADERBOARD,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
   '/triagem': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
@@ -266,6 +272,8 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/keyword-performance': PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE,
   '/growth/funil-conversao': PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO,
   '/growth/instagram': PERMISSION_KEYS.GROWTH.INSTAGRAM,
+  '/utm-builder': PERMISSION_KEYS.GROWTH.UTM_BUILDER,
+  '/ghl-marketing': PERMISSION_KEYS.GROWTH.GHL_MARKETING,
   // G&G
   '/dashboard/geg': PERMISSION_KEYS.GG.VISAO_GERAL,
   '/dashboard/recrutamento': PERMISSION_KEYS.GG.RECRUTAMENTO,
@@ -435,6 +443,7 @@ export const NAV_CONFIG = {
         { title: 'Notas Fiscais', url: '/dashboard/notas-fiscais', icon: 'FileText', permissionKey: PERMISSION_KEYS.FIN.NOTAS_FISCAIS },
         { title: 'Negativacao', url: '/financeiro/negativacao', icon: 'Scale', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },
         { title: 'Receita Recorrente', url: '/financeiro/receita-recorrente', icon: 'Repeat', permissionKey: PERMISSION_KEYS.FIN.RECEITA_RECORRENTE },
+        { title: 'Mix de Receita', url: '/financeiro/mix-receita', icon: 'PieChart', permissionKey: PERMISSION_KEYS.FIN.MIX_RECEITA },
       ],
     },
     {
@@ -448,6 +457,7 @@ export const NAV_CONFIG = {
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
         { title: 'Triagem Inteligente', url: '/triagem', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
+        { title: 'TV Leaderboard', url: '/gestao/tv-leaderboard', icon: 'Tv', permissionKey: PERMISSION_KEYS.GESTAO.TV_LEADERBOARD },
       ],
     },
     {
@@ -480,6 +490,8 @@ export const NAV_CONFIG = {
         { title: 'Planejamento de Metas', url: '/growth/planejamento-metas', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.GROWTH.PLANEJAMENTO_METAS },
         { title: 'Growth AI', url: '/growth/ai', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
         { title: 'Instagram', url: '/growth/instagram', icon: 'Instagram', permissionKey: PERMISSION_KEYS.GROWTH.INSTAGRAM },
+        { title: 'Gerador de UTMs', url: '/utm-builder', icon: 'Link2', permissionKey: PERMISSION_KEYS.GROWTH.UTM_BUILDER },
+        { title: 'CRM Marketing', url: '/ghl-marketing', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.GROWTH.GHL_MARKETING },
       ],
     },
     {

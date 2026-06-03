@@ -23,8 +23,11 @@ import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
+import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
+import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
+import { registerMixReceitaRoutes } from "./routes/mixReceita";
 import { registerMetasRoutes } from "./routes/metas";
 import { registerContratosRoutes } from "./routes/contratos";
 import { registerTechRoutes } from "./routes/tech";
@@ -33,11 +36,13 @@ import { registerRelatorioMensalRoutes } from "./routes/relatorioMensal";
 import { registerRelatorioMensalSlidesRoutes } from "./routes/relatorioMensalSlides";
 import { registerChatRoutes } from "./routes/chat";
 import { registerChamadosRoutes } from "./routes/chamados";
+import { registerFcaRoutes } from "./routes/fca";
 import { registerTurboZapRoutes, initTurboZapTables } from "./routes/turbozap";
 import { registerJuridicoAssistenteRoutes } from "./routes/juridico-assistente";
 import { registerIaHubRoutes } from "./routes/ia-hub";
 import { registerJuridicoRelatoriosRoutes } from "./routes/juridico-relatorios";
 import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
+import { registerSaldoDiarioRoutes } from "./routes/saldoDiario";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
 import { registerCrossSellRoutes } from "./routes/crosssell";
@@ -53,9 +58,11 @@ import { registerCreativesRoutes } from "./routes/creatives";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
+import { registerUtmRoutes } from "./routes/utm";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerGhlPublicRoutes, registerGhlApiRoutes } from "./routes/ghl";
 import { registerNegativacaoRoutes } from "./routes/negativacao";
 import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
@@ -439,7 +446,16 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Instagram Module (before isAuthenticated — OAuth routes need to be accessible)
   registerInstagramRoutes(app, db, storage);
 
+  // FCA Report — auth via bearer token (não usa sessão)
+  registerFcaRoutes(app);
+
+  // GHL webhook (público — chamado pelo GHL quando eventos de email/WA acontecem)
+  registerGhlPublicRoutes(app);
+
   app.use("/api", isAuthenticated);
+
+  // GHL APIs internas (sob /api → autenticadas pelo isAuthenticated acima)
+  registerGhlApiRoutes(app);
 
   app.get("/api/debug/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
@@ -2166,7 +2182,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           responsavel_geral as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
@@ -2207,6 +2223,84 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error fetching evolução mensal:", error);
       res.status(500).json({ error: "Failed to fetch evolução mensal" });
+    }
+  });
+
+  // Endpoint leve dedicado ao TV Leaderboard de Gestão.
+  // Retorna por operador (responsavel_geral): MRR ativo atual, MRR no início do
+  // mês atual (snapshot), MRR no início do mês anterior, e churn acumulado 3m.
+  // Squads internos excluídos.
+  app.get("/api/tv-leaderboard/operadores", async (req, res) => {
+    try {
+      const SQUADS_EXCLUIDOS_LIST = sql`('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')`;
+
+      const result = await db.execute(sql`
+        WITH atual AS (
+          SELECT responsavel, squad, SUM(valorr) AS mrr
+          FROM "Clickup".cup_contratos
+          WHERE status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel IS NOT NULL
+          GROUP BY responsavel, squad
+        ),
+        snap_inicio_mes_atual AS (
+          SELECT responsavel, squad, SUM(valorr) AS mrr
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot = DATE_TRUNC('month', CURRENT_DATE)::date
+            AND status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel IS NOT NULL
+          GROUP BY responsavel, squad
+        ),
+        snap_inicio_mes_anterior AS (
+          SELECT responsavel, squad, SUM(valorr) AS mrr
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot = DATE_TRUNC('month', CURRENT_DATE - INTERVAL '1 month')::date
+            AND status IN ('ativo', 'onboarding', 'triagem')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel IS NOT NULL
+          GROUP BY responsavel, squad
+        ),
+        churn_3m AS (
+          SELECT responsavel_geral AS responsavel, squad, SUM(valor_r) AS total
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE data_solicitacao_encerramento >= DATE_TRUNC('month', CURRENT_DATE - INTERVAL '2 months')
+            AND valor_r > 0
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+            AND squad NOT IN ${SQUADS_EXCLUIDOS_LIST}
+            AND responsavel_geral IS NOT NULL
+          GROUP BY responsavel_geral, squad
+        )
+        SELECT
+          COALESCE(a.responsavel, sa.responsavel, sb.responsavel, c.responsavel) AS responsavel,
+          COALESCE(a.squad, sa.squad, sb.squad, c.squad) AS squad,
+          COALESCE(a.mrr, 0) AS mrr_atual,
+          COALESCE(sa.mrr, 0) AS mrr_mes_atual_inicio,
+          COALESCE(sb.mrr, 0) AS mrr_mes_anterior_inicio,
+          COALESCE(c.total, 0) AS churn_3m
+        FROM atual a
+        FULL OUTER JOIN snap_inicio_mes_atual sa
+          ON LOWER(TRIM(a.responsavel)) = LOWER(TRIM(sa.responsavel))
+        FULL OUTER JOIN snap_inicio_mes_anterior sb
+          ON LOWER(TRIM(COALESCE(a.responsavel, sa.responsavel))) = LOWER(TRIM(sb.responsavel))
+        FULL OUTER JOIN churn_3m c
+          ON LOWER(TRIM(COALESCE(a.responsavel, sa.responsavel, sb.responsavel))) = LOWER(TRIM(c.responsavel))
+      `);
+
+      const operadores = result.rows.map((r: any) => ({
+        responsavel: String(r.responsavel ?? '').trim(),
+        squad: String(r.squad ?? '').trim(),
+        mrrAtual: Number(r.mrr_atual) || 0,
+        mrrMesAtualInicio: Number(r.mrr_mes_atual_inicio) || 0,
+        mrrMesAnteriorInicio: Number(r.mrr_mes_anterior_inicio) || 0,
+        churn3m: Number(r.churn_3m) || 0,
+      }));
+
+      res.json({ operadores });
+    } catch (error) {
+      console.error("[api] Error fetching tv-leaderboard/operadores:", error);
+      res.status(500).json({ error: "Failed to fetch tv-leaderboard operadores" });
     }
   });
 
@@ -2275,7 +2369,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
           responsavel_geral as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
@@ -4614,7 +4708,7 @@ Estruture sua resposta em:
           c.evitabilidade_churn,
           c.reteve,
           c.abonar_churn
-        FROM "Clickup".cup_churn c
+        FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND ${dateFilter}
@@ -4947,7 +5041,7 @@ Estruture sua resposta em:
           'Q' || EXTRACT(QUARTER FROM ultimo_dia_operacao)::int || ' ' || EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS label,
           COUNT(*) AS total_churns,
           SUM(COALESCE(valor_r, 0)) AS valor_total
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE ultimo_dia_operacao IS NOT NULL
           AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
@@ -4963,7 +5057,7 @@ Estruture sua resposta em:
       // = ativos atuais + tudo que churou DEPOIS do início desse trimestre
       const mrrAtualResult = await db.execute(sql`
         SELECT squad, SUM(COALESCE(valor_r, 0)) AS mrr_ativo
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE squad IS NOT NULL AND status = 'ativo' AND valor_r > 0
         GROUP BY squad
       `);
@@ -4976,7 +5070,7 @@ Estruture sua resposta em:
           EXTRACT(YEAR FROM ultimo_dia_operacao)::int AS ano,
           EXTRACT(QUARTER FROM ultimo_dia_operacao)::int AS trimestre,
           SUM(COALESCE(valor_r, 0)) AS valor_churn_posterior
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE ultimo_dia_operacao IS NOT NULL AND squad IS NOT NULL
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND valor_r > 0
@@ -5049,7 +5143,7 @@ Estruture sua resposta em:
           ultimo_dia_operacao,
           EXTRACT(MONTH FROM ultimo_dia_operacao)::int AS mes,
           TO_CHAR(ultimo_dia_operacao, 'Mon') AS mes_label
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE squad = ${squad}
           AND status IN ('cancelado/inativo', 'em cancelamento')
           AND ultimo_dia_operacao IS NOT NULL
@@ -6231,7 +6325,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesStr}::date
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
@@ -6287,7 +6381,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
@@ -6452,7 +6546,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável') as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesStr}::date
           AND data_solicitacao_encerramento <= ${fimMesStr}::date
@@ -6522,7 +6616,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           COALESCE(NULLIF(TRIM(responsavel_geral), ''), 'Sem Responsável') as responsavel,
           COUNT(*) as churns,
           COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${inicioMesAnteriorStr}::date
           AND data_solicitacao_encerramento <= ${fimMesAnteriorStr}::date
@@ -6626,7 +6720,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
           END as lt_meses,
           COALESCE(NULLIF(TRIM(c.tipo_negocio), ''), '') as tipo_negocio,
           c.parent_id
-        FROM "Clickup".cup_churn c
+        FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND c.data_solicitacao_encerramento >= ${evolucaoStartStr}::date
@@ -6680,7 +6774,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const evolucaoChurnResult = await db.execute(sql`
         SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           COUNT(*) as churns, COALESCE(SUM(valor_r), 0)::numeric as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
@@ -6694,7 +6788,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
           COALESCE(NULLIF(TRIM(motivo_cancelamento), ''), 'Sem Motivo') as motivo,
           COALESCE(SUM(valor_r::numeric), 0) as mrr_churn
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${evolucaoStartStr}::date
           AND COALESCE(abonar_churn, '') != 'Sim'
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
@@ -7472,6 +7566,28 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
     }
   });
 
+  // Meta Ads Backfill — detects and fills gaps in the last 14 days
+  app.post("/api/meta-ads/backfill", async (req, res) => {
+    try {
+      const { backfillMetaInsightsGaps } = await import("./services/metaAdsSync");
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        database: process.env.DB_NAME || 'dados_turbo',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
+        ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
+      });
+      const result = await backfillMetaInsightsGaps(pool);
+      await pool.end();
+      res.json(result);
+    } catch (error: any) {
+      console.error("[api] Error running Meta Ads backfill:", error);
+      res.status(500).json({ error: error.message || "Failed to run backfill" });
+    }
+  });
+
   // Meta Ads Sync status (freshness indicator)
   app.get("/api/meta-ads/sync-status", async (req, res) => {
     try {
@@ -7914,6 +8030,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Growth — Evolução Temporal (matriz métricas × meses/semanas)
   registerGrowthTimeseriesRoutes(app, db);
 
+  // YouTube OAuth (autorização dos canais Turbocast/TurboPartners/André/Vitor)
+  registerYoutubeOAuthRoutes(app, db);
+
+  // Google Ads — admin: sync de campanhas + métricas + status
+  registerGoogleAdsAdminRoutes(app);
+
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
 
@@ -7931,6 +8053,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // DRE (Demonstrativo de Resultado) - registered from separate file
   registerDRERoutes(app, db, storage);
+
+  // Mix de Receita por Produto (Pontual vs Recorrente)
+  registerMixReceitaRoutes(app, db);
 
   // Metas & Notifications Module - registered from separate file
   await registerMetasRoutes(app, db, storage);
@@ -7970,6 +8095,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Inadimplência Module - registered from separate file
   registerInadimplenciaRoutes(app);
 
+  // Saldo Diário Snapshot - registered from separate file
+  registerSaldoDiarioRoutes(app, isAuthenticated, isAdmin);
+
   // GEG (Gestão Estratégica de Gente) - registered from separate file
   registerGEGRoutes(app, db, storage);
 
@@ -7999,6 +8127,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Favorites Module - registered from separate file
   registerFavoritesRoutes(app);
+
+  // UTM Builder - registered from separate file
+  registerUtmRoutes(app);
 
   // BP Produtos Module
   registerBpProdutosRoutes(app);

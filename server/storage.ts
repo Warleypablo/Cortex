@@ -228,7 +228,7 @@ export interface IStorage {
   getGegCustoPorSetor(squad: string, setor: string, nivel: string, cargo: string): Promise<{ setor: string; custoTotal: number; totalColaboradores: number }[]>;
   getInadimplenciaContextos(clienteIds: string[]): Promise<Record<string, { contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null }>>;
   getInadimplenciaContexto(clienteId: string): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null; contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null; tipoInadimplencia: string | null } | null>;
-  upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
+  upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string | null; evidencias?: string | null; acao?: string | null; statusFinanceiro?: string | null; detalheFinanceiro?: string | null; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }>;
   upsertContextoJuridico(data: { clienteId: string; contextoJuridico?: string; procedimentoJuridico?: string; statusJuridico?: string; valorAcordado?: number; tipoInadimplencia?: string; atualizadoPor: string }): Promise<{ contextoJuridico: string | null; procedimentoJuridico: string | null; statusJuridico: string | null; valorAcordado: number | null; tipoInadimplencia: string | null; atualizadoJuridicoPor: string | null; atualizadoJuridicoEm: Date | null }>;
   getGegDemissoesPorTipo(squad: string, setor: string, nivel: string, cargo: string): Promise<GegDemissoesPorTipo[]>;
   getGegUltimasDemissoes(squad: string, setor: string, nivel: string, cargo: string, limit?: number): Promise<{ id: number; nome: string; cargo: string | null; squad: string | null; dataDesligamento: string; tempoDeEmpresa: number }[]>;
@@ -1121,7 +1121,7 @@ export class MemStorage implements IStorage {
     throw new Error("Not implemented in MemStorage");
   }
 
-  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string | null; evidencias?: string | null; acao?: string | null; statusFinanceiro?: string | null; detalheFinanceiro?: string | null; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
     throw new Error("Not implemented in MemStorage");
   }
 
@@ -2073,99 +2073,14 @@ export class DbStorage implements IStorage {
       .orderBy(desc(schema.cazReceber.dataCriacao))
       .limit(limit);
     
-    // Generate future installments based on existing payment patterns
-    const allReceitas: ContaReceber[] = [...result];
-    const parcelamentoMap = new Map<string, { parcelas: typeof result; totalParcelas: number; valorMedio: number }>();
-    
-    // Identify installment patterns (format: "X/Y - Venda NNNN" or "X/Y - Description")
-    for (const receita of result) {
-      if (!receita.descricao) continue;
-      const match = receita.descricao.match(/^(\d+)\/(\d+)\s*-\s*(.+)$/);
-      if (match) {
-        const parcelaAtual = parseInt(match[1]);
-        const totalParcelas = parseInt(match[2]);
-        const baseDescricao = match[3].trim();
-        
-        if (!parcelamentoMap.has(baseDescricao)) {
-          parcelamentoMap.set(baseDescricao, { parcelas: [], totalParcelas, valorMedio: 0 });
-        }
-        parcelamentoMap.get(baseDescricao)!.parcelas.push(receita);
-      }
-    }
-    
-    // Generate missing future installments
-    const today = new Date();
-    
-    for (const [baseDescricao, info] of parcelamentoMap.entries()) {
-      const { parcelas, totalParcelas } = info;
-      if (parcelas.length === 0) continue;
-      
-      // Find existing installment numbers
-      const existingNumbers = new Set<number>();
-      let lastVencimento: Date | null = null;
-      let valorTotal: number = 0;
-      let count = 0;
-      
-      for (const p of parcelas) {
-        const match = p.descricao?.match(/^(\d+)\/(\d+)/);
-        if (match) {
-          existingNumbers.add(parseInt(match[1]));
-        }
-        if (p.dataVencimento) {
-          if (!lastVencimento || new Date(p.dataVencimento) > new Date(lastVencimento)) {
-            lastVencimento = new Date(p.dataVencimento);
-          }
-        }
-        if (p.total) {
-          valorTotal += parseFloat(String(p.total));
-          count++;
-        }
-      }
-      
-      const valorMedio = count > 0 ? valorTotal / count : 0;
-      if (!lastVencimento || valorMedio === 0) continue;
-      
-      // Generate missing future installments
-      let futureCount = 0;
-      for (let i = 1; i <= totalParcelas; i++) {
-        if (!existingNumbers.has(i)) {
-          // Calculate expected vencimento date (1 month after last known vencimento per missing installment)
-          futureCount++;
-          const vencimentoPrevisto = new Date(lastVencimento);
-          vencimentoPrevisto.setMonth(vencimentoPrevisto.getMonth() + futureCount);
-          
-          // Determine status: first future = "Em Aberto", rest = "Prevista"
-          const isFirstFuture = futureCount === 1;
-          const statusFuturo = isFirstFuture ? "Em Aberto" : "Prevista";
-          
-          const parcelaFutura: ContaReceber = {
-            id: -(i * 1000 + parcelas[0].id), // Negative ID to indicate synthetic
-            status: statusFuturo,
-            total: String(valorMedio.toFixed(2)),
-            descricao: `${i}/${totalParcelas} - ${baseDescricao}`,
-            dataVencimento: vencimentoPrevisto,
-            naoPago: String(valorMedio.toFixed(2)),
-            pago: "0",
-            dataCriacao: parcelas[0].dataCriacao,
-            dataAlteracao: null,
-            clienteId: parcelas[0].clienteId,
-            clienteNome: parcelas[0].clienteNome,
-            empresa: parcelas[0].empresa,
-            urlCobranca: null,
-          };
-          
-          allReceitas.push(parcelaFutura);
-        }
-      }
-    }
-    
     // Sort by vencimento descending (most recent first)
+    const allReceitas = [...result];
     allReceitas.sort((a, b) => {
       const dateA = a.dataVencimento ? new Date(a.dataVencimento).getTime() : 0;
       const dateB = b.dataVencimento ? new Date(b.dataVencimento).getTime() : 0;
       return dateB - dateA;
     });
-    
+
     return allReceitas;
   }
 
@@ -4464,11 +4379,11 @@ export class DbStorage implements IStorage {
     if (mesAno >= '2026-02') {
       const cupChurnQuery = await db.execute(sql`
         SELECT COALESCE(SUM(valor_r), 0) as churn_total
-        FROM "Clickup".cup_churn
+        FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${inicioMes}::timestamp
           AND data_solicitacao_encerramento <= ${fimMes}::timestamp
           AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou')
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
       `);
       churnBase = parseFloat((cupChurnQuery.rows[0] as any)?.churn_total || '0');
     }
@@ -6367,13 +6282,15 @@ export class DbStorage implements IStorage {
       ORDER BY name
     `);
 
-    // Get distinct UTM terms (adset IDs) with names from meta_adsets
+    // Get distinct UTM terms (adset IDs) with names from meta_adsets.
+    // SPLIT_PART suporta o novo formato Constituição UTM v1: `{{adset.id}}-{{placement}}`
+    // (ex: `120242625739510450-instagram_stories`). Sem hífen, retorna o valor cru — compatível com legado.
     const utmTermsResult = await db.execute(sql`
-      SELECT DISTINCT 
-        d.utm_term as id,
-        COALESCE(a.adset_name, d.utm_term) as name
+      SELECT DISTINCT
+        SPLIT_PART(d.utm_term, '-', 1) as id,
+        COALESCE(a.adset_name, SPLIT_PART(d.utm_term, '-', 1)) as name
       FROM ${schema.crmDeal} d
-      LEFT JOIN ${schema.metaAdsets} a ON d.utm_term = a.adset_id
+      LEFT JOIN ${schema.metaAdsets} a ON SPLIT_PART(d.utm_term, '-', 1) = a.adset_id
       WHERE d.utm_term IS NOT NULL
       ORDER BY name
     `);
@@ -6589,8 +6506,10 @@ export class DbStorage implements IStorage {
         GROUP BY a.adset_id, a.adset_name, a.status, a.optimization_goal, a.targeting_age_min, a.targeting_age_max, c.campaign_name
       ),
       adset_crm AS (
-        SELECT 
-          utm_term as adset_id,
+        -- SPLIT_PART suporta Constituicao UTM v1: utm_term no formato adsetId-placement.
+        -- Sem hifen, retorna o valor cru, compativel com legado.
+        SELECT
+          SPLIT_PART(utm_term, '-', 1) as adset_id,
           COUNT(*) as leads,
           COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END) as won,
           COALESCE(SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) END), 0) as won_value
@@ -6602,8 +6521,8 @@ export class DbStorage implements IStorage {
           ${leadFilters?.stageNames?.length ? sql`AND stage_name = ANY(${leadFilters.stageNames})` : sql``}
           ${leadFilters?.utmSources?.length ? sql`AND utm_source = ANY(${leadFilters.utmSources})` : sql``}
           ${leadFilters?.utmCampaigns?.length ? sql`AND utm_campaign = ANY(${leadFilters.utmCampaigns})` : sql``}
-          ${leadFilters?.utmTerms?.length ? sql`AND utm_term = ANY(${leadFilters.utmTerms})` : sql``}
-        GROUP BY utm_term
+          ${leadFilters?.utmTerms?.length ? sql`AND SPLIT_PART(utm_term, '-', 1) = ANY(${leadFilters.utmTerms})` : sql``}
+        GROUP BY SPLIT_PART(utm_term, '-', 1)
       )
       SELECT 
         am.adset_id as "adsetId",
@@ -10134,7 +10053,7 @@ export class DbStorage implements IStorage {
     };
   }
 
-  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string; evidencias?: string; acao?: string; statusFinanceiro?: string; detalheFinanceiro?: string; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
+  async upsertInadimplenciaContexto(data: { clienteId: string; contexto?: string | null; evidencias?: string | null; acao?: string | null; statusFinanceiro?: string | null; detalheFinanceiro?: string | null; atualizadoPor: string }): Promise<{ contexto: string | null; evidencias: string | null; acao: string | null; statusFinanceiro: string | null; detalheFinanceiro: string | null; atualizadoPor: string | null; atualizadoEm: Date | null }> {
     const result = await db.execute(sql`
       INSERT INTO cortex_core.inadimplencia_contextos (cliente_id, contexto, evidencias, acao, status_financeiro, detalhe_financeiro, atualizado_por, atualizado_em)
       VALUES (${data.clienteId}, ${data.contexto || ''}, ${data.evidencias || ''}, NULLIF(${data.acao || ''}, ''), NULLIF(${data.statusFinanceiro || ''}, ''), NULLIF(${data.detalheFinanceiro || ''}, ''), ${data.atualizadoPor}, NOW())

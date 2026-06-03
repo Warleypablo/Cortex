@@ -36,6 +36,7 @@ import {
   Hash,
   BarChart3,
   Lightbulb,
+  Plus,
 } from "lucide-react";
 import { format, subDays, parseISO, getDay, getHours, getISOWeek } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -83,7 +84,8 @@ interface IgPost {
 
 interface IgConnection {
   id: number;
-  igUsername: string;
+  username: string;
+  clienteCnpj: string;
   isActive: boolean;
   [key: string]: unknown;
 }
@@ -294,11 +296,23 @@ export default function InstagramDashboard() {
     },
   });
 
-  const activeConnection = useMemo(
-    () => connections?.find((c) => c.isActive) ?? connections?.[0] ?? null,
+  const [selectedConnId, setSelectedConnId] = useState<number | "all" | null>(null);
+  const isAllMode = selectedConnId === "all";
+  const activeConnections = useMemo(
+    () => connections?.filter((c) => c.isActive) ?? [],
     [connections],
   );
-  const connId = activeConnection?.id;
+
+  // Auto-select first active connection when connections load or selected is removed
+  const activeConnection = useMemo(() => {
+    if (!connections || connections.length === 0) return null;
+    if (isAllMode) return null;
+    const selected = connections.find((c) => c.id === selectedConnId);
+    if (selected) return selected;
+    return connections.find((c) => c.isActive) ?? connections[0] ?? null;
+  }, [connections, selectedConnId, isAllMode]);
+
+  const connId = isAllMode ? null : activeConnection?.id;
 
   // --- Disconnect ---
   const disconnectMutation = useMutation({
@@ -324,8 +338,8 @@ export default function InstagramDashboard() {
     },
   });
 
-  // --- Fetch metrics ---
-  const { data: metrics, isLoading: loadingMetrics } = useQuery<IgMetric[]>({
+  // --- Fetch metrics (single account) ---
+  const { data: singleMetrics, isLoading: loadingSingleMetrics } = useQuery<IgMetric[]>({
     queryKey: ["/api/instagram/connections", connId, "metrics", startDate, endDate],
     queryFn: async () => {
       const res = await fetch(
@@ -334,11 +348,60 @@ export default function InstagramDashboard() {
       if (!res.ok) throw new Error("Erro ao buscar métricas");
       return res.json();
     },
-    enabled: !!connId,
+    enabled: !!connId && !isAllMode,
   });
 
-  // --- Fetch posts ---
-  const { data: posts, isLoading: loadingPosts } = useQuery<IgPost[]>({
+  // --- Fetch metrics (all accounts) ---
+  const { data: allMetrics, isLoading: loadingAllMetrics } = useQuery<IgMetric[]>({
+    queryKey: ["/api/instagram/connections", "all", "metrics", startDate, endDate, activeConnections.map((c) => c.id)],
+    queryFn: async () => {
+      const results = await Promise.all(
+        activeConnections.map(async (c) => {
+          const res = await fetch(
+            `/api/instagram/connections/${c.id}/metrics?startDate=${startDate}&endDate=${endDate}`,
+          );
+          if (!res.ok) return [] as IgMetric[];
+          return res.json() as Promise<IgMetric[]>;
+        }),
+      );
+      // Merge by date: sum numeric fields
+      const byDate = new Map<string, IgMetric>();
+      for (const arr of results) {
+        for (const m of arr) {
+          const existing = byDate.get(m.metricDate);
+          if (existing) {
+            existing.followers += m.followers;
+            existing.following += m.following;
+            existing.postsCount += m.postsCount;
+            existing.reachDay += m.reachDay;
+            existing.impressionsDay += m.impressionsDay;
+            existing.viewsDay += m.viewsDay;
+            existing.followsDay += m.followsDay;
+            existing.unfollowsDay += m.unfollowsDay;
+            existing.accountsEngaged += m.accountsEngaged;
+            existing.totalInteractions += m.totalInteractions;
+            existing.likesDay += m.likesDay;
+            existing.commentsDay += m.commentsDay;
+            existing.savesDay += m.savesDay;
+            existing.sharesDay += m.sharesDay;
+            existing.profileLinksTaps += m.profileLinksTaps;
+          } else {
+            byDate.set(m.metricDate, { ...m });
+          }
+        }
+      }
+      return Array.from(byDate.values()).sort(
+        (a, b) => a.metricDate.localeCompare(b.metricDate),
+      );
+    },
+    enabled: isAllMode && activeConnections.length > 0,
+  });
+
+  const metrics = isAllMode ? allMetrics : singleMetrics;
+  const loadingMetrics = isAllMode ? loadingAllMetrics : loadingSingleMetrics;
+
+  // --- Fetch posts (single account) ---
+  const { data: singlePosts, isLoading: loadingSinglePosts } = useQuery<IgPost[]>({
     queryKey: ["/api/instagram/connections", connId, "posts", startDate, endDate],
     queryFn: async () => {
       const res = await fetch(
@@ -347,8 +410,31 @@ export default function InstagramDashboard() {
       if (!res.ok) throw new Error("Erro ao buscar posts");
       return res.json();
     },
-    enabled: !!connId,
+    enabled: !!connId && !isAllMode,
   });
+
+  // --- Fetch posts (all accounts) ---
+  const { data: allPosts, isLoading: loadingAllPosts } = useQuery<IgPost[]>({
+    queryKey: ["/api/instagram/connections", "all", "posts", startDate, endDate, activeConnections.map((c) => c.id)],
+    queryFn: async () => {
+      const results = await Promise.all(
+        activeConnections.map(async (c) => {
+          const res = await fetch(
+            `/api/instagram/connections/${c.id}/posts?startDate=${startDate}&endDate=${endDate}&limit=100`,
+          );
+          if (!res.ok) return [] as IgPost[];
+          return res.json() as Promise<IgPost[]>;
+        }),
+      );
+      return results.flat().sort(
+        (a, b) => (b.postedAt ?? "").localeCompare(a.postedAt ?? ""),
+      );
+    },
+    enabled: isAllMode && activeConnections.length > 0,
+  });
+
+  const posts = isAllMode ? allPosts : singlePosts;
+  const loadingPosts = isAllMode ? loadingAllPosts : loadingSinglePosts;
 
   // --- Computed hero metrics (IMPROVED: fixed engagement calc, added reach/views trends) ---
   const heroData = useMemo(() => {
@@ -1013,7 +1099,7 @@ export default function InstagramDashboard() {
   }
 
   // --- Empty state: no connection ---
-  if (!loadingConn && !activeConnection) {
+  if (!loadingConn && !activeConnection && !isAllMode) {
     return (
       <div
         style={{ backgroundColor: "#0A0A0F", minHeight: "100vh" }}
@@ -1088,6 +1174,85 @@ export default function InstagramDashboard() {
               </button>
             ))}
           </div>
+
+          {/* Account selector */}
+          {activeConnections.length > 0 && (
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: "2px",
+                backgroundColor: "rgba(255,255,255,0.04)",
+                borderRadius: "8px",
+                padding: "3px",
+              }}
+            >
+              {activeConnections.length > 1 && (
+                <button
+                  onClick={() => setSelectedConnId("all")}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "6px",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    letterSpacing: "0.03em",
+                    border: "none",
+                    cursor: "pointer",
+                    backgroundColor: isAllMode ? "rgba(108,99,255,0.15)" : "transparent",
+                    color: isAllMode ? "#6C63FF" : "#52526A",
+                  }}
+                >
+                  Todos
+                </button>
+              )}
+              {activeConnections.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setSelectedConnId(c.id)}
+                  style={{
+                    padding: "6px 14px",
+                    borderRadius: "6px",
+                    fontSize: "0.8rem",
+                    fontWeight: 600,
+                    letterSpacing: "0.03em",
+                    border: "none",
+                    cursor: "pointer",
+                    backgroundColor:
+                      !isAllMode && activeConnection?.id === c.id ? "rgba(108,99,255,0.15)" : "transparent",
+                    color: !isAllMode && activeConnection?.id === c.id ? "#6C63FF" : "#52526A",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "6px",
+                  }}
+                >
+                  <Instagram className="h-3 w-3" />
+                  @{c.username}
+                </button>
+              ))}
+              <button
+                onClick={() => {
+                  const cnpj = activeConnections[0]?.clienteCnpj;
+                  if (cnpj) window.location.href = `/auth/instagram?clienteCnpj=${encodeURIComponent(cnpj)}`;
+                }}
+                title="Adicionar conta"
+                style={{
+                  width: "28px",
+                  height: "28px",
+                  borderRadius: "6px",
+                  fontSize: "0.8rem",
+                  border: "none",
+                  cursor: "pointer",
+                  backgroundColor: "transparent",
+                  color: "#52526A",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                }}
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            </div>
+          )}
 
           {/* Date inputs */}
           <input

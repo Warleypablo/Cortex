@@ -61,6 +61,8 @@ const DetailColaborador = lazyWithRetry(() => import("@/pages/DetailColaborador"
 const Patrimonio = lazyWithRetry(() => import("@/pages/Patrimonio"));
 const PatrimonioDetail = lazyWithRetry(() => import("@/pages/PatrimonioDetail"));
 const Ferramentas = lazyWithRetry(() => import("@/pages/Ferramentas"));
+const UtmBuilder = lazyWithRetry(() => import("@/pages/UtmBuilder"));
+const GhlMarketing = lazyWithRetry(() => import("@/pages/GhlMarketing"));
 const TurboZap = lazyWithRetry(() => import("@/pages/TurboZap"));
 const Atendimento = lazyWithRetry(() => import("@/pages/Atendimento"));
 const ChatAtendimento = lazyWithRetry(() => import("@/pages/ChatAtendimento"));
@@ -71,6 +73,7 @@ const Organograma = lazyWithRetry(() => import("@/pages/Organograma"));
 const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
 const ChurnPredicao = lazyWithRetry(() => import("@/pages/ChurnPredicao"));
 const AnalisePreditiva = lazyWithRetry(() => import("@/pages/gestao/AnalisePreditiva"));
+const TvLeaderboard = lazyWithRetry(() => import("@/pages/gestao/TvLeaderboard"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
 const DashboardDFC = lazyWithRetry(() => import("@/pages/DashboardDFC"));
 const DashboardInadimplencia = lazyWithRetry(() => import("@/pages/DashboardInadimplencia"));
@@ -91,6 +94,7 @@ const AdminUsuarios = lazyWithRetry(() => import("@/pages/AdminUsuarios"));
 const AdminAvisos = lazyWithRetry(() => import("@/pages/AdminAvisos"));
 const AccessDenied = lazyWithRetry(() => import("@/pages/AccessDenied"));
 const Login = lazyWithRetry(() => import("@/pages/Login"));
+const Privacy = lazyWithRetry(() => import("@/pages/Privacy"));
 const DashboardClosers = lazyWithRetry(() => import("@/pages/DashboardClosers"));
 const DashboardSDRs = lazyWithRetry(() => import("@/pages/DashboardSDRs"));
 const DetailClosers = lazyWithRetry(() => import("@/pages/DetailClosers"));
@@ -155,6 +159,7 @@ const Triagem = lazyWithRetry(() => import("@/pages/Triagem"));
 const CrossSellPipeline = lazyWithRetry(() => import("@/pages/CrossSellPipeline"));
 const CrossSellDashboard = lazyWithRetry(() => import("@/pages/CrossSellDashboard"));
 const ReceitaRecorrente = lazyWithRetry(() => import("@/pages/financeiro/ReceitaRecorrente"));
+const MixReceita = lazyWithRetry(() => import("@/pages/financeiro/MixReceita"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
 
 // Error boundary to catch silent crashes in the portal.
@@ -312,8 +317,13 @@ function ProtectedRouter() {
       <Route path="/dashboard/analise-squads">{() => <ProtectedRoute path="/dashboard/analise-squads" component={AnaliseSquads} />}</Route>
       <Route path="/dashboard/saude-base-ativa">{() => <ProtectedRoute path="/dashboard/saude-base-ativa" component={SaudeBaseAtiva} />}</Route>
       <Route path="/dashboard/analise-preditiva">{() => <ProtectedRoute path="/dashboard/analise-preditiva" component={AnalisePreditiva} />}</Route>
+      <Route path="/gestao/tv-leaderboard">
+        {() => <ProtectedRoute path="/gestao/tv-leaderboard" component={TvLeaderboard} />}
+      </Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
-      
+      <Route path="/utm-builder">{() => <ProtectedRoute path="/utm-builder" component={UtmBuilder} />}</Route>
+      <Route path="/ghl-marketing">{() => <ProtectedRoute path="/ghl-marketing" component={GhlMarketing} />}</Route>
+
       {/* Financeiro */}
       <Route path="/dashboard/dfc">{() => <ProtectedRoute path="/dashboard/dfc" component={DashboardDFC} />}</Route>
       <Route path="/dashboard/fluxo-caixa">{() => <ProtectedRoute path="/dashboard/fluxo-caixa" component={FluxoCaixa} />}</Route>
@@ -328,6 +338,7 @@ function ProtectedRouter() {
       <Route path="/financeiro/negativacao">{() => <ProtectedRoute path="/financeiro/negativacao" component={Negativacao} />}</Route>
       <Route path="/triagem">{() => <ProtectedRoute path="/triagem" component={Triagem} />}</Route>
       <Route path="/financeiro/receita-recorrente">{() => <ProtectedRoute path="/financeiro/receita-recorrente" component={ReceitaRecorrente} />}</Route>
+      <Route path="/financeiro/mix-receita">{() => <ProtectedRoute path="/financeiro/mix-receita" component={MixReceita} />}</Route>
       <Route path="/contratos-module">{() => <ProtectedRoute path="/contratos-module" component={ContratosModule} />}</Route>
       
       {/* G&G */}
@@ -445,6 +456,8 @@ function Router() {
       <Switch>
         <Route path="/login" component={Login} />
         <Route path="/loginclientes" component={LoginCliente} />
+        <Route path="/privacy" component={Privacy} />
+        <Route path="/privacidade" component={Privacy} />
         <Route path="/portal-cliente" component={PortalCliente} />
         <Route path="/portal/creator" component={PortalCreator} />
         <Route><ProtectedRouter /></Route>
@@ -466,13 +479,14 @@ function AppLayout() {
   const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation";
   const isPortalCliente = location.startsWith("/portal-cliente");
   const isPortalCreator = location.startsWith("/portal/creator");
+  const isPrivacy = location === "/privacy" || location === "/privacidade";
 
   const style = {
     "--sidebar-width": "16rem",
     "--sidebar-width-icon": "3rem",
   };
 
-  if (isLoginPage || isLoginCliente || isPortalCliente || isPortalCreator) {
+  if (isLoginPage || isLoginCliente || isPortalCliente || isPortalCreator || isPrivacy) {
     return <PortalErrorBoundary><Router /></PortalErrorBoundary>;
   }
 

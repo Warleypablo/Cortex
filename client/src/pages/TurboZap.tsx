@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,6 +9,7 @@ import {
   Zap, Send, History, Settings, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, SkipForward, Search, Loader2,
   MessageSquare, TrendingUp, AlertTriangle, Phone, X, Scale, Calendar,
+  Plus, Trash2,
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -98,6 +99,48 @@ interface PipelineJuridico {
   atualizado_em: string;
 }
 
+interface TurboZapTemplate {
+  id: number;
+  nome: string;
+  conteudo: string;
+  nivel: string | null;
+  criado_por: string | null;
+  criado_em: string;
+}
+
+interface NivelInfo {
+  tipo: string;
+  label: string;
+  ativo: boolean;
+  instancia: string;
+  is_custom: boolean;
+  dias: number;
+}
+
+const VARIAVEIS = ["{nome}", "{valor}", "{vencimento}", "{link_pagamento}"];
+
+function insertarVariavel(
+  variavel: string,
+  ref: React.RefObject<HTMLTextAreaElement>,
+  value: string,
+  onChange: (v: string) => void,
+) {
+  const ta = ref.current;
+  if (!ta) {
+    onChange(value + variavel);
+    return;
+  }
+  const start = ta.selectionStart ?? value.length;
+  const end = ta.selectionEnd ?? value.length;
+  const newVal = value.slice(0, start) + variavel + value.slice(end);
+  onChange(newVal);
+  requestAnimationFrame(() => {
+    ta.selectionStart = start + variavel.length;
+    ta.selectionEnd = start + variavel.length;
+    ta.focus();
+  });
+}
+
 const ETAPAS_PIPELINE = [
   { value: "formalizado", label: "Formalizado", color: "text-violet-600 dark:text-violet-400" },
   { value: "protesto_comunicado", label: "Protesto Comunicado", color: "text-fuchsia-600 dark:text-fuchsia-400" },
@@ -116,6 +159,7 @@ const TIPO_COLORS: Record<string, { bg: string; text: string; border: string }> 
   "D+3": { bg: "bg-yellow-50 dark:bg-yellow-950/30", text: "text-yellow-700 dark:text-yellow-300", border: "border-yellow-200 dark:border-yellow-800" },
   "D+7": { bg: "bg-orange-50 dark:bg-orange-950/30", text: "text-orange-700 dark:text-orange-300", border: "border-orange-200 dark:border-orange-800" },
   "D+10": { bg: "bg-red-50 dark:bg-red-950/30", text: "text-red-700 dark:text-red-300", border: "border-red-200 dark:border-red-800" },
+  "D+14": { bg: "bg-red-50 dark:bg-red-950/40", text: "text-red-800 dark:text-red-200", border: "border-red-300 dark:border-red-700" },
   "D+15": { bg: "bg-rose-50 dark:bg-rose-950/30", text: "text-rose-700 dark:text-rose-300", border: "border-rose-200 dark:border-rose-800" },
   "D+20": { bg: "bg-purple-50 dark:bg-purple-950/30", text: "text-purple-700 dark:text-purple-300", border: "border-purple-200 dark:border-purple-800" },
   "D+30": { bg: "bg-violet-50 dark:bg-violet-950/30", text: "text-violet-700 dark:text-violet-300", border: "border-violet-200 dark:border-violet-800" },
@@ -506,6 +550,7 @@ function HistoricoTab() {
             <SelectItem value="D+3">D+3</SelectItem>
             <SelectItem value="D+7">D+7</SelectItem>
             <SelectItem value="D+10">D+10</SelectItem>
+            <SelectItem value="D+14">D+14</SelectItem>
             <SelectItem value="D+15">D+15</SelectItem>
             <SelectItem value="D+20">D+20</SelectItem>
           </SelectContent>
@@ -619,6 +664,552 @@ function HistoricoTab() {
 }
 
 // ============================================
+// Gerenciar Níveis
+// ============================================
+
+function GerenciarNiveis() {
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [diasNovo, setDiasNovo] = useState("");
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+
+  const { data: niveis = [], isLoading } = useQuery<NivelInfo[]>({
+    queryKey: ["/api/turbozap/niveis"],
+    queryFn: async () => {
+      const res = await fetch("/api/turbozap/niveis", { credentials: "include" });
+      if (!res.ok) throw new Error("Erro ao buscar níveis");
+      return res.json();
+    },
+  });
+
+  const toggleMutation = useMutation({
+    mutationFn: async ({ tipo, ativo }: { tipo: string; ativo: boolean }) => {
+      const res = await apiRequest("PUT", "/api/turbozap/niveis/toggle", { tipo, ativo });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/niveis"] });
+      toast({ title: "Nível atualizado!" });
+    },
+    onError: () => {
+      toast({ title: "Erro ao alterar nível", variant: "destructive" });
+    },
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async (dias: number) => {
+      const res = await apiRequest("POST", "/api/turbozap/niveis", { dias });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/niveis"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/configuracoes"] });
+      toast({ title: "Nível criado!" });
+      setShowForm(false);
+      setDiasNovo("");
+    },
+    onError: (err: any) => {
+      toast({ title: err?.message || "Erro ao criar nível", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (tipo: string) => {
+      await apiRequest("DELETE", `/api/turbozap/niveis/${encodeURIComponent(tipo)}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/niveis"] });
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/configuracoes"] });
+      toast({ title: "Nível removido!" });
+      setDeleteTarget(null);
+    },
+    onError: () => {
+      toast({ title: "Erro ao remover nível", variant: "destructive" });
+      setDeleteTarget(null);
+    },
+  });
+
+  const diasNum = parseInt(diasNovo, 10);
+  const tipoPreview = !isNaN(diasNum)
+    ? diasNum >= 0 ? `D+${diasNum}` : `D${diasNum}`
+    : null;
+  const conflito = tipoPreview ? niveis.some((n) => n.tipo === tipoPreview) : false;
+
+  return (
+    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <CardTitle className="text-gray-900 dark:text-white text-lg">Gerenciar Níveis</CardTitle>
+        {!showForm && (
+          <Button size="sm" variant="outline" onClick={() => setShowForm(true)} className="gap-1">
+            <Plus className="w-3 h-3" /> Novo Nível
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent>
+        {showForm && (
+          <div className="border border-dashed border-gray-300 dark:border-zinc-700 rounded-lg p-4 mb-4 space-y-3">
+            <div className="flex items-center gap-3">
+              <div className="flex-1">
+                <Input
+                  type="number"
+                  placeholder="Dias (ex: 1, -1, 21)"
+                  value={diasNovo}
+                  onChange={(e) => setDiasNovo(e.target.value)}
+                  className="bg-gray-50 dark:bg-zinc-800"
+                />
+              </div>
+              {tipoPreview && (
+                <span className={`font-mono text-sm font-semibold px-2 py-1 rounded ${conflito ? "bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400" : "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300"}`}>
+                  {conflito ? `${tipoPreview} (já existe)` : tipoPreview}
+                </span>
+              )}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => !isNaN(diasNum) && createMutation.mutate(diasNum)}
+                disabled={!tipoPreview || conflito || createMutation.isPending}
+              >
+                {createMutation.isPending ? "Criando..." : "Criar Nível"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => { setShowForm(false); setDiasNovo(""); }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {isLoading ? (
+          <div className="flex items-center gap-2 py-2">
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+            <span className="text-sm text-gray-400 dark:text-zinc-500">Carregando...</span>
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {niveis.map((nivel) => (
+              <div
+                key={nivel.tipo}
+                className="flex items-center justify-between py-2 px-3 rounded-lg bg-gray-50 dark:bg-zinc-800"
+              >
+                <div className="flex items-center gap-2">
+                  <span
+                    className={`font-mono text-sm font-medium ${nivel.ativo ? "text-gray-900 dark:text-white" : "text-gray-400 dark:text-zinc-500 line-through"}`}
+                  >
+                    {nivel.tipo}
+                  </span>
+                  <span className="text-xs text-gray-400 dark:text-zinc-500">
+                    {nivel.label.replace(`${nivel.tipo} `, "")}
+                  </span>
+                  {nivel.is_custom && (
+                    <span className="text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400">
+                      Custom
+                    </span>
+                  )}
+                </div>
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={nivel.ativo}
+                    onCheckedChange={(checked) =>
+                      toggleMutation.mutate({ tipo: nivel.tipo, ativo: checked })
+                    }
+                    disabled={toggleMutation.isPending}
+                  />
+                  {nivel.is_custom && (
+                    <button
+                      onClick={() => setDeleteTarget(nivel.tipo)}
+                      className="p-1 text-gray-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 transition-colors"
+                      title="Remover nível"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-900 dark:text-white">
+              Remover nível customizado
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-500 dark:text-zinc-400">
+              Tem certeza que deseja remover o nível <strong className="text-gray-900 dark:text-white font-mono">{deleteTarget}</strong>? O template associado também será apagado.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="dark:bg-zinc-800 dark:text-white dark:border-zinc-700">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget)}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Removendo..." : "Remover"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
+
+// ============================================
+// Biblioteca de Templates
+// ============================================
+
+function BibliotecaTemplates() {
+  const { toast } = useToast();
+  const [showForm, setShowForm] = useState(false);
+  const [nomeNovo, setNomeNovo] = useState("");
+  const [conteudoNovo, setConteudoNovo] = useState("");
+  const [nivelNovo, setNivelNovo] = useState<string | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<TurboZapTemplate | null>(null);
+  const formTextareaRef = useRef<HTMLTextAreaElement>(null);
+
+  const { data: templates = [], isLoading: templatesLoading } = useQuery<TurboZapTemplate[]>({
+    queryKey: ["/api/turbozap/templates"],
+  });
+
+  const createMutation = useMutation({
+    mutationFn: async () => {
+      const res = await apiRequest("POST", "/api/turbozap/templates", {
+        nome: nomeNovo,
+        conteudo: conteudoNovo,
+        nivel: nivelNovo,
+      });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/templates"] });
+      toast({ title: "Template criado!" });
+      setShowForm(false);
+      setNomeNovo("");
+      setConteudoNovo("");
+      setNivelNovo(null);
+    },
+    onError: () => {
+      toast({ title: "Erro ao criar template", variant: "destructive" });
+    },
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: async (id: number) => {
+      await apiRequest("DELETE", `/api/turbozap/templates/${id}`);
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/turbozap/templates"] });
+      toast({ title: "Template excluído!" });
+      setDeleteTarget(null);
+    },
+    onError: () => {
+      toast({ title: "Erro ao excluir template", variant: "destructive" });
+      setDeleteTarget(null);
+    },
+  });
+
+  return (
+    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+      <CardHeader className="flex flex-row items-center justify-between pb-4">
+        <CardTitle className="text-gray-900 dark:text-white text-lg">
+          Biblioteca de Templates
+        </CardTitle>
+        {!showForm && (
+          <Button size="sm" variant="outline" onClick={() => setShowForm(true)} className="gap-1">
+            <Plus className="w-3 h-3" /> Novo Template
+          </Button>
+        )}
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {showForm && (
+          <div className="border border-dashed border-gray-300 dark:border-zinc-700 rounded-lg p-4 space-y-3">
+            <Input
+              placeholder="Nome do template (ex: Lembrete Amigável)"
+              value={nomeNovo}
+              onChange={(e) => setNomeNovo(e.target.value)}
+              className="bg-gray-50 dark:bg-zinc-800"
+              maxLength={100}
+            />
+            <Select
+              value={nivelNovo ?? "generico"}
+              onValueChange={(v) => setNivelNovo(v === "generico" ? null : v)}
+            >
+              <SelectTrigger className="bg-gray-50 dark:bg-zinc-800 h-9 text-sm">
+                <SelectValue placeholder="Nível (opcional)" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="generico">Genérico (todos os níveis)</SelectItem>
+                {(["D-3","D+0","D+3","D+7","D+10","D+14","D+15","D+20","D+30","D+40","D+45","D+50","D+55"] as const).map((tipo) => (
+                  <SelectItem key={tipo} value={tipo}>{tipo}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Textarea
+              ref={formTextareaRef}
+              placeholder="Conteúdo da mensagem..."
+              value={conteudoNovo}
+              onChange={(e) => setConteudoNovo(e.target.value)}
+              className="min-h-[120px] bg-gray-50 dark:bg-zinc-800 text-sm font-mono"
+            />
+            <div className="flex flex-wrap gap-1">
+              {VARIAVEIS.map((v) => (
+                <button
+                  key={v}
+                  type="button"
+                  onClick={() => insertarVariavel(v, formTextareaRef, conteudoNovo, setConteudoNovo)}
+                  className="px-2 py-0.5 text-xs rounded border border-dashed border-gray-300 dark:border-zinc-600 text-gray-500 dark:text-zinc-400 hover:border-primary hover:text-primary transition-colors font-mono"
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                onClick={() => createMutation.mutate()}
+                disabled={!nomeNovo.trim() || !conteudoNovo.trim() || createMutation.isPending}
+              >
+                {createMutation.isPending ? "Salvando..." : "Salvar Template"}
+              </Button>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => {
+                  setShowForm(false);
+                  setNomeNovo("");
+                  setConteudoNovo("");
+                  setNivelNovo(null);
+                }}
+              >
+                Cancelar
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {templatesLoading ? (
+          <div className="flex items-center gap-2 py-2">
+            <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+            <span className="text-sm text-gray-400 dark:text-zinc-500">Carregando...</span>
+          </div>
+        ) : templates.length === 0 && !showForm ? (
+          <p className="text-sm text-gray-400 dark:text-zinc-500">
+            Nenhum template salvo ainda. Crie o primeiro clicando em "Novo Template".
+          </p>
+        ) : null}
+
+        <div className="space-y-2">
+          {templates.map((tpl) => (
+            <div
+              key={tpl.id}
+              className="flex items-start gap-3 p-3 rounded-lg bg-gray-50 dark:bg-zinc-800"
+            >
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-sm font-medium text-gray-900 dark:text-white">{tpl.nome}</p>
+                  {tpl.nivel ? (
+                    <span className="inline-block text-xs px-1.5 py-0.5 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-mono">
+                      {tpl.nivel}
+                    </span>
+                  ) : (
+                    <span className="inline-block text-xs px-1.5 py-0.5 rounded bg-gray-100 dark:bg-zinc-700 text-gray-400 dark:text-zinc-400">
+                      Genérico
+                    </span>
+                  )}
+                </div>
+                <p className="text-xs text-gray-400 dark:text-zinc-500 mt-0.5 line-clamp-2">
+                  {tpl.conteudo}
+                </p>
+              </div>
+              <button
+                onClick={() => setDeleteTarget(tpl)}
+                className="shrink-0 p-1 text-gray-400 hover:text-red-500 dark:text-zinc-500 dark:hover:text-red-400 transition-colors"
+                title="Excluir template"
+              >
+                <Trash2 className="w-4 h-4" />
+              </button>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+
+      <AlertDialog open={!!deleteTarget} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <AlertDialogContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-900 dark:text-white">
+              Excluir template
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-500 dark:text-zinc-400">
+              Tem certeza que deseja excluir "{deleteTarget?.nome}"? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="dark:bg-zinc-800 dark:text-white dark:border-zinc-700">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTarget && deleteMutation.mutate(deleteTarget.id)}
+              disabled={deleteMutation.isPending}
+              className="bg-destructive hover:bg-destructive/90"
+            >
+              {deleteMutation.isPending ? "Excluindo..." : "Excluir"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </Card>
+  );
+}
+
+// ============================================
+// TemplateNivelEditor
+// ============================================
+
+interface TemplateNivelEditorProps {
+  tipo: string;
+  value: string;
+  isDirty: boolean;
+  onValueChange: (v: string) => void;
+  onSave: () => void;
+  savePending: boolean;
+  colors: { bg: string; text: string; border: string };
+}
+
+function TemplateNivelEditor({
+  tipo,
+  value,
+  isDirty,
+  onValueChange,
+  onSave,
+  savePending,
+  colors,
+}: TemplateNivelEditorProps) {
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const [pendingTemplate, setPendingTemplate] = useState<TurboZapTemplate | null>(null);
+  const [selectKey, setSelectKey] = useState(0);
+
+  const { data: templates = [] } = useQuery<TurboZapTemplate[]>({
+    queryKey: ["/api/turbozap/templates"],
+  });
+
+  const templatesForLevel = templates.filter(
+    (t) => t.nivel === tipo || t.nivel === null,
+  );
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between flex-wrap gap-2">
+        <div className="flex items-center gap-2">
+          <Badge className={`${colors.bg} ${colors.text} border-0`}>{tipo}</Badge>
+          {isDirty && (
+            <span className="text-xs text-yellow-600 dark:text-yellow-400">modificado</span>
+          )}
+        </div>
+        <div className="flex items-center gap-2">
+          {templatesForLevel.length > 0 && (
+            <Select
+              key={selectKey}
+              onValueChange={(v) => {
+                const tpl = templatesForLevel.find((t) => String(t.id) === v);
+                if (tpl) setPendingTemplate(tpl);
+              }}
+            >
+              <SelectTrigger className="h-8 text-xs w-[200px] bg-gray-50 dark:bg-zinc-800">
+                <SelectValue placeholder="Aplicar template..." />
+              </SelectTrigger>
+              <SelectContent>
+                {templatesForLevel.map((t) => (
+                  <SelectItem key={t.id} value={String(t.id)}>
+                    {t.nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+          {isDirty && (
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={onSave}
+              disabled={savePending}
+            >
+              Salvar
+            </Button>
+          )}
+        </div>
+      </div>
+
+      <Textarea
+        ref={textareaRef}
+        value={value}
+        onChange={(e) => onValueChange(e.target.value)}
+        className="min-h-[120px] bg-gray-50 dark:bg-zinc-800 text-sm font-mono"
+        placeholder={`Template para ${tipo}...`}
+      />
+
+      <div className="flex flex-wrap gap-1">
+        {VARIAVEIS.map((v) => (
+          <button
+            key={v}
+            type="button"
+            onClick={() => insertarVariavel(v, textareaRef, value, onValueChange)}
+            className="px-2 py-0.5 text-xs rounded border border-dashed border-gray-300 dark:border-zinc-600 text-gray-500 dark:text-zinc-400 hover:border-primary hover:text-primary transition-colors font-mono"
+          >
+            {v}
+          </button>
+        ))}
+      </div>
+
+      <AlertDialog
+        open={!!pendingTemplate}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPendingTemplate(null);
+            setSelectKey((k) => k + 1);
+          }
+        }}
+      >
+        <AlertDialogContent className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-gray-900 dark:text-white">
+              Aplicar template
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-gray-500 dark:text-zinc-400">
+              Substituir o texto atual de{" "}
+              <strong className="text-gray-900 dark:text-white">{tipo}</strong> pelo template{" "}
+              <strong className="text-gray-900 dark:text-white">"{pendingTemplate?.nome}"</strong>?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel
+              className="dark:bg-zinc-800 dark:text-white dark:border-zinc-700"
+            >
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (pendingTemplate) onValueChange(pendingTemplate.conteudo);
+                setPendingTemplate(null);
+              }}
+            >
+              Aplicar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
+  );
+}
+
+// ============================================
 // Configurações Tab
 // ============================================
 
@@ -649,6 +1240,20 @@ function ConfiguracoesTab() {
     }
     return map;
   }, [configs]);
+
+  const { data: niveisInfo = [] } = useQuery<NivelInfo[]>({
+    queryKey: ["/api/turbozap/niveis"],
+    queryFn: async () => {
+      const res = await fetch("/api/turbozap/niveis", { credentials: "include" });
+      if (!res.ok) throw new Error("Erro ao buscar níveis");
+      return res.json();
+    },
+  });
+
+  const niveisDesativados = useMemo(
+    () => niveisInfo.filter((n) => !n.ativo).map((n) => n.tipo),
+    [niveisInfo],
+  );
 
   function getVal(chave: string): string {
     return localConfigs[chave] ?? configMap[chave] ?? "";
@@ -706,8 +1311,12 @@ function ConfiguracoesTab() {
     );
   }
 
-  const templateKeysFinanceiro = ["D-3", "D+0", "D+3", "D+7", "D+10", "D+15", "D+20"];
-  const templateKeysJuridico = ["D+30", "D+40", "D+45", "D+50", "D+55"];
+  const templateKeysFinanceiro = niveisInfo
+    .filter((n) => n.ativo && n.instancia === "financeiro")
+    .map((n) => n.tipo);
+  const templateKeysJuridico = niveisInfo
+    .filter((n) => n.ativo && n.instancia === "juridico")
+    .map((n) => n.tipo);
   const skipNumerosRaw = getVal("skip_numeros");
   let skipNumeros: string[] = [];
   try {
@@ -747,102 +1356,72 @@ function ConfiguracoesTab() {
         </div>
       )}
 
+      {/* Biblioteca de Templates */}
+      <BibliotecaTemplates />
+
+      {/* Gerenciar Níveis */}
+      <GerenciarNiveis />
+
       {/* Templates Financeiro */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
-        <CardHeader>
-          <CardTitle className="text-gray-900 dark:text-white text-lg">
-            Templates — Financeiro
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {templateKeysFinanceiro.map((tipo) => {
-            const chave = `template_${tipo}`;
-            const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D-3"];
-            const isDirty = dirty.has(chave);
-            return (
-              <div key={tipo} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge className={`${colors.bg} ${colors.text} border-0`}>{tipo}</Badge>
-                    {isDirty && (
-                      <span className="text-xs text-yellow-600 dark:text-yellow-400">modificado</span>
-                    )}
-                  </div>
-                  {isDirty && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => saveMutation.mutate(chave)}
-                      disabled={saveMutation.isPending}
-                    >
-                      Salvar
-                    </Button>
-                  )}
-                </div>
-                <Textarea
+      {templateKeysFinanceiro.length > 0 && (
+        <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <CardHeader>
+            <CardTitle className="text-gray-900 dark:text-white text-lg">
+              Templates — Financeiro
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {templateKeysFinanceiro.map((tipo) => {
+              const chave = `template_${tipo}`;
+              const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D-3"];
+              return (
+                <TemplateNivelEditor
+                  key={tipo}
+                  tipo={tipo}
                   value={getVal(chave)}
-                  onChange={(e) => setVal(chave, e.target.value)}
-                  className="min-h-[120px] bg-gray-50 dark:bg-zinc-800 text-sm font-mono"
-                  placeholder={`Template para ${tipo}...`}
+                  isDirty={dirty.has(chave)}
+                  onValueChange={(v) => setVal(chave, v)}
+                  onSave={() => saveMutation.mutate(chave)}
+                  savePending={saveMutation.isPending}
+                  colors={colors}
                 />
-                <p className="text-xs text-gray-400 dark:text-zinc-500">
-                  Variáveis: {"{nome}"}, {"{valor}"}, {"{vencimento}"}, {"{link_pagamento}"}
-                </p>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Templates Jurídico */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
-        <CardHeader>
-          <CardTitle className="text-gray-900 dark:text-white text-lg flex items-center gap-2">
-            Templates — Jurídico
-            <Badge variant="outline" className="text-violet-600 dark:text-violet-400 border-violet-300 dark:border-violet-700">
-              Instância Jurídico
-            </Badge>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-6">
-          {templateKeysJuridico.map((tipo) => {
-            const chave = `template_${tipo}`;
-            const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D+30"];
-            const isDirty = dirty.has(chave);
-            return (
-              <div key={tipo} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Badge className={`${colors.bg} ${colors.text} border-0`}>{tipo}</Badge>
-                    {isDirty && (
-                      <span className="text-xs text-yellow-600 dark:text-yellow-400">modificado</span>
-                    )}
-                  </div>
-                  {isDirty && (
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => saveMutation.mutate(chave)}
-                      disabled={saveMutation.isPending}
-                    >
-                      Salvar
-                    </Button>
-                  )}
-                </div>
-                <Textarea
+      {templateKeysJuridico.length > 0 && (
+        <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
+          <CardHeader>
+            <CardTitle className="text-gray-900 dark:text-white text-lg flex items-center gap-2">
+              Templates — Jurídico
+              <Badge variant="outline" className="text-violet-600 dark:text-violet-400 border-violet-300 dark:border-violet-700">
+                Instância Jurídico
+              </Badge>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-6">
+            {templateKeysJuridico.map((tipo) => {
+              const chave = `template_${tipo}`;
+              const colors = TIPO_COLORS[tipo] || TIPO_COLORS["D+30"];
+              return (
+                <TemplateNivelEditor
+                  key={tipo}
+                  tipo={tipo}
                   value={getVal(chave)}
-                  onChange={(e) => setVal(chave, e.target.value)}
-                  className="min-h-[120px] bg-gray-50 dark:bg-zinc-800 text-sm font-mono"
-                  placeholder={`Template para ${tipo}...`}
+                  isDirty={dirty.has(chave)}
+                  onValueChange={(v) => setVal(chave, v)}
+                  onSave={() => saveMutation.mutate(chave)}
+                  savePending={saveMutation.isPending}
+                  colors={colors}
                 />
-                <p className="text-xs text-gray-400 dark:text-zinc-500">
-                  Variáveis: {"{nome}"}, {"{valor}"}, {"{vencimento}"}, {"{link_pagamento}"}
-                </p>
-              </div>
-            );
-          })}
-        </CardContent>
-      </Card>
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Skip Numbers */}
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-800">
@@ -973,6 +1552,7 @@ const TEMPLATE_OPTIONS = [
   { value: "D+3", label: "D+3 (3 dias)" },
   { value: "D+7", label: "D+7 (Suspensão)" },
   { value: "D+10", label: "D+10 (Rescisão)" },
+  { value: "D+14", label: "D+14 (Cancelamento)" },
   { value: "D+15", label: "D+15 (Encerramento)" },
   { value: "D+20", label: "D+20 (Cancelado)" },
   { value: "D+30", label: "D+30 (Formalização Jurídica)" },

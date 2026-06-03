@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 import { runAllForecasts } from "./services/predictiveEngine";
@@ -145,6 +145,7 @@ app.use((req, res, next) => {
     initializePredictionsTable(),
     initializeMetricRulesetsTables(),
     initializeItemAliasMapTable(),
+    initializeSaldoDiarioSnapshotsTable(),
   ]);
 
   // Phase 1.5: Migrations that depend on tables existing
@@ -175,38 +176,43 @@ app.use((req, res, next) => {
     try {
       const { db } = await import('./db');
       const { sql } = await import('drizzle-orm');
-      
-      const today = new Date().toISOString().split('T')[0];
-      
-      // Verificar se já existe snapshot para hoje
+
+      // Use yesterday's date when running after midnight (scheduled at 00:05),
+      // otherwise use today (manual/startup trigger)
+      const now = new Date();
+      const snapshotDate = now.getHours() < 6
+        ? new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1).toISOString().split('T')[0]
+        : now.toISOString().split('T')[0];
+
+      // Verificar se já existe snapshot para esta data
       const existingSnapshot = await db.execute(sql`
-        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist 
-        WHERE DATE(data_snapshot) = ${today}::date
+        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist
+        WHERE data_snapshot = ${snapshotDate}::date
       `);
-      
+
       if (parseInt((existingSnapshot.rows[0] as any)?.count || '0') > 0) {
-        console.log(`[snapshot-job] Snapshot já existe para ${today}, pulando...`);
+        console.log(`[snapshot-job] Snapshot já existe para ${snapshotDate}, pulando...`);
         return;
       }
-      
+
       // Inserir snapshot dos contratos atuais usando colunas existentes na tabela
       await db.execute(sql`
-        INSERT INTO "Clickup".cup_data_hist (data_snapshot, servico, status, valorr, valorp, id_task, id_subtask, 
+        INSERT INTO "Clickup".cup_data_hist (data_snapshot, servico, status, valorr, valorp, id_task, id_subtask,
                                    data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor)
-        SELECT 
-          CURRENT_TIMESTAMP,
+        SELECT
+          ${snapshotDate}::date,
           servico, status, valorr, valorp, id_task, id_subtask,
           data_inicio, data_encerramento, data_pausa, squad, produto, responsavel, cs_responsavel, vendedor
         FROM "Clickup".cup_contratos
       `);
-      
+
       const countResult = await db.execute(sql`
-        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist 
-        WHERE DATE(data_snapshot) = CURRENT_DATE
+        SELECT COUNT(*) as count FROM "Clickup".cup_data_hist
+        WHERE data_snapshot = ${snapshotDate}::date
       `);
-      
+
       const recordCount = parseInt((countResult.rows[0] as any)?.count || '0');
-      console.log(`[snapshot-job] Snapshot criado para ${today} com ${recordCount} contratos`);
+      console.log(`[snapshot-job] Snapshot criado para ${snapshotDate} com ${recordCount} contratos`);
     } catch (error) {
       console.error('[snapshot-job] Erro ao criar snapshot diário:', error);
     }
@@ -220,7 +226,7 @@ app.use((req, res, next) => {
   const runMetaSync = async () => {
     try {
       console.log("[meta-sync-job] Starting scheduled Meta Ads sync...");
-      const { syncMetaAds } = await import("./services/metaAdsSync");
+      const { syncMetaAds, backfillMetaInsightsGaps } = await import("./services/metaAdsSync");
       const { Pool } = await import("pg");
       const pool = new Pool({
         host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
@@ -228,9 +234,21 @@ app.use((req, res, next) => {
         database: process.env.DB_NAME || 'dados_turbo',
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
-        ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
+        ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
       });
       const result = await syncMetaAds(pool, { since: undefined, until: undefined });
+      // Backfill any gaps detected in the last 14 days after the regular sync
+      try {
+        const backfill = await backfillMetaInsightsGaps(pool);
+        if (backfill.filled.length > 0) {
+          console.log(`[meta-sync-job] Backfill filled ${backfill.filled.length} missing dates: ${backfill.filled.join(', ')}`);
+        }
+        if (backfill.errors.length > 0) {
+          result.errors.push(...backfill.errors.map(e => `backfill: ${e}`));
+        }
+      } catch (backfillErr: any) {
+        console.error("[meta-sync-job] Backfill failed:", backfillErr.message);
+      }
       await pool.end();
       // Store last sync result globally
       (globalThis as any).__metaSyncStatus = {
@@ -496,6 +514,33 @@ app.use((req, res, next) => {
   setInterval(() => runInstagramSync(), IG_SYNC_INTERVAL);
   console.log(`[instagram-sync-job] Scheduled every ${IG_SYNC_INTERVAL / 3600000}h`);
 
+  // Bitrix motivo de perda sync a cada 6 horas
+  const MOTIVO_PERDA_SYNC_INTERVAL = 6 * 60 * 60 * 1000; // 6h
+  const runMotivoPerdaSync = async () => {
+    try {
+      console.log("[motivo-perda-sync-job] Starting scheduled Bitrix motivo_perda sync...");
+      const { syncBitrixMotivoPerda } = await import("../scripts/sync-bitrix-motivo-perda");
+      const { totalSynced, totalSeen } = await syncBitrixMotivoPerda();
+      (globalThis as any).__motivoPerdaSyncStatus = {
+        lastSync: new Date().toISOString(),
+        totalSynced,
+        totalSeen,
+        status: "success",
+      };
+      console.log(`[motivo-perda-sync-job] Sync complete: ${totalSynced}/${totalSeen} deals`);
+    } catch (err: any) {
+      console.error("[motivo-perda-sync-job] Sync failed:", err.message);
+      (globalThis as any).__motivoPerdaSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  setTimeout(() => runMotivoPerdaSync(), 120000); // 2min após boot
+  setInterval(() => runMotivoPerdaSync(), MOTIVO_PERDA_SYNC_INTERVAL);
+  console.log(`[motivo-perda-sync-job] Scheduled every ${MOTIVO_PERDA_SYNC_INTERVAL / 3600000}h`);
+
   // Google Ads keywords sync a cada 12 horas
   const GOOGLE_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
   const runGoogleAdsSync = async () => {
@@ -509,7 +554,7 @@ app.use((req, res, next) => {
         database: process.env.DB_NAME || 'dados_turbo',
         user: process.env.DB_USER || 'postgres',
         password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
-        ssl: process.env.DB_SSL_REJECT_UNAUTHORIZED === "false" ? false : { rejectUnauthorized: false },
+        ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
       });
       const result = await syncGoogleAdsKeywords(pool);
       await pool.end();
@@ -562,6 +607,62 @@ app.use((req, res, next) => {
   setTimeout(() => runInternalTrainingsSync(), 60000);
   setInterval(() => runInternalTrainingsSync(), INTERNAL_TRAININGS_SYNC_INTERVAL);
   console.log(`[internal-trainings-sync-job] Scheduled every ${INTERNAL_TRAININGS_SYNC_INTERVAL / 60000} min`);
+
+  // GoHighLevel (GHL) — delta sync a cada 1 hora + tags snapshot diário
+  const GHL_SYNC_INTERVAL = 60 * 60 * 1000; // 1h
+  const runGhlSync = async () => {
+    if (!process.env.GHL_PIT_TOKEN || !process.env.GHL_LOCATION_ID) {
+      console.warn("[ghl-sync-job] Skipping — GHL_PIT_TOKEN/GHL_LOCATION_ID não configurados");
+      return;
+    }
+    try {
+      console.log("[ghl-sync-job] Starting hourly delta sync...");
+      const { runGhlHourlySync } = await import('./services/goHighLevelSync');
+      const r = await runGhlHourlySync();
+      console.log(
+        `[ghl-sync-job] Done: ${r.contacts} contacts, ${r.campaigns} campaigns, ` +
+        `${r.conversations} conversations, ${r.errors.length} errors`,
+      );
+      (globalThis as any).__ghlSyncStatus = {
+        lastSync: new Date().toISOString(),
+        report: r,
+      };
+    } catch (err: any) {
+      console.error("[ghl-sync-job] Failed:", err.message);
+      (globalThis as any).__ghlSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  // Primeira execução 2min após startup, depois a cada 1h
+  setTimeout(() => runGhlSync(), 2 * 60 * 1000);
+  setInterval(() => runGhlSync(), GHL_SYNC_INTERVAL);
+  console.log(`[ghl-sync-job] Scheduled every ${GHL_SYNC_INTERVAL / 60000} min`);
+
+  // GHL tags snapshot diário às 00:10
+  const scheduleNextGhlTagsSnapshot = () => {
+    const now = new Date();
+    const next = new Date(now);
+    next.setDate(next.getDate() + 1);
+    next.setHours(0, 10, 0, 0);
+    const msUntilNext = next.getTime() - now.getTime();
+    setTimeout(async () => {
+      try {
+        if (process.env.GHL_PIT_TOKEN && process.env.GHL_LOCATION_ID) {
+          const { runGhlDailyTagsSnapshot } = await import('./services/goHighLevelSync');
+          const r = await runGhlDailyTagsSnapshot();
+          console.log(`[ghl-tags-snapshot] Done: ${r.tags} tags`);
+        }
+      } catch (err: any) {
+        console.error("[ghl-tags-snapshot] Failed:", err.message);
+      }
+      scheduleNextGhlTagsSnapshot();
+    }, msUntilNext);
+    console.log(`[ghl-tags-snapshot] Próximo snapshot agendado para ${next.toISOString()}`);
+  };
+  scheduleNextGhlTagsSnapshot();
 
   // Agendar snapshot diário às 00:05
   const scheduleNextSnapshot = () => {
@@ -832,6 +933,19 @@ app.use((req, res, next) => {
   } catch (err) {
     console.error(
       "[inadimplencia-snapshot] Falha ao registrar job:",
+      err,
+    );
+  }
+
+  // Saldo diário — snapshot às 18h todos os dias
+  try {
+    const { setupSaldoDiarioSnapshotJob } = await import(
+      "./services/saldoDiarioSnapshotJob"
+    );
+    setupSaldoDiarioSnapshotJob();
+  } catch (err) {
+    console.error(
+      "[saldo-diario-snapshot] Falha ao registrar job:",
       err,
     );
   }

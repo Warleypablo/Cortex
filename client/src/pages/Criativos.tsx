@@ -8,30 +8,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { MetricFormattingSheet } from "@/components/MetricFormattingSheet";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { Search, X, ArrowUpDown, TrendingUp, TrendingDown, Rocket, ExternalLink, Loader2, Settings, ChevronRight, ChevronDown, Plus, History, Pause, Play, Archive, FolderPlus, LayoutGrid, Smartphone, Pencil } from "lucide-react";
-import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Search, X, ArrowUpDown, TrendingUp, TrendingDown, Rocket, ExternalLink, Loader2, Settings, ChevronRight, ChevronDown, Plus } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getMetricColor, getColorClasses, getBenchmarkColor, CRIATIVOS_BENCHMARK_MAP } from "@/lib/metricFormatting";
@@ -41,21 +21,16 @@ import type { DateRange } from "react-day-picker";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency as formatCurrencyUtil, formatDecimal as formatDecimalUtil, formatPercent as formatPercentUtil } from "@/lib/utils";
 import { NovaCampanhaSheet } from "@/components/criativos/criar-campanha/NovaCampanhaSheet";
-import { useIsCreationApprover, useCreationHistory, useActiveJob, useResumeDraft, useCancelDraft } from "@/hooks/useAdsCreation";
-
-type CriativoLevel = 'account' | 'campaign' | 'adset' | 'ad';
+import { useIsCreationApprover } from "@/hooks/useAdsCreation";
 
 interface CriativoData {
   id: string;
   adName: string;
-  link: string | null;
+  link: string;
   status: string;
   plataforma: string;
   campaignId: string | null;
   campaignName: string | null;
-  level?: CriativoLevel;
-  accountId?: string | null;
-  adsetId?: string | null;
   investimento: number;
   videoHook: number | null;
   videoHold: number | null;
@@ -67,6 +42,12 @@ interface CriativoData {
   cpl: number | null;
   mql: number;
   cpmql: number | null;
+  cpra: number | null;
+  cpraMql: number | null;
+  cpraNmql: number | null;
+  cprr: number | null;
+  cprrMql: number | null;
+  cprrNmql: number | null;
   percMql: number | null;
   descartadoPerc: number | null;
   descartadoMqlPerc: number | null;
@@ -142,102 +123,11 @@ export default function Criativos() {
   const [campanhaFilters, setCampanhaFilters] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'investimento', direction: 'desc' });
 
-  // Aba ativa e filtros de drill-down (default: Anúncios — comportamento atual preservado)
-  const [activeTab, setActiveTab] = useState<CriativoLevel>('ad');
-  const [drillFilter, setDrillFilter] = useState<{
-    accountIds?: string[];
-    campaignIds?: string[];
-    adsetIds?: string[];
-    accountName?: string;
-    campaignNameLabel?: string;
-    adsetNameLabel?: string;
-  }>({});
-
-  // Confirmação de pausar/ativar
-  const [statusConfirm, setStatusConfirm] = useState<{
-    level: 'campaign' | 'adset' | 'ad';
-    id: string;
-    name: string;
-    nextStatus: 'ACTIVE' | 'PAUSED';
-  } | null>(null);
-
-  // Seleção de linhas (checkbox)
-  const [selectedRows, setSelectedRows] = useState<Set<string>>(new Set());
-
-  // Confirmação de ação em massa
-  const [bulkConfirm, setBulkConfirm] = useState<{
-    nextStatus: 'ACTIVE' | 'PAUSED';
-    ids: string[];
-  } | null>(null);
-  const [bulkRunning, setBulkRunning] = useState(false);
-
   const { toast } = useToast();
   const [configOpen, setConfigOpen] = useState(false);
   const [novaCampanhaOpen, setNovaCampanhaOpen] = useState(false);
   const { data: creationApproverData } = useIsCreationApprover();
   const isCreationApprover = creationApproverData?.isApprover ?? false;
-  // NOTE(separação criação×otimização): os controles manuais de pausar/ativar anúncio
-  // nesta página eram gateados pelo approver de otimização (useIsApprover →
-  // /ads-optimization/whoami). Como a feature de otimização foi movida pra branch
-  // feature/agente-gestor-meta-ads, aqui o gate passa a reusar o approver de criação.
-  const isApprover = isCreationApprover;
-  const historyQuery = useCreationHistory(isCreationApprover, 10);
-
-  // Job ativo (executing/pausado) — alimenta o banner persistente
-  const activeJobQuery = useActiveJob(isCreationApprover);
-  const activeJob = activeJobQuery.data?.active ?? null;
-  const resumeDraft = useResumeDraft();
-  const cancelDraft = useCancelDraft();
-
-  // Mutation para pausar/ativar campaign | adset | ad
-  const statusMutation = useMutation({
-    mutationFn: async (vars: { level: 'campaign' | 'adset' | 'ad'; id: string; status: 'ACTIVE' | 'PAUSED' }) => {
-      return apiRequest('POST', `/api/growth/criativos/${vars.level}/${vars.id}/status`, { status: vars.status });
-    },
-    onSuccess: (_data, vars) => {
-      toast({ title: vars.status === 'PAUSED' ? 'Pausado com sucesso' : 'Ativado com sucesso' });
-      queryClient.invalidateQueries({ queryKey: ['/api/growth/criativos'] });
-    },
-    onError: (error: Error) => {
-      let description = 'Tente novamente em alguns segundos.';
-      try {
-        const body = JSON.parse(error.message.replace(/^\d+:\s*/, ''));
-        if (body.error) description = body.error;
-      } catch {
-        if (error.message) description = error.message;
-      }
-      toast({ title: 'Erro ao alterar status', description, variant: 'destructive' });
-    },
-  });
-
-  // Executa pausar/ativar em sequência (uma chamada por vez para respeitar rate limit do Meta)
-  const runBulkStatusUpdate = async (ids: string[], nextStatus: 'ACTIVE' | 'PAUSED') => {
-    if (activeTab === 'account') return;
-    setBulkRunning(true);
-    let ok = 0, fail = 0;
-    for (const id of ids) {
-      try {
-        await apiRequest('POST', `/api/growth/criativos/${activeTab}/${id}/status`, { status: nextStatus });
-        ok++;
-      } catch (err) {
-        fail++;
-        console.error('[bulk] erro em', id, err);
-      }
-    }
-    setBulkRunning(false);
-    setBulkConfirm(null);
-    setSelectedRows(new Set());
-    queryClient.invalidateQueries({ queryKey: ['/api/growth/criativos'] });
-    if (fail === 0) {
-      toast({ title: nextStatus === 'PAUSED' ? `${ok} pausado(s) com sucesso` : `${ok} ativado(s) com sucesso` });
-    } else {
-      toast({
-        title: `Concluído com ${fail} erro(s)`,
-        description: `${ok} ${nextStatus === 'PAUSED' ? 'pausados' : 'ativados'}, ${fail} falharam.`,
-        variant: 'destructive',
-      });
-    }
-  };
 
   const startDate = format(dateRange.from, 'yyyy-MM-dd');
   const endDate = format(dateRange.to, 'yyyy-MM-dd');
@@ -297,56 +187,18 @@ export default function Criativos() {
     return [];
   }, [selectedCampaignIds, selectedProdutos, campanhasFiltradas]);
 
-  // Query principal — usa endpoint legado para Anúncios (preserva comportamento atual)
-  // e o novo /hierarchy para Contas/Campanhas/Conjuntos.
   const { data: criativos = [], isLoading } = useQuery<CriativoData[]>({
-    queryKey: ['/api/growth/criativos', activeTab, drillFilter, startDate, endDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
+    queryKey: ['/api/growth/criativos', startDate, endDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
     queryFn: async () => {
       const params = new URLSearchParams({ startDate, endDate, status: statusFilter });
       if (selectedPlataformas.length > 0) {
         params.append('plataforma', selectedPlataformas.join(','));
       }
-
-      // IDs de campanha vindos dos filtros normais OU do drill-down
-      const drillCampaignIds = drillFilter.campaignIds || [];
-      const filterCampaignIds = activeCampaignIds.length > 0 ? activeCampaignIds : [];
-      const mergedCampaignIds = drillCampaignIds.length > 0
-        ? (filterCampaignIds.length > 0
-            ? filterCampaignIds.filter(id => drillCampaignIds.includes(id))
-            : drillCampaignIds)
-        : filterCampaignIds;
-
-      if (activeTab === 'ad') {
-        if (mergedCampaignIds.length > 0) {
-          params.append('campanhaIds', mergedCampaignIds.join(','));
-        }
-        if (drillFilter.adsetIds && drillFilter.adsetIds.length > 0) {
-          params.append('adsetIds', drillFilter.adsetIds.join(','));
-        }
-        const res = await fetch(`/api/growth/criativos?${params.toString()}`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch criativos');
-        const data: CriativoData[] = await res.json();
-        // Filtro client-side por adset (caso o endpoint legado ainda não suporte adsetIds)
-        if (drillFilter.adsetIds && drillFilter.adsetIds.length > 0) {
-          const adsetIdSet = new Set(drillFilter.adsetIds);
-          return data.filter((d: any) => d.adsetId && adsetIdSet.has(String(d.adsetId)));
-        }
-        return data;
+      if (activeCampaignIds.length > 0) {
+        params.append('campanhaIds', activeCampaignIds.join(','));
       }
-
-      // Hierarquia (account/campaign/adset)
-      params.append('level', activeTab);
-      if (drillFilter.accountIds && drillFilter.accountIds.length > 0) {
-        params.append('accountIds', drillFilter.accountIds.join(','));
-      }
-      if (mergedCampaignIds.length > 0) {
-        params.append('campaignIds', mergedCampaignIds.join(','));
-      }
-      if (drillFilter.adsetIds && drillFilter.adsetIds.length > 0) {
-        params.append('adsetIds', drillFilter.adsetIds.join(','));
-      }
-      const res = await fetch(`/api/growth/criativos/hierarchy?${params.toString()}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch criativos hierarchy');
+      const res = await fetch(`/api/growth/criativos?${params.toString()}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch criativos');
       return res.json();
     }
   });
@@ -356,33 +208,18 @@ export default function Criativos() {
   const compareEndDate = compareEnabled && compareRange?.to ? format(compareRange.to, 'yyyy-MM-dd') : '';
 
   const { data: compareData = [] } = useQuery<CriativoData[]>({
-    queryKey: ['/api/growth/criativos/compare', activeTab, drillFilter, compareStartDate, compareEndDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
+    queryKey: ['/api/growth/criativos/compare', compareStartDate, compareEndDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
     queryFn: async () => {
       if (!compareStartDate || !compareEndDate) return [];
       const params = new URLSearchParams({ startDate: compareStartDate, endDate: compareEndDate, status: statusFilter });
       if (selectedPlataformas.length > 0) {
         params.append('plataforma', selectedPlataformas.join(','));
       }
-      const drillCampaignIds = drillFilter.campaignIds || [];
-      const filterCampaignIds = activeCampaignIds.length > 0 ? activeCampaignIds : [];
-      const mergedCampaignIds = drillCampaignIds.length > 0
-        ? (filterCampaignIds.length > 0
-            ? filterCampaignIds.filter(id => drillCampaignIds.includes(id))
-            : drillCampaignIds)
-        : filterCampaignIds;
-
-      if (activeTab === 'ad') {
-        if (mergedCampaignIds.length > 0) params.append('campanhaIds', mergedCampaignIds.join(','));
-        const res = await fetch(`/api/growth/criativos?${params.toString()}`, { credentials: 'include' });
-        if (!res.ok) throw new Error('Failed to fetch compare criativos');
-        return res.json();
+      if (activeCampaignIds.length > 0) {
+        params.append('campanhaIds', activeCampaignIds.join(','));
       }
-      params.append('level', activeTab);
-      if (drillFilter.accountIds && drillFilter.accountIds.length > 0) params.append('accountIds', drillFilter.accountIds.join(','));
-      if (mergedCampaignIds.length > 0) params.append('campaignIds', mergedCampaignIds.join(','));
-      if (drillFilter.adsetIds && drillFilter.adsetIds.length > 0) params.append('adsetIds', drillFilter.adsetIds.join(','));
-      const res = await fetch(`/api/growth/criativos/hierarchy?${params.toString()}`, { credentials: 'include' });
-      if (!res.ok) throw new Error('Failed to fetch compare hierarchy');
+      const res = await fetch(`/api/growth/criativos?${params.toString()}`, { credentials: 'include' });
+      if (!res.ok) throw new Error('Failed to fetch compare criativos');
       return res.json();
     },
     enabled: compareEnabled && !!compareStartDate && !!compareEndDate,
@@ -603,6 +440,12 @@ export default function Criativos() {
       cpl: avg('cpl'),
       mql: totalMql,
       cpmql: avg('cpmql'),
+      cpra: avg('cpra'),
+      cpraMql: avg('cpraMql'),
+      cpraNmql: avg('cpraNmql'),
+      cprr: avg('cprr'),
+      cprrMql: avg('cprrMql'),
+      cprrNmql: avg('cprrNmql'),
       percMql: avg('percMql'),
       percRa: avg('percRa'),
       percRaMql: avg('percRaMql'),
@@ -862,238 +705,11 @@ export default function Criativos() {
             </Button>
           )}
 
-          {isCreationApprover && (
-            <Popover>
-              <PopoverTrigger asChild>
-                <Button variant="outline" size="sm" className="h-9 shrink-0 gap-1.5">
-                  <History className="w-4 h-4" />
-                  Histórico
-                </Button>
-              </PopoverTrigger>
-              <PopoverContent className="w-96 p-0" align="end">
-                <div className="p-2 border-b text-xs font-medium text-muted-foreground">
-                  Últimas campanhas criadas via Cortex
-                </div>
-                <div className="max-h-96 overflow-y-auto">
-                  {historyQuery.isLoading ? (
-                    <div className="p-4 text-center text-xs text-muted-foreground">
-                      <Loader2 className="w-4 h-4 animate-spin inline mr-1" /> Carregando...
-                    </div>
-                  ) : (historyQuery.data?.items ?? []).length === 0 ? (
-                    <div className="p-4 text-center text-xs text-muted-foreground">
-                      Nenhuma campanha criada ainda.
-                    </div>
-                  ) : (
-                    <ul className="divide-y">
-                      {(historyQuery.data?.items ?? []).map((item) => {
-                        const result = item.result;
-                        const adsetCount = result?.adsetIds?.length ?? 0;
-                        const adCount = result?.adIds?.length ?? 0;
-                        const date = item.executedAt ? new Date(item.executedAt) : null;
-                        const dateStr = date
-                          ? `${String(date.getDate()).padStart(2, "0")}/${String(date.getMonth() + 1).padStart(2, "0")} ${String(date.getHours()).padStart(2, "0")}:${String(date.getMinutes()).padStart(2, "0")}`
-                          : "—";
-                        const statusBadge =
-                          item.status === "created" ? (
-                            <Badge variant="outline" className="text-green-600 border-green-600">✓</Badge>
-                          ) : item.status === "failed" ? (
-                            <Badge variant="outline" className="text-red-600 border-red-600">✗</Badge>
-                          ) : (
-                            <Badge variant="outline">{item.status}</Badge>
-                          );
-                        return (
-                          <li key={item.id} className="p-2 text-xs hover:bg-muted/50">
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 mb-0.5">
-                                  {statusBadge}
-                                  <span className="font-medium truncate">
-                                    {item.briefing?.campaignName ?? "(sem nome)"}
-                                  </span>
-                                </div>
-                                <div className="text-muted-foreground">
-                                  {dateStr} · {adsetCount} conjunto(s) · {adCount} ad(s)
-                                </div>
-                              </div>
-                              {result?.managerUrl && (
-                                <a
-                                  href={result.managerUrl}
-                                  target="_blank"
-                                  rel="noreferrer"
-                                  className="text-blue-600 dark:text-blue-400 hover:underline shrink-0"
-                                >
-                                  <ExternalLink className="w-3.5 h-3.5" />
-                                </a>
-                              )}
-                            </div>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  )}
-                </div>
-              </PopoverContent>
-            </Popover>
-          )}
-
           <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-metrics">
             <Settings className="w-4 h-4" />
           </Button>
         </div>
       </div>
-
-      {/* Banner de job ativo / pausado */}
-      {activeJob && (
-        <div className={cn(
-          "mx-4 mt-2 px-4 py-2.5 rounded-md border flex items-center justify-between gap-3 text-sm",
-          activeJob.status === 'executing' && "bg-blue-500/10 border-blue-500/30 text-blue-700 dark:text-blue-300",
-          activeJob.status === 'paused_rate_limit' && "bg-amber-500/10 border-amber-500/30 text-amber-700 dark:text-amber-300",
-          activeJob.status === 'paused_manual' && "bg-red-500/10 border-red-500/30 text-red-700 dark:text-red-300",
-        )}>
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            {activeJob.status === 'executing' ? (
-              <Loader2 className="w-4 h-4 animate-spin shrink-0" />
-            ) : (
-              <Pause className="w-4 h-4 shrink-0" />
-            )}
-            <div className="flex-1 min-w-0">
-              <div className="font-medium truncate">
-                {activeJob.status === 'executing' && (
-                  <>
-                    {activeJob.percent !== null && <span className="font-bold mr-1.5">{activeJob.percent}%</span>}
-                    Criando campanha {activeJob.campaignName ? `"${activeJob.campaignName}"` : ''}
-                    {activeJob.totalFiles ? (
-                      <> — {activeJob.uploadedCount}/{activeJob.totalFiles} mídia(s) {activeJob.phase === 'create' ? '· criando ads' : ''}</>
-                    ) : (
-                      <> — {activeJob.uploadedCount} mídia(s) processada(s)</>
-                    )}
-                  </>
-                )}
-                {activeJob.status === 'paused_rate_limit' && (
-                  <>
-                    {activeJob.percent !== null && <span className="font-bold mr-1.5">{activeJob.percent}%</span>}
-                    Pausado por rate limit · {activeJob.uploadedCount}{activeJob.totalFiles ? `/${activeJob.totalFiles}` : ''} mídia(s) · tentativa {activeJob.attempts}/4
-                  </>
-                )}
-                {activeJob.status === 'paused_manual' && (
-                  <>
-                    {activeJob.percent !== null && <span className="font-bold mr-1.5">{activeJob.percent}%</span>}
-                    Job pausado após 4 tentativas · {activeJob.uploadedCount}{activeJob.totalFiles ? `/${activeJob.totalFiles}` : ''} mídia(s) — ação manual necessária
-                  </>
-                )}
-              </div>
-              {activeJob.status === 'paused_rate_limit' && activeJob.nextAttemptAt && (
-                <div className="text-xs opacity-80">
-                  Retomando automaticamente às {new Date(activeJob.nextAttemptAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                </div>
-              )}
-              {activeJob.lastError && activeJob.status === 'paused_manual' && (
-                <div className="text-xs opacity-80 truncate">{activeJob.lastError}</div>
-              )}
-            </div>
-          </div>
-          <div className="flex items-center gap-2 shrink-0">
-            {(activeJob.status === 'paused_rate_limit' || activeJob.status === 'paused_manual') && (
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-7"
-                disabled={resumeDraft.isPending}
-                onClick={() => resumeDraft.mutate(activeJob.id)}
-                data-testid="button-resume-job"
-              >
-                {resumeDraft.isPending ? <Loader2 className="w-3 h-3 animate-spin mr-1" /> : <Play className="w-3 h-3 mr-1" />}
-                Retomar agora
-              </Button>
-            )}
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-7 text-xs"
-              disabled={cancelDraft.isPending}
-              onClick={() => {
-                if (confirm('Cancelar job? Os ads já criados ficam no Meta — apague manualmente se quiser.')) {
-                  cancelDraft.mutate(activeJob.id);
-                }
-              }}
-              data-testid="button-cancel-job"
-            >
-              Cancelar
-            </Button>
-          </div>
-        </div>
-      )}
-
-      <NovaCampanhaSheet
-        open={novaCampanhaOpen}
-        onClose={() => setNovaCampanhaOpen(false)}
-      />
-
-      {/* Confirmação de ação em massa */}
-      <AlertDialog open={!!bulkConfirm} onOpenChange={(open) => !open && !bulkRunning && setBulkConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {bulkConfirm?.nextStatus === 'PAUSED' ? 'Desativar' : 'Ativar'} {bulkConfirm?.ids.length}{' '}
-              {activeTab === 'campaign' ? 'campanha(s)' : activeTab === 'adset' ? 'conjunto(s)' : 'anúncio(s)'}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação afeta a entrega imediatamente no Meta Ads e é visível para todos os colaboradores.
-              As alterações são aplicadas uma a uma — se algumas falharem, você verá um resumo no final.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={bulkRunning} data-testid="button-bulk-cancel">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={bulkRunning}
-              onClick={(e) => {
-                e.preventDefault();
-                if (!bulkConfirm) return;
-                runBulkStatusUpdate(bulkConfirm.ids, bulkConfirm.nextStatus);
-              }}
-              data-testid="button-bulk-confirm"
-            >
-              {bulkRunning ? (
-                <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Aplicando...</>
-              ) : (
-                bulkConfirm?.nextStatus === 'PAUSED' ? 'Desativar' : 'Ativar'
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      <AlertDialog open={!!statusConfirm} onOpenChange={(open) => !open && setStatusConfirm(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {statusConfirm?.nextStatus === 'PAUSED' ? 'Pausar' : 'Ativar'}{' '}
-              {statusConfirm?.level === 'campaign' ? 'campanha' : statusConfirm?.level === 'adset' ? 'conjunto' : 'anúncio'}?
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação afeta a entrega imediatamente no Meta Ads e é visível para todos os colaboradores.
-              <div className="mt-2 font-medium text-foreground">{statusConfirm?.name}</div>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-status-cancel">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (!statusConfirm) return;
-                statusMutation.mutate({
-                  level: statusConfirm.level,
-                  id: statusConfirm.id,
-                  status: statusConfirm.nextStatus,
-                });
-                setStatusConfirm(null);
-              }}
-              data-testid="button-status-confirm"
-            >
-              {statusConfirm?.nextStatus === 'PAUSED' ? 'Pausar' : 'Ativar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 px-4 py-2">
@@ -1206,142 +822,7 @@ export default function Criativos() {
         </Card>
       </div>
 
-      {/* Tabs hierárquicas estilo UTMFY: Contas | Campanhas | Conjuntos | Anúncios */}
-      <div className="px-4 pt-1">
-        <div className="flex items-end gap-1 border-b border-border">
-          {([
-            { key: 'account',  label: 'Contas',    Icon: Archive,     testId: 'tab-contas' },
-            { key: 'campaign', label: 'Campanhas', Icon: FolderPlus,  testId: 'tab-campanhas' },
-            { key: 'adset',    label: 'Conjuntos', Icon: LayoutGrid,  testId: 'tab-conjuntos' },
-            { key: 'ad',       label: 'Anúncios',  Icon: Smartphone,  testId: 'tab-anuncios' },
-          ] as const).map(({ key, label, Icon, testId }) => {
-            const isActive = activeTab === key;
-            return (
-              <button
-                key={key}
-                data-testid={testId}
-                onClick={() => {
-                  const next = key as CriativoLevel;
-                  setActiveTab(next);
-                  setSelectedRows(new Set());
-                  setDrillFilter(prev => {
-                    const out: typeof prev = {};
-                    if (next === 'campaign' || next === 'adset' || next === 'ad') {
-                      if (prev.accountIds) { out.accountIds = prev.accountIds; out.accountName = prev.accountName; }
-                    }
-                    if (next === 'adset' || next === 'ad') {
-                      if (prev.campaignIds) { out.campaignIds = prev.campaignIds; out.campaignNameLabel = prev.campaignNameLabel; }
-                    }
-                    if (next === 'ad') {
-                      if (prev.adsetIds) { out.adsetIds = prev.adsetIds; out.adsetNameLabel = prev.adsetNameLabel; }
-                    }
-                    return out;
-                  });
-                }}
-                className={cn(
-                  "relative flex-1 max-w-[280px] flex items-center gap-2.5 px-4 py-3 text-sm font-medium",
-                  "rounded-t-lg border border-b-0 transition-colors",
-                  isActive
-                    ? "bg-card border-border text-primary"
-                    : "bg-muted/30 border-transparent text-muted-foreground hover:text-foreground hover:bg-muted/50"
-                )}
-              >
-                <Icon className={cn("w-4 h-4", isActive ? "text-primary" : "text-muted-foreground")} />
-                <span>{label}</span>
-                {isActive && (
-                  <span className="absolute -bottom-px left-3 right-3 h-0.5 bg-primary rounded-full" />
-                )}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Toolbar de ações em massa (visível quando há seleção em Campanhas/Conjuntos/Anúncios) */}
-        {selectedRows.size > 0 && activeTab !== 'account' && (
-          <div className="flex items-center gap-2 mt-2 px-3 py-1.5 bg-primary/10 border border-primary/20 rounded-md">
-            <span className="text-sm font-medium">{selectedRows.size} selecionado(s)</span>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="h-8 gap-1.5"
-                  disabled={!isApprover || bulkRunning}
-                  data-testid="button-bulk-edit"
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  Editar
-                  <ChevronDown className="w-3 h-3 opacity-60" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-44">
-                <div className="px-2 py-1.5 text-xs text-muted-foreground font-medium">Geral</div>
-                <DropdownMenuItem
-                  onClick={() => setBulkConfirm({ nextStatus: 'ACTIVE', ids: Array.from(selectedRows) })}
-                  data-testid="bulk-action-ativar"
-                >
-                  <Play className="w-3.5 h-3.5 mr-2" /> Ativar
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  onClick={() => setBulkConfirm({ nextStatus: 'PAUSED', ids: Array.from(selectedRows) })}
-                  data-testid="bulk-action-desativar"
-                >
-                  <Pause className="w-3.5 h-3.5 mr-2" /> Desativar
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-            <Button
-              variant="ghost"
-              size="sm"
-              className="h-8 text-xs"
-              onClick={() => setSelectedRows(new Set())}
-            >
-              Limpar seleção
-            </Button>
-            {bulkRunning && (
-              <span className="flex items-center gap-1 text-xs text-muted-foreground ml-auto">
-                <Loader2 className="w-3 h-3 animate-spin" /> Aplicando...
-              </span>
-            )}
-          </div>
-        )}
-
-        {/* Breadcrumb drill-down */}
-        {(drillFilter.accountIds || drillFilter.campaignIds || drillFilter.adsetIds) && (
-          <div className="flex items-center gap-1 text-xs text-muted-foreground mt-2">
-            <span className="font-medium">Filtrado:</span>
-            {drillFilter.accountName && (
-              <Badge variant="outline" className="gap-1">
-                Conta: {drillFilter.accountName}
-                <button
-                  onClick={() => setDrillFilter(prev => ({ ...prev, accountIds: undefined, accountName: undefined }))}
-                  className="hover:text-destructive"
-                ><X className="w-3 h-3" /></button>
-              </Badge>
-            )}
-            {drillFilter.campaignNameLabel && (
-              <Badge variant="outline" className="gap-1">
-                Campanha: {drillFilter.campaignNameLabel}
-                <button
-                  onClick={() => setDrillFilter(prev => ({ ...prev, campaignIds: undefined, campaignNameLabel: undefined, adsetIds: undefined, adsetNameLabel: undefined }))}
-                  className="hover:text-destructive"
-                ><X className="w-3 h-3" /></button>
-              </Badge>
-            )}
-            {drillFilter.adsetNameLabel && (
-              <Badge variant="outline" className="gap-1">
-                Conjunto: {drillFilter.adsetNameLabel}
-                <button
-                  onClick={() => setDrillFilter(prev => ({ ...prev, adsetIds: undefined, adsetNameLabel: undefined }))}
-                  className="hover:text-destructive"
-                ><X className="w-3 h-3" /></button>
-              </Badge>
-            )}
-          </div>
-        )}
-      </div>
-
-      <div className="flex-1 p-4 pt-2">
+      <div className="flex-1 p-4 pt-0">
         <Card className="h-full">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2">
@@ -1368,40 +849,24 @@ export default function Criativos() {
                 <Table>
                   <TableHeader className="sticky top-0 z-50">
                     <TableRow className="bg-zinc-900 dark:bg-zinc-900 shadow-md [&>th]:bg-zinc-900 dark:[&>th]:bg-zinc-900">
-                      {/* Checkbox de seleção (estilo Meta) */}
-                      <TableHead className="w-[36px] text-xs bg-zinc-900 text-zinc-100 sticky left-0 z-10 px-2">
-                        <Checkbox
-                          checked={filteredData.length > 0 && filteredData.every(d => selectedRows.has(d.id))}
-                          onCheckedChange={(v) => {
-                            setSelectedRows(prev => {
-                              const next = new Set(prev);
-                              if (v) filteredData.forEach(d => next.add(d.id));
-                              else filteredData.forEach(d => next.delete(d.id));
-                              return next;
-                            });
-                          }}
-                          aria-label="Selecionar todos"
-                        />
-                      </TableHead>
-                      {/* Toggle de status (sticky) — substitui a antiga coluna Status */}
+                      <TableHead className="text-xs bg-zinc-900 text-zinc-100 sticky left-0 z-10">Link</TableHead>
                       <TableHead
-                        className="w-[60px] cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[36px] z-10"
-                        onClick={() => handleSort('status')}
-                      >
-                        <div className="flex items-center gap-1">Status <ArrowUpDown className="w-3 h-3" /></div>
-                      </TableHead>
-                      <TableHead className="text-xs bg-zinc-900 text-zinc-100 sticky left-[96px] z-10">Link</TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[148px] z-10"
+                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[52px] z-10"
                         onClick={() => handleSort('id')}
                       >
                         <div className="flex items-center gap-1">Ad Id <ArrowUpDown className="w-3 h-3" /></div>
                       </TableHead>
                       <TableHead
-                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[316px] z-10 border-r border-zinc-700"
+                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[220px] z-10"
                         onClick={() => handleSort('adName')}
                       >
                         <div className="flex items-center gap-1">Ad name <ArrowUpDown className="w-3 h-3" /></div>
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[470px] z-10 border-r border-zinc-700"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center gap-1">Status <ArrowUpDown className="w-3 h-3" /></div>
                       </TableHead>
                       <SortableHeader column="investimento" label="Invest" />
                       <SortableHeader column="cpm" label="CPM" />
@@ -1423,9 +888,17 @@ export default function Criativos() {
                         <SortableHeader column="percRaMql" label="RA MQL %" />
                         <SortableHeader column="percRaNmql" label="RA NMQL %" />
                       </GroupableHeader>
+                      <GroupableHeader group="cpra" label="CPRA" column="cpra">
+                        <SortableHeader column="cpraMql" label="CPRA MQL" />
+                        <SortableHeader column="cpraNmql" label="CPRA NMQL" />
+                      </GroupableHeader>
                       <GroupableHeader group="rr" label="RR %" column="percRr">
                         <SortableHeader column="percRrMql" label="RR MQL %" />
                         <SortableHeader column="percRrNmql" label="RR NMQL %" />
+                      </GroupableHeader>
+                      <GroupableHeader group="cprr" label="CPRR" column="cprr">
+                        <SortableHeader column="cprrMql" label="CPRR MQL" />
+                        <SortableHeader column="cprrNmql" label="CPRR NMQL" />
                       </GroupableHeader>
                       <GroupableHeader group="rrv" label="RR→V %" column="percRrVendas">
                         <SortableHeader column="percRrMqlVendas" label="RR MQL→V %" />
@@ -1447,11 +920,10 @@ export default function Criativos() {
                     {/* Linha de médias dentro do thead para sticky funcionar */}
                     {averages && (
                       <TableRow className="bg-zinc-800 dark:bg-zinc-800 border-b-2 border-zinc-700 font-semibold text-xs [&>th]:bg-zinc-800 dark:[&>th]:bg-zinc-800 [&>th]:font-semibold">
-                        <TableHead className="sticky left-0 z-10 bg-zinc-800 w-[36px]" />
-                        <TableHead className="sticky left-[36px] z-10 bg-zinc-800 w-[60px]" />
-                        <TableHead className="sticky left-[96px] z-10 bg-zinc-800" />
-                        <TableHead className="text-muted-foreground sticky left-[148px] z-10 bg-zinc-800">Média</TableHead>
-                        <TableHead className="sticky left-[316px] z-10 bg-zinc-800 border-r border-zinc-700" />
+                        <TableHead className="sticky left-0 z-10 bg-zinc-800" />
+                        <TableHead className="text-muted-foreground sticky left-[52px] z-10 bg-zinc-800">Média</TableHead>
+                        <TableHead className="sticky left-[220px] z-10 bg-zinc-800" />
+                        <TableHead className="sticky left-[470px] z-10 bg-zinc-800 border-r border-zinc-700" />
                         {(() => {
                           const avgCell = (val: string, col: string) => (
                             <>
@@ -1477,8 +949,12 @@ export default function Criativos() {
                               {expandedGroups.has('desc') && <>{avgCell('-', 'descartadoMqlPerc')}{avgCell('-', 'descartadoNmqlPerc')}</>}
                               {avgCell(formatPercent(averages.percRa), 'percRa')}
                               {expandedGroups.has('ra') && <>{avgCell(formatPercent(averages.percRaMql), 'percRaMql')}{avgCell(formatPercent(averages.percRaNmql), 'percRaNmql')}</>}
+                              {avgCell(formatCurrency(averages.cpra), 'cpra')}
+                              {expandedGroups.has('cpra') && <>{avgCell(formatCurrency(averages.cpraMql), 'cpraMql')}{avgCell(formatCurrency(averages.cpraNmql), 'cpraNmql')}</>}
                               {avgCell(formatPercent(averages.percRr), 'percRr')}
                               {expandedGroups.has('rr') && <>{avgCell(formatPercent(averages.percRrMql), 'percRrMql')}{avgCell(formatPercent(averages.percRrNmql), 'percRrNmql')}</>}
+                              {avgCell(formatCurrency(averages.cprr), 'cprr')}
+                              {expandedGroups.has('cprr') && <>{avgCell(formatCurrency(averages.cprrMql), 'cprrMql')}{avgCell(formatCurrency(averages.cprrNmql), 'cprrNmql')}</>}
                               {avgCell(formatPercent(averages.percRrVendas), 'percRrVendas')}
                               {expandedGroups.has('rrv') && <>{avgCell(formatPercent(averages.percRrMqlVendas), 'percRrMqlVendas')}{avgCell(formatPercent(averages.percRrNmqlVendas), 'percRrNmqlVendas')}</>}
                               {avgCell(formatNumber(averages.clientesUnicos), 'clientesUnicos')}
@@ -1496,86 +972,28 @@ export default function Criativos() {
                     )}
                   </TableHeader>
                   <TableBody>
-                    {filteredData.map((item) => {
-                      const drillable = activeTab !== 'ad';
-                      const handleDrillDown = () => {
-                        if (!drillable) return;
-                        if (activeTab === 'account') {
-                          setDrillFilter(prev => ({ ...prev, accountIds: [item.id], accountName: item.adName }));
-                          setActiveTab('campaign');
-                        } else if (activeTab === 'campaign') {
-                          setDrillFilter(prev => ({ ...prev, campaignIds: [item.id], campaignNameLabel: item.adName }));
-                          setActiveTab('adset');
-                        } else if (activeTab === 'adset') {
-                          setDrillFilter(prev => ({ ...prev, adsetIds: [item.id], adsetNameLabel: item.adName }));
-                          setActiveTab('ad');
-                        }
-                      };
-                      return (
-                      <TableRow
-                        key={item.id}
-                        data-testid={`row-criativo-${item.id}`}
-                        className={drillable ? 'cursor-pointer hover:bg-muted/30' : ''}
-                        onClick={drillable ? handleDrillDown : undefined}
-                      >
-                        {/* 1. Checkbox de seleção (sticky leftmost) */}
-                        <TableCell className="w-[36px] sticky left-0 z-10 bg-card px-2">
-                          <Checkbox
-                            checked={selectedRows.has(item.id)}
-                            onCheckedChange={(v) => {
-                              setSelectedRows(prev => {
-                                const next = new Set(prev);
-                                if (v) next.add(item.id); else next.delete(item.id);
-                                return next;
-                              });
-                            }}
-                            onClick={(e) => e.stopPropagation()}
-                            aria-label={`Selecionar ${item.adName}`}
-                          />
-                        </TableCell>
-                        {/* 2. Toggle de status (estilo Meta) — substitui a antiga coluna Status */}
-                        <TableCell className="w-[60px] sticky left-[36px] z-10 bg-card">
-                          {(item.status === 'Ativo' || item.status === 'Pausado') && activeTab !== 'account' ? (
-                            <Switch
-                              checked={item.status === 'Ativo'}
-                              disabled={!isApprover || statusMutation.isPending}
-                              onClick={(e) => e.stopPropagation()}
-                              onCheckedChange={(checked) => {
-                                if (!isApprover) return;
-                                setStatusConfirm({
-                                  level: activeTab as 'campaign' | 'adset' | 'ad',
-                                  id: item.id,
-                                  name: item.adName,
-                                  nextStatus: checked ? 'ACTIVE' : 'PAUSED',
-                                });
-                              }}
-                              aria-label={item.status === 'Ativo' ? 'Pausar' : 'Ativar'}
-                              data-testid={`switch-status-${item.id}`}
-                            />
-                          ) : (
-                            <Badge
-                              variant="secondary"
-                              className="text-[10px]"
-                            >
-                              {item.status}
-                            </Badge>
-                          )}
-                        </TableCell>
-                        {/* 3. Link (sticky) */}
-                        <TableCell className="sticky left-[96px] z-10 bg-card">
-                          {item.link && activeTab === 'ad' && (
-                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline" onClick={(e) => e.stopPropagation()}>
+                    {filteredData.map((item) => (
+                      <TableRow key={item.id} data-testid={`row-criativo-${item.id}`}>
+                        <TableCell className="sticky left-0 z-10 bg-card">
+                          {item.link && (
+                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                               <ExternalLink className="w-4 h-4" />
                             </a>
                           )}
                         </TableCell>
-                        {/* 4. Ad ID (sticky) */}
-                        <TableCell className="font-mono text-xs text-muted-foreground sticky left-[148px] z-10 bg-card" title={item.id}>
+                        <TableCell className="font-mono text-xs text-muted-foreground sticky left-[52px] z-10 bg-card" title={item.id}>
                           {item.id || '-'}
                         </TableCell>
-                        {/* 5. Ad name (sticky) */}
-                        <TableCell className="font-medium max-w-[250px] truncate sticky left-[316px] z-10 bg-card border-r border-zinc-700/50" title={item.adName}>
+                        <TableCell className="font-medium max-w-[250px] truncate sticky left-[220px] z-10 bg-card" title={item.adName}>
                           {item.adName}
+                        </TableCell>
+                        <TableCell className="sticky left-[470px] z-10 bg-card border-r border-zinc-700/50">
+                          <Badge
+                            variant={item.status === 'Ativo' ? 'default' : 'secondary'}
+                            className={item.status === 'Ativo' ? 'bg-green-500' : ''}
+                          >
+                            {item.status}
+                          </Badge>
                         </TableCell>
                         {(() => {
                           const c = compareMap.get(item.id);
@@ -1609,12 +1027,28 @@ export default function Criativos() {
                                   {renderCell(item.percRaNmql, c?.percRaNmql ?? null, 'percRaNmql', formatPercent, getCellColor(item.percRaNmql, 'percRaNmql'))}
                                 </>
                               )}
+                              {/* CPRA (grupo) */}
+                              {renderCell(item.cpra, c?.cpra ?? null, 'cpra', formatCurrency, getCellColor(item.cpra, 'cpmql'), true)}
+                              {expandedGroups.has('cpra') && (
+                                <>
+                                  {renderCell(item.cpraMql, c?.cpraMql ?? null, 'cpraMql', formatCurrency, getCellColor(item.cpraMql, 'cpmql'), true)}
+                                  {renderCell(item.cpraNmql, c?.cpraNmql ?? null, 'cpraNmql', formatCurrency, getCellColor(item.cpraNmql, 'cpmql'), true)}
+                                </>
+                              )}
                               {/* RR % (grupo) */}
                               {renderCell(item.percRr, c?.percRr ?? null, 'percRr', formatPercent, getCellColor(item.percRr, 'percRr'))}
                               {expandedGroups.has('rr') && (
                                 <>
                                   {renderCell(item.percRrMql, c?.percRrMql ?? null, 'percRrMql', formatPercent, getCellColor(item.percRrMql, 'percRrMql'))}
                                   {renderCell(item.percRrNmql, c?.percRrNmql ?? null, 'percRrNmql', formatPercent, getCellColor(item.percRrNmql, 'percRrNmql'))}
+                                </>
+                              )}
+                              {/* CPRR (grupo) */}
+                              {renderCell(item.cprr, c?.cprr ?? null, 'cprr', formatCurrency, getCellColor(item.cprr, 'cpmql'), true)}
+                              {expandedGroups.has('cprr') && (
+                                <>
+                                  {renderCell(item.cprrMql, c?.cprrMql ?? null, 'cprrMql', formatCurrency, getCellColor(item.cprrMql, 'cpmql'), true)}
+                                  {renderCell(item.cprrNmql, c?.cprrNmql ?? null, 'cprrNmql', formatCurrency, getCellColor(item.cprrNmql, 'cpmql'), true)}
                                 </>
                               )}
                               {/* RR→V % (grupo) */}
@@ -1649,11 +1083,10 @@ export default function Criativos() {
                           );
                         })()}
                       </TableRow>
-                      );
-                    })}
+                    ))}
                     {filteredData.length === 0 && (
                       <TableRow>
-                        <TableCell colSpan={37} className="text-center py-8 text-muted-foreground">
+                        <TableCell colSpan={36} className="text-center py-8 text-muted-foreground">
                           Nenhum criativo encontrado para o período selecionado
                         </TableCell>
                       </TableRow>
@@ -1668,6 +1101,11 @@ export default function Criativos() {
           </div>
         </Card>
       </div>
+
+      <NovaCampanhaSheet
+        open={novaCampanhaOpen}
+        onClose={() => setNovaCampanhaOpen(false)}
+      />
     </div>
   );
 }
