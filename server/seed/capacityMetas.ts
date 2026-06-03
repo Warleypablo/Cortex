@@ -38,7 +38,7 @@ export const CAPACITY_METAS_SEED: CapacityMetaSeed[] = [
   // ── Accounts ──
   { nome: "Moises",       match_responsavel: "Moises Silva Fernandes", categoria: "account", cap_recorrente: null, cap_mrr: 76085.63, cap_pontual: null, cap_contas: 30, ordem: 1 },
   { nome: "Pedro",        match_responsavel: "Pedro Antonio",          categoria: "account", cap_recorrente: null, cap_mrr: 86685,    cap_pontual: null, cap_contas: 30, ordem: 2 },
-  { nome: "Leonardo Acc", match_responsavel: "Leonardo",               categoria: "account", cap_recorrente: null, cap_mrr: 104650,   cap_pontual: null, cap_contas: 25, ordem: 3 },
+  { nome: "Leonardo Acc", match_responsavel: "Leonardo Soares Ferreira", categoria: "account", cap_recorrente: null, cap_mrr: 104650,   cap_pontual: null, cap_contas: 25, ordem: 3 },
   { nome: "Breno Acc",    match_responsavel: "Breno Carmo",            categoria: "account", cap_recorrente: null, cap_mrr: 60376.56, cap_pontual: null, cap_contas: 25, ordem: 4 },
 
   // ── Gestores / Accounts Prime ──
@@ -47,12 +47,23 @@ export const CAPACITY_METAS_SEED: CapacityMetaSeed[] = [
   { nome: "Renan (Account)",               match_responsavel: "Renan Fortunato",    categoria: "gestor", cap_recorrente: null, cap_mrr: 70126.04, cap_pontual: null, cap_contas: 25, ordem: 3 },
   { nome: "Thiago Andrey (Gestor Prime)",  match_responsavel: "Thiago Andrey",      categoria: "gestor", cap_recorrente: null, cap_mrr: 77085,    cap_pontual: null, cap_contas: 15, ordem: 4 },
   { nome: "Thiago Martins (Gestor Prime)", match_responsavel: "Thiago Martins",     categoria: "gestor", cap_recorrente: null, cap_mrr: 81794.06, cap_pontual: null, cap_contas: 15, ordem: 5 },
-  { nome: "Allan (Gestor)",                match_responsavel: "Allan",              categoria: "gestor", cap_recorrente: null, cap_mrr: 84151.25, cap_pontual: null, cap_contas: 30, ordem: 6 },
+  { nome: "Allan (Gestor)",                match_responsavel: "Allan Gestor",       categoria: "gestor", cap_recorrente: null, cap_mrr: 84151.25, cap_pontual: null, cap_contas: 30, ordem: 6 },
   { nome: "Victor Matsushita (Gestor)",    match_responsavel: "Victor Matsushita",  categoria: "gestor", cap_recorrente: null, cap_mrr: 81652.11, cap_pontual: null, cap_contas: 30, ordem: 7 },
 ];
 
 export async function seedCapacityMetas(): Promise<void> {
   try {
+    // Remove stale rows whose (nome, categoria) exists in seed but with a different
+    // match_responsavel — happens when match_responsavel is renamed between deploys.
+    for (const m of CAPACITY_METAS_SEED) {
+      await db.execute(sql`
+        DELETE FROM cortex_core.capacity_metas
+        WHERE nome = ${m.nome}
+          AND categoria = ${m.categoria}
+          AND match_responsavel <> ${m.match_responsavel}
+      `);
+    }
+
     for (const m of CAPACITY_METAS_SEED) {
       await db.execute(sql`
         INSERT INTO cortex_core.capacity_metas
