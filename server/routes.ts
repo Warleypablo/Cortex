@@ -48,6 +48,8 @@ import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
 import { registerGrowthAiRoutes } from "./routes/growth-ai";
 import { registerSdrAssistantRoutes } from "./routes/sdr-assistant";
+import { registerAdsCreationRoutes } from "./routes/ads-creation";
+import { registerCreativesRoutes } from "./routes/creatives";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
@@ -7914,6 +7916,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
+
+  // Growth — Criação de Campanhas (briefing → Meta API → PAUSED)
+  registerAdsCreationRoutes(app);
+
+  // Growth — Biblioteca de Criativos (cortex_core.creatives_library)
+  registerCreativesRoutes(app);
 
   // SDR Assistant Module - registered from separate file
   registerSdrAssistantRoutes(app, db);

@@ -900,10 +900,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(i.video_p50_watched_actions) as video_p50,
           SUM(i.video_p75_watched_actions) as video_p75,
           SUM(i.video_p100_watched_actions) as video_p100,
+          COALESCE(SUM(ve.video_3_sec_watched_actions), 0) as video_3_sec,
+          COALESCE(SUM(ve.video_thruplay_watched_actions), 0) as video_thruplay,
           COALESCE(SUM(i.landing_page_views), 0) as landing_page_views
         FROM meta_ads.meta_insights_daily i
         LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
         LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
+        LEFT JOIN cortex_core.meta_insights_video_extras ve
+          ON ve.account_id = i.account_id
+         AND ve.ad_id = i.ad_id
+         AND ve.date_start = i.date_start
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
           AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
         GROUP BY i.ad_id, a.ad_name, a.effective_status, a.created_time, a.preview_shareable_link, a.campaign_id, c.campaign_name
@@ -911,38 +917,50 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       `);
       
       // Buscar dados de conversão do CRM (leads, MQL, NMQL, RM, RR, Vendas com splits) usando utm_content = ad_id
+      // Descartados "culpa do marketing": leads cujo motivo de perda (UF_CRM_1753388460) sinaliza
+      // baixa qualidade do lead (Dropshipping, Nicho Black, Agencia de Marketing, Infoproduto, Afiliado, Fake).
       const dealsDataResult = await db.execute(sql`
         SELECT
-          utm_content as ad_id,
+          d.utm_content as ad_id,
           COUNT(*) as leads,
-          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as nmqls,
-          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as rm,
-          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm_mql,
-          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm_nmql,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr_mql,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr_nmql,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho'
-              AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_mql,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho'
-              AND NOT (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_nmql,
-          COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho'
-              THEN COALESCE(company_name, contact_name, title) END) as clientes_unicos,
+          SUM(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as nmqls,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rm_mql,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rm_nmql,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rr_mql,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rr_nmql,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho'
+              AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_mql,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho'
+              AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_nmql,
+          COUNT(DISTINCT CASE WHEN d.stage_name = 'Negócio Ganho'
+              THEN COALESCE(d.company_name, d.contact_name, d.title) END) as clientes_unicos,
           NULL::numeric as min_lead_time,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) ELSE 0 END) as valor_pontual,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_recorrente,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN
-            CASE WHEN produtos IS NULL OR produtos = '' OR produtos = '[]' THEN 1
-            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(produtos, '[', ''), ']', ''), ','), 1), 1) END
-          ELSE 0 END) as contratos
-        FROM "Bitrix".crm_deal
-        WHERE utm_content IS NOT NULL
-          AND utm_content != ''
-          AND created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
-          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
-        GROUP BY utm_content
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) ELSE 0 END) as valor_pontual,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_recorrente, 0) ELSE 0 END) as valor_recorrente,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN
+            CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1
+            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END
+          ELSE 0 END) as contratos,
+          SUM(CASE WHEN mp.motivo_perda IN (
+            'Dropshipping','Nicho Black','Agencia de Marketing','Infoproduto','Afiliado','Fake'
+          ) THEN 1 ELSE 0 END) as descartados_marketing,
+          SUM(CASE WHEN mp.motivo_perda IN (
+            'Dropshipping','Nicho Black','Agencia de Marketing','Infoproduto','Afiliado','Fake'
+          ) AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as descartados_marketing_mql,
+          SUM(CASE WHEN mp.motivo_perda IN (
+            'Dropshipping','Nicho Black','Agencia de Marketing','Infoproduto','Afiliado','Fake'
+          ) AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as descartados_marketing_nmql
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN cortex_core.deal_motivo_perda mp ON mp.deal_id = d.id
+        WHERE d.utm_content IS NOT NULL
+          AND d.utm_content != ''
+          AND d.created_at >= ${startDate}::date AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+        GROUP BY d.utm_content
       `);
 
       // Criar mapa de deals por ad_id
@@ -966,9 +984,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           valorPontual: parseFloat(row.valor_pontual) || 0,
           valorRecorrente: parseFloat(row.valor_recorrente) || 0,
           contratos: parseInt(row.contratos) || 0,
+          descartadosMarketing: parseInt(row.descartados_marketing) || 0,
+          descartadosMarketingMql: parseInt(row.descartados_marketing_mql) || 0,
+          descartadosMarketingNmql: parseInt(row.descartados_marketing_nmql) || 0,
         });
       }
-      
+
       // Lead time por cliente único: primeiro deal fechado de cada empresa, por ad_id
       // Filtra por data_fechamento (não created_at) para capturar deals criados antes do período mas fechados dentro dele
       const leadTimeResult = await db.execute(sql`
@@ -1007,6 +1028,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           0 as investimento, 0 as impressions, 0 as clicks, 0 as reach,
           0 as outbound_clicks, 0 as cpm, 0 as video_plays,
           0 as video_p25, 0 as video_p50, 0 as video_p75, 0 as video_p100,
+          0 as video_3_sec, 0 as video_thruplay,
           0 as landing_page_views
         FROM meta_ads.meta_ads a
         LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
@@ -1032,8 +1054,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const impressions = parseInt(row.impressions) || 0;
           const clicks = parseInt(row.clicks) || 0;
           const reach = parseInt(row.reach) || 0;
-          const videoP25 = parseInt(row.video_p25) || 0;
-          const videoP75 = parseInt(row.video_p75) || 0;
           const landingPageViews = parseInt(row.landing_page_views) || 0;
 
           const outboundClicks = parseInt(row.outbound_clicks) || 0;
@@ -1041,15 +1061,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const ctr = impressions > 0 && outboundClicks > 0 ? (outboundClicks / impressions) * 100 : null;
           const cpm = parseFloat(row.cpm) || (impressions > 0 ? (investimento / impressions) * 1000 : null);
 
-          // Vídeo Hook = % de plays que passaram 3s (p25 / video_plays)
-          const videoPlays = parseInt(row.video_plays) || 0;
-          const videoHook = videoPlays > 0 && videoP25 > 0 ? (videoP25 / videoPlays) * 100 : null;
-          // Vídeo HOLD = % de quem passou 3s que viu 75% (p75 / p25)
-          const videoHold = videoP25 > 0 && videoP75 > 0 ? (videoP75 / videoP25) * 100 : null;
+          // Vídeo Hook = "Reproduções de vídeo de 3s" / Impressões
+          const video3Sec = parseInt(row.video_3_sec) || 0;
+          const videoHook = impressions > 0 && video3Sec > 0 ? (video3Sec / impressions) * 100 : null;
+          // Vídeo Hold = ThruPlays / Impressões
+          const videoThruplay = parseInt(row.video_thruplay) || 0;
+          const videoHold = impressions > 0 && videoThruplay > 0 ? (videoThruplay / impressions) * 100 : null;
           // Connect rate = landing_page_views / outbound_clicks
           const connectRate = outboundClicks > 0 && landingPageViews > 0 ? (landingPageViews / outboundClicks) * 100 : null;
 
-          const deal = dealsMap.get(adId) || { leads: 0, mqls: 0, nmqls: 0, rm: 0, rmMql: 0, rmNmql: 0, rr: 0, rrMql: 0, rrNmql: 0, vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0, minLeadTime: null, valorPontual: 0, valorRecorrente: 0 };
+          const deal = dealsMap.get(adId) || { leads: 0, mqls: 0, nmqls: 0, rm: 0, rmMql: 0, rmNmql: 0, rr: 0, rrMql: 0, rrNmql: 0, vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0, minLeadTime: null, valorPontual: 0, valorRecorrente: 0, descartadosMarketing: 0, descartadosMarketingMql: 0, descartadosMarketingNmql: 0 };
 
           const leads = deal.leads;
           const mqls = deal.mqls;
@@ -1113,9 +1134,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             mql: mqls,
             cpmql: cpmql ? parseFloat(cpmql.toFixed(2)) : null,
             percMql,
-            descartadoPerc: null,
-            descartadoMqlPerc: null,
-            descartadoNmqlPerc: null,
+            descartadoPerc: leads > 0 ? parseFloat(((deal.descartadosMarketing / leads) * 100).toFixed(1)) : null,
+            descartadoMqlPerc: mqls > 0 ? parseFloat(((deal.descartadosMarketingMql / mqls) * 100).toFixed(1)) : null,
+            descartadoNmqlPerc: nmqls > 0 ? parseFloat(((deal.descartadosMarketingNmql / nmqls) * 100).toFixed(1)) : null,
             percRa,
             percRaMql,
             percRaNmql,
@@ -1254,6 +1275,442 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     } catch (error) {
       console.error("[api] Error fetching criativos KPIs:", error);
       res.status(500).json({ error: "Failed to fetch criativos KPIs" });
+    }
+  });
+
+  // Growth - Criativos Contas (lista contas Meta com gasto no período)
+  app.get("/api/growth/criativos/contas", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string || '';
+      const endDate = req.query.endDate as string || '';
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+
+      if (startDate && endDate && (!dateRegex.test(startDate) || !dateRegex.test(endDate))) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+
+      // Por enquanto só temos act_1331413260627780 (Turbo Partners)
+      const result = await db.execute(sql`
+        SELECT ac.account_id, ac.account_name
+        FROM meta_ads.meta_accounts ac
+        WHERE ac.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+        ORDER BY ac.account_name
+      `);
+      const contas = (result.rows as any[]).map((row: any) => ({
+        id: row.account_id,
+        name: row.account_name || row.account_id,
+      }));
+      res.json(contas);
+    } catch (error) {
+      console.error("[api] Error fetching criativos contas:", error);
+      res.status(500).json({ error: "Failed to fetch criativos contas" });
+    }
+  });
+
+  // Growth - Criativos Hierarchy (agregação por account|campaign|adset)
+  // - Mantém /api/growth/criativos intacto para nível Anúncios
+  // - Aceita drill-down via accountIds, campaignIds, adsetIds (csv)
+  app.get("/api/growth/criativos/hierarchy", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string || '2025-01-01';
+      const endDate = req.query.endDate as string || '2025-12-31';
+      const level = (req.query.level as string || 'campaign') as 'account' | 'campaign' | 'adset';
+      const status = req.query.status as string || 'Todos';
+      const plataformaParam = req.query.plataforma as string || 'Todos';
+      const accountIds = req.query.accountIds as string || '';
+      const campaignIds = req.query.campaignIds as string || req.query.campanhaIds as string || '';
+      const adsetIds = req.query.adsetIds as string || '';
+
+      const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
+      if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
+        return res.status(400).json({ error: "Invalid date format. Use YYYY-MM-DD" });
+      }
+      if (!['account', 'campaign', 'adset'].includes(level)) {
+        return res.status(400).json({ error: "Invalid level. Use account, campaign or adset" });
+      }
+
+      // Filtro de plataforma — hoje só temos Meta Ads
+      const plataformas = plataformaParam === 'Todos' ? [] : plataformaParam.split(',').map(p => p.trim());
+      if (plataformas.length > 0 && !plataformas.includes('Meta Ads')) {
+        return res.json([]);
+      }
+
+      // Conjuntos de IDs do drill-down
+      const accountIdSet = accountIds ? new Set(accountIds.split(',').map(s => s.trim()).filter(Boolean)) : null;
+      const campaignIdSet = campaignIds ? new Set(campaignIds.split(',').map(s => s.trim()).filter(Boolean)) : null;
+      const adsetIdSet = adsetIds ? new Set(adsetIds.split(',').map(s => s.trim()).filter(Boolean)) : null;
+
+      // 1) Métricas Meta agregadas por ad (com hierarquia de campanha/conjunto/conta)
+      const metricsResult = await db.execute(sql`
+        SELECT
+          i.account_id,
+          a.campaign_id,
+          a.adset_id,
+          i.ad_id,
+          a.effective_status as ad_status,
+          c.effective_status as campaign_status,
+          ase.effective_status as adset_status,
+          SUM(i.spend::numeric) as investimento,
+          SUM(i.impressions) as impressions,
+          SUM(i.clicks) as clicks,
+          SUM(i.reach) as reach,
+          COALESCE(SUM(i.outbound_clicks), 0) as outbound_clicks,
+          SUM(i.video_play_actions) as video_plays,
+          SUM(i.video_p25_watched_actions) as video_p25,
+          SUM(i.video_p50_watched_actions) as video_p50,
+          SUM(i.video_p75_watched_actions) as video_p75,
+          SUM(i.video_p100_watched_actions) as video_p100,
+          COALESCE(SUM(ve.video_3_sec_watched_actions), 0) as video_3_sec,
+          COALESCE(SUM(ve.video_thruplay_watched_actions), 0) as video_thruplay,
+          COALESCE(SUM(i.landing_page_views), 0) as landing_page_views
+        FROM meta_ads.meta_insights_daily i
+        LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
+        LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
+        LEFT JOIN meta_ads.meta_adsets ase ON a.adset_id = ase.adset_id
+        LEFT JOIN cortex_core.meta_insights_video_extras ve
+          ON ve.account_id = i.account_id
+         AND ve.ad_id = i.ad_id
+         AND ve.date_start = i.date_start
+        WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
+          AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+        GROUP BY i.account_id, a.campaign_id, a.adset_id, i.ad_id,
+                 a.effective_status, c.effective_status, ase.effective_status
+      `);
+
+      // 2) Deals do CRM agregados por ad_id (utm_content)
+      const dealsResult = await db.execute(sql`
+        SELECT
+          d.utm_content as ad_id,
+          COUNT(*) as leads,
+          SUM(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as nmqls,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as rm,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rm_mql,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rm_nmql,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rr_mql,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rr_nmql,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_mql,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_nmql,
+          COUNT(DISTINCT CASE WHEN d.stage_name = 'Negócio Ganho'
+              THEN COALESCE(d.company_name, d.contact_name, d.title) END) as clientes_unicos,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) ELSE 0 END) as valor_pontual,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_recorrente, 0) ELSE 0 END) as valor_recorrente,
+          SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN
+            CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1
+            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END
+          ELSE 0 END) as contratos,
+          SUM(CASE WHEN mp.motivo_perda IN ('Dropshipping','Nicho Black','Agencia de Marketing','Infoproduto','Afiliado','Fake') THEN 1 ELSE 0 END) as descartados_marketing,
+          SUM(CASE WHEN mp.motivo_perda IN ('Dropshipping','Nicho Black','Agencia de Marketing','Infoproduto','Afiliado','Fake')
+              AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as descartados_marketing_mql,
+          SUM(CASE WHEN mp.motivo_perda IN ('Dropshipping','Nicho Black','Agencia de Marketing','Infoproduto','Afiliado','Fake')
+              AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as descartados_marketing_nmql
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN cortex_core.deal_motivo_perda mp ON mp.deal_id = d.id
+        WHERE d.utm_content IS NOT NULL AND d.utm_content != ''
+          AND d.created_at >= ${startDate}::date AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+        GROUP BY d.utm_content
+      `);
+
+      // 3) Lead time médio por ad_id (mesmo cálculo do endpoint principal)
+      const leadTimeResult = await db.execute(sql`
+        SELECT utm_content as ad_id, AVG(lead_time_days) as avg_lead_time
+        FROM (
+          SELECT utm_content,
+            COALESCE(company_name, contact_name, title) as cliente,
+            MIN(EXTRACT(EPOCH FROM (data_fechamento::timestamp - date_create)) / 86400) as lead_time_days
+          FROM "Bitrix".crm_deal
+          WHERE utm_content IS NOT NULL AND utm_content != ''
+            AND stage_name = 'Negócio Ganho'
+            AND data_fechamento IS NOT NULL
+            AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          GROUP BY utm_content, COALESCE(company_name, contact_name, title)
+        ) sub
+        GROUP BY utm_content
+      `);
+
+      const dealsMap = new Map<string, any>();
+      for (const row of dealsResult.rows as any[]) {
+        dealsMap.set(String(row.ad_id), {
+          leads: parseInt(row.leads) || 0,
+          mqls: parseInt(row.mqls) || 0,
+          nmqls: parseInt(row.nmqls) || 0,
+          rm: parseInt(row.rm) || 0,
+          rmMql: parseInt(row.rm_mql) || 0,
+          rmNmql: parseInt(row.rm_nmql) || 0,
+          rr: parseInt(row.rr) || 0,
+          rrMql: parseInt(row.rr_mql) || 0,
+          rrNmql: parseInt(row.rr_nmql) || 0,
+          vendas: parseInt(row.vendas) || 0,
+          vendasMql: parseInt(row.vendas_mql) || 0,
+          vendasNmql: parseInt(row.vendas_nmql) || 0,
+          clientesUnicos: parseInt(row.clientes_unicos) || 0,
+          valorPontual: parseFloat(row.valor_pontual) || 0,
+          valorRecorrente: parseFloat(row.valor_recorrente) || 0,
+          contratos: parseInt(row.contratos) || 0,
+          descartadosMarketing: parseInt(row.descartados_marketing) || 0,
+          descartadosMarketingMql: parseInt(row.descartados_marketing_mql) || 0,
+          descartadosMarketingNmql: parseInt(row.descartados_marketing_nmql) || 0,
+        });
+      }
+      const leadTimeMap = new Map<string, number>();
+      for (const row of leadTimeResult.rows as any[]) {
+        if (row.avg_lead_time) leadTimeMap.set(String(row.ad_id), parseFloat(row.avg_lead_time));
+      }
+
+      // 4) Buscar nomes de account/campaign/adset
+      const namesResult = await db.execute(sql`
+        SELECT
+          ac.account_id, ac.account_name,
+          c.campaign_id, c.campaign_name,
+          ase.adset_id, ase.adset_name
+        FROM meta_ads.meta_accounts ac
+        LEFT JOIN meta_ads.meta_campaigns c ON c.account_id = ac.account_id
+        LEFT JOIN meta_ads.meta_adsets ase ON ase.campaign_id = c.campaign_id
+        WHERE ac.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+      `);
+      const accountNames = new Map<string, string>();
+      const campaignNames = new Map<string, string>();
+      const adsetNames = new Map<string, string>();
+      for (const row of namesResult.rows as any[]) {
+        if (row.account_id && row.account_name) accountNames.set(String(row.account_id), String(row.account_name));
+        if (row.campaign_id && row.campaign_name) campaignNames.set(String(row.campaign_id), String(row.campaign_name));
+        if (row.adset_id && row.adset_name) adsetNames.set(String(row.adset_id), String(row.adset_name));
+      }
+
+      // 5) Aplicar filtros drill-down e agregar por chave do nível
+      type AggBucket = {
+        id: string;
+        name: string;
+        accountId: string | null;
+        campaignId: string | null;
+        adsetId: string | null;
+        statusUpper: string; // ACTIVE/PAUSED/etc no nível
+        // Meta sums
+        investimento: number;
+        impressions: number;
+        clicks: number;
+        reach: number;
+        outboundClicks: number;
+        videoPlays: number;
+        video3Sec: number;
+        videoThruplay: number;
+        landingPageViews: number;
+        cpmWeightedSum: number; // SUM(cpm * impressions) p/ media ponderada se necessário; aqui usamos invest/imp*1000
+        // Deal sums
+        leads: number;
+        mqls: number;
+        nmqls: number;
+        rm: number;
+        rmMql: number;
+        rmNmql: number;
+        rr: number;
+        rrMql: number;
+        rrNmql: number;
+        vendas: number;
+        vendasMql: number;
+        vendasNmql: number;
+        clientesUnicos: number;
+        valorPontual: number;
+        valorRecorrente: number;
+        contratos: number;
+        descartadosMarketing: number;
+        descartadosMarketingMql: number;
+        descartadosMarketingNmql: number;
+        leadTimeWeightedSum: number;
+        leadTimeWeight: number;
+      };
+      const buckets = new Map<string, AggBucket>();
+
+      for (const row of metricsResult.rows as any[]) {
+        const accountId = String(row.account_id || '');
+        const campaignId = row.campaign_id ? String(row.campaign_id) : null;
+        const adsetId = row.adset_id ? String(row.adset_id) : null;
+        const adId = String(row.ad_id);
+
+        // Drill-down filters
+        if (accountIdSet && !accountIdSet.has(accountId)) continue;
+        if (campaignIdSet && (!campaignId || !campaignIdSet.has(campaignId))) continue;
+        if (adsetIdSet && (!adsetId || !adsetIdSet.has(adsetId))) continue;
+
+        // Define key & status do nível
+        let key: string;
+        let name: string;
+        let levelStatus: string;
+        if (level === 'account') {
+          key = accountId;
+          name = accountNames.get(accountId) || accountId;
+          levelStatus = ''; // Conta não tem status
+        } else if (level === 'campaign') {
+          if (!campaignId) continue;
+          key = campaignId;
+          name = campaignNames.get(campaignId) || campaignId;
+          levelStatus = String(row.campaign_status || '').toUpperCase();
+        } else { // adset
+          if (!adsetId) continue;
+          key = adsetId;
+          name = adsetNames.get(adsetId) || adsetId;
+          levelStatus = String(row.adset_status || '').toUpperCase();
+        }
+
+        let bucket = buckets.get(key);
+        if (!bucket) {
+          bucket = {
+            id: key, name,
+            accountId: accountId || null,
+            campaignId: level === 'campaign' || level === 'adset' ? campaignId : null,
+            adsetId: level === 'adset' ? adsetId : null,
+            statusUpper: levelStatus,
+            investimento: 0, impressions: 0, clicks: 0, reach: 0, outboundClicks: 0,
+            videoPlays: 0, video3Sec: 0, videoThruplay: 0, landingPageViews: 0,
+            cpmWeightedSum: 0,
+            leads: 0, mqls: 0, nmqls: 0, rm: 0, rmMql: 0, rmNmql: 0,
+            rr: 0, rrMql: 0, rrNmql: 0, vendas: 0, vendasMql: 0, vendasNmql: 0,
+            clientesUnicos: 0, valorPontual: 0, valorRecorrente: 0, contratos: 0,
+            descartadosMarketing: 0, descartadosMarketingMql: 0, descartadosMarketingNmql: 0,
+            leadTimeWeightedSum: 0, leadTimeWeight: 0,
+          };
+          buckets.set(key, bucket);
+        }
+
+        bucket.investimento += parseFloat(row.investimento) || 0;
+        bucket.impressions += parseInt(row.impressions) || 0;
+        bucket.clicks += parseInt(row.clicks) || 0;
+        bucket.reach += parseInt(row.reach) || 0;
+        bucket.outboundClicks += parseInt(row.outbound_clicks) || 0;
+        bucket.videoPlays += parseInt(row.video_plays) || 0;
+        bucket.video3Sec += parseInt(row.video_3_sec) || 0;
+        bucket.videoThruplay += parseInt(row.video_thruplay) || 0;
+        bucket.landingPageViews += parseInt(row.landing_page_views) || 0;
+
+        const deal = dealsMap.get(adId);
+        if (deal) {
+          bucket.leads += deal.leads;
+          bucket.mqls += deal.mqls;
+          bucket.nmqls += deal.nmqls;
+          bucket.rm += deal.rm;
+          bucket.rmMql += deal.rmMql;
+          bucket.rmNmql += deal.rmNmql;
+          bucket.rr += deal.rr;
+          bucket.rrMql += deal.rrMql;
+          bucket.rrNmql += deal.rrNmql;
+          bucket.vendas += deal.vendas;
+          bucket.vendasMql += deal.vendasMql;
+          bucket.vendasNmql += deal.vendasNmql;
+          bucket.clientesUnicos += deal.clientesUnicos;
+          bucket.valorPontual += deal.valorPontual;
+          bucket.valorRecorrente += deal.valorRecorrente;
+          bucket.contratos += deal.contratos;
+          bucket.descartadosMarketing += deal.descartadosMarketing;
+          bucket.descartadosMarketingMql += deal.descartadosMarketingMql;
+          bucket.descartadosMarketingNmql += deal.descartadosMarketingNmql;
+        }
+        const lt = leadTimeMap.get(adId);
+        if (lt) {
+          // Pondera lead time pelos clientes únicos do anúncio (peso simples = 1 se sem clientes)
+          const w = (deal?.clientesUnicos || 0) || 1;
+          bucket.leadTimeWeightedSum += lt * w;
+          bucket.leadTimeWeight += w;
+        }
+      }
+
+      // 6) Filtro de status (usa effective_status do nível)
+      const filterByStatus = (statusUpper: string): boolean => {
+        if (status === 'Todos' || level === 'account') return true;
+        if (status === 'Ativo') return ['ACTIVE', 'WITH_ISSUES'].includes(statusUpper);
+        if (status === 'Pausado') return ['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(statusUpper);
+        return true;
+      };
+
+      // 7) Montar resposta no shape compatível com CriativoData
+      const rows = Array.from(buckets.values())
+        .filter(b => filterByStatus(b.statusUpper))
+        .map(b => {
+          const ctr = b.impressions > 0 && b.outboundClicks > 0 ? (b.outboundClicks / b.impressions) * 100 : null;
+          const cpm = b.impressions > 0 ? (b.investimento / b.impressions) * 1000 : null;
+          const videoHook = b.impressions > 0 && b.video3Sec > 0 ? (b.video3Sec / b.impressions) * 100 : null;
+          const videoHold = b.impressions > 0 && b.videoThruplay > 0 ? (b.videoThruplay / b.impressions) * 100 : null;
+          const connectRate = b.outboundClicks > 0 && b.landingPageViews > 0 ? (b.landingPageViews / b.outboundClicks) * 100 : null;
+          const taxaConversao = b.landingPageViews > 0 && b.leads > 0 ? (b.leads / b.landingPageViews) * 100 : null;
+          const cpl = b.leads > 0 ? b.investimento / b.leads : null;
+          const percMql = b.leads > 0 ? parseFloat(((b.mqls / b.leads) * 100).toFixed(1)) : null;
+          const cpmql = b.mqls > 0 ? b.investimento / b.mqls : null;
+          const percRa = b.leads > 0 ? parseFloat(((b.rm / b.leads) * 100).toFixed(1)) : null;
+          const percRaMql = b.mqls > 0 ? parseFloat(((b.rmMql / b.mqls) * 100).toFixed(1)) : null;
+          const percRaNmql = b.nmqls > 0 ? parseFloat(((b.rmNmql / b.nmqls) * 100).toFixed(1)) : null;
+          const percRr = b.leads > 0 ? parseFloat(((b.rr / b.leads) * 100).toFixed(1)) : null;
+          const percRrMql = b.mqls > 0 ? parseFloat(((b.rrMql / b.mqls) * 100).toFixed(1)) : null;
+          const percRrNmql = b.nmqls > 0 ? parseFloat(((b.rrNmql / b.nmqls) * 100).toFixed(1)) : null;
+          const percRrVendas = b.rr > 0 ? parseFloat(((b.vendas / b.rr) * 100).toFixed(1)) : null;
+          const percRrMqlVendas = b.rrMql > 0 ? parseFloat(((b.vendasMql / b.rrMql) * 100).toFixed(1)) : null;
+          const percRrNmqlVendas = b.rrNmql > 0 ? parseFloat(((b.vendasNmql / b.rrNmql) * 100).toFixed(1)) : null;
+          const cacUnico = b.clientesUnicos > 0 ? b.investimento / b.clientesUnicos : null;
+          const cacContrato = b.contratos > 0 ? b.investimento / b.contratos : null;
+          const leadTime = b.leadTimeWeight > 0 ? parseFloat((b.leadTimeWeightedSum / b.leadTimeWeight).toFixed(1)) : null;
+
+          // Mapeia status do nível para label PT-BR
+          let statusLabel = 'Desconhecido';
+          if (level === 'account') {
+            statusLabel = 'Ativo';
+          } else if (['ACTIVE', 'WITH_ISSUES'].includes(b.statusUpper)) {
+            statusLabel = 'Ativo';
+          } else if (['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(b.statusUpper)) {
+            statusLabel = 'Pausado';
+          } else if (['ARCHIVED', 'DELETED', 'DISAPPROVED'].includes(b.statusUpper)) {
+            statusLabel = 'Inativo';
+          }
+
+          return {
+            id: b.id,
+            level,
+            adName: b.name,
+            link: null,
+            status: statusLabel,
+            plataforma: 'Meta Ads',
+            accountId: b.accountId,
+            campaignId: b.campaignId,
+            adsetId: b.adsetId,
+            campaignName: b.campaignId ? campaignNames.get(b.campaignId) || null : null,
+            investimento: Math.round(b.investimento),
+            videoHook: videoHook ? parseFloat(videoHook.toFixed(2)) : null,
+            videoHold: videoHold ? parseFloat(videoHold.toFixed(2)) : null,
+            ctr: ctr ? parseFloat(ctr.toFixed(2)) : null,
+            cpm: cpm ? Math.round(cpm) : null,
+            connectRate: connectRate ? parseFloat(connectRate.toFixed(2)) : null,
+            taxaConversao: taxaConversao ? parseFloat(taxaConversao.toFixed(2)) : null,
+            leads: b.leads,
+            cpl: cpl ? Math.round(cpl) : null,
+            mql: b.mqls,
+            cpmql: cpmql ? parseFloat(cpmql.toFixed(2)) : null,
+            percMql,
+            descartadoPerc: b.leads > 0 ? parseFloat(((b.descartadosMarketing / b.leads) * 100).toFixed(1)) : null,
+            descartadoMqlPerc: b.mqls > 0 ? parseFloat(((b.descartadosMarketingMql / b.mqls) * 100).toFixed(1)) : null,
+            descartadoNmqlPerc: b.nmqls > 0 ? parseFloat(((b.descartadosMarketingNmql / b.nmqls) * 100).toFixed(1)) : null,
+            percRa, percRaMql, percRaNmql,
+            percRr, percRrMql, percRrNmql,
+            percRrVendas, percRrMqlVendas, percRrNmqlVendas,
+            clientesUnicos: b.clientesUnicos,
+            leadTime,
+            aov: b.clientesUnicos > 0 ? Math.round((b.valorPontual + b.valorRecorrente) / b.clientesUnicos) : null,
+            receita: (b.valorPontual + b.valorRecorrente) || null,
+            receitaPontual: b.valorPontual,
+            receitaRecorrente: b.valorRecorrente,
+            cacGeral: b.vendas > 0 ? Math.round(b.investimento / b.vendas) : null,
+            cacUnico: cacUnico ? Math.round(cacUnico) : null,
+            cacContrato: cacContrato ? Math.round(cacContrato) : null,
+            roas: b.investimento > 0 ? parseFloat(((b.valorPontual + b.valorRecorrente) / b.investimento).toFixed(2)) : null,
+          };
+        })
+        .sort((a, b) => (b.investimento || 0) - (a.investimento || 0));
+
+      console.log(`[api] Growth Criativos Hierarchy - level=${level} total=${rows.length}`);
+      res.json(rows);
+    } catch (error) {
+      console.error("[api] Error fetching criativos hierarchy:", error);
+      res.status(500).json({ error: "Failed to fetch criativos hierarchy" });
     }
   });
 
@@ -2584,11 +3041,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina,
           COALESCE(SUM(mid.reach), 0) as alcance,
           COALESCE(AVG(mid.frequency), 0) as frequencia,
-          COALESCE(SUM(mid.video_p25_watched_actions), 0) as video_p25,
-          COALESCE(SUM(mid.video_p50_watched_actions), 0) as video_p50,
-          COALESCE(SUM(mid.video_p75_watched_actions), 0) as video_p75,
-          COALESCE(SUM(mid.video_play_actions), 0) as video_plays
+          COALESCE(SUM(ve.video_3_sec_watched_actions), 0) as video_3_sec,
+          COALESCE(SUM(ve.video_thruplay_watched_actions), 0) as video_thruplay
         FROM meta_ads.meta_insights_daily mid
+        LEFT JOIN cortex_core.meta_insights_video_extras ve
+          ON ve.account_id = mid.account_id
+         AND ve.ad_id = mid.ad_id
+         AND ve.date_start = mid.date_start
         WHERE mid.date_start >= ${startDate}::date
           AND mid.date_start <= ${endDate}::date
           AND mid.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
@@ -2602,17 +3061,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const visualizacoesPagina = parseInt(row.visualizacoes_pagina) || 0;
       const alcance = parseInt(row.alcance) || 0;
       const frequencia = parseFloat(row.frequencia) || 0;
-      const videoPlays = parseInt(row.video_plays) || 0;
-      const videoP25 = parseInt(row.video_p25) || 0;
-      const videoP75 = parseInt(row.video_p75) || 0;
+      const video3Sec = parseInt(row.video_3_sec) || 0;
+      const videoThruplay = parseInt(row.video_thruplay) || 0;
 
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = outbound_clicks / impressions
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
       const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
-      // Vídeo Hook = p25 / plays; Vídeo Hold = p75 / p25 (retenção condicional)
-      const videoHook = videoPlays > 0 ? (videoP25 / videoPlays) : null;
-      const videoHold = videoP25 > 0 ? (videoP75 / videoP25) : null;
+      // Vídeo Hook = video_3_sec / impressões ; Vídeo Hold = thruplay / impressões
+      const videoHook = impressoes > 0 ? (video3Sec / impressoes) : null;
+      const videoHold = impressoes > 0 ? (videoThruplay / impressoes) : null;
 
       res.json({
         investimento,
