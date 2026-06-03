@@ -36,6 +36,9 @@ export interface CsRow {
 export interface ComercialRow {
   nome: string;
   mrr_atual: number;
+  mrr_ativo: number;
+  mrr_onboarding: number;
+  mrr_cancelamento: number;
   cap_mrr: number | null;
   dif_mrr: number | null;
   contas_ativas: number;
@@ -120,6 +123,9 @@ export function toComercialRow(r: CapacityAggRow): ComercialRow {
   return {
     nome: r.nome,
     mrr_atual: r.mrr_operando,
+    mrr_ativo: r.mrr_ativo,
+    mrr_onboarding: r.mrr_onboarding,
+    mrr_cancelamento: r.mrr_cancelamento,
     cap_mrr: r.cap_mrr,
     dif_mrr: diff(r.cap_mrr, r.mrr_operando),
     contas_ativas: r.op_recorrente,
