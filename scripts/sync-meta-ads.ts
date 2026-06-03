@@ -37,8 +37,16 @@ async function main() {
   console.log('');
 
   try {
-    // Ensure meta_ads schema exists
-    await pool.query('CREATE SCHEMA IF NOT EXISTS meta_ads');
+    // Ensure meta_ads schema exists (ignore permission errors if already created)
+    try {
+      await pool.query('CREATE SCHEMA IF NOT EXISTS meta_ads');
+    } catch (e: any) {
+      if (e.code !== '42501') throw e;
+      const { rows: schemaRows } = await pool.query(
+        `SELECT 1 FROM information_schema.schemata WHERE schema_name = 'meta_ads'`
+      );
+      if (schemaRows.length === 0) throw e;
+    }
 
     // Check if tables exist, create if needed
     const { rows } = await pool.query(`

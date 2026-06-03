@@ -2304,3 +2304,42 @@ export async function migrateMetricRulesetsContext(): Promise<void> {
     console.error('[database] Error migrating metric_rulesets:', error);
   }
 }
+
+export async function initializeMetaActionsLogTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.meta_actions_log (
+        id SERIAL PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        actor_type VARCHAR(16) NOT NULL,
+        actor_user_id VARCHAR(64),
+        actor_email VARCHAR(255),
+        level VARCHAR(16) NOT NULL,
+        entity_id VARCHAR(64) NOT NULL,
+        entity_name TEXT,
+        action VARCHAR(32) NOT NULL,
+        payload_json JSONB NOT NULL,
+        previous_value_json JSONB,
+        reason TEXT NOT NULL,
+        agent_rationale_text TEXT,
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        meta_error_json JSONB,
+        confirmed_by_user_id VARCHAR(64),
+        confirmed_at TIMESTAMPTZ
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_meta_actions_log_entity
+        ON cortex_core.meta_actions_log(entity_id, status)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_meta_actions_log_pending
+        ON cortex_core.meta_actions_log(status)
+        WHERE status = 'pending'
+    `);
+    console.log('[database] Meta actions log table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing meta actions log table:', error);
+  }
+}
