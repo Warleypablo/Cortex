@@ -88,7 +88,8 @@ export function parseAggRow(raw: any): CapacityAggRow {
 
 export function toCsRow(r: CapacityAggRow): CsRow {
   const op_total = r.op_recorrente + r.op_pontual;
-  const util_pct = r.cap_mrr !== null
+  // cap_mrr null OU 0 = sem meta de MRR configurada (CS de capacity único) → utilização pelo total de contas (rec+pont)
+  const util_pct = (r.cap_mrr !== null && r.cap_mrr !== 0)
     ? utilPct(r.mrr_operando, r.cap_mrr)
     : utilPct(op_total, r.cap_recorrente);
   return {

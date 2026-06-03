@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  utilPct, diff, num, numOrNull, parseAggRow, buildResponse,
+  utilPct, diff, num, numOrNull, parseAggRow, buildResponse, toCsRow,
   type CapacityAggRow,
 } from "./capacityTimes.helpers";
 
@@ -8,6 +8,7 @@ describe("utilPct", () => {
   it("calcula % com 1 casa decimal", () => {
     expect(utilPct(43004, 107510)).toBe(40);
     expect(utilPct(58094, 58094)).toBe(100);
+    expect(utilPct(1, 3)).toBe(33.3);
   });
   it("retorna null quando cap é null ou zero", () => {
     expect(utilPct(10, null)).toBeNull();
@@ -84,5 +85,25 @@ describe("buildResponse", () => {
     expect(g.dif_mrr).toBe(107510 - 43004);
     expect(g.dif_contas).toBe(30 - 12);
     expect(g.util_pct).toBe(utilPct(43004, 107510));
+  });
+});
+
+describe("toCsRow", () => {
+  const base = {
+    nome: "X", categoria: "cs" as const, cap_recorrente: 20, cap_pontual: null, cap_contas: null,
+    op_recorrente: 6, mrr_operando: 36488, mrr_ativo: 36488, mrr_onboarding: 0, mrr_cancelamento: 0, op_pontual: 11,
+  };
+  it("usa MRR quando cap_mrr > 0", () => {
+    const r = toCsRow({ ...base, cap_mrr: 45000 });
+    expect(r.util_pct).toBe(utilPct(36488, 45000));
+  });
+  it("cai para total de contas quando cap_mrr é null", () => {
+    const r = toCsRow({ ...base, cap_mrr: null });
+    expect(r.op_total).toBe(17);
+    expect(r.util_pct).toBe(utilPct(17, 20));
+  });
+  it("cai para total de contas quando cap_mrr é 0", () => {
+    const r = toCsRow({ ...base, cap_mrr: 0 });
+    expect(r.util_pct).toBe(utilPct(17, 20));
   });
 });
