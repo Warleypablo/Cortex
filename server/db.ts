@@ -2264,6 +2264,30 @@ export async function initializeCapacityTable(): Promise<void> {
   }
 }
 
+export async function initializeCapacityMetasTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.capacity_metas (
+        id                SERIAL PRIMARY KEY,
+        nome              TEXT NOT NULL,
+        match_responsavel TEXT NOT NULL,
+        categoria         TEXT NOT NULL,
+        cap_recorrente    INTEGER,
+        cap_mrr           NUMERIC,
+        cap_pontual       INTEGER,
+        cap_contas        INTEGER,
+        ordem             INTEGER DEFAULT 0,
+        ativo             BOOLEAN DEFAULT TRUE,
+        atualizado_em     TIMESTAMP DEFAULT NOW(),
+        UNIQUE(match_responsavel, categoria)
+      )
+    `);
+    console.log('[database] capacity_metas table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing capacity_metas table:', error);
+  }
+}
+
 // Atribuição lead-a-lead de broadcast: cada resposta de WhatsApp ligada ao disparo de
 // origem (via conversationId) + ao deal do Bitrix (via telefone). Etapas de funil
 // (reunião/comparecimento/venda) NÃO são guardadas aqui — vêm live de "Bitrix".crm_deal.
