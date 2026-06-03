@@ -117,6 +117,17 @@ describe("GET /api/lt-ltv-churn/clientes", () => {
     expect(res.status).toBe(200);
     expect(res.body.clientes[0].ltvTotal).toBe(18000);
   });
+
+  it("aceita ordenação por coluna (sort/dir) sem quebrar", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ total: 1387 }] });
+    mockExecute.mockResolvedValueOnce({
+      rows: [{ id_task: "t2", nome_cliente: "Cliente Y", n_contratos_rec: 1,
+        ltv_recorrente: 1000, ltv_pontual: 0, ltv_total: 1000, lt_meses: 2.0, ativo: false }],
+    });
+    const res = await request(makeApp()).get("/api/lt-ltv-churn/clientes?sort=lt&dir=asc");
+    expect(res.status).toBe(200);
+    expect(res.body.clientes[0].ltMeses).toBe(2.0);
+  });
 });
 
 describe("GET /api/lt-ltv-churn/dist-lt-contratos", () => {
@@ -162,13 +173,15 @@ describe("GET /api/lt-ltv-churn/evolucao-clientes", () => {
   it("retorna serie mensal de LT e LTV medio dos clientes ativos", async () => {
     mockExecute.mockResolvedValueOnce({
       rows: [
-        { mes: "2025-11", lt: 5.0, ltv: 20289 },
-        { mes: "2026-05", lt: 6.4, ltv: 33284 },
+        { mes: "2025-11", lt: 5.0, ltv: 20289, lt_mediana: 4.2, ltv_mediana: 15000 },
+        { mes: "2026-05", lt: 6.4, ltv: 33284, lt_mediana: 5.4, ltv_mediana: 24495 },
       ],
     });
     const res = await request(makeApp()).get("/api/lt-ltv-churn/evolucao-clientes");
     expect(res.status).toBe(200);
     expect(res.body.serie).toHaveLength(2);
     expect(res.body.serie[1].lt).toBe(6.4);
+    expect(res.body.serie[1].ltMediana).toBe(5.4);
+    expect(res.body.serie[1].ltvMediana).toBe(24495);
   });
 });

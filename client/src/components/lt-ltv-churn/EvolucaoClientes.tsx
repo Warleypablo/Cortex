@@ -39,7 +39,7 @@ export function EvolucaoClientes() {
       <CardHeader>
         <CardTitle className="text-base">Evolução de LT/LTV dos clientes</CardTitle>
         <p className="text-xs text-gray-500 dark:text-zinc-400">
-          Média mensal da carteira ativa de clientes (snapshots) · LT (meses, esq.) e LTV (R$, dir.)
+          Carteira ativa de clientes (snapshots) · LT (meses, esq.) e LTV (R$, dir.) · linha cheia = média, tracejada = mediana
         </p>
       </CardHeader>
       <CardContent>
@@ -89,6 +89,28 @@ export function EvolucaoClientes() {
               type="monotone"
               connectNulls
               name="LTV médio"
+            />
+            <Line
+              yAxisId="lt"
+              dataKey="ltMediana"
+              stroke="#0ea5e9"
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              dot={{ r: 2 }}
+              type="monotone"
+              connectNulls
+              name="LT mediano (m)"
+            />
+            <Line
+              yAxisId="ltv"
+              dataKey="ltvMediana"
+              stroke="#6366f1"
+              strokeWidth={2}
+              strokeDasharray="5 4"
+              dot={{ r: 2 }}
+              type="monotone"
+              connectNulls
+              name="LTV mediano"
             />
           </LineChart>
         </ResponsiveContainer>

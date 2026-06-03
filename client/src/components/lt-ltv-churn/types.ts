@@ -73,4 +73,6 @@ export interface EvolucaoClientePonto {
   mes: string;
   lt: number;
   ltv: number;
+  ltMediana: number;
+  ltvMediana: number;
 }
