@@ -339,7 +339,9 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
         )
         SELECT to_char(b.m,'YYYY-MM') AS mes, b.produto,
           ROUND(AVG(b.lt)::numeric,1) AS lt,
-          ROUND(AVG(b.valorr*b.lt)::numeric,0) AS ltv
+          ROUND(AVG(b.valorr*b.lt)::numeric,0) AS ltv,
+          ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY b.lt)::numeric,1) AS lt_mediana,
+          ROUND(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY b.valorr*b.lt)::numeric,0) AS ltv_mediana
         FROM base b JOIN cobertura c ON c.m=b.m AND c.cob>=0.5
         WHERE b.produto IN ('Creators','Performance','Social Media')
         GROUP BY b.m, b.produto ORDER BY b.m, b.produto
@@ -347,7 +349,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
 
       const produtos = Array.from(new Set(rows.map((r) => r.produto)));
       const mesesList = Array.from(new Set(rows.map((r) => r.mes))).sort();
-      const pivot = (campo: "lt" | "ltv") =>
+      const pivot = (campo: "lt" | "ltv" | "lt_mediana" | "ltv_mediana") =>
         mesesList.map((mes) => {
           const ponto: Record<string, any> = { mes };
           for (const p of produtos) {
@@ -356,7 +358,13 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
           }
           return ponto;
         });
-      res.json({ produtos, lt: pivot("lt"), ltv: pivot("ltv") });
+      res.json({
+        produtos,
+        lt: pivot("lt"),
+        ltv: pivot("ltv"),
+        lt_mediana: pivot("lt_mediana"),
+        ltv_mediana: pivot("ltv_mediana"),
+      });
     } catch (error) {
       console.error("[api] Error fetching lt-ltv-churn evolucao-produto:", error);
       res.status(500).json({ error: "Failed to fetch evolucao-produto" });
