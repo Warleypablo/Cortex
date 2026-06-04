@@ -39,6 +39,7 @@ interface CapacityTimesResponse {
 interface TeamSummary {
   time: string;
   pessoas: number;
+  contas: number;
   mrr_operando: number;
   cap_mrr: number;
   util_pct: number | null;
@@ -84,6 +85,20 @@ function avgUtil(items: { util_pct: number | null }[]): number | null {
   if (!vals.length) return null;
   return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
 }
+function pct(part: number, whole: number): number | null {
+  if (!whole) return null;
+  return Math.round((part / whole) * 1000) / 10;
+}
+function ticket(mrr: number, contas: number): number | null {
+  if (!contas) return null;
+  return mrr / contas;
+}
+function riscoTone(p: number | null): string {
+  if (p === null) return "text-gray-400 dark:text-zinc-500";
+  if (p >= 20) return "text-red-600 dark:text-red-400";
+  if (p >= 10) return "text-yellow-600 dark:text-yellow-400";
+  return "text-gray-700 dark:text-zinc-300";
+}
 
 // ── Componentes reutilizáveis ──
 
@@ -117,7 +132,7 @@ function td(extra = "") { return cn("text-gray-900 dark:text-white", extra); }
 
 function StatCards({ cards }: { cards: { label: string; value: string; tone?: string }[] }) {
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
       {cards.map((c) => (
         <Card key={c.label} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
           <CardContent className="pt-4 pb-4">
@@ -197,6 +212,7 @@ function UtilChart({ people }: { people: { nome: string; util_pct: number | null
 
 function CsTable({ rows }: { rows: CsRow[] }) {
   if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Nenhuma pessoa neste time.</p>;
+  const teamMrr = sum(rows.map((r) => r.mrr_operando));
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -208,26 +224,35 @@ function CsTable({ rows }: { rows: CsRow[] }) {
             <TableHead className={th("text-right")}>Pontual</TableHead>
             <TableHead className={th("text-right")}>Cap. Pont.</TableHead>
             <TableHead className={th("text-right")}>MRR Operando</TableHead>
+            <TableHead className={th("text-right")} title="MRR recorrente / contas recorrentes">Ticket Médio</TableHead>
+            <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
+            <TableHead className={th("text-right")} title="MRR em cancelamento / MRR operando">% Risco</TableHead>
             <TableHead className={th("text-right")}>Cap. MRR</TableHead>
             <TableHead className={th("text-right")}>Utilização</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r, i) => (
-            <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
-              <TableCell className={td("font-medium")}>{r.nome}</TableCell>
-              <TableCell className={td("text-right")}>{r.op_recorrente}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_recorrente)}</TableCell>
-              <TableCell className={td("text-right")}>{r.op_pontual}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_pontual)}</TableCell>
-              <TableCell className={td("text-right")}>
-                {formatCurrency(r.mrr_operando)}
-                <MrrStatusBar ativo={r.mrr_ativo} onboarding={r.mrr_onboarding} cancelamento={r.mrr_cancelamento} />
-              </TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_mrr)}</TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_pct} /></TableCell>
-            </TableRow>
-          ))}
+          {rows.map((r, i) => {
+            const risco = pct(r.mrr_cancelamento, r.mrr_operando);
+            return (
+              <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
+                <TableCell className={td("font-medium")}>{r.nome}</TableCell>
+                <TableCell className={td("text-right")}>{r.op_recorrente}</TableCell>
+                <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_recorrente)}</TableCell>
+                <TableCell className={td("text-right")}>{r.op_pontual}</TableCell>
+                <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_pontual)}</TableCell>
+                <TableCell className={td("text-right")}>
+                  {formatCurrency(r.mrr_operando)}
+                  <MrrStatusBar ativo={r.mrr_ativo} onboarding={r.mrr_onboarding} cancelamento={r.mrr_cancelamento} />
+                </TableCell>
+                <TableCell className={td("text-right")}>{moneyOrDash(ticket(r.mrr_operando, r.op_recorrente))}</TableCell>
+                <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(r.mrr_operando, teamMrr))}</TableCell>
+                <TableCell className={cn("text-right", riscoTone(risco))}>{pctText(risco)}</TableCell>
+                <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_mrr)}</TableCell>
+                <TableCell className="text-right"><UtilBar pct={r.util_pct} /></TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -236,6 +261,7 @@ function CsTable({ rows }: { rows: CsRow[] }) {
 
 function ComercialTable({ rows }: { rows: ComercialRow[] }) {
   if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Nenhuma pessoa neste time.</p>;
+  const teamMrr = sum(rows.map((r) => r.mrr_atual));
   return (
     <div className="overflow-x-auto">
       <Table>
@@ -245,6 +271,9 @@ function ComercialTable({ rows }: { rows: ComercialRow[] }) {
             <TableHead className={th("text-right")}>MRR Atual</TableHead>
             <TableHead className={th("text-right")}>Cap. MRR</TableHead>
             <TableHead className={th("text-right")}>Δ MRR</TableHead>
+            <TableHead className={th("text-right")} title="MRR / contas ativas">Ticket Médio</TableHead>
+            <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
+            <TableHead className={th("text-right")} title="MRR em cancelamento / MRR atual">% Risco</TableHead>
             <TableHead className={th("text-right")}>Contas</TableHead>
             <TableHead className={th("text-right")}>Cap. Contas</TableHead>
             <TableHead className={th("text-right")}>Δ Contas</TableHead>
@@ -252,18 +281,24 @@ function ComercialTable({ rows }: { rows: ComercialRow[] }) {
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r, i) => (
-            <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
-              <TableCell className={td("font-medium")}>{r.nome}</TableCell>
-              <TableCell className={td("text-right")}>{formatCurrency(r.mrr_atual)}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_mrr)}</TableCell>
-              <TableCell className={cn("text-right", r.dif_mrr === null ? "text-gray-400 dark:text-zinc-500" : r.dif_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{r.dif_mrr === null ? "—" : formatCurrency(r.dif_mrr)}</TableCell>
-              <TableCell className={td("text-right")}>{r.contas_ativas}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_contas)}</TableCell>
-              <TableCell className={cn("text-right", r.dif_contas === null ? "text-gray-400 dark:text-zinc-500" : r.dif_contas < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_contas)}</TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_pct} /></TableCell>
-            </TableRow>
-          ))}
+          {rows.map((r, i) => {
+            const risco = pct(r.mrr_cancelamento, r.mrr_atual);
+            return (
+              <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
+                <TableCell className={td("font-medium")}>{r.nome}</TableCell>
+                <TableCell className={td("text-right")}>{formatCurrency(r.mrr_atual)}</TableCell>
+                <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_mrr)}</TableCell>
+                <TableCell className={cn("text-right", r.dif_mrr === null ? "text-gray-400 dark:text-zinc-500" : r.dif_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{r.dif_mrr === null ? "—" : formatCurrency(r.dif_mrr)}</TableCell>
+                <TableCell className={td("text-right")}>{moneyOrDash(ticket(r.mrr_atual, r.contas_ativas))}</TableCell>
+                <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(r.mrr_atual, teamMrr))}</TableCell>
+                <TableCell className={cn("text-right", riscoTone(risco))}>{pctText(risco)}</TableCell>
+                <TableCell className={td("text-right")}>{r.contas_ativas}</TableCell>
+                <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_contas)}</TableCell>
+                <TableCell className={cn("text-right", r.dif_contas === null ? "text-gray-400 dark:text-zinc-500" : r.dif_contas < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_contas)}</TableCell>
+                <TableCell className="text-right"><UtilBar pct={r.util_pct} /></TableCell>
+              </TableRow>
+            );
+          })}
         </TableBody>
       </Table>
     </div>
@@ -274,11 +309,16 @@ function ComercialTable({ rows }: { rows: ComercialRow[] }) {
 
 function SquadTab({ group }: { group: SquadGroup }) {
   const rows = group.rows;
+  const totMrr = sum(rows.map((r) => r.mrr_operando));
+  const totRec = sum(rows.map((r) => r.op_recorrente));
+  const totCancel = sum(rows.map((r) => r.mrr_cancelamento));
+  const riscoPct = pct(totCancel, totMrr);
   const cards = [
     { label: "Pessoas", value: String(rows.length) },
-    { label: "Recorrente (op / cap)", value: `${sum(rows.map((r) => r.op_recorrente))} / ${sum(rows.map((r) => r.cap_recorrente))}` },
-    { label: "Pontual (operando)", value: String(sum(rows.map((r) => r.op_pontual))) },
-    { label: "MRR Operando", value: formatCurrency(sum(rows.map((r) => r.mrr_operando))) },
+    { label: "Recorrente (op / cap)", value: `${totRec} / ${sum(rows.map((r) => r.cap_recorrente))}` },
+    { label: "MRR Operando", value: formatCurrency(totMrr) },
+    { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totRec)) },
+    { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
     { label: "Utilização média", value: pctText(avgUtil(rows)), tone: utilColor(avgUtil(rows)) },
   ];
   return (
@@ -295,12 +335,15 @@ function SquadTab({ group }: { group: SquadGroup }) {
 }
 
 function ComercialTab({ title, rows }: { title: string; rows: ComercialRow[] }) {
-  const totalDifMrr = sum(rows.map((r) => r.dif_mrr));
+  const totMrr = sum(rows.map((r) => r.mrr_atual));
+  const totContas = sum(rows.map((r) => r.contas_ativas));
+  const riscoPct = pct(sum(rows.map((r) => r.mrr_cancelamento)), totMrr);
   const cards = [
     { label: "Pessoas", value: String(rows.length) },
-    { label: "Contas (op / cap)", value: `${sum(rows.map((r) => r.contas_ativas))} / ${sum(rows.map((r) => r.cap_contas))}` },
-    { label: "MRR Atual", value: formatCurrency(sum(rows.map((r) => r.mrr_atual))) },
-    { label: "Espaço de MRR", value: formatCurrency(totalDifMrr), tone: totalDifMrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400" },
+    { label: "Contas (op / cap)", value: `${totContas} / ${sum(rows.map((r) => r.cap_contas))}` },
+    { label: "MRR Atual", value: formatCurrency(totMrr) },
+    { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totContas)) },
+    { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
     { label: "Utilização média", value: pctText(avgUtil(rows)), tone: utilColor(avgUtil(rows)) },
   ];
   return (
@@ -321,6 +364,7 @@ function summarizeSquad(g: SquadGroup): TeamSummary {
   return {
     time: g.squad,
     pessoas: rows.length,
+    contas: sum(rows.map((r) => r.op_recorrente)),
     mrr_operando: sum(rows.map((r) => r.mrr_operando)),
     cap_mrr: sum(rows.map((r) => r.cap_mrr)),
     util_pct: avgUtil(rows),
@@ -332,6 +376,7 @@ function summarizeComercial(time: string, rows: ComercialRow[]): TeamSummary {
   return {
     time,
     pessoas: rows.length,
+    contas: sum(rows.map((r) => r.contas_ativas)),
     mrr_operando: sum(rows.map((r) => r.mrr_atual)),
     cap_mrr: sum(rows.map((r) => r.cap_mrr)),
     util_pct: avgUtil(rows),
@@ -396,24 +441,31 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
                   <TableHead className={th()}>Time</TableHead>
                   <TableHead className={th("text-right")}>Pessoas</TableHead>
                   <TableHead className={th("text-right")}>MRR Operando</TableHead>
+                  <TableHead className={th("text-right")} title="MRR operando / contas">Ticket Médio</TableHead>
                   <TableHead className={th("text-right")}>Cap. MRR</TableHead>
                   <TableHead className={th("text-right")}>Espaço MRR</TableHead>
                   <TableHead className={th("text-right")}>Em Cancelamento</TableHead>
+                  <TableHead className={th("text-right")} title="MRR em cancelamento / MRR operando">% Risco</TableHead>
                   <TableHead className={th("text-right")}>Utilização</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {teams.map((t) => (
-                  <TableRow key={t.time} className="border-gray-200 dark:border-zinc-700">
-                    <TableCell className={td("font-medium")}>{t.time}</TableCell>
-                    <TableCell className={td("text-right")}>{t.pessoas}</TableCell>
-                    <TableCell className={td("text-right")}>{formatCurrency(t.mrr_operando)}</TableCell>
-                    <TableCell className="text-right text-gray-500 dark:text-zinc-400">{t.cap_mrr > 0 ? formatCurrency(t.cap_mrr) : "—"}</TableCell>
-                    <TableCell className={cn("text-right", t.gap_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{formatCurrency(t.gap_mrr)}</TableCell>
-                    <TableCell className={cn("text-right", t.mrr_cancelamento > 0 ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-zinc-400")}>{t.mrr_cancelamento > 0 ? formatCurrency(t.mrr_cancelamento) : "—"}</TableCell>
-                    <TableCell className="text-right"><UtilBar pct={t.util_pct} /></TableCell>
-                  </TableRow>
-                ))}
+                {teams.map((t) => {
+                  const risco = pct(t.mrr_cancelamento, t.mrr_operando);
+                  return (
+                    <TableRow key={t.time} className="border-gray-200 dark:border-zinc-700">
+                      <TableCell className={td("font-medium")}>{t.time}</TableCell>
+                      <TableCell className={td("text-right")}>{t.pessoas}</TableCell>
+                      <TableCell className={td("text-right")}>{formatCurrency(t.mrr_operando)}</TableCell>
+                      <TableCell className={td("text-right")}>{moneyOrDash(ticket(t.mrr_operando, t.contas))}</TableCell>
+                      <TableCell className="text-right text-gray-500 dark:text-zinc-400">{t.cap_mrr > 0 ? formatCurrency(t.cap_mrr) : "—"}</TableCell>
+                      <TableCell className={cn("text-right", t.gap_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{formatCurrency(t.gap_mrr)}</TableCell>
+                      <TableCell className={cn("text-right", t.mrr_cancelamento > 0 ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-zinc-400")}>{t.mrr_cancelamento > 0 ? formatCurrency(t.mrr_cancelamento) : "—"}</TableCell>
+                      <TableCell className={cn("text-right", riscoTone(risco))}>{pctText(risco)}</TableCell>
+                      <TableCell className="text-right"><UtilBar pct={t.util_pct} /></TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
