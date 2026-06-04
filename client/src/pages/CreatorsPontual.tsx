@@ -5,7 +5,6 @@ import { EntradaSaida } from "@/components/creators-pontual/EntradaSaida";
 import { EvolucaoCreators } from "@/components/creators-pontual/EvolucaoCreators";
 import { FunilStatus } from "@/components/creators-pontual/FunilStatus";
 import { ProdutividadeOperadores } from "@/components/creators-pontual/ProdutividadeOperadores";
-import { VendedoresRanking } from "@/components/creators-pontual/VendedoresRanking";
 import { VendasMensal } from "@/components/creators-pontual/VendasMensal";
 import { ItensTable } from "@/components/creators-pontual/ItensTable";
 import { fetchJson } from "@/components/creators-pontual/utils";
@@ -50,8 +49,6 @@ export default function CreatorsPontual() {
       <FunilStatus />
 
       <ProdutividadeOperadores />
-
-      <VendedoresRanking />
 
       <ItensTable statusList={statusList} operadores={operadoresList} />
     </div>
