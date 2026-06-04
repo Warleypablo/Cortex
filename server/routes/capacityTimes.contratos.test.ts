@@ -55,4 +55,11 @@ describe("GET /api/capacity-times/contratos", () => {
     const res = await request(makeApp()).get("/api/capacity-times/contratos?nome=Victor");
     expect(res.body.contratos[0].cliente).toBe("—");
   });
+
+  it("retorna array vazio quando operador não tem contratos", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    const res = await request(makeApp()).get("/api/capacity-times/contratos?nome=SemContratos");
+    expect(res.status).toBe(200);
+    expect(res.body.contratos).toEqual([]);
+  });
 });
