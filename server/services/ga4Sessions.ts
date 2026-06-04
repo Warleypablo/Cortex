@@ -17,9 +17,12 @@ import { getAnalyticsDataClient } from '../autoreport/credentials';
  */
 
 export type Ga4PlatformBreakdown = {
-  meta_ads: number;
-  google_ads: number;
-  organico: number;
+  meta_ads: number;   // PAGO: source facebook/fb/meta + medium pago
+  google_ads: number; // PAGO: source google/adwords/gads + medium pago
+  instagram: number;  // orgânico: source instagram/ig
+  youtube: number;    // orgânico: source youtube/yt (YouTube Ads vem como google)
+  linkedin: number;   // source linkedin
+  organico: number;   // direto/organic + Facebook orgânico
   outros: number;
 };
 
@@ -43,11 +46,21 @@ function fmtYmd(d: Date): string {
 function classifyPlatform(source: string, medium: string): keyof Ga4PlatformBreakdown {
   const s = source.toLowerCase().trim();
   const m = medium.toLowerCase().trim();
+  const isPaid = m === 'cpc' || m === 'ppc' || m === 'paid' || m === 'paidsocial' || m === 'paid_social' || m === 'paidsearch';
 
-  if (s.includes('facebook') || s.includes('meta') || s.includes('instagram') || s === 'ig' || s === 'fb') {
-    return 'meta_ads';
+  // Meta Ads PAGO = source facebook/fb/meta + medium pago. (Anúncios de placement IG
+  // também vêm como source=facebook — Constituição UTM §3.1.) Facebook ORGÂNICO
+  // (page posts, bio/linktree) compartilha o source mas NÃO é pago → vai pra organico.
+  if (s.includes('facebook') || s === 'fb' || s.includes('meta')) {
+    return isPaid ? 'meta_ads' : 'organico';
   }
-  if ((s.includes('google') || s.includes('adwords') || s.includes('gads')) && (m === 'cpc' || m === 'ppc' || m === 'paidsearch')) {
+  // Instagram orgânico (source=instagram). Pago do IG já saiu acima como facebook.
+  if (s.includes('instagram') || s === 'ig') return 'instagram';
+  // YouTube orgânico (source=youtube). YouTube Ads vem como google (network no term).
+  if (s.includes('youtube') || s === 'yt') return 'youtube';
+  if (s.includes('linkedin')) return 'linkedin';
+  // Google Ads PAGO = source google/adwords/gads + medium pago.
+  if ((s.includes('google') || s.includes('adwords') || s.includes('gads')) && isPaid) {
     return 'google_ads';
   }
   if (s === '(direct)' || m === '(none)' || m === 'organic') {
@@ -64,7 +77,7 @@ export async function getSessionsByPlatform(
   const propertyId = (process.env.LINKTREE_GA4_PROPERTY_ID || '').replace(/\D/g, '');
   const empty: Ga4SessionsResult = {
     total: 0,
-    byPlatform: { meta_ads: 0, google_ads: 0, organico: 0, outros: 0 },
+    byPlatform: { meta_ads: 0, google_ads: 0, instagram: 0, youtube: 0, linkedin: 0, organico: 0, outros: 0 },
     available: false,
   };
 
@@ -105,7 +118,7 @@ export async function getSessionsByPlatform(
       },
     } as any);
 
-    const byPlatform: Ga4PlatformBreakdown = { meta_ads: 0, google_ads: 0, organico: 0, outros: 0 };
+    const byPlatform: Ga4PlatformBreakdown = { meta_ads: 0, google_ads: 0, instagram: 0, youtube: 0, linkedin: 0, organico: 0, outros: 0 };
     let total = 0;
 
     for (const row of response.data.rows || []) {
