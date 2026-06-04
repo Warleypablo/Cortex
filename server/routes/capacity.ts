@@ -202,7 +202,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
           status: r.status as string,
           valorr: Number(r.valorr) || 0,
           valorp: Number(r.valorp) || 0,
-          id_subtask: r.id_subtask as string,
+          id_subtask: r.id_subtask ?? null,
         })),
       });
     } catch (error) {
