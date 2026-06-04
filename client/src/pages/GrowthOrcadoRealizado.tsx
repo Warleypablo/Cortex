@@ -1191,6 +1191,7 @@ export default function GrowthOrcadoRealizado() {
     receita: number | null; receitaPontual: number | null; receitaRecorrente: number | null;
     cac: number | null; cacUnico: number | null; cacContrato: number | null;
     clientesUnicos: number; contratos: number;
+    sessoes?: number | null; // Sessões GA4 do bucket da plataforma — denominador Conv. Sessão
   }
 
   const needsPlatformData = activeSection === 'aprofundado' || selectedPlataformas.length > 0;
@@ -1491,7 +1492,10 @@ export default function GrowthOrcadoRealizado() {
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
       { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRate ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRate), format: 'percent' },
-      { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0), format: 'percent' },
+      // No consolidado (todas as fontes), View = "—": LP views cobrem só Meta, mas os leads
+      // são de todas as fontes (apples-to-oranges). Sessão = leads ÷ sessões GA4 (todas as fontes).
+      { id: 'taxa_conversao_pagina_view', name: 'Tx Conversão de Página (View)', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
+      { id: 'taxa_conversao_pagina_sessao', name: 'Tx Conversão de Página (Sessão)', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : null, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : null), format: 'percent' },
       { id: 'leads', name: 'Leads', type: 'formula', orcado: ORCADO_ADS.leads, realizado: data.leads ?? 0, percentual: calcPercentual(ORCADO_ADS.leads, data.leads), format: 'number' },
       { id: 'mqls', name: 'MQLs', type: 'formula', orcado: ORCADO_ADS.mqls, realizado: data.mqls ?? 0, percentual: calcPercentual(ORCADO_ADS.mqls, data.mqls), format: 'number' },
       { id: 'cpl', name: 'CPL', type: 'formula', orcado: ORCADO_ADS.cpl, realizado: data.cpl ?? null, percentual: calcPercentual(ORCADO_ADS.cpl, data.cpl), format: 'currency' },
@@ -1518,15 +1522,25 @@ export default function GrowthOrcadoRealizado() {
   // ===== Platform-specific metric builders for Aprofundado view =====
 
   // Helper: build lead/MQL metrics for a platform (rest of funnel comes from MQL/NMQL/Total sections)
-  const buildFunnelMetrics = (prefix: string, funnel: PlatformFunnelData | undefined, orcado: any, investimento: number | null): Metric[] => {
+  const buildFunnelMetrics = (prefix: string, funnel: PlatformFunnelData | undefined, orcado: any, investimento: number | null, visualizacoesPagina: number | null = null): Metric[] => {
     const f = funnel || {} as PlatformFunnelData;
     const invest = investimento !== null && investimento > 0 ? investimento : 0;
     const cpl = invest > 0 && (f.leads || 0) > 0 ? invest / f.leads : null;
     const cpmql = invest > 0 && (f.mqls || 0) > 0 ? invest / f.mqls : null;
+    // Conversão de Página em DUAS métricas distintas:
+    //  - (View)   = Leads ÷ Visualizações de Página (Pixel). Só Meta tem LP views reais;
+    //    Google/IG/YT/LinkedIn recebem visualizacoesPagina=null → null ("—").
+    //  - (Sessão) = Leads ÷ Sessões (GA4 do bucket da plataforma). Universal.
+    const lpv = visualizacoesPagina ?? 0;
+    const txConvView = lpv > 0 && (f.leads || 0) > 0 ? f.leads / lpv : null;
+    const sess = f.sessoes ?? 0;
+    const txConvSessao = sess > 0 && (f.leads || 0) > 0 ? f.leads / sess : null;
     // CPRA e CPRR são métricas de VENDAS (denominador = reuniões) e vivem nas seções
     // Vendas — MQL/Não-MQL e Total, computadas com o investimento da plataforma selecionada.
     // Aqui (bloco de marketing por plataforma) só ficam Leads/MQLs/CPL/CPMQL/% MQLs.
     return [
+      { id: `${prefix}_txConvView`, name: 'Tx Conversão de Página (View)', type: 'formula', orcado: null, realizado: txConvView, percentual: null, format: 'percent' },
+      { id: `${prefix}_txConvSessao`, name: 'Tx Conversão de Página (Sessão)', type: 'formula', orcado: orcado.taxaConversaoPagina ?? null, realizado: txConvSessao, percentual: calcPercentual(orcado.taxaConversaoPagina ?? null, txConvSessao), format: 'percent' },
       { id: `${prefix}_leads`, name: 'Leads', type: 'formula', orcado: orcado.leads, realizado: f.leads ?? 0, percentual: calcPercentual(orcado.leads, f.leads), format: 'number' },
       { id: `${prefix}_mqls`, name: 'MQLs', type: 'formula', orcado: orcado.mqls, realizado: f.mqls ?? 0, percentual: calcPercentual(orcado.mqls, f.mqls), format: 'number' },
       { id: `${prefix}_cpl`, name: 'CPL', type: 'formula', orcado: orcado.cpl, realizado: cpl, percentual: calcPercentual(orcado.cpl, cpl), format: 'currency' },
@@ -1541,8 +1555,6 @@ export default function GrowthOrcadoRealizado() {
     funnel: PlatformFunnelData | undefined,
   ): Metric[] => {
     const O = ORCADO_META_ADS;
-    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'meta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'meta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -1550,9 +1562,9 @@ export default function GrowthOrcadoRealizado() {
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'meta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
       { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
-      { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('meta', funnel, O, d.investimento ?? null)];
+    // Meta tem LP views reais (Pixel) → passa visualizacoesPagina pra Conversão de Página (View).
+    return [...topMetrics, ...buildFunnelMetrics('meta', funnel, O, d.investimento ?? null, d.visualizacoesPagina ?? null)];
   };
 
   const metaAdsPlatformMetrics: Metric[] = useMemo(() => {
@@ -1571,8 +1583,6 @@ export default function GrowthOrcadoRealizado() {
     funnel: PlatformFunnelData | undefined,
   ): Metric[] => {
     const O = ORCADO_GOOGLE_ADS;
-    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'gads_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'gads_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -1580,9 +1590,10 @@ export default function GrowthOrcadoRealizado() {
       { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'gads_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
       { id: 'gads_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
-      { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('gads', funnel, O, d.investimento ?? null)];
+    // Google NÃO tem LP views reais (o 'visualizacoesPagina' dele é cliques) → View = "—".
+    // Só a Conversão de Página (Sessão) é válida, via funnel.sessoes (bucket google_ads do GA4).
+    return [...topMetrics, ...buildFunnelMetrics('gads', funnel, O, d.investimento ?? null, null)];
   };
 
   const googleAdsPlatformMetrics: Metric[] = useMemo(() => {

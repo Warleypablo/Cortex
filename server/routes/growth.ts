@@ -2781,6 +2781,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.log("[api] Google Ads query error in orcado-realizado/ads (may not have data):", googleError);
       }
 
+      // Connect Rate é puramente Meta (landing_page_views / outbound_clicks do Pixel).
+      // Captura os outbound clicks do Meta ANTES de somar Google — senão o denominador
+      // do Connect Rate inflaria com cliques do Google sem o numerador (LP views Meta)
+      // correspondente, subestimando a métrica no consolidado.
+      const metaOutboundClicks = cliquesSaida;
+
       // Cliques de saída consolidados: Meta outbound_clicks + Google clicks
       // (Google clicks são cliques no anúncio que levam à LP — equivalente a outbound).
       if (includeGoogle) {
@@ -2798,8 +2804,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // CPS = Custo por Sessão (Investimento / Visualizações de Página)
       const cps = visualizacoesPagina > 0 ? investimento / visualizacoesPagina : 0;
-      // Connect Rate = Visualizações de Página / Cliques de Saída (Meta Pixel only — semântica preservada)
-      const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
+      // Connect Rate = Visualizações de Página (LP views Meta) / Cliques de Saída do Meta.
+      // Usa metaOutboundClicks (sem Google) pra numerador e denominador serem ambos Meta.
+      const connectRate = metaOutboundClicks > 0 ? visualizacoesPagina / metaOutboundClicks : 0;
 
       // Sessões (GA4) — métrica universal de chegada na LP cobrindo Meta + Google + orgânico.
       // Filtro de funil aplicado via sessionCampaignName contains [NomeFunil].
@@ -2808,13 +2815,25 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         new Date(endDate),
         realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
       );
+      // Mapeia cada plataforma selecionada pro bucket GA4 certo e soma. Sem filtro = total.
+      // (instagram/youtube/linkedin agora têm bucket próprio — ver ga4Sessions.classifyPlatform.)
+      const tokenToBucket = (v: string): keyof typeof ga4.byPlatform | null => {
+        if (v.includes('facebook') || v.includes('meta') || v === 'fb') return 'meta_ads';
+        if (v.includes('instagram') || v === 'ig') return 'instagram';
+        if (v.includes('google') || v.includes('adwords') || v.includes('gads')) return 'google_ads';
+        if (v.includes('youtube') || v === 'yt') return 'youtube';
+        if (v.includes('linkedin')) return 'linkedin';
+        return null;
+      };
       let sessoes = 0;
-      if (includeMeta && includeGoogle) {
+      if (utmValues.length === 0) {
         sessoes = ga4.total;
-      } else if (includeMeta) {
-        sessoes = ga4.byPlatform.meta_ads;
-      } else if (includeGoogle) {
-        sessoes = ga4.byPlatform.google_ads;
+      } else {
+        const seen: Record<string, boolean> = {};
+        for (const v of utmValues) {
+          const b = tokenToBucket(v);
+          if (b && !seen[b]) { seen[b] = true; sessoes += (ga4.byPlatform as any)[b] || 0; }
+        }
       }
 
       // Query Leads e MQLs do Bitrix (tráfego pago)
@@ -2965,7 +2984,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
       const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPagina;
-      const sessoesExposto = onlyInstagram ? 0 : sessoes;
+      // Sessões NÃO zeram pra Instagram-only: agora há bucket GA4 'instagram' (orgânico),
+      // então `sessoes` já traz as sessões do IG — é o denominador da Conversão de Sessão.
+      const sessoesExposto = sessoes;
       const cpl = onlyInstagram ? 0 : (leads > 0 ? investimento / leads : 0);
       const cpmql = onlyInstagram ? 0 : (mqls > 0 ? investimento / mqls : 0);
       const percMqls = leads > 0 ? (mqls / leads) : 0;
@@ -3613,6 +3634,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         if (row.avg_lead_time) leadTimeMap.set(row.platform, parseFloat(row.avg_lead_time));
       }
 
+      // Sessões GA4 por plataforma — denominador da Conversão de Sessão por canal.
+      // (meta_ads/google_ads = pago; instagram/youtube/linkedin = orgânico.)
+      // NB: sem filtro de funil aqui (sessões = total por plataforma no período). Filtrar
+      // sessões por funil depende da propagação de filtros do funnel-by-platform (outra frente).
+      const ga4 = await getSessionsByPlatform(
+        new Date(startDate),
+        new Date(endDate),
+      );
+      const sessoesPorPlataforma: Record<string, number> = {
+        meta_ads: ga4.byPlatform.meta_ads,
+        google_ads: ga4.byPlatform.google_ads,
+        instagram: ga4.byPlatform.instagram,
+        youtube: ga4.byPlatform.youtube,
+        linkedin: ga4.byPlatform.linkedin,
+      };
+
       // Build result per platform
       const platforms = ['meta_ads', 'google_ads', 'instagram', 'youtube', 'linkedin', 'tiktok_ads', 'tiktok'];
       const result: Record<string, any> = {};
@@ -3665,6 +3702,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           cacContrato: null,
           clientesUnicos,
           contratos,
+          sessoes: sessoesPorPlataforma[platKey] ?? null,
         };
       }
 
