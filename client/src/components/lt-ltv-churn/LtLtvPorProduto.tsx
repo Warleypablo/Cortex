@@ -29,8 +29,14 @@ export function LtLtvPorProduto({ produtos }: { produtos: ProdutoBenchmark[] }) 
   const grid = isDark ? "#27272a" : "#e5e7eb";
   const axis = isDark ? "#a1a1aa" : "#6b7280";
   const [situacao, setSituacao] = useState<Situacao>("ambos");
+  const [agregador, setAgregador] = useState<"media" | "mediana">("media");
 
   const pick = (p: ProdutoBenchmark) => {
+    if (agregador === "mediana") {
+      if (situacao === "ativo") return { lt: p.ltMedianaAtivo, ltv: p.ltvMedianaAtivo };
+      if (situacao === "cancelado") return { lt: p.ltMedianaCancelado, ltv: p.ltvMediana };
+      return { lt: p.ltMedianaGeral, ltv: p.ltvMedianaGeral };
+    }
     if (situacao === "ativo") return { lt: p.ltMedioAtivo, ltv: p.ltvMedioAtivo };
     if (situacao === "cancelado") return { lt: p.ltMedioCancelado, ltv: p.ltvMedio };
     return { lt: p.ltMedioGeral, ltv: p.ltvMedioGeral };
@@ -42,6 +48,7 @@ export function LtLtvPorProduto({ produtos }: { produtos: ProdutoBenchmark[] }) 
     .filter((d) => d.lt > 0 || d.ltv > 0)
     .slice(0, 10);
 
+  const labelAgregador = agregador === "media" ? "médio" : "mediano";
   const subtitulo =
     situacao === "ativo"
       ? "Contratos ativos (LT em curso)"
@@ -56,19 +63,30 @@ export function LtLtvPorProduto({ produtos }: { produtos: ProdutoBenchmark[] }) 
           <div>
             <CardTitle className="text-base">LT e LTV por produto</CardTitle>
             <p className="text-xs text-gray-500 dark:text-zinc-400">
-              LT médio (meses, esq.) e LTV médio (R$, dir.) · {subtitulo}
+              LT {labelAgregador} (meses, esq.) e LTV {labelAgregador} (R$, dir.) · {subtitulo}
             </p>
           </div>
-          <Select value={situacao} onValueChange={(v) => setSituacao(v as Situacao)}>
-            <SelectTrigger className="w-[170px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="ambos">Ativos e cancelados</SelectItem>
-              <SelectItem value="ativo">Apenas ativos</SelectItem>
-              <SelectItem value="cancelado">Apenas cancelados</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={agregador} onValueChange={(v) => setAgregador(v as "media" | "mediana")}>
+              <SelectTrigger className="w-[120px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="media">Média</SelectItem>
+                <SelectItem value="mediana">Mediana</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={situacao} onValueChange={(v) => setSituacao(v as Situacao)}>
+              <SelectTrigger className="w-[170px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ambos">Ativos e cancelados</SelectItem>
+                <SelectItem value="ativo">Apenas ativos</SelectItem>
+                <SelectItem value="cancelado">Apenas cancelados</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
@@ -105,8 +123,8 @@ export function LtLtvPorProduto({ produtos }: { produtos: ProdutoBenchmark[] }) 
               }
             />
             <Legend />
-            <Bar yAxisId="lt" dataKey="lt" fill="#0ea5e9" radius={[4, 4, 0, 0]} name="LT médio (m)" />
-            <Bar yAxisId="ltv" dataKey="ltv" fill="#6366f1" radius={[4, 4, 0, 0]} name="LTV médio" />
+            <Bar yAxisId="lt" dataKey="lt" fill="#0ea5e9" radius={[4, 4, 0, 0]} name={`LT ${labelAgregador} (m)`} />
+            <Bar yAxisId="ltv" dataKey="ltv" fill="#6366f1" radius={[4, 4, 0, 0]} name={`LTV ${labelAgregador}`} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
