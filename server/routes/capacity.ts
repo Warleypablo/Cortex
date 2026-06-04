@@ -170,6 +170,47 @@ export function registerCapacityRoutes(app: Express, db: any) {
     }
   });
 
+  // GET /api/capacity-times/contratos?nome=<nome>
+  app.get("/api/capacity-times/contratos", async (req, res) => {
+    const nome = (req.query.nome as string | undefined)?.trim();
+    if (!nome) return res.status(400).json({ error: "nome é obrigatório" });
+    try {
+      const rows = (await db.execute(sql`
+        SELECT
+          cl.nome AS cliente,
+          c.produto,
+          c.status,
+          COALESCE(c.valorr, 0) AS valorr,
+          COALESCE(c.valorp, 0) AS valorp,
+          c.id_subtask
+        FROM cortex_core.capacity_metas m
+        JOIN "Clickup".cup_contratos c
+          ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
+          AND c.status IN ('ativo','onboarding','em cancelamento')
+        LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+        WHERE m.nome = ${nome}
+          AND m.ativo = TRUE
+        ORDER BY
+          CASE c.status WHEN 'ativo' THEN 1 WHEN 'onboarding' THEN 2 ELSE 3 END,
+          COALESCE(c.valorr, 0) DESC
+      `)).rows as any[];
+
+      res.json({
+        contratos: rows.map((r) => ({
+          cliente: r.cliente || "—",
+          produto: r.produto || "—",
+          status: r.status as string,
+          valorr: Number(r.valorr) || 0,
+          valorp: Number(r.valorp) || 0,
+          id_subtask: r.id_subtask as string,
+        })),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching capacity-times contratos:", error);
+      res.status(500).json({ error: "Failed to fetch contratos" });
+    }
+  });
+
   // ── Endpoints legados (mantidos para compatibilidade) ──
 
   app.get("/api/capacity", async (req, res) => {
