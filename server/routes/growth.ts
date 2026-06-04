@@ -63,6 +63,24 @@ const PLATFORM_CASE_SQL_BASIC = `CASE
 END`;
 
 /**
+ * Definição de "tráfego pago" por utm_source para o denominador de CPRA/CPRR:
+ * apenas Meta Ads (facebook/fb/meta) + Google Ads (google/adwords/gads).
+ *
+ * IMPORTANTE: NÃO inclui utm_source=instagram/ig — esse é tráfego ORGÂNICO (bio/perfil).
+ * O tráfego pago de IG (anúncios Meta em placement de Instagram) é marcado como
+ * utm_source=facebook, então já está coberto pelo padrão 'facebook'. Incluir 'instagram'
+ * contaminaria o denominador com orgânico, justamente o que queremos evitar.
+ *
+ * Usada quando NÃO há filtro de plataforma, para casar o denominador (reuniões pagas)
+ * com o numerador (investimento, que só conta Meta + Google).
+ * Requer que a tabela "Bitrix".crm_deal esteja aliada como `d`.
+ */
+const PAID_TRAFEGO_SOURCE_SQL = sql.raw(`
+  LOWER(d.utm_source) LIKE '%facebook%' OR LOWER(d.utm_source) LIKE '%fb%' OR LOWER(d.utm_source) LIKE '%meta%'
+  OR LOWER(d.utm_source) LIKE '%google%' OR LOWER(d.utm_source) LIKE '%adwords%' OR LOWER(d.utm_source) = 'gads'
+`);
+
+/**
  * Medium da Constituição UTM (paid | organic | crm | eventos | referral | outbound).
  * Nível superior da aba "Por Plataforma".
  *
@@ -2263,6 +2281,39 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const totalMqls = parseInt((totalResult.rows[0] as any).total_mqls) || 0;
       const reunioesAgendadas = parseInt((raResult.rows[0] as any).reunioes_agendadas_mql) || 0;
       const reunioesRealizadas = parseInt((rrResult.rows[0] as any).reunioes_realizadas_mql) || 0;
+
+      // RA/RR de tráfego pago — denominador de CPRA/CPRR MQL (casa com o investimento,
+      // que só conta Meta+Google). Com filtro de plataforma já equivalem ao reunioes
+      // filtrado; sem filtro, restringe às fontes pagas. Nº RA/RR exibidos seguem all-source.
+      let reunioesAgendadasPagas = reunioesAgendadas;
+      let reunioesRealizadasPagas = reunioesRealizadas;
+      if (!(utmSourceParam && utmSourceParam !== 'todos')) {
+        const raPagoResult = await db.execute(sql`
+          SELECT COUNT(*) as ra
+          FROM "Bitrix".crm_deal d
+          WHERE d.data_reuniao_agendada IS NOT NULL
+            AND d.data_reuniao_agendada::date >= ${startDate}::date
+            AND d.data_reuniao_agendada::date <= ${endDate}::date
+            AND ${mqlCondition}
+            ${inboundFilter}
+            ${funilFilter}
+            AND (${PAID_TRAFEGO_SOURCE_SQL})
+        `);
+        const rrPagoResult = await db.execute(sql`
+          SELECT COUNT(*) as rr
+          FROM "Bitrix".crm_deal d
+          WHERE d.data_reuniao_realizada IS NOT NULL
+            AND d.data_reuniao_realizada::date >= ${startDate}::date
+            AND d.data_reuniao_realizada::date <= ${endDate}::date
+            AND ${mqlCondition}
+            ${inboundFilter}
+            ${funilFilter}
+            AND (${PAID_TRAFEGO_SOURCE_SQL})
+        `);
+        reunioesAgendadasPagas = parseInt((raPagoResult.rows[0] as any).ra) || 0;
+        reunioesRealizadasPagas = parseInt((rrPagoResult.rows[0] as any).rr) || 0;
+      }
+
       const vRow = vendasResult.rows[0] as any;
       const novosClientes = parseInt(vRow.novos_clientes_mql) || 0;
       const contratosAceleracao = parseInt(vRow.contratos_aceleracao_mql) || 0;
@@ -2288,6 +2339,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         totalMqls,
         reunioesAgendadas,
         reunioesRealizadas,
+        reunioesAgendadasPagas,
+        reunioesRealizadasPagas,
         novosClientes,
         contratosAceleracao,
         contratosImplantacao,
@@ -2462,6 +2515,39 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const totalNaoMqls = parseInt((totalResult.rows[0] as any).total_nao_mqls) || 0;
       const reunioesAgendadas = parseInt((raResult.rows[0] as any).reunioes_agendadas) || 0;
       const reunioesRealizadas = parseInt((rrResult.rows[0] as any).reunioes_realizadas) || 0;
+
+      // RA/RR de tráfego pago — denominador de CPRA/CPRR não-MQL (casa com o investimento,
+      // que só conta Meta+Google). Com filtro de plataforma já equivalem ao reunioes
+      // filtrado; sem filtro, restringe às fontes pagas. Nº RA/RR exibidos seguem all-source.
+      let reunioesAgendadasPagas = reunioesAgendadas;
+      let reunioesRealizadasPagas = reunioesRealizadas;
+      if (!(utmSourceParam && utmSourceParam !== 'todos')) {
+        const raPagoResult = await db.execute(sql`
+          SELECT COUNT(*) as ra
+          FROM "Bitrix".crm_deal d
+          WHERE d.data_reuniao_agendada IS NOT NULL
+            AND d.data_reuniao_agendada::date >= ${startDate}::date
+            AND d.data_reuniao_agendada::date <= ${endDate}::date
+            AND ${naoMqlCondition}
+            ${inboundFilter}
+            ${funilFilter}
+            AND (${PAID_TRAFEGO_SOURCE_SQL})
+        `);
+        const rrPagoResult = await db.execute(sql`
+          SELECT COUNT(*) as rr
+          FROM "Bitrix".crm_deal d
+          WHERE d.data_reuniao_realizada IS NOT NULL
+            AND d.data_reuniao_realizada::date >= ${startDate}::date
+            AND d.data_reuniao_realizada::date <= ${endDate}::date
+            AND ${naoMqlCondition}
+            ${inboundFilter}
+            ${funilFilter}
+            AND (${PAID_TRAFEGO_SOURCE_SQL})
+        `);
+        reunioesAgendadasPagas = parseInt((raPagoResult.rows[0] as any).ra) || 0;
+        reunioesRealizadasPagas = parseInt((rrPagoResult.rows[0] as any).rr) || 0;
+      }
+
       const vRow = vendasResult.rows[0] as any;
       const novosClientes = parseInt(vRow.novos_clientes) || 0;
       const contratosAceleracao = parseInt(vRow.contratos_aceleracao) || 0;
@@ -2487,6 +2573,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         totalNaoMqls,
         reunioesAgendadas,
         reunioesRealizadas,
+        reunioesAgendadasPagas,
+        reunioesRealizadasPagas,
         novosClientes,
         contratosAceleracao,
         contratosImplantacao,
@@ -2756,6 +2844,18 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
       }
 
+      // Denominador de CPRA/CPRR precisa casar com o recorte do investimento (só pago).
+      // Com filtro de plataforma, utmSourceFilter já alinha numerador e denominador.
+      // SEM filtro, RA/RR all-source inflam o denominador (orgânico/direto/CRM entram
+      // sem ter investimento associado) → CPRA artificialmente baixo. Aqui restringimos
+      // às fontes pagas (PAID_TRAFEGO_SOURCE_SQL): Meta (facebook/fb/meta) + Google
+      // (google/adwords/gads). NÃO inclui instagram/ig — esse é orgânico; o IG pago já
+      // vem como utm_source=facebook.
+      let paidSourceFilter = utmSourceFilter;
+      if (utmValues.length === 0) {
+        paidSourceFilter = sql`AND (${PAID_TRAFEGO_SOURCE_SQL})`;
+      }
+
       const leadsResult = await db.execute(sql`
         SELECT
           COUNT(*) as total_leads,
@@ -2809,6 +2909,48 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const rrMql = parseInt(rrRow.rr_mql) || 0;
       const rrNmql = parseInt(rrRow.rr_nmql) || 0;
 
+      // RA/RR restritos a fontes pagas — denominador de CPRA/CPRR. Com filtro de
+      // plataforma já equivalem a ra/rr (paidSourceFilter === utmSourceFilter), então
+      // só pagamos as queries extras quando não há filtro.
+      let raPago = ra, raPagoMql = raMql, raPagoNmql = raNmql;
+      let rrPago = rr, rrPagoMql = rrMql, rrPagoNmql = rrNmql;
+      if (utmValues.length === 0) {
+        const raPagoResult = await db.execute(sql`
+          SELECT
+            COUNT(*) as total_ra,
+            COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as ra_mql,
+            COUNT(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 END) as ra_nmql
+          FROM "Bitrix".crm_deal d
+          WHERE d.data_reuniao_agendada IS NOT NULL
+            AND d.data_reuniao_agendada::date >= ${startDate}::date
+            AND d.data_reuniao_agendada::date <= ${endDate}::date
+            AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${funilFilter}
+            ${paidSourceFilter}
+        `);
+        const rrPagoResult = await db.execute(sql`
+          SELECT
+            COUNT(*) as total_rr,
+            COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as rr_mql,
+            COUNT(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 END) as rr_nmql
+          FROM "Bitrix".crm_deal d
+          WHERE d.data_reuniao_realizada IS NOT NULL
+            AND d.data_reuniao_realizada::date >= ${startDate}::date
+            AND d.data_reuniao_realizada::date <= ${endDate}::date
+            AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${funilFilter}
+            ${paidSourceFilter}
+        `);
+        const raPagoRow = raPagoResult.rows[0] as any;
+        const rrPagoRow = rrPagoResult.rows[0] as any;
+        raPago = parseInt(raPagoRow.total_ra) || 0;
+        raPagoMql = parseInt(raPagoRow.ra_mql) || 0;
+        raPagoNmql = parseInt(raPagoRow.ra_nmql) || 0;
+        rrPago = parseInt(rrPagoRow.total_rr) || 0;
+        rrPagoMql = parseInt(rrPagoRow.rr_mql) || 0;
+        rrPagoNmql = parseInt(rrPagoRow.rr_nmql) || 0;
+      }
+
       // Quando o filtro é EXATAMENTE Instagram (sozinho), não atribuímos investimento
       // pago à plataforma — gasto agregado fica na seção "Meta Ads". Visualizações/Alcance
       // pagos do IG continuam aparecendo nos cards específicos do Instagram.
@@ -2827,13 +2969,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpl = onlyInstagram ? 0 : (leads > 0 ? investimento / leads : 0);
       const cpmql = onlyInstagram ? 0 : (mqls > 0 ? investimento / mqls : 0);
       const percMqls = leads > 0 ? (mqls / leads) : 0;
-      // CPRA = invest / RA; CPRR = invest / RR. Null quando RA/RR=0 ou invest=0.
-      const cpra = onlyInstagram || ra === 0 || investimento === 0 ? null : investimento / ra;
-      const cpraMql = onlyInstagram || raMql === 0 || investimento === 0 ? null : investimento / raMql;
-      const cpraNmql = onlyInstagram || raNmql === 0 || investimento === 0 ? null : investimento / raNmql;
-      const cprr = onlyInstagram || rr === 0 || investimento === 0 ? null : investimento / rr;
-      const cprrMql = onlyInstagram || rrMql === 0 || investimento === 0 ? null : investimento / rrMql;
-      const cprrNmql = onlyInstagram || rrNmql === 0 || investimento === 0 ? null : investimento / rrNmql;
+      // CPRA = invest / RA_pago; CPRR = invest / RR_pago. Null quando RA/RR=0 ou invest=0.
+      // Denominador usa RA/RR de fontes pagas (raPago/rrPago) pra casar com o investimento.
+      const cpra = onlyInstagram || raPago === 0 || investimento === 0 ? null : investimento / raPago;
+      const cpraMql = onlyInstagram || raPagoMql === 0 || investimento === 0 ? null : investimento / raPagoMql;
+      const cpraNmql = onlyInstagram || raPagoNmql === 0 || investimento === 0 ? null : investimento / raPagoNmql;
+      const cprr = onlyInstagram || rrPago === 0 || investimento === 0 ? null : investimento / rrPago;
+      const cprrMql = onlyInstagram || rrPagoMql === 0 || investimento === 0 ? null : investimento / rrPagoMql;
+      const cprrNmql = onlyInstagram || rrPagoNmql === 0 || investimento === 0 ? null : investimento / rrPagoNmql;
 
       res.json({
         investimento: investimentoExposto,

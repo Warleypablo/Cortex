@@ -341,8 +341,6 @@ export default function PerformancePlataformas() {
       {renderCell(row.mqls, comp?.mqls ?? null, 'mqls', formatNumber)}
       {renderCell(row.cpl, comp?.cpl ?? null, 'cpl', formatCurrency, getCellClassName('cpl', row.cpl), true)}
       {renderCell(row.cpmql, comp?.cpmql ?? null, 'cpmql', formatCurrency, getCellClassName('cpmql', row.cpmql), true)}
-      {renderCell(row.cpra, comp?.cpra ?? null, 'cpra', formatCurrency, getCellClassName('cpmql', row.cpra), true)}
-      {renderCell(row.cprr, comp?.cprr ?? null, 'cprr', formatCurrency, getCellClassName('cpmql', row.cprr), true)}
       {renderCell(row.percMql, comp?.percMql ?? null, 'percMql', formatPercent, getCellClassName('percMql', row.percMql))}
       {/* RA % (grupo expansível) */}
       {renderCell(row.percRa, comp?.percRa ?? null, 'percRa', formatPercent, getCellClassName('percRa', row.percRa))}
@@ -352,6 +350,8 @@ export default function PerformancePlataformas() {
           {renderCell(row.percRaNmql, comp?.percRaNmql ?? null, 'percRaNmql', formatPercent, getCellClassName('percRa', row.percRaNmql))}
         </>
       )}
+      {/* CPRA — métrica de vendas (custo por reunião agendada), ao lado de RA % */}
+      {renderCell(row.cpra, comp?.cpra ?? null, 'cpra', formatCurrency, getCellClassName('cpmql', row.cpra), true)}
       {/* RR % (grupo expansível) */}
       {renderCell(row.percRr, comp?.percRr ?? null, 'percRr', formatPercent, getCellClassName('percRr', row.percRr))}
       {expandedGroups.has('rr') && (
@@ -360,6 +360,8 @@ export default function PerformancePlataformas() {
           {renderCell(row.percRrNmql, comp?.percRrNmql ?? null, 'percRrNmql', formatPercent, getCellClassName('percRr', row.percRrNmql))}
         </>
       )}
+      {/* CPRR — métrica de vendas (custo por reunião realizada), ao lado de RR % */}
+      {renderCell(row.cprr, comp?.cprr ?? null, 'cprr', formatCurrency, getCellClassName('cpmql', row.cprr), true)}
       {/* RR→V % (grupo expansível) */}
       {renderCell(row.percRrVendas, comp?.percRrVendas ?? null, 'percRrVendas', formatPercent, getCellClassName('percRrVendas', row.percRrVendas))}
       {expandedGroups.has('rrv') && (
@@ -493,17 +495,17 @@ export default function PerformancePlataformas() {
                     <SortableHeader column="mqls" label="MQLs" />
                     <SortableHeader column="cpl" label="CPL" />
                     <SortableHeader column="cpmql" label="CPMQL" />
-                    <SortableHeader column="cpra" label="CPRA" />
-                    <SortableHeader column="cprr" label="CPRR" />
                     <SortableHeader column="percMql" label="%MQLs" />
                     <GroupableHeader group="ra" label="RA %" column="percRa">
                       <SortableHeader column="percRaMql" label="RA MQL %" />
                       <SortableHeader column="percRaNmql" label="RA NMQL %" />
                     </GroupableHeader>
+                    <SortableHeader column="cpra" label="CPRA" />
                     <GroupableHeader group="rr" label="RR %" column="percRr">
                       <SortableHeader column="percRrMql" label="RR MQL %" />
                       <SortableHeader column="percRrNmql" label="RR NMQL %" />
                     </GroupableHeader>
+                    <SortableHeader column="cprr" label="CPRR" />
                     <GroupableHeader group="rrv" label="RR→V %" column="percRrVendas">
                       <SortableHeader column="percRrMqlVendas" label="RR MQL→V %" />
                       <SortableHeader column="percRrNmqlVendas" label="RR NMQL→V %" />
