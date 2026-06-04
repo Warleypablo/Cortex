@@ -67,6 +67,8 @@ export interface EvolucaoProdutoData {
   produtos: string[];
   lt: Array<Record<string, number | string>>;
   ltv: Array<Record<string, number | string>>;
+  lt_mediana: Array<Record<string, number | string>>;
+  ltv_mediana: Array<Record<string, number | string>>;
 }
 
 export interface EvolucaoClientePonto {

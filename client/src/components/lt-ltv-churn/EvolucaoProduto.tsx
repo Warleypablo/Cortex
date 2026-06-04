@@ -32,6 +32,7 @@ export function EvolucaoProduto() {
   const axis = isDark ? "#a1a1aa" : "#6b7280";
 
   const [metrica, setMetrica] = useState<"lt" | "ltv">("lt");
+  const [agregador, setAgregador] = useState<"media" | "mediana">("media");
 
   const { data: evolucao, isLoading } = useQuery({
     queryKey: ["/api/lt-ltv-churn/evolucao-produto"],
@@ -42,7 +43,9 @@ export function EvolucaoProduto() {
     return <div className="h-72 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />;
   }
 
-  const chartData = metrica === "lt" ? evolucao.lt : evolucao.ltv;
+  const chaveArray = agregador === "media" ? metrica : `${metrica}_mediana` as keyof EvolucaoProdutoData;
+  const chartData = evolucao[chaveArray] as Array<Record<string, number | string>>;
+  const labelAgregador = agregador === "media" ? "médio" : "mediano";
 
   return (
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
@@ -51,18 +54,29 @@ export function EvolucaoProduto() {
           <div>
             <CardTitle className="text-base">Evolução de LT/LTV por produto</CardTitle>
             <p className="text-xs text-gray-500 dark:text-zinc-400">
-              Média mensal da carteira ativa (snapshots) · meses sem produto preenchido são omitidos
+              {agregador === "media" ? "Média" : "Mediana"} mensal da carteira ativa (snapshots) · meses sem produto preenchido são omitidos
             </p>
           </div>
-          <Select value={metrica} onValueChange={(v) => setMetrica(v as "lt" | "ltv")}>
-            <SelectTrigger className="w-[170px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="lt">LT médio (meses)</SelectItem>
-              <SelectItem value="ltv">LTV médio (R$)</SelectItem>
-            </SelectContent>
-          </Select>
+          <div className="flex items-center gap-2">
+            <Select value={metrica} onValueChange={(v) => setMetrica(v as "lt" | "ltv")}>
+              <SelectTrigger className="w-[170px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lt">LT {labelAgregador} (meses)</SelectItem>
+                <SelectItem value="ltv">LTV {labelAgregador} (R$)</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={agregador} onValueChange={(v) => setAgregador(v as "media" | "mediana")}>
+              <SelectTrigger className="w-[120px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="media">Média</SelectItem>
+                <SelectItem value="mediana">Mediana</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
         </div>
       </CardHeader>
       <CardContent>
