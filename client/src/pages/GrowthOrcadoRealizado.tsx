@@ -44,6 +44,9 @@ interface MQLMetrics {
   totalMqls: number;
   reunioesAgendadas: number;
   reunioesRealizadas: number;
+  // RA/RR restritos a tráfego pago — denominador de CPRA/CPRR (casa com o investimento).
+  reunioesAgendadasPagas?: number;
+  reunioesRealizadasPagas?: number;
   novosClientes: number;
   contratosAceleracao: number;
   contratosImplantacao: number;
@@ -66,6 +69,9 @@ interface NaoMQLMetrics {
   totalNaoMqls: number;
   reunioesAgendadas: number;
   reunioesRealizadas: number;
+  // RA/RR restritos a tráfego pago — denominador de CPRA/CPRR (casa com o investimento).
+  reunioesAgendadasPagas?: number;
+  reunioesRealizadasPagas?: number;
   novosClientes: number;
   contratosAceleracao: number;
   contratosImplantacao: number;
@@ -1284,8 +1290,10 @@ export default function GrowthOrcadoRealizado() {
 
   const buildMqlMetrics = (data: MQLMetrics, investimento: number | null = null): Metric[] => {
     const invest = investimento ?? 0;
-    const raCount = data.reunioesAgendadas ?? 0;
-    const rrCount = data.reunioesRealizadas ?? 0;
+    // CPRA/CPRR usam RA/RR de tráfego pago (denominador casado com o investimento).
+    // Nº RA/RR exibidos seguem all-source (data.reunioesAgendadas/Realizadas).
+    const raCount = data.reunioesAgendadasPagas ?? data.reunioesAgendadas ?? 0;
+    const rrCount = data.reunioesRealizadasPagas ?? data.reunioesRealizadas ?? 0;
     const cpraMql = invest > 0 && raCount > 0 ? invest / raCount : null;
     const cprrMql = invest > 0 && rrCount > 0 ? invest / rrCount : null;
     return [
@@ -1515,27 +1523,14 @@ export default function GrowthOrcadoRealizado() {
     const invest = investimento !== null && investimento > 0 ? investimento : 0;
     const cpl = invest > 0 && (f.leads || 0) > 0 ? invest / f.leads : null;
     const cpmql = invest > 0 && (f.mqls || 0) > 0 ? invest / f.mqls : null;
-    // Funnel `ra` e `rr` vêm via /funnel-by-platform (created_at). Splits MQL/nMQL
-    // já são inferíveis a partir de ra/mqls. Mas pra CPRA/CPRR de MQL/nMQL
-    // específicos precisaria do split por estágio MQL — temos f.percRaMql etc.
-    // Conservador: ra = ra_total da plataforma, então CPRA aqui é geral.
-    const cpra = invest > 0 && (f.ra || 0) > 0 ? invest / f.ra : null;
-    const cpraMql = invest > 0 && (f.raMql || 0) > 0 ? invest / f.raMql : null;
-    const cpraNmql = invest > 0 && (f.raNmql || 0) > 0 ? invest / f.raNmql : null;
-    const cprr = invest > 0 && (f.rr || 0) > 0 ? invest / f.rr : null;
-    const cprrMql = invest > 0 && (f.rrMql || 0) > 0 ? invest / f.rrMql : null;
-    const cprrNmql = invest > 0 && (f.rrNmql || 0) > 0 ? invest / f.rrNmql : null;
+    // CPRA e CPRR são métricas de VENDAS (denominador = reuniões) e vivem nas seções
+    // Vendas — MQL/Não-MQL e Total, computadas com o investimento da plataforma selecionada.
+    // Aqui (bloco de marketing por plataforma) só ficam Leads/MQLs/CPL/CPMQL/% MQLs.
     return [
       { id: `${prefix}_leads`, name: 'Leads', type: 'formula', orcado: orcado.leads, realizado: f.leads ?? 0, percentual: calcPercentual(orcado.leads, f.leads), format: 'number' },
       { id: `${prefix}_mqls`, name: 'MQLs', type: 'formula', orcado: orcado.mqls, realizado: f.mqls ?? 0, percentual: calcPercentual(orcado.mqls, f.mqls), format: 'number' },
       { id: `${prefix}_cpl`, name: 'CPL', type: 'formula', orcado: orcado.cpl, realizado: cpl, percentual: calcPercentual(orcado.cpl, cpl), format: 'currency' },
       { id: `${prefix}_cpmql`, name: 'CPMQL', type: 'formula', orcado: orcado.cpmql, realizado: cpmql, percentual: calcPercentual(orcado.cpmql, cpmql), format: 'currency' },
-      { id: `${prefix}_cpra`, name: 'CPRA', type: 'formula', orcado: orcado.cpra, realizado: cpra, percentual: calcPercentual(orcado.cpra, cpra), format: 'currency' },
-      { id: `${prefix}_cpraMql`, name: 'CPRA MQL', type: 'formula', orcado: orcado.cpraMql, realizado: cpraMql, percentual: calcPercentual(orcado.cpraMql, cpraMql), format: 'currency' },
-      { id: `${prefix}_cpraNmql`, name: 'CPRA nMQL', type: 'formula', orcado: orcado.cpraNmql, realizado: cpraNmql, percentual: calcPercentual(orcado.cpraNmql, cpraNmql), format: 'currency' },
-      { id: `${prefix}_cprr`, name: 'CPRR', type: 'formula', orcado: orcado.cprr, realizado: cprr, percentual: calcPercentual(orcado.cprr, cprr), format: 'currency' },
-      { id: `${prefix}_cprrMql`, name: 'CPRR MQL', type: 'formula', orcado: orcado.cprrMql, realizado: cprrMql, percentual: calcPercentual(orcado.cprrMql, cprrMql), format: 'currency' },
-      { id: `${prefix}_cprrNmql`, name: 'CPRR nMQL', type: 'formula', orcado: orcado.cprrNmql, realizado: cprrNmql, percentual: calcPercentual(orcado.cprrNmql, cprrNmql), format: 'currency' },
       { id: `${prefix}_percMqls`, name: '% MQLs', type: 'formula', orcado: orcado.percMqls, realizado: f.percMqls ?? null, percentual: calcPercentual(orcado.percMqls, f.percMqls), format: 'percent' },
     ];
   };
@@ -1713,8 +1708,10 @@ export default function GrowthOrcadoRealizado() {
 
   const buildNaoMqlMetrics = (data: NaoMQLMetrics, investimento: number | null = null): Metric[] => {
     const invest = investimento ?? 0;
-    const raCount = data.reunioesAgendadas ?? 0;
-    const rrCount = data.reunioesRealizadas ?? 0;
+    // CPRA/CPRR usam RA/RR de tráfego pago (denominador casado com o investimento).
+    // Nº RA/RR exibidos seguem all-source (data.reunioesAgendadas/Realizadas).
+    const raCount = data.reunioesAgendadasPagas ?? data.reunioesAgendadas ?? 0;
+    const rrCount = data.reunioesRealizadasPagas ?? data.reunioesRealizadas ?? 0;
     const cpraNmql = invest > 0 && raCount > 0 ? invest / raCount : null;
     const cprrNmql = invest > 0 && rrCount > 0 ? invest / rrCount : null;
     return [
@@ -1911,6 +1908,9 @@ export default function GrowthOrcadoRealizado() {
   ): Metric[] => {
     const totalReunioesAgendadas = (mql.reunioesAgendadas ?? 0) + (naoMql.reunioesAgendadas ?? 0);
     const totalReunioesRealizadas = (mql.reunioesRealizadas ?? 0) + (naoMql.reunioesRealizadas ?? 0);
+    // Versões de tráfego pago — denominador de CPRA/CPRR total (casa com o investimento).
+    const totalReunioesAgendadasPagas = (mql.reunioesAgendadasPagas ?? mql.reunioesAgendadas ?? 0) + (naoMql.reunioesAgendadasPagas ?? naoMql.reunioesAgendadas ?? 0);
+    const totalReunioesRealizadasPagas = (mql.reunioesRealizadasPagas ?? mql.reunioesRealizadas ?? 0) + (naoMql.reunioesRealizadasPagas ?? naoMql.reunioesRealizadas ?? 0);
     const totalContratosAceleracao = (mql.contratosAceleracao ?? 0) + (naoMql.contratosAceleracao ?? 0);
     const totalContratosImplantacao = (mql.contratosImplantacao ?? 0) + (naoMql.contratosImplantacao ?? 0);
     const totalFatAceleracao = (mql.faturamentoAceleracao ?? 0) + (naoMql.faturamentoAceleracao ?? 0);
@@ -1959,9 +1959,9 @@ export default function GrowthOrcadoRealizado() {
     return [
       { id: 'total_perc_ra', name: '% RA', type: 'formula', orcado: ORCADO_TOTAL.percRA, realizado: percRA, percentual: calcPercentual(ORCADO_TOTAL.percRA, percRA), format: 'percent' },
       { id: 'total_ra', name: 'RA', type: 'formula', orcado: ORCADO_TOTAL.reunioesAgendadas, realizado: totalReunioesAgendadas, percentual: calcPercentual(ORCADO_TOTAL.reunioesAgendadas, totalReunioesAgendadas), format: 'number' },
-      { id: 'total_cpra', name: 'CPRA', type: 'formula', orcado: null, realizado: investimento > 0 && totalReunioesAgendadas > 0 ? investimento / totalReunioesAgendadas : null, percentual: null, format: 'currency' },
+      { id: 'total_cpra', name: 'CPRA', type: 'formula', orcado: null, realizado: investimento > 0 && totalReunioesAgendadasPagas > 0 ? investimento / totalReunioesAgendadasPagas : null, percentual: null, format: 'currency' },
       { id: 'total_rr', name: 'RR', type: 'formula', orcado: ORCADO_TOTAL.reunioesRealizadas, realizado: totalReunioesRealizadas, percentual: calcPercentual(ORCADO_TOTAL.reunioesRealizadas, totalReunioesRealizadas), format: 'number' },
-      { id: 'total_cprr', name: 'CPRR', type: 'formula', orcado: null, realizado: investimento > 0 && totalReunioesRealizadas > 0 ? investimento / totalReunioesRealizadas : null, percentual: null, format: 'currency' },
+      { id: 'total_cprr', name: 'CPRR', type: 'formula', orcado: null, realizado: investimento > 0 && totalReunioesRealizadasPagas > 0 ? investimento / totalReunioesRealizadasPagas : null, percentual: null, format: 'currency' },
       { id: 'total_noshow', name: 'No show', type: 'formula', orcado: ORCADO_TOTAL.percNoShow, realizado: percNoShowReal, percentual: calcPercentual(ORCADO_TOTAL.percNoShow, percNoShowReal), format: 'percent' },
       { id: 'total_perc_rr', name: '% RR', type: 'formula', orcado: ORCADO_TOTAL.percRr ?? null, realizado: totalLeads > 0 ? totalReunioesRealizadas / totalLeads : null, percentual: calcPercentual(ORCADO_TOTAL.percRr ?? null, totalLeads > 0 ? totalReunioesRealizadas / totalLeads : null), format: 'percent' },
       { id: 'total_conv_rrv', name: 'RR→V%', type: 'formula', orcado: ORCADO_TOTAL.percConversaoRRV, realizado: percConversaoRRV, percentual: calcPercentual(ORCADO_TOTAL.percConversaoRRV, percConversaoRRV), format: 'percent' },
