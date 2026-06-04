@@ -1,5 +1,6 @@
-import { type ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { OperadorDrawer } from "@/components/capacity-times/OperadorDrawer";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { cn } from "@/lib/utils";
@@ -210,7 +211,7 @@ function UtilChart({ people }: { people: { nome: string; util_pct: number | null
 
 // ── Tabelas ──
 
-function CsTable({ rows }: { rows: CsRow[] }) {
+function CsTable({ rows, onOperadorClick }: { rows: CsRow[]; onOperadorClick: (nome: string) => void }) {
   if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Nenhuma pessoa neste time.</p>;
   const teamMrr = sum(rows.map((r) => r.mrr_operando));
   return (
@@ -233,7 +234,12 @@ function CsTable({ rows }: { rows: CsRow[] }) {
         <TableBody>
           {rows.map((r, i) => (
             <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
-              <TableCell className={td("font-medium")}>{r.nome}</TableCell>
+              <TableCell
+                className={cn(td("font-medium"), "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline")}
+                onClick={() => onOperadorClick(r.nome)}
+              >
+                {r.nome}
+              </TableCell>
               <TableCell className={td("text-right")}>{r.op_recorrente}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_recorrente)}</TableCell>
               <TableCell className={td("text-right")}>{r.op_pontual}</TableCell>
@@ -254,7 +260,7 @@ function CsTable({ rows }: { rows: CsRow[] }) {
   );
 }
 
-function ComercialTable({ rows }: { rows: ComercialRow[] }) {
+function ComercialTable({ rows, onOperadorClick }: { rows: ComercialRow[]; onOperadorClick: (nome: string) => void }) {
   if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Nenhuma pessoa neste time.</p>;
   const teamMrr = sum(rows.map((r) => r.mrr_atual));
   return (
@@ -277,7 +283,12 @@ function ComercialTable({ rows }: { rows: ComercialRow[] }) {
         <TableBody>
           {rows.map((r, i) => (
             <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
-              <TableCell className={td("font-medium")}>{r.nome}</TableCell>
+              <TableCell
+                className={cn(td("font-medium"), "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline")}
+                onClick={() => onOperadorClick(r.nome)}
+              >
+                {r.nome}
+              </TableCell>
               <TableCell className={td("text-right")}>{formatCurrency(r.mrr_atual)}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_mrr)}</TableCell>
               <TableCell className={cn("text-right", r.dif_mrr === null ? "text-gray-400 dark:text-zinc-500" : r.dif_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{r.dif_mrr === null ? "—" : formatCurrency(r.dif_mrr)}</TableCell>
@@ -297,7 +308,7 @@ function ComercialTable({ rows }: { rows: ComercialRow[] }) {
 
 // ── Conteúdo das abas ──
 
-function SquadTab({ group }: { group: SquadGroup }) {
+function SquadTab({ group, onOperadorClick }: { group: SquadGroup; onOperadorClick: (nome: string) => void }) {
   const rows = group.rows;
   const totMrr = sum(rows.map((r) => r.mrr_operando));
   const totRec = sum(rows.map((r) => r.op_recorrente));
@@ -318,13 +329,13 @@ function SquadTab({ group }: { group: SquadGroup }) {
       <UtilChart people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader><CardTitle className="text-gray-900 dark:text-white">Squad {group.squad}</CardTitle></CardHeader>
-        <CardContent><CsTable rows={rows} /></CardContent>
+        <CardContent><CsTable rows={rows} onOperadorClick={onOperadorClick} /></CardContent>
       </Card>
     </div>
   );
 }
 
-function ComercialTab({ title, rows }: { title: string; rows: ComercialRow[] }) {
+function ComercialTab({ title, rows, onOperadorClick }: { title: string; rows: ComercialRow[]; onOperadorClick: (nome: string) => void }) {
   const totMrr = sum(rows.map((r) => r.mrr_atual));
   const totContas = sum(rows.map((r) => r.contas_ativas));
   const riscoPct = pct(sum(rows.map((r) => r.mrr_cancelamento)), totMrr);
@@ -343,7 +354,7 @@ function ComercialTab({ title, rows }: { title: string; rows: ComercialRow[] }) 
       <UtilChart people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader><CardTitle className="text-gray-900 dark:text-white">{title}</CardTitle></CardHeader>
-        <CardContent><ComercialTable rows={rows} /></CardContent>
+        <CardContent><ComercialTable rows={rows} onOperadorClick={onOperadorClick} /></CardContent>
       </Card>
     </div>
   );
@@ -468,6 +479,8 @@ export default function CapacityTimes() {
     queryKey: ["/api/capacity-times"],
   });
 
+  const [selectedOperador, setSelectedOperador] = useState<string | null>(null);
+
   const squads = data?.squads ?? [];
   const teams: TeamSummary[] = [
     ...squads.map(summarizeSquad),
@@ -506,14 +519,19 @@ export default function CapacityTimes() {
 
           {squads.map((s) => (
             <TabsContent key={s.squad} value={s.squad}>
-              <SquadTab group={s} />
+              <SquadTab group={s} onOperadorClick={setSelectedOperador} />
             </TabsContent>
           ))}
-          <TabsContent value="vendedor"><ComercialTab title="Selca" rows={data?.vendedor ?? []} /></TabsContent>
-          <TabsContent value="account"><ComercialTab title="Accounts" rows={data?.account ?? []} /></TabsContent>
-          <TabsContent value="gestor"><ComercialTab title="Squadra" rows={data?.gestor ?? []} /></TabsContent>
+          <TabsContent value="vendedor"><ComercialTab title="Selca" rows={data?.vendedor ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
+          <TabsContent value="account"><ComercialTab title="Accounts" rows={data?.account ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
+          <TabsContent value="gestor"><ComercialTab title="Squadra" rows={data?.gestor ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
         </Tabs>
       )}
+
+      <OperadorDrawer
+        operador={selectedOperador}
+        onClose={() => setSelectedOperador(null)}
+      />
     </div>
   );
 }
