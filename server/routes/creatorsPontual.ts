@@ -42,8 +42,17 @@ export function registerCreatorsPontualRoutes(app: Express, db: any) {
     try {
       const rows = (await db.execute(sql`
         SELECT status, COUNT(*) AS qtd, ROUND(SUM(valorp)::numeric, 0) AS valor
-        FROM "Clickup".cup_contratos
-        WHERE ${CREATORS} AND ${ESTOQUE}
+        FROM "Clickup".cup_contratos c
+        WHERE ${CREATORS_C} AND ${ESTOQUE_C}
+          AND NOT (
+            c.status = 'triagem'
+            AND EXISTS (
+              SELECT 1 FROM "Clickup".cup_contratos c2
+              WHERE c2.id_task = c.id_task
+                AND c2.valorp > 0
+                AND c2.status IN ('ativo','onboarding','pausado')
+            )
+          )
         GROUP BY status
         ORDER BY valor DESC NULLS LAST
       `)).rows;
