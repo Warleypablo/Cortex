@@ -25,6 +25,7 @@ import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
 import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
 import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
+import { registerLinkedinOAuthRoutes } from "./routes/linkedinOAuth";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMixReceitaRoutes } from "./routes/mixReceita";
@@ -8033,6 +8034,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Google Ads — admin: sync de campanhas + métricas + status
   registerGoogleAdsAdminRoutes(app);
+
+  // LinkedIn OAuth (autorização orgânica da Company Page Turbo Partners)
+  registerLinkedinOAuthRoutes(app, db);
 
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
