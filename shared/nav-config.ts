@@ -92,6 +92,7 @@ export const PERMISSION_KEYS = {
     PLANEJAMENTO_METAS: 'growth.planejamento_metas',
     UTM_BUILDER: 'growth.utm_builder',
     GHL_MARKETING: 'growth.ghl_marketing',
+    DFC_CAC: 'growth.dfc_cac',
   },
   // G&G (Pessoas)
   GG: {
@@ -281,6 +282,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/keyword-performance': PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE,
   '/growth/funil-conversao': PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO,
   '/growth/instagram': PERMISSION_KEYS.GROWTH.INSTAGRAM,
+  '/growth/dfc-cac': PERMISSION_KEYS.GROWTH.DFC_CAC,
   '/utm-builder': PERMISSION_KEYS.GROWTH.UTM_BUILDER,
   '/ghl-marketing': PERMISSION_KEYS.GROWTH.GHL_MARKETING,
   // G&G
@@ -504,6 +506,7 @@ export const NAV_CONFIG = {
         { title: 'Evolução Temporal', url: '/growth/evolucao-temporal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GROWTH.EVOLUCAO_TEMPORAL },
         { title: 'Orçamento por Campanha', url: '/growth/orcamento-campanhas', icon: 'Wallet', permissionKey: PERMISSION_KEYS.GROWTH.ORCAMENTO_CAMPANHAS },
         { title: 'Planejamento de Metas', url: '/growth/planejamento-metas', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.GROWTH.PLANEJAMENTO_METAS },
+        { title: 'DFC de CAC', url: '/growth/dfc-cac', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GROWTH.DFC_CAC },
         { title: 'Growth AI', url: '/growth/ai', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
         { title: 'Instagram', url: '/growth/instagram', icon: 'Instagram', permissionKey: PERMISSION_KEYS.GROWTH.INSTAGRAM },
         { title: 'Gerador de UTMs', url: '/utm-builder', icon: 'Link2', permissionKey: PERMISSION_KEYS.GROWTH.UTM_BUILDER },
