@@ -1,14 +1,14 @@
 /**
  * YouTube sync service.
  *
- * Para cada canal autorizado em `cortex_core.youtube_channels` (com `credential_id`):
- *  - syncChannelMetadata: snapshot atual (subs, views, videoCount) → cortex_core.youtube_channels
- *  - syncVideos:          lista vídeos via uploads playlist → cortex_core.youtube_videos
+ * Para cada canal autorizado em `youtube.channels` (com `credential_id`):
+ *  - syncChannelMetadata: snapshot atual (subs, views, videoCount) → youtube.channels
+ *  - syncVideos:          lista vídeos via uploads playlist → youtube.videos
  *  - syncChannelDailyMetrics: métricas diárias por canal (Analytics API)
  *  - syncVideoDailyMetrics:   métricas diárias por vídeo  (Analytics API)
  *
  * Reaproveita o OAuth client "Data Central" (GOOGLE_ADS_CLIENT_ID/SECRET) e
- * o refresh_token salvo em cortex_core.youtube_credentials.
+ * o refresh_token salvo em youtube.credentials.
  */
 
 import { google, youtube_v3, youtubeAnalytics_v2 } from 'googleapis';
@@ -42,7 +42,7 @@ function getAuthFor(refreshToken: string) {
 
 async function logRun(db: any, jobType: string, channelId: string | null, fn: () => Promise<number>): Promise<number> {
   const startRes = await db.execute(sql`
-    INSERT INTO cortex_core.youtube_sync_runs (job_type, channel_id, status, started_at)
+    INSERT INTO youtube.sync_runs (job_type, channel_id, status, started_at)
     VALUES (${jobType}, ${channelId}, 'running', NOW())
     RETURNING id
   `);
@@ -50,14 +50,14 @@ async function logRun(db: any, jobType: string, channelId: string | null, fn: ()
   try {
     const items = await fn();
     await db.execute(sql`
-      UPDATE cortex_core.youtube_sync_runs
+      UPDATE youtube.sync_runs
       SET status = 'success', finished_at = NOW(), items_processed = ${items}
       WHERE id = ${runId}
     `);
     return items;
   } catch (e: any) {
     await db.execute(sql`
-      UPDATE cortex_core.youtube_sync_runs
+      UPDATE youtube.sync_runs
       SET status = 'error', finished_at = NOW(), error_message = ${e.message}
       WHERE id = ${runId}
     `);
@@ -68,8 +68,8 @@ async function logRun(db: any, jobType: string, channelId: string | null, fn: ()
 async function fetchAuthorizedChannels(db: any): Promise<ChannelRow[]> {
   const r = await db.execute(sql`
     SELECT c.channel_id, c.credential_id, cred.refresh_token_enc
-    FROM cortex_core.youtube_channels c
-    JOIN cortex_core.youtube_credentials cred ON cred.id = c.credential_id
+    FROM youtube.channels c
+    JOIN youtube.credentials cred ON cred.id = c.credential_id
     WHERE cred.active = TRUE
     ORDER BY c.title
   `);
@@ -96,7 +96,7 @@ export async function syncChannelMetadata(db: any, channel: ChannelRow): Promise
     const snippet = ch.snippet || {};
     const stats = ch.statistics || {};
     await db.execute(sql`
-      UPDATE cortex_core.youtube_channels SET
+      UPDATE youtube.channels SET
         title = ${snippet.title || null},
         custom_url = ${snippet.customUrl || null},
         description = ${snippet.description || null},
@@ -157,7 +157,7 @@ export async function syncVideos(db: any, channel: ChannelRow): Promise<number> 
         const st = v.statistics || {};
         const cd = v.contentDetails || {};
         await db.execute(sql`
-          INSERT INTO cortex_core.youtube_videos (
+          INSERT INTO youtube.videos (
             video_id, channel_id, title, description, published_at, thumbnail_url,
             duration_seconds, tags, category_id, default_language, live_broadcast_content,
             view_count, like_count, comment_count, favorite_count, synced_at
@@ -221,7 +221,7 @@ export async function syncChannelDailyMetrics(
     for (const row of rows) {
       const [day, views, mw, avgDur, subG, subL, likes, comments, shares] = row as any[];
       await db.execute(sql`
-        INSERT INTO cortex_core.youtube_channel_daily_metrics (
+        INSERT INTO youtube.channel_daily_metrics (
           channel_id, report_date, views, estimated_minutes_watched, average_view_duration,
           subscribers_gained, subscribers_lost, likes, comments, shares, synced_at
         ) VALUES (
@@ -274,7 +274,7 @@ export async function syncVideoDailyMetrics(
       for (const row of rows) {
         const [videoId, day, views, mw, avgDur, avgPct, likes, comments, shares, subG, subL, cardClicks, cardImps] = row as any[];
         await db.execute(sql`
-          INSERT INTO cortex_core.youtube_video_daily_metrics (
+          INSERT INTO youtube.video_daily_metrics (
             video_id, channel_id, report_date, views, estimated_minutes_watched,
             average_view_duration, average_view_percentage, likes, comments, shares,
             subscribers_gained, subscribers_lost, card_clicks, card_impressions, synced_at
@@ -335,7 +335,7 @@ export async function syncAllChannels(
       result.channelsProcessed++;
       // Atualiza last_used_at da credential
       await db.execute(sql`
-        UPDATE cortex_core.youtube_credentials SET last_used_at = NOW() WHERE id = ${ch.credential_id}
+        UPDATE youtube.credentials SET last_used_at = NOW() WHERE id = ${ch.credential_id}
       `);
     } catch (e: any) {
       result.errors.push(`${ch.channel_id}: ${e.message}`);

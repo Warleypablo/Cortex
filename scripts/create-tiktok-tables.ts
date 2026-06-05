@@ -1,5 +1,5 @@
 /**
- * Migration: cria tabelas TikTok em cortex_core (mesmo padrão YouTube/LinkedIn).
+ * Migration: cria tabelas TikTok em tiktok (mesmo padrão YouTube/LinkedIn).
  *
  * Cobre os DOIS fluxos do app "Turbo Cortex" (Marketing API):
  *   - Advertiser   → Ads/reporting (campanhas, gasto, conversões)
@@ -7,7 +7,7 @@
  *
  * Idempotente — pode rodar várias vezes sem efeito colateral.
  *
- * Tabelas (todas em cortex_core):
+ * Tabelas (todas em tiktok):
  *  - tiktok_credentials  — tokens OAuth encriptados (kind = 'advertiser' | 'account')
  *  - tiktok_advertisers  — contas de anúncio descobertas (fluxo advertiser)
  *  - tiktok_accounts     — perfis TikTok orgânicos descobertos (fluxo account)
@@ -46,14 +46,14 @@ async function exec(label: string, sql: string) {
 }
 
 async function main() {
-  console.log('Criando tabelas tiktok_* em cortex_core...\n');
+  console.log('Criando tabelas tiktok_* em tiktok...\n');
 
-  await exec('schema cortex_core', `CREATE SCHEMA IF NOT EXISTS cortex_core`);
+  await exec('schema tiktok', `CREATE SCHEMA IF NOT EXISTS tiktok`);
 
   // Tokens OAuth. Advertiser (Marketing API): token longo, sem refresh.
   // Account (Login Kit): access ~24h + refresh ~365d.
-  await exec('cortex_core.tiktok_credentials', `
-    CREATE TABLE IF NOT EXISTS cortex_core.tiktok_credentials (
+  await exec('tiktok.credentials', `
+    CREATE TABLE IF NOT EXISTS tiktok.credentials (
       id                  SERIAL PRIMARY KEY,
       kind                VARCHAR(20) NOT NULL,          -- 'advertiser' | 'account'
       identity            VARCHAR(120) NOT NULL,         -- open_id (account) ou marcador (advertiser)
@@ -69,21 +69,21 @@ async function main() {
     )`);
 
   // Contas de anúncio (fluxo advertiser).
-  await exec('cortex_core.tiktok_advertisers', `
-    CREATE TABLE IF NOT EXISTS cortex_core.tiktok_advertisers (
+  await exec('tiktok.advertisers', `
+    CREATE TABLE IF NOT EXISTS tiktok.advertisers (
       advertiser_id   VARCHAR(40) PRIMARY KEY,
       name            TEXT,
       company         TEXT,
       currency        VARCHAR(10),
       timezone        TEXT,
       status          TEXT,
-      credential_id   INTEGER REFERENCES cortex_core.tiktok_credentials(id) ON DELETE SET NULL,
+      credential_id   INTEGER REFERENCES tiktok.credentials(id) ON DELETE SET NULL,
       synced_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
 
   // Perfis orgânicos (fluxo account holder).
-  await exec('cortex_core.tiktok_accounts', `
-    CREATE TABLE IF NOT EXISTS cortex_core.tiktok_accounts (
+  await exec('tiktok.accounts', `
+    CREATE TABLE IF NOT EXISTS tiktok.accounts (
       open_id         VARCHAR(120) PRIMARY KEY,
       union_id        VARCHAR(120),
       display_name    TEXT,
@@ -92,12 +92,12 @@ async function main() {
       following_count BIGINT,
       likes_count     BIGINT,
       video_count     BIGINT,
-      credential_id   INTEGER REFERENCES cortex_core.tiktok_credentials(id) ON DELETE SET NULL,
+      credential_id   INTEGER REFERENCES tiktok.credentials(id) ON DELETE SET NULL,
       synced_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
 
-  await exec('cortex_core.tiktok_sync_runs', `
-    CREATE TABLE IF NOT EXISTS cortex_core.tiktok_sync_runs (
+  await exec('tiktok.sync_runs', `
+    CREATE TABLE IF NOT EXISTS tiktok.sync_runs (
       id            SERIAL PRIMARY KEY,
       kind          TEXT NOT NULL,
       status        TEXT NOT NULL DEFAULT 'running',

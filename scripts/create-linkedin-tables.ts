@@ -1,10 +1,10 @@
 /**
- * Migration: cria tabelas LinkedIn em cortex_core (mesmo padrão YouTube/Instagram).
+ * Migration: cria tabelas LinkedIn em linkedin (mesmo padrão YouTube/Instagram).
  *
  * Foco: analytics ORGÂNICO de Company Page (followers, page views, engajamento).
  * Idempotente — pode rodar várias vezes sem efeito colateral.
  *
- * Tabelas (todas em cortex_core):
+ * Tabelas (todas em linkedin):
  *  - linkedin_credentials          — tokens OAuth encriptados, por membro LinkedIn que autorizou
  *  - linkedin_organizations        — metadata das Company Pages (Turbo Partners, etc)
  *  - linkedin_page_stats_daily     — page views por dia (organizationPageStatistics)
@@ -42,13 +42,13 @@ async function exec(label: string, sql: string) {
 }
 
 async function main() {
-  console.log('Criando tabelas linkedin_* em cortex_core...\n');
+  console.log('Criando tabelas linkedin_* em linkedin...\n');
 
-  await exec('schema cortex_core', `CREATE SCHEMA IF NOT EXISTS cortex_core`);
+  await exec('schema linkedin', `CREATE SCHEMA IF NOT EXISTS linkedin`);
 
   // Tokens OAuth. LinkedIn: access_token ~60 dias, refresh_token ~365 dias.
-  await exec('cortex_core.linkedin_credentials', `
-    CREATE TABLE IF NOT EXISTS cortex_core.linkedin_credentials (
+  await exec('linkedin.credentials', `
+    CREATE TABLE IF NOT EXISTS linkedin.credentials (
       id                  SERIAL PRIMARY KEY,
       member_id           VARCHAR(120) UNIQUE NOT NULL,
       member_email        TEXT,
@@ -64,23 +64,23 @@ async function main() {
     )`);
 
   // Company Pages que o membro administra.
-  await exec('cortex_core.linkedin_organizations', `
-    CREATE TABLE IF NOT EXISTS cortex_core.linkedin_organizations (
+  await exec('linkedin.organizations', `
+    CREATE TABLE IF NOT EXISTS linkedin.organizations (
       org_id          BIGINT PRIMARY KEY,
       vanity_name     TEXT,
       name            TEXT,
       description     TEXT,
       logo_url        TEXT,
       follower_count  BIGINT,
-      credential_id   INTEGER REFERENCES cortex_core.linkedin_credentials(id) ON DELETE SET NULL,
+      credential_id   INTEGER REFERENCES linkedin.credentials(id) ON DELETE SET NULL,
       synced_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
 
   // Page views por dia (organizationPageStatistics, time-bound).
-  await exec('cortex_core.linkedin_page_stats_daily', `
-    CREATE TABLE IF NOT EXISTS cortex_core.linkedin_page_stats_daily (
+  await exec('linkedin.page_stats_daily', `
+    CREATE TABLE IF NOT EXISTS linkedin.page_stats_daily (
       id                   SERIAL PRIMARY KEY,
-      org_id               BIGINT NOT NULL REFERENCES cortex_core.linkedin_organizations(org_id) ON DELETE CASCADE,
+      org_id               BIGINT NOT NULL REFERENCES linkedin.organizations(org_id) ON DELETE CASCADE,
       stat_date            DATE NOT NULL,
       all_page_views       INTEGER,
       unique_page_views    INTEGER,
@@ -92,10 +92,10 @@ async function main() {
     )`);
 
   // Seguidores por dia (organic/paid gain + total snapshot).
-  await exec('cortex_core.linkedin_follower_stats_daily', `
-    CREATE TABLE IF NOT EXISTS cortex_core.linkedin_follower_stats_daily (
+  await exec('linkedin.follower_stats_daily', `
+    CREATE TABLE IF NOT EXISTS linkedin.follower_stats_daily (
       id                     SERIAL PRIMARY KEY,
-      org_id                 BIGINT NOT NULL REFERENCES cortex_core.linkedin_organizations(org_id) ON DELETE CASCADE,
+      org_id                 BIGINT NOT NULL REFERENCES linkedin.organizations(org_id) ON DELETE CASCADE,
       stat_date              DATE NOT NULL,
       organic_follower_gain  INTEGER,
       paid_follower_gain     INTEGER,
@@ -106,10 +106,10 @@ async function main() {
     )`);
 
   // Engajamento por dia (impressões, cliques, likes, comments, shares, engagement).
-  await exec('cortex_core.linkedin_share_stats_daily', `
-    CREATE TABLE IF NOT EXISTS cortex_core.linkedin_share_stats_daily (
+  await exec('linkedin.share_stats_daily', `
+    CREATE TABLE IF NOT EXISTS linkedin.share_stats_daily (
       id                  SERIAL PRIMARY KEY,
-      org_id              BIGINT NOT NULL REFERENCES cortex_core.linkedin_organizations(org_id) ON DELETE CASCADE,
+      org_id              BIGINT NOT NULL REFERENCES linkedin.organizations(org_id) ON DELETE CASCADE,
       stat_date           DATE NOT NULL,
       impressions         INTEGER,
       unique_impressions  INTEGER,
@@ -123,8 +123,8 @@ async function main() {
       UNIQUE (org_id, stat_date)
     )`);
 
-  await exec('cortex_core.linkedin_sync_runs', `
-    CREATE TABLE IF NOT EXISTS cortex_core.linkedin_sync_runs (
+  await exec('linkedin.sync_runs', `
+    CREATE TABLE IF NOT EXISTS linkedin.sync_runs (
       id            SERIAL PRIMARY KEY,
       kind          TEXT NOT NULL,
       status        TEXT NOT NULL DEFAULT 'running',
@@ -135,11 +135,11 @@ async function main() {
     )`);
 
   await exec('idx_li_page_stats_date',
-    `CREATE INDEX IF NOT EXISTS idx_li_page_stats_date ON cortex_core.linkedin_page_stats_daily(org_id, stat_date)`);
+    `CREATE INDEX IF NOT EXISTS idx_li_page_stats_date ON linkedin.page_stats_daily(org_id, stat_date)`);
   await exec('idx_li_follower_stats_date',
-    `CREATE INDEX IF NOT EXISTS idx_li_follower_stats_date ON cortex_core.linkedin_follower_stats_daily(org_id, stat_date)`);
+    `CREATE INDEX IF NOT EXISTS idx_li_follower_stats_date ON linkedin.follower_stats_daily(org_id, stat_date)`);
   await exec('idx_li_share_stats_date',
-    `CREATE INDEX IF NOT EXISTS idx_li_share_stats_date ON cortex_core.linkedin_share_stats_daily(org_id, stat_date)`);
+    `CREATE INDEX IF NOT EXISTS idx_li_share_stats_date ON linkedin.share_stats_daily(org_id, stat_date)`);
 
   console.log('\n✅ Tabelas LinkedIn criadas.');
   await pool.end();
