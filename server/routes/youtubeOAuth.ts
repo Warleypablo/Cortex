@@ -51,11 +51,11 @@ export function registerYoutubeOAuthRoutes(app: Express, db: any) {
       const oauth2 = getOauthClient(req);
       const url = oauth2.generateAuthUrl({
         access_type: 'offline',
-        // select_account força o Google a mostrar o seletor de conta/canal a cada vez,
-        // pra escolher um Brand Account (Turbocast, TurboPartners…) e não só o canal pessoal.
-        prompt: 'select_account consent',
+        // prompt=consent + SEM include_granted_scopes: consentimento limpo só de YouTube.
+        // include_granted_scopes mesclava escopos antigos (ex: Google Ads) e suprimia o
+        // seletor de canal de Brand Account — por isso só vinha o canal pessoal.
+        prompt: 'consent',
         scope: YT_SCOPES,
-        include_granted_scopes: true,
       });
       res.redirect(url);
     } catch (e: any) {
