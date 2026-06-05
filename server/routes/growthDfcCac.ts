@@ -75,11 +75,11 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
           custoTotal[r.mes] = (custoTotal[r.mes] || 0) + (Number(r.total) || 0);
         }
         const subtotais: Record<string, number> = {};
-        for (const [, valores] of linhasMap) {
+        linhasMap.forEach((valores) => {
           for (const [mes, val] of Object.entries(valores)) {
-            subtotais[mes] = (subtotais[mes] || 0) + val;
+            subtotais[mes] = (subtotais[mes] || 0) + (val as number);
           }
-        }
+        });
         return {
           grupo: nome,
           prefixo,
