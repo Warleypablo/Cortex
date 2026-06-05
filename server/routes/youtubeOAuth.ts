@@ -51,7 +51,9 @@ export function registerYoutubeOAuthRoutes(app: Express, db: any) {
       const oauth2 = getOauthClient(req);
       const url = oauth2.generateAuthUrl({
         access_type: 'offline',
-        prompt: 'consent',
+        // select_account força o Google a mostrar o seletor de conta/canal a cada vez,
+        // pra escolher um Brand Account (Turbocast, TurboPartners…) e não só o canal pessoal.
+        prompt: 'select_account consent',
         scope: YT_SCOPES,
         include_granted_scopes: true,
       });
