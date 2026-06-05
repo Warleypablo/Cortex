@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent } from "@/components/ui/card";
@@ -156,8 +156,8 @@ export default function GrowthDfcCac() {
               </tr>
 
               {custos.grupos.map((grupo) => (
-                <>
-                  <tr key={grupo.prefixo} className="cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/30" onClick={() => toggleGrupo(grupo.prefixo)}>
+                <React.Fragment key={grupo.prefixo}>
+                  <tr className="cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/30" onClick={() => toggleGrupo(grupo.prefixo)}>
                     <td className="px-3 py-2 pl-4 font-medium text-gray-800 dark:text-zinc-200">
                       <span className="inline-flex items-center gap-1">
                         {expandidos[grupo.prefixo] ? <ChevronDown className="h-3.5 w-3.5 text-gray-400 shrink-0" /> : <ChevronRight className="h-3.5 w-3.5 text-gray-400 shrink-0" />}
@@ -178,7 +178,7 @@ export default function GrowthDfcCac() {
                     <td className="px-3 py-2 pl-10 text-xs font-semibold text-gray-700 dark:text-zinc-300">→ Subtotal {grupo.prefixo}</td>
                     {meses.map((m) => <td key={m} className="text-right text-xs px-3 py-2 whitespace-nowrap tabular-nums font-semibold text-gray-700 dark:text-zinc-300">{grupo.subtotais[m] ? fmtMoeda(grupo.subtotais[m]) : "—"}</td>)}
                   </tr>
-                </>
+                </React.Fragment>
               ))}
 
               <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
