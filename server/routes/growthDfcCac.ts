@@ -11,6 +11,37 @@ function safeDiv(num: number, den: number): number | null {
   return den === 0 ? null : Math.round((num / den) * 10) / 10;
 }
 
+type MetricasMes = {
+  cac: number | null;
+  ticket: number | null;
+  payback: number | null;
+  roi: number | null;
+};
+
+function calcMetricas(
+  mesesList: string[],
+  custoTotal: Record<string, number>,
+  receita: Record<string, number>,
+  contratosDen: Record<string, number>,
+  comPayback: boolean,
+): Record<string, MetricasMes> {
+  const result: Record<string, MetricasMes> = {};
+  for (const mes of mesesList) {
+    const n = contratosDen[mes] || 0;
+    const custo = custoTotal[mes] || 0;
+    const rev = receita[mes] || 0;
+    const cacVal = safeDiv(custo, n);
+    const ticketVal = safeDiv(rev, n);
+    result[mes] = {
+      cac: cacVal !== null ? Math.round(cacVal) : null,
+      ticket: ticketVal !== null ? Math.round(ticketVal) : null,
+      payback: comPayback && cacVal !== null && ticketVal !== null ? safeDiv(cacVal, ticketVal) : null,
+      roi: safeDiv((rev - custo) * 100, custo),
+    };
+  }
+  return result;
+}
+
 export function registerGrowthDfcCacRoutes(app: Express, db: any) {
   app.get("/api/growth/dfc-cac", async (req, res) => {
     const meses = Math.min(Math.max(parseInt(req.query.meses as string) || 6, 1), 24);
@@ -40,6 +71,7 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
           to_char(date_trunc('month', data_fechamento), 'YYYY-MM') AS mes,
           COUNT(*)::int AS contratos,
           COUNT(*) FILTER (WHERE valor_recorrente > 0)::int AS contratos_rec,
+          COUNT(*) FILTER (WHERE valor_pontual > 0)::int AS contratos_pont,
           ROUND(COALESCE(SUM(valor_recorrente), 0)::numeric, 0) AS mrr,
           ROUND(COALESCE(SUM(valor_pontual), 0)::numeric, 0) AS pontual
         FROM "Bitrix".crm_deal
@@ -48,7 +80,7 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
           AND data_fechamento < date_trunc('month', CURRENT_DATE)
         GROUP BY 1
         ORDER BY 1
-      `)).rows as { mes: string; contratos: string; contratos_rec: string; mrr: string; pontual: string }[];
+      `)).rows as { mes: string; contratos: string; contratos_rec: string; contratos_pont: string; mrr: string; pontual: string }[];
 
       const mesSet = new Set<string>();
       custosRows.forEach(r => mesSet.add(r.mes));
@@ -60,12 +92,14 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
       const total: Record<string, number> = {};
       const contratos: Record<string, number> = {};
       const contratosRec: Record<string, number> = {};
+      const contratosPont: Record<string, number> = {};
       for (const r of receitaRows) {
         recorrente[r.mes] = Number(r.mrr) || 0;
         pontual[r.mes] = Number(r.pontual) || 0;
         total[r.mes] = (Number(r.mrr) || 0) + (Number(r.pontual) || 0);
         contratos[r.mes] = Number(r.contratos) || 0;
         contratosRec[r.mes] = Number(r.contratos_rec) || 0;
+        contratosPont[r.mes] = Number(r.contratos_pont) || 0;
       }
 
       const custoTotal: Record<string, number> = {};
@@ -91,37 +125,23 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
         };
       });
 
-      const cac: Record<string, number | null> = {};
-      const ticketMedioRec: Record<string, number | null> = {};
-      const payback: Record<string, number | null> = {};
-      const roi: Record<string, number | null> = {};
-      for (const mes of mesesList) {
-        const c = contratos[mes] || 0;
-        const cRec = contratosRec[mes] || 0;
-        const custo = custoTotal[mes] || 0;
-        const mrr = recorrente[mes] || 0;
-        const rec = total[mes] || 0;
-        const cacVal = safeDiv(custo, c);
-        const ticketVal = safeDiv(mrr, cRec);
-        cac[mes] = cacVal !== null ? Math.round(cacVal) : null;
-        ticketMedioRec[mes] = ticketVal !== null ? Math.round(ticketVal) : null;
-        payback[mes] = cacVal !== null && ticketVal !== null ? safeDiv(cacVal, ticketVal) : null;
-        roi[mes] = safeDiv((rec - custo) * 100, custo);
-      }
+      // 3 sets de métricas: recorrente, pontual, ambos
+      const metricasRec = calcMetricas(mesesList, custoTotal, recorrente, contratosRec, true);
+      const metricasPont = calcMetricas(mesesList, custoTotal, pontual, contratosPont, false);
+      const metricasAmbos = calcMetricas(mesesList, custoTotal, total, contratos, false);
 
       const ultimoMes = mesesList[mesesList.length - 1];
       const resumo = {
-        cac: ultimoMes ? cac[ultimoMes] ?? null : null,
-        ticketMedioRec: ultimoMes ? ticketMedioRec[ultimoMes] ?? null : null,
-        payback: ultimoMes ? payback[ultimoMes] ?? null : null,
-        roi: ultimoMes ? roi[ultimoMes] ?? null : null,
+        recorrente: ultimoMes ? metricasRec[ultimoMes] : { cac: null, ticket: null, payback: null, roi: null },
+        pontual: ultimoMes ? metricasPont[ultimoMes] : { cac: null, ticket: null, payback: null, roi: null },
+        ambos: ultimoMes ? metricasAmbos[ultimoMes] : { cac: null, ticket: null, payback: null, roi: null },
       };
 
       res.json({
         meses: mesesList,
-        receita: { recorrente, pontual, total, contratos },
+        receita: { recorrente, pontual, total, contratos, contratosRec, contratosPont },
         custos: { grupos, total: custoTotal },
-        metricas: { cac, ticketMedioRec, payback, roi },
+        metricas: { recorrente: metricasRec, pontual: metricasPont, ambos: metricasAmbos },
         resumo,
       });
     } catch (error) {
