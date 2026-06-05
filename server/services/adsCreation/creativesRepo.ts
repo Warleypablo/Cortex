@@ -6,7 +6,7 @@
  * sem refator profundo.
  */
 
-import { and, desc, eq, isNull, ilike, or, sql, inArray } from "drizzle-orm";
+import { and, eq, isNull, ilike, or, sql, inArray } from "drizzle-orm";
 import { db } from "../../db";
 import { creativesLibrary, type CreativeLibraryItem, type InsertCreativeLibraryItem } from "@shared/schema";
 
@@ -187,7 +187,9 @@ export async function listCreatives(filters: ListFilters = {}): Promise<ListResu
     .select()
     .from(creativesLibrary)
     .where(where)
-    .orderBy(desc(creativesLibrary.createdAt))
+    // Ordena por TP numérico (decrescente — mais novo primeiro), igual à lógica da planilha.
+    // createdAt embaralha porque a migração inseriu tudo no mesmo instante.
+    .orderBy(sql`CAST(SUBSTRING(${creativesLibrary.tpId} FROM '^TP([0-9]+)$') AS INTEGER) DESC NULLS LAST`)
     .limit(pageSize)
     .offset((page - 1) * pageSize);
 
