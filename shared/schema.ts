@@ -3459,11 +3459,13 @@ export type InsertGeneratedUtmLink = typeof generatedUtmLinks.$inferInsert;
 
 // ============================================================
 // YouTube — sync de dados orgânicos (Data API v3 + Analytics API)
-// Padrão idêntico ao Instagram: schema cortex_core + prefixo youtube_.
+// Schema dedicado `youtube` (igual google_ads/meta_ads terem o seu).
 // access_token/refresh_token gravados encriptados (via utils/encryption).
 // ============================================================
 
-export const youtubeCredentials = cortexCoreSchema.table("youtube_credentials", {
+export const youtubeSchema = pgSchema("youtube");
+
+export const youtubeCredentials = youtubeSchema.table("credentials", {
   id: serial("id").primaryKey(),
   googleUserId: varchar("google_user_id", { length: 100 }).notNull().unique(),
   googleEmail: varchar("google_email", { length: 255 }),
@@ -3474,7 +3476,7 @@ export const youtubeCredentials = cortexCoreSchema.table("youtube_credentials", 
   active: boolean("active").notNull().default(true),
 });
 
-export const youtubeChannels = cortexCoreSchema.table("youtube_channels", {
+export const youtubeChannels = youtubeSchema.table("channels", {
   channelId: varchar("channel_id", { length: 50 }).primaryKey(),
   title: varchar("title", { length: 255 }),
   customUrl: varchar("custom_url", { length: 255 }),
@@ -3490,7 +3492,7 @@ export const youtubeChannels = cortexCoreSchema.table("youtube_channels", {
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const youtubeVideos = cortexCoreSchema.table("youtube_videos", {
+export const youtubeVideos = youtubeSchema.table("videos", {
   videoId: varchar("video_id", { length: 50 }).primaryKey(),
   channelId: varchar("channel_id", { length: 50 }).notNull(),
   title: varchar("title", { length: 500 }),
@@ -3512,7 +3514,7 @@ export const youtubeVideos = cortexCoreSchema.table("youtube_videos", {
   index("idx_yt_videos_published").on(table.publishedAt),
 ]);
 
-export const youtubeVideoDailyMetrics = cortexCoreSchema.table("youtube_video_daily_metrics", {
+export const youtubeVideoDailyMetrics = youtubeSchema.table("video_daily_metrics", {
   id: serial("id").primaryKey(),
   videoId: varchar("video_id", { length: 50 }).notNull(),
   channelId: varchar("channel_id", { length: 50 }).notNull(),
@@ -3536,7 +3538,7 @@ export const youtubeVideoDailyMetrics = cortexCoreSchema.table("youtube_video_da
   index("idx_yt_video_daily_channel").on(table.channelId),
 ]);
 
-export const youtubeChannelDailyMetrics = cortexCoreSchema.table("youtube_channel_daily_metrics", {
+export const youtubeChannelDailyMetrics = youtubeSchema.table("channel_daily_metrics", {
   id: serial("id").primaryKey(),
   channelId: varchar("channel_id", { length: 50 }).notNull(),
   reportDate: date("report_date").notNull(),
@@ -3554,7 +3556,7 @@ export const youtubeChannelDailyMetrics = cortexCoreSchema.table("youtube_channe
   index("idx_yt_channel_daily_date").on(table.reportDate),
 ]);
 
-export const youtubeSyncRuns = cortexCoreSchema.table("youtube_sync_runs", {
+export const youtubeSyncRuns = youtubeSchema.table("sync_runs", {
   id: serial("id").primaryKey(),
   jobType: varchar("job_type", { length: 50 }).notNull(),
   channelId: varchar("channel_id", { length: 50 }),

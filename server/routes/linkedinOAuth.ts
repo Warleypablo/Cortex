@@ -7,7 +7,7 @@
  *  GET /api/oauth/linkedin/callback
  *      → troca o code por access_token + refresh_token, identifica o membro (OIDC
  *        userinfo), descobre as organizações que ele administra (organizationAcls)
- *        e salva tudo encriptado em cortex_core.linkedin_credentials / _organizations.
+ *        e salva tudo encriptado em linkedin.credentials / _organizations.
  *
  *  GET /api/oauth/linkedin/status
  *      → lista organizações autorizadas e estado das credenciais.
@@ -146,7 +146,7 @@ export function registerLinkedinOAuthRoutes(app: Express, db: any) {
 
       // 3. Salvar credenciais (tokens encriptados)
       const credRes = await db.execute(sql`
-        INSERT INTO cortex_core.linkedin_credentials
+        INSERT INTO linkedin.credentials
           (member_id, member_email, member_name, access_token_enc, refresh_token_enc,
            access_expires_at, refresh_expires_at, scopes, authorized_at, last_used_at, active)
         VALUES (
@@ -214,7 +214,7 @@ export function registerLinkedinOAuthRoutes(app: Express, db: any) {
           } catch { /* opcional */ }
 
           await db.execute(sql`
-            INSERT INTO cortex_core.linkedin_organizations
+            INSERT INTO linkedin.organizations
               (org_id, vanity_name, name, description, follower_count, credential_id, synced_at)
             VALUES (${orgId}, ${vanity}, ${name}, ${description}, ${followerCount}, ${credentialId}, NOW())
             ON CONFLICT (org_id) DO UPDATE SET
@@ -261,8 +261,8 @@ export function registerLinkedinOAuthRoutes(app: Express, db: any) {
         SELECT o.org_id, o.name, o.vanity_name, o.follower_count, o.synced_at,
                c.member_email, c.member_name, c.authorized_at, c.access_expires_at,
                c.refresh_expires_at, c.active
-        FROM cortex_core.linkedin_organizations o
-        LEFT JOIN cortex_core.linkedin_credentials c ON c.id = o.credential_id
+        FROM linkedin.organizations o
+        LEFT JOIN linkedin.credentials c ON c.id = o.credential_id
         ORDER BY o.name
       `);
       res.json((r as any).rows || r);
