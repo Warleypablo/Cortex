@@ -1492,9 +1492,11 @@ export default function GrowthOrcadoRealizado() {
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
       { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRate ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRate), format: 'percent' },
-      // No consolidado (todas as fontes), View = "—": LP views cobrem só Meta, mas os leads
-      // são de todas as fontes (apples-to-oranges). Sessão = leads ÷ sessões GA4 (todas as fontes).
-      { id: 'taxa_conversao_pagina_view', name: 'Tx Conversão de Página (View)', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
+      // Conversão de Página em DUAS métricas (mostradas lado a lado):
+      //  - (View)   = Leads ÷ Visualizações de Página (Pixel Meta). No consolidado é Meta-enviesado
+      //    (LP views só-Meta, leads de todas as fontes) — mantida pra continuidade com o histórico.
+      //  - (Sessão) = Leads ÷ Sessões (GA4, todas as fontes). Métrica honesta pra comparar canais.
+      { id: 'taxa_conversao_pagina_view', name: 'Tx Conversão de Página (View)', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : null, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : null), format: 'percent' },
       { id: 'taxa_conversao_pagina_sessao', name: 'Tx Conversão de Página (Sessão)', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : null, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : null), format: 'percent' },
       { id: 'leads', name: 'Leads', type: 'formula', orcado: ORCADO_ADS.leads, realizado: data.leads ?? 0, percentual: calcPercentual(ORCADO_ADS.leads, data.leads), format: 'number' },
       { id: 'mqls', name: 'MQLs', type: 'formula', orcado: ORCADO_ADS.mqls, realizado: data.mqls ?? 0, percentual: calcPercentual(ORCADO_ADS.mqls, data.mqls), format: 'number' },

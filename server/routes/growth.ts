@@ -81,6 +81,32 @@ const PAID_TRAFEGO_SOURCE_SQL = sql.raw(`
 `);
 
 /**
+ * Resolve os IDs de campanha (Meta + Google) cujo nome casa com o funil selecionado.
+ * Necessário pra filtrar sessões GA4 por funil em TRÁFEGO PAGO: o utm_campaign do pago é
+ * `{{campaign.id}}` (ID numérico), então o `sessionCampaignName` do GA4 é o ID — filtrar por
+ * CONTAINS "[funil]" no nome NÃO casa (retorna 0). Aqui mapeamos nome→ID via tabelas de campanha.
+ */
+async function resolveFunnelCampaignIds(db: any, funnelValues: string[]): Promise<string[]> {
+  if (!funnelValues || funnelValues.length === 0) return [];
+  const ids: string[] = [];
+  try {
+    const conds = sql.join(
+      funnelValues.map(v => sql`c.campaign_name ILIKE ${'%[' + v + ']%'} OR c.campaign_name ILIKE ${'%' + v + '%'}`),
+      sql` OR `,
+    );
+    const r = await db.execute(sql`SELECT DISTINCT c.campaign_id::text AS id FROM meta_ads.meta_campaigns c WHERE (${conds})`);
+    for (const row of r.rows as any[]) if (row.id) ids.push(row.id);
+  } catch (e) { /* tabela Meta indisponível */ }
+  try {
+    const esc = (v: string) => v.replace(/'/g, "''");
+    const conds = funnelValues.map(v => `c.name ILIKE '%[${esc(v)}]%' OR c.name ILIKE '%${esc(v)}%'`).join(' OR ');
+    const r = await db.execute(sql.raw(`SELECT DISTINCT c.campaign_id::text AS id FROM google_ads.campaigns c WHERE (${conds})`));
+    for (const row of r.rows as any[]) if (row.id) ids.push(row.id);
+  } catch (e) { /* tabela Google indisponível ou sem campaign_id */ }
+  return ids;
+}
+
+/**
  * Medium da Constituição UTM (paid | organic | crm | eventos | referral | outbound).
  * Nível superior da aba "Por Plataforma".
  *
@@ -2809,11 +2835,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const connectRate = metaOutboundClicks > 0 ? visualizacoesPagina / metaOutboundClicks : 0;
 
       // Sessões (GA4) — métrica universal de chegada na LP cobrindo Meta + Google + orgânico.
-      // Filtro de funil aplicado via sessionCampaignName contains [NomeFunil].
+      // Filtro de funil via IDs de campanha (pago usa utm_campaign={{id}}, não nome).
+      const funnelCampaignIds = await resolveFunnelCampaignIds(db, realFunilValues);
       const ga4 = await getSessionsByPlatform(
         new Date(startDate),
         new Date(endDate),
-        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+        funnelCampaignIds.length > 0 ? { campaignIds: funnelCampaignIds } : undefined,
       );
       // Mapeia cada plataforma selecionada pro bucket GA4 certo e soma. Sem filtro = total.
       // (instagram/youtube/linkedin agora têm bucket próprio — ver ga4Sessions.classifyPlatform.)
@@ -3119,10 +3146,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const videoHook = impressoes > 0 && video3Sec > 0 ? (video3Sec / impressoes) * 100 : null;
       const videoHold = impressoes > 0 && videoThruplay > 0 ? (videoThruplay / impressoes) * 100 : null;
 
+      const funnelCampaignIds = await resolveFunnelCampaignIds(db, realFunilValues);
       const ga4 = await getSessionsByPlatform(
         new Date(startDate),
         new Date(endDate),
-        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+        funnelCampaignIds.length > 0 ? { campaignIds: funnelCampaignIds } : undefined,
       );
       const sessoes = ga4.byPlatform.meta_ads;
 
@@ -3249,7 +3277,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const custoConversao = conversoes > 0 ? (investimento / conversoes) : 0;
 
       // Sessões GA4 do tráfego Google (sessionSource=google + sessionMedium=cpc)
-      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const funnelCampaignIds = await resolveFunnelCampaignIds(db, realFunilValues);
+      const ga4 = await getSessionsByPlatform(
+        new Date(startDate),
+        new Date(endDate),
+        funnelCampaignIds.length > 0 ? { campaignIds: funnelCampaignIds } : undefined,
+      );
       const sessoes = ga4.byPlatform.google_ads;
 
       res.json({

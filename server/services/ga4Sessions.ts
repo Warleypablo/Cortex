@@ -35,8 +35,12 @@ export type Ga4SessionsResult = {
 
 export type Ga4SessionsOptions = {
   // Se informado, filtra sessões cujo sessionCampaignName contenha qualquer um dos valores.
-  // Usado para aplicar o filtro de funil ([NomeFunil] na campanha).
+  // Usado para aplicar o filtro de funil ([NomeFunil] na campanha) — funciona só pra campanhas
+  // cujo utm_campaign é NOME. Campanha paga (Meta/Google) usa ID numérico → use campaignIds.
   utmCampaignContains?: string[];
+  // Se informado, filtra sessões cujo sessionCampaignName ESTÁ na lista (match exato).
+  // Usado pra funil em tráfego pago: resolve ID de campanha (Meta/Google) → utm_campaign={{id}}.
+  campaignIds?: string[];
 };
 
 function fmtYmd(d: Date): string {
@@ -94,7 +98,16 @@ export async function getSessionsByPlatform(
     const filterExpressions: any[] = [
       { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'linktr.ee' } } } },
     ];
-    if (options?.utmCampaignContains && options.utmCampaignContains.length > 0) {
+    // Funil por ID de campanha (tráfego pago Meta/Google) — match exato em sessionCampaignName,
+    // que pra campanha paga carrega o utm_campaign={{campaign.id}} (ID numérico).
+    if (options?.campaignIds && options.campaignIds.length > 0) {
+      filterExpressions.push({
+        filter: {
+          fieldName: 'sessionCampaignName',
+          inListFilter: { values: options.campaignIds },
+        },
+      });
+    } else if (options?.utmCampaignContains && options.utmCampaignContains.length > 0) {
       filterExpressions.push({
         orGroup: {
           expressions: options.utmCampaignContains.map(v => ({
