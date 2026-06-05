@@ -58,10 +58,57 @@ async function main() {
       advertising_channel_type    TEXT,
       advertising_channel_subtype TEXT,
       bidding_strategy_type       TEXT,
+      budget_amount_micros        BIGINT,
       start_date                  DATE,
       end_date                    DATE,
       updated_at                  TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
+  // idempotente p/ tabela já criada no #229
+  await exec('google.campaigns +budget_amount_micros',
+    `ALTER TABLE google.campaigns ADD COLUMN IF NOT EXISTS budget_amount_micros BIGINT`);
+
+  await exec('google.ad_groups', `
+    CREATE TABLE IF NOT EXISTS google.ad_groups (
+      ad_group_id  BIGINT PRIMARY KEY,
+      campaign_id  BIGINT NOT NULL REFERENCES google.campaigns(campaign_id) ON DELETE CASCADE,
+      name         TEXT,
+      status       TEXT,
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+
+  await exec('google.keywords', `
+    CREATE TABLE IF NOT EXISTS google.keywords (
+      ad_group_id   BIGINT NOT NULL REFERENCES google.ad_groups(ad_group_id) ON DELETE CASCADE,
+      criterion_id  BIGINT NOT NULL,
+      text          TEXT,
+      match_type    VARCHAR(20),
+      status        VARCHAR(20),
+      negative      BOOLEAN NOT NULL DEFAULT FALSE,
+      quality_score INTEGER,
+      updated_at    TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (ad_group_id, criterion_id)
+    )`);
+
+  await exec('google.keyword_daily_metrics', `
+    CREATE TABLE IF NOT EXISTS google.keyword_daily_metrics (
+      report_date      DATE NOT NULL,
+      ad_group_id      BIGINT NOT NULL,
+      criterion_id     BIGINT NOT NULL,
+      device_type      VARCHAR(20) NOT NULL DEFAULT 'UNSPECIFIED',
+      network_type     VARCHAR(30) NOT NULL DEFAULT 'UNSPECIFIED',
+      impressions      BIGINT NOT NULL DEFAULT 0,
+      clicks           BIGINT NOT NULL DEFAULT 0,
+      cost_micros      BIGINT NOT NULL DEFAULT 0,
+      conversions      NUMERIC NOT NULL DEFAULT 0,
+      conversion_value NUMERIC NOT NULL DEFAULT 0,
+      quality_score    INTEGER,
+      synced_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (report_date, ad_group_id, criterion_id, device_type, network_type)
+    )`);
+  await exec('idx_google_kdm_date',
+    `CREATE INDEX IF NOT EXISTS idx_google_kdm_date ON google.keyword_daily_metrics(report_date)`);
+  await exec('idx_google_kw_adgroup',
+    `CREATE INDEX IF NOT EXISTS idx_google_kw_adgroup ON google.keywords(ad_group_id)`);
 
   await exec('google.campaign_daily_metrics', `
     CREATE TABLE IF NOT EXISTS google.campaign_daily_metrics (
