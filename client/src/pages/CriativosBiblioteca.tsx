@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -50,6 +50,40 @@ function formatDateBr(iso: string | Date | null | undefined): string {
   const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
   const yy = String(d.getUTCFullYear()).slice(-2);
   return `${dd}/${mm}/${yy}`;
+}
+
+const FMT_STYLES: Record<string, string> = {
+  "9x16": "bg-purple-100 text-purple-700 dark:bg-purple-900/40 dark:text-purple-300",
+  "4x5": "bg-blue-100 text-blue-700 dark:bg-blue-900/40 dark:text-blue-300",
+  "1x1": "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300",
+  "16x9": "bg-teal-100 text-teal-700 dark:bg-teal-900/40 dark:text-teal-300",
+};
+
+/**
+ * Extrai estrutura do nome do criativo: formato (9x16/4x5...) e variação (hook/body/cta),
+ * e devolve um "nome base" limpo (sem o sufixo h_b_c_formato, underscores → espaços).
+ * Robusto a separadores `_`, espaço e `-` e a zeros à esquerda (h01).
+ */
+function parseCreative(nomeDrive: string) {
+  const noExt = (nomeDrive || "").replace(/\.[^.]+$/, "");
+  const fmt = noExt.match(/(9x16|4x5|1x1|16x9)/i)?.[1]?.toLowerCase() ?? null;
+  const m = noExt.match(/h\s*0*(\d+)\s*[_\s-]+b\s*0*(\d+)\s*[_\s-]+c\s*0*(\d+)/i);
+  const hook = m?.[1] ?? null;
+  const body = m?.[2] ?? null;
+  const cta = m?.[3] ?? null;
+  let base = m
+    ? noExt.slice(0, m.index)
+    : noExt.replace(/[_\s-]*(9x16|4x5|1x1|16x9)\s*$/i, "");
+  base = base.replace(/[_\s-]+$/, "").replace(/_/g, " ").trim();
+  return { fmt, hook, body, cta, base: base || noExt };
+}
+
+function Chip({ children }: { children: ReactNode }) {
+  return (
+    <span className="inline-flex items-center justify-center rounded px-1.5 py-0.5 text-[11px] font-mono font-semibold bg-muted text-foreground/70">
+      {children}
+    </span>
+  );
 }
 
 export default function CriativosBiblioteca() {
@@ -251,7 +285,7 @@ export default function CriativosBiblioteca() {
           <div className="border rounded-md overflow-x-auto">
             <Table>
               <TableHeader>
-                <TableRow>
+                <TableRow className="hover:bg-transparent">
                   <TableHead className="w-[40px]">
                     <Checkbox
                       checked={
@@ -261,20 +295,20 @@ export default function CriativosBiblioteca() {
                       onCheckedChange={() => togglePage(data?.rows ?? [])}
                     />
                   </TableHead>
-                  <TableHead className="w-[80px] sticky left-0 bg-background z-10">TP</TableHead>
-                  <TableHead className="min-w-[200px]">Nome Drive</TableHead>
-                  <TableHead className="min-w-[120px]">Personagem</TableHead>
-                  <TableHead className="min-w-[120px]">Produto</TableHead>
-                  <TableHead className="min-w-[120px]">Data Postagem</TableHead>
-                  <TableHead className="min-w-[260px]">Nome Final</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
+                  <TableHead className="w-[88px] sticky left-0 bg-background z-10">TP</TableHead>
+                  <TableHead className="min-w-[240px]">Criativo</TableHead>
+                  <TableHead className="w-[150px]">Variação</TableHead>
+                  <TableHead className="w-[90px]">Formato</TableHead>
+                  <TableHead className="min-w-[110px]">Produto</TableHead>
+                  <TableHead className="w-[100px]">Data</TableHead>
+                  <TableHead className="w-[110px]">Status</TableHead>
+                  <TableHead className="w-[48px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin inline mr-2" />
                       Carregando...
                     </TableCell>
@@ -282,54 +316,91 @@ export default function CriativosBiblioteca() {
                 )}
                 {!isLoading && (data?.rows ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8 text-gray-500">
+                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
                       Nenhum criativo encontrado.
                     </TableCell>
                   </TableRow>
                 )}
-                {(data?.rows ?? []).map((row) => (
-                  <TableRow
-                    key={row.id}
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800"
-                    onClick={() => setFormState({ mode: "edit", creative: row })}
-                  >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      <Checkbox
-                        checked={selectedIds.has(row.id)}
-                        onCheckedChange={() => toggleRow(row.id)}
-                      />
-                    </TableCell>
-                    <TableCell className="font-mono sticky left-0 bg-background z-10">
-                      {row.tpId}
-                    </TableCell>
-                    <TableCell className="font-medium">{row.nomeDrive}</TableCell>
-                    <TableCell>{row.personagem || "—"}</TableCell>
-                    <TableCell>{row.produto || "—"}</TableCell>
-                    <TableCell>{formatDateBr(row.dataPostagem)}</TableCell>
-                    <TableCell className="font-mono text-xs">{row.nomeFinal}</TableCell>
-                    <TableCell>
-                      {row.adValidado ? (
-                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          Validado
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Pendente</Badge>
-                      )}
-                    </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {row.linkDrive && (
-                        <a
-                          href={row.linkDrive}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-gray-500 hover:text-gray-900 dark:hover:text-white"
-                        >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      )}
-                    </TableCell>
-                  </TableRow>
-                ))}
+                {(data?.rows ?? []).map((row, idx) => {
+                  const meta = parseCreative(row.nomeDrive);
+                  return (
+                    <TableRow
+                      key={row.id}
+                      title={row.nomeFinal || undefined}
+                      className={`cursor-pointer hover:bg-muted/60 ${idx % 2 ? "bg-muted/30" : ""}`}
+                      onClick={() => setFormState({ mode: "edit", creative: row })}
+                    >
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        <Checkbox
+                          checked={selectedIds.has(row.id)}
+                          onCheckedChange={() => toggleRow(row.id)}
+                        />
+                      </TableCell>
+                      <TableCell className="sticky left-0 bg-background z-10">
+                        <span className="font-mono text-xs font-semibold text-muted-foreground">
+                          {row.tpId}
+                        </span>
+                      </TableCell>
+                      <TableCell>
+                        <div className="font-medium leading-tight truncate max-w-[280px]">
+                          {meta.base}
+                        </div>
+                        {row.personagem && (
+                          <div className="text-xs text-muted-foreground mt-0.5">{row.personagem}</div>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {meta.hook || meta.body || meta.cta ? (
+                          <div className="flex gap-1">
+                            {meta.hook && <Chip>H{meta.hook}</Chip>}
+                            {meta.body && <Chip>B{meta.body}</Chip>}
+                            {meta.cta && <Chip>C{meta.cta}</Chip>}
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {meta.fmt ? (
+                          <Badge variant="secondary" className={`font-mono ${FMT_STYLES[meta.fmt] ?? ""}`}>
+                            {meta.fmt}
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">—</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-sm">
+                        {row.produto || <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
+                        {formatDateBr(row.dataPostagem)}
+                      </TableCell>
+                      <TableCell>
+                        {row.adValidado ? (
+                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                            Validado
+                          </Badge>
+                        ) : (
+                          <Badge variant="outline" className="text-muted-foreground">
+                            Pendente
+                          </Badge>
+                        )}
+                      </TableCell>
+                      <TableCell onClick={(e) => e.stopPropagation()}>
+                        {row.linkDrive && (
+                          <a
+                            href={row.linkDrive}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-muted-foreground hover:text-foreground"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
               </TableBody>
             </Table>
           </div>
