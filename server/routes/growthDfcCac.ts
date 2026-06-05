@@ -39,6 +39,7 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
         SELECT
           to_char(date_trunc('month', data_fechamento), 'YYYY-MM') AS mes,
           COUNT(*)::int AS contratos,
+          COUNT(*) FILTER (WHERE valor_recorrente > 0)::int AS contratos_rec,
           ROUND(COALESCE(SUM(valor_recorrente), 0)::numeric, 0) AS mrr,
           ROUND(COALESCE(SUM(valor_pontual), 0)::numeric, 0) AS pontual
         FROM "Bitrix".crm_deal
@@ -47,7 +48,7 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
           AND data_fechamento < date_trunc('month', CURRENT_DATE)
         GROUP BY 1
         ORDER BY 1
-      `)).rows as { mes: string; contratos: string; mrr: string; pontual: string }[];
+      `)).rows as { mes: string; contratos: string; contratos_rec: string; mrr: string; pontual: string }[];
 
       const mesSet = new Set<string>();
       custosRows.forEach(r => mesSet.add(r.mes));
@@ -58,11 +59,13 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
       const pontual: Record<string, number> = {};
       const total: Record<string, number> = {};
       const contratos: Record<string, number> = {};
+      const contratosRec: Record<string, number> = {};
       for (const r of receitaRows) {
         recorrente[r.mes] = Number(r.mrr) || 0;
         pontual[r.mes] = Number(r.pontual) || 0;
         total[r.mes] = (Number(r.mrr) || 0) + (Number(r.pontual) || 0);
         contratos[r.mes] = Number(r.contratos) || 0;
+        contratosRec[r.mes] = Number(r.contratos_rec) || 0;
       }
 
       const custoTotal: Record<string, number> = {};
@@ -94,11 +97,12 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
       const roi: Record<string, number | null> = {};
       for (const mes of mesesList) {
         const c = contratos[mes] || 0;
+        const cRec = contratosRec[mes] || 0;
         const custo = custoTotal[mes] || 0;
         const mrr = recorrente[mes] || 0;
         const rec = total[mes] || 0;
         const cacVal = safeDiv(custo, c);
-        const ticketVal = safeDiv(mrr, c);
+        const ticketVal = safeDiv(mrr, cRec);
         cac[mes] = cacVal !== null ? Math.round(cacVal) : null;
         ticketMedioRec[mes] = ticketVal !== null ? Math.round(ticketVal) : null;
         payback[mes] = cacVal !== null && ticketVal !== null ? safeDiv(cacVal, ticketVal) : null;
