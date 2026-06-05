@@ -117,7 +117,7 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
 
       // 2. Salvar credencial (1 linha por fluxo advertiser, atualizada a cada auth)
       const credRes = await db.execute(sql`
-        INSERT INTO cortex_core.tiktok_credentials
+        INSERT INTO tiktok.credentials
           (kind, identity, access_token_enc, scopes, authorized_at, last_used_at, active)
         VALUES ('advertiser', 'advertiser', ${encryptToken(accessToken)}, ${scope}, NOW(), NOW(), TRUE)
         ON CONFLICT (kind, identity) DO UPDATE SET
@@ -144,7 +144,7 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
           const info = await infoRes.json();
           for (const a of info.data?.list || []) {
             await db.execute(sql`
-              INSERT INTO cortex_core.tiktok_advertisers
+              INSERT INTO tiktok.advertisers
                 (advertiser_id, name, company, currency, timezone, status, credential_id, synced_at)
               VALUES (${String(a.advertiser_id)}, ${a.advertiser_name || a.name || null}, ${a.company || null},
                       ${a.currency || null}, ${a.timezone || null}, ${a.status || null}, ${credentialId}, NOW())
@@ -224,7 +224,7 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
 
       // 2. Salvar credencial
       const credRes = await db.execute(sql`
-        INSERT INTO cortex_core.tiktok_credentials
+        INSERT INTO tiktok.credentials
           (kind, identity, access_token_enc, refresh_token_enc, access_expires_at, refresh_expires_at,
            scopes, authorized_at, last_used_at, active)
         VALUES ('account', ${openId}, ${encryptToken(tok.access_token)},
@@ -255,7 +255,7 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
         const user = u.data?.user;
         if (user) {
           await db.execute(sql`
-            INSERT INTO cortex_core.tiktok_accounts
+            INSERT INTO tiktok.accounts
               (open_id, union_id, display_name, avatar_url, follower_count, following_count,
                likes_count, video_count, credential_id, synced_at)
             VALUES (${user.open_id || openId}, ${user.union_id || null}, ${user.display_name || null},
@@ -289,15 +289,15 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
       const adv = await db.execute(sql`
         SELECT a.advertiser_id, a.name, a.currency, a.status, a.synced_at,
                c.authorized_at, c.active
-        FROM cortex_core.tiktok_advertisers a
-        LEFT JOIN cortex_core.tiktok_credentials c ON c.id = a.credential_id
+        FROM tiktok.advertisers a
+        LEFT JOIN tiktok.credentials c ON c.id = a.credential_id
         ORDER BY a.name
       `);
       const acc = await db.execute(sql`
         SELECT ac.open_id, ac.display_name, ac.follower_count, ac.video_count, ac.synced_at,
                c.authorized_at, c.access_expires_at, c.active
-        FROM cortex_core.tiktok_accounts ac
-        LEFT JOIN cortex_core.tiktok_credentials c ON c.id = ac.credential_id
+        FROM tiktok.accounts ac
+        LEFT JOIN tiktok.credentials c ON c.id = ac.credential_id
         ORDER BY ac.display_name
       `);
       res.json({
