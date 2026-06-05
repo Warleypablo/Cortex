@@ -22,6 +22,9 @@ export const TURBO_CUSTOMER_ID = '3795436039';
 export interface GoogleSyncResult {
   campaigns: number;
   metrics: number;
+  adGroups: number;
+  keywords: number;
+  keywordMetrics: number;
   errors: string[];
 }
 
@@ -68,7 +71,7 @@ export async function syncGoogleTurbo(
   pool: Pool,
   options?: { customerId?: string; since?: string; until?: string },
 ): Promise<GoogleSyncResult> {
-  const result: GoogleSyncResult = { campaigns: 0, metrics: 0, errors: [] };
+  const result: GoogleSyncResult = { campaigns: 0, metrics: 0, adGroups: 0, keywords: 0, keywordMetrics: 0, errors: [] };
   const customerId = options?.customerId || TURBO_CUSTOMER_ID;
   const since = options?.since || new Date(Date.now() - 90 * 864e5).toISOString().slice(0, 10);
   const until = options?.until || new Date().toISOString().slice(0, 10);
@@ -98,31 +101,35 @@ export async function syncGoogleTurbo(
       [customerId, c?.descriptiveName || 'Turbo Partners', c?.currencyCode || null, c?.timeZone || null, !!c?.manager],
     );
 
-    // 2. Campanhas → upsert
+    // 2. Campanhas (+ orçamento) → upsert
     const camps = await gaql(customerId, `
       SELECT campaign.id, campaign.name, campaign.status,
              campaign.advertising_channel_type, campaign.advertising_channel_sub_type,
-             campaign.bidding_strategy_type, campaign.start_date, campaign.end_date
+             campaign.bidding_strategy_type, campaign.start_date, campaign.end_date,
+             campaign_budget.amount_micros
       FROM campaign
       WHERE campaign.status != 'REMOVED'`);
     for (const row of camps) {
       const c2 = row.campaign || {};
       if (!c2.id) continue;
+      const budgetMicros = row.campaignBudget?.amountMicros ?? null;
       await pool.query(
         `INSERT INTO google.campaigns
            (campaign_id, customer_id, name, status, advertising_channel_type,
-            advertising_channel_subtype, bidding_strategy_type, start_date, end_date, updated_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW())
+            advertising_channel_subtype, bidding_strategy_type, budget_amount_micros, start_date, end_date, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
          ON CONFLICT (campaign_id) DO UPDATE
            SET name = EXCLUDED.name, status = EXCLUDED.status,
                advertising_channel_type = EXCLUDED.advertising_channel_type,
                advertising_channel_subtype = EXCLUDED.advertising_channel_subtype,
                bidding_strategy_type = EXCLUDED.bidding_strategy_type,
+               budget_amount_micros = EXCLUDED.budget_amount_micros,
                start_date = EXCLUDED.start_date, end_date = EXCLUDED.end_date, updated_at = NOW()`,
         [
           String(c2.id), customerId, c2.name || '(sem nome)', c2.status || 'UNKNOWN',
           c2.advertisingChannelType || null, c2.advertisingChannelSubType || null,
-          c2.biddingStrategyType || null, c2.startDate || null, c2.endDate || null,
+          c2.biddingStrategyType || null, budgetMicros != null ? String(budgetMicros) : null,
+          c2.startDate || null, c2.endDate || null,
         ],
       );
       result.campaigns++;
@@ -161,6 +168,90 @@ export async function syncGoogleTurbo(
       result.metrics++;
     }
 
+    // 4. Ad groups → upsert
+    const adGroups = await gaql(customerId, `
+      SELECT ad_group.id, ad_group.campaign, ad_group.name, ad_group.status
+      FROM ad_group
+      WHERE campaign.status != 'REMOVED' AND ad_group.status != 'REMOVED'`);
+    for (const row of adGroups) {
+      const ag = row.adGroup || {};
+      if (!ag.id) continue;
+      const campaignId = ag.campaign ? String(ag.campaign).split('/').pop() : null;
+      if (!campaignId) continue;
+      await pool.query(
+        `INSERT INTO google.ad_groups (ad_group_id, campaign_id, name, status, updated_at)
+         VALUES ($1, $2, $3, $4, NOW())
+         ON CONFLICT (ad_group_id) DO UPDATE
+           SET campaign_id = EXCLUDED.campaign_id, name = EXCLUDED.name,
+               status = EXCLUDED.status, updated_at = NOW()`,
+        [String(ag.id), campaignId, ag.name || null, ag.status || null],
+      );
+      result.adGroups++;
+    }
+
+    // 5. Keywords → upsert
+    const kws = await gaql(customerId, `
+      SELECT ad_group.id, ad_group_criterion.criterion_id,
+             ad_group_criterion.keyword.text, ad_group_criterion.keyword.match_type,
+             ad_group_criterion.status, ad_group_criterion.negative,
+             ad_group_criterion.quality_info.quality_score
+      FROM keyword_view
+      WHERE campaign.status != 'REMOVED' AND ad_group.status != 'REMOVED'`);
+    for (const row of kws) {
+      const agId = row.adGroup?.id;
+      const crit = row.adGroupCriterion?.criterionId;
+      if (!agId || !crit) continue;
+      await pool.query(
+        `INSERT INTO google.keywords (ad_group_id, criterion_id, text, match_type, status, negative, quality_score, updated_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, NOW())
+         ON CONFLICT (ad_group_id, criterion_id) DO UPDATE
+           SET text = EXCLUDED.text, match_type = EXCLUDED.match_type, status = EXCLUDED.status,
+               negative = EXCLUDED.negative, quality_score = EXCLUDED.quality_score, updated_at = NOW()`,
+        [
+          String(agId), String(crit), row.adGroupCriterion?.keyword?.text || null,
+          row.adGroupCriterion?.keyword?.matchType || null, row.adGroupCriterion?.status || null,
+          row.adGroupCriterion?.negative || false, row.adGroupCriterion?.qualityInfo?.qualityScore ?? null,
+        ],
+      );
+      result.keywords++;
+    }
+
+    // 6. Métricas diárias de keyword → upsert
+    const kwMetrics = await gaql(customerId, `
+      SELECT segments.date, segments.device, segments.ad_network_type,
+             ad_group.id, ad_group_criterion.criterion_id,
+             metrics.impressions, metrics.clicks, metrics.cost_micros,
+             metrics.conversions, metrics.conversions_value,
+             ad_group_criterion.quality_info.quality_score
+      FROM keyword_view
+      WHERE segments.date BETWEEN '${since}' AND '${until}'
+        AND campaign.status != 'REMOVED' AND ad_group.status != 'REMOVED'
+        AND metrics.impressions > 0`);
+    for (const row of kwMetrics) {
+      const agId = row.adGroup?.id;
+      const crit = row.adGroupCriterion?.criterionId;
+      if (!agId || !crit) continue;
+      const m = row.metrics || {};
+      await pool.query(
+        `INSERT INTO google.keyword_daily_metrics
+           (report_date, ad_group_id, criterion_id, device_type, network_type,
+            impressions, clicks, cost_micros, conversions, conversion_value, quality_score, synced_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, NOW())
+         ON CONFLICT (report_date, ad_group_id, criterion_id, device_type, network_type) DO UPDATE
+           SET impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks, cost_micros = EXCLUDED.cost_micros,
+               conversions = EXCLUDED.conversions, conversion_value = EXCLUDED.conversion_value,
+               quality_score = EXCLUDED.quality_score, synced_at = NOW()`,
+        [
+          row.segments?.date, String(agId), String(crit),
+          row.segments?.device || 'UNSPECIFIED', row.segments?.adNetworkType || 'UNSPECIFIED',
+          parseInt(m.impressions || '0', 10), parseInt(m.clicks || '0', 10), parseInt(m.costMicros || '0', 10),
+          parseFloat(m.conversions || '0'), parseFloat(m.conversionsValue || '0'),
+          row.adGroupCriterion?.qualityInfo?.qualityScore ?? null,
+        ],
+      );
+      result.keywordMetrics++;
+    }
+
     await pool.query(
       `UPDATE google.sync_runs SET status='ok', campaigns=$2, metrics=$3, finished_at=NOW() WHERE id=$1`,
       [runId, result.campaigns, result.metrics],
@@ -174,6 +265,6 @@ export async function syncGoogleTurbo(
     console.error('[google-sync] erro:', err.message);
   }
 
-  console.log(`[google-sync] Turbo: ${result.campaigns} campanhas, ${result.metrics} métricas, ${result.errors.length} erros`);
+  console.log(`[google-sync] Turbo: ${result.campaigns} campanhas, ${result.metrics} métricas, ${result.adGroups} ad_groups, ${result.keywords} keywords, ${result.keywordMetrics} kw-métricas, ${result.errors.length} erros`);
   return result;
 }

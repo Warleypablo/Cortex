@@ -224,13 +224,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         try {
           // Check if google_ads schema exists
           const schemaCheck = await db.execute(sql`
-            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google_ads'
+            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google'
           `);
           
           if (schemaCheck.rows.length > 0) {
             const columnsResult = await db.execute(sql`
               SELECT column_name FROM information_schema.columns 
-              WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+              WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
               ORDER BY ordinal_position
             `);
             
@@ -248,7 +248,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                   COALESCE(SUM(cost_micros) / 1000000.0, 0) as total_investimento,
                   COALESCE(SUM(impressions), 0) as total_impressions,
                   COALESCE(SUM(clicks), 0) as total_clicks
-                FROM google_ads.campaign_daily_metrics
+                FROM google.campaign_daily_metrics
                 WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
               `));
               
@@ -258,7 +258,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                   COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
                   COALESCE(SUM(impressions), 0) as impressions,
                   COALESCE(SUM(clicks), 0) as clicks
-                FROM google_ads.campaign_daily_metrics
+                FROM google.campaign_daily_metrics
                 WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
                 GROUP BY ${dateColumn}
                 ORDER BY ${dateColumn}
@@ -420,19 +420,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       if (canal === 'Todos' || canal === 'Google') {
         try {
           const schemaCheck = await db.execute(sql`
-            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google_ads'
+            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google'
           `);
           
           if (schemaCheck.rows.length > 0) {
             const tableCheck = await db.execute(sql`
               SELECT table_name FROM information_schema.tables 
-              WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+              WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
             `);
             
             if (tableCheck.rows.length > 0) {
               const columnsResult = await db.execute(sql`
                 SELECT column_name FROM information_schema.columns 
-                WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+                WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
                 ORDER BY ordinal_position
               `);
               
@@ -451,8 +451,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                     COALESCE(SUM(m.cost_micros::numeric) / 1000000.0, 0) as investimento,
                     COALESCE(SUM(m.impressions::numeric), 0) as impressions,
                     COALESCE(SUM(m.clicks::numeric), 0) as clicks
-                  FROM google_ads.campaign_daily_metrics m
-                  JOIN google_ads.campaigns c ON m.campaign_key = c.campaign_key
+                  FROM google.campaign_daily_metrics m
+                  JOIN google.campaigns c ON m.campaign_id = c.campaign_id
                   WHERE m.${sql.raw(dateColumn)} >= ${startDate}::date AND m.${sql.raw(dateColumn)} <= ${endDate}::date
                   GROUP BY c.campaign_id, c.name
                 `);
@@ -1622,7 +1622,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+          WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
           ORDER BY ordinal_position
         `);
         const columns = columnsResult.rows.map((r: any) => r.column_name);
@@ -1636,7 +1636,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             SELECT
               COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
               COALESCE(SUM(clicks), 0) as sessoes
-            FROM google_ads.campaign_daily_metrics
+            FROM google.campaign_daily_metrics
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
           `));
           const gr = googleResult.rows[0] as any;
@@ -2639,7 +2639,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       // Query Google Ads (skip when platform filter excludes Google).
-      // Funnel filter aplicado via JOIN com google_ads.campaigns parsing do c.name
+      // Funnel filter aplicado via JOIN com google.campaigns parsing do c.name
       // (mesmo padrão `[NomeFunil]` usado em Meta).
       let googleInvestimento = 0;
       let googleImpressoes = 0;
@@ -2649,7 +2649,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       } else try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+          WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
           ORDER BY ordinal_position
         `);
         const columns = columnsResult.rows.map((r: any) => r.column_name);
@@ -2670,9 +2670,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             if (hasVazio) {
               inner = `(${inner} OR c.name NOT LIKE '%[%]%')`;
             }
-            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE ${inner})`;
+            googleFunnelFilter = `AND m.campaign_id IN (SELECT campaign_id FROM google.campaigns c WHERE ${inner})`;
           } else if (hasVazio) {
-            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
+            googleFunnelFilter = `AND m.campaign_id IN (SELECT campaign_id FROM google.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
           }
 
           const googleResult = await db.execute(sql.raw(`
@@ -2680,7 +2680,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
               COALESCE(SUM(impressions), 0) as impressoes,
               COALESCE(SUM(clicks), 0) as cliques
-            FROM google_ads.campaign_daily_metrics m
+            FROM google.campaign_daily_metrics m
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
               ${googleFunnelFilter}
           `));
@@ -3000,7 +3000,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         || utmValues.some(v => v.includes('google') || v.includes('adwords') || v === 'gads');
 
       // Funnel filter — Google Ads usa o mesmo padrão `[NomeFunil]` no `c.name`
-      // que o Meta. Parseamos via JOIN com google_ads.campaigns.
+      // que o Meta. Parseamos via JOIN com google.campaigns.
       const funilNgcRaw = req.query.funilNgc as string | undefined;
       const funilValues = funilNgcRaw
         ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
@@ -3028,7 +3028,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+          WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
           ORDER BY ordinal_position
         `);
         const columns = columnsResult.rows.map((r: any) => r.column_name);
@@ -3052,9 +3052,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             if (hasVazio) {
               inner = `(${inner} OR c.name NOT LIKE '%[%]%')`;
             }
-            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE ${inner})`;
+            googleFunnelFilter = `AND m.campaign_id IN (SELECT campaign_id FROM google.campaigns c WHERE ${inner})`;
           } else if (hasVazio) {
-            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
+            googleFunnelFilter = `AND m.campaign_id IN (SELECT campaign_id FROM google.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
           }
 
           const googleResult = await db.execute(sql.raw(`
@@ -3064,7 +3064,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(clicks), 0) as cliques
               ${hasConversions ? ', COALESCE(SUM(conversions), 0) as conversoes' : ''}
               ${hasConversionsValue ? ', COALESCE(SUM(conversions_value), 0) as valor_conversoes' : ''}
-            FROM google_ads.campaign_daily_metrics m
+            FROM google.campaign_daily_metrics m
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
               ${googleFunnelFilter}
           `));
@@ -3670,8 +3670,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       if (plataforma === 'Todos' || plataforma === 'Google') {
         try {
           const googleCampaignFilter = campaign
-            ? sql`AND campaign_key IN (
-                SELECT campaign_key FROM google_ads.campaigns
+            ? sql`AND campaign_id IN (
+                SELECT campaign_id FROM google.campaigns
                 WHERE name ILIKE ${'%' + campaign + '%'}
               )`
             : sql``;
@@ -3680,7 +3680,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(impressions), 0)::bigint as impressions,
               COALESCE(SUM(clicks), 0)::bigint as clicks,
               COALESCE(SUM(cost_micros), 0)::bigint as cost_micros
-            FROM google_ads.campaign_daily_metrics
+            FROM google.campaign_daily_metrics
             WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
               ${googleCampaignFilter}
           `);
@@ -3883,7 +3883,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const result = await db.execute(sql`
         WITH keyword_metrics AS (
           SELECT
-            k.keyword_key,
+            (k.ad_group_id || '_' || k.criterion_id) as keyword_key,
             k.text as keyword_text,
             k.match_type,
             k.status,
@@ -3898,15 +3898,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             COALESCE(SUM(m.conversions), 0)::numeric as conversions,
             COALESCE(SUM(m.conversion_value), 0)::numeric as conversion_value,
             MAX(m.quality_score) as max_quality_score
-          FROM google_ads.keywords k
-          JOIN google_ads.ad_groups ag ON k.ad_group_key = ag.ad_group_key
-          JOIN google_ads.campaigns c ON ag.campaign_key = c.campaign_key
-          LEFT JOIN google_ads.keyword_daily_metrics m
-            ON k.keyword_key = m.keyword_key
+          FROM google.keywords k
+          JOIN google.ad_groups ag ON k.ad_group_id = ag.ad_group_id
+          JOIN google.campaigns c ON ag.campaign_id = c.campaign_id
+          LEFT JOIN google.keyword_daily_metrics m
+            ON m.ad_group_id = k.ad_group_id AND m.criterion_id = k.criterion_id
             AND m.report_date >= ${startDate}::date
             AND m.report_date <= ${endDate}::date
           WHERE k.negative = false
-          GROUP BY k.keyword_key, k.text, k.match_type, k.status, k.quality_score, k.negative,
+          GROUP BY k.ad_group_id, k.criterion_id, k.text, k.match_type, k.status, k.quality_score, k.negative,
                    ag.name, c.name, c.status
         )
         SELECT
