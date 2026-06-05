@@ -1,5 +1,9 @@
 # Changelog
 
+## 2026-06-01 | style(nps): renomeia área "Comunicação" para "Social Media" no formulário — Sem impacto.
+
+---
+
 ## 2026-05-19 | feat(utm): UTM Builder + Constituição UTM Turbo v1.1
 
 **O que foi feito:**

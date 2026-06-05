@@ -26,6 +26,7 @@ import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
 import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
 import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
 import { registerLinkedinOAuthRoutes } from "./routes/linkedinOAuth";
+import { registerTiktokOAuthRoutes } from "./routes/tiktokOAuth";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMixReceitaRoutes } from "./routes/mixReceita";
@@ -61,11 +62,15 @@ import { registerUtmRoutes } from "./routes/utm";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerGrowthDfcCacRoutes } from "./routes/growthDfcCac";
 import { registerGhlPublicRoutes, registerGhlApiRoutes } from "./routes/ghl";
 import { registerNegativacaoRoutes } from "./routes/negativacao";
 import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
 import { registerInternalTrainingsRoutes } from "./routes/internalTrainings";
+import { registerLtLtvChurnRoutes } from "./routes/ltLtvChurn";
+import { registerEstoquePontualRoutes } from "./routes/estoquePontual";
+import { registerCreatorsPontualRoutes } from "./routes/creatorsPontual";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
@@ -8038,8 +8043,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // LinkedIn OAuth (autorização orgânica da Company Page Turbo Partners)
   registerLinkedinOAuthRoutes(app, db);
 
+  // TikTok OAuth (advertiser/Ads + account holder/orgânico)
+  registerTiktokOAuthRoutes(app, db);
+
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
+  registerGrowthDfcCacRoutes(app, db);
 
   // SDR Assistant Module - registered from separate file
   registerSdrAssistantRoutes(app, db);
@@ -8144,6 +8153,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Treinamentos Internos Module - registered from separate file
   registerInternalTrainingsRoutes(app);
+
+  // LT/LTV/Churn Dashboard - registered from separate file
+  registerLtLtvChurnRoutes(app, db);
+  registerEstoquePontualRoutes(app, db);
+  registerCreatorsPontualRoutes(app, db);
 
   // ============================================
   // Sugestões API

@@ -1,12 +1,12 @@
 import { useState } from "react";
-import { 
-  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound,
+import {
+  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, TrendingDown, UsersRound,
   Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase,
   Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut, Lock, Bell, Moon, Sun,
   ChevronRight, ChevronDown, Presentation, Activity, Palette, Sliders, Lightbulb, Megaphone, Ticket,
-  Star, Gauge, Bot, Link2
+  Star, Gauge, Bot, Link2, Package, Clapperboard
 } from "lucide-react";
 import { useTheme } from "@/components/ThemeProvider";
 import turboLogo from "@assets/logo-branca.png";
@@ -41,12 +41,12 @@ interface User {
 }
 
 const ICONS: Record<string, any> = {
-  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, UsersRound,
+  Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, TrendingDown, UsersRound,
   Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, Monitor,
   Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Activity, Palette,
-  Sliders, Bell, Lightbulb, Megaphone, Ticket, Gauge, Bot, Link2,
+  Sliders, Bell, Lightbulb, Megaphone, Ticket, Gauge, Bot, Link2, Package, Clapperboard,
 };
 
 const getIcon = (iconName: string) => ICONS[iconName] || FileText;
