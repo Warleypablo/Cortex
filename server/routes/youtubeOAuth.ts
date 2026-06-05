@@ -30,10 +30,13 @@ const YT_SCOPES = [
 ];
 
 function getOauthClient(req: Request) {
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
+  // OAuth client web "Data Central" (GOOGLE_CLIENT_ID/SECRET) — tem a redirect URI
+  // do YouTube cadastrada. NÃO usar o GOOGLE_ADS_CLIENT_ID (client de Ads, server-to-
+  // server, em outro projeto e sem essa redirect → redirect_uri_mismatch).
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_ADS_CLIENT_ID/SECRET não configurados (reaproveitados pelo YouTube)');
+    throw new Error('GOOGLE_CLIENT_ID/SECRET não configurados (Data Central, web client do YouTube)');
   }
   const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
   const host = req.get('host');

@@ -7,7 +7,7 @@
  *  - syncChannelDailyMetrics: métricas diárias por canal (Analytics API)
  *  - syncVideoDailyMetrics:   métricas diárias por vídeo  (Analytics API)
  *
- * Reaproveita o OAuth client "Data Central" (GOOGLE_ADS_CLIENT_ID/SECRET) e
+ * Reaproveita o OAuth client web "Data Central" (GOOGLE_CLIENT_ID/SECRET) e
  * o refresh_token salvo em youtube.credentials.
  */
 
@@ -30,10 +30,10 @@ export interface YoutubeSyncResult {
 }
 
 function getAuthFor(refreshToken: string) {
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_ADS_CLIENT_ID/SECRET ausentes — necessários pro YouTube');
+    throw new Error('GOOGLE_CLIENT_ID/SECRET ausentes — necessários pro YouTube (Data Central)');
   }
   const oauth2 = new google.auth.OAuth2(clientId, clientSecret);
   oauth2.setCredentials({ refresh_token: refreshToken });
