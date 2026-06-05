@@ -27,7 +27,7 @@ import { encryptToken } from '../utils/encryption';
 const LI_AUTH_URL = 'https://www.linkedin.com/oauth/v2/authorization';
 const LI_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 const LI_API = 'https://api.linkedin.com';
-const LI_VERSION = '202405'; // versão da REST API (bump conforme LinkedIn descontinua)
+const LI_VERSION = '202605'; // versão da REST API YYYYMM (LinkedIn mantém ~12 meses; bumpar quando der NONEXISTENT_VERSION)
 
 // Escopos: OpenID (identificação) + orgânico de Company Page.
 // Confira em Auth → "OAuth 2.0 scopes" quais o app realmente tem acesso.
