@@ -6,6 +6,15 @@ import { useTheme } from "@/components/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { ChevronDown, ChevronRight } from "lucide-react";
 
+type Modo = "recorrente" | "pontual" | "ambos";
+
+interface MetricasMes {
+  cac: number | null;
+  ticket: number | null;
+  payback: number | null;
+  roi: number | null;
+}
+
 interface DfcCacResponse {
   meses: string[];
   receita: {
@@ -13,6 +22,8 @@ interface DfcCacResponse {
     pontual: Record<string, number>;
     total: Record<string, number>;
     contratos: Record<string, number>;
+    contratosRec: Record<string, number>;
+    contratosPont: Record<string, number>;
   };
   custos: {
     grupos: {
@@ -24,16 +35,14 @@ interface DfcCacResponse {
     total: Record<string, number>;
   };
   metricas: {
-    cac: Record<string, number | null>;
-    ticketMedioRec: Record<string, number | null>;
-    payback: Record<string, number | null>;
-    roi: Record<string, number | null>;
+    recorrente: Record<string, MetricasMes>;
+    pontual: Record<string, MetricasMes>;
+    ambos: Record<string, MetricasMes>;
   };
   resumo: {
-    cac: number | null;
-    ticketMedioRec: number | null;
-    payback: number | null;
-    roi: number | null;
+    recorrente: MetricasMes;
+    pontual: MetricasMes;
+    ambos: MetricasMes;
   };
 }
 
@@ -70,11 +79,19 @@ function SummaryCard({ label, value, sub }: { label: string; value: string; sub?
   );
 }
 
+const MODO_LABELS: Record<Modo, string> = {
+  recorrente: "Recorrente",
+  pontual: "Pontual",
+  ambos: "Ambos",
+};
+
 export default function GrowthDfcCac() {
   useSetPageInfo("DFC de CAC", "Custos de aquisição vs receita vendida — CAC, Payback e ROI por mês");
 
   const { theme } = useTheme();
   const isDark = theme === "dark";
+
+  const [modo, setModo] = useState<Modo>("recorrente");
 
   const { data, isLoading } = useQuery<DfcCacResponse>({
     queryKey: ["/api/growth/dfc-cac"],
@@ -108,6 +125,10 @@ export default function GrowthDfcCac() {
   }
 
   const { meses, receita, custos, metricas, resumo } = data;
+  const metricasModo = metricas[modo];
+  const resumoModo = resumo[modo];
+  const receitaModo = modo === "recorrente" ? receita.recorrente : modo === "pontual" ? receita.pontual : receita.total;
+  const mostrarPayback = modo === "recorrente";
 
   const thBase = "text-right text-xs font-medium text-gray-500 dark:text-zinc-400 px-3 py-2 whitespace-nowrap";
   const tdBase = "text-right text-sm px-3 py-2 whitespace-nowrap tabular-nums";
@@ -115,13 +136,51 @@ export default function GrowthDfcCac() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-        <SummaryCard label="CAC (último mês)" value={fmtMoeda(resumo.cac)} sub="custo ÷ contratos fechados" />
-        <SummaryCard label="Ticket Médio Rec." value={fmtMoeda(resumo.ticketMedioRec)} sub="MRR vendido ÷ contratos" />
-        <SummaryCard label="Payback" value={fmtMeses(resumo.payback)} sub="CAC ÷ ticket médio" />
-        <SummaryCard label="ROI de Aquisição" value={fmtPct(resumo.roi)} sub="(receita − custo) ÷ custo" />
+      {/* Toggle de modo */}
+      <div className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800/50 rounded-lg p-1 w-fit">
+        {(["recorrente", "pontual", "ambos"] as Modo[]).map((m) => (
+          <button
+            key={m}
+            onClick={() => setModo(m)}
+            className={cn(
+              "px-4 py-1.5 rounded-md text-sm font-medium transition-colors",
+              modo === m
+                ? "bg-white dark:bg-zinc-700 text-gray-900 dark:text-white shadow-sm"
+                : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-300"
+            )}
+          >
+            {MODO_LABELS[m]}
+          </button>
+        ))}
       </div>
 
+      {/* Cards de resumo */}
+      <div className={cn("grid gap-4", mostrarPayback ? "grid-cols-2 md:grid-cols-4" : "grid-cols-2 md:grid-cols-3")}>
+        <SummaryCard
+          label="CAC (último mês)"
+          value={fmtMoeda(resumoModo.cac)}
+          sub={`custo ÷ contratos ${modo === "ambos" ? "totais" : modo}`}
+        />
+        <SummaryCard
+          label={`Ticket Médio${modo === "ambos" ? "" : " " + MODO_LABELS[modo]}`}
+          value={fmtMoeda(resumoModo.ticket)}
+          sub={`receita ${modo === "ambos" ? "total" : modo} ÷ contratos`}
+        />
+        {mostrarPayback && (
+          <SummaryCard
+            label="Payback"
+            value={fmtMeses(resumoModo.payback)}
+            sub="CAC ÷ ticket médio"
+          />
+        )}
+        <SummaryCard
+          label="ROI de Aquisição"
+          value={fmtPct(resumoModo.roi)}
+          sub="(receita − custo) ÷ custo"
+        />
+      </div>
+
+      {/* Tabela DFC */}
       <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50 overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-sm">
@@ -137,17 +196,27 @@ export default function GrowthDfcCac() {
               <tr className={sectionBg}>
                 <td className="px-3 py-2 text-xs font-semibold text-gray-700 dark:text-zinc-300 uppercase tracking-wide" colSpan={meses.length + 1}>Receita Vendida</td>
               </tr>
+              {(modo === "recorrente" || modo === "ambos") && (
+                <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
+                  <td className="px-3 py-2 pl-6 text-gray-700 dark:text-zinc-300">MRR Recorrente</td>
+                  {meses.map((m) => <td key={m} className={tdBase}>{receita.recorrente[m] ? fmtMoeda(receita.recorrente[m]) : "—"}</td>)}
+                </tr>
+              )}
+              {(modo === "pontual" || modo === "ambos") && (
+                <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
+                  <td className="px-3 py-2 pl-6 text-gray-700 dark:text-zinc-300">Pontual</td>
+                  {meses.map((m) => <td key={m} className={tdBase}>{receita.pontual[m] ? fmtMoeda(receita.pontual[m]) : "—"}</td>)}
+                </tr>
+              )}
               <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
-                <td className="px-3 py-2 pl-6 text-gray-700 dark:text-zinc-300">MRR Recorrente</td>
-                {meses.map((m) => <td key={m} className={tdBase}>{receita.recorrente[m] ? fmtMoeda(receita.recorrente[m]) : "—"}</td>)}
-              </tr>
-              <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
-                <td className="px-3 py-2 pl-6 text-gray-700 dark:text-zinc-300">Pontual</td>
-                {meses.map((m) => <td key={m} className={tdBase}>{receita.pontual[m] ? fmtMoeda(receita.pontual[m]) : "—"}</td>)}
-              </tr>
-              <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
-                <td className="px-3 py-2 pl-6 font-semibold text-green-700 dark:text-green-400">→ Total Receita</td>
-                {meses.map((m) => <td key={m} className={cn(tdBase, "font-semibold text-green-700 dark:text-green-400")}>{receita.total[m] ? fmtMoeda(receita.total[m]) : "—"}</td>)}
+                <td className="px-3 py-2 pl-6 font-semibold text-green-700 dark:text-green-400">
+                  → {modo === "ambos" ? "Total Receita" : `Total ${MODO_LABELS[modo]}`}
+                </td>
+                {meses.map((m) => (
+                  <td key={m} className={cn(tdBase, "font-semibold text-green-700 dark:text-green-400")}>
+                    {receitaModo[m] ? fmtMoeda(receitaModo[m]) : "—"}
+                  </td>
+                ))}
               </tr>
 
               {/* CUSTO DE AQUISIÇÃO */}
@@ -166,14 +235,12 @@ export default function GrowthDfcCac() {
                     </td>
                     {meses.map((m) => <td key={m} className={cn(tdBase, "text-gray-600 dark:text-zinc-400")}>{grupo.subtotais[m] ? fmtMoeda(grupo.subtotais[m]) : "—"}</td>)}
                   </tr>
-
                   {expandidos[grupo.prefixo] && grupo.linhas.map((linha) => (
                     <tr key={linha.categoria} className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
                       <td className="px-3 py-1.5 pl-10 text-xs text-gray-500 dark:text-zinc-400">{linha.categoria.replace(/^\d+\.\d+\.\d+\s+/, "")}</td>
                       {meses.map((m) => <td key={m} className="text-right text-xs px-3 py-1.5 whitespace-nowrap tabular-nums text-gray-500 dark:text-zinc-400">{linha.valores[m] ? fmtMoeda(linha.valores[m]) : "—"}</td>)}
                     </tr>
                   ))}
-
                   <tr key={`sub-${grupo.prefixo}`} className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
                     <td className="px-3 py-2 pl-10 text-xs font-semibold text-gray-700 dark:text-zinc-300">→ Subtotal {grupo.prefixo}</td>
                     {meses.map((m) => <td key={m} className="text-right text-xs px-3 py-2 whitespace-nowrap tabular-nums font-semibold text-gray-700 dark:text-zinc-300">{grupo.subtotais[m] ? fmtMoeda(grupo.subtotais[m]) : "—"}</td>)}
@@ -193,22 +260,31 @@ export default function GrowthDfcCac() {
               <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
                 <td className="px-3 py-2 pl-6 font-semibold text-gray-900 dark:text-white">Resultado Líquido</td>
                 {meses.map((m) => {
-                  const val = (receita.total[m] || 0) - (custos.total[m] || 0);
-                  const hasData = receita.total[m] || custos.total[m];
+                  const val = (receitaModo[m] || 0) - (custos.total[m] || 0);
+                  const hasData = receitaModo[m] || custos.total[m];
                   return <td key={m} className={cn(tdBase, "font-semibold", hasData ? (val >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400") : "")}>{hasData ? fmtMoeda(val) : "—"}</td>;
                 })}
               </tr>
               <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
                 <td className="px-3 py-2 pl-6 text-gray-700 dark:text-zinc-300">CAC</td>
-                {meses.map((m) => <td key={m} className={tdBase}>{fmtMoeda(metricas.cac[m])}</td>)}
+                {meses.map((m) => <td key={m} className={tdBase}>{fmtMoeda(metricasModo[m]?.cac)}</td>)}
               </tr>
-              <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
-                <td className="px-3 py-2 pl-6 text-gray-700 dark:text-zinc-300">Payback</td>
-                {meses.map((m) => <td key={m} className={tdBase}>{fmtMeses(metricas.payback[m])}</td>)}
-              </tr>
+              {mostrarPayback && (
+                <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
+                  <td className="px-3 py-2 pl-6 text-gray-700 dark:text-zinc-300">Payback</td>
+                  {meses.map((m) => <td key={m} className={tdBase}>{fmtMeses(metricasModo[m]?.payback)}</td>)}
+                </tr>
+              )}
               <tr className="hover:bg-gray-50 dark:hover:bg-zinc-800/30">
                 <td className="px-3 py-2 pl-6 text-gray-700 dark:text-zinc-300">ROI de Aquisição</td>
-                {meses.map((m) => <td key={m} className={cn(tdBase, metricas.roi[m] === null ? "" : metricas.roi[m]! >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400")}>{fmtPct(metricas.roi[m])}</td>)}
+                {meses.map((m) => (
+                  <td key={m} className={cn(tdBase,
+                    metricasModo[m]?.roi === null || metricasModo[m]?.roi === undefined ? "" :
+                    metricasModo[m]!.roi! >= 0 ? "text-green-700 dark:text-green-400" : "text-red-700 dark:text-red-400"
+                  )}>
+                    {fmtPct(metricasModo[m]?.roi)}
+                  </td>
+                ))}
               </tr>
 
             </tbody>
