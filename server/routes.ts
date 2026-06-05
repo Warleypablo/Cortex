@@ -27,6 +27,7 @@ import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
 import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
 import { registerGoogleAdminRoutes } from "./routes/googleAdmin";
 import { registerLinkedinOAuthRoutes } from "./routes/linkedinOAuth";
+import { registerLinkedinAdminRoutes } from "./routes/linkedinAdmin";
 import { registerTiktokOAuthRoutes } from "./routes/tiktokOAuth";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
@@ -8046,6 +8047,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // LinkedIn OAuth (autorização orgânica da Company Page Turbo Partners)
   registerLinkedinOAuthRoutes(app, db);
+
+  // LinkedIn — admin: sync orgânico (seguidores + page views + engajamento) + status
+  registerLinkedinAdminRoutes(app);
 
   // TikTok OAuth (advertiser/Ads + account holder/orgânico)
   registerTiktokOAuthRoutes(app, db);
