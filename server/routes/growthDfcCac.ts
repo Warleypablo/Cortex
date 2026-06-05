@@ -97,16 +97,12 @@ export function registerGrowthDfcCacRoutes(app: Express, db: any) {
         const custo = custoTotal[mes] || 0;
         const mrr = recorrente[mes] || 0;
         const rec = total[mes] || 0;
-        const cacVal = c > 0 ? Math.round(custo / c) : null;
-        const ticketVal = c > 0 ? Math.round(mrr / c) : null;
-        cac[mes] = cacVal;
-        ticketMedioRec[mes] = ticketVal;
-        payback[mes] = cacVal !== null && ticketVal !== null && ticketVal > 0
-          ? Math.round((cacVal / ticketVal) * 10) / 10
-          : null;
-        roi[mes] = custo > 0
-          ? Math.round(((rec - custo) / custo) * 100 * 10) / 10
-          : null;
+        const cacVal = safeDiv(custo, c);
+        const ticketVal = safeDiv(mrr, c);
+        cac[mes] = cacVal !== null ? Math.round(cacVal) : null;
+        ticketMedioRec[mes] = ticketVal !== null ? Math.round(ticketVal) : null;
+        payback[mes] = cacVal !== null && ticketVal !== null ? safeDiv(cacVal, ticketVal) : null;
+        roi[mes] = safeDiv((rec - custo) * 100, custo);
       }
 
       const ultimoMes = mesesList[mesesList.length - 1];
