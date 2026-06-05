@@ -112,7 +112,6 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
         return res.status(400).send(`Falha ao obter token: ${JSON.stringify(tok)}`);
       }
       const accessToken: string = tok.data.access_token;
-      const advertiserIds: string[] = tok.data.advertiser_ids || [];
       const scope = Array.isArray(tok.data.scope) ? tok.data.scope.join(',') : String(tok.data.scope || '');
 
       // 2. Salvar credencial (1 linha por fluxo advertiser, atualizada a cada auth)
@@ -130,37 +129,54 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
       `);
       const credentialId = (credRes as any).rows?.[0]?.id ?? (credRes as any)[0]?.id;
 
-      // 3. Descobrir detalhes das contas de anúncio (resiliente)
+      // 3. Descobrir contas de anúncio via oauth2/advertiser/get (canônico — retorna
+      //    advertiser_id COMO STRING + advertiser_name; evita o bug de precisão de
+      //    número grande e o campo errado da resposta do token).
       const linked: string[] = [];
       try {
-        if (advertiserIds.length) {
+        const advRes = await fetch(
+          `${TT_BIZ_API}/oauth2/advertiser/get/?app_id=${appId}&secret=${secret}`,
+          { headers: { 'Access-Token': accessToken } },
+        );
+        const adv = await advRes.json();
+        if (adv.code !== 0) throw new Error(`advertiser/get: ${JSON.stringify(adv).slice(0, 300)}`);
+        const list: any[] = adv.data?.list || []; // [{advertiser_id, advertiser_name}]
+
+        // Enriquecer com detalhes (currency/timezone/status) em lote.
+        const details: Record<string, any> = {};
+        if (list.length) {
+          const ids = list.map((a) => String(a.advertiser_id));
           const params = new URLSearchParams({
-            advertiser_ids: JSON.stringify(advertiserIds),
+            advertiser_ids: JSON.stringify(ids),
             fields: JSON.stringify(['advertiser_id', 'advertiser_name', 'company', 'currency', 'timezone', 'status']),
           });
           const infoRes = await fetch(`${TT_BIZ_API}/advertiser/info/?${params}`, {
             headers: { 'Access-Token': accessToken },
           });
           const info = await infoRes.json();
-          for (const a of info.data?.list || []) {
-            await db.execute(sql`
-              INSERT INTO tiktok.advertisers
-                (advertiser_id, name, company, currency, timezone, status, credential_id, synced_at)
-              VALUES (${String(a.advertiser_id)}, ${a.advertiser_name || a.name || null}, ${a.company || null},
-                      ${a.currency || null}, ${a.timezone || null}, ${a.status || null}, ${credentialId}, NOW())
-              ON CONFLICT (advertiser_id) DO UPDATE SET
-                name = EXCLUDED.name, company = EXCLUDED.company, currency = EXCLUDED.currency,
-                timezone = EXCLUDED.timezone, status = EXCLUDED.status,
-                credential_id = EXCLUDED.credential_id, synced_at = NOW()
-            `);
-            linked.push(`${a.advertiser_name || a.name || '(sem nome)'} — ${a.advertiser_id} (${a.currency || '?'})`);
-          }
+          for (const d of info.data?.list || []) details[String(d.advertiser_id)] = d;
+        }
+
+        for (const a of list) {
+          const id = String(a.advertiser_id);
+          const d = details[id] || {};
+          await db.execute(sql`
+            INSERT INTO tiktok.advertisers
+              (advertiser_id, name, company, currency, timezone, status, credential_id, synced_at)
+            VALUES (${id}, ${d.advertiser_name || a.advertiser_name || null}, ${d.company || null},
+                    ${d.currency || null}, ${d.timezone || null}, ${d.status || null}, ${credentialId}, NOW())
+            ON CONFLICT (advertiser_id) DO UPDATE SET
+              name = EXCLUDED.name, company = EXCLUDED.company, currency = EXCLUDED.currency,
+              timezone = EXCLUDED.timezone, status = EXCLUDED.status,
+              credential_id = EXCLUDED.credential_id, synced_at = NOW()
+          `);
+          linked.push(`${d.advertiser_name || a.advertiser_name || '(sem nome)'} — ${id} (${d.currency || '?'})`);
         }
       } catch (e: any) {
-        console.error('[tiktok-oauth] advertiser/info falhou:', e.message);
+        console.error('[tiktok-oauth] descoberta de advertisers falhou:', e.message);
         return res.status(200).send(successHtml(
           '⚠️ Token salvo, mas não listei as contas de anúncio',
-          [`Erro: ${e.message}`, `advertiser_ids recebidos: ${advertiserIds.join(', ') || '(nenhum)'}`],
+          [e.message],
         ));
       }
 
