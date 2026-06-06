@@ -29,14 +29,18 @@ const LI_TOKEN_URL = 'https://www.linkedin.com/oauth/v2/accessToken';
 const LI_API = 'https://api.linkedin.com';
 const LI_VERSION = '202605'; // versão da REST API YYYYMM (LinkedIn mantém ~12 meses; bumpar quando der NONEXISTENT_VERSION)
 
-// Escopos: OpenID (identificação) + orgânico de Company Page.
+// Escopos: OpenID (identificação) + orgânico de Company Page + Ads (Advertising API).
 // Confira em Auth → "OAuth 2.0 scopes" quais o app realmente tem acesso.
+// r_ads + r_ads_reporting exigem o produto "Advertising API" habilitado no app
+// (Turbo Cortex já tem — Development Tier). Re-autorizar o admin após adicionar.
 const LI_SCOPES = [
   'openid',
   'profile',
   'email',
   'r_organization_social',
   'rw_organization_admin',
+  'r_ads',
+  'r_ads_reporting',
 ];
 
 // CSRF: states emitidos no /start, validados no /callback (in-memory, TTL curto).

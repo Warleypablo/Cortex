@@ -472,6 +472,19 @@ const DEFAULT_ORCADO_TIKTOK_ADS = {
   cac: 0, cacUnico: 0, cacContrato: 0,
 };
 
+const DEFAULT_ORCADO_LINKEDIN_ADS = {
+  investimento: 0, cpm: 0, ctr: 0, impressoes: 0, cliques: 0,
+  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
+  // Funnel
+  leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  percRa: 0, percRaMql: 0, percRaNmql: 0,
+  percRr: 0, percRrMql: 0, percRrNmql: 0,
+  percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
+  negocioGanho: 0, leadTime: 0, aov: 0,
+  receita: 0, receitaPontual: 0, receitaRecorrente: 0,
+  cac: 0, cacUnico: 0, cacContrato: 0,
+};
+
 // Mapeamento de metric.id → segmento/chave no banco de budgets
 const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   // MQL
@@ -535,6 +548,8 @@ const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   ...Object.fromEntries(['seguidores','crescimentoSeguidores','visualizacoes','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`tt_${k}`, { segment: 'tiktok', key: k }])),
   // TikTok Ads (platform-specific — mídia paga)
   ...Object.fromEntries(['investimento','cpm','ctr','impressoes','cliques','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`tta_${k}`, { segment: 'tiktok_ads', key: k }])),
+  // LinkedIn Ads (platform-specific — mídia paga)
+  ...Object.fromEntries(['investimento','cpm','ctr','impressoes','cliques','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`lia_${k}`, { segment: 'linkedin_ads', key: k }])),
 };
 
 const PERCENT_METRICS = new Set([
@@ -573,6 +588,10 @@ const PERCENT_METRICS = new Set([
   'tta_ctr', 'tta_taxaConversaoPagina', 'tta_connectRate', 'tta_percMqls',
   'tta_percRa', 'tta_percRaMql', 'tta_percRaNmql', 'tta_percRr', 'tta_percRrMql', 'tta_percRrNmql',
   'tta_percRrVendas', 'tta_percRrMqlVendas', 'tta_percRrNmqlVendas',
+  // LinkedIn Ads
+  'lia_ctr', 'lia_taxaConversaoPagina', 'lia_connectRate', 'lia_percMqls',
+  'lia_percRa', 'lia_percRaMql', 'lia_percRaNmql', 'lia_percRr', 'lia_percRrMql', 'lia_percRrNmql',
+  'lia_percRrVendas', 'lia_percRrMqlVendas', 'lia_percRrNmqlVendas',
 ]);
 
 // Métricas onde "menor é melhor" — cores invertidas na tabela
@@ -586,6 +605,7 @@ const INVERTED_METRIC_IDS = new Set([
   'li_cpl', 'li_cpmql',
   'tt_cpl', 'tt_cpmql',
   'tta_cpm', 'tta_cpl', 'tta_cpmql',
+  'lia_cpm', 'lia_cpl', 'lia_cpmql',
   // CAC
   'total_cac_ads', 'total_cac_contrato',
   'meta_cac', 'meta_cacUnico', 'meta_cacContrato',
@@ -595,10 +615,11 @@ const INVERTED_METRIC_IDS = new Set([
   'li_cac', 'li_cacUnico', 'li_cacContrato',
   'tt_cac', 'tt_cacUnico', 'tt_cacContrato',
   'tta_cac', 'tta_cacUnico', 'tta_cacContrato',
+  'lia_cac', 'lia_cacUnico', 'lia_cacContrato',
   // No-show
   'mql_noshow', 'nmql_noshow', 'total_noshow',
   // Lead time
-  'meta_leadTime', 'gads_leadTime', 'ig_leadTime', 'yt_leadTime', 'li_leadTime', 'tt_leadTime', 'tta_leadTime',
+  'meta_leadTime', 'gads_leadTime', 'ig_leadTime', 'yt_leadTime', 'li_leadTime', 'tt_leadTime', 'tta_leadTime', 'lia_leadTime',
   // Perda de seguidores
   'ig_percPerdaSeguidores', 'ig_deixaramSeguir',
 ]);
@@ -759,6 +780,7 @@ export default function GrowthOrcadoRealizado() {
   const ORCADO_LINKEDIN = useMemo(() => ({ ...DEFAULT_ORCADO_LINKEDIN, ...(budgetsData?.linkedin || {}) }), [budgetsData]);
   const ORCADO_TIKTOK = useMemo(() => ({ ...DEFAULT_ORCADO_TIKTOK, ...(budgetsData?.tiktok || {}) }), [budgetsData]);
   const ORCADO_TIKTOK_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_TIKTOK_ADS, ...(budgetsData?.tiktok_ads || {}) }), [budgetsData]);
+  const ORCADO_LINKEDIN_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_LINKEDIN_ADS, ...(budgetsData?.linkedin_ads || {}) }), [budgetsData]);
   const ORCADO_TOTAL = useMemo(() => {
     const totalRA = ORCADO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.reunioesAgendadas;
     const totalRR = ORCADO_MQL.reunioesRealizadas + ORCADO_NAO_MQL.reunioesRealizadas;
@@ -1235,6 +1257,11 @@ export default function GrowthOrcadoRealizado() {
     cpm: number; ctr: number; hasConnection: boolean;
   }
 
+  interface LinkedinAdsDetailMetrics {
+    investimento: number; impressoes: number; cliques: number; conversoes: number;
+    cpm: number; ctr: number; hasConnection: boolean;
+  }
+
   interface LinkedinDetailMetrics {
     seguidores: number; novosSeguidores: number; impressoes: number;
     cliques: number; reacoes: number; comentarios: number; compartilhamentos: number;
@@ -1333,6 +1360,17 @@ export default function GrowthOrcadoRealizado() {
     staleTime: 0,
   });
 
+  const { data: linkedinAdsDetailData } = useQuery<LinkedinAdsDetailMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/linkedin-ads', dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/linkedin-ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      if (!res.ok) throw new Error('Failed to fetch LinkedIn Ads metrics');
+      return res.json();
+    },
+    enabled: needsPlatformData,
+    staleTime: 0,
+  });
+
   const { data: funnelByPlatformData } = useQuery<Record<string, PlatformFunnelData>>({
     queryKey: ['/api/growth/orcado-realizado/funnel-by-platform', dateRange.startDate, dateRange.endDate, selectedProdutos, selectedPlataformas],
     queryFn: async () => {
@@ -1422,6 +1460,18 @@ export default function GrowthOrcadoRealizado() {
     queryFn: async () => {
       if (!prevDateRange) return null;
       const res = await fetch(`/api/growth/orcado-realizado/tiktok-ads?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!prevDateRange && needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: prevLinkedinAdsDetailData } = useQuery<LinkedinAdsDetailMetrics | null>({
+    queryKey: ['/api/growth/orcado-realizado/linkedin-ads', prevDateRange?.startDate, prevDateRange?.endDate, 'prev'],
+    queryFn: async () => {
+      if (!prevDateRange) return null;
+      const res = await fetch(`/api/growth/orcado-realizado/linkedin-ads?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
       if (!res.ok) return null;
       return res.json();
     },
@@ -1891,6 +1941,25 @@ export default function GrowthOrcadoRealizado() {
     return mergePrevRealizado(cur, buildTiktokAdsMetrics(prevTiktokAdsDetailData || {} as TiktokAdsDetailMetrics, prevFunnelByPlatformData?.tiktok_ads));
   }, [tiktokAdsDetailData, funnelByPlatformData, prevTiktokAdsDetailData, prevFunnelByPlatformData, ORCADO_TIKTOK_ADS]);
 
+  // LinkedIn Ads platform metrics (mídia paga — lê linkedin.ad_metrics_daily via endpoint)
+  const buildLinkedinAdsMetrics = (d: LinkedinAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
+    const O = ORCADO_LINKEDIN_ADS;
+    const topMetrics: Metric[] = [
+      { id: 'lia_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
+      { id: 'lia_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
+      { id: 'lia_ctr', name: 'CTR', type: 'formula', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
+      { id: 'lia_impressoes', name: 'Impressões', type: 'formula', orcado: O.impressoes, realizado: d.impressoes ?? 0, percentual: calcPercentual(O.impressoes, d.impressoes), format: 'number' },
+      { id: 'lia_cliques', name: 'Cliques', type: 'formula', orcado: O.cliques, realizado: d.cliques ?? 0, percentual: calcPercentual(O.cliques, d.cliques), format: 'number' },
+    ];
+    return [...topMetrics, ...buildFunnelMetrics('lia', funnel, O, d.investimento ?? null)];
+  };
+
+  const linkedinAdsPlatformMetrics: Metric[] = useMemo(() => {
+    const cur = buildLinkedinAdsMetrics(linkedinAdsDetailData || {} as LinkedinAdsDetailMetrics, funnelByPlatformData?.linkedin_ads);
+    if (!prevLinkedinAdsDetailData && !prevFunnelByPlatformData) return cur;
+    return mergePrevRealizado(cur, buildLinkedinAdsMetrics(prevLinkedinAdsDetailData || {} as LinkedinAdsDetailMetrics, prevFunnelByPlatformData?.linkedin_ads));
+  }, [linkedinAdsDetailData, funnelByPlatformData, prevLinkedinAdsDetailData, prevFunnelByPlatformData, ORCADO_LINKEDIN_ADS]);
+
   // Instagram empty-state banner: distinguish "no connection" from "connection ok but no data"
   const instagramBanner = useMemo<React.ReactNode | undefined>(() => {
     if (!instagramDetailData) return undefined;
@@ -1932,6 +2001,13 @@ export default function GrowthOrcadoRealizado() {
     return undefined;
   }, [tiktokAdsDetailData]);
 
+  const linkedinAdsBanner = useMemo<React.ReactNode | undefined>(() => {
+    if (linkedinAdsDetailData && linkedinAdsDetailData.hasConnection === false) {
+      return 'Nenhuma conta de anúncios LinkedIn conectada. Re-autorize com escopos de Ads em Integrações.';
+    }
+    return undefined;
+  }, [linkedinAdsDetailData]);
+
   // Aprofundado sections with platform-specific metrics
   const aprofundadoPlatformSections: MetricSection[] = useMemo(() => [
     { title: 'Meta Ads', icon: <Megaphone className="w-5 h-5" />, metrics: metaAdsPlatformMetrics },
@@ -1941,7 +2017,8 @@ export default function GrowthOrcadoRealizado() {
     { title: 'LinkedIn', icon: <Briefcase className="w-5 h-5" />, metrics: linkedinPlatformMetrics, banner: linkedinBanner },
     { title: 'TikTok', icon: <Music className="w-5 h-5" />, metrics: tiktokPlatformMetrics, banner: tiktokBanner },
     { title: 'TikTok Ads', icon: <Megaphone className="w-5 h-5" />, metrics: tiktokAdsPlatformMetrics, banner: tiktokAdsBanner },
-  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, youtubeBanner, linkedinPlatformMetrics, linkedinBanner, tiktokPlatformMetrics, tiktokBanner, tiktokAdsPlatformMetrics, tiktokAdsBanner]);
+    { title: 'LinkedIn Ads', icon: <Megaphone className="w-5 h-5" />, metrics: linkedinAdsPlatformMetrics, banner: linkedinAdsBanner },
+  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, youtubeBanner, linkedinPlatformMetrics, linkedinBanner, tiktokPlatformMetrics, tiktokBanner, tiktokAdsPlatformMetrics, tiktokAdsBanner, linkedinAdsPlatformMetrics, linkedinAdsBanner]);
 
   const buildNaoMqlMetrics = (data: NaoMQLMetrics, investimento: number | null = null): Metric[] => {
     const invest = investimento ?? 0;
@@ -2260,6 +2337,7 @@ export default function GrowthOrcadoRealizado() {
     { key: 'linkedin', label: 'LinkedIn' },
     { key: 'tiktok', label: 'TikTok' },
     { key: 'tiktok_ads', label: 'TikTok Ads' },
+    { key: 'linkedin_ads', label: 'LinkedIn Ads' },
   ];
 
   const aprofundadoFilteredSections: MetricSection[] = useMemo(() => {
@@ -2271,6 +2349,7 @@ export default function GrowthOrcadoRealizado() {
       linkedin: aprofundadoPlatformSections[4],
       tiktok: aprofundadoPlatformSections[5],
       tiktok_ads: aprofundadoPlatformSections[6],
+      linkedin_ads: aprofundadoPlatformSections[7],
     };
     if (selectedPlataformas.length === 0) {
       return [
@@ -2323,6 +2402,7 @@ export default function GrowthOrcadoRealizado() {
       linkedin: aprofundadoPlatformSections[4],
       tiktok: aprofundadoPlatformSections[5],
       tiktok_ads: aprofundadoPlatformSections[6],
+      linkedin_ads: aprofundadoPlatformSections[7],
     };
 
     let baseSections: MetricSection[];
@@ -2353,7 +2433,7 @@ export default function GrowthOrcadoRealizado() {
 
   const getExportParams = (viewName: 'Consolidado' | 'Aprofundado'): ExportParams => {
     const plataformaLabels: Record<string, string> = {
-      meta_ads: 'Meta Ads', google_ads: 'Google Ads', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn', tiktok: 'TikTok', tiktok_ads: 'TikTok Ads',
+      meta_ads: 'Meta Ads', google_ads: 'Google Ads', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn', tiktok: 'TikTok', tiktok_ads: 'TikTok Ads', linkedin_ads: 'LinkedIn Ads',
     };
     return {
       sections: viewName === 'Consolidado' ? consolidadoSections : aprofundadoFilteredSections,
