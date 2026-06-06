@@ -3135,6 +3135,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT id FROM cortex_core.instagram_connections WHERE is_active = true
       `);
       const emptyPayload = {
+        postsPublicados: 0,
         comecaramSeguir: 0, deixaramSeguir: 0, percPerdaSeguidores: 0,
         deltaSeguidores: 0, totalSeguidores: 0, percCrescimentoSeguidores: 0,
         visualizacoesTotais: 0, percVisualizacoesOrganicas: 0, visualizacoesOrganicas: 0,
@@ -3367,7 +3368,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.warn('[orcado-realizado/instagram] sub-source breakdown query failed:', err?.message || err);
       }
 
+      // Posts publicados no período (conta a partir das métricas por post)
+      let postsPublicados = 0;
+      try {
+        const postsRes = await db.execute(sql`
+          SELECT COUNT(*)::int AS n
+          FROM cortex_core.instagram_post_metrics
+          WHERE connection_id IN (${sql.join(connectionIds.map((id: any) => sql`${id}`), sql`, `)})
+            AND posted_at >= ${startDate}::date
+            AND posted_at <= ${endDate}::date + INTERVAL '1 day'
+        `);
+        postsPublicados = parseInt((postsRes.rows[0] as any).n) || 0;
+      } catch (err: any) {
+        console.warn('[orcado-realizado/instagram] posts count failed:', err?.message || err);
+      }
+
       res.json({
+        postsPublicados,
         comecaramSeguir, deixaramSeguir, percPerdaSeguidores,
         deltaSeguidores, totalSeguidores: lastFollowers, percCrescimentoSeguidores,
         visualizacoesTotais: visualizacoesTotaisAjustado, percVisualizacoesOrganicas, visualizacoesOrganicas,

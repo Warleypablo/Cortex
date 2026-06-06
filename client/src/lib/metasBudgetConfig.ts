@@ -279,6 +279,7 @@ export const DEFAULT_ORCADO_GOOGLE_ADS = {
 };
 
 export const DEFAULT_ORCADO_INSTAGRAM = {
+  postsPublicados: 0,
   comecaramSeguir: 0, deixaramSeguir: 0, percPerdaSeguidores: 0,
   deltaSeguidores: 0, totalSeguidores: 0, percCrescimentoSeguidores: 0,
   visualizacoesTotais: 0, percVisualizacoesOrganicas: 0, visualizacoesOrganicas: 0,
@@ -435,7 +436,7 @@ export const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }>
   // Google Ads (platform-specific)
   ...Object.fromEntries(['investimento','cpm','ctr','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`gads_${k}`, { segment: 'google_ads', key: k }])),
   // Instagram (platform-specific)
-  ...Object.fromEntries(['comecaramSeguir','deixaramSeguir','percPerdaSeguidores','deltaSeguidores','totalSeguidores','percCrescimentoSeguidores','visualizacoesTotais','percVisualizacoesOrganicas','visualizacoesOrganicas','percVisualizacoesPagas','visualizacoesPagas','alcanceTotal','alcanceOrganico','alcancePago','frequenciaAlcance','ctrAlcanceVisitas','visitasPerfil','percEngajamento','interacoes','ctrAlcanceCliques','ctrVisitasCliques','cliquesLinkBio','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`ig_${k}`, { segment: 'instagram', key: k }])),
+  ...Object.fromEntries(['postsPublicados','comecaramSeguir','deixaramSeguir','percPerdaSeguidores','deltaSeguidores','totalSeguidores','percCrescimentoSeguidores','visualizacoesTotais','percVisualizacoesOrganicas','visualizacoesOrganicas','percVisualizacoesPagas','visualizacoesPagas','alcanceTotal','alcanceOrganico','alcancePago','frequenciaAlcance','ctrAlcanceVisitas','visitasPerfil','percEngajamento','interacoes','ctrAlcanceCliques','ctrVisitasCliques','cliquesLinkBio','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`ig_${k}`, { segment: 'instagram', key: k }])),
   // YouTube (platform-specific)
   ...Object.fromEntries(['comecaramInscrever','deixaramInscrever','percPerdaInscritos','deltaInscritos','totalInscritos','percCrescimentoInscritos','ctrImpressoes','visualizacoes','retencaoMedia','avgViewDuration','horasAssistidas','videosPublicados','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`yt_${k}`, { segment: 'youtube', key: k }])),
   // LinkedIn (platform-specific)
@@ -845,6 +846,7 @@ export const TIER3_METRIC_IDS = new Set<string>([
   // Meta Ads
   'meta_videoP75', 'meta_videoP100',
   // Instagram
+  'ig_postsPublicados',
   'ig_deixaramSeguir', 'ig_percPerdaSeguidores',
   'ig_visualizacoesTotais', 'ig_percVisualizacoesOrganicas', 'ig_visualizacoesOrganicas',
   'ig_percVisualizacoesPagas', 'ig_visualizacoesPagas',
