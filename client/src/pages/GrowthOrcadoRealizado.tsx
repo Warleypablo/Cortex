@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, Music, AlertCircle, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, Music, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
@@ -459,6 +459,19 @@ const DEFAULT_ORCADO_TIKTOK = {
   cac: 0, cacUnico: 0, cacContrato: 0,
 };
 
+const DEFAULT_ORCADO_TIKTOK_ADS = {
+  investimento: 0, cpm: 0, ctr: 0, impressoes: 0, cliques: 0,
+  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
+  // Funnel
+  leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  percRa: 0, percRaMql: 0, percRaNmql: 0,
+  percRr: 0, percRrMql: 0, percRrNmql: 0,
+  percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
+  negocioGanho: 0, leadTime: 0, aov: 0,
+  receita: 0, receitaPontual: 0, receitaRecorrente: 0,
+  cac: 0, cacUnico: 0, cacContrato: 0,
+};
+
 // Mapeamento de metric.id → segmento/chave no banco de budgets
 const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   // MQL
@@ -520,6 +533,8 @@ const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   ...Object.fromEntries(['seguidores','crescimentoSeguidores','impressoes','cliquesPost','taxaEngajamento','postsPublicados','reacoes','comentarios','compartilhamentos','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`li_${k}`, { segment: 'linkedin', key: k }])),
   // TikTok (platform-specific)
   ...Object.fromEntries(['seguidores','crescimentoSeguidores','visualizacoes','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`tt_${k}`, { segment: 'tiktok', key: k }])),
+  // TikTok Ads (platform-specific — mídia paga)
+  ...Object.fromEntries(['investimento','cpm','ctr','impressoes','cliques','visualizacoesPagina','sessoes','taxaConversaoPagina','connectRate','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`tta_${k}`, { segment: 'tiktok_ads', key: k }])),
 };
 
 const PERCENT_METRICS = new Set([
@@ -554,6 +569,10 @@ const PERCENT_METRICS = new Set([
   'tt_percMqls',
   'tt_percRa', 'tt_percRaMql', 'tt_percRaNmql', 'tt_percRr', 'tt_percRrMql', 'tt_percRrNmql',
   'tt_percRrVendas', 'tt_percRrMqlVendas', 'tt_percRrNmqlVendas',
+  // TikTok Ads
+  'tta_ctr', 'tta_taxaConversaoPagina', 'tta_connectRate', 'tta_percMqls',
+  'tta_percRa', 'tta_percRaMql', 'tta_percRaNmql', 'tta_percRr', 'tta_percRrMql', 'tta_percRrNmql',
+  'tta_percRrVendas', 'tta_percRrMqlVendas', 'tta_percRrNmqlVendas',
 ]);
 
 // Métricas onde "menor é melhor" — cores invertidas na tabela
@@ -566,6 +585,7 @@ const INVERTED_METRIC_IDS = new Set([
   'yt_cpl', 'yt_cpmql',
   'li_cpl', 'li_cpmql',
   'tt_cpl', 'tt_cpmql',
+  'tta_cpm', 'tta_cpl', 'tta_cpmql',
   // CAC
   'total_cac_ads', 'total_cac_contrato',
   'meta_cac', 'meta_cacUnico', 'meta_cacContrato',
@@ -574,10 +594,11 @@ const INVERTED_METRIC_IDS = new Set([
   'yt_cac', 'yt_cacUnico', 'yt_cacContrato',
   'li_cac', 'li_cacUnico', 'li_cacContrato',
   'tt_cac', 'tt_cacUnico', 'tt_cacContrato',
+  'tta_cac', 'tta_cacUnico', 'tta_cacContrato',
   // No-show
   'mql_noshow', 'nmql_noshow', 'total_noshow',
   // Lead time
-  'meta_leadTime', 'gads_leadTime', 'ig_leadTime', 'yt_leadTime', 'li_leadTime', 'tt_leadTime',
+  'meta_leadTime', 'gads_leadTime', 'ig_leadTime', 'yt_leadTime', 'li_leadTime', 'tt_leadTime', 'tta_leadTime',
   // Perda de seguidores
   'ig_percPerdaSeguidores', 'ig_deixaramSeguir',
 ]);
@@ -737,6 +758,7 @@ export default function GrowthOrcadoRealizado() {
   const ORCADO_YOUTUBE = useMemo(() => ({ ...DEFAULT_ORCADO_YOUTUBE, ...(budgetsData?.youtube || {}) }), [budgetsData]);
   const ORCADO_LINKEDIN = useMemo(() => ({ ...DEFAULT_ORCADO_LINKEDIN, ...(budgetsData?.linkedin || {}) }), [budgetsData]);
   const ORCADO_TIKTOK = useMemo(() => ({ ...DEFAULT_ORCADO_TIKTOK, ...(budgetsData?.tiktok || {}) }), [budgetsData]);
+  const ORCADO_TIKTOK_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_TIKTOK_ADS, ...(budgetsData?.tiktok_ads || {}) }), [budgetsData]);
   const ORCADO_TOTAL = useMemo(() => {
     const totalRA = ORCADO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.reunioesAgendadas;
     const totalRR = ORCADO_MQL.reunioesRealizadas + ORCADO_NAO_MQL.reunioesRealizadas;
@@ -1208,6 +1230,11 @@ export default function GrowthOrcadoRealizado() {
     videosPublicados: number; hasConnection: boolean;
   }
 
+  interface TiktokAdsDetailMetrics {
+    investimento: number; impressoes: number; cliques: number; conversoes: number;
+    cpm: number; ctr: number; hasConnection: boolean;
+  }
+
   interface LinkedinDetailMetrics {
     seguidores: number; novosSeguidores: number; impressoes: number;
     cliques: number; reacoes: number; comentarios: number; compartilhamentos: number;
@@ -1295,6 +1322,17 @@ export default function GrowthOrcadoRealizado() {
     staleTime: 0,
   });
 
+  const { data: tiktokAdsDetailData } = useQuery<TiktokAdsDetailMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/tiktok-ads', dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/tiktok-ads?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      if (!res.ok) throw new Error('Failed to fetch TikTok Ads metrics');
+      return res.json();
+    },
+    enabled: needsPlatformData,
+    staleTime: 0,
+  });
+
   const { data: funnelByPlatformData } = useQuery<Record<string, PlatformFunnelData>>({
     queryKey: ['/api/growth/orcado-realizado/funnel-by-platform', dateRange.startDate, dateRange.endDate, selectedProdutos, selectedPlataformas],
     queryFn: async () => {
@@ -1372,6 +1410,18 @@ export default function GrowthOrcadoRealizado() {
     queryFn: async () => {
       if (!prevDateRange) return null;
       const res = await fetch(`/api/growth/orcado-realizado/linkedin?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!prevDateRange && needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: prevTiktokAdsDetailData } = useQuery<TiktokAdsDetailMetrics | null>({
+    queryKey: ['/api/growth/orcado-realizado/tiktok-ads', prevDateRange?.startDate, prevDateRange?.endDate, 'prev'],
+    queryFn: async () => {
+      if (!prevDateRange) return null;
+      const res = await fetch(`/api/growth/orcado-realizado/tiktok-ads?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
       if (!res.ok) return null;
       return res.json();
     },
@@ -1822,6 +1872,25 @@ export default function GrowthOrcadoRealizado() {
     return mergePrevRealizado(cur, buildTiktokMetrics(prevTiktokDetailData || {} as TiktokDetailMetrics, prevFunnelByPlatformData?.tiktok));
   }, [tiktokDetailData, funnelByPlatformData, prevTiktokDetailData, prevFunnelByPlatformData, ORCADO_TIKTOK]);
 
+  // TikTok Ads platform metrics (mídia paga — lê tiktok.ad_metrics_daily via endpoint)
+  const buildTiktokAdsMetrics = (d: TiktokAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
+    const O = ORCADO_TIKTOK_ADS;
+    const topMetrics: Metric[] = [
+      { id: 'tta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
+      { id: 'tta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
+      { id: 'tta_ctr', name: 'CTR', type: 'formula', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
+      { id: 'tta_impressoes', name: 'Impressões', type: 'formula', orcado: O.impressoes, realizado: d.impressoes ?? 0, percentual: calcPercentual(O.impressoes, d.impressoes), format: 'number' },
+      { id: 'tta_cliques', name: 'Cliques', type: 'formula', orcado: O.cliques, realizado: d.cliques ?? 0, percentual: calcPercentual(O.cliques, d.cliques), format: 'number' },
+    ];
+    return [...topMetrics, ...buildFunnelMetrics('tta', funnel, O, d.investimento ?? null)];
+  };
+
+  const tiktokAdsPlatformMetrics: Metric[] = useMemo(() => {
+    const cur = buildTiktokAdsMetrics(tiktokAdsDetailData || {} as TiktokAdsDetailMetrics, funnelByPlatformData?.tiktok_ads);
+    if (!prevTiktokAdsDetailData && !prevFunnelByPlatformData) return cur;
+    return mergePrevRealizado(cur, buildTiktokAdsMetrics(prevTiktokAdsDetailData || {} as TiktokAdsDetailMetrics, prevFunnelByPlatformData?.tiktok_ads));
+  }, [tiktokAdsDetailData, funnelByPlatformData, prevTiktokAdsDetailData, prevFunnelByPlatformData, ORCADO_TIKTOK_ADS]);
+
   // Instagram empty-state banner: distinguish "no connection" from "connection ok but no data"
   const instagramBanner = useMemo<React.ReactNode | undefined>(() => {
     if (!instagramDetailData) return undefined;
@@ -1856,6 +1925,13 @@ export default function GrowthOrcadoRealizado() {
     return undefined;
   }, [tiktokDetailData]);
 
+  const tiktokAdsBanner = useMemo<React.ReactNode | undefined>(() => {
+    if (tiktokAdsDetailData && tiktokAdsDetailData.hasConnection === false) {
+      return 'Nenhuma conta de anúncios TikTok (advertiser) conectada. Autorize o fluxo de Ads em Integrações.';
+    }
+    return undefined;
+  }, [tiktokAdsDetailData]);
+
   // Aprofundado sections with platform-specific metrics
   const aprofundadoPlatformSections: MetricSection[] = useMemo(() => [
     { title: 'Meta Ads', icon: <Megaphone className="w-5 h-5" />, metrics: metaAdsPlatformMetrics },
@@ -1864,7 +1940,8 @@ export default function GrowthOrcadoRealizado() {
     { title: 'YouTube', icon: <Play className="w-5 h-5" />, metrics: youtubePlatformMetrics, banner: youtubeBanner },
     { title: 'LinkedIn', icon: <Briefcase className="w-5 h-5" />, metrics: linkedinPlatformMetrics, banner: linkedinBanner },
     { title: 'TikTok', icon: <Music className="w-5 h-5" />, metrics: tiktokPlatformMetrics, banner: tiktokBanner },
-  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, youtubeBanner, linkedinPlatformMetrics, linkedinBanner, tiktokPlatformMetrics, tiktokBanner]);
+    { title: 'TikTok Ads', icon: <Megaphone className="w-5 h-5" />, metrics: tiktokAdsPlatformMetrics, banner: tiktokAdsBanner },
+  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, youtubeBanner, linkedinPlatformMetrics, linkedinBanner, tiktokPlatformMetrics, tiktokBanner, tiktokAdsPlatformMetrics, tiktokAdsBanner]);
 
   const buildNaoMqlMetrics = (data: NaoMQLMetrics, investimento: number | null = null): Metric[] => {
     const invest = investimento ?? 0;
@@ -2182,6 +2259,7 @@ export default function GrowthOrcadoRealizado() {
     { key: 'youtube', label: 'YouTube' },
     { key: 'linkedin', label: 'LinkedIn' },
     { key: 'tiktok', label: 'TikTok' },
+    { key: 'tiktok_ads', label: 'TikTok Ads' },
   ];
 
   const aprofundadoFilteredSections: MetricSection[] = useMemo(() => {
@@ -2192,6 +2270,7 @@ export default function GrowthOrcadoRealizado() {
       youtube: aprofundadoPlatformSections[3],
       linkedin: aprofundadoPlatformSections[4],
       tiktok: aprofundadoPlatformSections[5],
+      tiktok_ads: aprofundadoPlatformSections[6],
     };
     if (selectedPlataformas.length === 0) {
       return [
@@ -2243,6 +2322,7 @@ export default function GrowthOrcadoRealizado() {
       youtube: aprofundadoPlatformSections[3],
       linkedin: aprofundadoPlatformSections[4],
       tiktok: aprofundadoPlatformSections[5],
+      tiktok_ads: aprofundadoPlatformSections[6],
     };
 
     let baseSections: MetricSection[];
@@ -2273,7 +2353,7 @@ export default function GrowthOrcadoRealizado() {
 
   const getExportParams = (viewName: 'Consolidado' | 'Aprofundado'): ExportParams => {
     const plataformaLabels: Record<string, string> = {
-      meta_ads: 'Meta Ads', google_ads: 'Google Ads', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn', tiktok: 'TikTok',
+      meta_ads: 'Meta Ads', google_ads: 'Google Ads', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn', tiktok: 'TikTok', tiktok_ads: 'TikTok Ads',
     };
     return {
       sections: viewName === 'Consolidado' ? consolidadoSections : aprofundadoFilteredSections,
@@ -2605,12 +2685,6 @@ export default function GrowthOrcadoRealizado() {
               className="w-[180px] text-xs"
             />
           </div>
-          {selectedPlataformas.some(p => p === 'tiktok_ads') && (
-            <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
-              <AlertCircle className="w-3 h-3 mr-1" />
-              Integração pendente
-            </Badge>
-          )}
           <DateRangePicker
             value={customDateRange}
             onChange={(range) => {
