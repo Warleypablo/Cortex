@@ -3475,6 +3475,20 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE published_at >= ${startDate}::date AND published_at <= ${endDate}::date + INTERVAL '1 day'
       `);
 
+      // Retenção média do canal: a Analytics API não dá averageViewPercentage no nível
+      // de canal de forma agregável, mas já coletamos no nível de vídeo. Agregamos por
+      // média ponderada por views. average_view_percentage vem 0–100 → /100 p/ decimal.
+      const retRes = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(average_view_percentage * views), 0)::numeric AS soma_pond,
+          COALESCE(SUM(CASE WHEN average_view_percentage IS NOT NULL THEN views ELSE 0 END), 0)::numeric AS soma_views
+        FROM youtube.video_daily_metrics
+        WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+      `);
+      const rr = retRes.rows[0] as any;
+      const somaViews = parseFloat(rr.soma_views) || 0;
+      const retencaoMedia = somaViews > 0 ? (parseFloat(rr.soma_pond) / somaViews) / 100 : 0;
+
       res.json({
         // Audiência (espelha o breakdown de seguidores do Instagram, seguidor → inscrito)
         comecaramInscrever: subsGained,
@@ -3490,6 +3504,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         visualizacoes,
         horasAssistidas: Math.round(minutos / 60),
         avgViewDuration,
+        retencaoMedia,
         curtidas: parseInt(d.curtidas) || 0,
         comentarios: parseInt(d.comentarios) || 0,
         compartilhamentos: parseInt(d.compartilhamentos) || 0,
