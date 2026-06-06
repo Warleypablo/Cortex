@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { format } from "date-fns";
 import { getLinktreeMetrics } from "../services/linktreeGa4";
-import { getSessionsByPlatform } from "../services/ga4Sessions";
+import { getSessionsByPlatform, getGa4SourceMediumDiagnostic } from "../services/ga4Sessions";
 import { UTM_SOURCES_BY_MEDIUM, UTM_SOURCE_LABELS, type UtmMedium } from "@shared/utm-vocabulary";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
@@ -2940,7 +2940,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const investimento = parseFloat(row.investimento) || 0;
       const impressoes = parseInt(row.impressoes) || 0;
       const cliquesSaida = parseInt(row.cliques_saida) || 0;
-      const visualizacoesPagina = parseInt(row.visualizacoes_pagina) || 0;
+      const landingPageViewsPixel = parseInt(row.visualizacoes_pagina) || 0;
       const alcance = parseInt(row.alcance) || 0;
       const frequencia = parseFloat(row.frequencia) || 0;
       const video3Sec = parseInt(row.video_3sec) || 0;
@@ -2949,7 +2949,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = outbound_clicks / impressions
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
-      const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
+      // Connect Rate pelo pixel (legado, mantido só p/ comparação)
+      const connectRatePixel = cliquesSaida > 0 ? landingPageViewsPixel / cliquesSaida : 0;
       // Vídeo Hook = video_3_sec_watched_actions / impressões (actions[].video_view, 3+ seg)
       // Vídeo Hold = video_thruplay_watched_actions / impressões
       // Escala 0–100 — alinhada com o endpoint de Criativos.
@@ -2962,6 +2963,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
       );
       const sessoes = ga4.byPlatform.meta_ads;
+      // Padrão GA4 (igual aos outros canais): Viz Página = page views GA4,
+      // Connect Rate = Sessões ÷ cliques de saída.
+      const visualizacoesPagina = ga4.byPlatformPageViews.meta_ads;
+      const connectRate = cliquesSaida > 0 ? sessoes / cliquesSaida : 0;
 
       res.json({
         investimento,
@@ -2976,6 +2981,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         connectRate,
         sessoes,
         sessoesAvailable: ga4.available,
+        // Comparação: valores antigos pelo pixel Meta (p/ avaliar o impacto da migração)
+        visualizacoesPaginaPixel: landingPageViewsPixel,
+        connectRatePixel,
       });
     } catch (error) {
       console.error("[api] Error fetching Meta Ads metrics:", error);
@@ -3085,9 +3093,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
       const custoConversao = conversoes > 0 ? (investimento / conversoes) : 0;
 
-      // Sessões GA4 do tráfego Google (sessionSource=google + sessionMedium=cpc)
+      // Sessões + page views GA4 do tráfego Google (sessionSource=google + medium cpc)
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.google_ads;
+      // Padrão GA4 (igual aos outros canais)
+      const visualizacoesPagina = ga4.byPlatformPageViews.google_ads;
+      const connectRate = cliques > 0 ? sessoes / cliques : 0;
 
       res.json({
         investimento,
@@ -3096,8 +3107,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cpm,
         cpc,
         ctr,
-        visualizacoesPagina: cliques, // Google Ads uses clicks as landing page proxy
-        connectRate: 0,
+        visualizacoesPagina,
+        connectRate,
         conversoes,
         valorConversoes,
         custoConversao,
@@ -3124,6 +3135,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT id FROM cortex_core.instagram_connections WHERE is_active = true
       `);
       const emptyPayload = {
+        postsPublicados: 0,
         comecaramSeguir: 0, deixaramSeguir: 0, percPerdaSeguidores: 0,
         deltaSeguidores: 0, totalSeguidores: 0, percCrescimentoSeguidores: 0,
         visualizacoesTotais: 0, percVisualizacoesOrganicas: 0, visualizacoesOrganicas: 0,
@@ -3356,7 +3368,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.warn('[orcado-realizado/instagram] sub-source breakdown query failed:', err?.message || err);
       }
 
+      // Posts publicados no período (conta a partir das métricas por post)
+      let postsPublicados = 0;
+      try {
+        const postsRes = await db.execute(sql`
+          SELECT COUNT(*)::int AS n
+          FROM cortex_core.instagram_post_metrics
+          WHERE connection_id IN (${sql.join(connectionIds.map((id: any) => sql`${id}`), sql`, `)})
+            AND posted_at >= ${startDate}::date
+            AND posted_at <= ${endDate}::date + INTERVAL '1 day'
+        `);
+        postsPublicados = parseInt((postsRes.rows[0] as any).n) || 0;
+      } catch (err: any) {
+        console.warn('[orcado-realizado/instagram] posts count failed:', err?.message || err);
+      }
+
       res.json({
+        postsPublicados,
         comecaramSeguir, deixaramSeguir, percPerdaSeguidores,
         deltaSeguidores, totalSeguidores: lastFollowers, percCrescimentoSeguidores,
         visualizacoesTotais: visualizacoesTotaisAjustado, percVisualizacoesOrganicas, visualizacoesOrganicas,
@@ -3428,6 +3456,17 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
       `);
       const d = dmRes.rows[0] as any;
+      const subsGained = parseInt(d.subs_gained) || 0;
+      const subsLost = parseInt(d.subs_lost) || 0;
+      const deltaInscritos = subsGained - subsLost;
+      const visualizacoes = parseInt(d.visualizacoes) || 0;
+      const minutos = parseInt(d.minutos) || 0;
+      // Duração média por view (segundos) — média ponderada via minutos/views (evita SUM de média)
+      const avgViewDuration = visualizacoes > 0 ? Math.round((minutos / visualizacoes) * 60) : 0;
+      // Mesmas fórmulas do Instagram, trocando seguidor → inscrito
+      const percPerdaInscritos = (subsGained + subsLost) > 0 ? subsLost / (subsGained + subsLost) : 0;
+      const baseInicial = inscritos - deltaInscritos; // inscritos no início do período
+      const percCrescimentoInscritos = baseInicial > 0 ? deltaInscritos / baseInicial : 0;
 
       // Vídeos publicados no período
       const vRes = await db.execute(sql`
@@ -3437,10 +3476,20 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       `);
 
       res.json({
+        // Audiência (espelha o breakdown de seguidores do Instagram, seguidor → inscrito)
+        comecaramInscrever: subsGained,
+        deixaramInscrever: subsLost,
+        percPerdaInscritos,
+        deltaInscritos,
+        totalInscritos: inscritos,
+        percCrescimentoInscritos,
+        // compat com consumidores antigos
         inscritos,
-        ganhoLiquidoInscritos: (parseInt(d.subs_gained) || 0) - (parseInt(d.subs_lost) || 0),
-        visualizacoes: parseInt(d.visualizacoes) || 0,
-        horasAssistidas: Math.round((parseInt(d.minutos) || 0) / 60),
+        ganhoLiquidoInscritos: deltaInscritos,
+        // Conteúdo / distribuição
+        visualizacoes,
+        horasAssistidas: Math.round(minutos / 60),
+        avgViewDuration,
         curtidas: parseInt(d.curtidas) || 0,
         comentarios: parseInt(d.comentarios) || 0,
         compartilhamentos: parseInt(d.compartilhamentos) || 0,
@@ -3481,6 +3530,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       `);
       const f = folRes.rows[0] as any;
 
+      // Começaram/Deixaram de seguir: inferido do delta dia-a-dia do total de seguidores
+      // (mesma aproximação do Instagram/LinkedIn). Positivo = ganho, negativo = perda.
+      const folDiffRes = await db.execute(sql`
+        WITH daily AS (
+          SELECT open_id,
+            follower_count - LAG(follower_count) OVER (PARTITION BY open_id ORDER BY snapshot_date) AS diff
+          FROM tiktok.account_metrics
+          WHERE snapshot_date >= ${startDate}::date AND snapshot_date <= ${endDate}::date
+        )
+        SELECT
+          COALESCE(SUM(CASE WHEN diff > 0 THEN diff ELSE 0 END), 0)::bigint AS gained,
+          COALESCE(SUM(CASE WHEN diff < 0 THEN -diff ELSE 0 END), 0)::bigint AS lost
+        FROM daily
+      `);
+      const fd = folDiffRes.rows[0] as any;
+
       // Vídeos: contadores cumulativos → ganho no período = MAX - MIN por vídeo, somado
       const vmRes = await db.execute(sql`
         WITH vid AS (
@@ -3506,14 +3571,33 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE create_time >= ${startDate}::date AND create_time <= ${endDate}::date + INTERVAL '1 day'
       `);
 
+      const totalSeguidores = parseInt(f.seguidores) || 0;
+      const deltaSeguidores = parseInt(f.crescimento) || 0;
+      const comecaramSeguir = parseInt(fd.gained) || 0;
+      const deixaramSeguir = parseInt(fd.lost) || 0;
+      const baseInicial = totalSeguidores - deltaSeguidores; // seguidores no início do período
+      const percCrescimentoSeguidores = baseInicial > 0 ? deltaSeguidores / baseInicial : 0;
+      const percPerdaSeguidores = (comecaramSeguir + deixaramSeguir) > 0
+        ? deixaramSeguir / (comecaramSeguir + deixaramSeguir) : 0;
+
       res.json({
-        seguidores: parseInt(f.seguidores) || 0,
-        crescimentoSeguidores: parseInt(f.crescimento) || 0,
+        // Audiência (espelha o breakdown de seguidores do Instagram/YouTube/LinkedIn)
+        comecaramSeguir,
+        deixaramSeguir,
+        percPerdaSeguidores,
+        deltaSeguidores,
+        totalSeguidores,
+        percCrescimentoSeguidores,
+        // compat
+        seguidores: totalSeguidores,
+        crescimentoSeguidores: deltaSeguidores,
+        // Distribuição
         visualizacoes: parseInt(v.visualizacoes) || 0,
-        curtidas: parseInt(v.curtidas) || 0,
-        comentarios: parseInt(v.comentarios) || 0,
         compartilhamentos: parseInt(v.compartilhamentos) || 0,
         videosPublicados: parseInt((vpubRes.rows[0] as any).n) || 0,
+        // vaidade (não exibidos, mantidos por compat)
+        curtidas: parseInt(v.curtidas) || 0,
+        comentarios: parseInt(v.comentarios) || 0,
         hasConnection: contas > 0,
       });
     } catch (error) {
@@ -3548,6 +3632,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const impressoes = parseInt(m.impressoes) || 0;
       const cliques = parseInt(m.cliques) || 0;
 
+      // Meio do funil via GA4: sessões + visualizações de página do tráfego tiktok_ads
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.tiktok_ads;
+      const visualizacoesPagina = ga4.byPlatformPageViews.tiktok_ads;
+      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+
       res.json({
         investimento,
         impressoes,
@@ -3555,11 +3645,33 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         conversoes: parseFloat(m.conversoes) || 0,
         cpm: impressoes > 0 ? (investimento / impressoes) * 1000 : 0,
         ctr: impressoes > 0 ? cliques / impressoes : 0,
+        visualizacoesPagina,
+        sessoes,
+        connectRate,
+        sessoesAvailable: ga4.available,
         hasConnection: advertisers > 0,
       });
     } catch (error) {
       console.error("[api] Error fetching TikTok Ads metrics:", error);
       res.status(500).json({ error: "Failed to fetch TikTok Ads metrics" });
+    }
+  });
+
+  // GA4 — diagnóstico de tagueamento: lista source/medium reais + bucket atribuído.
+  // Use em prod pra confirmar que TikTok/LinkedIn/Google Ads caem nos buckets certos
+  // antes de confiar em Connect Rate / Tx Conversão.
+  app.get("/api/growth/ga4-diagnostic", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+      const diag = await getGa4SourceMediumDiagnostic(new Date(startDate), new Date(endDate));
+      res.json(diag);
+    } catch (error) {
+      console.error("[api] Error fetching GA4 diagnostic:", error);
+      res.status(500).json({ error: "Failed to fetch GA4 diagnostic" });
     }
   });
 
@@ -3589,6 +3701,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const impressoes = parseInt(m.impressoes) || 0;
       const cliques = parseInt(m.cliques) || 0;
 
+      // Meio do funil via GA4: sessões + visualizações de página do tráfego linkedin_ads
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.linkedin_ads;
+      const visualizacoesPagina = ga4.byPlatformPageViews.linkedin_ads;
+      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+
       res.json({
         investimento,
         impressoes,
@@ -3596,6 +3714,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         conversoes: parseFloat(m.conversoes) || 0,
         cpm: impressoes > 0 ? (investimento / impressoes) * 1000 : 0,
         ctr: impressoes > 0 ? cliques / impressoes : 0,
+        visualizacoesPagina,
+        sessoes,
+        connectRate,
+        sessoesAvailable: ga4.available,
         hasConnection: contas > 0,
       });
     } catch (error) {
@@ -3631,6 +3753,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM foll
       `);
       const f = folRes.rows[0] as any;
+
+      // Começaram/Deixaram de seguir: LinkedIn não expõe unfollow → inferimos do
+      // delta dia-a-dia do total (mesma aproximação do Instagram). Positivo = ganho,
+      // negativo = perda.
+      const folDiffRes = await db.execute(sql`
+        WITH daily AS (
+          SELECT org_id,
+            total_followers - LAG(total_followers) OVER (PARTITION BY org_id ORDER BY stat_date) AS diff
+          FROM linkedin.follower_stats_daily
+          WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+        )
+        SELECT
+          COALESCE(SUM(CASE WHEN diff > 0 THEN diff ELSE 0 END), 0)::bigint AS gained,
+          COALESCE(SUM(CASE WHEN diff < 0 THEN -diff ELSE 0 END), 0)::bigint AS lost
+        FROM daily
+      `);
+      const fd = folDiffRes.rows[0] as any;
 
       // Engajamento: impressions/clicks/likes/comments/shares são contadores lifetime →
       // ganho no período = MAX - MIN por org. Já `engagement` é uma TAXA (decimal) do
@@ -3669,16 +3808,39 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT COALESCE(SUM(d_pv), 0)::bigint AS page_views FROM pg
       `);
 
+      const totalSeguidores = parseInt(f.seguidores) || 0;
+      const deltaSeguidores = parseInt(f.novos) || 0;
+      const comecaramSeguir = parseInt(fd.gained) || 0;
+      const deixaramSeguir = parseInt(fd.lost) || 0;
+      const baseInicial = totalSeguidores - deltaSeguidores; // seguidores no início do período
+      const percCrescimentoSeguidores = baseInicial > 0 ? deltaSeguidores / baseInicial : 0;
+      const percPerdaSeguidores = (comecaramSeguir + deixaramSeguir) > 0
+        ? deixaramSeguir / (comecaramSeguir + deixaramSeguir) : 0;
+      const impressoes = parseInt(s.impressoes) || 0;
+      const cliques = parseInt(s.cliques) || 0;
+      const ctr = impressoes > 0 ? cliques / impressoes : 0;
+
       res.json({
-        seguidores: parseInt(f.seguidores) || 0,
-        novosSeguidores: parseInt(f.novos) || 0,
-        impressoes: parseInt(s.impressoes) || 0,
-        cliques: parseInt(s.cliques) || 0,
+        // Audiência (espelha o breakdown de seguidores do Instagram/YouTube)
+        comecaramSeguir,
+        deixaramSeguir,
+        percPerdaSeguidores,
+        deltaSeguidores,
+        totalSeguidores,
+        percCrescimentoSeguidores,
+        // compat
+        seguidores: totalSeguidores,
+        novosSeguidores: deltaSeguidores,
+        // Distribuição / intenção
+        impressoes,
+        cliques,
+        ctr,
+        pageViews: parseInt((pgRes.rows[0] as any).page_views) || 0,
+        engajamento: parseFloat(s.engajamento) || 0,
+        // vaidade (não exibidos no bloco, mantidos por compat)
         reacoes: parseInt(s.reacoes) || 0,
         comentarios: parseInt(s.comentarios) || 0,
         compartilhamentos: parseInt(s.compartilhamentos) || 0,
-        engajamento: parseFloat(s.engajamento) || 0,
-        pageViews: parseInt((pgRes.rows[0] as any).page_views) || 0,
         hasConnection: orgs > 0,
       });
     } catch (error) {

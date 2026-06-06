@@ -19,13 +19,16 @@ import { getAnalyticsDataClient } from '../autoreport/credentials';
 export type Ga4PlatformBreakdown = {
   meta_ads: number;
   google_ads: number;
+  tiktok_ads: number;
+  linkedin_ads: number;
   organico: number;
   outros: number;
 };
 
 export type Ga4SessionsResult = {
   total: number;
-  byPlatform: Ga4PlatformBreakdown;
+  byPlatform: Ga4PlatformBreakdown;           // sessões por plataforma
+  byPlatformPageViews: Ga4PlatformBreakdown;   // visualizações de página por plataforma
   available: boolean;
   error?: string;
 };
@@ -43,12 +46,23 @@ function fmtYmd(d: Date): string {
 function classifyPlatform(source: string, medium: string): keyof Ga4PlatformBreakdown {
   const s = source.toLowerCase().trim();
   const m = medium.toLowerCase().trim();
+  const isPaid = m === 'cpc' || m === 'ppc' || m === 'paidsearch' || m === 'paid' || m === 'paidsocial' || m === 'paid_social';
 
-  if (s.includes('facebook') || s.includes('meta') || s.includes('instagram') || s === 'ig' || s === 'fb') {
+  // Meta paga — exige medium pago, senão puxava Instagram orgânico + referrals
+  // (facebook.com, linktree) pro bucket e inflava as métricas de Ads.
+  if ((s.includes('facebook') || s.includes('meta') || s.includes('instagram') || s === 'ig' || s === 'fb') && isPaid) {
     return 'meta_ads';
   }
   if ((s.includes('google') || s.includes('adwords') || s.includes('gads')) && (m === 'cpc' || m === 'ppc' || m === 'paidsearch')) {
     return 'google_ads';
+  }
+  // Ads pagas de TikTok/LinkedIn — convenção utm_source=tiktok_ads/linkedin_ads,
+  // ou source=tiktok/linkedin com medium pago. Orgânico (medium social/referral) cai fora.
+  if (s.includes('tiktok') && (s.includes('ads') || isPaid)) {
+    return 'tiktok_ads';
+  }
+  if (s.includes('linkedin') && (s.includes('ads') || isPaid)) {
+    return 'linkedin_ads';
   }
   if (s === '(direct)' || m === '(none)' || m === 'organic') {
     return 'organico';
@@ -62,9 +76,12 @@ export async function getSessionsByPlatform(
   options?: Ga4SessionsOptions,
 ): Promise<Ga4SessionsResult> {
   const propertyId = (process.env.LINKTREE_GA4_PROPERTY_ID || '').replace(/\D/g, '');
+  const zeroBreakdown = (): Ga4PlatformBreakdown =>
+    ({ meta_ads: 0, google_ads: 0, tiktok_ads: 0, linkedin_ads: 0, organico: 0, outros: 0 });
   const empty: Ga4SessionsResult = {
     total: 0,
-    byPlatform: { meta_ads: 0, google_ads: 0, organico: 0, outros: 0 },
+    byPlatform: zeroBreakdown(),
+    byPlatformPageViews: zeroBreakdown(),
     available: false,
   };
 
@@ -98,28 +115,108 @@ export async function getSessionsByPlatform(
       property: `properties/${propertyId}`,
       requestBody: {
         dateRanges: [{ startDate: start, endDate: end }],
-        metrics: [{ name: 'sessions' }],
+        metrics: [{ name: 'sessions' }, { name: 'screenPageViews' }],
         dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
         dimensionFilter: { andGroup: { expressions: filterExpressions } },
         limit: 500,
       },
     } as any);
 
-    const byPlatform: Ga4PlatformBreakdown = { meta_ads: 0, google_ads: 0, organico: 0, outros: 0 };
+    const byPlatform = zeroBreakdown();
+    const byPlatformPageViews = zeroBreakdown();
     let total = 0;
 
     for (const row of response.data.rows || []) {
       const source = row.dimensionValues?.[0]?.value || '';
       const medium = row.dimensionValues?.[1]?.value || '';
       const sessions = parseInt(row.metricValues?.[0]?.value || '0', 10);
+      const pageViews = parseInt(row.metricValues?.[1]?.value || '0', 10);
       const bucket = classifyPlatform(source, medium);
       byPlatform[bucket] += sessions;
+      byPlatformPageViews[bucket] += pageViews;
       total += sessions;
     }
 
-    return { total, byPlatform, available: true };
+    return { total, byPlatform, byPlatformPageViews, available: true };
   } catch (err: any) {
     console.warn('[GA4 Sessions] Falha ao buscar sessões:', err?.message || err);
     return { ...empty, error: err?.message || 'erro desconhecido' };
+  }
+}
+
+// ============================================================================
+// Diagnóstico: lista os source/medium REAIS do GA4 (sessões + page views) e como
+// cada um é classificado. Serve pra validar, em prod, se o tagueamento de UTM das
+// campanhas (sobretudo TikTok/LinkedIn Ads) cai nos buckets certos antes de
+// confiarmos nas métricas de Connect Rate / Tx Conversão.
+// ============================================================================
+
+export type Ga4DiagnosticRow = {
+  source: string;
+  medium: string;
+  sessions: number;
+  pageViews: number;
+  bucket: keyof Ga4PlatformBreakdown;
+};
+
+export type Ga4DiagnosticResult = {
+  available: boolean;
+  rows: Ga4DiagnosticRow[];            // ordenado por sessões desc
+  totalsByBucket: Ga4PlatformBreakdown; // sessões somadas por bucket
+  error?: string;
+};
+
+export async function getGa4SourceMediumDiagnostic(
+  startDate: Date,
+  endDate: Date,
+): Promise<Ga4DiagnosticResult> {
+  const propertyId = (process.env.LINKTREE_GA4_PROPERTY_ID || '').replace(/\D/g, '');
+  const zero = (): Ga4PlatformBreakdown =>
+    ({ meta_ads: 0, google_ads: 0, tiktok_ads: 0, linkedin_ads: 0, organico: 0, outros: 0 });
+
+  if (!propertyId) {
+    return { available: false, rows: [], totalsByBucket: zero(), error: 'LINKTREE_GA4_PROPERTY_ID não configurado' };
+  }
+
+  const start = fmtYmd(startDate);
+  const end = fmtYmd(endDate);
+
+  try {
+    const analytics = getAnalyticsDataClient();
+    const response = await analytics.properties.runReport({
+      property: `properties/${propertyId}`,
+      requestBody: {
+        dateRanges: [{ startDate: start, endDate: end }],
+        metrics: [{ name: 'sessions' }, { name: 'screenPageViews' }],
+        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
+        dimensionFilter: {
+          andGroup: {
+            expressions: [
+              { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'linktr.ee' } } } },
+            ],
+          },
+        },
+        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+        limit: 250,
+      },
+    } as any);
+
+    const rows: Ga4DiagnosticRow[] = [];
+    const totalsByBucket = zero();
+
+    for (const row of response.data.rows || []) {
+      const source = row.dimensionValues?.[0]?.value || '';
+      const medium = row.dimensionValues?.[1]?.value || '';
+      const sessions = parseInt(row.metricValues?.[0]?.value || '0', 10);
+      const pageViews = parseInt(row.metricValues?.[1]?.value || '0', 10);
+      const bucket = classifyPlatform(source, medium);
+      rows.push({ source, medium, sessions, pageViews, bucket });
+      totalsByBucket[bucket] += sessions;
+    }
+
+    return { available: true, rows, totalsByBucket };
+  } catch (err: any) {
+    console.warn('[GA4 Diagnostic] Falha:', err?.message || err);
+    return { available: false, rows: [], totalsByBucket: zero(), error: err?.message || 'erro desconhecido' };
   }
 }
