@@ -3378,6 +3378,232 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     }
   });
 
+  // ===========================================================================
+  // Métricas nativas orgânicas — YouTube / TikTok / LinkedIn
+  // ---------------------------------------------------------------------------
+  // Espelham o padrão do endpoint /instagram: leem as tabelas próprias de cada
+  // plataforma (preenchidas pelos syncs orgânicos #235/#236/#237) e devolvem JSON
+  // plano consumido pelos builders do Aprofundado (GrowthOrcadoRealizado.tsx).
+  // O funil (leads→MQL→venda) continua vindo do /funnel-by-platform — aqui é só a
+  // camada de vaidade/alcance nativa.
+  //
+  // Granularidade difere por plataforma (ver create-*-tables.ts + *Sync.ts):
+  //   - YouTube  → channel_daily_metrics é DIÁRIO real (Analytics API, dim=day) → SUM
+  //   - TikTok   → snapshots diários; account_metrics = total/dia (seguidores=último,
+  //                crescimento=último-primeiro); video_metrics = contadores CUMULATIVOS
+  //                por vídeo → ganho no período = MAX-MIN por vídeo, somado
+  //   - LinkedIn → snapshots de totais LIFETIME → tudo delta (último-primeiro / MAX-MIN);
+  //                os campos *_follower_gain não são populados (v1 só grava total_followers)
+  // ===========================================================================
+
+  // YouTube — inscritos + métricas diárias do canal (orgânico)
+  app.get("/api/growth/orcado-realizado/youtube", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Inscritos atuais (snapshot) + nº de canais conectados
+      const chRes = await db.execute(sql`
+        SELECT COALESCE(SUM(subscriber_count), 0)::bigint AS inscritos, COUNT(*)::int AS canais
+        FROM youtube.channels
+      `);
+      const inscritos = parseInt((chRes.rows[0] as any).inscritos) || 0;
+      const canais = parseInt((chRes.rows[0] as any).canais) || 0;
+
+      // Métricas diárias do canal — SUM no período (Analytics API entrega valor por dia)
+      const dmRes = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(views), 0)::bigint AS visualizacoes,
+          COALESCE(SUM(estimated_minutes_watched), 0)::bigint AS minutos,
+          COALESCE(SUM(subscribers_gained), 0)::int AS subs_gained,
+          COALESCE(SUM(subscribers_lost), 0)::int AS subs_lost,
+          COALESCE(SUM(likes), 0)::bigint AS curtidas,
+          COALESCE(SUM(comments), 0)::bigint AS comentarios,
+          COALESCE(SUM(shares), 0)::bigint AS compartilhamentos
+        FROM youtube.channel_daily_metrics
+        WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+      `);
+      const d = dmRes.rows[0] as any;
+
+      // Vídeos publicados no período
+      const vRes = await db.execute(sql`
+        SELECT COUNT(*)::int AS n
+        FROM youtube.videos
+        WHERE published_at >= ${startDate}::date AND published_at <= ${endDate}::date + INTERVAL '1 day'
+      `);
+
+      res.json({
+        inscritos,
+        ganhoLiquidoInscritos: (parseInt(d.subs_gained) || 0) - (parseInt(d.subs_lost) || 0),
+        visualizacoes: parseInt(d.visualizacoes) || 0,
+        horasAssistidas: Math.round((parseInt(d.minutos) || 0) / 60),
+        curtidas: parseInt(d.curtidas) || 0,
+        comentarios: parseInt(d.comentarios) || 0,
+        compartilhamentos: parseInt(d.compartilhamentos) || 0,
+        videosPublicados: parseInt((vRes.rows[0] as any).n) || 0,
+        hasConnection: canais > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching YouTube metrics:", error);
+      res.status(500).json({ error: "Failed to fetch YouTube metrics" });
+    }
+  });
+
+  // TikTok — perfil orgânico (seguidores + engajamento dos vídeos)
+  app.get("/api/growth/orcado-realizado/tiktok", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const accRes = await db.execute(sql`SELECT COUNT(*)::int AS n FROM tiktok.accounts`);
+      const contas = parseInt((accRes.rows[0] as any).n) || 0;
+
+      // Seguidores: snapshot por dia → último valor no range; crescimento = último - primeiro
+      const folRes = await db.execute(sql`
+        WITH acc AS (
+          SELECT open_id,
+            (ARRAY_AGG(follower_count ORDER BY snapshot_date DESC))[1] AS last_f,
+            (ARRAY_AGG(follower_count ORDER BY snapshot_date ASC))[1] AS first_f
+          FROM tiktok.account_metrics
+          WHERE snapshot_date >= ${startDate}::date AND snapshot_date <= ${endDate}::date
+          GROUP BY open_id
+        )
+        SELECT COALESCE(SUM(last_f), 0)::bigint AS seguidores,
+               COALESCE(SUM(last_f - first_f), 0)::bigint AS crescimento
+        FROM acc
+      `);
+      const f = folRes.rows[0] as any;
+
+      // Vídeos: contadores cumulativos → ganho no período = MAX - MIN por vídeo, somado
+      const vmRes = await db.execute(sql`
+        WITH vid AS (
+          SELECT video_id,
+            MAX(view_count) - MIN(view_count) AS d_views,
+            MAX(like_count) - MIN(like_count) AS d_likes,
+            MAX(comment_count) - MIN(comment_count) AS d_comments,
+            MAX(share_count) - MIN(share_count) AS d_shares
+          FROM tiktok.video_metrics
+          WHERE snapshot_date >= ${startDate}::date AND snapshot_date <= ${endDate}::date
+          GROUP BY video_id
+        )
+        SELECT COALESCE(SUM(d_views), 0)::bigint AS visualizacoes,
+               COALESCE(SUM(d_likes), 0)::bigint AS curtidas,
+               COALESCE(SUM(d_comments), 0)::bigint AS comentarios,
+               COALESCE(SUM(d_shares), 0)::bigint AS compartilhamentos
+        FROM vid
+      `);
+      const v = vmRes.rows[0] as any;
+
+      const vpubRes = await db.execute(sql`
+        SELECT COUNT(*)::int AS n FROM tiktok.videos
+        WHERE create_time >= ${startDate}::date AND create_time <= ${endDate}::date + INTERVAL '1 day'
+      `);
+
+      res.json({
+        seguidores: parseInt(f.seguidores) || 0,
+        crescimentoSeguidores: parseInt(f.crescimento) || 0,
+        visualizacoes: parseInt(v.visualizacoes) || 0,
+        curtidas: parseInt(v.curtidas) || 0,
+        comentarios: parseInt(v.comentarios) || 0,
+        compartilhamentos: parseInt(v.compartilhamentos) || 0,
+        videosPublicados: parseInt((vpubRes.rows[0] as any).n) || 0,
+        hasConnection: contas > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching TikTok metrics:", error);
+      res.status(500).json({ error: "Failed to fetch TikTok metrics" });
+    }
+  });
+
+  // LinkedIn — Company Page orgânica (seguidores + engajamento + page views)
+  app.get("/api/growth/orcado-realizado/linkedin", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const orgRes = await db.execute(sql`SELECT COUNT(*)::int AS n FROM linkedin.organizations`);
+      const orgs = parseInt((orgRes.rows[0] as any).n) || 0;
+
+      // Seguidores: snapshot de total → último no range; novos = último - primeiro
+      const folRes = await db.execute(sql`
+        WITH foll AS (
+          SELECT org_id,
+            (ARRAY_AGG(total_followers ORDER BY stat_date DESC))[1] AS last_f,
+            (ARRAY_AGG(total_followers ORDER BY stat_date ASC))[1] AS first_f
+          FROM linkedin.follower_stats_daily
+          WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          GROUP BY org_id
+        )
+        SELECT COALESCE(SUM(last_f), 0)::bigint AS seguidores,
+               COALESCE(SUM(last_f - first_f), 0)::bigint AS novos
+        FROM foll
+      `);
+      const f = folRes.rows[0] as any;
+
+      // Engajamento: impressions/clicks/likes/comments/shares são contadores lifetime →
+      // ganho no período = MAX - MIN por org. Já `engagement` é uma TAXA (decimal) do
+      // totalShareStatistics, não um contador → usa o último valor do range (média entre orgs).
+      const shRes = await db.execute(sql`
+        WITH sh AS (
+          SELECT org_id,
+            MAX(impressions) - MIN(impressions) AS d_imp,
+            MAX(clicks) - MIN(clicks) AS d_clk,
+            MAX(likes) - MIN(likes) AS d_likes,
+            MAX(comments) - MIN(comments) AS d_comments,
+            MAX(shares) - MIN(shares) AS d_shares,
+            (ARRAY_AGG(engagement ORDER BY stat_date DESC) FILTER (WHERE engagement IS NOT NULL))[1] AS last_eng
+          FROM linkedin.share_stats_daily
+          WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          GROUP BY org_id
+        )
+        SELECT COALESCE(SUM(d_imp), 0)::bigint AS impressoes,
+               COALESCE(SUM(d_clk), 0)::bigint AS cliques,
+               COALESCE(SUM(d_likes), 0)::bigint AS reacoes,
+               COALESCE(SUM(d_comments), 0)::bigint AS comentarios,
+               COALESCE(SUM(d_shares), 0)::bigint AS compartilhamentos,
+               COALESCE(AVG(last_eng), 0)::numeric AS engajamento
+        FROM sh
+      `);
+      const s = shRes.rows[0] as any;
+
+      // Page views: lifetime → ganho no período = MAX - MIN por org
+      const pgRes = await db.execute(sql`
+        WITH pg AS (
+          SELECT org_id, MAX(all_page_views) - MIN(all_page_views) AS d_pv
+          FROM linkedin.page_stats_daily
+          WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          GROUP BY org_id
+        )
+        SELECT COALESCE(SUM(d_pv), 0)::bigint AS page_views FROM pg
+      `);
+
+      res.json({
+        seguidores: parseInt(f.seguidores) || 0,
+        novosSeguidores: parseInt(f.novos) || 0,
+        impressoes: parseInt(s.impressoes) || 0,
+        cliques: parseInt(s.cliques) || 0,
+        reacoes: parseInt(s.reacoes) || 0,
+        comentarios: parseInt(s.comentarios) || 0,
+        compartilhamentos: parseInt(s.compartilhamentos) || 0,
+        engajamento: parseFloat(s.engajamento) || 0,
+        pageViews: parseInt((pgRes.rows[0] as any).page_views) || 0,
+        hasConnection: orgs > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching LinkedIn metrics:", error);
+      res.status(500).json({ error: "Failed to fetch LinkedIn metrics" });
+    }
+  });
+
   // Funnel metrics by platform (shared funnel: Leads → Receita → CAC)
   app.get("/api/growth/orcado-realizado/funnel-by-platform", async (req, res) => {
     try {
