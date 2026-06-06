@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { format } from "date-fns";
 import { getLinktreeMetrics } from "../services/linktreeGa4";
-import { getSessionsByPlatform } from "../services/ga4Sessions";
+import { getSessionsByPlatform, getGa4SourceMediumDiagnostic } from "../services/ga4Sessions";
 import { UTM_SOURCES_BY_MEDIUM, UTM_SOURCE_LABELS, type UtmMedium } from "@shared/utm-vocabulary";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
@@ -3626,6 +3626,24 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     } catch (error) {
       console.error("[api] Error fetching TikTok Ads metrics:", error);
       res.status(500).json({ error: "Failed to fetch TikTok Ads metrics" });
+    }
+  });
+
+  // GA4 — diagnóstico de tagueamento: lista source/medium reais + bucket atribuído.
+  // Use em prod pra confirmar que TikTok/LinkedIn/Google Ads caem nos buckets certos
+  // antes de confiar em Connect Rate / Tx Conversão.
+  app.get("/api/growth/ga4-diagnostic", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+      const diag = await getGa4SourceMediumDiagnostic(new Date(startDate), new Date(endDate));
+      res.json(diag);
+    } catch (error) {
+      console.error("[api] Error fetching GA4 diagnostic:", error);
+      res.status(500).json({ error: "Failed to fetch GA4 diagnostic" });
     }
   });
 
