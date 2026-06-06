@@ -53,6 +53,7 @@ const PLATFORM_CASE_SQL_BASIC = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%ads%' THEN 'linkedin_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%' THEN 'tiktok_ads'
@@ -3518,6 +3519,88 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
     } catch (error) {
       console.error("[api] Error fetching TikTok metrics:", error);
       res.status(500).json({ error: "Failed to fetch TikTok metrics" });
+    }
+  });
+
+  // TikTok Ads — mídia paga (gasto/impressões/cliques por campanha/dia).
+  // ad_metrics_daily é diário REAL (não cumulativo) → agrega por SUM no range.
+  app.get("/api/growth/orcado-realizado/tiktok-ads", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const advRes = await db.execute(sql`SELECT COUNT(*)::int AS n FROM tiktok.advertisers`);
+      const advertisers = parseInt((advRes.rows[0] as any).n) || 0;
+
+      const mRes = await db.execute(sql`
+        SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
+               COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+               COALESCE(SUM(clicks), 0)::bigint AS cliques,
+               COALESCE(SUM(conversions), 0)::numeric AS conversoes
+        FROM tiktok.ad_metrics_daily
+        WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+      `);
+      const m = mRes.rows[0] as any;
+      const investimento = parseFloat(m.investimento) || 0;
+      const impressoes = parseInt(m.impressoes) || 0;
+      const cliques = parseInt(m.cliques) || 0;
+
+      res.json({
+        investimento,
+        impressoes,
+        cliques,
+        conversoes: parseFloat(m.conversoes) || 0,
+        cpm: impressoes > 0 ? (investimento / impressoes) * 1000 : 0,
+        ctr: impressoes > 0 ? cliques / impressoes : 0,
+        hasConnection: advertisers > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching TikTok Ads metrics:", error);
+      res.status(500).json({ error: "Failed to fetch TikTok Ads metrics" });
+    }
+  });
+
+  // LinkedIn Ads — mídia paga (gasto/impressões/cliques por campanha/dia).
+  // ad_metrics_daily é diário REAL (adAnalytics DAILY) → agrega por SUM no range.
+  app.get("/api/growth/orcado-realizado/linkedin-ads", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const accRes = await db.execute(sql`SELECT COUNT(*)::int AS n FROM linkedin.ad_accounts`);
+      const contas = parseInt((accRes.rows[0] as any).n) || 0;
+
+      const mRes = await db.execute(sql`
+        SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
+               COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+               COALESCE(SUM(clicks), 0)::bigint AS cliques,
+               COALESCE(SUM(conversions), 0)::numeric AS conversoes
+        FROM linkedin.ad_metrics_daily
+        WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+      `);
+      const m = mRes.rows[0] as any;
+      const investimento = parseFloat(m.investimento) || 0;
+      const impressoes = parseInt(m.impressoes) || 0;
+      const cliques = parseInt(m.cliques) || 0;
+
+      res.json({
+        investimento,
+        impressoes,
+        cliques,
+        conversoes: parseFloat(m.conversoes) || 0,
+        cpm: impressoes > 0 ? (investimento / impressoes) * 1000 : 0,
+        ctr: impressoes > 0 ? cliques / impressoes : 0,
+        hasConnection: contas > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching LinkedIn Ads metrics:", error);
+      res.status(500).json({ error: "Failed to fetch LinkedIn Ads metrics" });
     }
   });
 
