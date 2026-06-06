@@ -48,7 +48,9 @@ function classifyPlatform(source: string, medium: string): keyof Ga4PlatformBrea
   const m = medium.toLowerCase().trim();
   const isPaid = m === 'cpc' || m === 'ppc' || m === 'paidsearch' || m === 'paid' || m === 'paidsocial' || m === 'paid_social';
 
-  if (s.includes('facebook') || s.includes('meta') || s.includes('instagram') || s === 'ig' || s === 'fb') {
+  // Meta paga — exige medium pago, senão puxava Instagram orgânico + referrals
+  // (facebook.com, linktree) pro bucket e inflava as métricas de Ads.
+  if ((s.includes('facebook') || s.includes('meta') || s.includes('instagram') || s === 'ig' || s === 'fb') && isPaid) {
     return 'meta_ads';
   }
   if ((s.includes('google') || s.includes('adwords') || s.includes('gads')) && (m === 'cpc' || m === 'ppc' || m === 'paidsearch')) {
