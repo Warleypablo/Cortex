@@ -141,3 +141,80 @@ export async function getSessionsByPlatform(
     return { ...empty, error: err?.message || 'erro desconhecido' };
   }
 }
+
+// ============================================================================
+// Diagnóstico: lista os source/medium REAIS do GA4 (sessões + page views) e como
+// cada um é classificado. Serve pra validar, em prod, se o tagueamento de UTM das
+// campanhas (sobretudo TikTok/LinkedIn Ads) cai nos buckets certos antes de
+// confiarmos nas métricas de Connect Rate / Tx Conversão.
+// ============================================================================
+
+export type Ga4DiagnosticRow = {
+  source: string;
+  medium: string;
+  sessions: number;
+  pageViews: number;
+  bucket: keyof Ga4PlatformBreakdown;
+};
+
+export type Ga4DiagnosticResult = {
+  available: boolean;
+  rows: Ga4DiagnosticRow[];            // ordenado por sessões desc
+  totalsByBucket: Ga4PlatformBreakdown; // sessões somadas por bucket
+  error?: string;
+};
+
+export async function getGa4SourceMediumDiagnostic(
+  startDate: Date,
+  endDate: Date,
+): Promise<Ga4DiagnosticResult> {
+  const propertyId = (process.env.LINKTREE_GA4_PROPERTY_ID || '').replace(/\D/g, '');
+  const zero = (): Ga4PlatformBreakdown =>
+    ({ meta_ads: 0, google_ads: 0, tiktok_ads: 0, linkedin_ads: 0, organico: 0, outros: 0 });
+
+  if (!propertyId) {
+    return { available: false, rows: [], totalsByBucket: zero(), error: 'LINKTREE_GA4_PROPERTY_ID não configurado' };
+  }
+
+  const start = fmtYmd(startDate);
+  const end = fmtYmd(endDate);
+
+  try {
+    const analytics = getAnalyticsDataClient();
+    const response = await analytics.properties.runReport({
+      property: `properties/${propertyId}`,
+      requestBody: {
+        dateRanges: [{ startDate: start, endDate: end }],
+        metrics: [{ name: 'sessions' }, { name: 'screenPageViews' }],
+        dimensions: [{ name: 'sessionSource' }, { name: 'sessionMedium' }],
+        dimensionFilter: {
+          andGroup: {
+            expressions: [
+              { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'linktr.ee' } } } },
+            ],
+          },
+        },
+        orderBys: [{ metric: { metricName: 'sessions' }, desc: true }],
+        limit: 250,
+      },
+    } as any);
+
+    const rows: Ga4DiagnosticRow[] = [];
+    const totalsByBucket = zero();
+
+    for (const row of response.data.rows || []) {
+      const source = row.dimensionValues?.[0]?.value || '';
+      const medium = row.dimensionValues?.[1]?.value || '';
+      const sessions = parseInt(row.metricValues?.[0]?.value || '0', 10);
+      const pageViews = parseInt(row.metricValues?.[1]?.value || '0', 10);
+      const bucket = classifyPlatform(source, medium);
+      rows.push({ source, medium, sessions, pageViews, bucket });
+      totalsByBucket[bucket] += sessions;
+    }
+
+    return { available: true, rows, totalsByBucket };
+  } catch (err: any) {
+    console.warn('[GA4 Diagnostic] Falha:', err?.message || err);
+    return { available: false, rows: [], totalsByBucket: zero(), error: err?.message || 'erro desconhecido' };
+  }
+}
