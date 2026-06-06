@@ -160,6 +160,7 @@ export const PLATFORM_OPTIONS = [
   { key: 'instagram', label: 'Instagram' },
   { key: 'youtube', label: 'YouTube' },
   { key: 'linkedin', label: 'LinkedIn' },
+  { key: 'tiktok', label: 'TikTok' },
 ] as const;
 
 export const CANAL_OPTIONS = [
@@ -173,9 +174,9 @@ export const PLATFORM_MULTISELECT_OPTIONS = [
   { value: 'google_ads', label: 'Google Ads' },
   { value: 'instagram', label: 'Instagram' },
   { value: 'youtube', label: 'YouTube' },
-  { value: 'linkedin', label: 'LinkedIn', badge: 'integração pendente' },
+  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'tiktok', label: 'TikTok' },
   { value: 'tiktok_ads', label: 'TikTok Ads', badge: 'integração pendente' },
-  { value: 'tiktok', label: 'TikTok', badge: 'integração pendente' },
 ];
 
 export const PLATFORM_TO_UTM: Record<string, string> = {
@@ -323,6 +324,20 @@ export const DEFAULT_ORCADO_LINKEDIN = {
   cac: 0, cacUnico: 0, cacContrato: 0,
 };
 
+export const DEFAULT_ORCADO_TIKTOK = {
+  seguidores: 0, crescimentoSeguidores: 0, visualizacoes: 0,
+  curtidas: 0, comentarios: 0, compartilhamentos: 0, videosPublicados: 0,
+  leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  cpra: 0, cpraMql: 0, cpraNmql: 0,
+  cprr: 0, cprrMql: 0, cprrNmql: 0,
+  percRa: 0, percRaMql: 0, percRaNmql: 0,
+  percRr: 0, percRrMql: 0, percRrNmql: 0,
+  percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
+  negocioGanho: 0, leadTime: 0, aov: 0,
+  receita: 0, receitaPontual: 0, receitaRecorrente: 0,
+  cac: 0, cacUnico: 0, cacContrato: 0,
+};
+
 // ===== Metric Budget Map =====
 // Maps metric.id → { segment, key } for database persistence
 
@@ -389,6 +404,8 @@ export const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }>
   ...Object.fromEntries(['inscritos','crescimentoInscritos','visualizacoes','horasAssistidas','ctrImpressoes','retencaoMedia','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`yt_${k}`, { segment: 'youtube', key: k }])),
   // LinkedIn (platform-specific)
   ...Object.fromEntries(['seguidores','crescimentoSeguidores','impressoes','cliquesPost','taxaEngajamento','postsPublicados','reacoes','comentarios','compartilhamentos','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`li_${k}`, { segment: 'linkedin', key: k }])),
+  // TikTok (platform-specific)
+  ...Object.fromEntries(['seguidores','crescimentoSeguidores','visualizacoes','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','cpra','cpraMql','cpraNmql','cprr','cprrMql','cprrNmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`tt_${k}`, { segment: 'tiktok', key: k }])),
 };
 
 // ===== Percent Metrics =====
@@ -422,6 +439,10 @@ export const PERCENT_METRICS = new Set([
   'li_taxaEngajamento', 'li_percMqls',
   'li_percRa', 'li_percRaMql', 'li_percRaNmql', 'li_percRr', 'li_percRrMql', 'li_percRrNmql',
   'li_percRrVendas', 'li_percRrMqlVendas', 'li_percRrNmqlVendas',
+  // TikTok
+  'tt_percMqls',
+  'tt_percRa', 'tt_percRaMql', 'tt_percRaNmql', 'tt_percRr', 'tt_percRrMql', 'tt_percRrNmql',
+  'tt_percRrVendas', 'tt_percRrMqlVendas', 'tt_percRrNmqlVendas',
 ]);
 
 // ===== Yellow Metric IDs (Key metrics for Consolidado view) =====
@@ -435,13 +456,15 @@ export const YELLOW_METRIC_IDS = new Set([
   // Total
   'total_perc_ra', 'total_conv_rrv', 'total_novos_clientes', 'total_cac_ads', 'total_ticket_acel', 'total_ticket_impl',
   // Platform-specific key metrics
-  ...['meta', 'gads', 'ig', 'yt', 'li'].flatMap(p => [
+  ...['meta', 'gads', 'ig', 'yt', 'li', 'tt'].flatMap(p => [
     `${p}_investimento`, `${p}_visualizacoesPagina`, `${p}_taxaConversaoPagina`,
     `${p}_leads`, `${p}_mqls`, `${p}_cpl`, `${p}_cpmql`, `${p}_percMqls`,
   ]),
   // Instagram-specific key metrics
   'ig_totalSeguidores', 'ig_deltaSeguidores', 'ig_alcanceTotal', 'ig_visualizacoesTotais',
   'ig_percEngajamento', 'ig_interacoes', 'ig_visitasPerfil', 'ig_cliquesLinkBio',
+  // TikTok-specific key metrics
+  'tt_seguidores', 'tt_crescimentoSeguidores', 'tt_visualizacoes',
 ]);
 
 // ===== Segment to Default Map =====
@@ -456,6 +479,7 @@ export const SEGMENT_DEFAULTS: Record<string, Record<string, number>> = {
   instagram: DEFAULT_ORCADO_INSTAGRAM,
   youtube: DEFAULT_ORCADO_YOUTUBE,
   linkedin: DEFAULT_ORCADO_LINKEDIN,
+  tiktok: DEFAULT_ORCADO_TIKTOK,
 };
 
 // ===== Metric Display Config for Planejamento =====
@@ -477,6 +501,7 @@ export const PLATFORM_SCOPE: Record<string, 'product' | 'company'> = {
   instagram: 'company',
   youtube: 'company',
   linkedin: 'company',
+  tiktok: 'company',
 };
 
 export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDisplayConfig[] }> = {
@@ -628,6 +653,19 @@ export const SECTION_METRICS: Record<string, { label: string; metrics: MetricDis
       { id: 'li_mqls', name: 'MQLs', format: 'number', tier: 1 },
     ],
   },
+  tiktok: {
+    label: 'TikTok',
+    metrics: [
+      // Ordem: Seguidores → Crescimento → Visualizações → Engajamento → Leads → MQLs
+      { id: 'tt_seguidores', name: 'Seguidores', format: 'number', tier: 1 },
+      { id: 'tt_crescimentoSeguidores', name: 'Crescimento Seguidores', format: 'number', tier: 2 },
+      { id: 'tt_visualizacoes', name: 'Visualizações', format: 'number', tier: 3 },
+      { id: 'tt_curtidas', name: 'Curtidas', format: 'number', tier: 3 },
+      { id: 'tt_videosPublicados', name: 'Vídeos Publicados', format: 'number', tier: 1 },
+      { id: 'tt_leads', name: 'Leads', format: 'number', tier: 1 },
+      { id: 'tt_mqls', name: 'MQLs', format: 'number', tier: 1 },
+    ],
+  },
 };
 
 // ===== Channel Derived Formulas =====
@@ -690,6 +728,9 @@ export const CHANNEL_DERIVED_FORMULAS: Record<string, (inputs: Record<string, nu
   linkedin: (inputs) => ({
     crescimentoSeguidores: 0, // Needs previous month data
   }),
+  tiktok: (inputs) => ({
+    crescimentoSeguidores: 0, // Needs previous month data
+  }),
 };
 
 // ===== Tier 3 Metric IDs =====
@@ -710,6 +751,9 @@ export const TIER3_METRIC_IDS = new Set<string>([
   // LinkedIn
   'li_impressoes', 'li_cliquesPost', 'li_postsPublicados',
   'li_reacoes', 'li_comentarios', 'li_compartilhamentos',
+  // TikTok
+  'tt_visualizacoes', 'tt_curtidas', 'tt_comentarios',
+  'tt_compartilhamentos', 'tt_videosPublicados',
 ]);
 
 // ===== Inbound Derivation Engine =====

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, AlertCircle, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, Music, AlertCircle, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
@@ -446,6 +446,19 @@ const DEFAULT_ORCADO_LINKEDIN = {
   cac: 0, cacUnico: 0, cacContrato: 0,
 };
 
+const DEFAULT_ORCADO_TIKTOK = {
+  seguidores: 0, crescimentoSeguidores: 0, visualizacoes: 0,
+  curtidas: 0, comentarios: 0, compartilhamentos: 0, videosPublicados: 0,
+  // Funnel
+  leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
+  percRa: 0, percRaMql: 0, percRaNmql: 0,
+  percRr: 0, percRrMql: 0, percRrNmql: 0,
+  percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
+  negocioGanho: 0, leadTime: 0, aov: 0,
+  receita: 0, receitaPontual: 0, receitaRecorrente: 0,
+  cac: 0, cacUnico: 0, cacContrato: 0,
+};
+
 // Mapeamento de metric.id → segmento/chave no banco de budgets
 const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   // MQL
@@ -505,6 +518,8 @@ const METRIC_BUDGET_MAP: Record<string, { segment: string; key: string }> = {
   ...Object.fromEntries(['inscritos','crescimentoInscritos','visualizacoes','horasAssistidas','ctrImpressoes','retencaoMedia','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`yt_${k}`, { segment: 'youtube', key: k }])),
   // LinkedIn (platform-specific)
   ...Object.fromEntries(['seguidores','crescimentoSeguidores','impressoes','cliquesPost','taxaEngajamento','postsPublicados','reacoes','comentarios','compartilhamentos','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`li_${k}`, { segment: 'linkedin', key: k }])),
+  // TikTok (platform-specific)
+  ...Object.fromEntries(['seguidores','crescimentoSeguidores','visualizacoes','curtidas','comentarios','compartilhamentos','videosPublicados','leads','mqls','cpl','cpmql','percMqls','percRa','percRaMql','percRaNmql','percRr','percRrMql','percRrNmql','percRrVendas','percRrMqlVendas','percRrNmqlVendas','negocioGanho','leadTime','aov','receita','receitaPontual','receitaRecorrente','cac','cacUnico','cacContrato'].map(k => [`tt_${k}`, { segment: 'tiktok', key: k }])),
 };
 
 const PERCENT_METRICS = new Set([
@@ -535,6 +550,10 @@ const PERCENT_METRICS = new Set([
   'li_taxaEngajamento', 'li_percMqls',
   'li_percRa', 'li_percRaMql', 'li_percRaNmql', 'li_percRr', 'li_percRrMql', 'li_percRrNmql',
   'li_percRrVendas', 'li_percRrMqlVendas', 'li_percRrNmqlVendas',
+  // TikTok
+  'tt_percMqls',
+  'tt_percRa', 'tt_percRaMql', 'tt_percRaNmql', 'tt_percRr', 'tt_percRrMql', 'tt_percRrNmql',
+  'tt_percRrVendas', 'tt_percRrMqlVendas', 'tt_percRrNmqlVendas',
 ]);
 
 // Métricas onde "menor é melhor" — cores invertidas na tabela
@@ -546,6 +565,7 @@ const INVERTED_METRIC_IDS = new Set([
   'ig_cpl', 'ig_cpmql',
   'yt_cpl', 'yt_cpmql',
   'li_cpl', 'li_cpmql',
+  'tt_cpl', 'tt_cpmql',
   // CAC
   'total_cac_ads', 'total_cac_contrato',
   'meta_cac', 'meta_cacUnico', 'meta_cacContrato',
@@ -553,10 +573,11 @@ const INVERTED_METRIC_IDS = new Set([
   'ig_cac', 'ig_cacUnico', 'ig_cacContrato',
   'yt_cac', 'yt_cacUnico', 'yt_cacContrato',
   'li_cac', 'li_cacUnico', 'li_cacContrato',
+  'tt_cac', 'tt_cacUnico', 'tt_cacContrato',
   // No-show
   'mql_noshow', 'nmql_noshow', 'total_noshow',
   // Lead time
-  'meta_leadTime', 'gads_leadTime', 'ig_leadTime', 'yt_leadTime', 'li_leadTime',
+  'meta_leadTime', 'gads_leadTime', 'ig_leadTime', 'yt_leadTime', 'li_leadTime', 'tt_leadTime',
   // Perda de seguidores
   'ig_percPerdaSeguidores', 'ig_deixaramSeguir',
 ]);
@@ -715,6 +736,7 @@ export default function GrowthOrcadoRealizado() {
   const ORCADO_INSTAGRAM = useMemo(() => ({ ...DEFAULT_ORCADO_INSTAGRAM, ...(budgetsData?.instagram || {}) }), [budgetsData]);
   const ORCADO_YOUTUBE = useMemo(() => ({ ...DEFAULT_ORCADO_YOUTUBE, ...(budgetsData?.youtube || {}) }), [budgetsData]);
   const ORCADO_LINKEDIN = useMemo(() => ({ ...DEFAULT_ORCADO_LINKEDIN, ...(budgetsData?.linkedin || {}) }), [budgetsData]);
+  const ORCADO_TIKTOK = useMemo(() => ({ ...DEFAULT_ORCADO_TIKTOK, ...(budgetsData?.tiktok || {}) }), [budgetsData]);
   const ORCADO_TOTAL = useMemo(() => {
     const totalRA = ORCADO_MQL.reunioesAgendadas + ORCADO_NAO_MQL.reunioesAgendadas;
     const totalRR = ORCADO_MQL.reunioesRealizadas + ORCADO_NAO_MQL.reunioesRealizadas;
@@ -1174,6 +1196,24 @@ export default function GrowthOrcadoRealizado() {
     snapshotCount: number;
   }
 
+  interface YoutubeDetailMetrics {
+    inscritos: number; ganhoLiquidoInscritos: number; visualizacoes: number;
+    horasAssistidas: number; curtidas: number; comentarios: number;
+    compartilhamentos: number; videosPublicados: number; hasConnection: boolean;
+  }
+
+  interface TiktokDetailMetrics {
+    seguidores: number; crescimentoSeguidores: number; visualizacoes: number;
+    curtidas: number; comentarios: number; compartilhamentos: number;
+    videosPublicados: number; hasConnection: boolean;
+  }
+
+  interface LinkedinDetailMetrics {
+    seguidores: number; novosSeguidores: number; impressoes: number;
+    cliques: number; reacoes: number; comentarios: number; compartilhamentos: number;
+    engajamento: number; pageViews: number; hasConnection: boolean;
+  }
+
   interface PlatformFunnelData {
     leads: number; mqls: number; cpl: number | null; cpmql: number | null; percMqls: number;
     ra: number; raMql: number; raNmql: number;
@@ -1222,6 +1262,39 @@ export default function GrowthOrcadoRealizado() {
     staleTime: 0,
   });
 
+  const { data: youtubeDetailData } = useQuery<YoutubeDetailMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/youtube', dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/youtube?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      if (!res.ok) throw new Error('Failed to fetch YouTube metrics');
+      return res.json();
+    },
+    enabled: needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: tiktokDetailData } = useQuery<TiktokDetailMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/tiktok', dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/tiktok?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      if (!res.ok) throw new Error('Failed to fetch TikTok metrics');
+      return res.json();
+    },
+    enabled: needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: linkedinDetailData } = useQuery<LinkedinDetailMetrics>({
+    queryKey: ['/api/growth/orcado-realizado/linkedin', dateRange.startDate, dateRange.endDate],
+    queryFn: async () => {
+      const res = await fetch(`/api/growth/orcado-realizado/linkedin?startDate=${dateRange.startDate}&endDate=${dateRange.endDate}`);
+      if (!res.ok) throw new Error('Failed to fetch LinkedIn metrics');
+      return res.json();
+    },
+    enabled: needsPlatformData,
+    staleTime: 0,
+  });
+
   const { data: funnelByPlatformData } = useQuery<Record<string, PlatformFunnelData>>({
     queryKey: ['/api/growth/orcado-realizado/funnel-by-platform', dateRange.startDate, dateRange.endDate, selectedProdutos, selectedPlataformas],
     queryFn: async () => {
@@ -1263,6 +1336,42 @@ export default function GrowthOrcadoRealizado() {
     queryFn: async () => {
       if (!prevDateRange) return null;
       const res = await fetch(`/api/growth/orcado-realizado/instagram?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!prevDateRange && needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: prevYoutubeDetailData } = useQuery<YoutubeDetailMetrics | null>({
+    queryKey: ['/api/growth/orcado-realizado/youtube', prevDateRange?.startDate, prevDateRange?.endDate, 'prev'],
+    queryFn: async () => {
+      if (!prevDateRange) return null;
+      const res = await fetch(`/api/growth/orcado-realizado/youtube?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!prevDateRange && needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: prevTiktokDetailData } = useQuery<TiktokDetailMetrics | null>({
+    queryKey: ['/api/growth/orcado-realizado/tiktok', prevDateRange?.startDate, prevDateRange?.endDate, 'prev'],
+    queryFn: async () => {
+      if (!prevDateRange) return null;
+      const res = await fetch(`/api/growth/orcado-realizado/tiktok?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
+      if (!res.ok) return null;
+      return res.json();
+    },
+    enabled: !!prevDateRange && needsPlatformData,
+    staleTime: 0,
+  });
+
+  const { data: prevLinkedinDetailData } = useQuery<LinkedinDetailMetrics | null>({
+    queryKey: ['/api/growth/orcado-realizado/linkedin', prevDateRange?.startDate, prevDateRange?.endDate, 'prev'],
+    queryFn: async () => {
+      if (!prevDateRange) return null;
+      const res = await fetch(`/api/growth/orcado-realizado/linkedin?startDate=${prevDateRange.startDate}&endDate=${prevDateRange.endDate}`);
       if (!res.ok) return null;
       return res.json();
     },
@@ -1643,52 +1752,75 @@ export default function GrowthOrcadoRealizado() {
     return mergePrevRealizado(cur, prev);
   }, [instagramDetailData, funnelByPlatformData, prevInstagramDetailData, prevFunnelByPlatformData, ORCADO_INSTAGRAM]);
 
-  // YouTube platform metrics (manual only - no integration yet)
-  const buildYoutubeMetrics = (funnel: PlatformFunnelData | undefined): Metric[] => {
+  // YouTube platform metrics (orgânico — lê youtube.* via endpoint)
+  const buildYoutubeMetrics = (d: YoutubeDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_YOUTUBE;
     const topMetrics: Metric[] = [
-      { id: 'yt_inscritos', name: 'Inscritos', type: 'manual', orcado: O.inscritos, realizado: null, percentual: null, format: 'number' },
-      { id: 'yt_crescimentoInscritos', name: 'Crescimento Inscritos', type: 'manual', orcado: O.crescimentoInscritos, realizado: null, percentual: null, format: 'number' },
-      { id: 'yt_visualizacoes', name: 'Visualizações', type: 'manual', orcado: O.visualizacoes, realizado: null, percentual: null, format: 'number' },
-      { id: 'yt_horasAssistidas', name: 'Horas Assistidas', type: 'manual', orcado: O.horasAssistidas, realizado: null, percentual: null, format: 'number' },
+      { id: 'yt_inscritos', name: 'Inscritos', type: 'formula', orcado: O.inscritos, realizado: d.inscritos ?? 0, percentual: calcPercentual(O.inscritos, d.inscritos), format: 'number' },
+      { id: 'yt_crescimentoInscritos', name: 'Crescimento Inscritos', type: 'formula', orcado: O.crescimentoInscritos, realizado: d.ganhoLiquidoInscritos ?? 0, percentual: calcPercentual(O.crescimentoInscritos, d.ganhoLiquidoInscritos), format: 'number' },
+      { id: 'yt_visualizacoes', name: 'Visualizações', type: 'formula', orcado: O.visualizacoes, realizado: d.visualizacoes ?? 0, percentual: calcPercentual(O.visualizacoes, d.visualizacoes), format: 'number' },
+      { id: 'yt_horasAssistidas', name: 'Horas Assistidas', type: 'formula', orcado: O.horasAssistidas, realizado: d.horasAssistidas ?? 0, percentual: calcPercentual(O.horasAssistidas, d.horasAssistidas), format: 'number' },
+      // CTR de impressões e retenção média não vêm da YouTube Analytics API atual → manual
       { id: 'yt_ctrImpressoes', name: 'CTR Impressões (Thumbnail)', type: 'manual', orcado: O.ctrImpressoes, realizado: null, percentual: null, format: 'percent' },
       { id: 'yt_retencaoMedia', name: 'Retenção Média', type: 'manual', orcado: O.retencaoMedia, realizado: null, percentual: null, format: 'percent' },
-      { id: 'yt_curtidas', name: 'Curtidas', type: 'manual', orcado: O.curtidas, realizado: null, percentual: null, format: 'number' },
-      { id: 'yt_comentarios', name: 'Comentários', type: 'manual', orcado: O.comentarios, realizado: null, percentual: null, format: 'number' },
-      { id: 'yt_compartilhamentos', name: 'Compartilhamentos', type: 'manual', orcado: O.compartilhamentos, realizado: null, percentual: null, format: 'number' },
-      { id: 'yt_videosPublicados', name: 'Vídeos Publicados', type: 'manual', orcado: O.videosPublicados, realizado: null, percentual: null, format: 'number' },
+      { id: 'yt_curtidas', name: 'Curtidas', type: 'formula', orcado: O.curtidas, realizado: d.curtidas ?? 0, percentual: calcPercentual(O.curtidas, d.curtidas), format: 'number' },
+      { id: 'yt_comentarios', name: 'Comentários', type: 'formula', orcado: O.comentarios, realizado: d.comentarios ?? 0, percentual: calcPercentual(O.comentarios, d.comentarios), format: 'number' },
+      { id: 'yt_compartilhamentos', name: 'Compartilhamentos', type: 'formula', orcado: O.compartilhamentos, realizado: d.compartilhamentos ?? 0, percentual: calcPercentual(O.compartilhamentos, d.compartilhamentos), format: 'number' },
+      { id: 'yt_videosPublicados', name: 'Vídeos Publicados', type: 'formula', orcado: O.videosPublicados, realizado: d.videosPublicados ?? 0, percentual: calcPercentual(O.videosPublicados, d.videosPublicados), format: 'number' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('yt', funnel, O, null)];
   };
 
   const youtubePlatformMetrics: Metric[] = useMemo(() => {
-    const cur = buildYoutubeMetrics(funnelByPlatformData?.youtube);
-    if (!prevFunnelByPlatformData) return cur;
-    return mergePrevRealizado(cur, buildYoutubeMetrics(prevFunnelByPlatformData?.youtube));
-  }, [funnelByPlatformData, prevFunnelByPlatformData, ORCADO_YOUTUBE]);
+    const cur = buildYoutubeMetrics(youtubeDetailData || {} as YoutubeDetailMetrics, funnelByPlatformData?.youtube);
+    if (!prevYoutubeDetailData && !prevFunnelByPlatformData) return cur;
+    return mergePrevRealizado(cur, buildYoutubeMetrics(prevYoutubeDetailData || {} as YoutubeDetailMetrics, prevFunnelByPlatformData?.youtube));
+  }, [youtubeDetailData, funnelByPlatformData, prevYoutubeDetailData, prevFunnelByPlatformData, ORCADO_YOUTUBE]);
 
-  // LinkedIn platform metrics (manual only - no integration yet)
-  const buildLinkedinMetrics = (funnel: PlatformFunnelData | undefined): Metric[] => {
+  // LinkedIn platform metrics (orgânico — lê linkedin.* via endpoint)
+  const buildLinkedinMetrics = (d: LinkedinDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_LINKEDIN;
     const topMetrics: Metric[] = [
-      { id: 'li_seguidores', name: 'Seguidores', type: 'manual', orcado: O.seguidores, realizado: null, percentual: null, format: 'number' },
-      { id: 'li_crescimentoSeguidores', name: 'Crescimento Seguidores', type: 'manual', orcado: O.crescimentoSeguidores, realizado: null, percentual: null, format: 'number' },
-      { id: 'li_impressoes', name: 'Impressões', type: 'manual', orcado: O.impressoes, realizado: null, percentual: null, format: 'number' },
-      { id: 'li_cliquesPost', name: 'Cliques no Post', type: 'manual', orcado: O.cliquesPost, realizado: null, percentual: null, format: 'number' },
-      { id: 'li_taxaEngajamento', name: 'Taxa de Engajamento', type: 'manual', orcado: O.taxaEngajamento, realizado: null, percentual: null, format: 'percent' },
+      { id: 'li_seguidores', name: 'Seguidores', type: 'formula', orcado: O.seguidores, realizado: d.seguidores ?? 0, percentual: calcPercentual(O.seguidores, d.seguidores), format: 'number' },
+      { id: 'li_crescimentoSeguidores', name: 'Crescimento Seguidores', type: 'formula', orcado: O.crescimentoSeguidores, realizado: d.novosSeguidores ?? 0, percentual: calcPercentual(O.crescimentoSeguidores, d.novosSeguidores), format: 'number' },
+      { id: 'li_impressoes', name: 'Impressões', type: 'formula', orcado: O.impressoes, realizado: d.impressoes ?? 0, percentual: calcPercentual(O.impressoes, d.impressoes), format: 'number' },
+      { id: 'li_cliquesPost', name: 'Cliques no Post', type: 'formula', orcado: O.cliquesPost, realizado: d.cliques ?? 0, percentual: calcPercentual(O.cliquesPost, d.cliques), format: 'number' },
+      { id: 'li_taxaEngajamento', name: 'Taxa de Engajamento', type: 'formula', orcado: O.taxaEngajamento, realizado: d.engajamento ?? null, percentual: calcPercentual(O.taxaEngajamento, d.engajamento), format: 'percent' },
+      // Posts publicados não vêm do sync orgânico atual → manual
       { id: 'li_postsPublicados', name: 'Posts Publicados', type: 'manual', orcado: O.postsPublicados, realizado: null, percentual: null, format: 'number' },
-      { id: 'li_reacoes', name: 'Reações', type: 'manual', orcado: O.reacoes, realizado: null, percentual: null, format: 'number' },
-      { id: 'li_comentarios', name: 'Comentários', type: 'manual', orcado: O.comentarios, realizado: null, percentual: null, format: 'number' },
-      { id: 'li_compartilhamentos', name: 'Compartilhamentos', type: 'manual', orcado: O.compartilhamentos, realizado: null, percentual: null, format: 'number' },
+      { id: 'li_reacoes', name: 'Reações', type: 'formula', orcado: O.reacoes, realizado: d.reacoes ?? 0, percentual: calcPercentual(O.reacoes, d.reacoes), format: 'number' },
+      { id: 'li_comentarios', name: 'Comentários', type: 'formula', orcado: O.comentarios, realizado: d.comentarios ?? 0, percentual: calcPercentual(O.comentarios, d.comentarios), format: 'number' },
+      { id: 'li_compartilhamentos', name: 'Compartilhamentos', type: 'formula', orcado: O.compartilhamentos, realizado: d.compartilhamentos ?? 0, percentual: calcPercentual(O.compartilhamentos, d.compartilhamentos), format: 'number' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('li', funnel, O, null)];
   };
 
   const linkedinPlatformMetrics: Metric[] = useMemo(() => {
-    const cur = buildLinkedinMetrics(funnelByPlatformData?.linkedin);
-    if (!prevFunnelByPlatformData) return cur;
-    return mergePrevRealizado(cur, buildLinkedinMetrics(prevFunnelByPlatformData?.linkedin));
-  }, [funnelByPlatformData, prevFunnelByPlatformData, ORCADO_LINKEDIN]);
+    const cur = buildLinkedinMetrics(linkedinDetailData || {} as LinkedinDetailMetrics, funnelByPlatformData?.linkedin);
+    if (!prevLinkedinDetailData && !prevFunnelByPlatformData) return cur;
+    return mergePrevRealizado(cur, buildLinkedinMetrics(prevLinkedinDetailData || {} as LinkedinDetailMetrics, prevFunnelByPlatformData?.linkedin));
+  }, [linkedinDetailData, funnelByPlatformData, prevLinkedinDetailData, prevFunnelByPlatformData, ORCADO_LINKEDIN]);
+
+  // TikTok platform metrics (orgânico — lê tiktok.* via endpoint)
+  const buildTiktokMetrics = (d: TiktokDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
+    const O = ORCADO_TIKTOK;
+    const topMetrics: Metric[] = [
+      { id: 'tt_seguidores', name: 'Seguidores', type: 'formula', orcado: O.seguidores, realizado: d.seguidores ?? 0, percentual: calcPercentual(O.seguidores, d.seguidores), format: 'number' },
+      { id: 'tt_crescimentoSeguidores', name: 'Crescimento Seguidores', type: 'formula', orcado: O.crescimentoSeguidores, realizado: d.crescimentoSeguidores ?? 0, percentual: calcPercentual(O.crescimentoSeguidores, d.crescimentoSeguidores), format: 'number' },
+      { id: 'tt_visualizacoes', name: 'Visualizações', type: 'formula', orcado: O.visualizacoes, realizado: d.visualizacoes ?? 0, percentual: calcPercentual(O.visualizacoes, d.visualizacoes), format: 'number' },
+      { id: 'tt_curtidas', name: 'Curtidas', type: 'formula', orcado: O.curtidas, realizado: d.curtidas ?? 0, percentual: calcPercentual(O.curtidas, d.curtidas), format: 'number' },
+      { id: 'tt_comentarios', name: 'Comentários', type: 'formula', orcado: O.comentarios, realizado: d.comentarios ?? 0, percentual: calcPercentual(O.comentarios, d.comentarios), format: 'number' },
+      { id: 'tt_compartilhamentos', name: 'Compartilhamentos', type: 'formula', orcado: O.compartilhamentos, realizado: d.compartilhamentos ?? 0, percentual: calcPercentual(O.compartilhamentos, d.compartilhamentos), format: 'number' },
+      { id: 'tt_videosPublicados', name: 'Vídeos Publicados', type: 'formula', orcado: O.videosPublicados, realizado: d.videosPublicados ?? 0, percentual: calcPercentual(O.videosPublicados, d.videosPublicados), format: 'number' },
+    ];
+    return [...topMetrics, ...buildFunnelMetrics('tt', funnel, O, null)];
+  };
+
+  const tiktokPlatformMetrics: Metric[] = useMemo(() => {
+    const cur = buildTiktokMetrics(tiktokDetailData || {} as TiktokDetailMetrics, funnelByPlatformData?.tiktok);
+    if (!prevTiktokDetailData && !prevFunnelByPlatformData) return cur;
+    return mergePrevRealizado(cur, buildTiktokMetrics(prevTiktokDetailData || {} as TiktokDetailMetrics, prevFunnelByPlatformData?.tiktok));
+  }, [tiktokDetailData, funnelByPlatformData, prevTiktokDetailData, prevFunnelByPlatformData, ORCADO_TIKTOK]);
 
   // Instagram empty-state banner: distinguish "no connection" from "connection ok but no data"
   const instagramBanner = useMemo<React.ReactNode | undefined>(() => {
@@ -1702,14 +1834,37 @@ export default function GrowthOrcadoRealizado() {
     return undefined;
   }, [instagramDetailData]);
 
+  // Banner de "sem conexão" para os orgânicos nativos (YouTube/LinkedIn/TikTok)
+  const youtubeBanner = useMemo<React.ReactNode | undefined>(() => {
+    if (youtubeDetailData && youtubeDetailData.hasConnection === false) {
+      return 'Nenhum canal YouTube conectado. Configure em Integrações para coletar métricas.';
+    }
+    return undefined;
+  }, [youtubeDetailData]);
+
+  const linkedinBanner = useMemo<React.ReactNode | undefined>(() => {
+    if (linkedinDetailData && linkedinDetailData.hasConnection === false) {
+      return 'Nenhuma organização LinkedIn conectada. Configure em Integrações para coletar métricas.';
+    }
+    return undefined;
+  }, [linkedinDetailData]);
+
+  const tiktokBanner = useMemo<React.ReactNode | undefined>(() => {
+    if (tiktokDetailData && tiktokDetailData.hasConnection === false) {
+      return 'Nenhuma conta TikTok conectada. Configure em Integrações para coletar métricas.';
+    }
+    return undefined;
+  }, [tiktokDetailData]);
+
   // Aprofundado sections with platform-specific metrics
   const aprofundadoPlatformSections: MetricSection[] = useMemo(() => [
     { title: 'Meta Ads', icon: <Megaphone className="w-5 h-5" />, metrics: metaAdsPlatformMetrics },
     { title: 'Google Ads', icon: <Megaphone className="w-5 h-5" />, metrics: googleAdsPlatformMetrics },
     { title: 'Instagram', icon: <Camera className="w-5 h-5" />, metrics: instagramPlatformMetrics, banner: instagramBanner },
-    { title: 'YouTube', icon: <Play className="w-5 h-5" />, metrics: youtubePlatformMetrics },
-    { title: 'LinkedIn', icon: <Briefcase className="w-5 h-5" />, metrics: linkedinPlatformMetrics },
-  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, linkedinPlatformMetrics]);
+    { title: 'YouTube', icon: <Play className="w-5 h-5" />, metrics: youtubePlatformMetrics, banner: youtubeBanner },
+    { title: 'LinkedIn', icon: <Briefcase className="w-5 h-5" />, metrics: linkedinPlatformMetrics, banner: linkedinBanner },
+    { title: 'TikTok', icon: <Music className="w-5 h-5" />, metrics: tiktokPlatformMetrics, banner: tiktokBanner },
+  ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, youtubeBanner, linkedinPlatformMetrics, linkedinBanner, tiktokPlatformMetrics, tiktokBanner]);
 
   const buildNaoMqlMetrics = (data: NaoMQLMetrics, investimento: number | null = null): Metric[] => {
     const invest = investimento ?? 0;
@@ -2026,6 +2181,7 @@ export default function GrowthOrcadoRealizado() {
     { key: 'instagram', label: 'Instagram' },
     { key: 'youtube', label: 'YouTube' },
     { key: 'linkedin', label: 'LinkedIn' },
+    { key: 'tiktok', label: 'TikTok' },
   ];
 
   const aprofundadoFilteredSections: MetricSection[] = useMemo(() => {
@@ -2035,6 +2191,7 @@ export default function GrowthOrcadoRealizado() {
       instagram: aprofundadoPlatformSections[2],
       youtube: aprofundadoPlatformSections[3],
       linkedin: aprofundadoPlatformSections[4],
+      tiktok: aprofundadoPlatformSections[5],
     };
     if (selectedPlataformas.length === 0) {
       return [
@@ -2085,6 +2242,7 @@ export default function GrowthOrcadoRealizado() {
       instagram: aprofundadoPlatformSections[2],
       youtube: aprofundadoPlatformSections[3],
       linkedin: aprofundadoPlatformSections[4],
+      tiktok: aprofundadoPlatformSections[5],
     };
 
     let baseSections: MetricSection[];
@@ -2115,7 +2273,7 @@ export default function GrowthOrcadoRealizado() {
 
   const getExportParams = (viewName: 'Consolidado' | 'Aprofundado'): ExportParams => {
     const plataformaLabels: Record<string, string> = {
-      meta_ads: 'Meta Ads', google_ads: 'Google Ads', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn',
+      meta_ads: 'Meta Ads', google_ads: 'Google Ads', instagram: 'Instagram', youtube: 'YouTube', linkedin: 'LinkedIn', tiktok: 'TikTok',
     };
     return {
       sections: viewName === 'Consolidado' ? consolidadoSections : aprofundadoFilteredSections,
@@ -2447,7 +2605,7 @@ export default function GrowthOrcadoRealizado() {
               className="w-[180px] text-xs"
             />
           </div>
-          {selectedPlataformas.some(p => p === 'youtube' || p === 'linkedin') && (
+          {selectedPlataformas.some(p => p === 'tiktok_ads') && (
             <Badge variant="outline" className="text-[10px] py-0 px-1.5 font-normal text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
               <AlertCircle className="w-3 h-3 mr-1" />
               Integração pendente
