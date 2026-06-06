@@ -1753,8 +1753,8 @@ export default function GrowthOrcadoRealizado() {
     funnel: PlatformFunnelData | undefined,
   ): Metric[] => {
     const O = ORCADO_META_ADS;
-    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
+    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
     const topMetrics: Metric[] = [
       { id: 'meta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'meta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -1783,8 +1783,8 @@ export default function GrowthOrcadoRealizado() {
     funnel: PlatformFunnelData | undefined,
   ): Metric[] => {
     const O = ORCADO_GOOGLE_ADS;
-    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
+    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
     const topMetrics: Metric[] = [
       { id: 'gads_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'gads_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -1935,8 +1935,8 @@ export default function GrowthOrcadoRealizado() {
   // TikTok Ads platform metrics (mídia paga — lê tiktok.ad_metrics_daily via endpoint)
   const buildTiktokAdsMetrics = (d: TiktokAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_TIKTOK_ADS;
-    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
+    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
     const topMetrics: Metric[] = [
       { id: 'tta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'tta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -1958,8 +1958,8 @@ export default function GrowthOrcadoRealizado() {
   // LinkedIn Ads platform metrics (mídia paga — lê linkedin.ad_metrics_daily via endpoint)
   const buildLinkedinAdsMetrics = (d: LinkedinAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_LINKEDIN_ADS;
-    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
+    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
     const topMetrics: Metric[] = [
       { id: 'lia_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'lia_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
