@@ -123,6 +123,20 @@ async function main() {
       UNIQUE (org_id, stat_date)
     )`);
 
+  // Posts publicados pela Company Page (Posts API, q=author). Exige r_organization_social.
+  await exec('linkedin.posts', `
+    CREATE TABLE IF NOT EXISTS linkedin.posts (
+      post_urn          TEXT PRIMARY KEY,
+      org_id            BIGINT NOT NULL REFERENCES linkedin.organizations(org_id) ON DELETE CASCADE,
+      created_at        TIMESTAMPTZ,
+      last_modified_at  TIMESTAMPTZ,
+      lifecycle_state   TEXT,
+      visibility        TEXT,
+      commentary        TEXT,
+      raw               JSONB,
+      synced_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+
   await exec('linkedin.sync_runs', `
     CREATE TABLE IF NOT EXISTS linkedin.sync_runs (
       id            SERIAL PRIMARY KEY,
@@ -140,6 +154,8 @@ async function main() {
     `CREATE INDEX IF NOT EXISTS idx_li_follower_stats_date ON linkedin.follower_stats_daily(org_id, stat_date)`);
   await exec('idx_li_share_stats_date',
     `CREATE INDEX IF NOT EXISTS idx_li_share_stats_date ON linkedin.share_stats_daily(org_id, stat_date)`);
+  await exec('idx_li_posts_created',
+    `CREATE INDEX IF NOT EXISTS idx_li_posts_created ON linkedin.posts(org_id, created_at)`);
 
   console.log('\n✅ Tabelas LinkedIn criadas.');
   await pool.end();
