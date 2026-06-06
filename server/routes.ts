@@ -28,6 +28,7 @@ import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
 import { registerGoogleAdminRoutes } from "./routes/googleAdmin";
 import { registerLinkedinOAuthRoutes } from "./routes/linkedinOAuth";
 import { registerTiktokOAuthRoutes } from "./routes/tiktokOAuth";
+import { registerTiktokAdminRoutes } from "./routes/tiktokAdmin";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMixReceitaRoutes } from "./routes/mixReceita";
@@ -8049,6 +8050,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // TikTok OAuth (advertiser/Ads + account holder/orgânico)
   registerTiktokOAuthRoutes(app, db);
+
+  // TikTok — admin: sync orgânico (perfil + vídeos + métricas) + status
+  registerTiktokAdminRoutes(app);
 
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);

@@ -107,6 +107,49 @@ async function main() {
       finished_at   TIMESTAMPTZ
     )`);
 
+  // ===== Fase B (orgânico): vídeos + snapshots de métricas =====
+  await exec('tiktok.videos', `
+    CREATE TABLE IF NOT EXISTS tiktok.videos (
+      video_id        VARCHAR(40) PRIMARY KEY,
+      open_id         VARCHAR(120) REFERENCES tiktok.accounts(open_id) ON DELETE CASCADE,
+      title           TEXT,
+      description     TEXT,
+      create_time     TIMESTAMPTZ,
+      cover_image_url TEXT,
+      share_url       TEXT,
+      duration        INTEGER,
+      synced_at       TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+
+  // Snapshot diário por vídeo (TikTok dá contadores cumulativos, não histórico).
+  await exec('tiktok.video_metrics', `
+    CREATE TABLE IF NOT EXISTS tiktok.video_metrics (
+      video_id      VARCHAR(40) NOT NULL REFERENCES tiktok.videos(video_id) ON DELETE CASCADE,
+      snapshot_date DATE NOT NULL,
+      view_count    BIGINT,
+      like_count    BIGINT,
+      comment_count BIGINT,
+      share_count   BIGINT,
+      raw           JSONB,
+      synced_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (video_id, snapshot_date)
+    )`);
+
+  // Snapshot diário do perfil (seguidores/curtidas ao longo do tempo).
+  await exec('tiktok.account_metrics', `
+    CREATE TABLE IF NOT EXISTS tiktok.account_metrics (
+      open_id         VARCHAR(120) NOT NULL REFERENCES tiktok.accounts(open_id) ON DELETE CASCADE,
+      snapshot_date   DATE NOT NULL,
+      follower_count  BIGINT,
+      following_count BIGINT,
+      likes_count     BIGINT,
+      video_count     BIGINT,
+      synced_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (open_id, snapshot_date)
+    )`);
+  await exec('idx_tt_video_metrics_date',
+    `CREATE INDEX IF NOT EXISTS idx_tt_video_metrics_date ON tiktok.video_metrics(snapshot_date)`);
+
   console.log('\n✅ Tabelas TikTok criadas.');
   await pool.end();
 }
