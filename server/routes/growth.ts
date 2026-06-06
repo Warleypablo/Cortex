@@ -2940,7 +2940,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const investimento = parseFloat(row.investimento) || 0;
       const impressoes = parseInt(row.impressoes) || 0;
       const cliquesSaida = parseInt(row.cliques_saida) || 0;
-      const visualizacoesPagina = parseInt(row.visualizacoes_pagina) || 0;
+      const landingPageViewsPixel = parseInt(row.visualizacoes_pagina) || 0;
       const alcance = parseInt(row.alcance) || 0;
       const frequencia = parseFloat(row.frequencia) || 0;
       const video3Sec = parseInt(row.video_3sec) || 0;
@@ -2949,7 +2949,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = outbound_clicks / impressions
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
-      const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
+      // Connect Rate pelo pixel (legado, mantido só p/ comparação)
+      const connectRatePixel = cliquesSaida > 0 ? landingPageViewsPixel / cliquesSaida : 0;
       // Vídeo Hook = video_3_sec_watched_actions / impressões (actions[].video_view, 3+ seg)
       // Vídeo Hold = video_thruplay_watched_actions / impressões
       // Escala 0–100 — alinhada com o endpoint de Criativos.
@@ -2962,6 +2963,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
       );
       const sessoes = ga4.byPlatform.meta_ads;
+      // Padrão GA4 (igual aos outros canais): Viz Página = page views GA4,
+      // Connect Rate = Sessões ÷ cliques de saída.
+      const visualizacoesPagina = ga4.byPlatformPageViews.meta_ads;
+      const connectRate = cliquesSaida > 0 ? sessoes / cliquesSaida : 0;
 
       res.json({
         investimento,
@@ -2976,6 +2981,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         connectRate,
         sessoes,
         sessoesAvailable: ga4.available,
+        // Comparação: valores antigos pelo pixel Meta (p/ avaliar o impacto da migração)
+        visualizacoesPaginaPixel: landingPageViewsPixel,
+        connectRatePixel,
       });
     } catch (error) {
       console.error("[api] Error fetching Meta Ads metrics:", error);
@@ -3085,9 +3093,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
       const custoConversao = conversoes > 0 ? (investimento / conversoes) : 0;
 
-      // Sessões GA4 do tráfego Google (sessionSource=google + sessionMedium=cpc)
+      // Sessões + page views GA4 do tráfego Google (sessionSource=google + medium cpc)
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.google_ads;
+      // Padrão GA4 (igual aos outros canais)
+      const visualizacoesPagina = ga4.byPlatformPageViews.google_ads;
+      const connectRate = cliques > 0 ? sessoes / cliques : 0;
 
       res.json({
         investimento,
@@ -3096,8 +3107,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cpm,
         cpc,
         ctr,
-        visualizacoesPagina: cliques, // Google Ads uses clicks as landing page proxy
-        connectRate: 0,
+        visualizacoesPagina,
+        connectRate,
         conversoes,
         valorConversoes,
         custoConversao,
