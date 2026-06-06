@@ -1223,6 +1223,7 @@ export default function GrowthOrcadoRealizado() {
   }
 
   interface InstagramDetailMetrics {
+    postsPublicados: number;
     comecaramSeguir: number; deixaramSeguir: number; percPerdaSeguidores: number;
     deltaSeguidores: number; totalSeguidores: number; percCrescimentoSeguidores: number;
     visualizacoesTotais: number; percVisualizacoesOrganicas: number; visualizacoesOrganicas: number;
@@ -1814,6 +1815,7 @@ export default function GrowthOrcadoRealizado() {
   ): Metric[] => {
     const O = ORCADO_INSTAGRAM;
     const topMetrics: Metric[] = [
+      { id: 'ig_postsPublicados', name: 'Posts Publicados', type: 'formula', orcado: (O as any).postsPublicados, realizado: d.postsPublicados ?? 0, percentual: calcPercentual((O as any).postsPublicados, d.postsPublicados), format: 'number' },
       { id: 'ig_comecaramSeguir', name: 'Começaram a Seguir', type: 'formula', orcado: O.comecaramSeguir, realizado: d.comecaramSeguir ?? 0, percentual: calcPercentual(O.comecaramSeguir, d.comecaramSeguir), format: 'number' },
       { id: 'ig_deixaramSeguir', name: 'Deixaram de Seguir', type: 'formula', orcado: O.deixaramSeguir, realizado: d.deixaramSeguir ?? 0, percentual: calcPercentual(O.deixaramSeguir, d.deixaramSeguir), format: 'number' },
       { id: 'ig_percPerdaSeguidores', name: '% Perda de Seguidores', type: 'formula', orcado: O.percPerdaSeguidores, realizado: d.percPerdaSeguidores ?? null, percentual: calcPercentual(O.percPerdaSeguidores, d.percPerdaSeguidores), format: 'percent' },
@@ -2400,14 +2402,21 @@ export default function GrowthOrcadoRealizado() {
     'total_contratos_ganhos',
     'total_faturamento', 'total_cac_ads', 'total_cac_contrato',
     'total_ticket_acel', 'total_ticket_impl',
-    // Platform-specific (consolidado per platform) — same key metrics with platform prefix
-    ...['meta', 'gads', 'ig', 'yt', 'li'].flatMap(p => [
-      `${p}_investimento`, `${p}_visualizacoesPagina`, `${p}_taxaConversaoPagina`,
+    // Consolidado por plataforma — só o essencial, por tipo de canal.
+    // Pagos: eficiência (Invest · Connect Rate · Tx Conversão) + resultado (Leads → %MQL)
+    ...['meta', 'gads', 'tta', 'lia'].flatMap(p => [
+      `${p}_investimento`, `${p}_connectRate`, `${p}_taxaConversaoPagina`,
       `${p}_leads`, `${p}_mqls`, `${p}_cpl`, `${p}_cpmql`, `${p}_percMqls`,
     ]),
-    // Instagram-specific key metrics
-    'ig_totalSeguidores', 'ig_deltaSeguidores', 'ig_alcanceTotal', 'ig_visualizacoesTotais',
-    'ig_percEngajamento', 'ig_interacoes', 'ig_visitasPerfil', 'ig_cliquesLinkBio',
+    // Instagram orgânico: clique na bio + posts + resultado (pode ter verba de boost → CPL/CPMQL)
+    'ig_postsPublicados', 'ig_cliquesLinkBio',
+    'ig_leads', 'ig_mqls', 'ig_cpl', 'ig_cpmql', 'ig_percMqls',
+    // YouTube orgânico: vídeos publicados + resultado
+    'yt_videosPublicados', 'yt_leads', 'yt_mqls', 'yt_percMqls',
+    // LinkedIn orgânico: posts publicados + resultado
+    'li_postsPublicados', 'li_leads', 'li_mqls', 'li_percMqls',
+    // TikTok orgânico: vídeos publicados + resultado
+    'tt_videosPublicados', 'tt_leads', 'tt_mqls', 'tt_percMqls',
   ]);
 
   const consolidadoSections: MetricSection[] = useMemo(() => {
