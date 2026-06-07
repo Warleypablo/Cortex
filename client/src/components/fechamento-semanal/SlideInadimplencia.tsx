@@ -16,9 +16,9 @@ interface InadimplenciaResumo {
 
 interface InadimplenciaCliente {
   idCliente: string;
-  nome: string;
-  totalDevido: number;
-  diasAtrasoMedio: number;
+  nomeCliente: string;
+  valorTotal: number;
+  diasAtrasoMax: number;
 }
 
 export default function SlideInadimplencia(_: SlideProps) {
@@ -30,13 +30,15 @@ export default function SlideInadimplencia(_: SlideProps) {
     },
   });
 
-  const { data: clientes } = useQuery<InadimplenciaCliente[]>({
+  const { data: clientesData } = useQuery<{ clientes: InadimplenciaCliente[] }>({
     queryKey: ["/api/inadimplencia/clientes", { limite: 5, ordenarPor: "valor" }],
     queryFn: async () => {
       const res = await fetch("/api/inadimplencia/clientes?limite=5&ordenarPor=valor", { credentials: "include" });
       return res.json();
     },
   });
+
+  const clientes = clientesData?.clientes;
 
   const faixas = resumo
     ? [
@@ -90,11 +92,11 @@ export default function SlideInadimplencia(_: SlideProps) {
                 <tbody>
                   {clientes.map((c, i) => (
                     <tr key={c.idCliente} className={i % 2 === 0 ? "bg-zinc-950" : "bg-zinc-900/50"}>
-                      <td className="px-4 py-3 font-medium">{c.nome}</td>
+                      <td className="px-4 py-3 font-medium">{c.nomeCliente}</td>
                       <td className="px-4 py-3 text-right text-red-400 font-semibold">
-                        {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(c.totalDevido)}
+                        {new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(c.valorTotal)}
                       </td>
-                      <td className="px-4 py-3 text-right text-zinc-300">{c.diasAtrasoMedio}d</td>
+                      <td className="px-4 py-3 text-right text-zinc-300">{c.diasAtrasoMax}d</td>
                     </tr>
                   ))}
                 </tbody>

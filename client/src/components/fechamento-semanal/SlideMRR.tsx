@@ -17,7 +17,7 @@ export default function SlideMRR({ semanaInicio }: SlideProps) {
   const { data, isLoading } = useQuery<MrrPonto[]>({
     queryKey: ["/api/visao-geral/mrr-evolucao", mesAno],
     queryFn: async () => {
-      const res = await fetch(`/api/visao-geral/mrr-evolucao?mesAno=${mesAno}&qtdMeses=9`);
+      const res = await fetch(`/api/visao-geral/mrr-evolucao?mesAno=${mesAno}&qtdMeses=9`, { credentials: "include" });
       return res.json();
     },
   });
