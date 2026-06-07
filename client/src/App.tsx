@@ -102,6 +102,7 @@ const DetailClosers = lazyWithRetry(() => import("@/pages/DetailClosers"));
 const DetailSDRs = lazyWithRetry(() => import("@/pages/DetailSDRs"));
 const AnaliseVendas = lazyWithRetry(() => import("@/pages/AnaliseVendas"));
 const PresentationMode = lazyWithRetry(() => import("@/pages/PresentationMode"));
+const FechamentoSemanal = lazyWithRetry(() => import("@/pages/FechamentoSemanal"));
 const DetalhamentoVendas = lazyWithRetry(() => import("@/pages/DetalhamentoVendas"));
 const ComercialReunioes = lazyWithRetry(() => import("@/pages/ComercialReunioes"));
 const FunilVendas = lazyWithRetry(() => import("@/pages/FunilVendas"));
@@ -384,6 +385,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/crosssell">{() => <ProtectedRoute path="/dashboard/comercial/crosssell" component={CrossSellPipeline} />}</Route>
       <Route path="/dashboard/comercial/crosssell-dashboard">{() => <ProtectedRoute path="/dashboard/comercial/crosssell-dashboard" component={CrossSellDashboard} />}</Route>
       <Route path="/presentation">{() => <ProtectedRoute path="/presentation" component={PresentationMode} />}</Route>
+      <Route path="/presentation/fechamento-semanal">{() => <ProtectedRoute path="/presentation/fechamento-semanal" component={FechamentoSemanal} />}</Route>
       
       {/* Growth */}
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
@@ -486,7 +488,7 @@ function AppLayout() {
   const [location] = useLocation();
   const isLoginPage = location === "/login";
   const isLoginCliente = location === "/loginclientes";
-  const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation";
+  const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation" || location === "/presentation/fechamento-semanal";
   const isPortalCliente = location.startsWith("/portal-cliente");
   const isPortalCreator = location.startsWith("/portal/creator");
   const isPrivacy = location === "/privacy" || location === "/privacidade";
