@@ -2,7 +2,7 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<title>Conversão da LP — Creators × Meta · Análise & Ação</title>
+<title>Creators × Meta — Orçado × Realizado & FCA</title>
 <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@200;300;400;500;600;700;800&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -12,53 +12,43 @@
 }
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--tp-dark);color:var(--tp-ice);
-  padding:36px 40px;max-width:1080px;margin:0 auto;line-height:1.6;}
-.hbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:36px;}
+  padding:36px 40px;max-width:920px;margin:0 auto;line-height:1.6;}
+.hbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:32px;}
 .logo{font-size:13px;font-weight:800;letter-spacing:2px;text-transform:uppercase;}
 .logo span{color:var(--tp-green);}
 .tag{font-size:11px;color:var(--tp-gray-500);}
 .hero{background:linear-gradient(135deg,#415FF2 0%,#37D3A4 60%,#03020A 100%);
-  padding:32px 40px;border-radius:12px;margin-bottom:36px;}
+  padding:28px 36px;border-radius:12px;margin-bottom:34px;}
 .hero .eye{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.75;margin-bottom:8px;}
-.hero h1{font-size:30px;font-weight:800;line-height:1.2;margin-bottom:10px;}
-.hero p{font-size:14px;opacity:.92;max-width:840px;}
+.hero h1{font-size:27px;font-weight:800;line-height:1.2;}
 .st{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--tp-blu);
-  margin-bottom:16px;display:flex;align-items:center;gap:8px;margin-top:8px;}
+  margin-bottom:16px;display:flex;align-items:center;gap:8px;}
 .st::after{content:'';flex:1;height:1px;background:var(--tp-gray-800);}
-.smb{margin-bottom:40px;}
-.lead{font-size:13px;color:var(--tp-gray-500);margin-bottom:18px;max-width:900px;}
+.smb{margin-bottom:38px;}
 table{width:100%;border-collapse:collapse;}
-th{background:var(--tp-blue);color:var(--tp-ice);padding:10px 12px;text-align:left;
+th{background:var(--tp-blue);color:var(--tp-ice);padding:10px 14px;text-align:left;
   font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
-th.r,td.r{text-align:right;}
-td{padding:8px 12px;border-bottom:1px solid var(--tp-gray-800);font-size:13px;}
+th.r,td.r{text-align:right;}th.c,td.c{text-align:center;}
+td{padding:9px 14px;border-bottom:1px solid var(--tp-gray-800);font-size:13.5px;}
 tr:last-child td{border-bottom:none;}
-tr.hl td{background:rgba(255,107,107,.08);font-weight:700;}
-.tbl-wrap{background:var(--tp-gray-800);border:1px solid var(--tp-gray-700);border-radius:10px;overflow:hidden;margin-bottom:14px;}
-.down{color:var(--red);font-weight:700;}.up{color:var(--tp-green);font-weight:700;}.flat{color:var(--yellow);font-weight:700;}
+tr.tot td{background:rgba(55,211,164,.08);font-weight:800;border-top:2px solid var(--tp-green);}
+.tbl-wrap{background:var(--tp-gray-800);border:1px solid var(--tp-gray-700);border-radius:10px;overflow:hidden;}
+.down{color:var(--red);font-weight:700;}.up{color:var(--tp-green);font-weight:700;}.ok{color:var(--tp-gray-400);}
+.note{font-size:11.5px;color:var(--tp-gray-500);margin-top:10px;font-style:italic;}
 .fbox{border-radius:10px;padding:18px 22px;margin-bottom:14px;border:1px solid;}
-.fato{background:rgba(65,95,242,.08);border-color:rgba(65,95,242,.28);}
-.causa{background:rgba(245,166,35,.07);border-color:rgba(245,166,35,.3);}
+.prob{background:rgba(255,107,107,.07);border-color:rgba(255,107,107,.28);}
+.anal{background:rgba(65,95,242,.08);border-color:rgba(65,95,242,.28);}
 .acao{background:rgba(55,211,164,.07);border-color:rgba(55,211,164,.28);}
-.fbox h3{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;display:flex;align-items:center;gap:8px;}
-.fato h3{color:#8ea3ff;}.causa h3{color:var(--yellow);}.acao h3{color:var(--tp-green);}
-.fbox .num{display:inline-flex;width:24px;height:24px;border-radius:50%;font-size:12px;font-weight:800;align-items:center;justify-content:center;}
-.fato .num{background:var(--tp-blu);color:#fff;}.causa .num{background:var(--yellow);color:#1a1300;}.acao .num{background:var(--tp-green);color:#012}
+.fbox h3{font-size:13px;font-weight:800;text-transform:uppercase;letter-spacing:1px;margin-bottom:12px;}
+.prob h3{color:var(--red);}.anal h3{color:#8ea3ff;}.acao h3{color:var(--tp-green);}
 ul.pts{list-style:none;}
 ul.pts li{position:relative;padding:6px 0 6px 22px;font-size:13.5px;border-bottom:1px solid rgba(255,255,255,.03);}
 ul.pts li:last-child{border-bottom:none;}
 ul.pts li::before{content:'';position:absolute;left:2px;top:14px;width:7px;height:7px;border-radius:2px;}
-.fato ul.pts li::before{background:var(--tp-blu);}.causa ul.pts li::before{background:var(--yellow);}.acao ul.pts li::before{background:var(--tp-green);}
+.prob ul.pts li::before{background:var(--red);}.anal ul.pts li::before{background:var(--tp-blu);}.acao ul.pts li::before{background:var(--tp-green);}
+.anal p{font-size:13.5px;}
 b.g{color:var(--tp-green);}b.r{color:var(--red);}b.y{color:var(--yellow);}b.b{color:#8ea3ff;}
-.eq{font-family:ui-monospace,monospace;background:var(--tp-black);border:1px solid var(--tp-gray-700);border-radius:8px;
-  padding:14px 18px;font-size:14px;text-align:center;margin:14px 0;color:var(--tp-ice);}
-.note{font-size:11.5px;color:var(--tp-gray-500);margin-top:8px;font-style:italic;}
-.g3{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-bottom:16px;}
-.card{background:var(--tp-gray-800);border:1px solid var(--tp-gray-700);border-radius:10px;padding:16px 18px;}
-.kl{font-size:11px;font-weight:600;color:var(--tp-gray-500);text-transform:uppercase;letter-spacing:.5px;margin-bottom:5px;}
-.kv{font-size:22px;font-weight:800;}
-.ks{font-size:11.5px;color:var(--tp-gray-500);margin-top:4px;}
-footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--tp-gray-800);
+footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--tp-gray-800);
   display:flex;justify-content:space-between;font-size:11.5px;color:var(--tp-gray-600);}
 </style>
 </head>
@@ -66,97 +56,70 @@ footer{margin-top:44px;padding-top:20px;border-top:1px solid var(--tp-gray-800);
 
 <div class="hbar">
   <div class="logo">TURBO<span>.</span>PARTNERS</div>
-  <div class="tag">Growth · Diagnóstico de Conversão · Creators × Meta · Jun 2026</div>
+  <div class="tag">Growth · Creators × Meta · Junho 2026</div>
 </div>
 
 <div class="hero">
-  <div class="eye">Análise de Constraint · LP de Creators</div>
-  <h1>Por que o CPMQL subiu — e o que a conversão da LP esconde</h1>
-  <p>O custo por MQL do Creators está a <b>R$450 (meta R$182)</b>. O gargalo é um só: a conversão da Landing Page,
-  que cai há 6 meses. Mas o número que olhávamos — o %MQL — vinha <b>subindo</b>, mascarando o problema.
-  Este doc desfaz a ilusão e aponta a iniciativa: <b>anúncios e LP menos restritivos</b>.</p>
+  <div class="eye">Campanha de Creators · Meta Ads</div>
+  <h1>Orçado × Realizado e diagnóstico</h1>
 </div>
 
-<!-- FCA -->
+<!-- 1 · ORÇADO X REALIZADO -->
 <div class="smb">
-  <div class="st">1 · Análise de constraint — Fato · Causa · Ação</div>
+  <div class="st">1 · Orçado × Realizado — Junho</div>
+  <div class="tbl-wrap"><table>
+    <thead><tr>
+      <th>Métrica</th><th class="r">Orçado</th><th class="r">Realizado</th><th class="r">Δ</th><th class="c"></th>
+    </tr></thead>
+    <tbody>
+      <tr><td>Investimento</td><td class="r">R$ 113.500</td><td class="r">R$ 113.003 *</td><td class="r ok">0%</td><td class="c">🟢</td></tr>
+      <tr><td>CPM</td><td class="r">R$ 70,00</td><td class="r">R$ 68,88</td><td class="r up">−2%</td><td class="c">🟢</td></tr>
+      <tr><td>CTR</td><td class="r">0,80%</td><td class="r">0,80%</td><td class="r ok">0%</td><td class="c">🟢</td></tr>
+      <tr><td>Connect Rate</td><td class="r">80%</td><td class="r">71,8%</td><td class="r down">−10%</td><td class="c">🔴</td></tr>
+      <tr><td><b>Tx Conversão da Página</b></td><td class="r">15%</td><td class="r">6,7%</td><td class="r down">−56%</td><td class="c">🔴</td></tr>
+      <tr><td>Leads</td><td class="r">1.557</td><td class="r">630 *</td><td class="r down">−60%</td><td class="c">🔴</td></tr>
+      <tr><td>% MQL</td><td class="r">40%</td><td class="r">39,9%</td><td class="r ok">0%</td><td class="c">🟢</td></tr>
+      <tr><td>MQLs</td><td class="r">623</td><td class="r">251 *</td><td class="r down">−60%</td><td class="c">🔴</td></tr>
+      <tr><td>CPL</td><td class="r">R$ 73</td><td class="r">R$ 179</td><td class="r down">+146%</td><td class="c">🔴</td></tr>
+      <tr class="tot"><td>CPMQL</td><td class="r">R$ 182</td><td class="r">R$ 450</td><td class="r down">+147%</td><td class="c">🔴</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">* Volumes = projeção do mês (realizado de 1–8/jun projetado linearmente). Taxas e custos = realizado direto do período.</div>
+</div>
 
-  <div class="fbox fato">
-    <h3><span class="num">F</span> Fato</h3>
+<!-- 2 · FCA -->
+<div class="smb">
+  <div class="st">2 · FCA</div>
+
+  <div class="fbox prob">
+    <h3>Problema</h3>
     <ul class="pts">
-      <li>Junho: <b class="r">CPMQL R$450 vs meta R$182 (+147%)</b>. No ritmo atual, projeta <b>~251 MQLs no mês vs meta de 623</b> (40% da meta).</li>
-      <li><b>CPM, CTR e %MQL estão no alvo.</b> O vazamento está concentrado numa única etapa: a <b>conversão da página</b>.</li>
-      <li>A conversão LP→Lead cai <b class="r">6 meses seguidos: 22,3% (jan) → 6,7% (jun)</b> — perdeu ~70%, mesmo com o tráfego (views) subindo.</li>
+      <li><b class="r">CPMQL a R$ 450 vs meta R$ 182 (+147%)</b> — no ritmo atual, projeta <b>251 MQLs no mês vs meta de 623</b>.</li>
+      <li>A causa imediata é uma só: <b>Tx Conversão da Página a 6,7% vs 15% planejado (−56%)</b>. CPM, CTR e %MQL estão no alvo.</li>
     </ul>
   </div>
 
-  <div class="fbox causa">
-    <h3><span class="num">C</span> Causa</h3>
-    <ul class="pts">
-      <li>A <b>LP e os anúncios ficaram restritivos demais</b> — copy específica, ângulo de mercado estreito. Viraram um <b>filtro</b>.</li>
-      <li>Esse filtro barra o público mais amplo (que viraria <b>Não-MQL</b>) e deixa passar só quem já chega muito qualificado.</li>
-      <li><b>Prova:</b> a queda é quase toda em Não-MQL — <b class="r">LP→N-MQL 18,4% → 4,0% (−78%)</b> — enquanto <b class="y">LP→MQL ficou parado em ~3%</b>.</li>
-      <li>O <b>%MQL subir de 17% → 40% é cosmético</b>: efeito de denominador (perdemos os N-MQL), não mais MQL. O volume bruto de MQL por página não mudou.</li>
-    </ul>
+  <div class="fbox anal">
+    <h3>Análise</h3>
+    <p style="margin-bottom:8px;">A conversão da LP <b>cai há 6 meses</b> (22% em jan → 7% agora) — e a perda é quase
+    toda em <b class="b">Não-MQL</b> (LP→N-MQL caiu 18% → 4%), enquanto o <b>MQL por página ficou parado em ~3%</b>.</p>
+    <p>Ou seja: o <b>%MQL subir de 17% pra 40% foi cosmético</b> — não geramos mais MQL, só perdemos os Não-MQL e o
+    denominador encolheu. A <b>LP e os anúncios ficaram restritivos demais</b> e viraram um filtro: barram o público
+    mais amplo (que viraria Não-MQL, de <b>ticket maior, ~R$12,6k</b>) e só deixam passar quem já chega muito qualificado.</p>
   </div>
 
   <div class="fbox acao">
-    <h3><span class="num">A</span> Ação</h3>
+    <h3>Ação</h3>
     <ul class="pts">
-      <li><b class="g">Anúncios menos restritivos + LP com copy menos restritiva</b> → sobe a conversão geral da página e recupera o N-MQL (de ticket maior).</li>
-      <li><b>Aceitar o %MQL cair</b> (~40% → ~20%, como era jan–abr). É troca boa: o MQL bruto não piora; ganhamos 2–3× mais leads e N-MQLs.</li>
-      <li><b>Critério de sucesso:</b> LP→Lead ≥ 12% em 7 dias, vigiando o LP→MQL pra confirmar que ele não cai abaixo de ~3%.</li>
+      <li><b class="g">Anúncios menos restritivos + LP com copy menos restritiva</b> — abrir o topo pra subir a conversão geral da página.</li>
+      <li><b>Aceitar o %MQL cair</b> (~40% → ~20%, como era jan–abr): o MQL bruto não piora e recuperamos o volume de Não-MQL.</li>
+      <li><b>Meta:</b> LP→Lead ≥ 12% em 7 dias, vigiando o LP→MQL pra confirmar que não cai abaixo de ~3%.</li>
     </ul>
   </div>
 </div>
 
-<!-- DADOS -->
-<div class="smb">
-  <div class="st">2 · O dado que sustenta a causa</div>
-  <div class="lead">Creators × Meta, conversão medida com a régua da própria tela (Leads ÷ Visualizações de página do pixel).
-  Repare nas duas colunas em destaque: a de Não-MQL desaba; a de MQL fica parada.</div>
-  <div class="tbl-wrap"><table>
-    <thead><tr>
-      <th>Mês</th><th class="r">Views (LP)</th><th class="r">Leads</th><th class="r">MQL</th><th class="r">N-MQL</th>
-      <th class="r">LP→Lead</th><th class="r">LP→MQL</th><th class="r">LP→N-MQL</th><th class="r">%MQL</th>
-    </tr></thead>
-    <tbody>
-      <tr><td>Jan</td><td class="r">5.152</td><td class="r">1.147</td><td class="r">200</td><td class="r">947</td><td class="r">22,3%</td><td class="r">3,9%</td><td class="r">18,4%</td><td class="r">17,4%</td></tr>
-      <tr><td>Fev</td><td class="r">6.204</td><td class="r">978</td><td class="r">231</td><td class="r">747</td><td class="r">15,8%</td><td class="r">3,7%</td><td class="r">12,0%</td><td class="r">23,6%</td></tr>
-      <tr><td>Mar</td><td class="r">6.390</td><td class="r">848</td><td class="r">197</td><td class="r">651</td><td class="r">13,3%</td><td class="r">3,1%</td><td class="r">10,2%</td><td class="r">23,2%</td></tr>
-      <tr><td>Abr</td><td class="r">6.941</td><td class="r">861</td><td class="r">155</td><td class="r">706</td><td class="r">12,4%</td><td class="r">2,2%</td><td class="r">10,2%</td><td class="r">18,0%</td></tr>
-      <tr><td>Mai</td><td class="r">7.628</td><td class="r">742</td><td class="r">254</td><td class="r">488</td><td class="r">9,7%</td><td class="r">3,3%</td><td class="r">6,4%</td><td class="r">34,2%</td></tr>
-      <tr class="hl"><td>Jun (1–8)</td><td class="r">2.518</td><td class="r">168</td><td class="r">67</td><td class="r">101</td><td class="r">6,7%</td><td class="r">2,7%</td><td class="r">4,0%</td><td class="r">39,9%</td></tr>
-    </tbody>
-  </table></div>
-  <div class="g3">
-    <div class="card"><div class="kl">LP→Lead</div><div class="kv down">22,3% → 6,7%</div><div class="ks">−70% · o gargalo</div></div>
-    <div class="card"><div class="kl">LP→N-MQL</div><div class="kv down">18,4% → 4,0%</div><div class="ks">−78% · onde está a perda</div></div>
-    <div class="card"><div class="kl">LP→MQL</div><div class="kv flat">~3% (parado)</div><div class="ks">volume bruto não mudou</div></div>
-  </div>
-</div>
-
-<!-- LÓGICA -->
-<div class="smb">
-  <div class="st">3 · A lógica da gangorra — por que o %MQL enganava</div>
-  <div class="lead">Os três números estão amarrados por uma identidade matemática:</div>
-  <div class="eq">LP→MQL  =  LP→Lead  ×  %MQL</div>
-  <p style="font-size:13.5px;margin-bottom:10px;">
-    Como o <b class="y">LP→MQL ficou fixo em ~3%</b> todos os meses, sobra uma consequência: se um lado sobe, o outro
-    <b>tem</b> que cair na mesma proporção. Foi o que aconteceu — apertar a LP <b>trocou Não-MQL por %MQL cosmético</b>,
-    sem gerar um MQL a mais por página.
-  </p>
-  <p style="font-size:13.5px;">
-    <b class="b">Não é uma lei dos dois números</b> — uma LP melhor (oferta/persuasão mais forte) poderia subir conversão
-    <b>e</b> %MQL juntos. O trade-off só existe porque a alavanca que mexemos foi a <b>restritividade</b>. Por isso a
-    iniciativa certa não é "qualificar mais", é <b class="g">abrir o topo</b>: como o MQL/página é ~insensível à
-    restritividade, afrouxar é quase de graça do lado do MQL — e recupera todo o Não-MQL, que tem <b>ticket maior (~R$12,6k)</b>.
-  </p>
-  <div class="note">Validação pendente: confirmar que o ~3% de LP→MQL se mantém em períodos de LP menos restritiva (histórico pré-janeiro) antes de escalar.</div>
-</div>
-
 <footer>
-  <div>© Turbo Partners · Confidencial · Interno · rascunho p/ lapidação</div>
+  <div>© Turbo Partners · Confidencial · Interno</div>
   <div>Creators × Meta · dados reais até 08/jun/2026</div>
 </footer>
 
