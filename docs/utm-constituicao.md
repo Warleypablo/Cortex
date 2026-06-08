@@ -1,8 +1,11 @@
-# Constituição UTM Turbo v1.2
+# Constituição UTM Turbo v1.3
 
 > Padrão único e definitivo de instrumentação de UTMs da Turbo Partners.
 > Vigência: a partir de **21 de maio de 2026**.
 > Documento vivo. Mudanças exigem aprovação do Growth + Pre-Sales.
+
+> **Versão 1.3 — refinamentos** (08/06/2026):
+> - **`rodrigo` adicionado como medium-exceção** — terceira figura-chave com canal próprio, mesmo tratamento de `victor` e `andre` (ver §3.7 e §4.7)
 
 > **Versão 1.2 — refinamentos pós-treinamento** (26/05/2026):
 > - Vocabulário de `term` por plataforma explicitado (Instagram, LinkedIn, YouTube, TikTok)
@@ -70,7 +73,7 @@ Mesmo que uma iniciativa (ex: social selling) seja conceitualmente "diferente", 
 
 ---
 
-## 2. Mediums permitidos (6 categorias + 2 exceções)
+## 2. Mediums permitidos (6 categorias + 3 exceções)
 
 | medium | descrição |
 |---|---|
@@ -82,10 +85,11 @@ Mesmo que uma iniciativa (ex: social selling) seja conceitualmente "diferente", 
 | `outbound` | Prospecção fria via SDR (lead que nunca interagiu antes) |
 | `victor` | **Exceção** — canal próprio do Victor (ver §3.7) |
 | `andre` | **Exceção** — canal próprio do André (ver §3.7) |
+| `rodrigo` | **Exceção** — canal próprio do Rodrigo (ver §3.7) |
 
 **Nota conceitual:** `paid` e `organic` descrevem **como o link foi distribuído** (compra ou postagem própria). `eventos`, `referral`, `crm`, `outbound` descrevem **o tipo de relação ou contexto** em que o link foi entregue. Naturezas diferentes, mas todas respondem à pergunta "como esse lead chegou aqui?".
 
-**Sobre `victor` e `andre`:** são exceções deliberadas à Lei 1 (vocabulário fechado). São figuras-chave de distribuição com canal próprio robusto, tratadas como dimensão de primeira ordem no relatório. Toda nova figura nesse formato exige aprovação Growth + Pre-Sales (caso a caso, não automático).
+**Sobre `victor`, `andre` e `rodrigo`:** são exceções deliberadas à Lei 1 (vocabulário fechado). São figuras-chave de distribuição com canal próprio robusto, tratadas como dimensão de primeira ordem no relatório. Toda nova figura nesse formato exige aprovação Growth + Pre-Sales (caso a caso, não automático).
 
 ---
 
@@ -166,7 +170,7 @@ Vocabulário **aberto**, mas com regra: `nome-do-evento` em slug (lowercase, sem
 
 **Sobre ligações:** ligações telefônicas (cold calls) **não entram aqui** porque o link nunca sai de uma ligação — ele é enviado depois por email/WhatsApp. Esses cliques devem ser registrados com o canal de envio efetivo (`email` ou `whatsapp`) e podem usar `term=pos-ligacao` ou `content=follow-up-call-X` para indicar que veio de cold call.
 
-### 3.7 `victor` e `andre` (mediums-exceção)
+### 3.7 `victor`, `andre` e `rodrigo` (mediums-exceção)
 
 Figuras-chave da Turbo com canal próprio robusto e distribuição independente. Tratadas como **mediums** (não como `campaign` dentro de `organic`) porque:
 
@@ -181,7 +185,7 @@ Figuras-chave da Turbo com canal próprio robusto e distribuição independente.
 | `linkedin` | Perfil pessoal no LinkedIn |
 | `tiktok` | Perfil no TikTok |
 
-**Quando NÃO usar `victor`/`andre`:**
+**Quando NÃO usar `victor`/`andre`/`rodrigo`:**
 - Conteúdo orgânico da página/canal **da Turbo** (mesmo que cite o Victor) → `organic`
 - Anúncio pago **da Turbo** que tem o Victor como rosto do criativo → `paid` (a figura aparece no `content` do ad, não no medium)
 - Indicação informal do Victor por WhatsApp pessoal pra um amigo → `referral/colaborador/victor`
@@ -340,7 +344,7 @@ A decisão depende de **onde a pessoa está fisicamente colando o link com UTM n
 | term | perfil do lead: `agencia-50-funcionarios`, `dono-clinica-odonto` |
 | content | touchpoint ou template: `email-2-quebra-objecao`, `linkedin-msg-1` |
 
-### 4.7 Mediums-exceção `victor` e `andre`
+### 4.7 Mediums-exceção `victor`, `andre` e `rodrigo`
 
 Mesma lógica de naming que `organic` (ver §4.2), porque a natureza do conteúdo é orgânica — o que muda é só quem distribui (a figura, não a Turbo).
 
@@ -512,6 +516,16 @@ https://turbopartners.com.br/creators?utm_source=facebook&utm_medium=paid&utm_ca
 **André — link da Turbo dentro da Linktree do Instagram dele:**
 ```
 ?utm_source=instagram&utm_medium=andre&utm_campaign=always-on&utm_term=linktree&utm_content=link-turbo
+```
+
+**Rodrigo — Sobre do perfil no LinkedIn apontando pra Turbo:**
+```
+?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=bio&utm_content=link-turbo
+```
+
+**Rodrigo — post no feed do LinkedIn dele:**
+```
+?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-08
 ```
 
 ---
@@ -735,9 +749,13 @@ Se as 4 respostas forem "sim", entra. Se alguma for "não", o caso provavelmente
 - Convenção de `content` em organic: `{slug-curto}-{aaaa-mm-dd}` sem repetir o formato
 - **`victor` e `andre` adicionados como mediums-exceção** (figuras-chave de distribuição com canal próprio robusto — §3.7 + §4.7 + exemplos em §5.3). Decisão deliberada de tratá-los como dimensão de primeira ordem no relatório, fugindo da Lei 1 (vocabulário fechado). Toda nova figura nesse formato exige aprovação Growth+Pre-Sales caso a caso.
 
+**v1.3** (08/06/2026) — `rodrigo` adicionado como medium-exceção:
+- Terceira figura-chave com canal próprio robusto, mesmo tratamento de `victor` e `andre` (§3.7 + §4.7 + exemplo no LinkedIn em §5.3)
+- Sources liberados: `instagram`, `youtube`, `linkedin`, `tiktok` (idêntico às outras figuras)
+
 ---
 
-**Versão:** 1.2
+**Versão:** 1.3
 **Data de aprovação:** *aguardando Ichino*
 **Vigência a partir de:** 21/05/2026
 **Próxima revisão prevista:** agosto/2026 (revisão trimestral)
