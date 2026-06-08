@@ -61,10 +61,12 @@ export function ChurnEvolucaoMensal() {
     queryFn: () => fetch("/api/churn/taxa-mensal").then(r => { if (!r.ok) throw new Error(); return r.json(); }),
   });
 
-  const { data: taxaProdutoData } = useQuery<{ rows: Array<{ mes: string; produto: string; mrr_base: string; mrr_churn: string; cancelamentos: string; taxa: string }> }>({
+  const { data: taxaProdutoData, isFetching: isFetchingTaxa, isError: isErrorTaxa } = useQuery<{ rows: Array<{ mes: string; produto: string; mrr_base: string; mrr_churn: string; cancelamentos: string; taxa: string }> }>({
     queryKey: ["/api/churn/taxa-por-produto"],
-    queryFn: () => fetch("/api/churn/taxa-por-produto").then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+    queryFn: () => fetch("/api/churn/taxa-por-produto").then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); }),
     enabled: metricaLinha === "taxa_churn",
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
   });
 
   const { chartData, produtos } = useMemo(() => {
@@ -436,9 +438,13 @@ export function ChurnEvolucaoMensal() {
         </div>
       </CardHeader>
       <CardContent>
-        {metricaLinha === "taxa_churn" && !taxaProdutoData ? (
+        {metricaLinha === "taxa_churn" && isFetchingTaxa && !taxaProdutoData ? (
+          <div className="h-96 flex items-center justify-center text-sm text-muted-foreground animate-pulse">
+            Calculando taxas...
+          </div>
+        ) : metricaLinha === "taxa_churn" && isErrorTaxa ? (
           <div className="h-96 flex items-center justify-center text-sm text-muted-foreground">
-            <div className="animate-pulse">Calculando taxas...</div>
+            Erro ao carregar taxas de churn por produto.
           </div>
         ) : (
         <ResponsiveContainer width="100%" height={400}>
