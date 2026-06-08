@@ -22,18 +22,21 @@ body{font-family:'Plus Jakarta Sans',sans-serif;background:var(--tp-dark);color:
 .hero .eye{font-size:11px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;opacity:.75;margin-bottom:8px;}
 .hero h1{font-size:27px;font-weight:800;line-height:1.2;}
 .st{font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:var(--tp-blu);
-  margin-bottom:16px;display:flex;align-items:center;gap:8px;}
+  margin-bottom:14px;display:flex;align-items:center;gap:8px;}
 .st::after{content:'';flex:1;height:1px;background:var(--tp-gray-800);}
-.smb{margin-bottom:38px;}
+.smb{margin-bottom:36px;}
 table{width:100%;border-collapse:collapse;}
-th{background:var(--tp-blue);color:var(--tp-ice);padding:10px 14px;text-align:left;
+th{background:var(--tp-blue);color:var(--tp-ice);padding:9px 14px;text-align:left;
   font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.5px;}
 th.r,td.r{text-align:right;}th.c,td.c{text-align:center;}
-td{padding:9px 14px;border-bottom:1px solid var(--tp-gray-800);font-size:13.5px;}
+td{padding:8px 14px;border-bottom:1px solid var(--tp-gray-800);font-size:13.5px;}
 tr:last-child td{border-bottom:none;}
-tr.tot td{background:rgba(55,211,164,.08);font-weight:800;border-top:2px solid var(--tp-green);}
+tr.tot td{background:rgba(55,211,164,.10);font-weight:800;border-top:2px solid var(--tp-green);}
+tr.seg td{background:rgba(167,139,250,.10);font-weight:700;color:var(--purple);text-transform:uppercase;font-size:10.5px;letter-spacing:.5px;}
+tr.sub td:first-child{padding-left:34px;color:var(--tp-gray-500);font-size:12.5px;}
+tr.sub td:first-child::before{content:'└ ';color:var(--tp-gray-600);}
 .tbl-wrap{background:var(--tp-gray-800);border:1px solid var(--tp-gray-700);border-radius:10px;overflow:hidden;}
-.down{color:var(--red);font-weight:700;}.up{color:var(--tp-green);font-weight:700;}.ok{color:var(--tp-gray-400);}
+.down{color:var(--red);font-weight:700;}.up{color:var(--tp-green);font-weight:700;}.ok{color:var(--tp-gray-500);}
 .note{font-size:11.5px;color:var(--tp-gray-500);margin-top:10px;font-style:italic;}
 .fbox{border-radius:10px;padding:18px 22px;margin-bottom:14px;border:1px solid;}
 .prob{background:rgba(255,107,107,.07);border-color:rgba(255,107,107,.28);}
@@ -64,48 +67,75 @@ footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--tp-gray-800);
   <h1>Orçado × Realizado e diagnóstico</h1>
 </div>
 
-<!-- 1 · ORÇADO X REALIZADO -->
+<!-- 1 · MARKETING -->
 <div class="smb">
-  <div class="st">1 · Orçado × Realizado — Junho</div>
+  <div class="st">1 · Orçado × Realizado — Marketing (1–8/jun)</div>
   <div class="tbl-wrap"><table>
     <thead><tr>
       <th>Métrica</th><th class="r">Orçado</th><th class="r">Realizado</th><th class="r">Δ</th><th class="c"></th>
     </tr></thead>
     <tbody>
-      <tr><td>Investimento</td><td class="r">R$ 113.500</td><td class="r">R$ 113.003 *</td><td class="r ok">0%</td><td class="c">🟢</td></tr>
+      <tr><td>Investimento</td><td class="r">R$ 30.267 ¹</td><td class="r">R$ 30.134</td><td class="r ok">0%</td><td class="c">🟢</td></tr>
       <tr><td>CPM</td><td class="r">R$ 70,00</td><td class="r">R$ 68,88</td><td class="r up">−2%</td><td class="c">🟢</td></tr>
       <tr><td>CTR</td><td class="r">0,80%</td><td class="r">0,80%</td><td class="r ok">0%</td><td class="c">🟢</td></tr>
       <tr><td>Connect Rate</td><td class="r">80%</td><td class="r">71,8%</td><td class="r down">−10%</td><td class="c">🔴</td></tr>
       <tr><td><b>Tx Conversão da Página</b></td><td class="r">15%</td><td class="r">6,7%</td><td class="r down">−56%</td><td class="c">🔴</td></tr>
-      <tr><td>Leads</td><td class="r">1.557</td><td class="r">630 *</td><td class="r down">−60%</td><td class="c">🔴</td></tr>
+      <tr class="sub"><td>MQL</td><td class="r">6,0%</td><td class="r">2,7%</td><td class="r down">−55%</td><td class="c">🔴</td></tr>
+      <tr class="sub"><td>Não-MQL</td><td class="r">9,0%</td><td class="r">4,0%</td><td class="r down">−56%</td><td class="c">🔴</td></tr>
+      <tr><td>Leads</td><td class="r">415 ¹</td><td class="r">168</td><td class="r down">−60%</td><td class="c">🔴</td></tr>
       <tr><td>% MQL</td><td class="r">40%</td><td class="r">39,9%</td><td class="r ok">0%</td><td class="c">🟢</td></tr>
-      <tr><td>MQLs</td><td class="r">623</td><td class="r">251 *</td><td class="r down">−60%</td><td class="c">🔴</td></tr>
+      <tr><td>MQLs</td><td class="r">166 ¹</td><td class="r">67</td><td class="r down">−60%</td><td class="c">🔴</td></tr>
       <tr><td>CPL</td><td class="r">R$ 73</td><td class="r">R$ 179</td><td class="r down">+146%</td><td class="c">🔴</td></tr>
       <tr class="tot"><td>CPMQL</td><td class="r">R$ 182</td><td class="r">R$ 450</td><td class="r down">+147%</td><td class="c">🔴</td></tr>
     </tbody>
   </table></div>
-  <div class="note">* Volumes = projeção do mês (realizado de 1–8/jun projetado linearmente). Taxas e custos = realizado direto do período.</div>
+  <div class="note">¹ Volumes: orçado proporcional aos 8 dias (meta mensal ÷ 30 × 8). Taxas e custos são realizado direto do período.</div>
 </div>
 
-<!-- 2 · FCA -->
+<!-- 2 · PRÉ-VENDAS & VENDAS -->
 <div class="smb">
-  <div class="st">2 · FCA</div>
+  <div class="st">2 · Orçado × Realizado — Pré-vendas &amp; Vendas</div>
+  <div class="tbl-wrap"><table>
+    <thead><tr>
+      <th>Taxa</th><th class="r">Orçado</th><th class="r">Realizado ²</th><th class="r">Δ</th><th class="c"></th>
+    </tr></thead>
+    <tbody>
+      <tr class="seg"><td colspan="5">MQL</td></tr>
+      <tr><td>% RA (reunião agendada)</td><td class="r ok">—</td><td class="r">30,9%</td><td class="r ok">—</td><td class="c">🔘</td></tr>
+      <tr><td>% No-show</td><td class="r ok">—</td><td class="r">20,3%</td><td class="r ok">—</td><td class="c">🔘</td></tr>
+      <tr><td>% RR (reunião realizada)</td><td class="r">24,7%</td><td class="r">24,6%</td><td class="r ok">0%</td><td class="c">🟢</td></tr>
+      <tr><td>RR → Venda</td><td class="r">20,7%</td><td class="r">22,8%</td><td class="r up">+10%</td><td class="c">🟢</td></tr>
+      <tr class="seg"><td colspan="5">Não-MQL</td></tr>
+      <tr><td>% RA (reunião agendada)</td><td class="r ok">—</td><td class="r">9,3%</td><td class="r ok">—</td><td class="c">🔘</td></tr>
+      <tr><td>% No-show</td><td class="r ok">—</td><td class="r">23,4%</td><td class="r ok">—</td><td class="c">🔘</td></tr>
+      <tr><td>% RR (reunião realizada)</td><td class="r">6,3%</td><td class="r">7,1%</td><td class="r up">+13%</td><td class="c">🟢</td></tr>
+      <tr><td>RR → Venda</td><td class="r">13,6%</td><td class="r">19,8%</td><td class="r up">+46%</td><td class="c">🟢</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">² Junho ainda imaturo (lead time — deals novos sem reunião). Taxas de vendas medidas na coorte madura mar–mai/2026. Orçado de %RA e No-show não estava no plano (🔘 sem meta).</div>
+</div>
+
+<!-- 3 · FCA -->
+<div class="smb">
+  <div class="st">3 · FCA</div>
 
   <div class="fbox prob">
     <h3>Problema</h3>
     <ul class="pts">
       <li><b class="r">CPMQL a R$ 450 vs meta R$ 182 (+147%)</b> — no ritmo atual, projeta <b>251 MQLs no mês vs meta de 623</b>.</li>
-      <li>A causa imediata é uma só: <b>Tx Conversão da Página a 6,7% vs 15% planejado (−56%)</b>. CPM, CTR e %MQL estão no alvo.</li>
+      <li>A causa imediata é uma só: <b>Tx Conversão da Página a 6,7% vs 15% (−56%)</b>. CPM, CTR, %MQL e todo o funil de vendas estão no alvo.</li>
     </ul>
   </div>
 
   <div class="fbox anal">
     <h3>Análise</h3>
     <p style="margin-bottom:8px;">A conversão da LP <b>cai há 6 meses</b> (22% em jan → 7% agora) — e a perda é quase
-    toda em <b class="b">Não-MQL</b> (LP→N-MQL caiu 18% → 4%), enquanto o <b>MQL por página ficou parado em ~3%</b>.</p>
-    <p>Ou seja: o <b>%MQL subir de 17% pra 40% foi cosmético</b> — não geramos mais MQL, só perdemos os Não-MQL e o
+    toda em <b class="b">Não-MQL</b> (LP→Não-MQL caiu 18% → 4%), enquanto o <b>MQL por página ficou parado em ~3%</b>.</p>
+    <p style="margin-bottom:8px;">Ou seja: o <b>%MQL subir de 17% pra 40% foi cosmético</b> — não geramos mais MQL, só perdemos os Não-MQL e o
     denominador encolheu. A <b>LP e os anúncios ficaram restritivos demais</b> e viraram um filtro: barram o público
     mais amplo (que viraria Não-MQL, de <b>ticket maior, ~R$12,6k</b>) e só deixam passar quem já chega muito qualificado.</p>
+    <p>Pré-vendas e vendas estão <b class="g">no alvo</b> (%RR e RR→Venda batem o plano nos dois segmentos) — o gargalo
+    está isolado na <b>conversão da página</b>, não no comercial.</p>
   </div>
 
   <div class="fbox acao">
