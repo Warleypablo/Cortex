@@ -94,6 +94,60 @@ export function ChurnEvolucaoMensal() {
     return { chartData, produtos };
   }, [data, metrica]);
 
+  const { chartData: motivoChartData, produtos: motivos } = useMemo(() => {
+    if (!data?.rows?.length) return { chartData: [], produtos: [] };
+
+    const aggMap = new Map<string, Map<string, { cancelamentos: number; mrr_perdido: number }>>();
+    data.rows.forEach(r => {
+      const motivo = r.motivo_cancelamento || "Não Informado";
+      if (!aggMap.has(r.ano_mes)) aggMap.set(r.ano_mes, new Map());
+      const mesMap = aggMap.get(r.ano_mes)!;
+      const cur = mesMap.get(motivo) || { cancelamentos: 0, mrr_perdido: 0 };
+      cur.cancelamentos += Number(r.cancelamentos);
+      cur.mrr_perdido += Number(r.mrr_perdido);
+      mesMap.set(motivo, cur);
+    });
+
+    const mesesOrdenados = Array.from(aggMap.keys()).sort();
+
+    const motivoTotais = new Map<string, number>();
+    data.rows.forEach(r => {
+      const motivo = r.motivo_cancelamento || "Não Informado";
+      motivoTotais.set(motivo, (motivoTotais.get(motivo) || 0) + Number(r.cancelamentos));
+    });
+    const todosMotivos = Array.from(motivoTotais.entries())
+      .sort((a, b) => b[1] - a[1])
+      .map(([m]) => m);
+
+    const topMotivos = todosMotivos.slice(0, TOP_N_PRODUTOS);
+    const temOutros = todosMotivos.length > TOP_N_PRODUTOS;
+    const motivos = temOutros ? [...topMotivos, "Outros"] : topMotivos;
+
+    const chartData = mesesOrdenados.map(mes => {
+      const mesMap = aggMap.get(mes)!;
+      const entry: Record<string, string | number> = {
+        mes: mes.slice(0, 7),
+        mesLabel: formatMes(mes),
+      };
+      topMotivos.forEach(m => {
+        const v = mesMap.get(m);
+        entry[m] = v ? v[metrica === "cancelamentos" ? "cancelamentos" : "mrr_perdido"] : 0;
+      });
+      if (temOutros) {
+        let outros = 0;
+        mesMap.forEach((v, m) => {
+          if (!topMotivos.includes(m)) {
+            outros += metrica === "cancelamentos" ? v.cancelamentos : v.mrr_perdido;
+          }
+        });
+        entry["Outros"] = outros;
+      }
+      return entry;
+    });
+
+    return { chartData, produtos: motivos };
+  }, [data, metrica]);
+
   function formatMes(isoDate: string): string {
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
                    "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -128,6 +182,7 @@ export function ChurnEvolucaoMensal() {
   }
 
   return (
+    <div className="space-y-6">
     <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
       <CardHeader>
         <div className="flex items-center justify-between">
@@ -195,5 +250,56 @@ export function ChurnEvolucaoMensal() {
         </ResponsiveContainer>
       </CardContent>
     </Card>
+
+    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+      <CardHeader>
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-base text-gray-900 dark:text-white">
+            Evolução por Motivo de Cancelamento
+          </CardTitle>
+          <p className="text-xs text-muted-foreground">Top 7 motivos + Outros</p>
+        </div>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={400}>
+          <LineChart data={motivoChartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} />
+            <XAxis
+              dataKey="mesLabel"
+              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tickFormatter={yFormatter}
+              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+              width={metrica === "mrr_perdido" ? 80 : 40}
+            />
+            <Tooltip
+              formatter={tooltipFormatter}
+              contentStyle={{
+                background: isDark ? "#18181b" : "#fff",
+                border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb",
+                borderRadius: 6,
+                fontSize: 12,
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
+            {motivos.map((motivo, i) => (
+              <Line
+                key={motivo}
+                type="monotone"
+                dataKey={motivo}
+                stroke={motivo === "Outros" ? "#9ca3af" : PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
+                strokeWidth={motivo === "Outros" ? 1.5 : 2}
+                strokeDasharray={motivo === "Outros" ? "4 3" : undefined}
+                dot={false}
+                activeDot={{ r: 4 }}
+              />
+            ))}
+          </LineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+    </div>
   );
 }
