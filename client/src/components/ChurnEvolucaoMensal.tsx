@@ -249,7 +249,7 @@ export function ChurnEvolucaoMensal() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {m === "cancelamentos" ? "Cancelamentos" : "MRR Perdido"}
+                {m === "cancelamentos" ? "Contratos" : "MRR Perdido"}
               </button>
             ))}
           </div>
@@ -355,15 +355,32 @@ export function ChurnEvolucaoMensal() {
           <CardTitle className="text-base text-gray-900 dark:text-white">
             Histórico Mensal por Produto
           </CardTitle>
-          <select
-            value={produtoEfetivo}
-            onChange={e => setProdutoSelecionado(e.target.value)}
-            className="text-xs px-2 py-1.5 rounded-md border border-border/60 bg-white dark:bg-zinc-800 text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500"
-          >
-            {todosProdutos.map(p => (
-              <option key={p} value={p}>{p}</option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
+              {(["cancelamentos", "mrr_perdido"] as Metrica[]).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setMetrica(m)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    metrica === m
+                      ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {m === "cancelamentos" ? "Contratos" : "MRR Perdido"}
+                </button>
+              ))}
+            </div>
+            <select
+              value={produtoEfetivo}
+              onChange={e => setProdutoSelecionado(e.target.value)}
+              className="text-xs px-2 py-1.5 rounded-md border border-border/60 bg-white dark:bg-zinc-800 text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500"
+            >
+              {todosProdutos.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
         </div>
         <p className="text-xs text-muted-foreground">Cancelamentos por motivo mês a mês</p>
       </CardHeader>
