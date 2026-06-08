@@ -7,13 +7,18 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { MetricFormattingSheet } from "@/components/MetricFormattingSheet";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
-import { Label } from "@/components/ui/label";
-import { Search, X, ArrowUpDown, TrendingUp, TrendingDown, Rocket, ExternalLink, Loader2, Settings, ChevronRight, ChevronDown, Plus, Trash2, Sparkles, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { CriativosTable } from "@/components/criativos/CriativosTable";
+import { aggregateByLevel, sortRows, type CriativoData, type Level, type SortConfig } from "@/lib/criativosMetrics";
+import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getMetricColor, getColorClasses, getBenchmarkColor, CRIATIVOS_BENCHMARK_MAP } from "@/lib/metricFormatting";
@@ -22,56 +27,6 @@ import type { MetricRulesetWithThresholds } from "@shared/schema";
 import type { DateRange } from "react-day-picker";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency as formatCurrencyUtil, formatDecimal as formatDecimalUtil, formatPercent as formatPercentUtil } from "@/lib/utils";
-
-interface CriativoData {
-  id: string;
-  adName: string;
-  link: string;
-  status: string;
-  plataforma: string;
-  campaignId: string | null;
-  campaignName: string | null;
-  investimento: number;
-  videoHook: number | null;
-  videoHold: number | null;
-  ctr: number | null;
-  cpm: number | null;
-  connectRate: number | null;
-  taxaConversao: number | null;
-  leads: number;
-  cpl: number | null;
-  mql: number;
-  cpmql: number | null;
-  cpra: number | null;
-  cpraMql: number | null;
-  cpraNmql: number | null;
-  cprr: number | null;
-  cprrMql: number | null;
-  cprrNmql: number | null;
-  percMql: number | null;
-  descartadoPerc: number | null;
-  descartadoMqlPerc: number | null;
-  descartadoNmqlPerc: number | null;
-  percRa: number | null;
-  percRaMql: number | null;
-  percRaNmql: number | null;
-  percRr: number | null;
-  percRrMql: number | null;
-  percRrNmql: number | null;
-  percRrVendas: number | null;
-  percRrMqlVendas: number | null;
-  percRrNmqlVendas: number | null;
-  clientesUnicos: number;
-  leadTime: number | null;
-  aov: number | null;
-  receita: number | null;
-  receitaPontual: number;
-  receitaRecorrente: number;
-  cacGeral: number | null;
-  cacUnico: number | null;
-  cacContrato: number | null;
-  roas: number | null;
-}
 
 interface Campanha {
   id: string;
@@ -109,9 +64,11 @@ interface AgentProposal {
   created_at: string;
 }
 
-type SortConfig = {
-  key: keyof CriativoData;
-  direction: 'asc' | 'desc';
+const LEVEL_LABEL: Record<Level, string> = {
+  conta: "conta",
+  campanha: "campanhas",
+  conjunto: "conjuntos",
+  anuncio: "anúncios",
 };
 
 function formatNumber(value: number | null): string {
@@ -144,6 +101,15 @@ export default function Criativos() {
   const [selectedProdutos, setSelectedProdutos] = useState<string[]>([]);
   const [campanhaFilters, setCampanhaFilters] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'investimento', direction: 'desc' });
+
+  // Nível de visualização (tabs): conta / campanha / conjunto / anúncio
+  const [level, setLevel] = useState<Level>("anuncio");
+  // Seleção em massa + toggle de status (pausar/ativar)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  const [statusOverride, setStatusOverride] = useState<Map<string, string>>(new Map());
+  const [bulkAction, setBulkAction] = useState<null | "pause" | "resume">(null);
+  const [bulkPending, setBulkPending] = useState(false);
 
   const { toast } = useToast();
   const [configOpen, setConfigOpen] = useState(false);
@@ -374,12 +340,13 @@ export default function Criativos() {
     enabled: compareEnabled && !!compareStartDate && !!compareEndDate,
   });
 
-  // Mapa de comparação por ad_id
+  // Mapa de comparação agregado no mesmo nível da tab ativa
   const compareMap = useMemo(() => {
+    const aggregated = aggregateByLevel(compareData, level);
     const map = new Map<string, CriativoData>();
-    compareData.forEach(item => map.set(item.id, item));
+    aggregated.forEach(item => map.set(item.id, item));
     return map;
-  }, [compareData]);
+  }, [compareData, level]);
 
   // Grupos de colunas expandidos (sub-métricas)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
@@ -517,38 +484,28 @@ export default function Criativos() {
     return '';
   }, [findRulesetForContext, selectedProdutos, selectedPlataformas, benchmarkData]);
 
-  const filteredData = useMemo(() => {
-    let result = [...criativos];
+  // Linhas de anúncio filtradas por busca (sem ordenação ainda)
+  const searchedRows = useMemo(() => {
+    if (!searchTerm) return criativos;
+    const term = searchTerm.toLowerCase();
+    return criativos.filter(item =>
+      item.adName.toLowerCase().includes(term) ||
+      item.id.toLowerCase().includes(term)
+    );
+  }, [criativos, searchTerm]);
 
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(item =>
-        item.adName.toLowerCase().includes(term) ||
-        item.id.toLowerCase().includes(term)
-      );
-    }
+  // Aplica override otimista de status (pause/resume reflete na hora;
+  // o DB sincroniza com a Meta só a cada 6h)
+  const applyOverride = useCallback((rows: CriativoData[]): CriativoData[] =>
+    statusOverride.size === 0
+      ? rows
+      : rows.map(r => statusOverride.has(r.id) ? { ...r, status: statusOverride.get(r.id)! } : r),
+  [statusOverride]);
 
-    result.sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-
-      if (aValue === null && bValue === null) return 0;
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-
-      const aStr = String(aValue);
-      const bStr = String(bValue);
-      return sortConfig.direction === 'asc'
-        ? aStr.localeCompare(bStr)
-        : bStr.localeCompare(aStr);
-    });
-
-    return result;
-  }, [criativos, searchTerm, sortConfig]);
+  // Linhas do nível atual: agrega → ordena → aplica override
+  const activeRows = useMemo(() =>
+    applyOverride(sortRows(aggregateByLevel(searchedRows, level), sortConfig)),
+  [searchedRows, level, sortConfig, applyOverride]);
 
   const handleSort = (key: keyof CriativoData) => {
     setSortConfig(prev => ({
@@ -557,71 +514,94 @@ export default function Criativos() {
     }));
   };
 
-  // Calcular médias das métricas numéricas
+  // Linha de totais (agregação de conta sobre as linhas filtradas) — somável,
+  // os derivados são recalculados a partir das somas (não média de médias)
   const averages = useMemo(() => {
-    const data = filteredData;
-    const len = data.length;
-    if (len === 0) return null;
+    if (searchedRows.length === 0) return null;
+    return aggregateByLevel(searchedRows, "conta")[0] ?? null;
+  }, [searchedRows]);
 
-    const avg = (key: keyof CriativoData) => {
-      const values = data.map(d => d[key] as number | null).filter((v): v is number => v !== null && v !== 0);
-      if (values.length === 0) return null;
-      return parseFloat((values.reduce((s, v) => s + v, 0) / values.length).toFixed(2));
-    };
+  // ── Handlers de seleção, toggle e ação em massa ──
+  const apiLevelFor = (l: Level): "ad" | "adset" | "campaign" =>
+    l === "campanha" ? "campaign" : l === "conjunto" ? "adset" : "ad";
 
-    const sum = (key: keyof CriativoData) => {
-      return data.reduce((s, d) => s + ((d[key] as number) || 0), 0);
-    };
+  const handleLevelChange = (l: string) => {
+    setLevel(l as Level);
+    setSelectedIds(new Set());
+  };
 
-    const totalInvest = sum('investimento');
-    const totalLeads = sum('leads');
-    const totalMql = sum('mql');
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = (checked: boolean, ids: string[]) => {
+    setSelectedIds(checked ? new Set(ids) : new Set());
+  };
 
-    return {
-      investimento: totalInvest,
-      cpm: avg('cpm'),
-      videoHook: avg('videoHook'),
-      videoHold: avg('videoHold'),
-      ctr: avg('ctr'),
-      connectRate: avg('connectRate'),
-      taxaConversao: avg('taxaConversao'),
-      leads: totalLeads,
-      cpl: avg('cpl'),
-      mql: totalMql,
-      cpmql: avg('cpmql'),
-      cpra: avg('cpra'),
-      cpraMql: avg('cpraMql'),
-      cpraNmql: avg('cpraNmql'),
-      cprr: avg('cprr'),
-      cprrMql: avg('cprrMql'),
-      cprrNmql: avg('cprrNmql'),
-      percMql: avg('percMql'),
-      percRa: avg('percRa'),
-      percRaMql: avg('percRaMql'),
-      percRaNmql: avg('percRaNmql'),
-      percRr: (() => {
-        const mql = avg('percRrMql');
-        const nmql = avg('percRrNmql');
-        if (mql !== null && nmql !== null) return parseFloat(((mql + nmql) / 2).toFixed(2));
-        return mql ?? nmql;
-      })(),
-      percRrMql: avg('percRrMql'),
-      percRrNmql: avg('percRrNmql'),
-      percRrVendas: avg('percRrVendas'),
-      percRrMqlVendas: avg('percRrMqlVendas'),
-      percRrNmqlVendas: avg('percRrNmqlVendas'),
-      clientesUnicos: sum('clientesUnicos'),
-      leadTime: avg('leadTime'),
-      aov: avg('aov'),
-      receita: avg('receita'),
-      receitaPontual: avg('receitaPontual'),
-      receitaRecorrente: avg('receitaRecorrente'),
-      cacGeral: avg('cacGeral'),
-      cacUnico: avg('cacUnico'),
-      cacContrato: avg('cacContrato'),
-      roas: avg('roas'),
-    };
-  }, [filteredData]);
+  const handleToggleStatus = async (row: CriativoData) => {
+    if (level === "conta") return;
+    const apiLevel = apiLevelFor(level);
+    const wasActive = row.status === "Ativo";
+    const action = wasActive ? "pause" : "resume";
+    setStatusOverride(prev => new Map(prev).set(row.id, wasActive ? "Pausado" : "Ativo"));
+    setTogglingIds(prev => new Set(prev).add(row.id));
+    try {
+      const res = await fetch(`/api/meta/actions/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ level: apiLevel, entityId: row.id, reason: "Ação manual via aba Criativos" }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `Erro ${res.status}`);
+      }
+      toast({ title: wasActive ? "Pausado" : "Ativado", description: row.adName });
+    } catch (err: any) {
+      setStatusOverride(prev => new Map(prev).set(row.id, wasActive ? "Ativo" : "Pausado"));
+      toast({ title: "Falha ao alterar status", description: err.message, variant: "destructive" });
+    } finally {
+      setTogglingIds(prev => { const s = new Set(prev); s.delete(row.id); return s; });
+    }
+  };
+
+  const runBulk = async () => {
+    if (!bulkAction) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) { setBulkAction(null); return; }
+    const apiLevel = apiLevelFor(level);
+    setBulkPending(true);
+    try {
+      const res = await fetch("/api/meta/actions/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: bulkAction,
+          reason: "Ação manual em massa via aba Criativos",
+          items: ids.map(id => ({ level: apiLevel, entityId: id })),
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `Erro ${res.status}`);
+      const newStatus = bulkAction === "pause" ? "Pausado" : "Ativo";
+      setStatusOverride(prev => {
+        const m = new Map(prev);
+        (j.results || []).filter((r: any) => r.ok).forEach((r: any) => m.set(r.entityId, newStatus));
+        return m;
+      });
+      toast({ title: "Ação em massa concluída", description: `${j.okCount ?? 0}/${j.total ?? ids.length} aplicados` });
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      toast({ title: "Falha na ação em massa", description: err.message, variant: "destructive" });
+    } finally {
+      setBulkPending(false);
+      setBulkAction(null);
+    }
+  };
 
   // Calcular variação percentual para KPI cards
   function calcVariation(current: number, compare: number | undefined, invertPositive = false) {
@@ -632,105 +612,6 @@ export default function Criativos() {
   }
 
   const isCompareActive = compareEnabled && compareData.length > 0;
-
-  const SortableHeader = ({ column, label }: { column: keyof CriativoData; label: string }) => {
-    const isExpanded = expandedColumns.has(column);
-    return (
-      <>
-        <TableHead
-          className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100"
-          onClick={() => handleSort(column)}
-          data-testid={`header-${column}`}
-        >
-          <div className="flex items-center gap-1">
-            {isCompareActive && (
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleColumn(column); }}
-                className="hover:text-white text-zinc-400"
-              >
-                {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              </button>
-            )}
-            {label}
-            <ArrowUpDown className="w-3 h-3" />
-          </div>
-        </TableHead>
-        {isCompareActive && isExpanded && (
-          <TableHead className="whitespace-nowrap text-xs bg-zinc-800 text-zinc-400 italic">
-            <div className="text-center">Var.</div>
-          </TableHead>
-        )}
-      </>
-    );
-  };
-
-  // Renderizar célula com variação expandida
-  const renderCell = (
-    value: number | null,
-    compareValue: number | null,
-    column: string,
-    formatter: (v: number | null) => string,
-    colorClass = '',
-    invertPositive = false,
-  ) => {
-    const isExpanded = expandedColumns.has(column);
-    return (
-      <>
-        <TableCell className={`text-right ${colorClass}`}>{formatter(value)}</TableCell>
-        {isCompareActive && isExpanded && (
-          <TableCell className="text-right text-xs bg-zinc-800/30">
-            {value !== null && compareValue !== null && compareValue !== 0 ? (
-              <div className="flex flex-col items-end">
-                <span className="text-muted-foreground">{formatter(value - compareValue)}</span>
-                <span className={cn("text-[10px]",
-                  (() => {
-                    const pct = ((value - compareValue) / compareValue) * 100;
-                    const positive = invertPositive ? pct < 0 : pct > 0;
-                    return positive ? "text-emerald-400" : "text-red-400";
-                  })()
-                )}>
-                  {((value - compareValue) / compareValue * 100) > 0 ? '+' : ''}
-                  {((value - compareValue) / compareValue * 100).toFixed(1)}%
-                </span>
-              </div>
-            ) : (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </TableCell>
-        )}
-      </>
-    );
-  };
-
-  // Header agrupável — mostra chevron para expandir sub-colunas
-  const GroupableHeader = ({ group, label, column, children }: { group: string; label: string; column: keyof CriativoData; children: React.ReactNode }) => {
-    const isGroupExpanded = expandedGroups.has(group);
-    return (
-      <>
-        <TableHead
-          className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100"
-          onClick={() => handleSort(column)}
-        >
-          <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleGroup(group); }}
-              className="hover:text-white text-zinc-400"
-            >
-              {isGroupExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            </button>
-            {label}
-            <ArrowUpDown className="w-3 h-3" />
-          </div>
-        </TableHead>
-        {isCompareActive && expandedColumns.has(column) && (
-          <TableHead className="whitespace-nowrap text-xs bg-zinc-800 text-zinc-400 italic">
-            <div className="text-center">Var.</div>
-          </TableHead>
-        )}
-        {isGroupExpanded && children}
-      </>
-    );
-  };
 
   const kpis = kpisData?.current;
   const kpisCompare = kpisData?.compare;
@@ -995,8 +876,40 @@ export default function Criativos() {
         <Card className="h-full">
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg sr-only">Performance por Criativo</CardTitle>
+              <Tabs value={level} onValueChange={handleLevelChange}>
+                <TabsList>
+                  <TabsTrigger value="conta" data-testid="tab-conta">Conta</TabsTrigger>
+                  <TabsTrigger value="campanha" data-testid="tab-campanha">Campanhas</TabsTrigger>
+                  <TabsTrigger value="conjunto" data-testid="tab-conjunto">Conjuntos</TabsTrigger>
+                  <TabsTrigger value="anuncio" data-testid="tab-anuncio">Anúncios</TabsTrigger>
+                </TabsList>
+              </Tabs>
               <div className="flex items-center gap-2">
+                {isAdmin && level !== "conta" && selectedIds.size > 0 && (
+                  <div className="flex items-center gap-2 mr-1">
+                    <span className="text-xs text-muted-foreground">{selectedIds.size} selecionado(s)</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      disabled={bulkPending}
+                      onClick={() => setBulkAction("resume")}
+                      data-testid="button-bulk-ativar"
+                    >
+                      <Power className="w-3.5 h-3.5 mr-1" /> Ativar
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8 text-red-600 dark:text-red-400"
+                      disabled={bulkPending}
+                      onClick={() => setBulkAction("pause")}
+                      data-testid="button-bulk-pausar"
+                    >
+                      <PowerOff className="w-3.5 h-3.5 mr-1" /> Pausar
+                    </Button>
+                  </div>
+                )}
                 <MetricFormattingSheet
                   open={configOpen}
                   onOpenChange={setConfigOpen}
@@ -1009,279 +922,54 @@ export default function Criativos() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <div className="relative max-h-[calc(100vh-260px)] overflow-auto [&>div]:!overflow-visible [&>div]:!static [&>div]:!w-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 z-50">
-                    <TableRow className="bg-zinc-900 dark:bg-zinc-900 shadow-md [&>th]:bg-zinc-900 dark:[&>th]:bg-zinc-900">
-                      <TableHead className="text-xs bg-zinc-900 text-zinc-100 sticky left-0 z-10">Link</TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[52px] z-10"
-                        onClick={() => handleSort('id')}
-                      >
-                        <div className="flex items-center gap-1">Ad Id <ArrowUpDown className="w-3 h-3" /></div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[220px] z-10"
-                        onClick={() => handleSort('adName')}
-                      >
-                        <div className="flex items-center gap-1">Ad name <ArrowUpDown className="w-3 h-3" /></div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[470px] z-10 border-r border-zinc-700"
-                        onClick={() => handleSort('status')}
-                      >
-                        <div className="flex items-center gap-1">Status <ArrowUpDown className="w-3 h-3" /></div>
-                      </TableHead>
-                      <SortableHeader column="investimento" label="Invest" />
-                      <SortableHeader column="cpm" label="CPM" />
-                      <SortableHeader column="videoHook" label="Video hook" />
-                      <SortableHeader column="videoHold" label="Video hold" />
-                      <SortableHeader column="ctr" label="CTR" />
-                      <SortableHeader column="connectRate" label="Connect rate" />
-                      <SortableHeader column="taxaConversao" label="Taxa conv." />
-                      <SortableHeader column="leads" label="Leads" />
-                      <SortableHeader column="cpl" label="CPL" />
-                      <SortableHeader column="mql" label="MQL" />
-                      <SortableHeader column="cpmql" label="CPMQL" />
-                      <SortableHeader column="percMql" label="%MQL" />
-                      <GroupableHeader group="desc" label="Desc. %" column="descartadoPerc">
-                        <SortableHeader column="descartadoMqlPerc" label="Desc. MQL %" />
-                        <SortableHeader column="descartadoNmqlPerc" label="Desc. NMQL %" />
-                      </GroupableHeader>
-                      <GroupableHeader group="ra" label="RA %" column="percRa">
-                        <SortableHeader column="percRaMql" label="RA MQL %" />
-                        <SortableHeader column="percRaNmql" label="RA NMQL %" />
-                      </GroupableHeader>
-                      <GroupableHeader group="cpra" label="CPRA" column="cpra">
-                        <SortableHeader column="cpraMql" label="CPRA MQL" />
-                        <SortableHeader column="cpraNmql" label="CPRA NMQL" />
-                      </GroupableHeader>
-                      <GroupableHeader group="rr" label="RR %" column="percRr">
-                        <SortableHeader column="percRrMql" label="RR MQL %" />
-                        <SortableHeader column="percRrNmql" label="RR NMQL %" />
-                      </GroupableHeader>
-                      <GroupableHeader group="cprr" label="CPRR" column="cprr">
-                        <SortableHeader column="cprrMql" label="CPRR MQL" />
-                        <SortableHeader column="cprrNmql" label="CPRR NMQL" />
-                      </GroupableHeader>
-                      <GroupableHeader group="rrv" label="RR→V %" column="percRrVendas">
-                        <SortableHeader column="percRrMqlVendas" label="RR MQL→V %" />
-                        <SortableHeader column="percRrNmqlVendas" label="RR NMQL→V %" />
-                      </GroupableHeader>
-                      <SortableHeader column="clientesUnicos" label="Neg. ganho" />
-                      <SortableHeader column="leadTime" label="Lead Time" />
-                      <SortableHeader column="aov" label="AOV" />
-                      <GroupableHeader group="receita" label="Receita" column="receita">
-                        <SortableHeader column="receitaPontual" label="Rec. pontual" />
-                        <SortableHeader column="receitaRecorrente" label="Rec. recorrente" />
-                      </GroupableHeader>
-                      <GroupableHeader group="cac" label="CAC" column="cacGeral">
-                        <SortableHeader column="cacUnico" label="CAC único" />
-                        <SortableHeader column="cacContrato" label="CAC contrato" />
-                      </GroupableHeader>
-                      <SortableHeader column="roas" label="ROAS" />
-                    </TableRow>
-                    {/* Linha de médias dentro do thead para sticky funcionar */}
-                    {averages && (
-                      <TableRow className="bg-zinc-800 dark:bg-zinc-800 border-b-2 border-zinc-700 font-semibold text-xs [&>th]:bg-zinc-800 dark:[&>th]:bg-zinc-800 [&>th]:font-semibold">
-                        <TableHead className="sticky left-0 z-10 bg-zinc-800" />
-                        <TableHead className="text-muted-foreground sticky left-[52px] z-10 bg-zinc-800">Média</TableHead>
-                        <TableHead className="sticky left-[220px] z-10 bg-zinc-800" />
-                        <TableHead className="sticky left-[470px] z-10 bg-zinc-800 border-r border-zinc-700" />
-                        {(() => {
-                          const avgCell = (val: string, col: string) => (
-                            <>
-                              <TableHead className="text-right text-xs font-semibold">{val}</TableHead>
-                              {isCompareActive && expandedColumns.has(col) && <TableHead className="bg-zinc-800/30" />}
-                            </>
-                          );
-                          return (
-                            <>
-                              {avgCell(formatCurrency(averages.investimento), 'investimento')}
-                              {avgCell(formatCurrency(averages.cpm), 'cpm')}
-                              {avgCell(formatPercent(averages.videoHook), 'videoHook')}
-                              {avgCell(formatPercent(averages.videoHold), 'videoHold')}
-                              {avgCell(formatPercent(averages.ctr), 'ctr')}
-                              {avgCell(formatPercent(averages.connectRate), 'connectRate')}
-                              {avgCell(formatPercent(averages.taxaConversao), 'taxaConversao')}
-                              {avgCell(formatNumber(averages.leads), 'leads')}
-                              {avgCell(formatCurrency(averages.cpl), 'cpl')}
-                              {avgCell(formatNumber(averages.mql), 'mql')}
-                              {avgCell(formatCurrency(averages.cpmql), 'cpmql')}
-                              {avgCell(formatPercent(averages.percMql), 'percMql')}
-                              {avgCell('-', 'descartadoPerc')}
-                              {expandedGroups.has('desc') && <>{avgCell('-', 'descartadoMqlPerc')}{avgCell('-', 'descartadoNmqlPerc')}</>}
-                              {avgCell(formatPercent(averages.percRa), 'percRa')}
-                              {expandedGroups.has('ra') && <>{avgCell(formatPercent(averages.percRaMql), 'percRaMql')}{avgCell(formatPercent(averages.percRaNmql), 'percRaNmql')}</>}
-                              {avgCell(formatCurrency(averages.cpra), 'cpra')}
-                              {expandedGroups.has('cpra') && <>{avgCell(formatCurrency(averages.cpraMql), 'cpraMql')}{avgCell(formatCurrency(averages.cpraNmql), 'cpraNmql')}</>}
-                              {avgCell(formatPercent(averages.percRr), 'percRr')}
-                              {expandedGroups.has('rr') && <>{avgCell(formatPercent(averages.percRrMql), 'percRrMql')}{avgCell(formatPercent(averages.percRrNmql), 'percRrNmql')}</>}
-                              {avgCell(formatCurrency(averages.cprr), 'cprr')}
-                              {expandedGroups.has('cprr') && <>{avgCell(formatCurrency(averages.cprrMql), 'cprrMql')}{avgCell(formatCurrency(averages.cprrNmql), 'cprrNmql')}</>}
-                              {avgCell(formatPercent(averages.percRrVendas), 'percRrVendas')}
-                              {expandedGroups.has('rrv') && <>{avgCell(formatPercent(averages.percRrMqlVendas), 'percRrMqlVendas')}{avgCell(formatPercent(averages.percRrNmqlVendas), 'percRrNmqlVendas')}</>}
-                              {avgCell(formatNumber(averages.clientesUnicos), 'clientesUnicos')}
-                              {avgCell(averages.leadTime !== null ? `${averages.leadTime}d` : '-', 'leadTime')}
-                              {avgCell(formatCurrency(averages.aov), 'aov')}
-                              {avgCell(formatCurrency(averages.receita), 'receita')}
-                              {expandedGroups.has('receita') && <>{avgCell(formatCurrency(averages.receitaPontual), 'receitaPontual')}{avgCell(formatCurrency(averages.receitaRecorrente), 'receitaRecorrente')}</>}
-                              {avgCell(formatCurrency(averages.cacGeral), 'cacGeral')}
-                              {expandedGroups.has('cac') && <>{avgCell(formatCurrency(averages.cacUnico), 'cacUnico')}{avgCell(formatCurrency(averages.cacContrato), 'cacContrato')}</>}
-                              {avgCell(averages.roas !== null ? `${averages.roas}x` : '-', 'roas')}
-                            </>
-                          );
-                        })()}
-                      </TableRow>
-                    )}
-                  </TableHeader>
-                  <TableBody>
-                    {filteredData.map((item) => (
-                      <TableRow key={item.id} data-testid={`row-criativo-${item.id}`}>
-                        <TableCell className="sticky left-0 z-10 bg-card">
-                          {item.link && (
-                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground sticky left-[52px] z-10 bg-card" title={item.id}>
-                          {item.id || '-'}
-                        </TableCell>
-                        <TableCell className="font-medium max-w-[250px] truncate sticky left-[220px] z-10 bg-card" title={item.adName}>
-                          <div className="flex items-center gap-1.5">
-                            <span className="truncate">{item.adName}</span>
-                            {pendingByEntity.has(item.id) && (
-                              <Badge
-                                variant="secondary"
-                                className="shrink-0 text-[10px] h-4 px-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200"
-                                title="Proposta pendente do agente"
-                              >
-                                <Sparkles className="w-2.5 h-2.5 mr-0.5" />
-                                IA
-                              </Badge>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="sticky left-[470px] z-10 bg-card border-r border-zinc-700/50">
-                          <Badge
-                            variant={item.status === 'Ativo' ? 'default' : 'secondary'}
-                            className={item.status === 'Ativo' ? 'bg-green-500' : ''}
-                          >
-                            {item.status}
-                          </Badge>
-                        </TableCell>
-                        {(() => {
-                          const c = compareMap.get(item.id);
-                          return (
-                            <>
-                              {renderCell(item.investimento, c?.investimento ?? null, 'investimento', formatCurrency)}
-                              {renderCell(item.cpm, c?.cpm ?? null, 'cpm', formatCurrency, getCellColor(item.cpm, 'cpm'), true)}
-                              {renderCell(item.videoHook, c?.videoHook ?? null, 'videoHook', formatPercent, getCellColor(item.videoHook, 'videoHook'))}
-                              {renderCell(item.videoHold, c?.videoHold ?? null, 'videoHold', formatPercent, getCellColor(item.videoHold, 'videoHold'))}
-                              {renderCell(item.ctr, c?.ctr ?? null, 'ctr', formatPercent, getCellColor(item.ctr, 'ctr'))}
-                              {renderCell(item.connectRate, c?.connectRate ?? null, 'connectRate', formatPercent, getCellColor(item.connectRate, 'connectRate'))}
-                              {renderCell(item.taxaConversao, c?.taxaConversao ?? null, 'taxaConversao', formatPercent, getCellColor(item.taxaConversao, 'taxaConversao'))}
-                              {renderCell(item.leads, c?.leads ?? null, 'leads', formatNumber)}
-                              {renderCell(item.cpl, c?.cpl ?? null, 'cpl', formatCurrency, getCellColor(item.cpl, 'cpl'), true)}
-                              {renderCell(item.mql, c?.mql ?? null, 'mql', formatNumber)}
-                              {renderCell(item.cpmql, c?.cpmql ?? null, 'cpmql', formatCurrency, getCellColor(item.cpmql, 'cpmql'), true)}
-                              {renderCell(item.percMql, c?.percMql ?? null, 'percMql', formatPercent, getCellColor(item.percMql, 'percMql'))}
-                              {/* Desc. % (grupo) */}
-                              {renderCell(item.descartadoPerc, c?.descartadoPerc ?? null, 'descartadoPerc', formatPercent)}
-                              {expandedGroups.has('desc') && (
-                                <>
-                                  {renderCell(item.descartadoMqlPerc, c?.descartadoMqlPerc ?? null, 'descartadoMqlPerc', formatPercent)}
-                                  {renderCell(item.descartadoNmqlPerc, c?.descartadoNmqlPerc ?? null, 'descartadoNmqlPerc', formatPercent)}
-                                </>
-                              )}
-                              {/* RA % (grupo) */}
-                              {renderCell(item.percRa, c?.percRa ?? null, 'percRa', formatPercent, getCellColor(item.percRa, 'percRa'))}
-                              {expandedGroups.has('ra') && (
-                                <>
-                                  {renderCell(item.percRaMql, c?.percRaMql ?? null, 'percRaMql', formatPercent, getCellColor(item.percRaMql, 'percRaMql'))}
-                                  {renderCell(item.percRaNmql, c?.percRaNmql ?? null, 'percRaNmql', formatPercent, getCellColor(item.percRaNmql, 'percRaNmql'))}
-                                </>
-                              )}
-                              {/* CPRA (grupo) */}
-                              {renderCell(item.cpra, c?.cpra ?? null, 'cpra', formatCurrency, getCellColor(item.cpra, 'cpmql'), true)}
-                              {expandedGroups.has('cpra') && (
-                                <>
-                                  {renderCell(item.cpraMql, c?.cpraMql ?? null, 'cpraMql', formatCurrency, getCellColor(item.cpraMql, 'cpmql'), true)}
-                                  {renderCell(item.cpraNmql, c?.cpraNmql ?? null, 'cpraNmql', formatCurrency, getCellColor(item.cpraNmql, 'cpmql'), true)}
-                                </>
-                              )}
-                              {/* RR % (grupo) */}
-                              {renderCell(item.percRr, c?.percRr ?? null, 'percRr', formatPercent, getCellColor(item.percRr, 'percRr'))}
-                              {expandedGroups.has('rr') && (
-                                <>
-                                  {renderCell(item.percRrMql, c?.percRrMql ?? null, 'percRrMql', formatPercent, getCellColor(item.percRrMql, 'percRrMql'))}
-                                  {renderCell(item.percRrNmql, c?.percRrNmql ?? null, 'percRrNmql', formatPercent, getCellColor(item.percRrNmql, 'percRrNmql'))}
-                                </>
-                              )}
-                              {/* CPRR (grupo) */}
-                              {renderCell(item.cprr, c?.cprr ?? null, 'cprr', formatCurrency, getCellColor(item.cprr, 'cpmql'), true)}
-                              {expandedGroups.has('cprr') && (
-                                <>
-                                  {renderCell(item.cprrMql, c?.cprrMql ?? null, 'cprrMql', formatCurrency, getCellColor(item.cprrMql, 'cpmql'), true)}
-                                  {renderCell(item.cprrNmql, c?.cprrNmql ?? null, 'cprrNmql', formatCurrency, getCellColor(item.cprrNmql, 'cpmql'), true)}
-                                </>
-                              )}
-                              {/* RR→V % (grupo) */}
-                              {renderCell(item.percRrVendas, c?.percRrVendas ?? null, 'percRrVendas', formatPercent, getCellColor(item.percRrVendas, 'percRrVendas'))}
-                              {expandedGroups.has('rrv') && (
-                                <>
-                                  {renderCell(item.percRrMqlVendas, c?.percRrMqlVendas ?? null, 'percRrMqlVendas', formatPercent, getCellColor(item.percRrMqlVendas, 'percRrMqlVendas'))}
-                                  {renderCell(item.percRrNmqlVendas, c?.percRrNmqlVendas ?? null, 'percRrNmqlVendas', formatPercent, getCellColor(item.percRrNmqlVendas, 'percRrNmqlVendas'))}
-                                </>
-                              )}
-                              {renderCell(item.clientesUnicos, c?.clientesUnicos ?? null, 'clientesUnicos', formatNumber)}
-                              {renderCell(item.leadTime, c?.leadTime ?? null, 'leadTime', (v) => v !== null ? `${v}d` : '-')}
-                              {renderCell(item.aov, c?.aov ?? null, 'aov', formatCurrency)}
-                              {/* Receita (grupo) */}
-                              {renderCell(item.receita, c?.receita ?? null, 'receita', formatCurrency)}
-                              {expandedGroups.has('receita') && (
-                                <>
-                                  {renderCell(item.receitaPontual || null, c?.receitaPontual || null, 'receitaPontual', formatCurrency)}
-                                  {renderCell(item.receitaRecorrente || null, c?.receitaRecorrente || null, 'receitaRecorrente', formatCurrency)}
-                                </>
-                              )}
-                              {/* CAC (grupo) */}
-                              {renderCell(item.cacGeral, c?.cacGeral ?? null, 'cacGeral', formatCurrency, '', true)}
-                              {expandedGroups.has('cac') && (
-                                <>
-                                  {renderCell(item.cacUnico, c?.cacUnico ?? null, 'cacUnico', formatCurrency, getCellColor(item.cacUnico, 'cacUnico'), true)}
-                                  {renderCell(item.cacContrato, c?.cacContrato ?? null, 'cacContrato', formatCurrency, getCellColor(item.cacContrato, 'cacContrato'), true)}
-                                </>
-                              )}
-                              {renderCell(item.roas, c?.roas ?? null, 'roas', (v) => v !== null ? `${v}x` : '-')}
-                            </>
-                          );
-                        })()}
-                      </TableRow>
-                    ))}
-                    {filteredData.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={36} className="text-center py-8 text-muted-foreground">
-                          Nenhum criativo encontrado para o período selecionado
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+            <CriativosTable
+              level={level}
+              rows={activeRows}
+              compareMap={compareMap}
+              averages={averages}
+              isCompareActive={isCompareActive}
+              isLoading={isLoading}
+              sortConfig={sortConfig}
+              onSort={handleSort}
+              expandedGroups={expandedGroups}
+              toggleGroup={toggleGroup}
+              expandedColumns={expandedColumns}
+              toggleColumn={toggleColumn}
+              getCellColor={getCellColor}
+              pendingByEntity={pendingByEntity}
+              isAdmin={!!isAdmin}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
+              onToggleStatus={handleToggleStatus}
+              togglingIds={togglingIds}
+            />
           </CardContent>
           <div className="px-4 py-2 border-t border-border">
-            <Badge variant="outline">{filteredData.length} criativos</Badge>
+            <Badge variant="outline">{activeRows.length} {LEVEL_LABEL[level]}</Badge>
           </div>
         </Card>
       </div>
+
+      {/* Confirmação de ação em massa (pausar/ativar) */}
+      <AlertDialog open={bulkAction !== null} onOpenChange={(o) => { if (!o) setBulkAction(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkAction === "pause" ? "Pausar" : "Ativar"} {selectedIds.size} {LEVEL_LABEL[level]}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação será aplicada diretamente na Meta Ads. Pode levar alguns segundos para concluir.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); runBulk(); }} disabled={bulkPending}>
+              {bulkPending ? "Aplicando..." : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* ── Drawer: Propostas do Agente Gestor de Performance ───────────── */}
       <Sheet open={agentDrawerOpen} onOpenChange={setAgentDrawerOpen}>
