@@ -27,6 +27,8 @@ const PRODUTO_COLORS = [
   "#4f46e5", "#0284c7", "#16a34a", "#ca8a04", "#e11d48",
 ];
 
+const TOP_N_PRODUTOS = 7;
+
 type Metrica = "cancelamentos" | "mrr_perdido";
 
 export function ChurnEvolucaoMensal() {
@@ -59,9 +61,13 @@ export function ChurnEvolucaoMensal() {
     data.rows.forEach(r => {
       produtoTotais.set(r.produto, (produtoTotais.get(r.produto) || 0) + Number(r.cancelamentos));
     });
-    const produtosOrdenados = Array.from(produtoTotais.entries())
+    const todosProdutos = Array.from(produtoTotais.entries())
       .sort((a, b) => b[1] - a[1])
       .map(([p]) => p);
+
+    const topProdutos = todosProdutos.slice(0, TOP_N_PRODUTOS);
+    const temOutros = todosProdutos.length > TOP_N_PRODUTOS;
+    const produtos = temOutros ? [...topProdutos, "Outros"] : topProdutos;
 
     const chartData = mesesOrdenados.map(mes => {
       const mesMap = aggMap.get(mes)!;
@@ -69,14 +75,23 @@ export function ChurnEvolucaoMensal() {
         mes: mes.slice(0, 7),
         mesLabel: formatMes(mes),
       };
-      produtosOrdenados.forEach(p => {
+      topProdutos.forEach(p => {
         const v = mesMap.get(p);
         entry[p] = v ? v[metrica === "cancelamentos" ? "cancelamentos" : "mrr_perdido"] : 0;
       });
+      if (temOutros) {
+        let outros = 0;
+        mesMap.forEach((v, p) => {
+          if (!topProdutos.includes(p)) {
+            outros += metrica === "cancelamentos" ? v.cancelamentos : v.mrr_perdido;
+          }
+        });
+        entry["Outros"] = outros;
+      }
       return entry;
     });
 
-    return { chartData, produtos: produtosOrdenados };
+    return { chartData, produtos };
   }, [data, metrica]);
 
   function formatMes(isoDate: string): string {
@@ -169,8 +184,9 @@ export function ChurnEvolucaoMensal() {
                 key={produto}
                 type="monotone"
                 dataKey={produto}
-                stroke={PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
-                strokeWidth={2}
+                stroke={produto === "Outros" ? "#9ca3af" : PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
+                strokeWidth={produto === "Outros" ? 1.5 : 2}
+                strokeDasharray={produto === "Outros" ? "4 3" : undefined}
                 dot={false}
                 activeDot={{ r: 4 }}
               />
