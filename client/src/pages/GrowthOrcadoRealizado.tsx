@@ -1212,6 +1212,9 @@ export default function GrowthOrcadoRealizado() {
     cpm: number; ctr: number; videoHook: number; videoHold: number;
     videoP75: number; videoP100: number; visualizacoesPagina: number; connectRate: number;
     sessoes: number;
+    // Base pixel Meta (landing_page_views) — usada em Connect Rate e Tx Conversão da Página,
+    // que devem ser calculadas a partir do Meta Ads, não do GA4.
+    connectRatePixel?: number; visualizacoesPaginaPixel?: number;
   }
 
   interface GoogleAdsDetailMetrics {
@@ -1755,15 +1758,18 @@ export default function GrowthOrcadoRealizado() {
     funnel: PlatformFunnelData | undefined,
   ): Metric[] => {
     const O = ORCADO_META_ADS;
-    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
+    // Connect Rate e Tx Conversão da Página calculadas a partir do Meta Ads (pixel),
+    // não do GA4: Connect Rate = landing_page_views ÷ cliques de saída (connectRatePixel),
+    // Tx Conversão = Leads ÷ landing_page_views (pixel).
+    const lpvPixel = d.visualizacoesPaginaPixel ?? 0;
+    const taxaConversaoPagina = lpvPixel > 0 ? ((funnel?.leads ?? 0) / lpvPixel) : 0;
     const topMetrics: Metric[] = [
       { id: 'meta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'meta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
       { id: 'meta_ctr', name: 'CTR', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'meta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
+      { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent' },
       { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('meta', funnel, O, d.investimento ?? null)];
