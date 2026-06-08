@@ -13,7 +13,8 @@ export function temperatureFrom(
 ): Temperature {
   if (!lastInteractionAt) return "cold";
   const days = (now - new Date(lastInteractionAt).getTime()) / 86_400_000;
-  if (days <= 15) return "hot";
+  if (!Number.isFinite(days)) return "cold"; // data inválida
+  if (days <= 15) return "hot"; // inclui datas futuras (days < 0) = muito recente
   if (days <= 30) return "warm";
   return "cold";
 }

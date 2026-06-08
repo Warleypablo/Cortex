@@ -179,6 +179,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
   app.post("/api/crm-instagram/profiles/:id/claim", async (req, res) => {
     try {
       const user = req.user as any;
+      if (!user?.id) return res.status(401).json({ message: "não autenticado" });
       const id = parseInt(req.params.id, 10);
       // "Pegar" = virar dono E travar pra mim numa ação só (combinado no plano).
       const updated = (await db.execute(sql`
@@ -201,6 +202,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
   app.post("/api/crm-instagram/profiles/:id/lock", async (req, res) => {
     try {
       const user = req.user as any;
+      if (!user?.id) return res.status(401).json({ message: "não autenticado" });
       const id = parseInt(req.params.id, 10);
       const updated = (await db.execute(sql`
         UPDATE cortex_core.prospecting_profiles
