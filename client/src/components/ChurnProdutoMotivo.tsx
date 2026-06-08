@@ -254,45 +254,6 @@ export function ChurnProdutoMotivo() {
         </Card>
       </div>
 
-      {/* Taxa de Churn Mensal */}
-      {taxaData?.rows && taxaData.rows.length > 1 && (
-        <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base text-gray-900 dark:text-white">Taxa de Churn Mensal</CardTitle>
-            <p className="text-xs text-muted-foreground">MRR churn / MRR base do mês · excluindo abonos, erros e inadimplência</p>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={taxaData.rows.map(r => ({ ...r, taxa: Number(r.taxa), mrr_churn: Number(r.mrr_churn), mrr_base: Number(r.mrr_base), cancelamentos: Number(r.cancelamentos), mesLabel: formatMesLabel(r.mes) }))} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
-                <defs>
-                  <linearGradient id="taxaGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
-                    <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} vertical={false} />
-                <XAxis dataKey="mesLabel" tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }} axisLine={false} tickLine={false} />
-                <YAxis
-                  tickFormatter={v => `${v.toFixed(1)}%`}
-                  tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
-                  axisLine={false} tickLine={false} width={45}
-                />
-                <RechartTooltip
-                  formatter={(v: number, name: string) => {
-                    if (name === "taxa") return [`${v.toFixed(2)}%`, "Taxa churn"];
-                    if (name === "mrr_churn") return [formatCurrencyNoDecimals(v), "MRR perdido"];
-                    return [v, name];
-                  }}
-                  contentStyle={{ background: isDark ? "#18181b" : "#fff", border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb", borderRadius: 6, fontSize: 12 }}
-                  labelStyle={{ color: isDark ? "#e4e4e7" : "#374151", marginBottom: 4 }}
-                />
-                <Area type="monotone" dataKey="taxa" stroke="#ef4444" strokeWidth={2} fill="url(#taxaGrad)" dot={{ r: 3, fill: "#ef4444", strokeWidth: 0 }} activeDot={{ r: 5 }} />
-              </AreaChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
-
       {/* Heatmap */}
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader>
