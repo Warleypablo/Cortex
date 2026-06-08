@@ -302,12 +302,27 @@ export function ChurnEvolucaoMensal() {
 
     <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
       <CardHeader>
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-3">
           <CardTitle className="text-base text-gray-900 dark:text-white">
             Evolução por Motivo de Cancelamento
           </CardTitle>
-          <p className="text-xs text-muted-foreground">Top 7 motivos + Outros</p>
+          <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
+            {(["cancelamentos", "mrr_perdido"] as Metrica[]).map(m => (
+              <button
+                key={m}
+                onClick={() => setMetrica(m)}
+                className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                  metrica === m
+                    ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {m === "cancelamentos" ? "Contratos" : "MRR Perdido"}
+              </button>
+            ))}
+          </div>
         </div>
+        <p className="text-xs text-muted-foreground">Top 7 motivos + Outros</p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
