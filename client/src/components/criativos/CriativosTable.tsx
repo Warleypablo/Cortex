@@ -231,8 +231,10 @@ export function CriativosTable({
           </th>
         );
       case "name":
+        // baseTh já tem `sticky` (que cria contexto de posicionamento p/ a alça);
+        // NÃO adicionar `relative` aqui — sobrescreveria o sticky e a coluna não grudaria.
         return (
-          <th key={c.uid} className={cn(baseTh, "relative cursor-pointer hover:bg-zinc-800 whitespace-nowrap")} style={style} onClick={() => onSort("adName")}>
+          <th key={c.uid} className={cn(baseTh, "cursor-pointer hover:bg-zinc-800 whitespace-nowrap")} style={style} onClick={() => onSort("adName")}>
             <div className="flex items-center gap-1">{NAME_HEADER[level]} <SortIcon /></div>
             <ResizeHandle c={c} />
           </th>
