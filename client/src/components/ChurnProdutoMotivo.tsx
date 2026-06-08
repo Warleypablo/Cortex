@@ -31,6 +31,20 @@ interface ProdutoMotivoData {
   totais: { cancelamentos: number; mrr_perdido: number; ticket_medio: number };
 }
 
+interface SquadCelula {
+  squad: string;
+  motivo_cancelamento: string;
+  cancelamentos: number;
+  mrr_perdido: number;
+  pct_dentro_squad: number;
+}
+
+interface SquadMotivoData {
+  squads: string[];
+  motivos: string[];
+  celulas: SquadCelula[];
+}
+
 function heatColor(pct: number, maxPct: number, isDark: boolean): string {
   if (maxPct === 0 || pct === 0) return "transparent";
   const t = Math.min(pct / maxPct, 1);
@@ -89,6 +103,13 @@ export function ChurnProdutoMotivo() {
     queryFn: () =>
       fetch(`/api/churn/produto-motivo?dataInicio=${inicio}&dataFim=${fim}`).then(r => r.json()),
     enabled: !!inicio && !!fim && inicio <= fim,
+  });
+
+  const { data: squadMotivoData } = useQuery<SquadMotivoData>({
+    queryKey: ["/api/churn/squad-motivo", produtoSelecionado, inicio, fim],
+    queryFn: () =>
+      fetch(`/api/churn/squad-motivo?produto=${encodeURIComponent(produtoSelecionado!)}&dataInicio=${inicio}&dataFim=${fim}`).then(r => r.json()),
+    enabled: !!produtoSelecionado && !!inicio && !!fim,
   });
 
   const maxPct = useMemo(() => {
@@ -353,6 +374,68 @@ export function ChurnProdutoMotivo() {
           </CardContent>
         </Card>
       )}
+
+      {/* Squad × Motivo drill-down */}
+      {produtoSelecionado && squadMotivoData && squadMotivoData.squads.length > 0 && (() => {
+        const smData = squadMotivoData;
+        const smMax = Math.max(...smData.celulas.map(c => c.pct_dentro_squad), 1);
+        const smMap = new Map(smData.celulas.map(c => [`${c.squad}|||${c.motivo_cancelamento}`, c]));
+        return (
+          <Card className="bg-white dark:bg-zinc-900 border-indigo-200 dark:border-indigo-800">
+            <CardHeader>
+              <CardTitle className="text-base text-gray-900 dark:text-white">
+                Squad × Motivo — {produtoSelecionado}
+              </CardTitle>
+              <p className="text-xs text-muted-foreground">% de cancelamentos do squad atribuídos ao motivo</p>
+            </CardHeader>
+            <CardContent className="overflow-x-auto">
+              <table className="w-full text-xs border-collapse">
+                <thead>
+                  <tr>
+                    <th className="text-left p-2 font-semibold text-gray-700 dark:text-zinc-300 min-w-[160px]">Squad</th>
+                    {smData.motivos.map(m => (
+                      <th key={m} className="text-center p-2 font-medium text-gray-600 dark:text-zinc-400 min-w-[80px] max-w-[110px]">
+                        <span className="block truncate" title={m}>{m}</span>
+                      </th>
+                    ))}
+                    <th className="text-right p-2 font-semibold text-gray-700 dark:text-zinc-300 min-w-[60px]">Total</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {smData.squads.map(squad => {
+                    const squadTotal = smData.celulas.filter(c => c.squad === squad).reduce((a, c) => a + c.cancelamentos, 0);
+                    return (
+                      <tr key={squad} className="border-t border-gray-100 dark:border-zinc-800">
+                        <td className="p-2 font-medium text-gray-900 dark:text-zinc-100 truncate max-w-[160px]" title={squad}>{squad}</td>
+                        {smData.motivos.map(motivo => {
+                          const c = smMap.get(`${squad}|||${motivo}`);
+                          const pct = c?.pct_dentro_squad ?? 0;
+                          return (
+                            <td key={motivo} className="p-1 text-center">
+                              {pct > 0 ? (
+                                <div
+                                  className={`rounded px-1 py-1.5 text-xs font-medium ${heatTextClass(pct, smMax)}`}
+                                  style={{ backgroundColor: heatColor(pct, smMax, isDark) }}
+                                  title={`${c?.cancelamentos ?? 0} churns · ${formatCurrencyNoDecimals(c?.mrr_perdido ?? 0)}`}
+                                >
+                                  {pct.toFixed(0)}%
+                                </div>
+                              ) : (
+                                <span className="text-gray-300 dark:text-zinc-700">—</span>
+                              )}
+                            </td>
+                          );
+                        })}
+                        <td className="p-2 text-right font-semibold text-gray-900 dark:text-zinc-100">{squadTotal}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </CardContent>
+          </Card>
+        );
+      })()}
 
     </div>
   );
