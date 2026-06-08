@@ -16,6 +16,8 @@
 
 **Impacto arquitetural:** Nenhum — apenas frontend, sem mudança de backend/SQL (dados leads/mqls/visualizacoesPagina já vinham na API)
 
+**Atualização (visual):** As sub-taxas foram aninhadas visualmente sob "Tx Conversão da Página" — indentação + marcador `└` + cor suave (`text-muted-foreground`), e renomeadas para "MQL" / "Não-MQL". Reusa o campo `indent` do tipo `Metric` (Orçado x Realizado) e um novo flag `sub` no `MetricDef` (Evolução Temporal).
+
 ---
 
 ## 2026-06-08 | feat(growth): seed do Planejamento de Metas — Creators × Meta Ads × Junho/2026
