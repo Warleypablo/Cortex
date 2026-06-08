@@ -45,7 +45,7 @@ type Metrica = "cancelamentos" | "mrr_perdido" | "taxa_churn";
 export function ChurnEvolucaoMensal() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [metrica, setMetrica] = useState<"cancelamentos" | "mrr_perdido">("cancelamentos");
+  const [metrica, setMetrica] = useState<Metrica>("cancelamentos");
   const [metricaLinha, setMetricaLinha] = useState<Metrica>("cancelamentos");
   const [produtoSelecionado, setProdutoSelecionado] = useState<string>("");
   const [highlightProduto, setHighlightProduto] = useState<string | null>(null);
@@ -64,7 +64,7 @@ export function ChurnEvolucaoMensal() {
   const { data: taxaProdutoData, isFetching: isFetchingTaxa, isError: isErrorTaxa } = useQuery<{ rows: Array<{ mes: string; produto: string; mrr_base: string; mrr_churn: string; cancelamentos: string; taxa: string }> }>({
     queryKey: ["/api/churn/taxa-por-produto"],
     queryFn: () => fetch("/api/churn/taxa-por-produto").then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); }),
-    enabled: metricaLinha === "taxa_churn",
+    enabled: metricaLinha === "taxa_churn" || metrica === "taxa_churn",
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
@@ -207,6 +207,87 @@ export function ChurnEvolucaoMensal() {
     return { taxaChartData, taxaProdutos };
   }, [taxaProdutoData]);
 
+  // % churn por motivo (usa mrr_perdido / mrr_base_total)
+  const { motivoTaxaChartData, motivoTaxaKeys } = useMemo(() => {
+    if (!data?.rows?.length || !taxaData?.rows?.length) return { motivoTaxaChartData: [], motivoTaxaKeys: [] };
+    const baseByMes = new Map<string, number>();
+    taxaData.rows.forEach(r => baseByMes.set(r.mes, Number(r.mrr_base)));
+    const motivoTotais = new Map<string, number>();
+    data.rows.forEach(r => {
+      const m = r.motivo_cancelamento || "Não Informado";
+      motivoTotais.set(m, (motivoTotais.get(m) || 0) + Number(r.cancelamentos));
+    });
+    const topMotivos = Array.from(motivoTotais.entries()).sort((a,b) => b[1]-a[1]).slice(0, TOP_N_PRODUTOS).map(([m]) => m);
+    const temOutros = motivoTotais.size > TOP_N_PRODUTOS;
+    const motivoTaxaKeys = temOutros ? [...topMotivos, "Outros"] : topMotivos;
+    const aggMap = new Map<string, Map<string, number>>();
+    data.rows.forEach(r => {
+      const m = r.motivo_cancelamento || "Não Informado";
+      if (!aggMap.has(r.ano_mes)) aggMap.set(r.ano_mes, new Map());
+      const mm = aggMap.get(r.ano_mes)!;
+      mm.set(m, (mm.get(m) || 0) + Number(r.mrr_perdido));
+    });
+    const mesesOrdenados = Array.from(aggMap.keys()).sort();
+    const motivoTaxaChartData = mesesOrdenados.map(mes => {
+      const mm = aggMap.get(mes)!;
+      const mesKey = mes.slice(0, 7);
+      const base = baseByMes.get(mesKey) || 0;
+      const entry: Record<string, string | number> = { mes: mesKey, mesLabel: formatMes(mes) };
+      topMotivos.forEach(m => {
+        const mrr = mm.get(m) || 0;
+        entry[m] = base > 0 ? Math.round(mrr / base * 10000) / 100 : 0;
+      });
+      if (temOutros) {
+        let otrosMrr = 0;
+        mm.forEach((v, m) => { if (!topMotivos.includes(m)) otrosMrr += v; });
+        entry["Outros"] = base > 0 ? Math.round(otrosMrr / base * 10000) / 100 : 0;
+      }
+      return entry;
+    });
+    return { motivoTaxaChartData, motivoTaxaKeys };
+  }, [data, taxaData]);
+
+  // % churn por motivo para produto específico (usa mrr_perdido / product_mrr_base)
+  const produtoMotivoTaxaChartData = useMemo(() => {
+    if (!data?.rows?.length || !taxaProdutoData?.rows?.length || !produtoEfetivo) return null;
+    const prodRows = data.rows.filter(r => r.produto === produtoEfetivo);
+    if (!prodRows.length) return null;
+    const prodBaseByMes = new Map<string, number>();
+    taxaProdutoData.rows.filter(r => r.produto === produtoEfetivo).forEach(r => {
+      prodBaseByMes.set(r.mes, Number(r.mrr_base));
+    });
+    const motivoTotais = new Map<string, number>();
+    prodRows.forEach(r => {
+      const m = r.motivo_cancelamento || "Não Informado";
+      motivoTotais.set(m, (motivoTotais.get(m) || 0) + Number(r.cancelamentos));
+    });
+    const topMotivos = Array.from(motivoTotais.entries()).sort((a,b) => b[1]-a[1]).slice(0, 7).map(([m]) => m);
+    const temOutros = motivoTotais.size > 7;
+    const mesAgg = new Map<string, Map<string, number>>();
+    prodRows.forEach(r => {
+      if (!mesAgg.has(r.ano_mes)) mesAgg.set(r.ano_mes, new Map());
+      const entry = mesAgg.get(r.ano_mes)!;
+      const m = topMotivos.includes(r.motivo_cancelamento) ? r.motivo_cancelamento : "Outros";
+      entry.set(m, (entry.get(m) || 0) + Number(r.mrr_perdido));
+    });
+    const mesesOrdenados = Array.from(mesAgg.keys()).sort();
+    return mesesOrdenados.map(mes => {
+      const mm = mesAgg.get(mes)!;
+      const mesKey = mes.slice(0, 7);
+      const base = prodBaseByMes.get(mesKey) || 0;
+      const entry: Record<string, number | string> = { mesLabel: formatMes(mes) };
+      topMotivos.forEach(m => {
+        const mrr = mm.get(m) || 0;
+        entry[m] = base > 0 ? Math.round(mrr / base * 10000) / 100 : 0;
+      });
+      if (temOutros) {
+        const otrosMrr = mm.get("Outros") || 0;
+        entry["Outros"] = base > 0 ? Math.round(otrosMrr / base * 10000) / 100 : 0;
+      }
+      return entry;
+    });
+  }, [data, taxaProdutoData, produtoEfetivo]);
+
   // Lista de todos os produtos disponíveis (para o dropdown)
   const todosProdutos = useMemo(() => {
     if (!data?.rows?.length) return [];
@@ -263,11 +344,15 @@ export function ChurnEvolucaoMensal() {
     return `${meses[parseInt(m, 10) - 1]}/${ano}`;
   }
 
-  const yFormatter = (v: number) =>
-    metrica === "mrr_perdido" ? formatCurrencyNoDecimals(v) : String(v);
+  const yFormatter = (v: number) => {
+    if (metrica === "mrr_perdido") return formatCurrencyNoDecimals(v);
+    if (metrica === "taxa_churn") return `${v.toFixed(1)}%`;
+    return String(v);
+  };
 
   const tooltipFormatter = (value: number, name: string) => {
     if (metrica === "mrr_perdido") return [formatCurrencyNoDecimals(value), name];
+    if (metrica === "taxa_churn") return [`${Number(value).toFixed(2)}%`, name];
     return [String(value), name];
   };
 
@@ -342,7 +427,7 @@ export function ChurnEvolucaoMensal() {
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
-              {(["cancelamentos", "mrr_perdido"] as Metrica[]).map(m => (
+              {(["cancelamentos", "mrr_perdido", "taxa_churn"] as Metrica[]).map(m => (
                 <button
                   key={m}
                   onClick={() => setMetrica(m)}
@@ -352,7 +437,7 @@ export function ChurnEvolucaoMensal() {
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {m === "cancelamentos" ? "Contratos" : "MRR Perdido"}
+                  {m === "cancelamentos" ? "Contratos" : m === "mrr_perdido" ? "MRR Perdido" : "% Churn"}
                 </button>
               ))}
             </div>
@@ -370,8 +455,16 @@ export function ChurnEvolucaoMensal() {
         <p className="text-xs text-muted-foreground">Cancelamentos por motivo mês a mês</p>
       </CardHeader>
       <CardContent>
+        {metrica === "taxa_churn" && !produtoMotivoTaxaChartData ? (
+          <div className="h-80 flex items-center justify-center text-sm text-muted-foreground animate-pulse">
+            Calculando taxas...
+          </div>
+        ) : (
         <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={produtoChartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+          <BarChart
+            data={metrica === "taxa_churn" ? (produtoMotivoTaxaChartData ?? produtoChartData) : produtoChartData}
+            margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} vertical={false} />
             <XAxis
               dataKey="mesLabel"
@@ -381,7 +474,7 @@ export function ChurnEvolucaoMensal() {
             <YAxis
               tickFormatter={yFormatter}
               tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
-              width={metrica === "mrr_perdido" ? 80 : 40}
+              width={metrica === "mrr_perdido" ? 80 : 45}
             />
             <Tooltip
               formatter={tooltipFormatter}
@@ -404,6 +497,7 @@ export function ChurnEvolucaoMensal() {
             ))}
           </BarChart>
         </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
 
@@ -507,7 +601,7 @@ export function ChurnEvolucaoMensal() {
             Evolução por Motivo de Cancelamento
           </CardTitle>
           <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
-            {(["cancelamentos", "mrr_perdido"] as Metrica[]).map(m => (
+            {(["cancelamentos", "mrr_perdido", "taxa_churn"] as Metrica[]).map(m => (
               <button
                 key={m}
                 onClick={() => setMetrica(m)}
@@ -517,7 +611,7 @@ export function ChurnEvolucaoMensal() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {m === "cancelamentos" ? "Contratos" : "MRR Perdido"}
+                {m === "cancelamentos" ? "Contratos" : m === "mrr_perdido" ? "MRR Perdido" : "% Churn"}
               </button>
             ))}
           </div>
@@ -532,7 +626,10 @@ export function ChurnEvolucaoMensal() {
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
-          <LineChart data={motivoChartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+          <LineChart
+            data={metrica === "taxa_churn" ? motivoTaxaChartData : motivoChartData}
+            margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+          >
             <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} />
             <XAxis
               dataKey="mesLabel"
@@ -542,7 +639,7 @@ export function ChurnEvolucaoMensal() {
             <YAxis
               tickFormatter={yFormatter}
               tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
-              width={metrica === "mrr_perdido" ? 80 : 40}
+              width={metrica === "mrr_perdido" ? 80 : 45}
             />
             <Tooltip
               formatter={tooltipFormatter}
@@ -559,7 +656,7 @@ export function ChurnEvolucaoMensal() {
                 setHighlightMotivo(prev => prev === d.value ? null : d.value)
               }
             />
-            {motivos.map((motivo, i) => (
+            {(metrica === "taxa_churn" ? motivoTaxaKeys : motivos).map((motivo, i) => (
               <Line
                 key={motivo}
                 type="monotone"
