@@ -164,10 +164,6 @@ export function CriativosTable({
     r.live = w;
     const col = colRefs.current[r.uid];
     if (col) col.style.width = `${w}px`;
-    // se for a coluna de nome, empurra o "left" sticky da coluna Status ao vivo
-    if (r.statusBaseLeft !== undefined && tableRef.current) {
-      tableRef.current.style.setProperty("--cz-status-left", `${r.statusBaseLeft - r.startW + w}px`);
-    }
   };
   const onResizeEnd = () => {
     const r = resizingRef.current;
@@ -202,14 +198,13 @@ export function CriativosTable({
     />
   );
 
-  const stickyLeft = (c: RCol): React.CSSProperties =>
-    c.kind === "status" ? { left: "var(--cz-status-left)" } : { left: c.left };
+  const stickyLeft = (c: RCol): React.CSSProperties => ({ left: c.left });
 
   const SortIcon = () => <ArrowUpDown className="w-3 h-3 shrink-0" />;
 
   // ── Header ──
   const renderHeader = (c: RCol) => {
-    const stickyCls = c.sticky ? "sticky z-10 overflow-hidden" : "";
+    const stickyCls = c.sticky ? "sticky z-30 overflow-hidden" : "";
     const lastCls = c.lastFrozen ? "border-r border-zinc-700" : "";
     const baseTh = cn("px-2 py-2 text-xs font-medium text-zinc-100 bg-zinc-900 align-middle", stickyCls, lastCls);
     const style = c.sticky ? stickyLeft(c) : undefined;
@@ -273,7 +268,7 @@ export function CriativosTable({
 
   // ── Linha de Total ──
   const renderTotal = (c: RCol) => {
-    const stickyCls = c.sticky ? "sticky z-10 overflow-hidden" : "";
+    const stickyCls = c.sticky ? "sticky z-30 overflow-hidden" : "";
     const lastCls = c.lastFrozen ? "border-r border-zinc-700" : "";
     const baseTh = cn("px-2 py-1.5 text-xs font-semibold bg-zinc-800 align-middle", stickyCls, lastCls);
     const style = c.sticky ? stickyLeft(c) : undefined;
@@ -286,7 +281,7 @@ export function CriativosTable({
 
   // ── Corpo ──
   const renderBody = (c: RCol, row: CriativoData) => {
-    const stickyCls = c.sticky ? "sticky z-10 bg-card overflow-hidden" : "";
+    const stickyCls = c.sticky ? "sticky z-20 bg-card overflow-hidden" : "";
     const lastCls = c.lastFrozen ? "border-r border-zinc-700/50" : "";
     const baseTd = cn("px-2 py-2 text-xs align-middle", stickyCls, lastCls);
     const style = c.sticky ? stickyLeft(c) : undefined;
@@ -392,7 +387,7 @@ export function CriativosTable({
       <table
         ref={tableRef}
         className="border-separate border-spacing-0 text-xs"
-        style={{ tableLayout: "fixed", width: totalWidth, ["--cz-status-left" as any]: `${statusBaseLeft}px` }}
+        style={{ tableLayout: "fixed", width: totalWidth }}
       >
         <colgroup>
           {allCols.map((c) => (

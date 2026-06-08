@@ -846,6 +846,10 @@ export default function Criativos() {
                   setCompareRange(range);
                 }}
               />
+
+              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-colunas" title="Configurar colunas e cores">
+                <Settings className="w-4 h-4" />
+              </Button>
               </div>
 
               {/* Ações à direita */}
@@ -884,9 +888,6 @@ export default function Criativos() {
                     </Button>
                   </>
                 )}
-                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-colunas" title="Configurar colunas e cores">
-                  <Settings className="w-4 h-4" />
-                </Button>
               </div>
             </div>
           </CardHeader>
