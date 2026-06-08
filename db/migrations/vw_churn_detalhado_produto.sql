@@ -4,8 +4,8 @@ SELECT
   COALESCE(produto, 'Não Identificado')           AS produto,
   COALESCE(motivo_cancelamento, 'Não Informado')  AS motivo_cancelamento,
   COUNT(*)                                         AS cancelamentos,
-  SUM(valor_r)                                     AS mrr_perdido,
-  AVG(valor_r)                                     AS ticket_medio,
+  ROUND(SUM(valor_r)::numeric, 2)                  AS mrr_perdido,
+  ROUND(AVG(valor_r)::numeric, 2)                  AS ticket_medio,
   ROUND(
     COUNT(*) * 100.0
     / SUM(COUNT(*)) OVER (PARTITION BY COALESCE(produto, 'Não Identificado')),
