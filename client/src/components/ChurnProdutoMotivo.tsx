@@ -53,9 +53,17 @@ function heatTextClass(pct: number, maxPct: number): string {
 
 const DRILL_COLORS = ["#6d28d9", "#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe", "#f5f3ff"];
 
+const PERIODO_OPTIONS = [
+  { label: "1M", meses: 1, titulo: "Último mês" },
+  { label: "3M", meses: 3, titulo: "Últimos 3 meses" },
+  { label: "6M", meses: 6, titulo: "Últimos 6 meses" },
+  { label: "12M", meses: 12, titulo: "Últimos 12 meses" },
+] as const;
+
 export function ChurnProdutoMotivo() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
+  const [meses, setMeses] = useState<1 | 3 | 6 | 12>(12);
   const [produtoSelecionado, setProdutoSelecionado] = useState<string | null>(null);
   const [tabelaAberta, setTabelaAberta] = useState(false);
   const [ordenacao, setOrdenacao] = useState<{ col: keyof Celula; dir: "asc" | "desc" }>({
@@ -64,8 +72,8 @@ export function ChurnProdutoMotivo() {
   });
 
   const { data, isLoading, isError } = useQuery<ProdutoMotivoData>({
-    queryKey: ["/api/churn/produto-motivo"],
-    queryFn: () => fetch("/api/churn/produto-motivo").then(r => r.json()),
+    queryKey: ["/api/churn/produto-motivo", meses],
+    queryFn: () => fetch(`/api/churn/produto-motivo?meses=${meses}`).then(r => r.json()),
   });
 
   const maxPct = useMemo(() => {
@@ -127,7 +135,26 @@ export function ChurnProdutoMotivo() {
 
   return (
     <div className="space-y-6">
-      <p className="text-xs text-muted-foreground">Últimos 12 meses</p>
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-muted-foreground">
+          {PERIODO_OPTIONS.find(o => o.meses === meses)?.titulo}
+        </p>
+        <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
+          {PERIODO_OPTIONS.map(opt => (
+            <button
+              key={opt.label}
+              onClick={() => { setMeses(opt.meses); setProdutoSelecionado(null); }}
+              className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                meses === opt.meses
+                  ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
+      </div>
 
       {/* Cards de resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

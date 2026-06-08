@@ -14,11 +14,24 @@ interface ViewRow {
 export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
   app.get("/api/churn/produto-motivo", async (req, res) => {
     try {
+      const mesesNum = Math.min(24, Math.max(1, parseInt(String(req.query.meses || "12"), 10)));
+      const now = new Date();
+      const start = new Date(now.getFullYear(), now.getMonth() - (mesesNum - 1), 1);
+      const startStr = start.toISOString().split("T")[0];
+
       const result = await db.execute(sql`
-        SELECT produto, motivo_cancelamento, cancelamentos,
-               mrr_perdido, ticket_medio, pct_dentro_produto, pct_total
-        FROM cortex_core.vw_churn_detalhado_produto
-        ORDER BY mrr_perdido DESC, cancelamentos DESC
+        SELECT produto, motivo_cancelamento,
+               SUM(cancelamentos)::int AS cancelamentos,
+               SUM(mrr_perdido)::numeric AS mrr_perdido,
+               CASE WHEN SUM(cancelamentos) > 0
+                    THEN SUM(mrr_perdido) / SUM(cancelamentos)
+                    ELSE 0 END AS ticket_medio,
+               0 AS pct_dentro_produto,
+               0 AS pct_total
+        FROM cortex_core.vw_churn_produto_motivo_mensal
+        WHERE ano_mes >= ${startStr}::date
+        GROUP BY produto, motivo_cancelamento
+        ORDER BY SUM(mrr_perdido) DESC, SUM(cancelamentos) DESC
       `);
       const data: ViewRow[] = result.rows;
 
