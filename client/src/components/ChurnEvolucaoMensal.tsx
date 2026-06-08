@@ -37,6 +37,8 @@ export function ChurnEvolucaoMensal() {
   const isDark = theme === "dark";
   const [metrica, setMetrica] = useState<Metrica>("cancelamentos");
   const [produtoSelecionado, setProdutoSelecionado] = useState<string>("");
+  const [highlightProduto, setHighlightProduto] = useState<string | null>(null);
+  const [highlightMotivo, setHighlightMotivo] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery<MensalResponse>({
     queryKey: ["/api/churn/produto-motivo/mensal"],
@@ -254,7 +256,9 @@ export function ChurnEvolucaoMensal() {
             ))}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">Histórico completo disponível</p>
+        <p className="text-xs text-muted-foreground">
+          Histórico completo · <span className="italic">clique na legenda para destacar uma série</span>
+        </p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
@@ -282,14 +286,20 @@ export function ChurnEvolucaoMensal() {
                 fontSize: 12,
               }}
             />
-            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
+            <Legend
+              wrapperStyle={{ fontSize: 11, paddingTop: 12, cursor: "pointer" }}
+              onClick={(d: { value: string }) =>
+                setHighlightProduto(prev => prev === d.value ? null : d.value)
+              }
+            />
             {produtos.map((produto, i) => (
               <Line
                 key={produto}
                 type="monotone"
                 dataKey={produto}
                 stroke={produto === "Outros" ? "#9ca3af" : PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
-                strokeWidth={produto === "Outros" ? 1.5 : 2}
+                strokeWidth={highlightProduto === produto ? 3 : (produto === "Outros" ? 1.5 : 2)}
+                strokeOpacity={highlightProduto === null || highlightProduto === produto ? 1 : 0.1}
                 strokeDasharray={produto === "Outros" ? "4 3" : undefined}
                 dot={false}
                 activeDot={{ r: 4 }}
@@ -322,7 +332,9 @@ export function ChurnEvolucaoMensal() {
             ))}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">Top 7 motivos + Outros</p>
+        <p className="text-xs text-muted-foreground">
+          Top 7 motivos + Outros · <span className="italic">clique na legenda para destacar uma série</span>
+        </p>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
@@ -347,14 +359,20 @@ export function ChurnEvolucaoMensal() {
                 fontSize: 12,
               }}
             />
-            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
+            <Legend
+              wrapperStyle={{ fontSize: 11, paddingTop: 12, cursor: "pointer" }}
+              onClick={(d: { value: string }) =>
+                setHighlightMotivo(prev => prev === d.value ? null : d.value)
+              }
+            />
             {motivos.map((motivo, i) => (
               <Line
                 key={motivo}
                 type="monotone"
                 dataKey={motivo}
                 stroke={motivo === "Outros" ? "#9ca3af" : PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
-                strokeWidth={motivo === "Outros" ? 1.5 : 2}
+                strokeWidth={highlightMotivo === motivo ? 3 : (motivo === "Outros" ? 1.5 : 2)}
+                strokeOpacity={highlightMotivo === null || highlightMotivo === motivo ? 1 : 0.1}
                 strokeDasharray={motivo === "Outros" ? "4 3" : undefined}
                 dot={false}
                 activeDot={{ r: 4 }}
