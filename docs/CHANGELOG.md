@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-08 | feat(growth): quebra Tx Conversão da Página em MQL × Não-MQL
+
+**O que foi feito:**
+- Adicionadas 2 linhas novas abaixo de "Tx Conversão da Página": "Tx Conversão Página — MQL" (mqls ÷ visualizações de página) e "Tx Conversão Página — Não-MQL" ((leads − mqls) ÷ visualizações de página)
+- Aplicado na Evolução Temporal (seção Métricas de Marketing) e no Orçado x Realizado (Consolidado + Aprofundado/Meta Ads, este usando a base do pixel)
+- Soma das duas reconstrói a taxa de conversão de página total já existente
+
+**Por que:**
+- Permitir comparar de onde vêm as conversões da página (parcela MQL vs Não-MQL), sem precisar abrir outras telas
+
+**Arquivos alterados:**
+- `client/src/pages/GrowthEvolucaoTemporal.tsx` - 2 novos MetricDef na seção marketing (sem orçado)
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - 2 linhas em buildAdsMetrics (consolidado) e em buildMetaAdsMetrics (aprofundado, base pixel)
+
+**Impacto arquitetural:** Nenhum — apenas frontend, sem mudança de backend/SQL (dados leads/mqls/visualizacoesPagina já vinham na API)
+
+---
+
 ## 2026-06-08 | feat(growth): seed do Planejamento de Metas — Creators × Meta Ads × Junho/2026
 
 **O que foi feito:**
