@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -13,11 +13,12 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { MetricFormattingSheet } from "@/components/MetricFormattingSheet";
+import { CriativosSettingsSheet } from "@/components/criativos/CriativosSettingsSheet";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { CriativosTable } from "@/components/criativos/CriativosTable";
 import { aggregateByLevel, sortRows, type CriativoData, type Level, type SortConfig } from "@/lib/criativosMetrics";
+import { loadConfig, persistConfig, loadViews, persistViews, resolveColumns, type ColumnConfig, type SavedView } from "@/lib/criativosColumns";
 import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle, Building2, Megaphone, Layers3, Image as ImageIcon } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -104,6 +105,15 @@ export default function Criativos() {
 
   // Nível de visualização (tabs): conta / campanha / conjunto / anúncio
   const [level, setLevel] = useState<Level>("anuncio");
+  // Configuração de colunas (visibilidade, ordem, larguras) + visualizações salvas
+  const [colConfig, setColConfig] = useState<ColumnConfig>(loadConfig);
+  const [colViews, setColViews] = useState<SavedView[]>(loadViews);
+  useEffect(() => { persistConfig(colConfig); }, [colConfig]);
+  useEffect(() => { persistViews(colViews); }, [colViews]);
+  const visibleColumns = useMemo(() => resolveColumns(colConfig), [colConfig]);
+  const handleResize = useCallback((key: string, width: number) => {
+    setColConfig((c) => ({ ...c, widths: { ...c.widths, [key]: width } }));
+  }, []);
   // Seleção em massa + toggle de status (pausar/ativar)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
@@ -347,17 +357,6 @@ export default function Criativos() {
     aggregated.forEach(item => map.set(item.id, item));
     return map;
   }, [compareData, level]);
-
-  // Grupos de colunas expandidos (sub-métricas)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const toggleGroup = (group: string) => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
-      return next;
-    });
-  };
 
   // Colunas expandidas (para mostrar variação de comparação)
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
@@ -625,142 +624,6 @@ export default function Criativos() {
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-card sticky top-0 z-20">
-        <div className="flex items-center gap-2 flex-nowrap min-w-0">
-          <div className="flex items-center gap-1 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Buscar criativo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 w-[140px] h-8 text-xs"
-                data-testid="input-search"
-              />
-              {searchTerm && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0.5 top-1/2 transform -translate-y-1/2 h-5 w-5"
-                  onClick={() => setSearchTerm("")}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[11px] text-muted-foreground font-medium">Status:</span>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[80px] h-8 text-xs" data-testid="select-status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todos</SelectItem>
-                <SelectItem value="Ativo">Ativos</SelectItem>
-                <SelectItem value="Pausado">Pausados</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[11px] text-muted-foreground font-medium">Plataforma:</span>
-            <MultiSelect
-              options={[
-                { value: 'Meta Ads', label: 'Meta Ads' },
-                { value: 'Google Ads', label: 'Google Ads' },
-                { value: 'LinkedIn Ads', label: 'LinkedIn Ads' },
-              ]}
-              selected={selectedPlataformas}
-              onChange={setSelectedPlataformas}
-              placeholder="Todas"
-              className="h-8 w-[120px] text-xs"
-            />
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[11px] text-muted-foreground font-medium">Produto:</span>
-            <MultiSelect
-              options={produtos.map(p => ({ value: p, label: p }))}
-              selected={selectedProdutos}
-              onChange={(v) => {
-                setSelectedProdutos(v);
-                setCampanhaFilters([]);
-              }}
-              placeholder="Todos"
-              className="h-8 w-[120px] text-xs"
-            />
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[11px] text-muted-foreground font-medium">Campanha:</span>
-            <MultiSelect
-              options={campanhasFiltradas.map(c => c.name)}
-              selected={campanhaFilters}
-              onChange={setCampanhaFilters}
-              placeholder="Todas"
-              searchPlaceholder="Buscar campanha..."
-              className="h-8 w-[140px] text-xs"
-            />
-          </div>
-
-          <DateRangePicker
-            value={dateRange}
-            onChange={(range) => {
-              if (range?.from) {
-                setDateRange({ from: range.from, to: range.to || range.from });
-              }
-            }}
-            align="end"
-            showCompare
-            compareEnabled={compareEnabled}
-            compareRange={compareRange}
-            onCompareChange={(enabled, range) => {
-              setCompareEnabled(enabled);
-              setCompareRange(range);
-            }}
-          />
-
-          {isAdmin && (
-            <>
-              <Button
-                variant="default"
-                size="sm"
-                onClick={() => analyzeMutation.mutate()}
-                disabled={analyzeMutation.isPending}
-                className="bg-purple-600 hover:bg-purple-700 text-white"
-                data-testid="button-analisar-ia"
-              >
-                {analyzeMutation.isPending ? (
-                  <Loader2 className="w-4 h-4 mr-1 animate-spin" />
-                ) : (
-                  <Sparkles className="w-4 h-4 mr-1" />
-                )}
-                {analyzeMutation.isPending ? "Analisando..." : "Analisar com IA"}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setAgentDrawerOpen(true)}
-                data-testid="button-abrir-propostas"
-              >
-                Propostas
-                {pendingProposals.length > 0 && (
-                  <Badge variant="secondary" className="ml-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">
-                    {pendingProposals.length}
-                  </Badge>
-                )}
-              </Button>
-            </>
-          )}
-
-          <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-metrics">
-            <Settings className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 px-4 py-2">
         {/* Investimento */}
@@ -872,10 +735,11 @@ export default function Criativos() {
         </Card>
       </div>
 
-      <div className="flex-1 p-4 pt-0">
-        <Card className="h-full">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-2">
+      <div className="flex-1 p-4 pt-0 min-h-0">
+        <Card className="h-full flex flex-col">
+          <CardHeader className="pb-2 space-y-2">
+            {/* Linha 1: tabs + ações */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
               <Tabs value={level} onValueChange={handleLevelChange}>
                 <TabsList className="h-9 gap-1 bg-muted/60 p-1">
                   <TabsTrigger value="conta" className="h-7 gap-1.5 px-3 text-xs data-[state=active]:shadow-sm" data-testid="tab-conta">
@@ -892,44 +756,139 @@ export default function Criativos() {
                   </TabsTrigger>
                 </TabsList>
               </Tabs>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {isAdmin && level !== "conta" && selectedIds.size > 0 && (
                   <div className="flex items-center gap-2 mr-1">
                     <span className="text-xs text-muted-foreground">{selectedIds.size} selecionado(s)</span>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8"
-                      disabled={bulkPending}
-                      onClick={() => setBulkAction("resume")}
-                      data-testid="button-bulk-ativar"
-                    >
+                    <Button size="sm" variant="outline" className="h-8" disabled={bulkPending} onClick={() => setBulkAction("resume")} data-testid="button-bulk-ativar">
                       <Power className="w-3.5 h-3.5 mr-1" /> Ativar
                     </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      className="h-8 text-red-600 dark:text-red-400"
-                      disabled={bulkPending}
-                      onClick={() => setBulkAction("pause")}
-                      data-testid="button-bulk-pausar"
-                    >
+                    <Button size="sm" variant="outline" className="h-8 text-red-600 dark:text-red-400" disabled={bulkPending} onClick={() => setBulkAction("pause")} data-testid="button-bulk-pausar">
                       <PowerOff className="w-3.5 h-3.5 mr-1" /> Pausar
                     </Button>
                   </div>
                 )}
-                <MetricFormattingSheet
-                  open={configOpen}
-                  onOpenChange={setConfigOpen}
-                  metricRules={metricRules}
-                  produtos={produtos}
-                  onSave={(data) => saveRulesMutation.mutate(data)}
-                  isSaving={saveRulesMutation.isPending}
-                />
+                {isAdmin && (
+                  <>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => analyzeMutation.mutate()}
+                      disabled={analyzeMutation.isPending}
+                      className="bg-purple-600 hover:bg-purple-700 text-white h-8"
+                      data-testid="button-analisar-ia"
+                    >
+                      {analyzeMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+                      {analyzeMutation.isPending ? "Analisando..." : "Analisar com IA"}
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-8" onClick={() => setAgentDrawerOpen(true)} data-testid="button-abrir-propostas">
+                      Propostas
+                      {pendingProposals.length > 0 && (
+                        <Badge variant="secondary" className="ml-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">
+                          {pendingProposals.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-colunas" title="Configurar colunas e cores">
+                  <Settings className="w-4 h-4" />
+                </Button>
               </div>
             </div>
+
+            {/* Linha 2: filtros */}
+            <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar criativo..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-[150px] h-8 text-xs"
+                  data-testid="input-search"
+                />
+                {searchTerm && (
+                  <Button variant="ghost" size="icon" className="absolute right-0.5 top-1/2 transform -translate-y-1/2 h-5 w-5" onClick={() => setSearchTerm("")}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[11px] text-muted-foreground font-medium">Status:</span>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[80px] h-8 text-xs" data-testid="select-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Todos">Todos</SelectItem>
+                    <SelectItem value="Ativo">Ativos</SelectItem>
+                    <SelectItem value="Pausado">Pausados</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[11px] text-muted-foreground font-medium">Plataforma:</span>
+                <MultiSelect
+                  options={[
+                    { value: 'Meta Ads', label: 'Meta Ads' },
+                    { value: 'Google Ads', label: 'Google Ads' },
+                    { value: 'LinkedIn Ads', label: 'LinkedIn Ads' },
+                  ]}
+                  selected={selectedPlataformas}
+                  onChange={setSelectedPlataformas}
+                  placeholder="Todas"
+                  className="h-8 w-[120px] text-xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[11px] text-muted-foreground font-medium">Produto:</span>
+                <MultiSelect
+                  options={produtos.map(p => ({ value: p, label: p }))}
+                  selected={selectedProdutos}
+                  onChange={(v) => {
+                    setSelectedProdutos(v);
+                    setCampanhaFilters([]);
+                  }}
+                  placeholder="Todos"
+                  className="h-8 w-[120px] text-xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[11px] text-muted-foreground font-medium">Campanha:</span>
+                <MultiSelect
+                  options={campanhasFiltradas.map(c => c.name)}
+                  selected={campanhaFilters}
+                  onChange={setCampanhaFilters}
+                  placeholder="Todas"
+                  searchPlaceholder="Buscar campanha..."
+                  className="h-8 w-[140px] text-xs"
+                />
+              </div>
+
+              <DateRangePicker
+                value={dateRange}
+                onChange={(range) => {
+                  if (range?.from) {
+                    setDateRange({ from: range.from, to: range.to || range.from });
+                  }
+                }}
+                align="end"
+                showCompare
+                compareEnabled={compareEnabled}
+                compareRange={compareRange}
+                onCompareChange={(enabled, range) => {
+                  setCompareEnabled(enabled);
+                  setCompareRange(range);
+                }}
+              />
+            </div>
           </CardHeader>
-          <CardContent className="p-0">
+          <CardContent className="p-0 flex-1 min-h-0">
             <CriativosTable
               level={level}
               rows={activeRows}
@@ -939,8 +898,6 @@ export default function Criativos() {
               isLoading={isLoading}
               sortConfig={sortConfig}
               onSort={handleSort}
-              expandedGroups={expandedGroups}
-              toggleGroup={toggleGroup}
               expandedColumns={expandedColumns}
               toggleColumn={toggleColumn}
               getCellColor={getCellColor}
@@ -951,6 +908,9 @@ export default function Criativos() {
               onToggleSelectAll={toggleSelectAll}
               onToggleStatus={handleToggleStatus}
               togglingIds={togglingIds}
+              columns={visibleColumns}
+              columnWidths={colConfig.widths}
+              onResize={handleResize}
             />
           </CardContent>
           <div className="px-4 py-2 border-t border-border">
@@ -958,6 +918,20 @@ export default function Criativos() {
           </div>
         </Card>
       </div>
+
+      {/* Configurações: colunas + cores */}
+      <CriativosSettingsSheet
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        config={colConfig}
+        onChangeConfig={setColConfig}
+        views={colViews}
+        onChangeViews={setColViews}
+        metricRules={metricRules}
+        produtos={produtos}
+        onSaveRule={(data) => saveRulesMutation.mutate(data)}
+        isSavingRule={saveRulesMutation.isPending}
+      />
 
       {/* Confirmação de ação em massa (pausar/ativar) */}
       <AlertDialog open={bulkAction !== null} onOpenChange={(o) => { if (!o) setBulkAction(null); }}>

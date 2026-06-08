@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-08 | feat(criativos): config de colunas (views), resize e layout reorganizado
+
+**O que foi feito:**
+- **Engrenagem de configurações** (uma só) com abas **Colunas** e **Cores**: escolher quais colunas aparecem, reordenar (arraste), e **visualizações salvas** (presets nomeados no navegador)
+- **Redimensionar colunas** arrastando a borda do cabeçalho (nome + métricas); largura salva no navegador
+- **Layout reorganizado**: KPI cards no topo; filtros (busca/status/plataforma/produto/campanha/data) + Analisar IA + Propostas + engrenagem movidos para dentro do card, junto das tabs (estilo Meta Ads)
+- Tabela migrada para `table-layout: fixed` + `<colgroup>` e renderização data-driven (registro central de colunas) — elimina de vez o drift das colunas fixas e habilita resize previsível
+
+**Por que:**
+- Há ~40 métricas; mostrar todas ocupa muito espaço. O usuário precisa montar a própria visão (como no Meta Ads) e ajustar larguras
+
+**Arquivos alterados:**
+- `client/src/lib/criativosColumns.ts` (novo) - registro de colunas, config, views, persistência
+- `client/src/components/criativos/CriativosSettingsSheet.tsx` (novo) - engrenagem com abas Colunas/Cores
+- `client/src/components/criativos/CriativosTable.tsx` - reescrita data-driven + colgroup + resize
+- `client/src/components/MetricFormattingSheet.tsx` - extrai `MetricFormattingContent` (reuso na aba Cores)
+- `client/src/pages/Criativos.tsx` - estado de config/views, wiring, reorganização do layout
+
+**Impacto arquitetural:** Tabela passa a ser data-driven a partir de um registro único de colunas; preferências (colunas/larguras/views) ficam no localStorage do usuário.
+
+---
+
 ## 2026-06-08 | feat(criativos): 4 tabs (Conta/Campanha/Conjunto/Anúncio) + pausar/ativar
 
 **O que foi feito:**
