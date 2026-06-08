@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-06-08 | feat(criativos): 4 tabs (Conta/Campanha/Conjunto/Anúncio) + pausar/ativar
+
+**O que foi feito:**
+- Aba Criativos agora tem 4 visualizações em tabs: **Conta**, **Campanhas**, **Conjuntos**, **Anúncios** — mesmas métricas agregadas por nível (agregação client-side a partir das linhas de anúncio; derivados recalculados por soma/soma)
+- Coluna de **toggle** (liga/desliga) por linha — pausa/ativa ad/conjunto/campanha direto na Meta Ads (reusa `POST /api/meta/actions/{pause,resume}` em modo manual)
+- Coluna de **checkbox** + barra de **ação em massa** (Ativar/Pausar selecionados) com confirmação — usa `POST /api/meta/actions/bulk`
+- Override otimista de status na sessão (a tabela lê do DB que sincroniza com a Meta a cada 6h)
+- Tabela extraída para `CriativosTable.tsx` (page caiu de ~1399 → ~990 linhas) e métricas para `lib/criativosMetrics.ts`
+- Linha de totais passou a usar soma/soma (antes média simples, conceitualmente errada)
+
+**Por que:**
+- O gestor pedia visão por conta/campanha/conjunto além de anúncio, e poder pausar/ativar em massa sem sair do Cortex (estilo Meta Ads Manager)
+
+**Arquivos alterados:**
+- `client/src/pages/Criativos.tsx` - tabs, agregação por nível, seleção/toggle/bulk, remoção da tabela inline
+- `client/src/components/criativos/CriativosTable.tsx` (novo) - tabela reutilizável parametrizada por nível, colunas congeladas dinâmicas, toggle + checkbox
+- `client/src/lib/criativosMetrics.ts` (novo) - tipos + agregação + cálculo de derivados
+- `server/routes/growth.ts` - adset + status reais + contadores brutos no payload
+- `server/routes/metaActions.ts` - endpoint `/bulk`
+
+**Impacto arquitetural:** Agregação client-side a partir de uma única fonte (`/api/growth/criativos`) — totais batem entre níveis por construção; sem novos endpoints de leitura.
+
+---
+
 ## 2026-06-08 | chore(criativos): remove impl ANTIGA órfã de otimização de ads
 
 **O que foi feito:**
