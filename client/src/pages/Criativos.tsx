@@ -18,7 +18,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { CriativosTable } from "@/components/criativos/CriativosTable";
 import { aggregateByLevel, sortRows, type CriativoData, type Level, type SortConfig } from "@/lib/criativosMetrics";
-import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle } from "lucide-react";
+import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle, Building2, Megaphone, Layers3, Image as ImageIcon } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getMetricColor, getColorClasses, getBenchmarkColor, CRIATIVOS_BENCHMARK_MAP } from "@/lib/metricFormatting";
@@ -877,11 +877,19 @@ export default function Criativos() {
           <CardHeader className="pb-2">
             <div className="flex items-center justify-between gap-2">
               <Tabs value={level} onValueChange={handleLevelChange}>
-                <TabsList>
-                  <TabsTrigger value="conta" data-testid="tab-conta">Conta</TabsTrigger>
-                  <TabsTrigger value="campanha" data-testid="tab-campanha">Campanhas</TabsTrigger>
-                  <TabsTrigger value="conjunto" data-testid="tab-conjunto">Conjuntos</TabsTrigger>
-                  <TabsTrigger value="anuncio" data-testid="tab-anuncio">Anúncios</TabsTrigger>
+                <TabsList className="h-9 gap-1 bg-muted/60 p-1">
+                  <TabsTrigger value="conta" className="h-7 gap-1.5 px-3 text-xs data-[state=active]:shadow-sm" data-testid="tab-conta">
+                    <Building2 className="w-3.5 h-3.5" /> Conta
+                  </TabsTrigger>
+                  <TabsTrigger value="campanha" className="h-7 gap-1.5 px-3 text-xs data-[state=active]:shadow-sm" data-testid="tab-campanha">
+                    <Megaphone className="w-3.5 h-3.5" /> Campanhas
+                  </TabsTrigger>
+                  <TabsTrigger value="conjunto" className="h-7 gap-1.5 px-3 text-xs data-[state=active]:shadow-sm" data-testid="tab-conjunto">
+                    <Layers3 className="w-3.5 h-3.5" /> Conjuntos
+                  </TabsTrigger>
+                  <TabsTrigger value="anuncio" className="h-7 gap-1.5 px-3 text-xs data-[state=active]:shadow-sm" data-testid="tab-anuncio">
+                    <ImageIcon className="w-3.5 h-3.5" /> Anúncios
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
               <div className="flex items-center gap-2">
