@@ -124,6 +124,78 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
     }
   });
 
+  app.get("/api/churn/squad-motivo", async (req, res) => {
+    try {
+      const now = new Date();
+      const defaultStart = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split("T")[0];
+      const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+
+      const produto = String(req.query.produto || "");
+      const rawInicio = String(req.query.dataInicio || "");
+      const rawFim = String(req.query.dataFim || "");
+      const startStr = rawInicio ? `${rawInicio.slice(0, 7)}-01` : defaultStart;
+      const endStr = rawFim ? `${rawFim.slice(0, 7)}-01` : defaultEnd;
+
+      if (!produto) return res.status(400).json({ error: "produto required" });
+
+      const result = await db.execute(sql`
+        SELECT
+          COALESCE(squad, 'Sem Squad') AS squad,
+          COALESCE(motivo_cancelamento, 'Não Informado') AS motivo_cancelamento,
+          COUNT(*)::int AS cancelamentos,
+          COALESCE(SUM(valor_r), 0)::numeric AS mrr_perdido
+        FROM "Clickup".cup_churn
+        WHERE produto = ${produto}
+          AND ultimo_dia_operacao >= ${startStr}::date
+          AND ultimo_dia_operacao <= ${endStr}::date
+        GROUP BY 1, 2
+        ORDER BY 1, 3 DESC
+      `);
+
+      const data = result.rows as { squad: string; motivo_cancelamento: string; cancelamentos: number; mrr_perdido: number }[];
+
+      // Top 6 motivos
+      const motivoTotais = new Map<string, number>();
+      data.forEach(r => motivoTotais.set(r.motivo_cancelamento, (motivoTotais.get(r.motivo_cancelamento) || 0) + Number(r.cancelamentos)));
+      const top6 = Array.from(motivoTotais.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([m]) => m);
+      const temOutros = motivoTotais.size > 6;
+      const motivos = temOutros ? [...top6, "Outros"] : top6;
+
+      // Squads ordenados por total
+      const squadTotais = new Map<string, number>();
+      data.forEach(r => squadTotais.set(r.squad, (squadTotais.get(r.squad) || 0) + Number(r.cancelamentos)));
+      const squads = Array.from(squadTotais.entries()).sort((a, b) => b[1] - a[1]).map(([s]) => s);
+
+      // Células
+      const cellMap = new Map<string, { cancelamentos: number; mrr_perdido: number }>();
+      data.forEach(r => {
+        const motivo = top6.includes(r.motivo_cancelamento) ? r.motivo_cancelamento : "Outros";
+        const key = `${r.squad}|||${motivo}`;
+        const cur = cellMap.get(key) || { cancelamentos: 0, mrr_perdido: 0 };
+        cur.cancelamentos += Number(r.cancelamentos);
+        cur.mrr_perdido += Number(r.mrr_perdido);
+        cellMap.set(key, cur);
+      });
+
+      const celulas = Array.from(cellMap.entries()).map(([key, v]) => {
+        const [squad, motivo_cancelamento] = key.split("|||");
+        const squadTotal = squadTotais.get(squad) || 1;
+        return {
+          squad,
+          motivo_cancelamento,
+          cancelamentos: v.cancelamentos,
+          mrr_perdido: Math.round(v.mrr_perdido * 100) / 100,
+          pct_dentro_squad: Math.round((v.cancelamentos / squadTotal) * 10000) / 100,
+        };
+      });
+
+      res.json({ squads, motivos, celulas });
+    } catch (error) {
+      console.error("[api] Error fetching squad-motivo:", error);
+      res.status(500).json({ error: "Failed to fetch squad-motivo" });
+    }
+  });
+
   app.get("/api/churn/produto-motivo/mensal", async (req, res) => {
     try {
       const result = await db.execute(sql`
