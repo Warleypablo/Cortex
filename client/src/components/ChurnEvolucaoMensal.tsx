@@ -6,7 +6,6 @@ import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { MousePointerClick } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar,
-  AreaChart, Area,
   XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -22,14 +21,6 @@ interface MensalRow {
 
 interface MensalResponse {
   rows: MensalRow[];
-}
-
-interface TaxaMensalRow {
-  mes: string;
-  mrr_base: number;
-  mrr_churn: number;
-  cancelamentos: number;
-  taxa: number;
 }
 
 const PRODUTO_COLORS = [
@@ -56,15 +47,18 @@ export function ChurnEvolucaoMensal() {
     queryFn: () => fetch("/api/churn/produto-motivo/mensal").then(r => r.json()),
   });
 
-  const { data: taxaData } = useQuery<{ rows: TaxaMensalRow[] }>({
-    queryKey: ["/api/churn/taxa-mensal"],
-    queryFn: () => fetch("/api/churn/taxa-mensal").then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-  });
-
   const { data: taxaProdutoData, isFetching: isFetchingTaxa, isError: isErrorTaxa } = useQuery<{ rows: Array<{ mes: string; produto: string; mrr_base: string; mrr_churn: string; cancelamentos: string; taxa: string }> }>({
     queryKey: ["/api/churn/taxa-por-produto"],
     queryFn: () => fetch("/api/churn/taxa-por-produto").then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); }),
     enabled: metricaLinha === "taxa_churn" || metrica === "taxa_churn",
+    retry: 1,
+    staleTime: 5 * 60 * 1000,
+  });
+
+  const { data: taxaMotivoData, isFetching: isFetchingTaxaMotivo, isError: isErrorTaxaMotivo } = useQuery<{ rows: Array<{ mes: string; motivo: string; mrr_base: string; mrr_churn: string; taxa: string }> }>({
+    queryKey: ["/api/churn/taxa-por-motivo"],
+    queryFn: () => fetch("/api/churn/taxa-por-motivo").then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); }),
+    enabled: metrica === "taxa_churn",
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
@@ -194,7 +188,7 @@ export function ChurnEvolucaoMensal() {
       const meRows = rows.filter(r => r.mes === mes);
       topProds.forEach(p => {
         const row = meRows.find(r => r.produto === p);
-        entry[p] = Number(row?.taxa ?? 0);
+        entry[p] = Math.min(Number(row?.taxa ?? 0), 100);
       });
       if (temOutros) {
         const outros = meRows.filter(r => !topProds.includes(r.produto));
@@ -207,45 +201,50 @@ export function ChurnEvolucaoMensal() {
     return { taxaChartData, taxaProdutos };
   }, [taxaProdutoData]);
 
-  // % churn por motivo (usa mrr_perdido / mrr_base_total)
+  // % churn por motivo — usa endpoint dedicado com filtros consistentes (36 meses)
   const { motivoTaxaChartData, motivoTaxaKeys } = useMemo(() => {
-    if (!data?.rows?.length || !taxaData?.rows?.length) return { motivoTaxaChartData: [], motivoTaxaKeys: [] };
-    const baseByMes = new Map<string, number>();
-    taxaData.rows.forEach(r => baseByMes.set(r.mes, Number(r.mrr_base)));
+    if (!taxaMotivoData?.rows?.length) return { motivoTaxaChartData: [], motivoTaxaKeys: [] };
+    const rows = taxaMotivoData.rows;
+
+    // Top N motivos por mrr_churn total
     const motivoTotais = new Map<string, number>();
-    data.rows.forEach(r => {
-      const m = r.motivo_cancelamento || "Não Informado";
-      motivoTotais.set(m, (motivoTotais.get(m) || 0) + Number(r.cancelamentos));
+    rows.forEach(r => {
+      motivoTotais.set(r.motivo, (motivoTotais.get(r.motivo) || 0) + Number(r.mrr_churn));
     });
-    const topMotivos = Array.from(motivoTotais.entries()).sort((a,b) => b[1]-a[1]).slice(0, TOP_N_PRODUTOS).map(([m]) => m);
+    const topMotivos = Array.from(motivoTotais.entries()).sort((a, b) => b[1] - a[1]).slice(0, TOP_N_PRODUTOS).map(([m]) => m);
     const temOutros = motivoTotais.size > TOP_N_PRODUTOS;
     const motivoTaxaKeys = temOutros ? [...topMotivos, "Outros"] : topMotivos;
-    const aggMap = new Map<string, Map<string, number>>();
-    data.rows.forEach(r => {
-      const m = r.motivo_cancelamento || "Não Informado";
-      if (!aggMap.has(r.ano_mes)) aggMap.set(r.ano_mes, new Map());
-      const mm = aggMap.get(r.ano_mes)!;
-      mm.set(m, (mm.get(m) || 0) + Number(r.mrr_perdido));
+
+    // mrr_base por mês (igual para todos os motivos, pegar do primeiro motivo do mês)
+    const baseByMes = new Map<string, number>();
+    rows.forEach(r => { if (!baseByMes.has(r.mes)) baseByMes.set(r.mes, Number(r.mrr_base)); });
+
+    // mrr_churn por mês×motivo
+    const mrrByMesMotivo = new Map<string, Map<string, number>>();
+    rows.forEach(r => {
+      if (!mrrByMesMotivo.has(r.mes)) mrrByMesMotivo.set(r.mes, new Map());
+      const mm = mrrByMesMotivo.get(r.mes)!;
+      mm.set(r.motivo, (mm.get(r.motivo) || 0) + Number(r.mrr_churn));
     });
-    const mesesOrdenados = Array.from(aggMap.keys()).sort();
+
+    const mesesOrdenados = Array.from(mrrByMesMotivo.keys()).sort();
     const motivoTaxaChartData = mesesOrdenados.map(mes => {
-      const mm = aggMap.get(mes)!;
-      const mesKey = mes.slice(0, 7);
-      const base = baseByMes.get(mesKey) || 0;
-      const entry: Record<string, string | number> = { mes: mesKey, mesLabel: formatMes(mes) };
+      const mm = mrrByMesMotivo.get(mes)!;
+      const base = baseByMes.get(mes) || 0;
+      const entry: Record<string, string | number> = { mes, mesLabel: formatMes(mes + "-01") };
       topMotivos.forEach(m => {
         const mrr = mm.get(m) || 0;
         entry[m] = base > 0 ? Math.round(mrr / base * 10000) / 100 : 0;
       });
       if (temOutros) {
-        let otrosMrr = 0;
-        mm.forEach((v, m) => { if (!topMotivos.includes(m)) otrosMrr += v; });
-        entry["Outros"] = base > 0 ? Math.round(otrosMrr / base * 10000) / 100 : 0;
+        let outrosMrr = 0;
+        mm.forEach((v, m) => { if (!topMotivos.includes(m)) outrosMrr += v; });
+        entry["Outros"] = base > 0 ? Math.round(outrosMrr / base * 10000) / 100 : 0;
       }
       return entry;
     });
     return { motivoTaxaChartData, motivoTaxaKeys };
-  }, [data, taxaData]);
+  }, [taxaMotivoData]);
 
   // Lista de todos os produtos disponíveis (para o dropdown)
   const todosProdutos = useMemo(() => {
@@ -591,6 +590,15 @@ export function ChurnEvolucaoMensal() {
         </div>
       </CardHeader>
       <CardContent>
+        {metrica === "taxa_churn" && isFetchingTaxaMotivo && !taxaMotivoData ? (
+          <div className="h-96 flex items-center justify-center text-sm text-muted-foreground animate-pulse">
+            Calculando taxas...
+          </div>
+        ) : metrica === "taxa_churn" && isErrorTaxaMotivo ? (
+          <div className="h-96 flex items-center justify-center text-sm text-muted-foreground">
+            Erro ao carregar taxas de churn por motivo.
+          </div>
+        ) : (
         <ResponsiveContainer width="100%" height={400}>
           <LineChart
             data={metrica === "taxa_churn" ? motivoTaxaChartData : motivoChartData}
@@ -637,6 +645,7 @@ export function ChurnEvolucaoMensal() {
             ))}
           </LineChart>
         </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
     </div>
