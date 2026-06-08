@@ -40,7 +40,7 @@ const PRODUTO_COLORS = [
 
 const TOP_N_PRODUTOS = 7;
 
-type Metrica = "cancelamentos" | "mrr_perdido";
+type Metrica = "cancelamentos" | "mrr_perdido" | "taxa_churn";
 
 export function ChurnEvolucaoMensal() {
   const { theme } = useTheme();
@@ -58,6 +58,12 @@ export function ChurnEvolucaoMensal() {
   const { data: taxaData } = useQuery<{ rows: TaxaMensalRow[] }>({
     queryKey: ["/api/churn/taxa-mensal"],
     queryFn: () => fetch("/api/churn/taxa-mensal").then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+  });
+
+  const { data: taxaProdutoData } = useQuery<{ rows: Array<{ mes: string; produto: string; mrr_base: string; mrr_churn: string; cancelamentos: string; taxa: string }> }>({
+    queryKey: ["/api/churn/taxa-por-produto"],
+    queryFn: () => fetch("/api/churn/taxa-por-produto").then(r => { if (!r.ok) throw new Error(); return r.json(); }),
+    enabled: metrica === "taxa_churn",
   });
 
   const { chartData, produtos } = useMemo(() => {
@@ -167,6 +173,37 @@ export function ChurnEvolucaoMensal() {
     return { chartData, produtos: motivos };
   }, [data, metrica]);
 
+  const { taxaChartData, taxaProdutos } = useMemo(() => {
+    if (!taxaProdutoData?.rows?.length) return { taxaChartData: [], taxaProdutos: [] };
+    const rows = taxaProdutoData.rows;
+
+    const prodTotais = new Map<string, number>();
+    rows.forEach(r => {
+      prodTotais.set(r.produto, (prodTotais.get(r.produto) || 0) + Number(r.mrr_churn));
+    });
+    const topProds = Array.from(prodTotais.entries()).sort((a, b) => b[1] - a[1]).slice(0, TOP_N_PRODUTOS).map(([p]) => p);
+    const temOutros = prodTotais.size > TOP_N_PRODUTOS;
+    const taxaProdutos = temOutros ? [...topProds, "Outros"] : topProds;
+
+    const mesesUnicos = Array.from(new Set(rows.map(r => r.mes))).sort();
+    const taxaChartData = mesesUnicos.map(mes => {
+      const entry: Record<string, string | number> = { mes, mesLabel: formatMes(mes + "-01") };
+      const meRows = rows.filter(r => r.mes === mes);
+      topProds.forEach(p => {
+        const row = meRows.find(r => r.produto === p);
+        entry[p] = Number(row?.taxa ?? 0);
+      });
+      if (temOutros) {
+        const outros = meRows.filter(r => !topProds.includes(r.produto));
+        const totalBase = outros.reduce((s, r) => s + Number(r.mrr_base), 0);
+        const totalChurn = outros.reduce((s, r) => s + Number(r.mrr_churn), 0);
+        entry["Outros"] = totalBase > 0 ? Math.round((totalChurn / totalBase) * 10000) / 100 : 0;
+      }
+      return entry;
+    });
+    return { taxaChartData, taxaProdutos };
+  }, [taxaProdutoData]);
+
   // Lista de todos os produtos disponíveis (para o dropdown)
   const todosProdutos = useMemo(() => {
     if (!data?.rows?.length) return [];
@@ -223,14 +260,16 @@ export function ChurnEvolucaoMensal() {
     return `${meses[parseInt(m, 10) - 1]}/${ano}`;
   }
 
-  const yFormatter = (v: number) =>
-    metrica === "mrr_perdido" ? formatCurrencyNoDecimals(v) : String(v);
+  const yFormatter = (v: number) => {
+    if (metrica === "mrr_perdido") return formatCurrencyNoDecimals(v);
+    if (metrica === "taxa_churn") return `${v.toFixed(1)}%`;
+    return String(v);
+  };
 
   const tooltipFormatter = (value: number, name: string) => {
-    const formatted = metrica === "mrr_perdido"
-      ? formatCurrencyNoDecimals(value)
-      : String(value);
-    return [formatted, name];
+    if (metrica === "mrr_perdido") return [formatCurrencyNoDecimals(value), name];
+    if (metrica === "taxa_churn") return [`${Number(value).toFixed(2)}%`, name];
+    return [String(value), name];
   };
 
   if (isLoading) {
@@ -364,7 +403,7 @@ export function ChurnEvolucaoMensal() {
             Cancelamentos por Produto ao Longo do Tempo
           </CardTitle>
           <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
-            {(["cancelamentos", "mrr_perdido"] as Metrica[]).map(m => (
+            {(["cancelamentos", "mrr_perdido", "taxa_churn"] as Metrica[]).map(m => (
               <button
                 key={m}
                 onClick={() => setMetrica(m)}
@@ -374,7 +413,7 @@ export function ChurnEvolucaoMensal() {
                     : "text-muted-foreground hover:text-foreground"
                 }`}
               >
-                {m === "cancelamentos" ? "Contratos" : "MRR Perdido"}
+                {m === "cancelamentos" ? "Contratos" : m === "mrr_perdido" ? "MRR Perdido" : "% Churn"}
               </button>
             ))}
           </div>
@@ -388,8 +427,14 @@ export function ChurnEvolucaoMensal() {
         </div>
       </CardHeader>
       <CardContent>
+        {metrica === "taxa_churn" && taxaProdutoData === undefined ? (
+          <div className="h-96 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
+        ) : (
         <ResponsiveContainer width="100%" height={400}>
-          <LineChart data={chartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+          <LineChart
+            data={metrica === "taxa_churn" ? taxaChartData : chartData}
+            margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+          >
             <CartesianGrid
               strokeDasharray="3 3"
               stroke={isDark ? "#3f3f46" : "#e5e7eb"}
@@ -402,7 +447,7 @@ export function ChurnEvolucaoMensal() {
             <YAxis
               tickFormatter={yFormatter}
               tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
-              width={metrica === "mrr_perdido" ? 80 : 40}
+              width={metrica === "mrr_perdido" ? 80 : 45}
             />
             <Tooltip
               formatter={tooltipFormatter}
@@ -419,7 +464,7 @@ export function ChurnEvolucaoMensal() {
                 setHighlightProduto(prev => prev === d.value ? null : d.value)
               }
             />
-            {produtos.map((produto, i) => (
+            {(metrica === "taxa_churn" ? taxaProdutos : produtos).map((produto, i) => (
               <Line
                 key={produto}
                 type="monotone"
@@ -434,6 +479,7 @@ export function ChurnEvolucaoMensal() {
             ))}
           </LineChart>
         </ResponsiveContainer>
+        )}
       </CardContent>
     </Card>
 
