@@ -30,13 +30,16 @@ const YT_SCOPES = [
 ];
 
 function getOauthClient(req: Request) {
-  // OAuth client web "Data Central" (GOOGLE_CLIENT_ID/SECRET) — tem a redirect URI
-  // do YouTube cadastrada. NÃO usar o GOOGLE_ADS_CLIENT_ID (client de Ads, server-to-
-  // server, em outro projeto e sem essa redirect → redirect_uri_mismatch).
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  // Client OAuth DEDICADO do YouTube (projeto GCP próprio, consent screen External +
+  // verificado) — permite que donos de canal externos (sem e-mail @turbopartners)
+  // autorizem com a própria conta. Enquanto esse client não existir, faz fallback pro
+  // client "Data Central" (GOOGLE_CLIENT_ID, Internal — só @turbopartners).
+  // NÃO usar o GOOGLE_ADS_CLIENT_ID (client de Ads, server-to-server, em outro projeto
+  // e sem essa redirect → redirect_uri_mismatch).
+  const clientId = process.env.YOUTUBE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_CLIENT_ID/SECRET não configurados (Data Central, web client do YouTube)');
+    throw new Error('YOUTUBE_CLIENT_ID/SECRET (ou fallback GOOGLE_CLIENT_ID/SECRET) não configurados');
   }
   const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
   const host = req.get('host');
