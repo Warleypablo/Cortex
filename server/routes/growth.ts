@@ -3835,7 +3835,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cliques = parseInt(s.cliques) || 0;
       const ctr = impressoes > 0 ? cliques / impressoes : 0;
 
+      // Posts publicados no período (Posts API → linkedin.posts). Pode vir 0 até o
+      // sync rodar com r_organization_social concedido. Conta lifecycle PUBLISHED.
+      let postsPublicados = 0;
+      try {
+        const postsRes = await db.execute(sql`
+          SELECT COUNT(*)::int AS n FROM linkedin.posts
+          WHERE created_at >= ${startDate}::date
+            AND created_at <= ${endDate}::date + INTERVAL '1 day'
+            AND (lifecycle_state IS NULL OR lifecycle_state = 'PUBLISHED')
+        `);
+        postsPublicados = parseInt((postsRes.rows[0] as any).n) || 0;
+      } catch (err: any) {
+        console.warn('[orcado-realizado/linkedin] posts count failed:', err?.message || err);
+      }
+
       res.json({
+        postsPublicados,
         // Audiência (espelha o breakdown de seguidores do Instagram/YouTube)
         comecaramSeguir,
         deixaramSeguir,
