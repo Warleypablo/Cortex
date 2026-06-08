@@ -2123,9 +2123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Evolução Mensal - MRR histórico por squad e operador com churn
   app.get("/api/dashboard/evolucao-mensal", async (req, res) => {
     try {
-      const { meses, comAbono } = req.query;
+      const { meses, semAbono } = req.query;
       const numMeses = Math.min(Math.max(parseInt(meses as string) || 6, 1), 36);
-      const incluirAbono = comAbono === 'true';
+      const excluirAbono = semAbono !== 'true';
       
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - numMeses);
@@ -2196,7 +2196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
-          ${!incluirAbono ? sql`AND COALESCE(abonar_churn, '') != 'Sim'` : sql``}
+          ${excluirAbono ? sql`AND COALESCE(abonar_churn, '') != 'Sim'` : sql``}
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
