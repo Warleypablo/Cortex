@@ -6,6 +6,7 @@ import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { MousePointerClick } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar,
+  AreaChart, Area,
   XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
@@ -21,6 +22,14 @@ interface MensalRow {
 
 interface MensalResponse {
   rows: MensalRow[];
+}
+
+interface TaxaMensalRow {
+  mes: string;
+  mrr_base: number;
+  mrr_churn: number;
+  cancelamentos: number;
+  taxa: number;
 }
 
 const PRODUTO_COLORS = [
@@ -44,6 +53,11 @@ export function ChurnEvolucaoMensal() {
   const { data, isLoading, isError } = useQuery<MensalResponse>({
     queryKey: ["/api/churn/produto-motivo/mensal"],
     queryFn: () => fetch("/api/churn/produto-motivo/mensal").then(r => r.json()),
+  });
+
+  const { data: taxaData } = useQuery<{ rows: TaxaMensalRow[] }>({
+    queryKey: ["/api/churn/taxa-mensal"],
+    queryFn: () => fetch("/api/churn/taxa-mensal").then(r => { if (!r.ok) throw new Error(); return r.json(); }),
   });
 
   const { chartData, produtos } = useMemo(() => {
@@ -235,6 +249,41 @@ export function ChurnEvolucaoMensal() {
 
   return (
     <div className="space-y-6">
+
+    {/* Taxa de Churn Mensal */}
+    {taxaData?.rows && taxaData.rows.length > 1 && (
+      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base text-gray-900 dark:text-white">Taxa de Churn Mensal</CardTitle>
+          <p className="text-xs text-muted-foreground">MRR churn / MRR base · excluindo abonos, erros e inadimplência</p>
+        </CardHeader>
+        <CardContent>
+          <ResponsiveContainer width="100%" height={180}>
+            <AreaChart data={taxaData.rows.map(r => ({ ...r, mesLabel: formatMes(r.mes + "-01") }))} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <defs>
+                <linearGradient id="taxaGradMensal" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
+                  <stop offset="95%" stopColor="#ef4444" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} vertical={false} />
+              <XAxis dataKey="mesLabel" tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }} axisLine={false} tickLine={false} interval="preserveStartEnd" />
+              <YAxis tickFormatter={v => `${v.toFixed(1)}%`} tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }} axisLine={false} tickLine={false} width={45} />
+              <Tooltip
+                formatter={(v: number, name: string) => {
+                  if (name === "taxa") return [`${v.toFixed(2)}%`, "Taxa churn"];
+                  if (name === "mrr_churn") return [yFormatter(v), "MRR perdido"];
+                  return [v, name];
+                }}
+                contentStyle={{ background: isDark ? "#18181b" : "#fff", border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb", borderRadius: 6, fontSize: 12 }}
+              />
+              <Area type="monotone" dataKey="taxa" stroke="#ef4444" strokeWidth={2} fill="url(#taxaGradMensal)" dot={{ r: 3, fill: "#ef4444", strokeWidth: 0 }} activeDot={{ r: 5 }} />
+            </AreaChart>
+          </ResponsiveContainer>
+        </CardContent>
+      </Card>
+    )}
+
     <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
       <CardHeader>
         <div className="flex items-center justify-between flex-wrap gap-3">

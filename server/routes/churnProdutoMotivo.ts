@@ -196,6 +196,85 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
     }
   });
 
+  app.get("/api/churn/taxa-mensal", async (req, res) => {
+    try {
+      const now = new Date();
+      const defaultStart = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split("T")[0];
+      const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+      const rawInicio = String(req.query.dataInicio || "");
+      const rawFim = String(req.query.dataFim || "");
+      const startStr = rawInicio ? `${rawInicio.slice(0, 7)}-01` : defaultStart;
+      const endStr = rawFim ? `${rawFim.slice(0, 7)}-01` : defaultEnd;
+
+      const SQUADS_EXCLUIDOS = ['🌟 Aurea','🗝️ Bloomfield','🔥 Chama','🏹 Hunters','👾 Squad X','👑 Supreme','🖥️ Tech','🚀 Turbo Interno'];
+
+      const result = await db.execute(sql`
+        WITH meses_range AS (
+          SELECT generate_series(
+            DATE_TRUNC('month', ${startStr}::date),
+            DATE_TRUNC('month', ${endStr}::date),
+            '1 month'::interval
+          )::date AS mes
+        ),
+        snapshots_mensais AS (
+          SELECT
+            mr.mes,
+            COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist
+               WHERE data_snapshot = (mr.mes + INTERVAL '1 month')::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist
+               WHERE DATE_TRUNC('month', data_snapshot) = mr.mes)
+            ) AS data_snapshot
+          FROM meses_range mr
+        ),
+        mrr_base AS (
+          SELECT
+            sm.mes,
+            COALESCE(SUM(h.valorr), 0)::numeric AS mrr_base
+          FROM snapshots_mensais sm
+          LEFT JOIN "Clickup".cup_data_hist h
+            ON DATE(h.data_snapshot) = DATE(sm.data_snapshot)
+            AND h.status IN ('ativo','onboarding','triagem')
+            AND h.squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+          WHERE sm.data_snapshot IS NOT NULL
+          GROUP BY sm.mes
+        ),
+        churn_mes AS (
+          SELECT
+            DATE_TRUNC('month', data_solicitacao_encerramento)::date AS mes,
+            COALESCE(SUM(valor_r), 0)::numeric AS mrr_churn,
+            COUNT(*)::int AS cancelamentos
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE valor_r > 0
+            AND data_solicitacao_encerramento IS NOT NULL
+            AND data_solicitacao_encerramento >= ${startStr}::date
+            AND data_solicitacao_encerramento <= ${endStr}::date
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
+            AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+          GROUP BY DATE_TRUNC('month', data_solicitacao_encerramento)::date
+        )
+        SELECT
+          TO_CHAR(b.mes, 'YYYY-MM') AS mes,
+          ROUND(b.mrr_base, 2) AS mrr_base,
+          COALESCE(c.mrr_churn, 0) AS mrr_churn,
+          COALESCE(c.cancelamentos, 0) AS cancelamentos,
+          CASE WHEN b.mrr_base > 0
+            THEN ROUND(COALESCE(c.mrr_churn, 0) / b.mrr_base * 100, 2)
+            ELSE 0
+          END AS taxa
+        FROM mrr_base b
+        LEFT JOIN churn_mes c ON c.mes = b.mes
+        ORDER BY b.mes
+      `);
+
+      res.json({ rows: result.rows });
+    } catch (error) {
+      console.error("[api] Error fetching taxa-mensal:", error);
+      res.status(500).json({ error: "Failed to fetch taxa-mensal" });
+    }
+  });
+
   app.get("/api/churn/produto-motivo/mensal", async (req, res) => {
     try {
       const result = await db.execute(sql`
