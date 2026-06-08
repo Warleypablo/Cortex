@@ -247,6 +247,18 @@ export function ChurnEvolucaoMensal() {
     return { motivoTaxaChartData, motivoTaxaKeys };
   }, [data, taxaData]);
 
+  // Lista de todos os produtos disponíveis (para o dropdown)
+  const todosProdutos = useMemo(() => {
+    if (!data?.rows?.length) return [];
+    const totais = new Map<string, number>();
+    data.rows.forEach(r => {
+      totais.set(r.produto, (totais.get(r.produto) || 0) + Number(r.cancelamentos));
+    });
+    return Array.from(totais.entries()).sort((a, b) => b[1] - a[1]).map(([p]) => p);
+  }, [data]);
+
+  const produtoEfetivo = produtoSelecionado || todosProdutos[0] || "";
+
   // % churn por motivo para produto específico (usa mrr_perdido / product_mrr_base)
   const produtoMotivoTaxaChartData = useMemo(() => {
     if (!data?.rows?.length || !taxaProdutoData?.rows?.length || !produtoEfetivo) return null;
@@ -287,18 +299,6 @@ export function ChurnEvolucaoMensal() {
       return entry;
     });
   }, [data, taxaProdutoData, produtoEfetivo]);
-
-  // Lista de todos os produtos disponíveis (para o dropdown)
-  const todosProdutos = useMemo(() => {
-    if (!data?.rows?.length) return [];
-    const totais = new Map<string, number>();
-    data.rows.forEach(r => {
-      totais.set(r.produto, (totais.get(r.produto) || 0) + Number(r.cancelamentos));
-    });
-    return Array.from(totais.entries()).sort((a, b) => b[1] - a[1]).map(([p]) => p);
-  }, [data]);
-
-  const produtoEfetivo = produtoSelecionado || todosProdutos[0] || "";
 
   const { produtoChartData, motivosBarras } = useMemo(() => {
     if (!data?.rows?.length || !produtoEfetivo) return { produtoChartData: [], motivosBarras: [] };
