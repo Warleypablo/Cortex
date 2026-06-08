@@ -109,47 +109,6 @@ export const metaActionsLog = cortexCoreSchema.table("meta_actions_log", {
 export type MetaActionLog = typeof metaActionsLog.$inferSelect;
 export type InsertMetaActionLog = typeof metaActionsLog.$inferInsert;
 
-// ============== META ADS OPTIMIZATION (impl ANTIGA — vinda da branch de criação) ==============
-// Propostas de otimização geradas pelo agente de IA (pause/reactivate de campanhas).
-// Preservada aqui junto da impl nova (metaActionsLog) — decidir depois qual seguir.
-export const metaOptimizationProposals = pgTable("meta_optimization_proposals", {
-  id: serial("id").primaryKey(),
-  batchId: varchar("batch_id", { length: 50 }).notNull(),
-
-  // Proposto pelo agente (imutável após criação):
-  proposedEntityType: varchar("proposed_entity_type", { length: 20 }).notNull(),
-  proposedEntityId: varchar("proposed_entity_id", { length: 50 }).notNull(),
-  proposedEntityName: varchar("proposed_entity_name", { length: 255 }),
-  proposedAction: varchar("proposed_action", { length: 30 }).notNull(),
-
-  // Editado pelo humano (sobrescreve o proposto na execução):
-  finalEntityType: varchar("final_entity_type", { length: 20 }),
-  finalEntityId: varchar("final_entity_id", { length: 50 }),
-  finalEntityName: varchar("final_entity_name", { length: 255 }),
-  finalAction: varchar("final_action", { length: 30 }),
-
-  // Contexto do agente:
-  produto: varchar("produto", { length: 50 }),
-  reason: text("reason").notNull(),
-  currentMetrics: jsonb("current_metrics").notNull(),
-  playbookRule: varchar("playbook_rule", { length: 100 }),
-
-  // Workflow:
-  status: varchar("status", { length: 20 }).notNull().default("pending"),
-  createdAt: timestamp("created_at").defaultNow(),
-  reviewedBy: varchar("reviewed_by", { length: 255 }),
-  reviewedAt: timestamp("reviewed_at"),
-  editNotes: text("edit_notes"),
-  executedAt: timestamp("executed_at"),
-  executionError: text("execution_error"),
-}, (table) => ({
-  batchIdx: index("idx_meta_optimization_proposals_batch").on(table.batchId),
-  statusIdx: index("idx_meta_optimization_proposals_status").on(table.status),
-}));
-
-export type MetaOptimizationProposal = typeof metaOptimizationProposals.$inferSelect;
-export type InsertMetaOptimizationProposal = typeof metaOptimizationProposals.$inferInsert;
-
 export const cazClientes = contaAzulSchema.table("caz_clientes", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
