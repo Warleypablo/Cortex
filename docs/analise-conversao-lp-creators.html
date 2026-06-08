@@ -151,37 +151,63 @@ footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--tp-gray-800);
   <div class="note">¹ Junho ainda imaturo (lead time — deals novos sem reunião). Taxas medidas na coorte madura mar–mai/2026. "Previsão As Is" e "Recálculo de Meta" não se aplicam aqui (coorte fechada, não mês em curso). Orçado de %RA e No-show não estava no plano (🔘 sem meta).</div>
 </div>
 
-<!-- 4 · FCA -->
+<!-- 4 · VENDAS POR FAIXA -->
 <div class="smb">
-  <div class="st">4 · FCA</div>
+  <div class="st">4 · Vendas por faixa — o R$0-30k vale a pena?</div>
+  <p style="font-size:13px;color:var(--tp-gray-500);margin-bottom:14px;max-width:880px;">
+    Coorte madura (leads criados jan–abr, já com tempo de fechar). Conversão lead→venda, ticket (MRR) e
+    eficiência (receita por lead) por faixa. <b>Achado-chave: MQL = empresa de R$100k+/mês</b> (abaixo disso, 0% MQL; acima, 100%).</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr>
+      <th>Faixa</th><th class="r">Leads</th><th class="r">Conv Lead→Venda</th><th class="r">Ticket (MRR)</th><th class="r">Receita/lead</th>
+    </tr></thead>
+    <tbody>
+      <tr class="hl"><td>R$ 0-30k <span style="color:var(--tp-gray-500);font-weight:400">(N-MQL)</span></td><td class="r">2.112</td><td class="r down">0,8%</td><td class="r">R$ 4.653</td><td class="r down">R$ 24</td></tr>
+      <tr><td>R$ 30-50k <span style="color:var(--tp-gray-500);font-weight:400">(N-MQL)</span></td><td class="r">479</td><td class="r down">1,7%</td><td class="r">R$ 3.333</td><td class="r down">R$ 21</td></tr>
+      <tr><td>R$ 50-100k <span style="color:var(--tp-gray-500);font-weight:400">(N-MQL)</span></td><td class="r">463</td><td class="r">2,4%</td><td class="r">R$ 7.458</td><td class="r">R$ 97</td></tr>
+      <tr><td>R$ 100-500k <span style="color:var(--purple);font-weight:400">(MQL)</span></td><td class="r">463</td><td class="r up">3,9%</td><td class="r">R$ 6.267</td><td class="r up">R$ 149</td></tr>
+      <tr><td>R$ 500k-1mi <span style="color:var(--purple);font-weight:400">(MQL)</span></td><td class="r">140</td><td class="r up">3,6%</td><td class="r">R$ 8.125</td><td class="r up">R$ 232</td></tr>
+      <tr><td>R$ 1-5mi <span style="color:var(--purple);font-weight:400">(MQL)</span></td><td class="r">107</td><td class="r up">8,4%</td><td class="r">R$ 7.549</td><td class="r up">R$ 282</td></tr>
+      <tr><td>R$ 5mi+ <span style="color:var(--purple);font-weight:400">(MQL)</span></td><td class="r">69</td><td class="r up">7,2%</td><td class="r">R$ 18.249</td><td class="r up">R$ 529</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    O <b style="color:var(--red)">R$0-30k converte 0,8% em venda</b> (5-10× pior que MQL), tem o menor ticket e é <b>6-22× menos eficiente por lead</b>.
+    Mas é 55% dos leads e ainda trouxe <b>R$51k MRR (19% da receita)</b> na base do volume. O plano supunha N-MQL com ticket MAIOR (~R$12,6k) — o dado mostra o contrário (R$4,6k).
+  </div>
+</div>
+
+<!-- 5 · FCA -->
+<div class="smb">
+  <div class="st">5 · FCA — conclusão</div>
 
   <div class="fbox prob">
     <h3>Problema</h3>
     <ul class="pts">
-      <li><b class="r">CPMQL a R$ 450 vs meta R$ 182 (+147%)</b> — pela Previsão As Is, fecha o mês em <b>251 MQLs vs meta de 623</b>.</li>
-      <li>A causa imediata é uma só: <b>Tx Conversão da Página a 6,7% vs 15% (−56%)</b>. CPM, CTR, %MQL e todo o funil de vendas estão no alvo.</li>
+      <li><b class="r">CPMQL a R$ 450 vs meta R$ 182 (+147%).</b> Projeta <b>~251 MQLs no mês vs meta de 623</b>.</li>
     </ul>
   </div>
 
   <div class="fbox anal">
     <h3>Análise</h3>
-    <p style="margin-bottom:8px;">A conversão da LP <b>cai há 6 meses</b> (22% em jan → 7% agora) — e a perda é quase
-    toda em <b class="b">Não-MQL</b> (LP→Não-MQL caiu 18% → 4%), enquanto o <b>MQL por página ficou parado em ~3%</b>.</p>
-    <p style="margin-bottom:8px;">Ou seja: o <b>%MQL subir de 17% pra 40% foi cosmético</b> — não geramos mais MQL, só perdemos os Não-MQL e o
-    denominador encolheu. A <b>LP e os anúncios ficaram restritivos demais</b> e viraram um filtro: barram o público
-    mais amplo (que viraria Não-MQL, de <b>ticket maior, ~R$12,6k</b>) e só deixam passar quem já chega muito qualificado.</p>
-    <p style="margin-bottom:8px;">A quebra por faixa (seção 2) confirma e localiza: <b class="r">64% do colapso está na faixa R$ 0–30k</b> e ~88%
-    abaixo de R$ 100k. O filtro está cortando especificamente o <b>pequeno faturamento</b> — o segmento que dava volume.</p>
-    <p>Pré-vendas e vendas estão <b class="g">no alvo</b> (%RR e RR→Venda batem o plano nos dois segmentos) — o gargalo
-    está isolado na <b>conversão da página</b>, não no comercial.</p>
+    <p style="margin-bottom:8px;"><b>1. A meta nunca foi real.</b> R$182 é <b>metade do nosso melhor mês histórico</b> (R$338, fev). O CPMQL sempre
+    rodou R$340-520. A meta assumia 15% conversão × 40% %MQL = 6% de MQL por view de página — e historicamente isso
+    é <b>~3% em qualquer página</b>. Ela dependia de dobrar um teto que nunca existiu.</p>
+    <p style="margin-bottom:8px;"><b>2. A queda de conversão é multi-causal e antiga.</b> Cai desde janeiro (22%→7%), na página VELHA com %MQL
+    parado — ⅔ do estrago é <b>saturação/fadiga</b>, anterior à página nova de maio. A página e o ângulo estreito
+    adicionaram a over-qualificação. A queda está concentrada na faixa <b>R$0-30k (64%)</b>.</p>
+    <p><b>3. O que perdemos é de baixo valor.</b> MQL = empresa de R$100k+/mês. O R$0-30k converte a <b>0,8%</b> em venda
+    (vs 4-8% do MQL), <b>menor ticket</b> e 6-22× menos eficiente por lead. Recuperá-lo traz lead/N-MQL — <b>não traz MQL,
+    então não melhora o CPMQL</b>; só infla o volume e derruba o %MQL. Abrir a página é o lever errado pra este problema.</p>
   </div>
 
   <div class="fbox acao">
     <h3>Ação</h3>
     <ul class="pts">
-      <li><b class="g">Anúncios menos restritivos + LP com copy menos restritiva</b> — abrir o topo pra subir a conversão geral da página.</li>
-      <li><b>Aceitar o %MQL cair</b> (~40% → ~20%, como era jan–abr): o MQL bruto não piora e recuperamos o volume de Não-MQL.</li>
-      <li><b>Meta:</b> LP→Lead ≥ 12% em 7 dias, vigiando o LP→MQL pra confirmar que não cai abaixo de ~3%.</li>
+      <li><b class="g">Recalibrar a meta de CPMQL pro real (~R$350-400).</b> R$182 nunca foi atingível com este funil — corrigir o orçado em vez de perseguir um número impossível.</li>
+      <li><b class="g">Pra baixar CPMQL: subir a DENSIDADE de MQL, não o volume de lead.</b> Criativo e segmentação mirando o público R$100k+ (mais MQL por real) — não abrir a página pra trazer R$0-30k.</li>
+      <li><b class="g">Funil de duas trilhas:</b> MQL (R$100k+) com venda de alto toque; R$0-30k só se servido barato/automatizado (oferta de entrada / self-serve) — ou deprioriza. Parar de tratar igual.</li>
+      <li><b>Onde o alvo é receita</b>, medir CAC/receita, não CPMQL isolado — ele ignora os 19% de receita que o R$0-30k ainda traz.</li>
     </ul>
   </div>
 </div>
