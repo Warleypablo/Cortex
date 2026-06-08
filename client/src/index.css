@@ -270,6 +270,31 @@
  */
 @layer utilities {
 
+  /* Scrollbar minimalista (horizontal + vertical) — fino, translúcido, sem setas */
+  .scrollbar-minimal {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.25) transparent;
+  }
+  .scrollbar-minimal::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+  }
+  .scrollbar-minimal::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  .scrollbar-minimal::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--muted-foreground) / 0.25);
+    border-radius: 9999px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+  }
+  .scrollbar-minimal::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--muted-foreground) / 0.45);
+  }
+  .scrollbar-minimal::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
   /* Shimmer animation for skeletons */
   @keyframes shimmer {
     0% {
