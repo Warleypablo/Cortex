@@ -1,5 +1,4 @@
-import React from "react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import React, { useRef } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
@@ -7,6 +6,7 @@ import { ArrowUpDown, ExternalLink, ChevronRight, ChevronDown, Sparkles, Loader2
 import { cn } from "@/lib/utils";
 import { formatCurrency as formatCurrencyUtil, formatPercent as formatPercentUtil } from "@/lib/utils";
 import type { CriativoData, Level, SortConfig } from "@/lib/criativosMetrics";
+import { type ColumnDef, type ColumnFormat, NAME_COL_KEY, NAME_DEFAULT_WIDTH } from "@/lib/criativosColumns";
 
 function formatNumber(value: number | null): string {
   if (value === null) return "-";
@@ -20,29 +20,14 @@ function formatCurrency(value: number | null): string {
   if (value === null) return "-";
   return formatCurrencyUtil(value);
 }
-
-type FrozenKey = "select" | "toggle" | "link" | "id" | "name" | "status";
-interface FrozenCol {
-  key: FrozenKey;
-  width: number;
-}
-
-function getFrozenCols(level: Level, isAdmin: boolean): FrozenCol[] {
-  const cols: FrozenCol[] = [];
-  const interactive = isAdmin && level !== "conta";
-  if (interactive) {
-    cols.push({ key: "select", width: 44 });
-    cols.push({ key: "toggle", width: 64 });
+function fmt(format: ColumnFormat, value: number | null): string {
+  switch (format) {
+    case "currency": return formatCurrency(value);
+    case "percent": return formatPercent(value);
+    case "days": return value !== null ? `${value}d` : "-";
+    case "roas": return value !== null ? `${value}x` : "-";
+    default: return formatNumber(value);
   }
-  if (level === "anuncio") {
-    cols.push({ key: "link", width: 48 });
-    cols.push({ key: "id", width: 150 });
-    cols.push({ key: "name", width: 240 });
-  } else {
-    cols.push({ key: "name", width: 300 });
-  }
-  cols.push({ key: "status", width: 110 });
-  return cols;
 }
 
 const NAME_HEADER: Record<Level, string> = {
@@ -51,6 +36,27 @@ const NAME_HEADER: Record<Level, string> = {
   campanha: "Campanha",
   conta: "Conta",
 };
+
+// Larguras fixas das colunas congeladas não-redimensionáveis
+const W_SELECT = 44;
+const W_TOGGLE = 64;
+const W_LINK = 48;
+const W_ID = 150;
+const W_STATUS = 110;
+const W_VAR = 84;
+const MIN_COL = 60;
+
+type RKind = "select" | "toggle" | "link" | "id" | "name" | "status" | "metric" | "var";
+interface RCol {
+  uid: string;
+  kind: RKind;
+  width: number;
+  sticky: boolean;
+  left?: number;
+  def?: ColumnDef;
+  resizeKey?: string; // chave usada na persistência de largura
+  lastFrozen?: boolean;
+}
 
 export interface CriativosTableProps {
   level: Level;
@@ -61,8 +67,6 @@ export interface CriativosTableProps {
   isLoading: boolean;
   sortConfig: SortConfig;
   onSort: (key: keyof CriativoData) => void;
-  expandedGroups: Set<string>;
-  toggleGroup: (g: string) => void;
   expandedColumns: Set<string>;
   toggleColumn: (c: string) => void;
   getCellColor: (value: number | null, metricKey: string) => string;
@@ -73,6 +77,9 @@ export interface CriativosTableProps {
   onToggleSelectAll: (checked: boolean, ids: string[]) => void;
   onToggleStatus: (row: CriativoData) => void;
   togglingIds: Set<string>;
+  columns: ColumnDef[];
+  columnWidths: Record<string, number>;
+  onResize: (key: string, width: number) => void;
 }
 
 export function CriativosTable({
@@ -84,8 +91,6 @@ export function CriativosTable({
   isLoading,
   sortConfig,
   onSort,
-  expandedGroups,
-  toggleGroup,
   expandedColumns,
   toggleColumn,
   getCellColor,
@@ -96,193 +101,207 @@ export function CriativosTable({
   onToggleSelectAll,
   onToggleStatus,
   togglingIds,
+  columns,
+  columnWidths,
+  onResize,
 }: CriativosTableProps) {
-  const frozen = getFrozenCols(level, isAdmin);
-  const lefts: number[] = [];
-  let acc = 0;
-  for (const c of frozen) {
-    lefts.push(acc);
-    acc += c.width;
-  }
-  const lastFrozenIdx = frozen.length - 1;
+  const tableRef = useRef<HTMLTableElement>(null);
+  const colRefs = useRef<Record<string, HTMLTableColElement | null>>({});
+  const resizingRef = useRef<{ resizeKey: string; uid: string; startX: number; startW: number; statusBaseLeft?: number; live: number } | null>(null);
+
+  const widthOf = (key: string, fb: number) =>
+    columnWidths[key] && columnWidths[key] > 0 ? columnWidths[key] : fb;
+
   const interactive = isAdmin && level !== "conta";
+
+  // ── Monta a lista unificada de colunas renderizadas ──
+  const frozen: RCol[] = [];
+  if (interactive) {
+    frozen.push({ uid: "select", kind: "select", width: W_SELECT, sticky: true });
+    frozen.push({ uid: "toggle", kind: "toggle", width: W_TOGGLE, sticky: true });
+  }
+  if (level === "anuncio") {
+    frozen.push({ uid: "link", kind: "link", width: W_LINK, sticky: true });
+    frozen.push({ uid: "id", kind: "id", width: W_ID, sticky: true });
+  }
+  const nameWidth = widthOf(NAME_COL_KEY, NAME_DEFAULT_WIDTH);
+  frozen.push({ uid: "name", kind: "name", width: nameWidth, sticky: true, resizeKey: NAME_COL_KEY });
+  frozen.push({ uid: "status", kind: "status", width: W_STATUS, sticky: true });
+
+  let acc = 0;
+  for (const f of frozen) { f.left = acc; acc += f.width; }
+  frozen[frozen.length - 1].lastFrozen = true;
+  const nameCol = frozen.find((f) => f.kind === "name")!;
+  const statusBaseLeft = nameCol.left! + nameCol.width; // = status.left
+
+  const metricCols: RCol[] = [];
+  for (const def of columns) {
+    metricCols.push({
+      uid: def.key as string,
+      kind: "metric",
+      def,
+      width: widthOf(def.key as string, def.defaultWidth),
+      sticky: false,
+      resizeKey: def.key as string,
+    });
+    if (isCompareActive && expandedColumns.has(def.key as string)) {
+      metricCols.push({ uid: `${def.key}:var`, kind: "var", def, width: W_VAR, sticky: false });
+    }
+  }
+
+  const allCols = [...frozen, ...metricCols];
+  const totalWidth = allCols.reduce((s, c) => s + c.width, 0);
 
   const allIds = rows.map((r) => r.id);
   const allSelected = allIds.length > 0 && allIds.every((id) => selectedIds.has(id));
   const someSelected = allIds.some((id) => selectedIds.has(id));
 
-  // ── Cabeçalho ordenável (com chevron de comparação) ──
-  const SortableHeader = ({ column, label }: { column: keyof CriativoData; label: string }) => {
-    const isExpanded = expandedColumns.has(column as string);
-    return (
-      <>
-        <TableHead
-          className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100"
-          onClick={() => onSort(column)}
-          data-testid={`header-${column}`}
-        >
-          <div className="flex items-center gap-1">
-            {isCompareActive && (
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleColumn(column as string); }}
-                className="hover:text-white text-zinc-400"
-              >
-                {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              </button>
-            )}
-            {label}
-            <ArrowUpDown className="w-3 h-3" />
-          </div>
-        </TableHead>
-        {isCompareActive && isExpanded && (
-          <TableHead className="whitespace-nowrap text-xs bg-zinc-800 text-zinc-400 italic">
-            <div className="text-center">Var.</div>
-          </TableHead>
-        )}
-      </>
-    );
+  // ── Resize ──
+  const onResizeMove = (e: PointerEvent) => {
+    const r = resizingRef.current;
+    if (!r) return;
+    const w = Math.max(MIN_COL, r.startW + (e.clientX - r.startX));
+    r.live = w;
+    const col = colRefs.current[r.uid];
+    if (col) col.style.width = `${w}px`;
+    // se for a coluna de nome, empurra o "left" sticky da coluna Status ao vivo
+    if (r.statusBaseLeft !== undefined && tableRef.current) {
+      tableRef.current.style.setProperty("--cz-status-left", `${r.statusBaseLeft - r.startW + w}px`);
+    }
+  };
+  const onResizeEnd = () => {
+    const r = resizingRef.current;
+    if (!r) return;
+    window.removeEventListener("pointermove", onResizeMove);
+    window.removeEventListener("pointerup", onResizeEnd);
+    resizingRef.current = null;
+    onResize(r.resizeKey, r.live);
+  };
+  const startResize = (e: React.PointerEvent, c: RCol) => {
+    if (!c.resizeKey) return;
+    e.preventDefault();
+    e.stopPropagation();
+    resizingRef.current = {
+      resizeKey: c.resizeKey,
+      uid: c.uid,
+      startX: e.clientX,
+      startW: c.width,
+      statusBaseLeft: c.kind === "name" ? statusBaseLeft : undefined,
+      live: c.width,
+    };
+    window.addEventListener("pointermove", onResizeMove);
+    window.addEventListener("pointerup", onResizeEnd);
   };
 
-  // ── Cabeçalho de grupo (sub-colunas colapsáveis) ──
-  const GroupableHeader = ({ group, label, column, children }: { group: string; label: string; column: keyof CriativoData; children: React.ReactNode }) => {
-    const isGroupExpanded = expandedGroups.has(group);
-    return (
-      <>
-        <TableHead
-          className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100"
-          onClick={() => onSort(column)}
-        >
-          <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleGroup(group); }}
-              className="hover:text-white text-zinc-400"
-            >
-              {isGroupExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            </button>
-            {label}
-            <ArrowUpDown className="w-3 h-3" />
-          </div>
-        </TableHead>
-        {isCompareActive && expandedColumns.has(column as string) && (
-          <TableHead className="whitespace-nowrap text-xs bg-zinc-800 text-zinc-400 italic">
-            <div className="text-center">Var.</div>
-          </TableHead>
-        )}
-        {isGroupExpanded && children}
-      </>
-    );
-  };
+  const ResizeHandle = ({ c }: { c: RCol }) => (
+    <span
+      onPointerDown={(e) => startResize(e, c)}
+      onClick={(e) => e.stopPropagation()}
+      className="absolute top-0 right-0 h-full w-1.5 cursor-col-resize hover:bg-primary/50 active:bg-primary z-20"
+      title="Arraste para redimensionar"
+    />
+  );
 
-  // ── Célula de métrica (com variação expandida) ──
-  const renderCell = (
-    value: number | null,
-    compareValue: number | null,
-    column: string,
-    formatter: (v: number | null) => string,
-    colorClass = "",
-    invertPositive = false,
-  ) => {
-    const isExpanded = expandedColumns.has(column);
-    return (
-      <>
-        <TableCell className={`text-right ${colorClass}`}>{formatter(value)}</TableCell>
-        {isCompareActive && isExpanded && (
-          <TableCell className="text-right text-xs bg-zinc-800/30">
-            {value !== null && compareValue !== null && compareValue !== 0 ? (
-              <div className="flex flex-col items-end">
-                <span className="text-muted-foreground">{formatter(value - compareValue)}</span>
-                <span className={cn("text-[10px]",
-                  (() => {
-                    const pct = ((value - compareValue) / compareValue) * 100;
-                    const positive = invertPositive ? pct < 0 : pct > 0;
-                    return positive ? "text-emerald-400" : "text-red-400";
-                  })()
-                )}>
-                  {((value - compareValue) / compareValue * 100) > 0 ? "+" : ""}
-                  {((value - compareValue) / compareValue * 100).toFixed(1)}%
-                </span>
-              </div>
-            ) : (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </TableCell>
-        )}
-      </>
-    );
-  };
+  const stickyLeft = (c: RCol): React.CSSProperties =>
+    c.kind === "status" ? { left: "var(--cz-status-left)" } : { left: c.left };
 
-  // ── Cabeçalho das colunas congeladas (esquerda) ──
-  const renderFrozenHeader = (col: FrozenCol, left: number, isLast: boolean) => {
-    const base = cn(
-      "text-xs bg-zinc-900 text-zinc-100 sticky z-10 overflow-hidden",
-      isLast && "border-r border-zinc-700",
-    );
-    const style = { left, minWidth: col.width, width: col.width, maxWidth: col.width } as React.CSSProperties;
-    switch (col.key) {
+  const SortIcon = () => <ArrowUpDown className="w-3 h-3 shrink-0" />;
+
+  // ── Header ──
+  const renderHeader = (c: RCol) => {
+    const stickyCls = c.sticky ? "sticky z-10 overflow-hidden" : "";
+    const lastCls = c.lastFrozen ? "border-r border-zinc-700" : "";
+    const baseTh = cn("px-2 py-2 text-xs font-medium text-zinc-100 bg-zinc-900 align-middle", stickyCls, lastCls);
+    const style = c.sticky ? stickyLeft(c) : undefined;
+
+    switch (c.kind) {
       case "select":
         return (
-          <TableHead key={col.key} className={base} style={style}>
+          <th key={c.uid} className={baseTh} style={style}>
             <Checkbox
               checked={allSelected ? true : someSelected ? "indeterminate" : false}
-              onCheckedChange={(c) => onToggleSelectAll(c === true, allIds)}
+              onCheckedChange={(v) => onToggleSelectAll(v === true, allIds)}
               aria-label="Selecionar todos"
             />
-          </TableHead>
+          </th>
         );
       case "toggle":
-        return <TableHead key={col.key} className={base} style={style} />;
+        return <th key={c.uid} className={baseTh} style={style} />;
       case "link":
-        return <TableHead key={col.key} className={base} style={style}>Link</TableHead>;
+        return <th key={c.uid} className={baseTh} style={style}>Link</th>;
       case "id":
         return (
-          <TableHead key={col.key} className={cn(base, "cursor-pointer hover:bg-zinc-800 whitespace-nowrap")} style={style} onClick={() => onSort("id")}>
-            <div className="flex items-center gap-1">Ad Id <ArrowUpDown className="w-3 h-3" /></div>
-          </TableHead>
+          <th key={c.uid} className={cn(baseTh, "cursor-pointer hover:bg-zinc-800 whitespace-nowrap")} style={style} onClick={() => onSort("id")}>
+            <div className="flex items-center gap-1">Ad Id <SortIcon /></div>
+          </th>
         );
       case "name":
         return (
-          <TableHead key={col.key} className={cn(base, "cursor-pointer hover:bg-zinc-800 whitespace-nowrap")} style={style} onClick={() => onSort("adName")}>
-            <div className="flex items-center gap-1">{NAME_HEADER[level]} <ArrowUpDown className="w-3 h-3" /></div>
-          </TableHead>
+          <th key={c.uid} className={cn(baseTh, "relative cursor-pointer hover:bg-zinc-800 whitespace-nowrap")} style={style} onClick={() => onSort("adName")}>
+            <div className="flex items-center gap-1">{NAME_HEADER[level]} <SortIcon /></div>
+            <ResizeHandle c={c} />
+          </th>
         );
       case "status":
         return (
-          <TableHead key={col.key} className={cn(base, "cursor-pointer hover:bg-zinc-800 whitespace-nowrap")} style={style} onClick={() => onSort("status")}>
-            <div className="flex items-center gap-1">Status <ArrowUpDown className="w-3 h-3" /></div>
-          </TableHead>
+          <th key={c.uid} className={cn(baseTh, "cursor-pointer hover:bg-zinc-800 whitespace-nowrap")} style={style} onClick={() => onSort("status")}>
+            <div className="flex items-center gap-1">Status <SortIcon /></div>
+          </th>
         );
+      case "metric": {
+        const def = c.def!;
+        const isExpanded = expandedColumns.has(def.key as string);
+        return (
+          <th key={c.uid} className={cn(baseTh, "relative cursor-pointer hover:bg-zinc-800 whitespace-nowrap")} onClick={() => onSort(def.key)}>
+            <div className="flex items-center gap-1">
+              {isCompareActive && (
+                <button onClick={(e) => { e.stopPropagation(); toggleColumn(def.key as string); }} className="hover:text-white text-zinc-400">
+                  {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                </button>
+              )}
+              {def.label}
+              <SortIcon />
+            </div>
+            <ResizeHandle c={c} />
+          </th>
+        );
+      }
+      case "var":
+        return <th key={c.uid} className="px-2 py-2 text-xs italic text-zinc-400 bg-zinc-800 text-center align-middle">Var.</th>;
     }
   };
 
-  // ── Linha de totais: células congeladas ──
-  const renderFrozenAvg = (col: FrozenCol, left: number, isLast: boolean) => {
-    const base = cn("sticky z-10 bg-zinc-800 overflow-hidden", isLast && "border-r border-zinc-700");
-    const style = { left, minWidth: col.width, width: col.width, maxWidth: col.width } as React.CSSProperties;
-    if (col.key === "name") {
-      return <TableHead key={col.key} className={cn(base, "text-muted-foreground")} style={style}>Total</TableHead>;
-    }
-    return <TableHead key={col.key} className={base} style={style} />;
+  // ── Linha de Total ──
+  const renderTotal = (c: RCol) => {
+    const stickyCls = c.sticky ? "sticky z-10 overflow-hidden" : "";
+    const lastCls = c.lastFrozen ? "border-r border-zinc-700" : "";
+    const baseTh = cn("px-2 py-1.5 text-xs font-semibold bg-zinc-800 align-middle", stickyCls, lastCls);
+    const style = c.sticky ? stickyLeft(c) : undefined;
+    if (c.kind === "name") return <th key={c.uid} className={cn(baseTh, "text-muted-foreground")} style={style}>Total</th>;
+    if (c.sticky) return <th key={c.uid} className={baseTh} style={style} />;
+    if (c.kind === "var") return <th key={c.uid} className="px-2 py-1.5 bg-zinc-800/40" />;
+    const def = c.def!;
+    return <th key={c.uid} className={cn(baseTh, "text-right")}>{averages ? fmt(def.format, averages[def.key] as number | null) : ""}</th>;
   };
 
-  // ── Body: células congeladas de uma linha ──
-  const renderFrozenBody = (col: FrozenCol, left: number, isLast: boolean, row: CriativoData) => {
-    const base = cn("sticky z-10 bg-card overflow-hidden", isLast && "border-r border-zinc-700/50");
-    const style = { left, minWidth: col.width, width: col.width, maxWidth: col.width } as React.CSSProperties;
+  // ── Corpo ──
+  const renderBody = (c: RCol, row: CriativoData) => {
+    const stickyCls = c.sticky ? "sticky z-10 bg-card overflow-hidden" : "";
+    const lastCls = c.lastFrozen ? "border-r border-zinc-700/50" : "";
+    const baseTd = cn("px-2 py-2 text-xs align-middle", stickyCls, lastCls);
+    const style = c.sticky ? stickyLeft(c) : undefined;
     const isToggling = togglingIds.has(row.id);
-    switch (col.key) {
+
+    switch (c.kind) {
       case "select":
         return (
-          <TableCell key={col.key} className={base} style={style}>
-            <Checkbox
-              checked={selectedIds.has(row.id)}
-              onCheckedChange={(c) => onToggleSelect(row.id, c === true)}
-              aria-label={`Selecionar ${row.adName}`}
-            />
-          </TableCell>
+          <td key={c.uid} className={baseTd} style={style}>
+            <Checkbox checked={selectedIds.has(row.id)} onCheckedChange={(v) => onToggleSelect(row.id, v === true)} aria-label={`Selecionar ${row.adName}`} />
+          </td>
         );
       case "toggle":
         return (
-          <TableCell key={col.key} className={base} style={style}>
+          <td key={c.uid} className={baseTd} style={style}>
             {isToggling ? (
               <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
             ) : (
@@ -293,63 +312,72 @@ export function CriativosTable({
                 aria-label={`Ligar/desligar ${row.adName}`}
               />
             )}
-          </TableCell>
+          </td>
         );
       case "link":
         return (
-          <TableCell key={col.key} className={base} style={style}>
+          <td key={c.uid} className={baseTd} style={style}>
             {row.link && (
               <a href={row.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                 <ExternalLink className="w-4 h-4" />
               </a>
             )}
-          </TableCell>
+          </td>
         );
       case "id":
-        return (
-          <TableCell key={col.key} className={cn(base, "font-mono text-xs text-muted-foreground")} style={style} title={row.id}>
-            {row.id || "-"}
-          </TableCell>
-        );
+        return <td key={c.uid} className={cn(baseTd, "font-mono text-muted-foreground")} style={style} title={row.id}>{row.id || "-"}</td>;
       case "name":
         return (
-          <TableCell key={col.key} className={cn(base, "font-medium truncate")} style={style} title={row.adName}>
+          <td key={c.uid} className={cn(baseTd, "font-medium")} style={style} title={row.adName}>
             <div className="flex items-center gap-1.5">
               <span className="truncate">{row.adName}</span>
               {pendingByEntity.has(row.id) && (
-                <Badge
-                  variant="secondary"
-                  className="shrink-0 text-[10px] h-4 px-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200"
-                  title="Proposta pendente do agente"
-                >
-                  <Sparkles className="w-2.5 h-2.5 mr-0.5" />
-                  IA
+                <Badge variant="secondary" className="shrink-0 text-[10px] h-4 px-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200" title="Proposta pendente do agente">
+                  <Sparkles className="w-2.5 h-2.5 mr-0.5" />IA
                 </Badge>
               )}
             </div>
-          </TableCell>
+          </td>
         );
       case "status":
         return (
-          <TableCell key={col.key} className={base} style={style}>
-            <Badge
-              variant={row.status === "Ativo" ? "default" : "secondary"}
-              className={row.status === "Ativo" ? "bg-green-500" : ""}
-            >
-              {row.status}
-            </Badge>
-          </TableCell>
+          <td key={c.uid} className={baseTd} style={style}>
+            <Badge variant={row.status === "Ativo" ? "default" : "secondary"} className={row.status === "Ativo" ? "bg-green-500" : ""}>{row.status}</Badge>
+          </td>
         );
+      case "metric": {
+        const def = c.def!;
+        const value = row[def.key] as number | null;
+        const colorClass = def.color ? getCellColor(value, def.colorKey || (def.key as string)) : "";
+        return <td key={c.uid} className={cn(baseTd, "text-right", colorClass)}>{fmt(def.format, value)}</td>;
+      }
+      case "var": {
+        const def = c.def!;
+        const value = row[def.key] as number | null;
+        const cmp = compareMap.get(row.id);
+        const compareValue = (cmp?.[def.key] as number | null) ?? null;
+        return (
+          <td key={c.uid} className="px-2 py-2 text-xs text-right bg-zinc-800/20 align-middle">
+            {value !== null && compareValue !== null && compareValue !== 0 ? (
+              <div className="flex flex-col items-end">
+                <span className="text-muted-foreground">{fmt(def.format, value - compareValue)}</span>
+                <span className={cn("text-[10px]", (() => {
+                  const pct = ((value - compareValue) / compareValue) * 100;
+                  const positive = def.invert ? pct < 0 : pct > 0;
+                  return positive ? "text-emerald-400" : "text-red-400";
+                })())}>
+                  {((value - compareValue) / compareValue * 100) > 0 ? "+" : ""}
+                  {((value - compareValue) / compareValue * 100).toFixed(1)}%
+                </span>
+              </div>
+            ) : (
+              <span className="text-muted-foreground">-</span>
+            )}
+          </td>
+        );
+      }
     }
   };
-
-  // ── Conjunto de colunas de métrica (compartilhado header/avg/body) ──
-  const avgCell = (val: string, col: string) => (
-    <>
-      <TableHead className="text-right text-xs font-semibold">{val}</TableHead>
-      {isCompareActive && expandedColumns.has(col) && <TableHead className="bg-zinc-800/30" />}
-    </>
-  );
 
   if (isLoading) {
     return (
@@ -360,190 +388,38 @@ export function CriativosTable({
   }
 
   return (
-    <div className="relative max-h-[calc(100vh-300px)] overflow-auto scrollbar-minimal [&>div]:!overflow-visible [&>div]:!static [&>div]:!w-auto">
-      <Table>
-        <TableHeader className="sticky top-0 z-50">
-          <TableRow className="bg-zinc-900 dark:bg-zinc-900 shadow-md [&>th]:bg-zinc-900 dark:[&>th]:bg-zinc-900">
-            {frozen.map((col, i) => renderFrozenHeader(col, lefts[i], i === lastFrozenIdx))}
-            <SortableHeader column="investimento" label="Invest" />
-            <SortableHeader column="cpm" label="CPM" />
-            <SortableHeader column="videoHook" label="Video hook" />
-            <SortableHeader column="videoHold" label="Video hold" />
-            <SortableHeader column="ctr" label="CTR" />
-            <SortableHeader column="connectRate" label="Connect rate" />
-            <SortableHeader column="taxaConversao" label="Taxa conv." />
-            <SortableHeader column="leads" label="Leads" />
-            <SortableHeader column="cpl" label="CPL" />
-            <SortableHeader column="mql" label="MQL" />
-            <SortableHeader column="cpmql" label="CPMQL" />
-            <SortableHeader column="percMql" label="%MQL" />
-            <GroupableHeader group="desc" label="Desc. %" column="descartadoPerc">
-              <SortableHeader column="descartadoMqlPerc" label="Desc. MQL %" />
-              <SortableHeader column="descartadoNmqlPerc" label="Desc. NMQL %" />
-            </GroupableHeader>
-            <GroupableHeader group="ra" label="RA %" column="percRa">
-              <SortableHeader column="percRaMql" label="RA MQL %" />
-              <SortableHeader column="percRaNmql" label="RA NMQL %" />
-            </GroupableHeader>
-            <GroupableHeader group="cpra" label="CPRA" column="cpra">
-              <SortableHeader column="cpraMql" label="CPRA MQL" />
-              <SortableHeader column="cpraNmql" label="CPRA NMQL" />
-            </GroupableHeader>
-            <GroupableHeader group="rr" label="RR %" column="percRr">
-              <SortableHeader column="percRrMql" label="RR MQL %" />
-              <SortableHeader column="percRrNmql" label="RR NMQL %" />
-            </GroupableHeader>
-            <GroupableHeader group="cprr" label="CPRR" column="cprr">
-              <SortableHeader column="cprrMql" label="CPRR MQL" />
-              <SortableHeader column="cprrNmql" label="CPRR NMQL" />
-            </GroupableHeader>
-            <GroupableHeader group="rrv" label="RR→V %" column="percRrVendas">
-              <SortableHeader column="percRrMqlVendas" label="RR MQL→V %" />
-              <SortableHeader column="percRrNmqlVendas" label="RR NMQL→V %" />
-            </GroupableHeader>
-            <SortableHeader column="clientesUnicos" label="Neg. ganho" />
-            <SortableHeader column="leadTime" label="Lead Time" />
-            <SortableHeader column="aov" label="AOV" />
-            <GroupableHeader group="receita" label="Receita" column="receita">
-              <SortableHeader column="receitaPontual" label="Rec. pontual" />
-              <SortableHeader column="receitaRecorrente" label="Rec. recorrente" />
-            </GroupableHeader>
-            <GroupableHeader group="cac" label="CAC" column="cacGeral">
-              <SortableHeader column="cacUnico" label="CAC único" />
-              <SortableHeader column="cacContrato" label="CAC contrato" />
-            </GroupableHeader>
-            <SortableHeader column="roas" label="ROAS" />
-          </TableRow>
-
+    <div className="relative max-h-[calc(100vh-320px)] overflow-auto scrollbar-minimal">
+      <table
+        ref={tableRef}
+        className="border-collapse text-xs"
+        style={{ tableLayout: "fixed", width: totalWidth, ["--cz-status-left" as any]: `${statusBaseLeft}px` }}
+      >
+        <colgroup>
+          {allCols.map((c) => (
+            <col key={c.uid} ref={(el) => { colRefs.current[c.uid] = el; }} style={{ width: c.width }} />
+          ))}
+        </colgroup>
+        <thead className="sticky top-0 z-50">
+          <tr className="bg-zinc-900 shadow-md">{allCols.map(renderHeader)}</tr>
           {averages && level !== "conta" && (
-            <TableRow className="bg-zinc-800 dark:bg-zinc-800 border-b-2 border-zinc-700 font-semibold text-xs [&>th]:bg-zinc-800 dark:[&>th]:bg-zinc-800 [&>th]:font-semibold">
-              {frozen.map((col, i) => renderFrozenAvg(col, lefts[i], i === lastFrozenIdx))}
-              {avgCell(formatCurrency(averages.investimento), "investimento")}
-              {avgCell(formatCurrency(averages.cpm), "cpm")}
-              {avgCell(formatPercent(averages.videoHook), "videoHook")}
-              {avgCell(formatPercent(averages.videoHold), "videoHold")}
-              {avgCell(formatPercent(averages.ctr), "ctr")}
-              {avgCell(formatPercent(averages.connectRate), "connectRate")}
-              {avgCell(formatPercent(averages.taxaConversao), "taxaConversao")}
-              {avgCell(formatNumber(averages.leads), "leads")}
-              {avgCell(formatCurrency(averages.cpl), "cpl")}
-              {avgCell(formatNumber(averages.mql), "mql")}
-              {avgCell(formatCurrency(averages.cpmql), "cpmql")}
-              {avgCell(formatPercent(averages.percMql), "percMql")}
-              {avgCell(formatPercent(averages.descartadoPerc), "descartadoPerc")}
-              {expandedGroups.has("desc") && <>{avgCell(formatPercent(averages.descartadoMqlPerc), "descartadoMqlPerc")}{avgCell(formatPercent(averages.descartadoNmqlPerc), "descartadoNmqlPerc")}</>}
-              {avgCell(formatPercent(averages.percRa), "percRa")}
-              {expandedGroups.has("ra") && <>{avgCell(formatPercent(averages.percRaMql), "percRaMql")}{avgCell(formatPercent(averages.percRaNmql), "percRaNmql")}</>}
-              {avgCell(formatCurrency(averages.cpra), "cpra")}
-              {expandedGroups.has("cpra") && <>{avgCell(formatCurrency(averages.cpraMql), "cpraMql")}{avgCell(formatCurrency(averages.cpraNmql), "cpraNmql")}</>}
-              {avgCell(formatPercent(averages.percRr), "percRr")}
-              {expandedGroups.has("rr") && <>{avgCell(formatPercent(averages.percRrMql), "percRrMql")}{avgCell(formatPercent(averages.percRrNmql), "percRrNmql")}</>}
-              {avgCell(formatCurrency(averages.cprr), "cprr")}
-              {expandedGroups.has("cprr") && <>{avgCell(formatCurrency(averages.cprrMql), "cprrMql")}{avgCell(formatCurrency(averages.cprrNmql), "cprrNmql")}</>}
-              {avgCell(formatPercent(averages.percRrVendas), "percRrVendas")}
-              {expandedGroups.has("rrv") && <>{avgCell(formatPercent(averages.percRrMqlVendas), "percRrMqlVendas")}{avgCell(formatPercent(averages.percRrNmqlVendas), "percRrNmqlVendas")}</>}
-              {avgCell(formatNumber(averages.clientesUnicos), "clientesUnicos")}
-              {avgCell(averages.leadTime !== null ? `${averages.leadTime}d` : "-", "leadTime")}
-              {avgCell(formatCurrency(averages.aov), "aov")}
-              {avgCell(formatCurrency(averages.receita), "receita")}
-              {expandedGroups.has("receita") && <>{avgCell(formatCurrency(averages.receitaPontual), "receitaPontual")}{avgCell(formatCurrency(averages.receitaRecorrente), "receitaRecorrente")}</>}
-              {avgCell(formatCurrency(averages.cacGeral), "cacGeral")}
-              {expandedGroups.has("cac") && <>{avgCell(formatCurrency(averages.cacUnico), "cacUnico")}{avgCell(formatCurrency(averages.cacContrato), "cacContrato")}</>}
-              {avgCell(averages.roas !== null ? `${averages.roas}x` : "-", "roas")}
-            </TableRow>
+            <tr className="bg-zinc-800 border-b-2 border-zinc-700">{allCols.map(renderTotal)}</tr>
           )}
-        </TableHeader>
-
-        <TableBody>
-          {rows.map((item) => {
-            const c = compareMap.get(item.id);
-            return (
-              <TableRow key={item.id} data-testid={`row-criativo-${item.id}`}>
-                {frozen.map((col, i) => renderFrozenBody(col, lefts[i], i === lastFrozenIdx, item))}
-                {renderCell(item.investimento, c?.investimento ?? null, "investimento", formatCurrency)}
-                {renderCell(item.cpm, c?.cpm ?? null, "cpm", formatCurrency, getCellColor(item.cpm, "cpm"), true)}
-                {renderCell(item.videoHook, c?.videoHook ?? null, "videoHook", formatPercent, getCellColor(item.videoHook, "videoHook"))}
-                {renderCell(item.videoHold, c?.videoHold ?? null, "videoHold", formatPercent, getCellColor(item.videoHold, "videoHold"))}
-                {renderCell(item.ctr, c?.ctr ?? null, "ctr", formatPercent, getCellColor(item.ctr, "ctr"))}
-                {renderCell(item.connectRate, c?.connectRate ?? null, "connectRate", formatPercent, getCellColor(item.connectRate, "connectRate"))}
-                {renderCell(item.taxaConversao, c?.taxaConversao ?? null, "taxaConversao", formatPercent, getCellColor(item.taxaConversao, "taxaConversao"))}
-                {renderCell(item.leads, c?.leads ?? null, "leads", formatNumber)}
-                {renderCell(item.cpl, c?.cpl ?? null, "cpl", formatCurrency, getCellColor(item.cpl, "cpl"), true)}
-                {renderCell(item.mql, c?.mql ?? null, "mql", formatNumber)}
-                {renderCell(item.cpmql, c?.cpmql ?? null, "cpmql", formatCurrency, getCellColor(item.cpmql, "cpmql"), true)}
-                {renderCell(item.percMql, c?.percMql ?? null, "percMql", formatPercent, getCellColor(item.percMql, "percMql"))}
-                {renderCell(item.descartadoPerc, c?.descartadoPerc ?? null, "descartadoPerc", formatPercent)}
-                {expandedGroups.has("desc") && (
-                  <>
-                    {renderCell(item.descartadoMqlPerc, c?.descartadoMqlPerc ?? null, "descartadoMqlPerc", formatPercent)}
-                    {renderCell(item.descartadoNmqlPerc, c?.descartadoNmqlPerc ?? null, "descartadoNmqlPerc", formatPercent)}
-                  </>
-                )}
-                {renderCell(item.percRa, c?.percRa ?? null, "percRa", formatPercent, getCellColor(item.percRa, "percRa"))}
-                {expandedGroups.has("ra") && (
-                  <>
-                    {renderCell(item.percRaMql, c?.percRaMql ?? null, "percRaMql", formatPercent, getCellColor(item.percRaMql, "percRaMql"))}
-                    {renderCell(item.percRaNmql, c?.percRaNmql ?? null, "percRaNmql", formatPercent, getCellColor(item.percRaNmql, "percRaNmql"))}
-                  </>
-                )}
-                {renderCell(item.cpra, c?.cpra ?? null, "cpra", formatCurrency, getCellColor(item.cpra, "cpmql"), true)}
-                {expandedGroups.has("cpra") && (
-                  <>
-                    {renderCell(item.cpraMql, c?.cpraMql ?? null, "cpraMql", formatCurrency, getCellColor(item.cpraMql, "cpmql"), true)}
-                    {renderCell(item.cpraNmql, c?.cpraNmql ?? null, "cpraNmql", formatCurrency, getCellColor(item.cpraNmql, "cpmql"), true)}
-                  </>
-                )}
-                {renderCell(item.percRr, c?.percRr ?? null, "percRr", formatPercent, getCellColor(item.percRr, "percRr"))}
-                {expandedGroups.has("rr") && (
-                  <>
-                    {renderCell(item.percRrMql, c?.percRrMql ?? null, "percRrMql", formatPercent, getCellColor(item.percRrMql, "percRrMql"))}
-                    {renderCell(item.percRrNmql, c?.percRrNmql ?? null, "percRrNmql", formatPercent, getCellColor(item.percRrNmql, "percRrNmql"))}
-                  </>
-                )}
-                {renderCell(item.cprr, c?.cprr ?? null, "cprr", formatCurrency, getCellColor(item.cprr, "cpmql"), true)}
-                {expandedGroups.has("cprr") && (
-                  <>
-                    {renderCell(item.cprrMql, c?.cprrMql ?? null, "cprrMql", formatCurrency, getCellColor(item.cprrMql, "cpmql"), true)}
-                    {renderCell(item.cprrNmql, c?.cprrNmql ?? null, "cprrNmql", formatCurrency, getCellColor(item.cprrNmql, "cpmql"), true)}
-                  </>
-                )}
-                {renderCell(item.percRrVendas, c?.percRrVendas ?? null, "percRrVendas", formatPercent, getCellColor(item.percRrVendas, "percRrVendas"))}
-                {expandedGroups.has("rrv") && (
-                  <>
-                    {renderCell(item.percRrMqlVendas, c?.percRrMqlVendas ?? null, "percRrMqlVendas", formatPercent, getCellColor(item.percRrMqlVendas, "percRrMqlVendas"))}
-                    {renderCell(item.percRrNmqlVendas, c?.percRrNmqlVendas ?? null, "percRrNmqlVendas", formatPercent, getCellColor(item.percRrNmqlVendas, "percRrNmqlVendas"))}
-                  </>
-                )}
-                {renderCell(item.clientesUnicos, c?.clientesUnicos ?? null, "clientesUnicos", formatNumber)}
-                {renderCell(item.leadTime, c?.leadTime ?? null, "leadTime", (v) => (v !== null ? `${v}d` : "-"))}
-                {renderCell(item.aov, c?.aov ?? null, "aov", formatCurrency)}
-                {renderCell(item.receita, c?.receita ?? null, "receita", formatCurrency)}
-                {expandedGroups.has("receita") && (
-                  <>
-                    {renderCell(item.receitaPontual || null, c?.receitaPontual || null, "receitaPontual", formatCurrency)}
-                    {renderCell(item.receitaRecorrente || null, c?.receitaRecorrente || null, "receitaRecorrente", formatCurrency)}
-                  </>
-                )}
-                {renderCell(item.cacGeral, c?.cacGeral ?? null, "cacGeral", formatCurrency, "", true)}
-                {expandedGroups.has("cac") && (
-                  <>
-                    {renderCell(item.cacUnico, c?.cacUnico ?? null, "cacUnico", formatCurrency, getCellColor(item.cacUnico, "cacUnico"), true)}
-                    {renderCell(item.cacContrato, c?.cacContrato ?? null, "cacContrato", formatCurrency, getCellColor(item.cacContrato, "cacContrato"), true)}
-                  </>
-                )}
-                {renderCell(item.roas, c?.roas ?? null, "roas", (v) => (v !== null ? `${v}x` : "-"))}
-              </TableRow>
-            );
-          })}
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={row.id} className="border-b border-border hover:bg-muted/40" data-testid={`row-criativo-${row.id}`}>
+              {allCols.map((c) => renderBody(c, row))}
+            </tr>
+          ))}
           {rows.length === 0 && (
-            <TableRow>
-              <TableCell colSpan={50} className="text-center py-8 text-muted-foreground">
+            <tr>
+              <td colSpan={allCols.length} className="text-center py-8 text-muted-foreground">
                 Nenhum dado encontrado para o período selecionado
-              </TableCell>
-            </TableRow>
+              </td>
+            </tr>
           )}
-        </TableBody>
-      </Table>
+        </tbody>
+      </table>
     </div>
   );
 }
