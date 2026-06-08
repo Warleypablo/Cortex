@@ -130,6 +130,7 @@ export function ChurnEvolucaoSquad() {
   const [operadorSelecionado, setOperadorSelecionado] = useState<string>("todos");
   const [meses, setMeses] = useState<string>("6");
   const [tableMode, setTableMode] = useState<"mrr" | "churn">("mrr");
+  const [comAbono, setComAbono] = useState(false);
 
   const [insightsOpen, setInsightsOpen] = useState(false);
   const [insightsContent, setInsightsContent] = useState("");
@@ -189,7 +190,7 @@ export function ChurnEvolucaoSquad() {
   }, []);
 
   const { data, isLoading, isError } = useQuery<EvolucaoMensalResponse>({
-    queryKey: [`/api/dashboard/evolucao-mensal?meses=${meses}`],
+    queryKey: [`/api/dashboard/evolucao-mensal?meses=${meses}${comAbono ? '&comAbono=true' : ''}`],
   });
 
   function formatMesLabel(mes: string): string {
@@ -390,6 +391,10 @@ export function ChurnEvolucaoSquad() {
           <SelectTrigger className="w-[130px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50"><SelectValue placeholder="Meses" /></SelectTrigger>
           <SelectContent><SelectItem value="3">3 meses</SelectItem><SelectItem value="6">6 meses</SelectItem><SelectItem value="12">12 meses</SelectItem><SelectItem value="24">24 meses</SelectItem></SelectContent>
         </Select>
+        <div className="flex items-center gap-1 bg-gray-100 dark:bg-zinc-800 rounded-lg p-0.5">
+          <button onClick={() => setComAbono(false)} className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all", !comAbono ? "bg-white dark:bg-zinc-700 text-gray-800 dark:text-zinc-100 shadow-sm" : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200")}>Sem abono</button>
+          <button onClick={() => setComAbono(true)} className={cn("px-3 py-1.5 text-xs font-medium rounded-md transition-all", comAbono ? "bg-amber-500 text-white shadow-sm" : "text-gray-500 dark:text-zinc-400 hover:text-gray-700 dark:hover:text-zinc-200")}>Com abono</button>
+        </div>
         <button onClick={handleGenerateInsights} disabled={insightsLoading} className={cn("flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition-all", "bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500", "text-white shadow-sm hover:shadow-md", "disabled:opacity-50 disabled:cursor-not-allowed")}>
           {insightsLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
           Gerar Insights
