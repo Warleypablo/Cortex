@@ -98,12 +98,16 @@ export function ChurnProdutoMotivo() {
     setProdutoSelecionado(null);
   }
 
-  const { data, isLoading, isError } = useQuery<ProdutoMotivoData>({
+  const { data: rawData, isLoading, isError } = useQuery<ProdutoMotivoData>({
     queryKey: ["/api/churn/produto-motivo", inicio, fim],
     queryFn: () =>
-      fetch(`/api/churn/produto-motivo?dataInicio=${inicio}&dataFim=${fim}`).then(r => r.json()),
+      fetch(`/api/churn/produto-motivo?dataInicio=${inicio}&dataFim=${fim}`)
+        .then(r => { if (!r.ok) throw new Error("API error"); return r.json(); }),
     enabled: !!inicio && !!fim && inicio <= fim,
   });
+  const data = (rawData && Array.isArray(rawData.produtos) && Array.isArray(rawData.motivos) && Array.isArray(rawData.celulas))
+    ? rawData
+    : undefined;
 
   const { data: squadMotivoData } = useQuery<SquadMotivoData>({
     queryKey: ["/api/churn/squad-motivo", produtoSelecionado, inicio, fim],
@@ -114,7 +118,7 @@ export function ChurnProdutoMotivo() {
   });
 
   const maxPct = useMemo(() => {
-    if (!data) return 0;
+    if (!data?.celulas) return 0;
     return Math.max(...data.celulas.map(c => c.pct_dentro_produto));
   }, [data]);
 
