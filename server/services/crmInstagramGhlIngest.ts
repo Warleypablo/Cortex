@@ -6,11 +6,11 @@
  * transformamos em interações `spontaneous_dm` nos prospects, ligando o
  * ghl_contact_id e marcando isExistingContact (dedup).
  *
- * ⚠️ A confirmar com dados reais (rodar o dev server): o valor exato de
- * `message_type` para Instagram no GHL e a melhor fonte do @handle. O código é
- * defensivo: filtra IG por message_type='IG' OU ILIKE '%insta%', e deriva o
- * handle de contact_name (fallback). Ajustar GHL_IG_TYPES / deriveHandle se a
- * inspeção mostrar outro formato.
+ * message_type confirmado em produção (2026-06): DMs de IG são 'TYPE_INSTAGRAM'
+ * (inbound). Comentários vêm como 'TYPE_INSTAGRAM_COMMENT' e NÃO entram aqui —
+ * são coletados via Graph API em crmInstagramCollector. Por isso o filtro é
+ * exato (= 'TYPE_INSTAGRAM'), não ILIKE '%insta%'. O @handle é derivado de
+ * contact_name (fallback em deriveHandle).
  */
 
 import { sql } from "drizzle-orm";
@@ -42,7 +42,7 @@ export async function runCrmInstagramGhlIngest(): Promise<void> {
       FROM cortex_core.ghl_messages m
       LEFT JOIN cortex_core.ghl_contacts c ON c.id = m.contact_id
       WHERE m.direction = 'inbound'
-        AND (m.message_type = 'IG' OR m.message_type ILIKE '%insta%')
+        AND m.message_type = 'TYPE_INSTAGRAM'
         AND m.date_added >= NOW() - (${LOOKBACK_DAYS} || ' days')::interval
       ORDER BY m.date_added ASC
     `)).rows as Array<{
