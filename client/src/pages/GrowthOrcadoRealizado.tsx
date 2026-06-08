@@ -949,7 +949,11 @@ export default function GrowthOrcadoRealizado() {
               "hover:bg-muted/30 transition-colors",
               !isPercent && "bg-blue-500/[0.04] dark:bg-blue-400/[0.03]"
             )}>
-              <TableCell className="text-sm font-medium">
+              <TableCell
+                className={cn("text-sm font-medium", m.indent ? "text-muted-foreground font-normal" : undefined)}
+                style={m.indent ? { paddingLeft: `${1 + m.indent * 1.5}rem` } : undefined}
+              >
+                {m.indent ? <span className="text-muted-foreground/60 mr-1">└</span> : null}
                 {showExpand ? (
                   <button
                     type="button"
@@ -1708,8 +1712,8 @@ export default function GrowthOrcadoRealizado() {
       { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
       { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRate ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRate), format: 'percent' },
       { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.visualizacoesPagina ?? 0) > 0 ? (data.leads ?? 0) / (data.visualizacoesPagina ?? 1) : 0), format: 'percent' },
-      { id: 'taxa_conversao_pagina_mql', name: 'Tx Conversão Página — MQL', type: 'formula', orcado: null, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.mqls ?? 0) / (data.visualizacoesPagina ?? 1) : 0, percentual: null, format: 'percent' },
-      { id: 'taxa_conversao_pagina_nmql', name: 'Tx Conversão Página — Não-MQL', type: 'formula', orcado: null, realizado: (data.visualizacoesPagina ?? 0) > 0 ? ((data.leads ?? 0) - (data.mqls ?? 0)) / (data.visualizacoesPagina ?? 1) : 0, percentual: null, format: 'percent' },
+      { id: 'taxa_conversao_pagina_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: (data.visualizacoesPagina ?? 0) > 0 ? (data.mqls ?? 0) / (data.visualizacoesPagina ?? 1) : 0, percentual: null, format: 'percent' },
+      { id: 'taxa_conversao_pagina_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: (data.visualizacoesPagina ?? 0) > 0 ? ((data.leads ?? 0) - (data.mqls ?? 0)) / (data.visualizacoesPagina ?? 1) : 0, percentual: null, format: 'percent' },
       { id: 'leads', name: 'Leads', type: 'formula', orcado: ORCADO_ADS.leads, realizado: data.leads ?? 0, percentual: calcPercentual(ORCADO_ADS.leads, data.leads), format: 'number' },
       { id: 'mqls', name: 'MQLs', type: 'formula', orcado: ORCADO_ADS.mqls, realizado: data.mqls ?? 0, percentual: calcPercentual(ORCADO_ADS.mqls, data.mqls), format: 'number' },
       { id: 'cpl', name: 'CPL', type: 'formula', orcado: ORCADO_ADS.cpl, realizado: data.cpl ?? null, percentual: calcPercentual(ORCADO_ADS.cpl, data.cpl), format: 'currency' },
@@ -1773,8 +1777,8 @@ export default function GrowthOrcadoRealizado() {
       { id: 'meta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
       { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent' },
       { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
-      { id: 'meta_taxaConversaoPagina_mql', name: 'Tx Conversão Página — MQL', type: 'formula', orcado: null, realizado: lpvPixel > 0 ? (funnel?.mqls ?? 0) / lpvPixel : 0, percentual: null, format: 'percent' },
-      { id: 'meta_taxaConversaoPagina_nmql', name: 'Tx Conversão Página — Não-MQL', type: 'formula', orcado: null, realizado: lpvPixel > 0 ? ((funnel?.leads ?? 0) - (funnel?.mqls ?? 0)) / lpvPixel : 0, percentual: null, format: 'percent' },
+      { id: 'meta_taxaConversaoPagina_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? (funnel?.mqls ?? 0) / lpvPixel : 0, percentual: null, format: 'percent' },
+      { id: 'meta_taxaConversaoPagina_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? ((funnel?.leads ?? 0) - (funnel?.mqls ?? 0)) / lpvPixel : 0, percentual: null, format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('meta', funnel, O, d.investimento ?? null)];
   };
