@@ -54,20 +54,22 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
       const temOutros = motivosOrdenados.length > 8;
       const motivos = temOutros ? top8.concat(["Outros"]) : top8;
 
-      // Produtos ordenados por mrr_perdido total
+      // Top 10 produtos ordenados por mrr_perdido total
       const produtoMrr = new Map<string, number>();
       data.forEach(r => {
         produtoMrr.set(r.produto, (produtoMrr.get(r.produto) || 0) + Number(r.mrr_perdido));
       });
       const produtos = Array.from(produtoMrr.entries())
         .sort((a, b) => b[1] - a[1])
-        .map(([p]) => p);
+        .map(([p]) => p)
+        .slice(0, 10);
 
-      // Agregar células — motivos fora do top8 viram "Outros"
+      // Agregar células — apenas top10 produtos, motivos fora do top8 viram "Outros"
       const cellMap = new Map<string, {
         cancelamentos: number; mrr_perdido: number; ticket_soma: number;
       }>();
       data.forEach(r => {
+        if (!produtos.includes(r.produto)) return;
         const motivo = top8.includes(r.motivo_cancelamento) ? r.motivo_cancelamento : "Outros";
         const key = `${r.produto}|||${motivo}`;
         const cur = cellMap.get(key) || { cancelamentos: 0, mrr_perdido: 0, ticket_soma: 0 };
