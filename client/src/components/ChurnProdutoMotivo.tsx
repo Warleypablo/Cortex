@@ -53,17 +53,29 @@ function heatTextClass(pct: number, maxPct: number): string {
 
 const DRILL_COLORS = ["#6d28d9", "#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe", "#f5f3ff"];
 
-const PERIODO_OPTIONS = [
-  { label: "1M", meses: 1, titulo: "Último mês" },
-  { label: "3M", meses: 3, titulo: "Últimos 3 meses" },
-  { label: "6M", meses: 6, titulo: "Últimos 6 meses" },
-  { label: "12M", meses: 12, titulo: "Últimos 12 meses" },
+function toMonthStr(date: Date): string {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function monthStrBack(months: number): string {
+  const d = new Date();
+  d.setMonth(d.getMonth() - months + 1);
+  return toMonthStr(d);
+}
+
+const PRESETS = [
+  { label: "1M", months: 1 },
+  { label: "3M", months: 3 },
+  { label: "6M", months: 6 },
+  { label: "12M", months: 12 },
 ] as const;
 
 export function ChurnProdutoMotivo() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [meses, setMeses] = useState<1 | 3 | 6 | 12>(12);
+  const today = new Date();
+  const [inicio, setInicio] = useState(() => monthStrBack(12));
+  const [fim, setFim] = useState(() => toMonthStr(today));
   const [produtoSelecionado, setProdutoSelecionado] = useState<string | null>(null);
   const [tabelaAberta, setTabelaAberta] = useState(false);
   const [ordenacao, setOrdenacao] = useState<{ col: keyof Celula; dir: "asc" | "desc" }>({
@@ -71,9 +83,17 @@ export function ChurnProdutoMotivo() {
     dir: "desc",
   });
 
+  function aplicarPreset(months: number) {
+    setInicio(monthStrBack(months));
+    setFim(toMonthStr(today));
+    setProdutoSelecionado(null);
+  }
+
   const { data, isLoading, isError } = useQuery<ProdutoMotivoData>({
-    queryKey: ["/api/churn/produto-motivo", meses],
-    queryFn: () => fetch(`/api/churn/produto-motivo?meses=${meses}`).then(r => r.json()),
+    queryKey: ["/api/churn/produto-motivo", inicio, fim],
+    queryFn: () =>
+      fetch(`/api/churn/produto-motivo?dataInicio=${inicio}&dataFim=${fim}`).then(r => r.json()),
+    enabled: !!inicio && !!fim && inicio <= fim,
   });
 
   const maxPct = useMemo(() => {
@@ -135,17 +155,15 @@ export function ChurnProdutoMotivo() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-center justify-between">
-        <p className="text-xs text-muted-foreground">
-          {PERIODO_OPTIONS.find(o => o.meses === meses)?.titulo}
-        </p>
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Presets rápidos */}
         <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
-          {PERIODO_OPTIONS.map(opt => (
+          {PRESETS.map(opt => (
             <button
               key={opt.label}
-              onClick={() => { setMeses(opt.meses); setProdutoSelecionado(null); }}
+              onClick={() => aplicarPreset(opt.months)}
               className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                meses === opt.meses
+                monthStrBack(opt.months) === inicio && toMonthStr(today) === fim
                   ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
                   : "text-muted-foreground hover:text-foreground"
               }`}
@@ -153,6 +171,27 @@ export function ChurnProdutoMotivo() {
               {opt.label}
             </button>
           ))}
+        </div>
+
+        {/* Inputs de intervalo personalizado */}
+        <div className="flex items-center gap-2">
+          <span className="text-xs text-muted-foreground">De</span>
+          <input
+            type="month"
+            value={inicio}
+            max={fim}
+            onChange={e => { setInicio(e.target.value); setProdutoSelecionado(null); }}
+            className="text-xs px-2 py-1 rounded-md border border-border/60 bg-white dark:bg-zinc-800 text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500"
+          />
+          <span className="text-xs text-muted-foreground">até</span>
+          <input
+            type="month"
+            value={fim}
+            min={inicio}
+            max={toMonthStr(today)}
+            onChange={e => { setFim(e.target.value); setProdutoSelecionado(null); }}
+            className="text-xs px-2 py-1 rounded-md border border-border/60 bg-white dark:bg-zinc-800 text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500"
+          />
         </div>
       </div>
 
