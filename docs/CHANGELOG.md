@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-08 | feat(youtube): rotas admin de sync + status (destrava métricas)
+
+**O que foi feito:**
+- Criado `server/routes/youtubeAdmin.ts` com `POST /api/admin/youtube/sync` (snapshot de canais + vídeos + métricas diárias de canal/vídeo) e `GET /api/admin/youtube/status` (canais autorizados, range das métricas diárias e últimas execuções).
+- Registrado `registerYoutubeAdminRoutes(app, db)` em `server/routes.ts`, logo após o OAuth do YouTube.
+
+**Por que:**
+- O serviço `youtubeSync.ts` (`syncAllChannels`) já estava pronto, mas era órfão: só o OAuth do YouTube estava registrado, sem nenhuma rota ou cron que disparasse o sync. Resultado: dava pra autorizar os canais, mas as métricas nunca entravam no banco. Todos os outros canais (LinkedIn, TikTok, Google, Google Ads) já tinham rota admin equivalente.
+
+**Arquivos alterados:**
+- `server/routes/youtubeAdmin.ts` - novo: endpoints admin de sync e status do YouTube (usa `db`/Drizzle, pois `syncAllChannels` faz queries via `db.execute`).
+- `server/routes.ts` - import + registro de `registerYoutubeAdminRoutes`.
+
+**Impacto arquitetural:** Nenhum — espelha o padrão admin já existente dos outros canais; nenhuma mudança de schema.
+
+---
+
 ## 2026-06-08 | feat(growth): quebra Tx Conversão da Página em MQL × Não-MQL
 
 **O que foi feito:**

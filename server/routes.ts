@@ -24,6 +24,7 @@ import { registerGrowthRoutes } from "./routes/growth";
 import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
 import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
+import { registerYoutubeAdminRoutes } from "./routes/youtubeAdmin";
 import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
 import { registerGoogleAdminRoutes } from "./routes/googleAdmin";
 import { registerLinkedinOAuthRoutes } from "./routes/linkedinOAuth";
@@ -8042,6 +8043,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // YouTube OAuth (autorização dos canais Turbocast/TurboPartners/André/Vitor)
   registerYoutubeOAuthRoutes(app, db);
+
+  // YouTube — admin: sync (snapshot + vídeos + métricas diárias canal/vídeo) + status
+  registerYoutubeAdminRoutes(app, db);
 
   // Google Ads — admin: sync de campanhas + métricas + status
   registerGoogleAdsAdminRoutes(app);
