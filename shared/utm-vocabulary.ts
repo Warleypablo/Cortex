@@ -11,6 +11,7 @@ export const UTM_MEDIUMS = [
   'outbound',
   'victor',
   'andre',
+  'rodrigo',
 ] as const;
 
 export type UtmMedium = typeof UTM_MEDIUMS[number];
@@ -24,6 +25,7 @@ export const UTM_MEDIUM_LABELS: Record<UtmMedium, string> = {
   outbound: 'Outbound — Prospecção fria via SDR',
   victor: 'Victor — Canal próprio (figura-exceção)',
   andre: 'André — Canal próprio (figura-exceção)',
+  rodrigo: 'Rodrigo — Canal próprio (figura-exceção)',
 };
 
 export const UTM_SOURCES_BY_MEDIUM: Record<UtmMedium, readonly string[]> = {
@@ -35,6 +37,7 @@ export const UTM_SOURCES_BY_MEDIUM: Record<UtmMedium, readonly string[]> = {
   outbound: ['email', 'whatsapp', 'linkedin'],
   victor: ['instagram', 'youtube', 'linkedin', 'tiktok'],
   andre: ['instagram', 'youtube', 'linkedin', 'tiktok'],
+  rodrigo: ['instagram', 'youtube', 'linkedin', 'tiktok'],
 };
 
 export const UTM_SOURCE_LABELS: Record<string, string> = {
