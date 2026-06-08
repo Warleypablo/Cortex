@@ -1,5 +1,14 @@
 # Changelog
 
+## 2026-06-08 | feat(growth): seed do Planejamento de Metas — Creators × Meta Ads × Junho/2026
+
+**O que foi feito:**
+- Script `scripts/seed-metas-creators-meta-junho.ts` que grava em `meta_ads.growth_budgets` (mes `2026-06`, segmento `meta_ads`, funil `Creators`) o plano de mídia de junho.
+- Tier-1 (Investimento R$113.500, CPM R$70, CTR 0,80%, Connect Rate 80%, Tx Conversão 15%, %MQL 40%) reproduz a cascata de marketing 1:1: Leads 1.557, MQLs 623, CPL R$73, CPMQL R$182.
+- Funil de vendas gravado com taxas **mescladas** (%RA 13,68%, RR→V% 18,78%, AOV R$9.480) → 40 negócios, receita R$379.200, CAC R$2.838.
+
+**Inconsistência conhecida:** a aba modela uma cadeia única de vendas (`deriveAdsFunnel`), enquanto o plano separa MQL/N-MQL com taxas distintas. As taxas mescladas reproduzem o total de vendas, mas perdem a separação MQL/N-MQL.
+
 ## 2026-06-01 | style(nps): renomeia área "Comunicação" para "Social Media" no formulário — Sem impacto.
 
 ---
