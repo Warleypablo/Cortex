@@ -73,6 +73,7 @@ import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
 import { registerInternalTrainingsRoutes } from "./routes/internalTrainings";
 import { registerLtLtvChurnRoutes } from "./routes/ltLtvChurn";
+import { registerChurnProdutoMotivoRoutes } from "./routes/churnProdutoMotivo";
 import { registerEstoquePontualRoutes } from "./routes/estoquePontual";
 import { registerCreatorsPontualRoutes } from "./routes/creatorsPontual";
 import * as autoreport from "./autoreport/index";
@@ -8172,6 +8173,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // LT/LTV/Churn Dashboard - registered from separate file
   registerLtLtvChurnRoutes(app, db);
+  registerChurnProdutoMotivoRoutes(app, db);
   registerEstoquePontualRoutes(app, db);
   registerCreatorsPontualRoutes(app, db);
 
