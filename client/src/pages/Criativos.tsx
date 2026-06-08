@@ -738,67 +738,27 @@ export default function Criativos() {
       <div className="flex-1 p-4 pt-0 min-h-0">
         <Card className="h-full flex flex-col">
           <CardHeader className="pb-2 space-y-2">
-            {/* Linha 1: tabs + ações */}
-            <div className="flex items-center justify-between gap-2 flex-wrap">
-              <Tabs value={level} onValueChange={handleLevelChange}>
-                <TabsList className="h-9 gap-1 bg-muted/60 p-1">
-                  <TabsTrigger value="conta" className="h-7 gap-1.5 px-3 text-xs data-[state=active]:shadow-sm" data-testid="tab-conta">
-                    <Building2 className="w-3.5 h-3.5" /> Conta
-                  </TabsTrigger>
-                  <TabsTrigger value="campanha" className="h-7 gap-1.5 px-3 text-xs data-[state=active]:shadow-sm" data-testid="tab-campanha">
-                    <Megaphone className="w-3.5 h-3.5" /> Campanhas
-                  </TabsTrigger>
-                  <TabsTrigger value="conjunto" className="h-7 gap-1.5 px-3 text-xs data-[state=active]:shadow-sm" data-testid="tab-conjunto">
-                    <Layers3 className="w-3.5 h-3.5" /> Conjuntos
-                  </TabsTrigger>
-                  <TabsTrigger value="anuncio" className="h-7 gap-1.5 px-3 text-xs data-[state=active]:shadow-sm" data-testid="tab-anuncio">
-                    <ImageIcon className="w-3.5 h-3.5" /> Anúncios
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
-              <div className="flex items-center gap-2 flex-wrap">
-                {isAdmin && level !== "conta" && selectedIds.size > 0 && (
-                  <div className="flex items-center gap-2 mr-1">
-                    <span className="text-xs text-muted-foreground">{selectedIds.size} selecionado(s)</span>
-                    <Button size="sm" variant="outline" className="h-8" disabled={bulkPending} onClick={() => setBulkAction("resume")} data-testid="button-bulk-ativar">
-                      <Power className="w-3.5 h-3.5 mr-1" /> Ativar
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-8 text-red-600 dark:text-red-400" disabled={bulkPending} onClick={() => setBulkAction("pause")} data-testid="button-bulk-pausar">
-                      <PowerOff className="w-3.5 h-3.5 mr-1" /> Pausar
-                    </Button>
-                  </div>
-                )}
-                {isAdmin && (
-                  <>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => analyzeMutation.mutate()}
-                      disabled={analyzeMutation.isPending}
-                      className="bg-purple-600 hover:bg-purple-700 text-white h-8"
-                      data-testid="button-analisar-ia"
-                    >
-                      {analyzeMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
-                      {analyzeMutation.isPending ? "Analisando..." : "Analisar com IA"}
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-8" onClick={() => setAgentDrawerOpen(true)} data-testid="button-abrir-propostas">
-                      Propostas
-                      {pendingProposals.length > 0 && (
-                        <Badge variant="secondary" className="ml-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">
-                          {pendingProposals.length}
-                        </Badge>
-                      )}
-                    </Button>
-                  </>
-                )}
-                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-colunas" title="Configurar colunas e cores">
-                  <Settings className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
+            {/* Tabs por nível (full width, estilo abas) */}
+            <Tabs value={level} onValueChange={handleLevelChange} className="w-full">
+              <TabsList className="grid w-full grid-cols-4 h-auto gap-2 bg-transparent p-0">
+                <TabsTrigger value="conta" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-conta">
+                  <Building2 className="w-4 h-4" /> Conta
+                </TabsTrigger>
+                <TabsTrigger value="campanha" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-campanha">
+                  <Megaphone className="w-4 h-4" /> Campanhas
+                </TabsTrigger>
+                <TabsTrigger value="conjunto" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-conjunto">
+                  <Layers3 className="w-4 h-4" /> Conjuntos
+                </TabsTrigger>
+                <TabsTrigger value="anuncio" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-anuncio">
+                  <ImageIcon className="w-4 h-4" /> Anúncios
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
 
-            {/* Linha 2: filtros */}
-            <div className="flex items-center gap-2 flex-wrap">
+            {/* Linha de filtros + ações */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
@@ -886,6 +846,48 @@ export default function Criativos() {
                   setCompareRange(range);
                 }}
               />
+              </div>
+
+              {/* Ações à direita */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {isAdmin && level !== "conta" && selectedIds.size > 0 && (
+                  <div className="flex items-center gap-2 mr-1">
+                    <span className="text-xs text-muted-foreground">{selectedIds.size} selecionado(s)</span>
+                    <Button size="sm" variant="outline" className="h-8" disabled={bulkPending} onClick={() => setBulkAction("resume")} data-testid="button-bulk-ativar">
+                      <Power className="w-3.5 h-3.5 mr-1" /> Ativar
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 text-red-600 dark:text-red-400" disabled={bulkPending} onClick={() => setBulkAction("pause")} data-testid="button-bulk-pausar">
+                      <PowerOff className="w-3.5 h-3.5 mr-1" /> Pausar
+                    </Button>
+                  </div>
+                )}
+                {isAdmin && (
+                  <>
+                    <Button
+                      variant="default"
+                      size="sm"
+                      onClick={() => analyzeMutation.mutate()}
+                      disabled={analyzeMutation.isPending}
+                      className="bg-purple-600 hover:bg-purple-700 text-white h-8"
+                      data-testid="button-analisar-ia"
+                    >
+                      {analyzeMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
+                      {analyzeMutation.isPending ? "Analisando..." : "Analisar com IA"}
+                    </Button>
+                    <Button variant="outline" size="sm" className="h-8" onClick={() => setAgentDrawerOpen(true)} data-testid="button-abrir-propostas">
+                      Propostas
+                      {pendingProposals.length > 0 && (
+                        <Badge variant="secondary" className="ml-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">
+                          {pendingProposals.length}
+                        </Badge>
+                      )}
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-colunas" title="Configurar colunas e cores">
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
           </CardHeader>
           <CardContent className="p-0 flex-1 min-h-0">
