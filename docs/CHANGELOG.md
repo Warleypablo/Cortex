@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-08 | chore(criativos): remove impl ANTIGA órfã de otimização de ads
+
+**O que foi feito:**
+- Removida a implementação ANTIGA de otimização de Meta Ads (não roteada/órfã, vinda de stash): `server/services/adsOptimization/`, `server/routes/ads-optimization.ts`, `server/playbooks/ads-optimization.md`, `client/src/components/criativos/AdsOptimizationDialog.tsx`, `client/src/components/criativos/EditProposalSheet.tsx`, `client/src/hooks/useAdsOptimization.ts`, `docs/handover-otimizacao-ads.md`
+- Removida a tabela Drizzle `metaOptimizationProposals` (+ types) de `shared/schema.ts`
+
+**Por que:**
+- Existiam DUAS implementações do agente de otimização convivendo. A NOVA (`criativosAgent` + `metaActions` + `metaActionsLog`) está integrada e funcional; a ANTIGA estava órfã. Limpeza decidida para seguir só com a nova.
+
+**Arquivos alterados:**
+- `shared/schema.ts` - removida tabela `meta_optimization_proposals` e seus types
+- (deleções acima)
+
+**Impacto arquitetural:** Nenhum — código removido não estava roteado nem importado. `tsc` sem novos erros nos arquivos da feature.
+
+---
+
 ## 2026-05-19 | feat(utm): UTM Builder + Constituição UTM Turbo v1.1
 
 **O que foi feito:**
