@@ -237,6 +237,79 @@ export function ChurnEvolucaoMensal() {
     <div className="space-y-6">
     <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
       <CardHeader>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <CardTitle className="text-base text-gray-900 dark:text-white">
+            Histórico Mensal por Produto
+          </CardTitle>
+          <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
+              {(["cancelamentos", "mrr_perdido"] as Metrica[]).map(m => (
+                <button
+                  key={m}
+                  onClick={() => setMetrica(m)}
+                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
+                    metrica === m
+                      ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {m === "cancelamentos" ? "Contratos" : "MRR Perdido"}
+                </button>
+              ))}
+            </div>
+            <select
+              value={produtoEfetivo}
+              onChange={e => setProdutoSelecionado(e.target.value)}
+              className="text-xs px-2 py-1.5 rounded-md border border-border/60 bg-white dark:bg-zinc-800 text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500"
+            >
+              {todosProdutos.map(p => (
+                <option key={p} value={p}>{p}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">Cancelamentos por motivo mês a mês</p>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={320}>
+          <BarChart data={produtoChartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} vertical={false} />
+            <XAxis
+              dataKey="mesLabel"
+              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tickFormatter={yFormatter}
+              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+              width={metrica === "mrr_perdido" ? 80 : 40}
+            />
+            <Tooltip
+              formatter={tooltipFormatter}
+              contentStyle={{
+                background: isDark ? "#18181b" : "#fff",
+                border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb",
+                borderRadius: 6,
+                fontSize: 12,
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
+            {motivosBarras.map((motivo, i) => (
+              <Bar
+                key={motivo}
+                dataKey={motivo}
+                stackId="a"
+                fill={motivo === "Outros" ? "#9ca3af" : PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
+                radius={i === motivosBarras.length - 1 ? [3, 3, 0, 0] : undefined}
+              />
+            ))}
+          </BarChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+
+    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+      <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle className="text-base text-gray-900 dark:text-white">
             Cancelamentos por Produto ao Longo do Tempo
@@ -388,78 +461,6 @@ export function ChurnEvolucaoMensal() {
               />
             ))}
           </LineChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-      <CardHeader>
-        <div className="flex items-center justify-between flex-wrap gap-3">
-          <CardTitle className="text-base text-gray-900 dark:text-white">
-            Histórico Mensal por Produto
-          </CardTitle>
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
-              {(["cancelamentos", "mrr_perdido"] as Metrica[]).map(m => (
-                <button
-                  key={m}
-                  onClick={() => setMetrica(m)}
-                  className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                    metrica === m
-                      ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  {m === "cancelamentos" ? "Contratos" : "MRR Perdido"}
-                </button>
-              ))}
-            </div>
-            <select
-              value={produtoEfetivo}
-              onChange={e => setProdutoSelecionado(e.target.value)}
-              className="text-xs px-2 py-1.5 rounded-md border border-border/60 bg-white dark:bg-zinc-800 text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500"
-            >
-              {todosProdutos.map(p => (
-                <option key={p} value={p}>{p}</option>
-              ))}
-            </select>
-          </div>
-        </div>
-        <p className="text-xs text-muted-foreground">Cancelamentos por motivo mês a mês</p>
-      </CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={320}>
-          <BarChart data={produtoChartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} vertical={false} />
-            <XAxis
-              dataKey="mesLabel"
-              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              tickFormatter={yFormatter}
-              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
-              width={metrica === "mrr_perdido" ? 80 : 40}
-            />
-            <Tooltip
-              formatter={tooltipFormatter}
-              contentStyle={{
-                background: isDark ? "#18181b" : "#fff",
-                border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb",
-                borderRadius: 6,
-                fontSize: 12,
-              }}
-            />
-            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
-            {motivosBarras.map((motivo, i) => (
-              <Bar
-                key={motivo}
-                dataKey={motivo}
-                stackId="a"
-                fill={motivo === "Outros" ? "#9ca3af" : PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
-                radius={i === motivosBarras.length - 1 ? [3, 3, 0, 0] : undefined}
-              />
-            ))}
-          </BarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
