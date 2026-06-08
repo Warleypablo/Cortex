@@ -258,6 +258,12 @@ const METRIC_DEFS: MetricDef[] = [
       return ads.visualizacoesPagina > 0 ? ads.leads / ads.visualizacoesPagina : 0;
     },
     orcado: (b) => b.marketing?.taxaConversaoPagina ?? null },
+  { id: "ads_taxa_conversao_pagina_mql", name: "Tx Conversão Página — MQL", format: "percent", section: "marketing",
+    realizado: ({ ads }) => (ads && ads.visualizacoesPagina > 0 ? ads.mqls / ads.visualizacoesPagina : null),
+    orcado: () => null },
+  { id: "ads_taxa_conversao_pagina_nmql", name: "Tx Conversão Página — Não-MQL", format: "percent", section: "marketing",
+    realizado: ({ ads }) => (ads && ads.visualizacoesPagina > 0 ? (ads.leads - ads.mqls) / ads.visualizacoesPagina : null),
+    orcado: () => null },
   { id: "ads_connect_rate", name: "Connect Rate", format: "percent", section: "marketing",
     realizado: ({ ads }) => ads?.connectRate ?? null,
     orcado: (b) => b.marketing?.connectRate ?? null },
