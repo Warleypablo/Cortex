@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
-import { TrendingDown, DollarSign, Hash, ChevronDown, ChevronUp } from "lucide-react";
+import { TrendingDown, DollarSign, Hash } from "lucide-react";
 import {
   BarChart,
   Bar,
@@ -77,11 +77,6 @@ export function ChurnProdutoMotivo() {
   const [inicio, setInicio] = useState(() => monthStrBack(12));
   const [fim, setFim] = useState(() => toMonthStr(today));
   const [produtoSelecionado, setProdutoSelecionado] = useState<string | null>(null);
-  const [tabelaAberta, setTabelaAberta] = useState(false);
-  const [ordenacao, setOrdenacao] = useState<{ col: keyof Celula; dir: "asc" | "desc" }>({
-    col: "cancelamentos",
-    dir: "desc",
-  });
 
   function aplicarPreset(months: number) {
     setInicio(monthStrBack(months));
@@ -114,23 +109,6 @@ export function ChurnProdutoMotivo() {
       .filter(c => c.produto === produtoSelecionado)
       .sort((a, b) => b.cancelamentos - a.cancelamentos);
   }, [data, produtoSelecionado]);
-
-  const tabelaOrdenada = useMemo(() => {
-    if (!data) return [];
-    return [...data.celulas].sort((a, b) => {
-      const va = a[ordenacao.col] as number;
-      const vb = b[ordenacao.col] as number;
-      return ordenacao.dir === "desc" ? vb - va : va - vb;
-    });
-  }, [data, ordenacao]);
-
-  function toggleOrdenacao(col: keyof Celula) {
-    setOrdenacao(prev =>
-      prev.col === col
-        ? { col, dir: prev.dir === "desc" ? "asc" : "desc" }
-        : { col, dir: "desc" }
-    );
-  }
 
   if (isLoading) {
     return (
@@ -376,76 +354,6 @@ export function ChurnProdutoMotivo() {
         </Card>
       )}
 
-      {/* Tabela detalhada (collapsible) */}
-      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-        <CardHeader
-          className="cursor-pointer select-none"
-          onClick={() => setTabelaAberta(v => !v)}
-        >
-          <div className="flex items-center justify-between">
-            <CardTitle className="text-base text-gray-900 dark:text-white">
-              Dados completos
-            </CardTitle>
-            {tabelaAberta ? (
-              <ChevronUp className="h-4 w-4 text-muted-foreground" />
-            ) : (
-              <ChevronDown className="h-4 w-4 text-muted-foreground" />
-            )}
-          </div>
-        </CardHeader>
-        {tabelaAberta && (
-          <CardContent className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-gray-200 dark:border-zinc-700">
-                  {(
-                    [
-                      { col: "produto" as keyof Celula, label: "Produto" },
-                      { col: "motivo_cancelamento" as keyof Celula, label: "Motivo" },
-                      { col: "cancelamentos" as keyof Celula, label: "Cancelamentos" },
-                      { col: "mrr_perdido" as keyof Celula, label: "MRR Perdido" },
-                      { col: "ticket_medio" as keyof Celula, label: "Ticket Médio" },
-                      { col: "pct_dentro_produto" as keyof Celula, label: "% no Produto" },
-                    ]
-                  ).map(({ col, label }) => (
-                    <th
-                      key={col}
-                      onClick={() => toggleOrdenacao(col)}
-                      className="text-left p-2 font-semibold text-gray-600 dark:text-zinc-400 cursor-pointer hover:text-gray-900 dark:hover:text-zinc-100 whitespace-nowrap"
-                    >
-                      {label}
-                      {ordenacao.col === col && (
-                        <span className="ml-1">{ordenacao.dir === "desc" ? "↓" : "↑"}</span>
-                      )}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {tabelaOrdenada.map((c, i) => (
-                  <tr
-                    key={i}
-                    className="border-b border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/40"
-                  >
-                    <td className="p-2 font-medium text-gray-900 dark:text-zinc-100">{c.produto}</td>
-                    <td className="p-2 text-gray-700 dark:text-zinc-300">{c.motivo_cancelamento}</td>
-                    <td className="p-2 text-right tabular-nums text-gray-700 dark:text-zinc-300">{c.cancelamentos}</td>
-                    <td className="p-2 text-right tabular-nums text-gray-700 dark:text-zinc-300">
-                      {formatCurrencyNoDecimals(c.mrr_perdido)}
-                    </td>
-                    <td className="p-2 text-right tabular-nums text-gray-700 dark:text-zinc-300">
-                      {formatCurrencyNoDecimals(c.ticket_medio)}
-                    </td>
-                    <td className="p-2 text-right tabular-nums text-gray-700 dark:text-zinc-300">
-                      {c.pct_dentro_produto.toFixed(1)}%
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </CardContent>
-        )}
-      </Card>
     </div>
   );
 }
