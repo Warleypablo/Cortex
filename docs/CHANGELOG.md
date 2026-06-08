@@ -1,5 +1,34 @@
 # Changelog
 
+## 2026-06-08 | feat(growth): quebra Tx Conversão da Página em MQL × Não-MQL
+
+**O que foi feito:**
+- Adicionadas 2 linhas novas abaixo de "Tx Conversão da Página": "Tx Conversão Página — MQL" (mqls ÷ visualizações de página) e "Tx Conversão Página — Não-MQL" ((leads − mqls) ÷ visualizações de página)
+- Aplicado na Evolução Temporal (seção Métricas de Marketing) e no Orçado x Realizado (Consolidado + Aprofundado/Meta Ads, este usando a base do pixel)
+- Soma das duas reconstrói a taxa de conversão de página total já existente
+
+**Por que:**
+- Permitir comparar de onde vêm as conversões da página (parcela MQL vs Não-MQL), sem precisar abrir outras telas
+
+**Arquivos alterados:**
+- `client/src/pages/GrowthEvolucaoTemporal.tsx` - 2 novos MetricDef na seção marketing (sem orçado)
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - 2 linhas em buildAdsMetrics (consolidado) e em buildMetaAdsMetrics (aprofundado, base pixel)
+
+**Impacto arquitetural:** Nenhum — apenas frontend, sem mudança de backend/SQL (dados leads/mqls/visualizacoesPagina já vinham na API)
+
+**Atualização (visual):** As sub-taxas foram aninhadas visualmente sob "Tx Conversão da Página" — indentação + marcador `└` + cor suave (`text-muted-foreground`), e renomeadas para "MQL" / "Não-MQL". Reusa o campo `indent` do tipo `Metric` (Orçado x Realizado) e um novo flag `sub` no `MetricDef` (Evolução Temporal).
+
+---
+
+## 2026-06-08 | feat(growth): seed do Planejamento de Metas — Creators × Meta Ads × Junho/2026
+
+**O que foi feito:**
+- Script `scripts/seed-metas-creators-meta-junho.ts` que grava em `meta_ads.growth_budgets` (mes `2026-06`, segmento `meta_ads`, funil `Creators`) o plano de mídia de junho.
+- Tier-1 (Investimento R$113.500, CPM R$70, CTR 0,80%, Connect Rate 80%, Tx Conversão 15%, %MQL 40%) reproduz a cascata de marketing 1:1: Leads 1.557, MQLs 623, CPL R$73, CPMQL R$182.
+- Funil de vendas gravado com taxas **mescladas** (%RA 13,68%, RR→V% 18,78%, AOV R$9.480) → 40 negócios, receita R$379.200, CAC R$2.838.
+
+**Inconsistência conhecida:** a aba modela uma cadeia única de vendas (`deriveAdsFunnel`), enquanto o plano separa MQL/N-MQL com taxas distintas. As taxas mescladas reproduzem o total de vendas, mas perdem a separação MQL/N-MQL.
+
 ## 2026-06-01 | style(nps): renomeia área "Comunicação" para "Social Media" no formulário — Sem impacto.
 
 ---
