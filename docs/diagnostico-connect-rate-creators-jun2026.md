@@ -87,6 +87,64 @@ conserto de fundo.
 6. **Descartado:** o parâmetro `tum_term+=` (malformado, "tum" em vez de "utm") — não faz sentido,
    remover do tagueamento. Não era a causa da queda.
 
+## Correlação LP antiga × queda — e projeção de leads/MQL perdidos
+
+> Método: cruzamento **leads/clique** (leads do Bitrix via `utm_content`=ad_id × cliques da Meta).
+> Isso **ignora o pixel quebrado** — usa só dados confiáveis (cliques Meta + leads Bitrix).
+> Bitrix `crm_deal` tem `utm_content`, `utm_campaign`, `mql`. GA4 confirma chegada na página.
+
+### Conversão clique→lead por LP (paid Meta)
+| LP | Período | Cliques | Leads | MQL | Leads/clique | MQL/clique | CR pixel |
+|---|---|---|---|---|---|---|---|
+| **Canônica** `pages/creators` | Maio | 7.755 | 613 | 227 | 7,9% | 2,9% | 83% |
+| | Jun 1-8 | 2.592 | 161 | 63 | 6,2% | 2,4% | 70% |
+| **Antiga** `lp/commerce/creators-lp` | Maio | 1.091 | 104 | 20 | **9,5%** | 1,8% | 71% |
+| | Jun 1-8 | 119 | **0** | **0** | **0%** | 0% | **15%** |
+
+### Leitura
+1. **Em maio a LP antiga convertia BEM** (9,5% leads/clique — até melhor que a canônica 7,9%).
+   Ou seja, a página em si não era ruim; mandar tráfego pra ela em maio **não** custou leads.
+2. **Em junho a LP antiga colapsou**: 119 cliques (221 sessões no GA4) → **0 leads, 0 MQL**,
+   pixel CR 71%→15%. As pessoas **chegaram** (GA4 viu), mas a página **parou de converter** —
+   quebra real a partir de ~02/jun (pixel + formulário/UTM), não só medição.
+3. **O estrago real foi pequeno** porque o time **já tinha movido ~93% do budget** pra fora da
+   LP antiga em junho (R$8,7k em maio → R$577 em junho).
+
+### Projeção de perda
+- **Realizada (Jun 1-8):** ~119 cliques na LP antiga quebrada → esperado ~7-11 leads e ~2-3 MQL
+  (às taxas de 6,2-9,5%), obtido **0**. → **perda real ≈ 7-11 leads e 2-3 MQL.** Pequena.
+- **Exposição se não tivesse sido pego (run-rate):** ao volume de maio (~1.091 cliques → 104 leads,
+  20 MQL/mês), um mês inteiro quebrado custaria **~100 leads e ~20 MQL/mês.** Foi a bala desviada
+  ao mover o budget cedo.
+
+### ⚠️ Sinal separado a verificar — a LP canônica também caiu
+`leads/clique` da canônica caiu **7,9% → 6,2%** (−21% relativo); MQL/clique 2,9% → 2,4%.
+Sobre os 2.592 cliques de junho, isso seria ~**40 leads** "a menos" que a taxa de maio — **maior
+que a perda da LP antiga**. **Mas** junho tem só 8 dias parciais e há **lag de classificação**
+(lead/MQL recém-criado ainda não marcado), o que **subestima** as taxas de junho. Reavaliar quando
+o mês fechar antes de tratar como perda confirmada — pode ser lag/saturação, não quebra de página.
+
+### Sobre a correlação que você perguntou
+- **LP antiga ↔ Connect Rate:** correlação **direta** (a queda do connect rate ESTÁ concentrada
+  nela), mas majoritariamente **medição** (pixel) + quebra real de junho em volume pequeno.
+- **LP antiga ↔ Tx Conversão da Página:** **não** é a causa principal. A queda de Tx Conversão é
+  o fenômeno de **saturação** (Mar→Jun, leads travados vs gasto escalando) — tendência de meses,
+  separada. A LP antiga só somou um pouco em junho. (Aliás, o pixel sub-contando LPV *infla* a
+  Tx Conversão da LP antiga, não deprime.)
+
+## Destinos a investigar (varredura da conta)
+- **`www.turbopartners.com.br/`** — 5 ads institucionais antigos ("Esther", mar/26: "Diferente das
+  Agências", "Cresceram Junto com a Turbo", "Grandes marcas institucional") mandando tráfego pago
+  pra **home institucional** (não é LP de conversão). Quase off em junho (R$13). Converteu 6,9%
+  leads/clique em maio. Não urgente, mas home ≠ LP.
+- **`tiktok-turbopartners.lovable.app/`** — 1 ad (`TP1377 - vv-Interno3`), campanha
+  `[TP] [Lead] [ABO] [TikTok] - Captação Creators`. LP no **Lovable** (3ª plataforma). CR pixel 85% ok.
+- **`authenticnutri.pilea.app/influencers`** — campanha `[TP] [Leads] [ABO] - Comunidade Authentic`.
+  **Produto diferente** (não Creators) — LP na **Pilea** (4ª plataforma). Não é erro, mas reforça a
+  fragmentação.
+- **(sem destino) — R$19,7k em maio:** ads sem URL parseável (provável Lead Form / Instant Experience
+  do Meta, ou catálogo). Confirmar manualmente.
+
 ## Como fazer o redirect (a LP está no Webflow)
 
 `lp.turbopartners.com.br` resolve por CNAME para `cdn.webflow.com` → hospedada no **Webflow**.
