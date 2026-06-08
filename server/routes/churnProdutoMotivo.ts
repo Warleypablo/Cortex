@@ -14,10 +14,15 @@ interface ViewRow {
 export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
   app.get("/api/churn/produto-motivo", async (req, res) => {
     try {
-      const mesesNum = Math.min(24, Math.max(1, parseInt(String(req.query.meses || "12"), 10)));
       const now = new Date();
-      const start = new Date(now.getFullYear(), now.getMonth() - (mesesNum - 1), 1);
-      const startStr = start.toISOString().split("T")[0];
+      const defaultStart = new Date(now.getFullYear(), now.getMonth() - 11, 1).toISOString().split("T")[0];
+      const defaultEnd = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split("T")[0];
+
+      // Aceita dataInicio e dataFim no formato YYYY-MM ou YYYY-MM-DD
+      const rawInicio = String(req.query.dataInicio || "");
+      const rawFim = String(req.query.dataFim || "");
+      const startStr = rawInicio ? `${rawInicio.slice(0, 7)}-01` : defaultStart;
+      const endStr = rawFim ? `${rawFim.slice(0, 7)}-01` : defaultEnd;
 
       const result = await db.execute(sql`
         SELECT produto, motivo_cancelamento,
@@ -30,6 +35,7 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
                0 AS pct_total
         FROM cortex_core.vw_churn_produto_motivo_mensal
         WHERE ano_mes >= ${startStr}::date
+          AND ano_mes <= ${endStr}::date
         GROUP BY produto, motivo_cancelamento
         ORDER BY SUM(mrr_perdido) DESC, SUM(cancelamentos) DESC
       `);
