@@ -188,7 +188,7 @@ export function ChurnEvolucaoSquad() {
     setInsightsLoading(false);
   }, []);
 
-  const { data, isLoading } = useQuery<EvolucaoMensalResponse>({
+  const { data, isLoading, isError } = useQuery<EvolucaoMensalResponse>({
     queryKey: [`/api/dashboard/evolucao-mensal?meses=${meses}`],
   });
 
@@ -350,6 +350,14 @@ export function ChurnEvolucaoSquad() {
         <div className="flex gap-4"><Skeleton className="h-10 w-40" /><Skeleton className="h-10 w-40" /><Skeleton className="h-10 w-40" /></div>
         <div className="grid grid-cols-4 gap-4"><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /><Skeleton className="h-28" /></div>
         <Skeleton className="h-80" /><Skeleton className="h-80" />
+      </div>
+    );
+  }
+
+  if (isError || !data?.mrr) {
+    return (
+      <div className="flex items-center justify-center h-40 text-sm text-muted-foreground">
+        Sem dados disponíveis.
       </div>
     );
   }

@@ -108,7 +108,8 @@ export function ChurnProdutoMotivo() {
   const { data: squadMotivoData } = useQuery<SquadMotivoData>({
     queryKey: ["/api/churn/squad-motivo", produtoSelecionado, inicio, fim],
     queryFn: () =>
-      fetch(`/api/churn/squad-motivo?produto=${encodeURIComponent(produtoSelecionado!)}&dataInicio=${inicio}&dataFim=${fim}`).then(r => r.json()),
+      fetch(`/api/churn/squad-motivo?produto=${encodeURIComponent(produtoSelecionado!)}&dataInicio=${inicio}&dataFim=${fim}`)
+        .then(r => { if (!r.ok) throw new Error("API error"); return r.json(); }),
     enabled: !!produtoSelecionado && !!inicio && !!fim,
   });
 
@@ -376,7 +377,7 @@ export function ChurnProdutoMotivo() {
       )}
 
       {/* Squad × Motivo drill-down */}
-      {produtoSelecionado && squadMotivoData && squadMotivoData.squads.length > 0 && (() => {
+      {produtoSelecionado && Array.isArray(squadMotivoData?.squads) && squadMotivoData!.squads.length > 0 && Array.isArray(squadMotivoData?.celulas) && (() => {
         const smData = squadMotivoData;
         const smMax = Math.max(...smData.celulas.map(c => c.pct_dentro_squad), 1);
         const smMap = new Map(smData.celulas.map(c => [`${c.squad}|||${c.motivo_cancelamento}`, c]));
