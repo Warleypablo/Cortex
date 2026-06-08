@@ -37,6 +37,8 @@ tr.sub td:first-child{padding-left:30px;color:var(--tp-gray-500);font-size:12.5p
 tr.sub td:first-child::before{content:'└ ';color:var(--tp-gray-600);}
 tr.hl td{background:rgba(255,107,107,.10);font-weight:700;}
 .tbl-wrap{background:var(--tp-gray-800);border:1px solid var(--tp-gray-700);border-radius:10px;overflow:hidden;}
+.tbl-wrap.x{overflow-x:auto;}
+table.cmp th,table.cmp td{padding:6px 9px;font-size:11.5px;white-space:nowrap;}
 .down{color:var(--red);font-weight:700;}.up{color:var(--tp-green);font-weight:700;}.ok{color:var(--tp-gray-500);}
 .prev{color:#8ea3ff;font-weight:600;}
 .note{font-size:11.5px;color:var(--tp-gray-500);margin-top:10px;font-style:italic;}
@@ -124,9 +126,50 @@ footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--tp-gray-800);
   </div>
 </div>
 
-<!-- 2 · CONVERSÃO POR FAIXA -->
+<!-- 2 · ORÇADO PROPORCIONAL AO PERÍODO -->
 <div class="smb">
-  <div class="st">2 · Conversão da página por faixa de faturamento</div>
+  <div class="st">2 · Orçado proporcional ao período (1–8/jun) — colunas do Cortex</div>
+  <p style="font-size:13px;color:var(--tp-gray-500);margin-bottom:14px;max-width:880px;">
+    "Quanto deveríamos ter até o dia 8." O <b>Orçado (1–8)</b> é o orçado mensal ÷ 30 × 8 (volumes); taxas e custos mantêm o valor.
+    Mesmas colunas da aba Orçado × Realizado do Cortex.</p>
+  <div class="tbl-wrap x"><table class="cmp">
+    <thead><tr>
+      <th>Métrica</th><th class="r">Orçado (mês)</th><th class="r">Orçado (1–8)</th><th class="r">Realizado (1–8)</th>
+      <th class="r">% Atingido</th><th class="r">Desvio Meta</th><th class="r">Previsão As Is</th><th class="r">Recálculo Meta</th>
+    </tr></thead>
+    <tbody>
+      <tr class="seg"><td colspan="8">Marketing</td></tr>
+      <tr><td>Investimento</td><td class="r">R$ 113.500</td><td class="r">R$ 30.267</td><td class="r">R$ 30.134</td><td class="r">26,6%</td><td class="r ok">−0,4%</td><td class="r prev">R$ 113.003</td><td class="r ok">+0,2%</td></tr>
+      <tr><td>CPM</td><td class="r">R$ 70,00</td><td class="r">R$ 70,00</td><td class="r">R$ 68,88</td><td class="r">98,4%</td><td class="r up">−1,6%</td><td class="r prev">R$ 68,88</td><td class="r ok">—</td></tr>
+      <tr><td>Impressões</td><td class="r">1.621.429</td><td class="r">432.381</td><td class="r">437.486</td><td class="r">27,0%</td><td class="r ok">+1,2%</td><td class="r prev">1.640.571</td><td class="r ok">~0%</td></tr>
+      <tr><td>CTR de saída</td><td class="r">0,80%</td><td class="r">0,80%</td><td class="r">0,80%</td><td class="r">100%</td><td class="r ok">0,0%</td><td class="r prev">0,80%</td><td class="r ok">0,0pp</td></tr>
+      <tr><td>Cliques de saída</td><td class="r">12.971</td><td class="r">3.459</td><td class="r">3.500</td><td class="r">27,0%</td><td class="r ok">+1,2%</td><td class="r prev">13.125</td><td class="r ok">~0%</td></tr>
+      <tr><td>Connect Rate</td><td class="r">80%</td><td class="r">80%</td><td class="r">71,8%</td><td class="r">89,8%</td><td class="r down">−10,3%</td><td class="r prev">71,8%</td><td class="r down">+8,2pp</td></tr>
+      <tr><td>Visualizações de página</td><td class="r">10.377</td><td class="r">2.767</td><td class="r">2.513</td><td class="r">24,2%</td><td class="r down">−9,2%</td><td class="r prev">9.424</td><td class="r down">+3,3%</td></tr>
+      <tr><td>Tx Conversão da Página</td><td class="r">15%</td><td class="r">15%</td><td class="r">6,7%</td><td class="r">44,7%</td><td class="r down">−55,3%</td><td class="r prev">6,7%</td><td class="r down">+8,3pp</td></tr>
+      <tr><td><b>Leads</b></td><td class="r">1.557</td><td class="r">415</td><td class="r">168</td><td class="r">10,8%</td><td class="r down">−59,5%</td><td class="r prev">630</td><td class="r down">+21,7%</td></tr>
+      <tr><td>CPL</td><td class="r">R$ 73</td><td class="r">R$ 73</td><td class="r">R$ 179</td><td class="r">245%</td><td class="r down">+145%</td><td class="r prev">R$ 179</td><td class="r ok">—</td></tr>
+      <tr><td>% MQL</td><td class="r">40%</td><td class="r">40%</td><td class="r">39,9%</td><td class="r">99,8%</td><td class="r ok">−0,3%</td><td class="r prev">39,9%</td><td class="r ok">+0,1pp</td></tr>
+      <tr><td>MQLs</td><td class="r">623</td><td class="r">166</td><td class="r">67</td><td class="r">10,8%</td><td class="r down">−59,6%</td><td class="r prev">251</td><td class="r down">+21,7%</td></tr>
+      <tr><td>CPMQL</td><td class="r">R$ 182</td><td class="r">R$ 182</td><td class="r">R$ 450</td><td class="r">247%</td><td class="r down">+147%</td><td class="r prev">R$ 450</td><td class="r ok">—</td></tr>
+      <tr><td>Não-MQLs</td><td class="r">934</td><td class="r">249</td><td class="r">101</td><td class="r">10,8%</td><td class="r down">−59,4%</td><td class="r prev">379</td><td class="r down">+21,6%</td></tr>
+      <tr class="seg"><td colspan="8">Pré-vendas e Vendas ¹</td></tr>
+      <tr><td>Novos clientes</td><td class="r">40</td><td class="r">11</td><td class="r">5</td><td class="r">12,5%</td><td class="r down">−53%</td><td class="r prev">19</td><td class="r down">+19,3%</td></tr>
+      <tr><td>CAC</td><td class="r">R$ 2.838</td><td class="r">R$ 2.838</td><td class="r">R$ 6.027</td><td class="r">212%</td><td class="r down">+112%</td><td class="r prev">R$ 5.948</td><td class="r ok">—</td></tr>
+      <tr><td>Faturamento</td><td class="r">~R$ 379k</td><td class="r">~R$ 101k</td><td class="r">~R$ 47k</td><td class="r">12,4%</td><td class="r down">−53%</td><td class="r prev">~R$ 180k</td><td class="r down">+19,3%</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    <b>% Atingido</b> = realizado ÷ orçado do mês (≈27% = no ritmo). <b>Desvio Meta</b> = realizado vs orçado proporcional (acima/abaixo do ritmo do período).
+    <b>Previsão As Is</b> = projeção fim do mês. <b>Recálculo Meta</b> = esforço pra fechar o orçado mensal (% nos volumes, pp nas taxas; "—" em custos).<br>
+    Leitura: <b class="g">investimento, CPM, CTR e cliques estão no ritmo</b> (Desvio ~0). O buraco começa no <b class="r">Connect Rate / Tx Conversão</b>
+    e se propaga: Leads, MQLs e Não-MQLs todos a ~11% do mês (deviam estar em ~27%). ¹ Vendas imaturas (lead time) — realizado = cohort × taxas maduras.
+  </div>
+</div>
+
+<!-- 3 · CONVERSÃO POR FAIXA -->
+<div class="smb">
+  <div class="st">3 · Conversão da página por faixa de faturamento</div>
   <p style="font-size:13px;color:var(--tp-gray-500);margin-bottom:14px;max-width:880px;">
     Conversão de cada faixa = <b>leads daquela faixa ÷ total de views da página</b> (denominador comum — a página é a mesma).
     A soma das faixas reconstrói a conversão total. Mostra <b>onde</b> a página parou de converter.</p>
@@ -155,7 +198,7 @@ footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--tp-gray-800);
 
 <!-- 3 · VENDAS POR FAIXA -->
 <div class="smb">
-  <div class="st">3 · Vendas por faixa — o R$0-30k vale a pena?</div>
+  <div class="st">4 · Vendas por faixa — o R$0-30k vale a pena?</div>
   <p style="font-size:13px;color:var(--tp-gray-500);margin-bottom:14px;max-width:880px;">
     Coorte madura (leads criados jan–abr, já com tempo de fechar). Conversão lead→venda, ticket (MRR) e
     eficiência (receita por lead) por faixa. <b>Achado-chave: MQL = empresa de R$100k+/mês</b> (abaixo disso, 0% MQL; acima, 100%).</p>
@@ -181,7 +224,7 @@ footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--tp-gray-800);
 
 <!-- 4 · FCA -->
 <div class="smb">
-  <div class="st">4 · FCA — conclusão</div>
+  <div class="st">5 · FCA — conclusão</div>
 
   <div class="fbox prob">
     <h3>Problema</h3>
