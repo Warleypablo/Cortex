@@ -2,18 +2,11 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { bitrixDealAdd } from "../services/bitrixClient";
+import { temperatureFrom, leadScore } from "../../shared/crmInstagramScoring";
 
 const STAGES = ["engajador", "oportunidade", "negocio"] as const;
 const SUBCATEGORIES = ["creator_ugc", "job_candidate", "competitor", "poor_fit"] as const;
 const LOCK_TTL_MIN = 15;
-
-function temperatureFrom(lastInteractionAt: string | Date | null): "hot" | "warm" | "cold" {
-  if (!lastInteractionAt) return "cold";
-  const days = (Date.now() - new Date(lastInteractionAt).getTime()) / 86_400_000;
-  if (days <= 15) return "hot";
-  if (days <= 30) return "warm";
-  return "cold";
-}
 
 export function registerCrmInstagramRoutes(app: Express, db: any, _storage: IStorage) {
   // ── Lista de prospects (kanban) — priorização + temperatura + dedup ──
@@ -24,15 +17,17 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
       const q = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : null;
 
       const result = await db.execute(sql`
-        SELECT p.id, p.ig_username, p.ig_user_id, p.bio, p.followers_count,
+        SELECT p.id, p.ig_username, p.display_name, p.ig_user_id, p.bio, p.followers_count,
                p.profile_picture_url, p.last_media_permalink, p.stage, p.subcategory,
                p.owner_user_id, p.locked_by, p.locked_at, p.bitrix_deal_id,
                p.ghl_contact_id, p.is_existing_contact, p.icp_tags,
                p.first_seen, p.last_interaction_at,
+               c.location_id AS ghl_location_id,
                COALESCE(i.comment_count, 0) AS comment_count,
                COALESCE(i.dm_count, 0) AS dm_count,
                i.last_text
         FROM cortex_core.prospecting_profiles p
+        LEFT JOIN cortex_core.ghl_contacts c ON c.id = p.ghl_contact_id
         LEFT JOIN (
           SELECT profile_id,
                  COUNT(*) FILTER (WHERE type = 'comment') AS comment_count,
@@ -43,38 +38,53 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         ) i ON i.profile_id = p.id
         WHERE (${stage}::text IS NULL OR p.stage = ${stage})
           AND (${owner}::text IS NULL OR p.owner_user_id = ${owner})
-          AND (${q}::text IS NULL OR LOWER(p.ig_username) LIKE '%' || ${q} || '%')
-        ORDER BY (COALESCE(i.dm_count,0) > 0) DESC,
-                 COALESCE(i.comment_count,0) DESC,
-                 p.last_interaction_at DESC NULLS LAST
+          AND (${q}::text IS NULL OR LOWER(COALESCE(p.ig_username, p.display_name)) LIKE '%' || ${q} || '%')
       `);
 
       const now = Date.now();
-      const rows = (result.rows as any[]).map((r) => ({
-        id: r.id,
-        igUsername: r.ig_username,
-        igUserId: r.ig_user_id,
-        bio: r.bio,
-        followersCount: r.followers_count,
-        profilePictureUrl: r.profile_picture_url,
-        lastMediaPermalink: r.last_media_permalink,
-        stage: r.stage,
-        subcategory: r.subcategory,
-        ownerUserId: r.owner_user_id,
-        lockedBy: r.locked_by,
-        lockedAt: r.locked_at,
-        isLocked: !!r.locked_by && r.locked_at && (now - new Date(r.locked_at).getTime()) < LOCK_TTL_MIN * 60_000,
-        bitrixDealId: r.bitrix_deal_id,
-        ghlContactId: r.ghl_contact_id,
-        isExistingContact: r.is_existing_contact,
-        icpTags: r.icp_tags,
-        firstSeen: r.first_seen,
-        lastInteractionAt: r.last_interaction_at,
-        commentCount: Number(r.comment_count),
-        dmCount: Number(r.dm_count),
-        lastText: r.last_text,
-        temperature: temperatureFrom(r.last_interaction_at),
-      }));
+      const rows = (result.rows as any[]).map((r) => {
+        const dmCount = Number(r.dm_count);
+        const commentCount = Number(r.comment_count);
+        return {
+          id: r.id,
+          igUsername: r.ig_username,
+          displayName: r.display_name,
+          igUserId: r.ig_user_id,
+          bio: r.bio,
+          followersCount: r.followers_count,
+          profilePictureUrl: r.profile_picture_url,
+          lastMediaPermalink: r.last_media_permalink,
+          stage: r.stage,
+          subcategory: r.subcategory,
+          ownerUserId: r.owner_user_id,
+          lockedBy: r.locked_by,
+          lockedAt: r.locked_at,
+          isLocked: !!r.locked_by && r.locked_at && (now - new Date(r.locked_at).getTime()) < LOCK_TTL_MIN * 60_000,
+          bitrixDealId: r.bitrix_deal_id,
+          ghlContactId: r.ghl_contact_id,
+          ghlLocationId: r.ghl_location_id,
+          isExistingContact: r.is_existing_contact,
+          icpTags: r.icp_tags,
+          firstSeen: r.first_seen,
+          lastInteractionAt: r.last_interaction_at,
+          commentCount,
+          dmCount,
+          lastText: r.last_text,
+          temperature: temperatureFrom(r.last_interaction_at, now),
+          score: leadScore({
+            dmCount,
+            commentCount,
+            lastInteractionAt: r.last_interaction_at,
+            followersCount: r.followers_count,
+            subcategory: r.subcategory,
+          }, now),
+        };
+      });
+      // Ordena pela qualificação (score desc), recência como desempate.
+      rows.sort((a, b) =>
+        b.score - a.score ||
+        new Date(b.lastInteractionAt || 0).getTime() - new Date(a.lastInteractionAt || 0).getTime(),
+      );
       res.json(rows);
     } catch (err: any) {
       console.error("[crm-instagram] GET /profiles erro:", err.message);
@@ -170,9 +180,13 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
     try {
       const user = req.user as any;
       const id = parseInt(req.params.id, 10);
+      // "Pegar" = virar dono E travar pra mim numa ação só (combinado no plano).
       const updated = (await db.execute(sql`
         UPDATE cortex_core.prospecting_profiles
-        SET owner_user_id = ${user.id}, updated_at = NOW()
+        SET owner_user_id = ${user.id},
+            locked_by = ${user.id},
+            locked_at = NOW(),
+            updated_at = NOW()
         WHERE id = ${id} AND owner_user_id IS NULL
         RETURNING id
       `)).rows;
@@ -228,7 +242,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
       const { nome, telefone, email, valor, responsavel } = req.body || {};
 
       const profile = (await db.execute(sql`
-        SELECT id, ig_username, bio, last_media_permalink, bitrix_deal_id, stage
+        SELECT id, ig_username, display_name, bio, last_media_permalink, bitrix_deal_id, stage
         FROM cortex_core.prospecting_profiles WHERE id = ${id}
       `)).rows[0];
       if (!profile) return res.status(404).json({ message: "não encontrado" });
@@ -237,9 +251,12 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         return res.json({ alreadyExists: true, dealId: profile.bitrix_deal_id });
       }
 
+      // Identidade: @handle real se houver (via comentário); senão o nome de exibição.
+      const ident = profile.ig_username ? `@${profile.ig_username}` : (profile.display_name || "lead IG");
+
       const comments = [
         `Origem: Instagram (CRM Instagram / garimpo)`,
-        `@${profile.ig_username}`,
+        ident,
         profile.last_media_permalink ? `Último post: ${profile.last_media_permalink}` : null,
         profile.bio ? `Bio: ${profile.bio}` : null,
         telefone ? `Telefone: ${telefone}` : null,
@@ -248,7 +265,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
       ].filter(Boolean).join("\n");
 
       const dealId = await bitrixDealAdd({
-        TITLE: nome ? `${nome} (@${profile.ig_username})` : `IG Garimpo - @${profile.ig_username}`,
+        TITLE: nome ? `${nome} (${ident})` : `IG Garimpo - ${ident}`,
         SOURCE_ID: "instagram_organic",
         UTM_SOURCE: "instagram",
         UTM_MEDIUM: "organic",

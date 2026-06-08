@@ -17,7 +17,8 @@ import {
 
 type Profile = {
   id: number;
-  igUsername: string;
+  igUsername: string | null;
+  displayName: string | null;
   bio: string | null;
   followersCount: number | null;
   profilePictureUrl: string | null;
@@ -29,13 +30,29 @@ type Profile = {
   isLocked: boolean;
   bitrixDealId: number | null;
   ghlContactId: string | null;
+  ghlLocationId: string | null;
   isExistingContact: boolean;
   lastInteractionAt: string | null;
   commentCount: number;
   dmCount: number;
   lastText: string | null;
   temperature: "hot" | "warm" | "cold";
+  score: number;
 };
+
+// Rótulo humano: nome de exibição ou @handle. Identidade visual sem assumir handle.
+function profileLabel(p: Profile): string {
+  if (p.displayName) return p.displayName;
+  if (p.igUsername) return `@${p.igUsername}`;
+  return "lead sem nome";
+}
+
+// Cor do score (qualificação): verde quente → cinza frio.
+function scoreColor(score: number): string {
+  if (score >= 70) return "bg-emerald-600 text-white";
+  if (score >= 40) return "bg-amber-500 text-white";
+  return "bg-gray-300 dark:bg-zinc-700 text-gray-700 dark:text-zinc-300";
+}
 
 const STAGES = [
   { key: "engajador", label: "Engajador" },
@@ -167,12 +184,18 @@ function ProfileCard({
     >
       <div className="flex items-start gap-2">
         <Avatar className="h-9 w-9">
-          {p.profilePictureUrl && <AvatarImage src={p.profilePictureUrl} alt={p.igUsername} />}
-          <AvatarFallback>{p.igUsername.slice(0, 2).toUpperCase()}</AvatarFallback>
+          {p.profilePictureUrl && <AvatarImage src={p.profilePictureUrl} alt={profileLabel(p)} />}
+          <AvatarFallback>{profileLabel(p).replace(/^@/, "").slice(0, 2).toUpperCase()}</AvatarFallback>
         </Avatar>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
-            <span className="font-medium text-gray-900 dark:text-white truncate">@{p.igUsername}</span>
+            <span
+              className={`shrink-0 rounded px-1.5 py-0.5 text-[11px] font-bold tabular-nums ${scoreColor(p.score)}`}
+              title="Lead score (qualificação)"
+            >
+              {p.score}
+            </span>
+            <span className="font-medium text-gray-900 dark:text-white truncate">{profileLabel(p)}</span>
             <span title={p.temperature}>{TEMP_EMOJI[p.temperature]}</span>
           </div>
           <div className="text-xs text-gray-500 dark:text-zinc-400">
@@ -212,13 +235,27 @@ function ProfileCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        <Button size="sm" variant="outline" className="h-7 text-xs gap-1" asChild>
-          <a href={`https://instagram.com/${p.igUsername}`} target="_blank" rel="noreferrer">
-            <ExternalLink className="h-3 w-3" />Abrir conversa
-          </a>
-        </Button>
+        {p.ghlContactId && p.ghlLocationId ? (
+          // Lead com conversa no GHL: SDR responde dentro do GHL (sem logar no IG).
+          <Button size="sm" className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white" asChild>
+            <a
+              href={`https://app.gohighlevel.com/v2/location/${p.ghlLocationId}/conversations/conversations/${p.ghlContactId}`}
+              target="_blank"
+              rel="noreferrer"
+            >
+              <MessageCircle className="h-3 w-3" />Responder no GHL
+            </a>
+          </Button>
+        ) : p.igUsername ? (
+          // Lead só de comentário: sem thread no GHL → abre o perfil no Instagram.
+          <Button size="sm" variant="outline" className="h-7 text-xs gap-1" asChild>
+            <a href={`https://instagram.com/${p.igUsername}`} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-3 w-3" />Abrir no Instagram
+            </a>
+          </Button>
+        ) : null}
         {!p.ownerUserId && (
-          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={onClaim}>Pegar</Button>
+          <Button size="sm" variant="ghost" className="h-7 text-xs" title="Pegar e travar pra mim por 15min" onClick={onClaim}>Pegar</Button>
         )}
         {idx < STAGES.length - 1 && (
           <Button
@@ -302,7 +339,7 @@ function BitrixModal({
     <Dialog open={!!target} onOpenChange={(o) => !o && onClose()}>
       <DialogContent className="bg-white dark:bg-zinc-900">
         <DialogHeader>
-          <DialogTitle>Criar no Bitrix — @{target?.igUsername}</DialogTitle>
+          <DialogTitle>Criar no Bitrix — {target ? profileLabel(target) : ""}</DialogTitle>
         </DialogHeader>
         <div className="space-y-3 text-sm">
           <p className="text-xs text-gray-500 dark:text-zinc-400">

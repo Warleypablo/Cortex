@@ -3266,7 +3266,11 @@ export const prospectingProfiles = cortexCoreSchema.table(
   "prospecting_profiles",
   {
     id: serial("id").primaryKey(),
-    igUsername: text("ig_username").notNull(),
+    // @handle real do Instagram — só conhecido pela via de comentário (Graph API).
+    // Null pra leads de DM (GHL não entrega handle, só nome de exibição).
+    igUsername: text("ig_username"),
+    // Nome de exibição (rótulo humano). Pra DM vem do contact_name do GHL.
+    displayName: text("display_name"),
     igUserId: text("ig_user_id"),
     bio: text("bio"),
     followersCount: integer("followers_count"),
@@ -3289,7 +3293,11 @@ export const prospectingProfiles = cortexCoreSchema.table(
     updatedAt: timestamp("updated_at").defaultNow(),
   },
   (table) => [
+    // Postgres trata NULLs como distintos: leads de DM (ig_username NULL) coexistem;
+    // a unicidade vale entre @handles reais (via comentário).
     uniqueIndex("uq_prospect_ig_username").on(table.igUsername),
+    // Chave de dedup estável dos leads de DM (GHL).
+    uniqueIndex("uq_prospect_ghl_contact").on(table.ghlContactId),
     index("idx_prospect_stage").on(table.stage),
     index("idx_prospect_owner").on(table.ownerUserId),
     index("idx_prospect_last_interaction").on(table.lastInteractionAt),

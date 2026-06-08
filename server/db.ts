@@ -2386,7 +2386,8 @@ export async function initializeCrmInstagramTables(): Promise<void> {
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS cortex_core.prospecting_profiles (
         id SERIAL PRIMARY KEY,
-        ig_username TEXT NOT NULL,
+        ig_username TEXT,
+        display_name TEXT,
         ig_user_id TEXT,
         bio TEXT,
         followers_count INTEGER,
@@ -2407,7 +2408,51 @@ export async function initializeCrmInstagramTables(): Promise<void> {
         updated_at TIMESTAMP DEFAULT NOW()
       )
     `);
+    // ── Migração idempotente: re-chaveamento por ghl_contact_id + display_name ──
+    // (separa nome de exibição do @handle real; conserta leads de DM exibidos como
+    //  "@nome com emoji" e dá dedup estável). Guardas garantem rodar 1x sem efeito
+    //  destrutivo em execuções futuras.
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS display_name TEXT`);
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ALTER COLUMN ig_username DROP NOT NULL`);
+    // 1) backfill do nome a partir do ig_username legado (só leads de DM ainda não migrados)
+    await db.execute(sql`
+      UPDATE cortex_core.prospecting_profiles
+      SET display_name = ig_username
+      WHERE display_name IS NULL AND ig_username IS NOT NULL AND ghl_contact_id IS NOT NULL
+    `);
+    // 2) zera o @handle dos leads de DM (era nome de exibição, não handle real).
+    //    Guarda ig_username = display_name evita apagar handle real de lead de comentário.
+    await db.execute(sql`
+      UPDATE cortex_core.prospecting_profiles
+      SET ig_username = NULL
+      WHERE ghl_contact_id IS NOT NULL AND ig_username IS NOT NULL AND ig_username = display_name
+    `);
+    // 3) dedup defensivo: se houver ghl_contact_id duplicado, mantém o menor id,
+    //    repointa interações/log e remove os duplicados (antes do índice único).
+    await db.execute(sql`
+      WITH dups AS (
+        SELECT ghl_contact_id, MIN(id) AS keep_id, ARRAY_AGG(id) AS ids
+        FROM cortex_core.prospecting_profiles
+        WHERE ghl_contact_id IS NOT NULL
+        GROUP BY ghl_contact_id HAVING COUNT(*) > 1
+      ),
+      repoint_int AS (
+        UPDATE cortex_core.prospecting_interactions pi SET profile_id = d.keep_id
+        FROM dups d WHERE pi.profile_id = ANY(d.ids) AND pi.profile_id <> d.keep_id
+        RETURNING 1
+      ),
+      repoint_log AS (
+        UPDATE cortex_core.prospecting_status_log sl SET profile_id = d.keep_id
+        FROM dups d WHERE sl.profile_id = ANY(d.ids) AND sl.profile_id <> d.keep_id
+        RETURNING 1
+      )
+      DELETE FROM cortex_core.prospecting_profiles p
+      USING dups d
+      WHERE p.ghl_contact_id = d.ghl_contact_id AND p.id <> d.keep_id
+    `);
+
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_ig_username ON cortex_core.prospecting_profiles (ig_username)`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_ghl_contact ON cortex_core.prospecting_profiles (ghl_contact_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_stage ON cortex_core.prospecting_profiles (stage)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_owner ON cortex_core.prospecting_profiles (owner_user_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_last_interaction ON cortex_core.prospecting_profiles (last_interaction_at)`);

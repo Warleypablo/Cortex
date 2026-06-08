@@ -85,6 +85,7 @@ export async function runCrmInstagramCollector(): Promise<void> {
             .insert(prospectingProfiles)
             .values({
               igUsername: username,
+              displayName: username, // comentário traz @handle real → serve de rótulo
               igUserId: igUserId || undefined,
               lastInteractionAt: lastTs,
               firstSeen: lastTs,
@@ -92,6 +93,7 @@ export async function runCrmInstagramCollector(): Promise<void> {
             .onConflictDoUpdate({
               target: prospectingProfiles.igUsername,
               set: {
+                displayName: sql`COALESCE(${prospectingProfiles.displayName}, ${username})`,
                 lastInteractionAt: sql`GREATEST(${prospectingProfiles.lastInteractionAt}, ${lastTs})`,
                 igUserId: sql`COALESCE(${prospectingProfiles.igUserId}, ${igUserId})`,
                 updatedAt: new Date(),

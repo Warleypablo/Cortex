@@ -19,15 +19,6 @@ import { prospectingProfiles, prospectingInteractions } from "../../shared/schem
 
 const LOOKBACK_DAYS = 45; // janela processada a cada run (idempotente por external_ref)
 
-function deriveHandle(contactName: string | null, fallbackId: string): string | null {
-  if (!contactName) return null;
-  const cleaned = contactName.trim().replace(/^@/, "");
-  if (!cleaned) return null;
-  // Handles de IG não têm espaço; se vier um nome de exibição com espaço,
-  // ainda assim usamos como chave normalizada (melhor ligar que perder).
-  return cleaned.toLowerCase();
-}
-
 export async function runCrmInstagramGhlIngest(): Promise<void> {
   const startedAt = new Date();
   try {
@@ -58,29 +49,33 @@ export async function runCrmInstagramGhlIngest(): Promise<void> {
     let skippedNoHandle = 0;
 
     for (const r of rows) {
-      const handle = deriveHandle(r.contact_name, r.contact_id || r.message_id);
-      if (!handle) { skippedNoHandle++; continue; }
+      // Chave de dedup estável = ghl_contact_id (o GHL não entrega @handle real).
+      // Sem contact_id não há como deduplicar com segurança → pula.
+      const ghlContactId = r.contact_id;
+      if (!ghlContactId) { skippedNoHandle++; continue; }
+      const displayName = r.contact_name?.trim() || `contato ${ghlContactId.slice(0, 6)}`;
 
       const occurredAt = r.date_added && !isNaN(new Date(r.date_added).getTime())
         ? new Date(r.date_added)
         : new Date();
 
-      // Upsert do prospect — DM marca isExistingContact (já está no CRM de marketing)
+      // Upsert do prospect — dedup por ghl_contact_id. ig_username (handle real) fica
+      // null até a via de comentário preencher; display_name é o rótulo humano.
       const upserted = await db
         .insert(prospectingProfiles)
         .values({
-          igUsername: handle,
-          ghlContactId: r.contact_id || undefined,
+          displayName,
+          ghlContactId,
           isExistingContact: true,
           lastInteractionAt: occurredAt,
           firstSeen: occurredAt,
           icpTags: r.tags || undefined,
         })
         .onConflictDoUpdate({
-          target: prospectingProfiles.igUsername,
+          target: prospectingProfiles.ghlContactId,
           set: {
+            displayName,
             lastInteractionAt: sql`GREATEST(${prospectingProfiles.lastInteractionAt}, ${occurredAt})`,
-            ghlContactId: sql`COALESCE(${prospectingProfiles.ghlContactId}, ${r.contact_id})`,
             isExistingContact: true,
             updatedAt: new Date(),
           },
