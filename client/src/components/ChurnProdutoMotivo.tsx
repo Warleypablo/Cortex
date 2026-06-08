@@ -356,16 +356,6 @@ export function ChurnProdutoMotivo() {
                 </Bar>
               </BarChart>
             </ResponsiveContainer>
-            <div className="mt-3 space-y-1">
-              {drillDown.map(c => (
-                <div key={c.motivo_cancelamento} className="flex justify-between text-xs text-muted-foreground">
-                  <span>{c.motivo_cancelamento}</span>
-                  <span>
-                    {c.cancelamentos} churns · {formatCurrencyNoDecimals(c.mrr_perdido)} · {c.pct_dentro_produto.toFixed(1)}%
-                  </span>
-                </div>
-              ))}
-            </div>
           </CardContent>
         </Card>
       )}
