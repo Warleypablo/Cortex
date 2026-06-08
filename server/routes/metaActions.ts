@@ -50,6 +50,20 @@ const budgetSchema = baseActionSchema.extend({
   newDailyBudgetCents: z.number().int().positive(),
 });
 
+const bulkSchema = z.object({
+  action: z.enum(['pause', 'resume']),
+  reason: z.string().min(5, 'reason deve ter pelo menos 5 caracteres').max(2000),
+  items: z
+    .array(
+      z.object({
+        level: levelSchema,
+        entityId: z.string().min(1).max(64),
+      }),
+    )
+    .min(1, 'items não pode ser vazio')
+    .max(200, 'máximo de 200 itens por lote'),
+});
+
 // ===================== DB HELPERS =====================
 
 interface LogRow {
@@ -313,6 +327,72 @@ router.post('/budget', async (req, res) => {
     { daily_budget_cents: parsed.data.newDailyBudgetCents },
     parsed.data.newDailyBudgetCents,
   );
+});
+
+// ---------- POST /bulk ----------
+// Ação manual em massa (pausar/ativar vários ad/adset/campaign de uma vez).
+// Cada item gera seu próprio registro no audit trail e roda sequencialmente
+// (respeita rate limit da Meta API). Retorna resultado por item.
+router.post('/bulk', async (req, res) => {
+  const parsed = bulkSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Payload inválido', details: parsed.error.issues });
+  }
+  const { action, reason, items } = parsed.data;
+  const user = (req as any).user;
+  const kind: ActionKind = action === 'pause' ? 'pause' : 'resume';
+  const payload = { status: action === 'pause' ? 'PAUSED' : 'ACTIVE' };
+
+  const results: Array<{
+    level: MetaEntityLevel;
+    entityId: string;
+    ok: boolean;
+    logId: number;
+    error?: string;
+  }> = [];
+
+  for (const item of items) {
+    try {
+      const logId = await insertLog({
+        actorType: 'human',
+        actorUserId: user.id,
+        actorEmail: user.email,
+        level: item.level,
+        entityId: item.entityId,
+        action: kind,
+        payloadJson: payload,
+        reason,
+        status: 'executing',
+        confirmedByUserId: user.id,
+        confirmedAt: new Date(),
+      });
+
+      const { result, previousSnapshot } = await executeAction(kind, {
+        level: item.level,
+        entityId: item.entityId,
+      });
+      await finalizeLog(logId, result, previousSnapshot ?? result.previousValue);
+
+      results.push({
+        level: item.level,
+        entityId: item.entityId,
+        ok: result.ok,
+        logId,
+        error: result.ok ? undefined : result.error?.message,
+      });
+    } catch (err) {
+      results.push({
+        level: item.level,
+        entityId: item.entityId,
+        ok: false,
+        logId: -1,
+        error: sanitizeError(err).message,
+      });
+    }
+  }
+
+  const okCount = results.filter((r) => r.ok).length;
+  res.json({ ok: okCount === results.length, okCount, total: results.length, results });
 });
 
 // ===================== CORE FLOW =====================
