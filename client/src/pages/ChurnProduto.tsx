@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { PieChart, LineChart } from "lucide-react";
+import { PieChart, LineChart, Users } from "lucide-react";
 import { ChurnProdutoMotivo } from "@/components/ChurnProdutoMotivo";
 import { ChurnEvolucaoMensal } from "@/components/ChurnEvolucaoMensal";
+import { ChurnEvolucaoSquad } from "@/components/ChurnEvolucaoSquad";
 
-type ActiveTab = "produto-motivo" | "evolucao-mensal";
+type ActiveTab = "produto-motivo" | "evolucao-mensal" | "evolucao-squad";
 
 export default function ChurnProduto() {
   useSetPageInfo("Churn por Produto", "Análise de cancelamentos segmentada por produto");
@@ -23,11 +24,16 @@ export default function ChurnProduto() {
             <LineChart className="h-4 w-4" />
             Evolução Mensal
           </TabsTrigger>
+          <TabsTrigger value="evolucao-squad" className="gap-2">
+            <Users className="h-4 w-4" />
+            Evolução por Squad
+          </TabsTrigger>
         </TabsList>
       </Tabs>
 
       {activeTab === "produto-motivo" && <ChurnProdutoMotivo />}
       {activeTab === "evolucao-mensal" && <ChurnEvolucaoMensal />}
+      {activeTab === "evolucao-squad" && <ChurnEvolucaoSquad />}
     </div>
   );
 }

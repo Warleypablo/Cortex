@@ -143,4 +143,5 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
       res.status(500).json({ error: "Failed to fetch churn produto-motivo mensal" });
     }
   });
+
 }
