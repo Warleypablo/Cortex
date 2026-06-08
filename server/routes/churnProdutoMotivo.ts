@@ -28,19 +28,19 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
         const m = r.motivo_cancelamento;
         motivoTotais.set(m, (motivoTotais.get(m) || 0) + Number(r.cancelamentos));
       });
-      const motivosOrdenados = [...motivoTotais.entries()]
+      const motivosOrdenados = Array.from(motivoTotais.entries())
         .sort((a, b) => b[1] - a[1])
         .map(([m]) => m);
       const top8 = motivosOrdenados.slice(0, 8);
       const temOutros = motivosOrdenados.length > 8;
-      const motivos = temOutros ? [...top8, "Outros"] : top8;
+      const motivos = temOutros ? top8.concat(["Outros"]) : top8;
 
       // Produtos ordenados por mrr_perdido total
       const produtoMrr = new Map<string, number>();
       data.forEach(r => {
         produtoMrr.set(r.produto, (produtoMrr.get(r.produto) || 0) + Number(r.mrr_perdido));
       });
-      const produtos = [...produtoMrr.entries()]
+      const produtos = Array.from(produtoMrr.entries())
         .sort((a, b) => b[1] - a[1])
         .map(([p]) => p);
 
@@ -65,11 +65,11 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
         const prod = key.split("|||")[0];
         prodTotais.set(prod, (prodTotais.get(prod) || 0) + v.cancelamentos);
       });
-      const totalCancelamentos = [...prodTotais.values()].reduce((a, b) => a + b, 0);
-      const totalMrr = [...cellMap.values()].reduce((a, v) => a + v.mrr_perdido, 0);
-      const totalTicketSoma = [...cellMap.values()].reduce((a, v) => a + v.ticket_soma, 0);
+      const totalCancelamentos = Array.from(prodTotais.values()).reduce((a, b) => a + b, 0);
+      const totalMrr = Array.from(cellMap.values()).reduce((a, v) => a + v.mrr_perdido, 0);
+      const totalTicketSoma = Array.from(cellMap.values()).reduce((a, v) => a + v.ticket_soma, 0);
 
-      const celulas = [...cellMap.entries()].map(([key, v]) => {
+      const celulas = Array.from(cellMap.entries()).map(([key, v]) => {
         const [produto, motivo_cancelamento] = key.split("|||");
         const prodTotal = prodTotais.get(produto) || 1;
         return {
