@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
+import { MousePointerClick } from "lucide-react";
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, Legend,
@@ -256,9 +257,13 @@ export function ChurnEvolucaoMensal() {
             ))}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Histórico completo · <span className="italic">clique na legenda para destacar uma série</span>
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">Histórico completo</span>
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-800 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40">
+            <MousePointerClick className="h-3 w-3" />
+            Clique na legenda para destacar
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
@@ -332,9 +337,13 @@ export function ChurnEvolucaoMensal() {
             ))}
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">
-          Top 7 motivos + Outros · <span className="italic">clique na legenda para destacar uma série</span>
-        </p>
+        <div className="flex items-center gap-2 flex-wrap">
+          <span className="text-xs text-muted-foreground">Top 7 motivos + Outros</span>
+          <span className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border border-violet-200 dark:border-violet-800 text-violet-600 dark:text-violet-400 bg-violet-50 dark:bg-violet-950/40">
+            <MousePointerClick className="h-3 w-3" />
+            Clique na legenda para destacar
+          </span>
+        </div>
       </CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={400}>
