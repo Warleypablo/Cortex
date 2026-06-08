@@ -9,7 +9,6 @@ import {
   Bar,
   XAxis,
   YAxis,
-  Tooltip,
   ResponsiveContainer,
   Cell,
 } from "recharts";
@@ -349,15 +348,6 @@ export function ChurnProdutoMotivo() {
                   dataKey="motivo_cancelamento"
                   width={170}
                   tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#374151" }}
-                />
-                <Tooltip
-                  formatter={(value: number) => [value, "Cancelamentos"]}
-                  contentStyle={{
-                    background: isDark ? "#18181b" : "#fff",
-                    border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb",
-                    borderRadius: 6,
-                    fontSize: 12,
-                  }}
                 />
                 <Bar dataKey="cancelamentos" radius={[0, 4, 4, 0]}>
                   {drillDown.map((_, i) => (
