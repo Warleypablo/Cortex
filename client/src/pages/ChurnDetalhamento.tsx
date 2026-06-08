@@ -55,7 +55,6 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import RelatorioSemanalChurn from "./RelatorioSemanalChurn";
 import ChurnConsolidadoTrimestral from "@/components/ChurnConsolidadoTrimestral";
-import { ChurnProdutoMotivo } from "@/components/ChurnProdutoMotivo";
 import { format, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { 
@@ -492,7 +491,7 @@ export default function ChurnDetalhamento() {
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [isFiltersOpen, setIsFiltersOpen] = useState(false); // Fechado por padrão, dados principais no hero
   const [viewMode, setViewMode] = useState<"contratos" | "clientes">("contratos");
-  const [mainTab, setMainTab] = useState<"analise" | "contratos" | "relatorio" | "consolidado" | "produto-motivo">("analise");
+  const [mainTab, setMainTab] = useState<"analise" | "contratos" | "relatorio" | "consolidado">("analise");
   const [crossAnalysisView, setCrossAnalysisView] = useState<"motivo" | "cluster" | "plano">("motivo");
   const [expandedMotivo, setExpandedMotivo] = useState<string | null>(null);
   const [analysisSubTab, setAnalysisSubTab] = useState<"resumo" | "distribuicao" | "inteligencia">("resumo");
@@ -1887,7 +1886,7 @@ export default function ChurnDetalhamento() {
       </Card>
 
       {/* Tabs de nível superior */}
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio" | "consolidado" | "produto-motivo")}>
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio" | "consolidado")}>
         <TabsList>
           <TabsTrigger value="analise" className="gap-2" data-testid="main-tab-analise">
             <BarChart3 className="h-4 w-4" />
@@ -1901,17 +1900,11 @@ export default function ChurnDetalhamento() {
             <CalendarRange className="h-4 w-4" />
             Relatório Semanal
           </TabsTrigger>
-          <TabsTrigger value="produto-motivo" className="gap-2" data-testid="main-tab-produto-motivo">
-            <PieChart className="h-4 w-4" />
-            Produto × Motivo
-          </TabsTrigger>
         </TabsList>
       </Tabs>
 
       {mainTab === "relatorio" ? (
         <RelatorioSemanalChurn />
-      ) : mainTab === "produto-motivo" ? (
-        <ChurnProdutoMotivo />
       ) : mainTab === "analise" ? (
       <>
 
