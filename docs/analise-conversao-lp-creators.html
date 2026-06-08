@@ -35,6 +35,7 @@ tr.tot td{background:rgba(55,211,164,.10);font-weight:800;border-top:2px solid v
 tr.seg td{background:rgba(167,139,250,.10);font-weight:700;color:var(--purple);text-transform:uppercase;font-size:10.5px;letter-spacing:.5px;}
 tr.sub td:first-child{padding-left:30px;color:var(--tp-gray-500);font-size:12.5px;}
 tr.sub td:first-child::before{content:'└ ';color:var(--tp-gray-600);}
+tr.hl td{background:rgba(255,107,107,.10);font-weight:700;}
 .tbl-wrap{background:var(--tp-gray-800);border:1px solid var(--tp-gray-700);border-radius:10px;overflow:hidden;}
 .down{color:var(--red);font-weight:700;}.up{color:var(--tp-green);font-weight:700;}.ok{color:var(--tp-gray-500);}
 .prev{color:#8ea3ff;font-weight:600;}
@@ -98,9 +99,38 @@ footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--tp-gray-800);
   </div>
 </div>
 
-<!-- 2 · PRÉ-VENDAS & VENDAS -->
+<!-- 2 · CONVERSÃO POR FAIXA -->
 <div class="smb">
-  <div class="st">2 · Orçado × Realizado — Pré-vendas &amp; Vendas</div>
+  <div class="st">2 · Conversão da página por faixa de faturamento</div>
+  <p style="font-size:13px;color:var(--tp-gray-500);margin-bottom:14px;max-width:880px;">
+    Conversão de cada faixa = <b>leads daquela faixa ÷ total de views da página</b> (denominador comum — a página é a mesma).
+    A soma das faixas reconstrói a conversão total. Mostra <b>onde</b> a página parou de converter.</p>
+  <div class="tbl-wrap"><table>
+    <thead><tr>
+      <th>Faixa de faturamento/mês</th><th class="r">Jan</th><th class="r">Fev</th><th class="r">Mar</th>
+      <th class="r">Abr</th><th class="r">Mai</th><th class="r">Jun</th><th class="r">Δ jan→jun</th>
+    </tr></thead>
+    <tbody>
+      <tr class="hl"><td>R$ 0 – 30k</td><td class="r">12,7%</td><td class="r">8,3%</td><td class="r">7,1%</td><td class="r">7,1%</td><td class="r">5,2%</td><td class="r">2,7%</td><td class="r down">−79%</td></tr>
+      <tr><td>R$ 30 – 50k</td><td class="r">3,1%</td><td class="r">1,8%</td><td class="r">1,6%</td><td class="r">1,5%</td><td class="r">1,0%</td><td class="r">1,0%</td><td class="r down">−68%</td></tr>
+      <tr><td>R$ 50 – 100k</td><td class="r">2,6%</td><td class="r">2,0%</td><td class="r">1,5%</td><td class="r">1,5%</td><td class="r">1,5%</td><td class="r">0,9%</td><td class="r down">−65%</td></tr>
+      <tr><td>R$ 100 – 500k</td><td class="r">2,1%</td><td class="r">2,1%</td><td class="r">2,0%</td><td class="r">1,4%</td><td class="r">1,1%</td><td class="r">1,0%</td><td class="r down">−52%</td></tr>
+      <tr><td>R$ 500k – 1mi</td><td class="r">0,7%</td><td class="r">0,7%</td><td class="r">0,5%</td><td class="r">0,3%</td><td class="r">0,3%</td><td class="r">0,5%</td><td class="r ok">−29%</td></tr>
+      <tr><td>R$ 1 – 5mi</td><td class="r">0,5%</td><td class="r">0,5%</td><td class="r">0,3%</td><td class="r">0,4%</td><td class="r">0,2%</td><td class="r">0,3%</td><td class="r ok">−40%</td></tr>
+      <tr><td>R$ 5mi+</td><td class="r">0,4%</td><td class="r">0,3%</td><td class="r">0,3%</td><td class="r">0,2%</td><td class="r">0,3%</td><td class="r">0,2%</td><td class="r ok">−50%</td></tr>
+      <tr class="tot"><td>TOTAL (LP→Lead)</td><td class="r">22,3%</td><td class="r">15,8%</td><td class="r">13,3%</td><td class="r">12,4%</td><td class="r">9,7%</td><td class="r">6,6%</td><td class="r down">−70%</td></tr>
+    </tbody>
+  </table></div>
+  <div class="note">
+    <b style="color:var(--red)">A quebra está na base da pirâmide:</b> a faixa <b>R$ 0–30k sozinha responde por 64% da queda total</b>
+    (−10,0pp dos −15,7pp); somando tudo <b>abaixo de R$ 100k, são ~88%</b>. As faixas maiores quase não mexeram — já eram pequenas.
+    A LP restritiva está filtrando os <b>pequenos</b>, que eram o motor de volume (57% dos leads em jan). Jun = parcial (1–8).
+  </div>
+</div>
+
+<!-- 3 · PRÉ-VENDAS & VENDAS -->
+<div class="smb">
+  <div class="st">3 · Orçado × Realizado — Pré-vendas &amp; Vendas</div>
   <div class="tbl-wrap"><table>
     <thead><tr>
       <th>Taxa</th><th class="r">Orçado</th><th class="r">Realizado ¹</th><th class="r">Δ</th><th class="c"></th>
@@ -121,9 +151,9 @@ footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--tp-gray-800);
   <div class="note">¹ Junho ainda imaturo (lead time — deals novos sem reunião). Taxas medidas na coorte madura mar–mai/2026. "Previsão As Is" e "Recálculo de Meta" não se aplicam aqui (coorte fechada, não mês em curso). Orçado de %RA e No-show não estava no plano (🔘 sem meta).</div>
 </div>
 
-<!-- 3 · FCA -->
+<!-- 4 · FCA -->
 <div class="smb">
-  <div class="st">3 · FCA</div>
+  <div class="st">4 · FCA</div>
 
   <div class="fbox prob">
     <h3>Problema</h3>
@@ -140,6 +170,8 @@ footer{margin-top:42px;padding-top:18px;border-top:1px solid var(--tp-gray-800);
     <p style="margin-bottom:8px;">Ou seja: o <b>%MQL subir de 17% pra 40% foi cosmético</b> — não geramos mais MQL, só perdemos os Não-MQL e o
     denominador encolheu. A <b>LP e os anúncios ficaram restritivos demais</b> e viraram um filtro: barram o público
     mais amplo (que viraria Não-MQL, de <b>ticket maior, ~R$12,6k</b>) e só deixam passar quem já chega muito qualificado.</p>
+    <p style="margin-bottom:8px;">A quebra por faixa (seção 2) confirma e localiza: <b class="r">64% do colapso está na faixa R$ 0–30k</b> e ~88%
+    abaixo de R$ 100k. O filtro está cortando especificamente o <b>pequeno faturamento</b> — o segmento que dava volume.</p>
     <p>Pré-vendas e vendas estão <b class="g">no alvo</b> (%RR e RR→Venda batem o plano nos dois segmentos) — o gargalo
     está isolado na <b>conversão da página</b>, não no comercial.</p>
   </div>
