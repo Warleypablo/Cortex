@@ -263,7 +263,7 @@ export function ChurnProdutoMotivo() {
           </CardHeader>
           <CardContent>
             <ResponsiveContainer width="100%" height={180}>
-              <AreaChart data={taxaData.rows.map(r => ({ ...r, mesLabel: formatMesLabel(r.mes) }))} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <AreaChart data={taxaData.rows.map(r => ({ ...r, taxa: Number(r.taxa), mrr_churn: Number(r.mrr_churn), mrr_base: Number(r.mrr_base), cancelamentos: Number(r.cancelamentos), mesLabel: formatMesLabel(r.mes) }))} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
                 <defs>
                   <linearGradient id="taxaGrad" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3} />
