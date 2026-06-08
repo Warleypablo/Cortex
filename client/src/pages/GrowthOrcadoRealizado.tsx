@@ -1273,6 +1273,7 @@ export default function GrowthOrcadoRealizado() {
   }
 
   interface LinkedinDetailMetrics {
+    postsPublicados: number;
     comecaramSeguir: number; deixaramSeguir: number; percPerdaSeguidores: number;
     deltaSeguidores: number; totalSeguidores: number; percCrescimentoSeguidores: number;
     seguidores: number; novosSeguidores: number; impressoes: number;
@@ -1887,8 +1888,9 @@ export default function GrowthOrcadoRealizado() {
   const buildLinkedinMetrics = (d: LinkedinDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_LINKEDIN;
     const topMetrics: Metric[] = [
-      // Posts publicados não vêm do sync orgânico atual → manual
-      { id: 'li_postsPublicados', name: 'Posts Publicados', type: 'manual', orcado: O.postsPublicados, realizado: null, percentual: null, format: 'number' },
+      // Posts publicados vêm da Posts API (linkedin.posts). Pode vir 0 até o sync
+      // rodar com r_organization_social concedido.
+      { id: 'li_postsPublicados', name: 'Posts Publicados', type: 'formula', orcado: O.postsPublicados, realizado: d.postsPublicados ?? 0, percentual: calcPercentual(O.postsPublicados, d.postsPublicados), format: 'number' },
       // Audiência (seguidores) — espelha o breakdown do Instagram/YouTube
       { id: 'li_comecaramSeguir', name: 'Começaram a Seguir', type: 'formula', orcado: O.comecaramSeguir, realizado: d.comecaramSeguir ?? 0, percentual: calcPercentual(O.comecaramSeguir, d.comecaramSeguir), format: 'number' },
       { id: 'li_deixaramSeguir', name: 'Deixaram de Seguir', type: 'formula', orcado: O.deixaramSeguir, realizado: d.deixaramSeguir ?? 0, percentual: calcPercentual(O.deixaramSeguir, d.deixaramSeguir), format: 'number' },

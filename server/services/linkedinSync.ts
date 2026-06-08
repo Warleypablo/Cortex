@@ -155,6 +155,45 @@ export async function syncLinkedin(pool: Pool): Promise<LinkedinSyncResult> {
           );
         } catch (e: any) { result.errors.push(`shareStats ${orgId}: ${e.message}`); }
 
+        // 5. Posts publicados (Posts API, q=author) — exige r_organization_social no token.
+        // Paginação start/count; busca os mais recentes e faz upsert. O histórico se
+        // acumula na tabela ao longo das execuções; o dashboard conta por created_at.
+        try {
+          const pageSize = 50;
+          const maxPages = 6; // ~300 posts mais recentes por execução
+          for (let page = 0; page < maxPages; page++) {
+            const start = page * pageSize;
+            const pr = await getJson(
+              `${LI_API}/rest/posts?q=author&author=${encUrn}&count=${pageSize}&start=${start}&sortBy=LAST_MODIFIED`,
+              token,
+            );
+            const elements: any[] = pr.elements || [];
+            if (elements.length === 0) break;
+            for (const p of elements) {
+              const createdMs = p.createdAt ?? p.firstPublishedAt ?? null;
+              const modifiedMs = p.lastModifiedAt ?? null;
+              await pool.query(
+                `INSERT INTO linkedin.posts
+                   (post_urn, org_id, created_at, last_modified_at, lifecycle_state, visibility, commentary, raw, synced_at)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
+                 ON CONFLICT (post_urn) DO UPDATE SET
+                   last_modified_at=EXCLUDED.last_modified_at, lifecycle_state=EXCLUDED.lifecycle_state,
+                   visibility=EXCLUDED.visibility, commentary=EXCLUDED.commentary, raw=EXCLUDED.raw, synced_at=NOW()`,
+                [
+                  p.id, orgId,
+                  createdMs ? new Date(createdMs) : null,
+                  modifiedMs ? new Date(modifiedMs) : null,
+                  p.lifecycleState ?? null,
+                  typeof p.visibility === 'string' ? p.visibility : JSON.stringify(p.visibility ?? null),
+                  (typeof p.commentary === 'string' ? p.commentary : '').slice(0, 2000),
+                  JSON.stringify(p),
+                ],
+              );
+            }
+            if (elements.length < pageSize) break;
+          }
+        } catch (e: any) { result.errors.push(`posts ${orgId}: ${e.message}`); }
+
         // atualiza follower_count na organização
         if (totalFollowers != null) {
           await pool.query(`UPDATE linkedin.organizations SET follower_count=$2, synced_at=NOW() WHERE org_id=$1`, [orgId, totalFollowers]);
