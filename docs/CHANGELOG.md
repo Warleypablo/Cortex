@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-06-08 | fix(criativos): scroll lateral (sticky) + tabs full-width
+
+**O que foi feito:**
+- Corrige o scroll horizontal "bugado" (vãos/transparência nas colunas fixas): tabela passa de `border-collapse` para `border-separate border-spacing-0` — `position: sticky` em células não funciona bem com border-collapse
+- Tabs redesenhados full-width (4 abas distribuídas, estilo abas com destaque azul na ativa), conforme referência
+
+**Arquivos alterados:**
+- `client/src/components/criativos/CriativosTable.tsx` - border-separate + bordas nas células
+- `client/src/pages/Criativos.tsx` - tabs full-width; ações movidas para a linha de filtros
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-08 | feat(criativos): config de colunas (views), resize e layout reorganizado
 
 **O que foi feito:**

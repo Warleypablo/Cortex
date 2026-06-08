@@ -391,7 +391,7 @@ export function CriativosTable({
     <div className="relative max-h-[calc(100vh-320px)] overflow-auto scrollbar-minimal">
       <table
         ref={tableRef}
-        className="border-collapse text-xs"
+        className="border-separate border-spacing-0 text-xs"
         style={{ tableLayout: "fixed", width: totalWidth, ["--cz-status-left" as any]: `${statusBaseLeft}px` }}
       >
         <colgroup>
@@ -407,7 +407,7 @@ export function CriativosTable({
         </thead>
         <tbody>
           {rows.map((row) => (
-            <tr key={row.id} className="border-b border-border hover:bg-muted/40" data-testid={`row-criativo-${row.id}`}>
+            <tr key={row.id} className="hover:bg-muted/40 [&>td]:border-b [&>td]:border-border" data-testid={`row-criativo-${row.id}`}>
               {allCols.map((c) => renderBody(c, row))}
             </tr>
           ))}
