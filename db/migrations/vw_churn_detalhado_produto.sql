@@ -22,3 +22,19 @@ WHERE ultimo_dia_operacao >= CURRENT_DATE - INTERVAL '12 months'
 GROUP BY
   COALESCE(produto, 'Não Identificado'),
   COALESCE(motivo_cancelamento, 'Não Informado');
+
+-- View 2: série temporal por produto × motivo (histórico completo)
+CREATE OR REPLACE VIEW cortex_core.vw_churn_produto_motivo_mensal AS
+SELECT
+  DATE_TRUNC('month', ultimo_dia_operacao)::date   AS ano_mes,
+  COALESCE(produto, 'Não Identificado')            AS produto,
+  COALESCE(motivo_cancelamento, 'Não Informado')   AS motivo_cancelamento,
+  COUNT(*)                                          AS cancelamentos,
+  ROUND(SUM(valor_r)::numeric, 2)                  AS mrr_perdido,
+  ROUND(AVG(valor_r)::numeric, 2)                  AS ticket_medio
+FROM cortex_core.vw_cup_churn_ajustado
+WHERE valor_r > 0
+GROUP BY
+  DATE_TRUNC('month', ultimo_dia_operacao)::date,
+  COALESCE(produto, 'Não Identificado'),
+  COALESCE(motivo_cancelamento, 'Não Informado');
