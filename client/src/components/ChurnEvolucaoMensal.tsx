@@ -45,7 +45,8 @@ type Metrica = "cancelamentos" | "mrr_perdido" | "taxa_churn";
 export function ChurnEvolucaoMensal() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
-  const [metrica, setMetrica] = useState<Metrica>("cancelamentos");
+  const [metrica, setMetrica] = useState<"cancelamentos" | "mrr_perdido">("cancelamentos");
+  const [metricaLinha, setMetricaLinha] = useState<Metrica>("cancelamentos");
   const [produtoSelecionado, setProdutoSelecionado] = useState<string>("");
   const [highlightProduto, setHighlightProduto] = useState<string | null>(null);
   const [highlightMotivo, setHighlightMotivo] = useState<string | null>(null);
@@ -63,7 +64,7 @@ export function ChurnEvolucaoMensal() {
   const { data: taxaProdutoData } = useQuery<{ rows: Array<{ mes: string; produto: string; mrr_base: string; mrr_churn: string; cancelamentos: string; taxa: string }> }>({
     queryKey: ["/api/churn/taxa-por-produto"],
     queryFn: () => fetch("/api/churn/taxa-por-produto").then(r => { if (!r.ok) throw new Error(); return r.json(); }),
-    enabled: metrica === "taxa_churn",
+    enabled: metricaLinha === "taxa_churn",
   });
 
   const { chartData, produtos } = useMemo(() => {
@@ -102,13 +103,13 @@ export function ChurnEvolucaoMensal() {
       };
       topProdutos.forEach(p => {
         const v = mesMap.get(p);
-        entry[p] = v ? v[metrica === "cancelamentos" ? "cancelamentos" : "mrr_perdido"] : 0;
+        entry[p] = v ? v[metricaLinha === "cancelamentos" ? "cancelamentos" : "mrr_perdido"] : 0;
       });
       if (temOutros) {
         let outros = 0;
         mesMap.forEach((v, p) => {
           if (!topProdutos.includes(p)) {
-            outros += metrica === "cancelamentos" ? v.cancelamentos : v.mrr_perdido;
+            outros += metricaLinha === "cancelamentos" ? v.cancelamentos : v.mrr_perdido;
           }
         });
         entry["Outros"] = outros;
@@ -117,7 +118,7 @@ export function ChurnEvolucaoMensal() {
     });
 
     return { chartData, produtos };
-  }, [data, metrica]);
+  }, [data, metricaLinha]);
 
   const { chartData: motivoChartData, produtos: motivos } = useMemo(() => {
     if (!data?.rows?.length) return { chartData: [], produtos: [] };
@@ -260,15 +261,23 @@ export function ChurnEvolucaoMensal() {
     return `${meses[parseInt(m, 10) - 1]}/${ano}`;
   }
 
-  const yFormatter = (v: number) => {
-    if (metrica === "mrr_perdido") return formatCurrencyNoDecimals(v);
-    if (metrica === "taxa_churn") return `${v.toFixed(1)}%`;
-    return String(v);
-  };
+  const yFormatter = (v: number) =>
+    metrica === "mrr_perdido" ? formatCurrencyNoDecimals(v) : String(v);
 
   const tooltipFormatter = (value: number, name: string) => {
     if (metrica === "mrr_perdido") return [formatCurrencyNoDecimals(value), name];
-    if (metrica === "taxa_churn") return [`${Number(value).toFixed(2)}%`, name];
+    return [String(value), name];
+  };
+
+  const yFormatterLinha = (v: number) => {
+    if (metricaLinha === "mrr_perdido") return formatCurrencyNoDecimals(v);
+    if (metricaLinha === "taxa_churn") return `${v.toFixed(1)}%`;
+    return String(v);
+  };
+
+  const tooltipFormatterLinha = (value: number, name: string) => {
+    if (metricaLinha === "mrr_perdido") return [formatCurrencyNoDecimals(value), name];
+    if (metricaLinha === "taxa_churn") return [`${Number(value).toFixed(2)}%`, name];
     return [String(value), name];
   };
 
@@ -406,9 +415,9 @@ export function ChurnEvolucaoMensal() {
             {(["cancelamentos", "mrr_perdido", "taxa_churn"] as Metrica[]).map(m => (
               <button
                 key={m}
-                onClick={() => setMetrica(m)}
+                onClick={() => setMetricaLinha(m)}
                 className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                  metrica === m
+                  metricaLinha === m
                     ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
                     : "text-muted-foreground hover:text-foreground"
                 }`}
@@ -427,12 +436,14 @@ export function ChurnEvolucaoMensal() {
         </div>
       </CardHeader>
       <CardContent>
-        {metrica === "taxa_churn" && taxaProdutoData === undefined ? (
-          <div className="h-96 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
+        {metricaLinha === "taxa_churn" && !taxaProdutoData ? (
+          <div className="h-96 flex items-center justify-center text-sm text-muted-foreground">
+            <div className="animate-pulse">Calculando taxas...</div>
+          </div>
         ) : (
         <ResponsiveContainer width="100%" height={400}>
           <LineChart
-            data={metrica === "taxa_churn" ? taxaChartData : chartData}
+            data={metricaLinha === "taxa_churn" ? taxaChartData : chartData}
             margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
           >
             <CartesianGrid
@@ -445,12 +456,12 @@ export function ChurnEvolucaoMensal() {
               interval="preserveStartEnd"
             />
             <YAxis
-              tickFormatter={yFormatter}
+              tickFormatter={yFormatterLinha}
               tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
-              width={metrica === "mrr_perdido" ? 80 : 45}
+              width={metricaLinha === "mrr_perdido" ? 80 : 45}
             />
             <Tooltip
-              formatter={tooltipFormatter}
+              formatter={tooltipFormatterLinha}
               contentStyle={{
                 background: isDark ? "#18181b" : "#fff",
                 border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb",
@@ -464,7 +475,7 @@ export function ChurnEvolucaoMensal() {
                 setHighlightProduto(prev => prev === d.value ? null : d.value)
               }
             />
-            {(metrica === "taxa_churn" ? taxaProdutos : produtos).map((produto, i) => (
+            {(metricaLinha === "taxa_churn" ? taxaProdutos : produtos).map((produto, i) => (
               <Line
                 key={produto}
                 type="monotone"
