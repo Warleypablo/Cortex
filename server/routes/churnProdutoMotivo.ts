@@ -196,6 +196,79 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
     }
   });
 
+  app.get("/api/churn/taxa-por-produto", async (req, res) => {
+    const t0 = Date.now();
+    try {
+      console.log("[taxa-por-produto] iniciando query...");
+      const SQUADS_EXCLUIDOS = ['🌟 Aurea','🗝️ Bloomfield','🔥 Chama','🏹 Hunters','👾 Squad X','👑 Supreme','🖥️ Tech','🚀 Turbo Interno'];
+
+      const result = await db.execute(sql`
+        WITH snapshot_datas AS (
+          SELECT
+            DATE_TRUNC('month', data_snapshot)::date AS mes,
+            MAX(data_snapshot) AS data_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= CURRENT_DATE - INTERVAL '36 months'
+          GROUP BY DATE_TRUNC('month', data_snapshot)::date
+        ),
+        mrr_por_produto AS (
+          SELECT
+            sd.mes,
+            COALESCE(h.produto, 'Não Identificado') AS produto,
+            SUM(h.valorr)::numeric AS mrr_base
+          FROM snapshot_datas sd
+          JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sd.data_snapshot)
+          WHERE h.status IN ('ativo','onboarding','triagem')
+            AND h.squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+          GROUP BY sd.mes, COALESCE(h.produto, 'Não Identificado')
+        ),
+        mrr_lagged AS (
+          SELECT
+            mes,
+            produto,
+            mrr_base,
+            LAG(mrr_base) OVER (PARTITION BY produto ORDER BY mes) AS mrr_base_anterior
+          FROM mrr_por_produto
+        ),
+        churn_por_produto AS (
+          SELECT
+            DATE_TRUNC('month', data_solicitacao_encerramento)::date AS mes,
+            COALESCE(produto, 'Não Identificado') AS produto,
+            COALESCE(SUM(valor_r), 0)::numeric AS mrr_churn,
+            COUNT(*)::int AS cancelamentos
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE valor_r > 0
+            AND data_solicitacao_encerramento IS NOT NULL
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
+            AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+          GROUP BY DATE_TRUNC('month', data_solicitacao_encerramento)::date,
+                   COALESCE(produto, 'Não Identificado')
+        )
+        SELECT
+          TO_CHAR(m.mes, 'YYYY-MM') AS mes,
+          m.produto,
+          ROUND(COALESCE(m.mrr_base_anterior, m.mrr_base), 2) AS mrr_base,
+          COALESCE(c.mrr_churn, 0) AS mrr_churn,
+          COALESCE(c.cancelamentos, 0) AS cancelamentos,
+          CASE WHEN COALESCE(m.mrr_base_anterior, m.mrr_base) > 0
+            THEN ROUND(COALESCE(c.mrr_churn, 0) / COALESCE(m.mrr_base_anterior, m.mrr_base) * 100, 2)
+            ELSE 0
+          END AS taxa
+        FROM mrr_lagged m
+        LEFT JOIN churn_por_produto c ON c.mes = m.mes AND c.produto = m.produto
+        WHERE m.mrr_base > 0 OR c.mrr_churn IS NOT NULL
+        ORDER BY m.mes, m.produto
+      `);
+
+      console.log(`[taxa-por-produto] OK em ${Date.now()-t0}ms, ${result.rows.length} rows`);
+      res.json({ rows: result.rows });
+    } catch (error) {
+      console.error(`[taxa-por-produto] ERRO em ${Date.now()-t0}ms:`, error);
+      res.status(500).json({ error: "Failed to fetch taxa-por-produto" });
+    }
+  });
+
   app.get("/api/churn/taxa-mensal", async (req, res) => {
     try {
       const now = new Date();
@@ -272,6 +345,66 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error fetching taxa-mensal:", error);
       res.status(500).json({ error: "Failed to fetch taxa-mensal" });
+    }
+  });
+
+  app.get("/api/churn/taxa-por-motivo", async (req, res) => {
+    const t0 = Date.now();
+    try {
+      const SQUADS_EXCLUIDOS = ['🌟 Aurea','🗝️ Bloomfield','🔥 Chama','🏹 Hunters','👾 Squad X','👑 Supreme','🖥️ Tech','🚀 Turbo Interno'];
+
+      const result = await db.execute(sql`
+        WITH snapshot_datas AS (
+          SELECT
+            DATE_TRUNC('month', data_snapshot)::date AS mes,
+            MAX(data_snapshot) AS data_snapshot
+          FROM "Clickup".cup_data_hist
+          WHERE data_snapshot >= CURRENT_DATE - INTERVAL '36 months'
+          GROUP BY DATE_TRUNC('month', data_snapshot)::date
+        ),
+        mrr_base AS (
+          SELECT
+            sd.mes,
+            COALESCE(SUM(h.valorr), 0)::numeric AS mrr_base
+          FROM snapshot_datas sd
+          JOIN "Clickup".cup_data_hist h ON DATE(h.data_snapshot) = DATE(sd.data_snapshot)
+          WHERE h.status IN ('ativo','onboarding','triagem')
+            AND h.squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+          GROUP BY sd.mes
+        ),
+        churn_motivo AS (
+          SELECT
+            DATE_TRUNC('month', data_solicitacao_encerramento)::date AS mes,
+            COALESCE(motivo_cancelamento, 'Não Informado') AS motivo,
+            COALESCE(SUM(valor_r), 0)::numeric AS mrr_churn
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE valor_r > 0
+            AND data_solicitacao_encerramento IS NOT NULL
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
+            AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+          GROUP BY DATE_TRUNC('month', data_solicitacao_encerramento)::date,
+                   COALESCE(motivo_cancelamento, 'Não Informado')
+        )
+        SELECT
+          TO_CHAR(b.mes, 'YYYY-MM') AS mes,
+          c.motivo,
+          ROUND(b.mrr_base, 2) AS mrr_base,
+          ROUND(c.mrr_churn, 2) AS mrr_churn,
+          CASE WHEN b.mrr_base > 0
+            THEN ROUND(c.mrr_churn / b.mrr_base * 100, 2)
+            ELSE 0
+          END AS taxa
+        FROM mrr_base b
+        JOIN churn_motivo c ON c.mes = b.mes
+        ORDER BY b.mes, c.mrr_churn DESC
+      `);
+
+      console.log(`[taxa-por-motivo] OK em ${Date.now()-t0}ms, ${result.rows.length} rows`);
+      res.json({ rows: result.rows });
+    } catch (error) {
+      console.error(`[taxa-por-motivo] ERRO em ${Date.now()-t0}ms:`, error);
+      res.status(500).json({ error: "Failed to fetch taxa-por-motivo" });
     }
   });
 
