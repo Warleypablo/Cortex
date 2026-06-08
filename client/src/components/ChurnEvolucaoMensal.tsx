@@ -4,7 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import {
-  LineChart, Line, XAxis, YAxis, Tooltip, Legend,
+  LineChart, Line, BarChart, Bar,
+  XAxis, YAxis, Tooltip, Legend,
   ResponsiveContainer, CartesianGrid,
 } from "recharts";
 
@@ -35,6 +36,7 @@ export function ChurnEvolucaoMensal() {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [metrica, setMetrica] = useState<Metrica>("cancelamentos");
+  const [produtoSelecionado, setProdutoSelecionado] = useState<string>("");
 
   const { data, isLoading, isError } = useQuery<MensalResponse>({
     queryKey: ["/api/churn/produto-motivo/mensal"],
@@ -147,6 +149,53 @@ export function ChurnEvolucaoMensal() {
 
     return { chartData, produtos: motivos };
   }, [data, metrica]);
+
+  // Lista de todos os produtos disponíveis (para o dropdown)
+  const todosProdutos = useMemo(() => {
+    if (!data?.rows?.length) return [];
+    const totais = new Map<string, number>();
+    data.rows.forEach(r => {
+      totais.set(r.produto, (totais.get(r.produto) || 0) + Number(r.cancelamentos));
+    });
+    return Array.from(totais.entries()).sort((a, b) => b[1] - a[1]).map(([p]) => p);
+  }, [data]);
+
+  const produtoEfetivo = produtoSelecionado || todosProdutos[0] || "";
+
+  const { produtoChartData, motivosBarras } = useMemo(() => {
+    if (!data?.rows?.length || !produtoEfetivo) return { produtoChartData: [], motivosBarras: [] };
+
+    const prodRows = data.rows.filter(r => r.produto === produtoEfetivo);
+
+    const motivoTotais = new Map<string, number>();
+    prodRows.forEach(r => {
+      const m = r.motivo_cancelamento || "Não Informado";
+      motivoTotais.set(m, (motivoTotais.get(m) || 0) + Number(r.cancelamentos));
+    });
+    const topMotivos = Array.from(motivoTotais.entries())
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 7)
+      .map(([m]) => m);
+    const temOutros = motivoTotais.size > 7;
+    const motivosBarras = temOutros ? [...topMotivos, "Outros"] : topMotivos;
+
+    const mesAgg = new Map<string, Record<string, number>>();
+    prodRows.forEach(r => {
+      const motivo = topMotivos.includes(r.motivo_cancelamento) ? r.motivo_cancelamento : "Outros";
+      if (!mesAgg.has(r.ano_mes)) mesAgg.set(r.ano_mes, {});
+      const entry = mesAgg.get(r.ano_mes)!;
+      const val = metrica === "cancelamentos" ? Number(r.cancelamentos) : Number(r.mrr_perdido);
+      entry[motivo] = (entry[motivo] || 0) + val;
+    });
+
+    const mesesOrdenados = Array.from(mesAgg.keys()).sort();
+    const produtoChartData = mesesOrdenados.map(mes => ({
+      mesLabel: formatMes(mes),
+      ...mesAgg.get(mes),
+    }));
+
+    return { produtoChartData, motivosBarras };
+  }, [data, produtoEfetivo, metrica]);
 
   function formatMes(isoDate: string): string {
     const meses = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun",
@@ -297,6 +346,61 @@ export function ChurnEvolucaoMensal() {
               />
             ))}
           </LineChart>
+        </ResponsiveContainer>
+      </CardContent>
+    </Card>
+    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+      <CardHeader>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <CardTitle className="text-base text-gray-900 dark:text-white">
+            Histórico Mensal por Produto
+          </CardTitle>
+          <select
+            value={produtoEfetivo}
+            onChange={e => setProdutoSelecionado(e.target.value)}
+            className="text-xs px-2 py-1.5 rounded-md border border-border/60 bg-white dark:bg-zinc-800 text-foreground focus:outline-none focus:ring-1 focus:ring-violet-500"
+          >
+            {todosProdutos.map(p => (
+              <option key={p} value={p}>{p}</option>
+            ))}
+          </select>
+        </div>
+        <p className="text-xs text-muted-foreground">Cancelamentos por motivo mês a mês</p>
+      </CardHeader>
+      <CardContent>
+        <ResponsiveContainer width="100%" height={320}>
+          <BarChart data={produtoChartData} margin={{ top: 5, right: 30, left: 10, bottom: 5 }}>
+            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} vertical={false} />
+            <XAxis
+              dataKey="mesLabel"
+              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+              interval="preserveStartEnd"
+            />
+            <YAxis
+              tickFormatter={yFormatter}
+              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+              width={metrica === "mrr_perdido" ? 80 : 40}
+            />
+            <Tooltip
+              formatter={tooltipFormatter}
+              contentStyle={{
+                background: isDark ? "#18181b" : "#fff",
+                border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb",
+                borderRadius: 6,
+                fontSize: 12,
+              }}
+            />
+            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
+            {motivosBarras.map((motivo, i) => (
+              <Bar
+                key={motivo}
+                dataKey={motivo}
+                stackId="a"
+                fill={motivo === "Outros" ? "#9ca3af" : PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
+                radius={i === motivosBarras.length - 1 ? [3, 3, 0, 0] : undefined}
+              />
+            ))}
+          </BarChart>
         </ResponsiveContainer>
       </CardContent>
     </Card>
