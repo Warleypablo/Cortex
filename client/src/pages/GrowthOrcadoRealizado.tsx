@@ -1245,7 +1245,8 @@ export default function GrowthOrcadoRealizado() {
     comecaramInscrever: number; deixaramInscrever: number; percPerdaInscritos: number;
     deltaInscritos: number; totalInscritos: number; percCrescimentoInscritos: number;
     inscritos: number; ganhoLiquidoInscritos: number; visualizacoes: number;
-    horasAssistidas: number; avgViewDuration: number; curtidas: number; comentarios: number;
+    horasAssistidas: number; avgViewDuration: number; retencaoMedia: number;
+    curtidas: number; comentarios: number;
     compartilhamentos: number; videosPublicados: number; hasConnection: boolean;
   }
 
@@ -1865,10 +1866,11 @@ export default function GrowthOrcadoRealizado() {
       { id: 'yt_totalInscritos', name: 'Total de Inscritos', type: 'formula', orcado: O.totalInscritos, realizado: d.totalInscritos ?? 0, percentual: calcPercentual(O.totalInscritos, d.totalInscritos), format: 'number' },
       { id: 'yt_percCrescimentoInscritos', name: '% Crescimento de Inscritos', type: 'formula', orcado: O.percCrescimentoInscritos, realizado: d.percCrescimentoInscritos ?? null, percentual: calcPercentual(O.percCrescimentoInscritos, d.percCrescimentoInscritos), format: 'percent' },
       // Conteúdo / distribuição
-      // CTR de impressões e retenção média não vêm da YouTube Analytics API atual → manual
+      // CTR de thumbnail NÃO existe na YouTube Analytics API pública (Studio-only,
+      // issue 254665034) → entrada manual. Retenção vem do nível de vídeo (agregada).
       { id: 'yt_ctrImpressoes', name: 'CTR Impressões (Thumbnail)', type: 'manual', orcado: O.ctrImpressoes, realizado: null, percentual: null, format: 'percent' },
       { id: 'yt_visualizacoes', name: 'Visualizações', type: 'formula', orcado: O.visualizacoes, realizado: d.visualizacoes ?? 0, percentual: calcPercentual(O.visualizacoes, d.visualizacoes), format: 'number' },
-      { id: 'yt_retencaoMedia', name: 'Retenção Média', type: 'manual', orcado: O.retencaoMedia, realizado: null, percentual: null, format: 'percent' },
+      { id: 'yt_retencaoMedia', name: 'Retenção Média', type: 'formula', orcado: O.retencaoMedia, realizado: d.retencaoMedia ?? null, percentual: calcPercentual(O.retencaoMedia, d.retencaoMedia), format: 'percent' },
       { id: 'yt_avgViewDuration', name: 'Duração Média (s)', type: 'formula', orcado: O.avgViewDuration, realizado: d.avgViewDuration ?? 0, percentual: calcPercentual(O.avgViewDuration, d.avgViewDuration), format: 'number' },
       { id: 'yt_horasAssistidas', name: 'Horas Assistidas', type: 'formula', orcado: O.horasAssistidas, realizado: d.horasAssistidas ?? 0, percentual: calcPercentual(O.horasAssistidas, d.horasAssistidas), format: 'number' },
     ];
