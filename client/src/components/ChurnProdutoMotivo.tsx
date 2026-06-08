@@ -4,14 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { TrendingDown, DollarSign, Hash } from "lucide-react";
-import {
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  ResponsiveContainer,
-  Cell,
-} from "recharts";
 
 interface Celula {
   produto: string;
@@ -64,7 +56,6 @@ function heatTextClass(pct: number, maxPct: number): string {
   return t > 0.55 ? "text-white" : "text-gray-800 dark:text-zinc-200";
 }
 
-const DRILL_COLORS = ["#6d28d9", "#7c3aed", "#8b5cf6", "#a78bfa", "#c4b5fd", "#ddd6fe", "#ede9fe", "#f5f3ff"];
 
 function toMonthStr(date: Date): string {
   return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, "0")}`;
@@ -128,12 +119,6 @@ export function ChurnProdutoMotivo() {
     return m;
   }, [data]);
 
-  const drillDown = useMemo(() => {
-    if (!data || !produtoSelecionado) return [];
-    return data.celulas
-      .filter(c => c.produto === produtoSelecionado)
-      .sort((a, b) => b.cancelamentos - a.cancelamentos);
-  }, [data, produtoSelecionado]);
 
   if (isLoading) {
     return (
@@ -327,38 +312,6 @@ export function ChurnProdutoMotivo() {
         </CardContent>
       </Card>
 
-      {/* Drill-down por produto */}
-      {produtoSelecionado && drillDown.length > 0 && (
-        <Card className="bg-white dark:bg-zinc-900 border-indigo-200 dark:border-indigo-800">
-          <CardHeader>
-            <CardTitle className="text-base text-gray-900 dark:text-white">
-              Motivos de churn — {produtoSelecionado}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(200, drillDown.length * 44)}>
-              <BarChart
-                data={drillDown}
-                layout="vertical"
-                margin={{ top: 0, right: 60, left: 0, bottom: 0 }}
-              >
-                <XAxis type="number" hide />
-                <YAxis
-                  type="category"
-                  dataKey="motivo_cancelamento"
-                  width={170}
-                  tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#374151" }}
-                />
-                <Bar dataKey="cancelamentos" radius={[0, 4, 4, 0]}>
-                  {drillDown.map((_, i) => (
-                    <Cell key={i} fill={DRILL_COLORS[Math.min(i, DRILL_COLORS.length - 1)]} />
-                  ))}
-                </Bar>
-              </BarChart>
-            </ResponsiveContainer>
-          </CardContent>
-        </Card>
-      )}
 
       {/* Squad × Motivo drill-down */}
       {produtoSelecionado && Array.isArray(squadMotivoData?.squads) && squadMotivoData!.squads.length > 0 && Array.isArray(squadMotivoData?.celulas) && (() => {
