@@ -34,6 +34,7 @@ SELECT
   ROUND(AVG(valor_r)::numeric, 2)                  AS ticket_medio
 FROM cortex_core.vw_cup_churn_ajustado
 WHERE valor_r > 0
+  AND ultimo_dia_operacao IS NOT NULL
 GROUP BY
   DATE_TRUNC('month', ultimo_dia_operacao)::date,
   COALESCE(produto, 'Não Identificado'),
