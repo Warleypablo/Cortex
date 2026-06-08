@@ -214,10 +214,10 @@ export function CriativosTable({
   // ── Cabeçalho das colunas congeladas (esquerda) ──
   const renderFrozenHeader = (col: FrozenCol, left: number, isLast: boolean) => {
     const base = cn(
-      "text-xs bg-zinc-900 text-zinc-100 sticky z-10",
+      "text-xs bg-zinc-900 text-zinc-100 sticky z-10 overflow-hidden",
       isLast && "border-r border-zinc-700",
     );
-    const style = { left, minWidth: col.width, width: col.width } as React.CSSProperties;
+    const style = { left, minWidth: col.width, width: col.width, maxWidth: col.width } as React.CSSProperties;
     switch (col.key) {
       case "select":
         return (
@@ -256,8 +256,8 @@ export function CriativosTable({
 
   // ── Linha de totais: células congeladas ──
   const renderFrozenAvg = (col: FrozenCol, left: number, isLast: boolean) => {
-    const base = cn("sticky z-10 bg-zinc-800", isLast && "border-r border-zinc-700");
-    const style = { left, minWidth: col.width, width: col.width } as React.CSSProperties;
+    const base = cn("sticky z-10 bg-zinc-800 overflow-hidden", isLast && "border-r border-zinc-700");
+    const style = { left, minWidth: col.width, width: col.width, maxWidth: col.width } as React.CSSProperties;
     if (col.key === "name") {
       return <TableHead key={col.key} className={cn(base, "text-muted-foreground")} style={style}>Total</TableHead>;
     }
@@ -266,8 +266,8 @@ export function CriativosTable({
 
   // ── Body: células congeladas de uma linha ──
   const renderFrozenBody = (col: FrozenCol, left: number, isLast: boolean, row: CriativoData) => {
-    const base = cn("sticky z-10 bg-card", isLast && "border-r border-zinc-700/50");
-    const style = { left, minWidth: col.width, width: col.width } as React.CSSProperties;
+    const base = cn("sticky z-10 bg-card overflow-hidden", isLast && "border-r border-zinc-700/50");
+    const style = { left, minWidth: col.width, width: col.width, maxWidth: col.width } as React.CSSProperties;
     const isToggling = togglingIds.has(row.id);
     switch (col.key) {
       case "select":
@@ -360,7 +360,7 @@ export function CriativosTable({
   }
 
   return (
-    <div className="relative max-h-[calc(100vh-300px)] overflow-auto [&>div]:!overflow-visible [&>div]:!static [&>div]:!w-auto">
+    <div className="relative max-h-[calc(100vh-300px)] overflow-auto scrollbar-minimal [&>div]:!overflow-visible [&>div]:!static [&>div]:!w-auto">
       <Table>
         <TableHeader className="sticky top-0 z-50">
           <TableRow className="bg-zinc-900 dark:bg-zinc-900 shadow-md [&>th]:bg-zinc-900 dark:[&>th]:bg-zinc-900">
