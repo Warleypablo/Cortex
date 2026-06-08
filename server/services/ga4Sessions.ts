@@ -37,6 +37,12 @@ export type Ga4SessionsOptions = {
   // Se informado, filtra sessões cujo sessionCampaignName contenha qualquer um dos valores.
   // Usado para aplicar o filtro de funil ([NomeFunil] na campanha).
   utmCampaignContains?: string[];
+  // IDs de campanha (ex.: meta_campaigns.campaign_id) para casar EXATAMENTE com o
+  // sessionCampaignName do GA4. Necessário porque o utm_campaign das campanhas Meta
+  // chega no GA4 como o ID numérico ({{campaign.id}}), e não como o nome com a tag
+  // [Funil]. Combinado em OR com utmCampaignContains (belt-and-suspenders: cobre tanto
+  // canais nomeados por ID quanto por nome-com-tag).
+  campaignIdIn?: string[];
 };
 
 function fmtYmd(d: Date): string {
@@ -98,17 +104,25 @@ export async function getSessionsByPlatform(
     const filterExpressions: any[] = [
       { notExpression: { filter: { fieldName: 'hostName', stringFilter: { value: 'linktr.ee' } } } },
     ];
+    const campaignExprs: any[] = [];
     if (options?.utmCampaignContains && options.utmCampaignContains.length > 0) {
-      filterExpressions.push({
-        orGroup: {
-          expressions: options.utmCampaignContains.map(v => ({
-            filter: {
-              fieldName: 'sessionCampaignName',
-              stringFilter: { matchType: 'CONTAINS', value: `[${v}]`, caseSensitive: false },
-            },
-          })),
+      campaignExprs.push(...options.utmCampaignContains.map(v => ({
+        filter: {
+          fieldName: 'sessionCampaignName',
+          stringFilter: { matchType: 'CONTAINS', value: `[${v}]`, caseSensitive: false },
+        },
+      })));
+    }
+    if (options?.campaignIdIn && options.campaignIdIn.length > 0) {
+      campaignExprs.push({
+        filter: {
+          fieldName: 'sessionCampaignName',
+          inListFilter: { values: options.campaignIdIn, caseSensitive: false },
         },
       });
+    }
+    if (campaignExprs.length > 0) {
+      filterExpressions.push({ orGroup: { expressions: campaignExprs } });
     }
 
     const response = await analytics.properties.runReport({

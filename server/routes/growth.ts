@@ -168,6 +168,29 @@ function expandFunilValues(values: string[]): string[] {
   return expanded;
 }
 
+// Resolve os campaign_id (Meta) cujas campanhas casam com o funil selecionado.
+// Usado para filtrar sessões do GA4 por ID — o sessionCampaignName do GA4 guarda o ID
+// numérico da campanha (utm_campaign={{campaign.id}}), não o nome com a tag [Funil].
+// Mesma lógica de match de nome usada no campaignFilter dos endpoints Meta.
+async function resolveMetaCampaignIdsForFunil(db: any, realFunilValues: string[]): Promise<string[]> {
+  if (realFunilValues.length === 0) return [];
+  try {
+    const nameConditions = realFunilValues.map(
+      v => sql`(c.campaign_name ILIKE ${'%[' + v + ']%'} OR c.campaign_name ILIKE ${'%' + v + '%'})`,
+    );
+    const nameFilter = sql.join(nameConditions, sql` OR `);
+    const result = await db.execute(sql`
+      SELECT DISTINCT c.campaign_id::text AS id
+      FROM meta_ads.meta_campaigns c
+      WHERE (${nameFilter})
+    `);
+    return (result.rows as any[]).map(r => r.id).filter(Boolean);
+  } catch (err) {
+    console.warn('[GA4] Falha ao resolver campaign_ids do funil:', (err as any)?.message || err);
+    return [];
+  }
+}
+
 export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Ensure landing_page_views column exists
   db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`)
@@ -2716,10 +2739,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // Sessões (GA4) — métrica universal de chegada na LP cobrindo Meta + Google + orgânico.
       // Filtro de funil aplicado via sessionCampaignName contains [NomeFunil].
+      const ga4CampaignIds = await resolveMetaCampaignIdsForFunil(db, realFunilValues);
       const ga4 = await getSessionsByPlatform(
         new Date(startDate),
         new Date(endDate),
-        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+        realFunilValues.length > 0
+          ? { utmCampaignContains: realFunilValues, campaignIdIn: ga4CampaignIds }
+          : undefined,
       );
       let sessoes = 0;
       if (includeMeta && includeGoogle) {
@@ -2957,10 +2983,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const videoHook = impressoes > 0 && video3Sec > 0 ? (video3Sec / impressoes) * 100 : null;
       const videoHold = impressoes > 0 && videoThruplay > 0 ? (videoThruplay / impressoes) * 100 : null;
 
+      const ga4CampaignIds = await resolveMetaCampaignIdsForFunil(db, realFunilValues);
       const ga4 = await getSessionsByPlatform(
         new Date(startDate),
         new Date(endDate),
-        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+        realFunilValues.length > 0
+          ? { utmCampaignContains: realFunilValues, campaignIdIn: ga4CampaignIds }
+          : undefined,
       );
       const sessoes = ga4.byPlatform.meta_ads;
       // Padrão GA4 (igual aos outros canais): Viz Página = page views GA4,
