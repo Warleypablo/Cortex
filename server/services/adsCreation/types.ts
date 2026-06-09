@@ -29,6 +29,11 @@ export interface Briefing {
   /** Quando campaignMode = "existing": ID da campanha (ex: 120247...). Demais fields de campanha são ignorados. */
   existingCampaignId?: string;
 
+  /** Override do nome do conjunto (ignora a nomenclatura automática). Útil pra nomes customizados/testes. */
+  adSetNameOverride?: string;
+  /** Se setado, nomeia os ads como `${prefixo} 1`, `${prefixo} 2`... (ignora o Nome Final). Útil pra testes. */
+  adNameOverridePrefix?: string;
+
   /** Nome literal da campanha — usado direto, sem prefixo automático. */
   campaignName: string;
   objective: MetaObjective;
