@@ -1398,7 +1398,7 @@ function TabGuia() {
             </table>
           </div>
           <p className="text-xs text-gray-600 dark:text-zinc-400">
-            Exemplos: <code className="font-mono">campaign=lancamento-creators-2026-05</code> · <code className="font-mono">content=diagnostico-ecommerce</code> · <code className="font-mono">content=comercial</code>
+            Exemplos: <code className="font-mono">campaign=lancamento-creators-2026-05</code> · link fixo <code className="font-mono">content=lp-creators</code> · post <code className="font-mono">content=ecommerce-2026-05</code>
           </p>
         </CardContent>
       </Card>
@@ -1435,7 +1435,7 @@ function TabGuia() {
             </div>
           </div>
           <p className="text-xs text-gray-600 dark:text-zinc-400">
-            Em qualquer caso, o <code className="font-mono">content</code> identifica qual link específico (ex: <code className="font-mono">diagnostico-creators</code>, <code className="font-mono">ecommerce</code>). Use slug puro, sem prefixo <code className="font-mono">link-</code>.
+            Em qualquer caso, o <code className="font-mono">content</code> identifica o <strong>tipo de destino</strong> do link fixo: <code className="font-mono">lp-creators</code> (landing page), <code className="font-mono">site-home</code> (site institucional). Não use o prefixo antigo <code className="font-mono">link-</code>.
           </p>
         </CardContent>
       </Card>
@@ -1477,9 +1477,9 @@ function TabGuia() {
         />
         <div className="space-y-3">
           <ExemploCard
-            titulo="Post no feed apontando pra bio"
-            descricao="Conteúdo recorrente, sem campanha nomeada."
-            url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=creators-2026-05"
+            titulo="Link fixo na bio (pra LP de Creators)"
+            descricao="Link fixo — content = tipo de destino (lp-), sem data."
+            url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=lp-creators"
           />
           <ExemploCard
             titulo="SDR mandando link via DM (social-selling)"
@@ -1525,7 +1525,7 @@ function TabGuia() {
           <ExemploCard
             titulo={`Link no "Sobre" da página`}
             descricao="Link fixo na seção de bio."
-            url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=diagnostico"
+            url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=lp-diagnostico"
           />
         </div>
       </Secao>
@@ -1558,7 +1558,7 @@ function TabGuia() {
           <ExemploCard
             titulo="Banner do canal"
             descricao="Links fixos no cabeçalho do canal."
-            url="https://turbopartners.com.br/diagnostico?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=banner&utm_content=diagnostico"
+            url="https://turbopartners.com.br/diagnostico?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=banner&utm_content=lp-diagnostico"
           />
           <ExemploCard
             titulo="Card de lançamento dentro do vídeo"
@@ -1585,7 +1585,7 @@ function TabGuia() {
           <ExemploCard
             titulo="Link na bio do TikTok"
             descricao="Único link clicável no perfil do TikTok."
-            url="https://turbopartners.com.br/diagnostico?utm_source=tiktok&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=diagnostico"
+            url="https://turbopartners.com.br/diagnostico?utm_source=tiktok&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=lp-diagnostico"
           />
         </div>
       </Secao>
