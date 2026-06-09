@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-06-08 | chore(criativos): pausa o agente de IA (Analisar com IA / Propostas)
+
+**O que foi feito:**
+- Remove da UI os botões "Analisar com IA" e "Propostas" + o drawer de propostas e todo o código cliente do agente
+- Desmonta a rota `/api/criativos/agent` e remove `server/routes/criativosAgent.ts`
+- Mantém `metaActions` (pausar/ativar/budget manual + bulk) e `growthAiTools` (compartilhado com a rota growth-ai), pois o pause/ativar manual depende deles
+
+**Por que:**
+- A feature de IA fica pausada por ora; o PR entrega o revamp da aba Criativos (tabs, colunas/views, resize, pausar/ativar manual, drill-down, busca) sem o agente
+
+**Impacto arquitetural:** Nenhum — agente desativado de forma reversível; backend compartilhado preservado.
+
+---
+
 ## 2026-06-08 | fix(criativos): scroll lateral (sticky) + tabs full-width
 
 **O que foi feito:**

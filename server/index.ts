@@ -170,11 +170,10 @@ app.use((req, res, next) => {
   // Register Object Storage routes
   registerObjectStorageRoutes(app);
 
-  // Meta Ads actions + Criativos AI agent (Fase 1 enxuta — rotas aditivas)
+  // Meta Ads actions (pausar/ativar/budget manual + bulk). O agente de IA
+  // (criativosAgent) está pausado por enquanto — não montado.
   const { default: metaActionsRouter } = await import('./routes/metaActions');
-  const { default: criativosAgentRouter } = await import('./routes/criativosAgent');
   app.use('/api/meta/actions', metaActionsRouter);
-  app.use('/api/criativos/agent', criativosAgentRouter);
 
   const server = await registerRoutes(app);
 

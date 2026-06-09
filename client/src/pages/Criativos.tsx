@@ -50,21 +50,6 @@ interface AuthUser {
   role: "admin" | "user";
 }
 
-interface AgentProposal {
-  id: number;
-  actor_type: "human" | "agent";
-  level: "ad" | "adset" | "campaign";
-  entity_id: string;
-  entity_name: string | null;
-  action: "pause" | "resume" | "budget_update";
-  payload_json: any;
-  previous_value_json: any;
-  reason: string;
-  agent_rationale_text: string | null;
-  status: "pending" | "executing" | "success" | "error" | "ignored";
-  created_at: string;
-}
-
 const LEVEL_LABEL: Record<Level, string> = {
   conta: "conta",
   campanha: "campanhas",
@@ -142,129 +127,9 @@ export default function Criativos() {
   });
   const isAdmin = authUser?.role === "admin";
 
-  const [agentDrawerOpen, setAgentDrawerOpen] = useState(false);
-
-  const { data: pendingProposals = [], refetch: refetchProposals } = useQuery<AgentProposal[]>({
-    queryKey: ["/api/meta/actions/pending"],
-    queryFn: async () => {
-      const res = await fetch("/api/meta/actions/pending", { credentials: "include" });
-      if (!res.ok) return [];
-      const j = await res.json();
-      return j.proposals || [];
-    },
-    enabled: !!isAdmin,
-    refetchInterval: agentDrawerOpen ? 15000 : false,
-  });
-
-  const pendingByEntity = useMemo(() => {
-    const map = new Map<string, AgentProposal>();
-    for (const p of pendingProposals) {
-      if (p.status === "pending") map.set(p.entity_id, p);
-    }
-    return map;
-  }, [pendingProposals]);
-
-  const analyzeMutation = useMutation({
-    mutationFn: async () => {
-      const body = {
-        period: {
-          startDate,
-          endDate,
-        },
-        filters: campanhaFilters.length > 0 ? { campanhaIds: campanhaFilters } : undefined,
-      };
-      const res = await fetch("/api/criativos/agent/analyze", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || "Erro ao rodar agente");
-      }
-      return res.json();
-    },
-    onSuccess: (data: any) => {
-      const n = Array.isArray(data?.proposalLogIds) ? data.proposalLogIds.length : 0;
-      toast({
-        title: "Análise concluída",
-        description: n > 0 ? `${n} proposta(s) geradas pelo agente` : "Agente não gerou propostas",
-      });
-      setAgentDrawerOpen(true);
-      refetchProposals();
-    },
-    onError: (err: any) => {
-      toast({ title: "Erro ao rodar agente", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const confirmProposalMutation = useMutation({
-    mutationFn: async (proposal: AgentProposal) => {
-      const endpoint =
-        proposal.action === "pause"
-          ? "/api/meta/actions/pause"
-          : proposal.action === "resume"
-            ? "/api/meta/actions/resume"
-            : "/api/meta/actions/budget";
-      const body: any = {
-        level: proposal.level,
-        entityId: proposal.entity_id,
-        reason: proposal.agent_rationale_text?.slice(0, 500) || proposal.reason,
-        fromLogId: proposal.id,
-      };
-      if (proposal.action === "budget_update") {
-        body.newDailyBudgetCents = proposal.payload_json?.daily_budget_cents;
-      }
-      const res = await fetch(endpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify(body),
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        if (res.status === 409) throw new Error("Proposta já foi processada por outro admin");
-        throw new Error(j.error || `Erro ${res.status}`);
-      }
-      return res.json();
-    },
-    onSuccess: (_data, proposal) => {
-      toast({ title: "Ação executada", description: `${proposal.action} aplicado em ${proposal.entity_id}` });
-      refetchProposals();
-      queryClient.invalidateQueries({ queryKey: ["/api/growth/criativos"] });
-    },
-    onError: (err: any) => {
-      toast({ title: "Falha", description: err.message, variant: "destructive" });
-      refetchProposals();
-    },
-  });
-
-  const ignoreProposalMutation = useMutation({
-    mutationFn: async (logId: number) => {
-      const res = await fetch(`/api/meta/actions/${logId}/ignore`, {
-        method: "POST",
-        credentials: "include",
-      });
-      if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j.error || `Erro ${res.status}`);
-      }
-      return res.json();
-    },
-    onSuccess: () => {
-      toast({ title: "Proposta ignorada" });
-      refetchProposals();
-    },
-    onError: (err: any) => {
-      toast({ title: "Erro ao ignorar", description: err.message, variant: "destructive" });
-    },
-  });
-
-  const formatCents = (cents: number | null | undefined): string => {
-    if (cents == null) return "-";
-    return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  };
+  // Agente de IA (Analisar com IA / Propostas) pausado por enquanto.
+  // Mantém um mapa vazio para a coluna de badge "IA" na tabela.
+  const pendingByEntity = useMemo(() => new Map<string, { entity_id: string }>(), []);
 
   // Buscar lista de campanhas (filtrada por gasto no período)
   const { data: campanhas = [] } = useQuery<Campanha[]>({
@@ -922,29 +787,6 @@ export default function Criativos() {
                     </Button>
                   </div>
                 )}
-                {isAdmin && (
-                  <>
-                    <Button
-                      variant="default"
-                      size="sm"
-                      onClick={() => analyzeMutation.mutate()}
-                      disabled={analyzeMutation.isPending}
-                      className="bg-purple-600 hover:bg-purple-700 text-white h-8"
-                      data-testid="button-analisar-ia"
-                    >
-                      {analyzeMutation.isPending ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : <Sparkles className="w-4 h-4 mr-1" />}
-                      {analyzeMutation.isPending ? "Analisando..." : "Analisar com IA"}
-                    </Button>
-                    <Button variant="outline" size="sm" className="h-8" onClick={() => setAgentDrawerOpen(true)} data-testid="button-abrir-propostas">
-                      Propostas
-                      {pendingProposals.length > 0 && (
-                        <Badge variant="secondary" className="ml-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200">
-                          {pendingProposals.length}
-                        </Badge>
-                      )}
-                    </Button>
-                  </>
-                )}
               </div>
             </div>
           </CardHeader>
@@ -1013,117 +855,6 @@ export default function Criativos() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* ── Drawer: Propostas do Agente Gestor de Performance ───────────── */}
-      <Sheet open={agentDrawerOpen} onOpenChange={setAgentDrawerOpen}>
-        <SheetContent className="w-[540px] sm:max-w-[540px] overflow-y-auto">
-          <SheetHeader>
-            <SheetTitle className="flex items-center gap-2">
-              <Sparkles className="w-5 h-5 text-purple-600" />
-              Propostas do Agente
-            </SheetTitle>
-          </SheetHeader>
-
-          <div className="mt-4 space-y-3">
-            {pendingProposals.length === 0 && (
-              <div className="text-sm text-muted-foreground text-center py-8">
-                Nenhuma proposta pendente. Clique em <b>"Analisar com IA"</b> para gerar novas propostas.
-              </div>
-            )}
-
-            {pendingProposals.map((p) => {
-              const actionBadge =
-                p.action === "pause"
-                  ? { label: "Pausar", cls: "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200" }
-                  : p.action === "resume"
-                    ? { label: "Reativar", cls: "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200" }
-                    : { label: "Ajustar budget", cls: "bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200" };
-
-              const prevCents = p.previous_value_json?.daily_budget_cents ?? null;
-              const newCents = p.payload_json?.daily_budget_cents ?? null;
-
-              return (
-                <Card
-                  key={p.id}
-                  className="border-gray-200 dark:border-zinc-700"
-                  data-testid={`proposal-${p.id}`}
-                >
-                  <CardContent className="p-4 space-y-3">
-                    <div className="flex items-start justify-between gap-2">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <Badge className={actionBadge.cls}>{actionBadge.label}</Badge>
-                          <span className="text-xs text-muted-foreground uppercase">
-                            {p.level}
-                          </span>
-                        </div>
-                        <div className="text-sm font-medium truncate" title={p.entity_name || p.entity_id}>
-                          {p.entity_name || p.entity_id}
-                        </div>
-                        <div className="text-xs font-mono text-muted-foreground truncate">
-                          {p.entity_id}
-                        </div>
-                      </div>
-                    </div>
-
-                    {p.action === "budget_update" && (
-                      <div className="text-sm bg-gray-50 dark:bg-zinc-800/60 rounded-md p-2 flex items-center justify-between">
-                        <span className="text-muted-foreground">Daily budget</span>
-                        <span className="font-medium">
-                          {formatCents(prevCents)} → <span className="text-blue-600 dark:text-blue-400">{formatCents(newCents)}</span>
-                        </span>
-                      </div>
-                    )}
-
-                    {p.agent_rationale_text && (
-                      <details className="text-xs">
-                        <summary className="cursor-pointer text-muted-foreground hover:text-foreground">
-                          Ver justificativa
-                        </summary>
-                        <p className="mt-2 whitespace-pre-wrap text-gray-700 dark:text-zinc-300">
-                          {p.agent_rationale_text}
-                        </p>
-                      </details>
-                    )}
-
-                    <div className="flex gap-2 pt-1">
-                      <Button
-                        size="sm"
-                        className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                        disabled={confirmProposalMutation.isPending}
-                        onClick={() => confirmProposalMutation.mutate(p)}
-                        data-testid={`button-confirm-${p.id}`}
-                      >
-                        <CheckCircle2 className="w-4 h-4 mr-1" />
-                        Confirmar
-                      </Button>
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="flex-1"
-                        disabled={ignoreProposalMutation.isPending}
-                        onClick={() => ignoreProposalMutation.mutate(p.id)}
-                        data-testid={`button-ignore-${p.id}`}
-                      >
-                        <XCircle className="w-4 h-4 mr-1" />
-                        Ignorar
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-
-            {pendingProposals.length > 0 && (
-              <div className="flex items-start gap-2 text-xs text-muted-foreground p-3 bg-amber-50 dark:bg-amber-900/20 rounded-md border border-amber-200 dark:border-amber-800/50">
-                <AlertTriangle className="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
-                <span>
-                  Cada proposta precisa da sua confirmação explícita antes de ser enviada à Meta Ads. Guard-rails do sistema: delta de budget máx ±30% e teto absoluto por env <code>META_ADS_MAX_DAILY_BUDGET_CENTS</code>.
-                </span>
-              </div>
-            )}
-          </div>
-        </SheetContent>
-      </Sheet>
     </div>
   );
 }
