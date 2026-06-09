@@ -374,15 +374,15 @@ function BitrixModal({
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
-              <label className="text-xs text-gray-600 dark:text-zinc-400">Nome</label>
+              <label className="text-xs text-gray-600 dark:text-zinc-400">Nome <span className="text-gray-400">(opcional)</span></label>
               <Input value={form.nome} onChange={set("nome")} placeholder="Nome real do lead" />
             </div>
             <div>
-              <label className="text-xs text-gray-600 dark:text-zinc-400">Telefone</label>
+              <label className="text-xs text-gray-600 dark:text-zinc-400">Telefone <span className="text-gray-400">(opcional)</span></label>
               <Input value={form.telefone} onChange={set("telefone")} placeholder="(11) 9..." />
             </div>
             <div>
-              <label className="text-xs text-gray-600 dark:text-zinc-400">Email</label>
+              <label className="text-xs text-gray-600 dark:text-zinc-400">Email <span className="text-gray-400">(opcional)</span></label>
               <Input value={form.email} onChange={set("email")} placeholder="email@..." />
             </div>
           </div>
