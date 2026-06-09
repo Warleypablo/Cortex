@@ -493,14 +493,18 @@ export default function Criativos() {
   }, [findRulesetForContext, selectedProdutos, selectedPlataformas, benchmarkData]);
 
   // Linhas de anúncio filtradas por busca (sem ordenação ainda)
+  // Busca casa com o campo do nível ativo (campanha/conjunto/anúncio),
+  // não com o nome do anúncio individual
   const searchedRows = useMemo(() => {
     if (!searchTerm) return criativos;
     const term = searchTerm.toLowerCase();
-    return criativos.filter(item =>
-      item.adName.toLowerCase().includes(term) ||
-      item.id.toLowerCase().includes(term)
-    );
-  }, [criativos, searchTerm]);
+    return criativos.filter(item => {
+      if (level === "campanha") return (item.campaignName || "").toLowerCase().includes(term) || (item.campaignId || "").toLowerCase().includes(term);
+      if (level === "conjunto") return (item.adsetName || "").toLowerCase().includes(term) || (item.adsetId || "").toLowerCase().includes(term);
+      if (level === "anuncio") return item.adName.toLowerCase().includes(term) || item.id.toLowerCase().includes(term);
+      return true; // conta: busca não filtra
+    });
+  }, [criativos, searchTerm, level]);
 
   // Drill-down: ao selecionar campanhas/conjuntos e abrir uma aba mais profunda,
   // filtramos os anúncios pelas entidades selecionadas (estilo Meta Ads Manager)
