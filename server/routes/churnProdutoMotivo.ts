@@ -428,88 +428,91 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
     if (!produto || !mes) {
       return res.status(400).json({ error: "produto e mes são obrigatórios" });
     }
+    if (!/^\d{4}-\d{2}$/.test(mes)) {
+      return res.status(400).json({ error: "mes deve estar no formato YYYY-MM" });
+    }
     const mesDate = `${mes}-01`;
     const SQUADS_EXCLUIDOS = ['🌟 Aurea','🗝️ Bloomfield','🔥 Chama','🏹 Hunters','👾 Squad X','👑 Supreme','🖥️ Tech','🚀 Turbo Interno'];
 
     try {
-      // Query 1 — totais + LTV mediano
-      const totaisResult = await db.execute(sql`
-        SELECT
-          COUNT(*)::int AS total_cancelamentos,
-          COALESCE(SUM(valor_r), 0)::numeric AS total_mrr,
-          COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY
-            valor_r * GREATEST(
-              EXTRACT(YEAR FROM AGE(data_solicitacao_encerramento,
-                COALESCE(data_primeiro_pagamento, data_criado))) * 12
-              + EXTRACT(MONTH FROM AGE(data_solicitacao_encerramento,
-                COALESCE(data_primeiro_pagamento, data_criado))),
-              1
-            )
-          ), 0)::numeric AS ltv_mediano
-        FROM cortex_core.vw_cup_churn_ajustado
-        WHERE valor_r > 0
-          AND data_solicitacao_encerramento IS NOT NULL
-          AND DATE_TRUNC('month', data_solicitacao_encerramento)::date = ${mesDate}::date
-          AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
-          AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
-          AND COALESCE(produto, 'Não Identificado') = ${produto}
-      `);
-
-      // Query 2 — por squad
-      const squadResult = await db.execute(sql`
-        SELECT
-          COALESCE(squad, 'Não Informado') AS squad,
-          COUNT(*)::int AS cancelamentos,
-          COALESCE(SUM(valor_r), 0)::numeric AS mrr
-        FROM cortex_core.vw_cup_churn_ajustado
-        WHERE valor_r > 0
-          AND data_solicitacao_encerramento IS NOT NULL
-          AND DATE_TRUNC('month', data_solicitacao_encerramento)::date = ${mesDate}::date
-          AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
-          AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
-          AND COALESCE(produto, 'Não Identificado') = ${produto}
-        GROUP BY COALESCE(squad, 'Não Informado')
-        ORDER BY cancelamentos DESC
-      `);
-
-      // Query 3 — por operador
-      const operadorResult = await db.execute(sql`
-        SELECT
-          COALESCE(responsavel_geral, 'Não Informado') AS operador,
-          COUNT(*)::int AS cancelamentos,
-          COALESCE(SUM(valor_r), 0)::numeric AS mrr
-        FROM cortex_core.vw_cup_churn_ajustado
-        WHERE valor_r > 0
-          AND data_solicitacao_encerramento IS NOT NULL
-          AND DATE_TRUNC('month', data_solicitacao_encerramento)::date = ${mesDate}::date
-          AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
-          AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
-          AND COALESCE(produto, 'Não Identificado') = ${produto}
-        GROUP BY COALESCE(responsavel_geral, 'Não Informado')
-        ORDER BY cancelamentos DESC
-      `);
-
-      // Query 4 — lista de contratos
-      const contratosResult = await db.execute(sql`
-        SELECT
-          COALESCE(nome, 'Sem nome') AS nome,
-          COALESCE(squad, 'Não Informado') AS squad,
-          COALESCE(responsavel_geral, 'Não Informado') AS operador,
-          valor_r,
-          COALESCE(motivo_cancelamento, 'Não Informado') AS motivo
-        FROM cortex_core.vw_cup_churn_ajustado
-        WHERE valor_r > 0
-          AND data_solicitacao_encerramento IS NOT NULL
-          AND DATE_TRUNC('month', data_solicitacao_encerramento)::date = ${mesDate}::date
-          AND COALESCE(abonar_churn, '') != 'Sim'
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
-          AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
-          AND COALESCE(produto, 'Não Identificado') = ${produto}
-        ORDER BY valor_r DESC
-      `);
+      const [totaisResult, squadResult, operadorResult, contratosResult] = await Promise.all([
+        // Query 1 — totais + LTV mediano
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int AS total_cancelamentos,
+            COALESCE(SUM(valor_r), 0)::numeric AS total_mrr,
+            COALESCE(PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY
+              valor_r * GREATEST(
+                EXTRACT(YEAR FROM AGE(data_solicitacao_encerramento,
+                  COALESCE(data_primeiro_pagamento, data_criado))) * 12
+                + EXTRACT(MONTH FROM AGE(data_solicitacao_encerramento,
+                  COALESCE(data_primeiro_pagamento, data_criado))),
+                1
+              )
+            ), 0)::numeric AS ltv_mediano
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE valor_r > 0
+            AND data_solicitacao_encerramento IS NOT NULL
+            AND DATE_TRUNC('month', data_solicitacao_encerramento)::date = ${mesDate}::date
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
+            AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+            AND COALESCE(produto, 'Não Identificado') = ${produto}
+        `),
+        // Query 2 — por squad
+        db.execute(sql`
+          SELECT
+            COALESCE(squad, 'Não Informado') AS squad,
+            COUNT(*)::int AS cancelamentos,
+            COALESCE(SUM(valor_r), 0)::numeric AS mrr
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE valor_r > 0
+            AND data_solicitacao_encerramento IS NOT NULL
+            AND DATE_TRUNC('month', data_solicitacao_encerramento)::date = ${mesDate}::date
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
+            AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+            AND COALESCE(produto, 'Não Identificado') = ${produto}
+          GROUP BY COALESCE(squad, 'Não Informado')
+          ORDER BY cancelamentos DESC
+        `),
+        // Query 3 — por operador
+        db.execute(sql`
+          SELECT
+            COALESCE(responsavel_geral, 'Não Informado') AS operador,
+            COUNT(*)::int AS cancelamentos,
+            COALESCE(SUM(valor_r), 0)::numeric AS mrr
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE valor_r > 0
+            AND data_solicitacao_encerramento IS NOT NULL
+            AND DATE_TRUNC('month', data_solicitacao_encerramento)::date = ${mesDate}::date
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
+            AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+            AND COALESCE(produto, 'Não Identificado') = ${produto}
+          GROUP BY COALESCE(responsavel_geral, 'Não Informado')
+          ORDER BY cancelamentos DESC
+        `),
+        // Query 4 — lista de contratos
+        db.execute(sql`
+          SELECT
+            COALESCE(nome, 'Sem nome') AS nome,
+            COALESCE(squad, 'Não Informado') AS squad,
+            COALESCE(responsavel_geral, 'Não Informado') AS operador,
+            valor_r,
+            COALESCE(motivo_cancelamento, 'Não Informado') AS motivo
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE valor_r > 0
+            AND data_solicitacao_encerramento IS NOT NULL
+            AND DATE_TRUNC('month', data_solicitacao_encerramento)::date = ${mesDate}::date
+            AND COALESCE(abonar_churn, '') != 'Sim'
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
+            AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+            AND COALESCE(produto, 'Não Identificado') = ${produto}
+          ORDER BY valor_r DESC
+          LIMIT 200
+        `),
+      ]);
 
       const totais = totaisResult.rows[0] as { total_cancelamentos: number; total_mrr: string; ltv_mediano: string };
       const totalCancelamentos = Number(totais.total_cancelamentos) || 0;
@@ -536,7 +539,13 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
         ltv_mediano: Number(totais.ltv_mediano),
         squads,
         operadores,
-        contratos: contratosResult.rows,
+        contratos: (contratosResult.rows as { nome: string; squad: string; operador: string; valor_r: string; motivo: string }[]).map(r => ({
+          nome: r.nome,
+          squad: r.squad,
+          operador: r.operador,
+          valor_r: Number(r.valor_r) || 0,
+          motivo: r.motivo,
+        })),
       });
     } catch (error) {
       console.error("[produto-mes-detalhe] erro:", error);
