@@ -67,3 +67,44 @@ describe("GET /api/capacity-metas/responsaveis", () => {
     expect(res.status).toBe(500);
   });
 });
+
+const validBody = {
+  nome: "Novo", match_responsavel: "Novo Operador", categoria: "Pulse",
+  cap_recorrente: 15, cap_mrr: 45000, cap_pontual: null, cap_contas: null,
+  ordem: 5, ativo: true,
+};
+
+describe("POST /api/capacity-metas", () => {
+  it("cria e retorna 201 com id", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 42 }] });
+    const res = await request(makeApp()).post("/api/capacity-metas").send(validBody);
+    expect(res.status).toBe(201);
+    expect(res.body).toEqual({ id: 42 });
+  });
+
+  it("aceita cap_* nulos", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 43 }] });
+    const res = await request(makeApp()).post("/api/capacity-metas").send({
+      ...validBody, cap_recorrente: null, cap_mrr: null, cap_pontual: null, cap_contas: null,
+    });
+    expect(res.status).toBe(201);
+  });
+
+  it("rejeita nome vazio com 400", async () => {
+    const res = await request(makeApp()).post("/api/capacity-metas").send({ ...validBody, nome: "" });
+    expect(res.status).toBe(400);
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it("rejeita match_responsavel ausente com 400", async () => {
+    const { match_responsavel, ...rest } = validBody;
+    const res = await request(makeApp()).post("/api/capacity-metas").send(rest);
+    expect(res.status).toBe(400);
+  });
+
+  it("retorna 409 em violação de unicidade", async () => {
+    mockExecute.mockRejectedValueOnce({ code: "23505" });
+    const res = await request(makeApp()).post("/api/capacity-metas").send(validBody);
+    expect(res.status).toBe(409);
+  });
+});
