@@ -4667,6 +4667,28 @@ Estruture sua resposta em:
     }
   });
 
+  app.patch("/api/churn/abonar/:taskId", async (req, res) => {
+    const { taskId } = req.params;
+    const { abonar } = req.body as { abonar: boolean };
+    if (!taskId) {
+      return res.status(400).json({ error: "taskId obrigatório" });
+    }
+    if (typeof abonar !== "boolean") {
+      return res.status(400).json({ error: "abonar deve ser boolean" });
+    }
+    try {
+      await db.execute(sql`
+        UPDATE "Clickup".cup_churn
+        SET abonar_churn = ${abonar ? "Sim" : null}
+        WHERE task_id = ${taskId}
+      `);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("[churn/abonar] erro:", error);
+      res.status(500).json({ error: "Falha ao atualizar abonar_churn" });
+    }
+  });
+
   // Churn Detalhamento - lista de contratos churned com detalhes ricos de cup_churn
   app.get("/api/analytics/churn-detalhamento", async (req, res) => {
     try {
