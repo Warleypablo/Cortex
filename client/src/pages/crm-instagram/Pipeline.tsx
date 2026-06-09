@@ -3,7 +3,6 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -192,10 +191,6 @@ function ProfileCard({
       className="rounded-lg bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-700 p-3 shadow-sm hover:shadow-md transition-shadow"
     >
       <div className="flex items-start gap-2">
-        <Avatar className="h-9 w-9">
-          {p.profilePictureUrl && <AvatarImage src={p.profilePictureUrl} alt={profileLabel(p)} />}
-          <AvatarFallback>{profileLabel(p).replace(/^@/, "").slice(0, 2).toUpperCase()}</AvatarFallback>
-        </Avatar>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-1.5">
             <span
@@ -288,17 +283,7 @@ function ProfileCard({
         {p.stage === "negocio" && !p.bitrixDealId && (
           <Button size="sm" variant="default" className="h-7 text-xs" onClick={onBitrix}>Criar no Bitrix</Button>
         )}
-        <QualifyMenu current={p.qualification} onQualify={onQualify} />
-        <NoteButton current={p.observacao} onSave={onObservacao} />
       </div>
-
-      {p.qualification && (
-        <div className="mt-2">
-          <Badge variant="outline" className="gap-1 text-xs">
-            <Tag className="h-3 w-3" />{TAG_LABELS[p.qualification]}
-          </Badge>
-        </div>
-      )}
 
       {p.observacao && (
         <p className="mt-2 flex gap-1 text-xs text-gray-500 dark:text-zinc-400 italic">
@@ -306,6 +291,12 @@ function ProfileCard({
           <span className="line-clamp-2">{p.observacao}</span>
         </p>
       )}
+
+      {/* Linha inferior fixa: tag + observação (texto + ícone) */}
+      <div className="mt-2 flex items-center gap-1 border-t border-gray-100 dark:border-zinc-800 pt-2">
+        <QualifyMenu current={p.qualification} onQualify={onQualify} />
+        <NoteButton current={p.observacao} onSave={onObservacao} />
+      </div>
     </div>
   );
 }
@@ -318,10 +309,10 @@ function NoteButton({ current, onSave }: { current: string | null; onSave: (txt:
       <PopoverTrigger asChild>
         <Button
           size="sm" variant="ghost"
-          className={`h-7 w-7 p-0 ${current ? "text-amber-500" : "text-gray-400"}`}
+          className={`h-7 text-xs gap-1 ${current ? "text-amber-500" : "text-gray-400"}`}
           title={current ? "Editar observação" : "Adicionar observação"}
         >
-          <StickyNote className="h-3 w-3" />
+          <StickyNote className="h-3 w-3" />{current ? "Observação" : "Adicionar observação"}
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-64 p-2 bg-white dark:bg-zinc-900" align="end">
@@ -344,8 +335,13 @@ function QualifyMenu({ current, onQualify }: { current: QualificationTag | null;
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
-      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400" title="Qualificar / bloquear" onClick={() => setOpen((o) => !o)}>
-        <Tag className="h-3 w-3" />
+      <Button
+        size="sm" variant="ghost"
+        className={`h-7 text-xs gap-1 ${current ? "text-gray-700 dark:text-zinc-300" : "text-gray-400"}`}
+        title="Adicionar tag"
+        onClick={() => setOpen((o) => !o)}
+      >
+        <Tag className="h-3 w-3" />{current ? TAG_LABELS[current] : "Adicionar tag"}
       </Button>
       {open && (
         <div className="absolute z-10 mt-1 right-0 w-48 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
