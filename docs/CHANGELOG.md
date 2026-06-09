@@ -1,5 +1,93 @@
 # Changelog
 
+## 2026-06-08 | chore(criativos): pausa o agente de IA (Analisar com IA / Propostas)
+
+**O que foi feito:**
+- Remove da UI os botões "Analisar com IA" e "Propostas" + o drawer de propostas e todo o código cliente do agente
+- Desmonta a rota `/api/criativos/agent` e remove `server/routes/criativosAgent.ts`
+- Mantém `metaActions` (pausar/ativar/budget manual + bulk) e `growthAiTools` (compartilhado com a rota growth-ai), pois o pause/ativar manual depende deles
+
+**Por que:**
+- A feature de IA fica pausada por ora; o PR entrega o revamp da aba Criativos (tabs, colunas/views, resize, pausar/ativar manual, drill-down, busca) sem o agente
+
+**Impacto arquitetural:** Nenhum — agente desativado de forma reversível; backend compartilhado preservado.
+
+---
+
+## 2026-06-08 | fix(criativos): scroll lateral (sticky) + tabs full-width
+
+**O que foi feito:**
+- Corrige o scroll horizontal "bugado" (vãos/transparência nas colunas fixas): tabela passa de `border-collapse` para `border-separate border-spacing-0` — `position: sticky` em células não funciona bem com border-collapse
+- Tabs redesenhados full-width (4 abas distribuídas, estilo abas com destaque azul na ativa), conforme referência
+
+**Arquivos alterados:**
+- `client/src/components/criativos/CriativosTable.tsx` - border-separate + bordas nas células
+- `client/src/pages/Criativos.tsx` - tabs full-width; ações movidas para a linha de filtros
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-06-08 | feat(criativos): config de colunas (views), resize e layout reorganizado
+
+**O que foi feito:**
+- **Engrenagem de configurações** (uma só) com abas **Colunas** e **Cores**: escolher quais colunas aparecem, reordenar (arraste), e **visualizações salvas** (presets nomeados no navegador)
+- **Redimensionar colunas** arrastando a borda do cabeçalho (nome + métricas); largura salva no navegador
+- **Layout reorganizado**: KPI cards no topo; filtros (busca/status/plataforma/produto/campanha/data) + Analisar IA + Propostas + engrenagem movidos para dentro do card, junto das tabs (estilo Meta Ads)
+- Tabela migrada para `table-layout: fixed` + `<colgroup>` e renderização data-driven (registro central de colunas) — elimina de vez o drift das colunas fixas e habilita resize previsível
+
+**Por que:**
+- Há ~40 métricas; mostrar todas ocupa muito espaço. O usuário precisa montar a própria visão (como no Meta Ads) e ajustar larguras
+
+**Arquivos alterados:**
+- `client/src/lib/criativosColumns.ts` (novo) - registro de colunas, config, views, persistência
+- `client/src/components/criativos/CriativosSettingsSheet.tsx` (novo) - engrenagem com abas Colunas/Cores
+- `client/src/components/criativos/CriativosTable.tsx` - reescrita data-driven + colgroup + resize
+- `client/src/components/MetricFormattingSheet.tsx` - extrai `MetricFormattingContent` (reuso na aba Cores)
+- `client/src/pages/Criativos.tsx` - estado de config/views, wiring, reorganização do layout
+
+**Impacto arquitetural:** Tabela passa a ser data-driven a partir de um registro único de colunas; preferências (colunas/larguras/views) ficam no localStorage do usuário.
+
+---
+
+## 2026-06-08 | feat(criativos): 4 tabs (Conta/Campanha/Conjunto/Anúncio) + pausar/ativar
+
+**O que foi feito:**
+- Aba Criativos agora tem 4 visualizações em tabs: **Conta**, **Campanhas**, **Conjuntos**, **Anúncios** — mesmas métricas agregadas por nível (agregação client-side a partir das linhas de anúncio; derivados recalculados por soma/soma)
+- Coluna de **toggle** (liga/desliga) por linha — pausa/ativa ad/conjunto/campanha direto na Meta Ads (reusa `POST /api/meta/actions/{pause,resume}` em modo manual)
+- Coluna de **checkbox** + barra de **ação em massa** (Ativar/Pausar selecionados) com confirmação — usa `POST /api/meta/actions/bulk`
+- Override otimista de status na sessão (a tabela lê do DB que sincroniza com a Meta a cada 6h)
+- Tabela extraída para `CriativosTable.tsx` (page caiu de ~1399 → ~990 linhas) e métricas para `lib/criativosMetrics.ts`
+- Linha de totais passou a usar soma/soma (antes média simples, conceitualmente errada)
+
+**Por que:**
+- O gestor pedia visão por conta/campanha/conjunto além de anúncio, e poder pausar/ativar em massa sem sair do Cortex (estilo Meta Ads Manager)
+
+**Arquivos alterados:**
+- `client/src/pages/Criativos.tsx` - tabs, agregação por nível, seleção/toggle/bulk, remoção da tabela inline
+- `client/src/components/criativos/CriativosTable.tsx` (novo) - tabela reutilizável parametrizada por nível, colunas congeladas dinâmicas, toggle + checkbox
+- `client/src/lib/criativosMetrics.ts` (novo) - tipos + agregação + cálculo de derivados
+- `server/routes/growth.ts` - adset + status reais + contadores brutos no payload
+- `server/routes/metaActions.ts` - endpoint `/bulk`
+
+**Impacto arquitetural:** Agregação client-side a partir de uma única fonte (`/api/growth/criativos`) — totais batem entre níveis por construção; sem novos endpoints de leitura.
+
+---
+
+## 2026-06-08 | chore(criativos): remove impl ANTIGA órfã de otimização de ads
+
+**O que foi feito:**
+- Removida a implementação ANTIGA de otimização de Meta Ads (não roteada/órfã, vinda de stash): `server/services/adsOptimization/`, `server/routes/ads-optimization.ts`, `server/playbooks/ads-optimization.md`, `client/src/components/criativos/AdsOptimizationDialog.tsx`, `client/src/components/criativos/EditProposalSheet.tsx`, `client/src/hooks/useAdsOptimization.ts`, `docs/handover-otimizacao-ads.md`
+- Removida a tabela Drizzle `metaOptimizationProposals` (+ types) de `shared/schema.ts`
+
+**Por que:**
+- Existiam DUAS implementações do agente de otimização convivendo. A NOVA (`criativosAgent` + `metaActions` + `metaActionsLog`) está integrada e funcional; a ANTIGA estava órfã. Limpeza decidida para seguir só com a nova.
+
+**Arquivos alterados:**
+- `shared/schema.ts` - removida tabela `meta_optimization_proposals` e seus types
+- (deleções acima)
+
+**Impacto arquitetural:** Nenhum — código removido não estava roteado nem importado. `tsc` sem novos erros nos arquivos da feature.
 ## 2026-06-08 | feat(growth): quebra Tx Conversão da Página em MQL × Não-MQL
 
 **O que foi feito:**
