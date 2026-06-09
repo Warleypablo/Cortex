@@ -158,12 +158,22 @@ const PLACEMENT_MAP: Record<Placement, { platform: "facebook" | "instagram"; pos
 };
 
 /**
- * Opt-out de TODAS as features do Advantage+ Creative (incluindo Multi-advertiser ads).
+ * Opt-out das features do Advantage+ Creative (incluindo Multi-advertiser ads).
  * Aplicado em todo creative criado pela feature.
+ *
+ * ⚠️ A Meta deprecou várias chaves de `creative_features_spec` que existiam aqui antes
+ * (composer_enhancement, site_extensions, video_filtering, advantage_plus_creative,
+ * pac_relaxation, music, cta_optimization, description_automation, enhance_cta,
+ * text_generation, image_enhancement, profile_card). Enviá-las fazia a criação do
+ * anúncio falhar com `(#100) Param key '...' must be one of {...}`.
+ *
+ * ⚠️ A Meta também deprecou o campo guarda-chuva `standard_enhancements`
+ * ("Including standard enhancements field ... has been deprecated. Please choose to
+ * set individual features instead."). Por isso fazemos opt-out apenas das features
+ * INDIVIDUAIS que a Marketing API ainda aceita.
  */
 const ADVANTAGE_PLUS_OPT_OUT = {
   creative_features_spec: {
-    standard_enhancements: { enroll_status: "OPT_OUT" },
     image_touchups: { enroll_status: "OPT_OUT" },
     image_brightness_and_contrast: { enroll_status: "OPT_OUT" },
     image_uncrop: { enroll_status: "OPT_OUT" },
@@ -171,18 +181,6 @@ const ADVANTAGE_PLUS_OPT_OUT = {
     inline_comment: { enroll_status: "OPT_OUT" },
     audio: { enroll_status: "OPT_OUT" },
     image_animation: { enroll_status: "OPT_OUT" },
-    composer_enhancement: { enroll_status: "OPT_OUT" },
-    profile_card: { enroll_status: "OPT_OUT" },
-    site_extensions: { enroll_status: "OPT_OUT" },
-    video_filtering: { enroll_status: "OPT_OUT" },
-    advantage_plus_creative: { enroll_status: "OPT_OUT" },
-    pac_relaxation: { enroll_status: "OPT_OUT" },
-    music: { enroll_status: "OPT_OUT" },
-    cta_optimization: { enroll_status: "OPT_OUT" },
-    description_automation: { enroll_status: "OPT_OUT" },
-    enhance_cta: { enroll_status: "OPT_OUT" },
-    text_generation: { enroll_status: "OPT_OUT" },
-    image_enhancement: { enroll_status: "OPT_OUT" },
   },
 };
 
@@ -325,7 +323,7 @@ export async function createAd(
   index: number,
 ): Promise<string> {
   const objectStorySpec: Record<string, any> = { page_id: ctx.pageId };
-  if (ctx.instagramActorId) objectStorySpec.instagram_actor_id = ctx.instagramActorId;
+  if (ctx.instagramActorId) objectStorySpec.instagram_user_id = ctx.instagramActorId;
 
   if (media.kind === "video" && media.videoId) {
     const videoData: Record<string, any> = {
@@ -384,12 +382,12 @@ async function createCreativeWithIgFallback(
   } catch (err: any) {
     const msg = String(err?.message ?? "");
     const igError =
-      objectStorySpec.instagram_actor_id &&
-      /instagram_actor_id|valid Instagram account/i.test(msg);
+      objectStorySpec.instagram_user_id &&
+      /instagram_actor_id|instagram_user_id|valid Instagram account/i.test(msg);
     if (!igError) throw err;
     console.warn(`[ads-creation] IG ID inválido, recriando sem Instagram: ${msg}`);
     const fallback = { ...objectStorySpec };
-    delete fallback.instagram_actor_id;
+    delete fallback.instagram_user_id;
     return await metaPostForm(`${ctx.adAccountId}/adcreatives`, {
       name,
       object_story_spec: fallback,
@@ -425,7 +423,7 @@ export async function createCarouselAd(
       child_attachments: childAttachments,
     },
   };
-  if (ctx.instagramActorId) objectStorySpec.instagram_actor_id = ctx.instagramActorId;
+  if (ctx.instagramActorId) objectStorySpec.instagram_user_id = ctx.instagramActorId;
 
   const creativeResult = await createCreativeWithIgFallback(
     ctx,
@@ -464,7 +462,7 @@ function buildCreativeParams(
   videoThumbUrl?: string | null,
 ): Record<string, any> {
   const objectStorySpec: Record<string, any> = { page_id: ctx.pageId };
-  if (withIg && ctx.instagramActorId) objectStorySpec.instagram_actor_id = ctx.instagramActorId;
+  if (withIg && ctx.instagramActorId) objectStorySpec.instagram_user_id = ctx.instagramActorId;
 
   if (media.kind === "video" && media.videoId) {
     const videoData: Record<string, any> = {
@@ -523,7 +521,7 @@ function buildCarouselCreativeParams(
       child_attachments: childAttachments,
     },
   };
-  if (withIg && ctx.instagramActorId) objectStorySpec.instagram_actor_id = ctx.instagramActorId;
+  if (withIg && ctx.instagramActorId) objectStorySpec.instagram_user_id = ctx.instagramActorId;
 
   const params: Record<string, any> = {
     name: `Criativo: carrossel`,
@@ -564,7 +562,7 @@ function buildAdSetParams(
   const targeting = buildTargeting(briefing, audienceId, excludedAudienceIds);
 
   const params: Record<string, any> = {
-    name: buildAdSetName(briefing, sequenceNumber, personagem, adNameBase),
+    name: briefing.adSetNameOverride ?? buildAdSetName(briefing, sequenceNumber, personagem, adNameBase),
     campaign_id: campaignIdOrSubst,
     status: "PAUSED",
     daily_budget: dailyBudgetCentsOverride ?? briefing.dailyBudgetCents,
@@ -585,7 +583,7 @@ function buildAdSetParams(
 }
 
 function isIgError(message: string): boolean {
-  return /instagram_actor_id|valid Instagram account/i.test(message);
+  return /instagram_actor_id|instagram_user_id|valid Instagram account/i.test(message);
 }
 
 /**
@@ -673,7 +671,7 @@ function buildPairedCreativeParams(
   ];
 
   const objectStorySpec: Record<string, any> = { page_id: ctx.pageId };
-  if (withIg && ctx.instagramActorId) objectStorySpec.instagram_actor_id = ctx.instagramActorId;
+  if (withIg && ctx.instagramActorId) objectStorySpec.instagram_user_id = ctx.instagramActorId;
 
   return {
     name: `Criativo: ${pair.finalAdName}`,
@@ -742,12 +740,22 @@ async function createOneAdSetWithAds(
     }
   }
 
-  // 3. Phase 3: batch com [creative_i, ad_i] por ad
-  const buildBatchReqs = (withIg: boolean): BatchRequest[] => {
+  // 3. Phase 3: batch [creative_i, ad_i] por ad, com retry-on-transient.
+  // A Meta às vezes falha a criação de criativo de vídeo com erro genérico
+  // ("Something went wrong. Please try again later") quando vários são criados de
+  // uma vez (throttle momentâneo). Reenviamos só os que falharam transiente, com backoff.
+  const TRANSIENT = /something went wrong|try again later|temporarily|please try again|reduce the (amount|number)/i;
+  const RETRY_DELAYS_MS = [8_000, 20_000, 40_000];
+
+  const buildReqsFor = (indices: number[], withIg: boolean): BatchRequest[] => {
     const reqs: BatchRequest[] = [];
-    batch.ads.forEach((pair, i) => {
+    for (const i of indices) {
+      const pair = batch.ads[i];
       const cName = `creative_${i}`;
       const aName = `ad_${i}`;
+      const adName = briefing.adNameOverridePrefix
+        ? `${briefing.adNameOverridePrefix} ${i + 1}`
+        : pair.finalAdName;
       const params = buildPairedCreativeParams(ctx, briefing, pair, withIg, videoThumbs);
       reqs.push({
         name: cName,
@@ -761,36 +769,54 @@ async function createOneAdSetWithAds(
         relative_url: `${ctx.adAccountId}/ads`,
         depends_on: cName,
         body:
-          `name=${encodeURIComponent(pair.finalAdName)}` +
+          `name=${encodeURIComponent(adName)}` +
           `&adset_id=${adsetId}` +
           `&status=PAUSED` +
           `&creative=${encodeURIComponent('{"creative_id":"')}{result=${cName}:$.id}${encodeURIComponent('"}')}`,
       });
-    });
+    }
     return reqs;
   };
 
-  let phase3 = await metaBatch(buildBatchReqs(!!ctx.instagramActorId));
-
-  // Retry sem IG se erro de IG detectado
-  const igFailed = phase3.some((r) => r.error && isIgError(r.error));
-  if (igFailed && ctx.instagramActorId) {
-    console.warn("[ads-creation] IG inválido no batch, retentando sem Instagram");
-    phase3 = await metaBatch(buildBatchReqs(false));
-  }
-
-  for (let i = 0; i < batch.ads.length; i++) {
-    const creativeResp = phase3[i * 2];
-    const adResp = phase3[i * 2 + 1];
-    if (creativeResp?.code && creativeResp.code >= 400) {
-      errors.push(`Criativo ${batch.ads[i].finalAdName}: ${creativeResp.error || "falha"}`);
-      continue;
+  let pending = batch.ads.map((_, i) => i);
+  let useIg = !!ctx.instagramActorId;
+  for (let attempt = 0; pending.length > 0; attempt++) {
+    if (attempt > 0) {
+      const delay = RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)];
+      console.warn(
+        `[ads-creation] retry ${attempt}: ${pending.length} criativo(s) com erro transiente — aguardando ${delay / 1000}s`,
+      );
+      await new Promise((r) => setTimeout(r, delay));
     }
-    if (!adResp || adResp.code !== 200 || !adResp.body?.id) {
-      errors.push(`Anúncio ${batch.ads[i].finalAdName}: ${adResp?.error || "falha"}`);
-      continue;
+
+    let resp = await metaBatch(buildReqsFor(pending, useIg));
+
+    // Fallback de IG só na 1ª tentativa (BM mal configurado → publica só FB)
+    if (attempt === 0 && useIg && resp.some((r) => r.error && isIgError(r.error))) {
+      const igErrs = resp.filter((r) => r.error && isIgError(r.error)).map((r) => r.error);
+      console.warn("[ads-creation] IG inválido no batch, retentando sem Instagram. Erro original:", JSON.stringify(igErrs));
+      useIg = false;
+      resp = await metaBatch(buildReqsFor(pending, useIg));
     }
-    adIds.push(adResp.body.id);
+
+    const stillPending: number[] = [];
+    pending.forEach((adIdx, k) => {
+      const creativeResp = resp[k * 2];
+      const adResp = resp[k * 2 + 1];
+      const canRetry = attempt < RETRY_DELAYS_MS.length;
+      if (creativeResp?.code && creativeResp.code >= 400) {
+        if (canRetry && TRANSIENT.test(creativeResp.error || "")) stillPending.push(adIdx);
+        else errors.push(`Criativo ${batch.ads[adIdx].finalAdName}: ${creativeResp.error || "falha"}`);
+        return;
+      }
+      if (!adResp || adResp.code !== 200 || !adResp.body?.id) {
+        if (canRetry && TRANSIENT.test(adResp?.error || "")) stillPending.push(adIdx);
+        else errors.push(`Anúncio ${batch.ads[adIdx].finalAdName}: ${adResp?.error || "falha"}`);
+        return;
+      }
+      adIds.push(adResp.body.id);
+    });
+    pending = stillPending;
   }
 
   return { adsetId, adIds, errors };
