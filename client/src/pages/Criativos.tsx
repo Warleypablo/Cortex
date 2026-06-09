@@ -116,6 +116,8 @@ export default function Criativos() {
   }, []);
   // Seleção em massa + toggle de status (pausar/ativar)
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Drill-down (filtro por entidades selecionadas, estilo Meta Ads Manager)
+  const [scope, setScope] = useState<{ fromLevel: Level; ids: string[] } | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [statusOverride, setStatusOverride] = useState<Map<string, string>>(new Map());
   const [bulkAction, setBulkAction] = useState<null | "pause" | "resume">(null);
@@ -493,6 +495,16 @@ export default function Criativos() {
     );
   }, [criativos, searchTerm]);
 
+  // Drill-down: ao selecionar campanhas/conjuntos e abrir uma aba mais profunda,
+  // filtramos os anúncios pelas entidades selecionadas (estilo Meta Ads Manager)
+  const scopedRows = useMemo(() => {
+    if (!scope) return searchedRows;
+    const ids = new Set(scope.ids);
+    if (scope.fromLevel === "campanha") return searchedRows.filter(r => r.campaignId && ids.has(r.campaignId));
+    if (scope.fromLevel === "conjunto") return searchedRows.filter(r => r.adsetId && ids.has(r.adsetId));
+    return searchedRows;
+  }, [searchedRows, scope]);
+
   // Aplica override otimista de status (pause/resume reflete na hora;
   // o DB sincroniza com a Meta só a cada 6h)
   const applyOverride = useCallback((rows: CriativoData[]): CriativoData[] =>
@@ -503,8 +515,8 @@ export default function Criativos() {
 
   // Linhas do nível atual: agrega → ordena → aplica override
   const activeRows = useMemo(() =>
-    applyOverride(sortRows(aggregateByLevel(searchedRows, level), sortConfig)),
-  [searchedRows, level, sortConfig, applyOverride]);
+    applyOverride(sortRows(aggregateByLevel(scopedRows, level), sortConfig)),
+  [scopedRows, level, sortConfig, applyOverride]);
 
   const handleSort = (key: keyof CriativoData) => {
     setSortConfig(prev => ({
@@ -516,16 +528,26 @@ export default function Criativos() {
   // Linha de totais (agregação de conta sobre as linhas filtradas) — somável,
   // os derivados são recalculados a partir das somas (não média de médias)
   const averages = useMemo(() => {
-    if (searchedRows.length === 0) return null;
-    return aggregateByLevel(searchedRows, "conta")[0] ?? null;
-  }, [searchedRows]);
+    if (scopedRows.length === 0) return null;
+    return aggregateByLevel(scopedRows, "conta")[0] ?? null;
+  }, [scopedRows]);
 
   // ── Handlers de seleção, toggle e ação em massa ──
   const apiLevelFor = (l: Level): "ad" | "adset" | "campaign" =>
     l === "campanha" ? "campaign" : l === "conjunto" ? "adset" : "ad";
 
+  const LEVEL_DEPTH: Record<Level, number> = { conta: 0, campanha: 1, conjunto: 2, anuncio: 3 };
+
   const handleLevelChange = (l: string) => {
-    setLevel(l as Level);
+    const target = l as Level;
+    // Drill-down: havia seleção em campanha/conjunto e estamos indo p/ um nível mais profundo
+    if (selectedIds.size > 0 && (level === "campanha" || level === "conjunto") && LEVEL_DEPTH[target] > LEVEL_DEPTH[level]) {
+      setScope({ fromLevel: level, ids: Array.from(selectedIds) });
+    } else if (scope && LEVEL_DEPTH[target] <= LEVEL_DEPTH[scope.fromLevel]) {
+      // voltou para o nível de origem (ou acima): limpa o filtro de drill-down
+      setScope(null);
+    }
+    setLevel(target);
     setSelectedIds(new Set());
   };
 
@@ -621,6 +643,30 @@ export default function Criativos() {
   const vendasVar = kpis && kpisCompare ? calcVariation(kpis.vendas, kpisCompare.vendas) : null;
   const cacVar = kpis && kpisCompare ? calcVariation(kpis.cac, kpisCompare.cac, true) : null;
   const aovVar = kpis && kpisCompare ? calcVariation(kpis.aov, kpisCompare.aov) : null;
+
+  // ── Tabs: badge de seleção + relabel das abas profundas (drill-down) ──
+  const selCount = selectedIds.size;
+  const plur = (n: number, sing: string) => `${n} ${sing}${n === 1 ? "" : "s"}`;
+  const renderSelBadge = (lvl: Level) =>
+    level === lvl && selCount > 0 ? (
+      <span className="ml-1 inline-flex items-center gap-1 rounded bg-primary text-primary-foreground text-[11px] px-1.5 py-0.5">
+        {plur(selCount, "selecionado")}
+        <span
+          role="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+          className="hover:opacity-80"
+          title="Limpar seleção"
+        >
+          <X className="w-3 h-3" />
+        </span>
+      </span>
+    ) : null;
+  const conjuntoLabel = level === "campanha" && selCount > 0 ? `Conjuntos para ${plur(selCount, "campanha")}` : "Conjuntos";
+  const anuncioLabel =
+    level === "campanha" && selCount > 0 ? `Anúncios para ${plur(selCount, "campanha")}`
+    : level === "conjunto" && selCount > 0 ? `Anúncios para ${plur(selCount, "conjunto")}`
+    : "Anúncios";
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -745,16 +791,28 @@ export default function Criativos() {
                   <Building2 className="w-4 h-4" /> Conta
                 </TabsTrigger>
                 <TabsTrigger value="campanha" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-campanha">
-                  <Megaphone className="w-4 h-4" /> Campanhas
+                  <Megaphone className="w-4 h-4 shrink-0" /> Campanhas {renderSelBadge("campanha")}
                 </TabsTrigger>
                 <TabsTrigger value="conjunto" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-conjunto">
-                  <Layers3 className="w-4 h-4" /> Conjuntos
+                  <Layers3 className="w-4 h-4 shrink-0" /> <span className="truncate">{conjuntoLabel}</span> {renderSelBadge("conjunto")}
                 </TabsTrigger>
                 <TabsTrigger value="anuncio" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-anuncio">
-                  <ImageIcon className="w-4 h-4" /> Anúncios
+                  <ImageIcon className="w-4 h-4 shrink-0" /> <span className="truncate">{anuncioLabel}</span> {renderSelBadge("anuncio")}
                 </TabsTrigger>
               </TabsList>
             </Tabs>
+
+            {/* Chip do filtro de drill-down ativo */}
+            {scope && (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 text-primary text-xs px-2 py-1">
+                  Filtrando por {plur(scope.ids.length, scope.fromLevel === "campanha" ? "campanha" : "conjunto")}
+                  <button onClick={() => setScope(null)} className="hover:opacity-80" title="Remover filtro">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              </div>
+            )}
 
             {/* Linha de filtros + ações */}
             <div className="flex items-center justify-between gap-2 flex-wrap">
@@ -856,7 +914,6 @@ export default function Criativos() {
               <div className="flex items-center gap-2 flex-wrap">
                 {isAdmin && level !== "conta" && selectedIds.size > 0 && (
                   <div className="flex items-center gap-2 mr-1">
-                    <span className="text-xs text-muted-foreground">{selectedIds.size} selecionado(s)</span>
                     <Button size="sm" variant="outline" className="h-8" disabled={bulkPending} onClick={() => setBulkAction("resume")} data-testid="button-bulk-ativar">
                       <Power className="w-3.5 h-3.5 mr-1" /> Ativar
                     </Button>
