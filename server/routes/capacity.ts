@@ -211,6 +211,40 @@ export function registerCapacityRoutes(app: Express, db: any) {
     }
   });
 
+  // ── CRUD de capacity_metas (edição manual) ──
+
+  function normalizeMetaRow(r: any) {
+    const numOrNull = (v: any) => (v === null || v === undefined ? null : Number(v));
+    return {
+      id: Number(r.id),
+      nome: String(r.nome),
+      match_responsavel: String(r.match_responsavel),
+      categoria: String(r.categoria),
+      cap_recorrente: numOrNull(r.cap_recorrente),
+      cap_mrr: numOrNull(r.cap_mrr),
+      cap_pontual: numOrNull(r.cap_pontual),
+      cap_contas: numOrNull(r.cap_contas),
+      ordem: Number(r.ordem),
+      ativo: Boolean(r.ativo),
+    };
+  }
+
+  // GET /api/capacity-metas — lista TODAS as metas (inclusive inativas)
+  app.get("/api/capacity-metas", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, nome, match_responsavel, categoria,
+               cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem, ativo
+        FROM cortex_core.capacity_metas
+        ORDER BY ordem, nome
+      `);
+      res.json(result.rows.map(normalizeMetaRow));
+    } catch (error) {
+      console.error("[api] Error fetching capacity-metas:", error);
+      res.status(500).json({ error: "Failed to fetch capacity-metas" });
+    }
+  });
+
   // ── Endpoints legados (mantidos para compatibilidade) ──
 
   app.get("/api/capacity", async (req, res) => {
