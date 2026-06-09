@@ -337,7 +337,7 @@ function BitrixModal({
   onCreated: () => void;
 }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({ nome: "", telefone: "", email: "", valor: "", responsavel: "" });
+  const [form, setForm] = useState({ nome: "", telefone: "", email: "" });
 
   const createM = useMutation({
     mutationFn: async () => {
@@ -345,8 +345,15 @@ function BitrixModal({
       return res.json();
     },
     onSuccess: (data) => {
-      toast({ title: data.alreadyExists ? "Já estava no Bitrix" : "Criado no Bitrix", description: `Deal #${data.dealId}` });
-      setForm({ nome: "", telefone: "", email: "", valor: "", responsavel: "" });
+      toast({
+        title: data.alreadyExists ? "Já estava no Bitrix" : "Criado no Bitrix",
+        description: data.alreadyExists
+          ? `Deal #${data.dealId}`
+          : data.assigned
+            ? `Deal #${data.dealId} — atribuído a você`
+            : `Deal #${data.dealId} — ⚠️ defina o responsável no Bitrix (seu e-mail não casou)`,
+      });
+      setForm({ nome: "", telefone: "", email: "" });
       onCreated();
     },
     onError: (e: any) => toast({ title: "Erro ao criar no Bitrix", description: e.message, variant: "destructive" }),
@@ -362,7 +369,8 @@ function BitrixModal({
         </DialogHeader>
         <div className="space-y-3 text-sm">
           <p className="text-xs text-gray-500 dark:text-zinc-400">
-            Origem e link do Instagram já vão preenchidos. Complete o que souber:
+            Origem e link do Instagram já vão preenchidos, e o deal é atribuído a você
+            (Responsável + SDR). Complete o que souber — tudo opcional:
           </p>
           <div className="grid grid-cols-2 gap-3">
             <div className="col-span-2">
@@ -376,14 +384,6 @@ function BitrixModal({
             <div>
               <label className="text-xs text-gray-600 dark:text-zinc-400">Email</label>
               <Input value={form.email} onChange={set("email")} placeholder="email@..." />
-            </div>
-            <div>
-              <label className="text-xs text-gray-600 dark:text-zinc-400">Valor estimado (R$)</label>
-              <Input value={form.valor} onChange={set("valor")} type="number" placeholder="0" />
-            </div>
-            <div>
-              <label className="text-xs text-gray-600 dark:text-zinc-400">Responsável</label>
-              <Input value={form.responsavel} onChange={set("responsavel")} placeholder="quem vai tocar" />
             </div>
           </div>
         </div>

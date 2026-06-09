@@ -36,6 +36,22 @@ export async function bitrixDealAdd(fields: BitrixDealFields): Promise<number> {
   return id;
 }
 
+/**
+ * Resolve um usuário Bitrix pelo e-mail. Retorna o ID numérico ou null.
+ * Best-effort: e-mail do nosso auth pode não bater com o do Bitrix.
+ */
+export async function bitrixFindUserIdByEmail(email: string | null | undefined): Promise<number | null> {
+  if (!email) return null;
+  try {
+    const res = await fetch(`${webhook()}/user.get?FILTER[EMAIL]=${encodeURIComponent(email)}&FILTER[ACTIVE]=true`);
+    const data = await res.json().catch(() => ({}));
+    const id = Number(data?.result?.[0]?.ID);
+    return id && !isNaN(id) ? id : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Atualiza campos de um deal existente. */
 export async function bitrixDealUpdate(dealId: number, fields: BitrixDealFields): Promise<boolean> {
   const res = await fetch(`${webhook()}/crm.deal.update`, {

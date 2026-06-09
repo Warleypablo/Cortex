@@ -1,7 +1,10 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
-import { bitrixDealAdd } from "../services/bitrixClient";
+import { bitrixDealAdd, bitrixFindUserIdByEmail } from "../services/bitrixClient";
+
+// Campo customizado "SDR" no Bitrix (tipo employee). Responsável = ASSIGNED_BY_ID.
+const BITRIX_SDR_FIELD = "UF_CRM_1752257983";
 import { temperatureFrom, leadScore } from "../../shared/crmInstagramScoring";
 import { BLOCKING_TAGS, isQualificationTag } from "../../shared/crmInstagramTags";
 
@@ -287,7 +290,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
     try {
       const user = req.user as any;
       const id = parseInt(req.params.id, 10);
-      const { nome, telefone, email, valor, responsavel } = req.body || {};
+      const { nome, telefone, email } = req.body || {};
 
       const profile = (await db.execute(sql`
         SELECT id, ig_username, display_name, bio, last_media_permalink, bitrix_deal_id, stage
@@ -309,8 +312,10 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         profile.bio ? `Bio: ${profile.bio}` : null,
         telefone ? `Telefone: ${telefone}` : null,
         email ? `Email: ${email}` : null,
-        responsavel ? `Responsável (sugerido): ${responsavel}` : null,
       ].filter(Boolean).join("\n");
+
+      // Atribui Responsável + SDR ao próprio SDR logado (best-effort por e-mail).
+      const sdrBitrixId = await bitrixFindUserIdByEmail(user?.email);
 
       const dealId = await bitrixDealAdd({
         TITLE: nome ? `${nome} (${ident})` : `IG Garimpo - ${ident}`,
@@ -318,7 +323,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         UTM_SOURCE: "instagram",
         UTM_MEDIUM: "organic",
         UTM_CAMPAIGN: "garimpo_engajamento",
-        OPPORTUNITY: valor ? Number(valor) : undefined,
+        ...(sdrBitrixId ? { ASSIGNED_BY_ID: sdrBitrixId, [BITRIX_SDR_FIELD]: sdrBitrixId } : {}),
         COMMENTS: comments,
       });
 
@@ -332,7 +337,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         VALUES (${id}, ${profile.stage}, 'negocio', ${user?.id || null})
       `);
 
-      res.json({ ok: true, dealId });
+      res.json({ ok: true, dealId, assigned: !!sdrBitrixId });
     } catch (err: any) {
       console.error("[crm-instagram] POST /bitrix erro:", err.message);
       res.status(500).json({ message: err.message });
