@@ -1,8 +1,14 @@
-# Constituição UTM Turbo v1.3
+# Constituição UTM Turbo v1.4
 
 > Padrão único e definitivo de instrumentação de UTMs da Turbo Partners.
 > Vigência: a partir de **21 de maio de 2026**.
 > Documento vivo. Mudanças exigem aprovação do Growth + Pre-Sales.
+
+> **Versão 1.4 — refinamentos** (09/06/2026):
+> - **`content` é slug puro, sem prefixo `link-`** — `creators`, não `link-creators` (ver §4.2). Exemplos do doc atualizados.
+> - **Bio com múltiplos links** documentada — até 5 links nativos no Instagram, todos `term=bio`, diferenciados por `content` (ver §4.2)
+> - Site institucional na raiz padronizado como `content=site`
+> - Nota sobre WhatsApp: UTM em link `wa.me`/`api.whatsapp.com` não rastreia; usar página de redirect tracked
 
 > **Versão 1.3 — refinamentos** (08/06/2026):
 > - **`rodrigo` adicionado como medium-exceção** — terceira figura-chave com canal próprio, mesmo tratamento de `victor` e `andre` (ver §3.7 e §4.7)
@@ -271,16 +277,37 @@ content = {slug-curto}-{aaaa-mm-dd}
 
 ou só `{slug-curto}` quando data não agrega.
 
+**Slug puro, sem prefixo `link-`:** o `content` é o slug direto do destino/oferta (`creators`, `ecommerce`, `creator-summit`, `whatsapp`, `site`). **Não** usar prefixo `link-` (era convenção antiga, descontinuada na v1.4). Para o site institucional na raiz, usar `content=site`.
+
 Exemplos:
 - `term=descricao-video` + `content=creators-ugc-2026-05-26` ✅
 - `term=descricao-video` + `content=video-creators-ugc-2026-05-26` ❌ (repete formato)
 - `term=feed` + `content=creators-2026-05-26` ✅
 - `term=dm` + `content=camila-2026-05-26` ✅
-- `term=banner` + `content=link-diagnostico` ✅ (sem data porque banner muda menos)
+- `term=banner` + `content=diagnostico` ✅ (sem data porque banner muda menos)
+
+#### Bio com múltiplos links (Instagram, TikTok, etc.)
+
+A bio nativa hoje permite **vários links diretos** (até 5 no Instagram), funcionando como uma Linktree embutida na plataforma. Como todos ficam fisicamente na bio, **todos usam `term=bio`** — o `content` é o que diferencia cada botão.
+
+- `content` = slug puro do destino/oferta de cada botão (`creators`, `whatsapp`, `creator-summit`, `site`)
+- Botão de bio é estável ("cola e esquece") → **sem data** no `content`
+- `campaign` permanece `always-on` para botões de presença contínua; muda só quando o botão pertence a uma iniciativa específica (ex: `creator-summit-2026`)
+
+Exemplo de uma bio com 4 botões:
+
+| Botão | campaign | term | content |
+|---|---|---|---|
+| Página Creators | `always-on` | `bio` | `creators` |
+| Creator Summit | `creator-summit-2026` | `bio` | `creator-summit` |
+| WhatsApp | `always-on` | `bio` | `whatsapp` |
+| Site | `always-on` | `bio` | `site` |
+
+> **Nota WhatsApp:** UTM colada direto num link `wa.me`/`api.whatsapp.com` **não rastreia** — o WhatsApp ignora os parâmetros e o lead cai na conversa sem chegar ao Bitrix. Para rastrear o botão de WhatsApp da bio, aponte para uma página de redirect tracked (ex: `pages.turbopartners.com.br/wpp?...`) que registra a UTM e redireciona para o `wa.me`.
 
 #### Slugs oficiais de produto
 
-Usar em campaign de lançamento (`lancamento-{slug}-…`) e em `content` (`link-{slug}`, `diagnostico-{slug}`):
+Usar em campaign de lançamento (`lancamento-{slug}-…`) e em `content` (`{slug}`, `diagnostico-{slug}`):
 
 | Produto | slug | também conhecido como |
 |---|---|---|
@@ -296,7 +323,7 @@ A decisão depende de **onde a pessoa está fisicamente colando o link com UTM n
 - **`term=bio`** → quando o link com UTM vai **direto no campo "site/website" do perfil** (Instagram, TikTok, LinkedIn). Aponta direto pra LP final, sem Linktree no meio.
 - **`term=linktree`** → quando o link com UTM está cadastrado **dentro da Linktree** (você está editando a Linktree e colando a URL no campo de algum botão de lá).
 
-**Por que separar:** permite medir se a Linktree ajuda ou atrapalha (cliques perdidos no intermediário) e qual link de lá performa melhor. Saber qual produto puxou o lead é via `content` (`link-creators`, `link-ecommerce`).
+**Por que separar:** permite medir se a Linktree ajuda ou atrapalha (cliques perdidos no intermediário) e qual link de lá performa melhor. Saber qual produto puxou o lead é via `content` (`creators`, `ecommerce`).
 
 **Definição operacional de `social-selling` na Turbo:**
 
@@ -352,7 +379,7 @@ Mesma lógica de naming que `organic` (ver §4.2), porque a natureza do conteúd
 |---|---|
 | campaign | `always-on` (default presença contínua) · `lancamento-{slug}-{aaaa-mm}` (parceria pontual com Turbo) · `paid-{{campaign.id}}` (se a figura rodar anúncio próprio apontando pra Turbo) |
 | term | mesmo vocabulário por plataforma de organic: `bio`, `linktree`, `descricao-video`, `feed`, `stories`, `reels`, etc |
-| content | `{slug-curto}-{aaaa-mm-dd}` — ex: `canal-victor`, `link-creators-2026-05`, `video-creators-2026-05-28` |
+| content | `{slug-curto}-{aaaa-mm-dd}` — ex: `canal-victor`, `creators-2026-05`, `video-creators-2026-05-28` |
 
 **Exemplo:**
 ```
@@ -414,7 +441,7 @@ https://turbopartners.com.br/creators?utm_source=facebook&utm_medium=paid&utm_ca
 
 **Instagram orgânico (post no feed apontando pra bio):**
 ```
-?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=link-creators-2026-05
+?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=creators-2026-05
 ```
 
 **Link da Linktree (configurado dentro da própria Linktree, com UTM embutida):**
@@ -505,7 +532,7 @@ https://turbopartners.com.br/creators?utm_source=facebook&utm_medium=paid&utm_ca
 
 **Victor — link da Turbo dentro da Linktree do Instagram dele:**
 ```
-?utm_source=instagram&utm_medium=victor&utm_campaign=always-on&utm_term=linktree&utm_content=link-turbo
+?utm_source=instagram&utm_medium=victor&utm_campaign=always-on&utm_term=linktree&utm_content=turbo
 ```
 
 **André — descrição de vídeo no canal dele:**
@@ -515,12 +542,12 @@ https://turbopartners.com.br/creators?utm_source=facebook&utm_medium=paid&utm_ca
 
 **André — link da Turbo dentro da Linktree do Instagram dele:**
 ```
-?utm_source=instagram&utm_medium=andre&utm_campaign=always-on&utm_term=linktree&utm_content=link-turbo
+?utm_source=instagram&utm_medium=andre&utm_campaign=always-on&utm_term=linktree&utm_content=turbo
 ```
 
 **Rodrigo — Sobre do perfil no LinkedIn apontando pra Turbo:**
 ```
-?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=bio&utm_content=link-turbo
+?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=bio&utm_content=turbo
 ```
 
 **Rodrigo — post no feed do LinkedIn dele:**
@@ -753,9 +780,15 @@ Se as 4 respostas forem "sim", entra. Se alguma for "não", o caso provavelmente
 - Terceira figura-chave com canal próprio robusto, mesmo tratamento de `victor` e `andre` (§3.7 + §4.7 + exemplo no LinkedIn em §5.3)
 - Sources liberados: `instagram`, `youtube`, `linkedin`, `tiktok` (idêntico às outras figuras)
 
+**v1.4** (09/06/2026) — `content` slug puro + bio com múltiplos links:
+- Prefixo `link-` descontinuado: `content` é o slug direto do destino/oferta (`creators`, não `link-creators`). Todos os exemplos do doc atualizados (§4.2, §4.7, §5.3)
+- Caso de **bio com múltiplos links nativos** documentado (§4.2): até 5 links no Instagram, todos `term=bio`, diferenciados por `content` (slug puro, sem data). `campaign` muda só quando o botão pertence a iniciativa específica
+- Site institucional na raiz padronizado: `content=site`
+- Nota sobre WhatsApp: UTM em link `wa.me`/`api.whatsapp.com` não é capturada; rastrear via página de redirect tracked (`/wpp`)
+
 ---
 
-**Versão:** 1.3
+**Versão:** 1.4
 **Data de aprovação:** *aguardando Ichino*
 **Vigência a partir de:** 21/05/2026
 **Próxima revisão prevista:** agosto/2026 (revisão trimestral)
