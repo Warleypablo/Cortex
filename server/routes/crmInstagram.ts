@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { bitrixDealAdd } from "../services/bitrixClient";
 import { temperatureFrom, leadScore } from "../../shared/crmInstagramScoring";
+import { BLOCKING_TAGS, isQualificationTag } from "../../shared/crmInstagramTags";
 
 const STAGES = ["engajador", "oportunidade", "negocio"] as const;
 const SUBCATEGORIES = ["creator_ugc", "job_candidate", "competitor", "poor_fit"] as const;
@@ -15,10 +16,13 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
       const stage = typeof req.query.stage === "string" ? req.query.stage : null;
       const owner = typeof req.query.owner === "string" ? req.query.owner : null;
       const q = typeof req.query.q === "string" ? req.query.q.trim().toLowerCase() : null;
+      // scope=all → aba Qualificação (mostra todos, inclusive bloqueados).
+      // Default (Pipeline) → esconde tags de bloqueio (colaborador/desqualificado).
+      const includeBlocked = req.query.scope === "all";
 
       const result = await db.execute(sql`
         SELECT p.id, p.ig_username, p.display_name, p.ig_user_id, p.bio, p.followers_count,
-               p.profile_picture_url, p.last_media_permalink, p.stage, p.subcategory,
+               p.profile_picture_url, p.last_media_permalink, p.stage, p.subcategory, p.qualification,
                p.owner_user_id, p.locked_by, p.locked_at, p.bitrix_deal_id,
                p.ghl_contact_id, p.is_existing_contact, p.icp_tags,
                p.first_seen, p.last_interaction_at,
@@ -37,6 +41,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         WHERE (${stage}::text IS NULL OR p.stage = ${stage})
           AND (${owner}::text IS NULL OR p.owner_user_id = ${owner})
           AND (${q}::text IS NULL OR LOWER(COALESCE(p.ig_username, p.display_name)) LIKE '%' || ${q} || '%')
+          AND (${includeBlocked} OR p.qualification IS NULL OR p.qualification NOT IN (${sql.join(BLOCKING_TAGS.map((t) => sql`${t}`), sql`, `)}))
       `);
 
       const now = Date.now();
@@ -54,6 +59,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
           lastMediaPermalink: r.last_media_permalink,
           stage: r.stage,
           subcategory: r.subcategory,
+          qualification: r.qualification,
           ownerUserId: r.owner_user_id,
           lockedBy: r.locked_by,
           lockedAt: r.locked_at,
@@ -150,6 +156,25 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         VALUES (${id}, ${profile.stage}, ${toStage}, ${user?.id || null})
       `);
       res.json({ ok: true, stage: toStage });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Qualificar (tag do SDR; colaborador/desqualificado = blocklist do Pipeline) ──
+  app.post("/api/crm-instagram/profiles/:id/qualification", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const qualification = req.body?.qualification ?? null;
+      if (qualification !== null && !isQualificationTag(qualification)) {
+        return res.status(400).json({ message: "tag de qualificação inválida" });
+      }
+      await db.execute(sql`
+        UPDATE cortex_core.prospecting_profiles
+        SET qualification = ${qualification}, updated_at = NOW()
+        WHERE id = ${id}
+      `);
+      res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }

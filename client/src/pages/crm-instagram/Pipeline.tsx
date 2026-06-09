@@ -12,8 +12,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
-  MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, UserPlus, Trash2,
+  MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, UserPlus, Tag,
 } from "lucide-react";
+import { QUALIFICATION_TAGS, TAG_LABELS, type QualificationTag } from "@shared/crmInstagramTags";
 
 type Profile = {
   id: number;
@@ -25,6 +26,7 @@ type Profile = {
   lastMediaPermalink: string | null;
   stage: string;
   subcategory: string | null;
+  qualification: QualificationTag | null;
   ownerUserId: string | null;
   lockedBy: string | null;
   isLocked: boolean;
@@ -62,13 +64,6 @@ const STAGES = [
 
 const TEMP_EMOJI: Record<string, string> = { hot: "🔥", warm: "🌡️", cold: "❄️" };
 
-const SUBCATS = [
-  { key: "creator_ugc", label: "Creator/UGC" },
-  { key: "job_candidate", label: "Candidato a vaga" },
-  { key: "competitor", label: "Concorrente" },
-  { key: "poor_fit", label: "Fora do perfil" },
-];
-
 export default function Pipeline() {
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -94,7 +89,7 @@ export default function Pipeline() {
   const moveM = act("stage");
   const claimM = act("claim");
   const lockM = act("lock");
-  const subM = act("subcategory");
+  const qualM = act("qualification");
 
   const move = (p: Profile, toStage: string) => {
     if (toStage === "negocio" && !p.bitrixDealId) { setBitrixTarget(p); return; }
@@ -140,7 +135,7 @@ export default function Pipeline() {
                     onClaim={() => claimM.mutate({ id: p.id })}
                     onLock={() => lockM.mutate({ id: p.id })}
                     onMove={(to) => move(p, to)}
-                    onDiscard={(sub) => subM.mutate({ id: p.id, body: { subcategory: sub } })}
+                    onQualify={(tag) => qualM.mutate({ id: p.id, body: { qualification: tag } })}
                     onBitrix={() => setBitrixTarget(p)}
                   />
                 ))}
@@ -163,14 +158,14 @@ export default function Pipeline() {
 }
 
 function ProfileCard({
-  p, meId, onClaim, onLock, onMove, onDiscard, onBitrix,
+  p, meId, onClaim, onLock, onMove, onQualify, onBitrix,
 }: {
   p: Profile;
   meId?: string;
   onClaim: () => void;
   onLock: () => void;
   onMove: (toStage: string) => void;
-  onDiscard: (sub: string) => void;
+  onQualify: (tag: string | null) => void;
   onBitrix: () => void;
 }) {
   const lockedByOther = p.isLocked && p.lockedBy && p.lockedBy !== meId;
@@ -269,7 +264,7 @@ function ProfileCard({
         {p.stage === "negocio" && !p.bitrixDealId && (
           <Button size="sm" variant="default" className="h-7 text-xs" onClick={onBitrix}>Criar no Bitrix</Button>
         )}
-        <DiscardMenu onDiscard={onDiscard} />
+        <QualifyMenu current={p.qualification} onQualify={onQualify} />
         {!p.isLocked && (
           <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Travar para mim" onClick={onLock}>
             <Lock className="h-3 w-3" />
@@ -277,33 +272,44 @@ function ProfileCard({
         )}
       </div>
 
-      {p.subcategory && (
-        <div className="mt-2 text-xs text-gray-400">
-          Descartado: {SUBCATS.find((s) => s.key === p.subcategory)?.label || p.subcategory}
+      {p.qualification && (
+        <div className="mt-2">
+          <Badge variant="outline" className="gap-1 text-xs">
+            <Tag className="h-3 w-3" />{TAG_LABELS[p.qualification]}
+          </Badge>
         </div>
       )}
     </div>
   );
 }
 
-function DiscardMenu({ onDiscard }: { onDiscard: (sub: string) => void }) {
+function QualifyMenu({ current, onQualify }: { current: QualificationTag | null; onQualify: (tag: string | null) => void }) {
   const [open, setOpen] = useState(false);
   return (
     <div className="relative">
-      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400" title="Descartar" onClick={() => setOpen((o) => !o)}>
-        <Trash2 className="h-3 w-3" />
+      <Button size="sm" variant="ghost" className="h-7 w-7 p-0 text-gray-400" title="Qualificar / bloquear" onClick={() => setOpen((o) => !o)}>
+        <Tag className="h-3 w-3" />
       </Button>
       {open && (
-        <div className="absolute z-10 mt-1 right-0 w-44 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
-          {SUBCATS.map((s) => (
+        <div className="absolute z-10 mt-1 right-0 w-48 rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 shadow-lg py-1">
+          {QUALIFICATION_TAGS.map((t) => (
             <button
-              key={s.key}
-              className="block w-full text-left px-3 py-1.5 text-xs text-gray-700 dark:text-zinc-300 hover:bg-gray-100 dark:hover:bg-zinc-800"
-              onClick={() => { onDiscard(s.key); setOpen(false); }}
+              key={t}
+              className={`block w-full text-left px-3 py-1.5 text-xs hover:bg-gray-100 dark:hover:bg-zinc-800 ${current === t ? "font-semibold text-gray-900 dark:text-white" : "text-gray-700 dark:text-zinc-300"}`}
+              onClick={() => { onQualify(t); setOpen(false); }}
             >
-              {s.label}
+              {TAG_LABELS[t]}
+              {(t === "colaborador" || t === "desqualificado") && <span className="text-gray-400"> · some do pipeline</span>}
             </button>
           ))}
+          {current && (
+            <button
+              className="block w-full text-left px-3 py-1.5 text-xs text-gray-500 border-t border-gray-100 dark:border-zinc-800 hover:bg-gray-100 dark:hover:bg-zinc-800"
+              onClick={() => { onQualify(null); setOpen(false); }}
+            >
+              Remover tag
+            </button>
+          )}
         </div>
       )}
     </div>

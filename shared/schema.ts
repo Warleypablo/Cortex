@@ -3278,8 +3278,11 @@ export const prospectingProfiles = cortexCoreSchema.table(
     lastMediaPermalink: text("last_media_permalink"),
     // engajador | oportunidade | negocio
     stage: text("stage").notNull().default("engajador"),
-    // null | creator_ugc | job_candidate | competitor | poor_fit
+    // null | creator_ugc | job_candidate | competitor | poor_fit (legado)
     subcategory: text("subcategory"),
+    // Tag de qualificação do SDR (ver shared/crmInstagramTags.ts).
+    // colaborador/desqualificado removem do Pipeline (blocklist).
+    qualification: text("qualification"),
     ownerUserId: text("owner_user_id"),
     lockedBy: text("locked_by"),
     lockedAt: timestamp("locked_at"),
