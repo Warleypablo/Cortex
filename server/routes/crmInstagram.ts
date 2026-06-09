@@ -22,12 +22,10 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
                p.owner_user_id, p.locked_by, p.locked_at, p.bitrix_deal_id,
                p.ghl_contact_id, p.is_existing_contact, p.icp_tags,
                p.first_seen, p.last_interaction_at,
-               c.location_id AS ghl_location_id,
                COALESCE(i.comment_count, 0) AS comment_count,
                COALESCE(i.dm_count, 0) AS dm_count,
                i.last_text
         FROM cortex_core.prospecting_profiles p
-        LEFT JOIN cortex_core.ghl_contacts c ON c.id = p.ghl_contact_id
         LEFT JOIN (
           SELECT profile_id,
                  COUNT(*) FILTER (WHERE type = 'comment') AS comment_count,
@@ -62,7 +60,8 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
           isLocked: !!r.locked_by && r.locked_at && (now - new Date(r.locked_at).getTime()) < LOCK_TTL_MIN * 60_000,
           bitrixDealId: r.bitrix_deal_id,
           ghlContactId: r.ghl_contact_id,
-          ghlLocationId: r.ghl_location_id,
+          // Location única do GHL (env). Todo lead de DM tem thread → roteia pro GHL.
+          ghlLocationId: r.ghl_contact_id ? (process.env.GHL_LOCATION_ID || null) : null,
           isExistingContact: r.is_existing_contact,
           icpTags: r.icp_tags,
           firstSeen: r.first_seen,
