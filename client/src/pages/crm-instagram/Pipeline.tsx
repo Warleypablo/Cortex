@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
@@ -11,8 +11,10 @@ import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, Tag,
+  MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, Tag, StickyNote,
 } from "lucide-react";
 import { QUALIFICATION_TAGS, TAG_LABELS, type QualificationTag } from "@shared/crmInstagramTags";
 
@@ -27,6 +29,7 @@ type Profile = {
   stage: string;
   subcategory: string | null;
   qualification: QualificationTag | null;
+  observacao: string | null;
   ownerUserId: string | null;
   ownerName: string | null;
   lockedBy: string | null;
@@ -98,6 +101,7 @@ export default function Pipeline() {
   const claimM = act("claim");
   const releaseM = act("release");
   const qualM = act("qualification");
+  const obsM = act("observacao");
 
   const move = (p: Profile, toStage: string) => {
     if (toStage === "negocio" && !p.bitrixDealId) { setBitrixTarget(p); return; }
@@ -144,6 +148,7 @@ export default function Pipeline() {
                     onRelease={() => releaseM.mutate({ id: p.id })}
                     onMove={(to) => move(p, to)}
                     onQualify={(tag) => qualM.mutate({ id: p.id, body: { qualification: tag } })}
+                    onObservacao={(txt) => obsM.mutate({ id: p.id, body: { observacao: txt } })}
                     onBitrix={() => setBitrixTarget(p)}
                   />
                 ))}
@@ -166,7 +171,7 @@ export default function Pipeline() {
 }
 
 function ProfileCard({
-  p, meId, onClaim, onRelease, onMove, onQualify, onBitrix,
+  p, meId, onClaim, onRelease, onMove, onQualify, onObservacao, onBitrix,
 }: {
   p: Profile;
   meId?: string;
@@ -174,6 +179,7 @@ function ProfileCard({
   onRelease: () => void;
   onMove: (toStage: string) => void;
   onQualify: (tag: string | null) => void;
+  onObservacao: (txt: string) => void;
   onBitrix: () => void;
 }) {
   const lockedByOther = p.isLocked && p.lockedBy && p.lockedBy !== meId;
@@ -283,6 +289,7 @@ function ProfileCard({
           <Button size="sm" variant="default" className="h-7 text-xs" onClick={onBitrix}>Criar no Bitrix</Button>
         )}
         <QualifyMenu current={p.qualification} onQualify={onQualify} />
+        <NoteButton current={p.observacao} onSave={onObservacao} />
       </div>
 
       {p.qualification && (
@@ -292,7 +299,44 @@ function ProfileCard({
           </Badge>
         </div>
       )}
+
+      {p.observacao && (
+        <p className="mt-2 flex gap-1 text-xs text-gray-500 dark:text-zinc-400 italic">
+          <StickyNote className="h-3 w-3 mt-0.5 shrink-0" />
+          <span className="line-clamp-2">{p.observacao}</span>
+        </p>
+      )}
     </div>
+  );
+}
+
+function NoteButton({ current, onSave }: { current: string | null; onSave: (txt: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState(current || "");
+  return (
+    <Popover open={open} onOpenChange={(o) => { setOpen(o); if (o) setText(current || ""); }}>
+      <PopoverTrigger asChild>
+        <Button
+          size="sm" variant="ghost"
+          className={`h-7 w-7 p-0 ${current ? "text-amber-500" : "text-gray-400"}`}
+          title={current ? "Editar observação" : "Adicionar observação"}
+        >
+          <StickyNote className="h-3 w-3" />
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-64 p-2 bg-white dark:bg-zinc-900" align="end">
+        <Textarea
+          value={text}
+          onChange={(e) => setText(e.target.value)}
+          placeholder="Observação livre do SDR..."
+          className="text-xs min-h-[80px]"
+        />
+        <div className="mt-2 flex justify-end gap-2">
+          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => setOpen(false)}>Cancelar</Button>
+          <Button size="sm" className="h-7 text-xs" onClick={() => { onSave(text); setOpen(false); }}>Salvar</Button>
+        </div>
+      </PopoverContent>
+    </Popover>
   );
 }
 
@@ -337,7 +381,12 @@ function BitrixModal({
   onCreated: () => void;
 }) {
   const { toast } = useToast();
-  const [form, setForm] = useState({ nome: "", telefone: "", email: "" });
+  const [form, setForm] = useState({ nome: "", telefone: "", email: "", observacao: "" });
+
+  // Pré-preenche a observação já salva no lead ao abrir o modal.
+  useEffect(() => {
+    if (target) setForm((f) => ({ ...f, observacao: target.observacao || "" }));
+  }, [target]);
 
   const createM = useMutation({
     mutationFn: async () => {
@@ -353,7 +402,7 @@ function BitrixModal({
             ? `Deal #${data.dealId} — atribuído a você`
             : `Deal #${data.dealId} — ⚠️ defina o responsável no Bitrix (seu e-mail não casou)`,
       });
-      setForm({ nome: "", telefone: "", email: "" });
+      setForm({ nome: "", telefone: "", email: "", observacao: "" });
       onCreated();
     },
     onError: (e: any) => toast({ title: "Erro ao criar no Bitrix", description: e.message, variant: "destructive" }),
@@ -384,6 +433,15 @@ function BitrixModal({
             <div>
               <label className="text-xs text-gray-600 dark:text-zinc-400">Email <span className="text-gray-400">(opcional)</span></label>
               <Input value={form.email} onChange={set("email")} placeholder="email@..." />
+            </div>
+            <div className="col-span-2">
+              <label className="text-xs text-gray-600 dark:text-zinc-400">Observação <span className="text-gray-400">(opcional · vai pros comentários do Bitrix)</span></label>
+              <Textarea
+                value={form.observacao}
+                onChange={(e) => setForm((f) => ({ ...f, observacao: e.target.value }))}
+                placeholder="Qualquer contexto do lead que valha registrar..."
+                className="min-h-[70px]"
+              />
             </div>
           </div>
         </div>

@@ -2396,6 +2396,7 @@ export async function initializeCrmInstagramTables(): Promise<void> {
         stage TEXT NOT NULL DEFAULT 'engajador',
         subcategory TEXT,
         qualification TEXT,
+        observacao TEXT,
         owner_user_id TEXT,
         locked_by TEXT,
         locked_at TIMESTAMP,
@@ -2449,6 +2450,7 @@ export async function initializeCrmInstagramTables(): Promise<void> {
     // destrutivo em execuções futuras.
     await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS display_name TEXT`);
     await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS qualification TEXT`);
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS observacao TEXT`);
     await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ALTER COLUMN ig_username DROP NOT NULL`);
     // 1) backfill do nome a partir do ig_username legado (só leads de DM ainda não migrados)
     await db.execute(sql`

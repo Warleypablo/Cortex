@@ -3283,6 +3283,8 @@ export const prospectingProfiles = cortexCoreSchema.table(
     // Tag de qualificação do SDR (ver shared/crmInstagramTags.ts).
     // colaborador/desqualificado removem do Pipeline (blocklist).
     qualification: text("qualification"),
+    // Observação livre do SDR; vai pro COMMENTS do Bitrix na criação do deal.
+    observacao: text("observacao"),
     ownerUserId: text("owner_user_id"),
     lockedBy: text("locked_by"),
     lockedAt: timestamp("locked_at"),

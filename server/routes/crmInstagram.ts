@@ -25,7 +25,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
 
       const result = await db.execute(sql`
         SELECT p.id, p.ig_username, p.display_name, p.ig_user_id, p.bio, p.followers_count,
-               p.profile_picture_url, p.last_media_permalink, p.stage, p.subcategory, p.qualification,
+               p.profile_picture_url, p.last_media_permalink, p.stage, p.subcategory, p.qualification, p.observacao,
                p.owner_user_id, p.locked_by, p.locked_at, p.bitrix_deal_id,
                p.ghl_contact_id, p.is_existing_contact, p.icp_tags,
                p.first_seen, p.last_interaction_at,
@@ -65,6 +65,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
           stage: r.stage,
           subcategory: r.subcategory,
           qualification: r.qualification,
+          observacao: r.observacao,
           ownerUserId: r.owner_user_id,
           ownerName: r.owner_name,
           lockedBy: r.locked_by,
@@ -186,6 +187,23 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
     }
   });
 
+  // ── Observação livre do SDR (persistente; vai pro Bitrix na criação) ──
+  app.post("/api/crm-instagram/profiles/:id/observacao", async (req, res) => {
+    try {
+      const id = parseInt(req.params.id, 10);
+      const raw = req.body?.observacao;
+      const observacao = typeof raw === "string" && raw.trim() ? raw.trim().slice(0, 2000) : null;
+      await db.execute(sql`
+        UPDATE cortex_core.prospecting_profiles
+        SET observacao = ${observacao}, updated_at = NOW()
+        WHERE id = ${id}
+      `);
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
   // ── Descartar (subcategoria não-oportunidade) ──
   app.post("/api/crm-instagram/profiles/:id/subcategory", async (req, res) => {
     try {
@@ -290,10 +308,10 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
     try {
       const user = req.user as any;
       const id = parseInt(req.params.id, 10);
-      const { nome, telefone, email } = req.body || {};
+      const { nome, telefone, email, observacao } = req.body || {};
 
       const profile = (await db.execute(sql`
-        SELECT id, ig_username, display_name, bio, last_media_permalink, bitrix_deal_id, stage
+        SELECT id, ig_username, display_name, bio, last_media_permalink, bitrix_deal_id, stage, observacao
         FROM cortex_core.prospecting_profiles WHERE id = ${id}
       `)).rows[0];
       if (!profile) return res.status(404).json({ message: "não encontrado" });
@@ -305,6 +323,11 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
       // Identidade: @handle real se houver (via comentário); senão o nome de exibição.
       const ident = profile.ig_username ? `@${profile.ig_username}` : (profile.display_name || "lead IG");
 
+      // Observação: usa a do modal se veio, senão a já salva no perfil.
+      const obs = (typeof observacao === "string" && observacao.trim())
+        ? observacao.trim().slice(0, 2000)
+        : (profile.observacao || null);
+
       const comments = [
         `Origem: Instagram (CRM Instagram / garimpo)`,
         ident,
@@ -312,6 +335,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         profile.bio ? `Bio: ${profile.bio}` : null,
         telefone ? `Telefone: ${telefone}` : null,
         email ? `Email: ${email}` : null,
+        obs ? `Observação do SDR: ${obs}` : null,
       ].filter(Boolean).join("\n");
 
       // Atribui Responsável + SDR ao próprio SDR logado (best-effort por e-mail).
@@ -329,7 +353,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
 
       await db.execute(sql`
         UPDATE cortex_core.prospecting_profiles
-        SET bitrix_deal_id = ${dealId}, stage = 'negocio', updated_at = NOW()
+        SET bitrix_deal_id = ${dealId}, stage = 'negocio', observacao = ${obs}, updated_at = NOW()
         WHERE id = ${id}
       `);
       await db.execute(sql`
