@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-09 | docs(utm): content slug puro (sem prefixo link-) + bio multi-link na Constituição v1.4
+
+**O que foi feito:**
+- Padronizado `utm_content` como **slug puro** do destino/oferta (`creators`, não `link-creators`). Prefixo `link-` descontinuado.
+- Documentado o caso de **bio com múltiplos links nativos** (até 5 no Instagram): todos usam `term=bio`, diferenciados por `content` (slug puro, sem data). `campaign` muda só quando o botão pertence a iniciativa específica.
+- Padronizado `content=site` para o site institucional na raiz.
+- Adicionada nota sobre WhatsApp: UTM em `wa.me`/`api.whatsapp.com` não é capturada; rastrear via página de redirect tracked (`/wpp`).
+- Constituição versionada para v1.4; exemplos do guia de links e da aba Guia do `/utm-builder` alinhados.
+
+**Por que:**
+- Surgiu na prática: bio do Instagram passou a permitir 5 links e o time não sabia como diferenciar cada botão no relatório (resposta: via `content`). Aproveitou-se pra eliminar a inconsistência do prefixo `link-`, que gerava linhas duplicadas no relatório quando misturado com slug puro.
+
+**Arquivos alterados:**
+- `docs/utm-constituicao.md` - nova regra de content slug puro (§4.2), seção de bio multi-link, nota WhatsApp, versão v1.4 + histórico.
+- `docs/utm-links-canais.md` - `link-turbo` → `turbo` em todos os canais, observação de bio multi-link, referência v1.4.
+- `client/src/pages/UtmBuilder.tsx` - exemplos da aba Guia alinhados ao slug puro (texto, sem mudança de lógica).
+
+**Impacto arquitetural:** Nenhum. Mudança de convenção/documentação; nenhuma alteração de schema, rota ou lógica de geração de UTM.
+
+---
+
 ## 2026-06-08 | feat(youtube): rotas admin de sync + status (destrava métricas)
 
 **O que foi feito:**
