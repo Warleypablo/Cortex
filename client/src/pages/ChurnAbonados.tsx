@@ -511,7 +511,7 @@ export default function ChurnAbonados() {
       <section>
         <SectionTitle>Por Motivo</SectionTitle>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card className="border-border/60">
+          <Card className={`border-border/60 ${submotivoData.length === 0 ? "lg:col-span-2" : ""}`}>
             <CardHeader className="pb-2 flex flex-row items-center justify-between">
               <CardTitle className="text-sm font-semibold">Distribuição por Motivo</CardTitle>
               <SegmentedToggle
