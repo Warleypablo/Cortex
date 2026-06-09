@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
+import { z } from "zod";
 import { parseAggRow, buildResponse } from "./capacityTimes.helpers";
 
 // Tabela de referência: nível do Gestor de Performance → metas
@@ -24,6 +25,18 @@ function normalizeSquad(squad: string | null): string {
   if (!squad) return "";
   return squad.replace(/^[^\p{L}]+/u, "").trim();
 }
+
+const capacityMetaSchema = z.object({
+  nome: z.string().trim().min(1, "nome é obrigatório"),
+  match_responsavel: z.string().trim().min(1, "match_responsavel é obrigatório"),
+  categoria: z.string().trim().min(1, "categoria é obrigatória"),
+  cap_recorrente: z.number().int().nonnegative().nullable(),
+  cap_mrr: z.number().nonnegative().nullable(),
+  cap_pontual: z.number().int().nonnegative().nullable(),
+  cap_contas: z.number().int().nonnegative().nullable(),
+  ordem: z.number().int().nonnegative().default(0),
+  ativo: z.boolean().default(true),
+});
 
 export function registerCapacityRoutes(app: Express, db: any) {
 
@@ -268,6 +281,31 @@ export function registerCapacityRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error fetching responsaveis:", error);
       res.status(500).json({ error: "Failed to fetch responsaveis" });
+    }
+  });
+
+  // POST /api/capacity-metas — cria operador
+  app.post("/api/capacity-metas", async (req, res) => {
+    const parsed = capacityMetaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "dados inválidos" });
+    }
+    const m = parsed.data;
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.capacity_metas
+          (nome, match_responsavel, categoria, cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem, ativo)
+        VALUES (${m.nome}, ${m.match_responsavel}, ${m.categoria}, ${m.cap_recorrente},
+                ${m.cap_mrr}, ${m.cap_pontual}, ${m.cap_contas}, ${m.ordem}, ${m.ativo})
+        RETURNING id
+      `);
+      res.status(201).json({ id: Number((result.rows[0] as any).id) });
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ error: "Operador já cadastrado nesse time" });
+      }
+      console.error("[api] Error creating capacity-meta:", error);
+      res.status(500).json({ error: "Failed to create capacity-meta" });
     }
   });
 
