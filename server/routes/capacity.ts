@@ -339,6 +339,19 @@ export function registerCapacityRoutes(app: Express, db: any) {
     }
   });
 
+  // DELETE /api/capacity-metas/:id — hard delete
+  app.delete("/api/capacity-metas/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+    try {
+      await db.execute(sql`DELETE FROM cortex_core.capacity_metas WHERE id = ${id}`);
+      res.status(204).end();
+    } catch (error) {
+      console.error("[api] Error deleting capacity-meta:", error);
+      res.status(500).json({ error: "Failed to delete capacity-meta" });
+    }
+  });
+
   // ── Endpoints legados (mantidos para compatibilidade) ──
 
   app.get("/api/capacity", async (req, res) => {

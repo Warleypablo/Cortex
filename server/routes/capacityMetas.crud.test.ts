@@ -133,3 +133,24 @@ describe("PUT /api/capacity-metas/:id", () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe("DELETE /api/capacity-metas/:id", () => {
+  it("remove e retorna 204", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    const res = await request(makeApp()).delete("/api/capacity-metas/7");
+    expect(res.status).toBe(204);
+    expect(mockExecute).toHaveBeenCalledTimes(1);
+  });
+
+  it("retorna 400 com id não numérico", async () => {
+    const res = await request(makeApp()).delete("/api/capacity-metas/abc");
+    expect(res.status).toBe(400);
+    expect(mockExecute).not.toHaveBeenCalled();
+  });
+
+  it("retorna 500 em erro de banco", async () => {
+    mockExecute.mockRejectedValueOnce(new Error("db down"));
+    const res = await request(makeApp()).delete("/api/capacity-metas/7");
+    expect(res.status).toBe(500);
+  });
+});
