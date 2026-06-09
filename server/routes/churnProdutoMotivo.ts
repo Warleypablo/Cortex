@@ -222,13 +222,27 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
             AND h.squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
           GROUP BY sd.mes, COALESCE(h.produto, 'Não Identificado')
         ),
+        mrr_lagged_raw AS (
+          SELECT
+            mes,
+            produto,
+            mrr_base,
+            LAG(mrr_base) OVER (PARTITION BY produto ORDER BY mes) AS mrr_base_lag
+          FROM mrr_por_produto
+        ),
         mrr_lagged AS (
           SELECT
             mes,
             produto,
             mrr_base,
-            LAG(mrr_base) OVER (PARTITION BY produto ORDER BY mes) AS mrr_base_anterior
-          FROM mrr_por_produto
+            -- Se o snapshot anterior capturou < 30% do base atual, é anomalia de dados
+            -- (ex: campo produto ausente naquele mês). Retorna NULL → COALESCE usa mrr_base atual.
+            CASE
+              WHEN mrr_base_lag IS NULL THEN NULL
+              WHEN mrr_base > 0 AND mrr_base_lag < mrr_base * 0.3 THEN NULL
+              ELSE mrr_base_lag
+            END AS mrr_base_anterior
+          FROM mrr_lagged_raw
         ),
         churn_por_produto AS (
           SELECT

@@ -215,9 +215,11 @@ export function ChurnEvolucaoMensal() {
     const temOutros = motivoTotais.size > TOP_N_PRODUTOS;
     const motivoTaxaKeys = temOutros ? [...topMotivos, "Outros"] : topMotivos;
 
-    // mrr_base por mês (igual para todos os motivos, pegar do primeiro motivo do mês)
-    const baseByMes = new Map<string, number>();
-    rows.forEach(r => { if (!baseByMes.has(r.mes)) baseByMes.set(r.mes, Number(r.mrr_base)); });
+    // total mrr_churn por mês (denominador: % de incidência dentro do total de churns)
+    const churnTotalByMes = new Map<string, number>();
+    rows.forEach(r => {
+      churnTotalByMes.set(r.mes, (churnTotalByMes.get(r.mes) || 0) + Number(r.mrr_churn));
+    });
 
     // mrr_churn por mês×motivo
     const mrrByMesMotivo = new Map<string, Map<string, number>>();
@@ -230,16 +232,16 @@ export function ChurnEvolucaoMensal() {
     const mesesOrdenados = Array.from(mrrByMesMotivo.keys()).sort();
     const motivoTaxaChartData = mesesOrdenados.map(mes => {
       const mm = mrrByMesMotivo.get(mes)!;
-      const base = baseByMes.get(mes) || 0;
+      const totalChurn = churnTotalByMes.get(mes) || 0;
       const entry: Record<string, string | number> = { mes, mesLabel: formatMes(mes + "-01") };
       topMotivos.forEach(m => {
         const mrr = mm.get(m) || 0;
-        entry[m] = base > 0 ? Math.round(mrr / base * 10000) / 100 : 0;
+        entry[m] = totalChurn > 0 ? Math.round(mrr / totalChurn * 10000) / 100 : 0;
       });
       if (temOutros) {
         let outrosMrr = 0;
         mm.forEach((v, m) => { if (!topMotivos.includes(m)) outrosMrr += v; });
-        entry["Outros"] = base > 0 ? Math.round(outrosMrr / base * 10000) / 100 : 0;
+        entry["Outros"] = totalChurn > 0 ? Math.round(outrosMrr / totalChurn * 10000) / 100 : 0;
       }
       return entry;
     });
