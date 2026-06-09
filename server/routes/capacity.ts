@@ -309,6 +309,36 @@ export function registerCapacityRoutes(app: Express, db: any) {
     }
   });
 
+  // PUT /api/capacity-metas/:id — atualiza operador
+  app.put("/api/capacity-metas/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+    const parsed = capacityMetaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "dados inválidos" });
+    }
+    const m = parsed.data;
+    try {
+      const result = await db.execute(sql`
+        UPDATE cortex_core.capacity_metas SET
+          nome = ${m.nome}, match_responsavel = ${m.match_responsavel}, categoria = ${m.categoria},
+          cap_recorrente = ${m.cap_recorrente}, cap_mrr = ${m.cap_mrr},
+          cap_pontual = ${m.cap_pontual}, cap_contas = ${m.cap_contas},
+          ordem = ${m.ordem}, ativo = ${m.ativo}, atualizado_em = NOW()
+        WHERE id = ${id}
+        RETURNING id
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "operador não encontrado" });
+      res.json({ id });
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ error: "Operador já cadastrado nesse time" });
+      }
+      console.error("[api] Error updating capacity-meta:", error);
+      res.status(500).json({ error: "Failed to update capacity-meta" });
+    }
+  });
+
   // ── Endpoints legados (mantidos para compatibilidade) ──
 
   app.get("/api/capacity", async (req, res) => {

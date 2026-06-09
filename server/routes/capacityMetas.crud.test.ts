@@ -108,3 +108,28 @@ describe("POST /api/capacity-metas", () => {
     expect(res.status).toBe(409);
   });
 });
+
+describe("PUT /api/capacity-metas/:id", () => {
+  it("atualiza e retorna o id", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ id: 7 }] });
+    const res = await request(makeApp()).put("/api/capacity-metas/7").send(validBody);
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual({ id: 7 });
+  });
+
+  it("retorna 404 quando id não existe", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [] });
+    const res = await request(makeApp()).put("/api/capacity-metas/999").send(validBody);
+    expect(res.status).toBe(404);
+  });
+
+  it("retorna 400 com body inválido", async () => {
+    const res = await request(makeApp()).put("/api/capacity-metas/7").send({ ...validBody, nome: "" });
+    expect(res.status).toBe(400);
+  });
+
+  it("retorna 400 com id não numérico", async () => {
+    const res = await request(makeApp()).put("/api/capacity-metas/abc").send(validBody);
+    expect(res.status).toBe(400);
+  });
+});
