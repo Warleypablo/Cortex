@@ -507,6 +507,7 @@ export default function ChurnDetalhamento() {
   const [expandedOpTheme, setExpandedOpTheme] = useState<string | null>(null);
   const [expandedCxTheme, setExpandedCxTheme] = useState<string | null>(null);
   const [abonadoOverrides, setAbonadoOverrides] = useState<Record<string, boolean>>({});
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const queryClient = useQueryClient();
 
   const abonarMutation = useMutation({
@@ -521,6 +522,7 @@ export default function ChurnDetalhamento() {
     },
     onMutate: ({ taskId, abonar }) => {
       setAbonadoOverrides(prev => ({ ...prev, [taskId]: abonar }));
+      setPendingIds(prev => new Set(prev).add(taskId));
     },
     onError: (_err, { taskId }) => {
       setAbonadoOverrides(prev => {
@@ -528,9 +530,11 @@ export default function ChurnDetalhamento() {
         delete next[taskId];
         return next;
       });
+      setPendingIds(prev => { const s = new Set(prev); s.delete(taskId); return s; });
       toast.error("Erro ao atualizar abono");
     },
-    onSuccess: () => {
+    onSuccess: (_data, { taskId }) => {
+      setPendingIds(prev => { const s = new Set(prev); s.delete(taskId); return s; });
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/churn-detalhamento"] });
     },
   });
@@ -4395,6 +4399,7 @@ export default function ChurnDetalhamento() {
                     {filteredContratos.slice(0, 100).map((contrato, index) => {
                       const isExpanded = expandedRow === `${contrato.id}-${index}`;
                       const hasDetails = contrato.mensagem_cliente || contrato.contexto_operacao || contrato.contexto_cx;
+                      const isAbonado = abonadoOverrides[contrato.id] ?? contrato.is_abonado ?? false;
                       return (
                         <React.Fragment key={`${contrato.id}-${index}`}>
                           <TableRow
@@ -4411,7 +4416,7 @@ export default function ChurnDetalhamento() {
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-medium text-sm">{contrato.cliente_nome || "-"}</span>
-                                  {contrato.is_abonado && (
+                                  {isAbonado && (
                                     <Badge variant="outline" className="text-[9px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
                                       Abonado
                                     </Badge>
@@ -4424,10 +4429,10 @@ export default function ChurnDetalhamento() {
                             </TableCell>
                             <TableCell>
                               <Badge
-                                variant={contrato.is_abonado ? 'secondary' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'secondary' : 'destructive'}
-                                className={contrato.is_abonado ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : 'text-[10px]'}
+                                variant={isAbonado ? 'secondary' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'secondary' : 'destructive'}
+                                className={isAbonado ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : 'text-[10px]'}
                               >
-                                {contrato.is_abonado ? 'Abonado' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'Em Cancel.' : 'Churn'}
+                                {isAbonado ? 'Abonado' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'Em Cancel.' : 'Churn'}
                               </Badge>
                               {contrato.status_cancelamento && (
                                 <div className="text-[10px] text-muted-foreground mt-0.5">{contrato.status_cancelamento}</div>
@@ -4469,11 +4474,11 @@ export default function ChurnDetalhamento() {
                             </TableCell>
                             <TableCell className="text-center" onClick={e => e.stopPropagation()}>
                               <Switch
-                                checked={abonadoOverrides[contrato.id] ?? contrato.is_abonado ?? false}
+                                checked={isAbonado}
                                 onCheckedChange={checked =>
                                   abonarMutation.mutate({ taskId: contrato.id, abonar: checked })
                                 }
-                                disabled={abonarMutation.isPending}
+                                disabled={pendingIds.has(contrato.id)}
                                 className="data-[state=checked]:bg-amber-500"
                               />
                             </TableCell>
