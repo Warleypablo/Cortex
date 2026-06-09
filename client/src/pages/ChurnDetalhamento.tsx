@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -504,6 +506,34 @@ export default function ChurnDetalhamento() {
   const [selectedThemeKeyword, setSelectedThemeKeyword] = useState<string | null>(null);
   const [expandedOpTheme, setExpandedOpTheme] = useState<string | null>(null);
   const [expandedCxTheme, setExpandedCxTheme] = useState<string | null>(null);
+  const [abonadoOverrides, setAbonadoOverrides] = useState<Record<string, boolean>>({});
+  const queryClient = useQueryClient();
+
+  const abonarMutation = useMutation({
+    mutationFn: async ({ taskId, abonar }: { taskId: string; abonar: boolean }) => {
+      const res = await fetch(`/api/churn/abonar/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ abonar }),
+      });
+      if (!res.ok) throw new Error("Falha ao atualizar");
+      return res.json();
+    },
+    onMutate: ({ taskId, abonar }) => {
+      setAbonadoOverrides(prev => ({ ...prev, [taskId]: abonar }));
+    },
+    onError: (_err, { taskId }) => {
+      setAbonadoOverrides(prev => {
+        const next = { ...prev };
+        delete next[taskId];
+        return next;
+      });
+      toast.error("Erro ao atualizar abono");
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/churn-detalhamento"] });
+    },
+  });
 
   // Buscar série de churn do ano para calcular excesso acumulado de meses anteriores
   const currentMonthKey = dataInicio ? format(parseISO(dataInicio), "yyyy-MM") : "";
@@ -4358,6 +4388,7 @@ export default function ChurnDetalhamento() {
                           <SortIcon column="lifetime_meses" />
                         </div>
                       </TableHead>
+                      <TableHead className="text-center w-[80px]">Abonar</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -4436,10 +4467,20 @@ export default function ChurnDetalhamento() {
                                 {contrato.lifetime_meses.toFixed(1)}m
                               </Badge>
                             </TableCell>
+                            <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                              <Switch
+                                checked={abonadoOverrides[contrato.id] ?? contrato.is_abonado ?? false}
+                                onCheckedChange={checked =>
+                                  abonarMutation.mutate({ taskId: contrato.id, abonar: checked })
+                                }
+                                disabled={abonarMutation.isPending}
+                                className="data-[state=checked]:bg-amber-500"
+                              />
+                            </TableCell>
                           </TableRow>
                           {isExpanded && hasDetails && (
                             <TableRow key={`${contrato.id}-${index}-details`} className="bg-muted/10 hover:bg-muted/10">
-                              <TableCell colSpan={11} className="p-0">
+                              <TableCell colSpan={12} className="p-0">
                                 <div className="px-6 py-4 space-y-3 border-l-4 border-primary/30">
                                   {/* Churn DNA Tags */}
                                   {getChurnDNATags(contrato).length > 0 && (
