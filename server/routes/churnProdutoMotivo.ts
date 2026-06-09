@@ -496,20 +496,21 @@ export function registerChurnProdutoMotivoRoutes(app: Express, db: any) {
         // Query 4 — lista de contratos
         db.execute(sql`
           SELECT
-            COALESCE(nome, 'Sem nome') AS nome,
-            COALESCE(squad, 'Não Informado') AS squad,
-            COALESCE(responsavel_geral, 'Não Informado') AS operador,
-            valor_r,
-            COALESCE(motivo_cancelamento, 'Não Informado') AS motivo
-          FROM cortex_core.vw_cup_churn_ajustado
-          WHERE valor_r > 0
-            AND data_solicitacao_encerramento IS NOT NULL
-            AND DATE_TRUNC('month', data_solicitacao_encerramento)::date = ${mesDate}::date
-            AND COALESCE(abonar_churn, '') != 'Sim'
-            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
-            AND squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
-            AND COALESCE(produto, 'Não Identificado') = ${produto}
-          ORDER BY valor_r DESC
+            COALESCE(cl.nome, c.nome, 'Sem nome') AS nome,
+            COALESCE(c.squad, 'Não Informado') AS squad,
+            COALESCE(c.responsavel_geral, 'Não Informado') AS operador,
+            c.valor_r,
+            COALESCE(c.motivo_cancelamento, 'Não Informado') AS motivo
+          FROM cortex_core.vw_cup_churn_ajustado c
+          LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
+          WHERE c.valor_r > 0
+            AND c.data_solicitacao_encerramento IS NOT NULL
+            AND DATE_TRUNC('month', c.data_solicitacao_encerramento)::date = ${mesDate}::date
+            AND COALESCE(c.abonar_churn, '') != 'Sim'
+            AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
+            AND c.squad NOT IN (${SQUADS_EXCLUIDOS[0]},${SQUADS_EXCLUIDOS[1]},${SQUADS_EXCLUIDOS[2]},${SQUADS_EXCLUIDOS[3]},${SQUADS_EXCLUIDOS[4]},${SQUADS_EXCLUIDOS[5]},${SQUADS_EXCLUIDOS[6]},${SQUADS_EXCLUIDOS[7]})
+            AND COALESCE(c.produto, 'Não Identificado') = ${produto}
+          ORDER BY c.valor_r DESC
           LIMIT 200
         `),
       ]);
