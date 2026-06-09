@@ -10,8 +10,14 @@ import {
 } from "@/components/ui/select";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatCurrencyNoDecimals } from "@/lib/utils";
 import { TrendingDown, DollarSign, Users, Calendar, Shield } from "lucide-react";
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
 import {
   ResponsiveContainer,
   BarChart,
@@ -90,6 +96,11 @@ export default function ChurnAbonados() {
   const [filterSquad, setFilterSquad] = useState<string>("todos");
   const [motivoToggle, setMotivoToggle] = useState<"mrr" | "volume">("mrr");
   const [temporalToggle, setTemporalToggle] = useState<"mrr" | "volume">("mrr");
+  const [selectedFilter, setSelectedFilter] = useState<{
+    type: "motivo" | "squad" | "responsavel" | "mes";
+    value: string;
+    mesKey?: string;
+  } | null>(null);
 
   const refDate = useMemo(() => {
     const [year, month] = anoMes.split("-").map(Number);
@@ -211,6 +222,24 @@ export default function ChurnAbonados() {
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
   }, [abonadosMes]);
+
+  const drillContracts = useMemo(() => {
+    if (!selectedFilter) return [];
+    const { type, value, mesKey } = selectedFilter;
+    if (type === "mes") {
+      return abonados12m.filter(
+        (c) =>
+          (filterSquad === "todos" || c.squad === filterSquad) &&
+          (c.data_encerramento?.substring(0, 7) === mesKey)
+      );
+    }
+    return abonadosMes.filter((c) => {
+      if (type === "motivo") return (c.motivo_cancelamento || "Não especificado") === value;
+      if (type === "squad") return (c.squad || "Sem Squad") === value;
+      if (type === "responsavel") return (c.responsavel || "Não especificado") === value;
+      return false;
+    });
+  }, [selectedFilter, abonadosMes, abonados12m, filterSquad]);
 
   const temporalData = useMemo(() => {
     const months: Record<
@@ -444,7 +473,16 @@ export default function ChurnAbonados() {
             <CardContent>
               {motivoData.length === 0 ? <EmptyState /> : (
                 <ResponsiveContainer width="100%" height={Math.max(motivoData.length * 52 + 20, 100)}>
-                  <BarChart data={motivoData} layout="vertical" margin={{ left: 8, right: 32, top: 4, bottom: 4 }}>
+                  <BarChart
+                    data={motivoData}
+                    layout="vertical"
+                    margin={{ left: 8, right: 32, top: 4, bottom: 4 }}
+                    style={{ cursor: "pointer" }}
+                    onClick={(d) => {
+                      const v = d?.activePayload?.[0]?.payload?.motivo;
+                      if (v) setSelectedFilter({ type: "motivo", value: v });
+                    }}
+                  >
                     <XAxis type="number" hide />
                     <YAxis type="category" dataKey="motivo" width={170} tick={{ fontSize: 12 }} />
                     <Tooltip
@@ -499,7 +537,15 @@ export default function ChurnAbonados() {
             <CardContent>
               {squadData.length === 0 ? <EmptyState /> : (
                 <ResponsiveContainer width="100%" height={240}>
-                  <BarChart data={squadData} margin={{ top: 8, right: 24, bottom: 48, left: 8 }}>
+                  <BarChart
+                    data={squadData}
+                    margin={{ top: 8, right: 24, bottom: 48, left: 8 }}
+                    style={{ cursor: "pointer" }}
+                    onClick={(d) => {
+                      const v = d?.activePayload?.[0]?.payload?.squad;
+                      if (v) setSelectedFilter({ type: "squad", value: v });
+                    }}
+                  >
                     <XAxis dataKey="squad" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
                     <YAxis hide />
                     <Tooltip
@@ -520,7 +566,16 @@ export default function ChurnAbonados() {
             <CardContent>
               {responsavelData.length === 0 ? <EmptyState /> : (
                 <ResponsiveContainer width="100%" height={Math.max(responsavelData.length * 44 + 20, 80)}>
-                  <BarChart data={responsavelData} layout="vertical" margin={{ left: 8, right: 32, top: 4, bottom: 4 }}>
+                  <BarChart
+                    data={responsavelData}
+                    layout="vertical"
+                    margin={{ left: 8, right: 32, top: 4, bottom: 4 }}
+                    style={{ cursor: "pointer" }}
+                    onClick={(d) => {
+                      const v = d?.activePayload?.[0]?.payload?.responsavel;
+                      if (v) setSelectedFilter({ type: "responsavel", value: v });
+                    }}
+                  >
                     <XAxis type="number" hide />
                     <YAxis type="category" dataKey="responsavel" width={150} tick={{ fontSize: 11 }} />
                     <Tooltip
@@ -563,7 +618,15 @@ export default function ChurnAbonados() {
               </div>
             </div>
             <ResponsiveContainer width="100%" height={260}>
-              <AreaChart data={temporalData} margin={{ top: 8, right: 24, bottom: 8, left: 8 }}>
+              <AreaChart
+                data={temporalData}
+                margin={{ top: 8, right: 24, bottom: 8, left: 8 }}
+                style={{ cursor: "pointer" }}
+                onClick={(d) => {
+                  const p = d?.activePayload?.[0]?.payload;
+                  if (p?.mes) setSelectedFilter({ type: "mes", value: p.mes, mesKey: p.sortKey });
+                }}
+              >
                 <defs>
                   <linearGradient id="gradManual" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
@@ -603,6 +666,68 @@ export default function ChurnAbonados() {
           </CardContent>
         </Card>
       </section>
+
+      {/* Drill-down side panel */}
+      <Sheet open={!!selectedFilter} onOpenChange={(open) => { if (!open) setSelectedFilter(null); }}>
+        <SheetContent side="right" className="w-[480px] sm:w-[540px] overflow-y-auto">
+          <SheetHeader className="mb-4">
+            <SheetTitle className="flex items-center gap-2 text-base">
+              <Shield className="h-4 w-4 text-amber-500" />
+              {selectedFilter?.type === "motivo" && `Motivo: ${selectedFilter.value}`}
+              {selectedFilter?.type === "squad" && `Squad: ${selectedFilter.value}`}
+              {selectedFilter?.type === "responsavel" && `Responsável: ${selectedFilter.value}`}
+              {selectedFilter?.type === "mes" && `Mês: ${selectedFilter.value}`}
+            </SheetTitle>
+            <p className="text-xs text-muted-foreground">
+              {drillContracts.length} contrato{drillContracts.length !== 1 ? "s" : ""} abonado{drillContracts.length !== 1 ? "s" : ""}
+              {" · "}MRR total: {formatCurrencyNoDecimals(drillContracts.reduce((s, c) => s + (c.valorr ?? 0), 0))}
+            </p>
+          </SheetHeader>
+
+          <div className="space-y-2">
+            {drillContracts.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-8">Nenhum contrato encontrado</p>
+            ) : (
+              drillContracts.map((c) => (
+                <div
+                  key={c.id}
+                  className="rounded-lg border border-border/60 bg-muted/30 p-3 space-y-1.5"
+                >
+                  <div className="flex items-start justify-between gap-2">
+                    <span className="text-sm font-medium leading-tight">{c.cliente_nome}</span>
+                    <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                      {formatCurrencyNoDecimals(c.valorr ?? 0)}
+                    </span>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {c.produto && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300">
+                        {c.produto}
+                      </span>
+                    )}
+                    {c.squad && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                        {c.squad}
+                      </span>
+                    )}
+                    {c.responsavel && (
+                      <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300">
+                        {c.responsavel}
+                      </span>
+                    )}
+                  </div>
+                  <div className="flex items-center justify-between text-[11px] text-muted-foreground">
+                    <span>{c.motivo_cancelamento ?? "Motivo não informado"}</span>
+                    {c.data_encerramento && (
+                      <span>{new Date(c.data_encerramento).toLocaleDateString("pt-BR")}</span>
+                    )}
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   );
 }
