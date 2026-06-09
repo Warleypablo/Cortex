@@ -20,11 +20,10 @@ export const CAPACITY_METAS_SEED: CapacityMetaSeed[] = [
   { nome: "Karla",         match_responsavel: "Karla Pin",          categoria: "Pulse", cap_recorrente: 14, cap_mrr: 30000, cap_pontual: 0,  cap_contas: null, ordem: 3 },
   { nome: "Iasmim",        match_responsavel: "Iasmim Torres",      categoria: "Pulse", cap_recorrente: 15, cap_mrr: 45000, cap_pontual: 0,  cap_contas: null, ordem: 4 },
   { nome: "Victor",        match_responsavel: "Victor Klein",       categoria: "Pulse", cap_recorrente: 12, cap_mrr: 45000, cap_pontual: 10, cap_contas: null, ordem: 5 },
-
-  // ── Squad Aura (operacional) ──
-  { nome: "Mariana Dalto", match_responsavel: "Mariana Dalto",      categoria: "Aura", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 6 },
-  { nome: "Lara Grobério", match_responsavel: "Lara Grobério",      categoria: "Aura", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 7 },
-  { nome: "Julia Manhães", match_responsavel: "Julia Manhães",      categoria: "Aura", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 8 },
+  // Aura foi descontinuada (2026-06-09) — colaboradores migrados para Pulse
+  { nome: "Mariana Dalto", match_responsavel: "Mariana Dalto",      categoria: "Pulse", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 6 },
+  { nome: "Lara Grobério", match_responsavel: "Lara Grobério",      categoria: "Pulse", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 7 },
+  { nome: "Julia Manhães", match_responsavel: "Julia Manhães",      categoria: "Pulse", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 8 },
 
   // ── Squad Olimpo (operacional) ──
   { nome: "Debora",        match_responsavel: "Debora Mund",        categoria: "Olimpo", cap_recorrente: 25, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 9 },
