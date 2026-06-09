@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-09 | feat(churn-abonados): redesign visual — paleta azul, visão 12m, cores por squad
+
+**O que foi feito:**
+- Substitui o tema âmbar/amarelo monocromático pela identidade azul do app (header e KPIs neutros, azul primário só como acento)
+- Visão de 12 meses vira o padrão; o mês passa a ser drill opcional, com banner de fallback quando o mês selecionado não tem abonados — elimina os cards vazios ao abrir
+- Gráfico por squad colorido via `getSquadColor`, normalizando o prefixo de emoji vindo do ClickUp (`🪖 Selva` → `Selva`); adiciona `Aura` e `Olimpo` ao mapa central de cores
+- Distinção manual×automático no gráfico temporal passa de âmbar/laranja (quase iguais) para azul/roxo, com cores fixas que funcionam em dark e light
+- Empty states compactos e `isAnimationActive={false}` nos gráficos
+
+**Por que:**
+- A tela destoava do resto do app ("amarelo aleatório") e abria praticamente vazia no mês corrente sem abonados ("buracos vazios")
+
+**Arquivos alterados:**
+- `client/src/pages/ChurnAbonados.tsx` - recolorido para a paleta do app, visão 12m como padrão + banner de mês vazio, cores por squad, distinção manual/automático, empty states compactos
+- `client/src/lib/squadColors.ts` - adiciona cores canônicas para os squads `Aura` (teal) e `Olimpo` (laranja)
+
+**Impacto arquitetural:** Nenhum — apenas camada de apresentação; lógica de dados e endpoint inalterados. A adição de 2 squads ao mapa de cores beneficia todas as telas que usam `getSquadColor`.
+
+---
+
 ## 2026-06-08 | chore(criativos): pausa o agente de IA (Analisar com IA / Propostas)
 
 **O que foi feito:**
