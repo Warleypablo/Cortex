@@ -1,0 +1,46 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+import express from "express";
+import request from "supertest";
+
+const mockExecute = vi.fn();
+vi.mock("../db", () => ({ db: { execute: mockExecute } }));
+
+import { registerCapacityRoutes } from "./capacity";
+
+function makeApp() {
+  const app = express();
+  app.use(express.json());
+  app.use((req, _res, next) => { (req as any).user = { email: "t@t.com" }; next(); });
+  registerCapacityRoutes(app, { execute: mockExecute } as any);
+  return app;
+}
+
+beforeEach(() => vi.clearAllMocks());
+
+describe("GET /api/capacity-metas", () => {
+  it("lista todas as metas, inclusive inativas, com tipos normalizados", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [
+        { id: 1, nome: "Brenda", match_responsavel: "Brenda Federici", categoria: "Pulse",
+          cap_recorrente: 15, cap_mrr: "45000", cap_pontual: 0, cap_contas: null, ordem: 1, ativo: true },
+        { id: 2, nome: "Old", match_responsavel: "Old Person", categoria: "Pulse",
+          cap_recorrente: null, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 99, ativo: false },
+      ],
+    });
+    const res = await request(makeApp()).get("/api/capacity-metas");
+    expect(res.status).toBe(200);
+    expect(res.body).toHaveLength(2);
+    expect(res.body[0]).toEqual({
+      id: 1, nome: "Brenda", match_responsavel: "Brenda Federici", categoria: "Pulse",
+      cap_recorrente: 15, cap_mrr: 45000, cap_pontual: 0, cap_contas: null, ordem: 1, ativo: true,
+    });
+    expect(res.body[1].ativo).toBe(false);
+    expect(res.body[1].cap_mrr).toBeNull();
+  });
+
+  it("retorna 500 em erro de banco", async () => {
+    mockExecute.mockRejectedValueOnce(new Error("db down"));
+    const res = await request(makeApp()).get("/api/capacity-metas");
+    expect(res.status).toBe(500);
+  });
+});
