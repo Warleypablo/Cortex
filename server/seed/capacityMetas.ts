@@ -57,15 +57,15 @@ export const CAPACITY_METAS_SEED: CapacityMetaSeed[] = [
 
 export async function seedCapacityMetas(): Promise<void> {
   try {
-    // Remove stale rows whose (nome, categoria) exists in seed but with a different
-    // match_responsavel — happens when match_responsavel is renamed between deploys.
-    for (const m of CAPACITY_METAS_SEED) {
-      await db.execute(sql`
-        DELETE FROM cortex_core.capacity_metas
-        WHERE nome = ${m.nome}
-          AND categoria = ${m.categoria}
-          AND match_responsavel <> ${m.match_responsavel}
-      `);
+    // Bootstrap idempotente: a edição manual via UI é a fonte de verdade.
+    // O seed só popula a tabela na primeira vez (quando está vazia).
+    const { rows } = await db.execute(
+      sql`SELECT COUNT(*)::int AS n FROM cortex_core.capacity_metas`
+    );
+    const n = Number((rows[0] as any)?.n ?? 0);
+    if (n > 0) {
+      console.log(`[database] capacity_metas já populada (${n} linhas) — bootstrap pulado`);
+      return;
     }
 
     for (const m of CAPACITY_METAS_SEED) {
@@ -74,26 +74,10 @@ export async function seedCapacityMetas(): Promise<void> {
           (nome, match_responsavel, categoria, cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem)
         VALUES (${m.nome}, ${m.match_responsavel}, ${m.categoria}, ${m.cap_recorrente},
                 ${m.cap_mrr}, ${m.cap_pontual}, ${m.cap_contas}, ${m.ordem})
-        ON CONFLICT (match_responsavel, categoria) DO UPDATE SET
-          nome = EXCLUDED.nome,
-          cap_recorrente = EXCLUDED.cap_recorrente,
-          cap_mrr = EXCLUDED.cap_mrr,
-          cap_pontual = EXCLUDED.cap_pontual,
-          cap_contas = EXCLUDED.cap_contas,
-          ordem = EXCLUDED.ordem,
-          atualizado_em = NOW()
       `);
     }
 
-    // Remove metas que não estão mais no seed (ex.: match_responsavel renomeado).
-    // CAPACITY_METAS_SEED é a fonte autoritativa — não há edição manual de metas.
-    const pares = CAPACITY_METAS_SEED.map((m) => sql`(${m.match_responsavel}, ${m.categoria})`);
-    await db.execute(sql`
-      DELETE FROM cortex_core.capacity_metas
-      WHERE (match_responsavel, categoria) NOT IN (${sql.join(pares, sql`, `)})
-    `);
-
-    console.log(`[database] capacity_metas seeded (${CAPACITY_METAS_SEED.length} rows)`);
+    console.log(`[database] capacity_metas bootstrap (${CAPACITY_METAS_SEED.length} linhas)`);
   } catch (error) {
     console.error('[database] Error seeding capacity_metas:', error);
   }
