@@ -8,6 +8,7 @@
 - Gráfico por squad colorido via `getSquadColor`, normalizando o prefixo de emoji vindo do ClickUp (`🪖 Selva` → `Selva`); adiciona `Aura` e `Olimpo` ao mapa central de cores
 - Distinção manual×automático no gráfico temporal passa de âmbar/laranja (quase iguais) para azul/roxo, com cores fixas que funcionam em dark e light
 - Empty states compactos e `isAnimationActive={false}` nos gráficos
+- Card "Distribuição por Motivo" ocupa a largura total quando não há submotivos, eliminando a coluna vazia ao lado
 
 **Por que:**
 - A tela destoava do resto do app ("amarelo aleatório") e abria praticamente vazia no mês corrente sem abonados ("buracos vazios")
