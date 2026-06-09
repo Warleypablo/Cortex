@@ -245,6 +245,32 @@ export function registerCapacityRoutes(app: Express, db: any) {
     }
   });
 
+  // GET /api/capacity-metas/responsaveis — responsáveis reais de cup_contratos (dropdown + prévia)
+  app.get("/api/capacity-metas/responsaveis", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT TRIM(r.parte) AS responsavel,
+               COUNT(DISTINCT c.id_subtask) AS contratos,
+               COALESCE(SUM(c.valorr), 0)   AS mrr
+        FROM "Clickup".cup_contratos c
+        CROSS JOIN LATERAL regexp_split_to_table(c.responsavel, ';') AS r(parte)
+        WHERE c.status IN ('ativo','onboarding','em cancelamento')
+          AND c.responsavel IS NOT NULL AND c.responsavel <> ''
+          AND TRIM(r.parte) <> ''
+        GROUP BY TRIM(r.parte)
+        ORDER BY mrr DESC
+      `);
+      res.json(result.rows.map((r: any) => ({
+        responsavel: String(r.responsavel),
+        contratos: Number(r.contratos),
+        mrr: Number(r.mrr),
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching responsaveis:", error);
+      res.status(500).json({ error: "Failed to fetch responsaveis" });
+    }
+  });
+
   // ── Endpoints legados (mantidos para compatibilidade) ──
 
   app.get("/api/capacity", async (req, res) => {

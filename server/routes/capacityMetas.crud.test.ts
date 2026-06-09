@@ -44,3 +44,26 @@ describe("GET /api/capacity-metas", () => {
     expect(res.status).toBe(500);
   });
 });
+
+describe("GET /api/capacity-metas/responsaveis", () => {
+  it("lista responsáveis reais com contratos e mrr normalizados", async () => {
+    mockExecute.mockResolvedValueOnce({
+      rows: [
+        { responsavel: "Brenda Federici", contratos: 8, mrr: "30238" },
+        { responsavel: "Karla Pin", contratos: "5", mrr: "12000.5" },
+      ],
+    });
+    const res = await request(makeApp()).get("/api/capacity-metas/responsaveis");
+    expect(res.status).toBe(200);
+    expect(res.body).toEqual([
+      { responsavel: "Brenda Federici", contratos: 8, mrr: 30238 },
+      { responsavel: "Karla Pin", contratos: 5, mrr: 12000.5 },
+    ]);
+  });
+
+  it("retorna 500 em erro de banco", async () => {
+    mockExecute.mockRejectedValueOnce(new Error("db down"));
+    const res = await request(makeApp()).get("/api/capacity-metas/responsaveis");
+    expect(res.status).toBe(500);
+  });
+});
