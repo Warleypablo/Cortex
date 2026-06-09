@@ -2,6 +2,7 @@
 // dashboards (TV Leaderboard, etc.) reuse the same mapping.
 
 export const SQUAD_COLORS: Record<string, string> = {
+  "Aura": "#14b8a6",
   "Aurea": "#fbbf24",
   "Aurea (OFF)": "#fcd34d",
   "Black": "#475569",
@@ -12,6 +13,7 @@ export const SQUAD_COLORS: Record<string, string> = {
   "Hunters": "#a855f7",
   "Hunters (OFF)": "#c084fc",
   "Makers": "#06b6d4",
+  "Olimpo": "#f97316",
   "Pulse": "#ec4899",
   "Selva": "#22c55e",
   "Solar+ (OFF)": "#facc15",
