@@ -8,7 +8,7 @@
  *  GET /api/oauth/youtube/callback
  *      → recebe o code, troca por refresh_token + access_token, descobre
  *        quais canais aquela conta gerencia e salva tudo encriptado em
- *        cortex_core.youtube_credentials e cortex_core.youtube_channels.
+ *        youtube.credentials e youtube.channels.
  *
  *  GET /api/oauth/youtube/status
  *      → lista canais autorizados e estado das credenciais.
@@ -30,10 +30,13 @@ const YT_SCOPES = [
 ];
 
 function getOauthClient(req: Request) {
-  const clientId = process.env.GOOGLE_ADS_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_ADS_CLIENT_SECRET;
+  // OAuth client web "Data Central" (GOOGLE_CLIENT_ID/SECRET) — tem a redirect URI
+  // do YouTube cadastrada. NÃO usar o GOOGLE_ADS_CLIENT_ID (client de Ads, server-to-
+  // server, em outro projeto e sem essa redirect → redirect_uri_mismatch).
+  const clientId = process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_ADS_CLIENT_ID/SECRET não configurados (reaproveitados pelo YouTube)');
+    throw new Error('GOOGLE_CLIENT_ID/SECRET não configurados (Data Central, web client do YouTube)');
   }
   const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol;
   const host = req.get('host');
@@ -48,9 +51,11 @@ export function registerYoutubeOAuthRoutes(app: Express, db: any) {
       const oauth2 = getOauthClient(req);
       const url = oauth2.generateAuthUrl({
         access_type: 'offline',
+        // prompt=consent + SEM include_granted_scopes: consentimento limpo só de YouTube.
+        // include_granted_scopes mesclava escopos antigos (ex: Google Ads) e suprimia o
+        // seletor de canal de Brand Account — por isso só vinha o canal pessoal.
         prompt: 'consent',
         scope: YT_SCOPES,
-        include_granted_scopes: true,
       });
       res.redirect(url);
     } catch (e: any) {
@@ -84,7 +89,7 @@ export function registerYoutubeOAuthRoutes(app: Express, db: any) {
       const refreshTokenEnc = encryptToken(tokens.refresh_token);
 
       const credRes = await db.execute(sql`
-        INSERT INTO cortex_core.youtube_credentials
+        INSERT INTO youtube.credentials
           (google_user_id, google_email, refresh_token_enc, scopes, authorized_at, last_used_at, active)
         VALUES (${googleUserId}, ${googleEmail}, ${refreshTokenEnc}, ${YT_SCOPES.join(' ')}, NOW(), NOW(), TRUE)
         ON CONFLICT (google_user_id) DO UPDATE
@@ -111,7 +116,7 @@ export function registerYoutubeOAuthRoutes(app: Express, db: any) {
         const snippet = ch.snippet || {};
         const stats = ch.statistics || {};
         await db.execute(sql`
-          INSERT INTO cortex_core.youtube_channels (
+          INSERT INTO youtube.channels (
             channel_id, title, custom_url, description, thumbnail_url, country,
             published_at, subscriber_count, view_count, video_count, hidden_subscriber_count,
             credential_id, synced_at
@@ -168,8 +173,8 @@ export function registerYoutubeOAuthRoutes(app: Express, db: any) {
       const r = await db.execute(sql`
         SELECT c.channel_id, c.title, c.subscriber_count, c.video_count,
                cred.google_email, cred.authorized_at, cred.last_used_at, cred.active
-        FROM cortex_core.youtube_channels c
-        LEFT JOIN cortex_core.youtube_credentials cred ON cred.id = c.credential_id
+        FROM youtube.channels c
+        LEFT JOIN youtube.credentials cred ON cred.id = c.credential_id
         ORDER BY c.title
       `);
       res.json((r as any).rows || r);

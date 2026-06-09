@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest, queryClient } from "@/lib/queryClient";
-import { Copy, Check, AlertTriangle, Link2, History, Settings, Loader2, Plus, ShieldAlert, Sparkles } from "lucide-react";
+import { Copy, Check, AlertTriangle, Link2, History, Settings, Loader2, Plus, ShieldAlert, Sparkles, BookOpen } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
@@ -93,6 +93,10 @@ export default function UtmBuilder() {
               </Badge>
             )}
           </TabsTrigger>
+          <TabsTrigger value="guia" data-testid="tab-guia">
+            <BookOpen className="w-4 h-4 mr-2" />
+            Guia
+          </TabsTrigger>
         </TabsList>
 
         <TabsContent value="gerar">
@@ -105,6 +109,10 @@ export default function UtmBuilder() {
 
         <TabsContent value="configurar">
           <TabConfigurar />
+        </TabsContent>
+
+        <TabsContent value="guia">
+          <TabGuia />
         </TabsContent>
       </Tabs>
     </div>
@@ -1247,5 +1255,450 @@ function VocabularyDialog({
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+// ============================================================================
+// ABA 4 — GUIA (exemplos por plataforma)
+// ============================================================================
+
+interface ExemploProps {
+  titulo: string;
+  descricao: string;
+  url: string;
+}
+
+function ExemploCard({ titulo, descricao, url }: ExemploProps) {
+  const { toast } = useToast();
+  const [copied, setCopied] = useState(false);
+
+  const handleCopy = async () => {
+    await navigator.clipboard.writeText(url);
+    setCopied(true);
+    toast({ title: "URL copiada", description: "Cola e ajusta o conteúdo final." });
+    setTimeout(() => setCopied(false), 2000);
+  };
+
+  return (
+    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-4 bg-white dark:bg-zinc-900">
+      <div className="flex items-start justify-between gap-4 mb-2">
+        <div>
+          <h4 className="font-semibold text-gray-900 dark:text-white">{titulo}</h4>
+          <p className="text-sm text-gray-600 dark:text-zinc-400 mt-1">{descricao}</p>
+        </div>
+        <Button size="sm" variant="outline" onClick={handleCopy} className="shrink-0">
+          {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+        </Button>
+      </div>
+      <code className="block bg-gray-50 dark:bg-zinc-800 text-xs font-mono p-2 rounded mt-2 break-all text-gray-800 dark:text-zinc-200">
+        {url}
+      </code>
+    </div>
+  );
+}
+
+function TermoTabela({ rows }: { rows: { term: string; onde: string }[] }) {
+  return (
+    <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+      <table className="w-full text-sm">
+        <thead className="bg-gray-50 dark:bg-zinc-800">
+          <tr>
+            <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300 w-1/3">term</th>
+            <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">onde fica</th>
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((r) => (
+            <tr key={r.term} className="border-t border-gray-200 dark:border-zinc-700">
+              <td className="px-3 py-2 font-mono text-xs text-gray-900 dark:text-white">{r.term}</td>
+              <td className="px-3 py-2 text-gray-700 dark:text-zinc-300">{r.onde}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function Secao({ titulo, descricao, children }: { titulo: string; descricao?: string; children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-4">
+        <div>
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">{titulo}</h3>
+          {descricao && <p className="text-sm text-gray-600 dark:text-zinc-400 mt-1">{descricao}</p>}
+        </div>
+        {children}
+      </CardContent>
+    </Card>
+  );
+}
+
+function TabGuia() {
+  return (
+    <div className="space-y-6">
+      {/* Intro */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Como preencher cada UTM</h2>
+          <p className="text-sm text-gray-700 dark:text-zinc-300">
+            Esses exemplos seguem a <strong>Constituição UTM Turbo v1.1</strong>. Use a aba <strong>Gerar link</strong> pra montar com dropdowns — o guia abaixo serve pra entender o padrão e copiar exemplos prontos.
+          </p>
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm space-y-1">
+            <div><strong>medium</strong> — categoria do canal (paid, organic, eventos, referral, crm, outbound)</div>
+            <div><strong>source</strong> — plataforma técnica de onde saiu o clique (facebook, google, instagram, linkedin…)</div>
+            <div><strong>campaign</strong> — iniciativa de marketing (always-on, social-selling, lancamento-X)</div>
+            <div><strong>term</strong> — onde fisicamente o link foi colado (feed, stories, bio, dm…)</div>
+            <div><strong>content</strong> — identificador da peça específica (slug + data quando relevante)</div>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-zinc-500">
+            Regra de ouro do <strong>content</strong>: não repita o formato. Se <code className="font-mono">term=descricao-video</code>, content é só o slug (ex: <code className="font-mono">creators-ugc-2026-05-26</code>) — não <code className="font-mono">video-creators-ugc-…</code>.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* SLUGS DE PRODUTO */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Slugs oficiais dos produtos</h3>
+          <p className="text-sm text-gray-700 dark:text-zinc-300">
+            Use sempre esses slugs em <code className="font-mono">campaign</code> de lançamento e em <code className="font-mono">content</code>. Não inventar variações.
+          </p>
+          <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-zinc-800">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300 w-1/3">Produto</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300 w-1/4">slug</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">também conhecido como</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">Creators</td>
+                  <td className="px-3 py-2 font-mono text-xs text-gray-900 dark:text-white">creators</td>
+                  <td className="px-3 py-2 text-gray-700 dark:text-zinc-300">UGC, GC (mesma coisa)</td>
+                </tr>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">E-Commerce</td>
+                  <td className="px-3 py-2 font-mono text-xs text-gray-900 dark:text-white">ecommerce</td>
+                  <td className="px-3 py-2 text-gray-700 dark:text-zinc-300">Shopify (todo projeto é em Shopify)</td>
+                </tr>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">Estruturação Comercial</td>
+                  <td className="px-3 py-2 font-mono text-xs text-gray-900 dark:text-white">comercial</td>
+                  <td className="px-3 py-2 text-gray-700 dark:text-zinc-300">—</td>
+                </tr>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">Flash</td>
+                  <td className="px-3 py-2 font-mono text-xs text-gray-900 dark:text-white">flash</td>
+                  <td className="px-3 py-2 text-gray-700 dark:text-zinc-300">—</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-zinc-400">
+            Exemplos: <code className="font-mono">campaign=lancamento-creators-2026-05</code> · <code className="font-mono">content=diagnostico-ecommerce</code> · <code className="font-mono">content=link-comercial</code>
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* BIO VS LINKTREE */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Bio vs Linktree — qual usar?</h3>
+          <p className="text-sm text-gray-700 dark:text-zinc-300">
+            Os dois existem porque a Turbo usa Linktree no Instagram (e às vezes no TikTok). A regra é simples e depende só de <strong>onde você está colando o link</strong> na hora.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+              <h4 className="font-semibold text-gray-900 dark:text-white">
+                <code className="font-mono text-sm">term=bio</code>
+              </h4>
+              <p className="text-sm text-gray-700 dark:text-zinc-300 mt-2">
+                Quando o link com UTM vai <strong>direto na bio do perfil</strong> (campo "site/website" do Instagram/TikTok/LinkedIn). Sem Linktree no meio.
+              </p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-2">
+                Ex: bio do IG aponta direto pra <code className="font-mono">turbopartners.com.br/creators?utm=…</code>
+              </p>
+            </div>
+            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+              <h4 className="font-semibold text-gray-900 dark:text-white">
+                <code className="font-mono text-sm">term=linktree</code>
+              </h4>
+              <p className="text-sm text-gray-700 dark:text-zinc-300 mt-2">
+                Quando o link com UTM está cadastrado <strong>dentro da Linktree</strong>. Você está editando a Linktree e colando a URL no campo de algum botão de lá.
+              </p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-2">
+                Ex: bio do IG aponta pra Linktree, e dentro tem botão "Diagnóstico Creators" com UTM.
+              </p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-zinc-400">
+            Em qualquer caso, o <code className="font-mono">content</code> identifica qual link específico (ex: <code className="font-mono">diagnostico-creators</code>, <code className="font-mono">link-ecommerce</code>).
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* PAID */}
+      <Secao
+        titulo="Mídia Paga (Meta, Google, YouTube)"
+        descricao="Time não escreve UTM. A plataforma substitui os tokens automaticamente no momento do clique. Configurado uma vez no Tracking template / URL parameters."
+      >
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="Meta Ads (Facebook + Instagram)"
+            descricao="URL parameters no nível do anúncio. Tokens já configurados em server/services/adsCreation/creator.ts."
+            url="utm_source=facebook&utm_medium=paid&utm_campaign={{campaign.id}}&utm_term={{adset.id}}-{{placement}}&utm_content={{ad.id}}"
+          />
+          <ExemploCard
+            titulo="Google Ads (Search, Display, YouTube)"
+            descricao="Tracking template a nível de conta. YouTube Ads roda dentro do Google Ads — o token {network} retorna youtube automaticamente."
+            url="{lpurl}?utm_source=google&utm_medium=paid&utm_campaign={campaignid}&utm_term={adgroupid}-{network}-{device}-{matchtype}-{keyword}&utm_content={creative}"
+          />
+        </div>
+      </Secao>
+
+      {/* INSTAGRAM ORGÂNICO */}
+      <Secao
+        titulo="Instagram orgânico"
+        descricao="source = instagram. Mesmo quando passa por Linktree, o source continua sendo instagram (Linktree vira term)."
+      >
+        <TermoTabela
+          rows={[
+            { term: "bio", onde: "link único na bio do perfil" },
+            { term: "feed", onde: "post no feed/timeline" },
+            { term: "stories", onde: "stories temporários" },
+            { term: "reels", onde: "Reels" },
+            { term: "destaques", onde: "Story Highlights (destaques fixados)" },
+            { term: "dm", onde: "mensagem direta (social-selling do SDR)" },
+            { term: "linktree", onde: "passou pelo intermediário Linktree" },
+          ]}
+        />
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="Post no feed apontando pra bio"
+            descricao="Conteúdo recorrente, sem campanha nomeada."
+            url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=link-creators-2026-05"
+          />
+          <ExemploCard
+            titulo="SDR mandando link via DM (social-selling)"
+            descricao="Iniciativa coordenada do time de Pré-vendas conversando nas DMs."
+            url="https://turbopartners.com.br/diagnostico?utm_source=instagram&utm_medium=organic&utm_campaign=social-selling&utm_term=dm&utm_content=leandro-2026-05-26"
+          />
+          <ExemploCard
+            titulo="Stories de lançamento de produto"
+            descricao="Campanha pontual — slug no formato lancamento-{produto}-{aaaa-mm}."
+            url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=lancamento-creators-2026-05&utm_term=stories&utm_content=story-cta-final"
+          />
+          <ExemploCard
+            titulo="ManyChat respondendo comentário (automação)"
+            descricao="Bots e fluxos automáticos no Instagram."
+            url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=automacoes&utm_term=dm&utm_content=manychat-quero-creators"
+          />
+        </div>
+      </Secao>
+
+      {/* LINKEDIN ORGÂNICO */}
+      <Secao
+        titulo="LinkedIn orgânico"
+        descricao="source = linkedin. Vale igual para página oficial da Turbo e para post no perfil pessoal de colaborador."
+      >
+        <TermoTabela
+          rows={[
+            { term: "bio", onde: "seção \"Sobre\" do perfil/página" },
+            { term: "feed", onde: "post no feed (página ou perfil pessoal)" },
+            { term: "dm", onde: "mensagem direta (social-selling do SDR)" },
+          ]}
+        />
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="Post no feed da página"
+            descricao="Conteúdo recorrente da página oficial."
+            url="https://turbopartners.com.br/creators?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-05-26"
+          />
+          <ExemploCard
+            titulo="SDR via DM (social-selling)"
+            descricao="Pré-vendas conversando ativamente nas DMs do LinkedIn da Turbo."
+            url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=organic&utm_campaign=social-selling&utm_term=dm&utm_content=camila-2026-05-26"
+          />
+          <ExemploCard
+            titulo={`Link no "Sobre" da página`}
+            descricao="Link fixo na seção de bio."
+            url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=link-diagnostico"
+          />
+        </div>
+      </Secao>
+
+      {/* YOUTUBE ORGÂNICO */}
+      <Secao
+        titulo="YouTube orgânico"
+        descricao="source = youtube. Conteúdo do canal Turbo. Se você aparece como convidado em canal de terceiro, vai como referral/influencer (não organic)."
+      >
+        <TermoTabela
+          rows={[
+            { term: "descricao-video", onde: "descrição abaixo do vídeo" },
+            { term: "descricao-shorts", onde: "descrição de YouTube Shorts" },
+            { term: "card", onde: "cards interativos no canto do vídeo" },
+            { term: "bio", onde: "seção \"Sobre\" do canal" },
+            { term: "banner", onde: "links clicáveis no cabeçalho/banner do canal" },
+          ]}
+        />
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="Link na descrição de vídeo"
+            descricao="Caso mais comum — slug do vídeo + data."
+            url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-ugc-2026-05-26"
+          />
+          <ExemploCard
+            titulo="Link na descrição de Shorts"
+            descricao="Vídeos curtos do YouTube Shorts."
+            url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-shorts&utm_content=hook-rafa-2026-05-26"
+          />
+          <ExemploCard
+            titulo="Banner do canal"
+            descricao="Links fixos no cabeçalho do canal."
+            url="https://turbopartners.com.br/diagnostico?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=banner&utm_content=link-diagnostico"
+          />
+          <ExemploCard
+            titulo="Card de lançamento dentro do vídeo"
+            descricao="Card interativo apontando pra LP de lançamento."
+            url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=organic&utm_campaign=lancamento-creators-2026-05&utm_term=card&utm_content=cta-final-creators"
+          />
+        </div>
+      </Secao>
+
+      {/* TIKTOK ORGÂNICO */}
+      <Secao
+        titulo="TikTok orgânico"
+        descricao="source = tiktok. Conteúdo da conta oficial da Turbo no TikTok."
+      >
+        <TermoTabela
+          rows={[
+            { term: "bio", onde: "link único na bio do perfil" },
+            { term: "feed", onde: "vídeos no feed" },
+            { term: "dm", onde: "mensagem direta (social-selling)" },
+            { term: "linktree", onde: "passou pelo intermediário Linktree" },
+          ]}
+        />
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="Link na bio do TikTok"
+            descricao="Único link clicável no perfil do TikTok."
+            url="https://turbopartners.com.br/diagnostico?utm_source=tiktok&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=link-diagnostico"
+          />
+        </div>
+      </Secao>
+
+      {/* REFERRAL */}
+      <Secao
+        titulo="Referral (cliente, colaborador, influencer, marketplace)"
+        descricao="Alguém externo trazendo lead. O source é o tipo de relação, e o campaign é o nome da entidade."
+      >
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="Footer da clínica do Dr. Rafael (cliente)"
+            descricao="Cliente colocando link da Turbo no footer do site dele."
+            url="https://turbopartners.com.br/?utm_source=cliente&utm_medium=referral&utm_campaign=dr-rafael&utm_term=footer&utm_content=rodape-home"
+          />
+          <ExemploCard
+            titulo="Colaborador (informal) indicando via WhatsApp pessoal"
+            descricao="Não confunde com social-selling (que é iniciativa coordenada nas DMs oficiais)."
+            url="https://turbopartners.com.br/?utm_source=colaborador&utm_medium=referral&utm_campaign=lucas&utm_term=indicacao&utm_content=whatsapp-amigo-loja-x"
+          />
+          <ExemploCard
+            titulo="Influencer postando link"
+            descricao="Criador externo divulgando Turbo no conteúdo dele."
+            url="https://turbopartners.com.br/?utm_source=influencer&utm_medium=referral&utm_campaign=joao-silva&utm_term=bio-influencer&utm_content=stories-link-bio"
+          />
+        </div>
+      </Secao>
+
+      {/* CRM */}
+      <Secao
+        titulo="CRM (base própria — email, WhatsApp broadcast, SMS)"
+        descricao="Comunicação ativa pra quem já é lead/cliente. source é o canal de entrega, não a ferramenta de envio."
+      >
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="Régua de WhatsApp da Turma 6 do Dr. Rafael"
+            descricao="Toque específico (12 de 41) numa régua de quentes."
+            url="https://turbopartners.com.br/agendar?utm_source=whatsapp&utm_medium=crm&utm_campaign=turma-6-rafa-mais-proximo&utm_term=lista-quentes&utm_content=touchpoint-12-audio-convite"
+          />
+          <ExemploCard
+            titulo="E-mail de nutrição do funil Creators"
+            descricao="Disparo de email para MQLs não convertidos."
+            url="https://turbopartners.com.br/diagnostico?utm_source=email&utm_medium=crm&utm_campaign=nutricao-creators-2026-11&utm_term=mql-nao-convertido&utm_content=cta-agendar-diagnostico"
+          />
+        </div>
+      </Secao>
+
+      {/* OUTBOUND */}
+      <Secao
+        titulo="Outbound (prospecção fria — SDR)"
+        descricao="Lead que nunca interagiu antes. source é o canal final de envio."
+      >
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="Cold email do SDR"
+            descricao="Cadência de prospecção via Apollo/Reply/Lemlist."
+            url="https://turbopartners.com.br/diagnostico?utm_source=email&utm_medium=outbound&utm_campaign=cadencia-q4-donos-agencia&utm_term=agencia-50-funcionarios&utm_content=email-2-quebra-objecao"
+          />
+          <ExemploCard
+            titulo="Cold outreach LinkedIn"
+            descricao="DM fria via Sales Navigator (não confunde com DM social-selling em organic)."
+            url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=outbound&utm_campaign=cadencia-q4-donos-agencia&utm_term=agencia-50-funcionarios&utm_content=linkedin-msg-1"
+          />
+          <ExemploCard
+            titulo="Follow-up de cold call (WhatsApp pós-ligação)"
+            descricao="Ligação não é canal de UTM — usa o canal real de envio (whatsapp/email)."
+            url="https://turbopartners.com.br/diagnostico?utm_source=whatsapp&utm_medium=outbound&utm_campaign=cadencia-q4-donos-agencia&utm_term=pos-ligacao&utm_content=follow-up-call-2026-05-26"
+          />
+        </div>
+      </Secao>
+
+      {/* EVENTOS */}
+      <Secao
+        titulo="Eventos"
+        descricao="source = slug do evento (lowercase, sem acento, hífen). Se for evento próprio, prefixa com turbo-."
+      >
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="QR code no slide final de palestra (RD Summit)"
+            descricao="Evento de terceiro — nome direto."
+            url="https://turbopartners.com.br/diagnostico?utm_source=rd-summit-2026&utm_medium=eventos&utm_campaign=presencial-2026&utm_term=palestra&utm_content=slide-final-cta"
+          />
+          <ExemploCard
+            titulo="Workshop próprio da Turbo"
+            descricao="Evento próprio — prefixo turbo-."
+            url="https://turbopartners.com.br/diagnostico?utm_source=turbo-workshop-creators-sp&utm_medium=eventos&utm_campaign=presencial-2026&utm_term=qrcode-cracha&utm_content=mesa-recepcao"
+          />
+        </div>
+      </Secao>
+
+      {/* PROIBIÇÕES */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5" />
+            Proibições
+          </h3>
+          <ul className="text-sm space-y-2 text-gray-700 dark:text-zinc-300">
+            <li>• <strong>Nunca</strong> usar <code className="font-mono">fb</code>, <code className="font-mono">meta</code> ou <code className="font-mono">ig</code> — Meta Ads é sempre <code className="font-mono">facebook</code>, Instagram orgânico é <code className="font-mono">instagram</code>.</li>
+            <li>• <strong>Linktree não é source.</strong> O source é a rede onde o clique nasceu (instagram, tiktok…). Linktree vai como <code className="font-mono">term=linktree</code>.</li>
+            <li>• Nome de cliente, colaborador, influencer <strong>nunca em source</strong>. Vai em <code className="font-mono">campaign</code>.</li>
+            <li>• Sem espaço, sem underline, sem maiúscula, sem acento. Sempre lowercase com hífen.</li>
+            <li>• Ferramenta de envio (RD, Mailchimp, Apollo) não entra no UTM. source é só o canal de entrega.</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* Footer */}
+      <Card>
+        <CardContent className="p-4 text-xs text-gray-500 dark:text-zinc-500 text-center">
+          Documento de referência completo: <code className="font-mono">docs/utm-constituicao.md</code> · Constituição UTM Turbo v1.1 · Vigência a partir de 21/05/2026
+        </CardContent>
+      </Card>
+    </div>
   );
 }

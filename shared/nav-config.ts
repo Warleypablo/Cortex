@@ -47,6 +47,12 @@ export const PERMISSION_KEYS = {
     CAPACITY: 'gestao.capacity',
     ANALISE_PREDITIVA: 'gestao.analise_preditiva',
     TV_LEADERBOARD: 'gestao.tv_leaderboard',
+    LT_LTV_CHURN: 'gestao.lt_ltv_churn',
+    LTV_CLIENTES: 'gestao.ltv_clientes',
+    ESTOQUE_PONTUAL: 'gestao.estoque_pontual',
+    CREATORS_PONTUAL: 'gestao.creators_pontual',
+    CAPACITY_TIMES: 'gestao.capacity_times',
+    CHURN_PRODUTO: 'gestao.churn_produto',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -87,11 +93,13 @@ export const PERMISSION_KEYS = {
     PLANEJAMENTO_METAS: 'growth.planejamento_metas',
     UTM_BUILDER: 'growth.utm_builder',
     GHL_MARKETING: 'growth.ghl_marketing',
+    DFC_CAC: 'growth.dfc_cac',
   },
   // G&G (Pessoas)
   GG: {
     VISAO_GERAL: 'gg.visao_geral',
     COLABORADORES: 'gg.colaboradores',
+    COLABORADORES_RESTRITO: 'gg.colaboradores_restrito',
     RECRUTAMENTO: 'gg.recrutamento',
     ONBOARDING: 'gg.onboarding',
     PESQUISAS: 'gg.pesquisas',
@@ -229,9 +237,15 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/visao-geral': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
   '/dashboard/churn-predicao': PERMISSION_KEYS.GESTAO.CHURN_PREDICAO,
+  '/dashboard/churn-produto': PERMISSION_KEYS.GESTAO.CHURN_PRODUTO,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
   '/gestao/tv-leaderboard': PERMISSION_KEYS.GESTAO.TV_LEADERBOARD,
+  '/lt-ltv-churn': PERMISSION_KEYS.GESTAO.LT_LTV_CHURN,
+  '/ltv-clientes': PERMISSION_KEYS.GESTAO.LTV_CLIENTES,
+  '/estoque-pontual': PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL,
+  '/creators-pontual': PERMISSION_KEYS.GESTAO.CREATORS_PONTUAL,
+  '/capacity-times': PERMISSION_KEYS.GESTAO.CAPACITY_TIMES,
   '/bp-produtos': PERMISSION_KEYS.GESTAO.BP_PRODUTOS,
   '/triagem': PERMISSION_KEYS.GESTAO.VISAO_GERAL,
   '/clientes': PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS,
@@ -270,6 +284,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/keyword-performance': PERMISSION_KEYS.GROWTH.KEYWORD_PERFORMANCE,
   '/growth/funil-conversao': PERMISSION_KEYS.GROWTH.FUNIL_CONVERSAO,
   '/growth/instagram': PERMISSION_KEYS.GROWTH.INSTAGRAM,
+  '/growth/dfc-cac': PERMISSION_KEYS.GROWTH.DFC_CAC,
   '/utm-builder': PERMISSION_KEYS.GROWTH.UTM_BUILDER,
   '/ghl-marketing': PERMISSION_KEYS.GROWTH.GHL_MARKETING,
   // G&G
@@ -311,6 +326,9 @@ Object.entries(ROUTE_TO_PERMISSION).forEach(([route, permission]) => {
   }
   PERMISSION_TO_ROUTES[permission].push(route);
 });
+
+// Rota de acesso restrito a colaboradores (sem salário)
+PERMISSION_TO_ROUTES['gg.colaboradores_restrito'] = ['/colaboradores', '/colaboradores/analise'];
 
 // Helper to convert old allowedRoutes to new permission keys
 export function routesToPermissions(routes: string[]): string[] {
@@ -452,10 +470,16 @@ export const NAV_CONFIG = {
         { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS },
         { title: 'Evolução Mensal', url: '/dashboard/evolucao-mensal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL },
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
+        { title: 'Churn por Produto', url: '/dashboard/churn-produto', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_PRODUTO },
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
         { title: 'Triagem Inteligente', url: '/triagem', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
         { title: 'TV Leaderboard', url: '/gestao/tv-leaderboard', icon: 'Tv', permissionKey: PERMISSION_KEYS.GESTAO.TV_LEADERBOARD },
+        { title: 'LTV por Contrato', url: '/lt-ltv-churn', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.LT_LTV_CHURN },
+        { title: 'LTV por Cliente', url: '/ltv-clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.LTV_CLIENTES },
+        { title: 'Estoque de Pontual', url: '/estoque-pontual', icon: 'Package', permissionKey: PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL },
+        { title: 'Creators Pontual', url: '/creators-pontual', icon: 'Clapperboard', permissionKey: PERMISSION_KEYS.GESTAO.CREATORS_PONTUAL },
+        { title: 'Capacity Times', url: '/capacity-times', icon: 'Gauge', permissionKey: PERMISSION_KEYS.GESTAO.CAPACITY_TIMES },
       ],
     },
     {
@@ -485,6 +509,7 @@ export const NAV_CONFIG = {
         { title: 'Evolução Temporal', url: '/growth/evolucao-temporal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GROWTH.EVOLUCAO_TEMPORAL },
         { title: 'Orçamento por Campanha', url: '/growth/orcamento-campanhas', icon: 'Wallet', permissionKey: PERMISSION_KEYS.GROWTH.ORCAMENTO_CAMPANHAS },
         { title: 'Planejamento de Metas', url: '/growth/planejamento-metas', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.GROWTH.PLANEJAMENTO_METAS },
+        { title: 'DFC de CAC', url: '/growth/dfc-cac', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GROWTH.DFC_CAC },
         { title: 'Growth AI', url: '/growth/ai', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
         { title: 'Instagram', url: '/growth/instagram', icon: 'Instagram', permissionKey: PERMISSION_KEYS.GROWTH.INSTAGRAM },
         { title: 'Gerador de UTMs', url: '/utm-builder', icon: 'Link2', permissionKey: PERMISSION_KEYS.GROWTH.UTM_BUILDER },
@@ -679,6 +704,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.FIN.NOTAS_FISCAIS]: 'Notas Fiscais',
   [PERMISSION_KEYS.GESTAO.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
+  [PERMISSION_KEYS.GESTAO.CHURN_PRODUTO]: 'Churn por Produto',
   [PERMISSION_KEYS.GESTAO.CHURN_PREDICAO]: 'Predição de Churn',
   [PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL]: 'Evolução Mensal',
   [PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS]: 'Clientes & Contratos',
@@ -686,6 +712,11 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GESTAO.SAUDE_BASE]: 'Saúde da Base Ativa',
   [PERMISSION_KEYS.GESTAO.BP_PRODUTOS]: 'BP Produtos',
   [PERMISSION_KEYS.GESTAO.ANALISE_PREDITIVA]: 'Análise Preditiva',
+  [PERMISSION_KEYS.GESTAO.LT_LTV_CHURN]: 'LTV por Contrato',
+  [PERMISSION_KEYS.GESTAO.LTV_CLIENTES]: 'LTV por Cliente',
+  [PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL]: 'Estoque de Pontual',
+  [PERMISSION_KEYS.GESTAO.CREATORS_PONTUAL]: 'Creators Pontual',
+  [PERMISSION_KEYS.GESTAO.CAPACITY_TIMES]: 'Capacity Times',
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
   [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',

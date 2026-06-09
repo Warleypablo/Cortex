@@ -4909,6 +4909,39 @@ export class DbStorage implements IStorage {
       }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // ⚠️ AJUSTE DE CONCILIAÇÃO TEMPORÁRIO — REMOVER APÓS CONCILIAR CONTAS A PAGAR
+    // Existe uma divergência de R$ 10.000 a MENOR em contas a pagar cuja causa
+    // raiz ainda não foi rastreada (parcela faltante / sync incompleto / erro de
+    // competência). Enquanto a origem não é identificada, lançamos o valor como
+    // uma linha PRÓPRIA e ROTULADA sob "Despesas" — NÃO embutido em nenhuma
+    // categoria real — para que a DFC feche sem distorcer despesas legítimas e
+    // para que fique evidente que isto é um plug a investigar, não um gasto real.
+    // TODO(financeiro): remover este bloco assim que a diferença em contas a
+    //                   pagar for conciliada. Criado em 2026-06-02.
+    const AJUSTE_CONCILIACAO = {
+      ativo: true,
+      mes: '2026-05', // competência definida pelo solicitante
+      valor: 10000,
+      label: 'Ajuste de conciliação (não conciliado)',
+      categoriaId: '09', // fora do plano de contas real (05/06/07/08) → vira linha própria sob DESPESAS
+    };
+    if (AJUSTE_CONCILIACAO.ativo) {
+      console.warn(
+        `[DFC] ⚠️ Injetando AJUSTE DE CONCILIAÇÃO ARTIFICIAL de R$ ${AJUSTE_CONCILIACAO.valor.toLocaleString('pt-BR')} ` +
+        `em DESPESAS / ${AJUSTE_CONCILIACAO.mes} (linha "${AJUSTE_CONCILIACAO.label}"). ` +
+        `Este valor NÃO vem de caz_parcelas — remover após conciliar contas a pagar.`
+      );
+      mesesSet.add(AJUSTE_CONCILIACAO.mes);
+      items.push({
+        categoriaId: AJUSTE_CONCILIACAO.categoriaId,
+        categoriaNome: AJUSTE_CONCILIACAO.label,
+        mes: AJUSTE_CONCILIACAO.mes,
+        valorTotal: AJUSTE_CONCILIACAO.valor,
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const todosOsMeses = Array.from(mesesSet).sort();
 
     console.log(`[DFC DEBUG] Parcelas únicas processadas: ${parcelaIdsProcessadas.size}`);

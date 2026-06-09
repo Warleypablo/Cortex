@@ -1886,7 +1886,7 @@ export default function ChurnDetalhamento() {
       </Card>
 
       {/* Tabs de nível superior */}
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio")}>
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio" | "consolidado")}>
         <TabsList>
           <TabsTrigger value="analise" className="gap-2" data-testid="main-tab-analise">
             <BarChart3 className="h-4 w-4" />

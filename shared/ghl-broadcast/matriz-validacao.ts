@@ -19,9 +19,6 @@ import type {
 // ── CATEGORIZAÇÃO DE BASES ─────────────────────────────────────────────────
 
 export const BASE_CATEGORIAS: Record<string, CategoriaBase[]> = {
-  "Mix da Nata": ["premium", "mql"],
-  "Show me the money": ["premium", "mql"],
-  "Show me the money expandido": ["mql", "leads_30_100k"],
   Clientes: ["clientes"],
   Congelados: ["congelados"],
   "Geral - MQLs": ["mql", "funil_geral"],
@@ -76,7 +73,7 @@ const REGRAS_BLOCK: Regra[] = [
       baseTem(ctx.base, "leads_abaixo_30k"),
     motivo:
       "Oferta de tíquete alto (>R$10k) não cabe em base com faturamento <R$30k/mês — sem fôlego financeiro.",
-    sugestao: "Use Mix da Nata, Show me the money, ou outras bases MQLs.",
+    sugestao: "Use bases MQLs (Geral - MQLs, Creators - MQLs, IA - MQLs).",
   },
   {
     chave: "oferta_nova_para_clientes",
@@ -142,7 +139,7 @@ const REGRAS_WARN: Regra[] = [
       ctx.parametros?.faixaFaturamento === "100k+" &&
       !baseTem(ctx.base, "premium"),
     motivo: 'Personalização "+R$100k" em base sem segmentação por faturamento vai filtrar muita gente.',
-    sugestao: 'Use base MQL premium (Mix da Nata, Show me the money) ou reduza a faixa pra "50k+".',
+    sugestao: 'Não há mais base premium segmentada por faturamento — reduza a faixa ou use uma base MQL (Geral - MQLs, Creators - MQLs).',
   },
   {
     chave: "evento_congelados_sem_aquecimento",
@@ -196,8 +193,6 @@ export function validarCombinacao(ctx: ContextoValidacao): ResultadoValidacao {
 export type NivelCompat = "++" | "+" | "~" | "-";
 
 export const COMPATIBILIDADE_BASE_PADRAO: Record<string, Partial<Record<PadraoKey, NivelCompat>>> = {
-  "Mix da Nata": { URGENCIA_SAZONAL: "+", EVENTO: "+", REATIVACAO: "-", CASE_STUDY: "++", HOOK_PROVOCATIVO: "++", CONTRASTE: "~", PERSONALIZACAO_NICHO: "++" },
-  "Show me the money": { URGENCIA_SAZONAL: "++", EVENTO: "+", REATIVACAO: "-", CASE_STUDY: "++", HOOK_PROVOCATIVO: "+", CONTRASTE: "~", PERSONALIZACAO_NICHO: "+" },
   Clientes: { URGENCIA_SAZONAL: "+", EVENTO: "++", REATIVACAO: "-", CASE_STUDY: "~", HOOK_PROVOCATIVO: "~", CONTRASTE: "-", PERSONALIZACAO_NICHO: "+" },
   Congelados: { URGENCIA_SAZONAL: "++", EVENTO: "~", REATIVACAO: "++", CASE_STUDY: "+", HOOK_PROVOCATIVO: "~", CONTRASTE: "~", PERSONALIZACAO_NICHO: "~" },
   "Geral - MQLs": { URGENCIA_SAZONAL: "++", EVENTO: "+", REATIVACAO: "~", CASE_STUDY: "++", HOOK_PROVOCATIVO: "+", CONTRASTE: "+", PERSONALIZACAO_NICHO: "+" },
@@ -212,8 +207,6 @@ export const COMPATIBILIDADE_BASE_PADRAO: Record<string, Partial<Record<PadraoKe
 };
 
 export const COMPATIBILIDADE_BASE_OFERTA: Record<string, Partial<Record<OfertaKey, "+" | "~" | "-">>> = {
-  "Mix da Nata": { CREATORS: "+", PERFORMANCE: "+", COMUNICACAO: "+", LP: "+", CRM: "+", IFV: "+", ESTRUTURA_MARKETING: "+", SEO: "+", IA: "+", EVENTO: "+", NUTRICAO: "~", UPSELL: "-" },
-  "Show me the money": { CREATORS: "+", PERFORMANCE: "+", COMUNICACAO: "+", LP: "+", CRM: "+", IFV: "+", ESTRUTURA_MARKETING: "~", SEO: "+", IA: "+", EVENTO: "+", NUTRICAO: "~", UPSELL: "-" },
   Clientes: { CREATORS: "~", PERFORMANCE: "~", COMUNICACAO: "~", LP: "~", CRM: "~", IFV: "~", ESTRUTURA_MARKETING: "~", SEO: "~", IA: "~", EVENTO: "+", NUTRICAO: "~", UPSELL: "+" },
   Congelados: { CREATORS: "+", PERFORMANCE: "+", COMUNICACAO: "~", LP: "~", CRM: "~", IFV: "~", ESTRUTURA_MARKETING: "-", SEO: "~", IA: "~", EVENTO: "~", NUTRICAO: "+", UPSELL: "-" },
   "Geral - MQLs": { CREATORS: "~", PERFORMANCE: "+", COMUNICACAO: "+", LP: "+", CRM: "+", IFV: "+", ESTRUTURA_MARKETING: "~", SEO: "+", IA: "+", EVENTO: "+", NUTRICAO: "~", UPSELL: "-" },

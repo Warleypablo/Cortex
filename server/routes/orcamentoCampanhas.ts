@@ -126,7 +126,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
       // Detecta coluna de data disponível em campaign_daily_metrics (histórico: report_date/metric_date/date).
       const gaColsRes = await db.execute(sql`
         SELECT column_name FROM information_schema.columns
-        WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+        WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
       `);
       const gaCols = (gaColsRes.rows || []).map((r: any) => r.column_name);
       const hasGoogleSchema = gaCols.length > 0;
@@ -140,17 +140,17 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         // Mostra apenas: ENABLED, com spend no mês, ou com meta definida.
         const googleRes = await db.execute(sql.raw(`
           WITH spend_agg AS (
-            SELECT campaign_key, SUM(cost_micros)::numeric AS cost_sum
-            FROM google_ads.campaign_daily_metrics
+            SELECT campaign_id, SUM(cost_micros)::numeric AS cost_sum
+            FROM google.campaign_daily_metrics
             WHERE ${gaDateCol} BETWEEN '${firstDay}'::date AND '${lastDay}'::date
-            GROUP BY campaign_key
+            GROUP BY campaign_id
           ),
           recent_spend_agg AS (
-            SELECT campaign_key, SUM(cost_micros)::numeric AS recent_cost_sum
-            FROM google_ads.campaign_daily_metrics
+            SELECT campaign_id, SUM(cost_micros)::numeric AS recent_cost_sum
+            FROM google.campaign_daily_metrics
             WHERE ${gaDateCol} >= (CURRENT_DATE - INTERVAL '3 days')
               AND ${gaDateCol} < CURRENT_DATE
-            GROUP BY campaign_key
+            GROUP BY campaign_id
           ),
           metas_google AS (
             SELECT campaign_id FROM cortex_core.campaign_monthly_budget
@@ -160,13 +160,12 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
             c.campaign_id::text AS campaign_id,
             c.name AS name,
             c.status AS status,
-            COALESCE(b.amount_micros::numeric / 1000000, 0)::float AS daily_budget_atual,
+            COALESCE(c.budget_amount_micros::numeric / 1000000, 0)::float AS daily_budget_atual,
             COALESCE(s.cost_sum / 1000000, 0)::float AS investido_total,
             COALESCE(rs.recent_cost_sum / 1000000, 0)::float AS recent_spend
-          FROM google_ads.campaigns c
-          LEFT JOIN google_ads.campaign_budgets b ON b.budget_key = c.budget_key
-          LEFT JOIN spend_agg s ON s.campaign_key = c.campaign_key
-          LEFT JOIN recent_spend_agg rs ON rs.campaign_key = c.campaign_key
+          FROM google.campaigns c
+          LEFT JOIN spend_agg s ON s.campaign_id = c.campaign_id
+          LEFT JOIN recent_spend_agg rs ON rs.campaign_id = c.campaign_id
           WHERE COALESCE(s.cost_sum, 0) > 0
              OR c.campaign_id::text IN (SELECT campaign_id FROM metas_google)
           ORDER BY c.name;
