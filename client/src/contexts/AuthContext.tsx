@@ -1,6 +1,6 @@
 import { createContext, useContext, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { ROUTE_TO_PERMISSION } from "@shared/nav-config";
+import { PERMISSION_TO_ROUTES } from "@shared/nav-config";
 
 export interface User {
   id: string;
@@ -40,9 +40,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (user.role === 'admin') return true;
     if (PUBLIC_ROUTES.includes(path)) return true;
     if (user.allowedRoutes?.includes(path)) return true;
-    // Also check by permission key (new system)
-    const permKey = ROUTE_TO_PERMISSION[path];
-    if (permKey && user.allowedRoutes?.includes(permKey)) return true;
+    for (const perm of (user.allowedRoutes ?? [])) {
+      if (PERMISSION_TO_ROUTES[perm]?.includes(path)) return true;
+    }
     return false;
   };
 

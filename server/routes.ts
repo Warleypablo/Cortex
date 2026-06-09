@@ -25,6 +25,11 @@ import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
 import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
 import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
+import { registerGoogleAdminRoutes } from "./routes/googleAdmin";
+import { registerLinkedinOAuthRoutes } from "./routes/linkedinOAuth";
+import { registerLinkedinAdminRoutes } from "./routes/linkedinAdmin";
+import { registerTiktokOAuthRoutes } from "./routes/tiktokOAuth";
+import { registerTiktokAdminRoutes } from "./routes/tiktokAdmin";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMixReceitaRoutes } from "./routes/mixReceita";
@@ -45,6 +50,7 @@ import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
 import { registerSaldoDiarioRoutes } from "./routes/saldoDiario";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
+import { registerFechamentoSemanalRoutes } from "./routes/fechamentoSemanal";
 import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
@@ -60,11 +66,16 @@ import { registerUtmRoutes } from "./routes/utm";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerGrowthDfcCacRoutes } from "./routes/growthDfcCac";
 import { registerGhlPublicRoutes, registerGhlApiRoutes } from "./routes/ghl";
 import { registerNegativacaoRoutes } from "./routes/negativacao";
 import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
 import { registerInternalTrainingsRoutes } from "./routes/internalTrainings";
+import { registerLtLtvChurnRoutes } from "./routes/ltLtvChurn";
+import { registerChurnProdutoMotivoRoutes } from "./routes/churnProdutoMotivo";
+import { registerEstoquePontualRoutes } from "./routes/estoquePontual";
+import { registerCreatorsPontualRoutes } from "./routes/creatorsPontual";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
@@ -2112,8 +2123,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Evolução Mensal - MRR histórico por squad e operador com churn
   app.get("/api/dashboard/evolucao-mensal", async (req, res) => {
     try {
-      const { meses } = req.query;
+      const { meses, semAbono } = req.query;
       const numMeses = Math.min(Math.max(parseInt(meses as string) || 6, 1), 36);
+      const excluirAbono = semAbono !== 'true';
       
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - numMeses);
@@ -2172,7 +2184,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY mes, squad, responsavel
       `);
       
-      // Buscar churns por mês da tabela curada cup_churn (excluindo churn abonado)
+      // Buscar churns por mês da tabela curada cup_churn
       const churnResult = await db.execute(sql`
         SELECT
           TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
@@ -2184,7 +2196,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
-          AND COALESCE(abonar_churn, '') != 'Sim'
+          ${excluirAbono ? sql`AND COALESCE(abonar_churn, '') != 'Sim'` : sql``}
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
@@ -8034,8 +8046,24 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Google Ads — admin: sync de campanhas + métricas + status
   registerGoogleAdsAdminRoutes(app);
 
+  // Google (Turbo-only, schema `google`) — admin: sync + status
+  registerGoogleAdminRoutes(app);
+
+  // LinkedIn OAuth (autorização orgânica da Company Page Turbo Partners)
+  registerLinkedinOAuthRoutes(app, db);
+
+  // LinkedIn — admin: sync orgânico (seguidores + page views + engajamento) + status
+  registerLinkedinAdminRoutes(app);
+
+  // TikTok OAuth (advertiser/Ads + account holder/orgânico)
+  registerTiktokOAuthRoutes(app, db);
+
+  // TikTok — admin: sync orgânico (perfil + vídeos + métricas) + status
+  registerTiktokAdminRoutes(app);
+
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
+  registerGrowthDfcCacRoutes(app, db);
 
   // SDR Assistant Module - registered from separate file
   registerSdrAssistantRoutes(app, db);
@@ -8096,6 +8124,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Comercial (Closers, SDRs, Vendas) - registered from separate file
   registerComercialRoutes(app);
 
+  // Fechamento Semanal - novos contratos e saúde de squads
+  registerFechamentoSemanalRoutes(app);
+
   // Cross-Sell Management - registered from separate file
   registerCrossSellRoutes(app);
 
@@ -8140,6 +8171,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Treinamentos Internos Module - registered from separate file
   registerInternalTrainingsRoutes(app);
+
+  // LT/LTV/Churn Dashboard - registered from separate file
+  registerLtLtvChurnRoutes(app, db);
+  registerChurnProdutoMotivoRoutes(app, db);
+  registerEstoquePontualRoutes(app, db);
+  registerCreatorsPontualRoutes(app, db);
 
   // ============================================
   // Sugestões API

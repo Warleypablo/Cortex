@@ -1,8 +1,21 @@
-# Constituição UTM Turbo v1.1
+# Constituição UTM Turbo v1.3
 
 > Padrão único e definitivo de instrumentação de UTMs da Turbo Partners.
 > Vigência: a partir de **21 de maio de 2026**.
 > Documento vivo. Mudanças exigem aprovação do Growth + Pre-Sales.
+
+> **Versão 1.3 — refinamentos** (08/06/2026):
+> - **`rodrigo` adicionado como medium-exceção** — terceira figura-chave com canal próprio, mesmo tratamento de `victor` e `andre` (ver §3.7 e §4.7)
+
+> **Versão 1.2 — refinamentos pós-treinamento** (26/05/2026):
+> - Vocabulário de `term` por plataforma explicitado (Instagram, LinkedIn, YouTube, TikTok)
+> - YouTube ganha `descricao-video`, `descricao-shorts`, `card`, `bio`, `banner`
+> - LinkedIn enxuto: só `bio`, `feed`, `dm` (cobrir formatos extras é adicionar conforme uso)
+> - Regra `bio` vs `linktree` reescrita: decisão pela pessoa que está fisicamente colando o link
+> - `facebook` removido de `organic` (Turbo não opera Facebook orgânico)
+> - Slugs oficiais de produto fixados: `creators`, `ecommerce`, `comercial`, `flash`
+> - Convenção de `content` em organic: `{slug-curto}-{aaaa-mm-dd}` sem repetir formato
+> - **`victor` e `andre` adicionados como mediums-exceção** (figuras-chave com canal próprio robusto — ver §3.7 e §4.7)
 
 > **Versão 1.1 — refinamentos** (19/05/2026):
 > - `bio`, `destaques-fixados` movidos de campaign → term em organic
@@ -60,7 +73,7 @@ Mesmo que uma iniciativa (ex: social selling) seja conceitualmente "diferente", 
 
 ---
 
-## 2. Mediums permitidos (6 categorias)
+## 2. Mediums permitidos (6 categorias + 3 exceções)
 
 | medium | descrição |
 |---|---|
@@ -70,8 +83,13 @@ Mesmo que uma iniciativa (ex: social selling) seja conceitualmente "diferente", 
 | `referral` | Alguém externo trazendo lead (cliente, colaborador, influencer, parceiro, marketplace) |
 | `crm` | Comunicação ativa para base própria (email, WhatsApp broadcast, SMS) |
 | `outbound` | Prospecção fria via SDR (lead que nunca interagiu antes) |
+| `victor` | **Exceção** — canal próprio do Victor (ver §3.7) |
+| `andre` | **Exceção** — canal próprio do André (ver §3.7) |
+| `rodrigo` | **Exceção** — canal próprio do Rodrigo (ver §3.7) |
 
 **Nota conceitual:** `paid` e `organic` descrevem **como o link foi distribuído** (compra ou postagem própria). `eventos`, `referral`, `crm`, `outbound` descrevem **o tipo de relação ou contexto** em que o link foi entregue. Naturezas diferentes, mas todas respondem à pergunta "como esse lead chegou aqui?".
+
+**Sobre `victor`, `andre` e `rodrigo`:** são exceções deliberadas à Lei 1 (vocabulário fechado). São figuras-chave de distribuição com canal próprio robusto, tratadas como dimensão de primeira ordem no relatório. Toda nova figura nesse formato exige aprovação Growth + Pre-Sales (caso a caso, não automático).
 
 ---
 
@@ -96,12 +114,13 @@ Mesmo que uma iniciativa (ex: social selling) seja conceitualmente "diferente", 
 
 | source | quando usar |
 |---|---|
-| `instagram` | Posts, reels, stories, destaques, DM, link na bio (inclusive quando passa por Linktree) |
+| `instagram` | Posts, reels, stories, destaques, DM, link na bio (direto ou via Linktree — ver seção 4.2) |
 | `linkedin` | Posts da página Turbo, DMs de SDR via canal LinkedIn da Turbo |
-| `youtube` | Descrição de vídeo, card, end screen |
+| `youtube` | Descrição de vídeo, Shorts, card, bio do canal, banner |
 | `tiktok` | Bio, descrição de vídeos, DMs |
-| `facebook` | Posts da página oficial da Turbo no Facebook (raro hoje mas reservado) |
 | `pinterest` | Pins orgânicos (raro hoje mas reservado) |
+
+**Facebook orgânico removido em v1.2:** a Turbo não opera Facebook orgânico. Caso volte a operar, propor PR pra readicionar.
 
 **Sobre Linktree:** Linktree não é source porque é apenas um intermediário entre a bio e a LP final. O clique original vem de uma plataforma (Instagram, TikTok, etc) — essa é a verdadeira origem. Linktree entra como `term=linktree` para preservar a informação de que houve passagem pela ferramenta. Ver seção 4.2.
 
@@ -151,6 +170,28 @@ Vocabulário **aberto**, mas com regra: `nome-do-evento` em slug (lowercase, sem
 
 **Sobre ligações:** ligações telefônicas (cold calls) **não entram aqui** porque o link nunca sai de uma ligação — ele é enviado depois por email/WhatsApp. Esses cliques devem ser registrados com o canal de envio efetivo (`email` ou `whatsapp`) e podem usar `term=pos-ligacao` ou `content=follow-up-call-X` para indicar que veio de cold call.
 
+### 3.7 `victor`, `andre` e `rodrigo` (mediums-exceção)
+
+Figuras-chave da Turbo com canal próprio robusto e distribuição independente. Tratadas como **mediums** (não como `campaign` dentro de `organic`) porque:
+
+1. Operam ecossistemas próprios (canal no YouTube, perfil no Instagram, LinkedIn etc) com audiência e marca pessoal — não são apenas peças de uma iniciativa Turbo
+2. Devem aparecer como **dimensão de primeira ordem** no relatório, lado a lado com `paid`/`organic`, pra leitura imediata de performance por canal
+3. Quando o Victor um dia rodar mídia paga apontando pra Turbo, o medium continua `victor` (a natureza "distribuição via canal-próprio do Victor" é preservada); informação de pago vs orgânico fica em `campaign`/`content`
+
+| source | quando usar |
+|---|---|
+| `instagram` | Perfil do Instagram da figura (posts, reels, stories, bio, linktree, DM) |
+| `youtube` | Canal do YouTube da figura (descrição, bio, banner, card) |
+| `linkedin` | Perfil pessoal no LinkedIn |
+| `tiktok` | Perfil no TikTok |
+
+**Quando NÃO usar `victor`/`andre`/`rodrigo`:**
+- Conteúdo orgânico da página/canal **da Turbo** (mesmo que cite o Victor) → `organic`
+- Anúncio pago **da Turbo** que tem o Victor como rosto do criativo → `paid` (a figura aparece no `content` do ad, não no medium)
+- Indicação informal do Victor por WhatsApp pessoal pra um amigo → `referral/colaborador/victor`
+
+**Crescimento do vocabulário:** abrir exceção pra nova figura (ex: Camila) exige aprovação Growth + Pre-Sales caso a caso. NÃO é regra automática — manter o vocabulário enxuto evita inflação de mediums.
+
 ---
 
 ## 4. Regras de naming para `campaign`, `term` e `content`
@@ -167,11 +208,95 @@ Use **tokens dinâmicos da plataforma** sempre que possível. A plataforma subst
 
 ### 4.2 Conteúdo orgânico (`organic`)
 
-| campo | valor |
+#### Campaign (vocabulário fechado de iniciativas)
+
+| campaign | quando usar |
 |---|---|
-| campaign | **iniciativa coordenada de marketing**. Pode ser perene ou pontual:<br>• `always-on` — presença contínua sem campanha específica nomeada<br>• `automacoes` — fluxos automatizados (ManyChat, bots de DM)<br>• `social-selling` — SDRs conversando ativamente em DMs dos canais orgânicos<br>• nome de campanha pontual: `lancamento-creators-2026-05`, `black-friday-2026`, `workshop-shopify-2026-04` |
-| term | **posicionamento ou local físico do clique**:<br>• `bio` — link único na bio do perfil<br>• `destaques` — destaques fixados (Story Highlights do Instagram)<br>• `linktree` — passou pelo intermediário Linktree<br>• `feed` — post no feed/timeline<br>• `stories` — stories temporários<br>• `reels` — Reels/shorts<br>• `dm` — mensagem direta enviada (manual ou automatizada)<br>• `descricao-video`, `card` — YouTube |
-| content | ID único do post, peça ou link específico (ex: `post-2026-05-19-creators`, `link-checkout-creators`) |
+| `always-on` | Presença contínua sem campanha nomeada (default) |
+| `automacoes` | Fluxos automáticos (ManyChat, bots de DM) |
+| `social-selling` | SDR conversando ativamente em DMs dos canais orgânicos da Turbo |
+| `lancamento-{slug}-{aaaa-mm}` | Campanha pontual de lançamento de produto (ver slugs em §4.2.4) |
+| `{evento}-{aaaa-mm}` | Workshop/evento pontual da Turbo (ex: `workshop-shopify-2026-04`) |
+
+#### Term por plataforma (vocabulário fechado)
+
+`term` responde **"onde fisicamente o link com UTM está colado?"**
+
+**Instagram:**
+
+| term | onde fica |
+|---|---|
+| `bio` | link único na bio do perfil (direto pra LP, sem Linktree) |
+| `linktree` | link cadastrado dentro da Linktree (ver §4.2.3) |
+| `feed` | post no feed/timeline |
+| `stories` | stories temporários |
+| `reels` | Reels |
+| `destaques` | destaques fixados (Story Highlights) |
+| `dm` | mensagem direta (social-selling do SDR ou automação) |
+
+**LinkedIn:**
+
+| term | onde fica |
+|---|---|
+| `bio` | seção "Sobre" do perfil ou da página da Turbo |
+| `feed` | post no feed (página oficial ou perfil pessoal de colaborador) |
+| `dm` | mensagem direta (social-selling do SDR) |
+
+**YouTube:**
+
+| term | onde fica |
+|---|---|
+| `descricao-video` | descrição abaixo do vídeo |
+| `descricao-shorts` | descrição de YouTube Shorts |
+| `card` | cards interativos no canto do vídeo |
+| `bio` | seção "Sobre" do canal |
+| `banner` | links clicáveis no banner/cabeçalho do canal |
+
+**TikTok:**
+
+| term | onde fica |
+|---|---|
+| `bio` | link único na bio do perfil (direto pra LP) |
+| `linktree` | link cadastrado dentro da Linktree (se aplicável) |
+| `feed` | vídeos no feed |
+| `dm` | mensagem direta (social-selling) |
+
+#### Content (convenção)
+
+`content` = identificador único da peça específica. **Não repete o formato** (que já está em `term`).
+
+```
+content = {slug-curto}-{aaaa-mm-dd}
+```
+
+ou só `{slug-curto}` quando data não agrega.
+
+Exemplos:
+- `term=descricao-video` + `content=creators-ugc-2026-05-26` ✅
+- `term=descricao-video` + `content=video-creators-ugc-2026-05-26` ❌ (repete formato)
+- `term=feed` + `content=creators-2026-05-26` ✅
+- `term=dm` + `content=camila-2026-05-26` ✅
+- `term=banner` + `content=link-diagnostico` ✅ (sem data porque banner muda menos)
+
+#### Slugs oficiais de produto
+
+Usar em campaign de lançamento (`lancamento-{slug}-…`) e em `content` (`link-{slug}`, `diagnostico-{slug}`):
+
+| Produto | slug | também conhecido como |
+|---|---|---|
+| Creators | `creators` | UGC, GC (mesma coisa) |
+| E-Commerce | `ecommerce` | Shopify (todo projeto é em Shopify) |
+| Estruturação Comercial | `comercial` | — |
+| Flash | `flash` | — |
+
+#### Regra `bio` vs `linktree`
+
+A decisão depende de **onde a pessoa está fisicamente colando o link com UTM no momento**:
+
+- **`term=bio`** → quando o link com UTM vai **direto no campo "site/website" do perfil** (Instagram, TikTok, LinkedIn). Aponta direto pra LP final, sem Linktree no meio.
+- **`term=linktree`** → quando o link com UTM está cadastrado **dentro da Linktree** (você está editando a Linktree e colando a URL no campo de algum botão de lá).
+
+**Por que separar:** permite medir se a Linktree ajuda ou atrapalha (cliques perdidos no intermediário) e qual link de lá performa melhor. Saber qual produto puxou o lead é via `content` (`link-creators`, `link-ecommerce`).
 
 **Definição operacional de `social-selling` na Turbo:**
 
@@ -185,9 +310,7 @@ Use **tokens dinâmicos da plataforma** sempre que possível. A plataforma subst
 | SDR responde DM no LinkedIn oficial da Turbo com link | `organic/linkedin/social-selling/term=dm` |
 | Colaborador manda link da Turbo no WhatsApp pessoal pra um amigo | `referral/colaborador/lucas/term=indicacao` |
 | Colaborador conta sobre Turbo em conversa de café e depois manda link | `referral/colaborador/lucas/term=indicacao` |
-| Colaborador faz post no LinkedIn pessoal dele com link | (caso raro) `organic/linkedin/always-on/content=post-{id}` |
-
-**Tratamento do Linktree:** quando o link passa pela Linktree, marca `term=linktree` e usa `content` para identificar qual link específico foi clicado. O `source` é sempre a plataforma de origem (Instagram, TikTok, etc), não a Linktree em si.
+| Colaborador faz post no LinkedIn pessoal dele com link | `organic/linkedin/always-on/feed/content=post-{slug}-{data}` |
 
 ### 4.3 Eventos
 
@@ -220,6 +343,21 @@ Use **tokens dinâmicos da plataforma** sempre que possível. A plataforma subst
 | campaign | nome da cadência: `cadencia-q4-donos-agencia` |
 | term | perfil do lead: `agencia-50-funcionarios`, `dono-clinica-odonto` |
 | content | touchpoint ou template: `email-2-quebra-objecao`, `linkedin-msg-1` |
+
+### 4.7 Mediums-exceção `victor`, `andre` e `rodrigo`
+
+Mesma lógica de naming que `organic` (ver §4.2), porque a natureza do conteúdo é orgânica — o que muda é só quem distribui (a figura, não a Turbo).
+
+| campo | valor |
+|---|---|
+| campaign | `always-on` (default presença contínua) · `lancamento-{slug}-{aaaa-mm}` (parceria pontual com Turbo) · `paid-{{campaign.id}}` (se a figura rodar anúncio próprio apontando pra Turbo) |
+| term | mesmo vocabulário por plataforma de organic: `bio`, `linktree`, `descricao-video`, `feed`, `stories`, `reels`, etc |
+| content | `{slug-curto}-{aaaa-mm-dd}` — ex: `canal-victor`, `link-creators-2026-05`, `video-creators-2026-05-28` |
+
+**Exemplo:**
+```
+?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=descricao-video&utm_content=video-creators-2026-05-28
+```
 
 ---
 
@@ -353,6 +491,41 @@ https://turbopartners.com.br/creators?utm_source=facebook&utm_medium=paid&utm_ca
 **Evento (palestra com QR code no slide):**
 ```
 ?utm_source=rd-summit-2026&utm_medium=eventos&utm_campaign=presencial-2026&utm_term=palestra&utm_content=slide-final-cta
+```
+
+**Victor — bio do canal no YouTube apontando pra Turbo:**
+```
+?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=bio&utm_content=canal-victor
+```
+
+**Victor — descrição de vídeo no canal dele:**
+```
+?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=descricao-video&utm_content=video-creators-2026-05-28
+```
+
+**Victor — link da Turbo dentro da Linktree do Instagram dele:**
+```
+?utm_source=instagram&utm_medium=victor&utm_campaign=always-on&utm_term=linktree&utm_content=link-turbo
+```
+
+**André — descrição de vídeo no canal dele:**
+```
+?utm_source=youtube&utm_medium=andre&utm_campaign=always-on&utm_term=descricao-video&utm_content=video-creators-2026-05-28
+```
+
+**André — link da Turbo dentro da Linktree do Instagram dele:**
+```
+?utm_source=instagram&utm_medium=andre&utm_campaign=always-on&utm_term=linktree&utm_content=link-turbo
+```
+
+**Rodrigo — Sobre do perfil no LinkedIn apontando pra Turbo:**
+```
+?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=bio&utm_content=link-turbo
+```
+
+**Rodrigo — post no feed do LinkedIn dele:**
+```
+?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-08
 ```
 
 ---
@@ -566,9 +739,23 @@ Se as 4 respostas forem "sim", entra. Se alguma for "não", o caso provavelmente
 - Term `dm-direta` renomeado para `dm` (mais conciso)
 - Campaign `social-selling` agora vale para qualquer source de organic (era restrita a Instagram + LinkedIn). Cobre o caso futuro de DMs no TikTok, YouTube, etc.
 
+**v1.2** (26/05/2026) — Refinamentos pós-treinamento do time + aba Guia em `/utm-builder`:
+- Vocabulário de `term` por plataforma explicitado em tabelas (Instagram, LinkedIn, YouTube, TikTok)
+- YouTube ganha vocabulário próprio: `descricao-video`, `descricao-shorts`, `card`, `bio`, `banner`
+- LinkedIn enxuto: `bio`, `feed`, `dm`
+- Regra `bio` vs `linktree` reescrita pela ótica de quem está colando o link (elimina confusão)
+- `facebook` removido de organic (Turbo não opera Facebook orgânico)
+- Slugs oficiais de produto fixados: `creators`, `ecommerce`, `comercial`, `flash`
+- Convenção de `content` em organic: `{slug-curto}-{aaaa-mm-dd}` sem repetir o formato
+- **`victor` e `andre` adicionados como mediums-exceção** (figuras-chave de distribuição com canal próprio robusto — §3.7 + §4.7 + exemplos em §5.3). Decisão deliberada de tratá-los como dimensão de primeira ordem no relatório, fugindo da Lei 1 (vocabulário fechado). Toda nova figura nesse formato exige aprovação Growth+Pre-Sales caso a caso.
+
+**v1.3** (08/06/2026) — `rodrigo` adicionado como medium-exceção:
+- Terceira figura-chave com canal próprio robusto, mesmo tratamento de `victor` e `andre` (§3.7 + §4.7 + exemplo no LinkedIn em §5.3)
+- Sources liberados: `instagram`, `youtube`, `linkedin`, `tiktok` (idêntico às outras figuras)
+
 ---
 
-**Versão:** 1.1
+**Versão:** 1.3
 **Data de aprovação:** *aguardando Ichino*
 **Vigência a partir de:** 21/05/2026
 **Próxima revisão prevista:** agosto/2026 (revisão trimestral)

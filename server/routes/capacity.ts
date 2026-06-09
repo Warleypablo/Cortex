@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
+import { parseAggRow, buildResponse } from "./capacityTimes.helpers";
 
 // Tabela de referência: nível do Gestor de Performance → metas
 const GESTOR_LEVELS: Record<string, { mrr_alvo: number; ticket_alvo: number }> = {
@@ -115,6 +116,99 @@ export function registerCapacityRoutes(app: Express, db: any) {
   // GET /api/capacity/levels — referência de níveis
   app.get("/api/capacity/levels", async (_req, res) => {
     res.json(GESTOR_LEVELS);
+  });
+
+  // GET /api/capacity-times — ocupação atual vs capacidade por pessoa/time
+  app.get("/api/capacity-times", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        WITH m AS (
+          SELECT nome, categoria, match_responsavel,
+                 cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem
+          FROM cortex_core.capacity_metas
+          WHERE ativo = TRUE
+        ),
+        agg AS (
+          SELECT
+            m.nome, m.categoria, m.ordem,
+            m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas,
+            COUNT(*) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0
+                AND c.status IN ('ativo','onboarding','em cancelamento')
+            ) AS op_recorrente,
+            COALESCE(SUM(c.valorr) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0
+                AND c.status IN ('ativo','onboarding','em cancelamento')
+            ), 0) AS mrr_operando,
+            COALESCE(SUM(c.valorr) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0 AND c.status = 'ativo'
+            ), 0) AS mrr_ativo,
+            COALESCE(SUM(c.valorr) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0 AND c.status = 'onboarding'
+            ), 0) AS mrr_onboarding,
+            COALESCE(SUM(c.valorr) FILTER (
+              WHERE COALESCE(c.valorr, 0) > 0 AND c.status = 'em cancelamento'
+            ), 0) AS mrr_cancelamento,
+            COUNT(*) FILTER (
+              WHERE COALESCE(c.valorp, 0) > 0
+                AND c.status IN ('ativo','onboarding')
+            ) AS op_pontual
+          FROM m
+          LEFT JOIN "Clickup".cup_contratos c
+            ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
+          GROUP BY m.nome, m.categoria, m.ordem,
+                   m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas
+        )
+        SELECT * FROM agg ORDER BY ordem, nome
+      `);
+
+      const rows = result.rows.map(parseAggRow);
+      res.json(buildResponse(rows));
+    } catch (error) {
+      console.error("[api] Error fetching capacity-times:", error);
+      res.status(500).json({ error: "Failed to fetch capacity-times" });
+    }
+  });
+
+  // GET /api/capacity-times/contratos?nome=<nome>
+  app.get("/api/capacity-times/contratos", async (req, res) => {
+    const nome = (req.query.nome as string | undefined)?.trim();
+    if (!nome) return res.status(400).json({ error: "nome é obrigatório" });
+    try {
+      const rows = (await db.execute(sql`
+        SELECT
+          cl.nome AS cliente,
+          c.produto,
+          c.status,
+          COALESCE(c.valorr, 0) AS valorr,
+          COALESCE(c.valorp, 0) AS valorp,
+          c.id_subtask
+        FROM cortex_core.capacity_metas m
+        JOIN "Clickup".cup_contratos c
+          ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
+          AND c.status IN ('ativo','onboarding','em cancelamento')
+        LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+        WHERE m.nome = ${nome}
+          AND m.ativo = TRUE
+        ORDER BY
+          CASE c.status WHEN 'ativo' THEN 1 WHEN 'onboarding' THEN 2 ELSE 3 END,
+          COALESCE(c.valorr, 0) DESC
+      `)).rows as any[];
+
+      res.json({
+        contratos: rows.map((r) => ({
+          cliente: r.cliente || "—",
+          produto: r.produto || "—",
+          status: r.status as string,
+          valorr: Number(r.valorr) || 0,
+          valorp: Number(r.valorp) || 0,
+          id_subtask: r.id_subtask ?? null,
+        })),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching capacity-times contratos:", error);
+      res.status(500).json({ error: "Failed to fetch contratos" });
+    }
   });
 
   // ── Endpoints legados (mantidos para compatibilidade) ──

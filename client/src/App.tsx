@@ -72,6 +72,7 @@ const CalendarioFerias = lazyWithRetry(() => import("@/pages/CalendarioFerias"))
 const Organograma = lazyWithRetry(() => import("@/pages/Organograma"));
 const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
 const ChurnPredicao = lazyWithRetry(() => import("@/pages/ChurnPredicao"));
+const ChurnProduto = lazyWithRetry(() => import("@/pages/ChurnProduto"));
 const AnalisePreditiva = lazyWithRetry(() => import("@/pages/gestao/AnalisePreditiva"));
 const TvLeaderboard = lazyWithRetry(() => import("@/pages/gestao/TvLeaderboard"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
@@ -86,6 +87,7 @@ const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
 const InstagramDashboard = lazyWithRetry(() => import("@/pages/InstagramDashboard"));
+const GrowthDfcCac = lazyWithRetry(() => import("@/pages/GrowthDfcCac"));
 const AuditoriaSistemas = lazyWithRetry(() => import("@/pages/AuditoriaSistemas"));
 const ContribuicaoColaborador = lazyWithRetry(() => import("@/pages/ContribuicaoColaborador"));
 const ContribuicaoOperador = lazyWithRetry(() => import("@/pages/ContribuicaoOperador"));
@@ -101,6 +103,7 @@ const DetailClosers = lazyWithRetry(() => import("@/pages/DetailClosers"));
 const DetailSDRs = lazyWithRetry(() => import("@/pages/DetailSDRs"));
 const AnaliseVendas = lazyWithRetry(() => import("@/pages/AnaliseVendas"));
 const PresentationMode = lazyWithRetry(() => import("@/pages/PresentationMode"));
+const FechamentoSemanal = lazyWithRetry(() => import("@/pages/FechamentoSemanal"));
 const DetalhamentoVendas = lazyWithRetry(() => import("@/pages/DetalhamentoVendas"));
 const ComercialReunioes = lazyWithRetry(() => import("@/pages/ComercialReunioes"));
 const FunilVendas = lazyWithRetry(() => import("@/pages/FunilVendas"));
@@ -150,6 +153,7 @@ const AutoReport = lazyWithRetry(() => import("@/pages/AutoReport"));
 const Chamados = lazyWithRetry(() => import("@/pages/Chamados"));
 const SolicitacaoFerramentas = lazyWithRetry(() => import("@/pages/SolicitacaoFerramentas"));
 const Capacity = lazyWithRetry(() => import("@/pages/Capacity"));
+const CapacityTimes = lazyWithRetry(() => import("@/pages/CapacityTimes"));
 const PortalCliente = PortalClientePage;
 const PortalCreator = lazyWithRetry(() => import("@/pages/PortalCreator"));
 const TestWorkflow = lazyWithRetry(() => import("@/pages/TestWorkflow"));
@@ -160,6 +164,10 @@ const CrossSellDashboard = lazyWithRetry(() => import("@/pages/CrossSellDashboar
 const ReceitaRecorrente = lazyWithRetry(() => import("@/pages/financeiro/ReceitaRecorrente"));
 const MixReceita = lazyWithRetry(() => import("@/pages/financeiro/MixReceita"));
 const NotFound = lazyWithRetry(() => import("@/pages/not-found"));
+const LtLtvChurn = lazyWithRetry(() => import("@/pages/LtLtvChurn"));
+const LtvClientes = lazyWithRetry(() => import("@/pages/LtvClientes"));
+const EstoquePontual = lazyWithRetry(() => import("@/pages/EstoquePontual"));
+const CreatorsPontual = lazyWithRetry(() => import("@/pages/CreatorsPontual"));
 
 // Error boundary to catch silent crashes in the portal.
 // The lazyWithRetry wrapper handles the first auto-reload attempt at the
@@ -312,6 +320,11 @@ function ProtectedRouter() {
       <Route path="/visao-geral">{() => <ProtectedRoute path="/visao-geral" component={VisaoGeral} />}</Route>
       <Route path="/dashboard/churn-detalhamento">{() => <ProtectedRoute path="/dashboard/churn-detalhamento" component={ChurnDetalhamento} />}</Route>
       <Route path="/dashboard/churn-predicao">{() => <ProtectedRoute path="/dashboard/churn-predicao" component={ChurnPredicao} />}</Route>
+      <Route path="/dashboard/churn-produto">{() => <ProtectedRoute path="/dashboard/churn-produto" component={ChurnProduto} />}</Route>
+      <Route path="/lt-ltv-churn">{() => <ProtectedRoute path="/lt-ltv-churn" component={LtLtvChurn} />}</Route>
+      <Route path="/ltv-clientes">{() => <ProtectedRoute path="/ltv-clientes" component={LtvClientes} />}</Route>
+      <Route path="/estoque-pontual">{() => <ProtectedRoute path="/estoque-pontual" component={EstoquePontual} />}</Route>
+      <Route path="/creators-pontual">{() => <ProtectedRoute path="/creators-pontual" component={CreatorsPontual} />}</Route>
       <Route path="/dashboard/evolucao-mensal">{() => <ProtectedRoute path="/dashboard/evolucao-mensal" component={EvolucaoMensal} />}</Route>
       <Route path="/dashboard/analise-squads">{() => <ProtectedRoute path="/dashboard/analise-squads" component={AnaliseSquads} />}</Route>
       <Route path="/dashboard/saude-base-ativa">{() => <ProtectedRoute path="/dashboard/saude-base-ativa" component={SaudeBaseAtiva} />}</Route>
@@ -374,6 +387,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/comercial/crosssell">{() => <ProtectedRoute path="/dashboard/comercial/crosssell" component={CrossSellPipeline} />}</Route>
       <Route path="/dashboard/comercial/crosssell-dashboard">{() => <ProtectedRoute path="/dashboard/comercial/crosssell-dashboard" component={CrossSellDashboard} />}</Route>
       <Route path="/presentation">{() => <ProtectedRoute path="/presentation" component={PresentationMode} />}</Route>
+      <Route path="/presentation/fechamento-semanal">{() => <ProtectedRoute path="/presentation/fechamento-semanal" component={FechamentoSemanal} />}</Route>
       
       {/* Growth */}
       <Route path="/growth/visao-geral">{() => <ProtectedRoute path="/growth/visao-geral" component={GrowthVisaoGeral} />}</Route>
@@ -388,6 +402,7 @@ function ProtectedRouter() {
       <Route path="/growth/ai">{() => <ProtectedRoute path="/growth/ai" component={GrowthAI} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
       <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramDashboard} />}</Route>
+      <Route path="/growth/dfc-cac">{() => <ProtectedRoute path="/growth/dfc-cac" component={GrowthDfcCac} />}</Route>
       
       {/* Social (Makers) */}
       <Route path="/social/creators">{() => <ProtectedRoute path="/social/creators" component={Creators} />}</Route>
@@ -407,6 +422,7 @@ function ProtectedRouter() {
       <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>
       <Route path="/bp-produtos">{() => <ProtectedRoute path="/bp-produtos" component={BpProdutos} />}</Route>
       <Route path="/capacity">{() => <ProtectedRoute path="/capacity" component={Capacity} />}</Route>
+      <Route path="/capacity-times">{() => <ProtectedRoute path="/capacity-times" component={CapacityTimes} />}</Route>
 
       {/* Calendário */}
       <Route path="/calendario">{() => <ProtectedRoute path="/calendario" component={Calendario} />}</Route>
@@ -474,7 +490,7 @@ function AppLayout() {
   const [location] = useLocation();
   const isLoginPage = location === "/login";
   const isLoginCliente = location === "/loginclientes";
-  const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation";
+  const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation" || location === "/presentation/fechamento-semanal";
   const isPortalCliente = location.startsWith("/portal-cliente");
   const isPortalCreator = location.startsWith("/portal/creator");
   const isPrivacy = location === "/privacy" || location === "/privacidade";
