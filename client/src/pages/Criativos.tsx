@@ -72,6 +72,13 @@ const LEVEL_LABEL: Record<Level, string> = {
   anuncio: "anúncios",
 };
 
+const LEVEL_SINGULAR: Record<Level, string> = {
+  conta: "conta",
+  campanha: "campanha",
+  conjunto: "conjunto",
+  anuncio: "anúncio",
+};
+
 function formatNumber(value: number | null): string {
   if (value === null) return '-';
   return new Intl.NumberFormat("pt-BR").format(value);
@@ -820,10 +827,10 @@ export default function Criativos() {
               <div className="relative">
                 <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar criativo..."
+                  placeholder={`Buscar ${LEVEL_SINGULAR[level]}...`}
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-8 w-[150px] h-8 text-xs"
+                  className="pl-8 w-[170px] h-8 text-xs"
                   data-testid="input-search"
                 />
                 {searchTerm && (
@@ -876,17 +883,6 @@ export default function Criativos() {
                 />
               </div>
 
-              <div className="flex items-center gap-1 shrink-0">
-                <span className="text-[11px] text-muted-foreground font-medium">Campanha:</span>
-                <MultiSelect
-                  options={campanhasFiltradas.map(c => c.name)}
-                  selected={campanhaFilters}
-                  onChange={setCampanhaFilters}
-                  placeholder="Todas"
-                  searchPlaceholder="Buscar campanha..."
-                  className="h-8 w-[140px] text-xs"
-                />
-              </div>
 
               <DateRangePicker
                 value={dateRange}
@@ -912,12 +908,12 @@ export default function Criativos() {
 
               {/* Ações à direita */}
               <div className="flex items-center gap-2 flex-wrap">
-                {isAdmin && level !== "conta" && selectedIds.size > 0 && (
+                {isAdmin && level !== "conta" && (
                   <div className="flex items-center gap-2 mr-1">
-                    <Button size="sm" variant="outline" className="h-8" disabled={bulkPending} onClick={() => setBulkAction("resume")} data-testid="button-bulk-ativar">
+                    <Button size="sm" variant="outline" className="h-8" disabled={bulkPending || selectedIds.size === 0} onClick={() => setBulkAction("resume")} data-testid="button-bulk-ativar">
                       <Power className="w-3.5 h-3.5 mr-1" /> Ativar
                     </Button>
-                    <Button size="sm" variant="outline" className="h-8 text-red-600 dark:text-red-400" disabled={bulkPending} onClick={() => setBulkAction("pause")} data-testid="button-bulk-pausar">
+                    <Button size="sm" variant="outline" className="h-8 text-red-600 dark:text-red-400" disabled={bulkPending || selectedIds.size === 0} onClick={() => setBulkAction("pause")} data-testid="button-bulk-pausar">
                       <PowerOff className="w-3.5 h-3.5 mr-1" /> Pausar
                     </Button>
                   </div>
