@@ -23,9 +23,7 @@ interface ThresholdRow {
   label: string;
 }
 
-interface MetricFormattingSheetProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
+interface MetricFormattingContentProps {
   metricRules: MetricRulesetWithThresholds[];
   produtos: string[];
   onSave: (data: {
@@ -38,14 +36,18 @@ interface MetricFormattingSheetProps {
   isSaving: boolean;
 }
 
-export function MetricFormattingSheet({
-  open,
-  onOpenChange,
+interface MetricFormattingSheetProps extends MetricFormattingContentProps {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}
+
+/** Corpo da configuração de cores — usado dentro de um Sheet ou de abas. */
+export function MetricFormattingContent({
   metricRules,
   produtos,
   onSave,
   isSaving,
-}: MetricFormattingSheetProps) {
+}: MetricFormattingContentProps) {
   const [selectedMetric, setSelectedMetric] = useState<string>("");
   const [selectedProduto, setSelectedProduto] = useState<string>("all");
   const [selectedPlataforma, setSelectedPlataforma] = useState<string>("all");
@@ -115,19 +117,10 @@ export function MetricFormattingSheet({
   };
 
   return (
-    <Sheet open={open} onOpenChange={onOpenChange}>
-      <SheetContent className="w-[480px] sm:max-w-[480px] overflow-y-auto">
-        <SheetHeader>
-          <SheetTitle>Formatação de Métricas</SheetTitle>
-          <SheetDescription>
-            Configure cores e faixas para as métricas dos criativos
-          </SheetDescription>
-        </SheetHeader>
-
-        <div className="space-y-4 mt-6">
-          <div className="space-y-2">
-            <Label>Métrica</Label>
-            <Select value={selectedMetric} onValueChange={loadRule}>
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Métrica</Label>
+        <Select value={selectedMetric} onValueChange={loadRule}>
               <SelectTrigger>
                 <SelectValue placeholder="Selecione uma métrica" />
               </SelectTrigger>
@@ -230,12 +223,26 @@ export function MetricFormattingSheet({
                 ))}
               </div>
 
-              <Button onClick={handleSave} disabled={isSaving} className="w-full">
-                {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
-                Salvar
-              </Button>
-            </>
-          )}
+          <Button onClick={handleSave} disabled={isSaving} className="w-full">
+            {isSaving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+            Salvar
+          </Button>
+        </>
+      )}
+    </div>
+  );
+}
+
+export function MetricFormattingSheet({ open, onOpenChange, ...content }: MetricFormattingSheetProps) {
+  return (
+    <Sheet open={open} onOpenChange={onOpenChange}>
+      <SheetContent className="w-[480px] sm:max-w-[480px] overflow-y-auto">
+        <SheetHeader>
+          <SheetTitle>Formatação de Métricas</SheetTitle>
+          <SheetDescription>Configure cores e faixas para as métricas dos criativos</SheetDescription>
+        </SheetHeader>
+        <div className="mt-6">
+          <MetricFormattingContent {...content} />
         </div>
       </SheetContent>
     </Sheet>

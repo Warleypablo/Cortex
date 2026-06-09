@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback } from "react";
+import { useState, useMemo, useCallback, useEffect } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -7,11 +7,19 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { MetricFormattingSheet } from "@/components/MetricFormattingSheet";
+import { CriativosSettingsSheet } from "@/components/criativos/CriativosSettingsSheet";
 import { MultiSelect } from "@/components/ui/multi-select";
-import { Search, X, ArrowUpDown, TrendingUp, TrendingDown, Rocket, ExternalLink, Loader2, Settings, ChevronRight, ChevronDown } from "lucide-react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { CriativosTable } from "@/components/criativos/CriativosTable";
+import { aggregateByLevel, sortRows, type CriativoData, type Level, type SortConfig } from "@/lib/criativosMetrics";
+import { loadConfig, persistConfig, loadViews, persistViews, resolveColumns, type ColumnConfig, type SavedView } from "@/lib/criativosColumns";
+import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle, Building2, Megaphone, Layers3, Image as ImageIcon } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getMetricColor, getColorClasses, getBenchmarkColor, CRIATIVOS_BENCHMARK_MAP } from "@/lib/metricFormatting";
@@ -20,56 +28,6 @@ import type { MetricRulesetWithThresholds } from "@shared/schema";
 import type { DateRange } from "react-day-picker";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency as formatCurrencyUtil, formatDecimal as formatDecimalUtil, formatPercent as formatPercentUtil } from "@/lib/utils";
-
-interface CriativoData {
-  id: string;
-  adName: string;
-  link: string;
-  status: string;
-  plataforma: string;
-  campaignId: string | null;
-  campaignName: string | null;
-  investimento: number;
-  videoHook: number | null;
-  videoHold: number | null;
-  ctr: number | null;
-  cpm: number | null;
-  connectRate: number | null;
-  taxaConversao: number | null;
-  leads: number;
-  cpl: number | null;
-  mql: number;
-  cpmql: number | null;
-  cpra: number | null;
-  cpraMql: number | null;
-  cpraNmql: number | null;
-  cprr: number | null;
-  cprrMql: number | null;
-  cprrNmql: number | null;
-  percMql: number | null;
-  descartadoPerc: number | null;
-  descartadoMqlPerc: number | null;
-  descartadoNmqlPerc: number | null;
-  percRa: number | null;
-  percRaMql: number | null;
-  percRaNmql: number | null;
-  percRr: number | null;
-  percRrMql: number | null;
-  percRrNmql: number | null;
-  percRrVendas: number | null;
-  percRrMqlVendas: number | null;
-  percRrNmqlVendas: number | null;
-  clientesUnicos: number;
-  leadTime: number | null;
-  aov: number | null;
-  receita: number | null;
-  receitaPontual: number;
-  receitaRecorrente: number;
-  cacGeral: number | null;
-  cacUnico: number | null;
-  cacContrato: number | null;
-  roas: number | null;
-}
 
 interface Campanha {
   id: string;
@@ -85,9 +43,25 @@ interface KpiData {
   aov: number;
 }
 
-type SortConfig = {
-  key: keyof CriativoData;
-  direction: 'asc' | 'desc';
+interface AuthUser {
+  id: string;
+  name: string;
+  email: string;
+  role: "admin" | "user";
+}
+
+const LEVEL_LABEL: Record<Level, string> = {
+  conta: "conta",
+  campanha: "campanhas",
+  conjunto: "conjuntos",
+  anuncio: "anúncios",
+};
+
+const LEVEL_SINGULAR: Record<Level, string> = {
+  conta: "conta",
+  campanha: "campanha",
+  conjunto: "conjunto",
+  anuncio: "anúncio",
 };
 
 function formatNumber(value: number | null): string {
@@ -121,11 +95,41 @@ export default function Criativos() {
   const [campanhaFilters, setCampanhaFilters] = useState<string[]>([]);
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: 'investimento', direction: 'desc' });
 
+  // Nível de visualização (tabs): conta / campanha / conjunto / anúncio
+  const [level, setLevel] = useState<Level>("anuncio");
+  // Configuração de colunas (visibilidade, ordem, larguras) + visualizações salvas
+  const [colConfig, setColConfig] = useState<ColumnConfig>(loadConfig);
+  const [colViews, setColViews] = useState<SavedView[]>(loadViews);
+  useEffect(() => { persistConfig(colConfig); }, [colConfig]);
+  useEffect(() => { persistViews(colViews); }, [colViews]);
+  const visibleColumns = useMemo(() => resolveColumns(colConfig), [colConfig]);
+  const handleResize = useCallback((key: string, width: number) => {
+    setColConfig((c) => ({ ...c, widths: { ...c.widths, [key]: width } }));
+  }, []);
+  // Seleção em massa + toggle de status (pausar/ativar)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  // Drill-down (filtro por entidades selecionadas, estilo Meta Ads Manager)
+  const [scope, setScope] = useState<{ fromLevel: Level; ids: string[] } | null>(null);
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
+  const [statusOverride, setStatusOverride] = useState<Map<string, string>>(new Map());
+  const [bulkAction, setBulkAction] = useState<null | "pause" | "resume">(null);
+  const [bulkPending, setBulkPending] = useState(false);
+
   const { toast } = useToast();
   const [configOpen, setConfigOpen] = useState(false);
 
   const startDate = format(dateRange.from, 'yyyy-MM-dd');
   const endDate = format(dateRange.to, 'yyyy-MM-dd');
+
+  // ── Agente Gestor de Performance (admin only) ─────────────────────────
+  const { data: authUser } = useQuery<AuthUser>({
+    queryKey: ["/api/auth/me"],
+  });
+  const isAdmin = authUser?.role === "admin";
+
+  // Agente de IA (Analisar com IA / Propostas) pausado por enquanto.
+  // Mantém um mapa vazio para a coluna de badge "IA" na tabela.
+  const pendingByEntity = useMemo(() => new Map<string, { entity_id: string }>(), []);
 
   // Buscar lista de campanhas (filtrada por gasto no período)
   const { data: campanhas = [] } = useQuery<Campanha[]>({
@@ -220,23 +224,13 @@ export default function Criativos() {
     enabled: compareEnabled && !!compareStartDate && !!compareEndDate,
   });
 
-  // Mapa de comparação por ad_id
+  // Mapa de comparação agregado no mesmo nível da tab ativa
   const compareMap = useMemo(() => {
+    const aggregated = aggregateByLevel(compareData, level);
     const map = new Map<string, CriativoData>();
-    compareData.forEach(item => map.set(item.id, item));
+    aggregated.forEach(item => map.set(item.id, item));
     return map;
-  }, [compareData]);
-
-  // Grupos de colunas expandidos (sub-métricas)
-  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const toggleGroup = (group: string) => {
-    setExpandedGroups(prev => {
-      const next = new Set(prev);
-      if (next.has(group)) next.delete(group);
-      else next.add(group);
-      return next;
-    });
-  };
+  }, [compareData, level]);
 
   // Colunas expandidas (para mostrar variação de comparação)
   const [expandedColumns, setExpandedColumns] = useState<Set<string>>(new Set());
@@ -363,38 +357,42 @@ export default function Criativos() {
     return '';
   }, [findRulesetForContext, selectedProdutos, selectedPlataformas, benchmarkData]);
 
-  const filteredData = useMemo(() => {
-    let result = [...criativos];
-
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      result = result.filter(item =>
-        item.adName.toLowerCase().includes(term) ||
-        item.id.toLowerCase().includes(term)
-      );
-    }
-
-    result.sort((a, b) => {
-      const aValue = a[sortConfig.key];
-      const bValue = b[sortConfig.key];
-
-      if (aValue === null && bValue === null) return 0;
-      if (aValue === null) return 1;
-      if (bValue === null) return -1;
-
-      if (typeof aValue === 'number' && typeof bValue === 'number') {
-        return sortConfig.direction === 'asc' ? aValue - bValue : bValue - aValue;
-      }
-
-      const aStr = String(aValue);
-      const bStr = String(bValue);
-      return sortConfig.direction === 'asc'
-        ? aStr.localeCompare(bStr)
-        : bStr.localeCompare(aStr);
+  // Linhas de anúncio filtradas por busca (sem ordenação ainda)
+  // Busca casa com o campo do nível ativo (campanha/conjunto/anúncio),
+  // não com o nome do anúncio individual
+  const searchedRows = useMemo(() => {
+    if (!searchTerm) return criativos;
+    const term = searchTerm.toLowerCase();
+    return criativos.filter(item => {
+      if (level === "campanha") return (item.campaignName || "").toLowerCase().includes(term) || (item.campaignId || "").toLowerCase().includes(term);
+      if (level === "conjunto") return (item.adsetName || "").toLowerCase().includes(term) || (item.adsetId || "").toLowerCase().includes(term);
+      if (level === "anuncio") return item.adName.toLowerCase().includes(term) || item.id.toLowerCase().includes(term);
+      return true; // conta: busca não filtra
     });
+  }, [criativos, searchTerm, level]);
 
-    return result;
-  }, [criativos, searchTerm, sortConfig]);
+  // Drill-down: ao selecionar campanhas/conjuntos e abrir uma aba mais profunda,
+  // filtramos os anúncios pelas entidades selecionadas (estilo Meta Ads Manager)
+  const scopedRows = useMemo(() => {
+    if (!scope) return searchedRows;
+    const ids = new Set(scope.ids);
+    if (scope.fromLevel === "campanha") return searchedRows.filter(r => r.campaignId && ids.has(r.campaignId));
+    if (scope.fromLevel === "conjunto") return searchedRows.filter(r => r.adsetId && ids.has(r.adsetId));
+    return searchedRows;
+  }, [searchedRows, scope]);
+
+  // Aplica override otimista de status (pause/resume reflete na hora;
+  // o DB sincroniza com a Meta só a cada 6h)
+  const applyOverride = useCallback((rows: CriativoData[]): CriativoData[] =>
+    statusOverride.size === 0
+      ? rows
+      : rows.map(r => statusOverride.has(r.id) ? { ...r, status: statusOverride.get(r.id)! } : r),
+  [statusOverride]);
+
+  // Linhas do nível atual: agrega → ordena → aplica override
+  const activeRows = useMemo(() =>
+    applyOverride(sortRows(aggregateByLevel(scopedRows, level), sortConfig)),
+  [scopedRows, level, sortConfig, applyOverride]);
 
   const handleSort = (key: keyof CriativoData) => {
     setSortConfig(prev => ({
@@ -403,71 +401,104 @@ export default function Criativos() {
     }));
   };
 
-  // Calcular médias das métricas numéricas
+  // Linha de totais (agregação de conta sobre as linhas filtradas) — somável,
+  // os derivados são recalculados a partir das somas (não média de médias)
   const averages = useMemo(() => {
-    const data = filteredData;
-    const len = data.length;
-    if (len === 0) return null;
+    if (scopedRows.length === 0) return null;
+    return aggregateByLevel(scopedRows, "conta")[0] ?? null;
+  }, [scopedRows]);
 
-    const avg = (key: keyof CriativoData) => {
-      const values = data.map(d => d[key] as number | null).filter((v): v is number => v !== null && v !== 0);
-      if (values.length === 0) return null;
-      return parseFloat((values.reduce((s, v) => s + v, 0) / values.length).toFixed(2));
-    };
+  // ── Handlers de seleção, toggle e ação em massa ──
+  const apiLevelFor = (l: Level): "ad" | "adset" | "campaign" =>
+    l === "campanha" ? "campaign" : l === "conjunto" ? "adset" : "ad";
 
-    const sum = (key: keyof CriativoData) => {
-      return data.reduce((s, d) => s + ((d[key] as number) || 0), 0);
-    };
+  const LEVEL_DEPTH: Record<Level, number> = { conta: 0, campanha: 1, conjunto: 2, anuncio: 3 };
 
-    const totalInvest = sum('investimento');
-    const totalLeads = sum('leads');
-    const totalMql = sum('mql');
+  const handleLevelChange = (l: string) => {
+    const target = l as Level;
+    // Drill-down: havia seleção em campanha/conjunto e estamos indo p/ um nível mais profundo
+    if (selectedIds.size > 0 && (level === "campanha" || level === "conjunto") && LEVEL_DEPTH[target] > LEVEL_DEPTH[level]) {
+      setScope({ fromLevel: level, ids: Array.from(selectedIds) });
+    } else if (scope && LEVEL_DEPTH[target] <= LEVEL_DEPTH[scope.fromLevel]) {
+      // voltou para o nível de origem (ou acima): limpa o filtro de drill-down
+      setScope(null);
+    }
+    setLevel(target);
+    setSelectedIds(new Set());
+  };
 
-    return {
-      investimento: totalInvest,
-      cpm: avg('cpm'),
-      videoHook: avg('videoHook'),
-      videoHold: avg('videoHold'),
-      ctr: avg('ctr'),
-      connectRate: avg('connectRate'),
-      taxaConversao: avg('taxaConversao'),
-      leads: totalLeads,
-      cpl: avg('cpl'),
-      mql: totalMql,
-      cpmql: avg('cpmql'),
-      cpra: avg('cpra'),
-      cpraMql: avg('cpraMql'),
-      cpraNmql: avg('cpraNmql'),
-      cprr: avg('cprr'),
-      cprrMql: avg('cprrMql'),
-      cprrNmql: avg('cprrNmql'),
-      percMql: avg('percMql'),
-      percRa: avg('percRa'),
-      percRaMql: avg('percRaMql'),
-      percRaNmql: avg('percRaNmql'),
-      percRr: (() => {
-        const mql = avg('percRrMql');
-        const nmql = avg('percRrNmql');
-        if (mql !== null && nmql !== null) return parseFloat(((mql + nmql) / 2).toFixed(2));
-        return mql ?? nmql;
-      })(),
-      percRrMql: avg('percRrMql'),
-      percRrNmql: avg('percRrNmql'),
-      percRrVendas: avg('percRrVendas'),
-      percRrMqlVendas: avg('percRrMqlVendas'),
-      percRrNmqlVendas: avg('percRrNmqlVendas'),
-      clientesUnicos: sum('clientesUnicos'),
-      leadTime: avg('leadTime'),
-      aov: avg('aov'),
-      receita: avg('receita'),
-      receitaPontual: avg('receitaPontual'),
-      receitaRecorrente: avg('receitaRecorrente'),
-      cacGeral: avg('cacGeral'),
-      cacUnico: avg('cacUnico'),
-      cacContrato: avg('cacContrato'),
-      roas: avg('roas'),
-    };
-  }, [filteredData]);
+  const toggleSelect = (id: string, checked: boolean) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (checked) next.add(id); else next.delete(id);
+      return next;
+    });
+  };
+  const toggleSelectAll = (checked: boolean, ids: string[]) => {
+    setSelectedIds(checked ? new Set(ids) : new Set());
+  };
+
+  const handleToggleStatus = async (row: CriativoData) => {
+    if (level === "conta") return;
+    const apiLevel = apiLevelFor(level);
+    const wasActive = row.status === "Ativo";
+    const action = wasActive ? "pause" : "resume";
+    setStatusOverride(prev => new Map(prev).set(row.id, wasActive ? "Pausado" : "Ativo"));
+    setTogglingIds(prev => new Set(prev).add(row.id));
+    try {
+      const res = await fetch(`/api/meta/actions/${action}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ level: apiLevel, entityId: row.id, reason: "Ação manual via aba Criativos" }),
+      });
+      if (!res.ok) {
+        const j = await res.json().catch(() => ({}));
+        throw new Error(j.error || `Erro ${res.status}`);
+      }
+      toast({ title: wasActive ? "Pausado" : "Ativado", description: row.adName });
+    } catch (err: any) {
+      setStatusOverride(prev => new Map(prev).set(row.id, wasActive ? "Ativo" : "Pausado"));
+      toast({ title: "Falha ao alterar status", description: err.message, variant: "destructive" });
+    } finally {
+      setTogglingIds(prev => { const s = new Set(prev); s.delete(row.id); return s; });
+    }
+  };
+
+  const runBulk = async () => {
+    if (!bulkAction) return;
+    const ids = Array.from(selectedIds);
+    if (ids.length === 0) { setBulkAction(null); return; }
+    const apiLevel = apiLevelFor(level);
+    setBulkPending(true);
+    try {
+      const res = await fetch("/api/meta/actions/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          action: bulkAction,
+          reason: "Ação manual em massa via aba Criativos",
+          items: ids.map(id => ({ level: apiLevel, entityId: id })),
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `Erro ${res.status}`);
+      const newStatus = bulkAction === "pause" ? "Pausado" : "Ativo";
+      setStatusOverride(prev => {
+        const m = new Map(prev);
+        (j.results || []).filter((r: any) => r.ok).forEach((r: any) => m.set(r.entityId, newStatus));
+        return m;
+      });
+      toast({ title: "Ação em massa concluída", description: `${j.okCount ?? 0}/${j.total ?? ids.length} aplicados` });
+      setSelectedIds(new Set());
+    } catch (err: any) {
+      toast({ title: "Falha na ação em massa", description: err.message, variant: "destructive" });
+    } finally {
+      setBulkPending(false);
+      setBulkAction(null);
+    }
+  };
 
   // Calcular variação percentual para KPI cards
   function calcVariation(current: number, compare: number | undefined, invertPositive = false) {
@@ -479,105 +510,6 @@ export default function Criativos() {
 
   const isCompareActive = compareEnabled && compareData.length > 0;
 
-  const SortableHeader = ({ column, label }: { column: keyof CriativoData; label: string }) => {
-    const isExpanded = expandedColumns.has(column);
-    return (
-      <>
-        <TableHead
-          className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100"
-          onClick={() => handleSort(column)}
-          data-testid={`header-${column}`}
-        >
-          <div className="flex items-center gap-1">
-            {isCompareActive && (
-              <button
-                onClick={(e) => { e.stopPropagation(); toggleColumn(column); }}
-                className="hover:text-white text-zinc-400"
-              >
-                {isExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-              </button>
-            )}
-            {label}
-            <ArrowUpDown className="w-3 h-3" />
-          </div>
-        </TableHead>
-        {isCompareActive && isExpanded && (
-          <TableHead className="whitespace-nowrap text-xs bg-zinc-800 text-zinc-400 italic">
-            <div className="text-center">Var.</div>
-          </TableHead>
-        )}
-      </>
-    );
-  };
-
-  // Renderizar célula com variação expandida
-  const renderCell = (
-    value: number | null,
-    compareValue: number | null,
-    column: string,
-    formatter: (v: number | null) => string,
-    colorClass = '',
-    invertPositive = false,
-  ) => {
-    const isExpanded = expandedColumns.has(column);
-    return (
-      <>
-        <TableCell className={`text-right ${colorClass}`}>{formatter(value)}</TableCell>
-        {isCompareActive && isExpanded && (
-          <TableCell className="text-right text-xs bg-zinc-800/30">
-            {value !== null && compareValue !== null && compareValue !== 0 ? (
-              <div className="flex flex-col items-end">
-                <span className="text-muted-foreground">{formatter(value - compareValue)}</span>
-                <span className={cn("text-[10px]",
-                  (() => {
-                    const pct = ((value - compareValue) / compareValue) * 100;
-                    const positive = invertPositive ? pct < 0 : pct > 0;
-                    return positive ? "text-emerald-400" : "text-red-400";
-                  })()
-                )}>
-                  {((value - compareValue) / compareValue * 100) > 0 ? '+' : ''}
-                  {((value - compareValue) / compareValue * 100).toFixed(1)}%
-                </span>
-              </div>
-            ) : (
-              <span className="text-muted-foreground">-</span>
-            )}
-          </TableCell>
-        )}
-      </>
-    );
-  };
-
-  // Header agrupável — mostra chevron para expandir sub-colunas
-  const GroupableHeader = ({ group, label, column, children }: { group: string; label: string; column: keyof CriativoData; children: React.ReactNode }) => {
-    const isGroupExpanded = expandedGroups.has(group);
-    return (
-      <>
-        <TableHead
-          className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100"
-          onClick={() => handleSort(column)}
-        >
-          <div className="flex items-center gap-1">
-            <button
-              onClick={(e) => { e.stopPropagation(); toggleGroup(group); }}
-              className="hover:text-white text-zinc-400"
-            >
-              {isGroupExpanded ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
-            </button>
-            {label}
-            <ArrowUpDown className="w-3 h-3" />
-          </div>
-        </TableHead>
-        {isCompareActive && expandedColumns.has(column) && (
-          <TableHead className="whitespace-nowrap text-xs bg-zinc-800 text-zinc-400 italic">
-            <div className="text-center">Var.</div>
-          </TableHead>
-        )}
-        {isGroupExpanded && children}
-      </>
-    );
-  };
-
   const kpis = kpisData?.current;
   const kpisCompare = kpisData?.compare;
 
@@ -588,111 +520,32 @@ export default function Criativos() {
   const cacVar = kpis && kpisCompare ? calcVariation(kpis.cac, kpisCompare.cac, true) : null;
   const aovVar = kpis && kpisCompare ? calcVariation(kpis.aov, kpisCompare.aov) : null;
 
+  // ── Tabs: badge de seleção + relabel das abas profundas (drill-down) ──
+  const selCount = selectedIds.size;
+  const plur = (n: number, sing: string) => `${n} ${sing}${n === 1 ? "" : "s"}`;
+  const renderSelBadge = (lvl: Level) =>
+    level === lvl && selCount > 0 ? (
+      <span className="ml-1 inline-flex items-center gap-1 rounded bg-primary text-primary-foreground text-[11px] px-1.5 py-0.5">
+        {plur(selCount, "selecionado")}
+        <span
+          role="button"
+          onPointerDown={(e) => e.stopPropagation()}
+          onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+          className="hover:opacity-80"
+          title="Limpar seleção"
+        >
+          <X className="w-3 h-3" />
+        </span>
+      </span>
+    ) : null;
+  const conjuntoLabel = level === "campanha" && selCount > 0 ? `Conjuntos para ${plur(selCount, "campanha")}` : "Conjuntos";
+  const anuncioLabel =
+    level === "campanha" && selCount > 0 ? `Anúncios para ${plur(selCount, "campanha")}`
+    : level === "conjunto" && selCount > 0 ? `Anúncios para ${plur(selCount, "conjunto")}`
+    : "Anúncios";
+
   return (
     <div className="flex flex-col h-full overflow-hidden">
-      <div className="flex items-center justify-between px-4 py-2 border-b bg-card sticky top-0 z-20">
-        <div className="flex items-center gap-2 flex-nowrap min-w-0">
-          <div className="flex items-center gap-1 shrink-0">
-            <div className="relative">
-              <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
-              <Input
-                placeholder="Buscar criativo..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-8 w-[140px] h-8 text-xs"
-                data-testid="input-search"
-              />
-              {searchTerm && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="absolute right-0.5 top-1/2 transform -translate-y-1/2 h-5 w-5"
-                  onClick={() => setSearchTerm("")}
-                >
-                  <X className="w-3 h-3" />
-                </Button>
-              )}
-            </div>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[11px] text-muted-foreground font-medium">Status:</span>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[80px] h-8 text-xs" data-testid="select-status">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="Todos">Todos</SelectItem>
-                <SelectItem value="Ativo">Ativos</SelectItem>
-                <SelectItem value="Pausado">Pausados</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[11px] text-muted-foreground font-medium">Plataforma:</span>
-            <MultiSelect
-              options={[
-                { value: 'Meta Ads', label: 'Meta Ads' },
-                { value: 'Google Ads', label: 'Google Ads' },
-                { value: 'LinkedIn Ads', label: 'LinkedIn Ads' },
-              ]}
-              selected={selectedPlataformas}
-              onChange={setSelectedPlataformas}
-              placeholder="Todas"
-              className="h-8 w-[120px] text-xs"
-            />
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[11px] text-muted-foreground font-medium">Produto:</span>
-            <MultiSelect
-              options={produtos.map(p => ({ value: p, label: p }))}
-              selected={selectedProdutos}
-              onChange={(v) => {
-                setSelectedProdutos(v);
-                setCampanhaFilters([]);
-              }}
-              placeholder="Todos"
-              className="h-8 w-[120px] text-xs"
-            />
-          </div>
-
-          <div className="flex items-center gap-1 shrink-0">
-            <span className="text-[11px] text-muted-foreground font-medium">Campanha:</span>
-            <MultiSelect
-              options={campanhasFiltradas.map(c => c.name)}
-              selected={campanhaFilters}
-              onChange={setCampanhaFilters}
-              placeholder="Todas"
-              searchPlaceholder="Buscar campanha..."
-              className="h-8 w-[140px] text-xs"
-            />
-          </div>
-
-          <DateRangePicker
-            value={dateRange}
-            onChange={(range) => {
-              if (range?.from) {
-                setDateRange({ from: range.from, to: range.to || range.from });
-              }
-            }}
-            align="end"
-            showCompare
-            compareEnabled={compareEnabled}
-            compareRange={compareRange}
-            onCompareChange={(enabled, range) => {
-              setCompareEnabled(enabled);
-              setCompareRange(range);
-            }}
-          />
-
-          <Button variant="outline" size="icon" className="h-9 w-9 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-metrics">
-            <Settings className="w-4 h-4" />
-          </Button>
-        </div>
-      </div>
-
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-2 px-4 py-2">
         {/* Investimento */}
@@ -752,7 +605,7 @@ export default function Criativos() {
         {/* NEGÓCIOS GANHOS */}
         <Card className="border bg-card">
           <CardContent className="pt-3 pb-2 px-4">
-            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Negócios Ganhos</span>
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Clientes Ganhos</span>
             <div className="text-lg font-bold tracking-tight mt-1">
               {kpisLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : formatNumber(kpis?.vendas ?? null)}
             </div>
@@ -804,285 +657,204 @@ export default function Criativos() {
         </Card>
       </div>
 
-      <div className="flex-1 p-4 pt-0">
-        <Card className="h-full">
-          <CardHeader className="pb-2">
-            <div className="flex items-center justify-between gap-2">
-              <CardTitle className="text-lg sr-only">Performance por Criativo</CardTitle>
+      <div className="flex-1 p-4 pt-0 min-h-0">
+        <Card className="h-full flex flex-col">
+          <CardHeader className="pb-2 space-y-2">
+            {/* Tabs por nível (full width, estilo abas) */}
+            <Tabs value={level} onValueChange={handleLevelChange} className="w-full">
+              <TabsList className="grid w-full grid-cols-4 h-auto gap-2 bg-transparent p-0">
+                <TabsTrigger value="conta" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-conta">
+                  <Building2 className="w-4 h-4" /> Conta
+                </TabsTrigger>
+                <TabsTrigger value="campanha" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-campanha">
+                  <Megaphone className="w-4 h-4 shrink-0" /> Campanhas {renderSelBadge("campanha")}
+                </TabsTrigger>
+                <TabsTrigger value="conjunto" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-conjunto">
+                  <Layers3 className="w-4 h-4 shrink-0" /> <span className="truncate">{conjuntoLabel}</span> {renderSelBadge("conjunto")}
+                </TabsTrigger>
+                <TabsTrigger value="anuncio" className="h-10 gap-2 rounded-lg border border-border bg-muted/30 text-muted-foreground text-sm font-medium data-[state=active]:bg-card data-[state=active]:text-primary data-[state=active]:border-primary data-[state=active]:border-b-2 data-[state=active]:shadow-sm" data-testid="tab-anuncio">
+                  <ImageIcon className="w-4 h-4 shrink-0" /> <span className="truncate">{anuncioLabel}</span> {renderSelBadge("anuncio")}
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Chip do filtro de drill-down ativo */}
+            {scope && (
               <div className="flex items-center gap-2">
-                <MetricFormattingSheet
-                  open={configOpen}
-                  onOpenChange={setConfigOpen}
-                  metricRules={metricRules}
-                  produtos={produtos}
-                  onSave={(data) => saveRulesMutation.mutate(data)}
-                  isSaving={saveRulesMutation.isPending}
+                <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 text-primary text-xs px-2 py-1">
+                  Filtrando por {plur(scope.ids.length, scope.fromLevel === "campanha" ? "campanha" : "conjunto")}
+                  <button onClick={() => setScope(null)} className="hover:opacity-80" title="Remover filtro">
+                    <X className="w-3 h-3" />
+                  </button>
+                </span>
+              </div>
+            )}
+
+            {/* Linha de filtros + ações */}
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-2 flex-wrap">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 w-3.5 h-3.5 text-muted-foreground" />
+                <Input
+                  placeholder={`Buscar ${LEVEL_SINGULAR[level]}...`}
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 w-[170px] h-8 text-xs"
+                  data-testid="input-search"
                 />
+                {searchTerm && (
+                  <Button variant="ghost" size="icon" className="absolute right-0.5 top-1/2 transform -translate-y-1/2 h-5 w-5" onClick={() => setSearchTerm("")}>
+                    <X className="w-3 h-3" />
+                  </Button>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[11px] text-muted-foreground font-medium">Status:</span>
+                <Select value={statusFilter} onValueChange={setStatusFilter}>
+                  <SelectTrigger className="w-[80px] h-8 text-xs" data-testid="select-status">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Todos">Todos</SelectItem>
+                    <SelectItem value="Ativo">Ativos</SelectItem>
+                    <SelectItem value="Pausado">Pausados</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[11px] text-muted-foreground font-medium">Plataforma:</span>
+                <MultiSelect
+                  options={[
+                    { value: 'Meta Ads', label: 'Meta Ads' },
+                    { value: 'Google Ads', label: 'Google Ads' },
+                    { value: 'LinkedIn Ads', label: 'LinkedIn Ads' },
+                  ]}
+                  selected={selectedPlataformas}
+                  onChange={setSelectedPlataformas}
+                  placeholder="Todas"
+                  className="h-8 w-[120px] text-xs"
+                />
+              </div>
+
+              <div className="flex items-center gap-1 shrink-0">
+                <span className="text-[11px] text-muted-foreground font-medium">Produto:</span>
+                <MultiSelect
+                  options={produtos.map(p => ({ value: p, label: p }))}
+                  selected={selectedProdutos}
+                  onChange={(v) => {
+                    setSelectedProdutos(v);
+                    setCampanhaFilters([]);
+                  }}
+                  placeholder="Todos"
+                  className="h-8 w-[120px] text-xs"
+                />
+              </div>
+
+
+              <DateRangePicker
+                value={dateRange}
+                onChange={(range) => {
+                  if (range?.from) {
+                    setDateRange({ from: range.from, to: range.to || range.from });
+                  }
+                }}
+                align="end"
+                showCompare
+                compareEnabled={compareEnabled}
+                compareRange={compareRange}
+                onCompareChange={(enabled, range) => {
+                  setCompareEnabled(enabled);
+                  setCompareRange(range);
+                }}
+              />
+
+              <Button variant="outline" size="icon" className="h-8 w-8 shrink-0" onClick={() => setConfigOpen(true)} data-testid="button-config-colunas" title="Configurar colunas e cores">
+                <Settings className="w-4 h-4" />
+              </Button>
+              </div>
+
+              {/* Ações à direita */}
+              <div className="flex items-center gap-2 flex-wrap">
+                {isAdmin && level !== "conta" && (
+                  <div className="flex items-center gap-2 mr-1">
+                    <Button size="sm" variant="outline" className="h-8" disabled={bulkPending || selectedIds.size === 0} onClick={() => setBulkAction("resume")} data-testid="button-bulk-ativar">
+                      <Power className="w-3.5 h-3.5 mr-1" /> Ativar
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-8 text-red-600 dark:text-red-400" disabled={bulkPending || selectedIds.size === 0} onClick={() => setBulkAction("pause")} data-testid="button-bulk-pausar">
+                      <PowerOff className="w-3.5 h-3.5 mr-1" /> Pausar
+                    </Button>
+                  </div>
+                )}
               </div>
             </div>
           </CardHeader>
-          <CardContent className="p-0">
-            {isLoading ? (
-              <div className="flex items-center justify-center h-64">
-                <Loader2 className="w-8 h-8 animate-spin text-muted-foreground" />
-              </div>
-            ) : (
-              <div className="relative max-h-[calc(100vh-260px)] overflow-auto [&>div]:!overflow-visible [&>div]:!static [&>div]:!w-auto">
-                <Table>
-                  <TableHeader className="sticky top-0 z-50">
-                    <TableRow className="bg-zinc-900 dark:bg-zinc-900 shadow-md [&>th]:bg-zinc-900 dark:[&>th]:bg-zinc-900">
-                      <TableHead className="text-xs bg-zinc-900 text-zinc-100 sticky left-0 z-10">Link</TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[52px] z-10"
-                        onClick={() => handleSort('id')}
-                      >
-                        <div className="flex items-center gap-1">Ad Id <ArrowUpDown className="w-3 h-3" /></div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[220px] z-10"
-                        onClick={() => handleSort('adName')}
-                      >
-                        <div className="flex items-center gap-1">Ad name <ArrowUpDown className="w-3 h-3" /></div>
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer hover:bg-zinc-800 whitespace-nowrap text-xs bg-zinc-900 text-zinc-100 sticky left-[470px] z-10 border-r border-zinc-700"
-                        onClick={() => handleSort('status')}
-                      >
-                        <div className="flex items-center gap-1">Status <ArrowUpDown className="w-3 h-3" /></div>
-                      </TableHead>
-                      <SortableHeader column="investimento" label="Invest" />
-                      <SortableHeader column="cpm" label="CPM" />
-                      <SortableHeader column="videoHook" label="Video hook" />
-                      <SortableHeader column="videoHold" label="Video hold" />
-                      <SortableHeader column="ctr" label="CTR" />
-                      <SortableHeader column="connectRate" label="Connect rate" />
-                      <SortableHeader column="taxaConversao" label="Taxa conv." />
-                      <SortableHeader column="leads" label="Leads" />
-                      <SortableHeader column="cpl" label="CPL" />
-                      <SortableHeader column="mql" label="MQL" />
-                      <SortableHeader column="cpmql" label="CPMQL" />
-                      <SortableHeader column="percMql" label="%MQL" />
-                      <GroupableHeader group="desc" label="Desc. %" column="descartadoPerc">
-                        <SortableHeader column="descartadoMqlPerc" label="Desc. MQL %" />
-                        <SortableHeader column="descartadoNmqlPerc" label="Desc. NMQL %" />
-                      </GroupableHeader>
-                      <GroupableHeader group="ra" label="RA %" column="percRa">
-                        <SortableHeader column="percRaMql" label="RA MQL %" />
-                        <SortableHeader column="percRaNmql" label="RA NMQL %" />
-                      </GroupableHeader>
-                      <GroupableHeader group="cpra" label="CPRA" column="cpra">
-                        <SortableHeader column="cpraMql" label="CPRA MQL" />
-                        <SortableHeader column="cpraNmql" label="CPRA NMQL" />
-                      </GroupableHeader>
-                      <GroupableHeader group="rr" label="RR %" column="percRr">
-                        <SortableHeader column="percRrMql" label="RR MQL %" />
-                        <SortableHeader column="percRrNmql" label="RR NMQL %" />
-                      </GroupableHeader>
-                      <GroupableHeader group="cprr" label="CPRR" column="cprr">
-                        <SortableHeader column="cprrMql" label="CPRR MQL" />
-                        <SortableHeader column="cprrNmql" label="CPRR NMQL" />
-                      </GroupableHeader>
-                      <GroupableHeader group="rrv" label="RR→V %" column="percRrVendas">
-                        <SortableHeader column="percRrMqlVendas" label="RR MQL→V %" />
-                        <SortableHeader column="percRrNmqlVendas" label="RR NMQL→V %" />
-                      </GroupableHeader>
-                      <SortableHeader column="clientesUnicos" label="Neg. ganho" />
-                      <SortableHeader column="leadTime" label="Lead Time" />
-                      <SortableHeader column="aov" label="AOV" />
-                      <GroupableHeader group="receita" label="Receita" column="receita">
-                        <SortableHeader column="receitaPontual" label="Rec. pontual" />
-                        <SortableHeader column="receitaRecorrente" label="Rec. recorrente" />
-                      </GroupableHeader>
-                      <GroupableHeader group="cac" label="CAC" column="cacGeral">
-                        <SortableHeader column="cacUnico" label="CAC único" />
-                        <SortableHeader column="cacContrato" label="CAC contrato" />
-                      </GroupableHeader>
-                      <SortableHeader column="roas" label="ROAS" />
-                    </TableRow>
-                    {/* Linha de médias dentro do thead para sticky funcionar */}
-                    {averages && (
-                      <TableRow className="bg-zinc-800 dark:bg-zinc-800 border-b-2 border-zinc-700 font-semibold text-xs [&>th]:bg-zinc-800 dark:[&>th]:bg-zinc-800 [&>th]:font-semibold">
-                        <TableHead className="sticky left-0 z-10 bg-zinc-800" />
-                        <TableHead className="text-muted-foreground sticky left-[52px] z-10 bg-zinc-800">Média</TableHead>
-                        <TableHead className="sticky left-[220px] z-10 bg-zinc-800" />
-                        <TableHead className="sticky left-[470px] z-10 bg-zinc-800 border-r border-zinc-700" />
-                        {(() => {
-                          const avgCell = (val: string, col: string) => (
-                            <>
-                              <TableHead className="text-right text-xs font-semibold">{val}</TableHead>
-                              {isCompareActive && expandedColumns.has(col) && <TableHead className="bg-zinc-800/30" />}
-                            </>
-                          );
-                          return (
-                            <>
-                              {avgCell(formatCurrency(averages.investimento), 'investimento')}
-                              {avgCell(formatCurrency(averages.cpm), 'cpm')}
-                              {avgCell(formatPercent(averages.videoHook), 'videoHook')}
-                              {avgCell(formatPercent(averages.videoHold), 'videoHold')}
-                              {avgCell(formatPercent(averages.ctr), 'ctr')}
-                              {avgCell(formatPercent(averages.connectRate), 'connectRate')}
-                              {avgCell(formatPercent(averages.taxaConversao), 'taxaConversao')}
-                              {avgCell(formatNumber(averages.leads), 'leads')}
-                              {avgCell(formatCurrency(averages.cpl), 'cpl')}
-                              {avgCell(formatNumber(averages.mql), 'mql')}
-                              {avgCell(formatCurrency(averages.cpmql), 'cpmql')}
-                              {avgCell(formatPercent(averages.percMql), 'percMql')}
-                              {avgCell('-', 'descartadoPerc')}
-                              {expandedGroups.has('desc') && <>{avgCell('-', 'descartadoMqlPerc')}{avgCell('-', 'descartadoNmqlPerc')}</>}
-                              {avgCell(formatPercent(averages.percRa), 'percRa')}
-                              {expandedGroups.has('ra') && <>{avgCell(formatPercent(averages.percRaMql), 'percRaMql')}{avgCell(formatPercent(averages.percRaNmql), 'percRaNmql')}</>}
-                              {avgCell(formatCurrency(averages.cpra), 'cpra')}
-                              {expandedGroups.has('cpra') && <>{avgCell(formatCurrency(averages.cpraMql), 'cpraMql')}{avgCell(formatCurrency(averages.cpraNmql), 'cpraNmql')}</>}
-                              {avgCell(formatPercent(averages.percRr), 'percRr')}
-                              {expandedGroups.has('rr') && <>{avgCell(formatPercent(averages.percRrMql), 'percRrMql')}{avgCell(formatPercent(averages.percRrNmql), 'percRrNmql')}</>}
-                              {avgCell(formatCurrency(averages.cprr), 'cprr')}
-                              {expandedGroups.has('cprr') && <>{avgCell(formatCurrency(averages.cprrMql), 'cprrMql')}{avgCell(formatCurrency(averages.cprrNmql), 'cprrNmql')}</>}
-                              {avgCell(formatPercent(averages.percRrVendas), 'percRrVendas')}
-                              {expandedGroups.has('rrv') && <>{avgCell(formatPercent(averages.percRrMqlVendas), 'percRrMqlVendas')}{avgCell(formatPercent(averages.percRrNmqlVendas), 'percRrNmqlVendas')}</>}
-                              {avgCell(formatNumber(averages.clientesUnicos), 'clientesUnicos')}
-                              {avgCell(averages.leadTime !== null ? `${averages.leadTime}d` : '-', 'leadTime')}
-                              {avgCell(formatCurrency(averages.aov), 'aov')}
-                              {avgCell(formatCurrency(averages.receita), 'receita')}
-                              {expandedGroups.has('receita') && <>{avgCell(formatCurrency(averages.receitaPontual), 'receitaPontual')}{avgCell(formatCurrency(averages.receitaRecorrente), 'receitaRecorrente')}</>}
-                              {avgCell(formatCurrency(averages.cacGeral), 'cacGeral')}
-                              {expandedGroups.has('cac') && <>{avgCell(formatCurrency(averages.cacUnico), 'cacUnico')}{avgCell(formatCurrency(averages.cacContrato), 'cacContrato')}</>}
-                              {avgCell(averages.roas !== null ? `${averages.roas}x` : '-', 'roas')}
-                            </>
-                          );
-                        })()}
-                      </TableRow>
-                    )}
-                  </TableHeader>
-                  <TableBody>
-                    {filteredData.map((item) => (
-                      <TableRow key={item.id} data-testid={`row-criativo-${item.id}`}>
-                        <TableCell className="sticky left-0 z-10 bg-card">
-                          {item.link && (
-                            <a href={item.link} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                              <ExternalLink className="w-4 h-4" />
-                            </a>
-                          )}
-                        </TableCell>
-                        <TableCell className="font-mono text-xs text-muted-foreground sticky left-[52px] z-10 bg-card" title={item.id}>
-                          {item.id || '-'}
-                        </TableCell>
-                        <TableCell className="font-medium max-w-[250px] truncate sticky left-[220px] z-10 bg-card" title={item.adName}>
-                          {item.adName}
-                        </TableCell>
-                        <TableCell className="sticky left-[470px] z-10 bg-card border-r border-zinc-700/50">
-                          <Badge
-                            variant={item.status === 'Ativo' ? 'default' : 'secondary'}
-                            className={item.status === 'Ativo' ? 'bg-green-500' : ''}
-                          >
-                            {item.status}
-                          </Badge>
-                        </TableCell>
-                        {(() => {
-                          const c = compareMap.get(item.id);
-                          return (
-                            <>
-                              {renderCell(item.investimento, c?.investimento ?? null, 'investimento', formatCurrency)}
-                              {renderCell(item.cpm, c?.cpm ?? null, 'cpm', formatCurrency, getCellColor(item.cpm, 'cpm'), true)}
-                              {renderCell(item.videoHook, c?.videoHook ?? null, 'videoHook', formatPercent, getCellColor(item.videoHook, 'videoHook'))}
-                              {renderCell(item.videoHold, c?.videoHold ?? null, 'videoHold', formatPercent, getCellColor(item.videoHold, 'videoHold'))}
-                              {renderCell(item.ctr, c?.ctr ?? null, 'ctr', formatPercent, getCellColor(item.ctr, 'ctr'))}
-                              {renderCell(item.connectRate, c?.connectRate ?? null, 'connectRate', formatPercent, getCellColor(item.connectRate, 'connectRate'))}
-                              {renderCell(item.taxaConversao, c?.taxaConversao ?? null, 'taxaConversao', formatPercent, getCellColor(item.taxaConversao, 'taxaConversao'))}
-                              {renderCell(item.leads, c?.leads ?? null, 'leads', formatNumber)}
-                              {renderCell(item.cpl, c?.cpl ?? null, 'cpl', formatCurrency, getCellColor(item.cpl, 'cpl'), true)}
-                              {renderCell(item.mql, c?.mql ?? null, 'mql', formatNumber)}
-                              {renderCell(item.cpmql, c?.cpmql ?? null, 'cpmql', formatCurrency, getCellColor(item.cpmql, 'cpmql'), true)}
-                              {renderCell(item.percMql, c?.percMql ?? null, 'percMql', formatPercent, getCellColor(item.percMql, 'percMql'))}
-                              {/* Desc. % (grupo) */}
-                              {renderCell(item.descartadoPerc, c?.descartadoPerc ?? null, 'descartadoPerc', formatPercent)}
-                              {expandedGroups.has('desc') && (
-                                <>
-                                  {renderCell(item.descartadoMqlPerc, c?.descartadoMqlPerc ?? null, 'descartadoMqlPerc', formatPercent)}
-                                  {renderCell(item.descartadoNmqlPerc, c?.descartadoNmqlPerc ?? null, 'descartadoNmqlPerc', formatPercent)}
-                                </>
-                              )}
-                              {/* RA % (grupo) */}
-                              {renderCell(item.percRa, c?.percRa ?? null, 'percRa', formatPercent, getCellColor(item.percRa, 'percRa'))}
-                              {expandedGroups.has('ra') && (
-                                <>
-                                  {renderCell(item.percRaMql, c?.percRaMql ?? null, 'percRaMql', formatPercent, getCellColor(item.percRaMql, 'percRaMql'))}
-                                  {renderCell(item.percRaNmql, c?.percRaNmql ?? null, 'percRaNmql', formatPercent, getCellColor(item.percRaNmql, 'percRaNmql'))}
-                                </>
-                              )}
-                              {/* CPRA (grupo) */}
-                              {renderCell(item.cpra, c?.cpra ?? null, 'cpra', formatCurrency, getCellColor(item.cpra, 'cpmql'), true)}
-                              {expandedGroups.has('cpra') && (
-                                <>
-                                  {renderCell(item.cpraMql, c?.cpraMql ?? null, 'cpraMql', formatCurrency, getCellColor(item.cpraMql, 'cpmql'), true)}
-                                  {renderCell(item.cpraNmql, c?.cpraNmql ?? null, 'cpraNmql', formatCurrency, getCellColor(item.cpraNmql, 'cpmql'), true)}
-                                </>
-                              )}
-                              {/* RR % (grupo) */}
-                              {renderCell(item.percRr, c?.percRr ?? null, 'percRr', formatPercent, getCellColor(item.percRr, 'percRr'))}
-                              {expandedGroups.has('rr') && (
-                                <>
-                                  {renderCell(item.percRrMql, c?.percRrMql ?? null, 'percRrMql', formatPercent, getCellColor(item.percRrMql, 'percRrMql'))}
-                                  {renderCell(item.percRrNmql, c?.percRrNmql ?? null, 'percRrNmql', formatPercent, getCellColor(item.percRrNmql, 'percRrNmql'))}
-                                </>
-                              )}
-                              {/* CPRR (grupo) */}
-                              {renderCell(item.cprr, c?.cprr ?? null, 'cprr', formatCurrency, getCellColor(item.cprr, 'cpmql'), true)}
-                              {expandedGroups.has('cprr') && (
-                                <>
-                                  {renderCell(item.cprrMql, c?.cprrMql ?? null, 'cprrMql', formatCurrency, getCellColor(item.cprrMql, 'cpmql'), true)}
-                                  {renderCell(item.cprrNmql, c?.cprrNmql ?? null, 'cprrNmql', formatCurrency, getCellColor(item.cprrNmql, 'cpmql'), true)}
-                                </>
-                              )}
-                              {/* RR→V % (grupo) */}
-                              {renderCell(item.percRrVendas, c?.percRrVendas ?? null, 'percRrVendas', formatPercent, getCellColor(item.percRrVendas, 'percRrVendas'))}
-                              {expandedGroups.has('rrv') && (
-                                <>
-                                  {renderCell(item.percRrMqlVendas, c?.percRrMqlVendas ?? null, 'percRrMqlVendas', formatPercent, getCellColor(item.percRrMqlVendas, 'percRrMqlVendas'))}
-                                  {renderCell(item.percRrNmqlVendas, c?.percRrNmqlVendas ?? null, 'percRrNmqlVendas', formatPercent, getCellColor(item.percRrNmqlVendas, 'percRrNmqlVendas'))}
-                                </>
-                              )}
-                              {renderCell(item.clientesUnicos, c?.clientesUnicos ?? null, 'clientesUnicos', formatNumber)}
-                              {renderCell(item.leadTime, c?.leadTime ?? null, 'leadTime', (v) => v !== null ? `${v}d` : '-')}
-                              {renderCell(item.aov, c?.aov ?? null, 'aov', formatCurrency)}
-                              {/* Receita (grupo) */}
-                              {renderCell(item.receita, c?.receita ?? null, 'receita', formatCurrency)}
-                              {expandedGroups.has('receita') && (
-                                <>
-                                  {renderCell(item.receitaPontual || null, c?.receitaPontual || null, 'receitaPontual', formatCurrency)}
-                                  {renderCell(item.receitaRecorrente || null, c?.receitaRecorrente || null, 'receitaRecorrente', formatCurrency)}
-                                </>
-                              )}
-                              {/* CAC (grupo) */}
-                              {renderCell(item.cacGeral, c?.cacGeral ?? null, 'cacGeral', formatCurrency, '', true)}
-                              {expandedGroups.has('cac') && (
-                                <>
-                                  {renderCell(item.cacUnico, c?.cacUnico ?? null, 'cacUnico', formatCurrency, getCellColor(item.cacUnico, 'cacUnico'), true)}
-                                  {renderCell(item.cacContrato, c?.cacContrato ?? null, 'cacContrato', formatCurrency, getCellColor(item.cacContrato, 'cacContrato'), true)}
-                                </>
-                              )}
-                              {renderCell(item.roas, c?.roas ?? null, 'roas', (v) => v !== null ? `${v}x` : '-')}
-                            </>
-                          );
-                        })()}
-                      </TableRow>
-                    ))}
-                    {filteredData.length === 0 && (
-                      <TableRow>
-                        <TableCell colSpan={36} className="text-center py-8 text-muted-foreground">
-                          Nenhum criativo encontrado para o período selecionado
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
+          <CardContent className="p-0 flex-1 min-h-0">
+            <CriativosTable
+              level={level}
+              rows={activeRows}
+              compareMap={compareMap}
+              averages={averages}
+              isCompareActive={isCompareActive}
+              isLoading={isLoading}
+              sortConfig={sortConfig}
+              onSort={handleSort}
+              expandedColumns={expandedColumns}
+              toggleColumn={toggleColumn}
+              getCellColor={getCellColor}
+              pendingByEntity={pendingByEntity}
+              isAdmin={!!isAdmin}
+              selectedIds={selectedIds}
+              onToggleSelect={toggleSelect}
+              onToggleSelectAll={toggleSelectAll}
+              onToggleStatus={handleToggleStatus}
+              togglingIds={togglingIds}
+              columns={visibleColumns}
+              columnWidths={colConfig.widths}
+              onResize={handleResize}
+            />
           </CardContent>
           <div className="px-4 py-2 border-t border-border">
-            <Badge variant="outline">{filteredData.length} criativos</Badge>
+            <Badge variant="outline">{activeRows.length} {LEVEL_LABEL[level]}</Badge>
           </div>
         </Card>
       </div>
+
+      {/* Configurações: colunas + cores */}
+      <CriativosSettingsSheet
+        open={configOpen}
+        onOpenChange={setConfigOpen}
+        config={colConfig}
+        onChangeConfig={setColConfig}
+        views={colViews}
+        onChangeViews={setColViews}
+        metricRules={metricRules}
+        produtos={produtos}
+        onSaveRule={(data) => saveRulesMutation.mutate(data)}
+        isSavingRule={saveRulesMutation.isPending}
+      />
+
+      {/* Confirmação de ação em massa (pausar/ativar) */}
+      <AlertDialog open={bulkAction !== null} onOpenChange={(o) => { if (!o) setBulkAction(null); }}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {bulkAction === "pause" ? "Pausar" : "Ativar"} {selectedIds.size} {LEVEL_LABEL[level]}?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação será aplicada diretamente na Meta Ads. Pode levar alguns segundos para concluir.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={bulkPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={(e) => { e.preventDefault(); runBulk(); }} disabled={bulkPending}>
+              {bulkPending ? "Aplicando..." : "Confirmar"}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
     </div>
   );
 }

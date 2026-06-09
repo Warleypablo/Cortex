@@ -1055,6 +1055,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           a.preview_shareable_link as link,
           a.campaign_id,
           c.campaign_name,
+          c.effective_status as campaign_status,
+          a.adset_id,
+          s.adset_name,
+          s.effective_status as adset_status,
           SUM(i.spend::numeric) as investimento,
           SUM(i.impressions) as impressions,
           SUM(i.clicks) as clicks,
@@ -1072,9 +1076,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM meta_ads.meta_insights_daily i
         LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
         LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
+        LEFT JOIN meta_ads.meta_adsets s ON a.adset_id = s.adset_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
           AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
-        GROUP BY i.ad_id, a.ad_name, a.effective_status, a.created_time, a.preview_shareable_link, a.campaign_id, c.campaign_name
+        GROUP BY i.ad_id, a.ad_name, a.effective_status, a.created_time, a.preview_shareable_link,
+                 a.campaign_id, c.campaign_name, c.effective_status, a.adset_id, s.adset_name, s.effective_status
         ORDER BY SUM(i.spend::numeric) DESC
       `);
       
@@ -1183,6 +1189,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           a.preview_shareable_link as link,
           a.campaign_id,
           c.campaign_name,
+          c.effective_status as campaign_status,
+          a.adset_id,
+          s.adset_name,
+          s.effective_status as adset_status,
           0 as investimento, 0 as impressions, 0 as clicks, 0 as reach,
           0 as outbound_clicks, 0 as cpm, 0 as video_plays,
           0 as video_p25, 0 as video_p50, 0 as video_p75, 0 as video_p100,
@@ -1190,6 +1200,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           0 as landing_page_views
         FROM meta_ads.meta_ads a
         LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
+        LEFT JOIN meta_ads.meta_adsets s ON a.adset_id = s.adset_id
         WHERE a.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
           AND a.effective_status IN ('ACTIVE', 'WITH_ISSUES')
           AND a.ad_id NOT IN (
@@ -1274,12 +1285,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const cprrMql = investimento > 0 && rrMql > 0 ? investimento / rrMql : null;
           const cprrNmql = investimento > 0 && rrNmql > 0 ? investimento / rrNmql : null;
 
-          // Determinar status baseado no effective_status (reflete estado real atual)
-          let adStatus = row.ad_status || 'Desconhecido';
-          const upperStatus = adStatus.toUpperCase();
-          if (['ACTIVE', 'WITH_ISSUES'].includes(upperStatus)) adStatus = 'Ativo';
-          else if (['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(upperStatus)) adStatus = 'Pausado';
-          else if (['ARCHIVED', 'DELETED', 'DISAPPROVED'].includes(upperStatus)) adStatus = 'Inativo';
+          // Normaliza effective_status (reflete estado real atual) em Ativo/Pausado/Inativo
+          const normalizeStatus = (raw: string | null): string => {
+            if (!raw) return 'Desconhecido';
+            const u = raw.toUpperCase();
+            if (['ACTIVE', 'WITH_ISSUES'].includes(u)) return 'Ativo';
+            if (['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(u)) return 'Pausado';
+            if (['ARCHIVED', 'DELETED', 'DISAPPROVED'].includes(u)) return 'Inativo';
+            return 'Desconhecido';
+          };
+          const adStatus = normalizeStatus(row.ad_status);
 
           return {
             id: adId,
@@ -1290,7 +1305,18 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             plataforma: 'Meta Ads',
             campaignId: row.campaign_id || null,
             campaignName: row.campaign_name || null,
+            campaignStatus: normalizeStatus(row.campaign_status),
+            adsetId: row.adset_id || null,
+            adsetName: row.adset_name || null,
+            adsetStatus: normalizeStatus(row.adset_status),
             investimento: Math.round(investimento),
+            // contadores brutos do Meta (para agregação por nível no frontend)
+            impressions,
+            outboundClicks,
+            landingPageViews,
+            reach,
+            video3sec: video3Sec,
+            videoThruplay,
             videoHook: videoHook ? parseFloat(videoHook.toFixed(2)) : null,
             videoHold: videoHold ? parseFloat(videoHold.toFixed(2)) : null,
             ctr: ctr ? parseFloat(ctr.toFixed(2)) : null,
@@ -1326,6 +1352,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             receita: deal.valorPontual + deal.valorRecorrente || null,
             receitaPontual: deal.valorPontual,
             receitaRecorrente: deal.valorRecorrente,
+            // contadores brutos do CRM (para agregação por nível no frontend)
+            nmqls,
+            rm,
+            rmMql,
+            rmNmql,
+            rr,
+            rrMql,
+            rrNmql,
+            vendas,
+            vendasMql,
+            vendasNmql,
+            contratos,
+            descartados: deal.descartados,
+            descartadosMql: deal.descartadosMql,
+            descartadosNmql: deal.descartadosNmql,
             cacGeral: vendas > 0 ? Math.round(investimento / vendas) : null,
             cacUnico: cacUnico ? Math.round(cacUnico) : null,
             cacContrato: cacContrato ? Math.round(cacContrato) : null,

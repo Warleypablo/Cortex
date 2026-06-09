@@ -122,6 +122,80 @@ export const GROWTH_AI_TOOLS: any[] = [
       },
     },
   },
+  // ── Criativos Agent (propose-only) — gravam propostas em cortex_core.meta_actions_log,
+  //    NÃO executam nenhuma ação na Meta API. A execução é feita pelo admin humano
+  //    via /api/meta/actions/* depois de aprovar a proposta.
+  {
+    type: "function",
+    function: {
+      name: "proposePauseEntity",
+      description:
+        "Cria uma PROPOSTA de pausar um ad/adset/campaign no Meta Ads. NÃO pausa de fato — só registra a proposta em meta_actions_log para um admin humano revisar e confirmar. Use quando identificar criativo com performance ruim comprovada (≥7 dias de dados). O rationale deve citar spend, leads, deals ganhos, CAC, período analisado e meta de referência.",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          level: { type: "string", enum: ["ad", "adset", "campaign"], description: "Nível da entidade" },
+          entityId: { type: "string", description: "ID da entidade na Meta (ad_id, adset_id ou campaign_id)" },
+          entityName: { type: "string", description: "Nome da entidade para facilitar a revisão humana" },
+          rationale: { type: "string", description: "Justificativa detalhada: spend, leads, deals, CAC, período, meta — mínimo 40 chars" },
+        },
+        required: ["level", "entityId", "rationale"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "proposeResumeEntity",
+      description:
+        "Cria uma PROPOSTA de reativar um ad/adset/campaign pausado no Meta Ads. NÃO reativa de fato — só registra a proposta em meta_actions_log para um admin revisar. Use quando houver evidência nova de que o criativo merece segunda chance.",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          level: { type: "string", enum: ["ad", "adset", "campaign"], description: "Nível da entidade" },
+          entityId: { type: "string", description: "ID da entidade na Meta" },
+          entityName: { type: "string", description: "Nome da entidade" },
+          rationale: { type: "string", description: "Justificativa — mínimo 40 chars" },
+        },
+        required: ["level", "entityId", "rationale"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "proposeBudgetChange",
+      description:
+        "Cria uma PROPOSTA de ajustar o daily budget de um adset ou campaign no Meta Ads. NÃO aplica de fato. Guard-rails do sistema: delta máximo ±30% do valor atual, e teto absoluto em cents (META_ADS_MAX_DAILY_BUDGET_CENTS). Para aumentos, só propor quando houver ROAS ≥ 1.5x a meta por ≥ 14 dias.",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          level: { type: "string", enum: ["adset", "campaign"], description: "Nível da entidade (ad não tem daily_budget próprio)" },
+          entityId: { type: "string", description: "ID da entidade na Meta" },
+          entityName: { type: "string", description: "Nome da entidade" },
+          newDailyBudgetCents: { type: "number", description: "Novo daily budget em cents (ex: 50000 = R$ 500,00)" },
+          rationale: { type: "string", description: "Justificativa — mínimo 40 chars, citando ROAS, período e meta" },
+        },
+        required: ["level", "entityId", "newDailyBudgetCents", "rationale"],
+      },
+    },
+  },
+  {
+    type: "function",
+    function: {
+      name: "getCriativoTimeSeries",
+      description:
+        "Retorna série temporal diária de um ad específico (spend, impressões, cliques, CPM, CTR, CPC) nos últimos N dias. Use para analisar tendência de um criativo antes de propor pause/resume. Regra: só propor pause se houver ≥7 dias de dados consecutivos.",
+      parameters: {
+        type: "object" as const,
+        properties: {
+          adId: { type: "string", description: "Meta ad_id" },
+          days: { type: "number", description: "Janela de dias (padrão 14, máx 60)" },
+        },
+        required: ["adId"],
+      },
+    },
+  },
 ];
 
 // ── Tool Execution ──────────────────────────────────────────────────────────
@@ -453,6 +527,183 @@ export async function executeGrowthTool(
     }
   } catch (error: any) {
     console.error(`[growth-ai] Erro ao executar tool ${toolName}:`, error);
+    return JSON.stringify({
+      error: `Erro ao executar ${toolName}: ${error.message}`,
+    });
+  }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
+// Criativos Agent — tools adicionais (propose-only + time series)
+// ═══════════════════════════════════════════════════════════════════════════
+
+export interface CriativosAgentContext {
+  userId: string | null;
+  userEmail: string | null;
+}
+
+type AgentLevel = "ad" | "adset" | "campaign";
+
+async function getCriativoTimeSeries(
+  db: any,
+  input: { adId: string; days?: number }
+): Promise<string> {
+  const adId = input.adId;
+  const days = Math.min(Math.max(input.days ?? 14, 1), 60);
+
+  const result = await db.execute(sql`
+    SELECT
+      i.date_start::text as date,
+      COALESCE(SUM(i.spend::numeric), 0) as spend,
+      COALESCE(SUM(i.impressions), 0) as impressions,
+      COALESCE(SUM(i.clicks), 0) as clicks,
+      CASE WHEN SUM(i.impressions) > 0 THEN ROUND(SUM(i.spend::numeric) / SUM(i.impressions) * 1000, 2) ELSE 0 END as cpm,
+      CASE WHEN SUM(i.impressions) > 0 THEN ROUND(SUM(i.clicks)::numeric / SUM(i.impressions) * 100, 2) ELSE 0 END as ctr,
+      CASE WHEN SUM(i.clicks) > 0 THEN ROUND(SUM(i.spend::numeric) / SUM(i.clicks), 2) ELSE 0 END as cpc
+    FROM meta_ads.meta_insights_daily i
+    WHERE i.ad_id = ${adId}
+      AND i.date_start >= CURRENT_DATE - (${days}::int || ' days')::interval
+    GROUP BY i.date_start
+    ORDER BY i.date_start
+  `);
+
+  const rows = (result.rows as any[]) || [];
+  const activeDays = rows.filter((r) => parseFloat(r.spend) > 0).length;
+
+  return JSON.stringify({
+    adId,
+    windowDays: days,
+    totalDaysWithData: rows.length,
+    activeDaysWithSpend: activeDays,
+    series: rows,
+  });
+}
+
+async function insertAgentProposal(
+  db: any,
+  ctx: CriativosAgentContext,
+  opts: {
+    level: AgentLevel;
+    entityId: string;
+    entityName?: string;
+    action: "pause" | "resume" | "budget_update";
+    payload: Record<string, any>;
+    rationale: string;
+  }
+): Promise<{ ok: true; logId: number } | { ok: false; error: string }> {
+  if (!opts.rationale || opts.rationale.trim().length < 40) {
+    return {
+      ok: false,
+      error: "rationale muito curto — descreva spend, leads, deals, CAC, período e meta",
+    };
+  }
+
+  const result = await db.execute(sql`
+    INSERT INTO cortex_core.meta_actions_log (
+      actor_type, actor_user_id, actor_email, level, entity_id, entity_name,
+      action, payload_json, reason, agent_rationale_text, status
+    ) VALUES (
+      'agent',
+      ${ctx.userId},
+      ${ctx.userEmail},
+      ${opts.level},
+      ${opts.entityId},
+      ${opts.entityName ?? null},
+      ${opts.action},
+      ${sql.raw(`'${JSON.stringify(opts.payload).replace(/'/g, "''")}'::jsonb`)},
+      ${opts.rationale.slice(0, 2000)},
+      ${opts.rationale},
+      'pending'
+    )
+    RETURNING id
+  `);
+  const row = (result.rows[0] as any) || {};
+  return { ok: true, logId: parseInt(row.id, 10) };
+}
+
+async function proposePauseEntity(
+  db: any,
+  ctx: CriativosAgentContext,
+  input: { level: AgentLevel; entityId: string; entityName?: string; rationale: string }
+): Promise<string> {
+  const r = await insertAgentProposal(db, ctx, {
+    level: input.level,
+    entityId: input.entityId,
+    entityName: input.entityName,
+    action: "pause",
+    payload: { status: "PAUSED" },
+    rationale: input.rationale,
+  });
+  return JSON.stringify(r);
+}
+
+async function proposeResumeEntity(
+  db: any,
+  ctx: CriativosAgentContext,
+  input: { level: AgentLevel; entityId: string; entityName?: string; rationale: string }
+): Promise<string> {
+  const r = await insertAgentProposal(db, ctx, {
+    level: input.level,
+    entityId: input.entityId,
+    entityName: input.entityName,
+    action: "resume",
+    payload: { status: "ACTIVE" },
+    rationale: input.rationale,
+  });
+  return JSON.stringify(r);
+}
+
+async function proposeBudgetChange(
+  db: any,
+  ctx: CriativosAgentContext,
+  input: {
+    level: "adset" | "campaign";
+    entityId: string;
+    entityName?: string;
+    newDailyBudgetCents: number;
+    rationale: string;
+  }
+): Promise<string> {
+  if (!Number.isFinite(input.newDailyBudgetCents) || input.newDailyBudgetCents <= 0) {
+    return JSON.stringify({ ok: false, error: "newDailyBudgetCents inválido" });
+  }
+  const r = await insertAgentProposal(db, ctx, {
+    level: input.level,
+    entityId: input.entityId,
+    entityName: input.entityName,
+    action: "budget_update",
+    payload: { daily_budget_cents: Math.round(input.newDailyBudgetCents) },
+    rationale: input.rationale,
+  });
+  return JSON.stringify(r);
+}
+
+/**
+ * Dispatcher usado pelo agente de criativos. Sabe lidar com as tools
+ * propose-only + getCriativoTimeSeries, e delega o resto para o dispatcher
+ * `executeGrowthTool` existente (getAdsMetrics, getDealsMetrics, getBudgets, etc.).
+ */
+export async function executeCriativosAgentTool(
+  db: any,
+  toolName: string,
+  input: any,
+  ctx: CriativosAgentContext
+): Promise<string> {
+  try {
+    switch (toolName) {
+      case "proposePauseEntity":
+        return await proposePauseEntity(db, ctx, input);
+      case "proposeResumeEntity":
+        return await proposeResumeEntity(db, ctx, input);
+      case "proposeBudgetChange":
+        return await proposeBudgetChange(db, ctx, input);
+      case "getCriativoTimeSeries":
+        return await getCriativoTimeSeries(db, input);
+      default:
+        return await executeGrowthTool(db, toolName, input);
+    }
+  } catch (error: any) {
+    console.error(`[criativos-agent] Erro ao executar tool ${toolName}:`, error);
     return JSON.stringify({
       error: `Erro ao executar ${toolName}: ${error.message}`,
     });
