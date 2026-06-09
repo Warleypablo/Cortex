@@ -1,6 +1,12 @@
-import { describe, it, expect } from "vitest";
-import { CAPACITY_METAS_SEED } from "./capacityMetas";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { COMMERCIAL_CATEGORIAS } from "../routes/capacityTimes.helpers";
+
+const mockExecute = vi.hoisted(() => vi.fn());
+vi.mock("../db", () => ({ db: { execute: mockExecute } }));
+
+import { seedCapacityMetas, CAPACITY_METAS_SEED } from "./capacityMetas";
+
+beforeEach(() => vi.clearAllMocks());
 
 describe("CAPACITY_METAS_SEED", () => {
   it("tem a contagem esperada por categoria", () => {
@@ -34,5 +40,21 @@ describe("CAPACITY_METAS_SEED", () => {
         expect(m.cap_recorrente).not.toBeNull();
       }
     }
+  });
+});
+
+describe("seedCapacityMetas (bootstrap)", () => {
+  it("não insere quando a tabela já tem linhas", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ n: 28 }] }); // SELECT COUNT(*)
+    await seedCapacityMetas();
+    expect(mockExecute).toHaveBeenCalledTimes(1); // só o COUNT, nenhum INSERT
+  });
+
+  it("insere todas as linhas do seed quando a tabela está vazia", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ n: 0 }] }); // COUNT = 0
+    mockExecute.mockResolvedValue({ rows: [] });             // INSERTs
+    await seedCapacityMetas();
+    // 1 COUNT + N INSERTs
+    expect(mockExecute).toHaveBeenCalledTimes(1 + CAPACITY_METAS_SEED.length);
   });
 });
