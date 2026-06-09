@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { MousePointerClick } from "lucide-react";
+import { ChurnDetalheDrawer } from "@/components/ChurnDetalheDrawer";
 import {
   LineChart, Line, BarChart, Bar,
   XAxis, YAxis, Tooltip, Legend,
@@ -31,7 +32,7 @@ const PRODUTO_COLORS = [
 
 const TOP_N_PRODUTOS = 7;
 
-type Metrica = "cancelamentos" | "mrr_perdido" | "taxa_churn";
+type Metrica = "cancelamentos" | "mrr_perdido" | "taxa_churn" | "taxa_total_produto";
 
 export function ChurnEvolucaoMensal() {
   const { theme } = useTheme();
@@ -41,6 +42,7 @@ export function ChurnEvolucaoMensal() {
   const [produtoSelecionado, setProdutoSelecionado] = useState<string>("");
   const [highlightProduto, setHighlightProduto] = useState<string | null>(null);
   const [highlightMotivo, setHighlightMotivo] = useState<string | null>(null);
+  const [selectedMes, setSelectedMes] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery<MensalResponse>({
     queryKey: ["/api/churn/produto-motivo/mensal"],
@@ -50,7 +52,7 @@ export function ChurnEvolucaoMensal() {
   const { data: taxaProdutoData, isFetching: isFetchingTaxa, isError: isErrorTaxa } = useQuery<{ rows: Array<{ mes: string; produto: string; mrr_base: string; mrr_churn: string; cancelamentos: string; taxa: string }> }>({
     queryKey: ["/api/churn/taxa-por-produto"],
     queryFn: () => fetch("/api/churn/taxa-por-produto").then(r => { if (!r.ok) throw new Error(String(r.status)); return r.json(); }),
-    enabled: metricaLinha === "taxa_churn" || metrica === "taxa_churn",
+    enabled: metricaLinha === "taxa_churn" || metrica === "taxa_churn" || metrica === "taxa_total_produto",
     retry: 1,
     staleTime: 5 * 60 * 1000,
   });
@@ -288,7 +290,7 @@ export function ChurnEvolucaoMensal() {
       const mm = mesAgg.get(mes)!;
       const mesKey = mes.slice(0, 7);
       const base = prodBaseByMes.get(mesKey) || 0;
-      const entry: Record<string, number | string> = { mesLabel: formatMes(mes) };
+      const entry: Record<string, number | string> = { mes: mes.slice(0, 7), mesLabel: formatMes(mes) };
       topMotivos.forEach(m => {
         const mrr = mm.get(m) || 0;
         entry[m] = base > 0 ? Math.round(mrr / base * 10000) / 100 : 0;
@@ -300,6 +302,18 @@ export function ChurnEvolucaoMensal() {
       return entry;
     });
   }, [data, taxaProdutoData, produtoEfetivo]);
+
+  const produtoTaxaTotalChartData = useMemo(() => {
+    if (!taxaProdutoData?.rows?.length || !produtoEfetivo) return [];
+    return taxaProdutoData.rows
+      .filter(r => r.produto === produtoEfetivo && Number(r.mrr_churn) > 0)
+      .map(r => ({
+        mes: r.mes,
+        mesLabel: formatMes(r.mes + "-01"),
+        taxa: Math.min(Number(r.taxa ?? 0), 100),
+      }))
+      .sort((a, b) => a.mes.localeCompare(b.mes));
+  }, [taxaProdutoData, produtoEfetivo]);
 
   const { produtoChartData, motivosBarras } = useMemo(() => {
     if (!data?.rows?.length || !produtoEfetivo) return { produtoChartData: [], motivosBarras: [] };
@@ -329,6 +343,7 @@ export function ChurnEvolucaoMensal() {
 
     const mesesOrdenados = Array.from(mesAgg.keys()).sort();
     const produtoChartData = mesesOrdenados.map(mes => ({
+      mes: mes.slice(0, 7),
       mesLabel: formatMes(mes),
       ...mesAgg.get(mes),
     }));
@@ -347,13 +362,13 @@ export function ChurnEvolucaoMensal() {
 
   const yFormatter = (v: number) => {
     if (metrica === "mrr_perdido") return formatCurrencyNoDecimals(v);
-    if (metrica === "taxa_churn") return `${v.toFixed(1)}%`;
+    if (metrica === "taxa_churn" || metrica === "taxa_total_produto") return `${v.toFixed(1)}%`;
     return String(v);
   };
 
   const tooltipFormatter = (value: number, name: string) => {
     if (metrica === "mrr_perdido") return [formatCurrencyNoDecimals(value), name];
-    if (metrica === "taxa_churn") return [`${Number(value).toFixed(2)}%`, name];
+    if (metrica === "taxa_churn" || metrica === "taxa_total_produto") return [`${Number(value).toFixed(2)}%`, name];
     return [String(value), name];
   };
 
@@ -394,7 +409,7 @@ export function ChurnEvolucaoMensal() {
           </CardTitle>
           <div className="flex items-center gap-2 flex-wrap">
             <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40">
-              {(["cancelamentos", "mrr_perdido", "taxa_churn"] as Metrica[]).map(m => (
+              {(["cancelamentos", "mrr_perdido", "taxa_churn", "taxa_total_produto"] as Metrica[]).map(m => (
                 <button
                   key={m}
                   onClick={() => setMetrica(m)}
@@ -404,7 +419,10 @@ export function ChurnEvolucaoMensal() {
                       : "text-muted-foreground hover:text-foreground"
                   }`}
                 >
-                  {m === "cancelamentos" ? "Contratos" : m === "mrr_perdido" ? "MRR Perdido" : "% Churn"}
+                  {m === "cancelamentos" ? "Contratos"
+                    : m === "mrr_perdido" ? "MRR Perdido"
+                    : m === "taxa_churn" ? "% Churn"
+                    : "Taxa Total"}
                 </button>
               ))}
             </div>
@@ -419,51 +437,82 @@ export function ChurnEvolucaoMensal() {
             </select>
           </div>
         </div>
-        <p className="text-xs text-muted-foreground">Cancelamentos por motivo mês a mês</p>
+        <p className="text-xs text-muted-foreground">
+          {metrica === "taxa_total_produto"
+            ? "Taxa de churn total do produto por mês"
+            : "Cancelamentos por motivo mês a mês"}
+        </p>
       </CardHeader>
       <CardContent>
-        {metrica === "taxa_churn" && !produtoMotivoTaxaChartData ? (
+        {(metrica === "taxa_churn" && !produtoMotivoTaxaChartData) ||
+         (metrica === "taxa_total_produto" && isFetchingTaxa && !taxaProdutoData) ? (
           <div className="h-80 flex items-center justify-center text-sm text-muted-foreground animate-pulse">
             Calculando taxas...
           </div>
         ) : (
-        <ResponsiveContainer width="100%" height={320}>
-          <BarChart
-            data={metrica === "taxa_churn" ? (produtoMotivoTaxaChartData ?? produtoChartData) : produtoChartData}
-            margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
-          >
-            <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} vertical={false} />
-            <XAxis
-              dataKey="mesLabel"
-              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
-              interval="preserveStartEnd"
-            />
-            <YAxis
-              tickFormatter={yFormatter}
-              tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
-              width={metrica === "mrr_perdido" ? 80 : 45}
-            />
-            <Tooltip
-              formatter={tooltipFormatter}
-              contentStyle={{
-                background: isDark ? "#18181b" : "#fff",
-                border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb",
-                borderRadius: 6,
-                fontSize: 12,
+          <ResponsiveContainer width="100%" height={320}>
+            <BarChart
+              data={
+                metrica === "taxa_churn"
+                  ? (produtoMotivoTaxaChartData ?? produtoChartData).filter(entry =>
+                      Object.keys(entry)
+                        .filter(k => k !== "mes" && k !== "mesLabel")
+                        .some(k => Number(entry[k]) > 0)
+                    )
+                  : metrica === "taxa_total_produto"
+                  ? produtoTaxaTotalChartData
+                  : produtoChartData
+              }
+              margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
+              onClick={chartData => {
+                const mes = chartData?.activePayload?.[0]?.payload?.mes as string | undefined;
+                if (mes) setSelectedMes(mes);
               }}
-            />
-            <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
-            {motivosBarras.map((motivo, i) => (
-              <Bar
-                key={motivo}
-                dataKey={motivo}
-                stackId="a"
-                fill={motivo === "Outros" ? "#9ca3af" : PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
-                radius={i === motivosBarras.length - 1 ? [3, 3, 0, 0] : undefined}
+              style={{ cursor: "pointer" }}
+            >
+              <CartesianGrid strokeDasharray="3 3" stroke={isDark ? "#3f3f46" : "#e5e7eb"} vertical={false} />
+              <XAxis
+                dataKey="mesLabel"
+                tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+                interval="preserveStartEnd"
               />
-            ))}
-          </BarChart>
-        </ResponsiveContainer>
+              <YAxis
+                tickFormatter={yFormatter}
+                tick={{ fontSize: 11, fill: isDark ? "#a1a1aa" : "#6b7280" }}
+                width={metrica === "mrr_perdido" ? 80 : 45}
+              />
+              <Tooltip
+                formatter={tooltipFormatter}
+                contentStyle={{
+                  background: isDark ? "#18181b" : "#fff",
+                  border: isDark ? "1px solid #3f3f46" : "1px solid #e5e7eb",
+                  borderRadius: 6,
+                  fontSize: 12,
+                }}
+              />
+              {metrica !== "taxa_total_produto" && (
+                <Legend wrapperStyle={{ fontSize: 11, paddingTop: 12 }} />
+              )}
+              {metrica === "taxa_total_produto" ? (
+                <Bar
+                  dataKey="taxa"
+                  name={produtoEfetivo}
+                  fill={PRODUTO_COLORS[0]}
+                  radius={[3, 3, 0, 0]}
+                />
+              ) : (
+                motivosBarras.map((motivo, i) => (
+                  <Bar
+                    key={motivo}
+                    dataKey={motivo}
+                    stackId="a"
+                    fill={motivo === "Outros" ? "#9ca3af" : PRODUTO_COLORS[i % PRODUTO_COLORS.length]}
+                    radius={i === motivosBarras.length - 1 ? [3, 3, 0, 0] : undefined}
+                  />
+                ))
+              )}
+            </BarChart>
+          </ResponsiveContainer>
         )}
       </CardContent>
     </Card>
@@ -650,6 +699,11 @@ export function ChurnEvolucaoMensal() {
         )}
       </CardContent>
     </Card>
+    <ChurnDetalheDrawer
+      produto={produtoEfetivo}
+      mes={selectedMes}
+      onClose={() => setSelectedMes(null)}
+    />
     </div>
   );
 }
