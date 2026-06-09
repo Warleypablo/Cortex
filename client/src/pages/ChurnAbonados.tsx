@@ -11,7 +11,8 @@ import {
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatCurrencyNoDecimals } from "@/lib/utils";
-import { TrendingDown, DollarSign, Users, Calendar, Shield } from "lucide-react";
+import { getSquadColor } from "@/lib/squadColors";
+import { TrendingDown, DollarSign, Users, Calendar, Shield, Info } from "lucide-react";
 import {
   Sheet,
   SheetContent,
@@ -22,12 +23,13 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  Cell,
   XAxis,
   YAxis,
   Tooltip,
   AreaChart,
   Area,
-  Legend,
+  ReferenceLine,
 } from "recharts";
 import {
   format,
@@ -60,6 +62,23 @@ interface ChurnDetalhamentoData {
 
 const MOTIVOS_AUTOMATICOS = ["Inadimplente 1º Mês", "Não começou", "Erro na Venda"];
 
+// Cores dos fills de gráfico. Hex fixos (não as vars de tema) porque --primary vira
+// navy quase preto no light mode e --chart-2 alterna roxo↔azul entre temas — o que
+// apagaria a distinção manual×automático. Azul/roxo vivos funcionam em dark e light.
+// Os elementos de UI (número hero, toggle, marcador) seguem o tema via classes -primary.
+const PRIMARY = "#3b82f6";
+const PURPLE = "#8b5cf6";
+
+// Squads vêm do ClickUp com prefixo de emoji ("🪖 Selva", "⚡Makers"). Limpa o
+// prefixo antes de mapear a cor; passa o índice para variar o fallback dos
+// squads sem cor fixa (Olimpo, Aura, Não especificado).
+function squadColor(squad: string, index: number): string {
+  // Remove o prefixo de emoji/variation-selector/espaço até a 1ª letra latina
+  // (sem \p{L}/flag u, que exige target es6+ no tsc deste projeto).
+  const clean = (squad || "").replace(/^[^A-Za-zÀ-ÿ]+/, "").trim();
+  return getSquadColor(clean, index);
+}
+
 function SegmentedToggle({
   options,
   value,
@@ -77,7 +96,7 @@ function SegmentedToggle({
           onClick={() => onChange(o.value)}
           className={`px-3 py-0.5 text-xs font-medium rounded-full transition-all ${
             value === o.value
-              ? "bg-amber-500 text-white shadow-sm"
+              ? "bg-primary text-primary-foreground shadow-sm"
               : "text-muted-foreground hover:text-foreground"
           }`}
         >
@@ -92,7 +111,8 @@ export default function ChurnAbonados() {
   usePageTitle("Churns Abonados");
   useSetPageInfo("Churns Abonados", "Análise de contratos com churn abonado");
 
-  const [anoMes, setAnoMes] = useState(() => format(new Date(), "yyyy-MM"));
+  // "12m" = últimos 12 meses (default). Caso contrário, um mês específico (yyyy-MM).
+  const [periodo, setPeriodo] = useState<string>("12m");
   const [filterSquad, setFilterSquad] = useState<string>("todos");
   const [motivoToggle, setMotivoToggle] = useState<"mrr" | "volume">("mrr");
   const [temporalToggle, setTemporalToggle] = useState<"mrr" | "volume">("mrr");
@@ -102,10 +122,14 @@ export default function ChurnAbonados() {
     mesKey?: string;
   } | null>(null);
 
+  const isAll = periodo === "12m";
+
+  // Mês de referência: hoje quando "12m", ou o mês escolhido para drill.
   const refDate = useMemo(() => {
-    const [year, month] = anoMes.split("-").map(Number);
+    const ref = isAll ? format(new Date(), "yyyy-MM") : periodo;
+    const [year, month] = ref.split("-").map(Number);
     return new Date(year, month - 1, 1);
-  }, [anoMes]);
+  }, [isAll, periodo]);
 
   const dataInicio12m = useMemo(
     () => format(startOfMonth(subMonths(refDate, 11)), "yyyy-MM-dd"),
@@ -132,8 +156,11 @@ export default function ChurnAbonados() {
   });
 
   const abonados12m = useMemo(
-    () => (data?.contratos ?? []).filter((c) => c.is_abonado),
-    [data]
+    () =>
+      (data?.contratos ?? [])
+        .filter((c) => c.is_abonado)
+        .filter((c) => filterSquad === "todos" || c.squad === filterSquad),
+    [data, filterSquad]
   );
 
   const mesInicio = format(startOfMonth(refDate), "yyyy-MM-dd");
@@ -143,34 +170,40 @@ export default function ChurnAbonados() {
     () =>
       abonados12m.filter((c) => {
         const d = c.data_encerramento ?? "";
-        return (
-          d >= mesInicio &&
-          d <= mesFim &&
-          (filterSquad === "todos" || c.squad === filterSquad)
-        );
+        return d >= mesInicio && d <= mesFim;
       }),
-    [abonados12m, mesInicio, mesFim, filterSquad]
+    [abonados12m, mesInicio, mesFim]
   );
+
+  // Mês específico sem abonados → cai para a visão de 12 meses (nunca fica vazio).
+  const mesVazio = !isAll && abonadosMes.length === 0 && abonados12m.length > 0;
+  const usar12m = isAll || mesVazio;
+  const abonadosAtivos = usar12m ? abonados12m : abonadosMes;
+
+  const periodoLabel = usar12m
+    ? "últimos 12 meses"
+    : format(refDate, "MMMM 'de' yyyy", { locale: ptBR });
+  const mesAtivoLabel = format(refDate, "MMMM 'de' yyyy", { locale: ptBR });
 
   const squads = useMemo(() => data?.filtros?.squads ?? [], [data]);
 
   const heroMetrics = useMemo(() => {
-    const count = abonadosMes.length;
-    const mrr = abonadosMes.reduce((sum, c) => sum + (c.valorr || 0), 0);
+    const count = abonadosAtivos.length;
+    const mrr = abonadosAtivos.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const ticketMedio = count > 0 ? mrr / count : 0;
     const byMotivo: Record<string, number> = {};
-    abonadosMes.forEach((c) => {
+    abonadosAtivos.forEach((c) => {
       const m = c.motivo_cancelamento || "Não especificado";
       byMotivo[m] = (byMotivo[m] || 0) + 1;
     });
     const maiorMotivo =
       Object.entries(byMotivo).sort((a, b) => b[1] - a[1])[0]?.[0] ?? "—";
     return { count, mrr, ticketMedio, maiorMotivo };
-  }, [abonadosMes]);
+  }, [abonadosAtivos]);
 
   const motivoData = useMemo(() => {
     const map: Record<string, { count: number; mrr: number }> = {};
-    abonadosMes.forEach((c) => {
+    abonadosAtivos.forEach((c) => {
       const m = c.motivo_cancelamento || "Não especificado";
       if (!map[m]) map[m] = { count: 0, mrr: 0 };
       map[m].count++;
@@ -179,11 +212,11 @@ export default function ChurnAbonados() {
     return Object.entries(map)
       .map(([motivo, v]) => ({ motivo, ...v }))
       .sort((a, b) => b.mrr - a.mrr);
-  }, [abonadosMes]);
+  }, [abonadosAtivos]);
 
   const submotivoData = useMemo(() => {
     const map: Record<string, { count: number; mrr: number }> = {};
-    abonadosMes
+    abonadosAtivos
       .filter((c) => c.submotivo)
       .forEach((c) => {
         const s = c.submotivo!;
@@ -194,11 +227,11 @@ export default function ChurnAbonados() {
     return Object.entries(map)
       .map(([submotivo, v]) => ({ submotivo, ...v }))
       .sort((a, b) => b.mrr - a.mrr);
-  }, [abonadosMes]);
+  }, [abonadosAtivos]);
 
   const squadData = useMemo(() => {
     const map: Record<string, { count: number; mrr: number }> = {};
-    abonadosMes.forEach((c) => {
+    abonadosAtivos.forEach((c) => {
       const s = c.squad || "Sem Squad";
       if (!map[s]) map[s] = { count: 0, mrr: 0 };
       map[s].count++;
@@ -207,11 +240,11 @@ export default function ChurnAbonados() {
     return Object.entries(map)
       .map(([squad, v]) => ({ squad, ...v }))
       .sort((a, b) => b.mrr - a.mrr);
-  }, [abonadosMes]);
+  }, [abonadosAtivos]);
 
   const responsavelData = useMemo(() => {
     const map: Record<string, { count: number; mrr: number }> = {};
-    abonadosMes.forEach((c) => {
+    abonadosAtivos.forEach((c) => {
       const r = c.responsavel || "Não especificado";
       if (!map[r]) map[r] = { count: 0, mrr: 0 };
       map[r].count++;
@@ -221,25 +254,23 @@ export default function ChurnAbonados() {
       .map(([responsavel, v]) => ({ responsavel, ...v }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10);
-  }, [abonadosMes]);
+  }, [abonadosAtivos]);
 
   const drillContracts = useMemo(() => {
     if (!selectedFilter) return [];
     const { type, value, mesKey } = selectedFilter;
     if (type === "mes") {
       return abonados12m.filter(
-        (c) =>
-          (filterSquad === "todos" || c.squad === filterSquad) &&
-          (c.data_encerramento?.substring(0, 7) === mesKey)
+        (c) => c.data_encerramento?.substring(0, 7) === mesKey
       );
     }
-    return abonadosMes.filter((c) => {
+    return abonadosAtivos.filter((c) => {
       if (type === "motivo") return (c.motivo_cancelamento || "Não especificado") === value;
       if (type === "squad") return (c.squad || "Sem Squad") === value;
       if (type === "responsavel") return (c.responsavel || "Não especificado") === value;
       return false;
     });
-  }, [selectedFilter, abonadosMes, abonados12m, filterSquad]);
+  }, [selectedFilter, abonadosAtivos, abonados12m]);
 
   const temporalData = useMemo(() => {
     const months: Record<
@@ -265,11 +296,7 @@ export default function ChurnAbonados() {
       };
     }
 
-    const filtrados = abonados12m.filter(
-      (c) => filterSquad === "todos" || c.squad === filterSquad
-    );
-
-    filtrados.forEach((c) => {
+    abonados12m.forEach((c) => {
       if (!c.data_encerramento) return;
       const d = parseISO(c.data_encerramento);
       const key = format(d, "MMM/yy", { locale: ptBR });
@@ -287,10 +314,18 @@ export default function ChurnAbonados() {
     return Object.entries(months)
       .sort((a, b) => a[1].sortKey.localeCompare(b[1].sortKey))
       .map(([mes, v]) => ({ mes, ...v }));
-  }, [abonados12m, refDate, filterSquad]);
+  }, [abonados12m, refDate]);
 
-  const monthOptions = useMemo(() => {
-    const opts = [];
+  // Rótulo do mês destacado no gráfico temporal (quando há um mês específico ativo).
+  const mesDestaque = useMemo(
+    () => (isAll ? null : format(refDate, "MMM/yy", { locale: ptBR })),
+    [isAll, refDate]
+  );
+
+  const periodoOptions = useMemo(() => {
+    const opts: { value: string; label: string }[] = [
+      { value: "12m", label: "Últimos 12 meses" },
+    ];
     for (let i = 0; i < 24; i++) {
       const d = subMonths(new Date(), i);
       opts.push({
@@ -334,10 +369,17 @@ export default function ChurnAbonados() {
     { value: "volume", label: "Volume" },
   ];
 
+  const tooltipStyle = {
+    borderRadius: 8,
+    border: "1px solid hsl(var(--border))",
+    background: "hsl(var(--popover))",
+    boxShadow: "0 4px 16px rgba(0,0,0,0.18)",
+  };
+
   function SectionTitle({ children }: { children: React.ReactNode }) {
     return (
       <div className="flex items-center gap-2.5 mb-4">
-        <div className="h-4 w-0.5 rounded-full bg-amber-500" />
+        <div className="h-4 w-0.5 rounded-full bg-primary" />
         <h2 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">
           {children}
         </h2>
@@ -348,9 +390,9 @@ export default function ChurnAbonados() {
 
   function EmptyState() {
     return (
-      <div className="flex flex-col items-center justify-center py-10 gap-2">
-        <Shield className="h-8 w-8 text-muted-foreground/30" />
-        <p className="text-sm text-muted-foreground">Nenhum abonado no período</p>
+      <div className="flex items-center justify-center gap-2 py-6 text-muted-foreground">
+        <Shield className="h-4 w-4 opacity-40" />
+        <p className="text-sm">Nenhum abonado no período</p>
       </div>
     );
   }
@@ -358,14 +400,14 @@ export default function ChurnAbonados() {
   return (
     <div className="p-6 space-y-8 bg-background min-h-screen">
       {/* Header */}
-      <div className="relative overflow-hidden rounded-2xl border border-amber-200 dark:border-amber-800/40 bg-gradient-to-br from-amber-50 via-orange-50/60 to-background dark:from-amber-950/40 dark:via-orange-950/20 dark:to-background p-6">
-        <div className="absolute top-0 right-0 w-48 h-48 opacity-[0.06] pointer-events-none">
-          <Shield className="w-full h-full text-amber-500" />
+      <div className="relative overflow-hidden rounded-2xl border border-border bg-card p-6">
+        <div className="absolute top-0 right-0 w-48 h-48 opacity-[0.04] pointer-events-none">
+          <Shield className="w-full h-full text-primary" />
         </div>
         <div className="flex items-start justify-between gap-4 relative">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-amber-100 dark:bg-amber-900/50 border border-amber-200 dark:border-amber-800/50 shadow-sm">
-              <Shield className="h-7 w-7 text-amber-600 dark:text-amber-400" />
+            <div className="p-3 rounded-xl bg-primary/10 border border-primary/20">
+              <Shield className="h-7 w-7 text-primary" />
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground tracking-tight">
@@ -378,24 +420,24 @@ export default function ChurnAbonados() {
           </div>
           {heroMetrics.count > 0 && (
             <div className="text-right">
-              <div className="text-3xl font-bold text-amber-600 dark:text-amber-400 tabular-nums">
+              <div className="text-3xl font-bold text-primary tabular-nums">
                 {heroMetrics.count}
               </div>
-              <div className="text-xs text-amber-600/70 dark:text-amber-400/70 font-medium">
-                abonados no mês
+              <div className="text-xs text-muted-foreground font-medium">
+                abonados · {periodoLabel}
               </div>
             </div>
           )}
         </div>
 
         {/* Filtros integrados ao header */}
-        <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-amber-200/60 dark:border-amber-800/30">
-          <Select value={anoMes} onValueChange={setAnoMes}>
-            <SelectTrigger className="h-8 w-[190px] text-xs bg-white/70 dark:bg-zinc-900/70 border-amber-200 dark:border-amber-800/50">
+        <div className="flex flex-wrap gap-2 mt-5 pt-5 border-t border-border">
+          <Select value={periodo} onValueChange={setPeriodo}>
+            <SelectTrigger className="h-8 w-[190px] text-xs bg-background border-border">
               <SelectValue placeholder="Período" />
             </SelectTrigger>
             <SelectContent>
-              {monthOptions.map((o) => (
+              {periodoOptions.map((o) => (
                 <SelectItem key={o.value} value={o.value} className="text-xs">
                   {o.label}
                 </SelectItem>
@@ -403,7 +445,7 @@ export default function ChurnAbonados() {
             </SelectContent>
           </Select>
           <Select value={filterSquad} onValueChange={setFilterSquad}>
-            <SelectTrigger className="h-8 w-[190px] text-xs bg-white/70 dark:bg-zinc-900/70 border-amber-200 dark:border-amber-800/50">
+            <SelectTrigger className="h-8 w-[190px] text-xs bg-background border-border">
               <SelectValue placeholder="Squad" />
             </SelectTrigger>
             <SelectContent>
@@ -418,42 +460,50 @@ export default function ChurnAbonados() {
         </div>
       </div>
 
+      {/* Banner: mês selecionado sem abonados */}
+      {mesVazio && (
+        <div className="flex items-center gap-2 rounded-xl border border-border bg-muted/40 px-4 py-2.5 text-sm text-muted-foreground -mt-4">
+          <Info className="h-4 w-4 shrink-0 text-primary" />
+          Sem abonados em <span className="font-medium text-foreground">{mesAtivoLabel}</span> — exibindo a visão dos últimos 12 meses.
+        </div>
+      )}
+
       {/* Hero Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-        <div className="p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/50">
+        <div className="p-4 bg-card rounded-xl border border-border">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase tracking-wider">Contratos</span>
-            <TrendingDown className="h-4 w-4 text-amber-500" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Contratos</span>
+            <TrendingDown className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="text-3xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">{heroMetrics.count}</div>
-          <div className="text-xs text-amber-600/60 dark:text-amber-400/60 mt-1">abonados no período</div>
+          <div className="text-3xl font-bold text-primary tabular-nums">{heroMetrics.count}</div>
+          <div className="text-xs text-muted-foreground mt-1">abonados no período</div>
         </div>
 
-        <div className="p-4 bg-orange-50 dark:bg-orange-950/30 rounded-xl border border-orange-100 dark:border-orange-900/50">
+        <div className="p-4 bg-card rounded-xl border border-border">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-orange-600 dark:text-orange-400 uppercase tracking-wider">MRR Abonado</span>
-            <DollarSign className="h-4 w-4 text-orange-500" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">MRR Abonado</span>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="text-2xl font-bold text-orange-700 dark:text-orange-300 tabular-nums leading-tight">{formatCurrency(heroMetrics.mrr)}</div>
-          <div className="text-xs text-orange-600/60 dark:text-orange-400/60 mt-1">não contabilizado como churn</div>
+          <div className="text-2xl font-bold text-foreground tabular-nums leading-tight">{formatCurrency(heroMetrics.mrr)}</div>
+          <div className="text-xs text-muted-foreground mt-1">não contabilizado como churn</div>
         </div>
 
-        <div className="p-4 bg-yellow-50 dark:bg-yellow-950/30 rounded-xl border border-yellow-100 dark:border-yellow-900/50">
+        <div className="p-4 bg-card rounded-xl border border-border">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-yellow-600 dark:text-yellow-400 uppercase tracking-wider">Ticket Médio</span>
-            <Users className="h-4 w-4 text-yellow-600" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Ticket Médio</span>
+            <Users className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="text-2xl font-bold text-yellow-700 dark:text-yellow-300 tabular-nums leading-tight">{formatCurrency(heroMetrics.ticketMedio)}</div>
-          <div className="text-xs text-yellow-600/60 dark:text-yellow-400/60 mt-1">por contrato abonado</div>
+          <div className="text-2xl font-bold text-foreground tabular-nums leading-tight">{formatCurrency(heroMetrics.ticketMedio)}</div>
+          <div className="text-xs text-muted-foreground mt-1">por contrato abonado</div>
         </div>
 
-        <div className="p-4 bg-stone-50 dark:bg-stone-900/30 rounded-xl border border-stone-200 dark:border-stone-700/50">
+        <div className="p-4 bg-card rounded-xl border border-border">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-stone-500 dark:text-stone-400 uppercase tracking-wider">Maior Motivo</span>
-            <Calendar className="h-4 w-4 text-stone-400" />
+            <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Maior Motivo</span>
+            <Calendar className="h-4 w-4 text-muted-foreground" />
           </div>
-          <div className="text-base font-bold text-stone-700 dark:text-stone-200 leading-tight">{heroMetrics.maiorMotivo}</div>
-          <div className="text-xs text-stone-500/60 dark:text-stone-400/60 mt-1">motivo mais frequente</div>
+          <div className="text-base font-bold text-foreground leading-tight">{heroMetrics.maiorMotivo}</div>
+          <div className="text-xs text-muted-foreground mt-1">motivo mais frequente</div>
         </div>
       </div>
 
@@ -485,11 +535,8 @@ export default function ChurnAbonados() {
                   >
                     <XAxis type="number" hide />
                     <YAxis type="category" dataKey="motivo" width={170} tick={{ fontSize: 12 }} />
-                    <Tooltip
-                      formatter={tooltipFormatter}
-                      contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 4px 16px rgba(0,0,0,0.12)" }}
-                    />
-                    <Bar dataKey={motivoBarKey} fill="#f59e0b" radius={[0, 6, 6, 0]} />
+                    <Tooltip formatter={tooltipFormatter} contentStyle={tooltipStyle} />
+                    <Bar dataKey={motivoBarKey} fill={PRIMARY} radius={[0, 6, 6, 0]} isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -512,10 +559,10 @@ export default function ChurnAbonados() {
                   </thead>
                   <tbody>
                     {submotivoData.map((row) => (
-                      <tr key={row.submotivo} className="border-b border-border/40 hover:bg-amber-50/50 dark:hover:bg-amber-950/20 transition-colors">
+                      <tr key={row.submotivo} className="border-b border-border/40 hover:bg-muted/50 transition-colors">
                         <td className="py-2.5 text-foreground">{row.submotivo}</td>
                         <td className="py-2.5 text-right font-medium tabular-nums">{row.count}</td>
-                        <td className="py-2.5 text-right text-amber-600 dark:text-amber-400 font-semibold tabular-nums">{formatCurrency(row.mrr)}</td>
+                        <td className="py-2.5 text-right text-primary font-semibold tabular-nums">{formatCurrency(row.mrr)}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -548,11 +595,12 @@ export default function ChurnAbonados() {
                   >
                     <XAxis dataKey="squad" tick={{ fontSize: 11 }} angle={-30} textAnchor="end" interval={0} />
                     <YAxis hide />
-                    <Tooltip
-                      formatter={tooltipFormatter}
-                      contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 4px 16px rgba(0,0,0,0.12)" }}
-                    />
-                    <Bar dataKey="mrr" fill="#f59e0b" radius={[6, 6, 0, 0]} name="mrr" />
+                    <Tooltip formatter={tooltipFormatter} contentStyle={tooltipStyle} />
+                    <Bar dataKey="mrr" radius={[6, 6, 0, 0]} name="mrr" isAnimationActive={false}>
+                      {squadData.map((entry, i) => (
+                        <Cell key={entry.squad} fill={squadColor(entry.squad, i)} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -578,11 +626,8 @@ export default function ChurnAbonados() {
                   >
                     <XAxis type="number" hide />
                     <YAxis type="category" dataKey="responsavel" width={150} tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      formatter={tooltipFormatter}
-                      contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 4px 16px rgba(0,0,0,0.12)" }}
-                    />
-                    <Bar dataKey="count" fill="#fb923c" radius={[0, 6, 6, 0]} name="count" />
+                    <Tooltip formatter={tooltipFormatter} contentStyle={tooltipStyle} />
+                    <Bar dataKey="count" fill={PRIMARY} radius={[0, 6, 6, 0]} name="count" isAnimationActive={false} />
                   </BarChart>
                 </ResponsiveContainer>
               )}
@@ -609,11 +654,11 @@ export default function ChurnAbonados() {
           <CardContent>
             <div className="flex items-center gap-4 mb-4">
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-amber-400" />
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PRIMARY }} />
                 <span className="text-xs text-muted-foreground">Abono Manual</span>
               </div>
               <div className="flex items-center gap-1.5">
-                <div className="w-2.5 h-2.5 rounded-full bg-orange-400" />
+                <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: PURPLE }} />
                 <span className="text-xs text-muted-foreground">Abono Automático</span>
               </div>
             </div>
@@ -629,37 +674,39 @@ export default function ChurnAbonados() {
               >
                 <defs>
                   <linearGradient id="gradManual" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#f59e0b" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#f59e0b" stopOpacity={0.05} />
+                    <stop offset="5%" stopColor={PRIMARY} stopOpacity={0.4} />
+                    <stop offset="95%" stopColor={PRIMARY} stopOpacity={0.05} />
                   </linearGradient>
                   <linearGradient id="gradAuto" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#fb923c" stopOpacity={0.4} />
-                    <stop offset="95%" stopColor="#fb923c" stopOpacity={0.05} />
+                    <stop offset="5%" stopColor={PURPLE} stopOpacity={0.4} />
+                    <stop offset="95%" stopColor={PURPLE} stopOpacity={0.05} />
                   </linearGradient>
                 </defs>
                 <XAxis dataKey="mes" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis hide />
-                <Tooltip
-                  formatter={tooltipFormatter}
-                  contentStyle={{ borderRadius: 8, border: "none", boxShadow: "0 4px 16px rgba(0,0,0,0.12)" }}
-                />
+                <Tooltip formatter={tooltipFormatter} contentStyle={tooltipStyle} />
+                {mesDestaque && (
+                  <ReferenceLine x={mesDestaque} stroke={PRIMARY} strokeDasharray="4 3" strokeOpacity={0.6} />
+                )}
                 <Area
                   type="monotone"
                   dataKey={temporalManualKey}
                   stackId="1"
                   fill="url(#gradManual)"
-                  stroke="#f59e0b"
+                  stroke={PRIMARY}
                   strokeWidth={2}
                   name={temporalManualKey}
+                  isAnimationActive={false}
                 />
                 <Area
                   type="monotone"
                   dataKey={temporalAutoKey}
                   stackId="1"
                   fill="url(#gradAuto)"
-                  stroke="#fb923c"
+                  stroke={PURPLE}
                   strokeWidth={2}
                   name={temporalAutoKey}
+                  isAnimationActive={false}
                 />
               </AreaChart>
             </ResponsiveContainer>
@@ -672,7 +719,7 @@ export default function ChurnAbonados() {
         <SheetContent side="right" className="w-[480px] sm:w-[540px] overflow-y-auto">
           <SheetHeader className="mb-4">
             <SheetTitle className="flex items-center gap-2 text-base">
-              <Shield className="h-4 w-4 text-amber-500" />
+              <Shield className="h-4 w-4 text-primary" />
               {selectedFilter?.type === "motivo" && `Motivo: ${selectedFilter.value}`}
               {selectedFilter?.type === "squad" && `Squad: ${selectedFilter.value}`}
               {selectedFilter?.type === "responsavel" && `Responsável: ${selectedFilter.value}`}
@@ -695,7 +742,7 @@ export default function ChurnAbonados() {
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="text-sm font-medium leading-tight">{c.cliente_nome}</span>
-                    <span className="text-sm font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                    <span className="text-sm font-semibold text-primary whitespace-nowrap">
                       {formatCurrencyNoDecimals(c.valorr ?? 0)}
                     </span>
                   </div>
