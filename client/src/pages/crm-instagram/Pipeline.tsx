@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import {
-  MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, UserPlus, Tag,
+  MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, Tag,
 } from "lucide-react";
 import { QUALIFICATION_TAGS, TAG_LABELS, type QualificationTag } from "@shared/crmInstagramTags";
 
@@ -28,6 +28,7 @@ type Profile = {
   subcategory: string | null;
   qualification: QualificationTag | null;
   ownerUserId: string | null;
+  ownerName: string | null;
   lockedBy: string | null;
   isLocked: boolean;
   bitrixDealId: number | null;
@@ -47,6 +48,13 @@ function profileLabel(p: Profile): string {
   if (p.displayName) return p.displayName;
   if (p.igUsername) return `@${p.igUsername}`;
   return "lead sem nome";
+}
+
+// Iniciais do nome do SDR pro balãozinho do dono.
+function initials(name: string | null): string {
+  if (!name) return "?";
+  const parts = name.trim().split(/\s+/);
+  return ((parts[0]?.[0] || "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "?";
 }
 
 // Cor do score (qualificação): verde quente → cinza frio.
@@ -88,7 +96,7 @@ export default function Pipeline() {
 
   const moveM = act("stage");
   const claimM = act("claim");
-  const lockM = act("lock");
+  const releaseM = act("release");
   const qualM = act("qualification");
 
   const move = (p: Profile, toStage: string) => {
@@ -133,7 +141,7 @@ export default function Pipeline() {
                     p={p}
                     meId={user?.id}
                     onClaim={() => claimM.mutate({ id: p.id })}
-                    onLock={() => lockM.mutate({ id: p.id })}
+                    onRelease={() => releaseM.mutate({ id: p.id })}
                     onMove={(to) => move(p, to)}
                     onQualify={(tag) => qualM.mutate({ id: p.id, body: { qualification: tag } })}
                     onBitrix={() => setBitrixTarget(p)}
@@ -158,12 +166,12 @@ export default function Pipeline() {
 }
 
 function ProfileCard({
-  p, meId, onClaim, onLock, onMove, onQualify, onBitrix,
+  p, meId, onClaim, onRelease, onMove, onQualify, onBitrix,
 }: {
   p: Profile;
   meId?: string;
   onClaim: () => void;
-  onLock: () => void;
+  onRelease: () => void;
   onMove: (toStage: string) => void;
   onQualify: (tag: string | null) => void;
   onBitrix: () => void;
@@ -225,7 +233,15 @@ function ProfileCard({
           </Badge>
         )}
         {p.ownerUserId && (
-          <Badge variant="outline" className="gap-1"><UserPlus className="h-3 w-3" />dono</Badge>
+          <span
+            className="inline-flex items-center gap-1 rounded-full bg-indigo-100 dark:bg-indigo-900/40 py-0.5 pl-0.5 pr-2 text-[11px] font-medium text-indigo-700 dark:text-indigo-300"
+            title={`Pego por ${p.ownerName || "SDR"}`}
+          >
+            <span className="flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[9px] font-bold text-white">
+              {initials(p.ownerName)}
+            </span>
+            {p.ownerUserId === meId ? "você" : (p.ownerName?.split(" ")[0] || "SDR")}
+          </span>
         )}
       </div>
 
@@ -249,9 +265,11 @@ function ProfileCard({
             </a>
           </Button>
         ) : null}
-        {!p.ownerUserId && (
+        {!p.ownerUserId ? (
           <Button size="sm" variant="ghost" className="h-7 text-xs" title="Pegar e travar pra mim por 15min" onClick={onClaim}>Pegar</Button>
-        )}
+        ) : p.ownerUserId === meId ? (
+          <Button size="sm" variant="ghost" className="h-7 text-xs text-amber-600" title="Devolver pra fila" onClick={onRelease}>Soltar</Button>
+        ) : null}
         {idx < STAGES.length - 1 && (
           <Button
             size="sm" variant="default" className="h-7 text-xs"
@@ -265,11 +283,6 @@ function ProfileCard({
           <Button size="sm" variant="default" className="h-7 text-xs" onClick={onBitrix}>Criar no Bitrix</Button>
         )}
         <QualifyMenu current={p.qualification} onQualify={onQualify} />
-        {!p.isLocked && (
-          <Button size="sm" variant="ghost" className="h-7 w-7 p-0" title="Travar para mim" onClick={onLock}>
-            <Lock className="h-3 w-3" />
-          </Button>
-        )}
       </div>
 
       {p.qualification && (

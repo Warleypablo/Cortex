@@ -26,10 +26,12 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
                p.owner_user_id, p.locked_by, p.locked_at, p.bitrix_deal_id,
                p.ghl_contact_id, p.is_existing_contact, p.icp_tags,
                p.first_seen, p.last_interaction_at,
+               u.name AS owner_name,
                COALESCE(i.comment_count, 0) AS comment_count,
                COALESCE(i.dm_count, 0) AS dm_count,
                i.last_text
         FROM cortex_core.prospecting_profiles p
+        LEFT JOIN cortex_core.auth_users u ON u.id = p.owner_user_id
         LEFT JOIN (
           SELECT profile_id,
                  COUNT(*) FILTER (WHERE type = 'comment') AS comment_count,
@@ -61,6 +63,7 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
           subcategory: r.subcategory,
           qualification: r.qualification,
           ownerUserId: r.owner_user_id,
+          ownerName: r.owner_name,
           lockedBy: r.locked_by,
           lockedAt: r.locked_at,
           isLocked: !!r.locked_by && r.locked_at && (now - new Date(r.locked_at).getTime()) < LOCK_TTL_MIN * 60_000,
@@ -216,6 +219,25 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         RETURNING id
       `)).rows;
       if (updated.length === 0) return res.status(409).json({ message: "prospect já tem dono" });
+      res.json({ ok: true });
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // ── Soltar (devolve pra fila: limpa dono + trava; só o dono ou admin) ──
+  app.post("/api/crm-instagram/profiles/:id/release", async (req, res) => {
+    try {
+      const user = req.user as any;
+      if (!user?.id) return res.status(401).json({ message: "não autenticado" });
+      const id = parseInt(req.params.id, 10);
+      const updated = (await db.execute(sql`
+        UPDATE cortex_core.prospecting_profiles
+        SET owner_user_id = NULL, locked_by = NULL, locked_at = NULL, updated_at = NOW()
+        WHERE id = ${id} AND (owner_user_id = ${user.id} OR ${user.role === "admin"})
+        RETURNING id
+      `)).rows;
+      if (updated.length === 0) return res.status(403).json({ message: "só o dono pode soltar" });
       res.json({ ok: true });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
