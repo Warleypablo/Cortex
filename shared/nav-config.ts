@@ -53,6 +53,7 @@ export const PERMISSION_KEYS = {
     CREATORS_PONTUAL: 'gestao.creators_pontual',
     CAPACITY_TIMES: 'gestao.capacity_times',
     CHURN_PRODUTO: 'gestao.churn_produto',
+    CHURN_ABONADOS: 'gestao.churn_abonados',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -238,6 +239,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/churn-detalhamento': PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO,
   '/dashboard/churn-predicao': PERMISSION_KEYS.GESTAO.CHURN_PREDICAO,
   '/dashboard/churn-produto': PERMISSION_KEYS.GESTAO.CHURN_PRODUTO,
+  '/dashboard/churn-abonados': PERMISSION_KEYS.GESTAO.CHURN_ABONADOS,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
   '/gestao/tv-leaderboard': PERMISSION_KEYS.GESTAO.TV_LEADERBOARD,
@@ -471,6 +473,7 @@ export const NAV_CONFIG = {
         { title: 'Evolução Mensal', url: '/dashboard/evolucao-mensal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL },
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
         { title: 'Churn por Produto', url: '/dashboard/churn-produto', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_PRODUTO },
+        { title: 'Churns Abonados', url: '/dashboard/churn-abonados', icon: 'Shield', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_ABONADOS },
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
         { title: 'Triagem Inteligente', url: '/triagem', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
@@ -705,6 +708,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GESTAO.VISAO_GERAL]: 'Visão Geral',
   [PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO]: 'Detalhamento de Churn',
   [PERMISSION_KEYS.GESTAO.CHURN_PRODUTO]: 'Churn por Produto',
+  [PERMISSION_KEYS.GESTAO.CHURN_ABONADOS]: 'Churns Abonados',
   [PERMISSION_KEYS.GESTAO.CHURN_PREDICAO]: 'Predição de Churn',
   [PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL]: 'Evolução Mensal',
   [PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS]: 'Clientes & Contratos',

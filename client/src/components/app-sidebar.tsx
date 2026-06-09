@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, TrendingDown, UsersRound,
-  Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase,
+  Eye, UserCheck, UserPlus, Target, ShieldAlert, Shield, DollarSign, Briefcase,
   Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, CalendarCheck, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut, Lock, Bell, Moon, Sun,
@@ -42,7 +42,7 @@ interface User {
 
 const ICONS: Record<string, any> = {
   Users, FileText, BarChart3, UserCog, Building2, Wrench, TrendingUp, TrendingDown, UsersRound,
-  Eye, UserCheck, UserPlus, Target, ShieldAlert, DollarSign, Briefcase, Monitor,
+  Eye, UserCheck, UserPlus, Target, ShieldAlert, Shield, DollarSign, Briefcase, Monitor,
   Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
   CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Activity, Palette,

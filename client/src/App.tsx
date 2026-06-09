@@ -73,6 +73,7 @@ const Organograma = lazyWithRetry(() => import("@/pages/Organograma"));
 const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
 const ChurnPredicao = lazyWithRetry(() => import("@/pages/ChurnPredicao"));
 const ChurnProduto = lazyWithRetry(() => import("@/pages/ChurnProduto"));
+const ChurnAbonados = lazyWithRetry(() => import("@/pages/ChurnAbonados"));
 const AnalisePreditiva = lazyWithRetry(() => import("@/pages/gestao/AnalisePreditiva"));
 const TvLeaderboard = lazyWithRetry(() => import("@/pages/gestao/TvLeaderboard"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
@@ -321,6 +322,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/churn-detalhamento">{() => <ProtectedRoute path="/dashboard/churn-detalhamento" component={ChurnDetalhamento} />}</Route>
       <Route path="/dashboard/churn-predicao">{() => <ProtectedRoute path="/dashboard/churn-predicao" component={ChurnPredicao} />}</Route>
       <Route path="/dashboard/churn-produto">{() => <ProtectedRoute path="/dashboard/churn-produto" component={ChurnProduto} />}</Route>
+      <Route path="/dashboard/churn-abonados">{() => <ProtectedRoute path="/dashboard/churn-abonados" component={ChurnAbonados} />}</Route>
       <Route path="/lt-ltv-churn">{() => <ProtectedRoute path="/lt-ltv-churn" component={LtLtvChurn} />}</Route>
       <Route path="/ltv-clientes">{() => <ProtectedRoute path="/ltv-clientes" component={LtvClientes} />}</Route>
       <Route path="/estoque-pontual">{() => <ProtectedRoute path="/estoque-pontual" component={EstoquePontual} />}</Route>
