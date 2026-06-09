@@ -43,12 +43,13 @@ interface AbonadoContract {
   motivo_cancelamento?: string;
   submotivo?: string | null;
   is_abonado?: boolean;
-  abonar_churn?: string;
 }
 
 interface ChurnDetalhamentoData {
   contratos: AbonadoContract[];
-  squads: string[];
+  filtros: {
+    squads: string[];
+  };
 }
 
 const MOTIVOS_AUTOMATICOS = ["Inadimplente 1º Mês", "Não começou", "Erro na Venda"];
@@ -135,7 +136,7 @@ export default function ChurnAbonados() {
     [abonados12m, mesInicio, mesFim, filterSquad]
   );
 
-  const squads = useMemo(() => data?.squads ?? [], [data]);
+  const squads = useMemo(() => data?.filtros?.squads ?? [], [data]);
 
   const heroMetrics = useMemo(() => {
     const count = abonadosMes.length;
@@ -239,9 +240,7 @@ export default function ChurnAbonados() {
       const d = parseISO(c.data_encerramento);
       const key = format(d, "MMM/yy", { locale: ptBR });
       if (!months[key]) return;
-      const isManual =
-        c.abonar_churn === "Sim" &&
-        !MOTIVOS_AUTOMATICOS.includes(c.motivo_cancelamento ?? "");
+      const isManual = !MOTIVOS_AUTOMATICOS.includes(c.motivo_cancelamento ?? "");
       if (isManual) {
         months[key].manual++;
         months[key].mrrManual += c.valorr || 0;
