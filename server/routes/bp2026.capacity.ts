@@ -103,14 +103,15 @@ export async function montarCapacity(deps: Deps): Promise<Linha[]> {
 
   return [
     fazLinha({ metrica: "cap_contratos_performance", titulo: "Contratos Performance", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "int", destaque: true }, contratos, orcDe("contratos_performance"), ytdPos(contratos, orcDe("contratos_performance"))),
-    fazLinha({ metrica: "gestores_necessarios", titulo: "Gestores necessários", tipoAgregacao: "estoque", direcao: "neutro", unidade: "dec" }, gestoresNec, orcDe("gestores_necessarios"), ytdPos(gestoresNec, orcDe("gestores_necessarios"))),
-    fazLinha({ metrica: "gestores_atuais", titulo: "Gestores atuais", tipoAgregacao: "estoque", direcao: "neutro", unidade: "int" }, gestores, orcDe("gestores_atuais"), ytdPos(gestores, orcDe("gestores_atuais"))),
+    fazLinha({ metrica: "gestores_necessarios", titulo: "Gestores necessários", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "dec" }, gestoresNec, orcDe("gestores_necessarios"), ytdPos(gestoresNec, orcDe("gestores_necessarios"))),
+    fazLinha({ metrica: "gestores_atuais", titulo: "Gestores atuais", tipoAgregacao: "estoque", direcao: "menor_melhor", unidade: "int" }, gestores, orcDe("gestores_atuais"), ytdPos(gestores, orcDe("gestores_atuais"))),
+    // necessidade fica neutra: atingimento sobre orçado negativo não tem leitura de cor
     fazLinha({ metrica: "necessidade_gestores", titulo: "Necessidade de contratar (gestores)", tipoAgregacao: "estoque", direcao: "neutro", unidade: "dec" }, necessidade,
       (m) => (orcado["gestores_necessarios"]?.[m] ?? 0) - (orcado["gestores_atuais"]?.[m] ?? 0),
       ytdPos(necessidade, (m) => (orcado["gestores_necessarios"]?.[m] ?? 0) - (orcado["gestores_atuais"]?.[m] ?? 0))),
-    fazLinha({ metrica: "contratos_por_gestor", titulo: "Contratos por gestor", tipoAgregacao: "estoque", direcao: "neutro", unidade: "dec", nota: NOTA_CONTRATOS_GESTOR }, contratosPorGestor, orcDe("contratos_por_gestor"), ytdPos(contratosPorGestor, orcDe("contratos_por_gestor"))),
-    fazLinha({ metrica: "designers_necessarios", titulo: "Designers necessários", tipoAgregacao: "estoque", direcao: "neutro", unidade: "dec" }, designersNec, orcDe("designers_necessarios"), ytdPos(designersNec, orcDe("designers_necessarios"))),
-    fazLinha({ metrica: "designers_atuais", titulo: "Designers atuais", tipoAgregacao: "estoque", direcao: "neutro", unidade: "int", nota: NOTA_DESIGNERS }, designers, orcDe("designers_atuais"), ytdPos(designers, orcDe("designers_atuais"))),
-    fazLinha({ metrica: "contas_por_designer", titulo: "Contas por designer", tipoAgregacao: "estoque", direcao: "neutro", unidade: "dec" }, contasPorDesigner, orcDe("contas_por_designer"), ytdPos(contasPorDesigner, orcDe("contas_por_designer"))),
+    fazLinha({ metrica: "contratos_por_gestor", titulo: "Contratos por gestor", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "dec", nota: NOTA_CONTRATOS_GESTOR }, contratosPorGestor, orcDe("contratos_por_gestor"), ytdPos(contratosPorGestor, orcDe("contratos_por_gestor"))),
+    fazLinha({ metrica: "designers_necessarios", titulo: "Designers necessários", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "dec" }, designersNec, orcDe("designers_necessarios"), ytdPos(designersNec, orcDe("designers_necessarios"))),
+    fazLinha({ metrica: "designers_atuais", titulo: "Designers atuais", tipoAgregacao: "estoque", direcao: "menor_melhor", unidade: "int", nota: NOTA_DESIGNERS }, designers, orcDe("designers_atuais"), ytdPos(designers, orcDe("designers_atuais"))),
+    fazLinha({ metrica: "contas_por_designer", titulo: "Contas por designer", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "dec" }, contasPorDesigner, orcDe("contas_por_designer"), ytdPos(contasPorDesigner, orcDe("contas_por_designer"))),
   ];
 }
