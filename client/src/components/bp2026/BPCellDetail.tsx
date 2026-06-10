@@ -4,7 +4,7 @@ import {
   Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription,
 } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
-import type { BPLinha } from "./BPDreTable";
+import { corAtingimento, type BPLinha } from "./BPDreTable";
 
 const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
@@ -59,7 +59,14 @@ export function BPCellDetail({ metrica, mes, linhas, onClose }: Props) {
           </SheetTitle>
           <SheetDescription className="text-gray-600 dark:text-zinc-400">
             Orçado {fmt(celula?.orcado)} · Realizado {fmt(celula?.realizado)}
-            {celula?.atingimento != null && ` · ${(celula.atingimento * 100).toFixed(1)}%`}
+            {celula?.atingimento != null && (
+              <>
+                {" · "}
+                <span className={`font-semibold ${corAtingimento(celula.atingimento, linha?.direcao)}`}>
+                  {(celula.atingimento * 100).toFixed(1)}%
+                </span>
+              </>
+            )}
           </SheetDescription>
         </SheetHeader>
 
@@ -73,9 +80,17 @@ export function BPCellDetail({ metrica, mes, linhas, onClose }: Props) {
                 const comp = linhas.find((l) => l.metrica === m);
                 const cm = comp?.meses[mes - 1];
                 return (
-                  <div key={m} className="flex items-center justify-between rounded border border-gray-100 dark:border-zinc-800 px-3 py-2 text-sm">
+                  <div key={m} className="flex items-center justify-between gap-2 rounded border border-gray-100 dark:border-zinc-800 px-3 py-2 text-sm">
                     <span className="text-gray-800 dark:text-zinc-200">{comp?.titulo}</span>
-                    <span className="tabular-nums text-gray-900 dark:text-white">{fmt(cm?.realizado)}</span>
+                    <span className="flex items-baseline gap-2 shrink-0">
+                      <span className="text-[11px] tabular-nums text-gray-500 dark:text-zinc-500">
+                        orç {fmt(cm?.orcado)}
+                      </span>
+                      <span className="tabular-nums text-gray-900 dark:text-white">{fmt(cm?.realizado)}</span>
+                      <span className={`text-[11px] font-semibold tabular-nums ${corAtingimento(cm?.atingimento ?? null, comp?.direcao)}`}>
+                        {cm?.atingimento != null ? `${(cm.atingimento * 100).toFixed(1)}%` : "—"}
+                      </span>
+                    </span>
                   </div>
                 );
               })}

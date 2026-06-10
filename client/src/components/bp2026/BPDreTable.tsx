@@ -24,7 +24,7 @@ export interface BPLinha {
 
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-function corAtingimento(
+export function corAtingimento(
   a: number | null,
   direcao: "maior_melhor" | "menor_melhor" = "maior_melhor"
 ): string {
