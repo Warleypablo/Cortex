@@ -62,6 +62,10 @@ LINHAS = [
     ("Revenue", 28, "aov_others", 4),
     ("Revenue", 29, "contratos_others", 4),
     ("Revenue", 30, "churn_pct_others", 4),
+    ("CAC", 69, "aov_venda_pontual", 17),
+    ("CAC", 70, "aov_venda_mrr", 17),
+    ("CAC", 71, "taxa_conversao", 17),
+    ("CAC", 72, "reunioes_necessarias", 17),
 ]
 # Totais conhecidos da planilha, para verificação anti-drift
 TOTAIS_ESPERADOS = {
@@ -117,6 +121,10 @@ TOTAIS_ESPERADOS = {
     "aov_others": 20565.197133,
     "contratos_others": 1112.449569,
     "churn_pct_others": 1.08,
+    "aov_venda_pontual": 118080.0,
+    "aov_venda_mrr": 51480.0,
+    "taxa_conversao": 3.3,
+    "reunioes_necessarias": 2918.7741306,
 }
 
 # Métricas com células vazias na planilha (tratadas como 0). Ex.: Bônus só tem jan-mar.
