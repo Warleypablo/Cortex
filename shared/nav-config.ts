@@ -230,6 +230,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/contribuicao-squad': PERMISSION_KEYS.FIN.CONTRIBUICAO_OPERADOR,
   '/turbozap': PERMISSION_KEYS.FIN.TURBOZAP,
   '/dashboard/dre': PERMISSION_KEYS.FIN.DRE,
+  '/bp-2026': PERMISSION_KEYS.FIN.DRE,
   '/dashboard/notas-fiscais': PERMISSION_KEYS.FIN.NOTAS_FISCAIS,
   '/financeiro/negativacao': PERMISSION_KEYS.FIN.INADIMPLENCIA,
   '/financeiro/receita-recorrente': PERMISSION_KEYS.FIN.RECEITA_RECORRENTE,
@@ -453,6 +454,7 @@ export const NAV_CONFIG = {
       items: [
         { title: 'DFC', url: '/dashboard/dfc', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.FIN.DFC },
         { title: 'DRE', url: '/dashboard/dre', icon: 'FileBarChart', permissionKey: PERMISSION_KEYS.FIN.DRE },
+        { title: 'BP Orçado × Realizado', url: '/bp-2026', icon: 'Target', permissionKey: PERMISSION_KEYS.FIN.DRE },
         { title: 'Fluxo de Caixa', url: '/dashboard/fluxo-caixa', icon: 'Wallet', permissionKey: PERMISSION_KEYS.FIN.FLUXO_CAIXA },
         { title: 'Metas de Receita', url: '/dashboard/revenue-goals', icon: 'Target', permissionKey: PERMISSION_KEYS.FIN.REVENUE_GOALS },
         { title: 'Inadimplência', url: '/dashboard/inadimplencia', icon: 'AlertTriangle', permissionKey: PERMISSION_KEYS.FIN.INADIMPLENCIA },

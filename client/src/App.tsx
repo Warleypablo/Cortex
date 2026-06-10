@@ -85,6 +85,7 @@ const TechHub = lazyWithRetry(() => import("@/pages/TechHub"));
 const TechResponsavel = lazyWithRetry(() => import("@/pages/TechResponsavel"));
 const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
 const DRE = lazyWithRetry(() => import("@/pages/DRE"));
+const BP2026 = lazyWithRetry(() => import("@/pages/BP2026"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
 const InstagramDashboard = lazyWithRetry(() => import("@/pages/InstagramDashboard"));
@@ -348,6 +349,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/contribuicao-operador">{() => <ProtectedRoute path="/dashboard/contribuicao-operador" component={ContribuicaoOperador} />}</Route>
       <Route path="/dashboard/contribuicao-squad">{() => <ProtectedRoute path="/dashboard/contribuicao-squad" component={ContribuicaoSquad} />}</Route>
       <Route path="/dashboard/dre">{() => <ProtectedRoute path="/dashboard/dre" component={DRE} />}</Route>
+      <Route path="/bp-2026">{() => <ProtectedRoute path="/bp-2026" component={BP2026} />}</Route>
       <Route path="/dashboard/notas-fiscais">{() => <ProtectedRoute path="/dashboard/notas-fiscais" component={NotasFiscais} />}</Route>
       <Route path="/financeiro/negativacao">{() => <ProtectedRoute path="/financeiro/negativacao" component={Negativacao} />}</Route>
       <Route path="/triagem">{() => <ProtectedRoute path="/triagem" component={Triagem} />}</Route>
