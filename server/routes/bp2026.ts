@@ -15,6 +15,7 @@ import { montarMetricasGerais } from "./bp2026.metricas";
 import { montarRevenue } from "./bp2026.revenue";
 import { montarFunil } from "./bp2026.funil";
 import { montarCapacity } from "./bp2026.capacity";
+import { montarDetalhamentos } from "./bp2026.detalhamentos";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -115,7 +116,7 @@ export const LINHAS_POS_EBITDA: DefLinha[] = [
 
 // Soma mensal de despesas em regime caixa (QUITADO por data_quitacao em 2026),
 // filtrada por um predicado de categorias.
-async function somaDespesaCaixaPorMes(
+export async function somaDespesaCaixaPorMes(
   db: any,
   predicadoCategorias: ReturnType<typeof sql>
 ): Promise<Record<number, number>> {
@@ -518,6 +519,11 @@ export function registerBp2026Routes(app: Express, db: any) {
         db, orcado, contratosPerformance: contratosPerformanceSerie, mesCorrente, mesFechado,
       });
 
+      // 12. Detalhamentos: SG&A por sub-linha e Outras Receitas por categoria
+      const { sga: sgaDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
+        db, orcado, mesCorrente, mesFechado,
+      });
+
       const payload = {
         ano: ANO,
         mesCorrente,
@@ -536,6 +542,8 @@ export function registerBp2026Routes(app: Express, db: any) {
         revenue,
         funil,
         capacity,
+        sgaDetalhe,
+        outrasDetalhe,
         atualizadoEm: new Date().toISOString(),
       };
 
