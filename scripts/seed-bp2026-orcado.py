@@ -1,35 +1,43 @@
 #!/usr/bin/env python3
 """Seed de cortex_core.bp2026_orcado a partir da planilha BP 2026.
 
-Lê a aba Overview (linhas 4-6 e 8-9 = MRR Ativo, Receita Pontual, Outras Receitas,
-Inadimplência, Impostos sobre Receita; colunas C..N = Janeiro..Dezembro) e gera
-/tmp/seed-bp2026-orcado.sql.
-Aborta se os totais lidos divergirem dos totais conhecidos da planilha.
+Lê linhas de orçamento de várias abas (colunas C..N = Janeiro..Dezembro)
+e gera /tmp/seed-bp2026-orcado.sql. Aborta se os totais lidos divergirem
+dos totais conhecidos da planilha.
 """
 import openpyxl
 
 XLSX = "BP 2026 - Turbo - Financials.xlsx"
-LINHAS = {
-    4: "mrr_ativo",
-    5: "receita_pontual",
-    6: "outras_receitas",
-    8: "inadimplencia",
-    9: "impostos_receita",
-}
-# Totais da coluna O da aba Overview, para verificação anti-drift
+# (aba, linha, metrica)
+LINHAS = [
+    ("Overview", 4, "mrr_ativo"),
+    ("Overview", 5, "receita_pontual"),
+    ("Overview", 6, "outras_receitas"),
+    ("Overview", 8, "inadimplencia"),
+    ("Overview", 9, "impostos_receita"),
+    ("Overview", 11, "csv_salarios"),
+    ("Overview", 12, "csv_beneficio"),
+    ("Overview", 13, "csv_stack"),
+    ("SG&A", 11, "beneficio_total_empresa"),  # denominador do rateio do benefício
+]
+# Totais conhecidos da planilha, para verificação anti-drift
 TOTAIS_ESPERADOS = {
     "mrr_ativo": 20998078.1,
     "receita_pontual": 4045000.0,
     "outras_receitas": 1040111.3,
     "inadimplencia": 1564991.4,
     "impostos_receita": 2422411.4,
+    "csv_salarios": 6314099.1,
+    "csv_beneficio": 481200.0,
+    "csv_stack": 565344.0,
+    "beneficio_total_empresa": 736000.0,
 }
 
 wb = openpyxl.load_workbook(XLSX, data_only=True)
-ws = wb["Overview"]
 
 stmts = []
-for row, metrica in LINHAS.items():
+for aba, row, metrica in LINHAS:
+    ws = wb[aba]
     valores = [ws.cell(row=row, column=col).value for col in range(3, 15)]  # C..N
     assert all(isinstance(v, (int, float)) for v in valores), f"{metrica}: célula vazia/não numérica: {valores}"
     total = sum(valores)
