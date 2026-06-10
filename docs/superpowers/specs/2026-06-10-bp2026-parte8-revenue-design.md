@@ -46,7 +46,7 @@ Churn 2026 por produto (mesmos filtros do BP): Performance 333.096, Social 123.5
   - Query 1: `cup_data_hist` — snapshots fim de mês de **dez/2025 a dez/2026** (o dez/2025 alimenta o denominador do churn de janeiro), `CASE TRIM(produto)` → linha, devolvendo MRR e contratos por linha/mês.
   - Query 2: `vw_cup_churn_ajustado` 2026 com o mesmo CASE, churn R$ por linha/mês.
   - Churn % mês m = churnR$[linha][m] ÷ MRR[linha][m−1]; janeiro usa dez/2025. Denominador 0/ausente → null.
-  - AOV = MRR ÷ contratos por mês; YTDs: MRR/contratos estoque; AOV razão das posições; churn % YTD = Σ churn R$ (até mês fechado) ÷ MRR médio? **Definição**: churn % YTD = Σ churnR$ jan..mesFechado ÷ média dos denominadores usados (MRR fim do mês anterior, jan..mesFechado) — equivalente à taxa acumulada média ponderada; orçado YTD idem com orçados (média ponderada pelo MRR orçado da linha, padrão `ytdOrcPctPonderada` adaptado ao MRR da própria linha).
+  - AOV = MRR ÷ contratos por mês; YTDs: MRR/contratos estoque; AOV razão das posições; churn % YTD = Σ churn R$ (até mês fechado) ÷ MRR médio? **Definição**: churn % YTD = Σ churnR$ jan..mesFechado ÷ Σ dos denominadores (MRR fim do mês anterior, jan..mesFechado) — taxa média mensal ponderada; orçado YTD = Σ(pct_orc(m) × mrr_orc(m)) ÷ Σ mrr_orc(m), ponderada pelo MRR orçado da linha.
 - `bp2026.ts`: payload ganha `revenue: LinhaReceita[]`; `LinhaReceita`/`DefLinha` ganham `destaque?: boolean`.
 
 ### Frontend
