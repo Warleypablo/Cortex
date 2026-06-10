@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcAtingimento, calcYtd, ultimoDiaDoMes, subtrairMeses } from "./bp2026.helpers";
+import { calcAtingimento, calcYtd, ultimoDiaDoMes, subtrairMeses, ratear } from "./bp2026.helpers";
 
 describe("calcAtingimento", () => {
   it("calcula razão realizado/orçado", () => {
@@ -62,5 +62,17 @@ describe("subtrairMeses", () => {
     const r = subtrairMeses(base, [ded1, ded2]);
     expect(r[1]).toEqual({ mes: 2, orcado: 780, realizado: null });
     expect(r[2]).toEqual({ mes: 3, orcado: 860, realizado: null });
+  });
+});
+
+describe("ratear", () => {
+  it("aplica a fração numerador/denominador ao valor", () => {
+    expect(ratear(48678, 29200, 44000)).toBeCloseTo(32304.49, 1);
+  });
+  it("retorna null para valor null", () => {
+    expect(ratear(null, 29200, 44000)).toBeNull();
+  });
+  it("retorna null com denominador zero (não mascara seed quebrado)", () => {
+    expect(ratear(48678, 29200, 0)).toBeNull();
   });
 });

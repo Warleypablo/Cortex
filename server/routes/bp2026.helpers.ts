@@ -36,6 +36,17 @@ export function ultimoDiaDoMes(ano: number, mes: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Rateio proporcional null-safe (usado para dividir o benefício entre CSV e SG&A
+// pela fração orçada do mês). Denominador inválido => null, para expor erro de seed.
+export function ratear(
+  valor: number | null,
+  numerador: number,
+  denominador: number
+): number | null {
+  if (valor === null || !denominador) return null;
+  return (valor * numerador) / denominador;
+}
+
 // Pré-condição: todos os arrays alinhados por posição (meses 1..12, mesmo comprimento).
 export function subtrairMeses(
   minuendo: MesValor[],
