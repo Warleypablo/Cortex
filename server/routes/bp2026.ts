@@ -160,15 +160,20 @@ export function registerBp2026Routes(app: Express, db: any) {
         })),
       });
 
-      // 7. YTD por linha (até o mês corrente, ou dez se ano encerrado)
-      const mesYtd = Math.max(1, Math.min(mesCorrente, 12));
+      // 7. YTD por linha — acumula apenas meses fechados; mês corrente (parcial) fica de fora
+      // mesFechado = 0 quando ainda não há nenhum mês fechado (jan ou ano ainda não iniciado)
+      const mesFechado = mesCorrente <= 1 ? 0 : Math.max(1, Math.min(mesCorrente - 1, 12));
       const payload = {
         ano: ANO,
         mesCorrente,
+        mesFechado,
         linhas: linhas.map((l) => ({
           ...l,
           ytd: (() => {
-            const v = calcYtd(l.meses, mesYtd, l.tipoAgregacao);
+            if (mesFechado === 0) {
+              return { orcado: 0, realizado: null, atingimento: null };
+            }
+            const v = calcYtd(l.meses, mesFechado, l.tipoAgregacao);
             return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) };
           })(),
         })),
