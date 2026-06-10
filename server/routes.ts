@@ -76,6 +76,7 @@ import { registerLtLtvChurnRoutes } from "./routes/ltLtvChurn";
 import { registerChurnProdutoMotivoRoutes } from "./routes/churnProdutoMotivo";
 import { registerEstoquePontualRoutes } from "./routes/estoquePontual";
 import { registerBp2026Routes } from "./routes/bp2026";
+import { registerBp2026DetalheRoutes } from "./routes/bp2026.detalhe";
 import { registerCreatorsPontualRoutes } from "./routes/creatorsPontual";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
@@ -8200,6 +8201,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   registerChurnProdutoMotivoRoutes(app, db);
   registerEstoquePontualRoutes(app, db);
   registerBp2026Routes(app, db);
+  registerBp2026DetalheRoutes(app, db);
   registerCreatorsPontualRoutes(app, db);
 
   // ============================================
