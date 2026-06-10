@@ -18,6 +18,9 @@ LINHAS = [
     ("Overview", 11, "csv_salarios"),
     ("Overview", 12, "csv_beneficio"),
     ("Overview", 13, "csv_stack"),
+    ("Overview", 15, "cac"),
+    ("Overview", 16, "sga"),
+    ("Overview", 17, "bonus"),
     ("SG&A", 11, "beneficio_total_empresa"),  # denominador do rateio do benefício
 ]
 # Totais conhecidos da planilha, para verificação anti-drift
@@ -30,8 +33,14 @@ TOTAIS_ESPERADOS = {
     "csv_salarios": 6314099.1,
     "csv_beneficio": 481200.0,
     "csv_stack": 565344.0,
+    "cac": 4449113.7,
+    "sga": 2688672.0,
+    "bonus": 100000.0,
     "beneficio_total_empresa": 736000.0,
 }
+
+# Métricas com células vazias na planilha (tratadas como 0). Ex.: Bônus só tem jan-mar.
+PERMITE_VAZIO = {"bonus"}
 
 wb = openpyxl.load_workbook(XLSX, data_only=True)
 
@@ -39,6 +48,8 @@ stmts = []
 for aba, row, metrica in LINHAS:
     ws = wb[aba]
     valores = [ws.cell(row=row, column=col).value for col in range(3, 15)]  # C..N
+    if metrica in PERMITE_VAZIO:
+        valores = [v if isinstance(v, (int, float)) else 0 for v in valores]
     assert all(isinstance(v, (int, float)) for v in valores), f"{metrica}: célula vazia/não numérica: {valores}"
     total = sum(valores)
     esperado = TOTAIS_ESPERADOS[metrica]
