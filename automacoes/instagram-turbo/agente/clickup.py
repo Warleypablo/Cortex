@@ -110,16 +110,19 @@ class Comment:
     user: str
 
 
-def list_approved_tasks() -> list[Task]:
+def list_approved_tasks(list_id: str | None = None) -> list[Task]:
     """
-    Retorna tasks filhas (posts) com status=aprovado na lista Instagram 📷.
+    Retorna tasks filhas (posts) com status=aprovado na lista informada.
+    Default = lista Instagram 📷 (comportamento original, intocado). O TikTok
+    passa sua própria lista via `list_id` — ver agente/main_tiktok.py.
     Ignora tasks pai ('Social Media - <MÊS>') e tasks sem parent.
     """
+    lid = list_id or CONFIG.clickup_list_id_instagram
     tasks: list[Task] = []
     page = 0
     while True:
         r = _get(
-            f"/list/{CONFIG.clickup_list_id_instagram}/task",
+            f"/list/{lid}/task",
             {"subtasks": "true", "include_closed": "false", "page": page},
         )
         batch = r.get("tasks", [])
