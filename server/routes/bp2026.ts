@@ -14,6 +14,7 @@ import {
 import { montarMetricasGerais } from "./bp2026.metricas";
 import { montarRevenue } from "./bp2026.revenue";
 import { montarFunil } from "./bp2026.funil";
+import { montarCapacity } from "./bp2026.capacity";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -509,6 +510,14 @@ export function registerBp2026Routes(app: Express, db: any) {
       // 10. Funil Comercial (sub-aba)
       const funil = await montarFunil({ db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado });
 
+      // 11. Capacity (sub-aba) — contratos Performance extraídos do retorno da Revenue
+      const contratosPerformanceSerie =
+        revenue.find((l) => l.metrica === "contratos_performance")?.meses.map((m) => m.realizado) ??
+        Array.from({ length: 12 }, () => null);
+      const capacity = await montarCapacity({
+        db, orcado, contratosPerformance: contratosPerformanceSerie, mesCorrente, mesFechado,
+      });
+
       const payload = {
         ano: ANO,
         mesCorrente,
@@ -526,6 +535,7 @@ export function registerBp2026Routes(app: Express, db: any) {
         metricasGerais,
         revenue,
         funil,
+        capacity,
         atualizadoEm: new Date().toISOString(),
       };
 
