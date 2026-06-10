@@ -17,7 +17,7 @@ export interface BPLinha {
   titulo: string;
   tipoAgregacao: "fluxo" | "estoque";
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
-  unidade?: "brl" | "int" | "pct";
+  unidade?: "brl" | "int" | "pct" | "dec";
   nota?: string;
   destaque?: boolean;
   meses: BPMes[];
@@ -47,10 +47,11 @@ function fmtPct(a: number | null): string {
 }
 
 // sem prefixo R$ para a tabela anual caber na tela; unidade indicada no cabeçalho
-function fmtValor(v: number | null, unidade: "brl" | "int" | "pct" = "brl"): string {
+function fmtValor(v: number | null, unidade: "brl" | "int" | "pct" | "dec" = "brl"): string {
   if (v === null) return "—";
   if (unidade === "pct") return `${(v * 100).toFixed(1)}%`;
-  if (unidade === "int") return Math.round(v).toLocaleString("pt-BR");
+  if (unidade === "dec")
+    return v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
   return Math.round(v).toLocaleString("pt-BR");
 }
 
@@ -59,7 +60,7 @@ interface CelulaProps {
   realizado: number | null;
   atingimento: number | null;
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
-  unidade: "brl" | "int" | "pct";
+  unidade: "brl" | "int" | "pct" | "dec";
 }
 
 function Celula({ orcado, realizado, atingimento, direcao, unidade }: CelulaProps) {
