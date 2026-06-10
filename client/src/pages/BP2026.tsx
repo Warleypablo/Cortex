@@ -4,12 +4,14 @@ import { useQuery } from "@tanstack/react-query";
 import { BPDreTable, type BPLinha } from "@/components/bp2026/BPDreTable";
 import { BPCellDetail } from "@/components/bp2026/BPCellDetail";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
 interface ReceitasResponse {
   ano: number;
   mesCorrente: number;
   mesFechado: number;
   linhas: BPLinha[];
+  metricasGerais: BPLinha[];
   atualizadoEm: string;
 }
 
@@ -46,12 +48,27 @@ export default function BP2026() {
           Bloco de receitas · orçado fechado em dezembro/2025 · realizado ao vivo
         </p>
       </div>
-      <BPDreTable
-        linhas={data.linhas}
-        mesCorrente={data.mesCorrente}
-        mesFechado={data.mesFechado}
-        onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
-      />
+      <Tabs defaultValue="dre">
+        <TabsList>
+          <TabsTrigger value="dre">DRE</TabsTrigger>
+          <TabsTrigger value="metricas">Métricas Gerais</TabsTrigger>
+        </TabsList>
+        <TabsContent value="dre" className="mt-4">
+          <BPDreTable
+            linhas={data.linhas}
+            mesCorrente={data.mesCorrente}
+            mesFechado={data.mesFechado}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
+          />
+        </TabsContent>
+        <TabsContent value="metricas" className="mt-4">
+          <BPDreTable
+            linhas={data.metricasGerais}
+            mesCorrente={data.mesCorrente}
+            mesFechado={data.mesFechado}
+          />
+        </TabsContent>
+      </Tabs>
       <BPCellDetail
         metrica={detalhe?.metrica ?? null}
         mes={detalhe?.mes ?? null}

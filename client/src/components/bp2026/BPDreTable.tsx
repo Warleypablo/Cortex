@@ -16,7 +16,8 @@ export interface BPLinha {
   metrica: string;
   titulo: string;
   tipoAgregacao: "fluxo" | "estoque";
-  direcao: "maior_melhor" | "menor_melhor";
+  direcao: "maior_melhor" | "menor_melhor" | "neutro";
+  unidade?: "brl" | "int" | "pct";
   nota?: string;
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
@@ -26,9 +27,10 @@ const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "S
 
 export function corAtingimento(
   a: number | null,
-  direcao: "maior_melhor" | "menor_melhor" = "maior_melhor"
+  direcao: "maior_melhor" | "menor_melhor" | "neutro" = "maior_melhor"
 ): string {
   if (a === null) return "text-gray-400 dark:text-zinc-500";
+  if (direcao === "neutro") return "text-gray-500 dark:text-zinc-400";
   if (direcao === "menor_melhor") {
     if (a <= 1) return "text-emerald-600 dark:text-emerald-400";
     if (a <= 1.1) return "text-amber-600 dark:text-amber-400";
@@ -44,25 +46,29 @@ function fmtPct(a: number | null): string {
 }
 
 // sem prefixo R$ para a tabela anual caber na tela; unidade indicada no cabeçalho
-function fmtValor(v: number | null): string {
-  return v === null ? "—" : Math.round(v).toLocaleString("pt-BR");
+function fmtValor(v: number | null, unidade: "brl" | "int" | "pct" = "brl"): string {
+  if (v === null) return "—";
+  if (unidade === "pct") return `${(v * 100).toFixed(1)}%`;
+  if (unidade === "int") return Math.round(v).toLocaleString("pt-BR");
+  return Math.round(v).toLocaleString("pt-BR");
 }
 
 interface CelulaProps {
   orcado: number;
   realizado: number | null;
   atingimento: number | null;
-  direcao: "maior_melhor" | "menor_melhor";
+  direcao: "maior_melhor" | "menor_melhor" | "neutro";
+  unidade: "brl" | "int" | "pct";
 }
 
-function Celula({ orcado, realizado, atingimento, direcao }: CelulaProps) {
+function Celula({ orcado, realizado, atingimento, direcao, unidade }: CelulaProps) {
   return (
     <div className="flex flex-col items-end gap-0.5">
       <span className="text-xs font-medium tabular-nums text-gray-900 dark:text-white">
-        {fmtValor(realizado)}
+        {fmtValor(realizado, unidade)}
       </span>
       <span className="text-[10px] tabular-nums text-gray-500 dark:text-zinc-500">
-        {fmtValor(orcado)}
+        {fmtValor(orcado, unidade)}
       </span>
       <span className={`text-[10px] font-semibold tabular-nums ${corAtingimento(atingimento, direcao)}`}>
         {fmtPct(atingimento)}
@@ -75,7 +81,7 @@ interface Props {
   linhas: BPLinha[];
   mesCorrente: number; // 0-12 (mês atual; parcial quando > mesFechado)
   mesFechado: number; // 0-12 (último mês fechado — período do acumulado)
-  onCellClick: (metrica: string, mes: number) => void;
+  onCellClick?: (metrica: string, mes: number) => void;
 }
 
 export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Props) {
@@ -158,34 +164,38 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                     )}
                   </span>
                 </td>
-                {linha.meses.map((m) => (
-                  <td
-                    key={m.mes}
-                    className={`px-2 py-2 text-right align-top${m.realizado !== null ? " cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/70" : ""}`}
-                    onClick={m.realizado !== null ? () => onCellClick(linha.metrica, m.mes) : undefined}
-                  >
-                    <span className="inline-flex items-start gap-1">
-                      {m.fonteAproximada && (
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="mt-0.5 h-3 w-3 text-amber-500 dark:text-amber-400" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Snapshot do ClickUp não disponível no último dia do mês;
-                            usado o mais próximo anterior.
-                          </TooltipContent>
-                        </Tooltip>
-                      )}
-                      <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} direcao={linha.direcao} />
-                    </span>
-                  </td>
-                ))}
+                {linha.meses.map((m) => {
+                    const clicavel = !!onCellClick && m.realizado !== null;
+                    return (
+                      <td
+                        key={m.mes}
+                        className={`px-2 py-2 text-right align-top${clicavel ? " cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/70" : ""}`}
+                        onClick={clicavel ? () => onCellClick!(linha.metrica, m.mes) : undefined}
+                      >
+                        <span className="inline-flex items-start gap-1">
+                          {m.fonteAproximada && (
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Info className="mt-0.5 h-3 w-3 text-amber-500 dark:text-amber-400" />
+                              </TooltipTrigger>
+                              <TooltipContent>
+                                Snapshot do ClickUp não disponível no último dia do mês;
+                                usado o mais próximo anterior.
+                              </TooltipContent>
+                            </Tooltip>
+                          )}
+                          <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} direcao={linha.direcao} unidade={linha.unidade ?? "brl"} />
+                        </span>
+                      </td>
+                    );
+                  })}
                 <td className="px-3 py-2 text-right align-top border-l border-gray-200 dark:border-zinc-700 bg-gray-50/50 dark:bg-zinc-800/50">
                   <Celula
                     orcado={linha.ytd.orcado}
                     realizado={linha.ytd.realizado}
                     atingimento={linha.ytd.atingimento}
                     direcao={linha.direcao}
+                    unidade={linha.unidade ?? "brl"}
                   />
                 </td>
               </tr>
