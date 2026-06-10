@@ -480,7 +480,7 @@ export function registerBp2026Routes(app: Express, db: any) {
       for (const l of linhas) realizadoDre[l.metrica] = l.meses.map((m) => m.realizado);
       const metricasGerais = await montarMetricasGerais({
         db, orcado, realizadoDre,
-        mrrInfoPorMes: mrrPorMes as any,
+        mrrInfoPorMes: mrrPorMes,
         pontualPorMes, dfcPorMes, mesCorrente, mesFechado,
       });
 

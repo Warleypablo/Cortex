@@ -1,6 +1,6 @@
 // server/routes/bp2026.metricas.ts
 // Bloco "Métricas Gerais" (sub-aba): monta as 18 linhas a partir das séries já
-// computadas do DRE + 3 consultas próprias (vendas MRR, headcount/áreas, churn, saldo).
+// computadas do DRE + 4 consultas próprias (vendas MRR, headcount/áreas, churn, saldo).
 import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd, type MesValor } from "./bp2026.helpers";
 
