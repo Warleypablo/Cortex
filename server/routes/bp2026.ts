@@ -5,6 +5,7 @@ import {
   calcAtingimento,
   calcYtd,
   ultimoDiaDoMes,
+  subtrairMeses,
   type MesValor,
   type TipoAgregacao,
 } from "./bp2026.helpers";
@@ -12,10 +13,13 @@ import {
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
+export type Direcao = "maior_melhor" | "menor_melhor";
+
 interface LinhaReceita {
   metrica: string;
   titulo: string;
   tipoAgregacao: TipoAgregacao;
+  direcao: Direcao;
   meses: Array<{
     mes: number;
     orcado: number;
@@ -27,10 +31,25 @@ interface LinhaReceita {
 
 let cache: { payload: unknown; expiraEm: number } | null = null;
 
-const LINHAS: Array<{ metrica: string; titulo: string; tipoAgregacao: TipoAgregacao }> = [
-  { metrica: "mrr_ativo", titulo: "(+) MRR Ativo", tipoAgregacao: "estoque" },
-  { metrica: "receita_pontual", titulo: "(+) Receita Pontual", tipoAgregacao: "fluxo" },
-  { metrica: "outras_receitas", titulo: "(+) Outras Receitas", tipoAgregacao: "fluxo" },
+const LINHAS: Array<{
+  metrica: string;
+  titulo: string;
+  tipoAgregacao: TipoAgregacao;
+  direcao: Direcao;
+}> = [
+  { metrica: "mrr_ativo", titulo: "(+) MRR Ativo", tipoAgregacao: "estoque", direcao: "maior_melhor" },
+  { metrica: "receita_pontual", titulo: "(+) Receita Pontual", tipoAgregacao: "fluxo", direcao: "maior_melhor" },
+  { metrica: "outras_receitas", titulo: "(+) Outras Receitas", tipoAgregacao: "fluxo", direcao: "maior_melhor" },
+];
+
+const LINHAS_DEDUCOES: Array<{
+  metrica: string;
+  titulo: string;
+  tipoAgregacao: TipoAgregacao;
+  direcao: Direcao;
+}> = [
+  { metrica: "inadimplencia", titulo: "(−) Inadimplência", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
+  { metrica: "impostos_receita", titulo: "(−) Impostos sobre Receita", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
 ];
 
 export function registerBp2026Routes(app: Express, db: any) {
@@ -113,6 +132,37 @@ export function registerBp2026Routes(app: Express, db: any) {
         outrasPorMes[Number(row.mes)] = parseFloat(row.total);
       }
 
+      // 4b. Inadimplência: foto atual — não pago das parcelas vencidas no mês
+      const inadResult = await db.execute(sql`
+        SELECT EXTRACT(MONTH FROM data_vencimento)::int AS mes,
+               SUM(nao_pago::numeric) AS total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'RECEITA'
+          AND data_vencimento >= '2026-01-01' AND data_vencimento < '2027-01-01'
+          AND nao_pago::numeric > 0
+        GROUP BY 1 ORDER BY 1
+      `);
+      const inadPorMes: Record<number, number> = {};
+      for (const row of inadResult.rows as any[]) {
+        inadPorMes[Number(row.mes)] = parseFloat(row.total);
+      }
+
+      // 4c. Impostos sobre receita: regime caixa (quitação), categorias 05.05.x
+      const impostosResult = await db.execute(sql`
+        SELECT EXTRACT(MONTH FROM data_quitacao)::int AS mes,
+               SUM(COALESCE(valor_pago::numeric, 0)) AS total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND categoria_nome LIKE '05.05%'
+          AND status = 'QUITADO'
+          AND data_quitacao >= '2026-01-01' AND data_quitacao < '2027-01-01'
+        GROUP BY 1 ORDER BY 1
+      `);
+      const impostosPorMes: Record<number, number> = {};
+      for (const row of impostosResult.rows as any[]) {
+        impostosPorMes[Number(row.mes)] = parseFloat(row.total);
+      }
+
       // 5. Montagem: meses futuros => realizado null
       const agora = new Date();
       const anoAtual = agora.getFullYear();
@@ -126,12 +176,15 @@ export function registerBp2026Routes(app: Express, db: any) {
         mrr_ativo: (mes) => (mes <= mesCorrente ? mrrPorMes[mes]?.valor ?? null : null),
         receita_pontual: (mes) => (mes <= mesCorrente ? pontualPorMes[mes] ?? null : null),
         outras_receitas: (mes) => (mes <= mesCorrente ? outrasPorMes[mes] ?? null : null),
+        inadimplencia: (mes) => (mes <= mesCorrente ? inadPorMes[mes] ?? 0 : null),
+        impostos_receita: (mes) => (mes <= mesCorrente ? impostosPorMes[mes] ?? 0 : null),
       };
 
-      const linhas: LinhaReceita[] = LINHAS.map(({ metrica, titulo, tipoAgregacao }) => ({
+      const linhas: LinhaReceita[] = LINHAS.map(({ metrica, titulo, tipoAgregacao, direcao }) => ({
         metrica,
         titulo,
         tipoAgregacao,
+        direcao,
         meses: Array.from({ length: 12 }, (_, i) => {
           const mes = i + 1;
           const o = orcado[metrica]?.[mes] ?? 0;
@@ -158,7 +211,41 @@ export function registerBp2026Routes(app: Express, db: any) {
         metrica: "receita_total_faturavel",
         titulo: "(=) Receita Total Faturável",
         tipoAgregacao: "fluxo",
+        direcao: "maior_melhor",
         meses: totalMeses.map((m) => ({
+          ...m,
+          atingimento: calcAtingimento(m.orcado, m.realizado),
+        })),
+      });
+
+      // 6b. Deduções: inadimplência e impostos
+      const deducoes: LinhaReceita[] = LINHAS_DEDUCOES.map(
+        ({ metrica, titulo, tipoAgregacao, direcao }) => ({
+          metrica,
+          titulo,
+          tipoAgregacao,
+          direcao,
+          meses: Array.from({ length: 12 }, (_, i) => {
+            const mes = i + 1;
+            const o = orcado[metrica]?.[mes] ?? 0;
+            const r = realizadoPorMetrica[metrica](mes);
+            return { mes, orcado: o, realizado: r, atingimento: calcAtingimento(o, r) };
+          }),
+        })
+      );
+      linhas.push(...deducoes);
+
+      // 6c. Receita Líquida = Total Faturável − Inadimplência − Impostos
+      const liquidaMeses = subtrairMeses(
+        totalMeses,
+        deducoes.map((d) => d.meses)
+      );
+      linhas.push({
+        metrica: "receita_liquida",
+        titulo: "(=) Receita Líquida",
+        tipoAgregacao: "fluxo",
+        direcao: "maior_melhor",
+        meses: liquidaMeses.map((m) => ({
           ...m,
           atingimento: calcAtingimento(m.orcado, m.realizado),
         })),
