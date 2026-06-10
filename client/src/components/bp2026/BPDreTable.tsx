@@ -115,7 +115,8 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado }: Props) {
               linha.metrica === "receita_total_faturavel" ||
               linha.metrica === "receita_liquida" ||
               linha.metrica === "margem_bruta" ||
-              linha.metrica === "ebitda";
+              linha.metrica === "ebitda" ||
+              linha.metrica === "geracao_caixa";
             const ehEstoque = linha.tipoAgregacao === "estoque";
             return (
               <tr
