@@ -1,6 +1,8 @@
 // server/routes/bp2026.metricas.ts
 // Bloco "Métricas Gerais" (sub-aba): monta as 18 linhas a partir das séries já
-// computadas do DRE + 4 consultas próprias (vendas MRR, headcount/áreas, churn, saldo).
+// computadas do DRE + 3 consultas próprias (headcount/áreas, churn, saldo).
+// A série vendasMrrPorMes agora é fornecida pelo handler (bp2026.ts) para ser
+// reutilizada também pelo módulo de Funil Comercial.
 import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd, type MesValor } from "./bp2026.helpers";
 
@@ -30,6 +32,7 @@ interface Deps {
   realizadoDre: Record<string, (number | null)[]>; // por metrica do DRE, array[12]
   mrrInfoPorMes: Record<number, { valor: number; clientes: number; contratos: number }>;
   pontualPorMes: Record<number, number>;
+  vendasMrrPorMes: Record<number, number>;
   dfcPorMes: Record<number, number>;
   mesCorrente: number;
   mesFechado: number;
@@ -77,19 +80,9 @@ function buildLinhaGeral(
 }
 
 export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
-  const { db, orcado, realizadoDre, mrrInfoPorMes, pontualPorMes, dfcPorMes, mesCorrente, mesFechado } = deps;
+  const { db, orcado, realizadoDre, mrrInfoPorMes, pontualPorMes, vendasMrrPorMes, dfcPorMes, mesCorrente, mesFechado } = deps;
 
   // ---- consultas próprias ----
-  const vendasResult = await db.execute(sql`
-    SELECT EXTRACT(MONTH FROM data_fechamento)::int AS mes,
-           SUM(valor_recorrente::numeric) AS total
-    FROM "Bitrix".crm_deal
-    WHERE stage_name = 'Negócio Ganho' AND valor_recorrente > 0
-      AND data_fechamento >= '2026-01-01' AND data_fechamento < '2027-01-01'
-    GROUP BY 1 ORDER BY 1
-  `);
-  const vendasMrrPorMes: Record<number, number> = {};
-  for (const row of vendasResult.rows as any[]) vendasMrrPorMes[Number(row.mes)] = parseFloat(row.total);
 
   const pessoasResult = await db.execute(sql`
     SELECT gs.mes,

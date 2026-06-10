@@ -13,6 +13,7 @@ import {
 } from "./bp2026.helpers";
 import { montarMetricasGerais } from "./bp2026.metricas";
 import { montarRevenue } from "./bp2026.revenue";
+import { montarFunil } from "./bp2026.funil";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -220,6 +221,21 @@ export function registerBp2026Routes(app: Express, db: any) {
       const pontualPorMes: Record<number, number> = {};
       for (const row of pontualResult.rows as any[]) {
         pontualPorMes[Number(row.mes)] = parseFloat(row.total);
+      }
+
+      // 3b. Vendas MRR: deals ganhos com valor_recorrente > 0 no Bitrix
+      // (movido do bp2026.metricas.ts para ser compartilhado com o módulo de Funil)
+      const vendasMrrResult = await db.execute(sql`
+        SELECT EXTRACT(MONTH FROM data_fechamento)::int AS mes,
+               SUM(valor_recorrente::numeric) AS total
+        FROM "Bitrix".crm_deal
+        WHERE stage_name = 'Negócio Ganho' AND valor_recorrente > 0
+          AND data_fechamento >= '2026-01-01' AND data_fechamento < '2027-01-01'
+        GROUP BY 1 ORDER BY 1
+      `);
+      const vendasMrrPorMes: Record<number, number> = {};
+      for (const row of vendasMrrResult.rows as any[]) {
+        vendasMrrPorMes[Number(row.mes)] = parseFloat(row.total);
       }
 
       // 4. Outras receitas: Conta Azul por competência
@@ -484,11 +500,14 @@ export function registerBp2026Routes(app: Express, db: any) {
       const metricasGerais = await montarMetricasGerais({
         db, orcado, realizadoDre,
         mrrInfoPorMes: mrrPorMes,
-        pontualPorMes, dfcPorMes, mesCorrente, mesFechado,
+        pontualPorMes, vendasMrrPorMes, dfcPorMes, mesCorrente, mesFechado,
       });
 
       // 9. Revenue por linha de serviço (sub-aba)
       const revenue = await montarRevenue({ db, orcado, mesCorrente, mesFechado });
+
+      // 10. Funil Comercial (sub-aba)
+      const funil = await montarFunil({ db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado });
 
       const payload = {
         ano: ANO,
@@ -506,6 +525,7 @@ export function registerBp2026Routes(app: Express, db: any) {
         })),
         metricasGerais,
         revenue,
+        funil,
         atualizadoEm: new Date().toISOString(),
       };
 
