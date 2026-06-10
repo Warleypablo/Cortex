@@ -75,9 +75,10 @@ interface Props {
   linhas: BPLinha[];
   mesCorrente: number; // 0-12 (mês atual; parcial quando > mesFechado)
   mesFechado: number; // 0-12 (último mês fechado — período do acumulado)
+  onCellClick: (metrica: string, mes: number) => void;
 }
 
-export function BPDreTable({ linhas, mesCorrente, mesFechado }: Props) {
+export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Props) {
   const ytdLabel = mesFechado >= 1 ? `YTD ${MESES_CURTOS[mesFechado - 1]}` : "YTD";
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-zinc-700">
@@ -158,7 +159,11 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado }: Props) {
                   </span>
                 </td>
                 {linha.meses.map((m) => (
-                  <td key={m.mes} className="px-2 py-2 text-right align-top">
+                  <td
+                    key={m.mes}
+                    className={`px-2 py-2 text-right align-top${m.realizado !== null ? " cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/70" : ""}`}
+                    onClick={m.realizado !== null ? () => onCellClick(linha.metrica, m.mes) : undefined}
+                  >
                     <span className="inline-flex items-start gap-1">
                       {m.fonteAproximada && (
                         <Tooltip>

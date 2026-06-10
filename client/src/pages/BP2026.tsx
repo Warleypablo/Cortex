@@ -1,6 +1,8 @@
 // client/src/pages/BP2026.tsx
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BPDreTable, type BPLinha } from "@/components/bp2026/BPDreTable";
+import { BPCellDetail } from "@/components/bp2026/BPCellDetail";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface ReceitasResponse {
@@ -15,6 +17,7 @@ export default function BP2026() {
   const { data, isLoading, error } = useQuery<ReceitasResponse>({
     queryKey: ["/api/bp2026/receitas"],
   });
+  const [detalhe, setDetalhe] = useState<{ metrica: string; mes: number } | null>(null);
 
   if (isLoading) {
     return (
@@ -47,6 +50,13 @@ export default function BP2026() {
         linhas={data.linhas}
         mesCorrente={data.mesCorrente}
         mesFechado={data.mesFechado}
+        onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
+      />
+      <BPCellDetail
+        metrica={detalhe?.metrica ?? null}
+        mes={detalhe?.mes ?? null}
+        linhas={data.linhas}
+        onClose={() => setDetalhe(null)}
       />
       <p className="text-xs text-gray-500 dark:text-zinc-500">
         MRR: ClickUp (snapshot fim do mês) · Pontual: Bitrix (vendas ganhas — proxy de
