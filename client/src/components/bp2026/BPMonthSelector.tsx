@@ -27,14 +27,14 @@ export function BPMonthSelector({ mes, mesMaximo, parcial, onChange }: Props) {
       >
         <ChevronLeft className="h-4 w-4" />
       </Button>
-      <span className="min-w-36 text-center font-semibold text-gray-900 dark:text-white">
+      <div className="min-w-36 text-center font-semibold text-gray-900 dark:text-white">
         {MESES[mes - 1]} 2026
         {parcial && (
           <Badge variant="outline" className="ml-2 text-amber-600 dark:text-amber-400 border-amber-300 dark:border-amber-700">
             parcial
           </Badge>
         )}
-      </span>
+      </div>
       <Button
         variant="outline"
         size="icon"

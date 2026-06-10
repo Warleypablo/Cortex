@@ -1,7 +1,7 @@
 // client/src/components/bp2026/BPDreTable.tsx
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import {
-  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+  Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
 import { Info } from "lucide-react";
 
@@ -81,17 +81,15 @@ export function BPDreTable({ linhas, mes, mesFechado }: Props) {
                   <span className="flex items-center gap-1.5">
                     {linha.titulo}
                     {m.fonteAproximada && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3.5 w-3.5 text-amber-500" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            Snapshot do ClickUp não disponível no último dia do mês;
-                            usado o mais próximo anterior.
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          Snapshot do ClickUp não disponível no último dia do mês;
+                          usado o mais próximo anterior.
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </span>
                 </td>
@@ -104,17 +102,15 @@ export function BPDreTable({ linhas, mes, mesFechado }: Props) {
                   <span className="inline-flex items-center gap-1">
                     {fmtValor(linha.ytd.orcado)}
                     {ehEstoque && (
-                      <TooltipProvider>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
-                          </TooltipTrigger>
-                          <TooltipContent>
-                            MRR é estoque: o acumulado mostra a posição no último mês
-                            fechado, não a soma dos meses.
-                          </TooltipContent>
-                        </Tooltip>
-                      </TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          MRR é estoque: o acumulado mostra a posição no último mês
+                          fechado, não a soma dos meses.
+                        </TooltipContent>
+                      </Tooltip>
                     )}
                   </span>
                 </td>
