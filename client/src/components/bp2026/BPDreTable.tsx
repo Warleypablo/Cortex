@@ -16,14 +16,23 @@ export interface BPLinha {
   metrica: string;
   titulo: string;
   tipoAgregacao: "fluxo" | "estoque";
+  direcao: "maior_melhor" | "menor_melhor";
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
 
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-function corAtingimento(a: number | null): string {
+function corAtingimento(
+  a: number | null,
+  direcao: "maior_melhor" | "menor_melhor" = "maior_melhor"
+): string {
   if (a === null) return "text-gray-400 dark:text-zinc-500";
+  if (direcao === "menor_melhor") {
+    if (a <= 1) return "text-emerald-600 dark:text-emerald-400";
+    if (a <= 1.1) return "text-amber-600 dark:text-amber-400";
+    return "text-red-600 dark:text-red-400";
+  }
   if (a >= 1) return "text-emerald-600 dark:text-emerald-400";
   if (a >= 0.9) return "text-amber-600 dark:text-amber-400";
   return "text-red-600 dark:text-red-400";
@@ -42,9 +51,10 @@ interface CelulaProps {
   orcado: number;
   realizado: number | null;
   atingimento: number | null;
+  direcao: "maior_melhor" | "menor_melhor";
 }
 
-function Celula({ orcado, realizado, atingimento }: CelulaProps) {
+function Celula({ orcado, realizado, atingimento, direcao }: CelulaProps) {
   return (
     <div className="flex flex-col items-end gap-0.5">
       <span className="text-xs font-medium tabular-nums text-gray-900 dark:text-white">
@@ -53,7 +63,7 @@ function Celula({ orcado, realizado, atingimento }: CelulaProps) {
       <span className="text-[10px] tabular-nums text-gray-500 dark:text-zinc-500">
         {fmtValor(orcado)}
       </span>
-      <span className={`text-[10px] font-semibold tabular-nums ${corAtingimento(atingimento)}`}>
+      <span className={`text-[10px] font-semibold tabular-nums ${corAtingimento(atingimento, direcao)}`}>
         {fmtPct(atingimento)}
       </span>
     </div>
@@ -100,7 +110,9 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado }: Props) {
         </thead>
         <tbody>
           {linhas.map((linha) => {
-            const ehTotal = linha.metrica === "receita_total_faturavel";
+            const ehTotal =
+              linha.metrica === "receita_total_faturavel" ||
+              linha.metrica === "receita_liquida";
             const ehEstoque = linha.tipoAgregacao === "estoque";
             return (
               <tr
@@ -146,7 +158,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado }: Props) {
                           </TooltipContent>
                         </Tooltip>
                       )}
-                      <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} />
+                      <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} direcao={linha.direcao} />
                     </span>
                   </td>
                 ))}
@@ -155,6 +167,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado }: Props) {
                     orcado={linha.ytd.orcado}
                     realizado={linha.ytd.realizado}
                     atingimento={linha.ytd.atingimento}
+                    direcao={linha.direcao}
                   />
                 </td>
               </tr>
