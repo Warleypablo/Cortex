@@ -21,6 +21,8 @@ LINHAS = [
     ("Overview", 15, "cac"),
     ("Overview", 16, "sga"),
     ("Overview", 17, "bonus"),
+    ("Overview", 19, "impostos_diretos"),
+    ("Overview", 20, "capex"),
     ("SG&A", 11, "beneficio_total_empresa"),  # denominador do rateio do benefício
 ]
 # Totais conhecidos da planilha, para verificação anti-drift
@@ -36,6 +38,8 @@ TOTAIS_ESPERADOS = {
     "cac": 4449113.7,
     "sga": 2688672.0,
     "bonus": 100000.0,
+    "impostos_diretos": 2583101.7,
+    "capex": 420000.0,
     "beneficio_total_empresa": 736000.0,
 }
 
