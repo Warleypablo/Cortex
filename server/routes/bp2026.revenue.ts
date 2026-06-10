@@ -1,6 +1,7 @@
 // server/routes/bp2026.revenue.ts
 // Sub-aba Revenue: MRR/Contratos/AOV/Churn% por linha de serviço.
-// Mapeamento por produto exato; Others = demais — soma das 5 = MRR total da matriz.
+// Mapeamento por produto exato com fallback por serviço (produto vazio até jan/2026);
+// Others = demais — soma das 5 = MRR total da matriz por construção.
 import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd, type MesValor } from "./bp2026.helpers";
 
