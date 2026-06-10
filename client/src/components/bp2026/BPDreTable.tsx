@@ -1,5 +1,4 @@
 // client/src/components/bp2026/BPDreTable.tsx
-import { formatCurrencyNoDecimals } from "@/lib/utils";
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
@@ -21,7 +20,7 @@ export interface BPLinha {
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
 
-const MESES_CURTOS = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
 function corAtingimento(a: number | null): string {
   if (a === null) return "text-gray-400 dark:text-zinc-500";
@@ -34,37 +33,73 @@ function fmtPct(a: number | null): string {
   return a === null ? "—" : `${(a * 100).toFixed(1)}%`;
 }
 
+// sem prefixo R$ para a tabela anual caber na tela; unidade indicada no cabeçalho
 function fmtValor(v: number | null): string {
-  return v === null ? "—" : formatCurrencyNoDecimals(v);
+  return v === null ? "—" : Math.round(v).toLocaleString("pt-BR");
+}
+
+interface CelulaProps {
+  orcado: number;
+  realizado: number | null;
+  atingimento: number | null;
+}
+
+function Celula({ orcado, realizado, atingimento }: CelulaProps) {
+  return (
+    <div className="flex flex-col items-end gap-0.5">
+      <span className="text-xs font-medium tabular-nums text-gray-900 dark:text-white">
+        {fmtValor(realizado)}
+      </span>
+      <span className="text-[10px] tabular-nums text-gray-500 dark:text-zinc-500">
+        {fmtValor(orcado)}
+      </span>
+      <span className={`text-[10px] font-semibold tabular-nums ${corAtingimento(atingimento)}`}>
+        {fmtPct(atingimento)}
+      </span>
+    </div>
+  );
 }
 
 interface Props {
   linhas: BPLinha[];
-  mes: number; // 1-12 (mês selecionado)
-  mesFechado: number; // 0-12 (último mês fechado — período do YTD)
+  mesCorrente: number; // 0-12 (mês atual; parcial quando > mesFechado)
+  mesFechado: number; // 0-12 (último mês fechado — período do acumulado)
 }
 
-export function BPDreTable({ linhas, mes, mesFechado }: Props) {
-  const ytdLabel = mesFechado >= 1 ? `YTD até ${MESES_CURTOS[mesFechado - 1]}` : "YTD";
+export function BPDreTable({ linhas, mesCorrente, mesFechado }: Props) {
+  const ytdLabel = mesFechado >= 1 ? `YTD ${MESES_CURTOS[mesFechado - 1]}` : "YTD";
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-zinc-700">
       <table className="w-full text-sm" data-testid="bp-dre-table">
         <thead>
           <tr className="bg-gray-50 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400">
-            <th className="px-4 py-3 text-left font-medium">Linha</th>
-            <th className="px-4 py-3 text-right font-medium">Orçado</th>
-            <th className="px-4 py-3 text-right font-medium">Realizado</th>
-            <th className="px-4 py-3 text-right font-medium">Atingimento</th>
-            <th className="px-4 py-3 text-right font-medium border-l border-gray-200 dark:border-zinc-700">
-              {ytdLabel} · Orçado
+            <th className="sticky left-0 z-10 bg-gray-50 dark:bg-zinc-800 px-4 py-3 text-left font-medium whitespace-nowrap">
+              <div>Linha</div>
+              <div className="text-[10px] font-normal normal-case text-gray-400 dark:text-zinc-500">
+                realizado · orçado · ating. · valores em R$
+              </div>
             </th>
-            <th className="px-4 py-3 text-right font-medium">{ytdLabel} · Realizado</th>
-            <th className="px-4 py-3 text-right font-medium">{ytdLabel} · Ating.</th>
+            {MESES_CURTOS.map((nome, i) => {
+              const mes = i + 1;
+              const ehParcial = mes === mesCorrente && mesCorrente > mesFechado;
+              return (
+                <th key={mes} className="px-2 py-3 text-right font-medium whitespace-nowrap">
+                  {nome}
+                  {ehParcial && (
+                    <span className="ml-1 text-[10px] font-normal text-amber-600 dark:text-amber-400">
+                      parcial
+                    </span>
+                  )}
+                </th>
+              );
+            })}
+            <th className="px-3 py-3 text-right font-semibold whitespace-nowrap border-l border-gray-200 dark:border-zinc-700">
+              {ytdLabel}
+            </th>
           </tr>
         </thead>
         <tbody>
           {linhas.map((linha) => {
-            const m = linha.meses[mes - 1];
             const ehTotal = linha.metrica === "receita_total_faturavel";
             const ehEstoque = linha.tipoAgregacao === "estoque";
             return (
@@ -72,35 +107,18 @@ export function BPDreTable({ linhas, mes, mesFechado }: Props) {
                 key={linha.metrica}
                 className={
                   ehTotal
-                    ? "bg-gray-100 dark:bg-zinc-800 font-bold text-gray-900 dark:text-white"
+                    ? "bg-gray-100 dark:bg-zinc-800 font-bold text-gray-900 dark:text-white border-t border-gray-200 dark:border-zinc-700"
                     : "border-t border-gray-100 dark:border-zinc-800 text-gray-800 dark:text-zinc-200"
                 }
                 data-testid={`bp-linha-${linha.metrica}`}
               >
-                <td className="px-4 py-3 whitespace-nowrap">
+                <td
+                  className={`sticky left-0 z-10 px-4 py-3 whitespace-nowrap align-top ${
+                    ehTotal ? "bg-gray-100 dark:bg-zinc-800" : "bg-white dark:bg-zinc-900"
+                  }`}
+                >
                   <span className="flex items-center gap-1.5">
                     {linha.titulo}
-                    {m.fonteAproximada && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-3.5 w-3.5 text-amber-500 dark:text-amber-400" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          Snapshot do ClickUp não disponível no último dia do mês;
-                          usado o mais próximo anterior.
-                        </TooltipContent>
-                      </Tooltip>
-                    )}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums">{fmtValor(m.orcado)}</td>
-                <td className="px-4 py-3 text-right tabular-nums">{fmtValor(m.realizado)}</td>
-                <td className={`px-4 py-3 text-right tabular-nums font-semibold ${corAtingimento(m.atingimento)}`}>
-                  {fmtPct(m.atingimento)}
-                </td>
-                <td className="px-4 py-3 text-right tabular-nums border-l border-gray-200 dark:border-zinc-700">
-                  <span className="inline-flex items-center gap-1">
-                    {fmtValor(linha.ytd.orcado)}
                     {ehEstoque && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -114,9 +132,30 @@ export function BPDreTable({ linhas, mes, mesFechado }: Props) {
                     )}
                   </span>
                 </td>
-                <td className="px-4 py-3 text-right tabular-nums">{fmtValor(linha.ytd.realizado)}</td>
-                <td className={`px-4 py-3 text-right tabular-nums font-semibold ${corAtingimento(linha.ytd.atingimento)}`}>
-                  {fmtPct(linha.ytd.atingimento)}
+                {linha.meses.map((m) => (
+                  <td key={m.mes} className="px-2 py-2 text-right align-top">
+                    <span className="inline-flex items-start gap-1">
+                      {m.fonteAproximada && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Info className="mt-0.5 h-3 w-3 text-amber-500 dark:text-amber-400" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            Snapshot do ClickUp não disponível no último dia do mês;
+                            usado o mais próximo anterior.
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                      <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} />
+                    </span>
+                  </td>
+                ))}
+                <td className="px-3 py-2 text-right align-top border-l border-gray-200 dark:border-zinc-700 bg-gray-50/50 dark:bg-zinc-800/50">
+                  <Celula
+                    orcado={linha.ytd.orcado}
+                    realizado={linha.ytd.realizado}
+                    atingimento={linha.ytd.atingimento}
+                  />
                 </td>
               </tr>
             );

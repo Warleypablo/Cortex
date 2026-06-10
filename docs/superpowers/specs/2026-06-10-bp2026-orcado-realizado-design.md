@@ -36,7 +36,7 @@ Bloco de receitas do DRE, agregado (sem drill por squad):
 | MRR realizado | ClickUp `cup_data_hist`, snapshot fim do mês |
 | Pontual realizada | **Bitrix `crm_deal`, vendas ganhas no mês** (revisado na investigação: o Conta Azul não separa pontual de recorrente — receita de serviços cai toda na categoria 03.01.01 e o rastro parcela→venda→itens cobre só ~metade das parcelas; revisitar quando o financeiro categorizar pontual) |
 | Backend | Módulo novo isolado (`server/routes/bp2026.ts`), zero herança do okr2026 |
-| Layout | Tabela DRE com seletor de mês + coluna Total YTD |
+| Layout | **Matriz anual** (revisado pós-implementação a pedido do usuário): 12 meses como colunas, sem seletor — cada célula empilha realizado / orçado / % atingimento; coluna YTD à direita; mês corrente com selo "parcial" |
 
 ## Dados
 
