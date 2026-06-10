@@ -81,6 +81,19 @@ const LINHAS_OPEX: DefLinha[] = [
   { metrica: "bonus", titulo: "(−) Bônus", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_BONUS },
 ];
 
+const NOTA_IMPOSTOS_DIRETOS =
+  "IRPJ/CSLL ainda não aparecem lançados no Conta Azul em 2026 — o atingimento " +
+  "baixo reflete lacuna de lançamento, não economia.";
+
+const NOTA_GERACAO =
+  "Enquanto IRPJ/CSLL não forem lançados no Conta Azul, o realizado desta linha " +
+  "fica superestimado.";
+
+const LINHAS_POS_EBITDA: DefLinha[] = [
+  { metrica: "impostos_diretos", titulo: "(−) IR + CSLL + ICMS + DIFAL", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_IMPOSTOS_DIRETOS },
+  { metrica: "capex", titulo: "(−) CAPEX", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
+];
+
 // Soma mensal de despesas em regime caixa (QUITADO por data_quitacao em 2026),
 // filtrada por um predicado de categorias.
 async function somaDespesaCaixaPorMes(
@@ -260,6 +273,15 @@ export function registerBp2026Routes(app: Express, db: any) {
       // 4i. Bônus: caixa — Premiações (05.01.10), excluída do CSV-Salários
       const bonusPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '05.01.10%'`);
 
+      // 4j. Impostos diretos: caixa — ICMS/DIFAL + IRPJ/CSLL quando lançados
+      const impostosDiretosPorMes = await somaDespesaCaixaPorMes(
+        db,
+        sql`categoria_nome LIKE '06.12%' OR categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01%'`
+      );
+
+      // 4k. CAPEX: caixa — computadores, periféricos e conserto de ativo
+      const capexPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '06.11%'`);
+
       // 5. Montagem: meses futuros => realizado null
       const agora = new Date();
       const anoAtual = agora.getFullYear();
@@ -298,6 +320,8 @@ export function registerBp2026Routes(app: Express, db: any) {
           return (sgaBucketPorMes[mes] ?? 0) + complemento;
         },
         bonus: (mes) => (mes <= mesCorrente ? bonusPorMes[mes] ?? 0 : null),
+        impostos_diretos: (mes) => (mes <= mesCorrente ? impostosDiretosPorMes[mes] ?? 0 : null),
+        capex: (mes) => (mes <= mesCorrente ? capexPorMes[mes] ?? 0 : null),
       };
 
       const linhas: LinhaReceita[] = LINHAS.map(({ metrica, titulo, tipoAgregacao, direcao }) => ({
@@ -393,6 +417,27 @@ export function registerBp2026Routes(app: Express, db: any) {
         tipoAgregacao: "fluxo",
         direcao: "maior_melhor",
         meses: ebitdaMeses.map((m) => ({
+          ...m,
+          atingimento: calcAtingimento(m.orcado, m.realizado),
+        })),
+      });
+
+      // 6h. Pós-EBITDA: impostos diretos e CAPEX
+      const linhasPosEbitda = buildLinhas(LINHAS_POS_EBITDA, orcado, realizadoPorMetrica);
+      linhas.push(...linhasPosEbitda);
+
+      // 6i. Geração de Caixa = EBITDA − impostos diretos − CAPEX
+      const geracaoMeses = subtrairMeses(
+        ebitdaMeses,
+        linhasPosEbitda.map((l) => l.meses)
+      );
+      linhas.push({
+        metrica: "geracao_caixa",
+        titulo: "(=) Geração de Caixa",
+        tipoAgregacao: "fluxo",
+        direcao: "maior_melhor",
+        nota: NOTA_GERACAO,
+        meses: geracaoMeses.map((m) => ({
           ...m,
           atingimento: calcAtingimento(m.orcado, m.realizado),
         })),
