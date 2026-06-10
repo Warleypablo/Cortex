@@ -188,7 +188,7 @@ export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
     buildLinhaGeral({ metrica: "despesa_total", titulo: "Despesa Total", tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "brl" }, orcado, despesaTotal, mesFechado),
     buildLinhaGeral({ metrica: "vendas_mrr", titulo: "Vendas MRR", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, vendasMrr, mesFechado),
     buildLinhaGeral({ metrica: "vendas_pontual", titulo: "Vendas Pontual", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, vendasPontual, mesFechado),
-    buildLinhaGeral({ metrica: "colaboradores", titulo: "Número de Colaboradores", tipoAgregacao: "estoque", direcao: "neutro", unidade: "int" }, orcado, colaboradores, mesFechado),
+    buildLinhaGeral({ metrica: "colaboradores", titulo: "Número de Colaboradores", tipoAgregacao: "estoque", direcao: "menor_melhor", unidade: "int" }, orcado, colaboradores, mesFechado),
     buildLinhaGeral({ metrica: "receita_cabeca", titulo: "Receita por Cabeça", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, receitaCabeca, mesFechado,
       mesFechado === 0 ? undefined : { orcado: razao(ytdOrcFluxo("receita_total"), ytdOrcEstoque("colaboradores")) ?? 0, realizado: razao(ytdFluxo(receitaTotal), ytdEstoque(colaboradores)) }),
     buildLinhaGeral({ metrica: "mrr_cabeca", titulo: "MRR por Cabeça", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, mrrCabeca, mesFechado,
@@ -205,9 +205,9 @@ export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
     buildLinhaGeral({ metrica: "margem_geracao", titulo: "Margem de Geração", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "pct" }, orcado, margemGeracao, mesFechado,
       mesFechado === 0 ? undefined : { orcado: ytdOrcPctPonderada("margem_geracao"), realizado: razao(ytdFluxo(geracao), ytdFluxo(fat)) }),
     buildLinhaGeral({ metrica: "saldo_caixa", titulo: "Saldo de Caixa", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "brl", nota: NOTA_SALDO }, orcado, saldo, mesFechado),
-    buildLinhaGeral({ metrica: "pessoas_csv", titulo: "Pessoas em CSV", tipoAgregacao: "estoque", direcao: "neutro", unidade: "int", nota: NOTA_PESSOAS }, orcado, mensal((m) => pessoasPorMes[m]?.csv ?? null), mesFechado),
-    buildLinhaGeral({ metrica: "pessoas_cac", titulo: "Pessoas em CAC", tipoAgregacao: "estoque", direcao: "neutro", unidade: "int", nota: NOTA_PESSOAS }, orcado, mensal((m) => pessoasPorMes[m]?.cac ?? null), mesFechado),
-    buildLinhaGeral({ metrica: "pessoas_sgea", titulo: "Pessoas em SGEA", tipoAgregacao: "estoque", direcao: "neutro", unidade: "int", nota: NOTA_PESSOAS }, orcado, mensal((m) => pessoasPorMes[m]?.sgea ?? null), mesFechado),
+    buildLinhaGeral({ metrica: "pessoas_csv", titulo: "Pessoas em CSV", tipoAgregacao: "estoque", direcao: "menor_melhor", unidade: "int", nota: NOTA_PESSOAS }, orcado, mensal((m) => pessoasPorMes[m]?.csv ?? null), mesFechado),
+    buildLinhaGeral({ metrica: "pessoas_cac", titulo: "Pessoas em CAC", tipoAgregacao: "estoque", direcao: "menor_melhor", unidade: "int", nota: NOTA_PESSOAS }, orcado, mensal((m) => pessoasPorMes[m]?.cac ?? null), mesFechado),
+    buildLinhaGeral({ metrica: "pessoas_sgea", titulo: "Pessoas em SGEA", tipoAgregacao: "estoque", direcao: "menor_melhor", unidade: "int", nota: NOTA_PESSOAS }, orcado, mensal((m) => pessoasPorMes[m]?.sgea ?? null), mesFechado),
   ];
   return linhas;
 }
