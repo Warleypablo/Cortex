@@ -66,6 +66,14 @@ LINHAS = [
     ("CAC", 70, "aov_venda_mrr", 17),
     ("CAC", 71, "taxa_conversao", 17),
     ("CAC", 72, "reunioes_necessarias", 17),
+    ("CSV", 13, "capacity_gestores", 4),
+    ("CSV", 14, "gestores_necessarios", 4),
+    ("CSV", 15, "gestores_atuais", 4),
+    ("CSV", 17, "contratos_por_gestor", 4),
+    ("CSV", 55, "capacity_designers", 4),
+    ("CSV", 56, "designers_necessarios", 4),
+    ("CSV", 57, "designers_atuais", 4),
+    ("CSV", 59, "contas_por_designer", 4),
 ]
 # Totais conhecidos da planilha, para verificação anti-drift
 TOTAIS_ESPERADOS = {
@@ -125,6 +133,14 @@ TOTAIS_ESPERADOS = {
     "aov_venda_mrr": 51480.0,
     "taxa_conversao": 3.3,
     "reunioes_necessarias": 2918.7741306,
+    "capacity_gestores": 144.0,
+    "gestores_necessarios": 217.017081,
+    "gestores_atuais": 258.0,
+    "contratos_por_gestor": 121.090493,
+    "capacity_designers": 312.0,
+    "designers_necessarios": 100.16173,
+    "designers_atuais": 111.0,
+    "contas_por_designer": 281.36058,
 }
 
 # Métricas com células vazias na planilha (tratadas como 0). Ex.: Bônus só tem jan-mar.
