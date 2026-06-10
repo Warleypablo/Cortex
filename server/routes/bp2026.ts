@@ -132,13 +132,15 @@ export function registerBp2026Routes(app: Express, db: any) {
         outrasPorMes[Number(row.mes)] = parseFloat(row.total);
       }
 
-      // 4b. Inadimplência: foto atual — não pago das parcelas vencidas no mês
+      // 4b. Inadimplência: foto atual — não pago das parcelas JÁ vencidas no mês
+      // (data_vencimento <= hoje: parcelas a vencer no restante do mês corrente não são inadimplência)
       const inadResult = await db.execute(sql`
         SELECT EXTRACT(MONTH FROM data_vencimento)::int AS mes,
                SUM(nao_pago::numeric) AS total
         FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND data_vencimento >= '2026-01-01' AND data_vencimento < '2027-01-01'
+          AND data_vencimento <= CURRENT_DATE
           AND nao_pago::numeric > 0
         GROUP BY 1 ORDER BY 1
       `);
