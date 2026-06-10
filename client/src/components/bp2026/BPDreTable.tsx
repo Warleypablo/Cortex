@@ -17,6 +17,7 @@ export interface BPLinha {
   titulo: string;
   tipoAgregacao: "fluxo" | "estoque";
   direcao: "maior_melhor" | "menor_melhor";
+  nota?: string;
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -112,7 +113,8 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado }: Props) {
           {linhas.map((linha) => {
             const ehTotal =
               linha.metrica === "receita_total_faturavel" ||
-              linha.metrica === "receita_liquida";
+              linha.metrica === "receita_liquida" ||
+              linha.metrica === "margem_bruta";
             const ehEstoque = linha.tipoAgregacao === "estoque";
             return (
               <tr
@@ -140,6 +142,14 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado }: Props) {
                           MRR é estoque: o acumulado mostra a posição no último mês
                           fechado, não a soma dos meses.
                         </TooltipContent>
+                      </Tooltip>
+                    )}
+                    {linha.nota && (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
+                        </TooltipTrigger>
+                        <TooltipContent className="max-w-72">{linha.nota}</TooltipContent>
                       </Tooltip>
                     )}
                   </span>
