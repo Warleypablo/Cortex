@@ -23,6 +23,24 @@ LINHAS = [
     ("Overview", 17, "bonus"),
     ("Overview", 19, "impostos_diretos"),
     ("Overview", 20, "capex"),
+    ("Overview", 25, "receita_total"),
+    ("Overview", 26, "despesa_total"),
+    ("Overview", 27, "vendas_mrr"),
+    ("Overview", 28, "vendas_pontual"),
+    ("Overview", 29, "colaboradores"),
+    ("Overview", 30, "receita_cabeca"),
+    ("Overview", 31, "mrr_cabeca"),
+    ("Overview", 32, "clientes"),
+    ("Overview", 33, "contratos"),
+    ("Overview", 34, "ticket_cliente"),
+    ("Overview", 35, "ticket_contrato"),
+    ("Overview", 36, "churn_mes"),
+    ("Overview", 37, "aliquota_efetiva"),
+    ("Overview", 39, "margem_geracao"),
+    ("Overview", 40, "saldo_caixa"),
+    ("Overview", 43, "pessoas_csv"),
+    ("Overview", 44, "pessoas_cac"),
+    ("Overview", 45, "pessoas_sgea"),
     ("SG&A", 11, "beneficio_total_empresa"),  # denominador do rateio do benefício
 ]
 # Totais conhecidos da planilha, para verificação anti-drift
@@ -40,6 +58,24 @@ TOTAIS_ESPERADOS = {
     "bonus": 100000.0,
     "impostos_diretos": 2583101.7,
     "capex": 420000.0,
+    "receita_total": 24518198.06,
+    "despesa_total": 20023941.87,
+    "vendas_mrr": 3075000.0,
+    "vendas_pontual": 4230000.0,
+    "colaboradores": 1704.0,
+    "receita_cabeca": 181563.68,
+    "mrr_cabeca": 146258.20,
+    "clientes": 5231.49,
+    "contratos": 7246.86,
+    "ticket_cliente": 59490.94,
+    "ticket_contrato": 42974.33,
+    "churn_mes": 1889827.03,
+    "aliquota_efetiva": 2.27,
+    "margem_geracao": 1.96,
+    "saldo_caixa": 28936413.23,
+    "pessoas_csv": 1203.0,
+    "pessoas_cac": 359.0,
+    "pessoas_sgea": 142.0,
     "beneficio_total_empresa": 736000.0,
 }
 
@@ -57,7 +93,8 @@ for aba, row, metrica in LINHAS:
     assert all(isinstance(v, (int, float)) for v in valores), f"{metrica}: célula vazia/não numérica: {valores}"
     total = sum(valores)
     esperado = TOTAIS_ESPERADOS[metrica]
-    assert abs(total - esperado) < 1, f"{metrica}: total lido {total:.1f} != esperado {esperado:.1f}"
+    tol = 0.01 if esperado < 10 else 1
+    assert abs(total - esperado) < tol, f"{metrica}: total lido {total:.2f} != esperado {esperado:.2f}"
     stmts.append(f"DELETE FROM cortex_core.bp2026_orcado WHERE metrica = '{metrica}';")
     for mes, valor in enumerate(valores, 1):
         stmts.append(
