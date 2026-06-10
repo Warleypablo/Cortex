@@ -98,7 +98,7 @@ for aba, row, metrica in LINHAS:
     stmts.append(f"DELETE FROM cortex_core.bp2026_orcado WHERE metrica = '{metrica}';")
     for mes, valor in enumerate(valores, 1):
         stmts.append(
-            f"INSERT INTO cortex_core.bp2026_orcado (metrica, mes, valor) VALUES ('{metrica}', {mes}, {round(valor, 2)});"
+            f"INSERT INTO cortex_core.bp2026_orcado (metrica, mes, valor) VALUES ('{metrica}', {mes}, {round(valor, 6)});"
         )
 
 with open("/tmp/seed-bp2026-orcado.sql", "w") as f:
