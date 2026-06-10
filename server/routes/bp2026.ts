@@ -1,6 +1,7 @@
 // server/routes/bp2026.ts
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
+import { PREDICADOS_DESPESA, PREDICADO_OUTRAS_RECEITAS } from "./bp2026.predicados";
 import {
   calcAtingimento,
   calcYtd,
@@ -16,7 +17,7 @@ const CACHE_TTL_MS = 10 * 60 * 1000;
 
 export type Direcao = "maior_melhor" | "menor_melhor";
 
-interface DefLinha {
+export interface DefLinha {
   metrica: string;
   titulo: string;
   tipoAgregacao: TipoAgregacao;
@@ -41,7 +42,7 @@ interface LinhaReceita {
 
 let cache: { payload: unknown; expiraEm: number } | null = null;
 
-const LINHAS: Array<{
+export const LINHAS: Array<{
   metrica: string;
   titulo: string;
   tipoAgregacao: TipoAgregacao;
@@ -56,7 +57,7 @@ const NOTA_INADIMPLENCIA =
   "Inadimplência: não pago das parcelas já vencidas (foto atual). Estornos: " +
   "devoluções de serviço pagas no mês. O BP orçou apenas a provisão de inadimplência.";
 
-const LINHAS_DEDUCOES: DefLinha[] = [
+export const LINHAS_DEDUCOES: DefLinha[] = [
   { metrica: "inadimplencia", titulo: "(−) Inadimplência e Estornos", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_INADIMPLENCIA },
   { metrica: "impostos_receita", titulo: "(−) Impostos sobre Receita", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
 ];
@@ -65,7 +66,7 @@ const NOTA_BENEFICIO =
   "O benefício (Caju) não separa operação de administrativo no Conta Azul; " +
   "o realizado é rateado pela fração orçada do mês.";
 
-const LINHAS_CSV: DefLinha[] = [
+export const LINHAS_CSV: DefLinha[] = [
   { metrica: "csv_salarios", titulo: "(−) CSV — Salários", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
   { metrica: "csv_beneficio", titulo: "(−) CSV — Benefício", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_BENEFICIO },
   { metrica: "csv_stack", titulo: "(−) CSV — Stack Tecnologia", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
@@ -80,7 +81,7 @@ const NOTA_BONUS =
   "Realizado usa a categoria Premiações (05.01.10), que também inclui " +
   "premiações mensais orçadas no SG&A (~R$ 5k/mês).";
 
-const LINHAS_OPEX: DefLinha[] = [
+export const LINHAS_OPEX: DefLinha[] = [
   { metrica: "cac", titulo: "(−) CAC", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
   { metrica: "sga", titulo: "(−) SG&A", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_SGA },
   { metrica: "bonus", titulo: "(−) Bônus", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_BONUS },
@@ -99,7 +100,7 @@ const NOTA_GERACAO =
   "Enquanto IRPJ/CSLL não forem lançados no Conta Azul, o realizado desta linha " +
   "fica superestimado.";
 
-const LINHAS_POS_EBITDA: DefLinha[] = [
+export const LINHAS_POS_EBITDA: DefLinha[] = [
   { metrica: "impostos_diretos", titulo: "(−) IR + CSLL + ICMS + DIFAL", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_IMPOSTOS_DIRETOS },
   { metrica: "capex", titulo: "(−) CAPEX", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
 ];
@@ -218,8 +219,7 @@ export function registerBp2026Routes(app: Express, db: any) {
         FROM "Conta Azul".caz_parcelas
         WHERE tipo_evento = 'RECEITA'
           AND data_competencia >= '2026-01-01' AND data_competencia < '2027-01-01'
-          AND (categoria_nome LIKE '03.02%' OR categoria_nome LIKE '03.03%'
-               OR categoria_nome LIKE '04.01%' OR categoria_nome LIKE '04.03%')
+          AND (${PREDICADO_OUTRAS_RECEITAS})
         GROUP BY 1 ORDER BY 1
       `);
       const outrasPorMes: Record<number, number> = {};
@@ -245,55 +245,34 @@ export function registerBp2026Routes(app: Express, db: any) {
       }
 
       // 4b2. Estornos e devoluções de serviço: caixa — dedução de receita não orçada no BP
-      const estornosPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '05.06%'`);
+      const estornosPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.estornos);
 
       // 4c. Impostos sobre receita: regime caixa (quitação), categorias 05.05.x + lançamentos sem código
-      const impostosPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '05.05%' OR categoria_nome ILIKE 'Impostos retidos%'`);
+      const impostosPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.impostos_receita);
 
       // 4d. CSV Salários: caixa — folha de operação (05.01 exceto premiações) + freelancers (05.02)
-      const salariosPorMes = await somaDespesaCaixaPorMes(
-        db,
-        sql`(categoria_nome LIKE '05.01%' AND categoria_nome NOT LIKE '05.01.10%') OR categoria_nome LIKE '05.02%'`
-      );
+      const salariosPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.csv_salarios);
 
       // 4e. Benefícios totais da empresa (Caju): caixa — rateado depois pela fração orçada
-      const beneficioTotalPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '06.10.04%'`);
+      const beneficioTotalPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.beneficio_total);
 
       // 4f. CSV Stack: caixa — todo o software da empresa (conceito da planilha)
-      const stackPorMes = await somaDespesaCaixaPorMes(
-        db,
-        sql`categoria_nome LIKE '05.03%' OR categoria_nome LIKE '05.04.01%' OR categoria_nome LIKE '06.05.03%' OR categoria_nome LIKE '06.10.01%'`
-      );
+      const stackPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.csv_stack);
 
       // 4g. CAC: caixa — comercial, mídia, eventos, brindes, viagens, locomoção
-      const cacPorMes = await somaDespesaCaixaPorMes(
-        db,
-        sql`categoria_nome LIKE '05.04.02%' OR categoria_nome LIKE '06.04%'
-            OR categoria_nome LIKE '06.05.04%' OR categoria_nome LIKE '06.05.05%'
-            OR categoria_nome LIKE '06.06%' OR categoria_nome LIKE '06.07%'`
-      );
+      const cacPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac);
 
       // 4h. SG&A (sem benefício): caixa — ocupação, tarifas, backoffice, pró-labore, adm, Turbooh
-      const sgaBucketPorMes = await somaDespesaCaixaPorMes(
-        db,
-        sql`categoria_nome LIKE '06.01%' OR categoria_nome LIKE '06.02%'
-            OR categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.08%'
-            OR categoria_nome LIKE '06.09%' OR categoria_nome LIKE '06.10.02%'
-            OR categoria_nome LIKE '06.10.03%' OR categoria_nome LIKE '06.10.06%'
-            OR categoria_nome LIKE '06.10.07%' OR categoria_nome LIKE '06.10.08%'`
-      );
+      const sgaBucketPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.sga_bucket);
 
       // 4i. Bônus: caixa — Premiações (05.01.10), excluída do CSV-Salários
-      const bonusPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '05.01.10%'`);
+      const bonusPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.bonus);
 
       // 4j. Impostos diretos: caixa — ICMS/DIFAL + IRPJ/CSLL quando lançados
-      const impostosDiretosPorMes = await somaDespesaCaixaPorMes(
-        db,
-        sql`categoria_nome LIKE '06.12%' OR categoria_nome LIKE '06.13%' OR categoria_nome LIKE '08.01%'`
-      );
+      const impostosDiretosPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.impostos_diretos);
 
       // 4k. CAPEX: caixa — computadores, periféricos e conserto de ativo
-      const capexPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '06.11%'`);
+      const capexPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.capex);
 
       // 4l. Fluxo de caixa real (DFC): entradas − saídas quitadas no mês
       const dfcResult = await db.execute(sql`
