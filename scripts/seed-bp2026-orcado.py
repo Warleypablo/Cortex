@@ -74,6 +74,15 @@ LINHAS = [
     ("CSV", 56, "designers_necessarios", 4),
     ("CSV", 57, "designers_atuais", 4),
     ("CSV", 59, "contas_por_designer", 4),
+    ("SG&A", 7, "sga_uzk"),
+    ("SG&A", 8, "sga_backoffice"),
+    ("SG&A", 9, "sga_software"),
+    ("SG&A", 10, "sga_ocupacao"),
+    ("SG&A", 12, "sga_premiacoes"),
+    ("SG&A", 13, "sga_eventos"),
+    ("SG&A", 14, "sga_outras"),
+    ("Outras Receitas", 3, "or_receita_variavel"),
+    ("Outras Receitas", 7, "or_stack_digital"),
 ]
 # Totais conhecidos da planilha, para verificação anti-drift
 TOTAIS_ESPERADOS = {
@@ -141,6 +150,15 @@ TOTAIS_ESPERADOS = {
     "designers_necessarios": 100.16173,
     "designers_atuais": 111.0,
     "contas_por_designer": 281.36058,
+    "sga_uzk": 960000.0,
+    "sga_backoffice": 616000.0,
+    "sga_software": 565344.0,
+    "sga_ocupacao": 404840.0,
+    "sga_premiacoes": 60000.0,
+    "sga_eventos": 180000.0,
+    "sga_outras": 213032.0,
+    "or_receita_variavel": 120000.0,
+    "or_stack_digital": 78000.0,
 }
 
 # Métricas com células vazias na planilha (tratadas como 0). Ex.: Bônus só tem jan-mar.
