@@ -23,17 +23,32 @@ const LINHAS_SERVICO = [
 
 const NOTA_OTHERS =
   "Agrega os demais produtos recorrentes do ClickUp (Broadcast, Sustentação, " +
-  "CRM de Vendas, TikTok Shop, Consultoria de Performance, sem produto, etc.).";
+  "CRM de Vendas, TikTok Shop, Consultoria de Performance, sem produto, etc.). " +
+  "Até jan/2026 o campo produto não era preenchido — nesses meses a classificação usa o nome do serviço.";
 
 const NOTA_CHURN =
   "Taxa do mês = churn (não abonado) do produto ÷ MRR da linha no fim do mês anterior.";
 
-// mesma expressão nas duas queries — mapeamento único
-const CASE_PRODUTO = sql`CASE TRIM(produto)
-  WHEN 'Performance' THEN 'performance'
-  WHEN 'Creators' THEN 'creators'
-  WHEN 'Social Media' THEN 'social'
-  WHEN 'Gestão de Comunidade' THEN 'gc'
+// mapeamento: produto exato; quando vazio (snapshots até jan/2026), fallback pelo nome do serviço
+const CASE_PRODUTO = sql`CASE
+  WHEN TRIM(COALESCE(produto, '')) = 'Performance' THEN 'performance'
+  WHEN TRIM(COALESCE(produto, '')) = 'Creators' THEN 'creators'
+  WHEN TRIM(COALESCE(produto, '')) = 'Social Media' THEN 'social'
+  WHEN TRIM(COALESCE(produto, '')) = 'Gestão de Comunidade' THEN 'gc'
+  WHEN TRIM(COALESCE(produto, '')) != '' THEN 'others'
+  WHEN servico ILIKE '%performance%' THEN 'performance'
+  WHEN servico ILIKE '%creator%' THEN 'creators'
+  WHEN servico ILIKE '%social%' THEN 'social'
+  WHEN servico ILIKE '%comunidade%' THEN 'gc'
+  ELSE 'others' END`;
+
+// vw_cup_churn_ajustado não tem coluna servico (cup_churn só tem produto);
+// churn de 2026 já tem produto preenchido, então o CASE por produto é suficiente.
+const CASE_PRODUTO_CHURN = sql`CASE
+  WHEN TRIM(COALESCE(produto, '')) = 'Performance' THEN 'performance'
+  WHEN TRIM(COALESCE(produto, '')) = 'Creators' THEN 'creators'
+  WHEN TRIM(COALESCE(produto, '')) = 'Social Media' THEN 'social'
+  WHEN TRIM(COALESCE(produto, '')) = 'Gestão de Comunidade' THEN 'gc'
   ELSE 'others' END`;
 
 interface Deps {
@@ -77,7 +92,7 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
 
   const churnResult = await db.execute(sql`
     SELECT EXTRACT(MONTH FROM data_solicitacao_encerramento)::int AS mes,
-           ${CASE_PRODUTO} AS linha,
+           ${CASE_PRODUTO_CHURN} AS linha,
            SUM(valor_r) AS total
     FROM cortex_core.vw_cup_churn_ajustado
     WHERE data_solicitacao_encerramento >= '2026-01-01' AND data_solicitacao_encerramento < '2027-01-01'
