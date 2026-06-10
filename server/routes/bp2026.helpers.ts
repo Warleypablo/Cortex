@@ -35,3 +35,18 @@ export function ultimoDiaDoMes(ano: number, mes: number): string {
   const d = new Date(Date.UTC(ano, mes, 0));
   return d.toISOString().slice(0, 10);
 }
+
+export function subtrairMeses(
+  minuendo: MesValor[],
+  subtraendos: MesValor[][]
+): MesValor[] {
+  return minuendo.map((m, i) => {
+    const partes = subtraendos.map((s) => s[i]);
+    const orcado = partes.reduce((acc, p) => acc - p.orcado, m.orcado);
+    const algumNull = m.realizado === null || partes.some((p) => p.realizado === null);
+    const realizado = algumNull
+      ? null
+      : partes.reduce((acc, p) => acc - (p.realizado ?? 0), m.realizado ?? 0);
+    return { mes: m.mes, orcado, realizado };
+  });
+}

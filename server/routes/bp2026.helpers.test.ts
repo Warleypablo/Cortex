@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcAtingimento, calcYtd, ultimoDiaDoMes } from "./bp2026.helpers";
+import { calcAtingimento, calcYtd, ultimoDiaDoMes, subtrairMeses } from "./bp2026.helpers";
 
 describe("calcAtingimento", () => {
   it("calcula razão realizado/orçado", () => {
@@ -33,5 +33,34 @@ describe("ultimoDiaDoMes", () => {
   it("calcula último dia, inclusive fevereiro", () => {
     expect(ultimoDiaDoMes(2026, 2)).toBe("2026-02-28");
     expect(ultimoDiaDoMes(2026, 12)).toBe("2026-12-31");
+  });
+});
+
+describe("subtrairMeses", () => {
+  const base = [
+    { mes: 1, orcado: 1000, realizado: 900 },
+    { mes: 2, orcado: 1100, realizado: 1200 },
+    { mes: 3, orcado: 1200, realizado: null },
+  ];
+  const ded1 = [
+    { mes: 1, orcado: 100, realizado: 50 },
+    { mes: 2, orcado: 110, realizado: null },
+    { mes: 3, orcado: 120, realizado: null },
+  ];
+  const ded2 = [
+    { mes: 1, orcado: 200, realizado: 150 },
+    { mes: 2, orcado: 210, realizado: 200 },
+    { mes: 3, orcado: 220, realizado: null },
+  ];
+
+  it("subtrai orçado e realizado mês a mês", () => {
+    const r = subtrairMeses(base, [ded1, ded2]);
+    expect(r[0]).toEqual({ mes: 1, orcado: 700, realizado: 700 });
+  });
+
+  it("propaga null: qualquer componente sem realizado zera o realizado derivado", () => {
+    const r = subtrairMeses(base, [ded1, ded2]);
+    expect(r[1]).toEqual({ mes: 2, orcado: 780, realizado: null });
+    expect(r[2]).toEqual({ mes: 3, orcado: 860, realizado: null });
   });
 });
