@@ -52,8 +52,12 @@ const LINHAS: Array<{
   { metrica: "outras_receitas", titulo: "(+) Outras Receitas", tipoAgregacao: "fluxo", direcao: "maior_melhor" },
 ];
 
+const NOTA_INADIMPLENCIA =
+  "Inadimplência: não pago das parcelas já vencidas (foto atual). Estornos: " +
+  "devoluções de serviço pagas no mês. O BP orçou apenas a provisão de inadimplência.";
+
 const LINHAS_DEDUCOES: DefLinha[] = [
-  { metrica: "inadimplencia", titulo: "(−) Inadimplência", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
+  { metrica: "inadimplencia", titulo: "(−) Inadimplência e Estornos", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_INADIMPLENCIA },
   { metrica: "impostos_receita", titulo: "(−) Impostos sobre Receita", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
 ];
 
@@ -68,8 +72,9 @@ const LINHAS_CSV: DefLinha[] = [
 ];
 
 const NOTA_SGA =
-  "Inclui o complemento do benefício (Caju) não atribuído ao CSV, " +
-  "rateado pela fração orçada do mês.";
+  "Inclui o complemento do benefício (Caju) não atribuído ao CSV (rateado pela " +
+  "fração orçada do mês) e o custo da venture Turbooh (06.01), cuja receita está " +
+  "em Outras Receitas.";
 
 const NOTA_BONUS =
   "Realizado usa a categoria Premiações (05.01.10), que também inclui " +
@@ -80,6 +85,11 @@ const LINHAS_OPEX: DefLinha[] = [
   { metrica: "sga", titulo: "(−) SG&A", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_SGA },
   { metrica: "bonus", titulo: "(−) Bônus", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_BONUS },
 ];
+
+const NOTA_DFC =
+  "Caixa real: entradas − saídas quitadas no mês, incluindo distribuição a sócios. " +
+  "Difere da Geração derivada pelo timing de recebimento (vendas parceladas, base " +
+  "contratada vs recebido) e pela distribuição.";
 
 const NOTA_IMPOSTOS_DIRETOS =
   "IRPJ/CSLL ainda não aparecem lançados no Conta Azul em 2026 — o atingimento " +
@@ -234,8 +244,11 @@ export function registerBp2026Routes(app: Express, db: any) {
         inadPorMes[Number(row.mes)] = parseFloat(row.total);
       }
 
-      // 4c. Impostos sobre receita: regime caixa (quitação), categorias 05.05.x
-      const impostosPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '05.05%'`);
+      // 4b2. Estornos e devoluções de serviço: caixa — dedução de receita não orçada no BP
+      const estornosPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '05.06%'`);
+
+      // 4c. Impostos sobre receita: regime caixa (quitação), categorias 05.05.x + lançamentos sem código
+      const impostosPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '05.05%' OR categoria_nome ILIKE 'Impostos retidos%'`);
 
       // 4d. CSV Salários: caixa — folha de operação (05.01 exceto premiações) + freelancers (05.02)
       const salariosPorMes = await somaDespesaCaixaPorMes(
@@ -260,14 +273,14 @@ export function registerBp2026Routes(app: Express, db: any) {
             OR categoria_nome LIKE '06.06%' OR categoria_nome LIKE '06.07%'`
       );
 
-      // 4h. SG&A (sem benefício): caixa — ocupação, tarifas, backoffice, pró-labore, adm
+      // 4h. SG&A (sem benefício): caixa — ocupação, tarifas, backoffice, pró-labore, adm, Turbooh
       const sgaBucketPorMes = await somaDespesaCaixaPorMes(
         db,
-        sql`categoria_nome LIKE '06.02%' OR categoria_nome LIKE '06.03%'
-            OR categoria_nome LIKE '06.08%' OR categoria_nome LIKE '06.09%'
-            OR categoria_nome LIKE '06.10.02%' OR categoria_nome LIKE '06.10.03%'
-            OR categoria_nome LIKE '06.10.06%' OR categoria_nome LIKE '06.10.07%'
-            OR categoria_nome LIKE '06.10.08%'`
+        sql`categoria_nome LIKE '06.01%' OR categoria_nome LIKE '06.02%'
+            OR categoria_nome LIKE '06.03%' OR categoria_nome LIKE '06.08%'
+            OR categoria_nome LIKE '06.09%' OR categoria_nome LIKE '06.10.02%'
+            OR categoria_nome LIKE '06.10.03%' OR categoria_nome LIKE '06.10.06%'
+            OR categoria_nome LIKE '06.10.07%' OR categoria_nome LIKE '06.10.08%'`
       );
 
       // 4i. Bônus: caixa — Premiações (05.01.10), excluída do CSV-Salários
@@ -282,6 +295,21 @@ export function registerBp2026Routes(app: Express, db: any) {
       // 4k. CAPEX: caixa — computadores, periféricos e conserto de ativo
       const capexPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '06.11%'`);
 
+      // 4l. Fluxo de caixa real (DFC): entradas − saídas quitadas no mês
+      const dfcResult = await db.execute(sql`
+        SELECT EXTRACT(MONTH FROM data_quitacao)::int AS mes,
+               SUM(CASE WHEN tipo_evento = 'RECEITA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END)
+             - SUM(CASE WHEN tipo_evento = 'DESPESA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END) AS fluxo
+        FROM "Conta Azul".caz_parcelas
+        WHERE status = 'QUITADO'
+          AND data_quitacao >= '2026-01-01' AND data_quitacao < '2027-01-01'
+        GROUP BY 1 ORDER BY 1
+      `);
+      const dfcPorMes: Record<number, number> = {};
+      for (const row of dfcResult.rows as any[]) {
+        dfcPorMes[Number(row.mes)] = parseFloat(row.fluxo);
+      }
+
       // 5. Montagem: meses futuros => realizado null
       const agora = new Date();
       const anoAtual = agora.getFullYear();
@@ -295,7 +323,8 @@ export function registerBp2026Routes(app: Express, db: any) {
         mrr_ativo: (mes) => (mes <= mesCorrente ? mrrPorMes[mes]?.valor ?? null : null),
         receita_pontual: (mes) => (mes <= mesCorrente ? pontualPorMes[mes] ?? null : null),
         outras_receitas: (mes) => (mes <= mesCorrente ? outrasPorMes[mes] ?? null : null),
-        inadimplencia: (mes) => (mes <= mesCorrente ? inadPorMes[mes] ?? 0 : null),
+        inadimplencia: (mes) =>
+          mes <= mesCorrente ? (inadPorMes[mes] ?? 0) + (estornosPorMes[mes] ?? 0) : null,
         impostos_receita: (mes) => (mes <= mesCorrente ? impostosPorMes[mes] ?? 0 : null),
         csv_salarios: (mes) => (mes <= mesCorrente ? salariosPorMes[mes] ?? 0 : null),
         csv_beneficio: (mes) =>
@@ -441,6 +470,20 @@ export function registerBp2026Routes(app: Express, db: any) {
           ...m,
           atingimento: calcAtingimento(m.orcado, m.realizado),
         })),
+      });
+
+      // 6j. Linha informativa: caixa real vs plano de caixa do BP (orçado da geração)
+      linhas.push({
+        metrica: "dfc_real",
+        titulo: "(=) Fluxo de Caixa (DFC)",
+        tipoAgregacao: "fluxo",
+        direcao: "maior_melhor",
+        nota: NOTA_DFC,
+        meses: geracaoMeses.map((g, i) => {
+          const mes = i + 1;
+          const r = mes <= mesCorrente ? dfcPorMes[mes] ?? 0 : null;
+          return { mes, orcado: g.orcado, realizado: r, atingimento: calcAtingimento(g.orcado, r) };
+        }),
       });
 
       // 7. YTD por linha — acumula apenas meses fechados; mês corrente (parcial) fica de fora
