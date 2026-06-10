@@ -19,6 +19,7 @@ export interface BPLinha {
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
   unidade?: "brl" | "int" | "pct";
   nota?: string;
+  destaque?: boolean;
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -119,12 +120,13 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
         <tbody>
           {linhas.map((linha) => {
             const ehTotal =
-              linha.metrica === "receita_total_faturavel" ||
-              linha.metrica === "receita_liquida" ||
-              linha.metrica === "margem_bruta" ||
-              linha.metrica === "ebitda" ||
-              linha.metrica === "geracao_caixa" ||
-              linha.metrica === "dfc_real";
+              linha.destaque ??
+              (linha.metrica === "receita_total_faturavel" ||
+                linha.metrica === "receita_liquida" ||
+                linha.metrica === "margem_bruta" ||
+                linha.metrica === "ebitda" ||
+                linha.metrica === "geracao_caixa" ||
+                linha.metrica === "dfc_real");
             const ehEstoque = linha.tipoAgregacao === "estoque";
             return (
               <tr
