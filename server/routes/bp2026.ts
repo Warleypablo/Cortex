@@ -6,6 +6,7 @@ import {
   calcYtd,
   ultimoDiaDoMes,
   subtrairMeses,
+  ratear,
   type MesValor,
   type TipoAgregacao,
 } from "./bp2026.helpers";
@@ -20,6 +21,7 @@ interface LinhaReceita {
   titulo: string;
   tipoAgregacao: TipoAgregacao;
   direcao: Direcao;
+  nota?: string;
   meses: Array<{
     mes: number;
     orcado: number;
@@ -50,6 +52,22 @@ const LINHAS_DEDUCOES: Array<{
 }> = [
   { metrica: "inadimplencia", titulo: "(−) Inadimplência", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
   { metrica: "impostos_receita", titulo: "(−) Impostos sobre Receita", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
+];
+
+const NOTA_BENEFICIO =
+  "O benefício (Caju) não separa operação de administrativo no Conta Azul; " +
+  "o realizado é rateado pela fração orçada do mês.";
+
+const LINHAS_CSV: Array<{
+  metrica: string;
+  titulo: string;
+  tipoAgregacao: TipoAgregacao;
+  direcao: Direcao;
+  nota?: string;
+}> = [
+  { metrica: "csv_salarios", titulo: "(−) CSV — Salários", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
+  { metrica: "csv_beneficio", titulo: "(−) CSV — Benefício", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_BENEFICIO },
+  { metrica: "csv_stack", titulo: "(−) CSV — Stack Tecnologia", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
 ];
 
 export function registerBp2026Routes(app: Express, db: any) {
@@ -165,6 +183,56 @@ export function registerBp2026Routes(app: Express, db: any) {
         impostosPorMes[Number(row.mes)] = parseFloat(row.total);
       }
 
+      // 4d. CSV Salários: caixa — folha de operação (05.01 exceto premiações) + freelancers (05.02)
+      const salariosResult = await db.execute(sql`
+        SELECT EXTRACT(MONTH FROM data_quitacao)::int AS mes,
+               SUM(COALESCE(valor_pago::numeric, 0)) AS total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status = 'QUITADO'
+          AND data_quitacao >= '2026-01-01' AND data_quitacao < '2027-01-01'
+          AND ((categoria_nome LIKE '05.01%' AND categoria_nome NOT LIKE '05.01.10%')
+               OR categoria_nome LIKE '05.02%')
+        GROUP BY 1 ORDER BY 1
+      `);
+      const salariosPorMes: Record<number, number> = {};
+      for (const row of salariosResult.rows as any[]) {
+        salariosPorMes[Number(row.mes)] = parseFloat(row.total);
+      }
+
+      // 4e. Benefícios totais da empresa (Caju): caixa — rateado depois pela fração orçada
+      const beneficioResult = await db.execute(sql`
+        SELECT EXTRACT(MONTH FROM data_quitacao)::int AS mes,
+               SUM(COALESCE(valor_pago::numeric, 0)) AS total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status = 'QUITADO'
+          AND data_quitacao >= '2026-01-01' AND data_quitacao < '2027-01-01'
+          AND categoria_nome LIKE '06.10.04%'
+        GROUP BY 1 ORDER BY 1
+      `);
+      const beneficioTotalPorMes: Record<number, number> = {};
+      for (const row of beneficioResult.rows as any[]) {
+        beneficioTotalPorMes[Number(row.mes)] = parseFloat(row.total);
+      }
+
+      // 4f. CSV Stack: caixa — todo o software da empresa (conceito da planilha)
+      const stackResult = await db.execute(sql`
+        SELECT EXTRACT(MONTH FROM data_quitacao)::int AS mes,
+               SUM(COALESCE(valor_pago::numeric, 0)) AS total
+        FROM "Conta Azul".caz_parcelas
+        WHERE tipo_evento = 'DESPESA'
+          AND status = 'QUITADO'
+          AND data_quitacao >= '2026-01-01' AND data_quitacao < '2027-01-01'
+          AND (categoria_nome LIKE '05.03%' OR categoria_nome LIKE '05.04.01%'
+               OR categoria_nome LIKE '06.05.03%' OR categoria_nome LIKE '06.10.01%')
+        GROUP BY 1 ORDER BY 1
+      `);
+      const stackPorMes: Record<number, number> = {};
+      for (const row of stackResult.rows as any[]) {
+        stackPorMes[Number(row.mes)] = parseFloat(row.total);
+      }
+
       // 5. Montagem: meses futuros => realizado null
       const agora = new Date();
       const anoAtual = agora.getFullYear();
@@ -180,6 +248,16 @@ export function registerBp2026Routes(app: Express, db: any) {
         outras_receitas: (mes) => (mes <= mesCorrente ? outrasPorMes[mes] ?? null : null),
         inadimplencia: (mes) => (mes <= mesCorrente ? inadPorMes[mes] ?? 0 : null),
         impostos_receita: (mes) => (mes <= mesCorrente ? impostosPorMes[mes] ?? 0 : null),
+        csv_salarios: (mes) => (mes <= mesCorrente ? salariosPorMes[mes] ?? 0 : null),
+        csv_beneficio: (mes) =>
+          mes <= mesCorrente
+            ? ratear(
+                beneficioTotalPorMes[mes] ?? 0,
+                orcado["csv_beneficio"]?.[mes] ?? 0,
+                orcado["beneficio_total_empresa"]?.[mes] ?? 0
+              )
+            : null,
+        csv_stack: (mes) => (mes <= mesCorrente ? stackPorMes[mes] ?? 0 : null),
       };
 
       const linhas: LinhaReceita[] = LINHAS.map(({ metrica, titulo, tipoAgregacao, direcao }) => ({
@@ -248,6 +326,40 @@ export function registerBp2026Routes(app: Express, db: any) {
         tipoAgregacao: "fluxo",
         direcao: "maior_melhor",
         meses: liquidaMeses.map((m) => ({
+          ...m,
+          atingimento: calcAtingimento(m.orcado, m.realizado),
+        })),
+      });
+
+      // 6d. CSV: salários, benefício (rateado) e stack
+      const linhasCsv: LinhaReceita[] = LINHAS_CSV.map(
+        ({ metrica, titulo, tipoAgregacao, direcao, nota }) => ({
+          metrica,
+          titulo,
+          tipoAgregacao,
+          direcao,
+          nota,
+          meses: Array.from({ length: 12 }, (_, i) => {
+            const mes = i + 1;
+            const o = orcado[metrica]?.[mes] ?? 0;
+            const r = realizadoPorMetrica[metrica](mes);
+            return { mes, orcado: o, realizado: r, atingimento: calcAtingimento(o, r) };
+          }),
+        })
+      );
+      linhas.push(...linhasCsv);
+
+      // 6e. Margem Bruta = Receita Líquida − CSV (salários + benefício + stack)
+      const margemMeses = subtrairMeses(
+        liquidaMeses,
+        linhasCsv.map((l) => l.meses)
+      );
+      linhas.push({
+        metrica: "margem_bruta",
+        titulo: "(=) Margem Bruta",
+        tipoAgregacao: "fluxo",
+        direcao: "maior_melhor",
+        meses: margemMeses.map((m) => ({
           ...m,
           atingimento: calcAtingimento(m.orcado, m.realizado),
         })),
