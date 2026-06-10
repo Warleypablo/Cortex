@@ -78,6 +78,8 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         WHERE metrica = ${metrica} AND mes = ${mes}
       `);
       if (orcRes.rows.length) orcado = parseFloat((orcRes.rows[0] as any).valor);
+      // dfc_real não tem orçado persistido (usa o da Geração de Caixa, derivada);
+      // o frontend lê o orçado da célula no payload da matriz — aqui permanece null.
 
       const agora = new Date();
       const anoAtual = agora.getFullYear();
@@ -114,7 +116,8 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
           grupo: r.squad, nome: r.cliente, detalhe: r.servico, data: null, valor: parseFloat(r.valor),
         }));
-        grupos = agruparItens(itens, LIMITE_ITENS);
+        // MRR lista todos os contratos (spec: sem corte) — squads têm até ~100 clientes
+        grupos = agruparItens(itens, Number.MAX_SAFE_INTEGER);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
       } else if (metrica === "receita_pontual") {
         const result = await db.execute(sql`
