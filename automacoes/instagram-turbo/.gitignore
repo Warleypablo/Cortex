@@ -1,0 +1,13 @@
+.env
+.env.local
+*.secret
+node_modules/
+__pycache__/
+*.pyc
+.DS_Store
+_arquivado/
+logs/
+.cache/
+*.pem
+*service-account*.json
+n8n-reports-*.json
