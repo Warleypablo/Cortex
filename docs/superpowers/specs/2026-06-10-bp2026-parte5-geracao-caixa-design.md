@@ -2,7 +2,7 @@
 
 **Data:** 2026-06-10
 **Status:** Aprovado
-**Base:** Partes 1–4 (specs `2026-06-10-bp2026-*.md`). Fecha o DRE (17 linhas).
+**Base:** Partes 1–4 (specs `2026-06-10-bp2026-*.md`). Fecha o DRE (18 linhas).
 
 ## Escopo
 
