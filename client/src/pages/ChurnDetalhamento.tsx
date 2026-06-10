@@ -669,6 +669,11 @@ export default function ChurnDetalhamento() {
         const isAbonado = abonadoOverrides[c.id] ?? c.is_abonado ?? false;
         return filterAbono === "abonados" ? isAbonado : !isAbonado;
       });
+      if (filterAbono === "abonados") {
+        // Abonados viram a população analisada: sem o flag, todos os
+        // cálculos (taxa, squads, motivos, gráficos) os tratam como churn
+        filtered = filtered.map(c => ({ ...c, is_abonado: false }));
+      }
     }
 
     filtered.sort((a, b) => {
@@ -2011,16 +2016,23 @@ export default function ChurnDetalhamento() {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Coluna 1: Gauge e status */}
               <div className="flex flex-col items-center justify-center p-4 bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Taxa de Churn</h3>
-                <ChurnGauge value={filteredTaxaChurn || 0} statusOverride={gaugeStatusOverride} />
-                {churnPlanejado.taxaPlanejada > 0 && (
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">{filterAbono === "abonados" ? "Taxa de Abono" : "Taxa de Churn"}</h3>
+                <ChurnGauge
+                  value={filteredTaxaChurn || 0}
+                  statusOverride={filterAbono === "abonados"
+                    ? { label: "Recorte: abonados", color: "text-amber-500", bg: "from-amber-500 to-orange-500", dotBg: "bg-amber-500" }
+                    : gaugeStatusOverride}
+                />
+                {filterAbono !== "abonados" && churnPlanejado.taxaPlanejada > 0 && (
                   <p className="text-[11px] text-muted-foreground text-center mt-1">
                     Planejado até hoje: <span className="font-semibold">{churnPlanejado.taxaPlanejada.toFixed(2)}%</span>
                   </p>
                 )}
-                <p className="text-[10px] text-muted-foreground text-center">
-                  Status baseado na media diaria
-                </p>
+                {filterAbono !== "abonados" && (
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    Status baseado na media diaria
+                  </p>
+                )}
               </div>
               
               {/* Coluna 2: Métricas principais */}
@@ -2034,14 +2046,14 @@ export default function ChurnDetalhamento() {
                   <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">base de referência do período</div>
                 </div>
 
-                <div className="flex-1 p-4 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50 flex flex-col justify-center">
+                <div className={`flex-1 p-4 rounded-xl border flex flex-col justify-center ${filterAbono === "abonados" ? "bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50" : "bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50"}`}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase">MRR Perdido</span>
-                    <DollarSign className="h-4 w-4 text-red-500" />
+                    <span className={`text-xs font-medium uppercase ${filterAbono === "abonados" ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>{filterAbono === "abonados" ? "MRR Abonado" : "MRR Perdido"}</span>
+                    <DollarSign className={`h-4 w-4 ${filterAbono === "abonados" ? "text-amber-500" : "text-red-500"}`} />
                   </div>
-                  <div className="text-2xl font-bold text-red-700 dark:text-red-300">{formatCurrency(filteredMetricas.mrr_perdido)}</div>
-                  <div className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">{filteredMetricas.total_churned} contratos encerrados</div>
-                  {churnPlanejado.mrrPlanejado > 0 && (
+                  <div className={`text-2xl font-bold ${filterAbono === "abonados" ? "text-amber-700 dark:text-amber-300" : "text-red-700 dark:text-red-300"}`}>{formatCurrency(filteredMetricas.mrr_perdido)}</div>
+                  <div className={`text-xs mt-1 ${filterAbono === "abonados" ? "text-amber-600/70 dark:text-amber-400/70" : "text-red-600/70 dark:text-red-400/70"}`}>{filteredMetricas.total_churned} contratos {filterAbono === "abonados" ? "abonados" : "encerrados"}</div>
+                  {filterAbono !== "abonados" && churnPlanejado.mrrPlanejado > 0 && (
                     <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800/50">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-red-600/70 dark:text-red-400/70">Planejado até hoje</span>
@@ -2065,6 +2077,7 @@ export default function ChurnDetalhamento() {
                   )}
                 </div>
                 
+                {filterAbono === "todos" && (
                 <div className="flex-1 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase">Churn Abonado</span>
@@ -2085,7 +2098,9 @@ export default function ChurnDetalhamento() {
                     </div>
                   )}
                 </div>
-                
+                )}
+
+                {filterAbono === "todos" && (
                 <div className="flex-1 p-4 bg-purple-50 dark:bg-purple-950/30 rounded-xl border border-purple-100 dark:border-purple-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase">Churn Total</span>
@@ -2100,6 +2115,7 @@ export default function ChurnDetalhamento() {
                     <span className="text-amber-500">Abonado: {formatCurrency(filteredMetricas.mrr_abonado)}</span>
                   </div>
                 </div>
+                )}
               </div>
 
               {/* Coluna NRR & Cross-sell */}
