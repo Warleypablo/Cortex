@@ -11,17 +11,19 @@ import {
   type MesValor,
   type TipoAgregacao,
 } from "./bp2026.helpers";
+import { montarMetricasGerais } from "./bp2026.metricas";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
-export type Direcao = "maior_melhor" | "menor_melhor";
+export type Direcao = "maior_melhor" | "menor_melhor" | "neutro";
 
 export interface DefLinha {
   metrica: string;
   titulo: string;
   tipoAgregacao: TipoAgregacao;
   direcao: Direcao;
+  unidade?: "brl" | "int" | "pct";
   nota?: string;
 }
 
@@ -30,6 +32,7 @@ interface LinhaReceita {
   titulo: string;
   tipoAgregacao: TipoAgregacao;
   direcao: Direcao;
+  unidade?: "brl" | "int" | "pct";
   nota?: string;
   meses: Array<{
     mes: number;
@@ -182,18 +185,22 @@ export function registerBp2026Routes(app: Express, db: any) {
            AND s.d < (make_date(2026, gs.mes, 1) + INTERVAL '1 month')
           GROUP BY gs.mes
         )
-        SELECT a.mes, a.snapshot_dia::text AS snapshot_dia, SUM(h.valorr::numeric) AS mrr
+        SELECT a.mes, a.snapshot_dia::text AS snapshot_dia, SUM(h.valorr::numeric) AS mrr,
+               COUNT(DISTINCT h.id_task) AS clientes,
+               COUNT(DISTINCT h.id_subtask) AS contratos
         FROM alvo a
         JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = a.snapshot_dia
         WHERE h.status IN ('ativo', 'onboarding', 'triagem')
         GROUP BY a.mes, a.snapshot_dia
         ORDER BY a.mes
       `);
-      const mrrPorMes: Record<number, { valor: number; snapshotDia: string }> = {};
+      const mrrPorMes: Record<number, { valor: number; snapshotDia: string; clientes: number; contratos: number }> = {};
       for (const row of mrrResult.rows as any[]) {
         mrrPorMes[Number(row.mes)] = {
           valor: parseFloat(row.mrr),
           snapshotDia: row.snapshot_dia,
+          clientes: parseInt(row.clientes),
+          contratos: parseInt(row.contratos),
         };
       }
 
@@ -467,6 +474,16 @@ export function registerBp2026Routes(app: Express, db: any) {
 
       // 7. YTD por linha — acumula apenas meses fechados; mês corrente (parcial) fica de fora
       // mesFechado já calculado acima (hoisted para uso em fonteAproximada)
+
+      // 8. Métricas Gerais (sub-aba)
+      const realizadoDre: Record<string, (number | null)[]> = {};
+      for (const l of linhas) realizadoDre[l.metrica] = l.meses.map((m) => m.realizado);
+      const metricasGerais = await montarMetricasGerais({
+        db, orcado, realizadoDre,
+        mrrInfoPorMes: mrrPorMes as any,
+        pontualPorMes, dfcPorMes, mesCorrente, mesFechado,
+      });
+
       const payload = {
         ano: ANO,
         mesCorrente,
@@ -481,6 +498,7 @@ export function registerBp2026Routes(app: Express, db: any) {
             return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) };
           })(),
         })),
+        metricasGerais,
         atualizadoEm: new Date().toISOString(),
       };
 
