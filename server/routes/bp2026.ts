@@ -67,6 +67,20 @@ const LINHAS_CSV: DefLinha[] = [
   { metrica: "csv_stack", titulo: "(−) CSV — Stack Tecnologia", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
 ];
 
+const NOTA_SGA =
+  "Inclui o complemento do benefício (Caju) não atribuído ao CSV, " +
+  "rateado pela fração orçada do mês.";
+
+const NOTA_BONUS =
+  "Realizado usa a categoria Premiações (05.01.10), que também inclui " +
+  "premiações mensais orçadas no SG&A (~R$ 5k/mês).";
+
+const LINHAS_OPEX: DefLinha[] = [
+  { metrica: "cac", titulo: "(−) CAC", tipoAgregacao: "fluxo", direcao: "menor_melhor" },
+  { metrica: "sga", titulo: "(−) SG&A", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_SGA },
+  { metrica: "bonus", titulo: "(−) Bônus", tipoAgregacao: "fluxo", direcao: "menor_melhor", nota: NOTA_BONUS },
+];
+
 // Soma mensal de despesas em regime caixa (QUITADO por data_quitacao em 2026),
 // filtrada por um predicado de categorias.
 async function somaDespesaCaixaPorMes(
@@ -225,6 +239,27 @@ export function registerBp2026Routes(app: Express, db: any) {
         sql`categoria_nome LIKE '05.03%' OR categoria_nome LIKE '05.04.01%' OR categoria_nome LIKE '06.05.03%' OR categoria_nome LIKE '06.10.01%'`
       );
 
+      // 4g. CAC: caixa — comercial, mídia, eventos, brindes, viagens, locomoção
+      const cacPorMes = await somaDespesaCaixaPorMes(
+        db,
+        sql`categoria_nome LIKE '05.04.02%' OR categoria_nome LIKE '06.04%'
+            OR categoria_nome LIKE '06.05.04%' OR categoria_nome LIKE '06.05.05%'
+            OR categoria_nome LIKE '06.06%' OR categoria_nome LIKE '06.07%'`
+      );
+
+      // 4h. SG&A (sem benefício): caixa — ocupação, tarifas, backoffice, pró-labore, adm
+      const sgaBucketPorMes = await somaDespesaCaixaPorMes(
+        db,
+        sql`categoria_nome LIKE '06.02%' OR categoria_nome LIKE '06.03%'
+            OR categoria_nome LIKE '06.08%' OR categoria_nome LIKE '06.09%'
+            OR categoria_nome LIKE '06.10.02%' OR categoria_nome LIKE '06.10.03%'
+            OR categoria_nome LIKE '06.10.06%' OR categoria_nome LIKE '06.10.07%'
+            OR categoria_nome LIKE '06.10.08%'`
+      );
+
+      // 4i. Bônus: caixa — Premiações (05.01.10), excluída do CSV-Salários
+      const bonusPorMes = await somaDespesaCaixaPorMes(db, sql`categoria_nome LIKE '05.01.10%'`);
+
       // 5. Montagem: meses futuros => realizado null
       const agora = new Date();
       const anoAtual = agora.getFullYear();
@@ -250,6 +285,19 @@ export function registerBp2026Routes(app: Express, db: any) {
               )
             : null,
         csv_stack: (mes) => (mes <= mesCorrente ? stackPorMes[mes] ?? 0 : null),
+        cac: (mes) => (mes <= mesCorrente ? cacPorMes[mes] ?? 0 : null),
+        sga: (mes) => {
+          if (mes > mesCorrente) return null;
+          // complemento do Caju: parcela não atribuída ao CSV (fecha o rateio da Parte 3)
+          const complemento = ratear(
+            beneficioTotalPorMes[mes] ?? 0,
+            (orcado["beneficio_total_empresa"]?.[mes] ?? 0) - (orcado["csv_beneficio"]?.[mes] ?? 0),
+            orcado["beneficio_total_empresa"]?.[mes] ?? 0
+          );
+          if (complemento === null) return null; // denominador inválido => seed quebrado, sinalizar
+          return (sgaBucketPorMes[mes] ?? 0) + complemento;
+        },
+        bonus: (mes) => (mes <= mesCorrente ? bonusPorMes[mes] ?? 0 : null),
       };
 
       const linhas: LinhaReceita[] = LINHAS.map(({ metrica, titulo, tipoAgregacao, direcao }) => ({
@@ -325,6 +373,26 @@ export function registerBp2026Routes(app: Express, db: any) {
         tipoAgregacao: "fluxo",
         direcao: "maior_melhor",
         meses: margemMeses.map((m) => ({
+          ...m,
+          atingimento: calcAtingimento(m.orcado, m.realizado),
+        })),
+      });
+
+      // 6f. Opex: CAC, SG&A (com complemento do benefício) e Bônus
+      const linhasOpex = buildLinhas(LINHAS_OPEX, orcado, realizadoPorMetrica);
+      linhas.push(...linhasOpex);
+
+      // 6g. EBITDA = Margem Bruta − CAC − SG&A − Bônus
+      const ebitdaMeses = subtrairMeses(
+        margemMeses,
+        linhasOpex.map((l) => l.meses)
+      );
+      linhas.push({
+        metrica: "ebitda",
+        titulo: "(=) EBITDA",
+        tipoAgregacao: "fluxo",
+        direcao: "maior_melhor",
+        meses: ebitdaMeses.map((m) => ({
           ...m,
           atingimento: calcAtingimento(m.orcado, m.realizado),
         })),
