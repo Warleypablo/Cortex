@@ -497,6 +497,7 @@ export default function ChurnDetalhamento() {
   const [crossAnalysisView, setCrossAnalysisView] = useState<"motivo" | "cluster" | "plano">("motivo");
   const [expandedMotivo, setExpandedMotivo] = useState<string | null>(null);
   const [analysisSubTab, setAnalysisSubTab] = useState<"resumo" | "distribuicao" | "inteligencia">("resumo");
+  const [filterAbono, setFilterAbono] = useState<"todos" | "abonados" | "nao_abonados">("todos");
 
   // Voz do Cliente states
   const [muralSortBy, setMuralSortBy] = useState<"mrr" | "date">("mrr");
@@ -662,6 +663,14 @@ export default function ChurnDetalhamento() {
       filtered = filtered.filter(c => c.possibilidade_retencao && filterPossibilidadesRetencao.includes(c.possibilidade_retencao));
     }
 
+    // Filtro de abono — só na aba Análise, onde o controle fica visível
+    if (mainTab === "analise" && filterAbono !== "todos") {
+      filtered = filtered.filter(c => {
+        const isAbonado = abonadoOverrides[c.id] ?? c.is_abonado ?? false;
+        return filterAbono === "abonados" ? isAbonado : !isAbonado;
+      });
+    }
+
     filtered.sort((a, b) => {
       let comparison = 0;
       switch (sortBy) {
@@ -689,7 +698,7 @@ export default function ChurnDetalhamento() {
     });
     
     return filtered;
-  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, filterPlanos, filterClusters, filterEvitabilidades, filterPossibilidadesRetencao, dataInicio, dataFim, sortBy, sortOrder]);
+  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, filterPlanos, filterClusters, filterEvitabilidades, filterPossibilidadesRetencao, dataInicio, dataFim, sortBy, sortOrder, mainTab, filterAbono, abonadoOverrides]);
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
@@ -1942,25 +1951,50 @@ export default function ChurnDetalhamento() {
       ) : mainTab === "analise" ? (
       <>
 
-      {/* Sub-abas da Análise */}
-      <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40 w-fit">
-        {([
-          { key: "resumo", label: "Resumo" },
-          { key: "distribuicao", label: "Distribuição" },
-          { key: "inteligencia", label: "Inteligência" },
-        ] as const).map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setAnalysisSubTab(tab.key)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-              analysisSubTab === tab.key
-                ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Sub-abas da Análise + filtro de abono */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40 w-fit">
+          {([
+            { key: "resumo", label: "Resumo" },
+            { key: "distribuicao", label: "Distribuição" },
+            { key: "inteligencia", label: "Inteligência" },
+          ] as const).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setAnalysisSubTab(tab.key)}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                analysisSubTab === tab.key
+                  ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40 w-fit">
+          {([
+            { key: "todos", label: "Todos" },
+            { key: "nao_abonados", label: "Não abonados" },
+            { key: "abonados", label: "Abonados" },
+          ] as const).map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setFilterAbono(opt.key)}
+              data-testid={`filter-abono-${opt.key}`}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                filterAbono === opt.key
+                  ? opt.key === "abonados"
+                    ? "bg-amber-100 dark:bg-amber-900/40 shadow-sm text-amber-800 dark:text-amber-300"
+                    : "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {analysisSubTab === "resumo" && (
