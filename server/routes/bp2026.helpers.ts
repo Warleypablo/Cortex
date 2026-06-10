@@ -72,7 +72,7 @@ export function agruparItens(itens: ItemDetalhe[], limite: number): GrupoDetalhe
     porGrupo.set(item.grupo, lista);
   }
   const grupos: GrupoDetalhe[] = [];
-  for (const [titulo, lista] of porGrupo) {
+  porGrupo.forEach((lista, titulo) => {
     lista.sort((a, b) => b.valor - a.valor);
     const total = lista.reduce((s, i) => s + i.valor, 0);
     const visiveis = lista.slice(0, limite);
@@ -85,7 +85,7 @@ export function agruparItens(itens: ItemDetalhe[], limite: number): GrupoDetalhe
         ? { itensOmitidos: { qtd: omitidos.length, valor: omitidos.reduce((s, i) => s + i.valor, 0) } }
         : {}),
     });
-  }
+  });
   grupos.sort((a, b) => b.total - a.total);
   return grupos;
 }
