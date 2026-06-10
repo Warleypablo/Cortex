@@ -36,6 +36,7 @@ export function ultimoDiaDoMes(ano: number, mes: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+// Pré-condição: todos os arrays alinhados por posição (meses 1..12, mesmo comprimento).
 export function subtrairMeses(
   minuendo: MesValor[],
   subtraendos: MesValor[][]
