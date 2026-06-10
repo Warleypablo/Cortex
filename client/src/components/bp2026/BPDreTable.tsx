@@ -149,8 +149,8 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                           <Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
                         </TooltipTrigger>
                         <TooltipContent>
-                          MRR é estoque: o acumulado mostra a posição no último mês
-                          fechado, não a soma dos meses.
+                          Métrica de estoque (posição): o acumulado mostra a posição no
+                          último mês fechado, não a soma dos meses.
                         </TooltipContent>
                       </Tooltip>
                     )}
