@@ -115,8 +115,12 @@ export function registerBp2026Routes(app: Express, db: any) {
 
       // 5. Montagem: meses futuros => realizado null
       const agora = new Date();
+      const anoAtual = agora.getFullYear();
       const mesCorrente =
-        agora.getFullYear() > ANO ? 12 : agora.getFullYear() < ANO ? 0 : agora.getMonth() + 1;
+        anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;
+      // mesFechado: 12 quando o ano inteiro já fechou, 0 quando nenhum mês fechou ainda,
+      // caso contrário o mês imediatamente anterior ao corrente.
+      const mesFechado = anoAtual > ANO ? 12 : mesCorrente <= 1 ? 0 : mesCorrente - 1;
 
       const realizadoPorMetrica: Record<string, (mes: number) => number | null> = {
         mrr_ativo: (mes) => (mes <= mesCorrente ? mrrPorMes[mes]?.valor ?? null : null),
@@ -133,7 +137,7 @@ export function registerBp2026Routes(app: Express, db: any) {
           const o = orcado[metrica]?.[mes] ?? 0;
           const r = realizadoPorMetrica[metrica](mes);
           const fonteAproximada =
-            metrica === "mrr_ativo" && r !== null && mes < mesCorrente
+            metrica === "mrr_ativo" && r !== null && mes <= mesFechado
               ? mrrPorMes[mes]?.snapshotDia !== ultimoDiaDoMes(ANO, mes)
               : undefined;
           return { mes, orcado: o, realizado: r, atingimento: calcAtingimento(o, r), fonteAproximada };
@@ -161,8 +165,7 @@ export function registerBp2026Routes(app: Express, db: any) {
       });
 
       // 7. YTD por linha — acumula apenas meses fechados; mês corrente (parcial) fica de fora
-      // mesFechado = 0 quando ainda não há nenhum mês fechado (jan ou ano ainda não iniciado)
-      const mesFechado = mesCorrente <= 1 ? 0 : Math.max(1, Math.min(mesCorrente - 1, 12));
+      // mesFechado já calculado acima (hoisted para uso em fonteAproximada)
       const payload = {
         ano: ANO,
         mesCorrente,
