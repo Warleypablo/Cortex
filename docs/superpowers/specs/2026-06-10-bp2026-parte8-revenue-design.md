@@ -18,7 +18,7 @@ Sub-aba **"Revenue"**: o MRR aberto por linha de serviço, espelhando a aba Reve
 ## Decisões (aprovadas)
 
 - **Mapeamento por produto exato com fallback por serviço** (decisão revisada na implementação: o campo produto só passou a ser preenchido em fev/2026 — janeiro tinha 81% do MRR sem produto): TRIM(produto) exato para as 4 linhas nomeadas; quando produto vazio, classifica por servico ILIKE ('%performance%'→Performance, '%creator%'→Creators, '%social%'→Social, '%comunidade%'→GC); **Others = todos os demais** (Broadcast, Sustentação, CRM de Vendas, TikTok Shop, Consultoria de Performance, sem produto, …). Soma das 5 linhas de MRR = MRR total da matriz por construção. Nota na linha MRR Others listando os principais componentes.
-- **Churn % com denominador do mês anterior** (conceito da planilha: churn sobre a base que entrou no mês). Snapshots existem desde 2025-11-17 — janeiro usa dez/2025. Mapeamento de produto idêntico nas duas pontas (mesma expressão CASE).
+- **Churn % com denominador do mês anterior** (conceito da planilha: churn sobre a base que entrou no mês). Snapshots existem desde 2025-11-17 — janeiro usa dez/2025. Snapshot usa CASE com fallback por serviço; o churn usa CASE só por produto (a view não tem coluna servico; 100% do churn 2026 tem produto preenchido — assimetria documentada no código).
 - **Mesma branch/PR** da Parte 7 (#248).
 - Sem drill nesta sub-aba (mesma regra da aba Métricas Gerais).
 
