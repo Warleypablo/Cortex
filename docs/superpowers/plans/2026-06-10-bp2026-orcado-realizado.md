@@ -10,6 +10,12 @@
 
 **Spec:** `docs/superpowers/specs/2026-06-10-bp2026-orcado-realizado-design.md`
 
+> **AMENDMENTS (2026-06-10, durante execução — substituem o código da Task 3 abaixo onde divergirem):**
+> 1. **YTD acumula apenas meses fechados** (decisão de produto): o payload expõe `mesFechado` (último mês fechado; `0` se nenhum, `12` a partir de 2027) e `linhas[].ytd` usa `mesFechado`, não `mesCorrente`. O mês corrente parcial continua em `meses[]`.
+> 2. `fonteAproximada` usa `mes <= mesFechado` (não `mes < mesCorrente`).
+> 3. **UI (Tasks 4/5):** seletor de mês abre por padrão em `mesFechado` (fallback: mês 1 quando `mesFechado === 0`); o mês corrente é navegável com selo "parcial"; cabeçalho das colunas YTD deve indicar "até <mês fechado>"; o YTD do MRR é posição (estoque), não soma — não renderizar como coluna somável.
+> Implementado nos commits `42d19470` e `1f9972b4`.
+
 **Contexto para quem nunca viu o projeto:**
 - Banco prod: GCP `34.95.249.110/dados_turbo`; local: `postgresql://cortex:dev123@localhost:5432/cortex_dev`. Senha prod: extrair do `.env` da raiz com `PROD_PASS=$(grep -E "^# *DB_PASSWORD=" .env | head -1 | sed -E 's/^# *DB_PASSWORD=//' | tr -d '"'"'"' \r')`.
 - Schemas com espaço exigem aspas duplas: `"Conta Azul".caz_parcelas`, `"Clickup".cup_data_hist`.
