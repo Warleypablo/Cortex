@@ -42,6 +42,26 @@ LINHAS = [
     ("Overview", 44, "pessoas_cac"),
     ("Overview", 45, "pessoas_sgea"),
     ("SG&A", 11, "beneficio_total_empresa"),  # denominador do rateio do benefício
+    ("Revenue", 7, "mrr_performance", 4),
+    ("Revenue", 8, "aov_performance", 4),
+    ("Revenue", 9, "contratos_performance", 4),
+    ("Revenue", 10, "churn_pct_performance", 4),
+    ("Revenue", 12, "mrr_creators", 4),
+    ("Revenue", 13, "aov_creators", 4),
+    ("Revenue", 14, "contratos_creators", 4),
+    ("Revenue", 15, "churn_pct_creators", 4),
+    ("Revenue", 17, "mrr_social", 4),
+    ("Revenue", 18, "aov_social", 4),
+    ("Revenue", 19, "contratos_social", 4),
+    ("Revenue", 20, "churn_pct_social", 4),
+    ("Revenue", 22, "mrr_gc", 4),
+    ("Revenue", 23, "aov_gc", 4),
+    ("Revenue", 24, "contratos_gc", 4),
+    ("Revenue", 25, "churn_pct_gc", 4),
+    ("Revenue", 27, "mrr_others", 4),
+    ("Revenue", 28, "aov_others", 4),
+    ("Revenue", 29, "contratos_others", 4),
+    ("Revenue", 30, "churn_pct_others", 4),
 ]
 # Totais conhecidos da planilha, para verificação anti-drift
 TOTAIS_ESPERADOS = {
@@ -77,6 +97,26 @@ TOTAIS_ESPERADOS = {
     "pessoas_cac": 359.0,
     "pessoas_sgea": 142.0,
     "beneficio_total_empresa": 736000.0,
+    "mrr_performance": 7426334.8933,
+    "aov_performance": 34141.465714,
+    "contratos_performance": 2604.204968,
+    "churn_pct_performance": 1.08,
+    "mrr_creators": 5004613.2318,
+    "aov_creators": 56074.061264,
+    "contratos_creators": 1063.612613,
+    "churn_pct_creators": 1.08,
+    "mrr_social": 4014651.4263,
+    "aov_social": 26732.128216,
+    "contratos_social": 1795.775497,
+    "churn_pct_social": 1.08,
+    "mrr_gc": 2634209.6604,
+    "aov_gc": 108740.581448,
+    "contratos_gc": 286.346478,
+    "churn_pct_gc": 1.08,
+    "mrr_others": 1918268.8799,
+    "aov_others": 20565.197133,
+    "contratos_others": 1112.449569,
+    "churn_pct_others": 1.08,
 }
 
 # Métricas com células vazias na planilha (tratadas como 0). Ex.: Bônus só tem jan-mar.
@@ -85,9 +125,11 @@ PERMITE_VAZIO = {"bonus"}
 wb = openpyxl.load_workbook(XLSX, data_only=True)
 
 stmts = []
-for aba, row, metrica in LINHAS:
+for entrada in LINHAS:
+    aba, row, metrica = entrada[0], entrada[1], entrada[2]
+    col_inicial = entrada[3] if len(entrada) > 3 else 3  # C; aba Revenue usa 4 (D)
     ws = wb[aba]
-    valores = [ws.cell(row=row, column=col).value for col in range(3, 15)]  # C..N
+    valores = [ws.cell(row=row, column=col).value for col in range(col_inicial, col_inicial + 12)]
     if metrica in PERMITE_VAZIO:
         valores = [v if isinstance(v, (int, float)) else 0 for v in valores]
     assert all(isinstance(v, (int, float)) for v in valores), f"{metrica}: célula vazia/não numérica: {valores}"
