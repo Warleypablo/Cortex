@@ -12,6 +12,7 @@ import {
   type TipoAgregacao,
 } from "./bp2026.helpers";
 import { montarMetricasGerais } from "./bp2026.metricas";
+import { montarRevenue } from "./bp2026.revenue";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -25,6 +26,7 @@ export interface DefLinha {
   direcao: Direcao;
   unidade?: "brl" | "int" | "pct";
   nota?: string;
+  destaque?: boolean;
 }
 
 interface LinhaReceita {
@@ -34,6 +36,7 @@ interface LinhaReceita {
   direcao: Direcao;
   unidade?: "brl" | "int" | "pct";
   nota?: string;
+  destaque?: boolean;
   meses: Array<{
     mes: number;
     orcado: number;
@@ -484,6 +487,9 @@ export function registerBp2026Routes(app: Express, db: any) {
         pontualPorMes, dfcPorMes, mesCorrente, mesFechado,
       });
 
+      // 9. Revenue por linha de serviço (sub-aba)
+      const revenue = await montarRevenue({ db, orcado, mesCorrente, mesFechado });
+
       const payload = {
         ano: ANO,
         mesCorrente,
@@ -499,6 +505,7 @@ export function registerBp2026Routes(app: Express, db: any) {
           })(),
         })),
         metricasGerais,
+        revenue,
         atualizadoEm: new Date().toISOString(),
       };
 
