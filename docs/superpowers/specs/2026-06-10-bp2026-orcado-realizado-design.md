@@ -34,7 +34,7 @@ Bloco de receitas do DRE, agregado (sem drill por squad):
 | Localização | Página nova dedicada `/bp-2026` |
 | Fonte do orçado | Extração 1:1 do xlsx para tabela no banco (seed idempotente) |
 | MRR realizado | ClickUp `cup_data_hist`, snapshot fim do mês |
-| Pontual realizada | Conta Azul `caz_parcelas`, faturado no mês |
+| Pontual realizada | **Bitrix `crm_deal`, vendas ganhas no mês** (revisado na investigação: o Conta Azul não separa pontual de recorrente — receita de serviços cai toda na categoria 03.01.01 e o rastro parcela→venda→itens cobre só ~metade das parcelas; revisitar quando o financeiro categorizar pontual) |
 | Backend | Módulo novo isolado (`server/routes/bp2026.ts`), zero herança do okr2026 |
 | Layout | Tabela DRE com seletor de mês + coluna Total YTD |
 
@@ -56,12 +56,20 @@ Bloco de receitas do DRE, agregado (sem drill por squad):
 
 | Linha | Fonte | Definição |
 |---|---|---|
-| MRR Ativo | `"Clickup".cup_data_hist` | Soma do valor recorrente no snapshot do **último dia do mês**, status `ativo`/`onboarding`/`triagem`. Mês corrente: snapshot mais recente disponível. |
-| Receita Pontual | `"Conta Azul".caz_parcelas` | Parcelas de receita tipo PONTUAL **emitidas** no mês. |
-| Outras Receitas | `"Conta Azul".caz_parcelas` | Parcelas de receita nas categorias de "outras receitas". **Mapeamento de categorias a validar na investigação** (ponto em aberto até a Etapa de Investigação; o atual usa `categoria_nome LIKE '03.02%/03.03%/04.01%/04.03%'`). |
+| MRR Ativo | `"Clickup".cup_data_hist` | Soma de `valorr` no snapshot do **último dia do mês**, status `ativo`/`onboarding`/`triagem`. Mês corrente: snapshot mais recente disponível. |
+| Receita Pontual | `"Bitrix".crm_deal` | Soma de `valor_pontual` dos deals com `stage_name = 'Negócio Ganho'` e `data_fechamento` no mês. Proxy de "vendido" para "faturado" — limitação registrada. |
+| Outras Receitas | `"Conta Azul".caz_parcelas` | `tipo_evento='RECEITA'` nas categorias `03.02%`, `03.03%`, `04.01%`, `04.03%`, por `data_competencia`. |
 | Total Faturável | derivado | Soma das três linhas. |
 
-**Gate de validação:** antes de congelar qualquer query no código, rodá-la contra produção e conferir com o usuário os valores de jan–mai/2026. Referências conhecidas (aba oculta "BP ORÇADO X REALIZADO" da planilha, preenchida manualmente para janeiro): MRR jan ≈ R$ 1.119.046; Pontual jan ≈ R$ 326.472. Divergência ⇒ ajustar definição com o usuário antes de seguir.
+**Gate de validação (executado em 2026-06-10 contra produção):**
+
+| Mês | MRR (ClickUp) | Pontual (Bitrix) | Outras (Conta Azul) |
+|---|---|---|---|
+| Jan | 1.119.046 ✅ (= referência manual da planilha) | 318.311 (ref. manual: 326.472, Δ 2,5%) | 18.179 |
+| Fev | 1.139.795 | 472.127 | 17.812 |
+| Mar | 1.260.758 | 333.635 | 14.636 |
+| Abr | 1.100.088 | 386.082 | 17.954 |
+| Mai | 1.030.229 | 364.076 | 15.992 |
 
 ## API
 
@@ -74,12 +82,12 @@ Bloco de receitas do DRE, agregado (sem drill por squad):
       "metrica": "mrr_ativo",
       "titulo": "(+) MRR Ativo",
       "meses": [
-        { "mes": 1, "orcado": 1156850, "realizado": 1119046, "atingimento": 0.967, "fonte_aproximada": false },
+        { "mes": 1, "orcado": 1156850, "realizado": 1119046, "atingimento": 0.967, "fonteAproximada": false },
         { "mes": 7, "orcado": 1806544, "realizado": null, "atingimento": null }
       ]
     }
   ],
-  "atualizado_em": "..."
+  "atualizadoEm": "..."
 }
 ```
 
