@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcAtingimento, calcYtd, ultimoDiaDoMes, subtrairMeses, ratear } from "./bp2026.helpers";
+import { calcAtingimento, calcYtd, ultimoDiaDoMes, subtrairMeses, ratear, agruparItens } from "./bp2026.helpers";
 
 describe("calcAtingimento", () => {
   it("calcula razão realizado/orçado", () => {
@@ -74,5 +74,33 @@ describe("ratear", () => {
   });
   it("retorna null com denominador zero (não mascara seed quebrado)", () => {
     expect(ratear(48678, 29200, 0)).toBeNull();
+  });
+});
+
+describe("agruparItens", () => {
+  const itens = [
+    { grupo: "B", nome: "b1", detalhe: "", data: "2026-05-01", valor: 10 },
+    { grupo: "A", nome: "a1", detalhe: "", data: "2026-05-02", valor: 100 },
+    { grupo: "A", nome: "a2", detalhe: "", data: "2026-05-03", valor: 50 },
+    { grupo: "A", nome: "a3", detalhe: "", data: "2026-05-04", valor: 1 },
+  ];
+
+  it("agrupa por grupo, ordena grupos por total desc e itens por valor desc", () => {
+    const g = agruparItens(itens, 50);
+    expect(g.map((x) => x.titulo)).toEqual(["A", "B"]);
+    expect(g[0].total).toBe(151);
+    expect(g[0].itens.map((i) => i.nome)).toEqual(["a1", "a2", "a3"]);
+    expect(g[0].itensOmitidos).toBeUndefined();
+  });
+
+  it("corta no limite e agrega o excedente em itensOmitidos", () => {
+    const g = agruparItens(itens, 2);
+    expect(g[0].itens).toHaveLength(2);
+    expect(g[0].itensOmitidos).toEqual({ qtd: 1, valor: 1 });
+    expect(g[0].total).toBe(151); // total inclui omitidos
+  });
+
+  it("lista vazia retorna []", () => {
+    expect(agruparItens([], 50)).toEqual([]);
   });
 });

@@ -47,6 +47,49 @@ export function ratear(
   return (valor * numerador) / denominador;
 }
 
+export interface ItemDetalhe {
+  grupo: string;
+  nome: string;
+  detalhe: string;
+  data: string | null;
+  valor: number;
+}
+
+export interface GrupoDetalhe {
+  titulo: string;
+  total: number;
+  itens: Array<Omit<ItemDetalhe, "grupo">>;
+  itensOmitidos?: { qtd: number; valor: number };
+}
+
+// Agrupa itens por `grupo`, ordena grupos por total desc e itens por valor desc;
+// corta cada grupo em `limite` itens, agregando o excedente em itensOmitidos.
+export function agruparItens(itens: ItemDetalhe[], limite: number): GrupoDetalhe[] {
+  const porGrupo = new Map<string, ItemDetalhe[]>();
+  for (const item of itens) {
+    const lista = porGrupo.get(item.grupo) ?? [];
+    lista.push(item);
+    porGrupo.set(item.grupo, lista);
+  }
+  const grupos: GrupoDetalhe[] = [];
+  for (const [titulo, lista] of porGrupo) {
+    lista.sort((a, b) => b.valor - a.valor);
+    const total = lista.reduce((s, i) => s + i.valor, 0);
+    const visiveis = lista.slice(0, limite);
+    const omitidos = lista.slice(limite);
+    grupos.push({
+      titulo,
+      total,
+      itens: visiveis.map(({ grupo: _g, ...resto }) => resto),
+      ...(omitidos.length
+        ? { itensOmitidos: { qtd: omitidos.length, valor: omitidos.reduce((s, i) => s + i.valor, 0) } }
+        : {}),
+    });
+  }
+  grupos.sort((a, b) => b.total - a.total);
+  return grupos;
+}
+
 // Pré-condição: todos os arrays alinhados por posição (meses 1..12, mesmo comprimento).
 export function subtrairMeses(
   minuendo: MesValor[],
