@@ -20,6 +20,18 @@ const NOTA_SALDO =
   "Reconstrução retroativa: saldo bancário atual menos os fluxos quitados " +
   "posteriores ao fim do mês. Não captura ajustes manuais de conta.";
 
+const NOTA_PONTE =
+  "MRR do mês anterior + vendas − churn − MRR real do mês: o que vazou sem virar " +
+  "churn declarado (downgrades, abonados, vendas não ativadas, reajustes). " +
+  "Janeiro compara contra o MRR real de dez/2025 e não tem orçado (base não seedada).";
+
+const NOTA_TICKET =
+  "Receita faturável do mês ÷ base ativa — mesma definição do orçado da planilha.";
+
+const NOTA_IRPJ =
+  "IRPJ/CSLL de 2026 ainda não estão lançados no Conta Azul — esta linha fica " +
+  "distorcida para melhor até o financeiro regularizar os lançamentos.";
+
 const NOTA_PESSOAS =
   "Mapeamento aproximado por setor do Inhire (Commerce+Tech→CSV; Growth→CAC; " +
   "Backoffice+Sócios→SG&A) — o time comercial está dentro de Commerce, " +
@@ -120,6 +132,18 @@ export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
   const saldoResult = await db.execute(sql`SELECT COALESCE(SUM(balance::numeric), 0) AS saldo FROM "Conta Azul".caz_bancos`);
   const saldoAtual = parseFloat((saldoResult.rows[0] as any).saldo);
 
+  // MRR do fim de dez/2025 — base da ponte de janeiro (mesma resolução MAX(d) do MRR)
+  const dezResult = await db.execute(sql`
+    WITH alvo AS (
+      SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+      WHERE data_snapshot::date >= '2025-12-01' AND data_snapshot::date < '2026-01-01'
+    )
+    SELECT COALESCE(SUM(h.valorr::numeric), 0) AS mrr
+    FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+    WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+  `);
+  const mrrDez25 = parseFloat((dezResult.rows[0] as any).mrr);
+
   // ---- séries auxiliares (a partir do DRE) ----
   const fat = serie(realizadoDre, "receita_total_faturavel");
   const inad = serie(realizadoDre, "inadimplencia");
@@ -152,12 +176,30 @@ export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
 
   const receitaCabeca = Array.from({ length: 12 }, (_, i) => razao(receitaTotal[i], colaboradores[i]));
   const mrrCabeca = Array.from({ length: 12 }, (_, i) => razao(mrr[i], colaboradores[i]));
-  const ticketCliente = Array.from({ length: 12 }, (_, i) => razao(mrr[i], clientes[i]));
-  const ticketContrato = Array.from({ length: 12 }, (_, i) => razao(mrr[i], contratos[i]));
+  // tickets seguem a definição da planilha: receita FATURÁVEL do mês ÷ base
+  // (o orçado seedado é faturável÷clientes — realizado com MRR criaria viés estrutural)
+  const ticketCliente = Array.from({ length: 12 }, (_, i) => razao(fat[i], clientes[i]));
+  const ticketContrato = Array.from({ length: 12 }, (_, i) => razao(fat[i], contratos[i]));
   const aliquota = Array.from({ length: 12 }, (_, i) =>
     razao(somaSeries([impostosRec, impostosDir])[i], fat[i])
   );
   const margemGeracao = Array.from({ length: 12 }, (_, i) => razao(geracao[i], fat[i]));
+
+  // ponte do MRR: (MRR anterior + vendas − churn) − MRR real = vazamento não explicado
+  // (downgrades, churns abonados, vendas ainda não ativadas, reajustes de contrato)
+  const ponteMrr = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1;
+    if (m > mesCorrente) return null;
+    const prev = m === 1 ? mrrDez25 : mrr[i - 1];
+    if (prev === null || mrr[i] === null) return null;
+    return prev + (vendasMrrPorMes[m] ?? 0) - (churnPorMes[m] ?? 0) - (mrr[i] as number);
+  });
+  // orçado: mesma conta com os orçados; janeiro sem base orçada (bookado dez/2025 não seedado) → 0
+  const ponteOrc = (m: number) => {
+    if (m === 1) return 0;
+    return (orcado["mrr_ativo"]?.[m - 1] ?? 0) + (orcado["vendas_mrr"]?.[m] ?? 0)
+      - (orcado["churn_mes"]?.[m] ?? 0) - (orcado["mrr_ativo"]?.[m] ?? 0);
+  };
 
   // ---- YTDs derivados (razões sobre agregados, não média de %) ----
   const ytdFluxo = (s: (number | null)[]) =>
@@ -195,14 +237,30 @@ export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
       mesFechado === 0 ? undefined : { orcado: razao(ytdOrcEstoque("mrr_ativo"), ytdOrcEstoque("colaboradores")) ?? 0, realizado: razao(ytdEstoque(mrr), ytdEstoque(colaboradores)) }),
     buildLinhaGeral({ metrica: "clientes", titulo: "Número de Clientes", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "int" }, orcado, clientes, mesFechado),
     buildLinhaGeral({ metrica: "contratos", titulo: "Número de Contratos", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "int" }, orcado, contratos, mesFechado),
-    buildLinhaGeral({ metrica: "ticket_cliente", titulo: "Ticket Médio por Cliente", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, ticketCliente, mesFechado,
-      mesFechado === 0 ? undefined : { orcado: razao(ytdOrcEstoque("mrr_ativo"), ytdOrcEstoque("clientes")) ?? 0, realizado: razao(ytdEstoque(mrr), ytdEstoque(clientes)) }),
-    buildLinhaGeral({ metrica: "ticket_contrato", titulo: "Ticket Médio por Contrato", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, ticketContrato, mesFechado,
-      mesFechado === 0 ? undefined : { orcado: razao(ytdOrcEstoque("mrr_ativo"), ytdOrcEstoque("contratos")) ?? 0, realizado: razao(ytdEstoque(mrr), ytdEstoque(contratos)) }),
+    buildLinhaGeral({ metrica: "ticket_cliente", titulo: "Ticket Médio por Cliente", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl", nota: NOTA_TICKET }, orcado, ticketCliente, mesFechado,
+      mesFechado === 0 ? undefined : { orcado: razao(orcFaturavelMes(mesFechado), ytdOrcEstoque("clientes")) ?? 0, realizado: razao(ytdEstoque(fat), ytdEstoque(clientes)) }),
+    buildLinhaGeral({ metrica: "ticket_contrato", titulo: "Ticket Médio por Contrato", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl", nota: NOTA_TICKET }, orcado, ticketContrato, mesFechado,
+      mesFechado === 0 ? undefined : { orcado: razao(orcFaturavelMes(mesFechado), ytdOrcEstoque("contratos")) ?? 0, realizado: razao(ytdEstoque(fat), ytdEstoque(contratos)) }),
     buildLinhaGeral({ metrica: "churn_mes", titulo: "Churn do Mês", tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "brl" }, orcado, churn, mesFechado),
-    buildLinhaGeral({ metrica: "aliquota_efetiva", titulo: "Alíquota de Imposto Efetiva", tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "pct" }, orcado, aliquota, mesFechado,
+    (() => {
+      // a ponte se lê em R$: % contra orçado pequeno/negativo gera ruído (−2.500%…)
+      const meses = Array.from({ length: 12 }, (_, i) => {
+        const mes = i + 1;
+        return { mes, orcado: ponteOrc(mes), realizado: ponteMrr[i], atingimento: null };
+      });
+      const ytdOrc = Array.from({ length: mesFechado }, (_, i) => ponteOrc(i + 1)).reduce((a, b) => a + b, 0);
+      const ytdReal = mesFechado === 0 ? null :
+        ponteMrr.slice(0, mesFechado).reduce<number | null>((acc, v) => (v === null ? acc : (acc ?? 0) + v), null);
+      return {
+        metrica: "mrr_delta_nao_explicado", titulo: "Δ MRR não explicado (ponte)",
+        tipoAgregacao: "fluxo" as const, direcao: "menor_melhor" as const, unidade: "brl" as const,
+        nota: NOTA_PONTE, meses,
+        ytd: { orcado: ytdOrc, realizado: ytdReal, atingimento: null },
+      };
+    })(),
+    buildLinhaGeral({ metrica: "aliquota_efetiva", titulo: "Alíquota de Imposto Efetiva", tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "pct", nota: NOTA_IRPJ }, orcado, aliquota, mesFechado,
       mesFechado === 0 ? undefined : { orcado: razao(ytdOrcFluxo("impostos_receita") + ytdOrcFluxo("impostos_diretos"), ytdOrcFaturavel()) ?? 0, realizado: razao((ytdFluxo(impostosRec) ?? 0) + (ytdFluxo(impostosDir) ?? 0), ytdFluxo(fat)) }),
-    buildLinhaGeral({ metrica: "margem_geracao", titulo: "Margem de Geração", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "pct" }, orcado, margemGeracao, mesFechado,
+    buildLinhaGeral({ metrica: "margem_geracao", titulo: "Margem de Geração", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "pct", nota: NOTA_IRPJ }, orcado, margemGeracao, mesFechado,
       mesFechado === 0 ? undefined : { orcado: ytdOrcPctPonderada("margem_geracao"), realizado: razao(ytdFluxo(geracao), ytdFluxo(fat)) }),
     buildLinhaGeral({ metrica: "saldo_caixa", titulo: "Saldo de Caixa", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "brl", nota: NOTA_SALDO }, orcado, saldo, mesFechado),
     buildLinhaGeral({ metrica: "pessoas_csv", titulo: "Pessoas em CSV", tipoAgregacao: "estoque", direcao: "menor_melhor", unidade: "int", nota: NOTA_PESSOAS }, orcado, mensal((m) => pessoasPorMes[m]?.csv ?? null), mesFechado),

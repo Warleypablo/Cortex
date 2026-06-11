@@ -27,7 +27,7 @@ const DERIVADAS = [
   "aov_venda_mrr", "aov_venda_pontual",
   "gestores_necessarios", "designers_necessarios", "necessidade_gestores",
   "contratos_por_gestor", "contas_por_designer",
-  "sga_total_detalhe", "or_total_detalhe", "cac_total_detalhe", "cac_pct_receita", "cac_payback_mrr",
+  "sga_total_detalhe", "or_total_detalhe", "cac_total_detalhe", "cac_pct_receita", "cac_payback_mrr", "mrr_delta_nao_explicado",
 ];
 
 // métricas de despesa cujo detalhe é o bucket puro (parcelas por quitação, grupos por categoria)

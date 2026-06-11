@@ -61,9 +61,20 @@ interface CelulaProps {
   atingimento: number | null;
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
   unidade: "brl" | "int" | "pct" | "dec";
+  parcial?: boolean;
 }
 
-function Celula({ orcado, realizado, atingimento, direcao, unidade }: CelulaProps) {
+function Celula({ orcado, realizado, atingimento, direcao, unidade, parcial }: CelulaProps) {
+  // gasto/receita sem orçamento: precisa saltar aos olhos, não virar "—"
+  const naoOrcado = atingimento === null && orcado === 0 && realizado !== null && realizado > 0;
+  // mês parcial: atingimento sem cor semântica (compara dias corridos com mês cheio)
+  const corAting = parcial
+    ? "text-gray-400 dark:text-zinc-500"
+    : naoOrcado
+      ? direcao === "menor_melhor"
+        ? "text-red-600 dark:text-red-400"
+        : "text-amber-600 dark:text-amber-400"
+      : corAtingimento(atingimento, direcao);
   return (
     <div className="flex flex-col items-end gap-0.5">
       <span className="text-xs font-medium tabular-nums text-gray-900 dark:text-white">
@@ -72,8 +83,8 @@ function Celula({ orcado, realizado, atingimento, direcao, unidade }: CelulaProp
       <span className="text-[10px] tabular-nums text-gray-500 dark:text-zinc-500">
         {fmtValor(orcado, unidade)}
       </span>
-      <span className={`text-[10px] font-semibold tabular-nums ${corAtingimento(atingimento, direcao)}`}>
-        {fmtPct(atingimento)}
+      <span className={`text-[10px] font-semibold tabular-nums ${corAting}`}>
+        {naoOrcado ? "não orç." : fmtPct(atingimento)}
       </span>
     </div>
   );
@@ -96,7 +107,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
             <th className="sticky left-0 z-10 bg-gray-50 dark:bg-zinc-800 px-4 py-3 text-left font-medium whitespace-nowrap">
               <div>Linha</div>
               <div className="text-[10px] font-normal normal-case text-gray-400 dark:text-zinc-500">
-                realizado · orçado · ating. · valores em R$
+                realizado · orçado · ating.
               </div>
             </th>
             {MESES_CURTOS.map((nome, i) => {
@@ -187,7 +198,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                               </TooltipContent>
                             </Tooltip>
                           )}
-                          <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} direcao={linha.direcao} unidade={linha.unidade ?? "brl"} />
+                          <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} direcao={linha.direcao} unidade={linha.unidade ?? "brl"} parcial={m.mes === mesCorrente && mesCorrente > mesFechado} />
                         </span>
                       </td>
                     );
