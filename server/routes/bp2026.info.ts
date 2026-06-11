@@ -36,7 +36,7 @@ function infoRevenue(): Record<string, InfoMetrica> {
     out[`contratos_${chave}`] = {
       definicao: `Número de contratos da linha ${nome} ativos no fim do mês.`,
       fonte: FONTE_SNAPSHOT,
-      calculo: `Contagem de contratos (id_subtask) classificados como ${nome}.`,
+      calculo: `Contagem de contratos (id_subtask) classificados como ${nome}.${chave === "creators" ? " Atenção: em Creators cada 'entrega' do ClickUp conta como contrato — atingimento de contratos e AOV são afetados pela granularidade da operação." : ""}`,
     };
     out[`aov_${chave}`] = {
       definicao: `Ticket médio mensal dos contratos da linha ${nome}.`,
@@ -179,7 +179,7 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
   receita_cabeca: {
     definicao: "Receita gerada por colaborador.",
     fonte: "Derivada.",
-    calculo: "Receita Total ÷ Número de Colaboradores do mês.",
+    calculo: "Receita Faturável do mês ÷ Número de Colaboradores (mesma definição do orçado da planilha).",
   },
   mrr_cabeca: {
     definicao: "MRR sustentado por colaborador.",

@@ -174,7 +174,8 @@ export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
     return s;
   });
 
-  const receitaCabeca = Array.from({ length: 12 }, (_, i) => razao(receitaTotal[i], colaboradores[i]));
+  // mesma definição do orçado da planilha (linha 30): FATURÁVEL ÷ colaboradores
+  const receitaCabeca = Array.from({ length: 12 }, (_, i) => razao(fat[i], colaboradores[i]));
   const mrrCabeca = Array.from({ length: 12 }, (_, i) => razao(mrr[i], colaboradores[i]));
   // tickets seguem a definição da planilha: receita FATURÁVEL do mês ÷ base
   // (o orçado seedado é faturável÷clientes — realizado com MRR criaria viés estrutural)
@@ -231,8 +232,8 @@ export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
     buildLinhaGeral({ metrica: "vendas_mrr", titulo: "Vendas MRR", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, vendasMrr, mesFechado),
     buildLinhaGeral({ metrica: "vendas_pontual", titulo: "Vendas Pontual", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, vendasPontual, mesFechado),
     buildLinhaGeral({ metrica: "colaboradores", titulo: "Número de Colaboradores", tipoAgregacao: "estoque", direcao: "menor_melhor", unidade: "int" }, orcado, colaboradores, mesFechado),
-    buildLinhaGeral({ metrica: "receita_cabeca", titulo: "Receita por Cabeça", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, receitaCabeca, mesFechado,
-      mesFechado === 0 ? undefined : { orcado: razao(ytdOrcFluxo("receita_total"), ytdOrcEstoque("colaboradores")) ?? 0, realizado: razao(ytdFluxo(receitaTotal), ytdEstoque(colaboradores)) }),
+    buildLinhaGeral({ metrica: "receita_cabeca", titulo: "Receita por Cabeça", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl", nota: NOTA_TICKET }, orcado, receitaCabeca, mesFechado,
+      mesFechado === 0 ? undefined : { orcado: razao(orcFaturavelMes(mesFechado), ytdOrcEstoque("colaboradores")) ?? 0, realizado: razao(ytdEstoque(fat), ytdEstoque(colaboradores)) }),
     buildLinhaGeral({ metrica: "mrr_cabeca", titulo: "MRR por Cabeça", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, orcado, mrrCabeca, mesFechado,
       mesFechado === 0 ? undefined : { orcado: razao(ytdOrcEstoque("mrr_ativo"), ytdOrcEstoque("colaboradores")) ?? 0, realizado: razao(ytdEstoque(mrr), ytdEstoque(colaboradores)) }),
     buildLinhaGeral({ metrica: "clientes", titulo: "Número de Clientes", tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "int" }, orcado, clientes, mesFechado),
