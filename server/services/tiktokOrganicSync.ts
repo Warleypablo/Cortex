@@ -34,9 +34,11 @@ export interface TiktokOrganicResult {
 
 /** Garante um access_token válido: refresca se faltam <10min e persiste os novos tokens. */
 async function getValidAccessToken(pool: Pool, cred: any): Promise<string> {
-  const appId = process.env.TIKTOK_APP_ID;
-  const secret = process.env.TIKTOK_APP_SECRET;
-  if (!appId || !secret) throw new Error('TIKTOK_APP_ID/SECRET ausentes');
+  // Orgânico usa o app de Login Kit (developers.tiktok.com), não o de Marketing API.
+  // Fallback p/ TIKTOK_APP_ID/SECRET só pra compat; o refresh real exige o app de Login Kit.
+  const appId = process.env.TIKTOK_LOGIN_APP_ID || process.env.TIKTOK_APP_ID;
+  const secret = process.env.TIKTOK_LOGIN_APP_SECRET || process.env.TIKTOK_APP_SECRET;
+  if (!appId || !secret) throw new Error('TIKTOK_LOGIN_APP_ID/SECRET ausentes');
 
   const expiresAt = cred.access_expires_at ? new Date(cred.access_expires_at).getTime() : 0;
   if (expiresAt - Date.now() > 10 * 60 * 1000) {
