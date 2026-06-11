@@ -1,5 +1,32 @@
 # Changelog
 
+## 2026-06-11 | feat(criativos): orçamento editável (CBO/ABO), split MQL×NMQL e escrita por allowlist
+
+**O que foi feito:**
+- Taxa de conversão agora expande por **MQL × NMQL** (cada faixa = leads da faixa ÷ visualizações da LP), com barra proporcional — em todos os níveis (conta/campanha/conjunto/anúncio).
+- Nova coluna **Orçamento** espelhando o Meta Ads: mostra valor + "Diário" onde o orçamento mora (campanha CBO / conjunto ABO) e a mensagem "Usando o orçamento do conjunto/da campanha" (clicável, leva pra aba dona) caso contrário.
+- **Edição de orçamento pelo Cortex**: inline (lápis) com atalhos +10/+20/+30%, e ajuste **em massa por %** na barra de ações (seleciona linhas → "Orçamento %" → Aplicar). Escreve no Meta via `updateDailyBudget`/`increaseDailyBudgetByPct`, com guard-rails de ±30% e teto diário.
+- **Permissão de escrita** (pausar/selecionar/editar orçamento) restrita a uma allowlist por e-mail (`META_WRITE_ALLOWED_EMAILS`): Caio Malini, Vinicius Ichino e a conta admin. Demais usuários ficam read-only, inclusive admins.
+- Backend: rotas de execução do `/api/meta/actions/*` passam a usar `requireMetaWriter` (allowlist) no lugar de `isAdmin`; nova rota `POST /bulk-budget`.
+- Fix: linha **Total** soma o orçamento apenas de campanhas/conjuntos **ativos** (pausados têm budget configurado mas gastam R$0/dia, inflavam o total).
+
+**Por que:**
+- Permitir gerir verba (ajuste fino e escala por %) e ligar/desligar criativos direto do Cortex, com controle de quem pode escrever e trilha de auditoria, sem depender do Gerenciador do Meta.
+
+**Arquivos alterados:**
+- `shared/constants.ts` - allowlist `META_WRITE_ALLOWED_EMAILS` + helper `canWriteMeta()`.
+- `server/routes/metaActions.ts` - gate `requireMetaWriter` nas escritas + rota `/bulk-budget`.
+- `server/services/metaAdsWrite.ts` - `increaseDailyBudgetByPct()` (ajuste por % com guard-rails).
+- `server/routes/growth.ts` - expõe daily/lifetime budget de campanha e conjunto na query de criativos.
+- `client/src/lib/criativosMetrics.ts` - lógica de orçamento por nível (CBO/ABO/own/usa_*), total só ativos, campos MQL/NMQL.
+- `client/src/lib/criativosColumns.ts` - coluna "Orçamento".
+- `client/src/components/criativos/CriativosTable.tsx` - sub-linhas MQL/NMQL, célula de orçamento (valor/mensagem/edição/% atalhos).
+- `client/src/pages/Criativos.tsx` - `canEditMeta`, handlers de edição e ajuste em massa, navegação entre abas.
+
+**Impacto arquitetural:** Permissão de escrita no Meta deixa de ser por role admin e passa a ser por allowlist de e-mail (decisão de produto). Pendência de infra: o usuário de banco `growth_dev` precisa de GRANT (SELECT/INSERT/UPDATE) em `cortex_core.meta_actions_log` para a auditoria — sem isso, as escritas falham antes de tocar o Meta.
+
+---
+
 ## 2026-06-09 | feat(churn-abonados): redesign visual — paleta azul, visão 12m, cores por squad
 
 **O que foi feito:**

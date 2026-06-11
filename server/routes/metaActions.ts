@@ -12,10 +12,12 @@ import { Router, type Request, type Response, type NextFunction } from 'express'
 import { z } from 'zod';
 import { pool } from '../db';
 import { isAuthenticated } from '../auth/middleware';
+import { canWriteMeta } from '@shared/constants';
 import {
   pauseEntity,
   resumeEntity,
   updateDailyBudget,
+  increaseDailyBudgetByPct,
   readEntitySnapshot,
   sanitizeError,
   type MetaEntityLevel,
@@ -28,6 +30,15 @@ import {
 function isAdmin(req: any, res: Response, next: NextFunction) {
   if (!req.user || req.user.role !== 'admin') {
     return res.status(403).json({ error: 'Forbidden - Admin access required' });
+  }
+  next();
+}
+
+// Gate de escrita no Meta: SOMENTE os e-mails da allowlist (não basta ser admin).
+// Aplicado nas rotas que executam pause/resume/budget/bulk.
+function requireMetaWriter(req: any, res: Response, next: NextFunction) {
+  if (!canWriteMeta(req.user?.email)) {
+    return res.status(403).json({ error: 'Sem permissão para alterar anúncios no Meta Ads' });
   }
   next();
 }
@@ -57,6 +68,22 @@ const bulkSchema = z.object({
     .array(
       z.object({
         level: levelSchema,
+        entityId: z.string().min(1).max(64),
+      }),
+    )
+    .min(1, 'items não pode ser vazio')
+    .max(200, 'máximo de 200 itens por lote'),
+});
+
+// Ajuste de orçamento em massa por percentual. O backend lê o valor atual de cada
+// entidade e aplica o %, herdando os guard-rails (±30% e teto). Só adset/campaign.
+const bulkBudgetSchema = z.object({
+  pct: z.number().refine((v) => v !== 0 && v >= -90 && v <= 100, 'pct deve ser diferente de 0 e entre -90 e 100'),
+  reason: z.string().min(5, 'reason deve ter pelo menos 5 caracteres').max(2000),
+  items: z
+    .array(
+      z.object({
+        level: z.enum(['adset', 'campaign']),
         entityId: z.string().min(1).max(64),
       }),
     )
@@ -179,10 +206,12 @@ async function claimPendingLog(
 const router = Router();
 
 router.use(isAuthenticated);
-router.use(isAdmin);
+// Obs.: não aplicamos isAdmin no router inteiro — as rotas de execução
+// (pause/resume/budget/bulk) usam `requireMetaWriter` (allowlist por e-mail),
+// pois os operadores autorizados (Caio Malini, Vinicius Ichino) são role=user.
 
 // ---------- GET /pending ----------
-router.get('/pending', async (_req, res) => {
+router.get('/pending', isAdmin, async (_req, res) => {
   try {
     const { rows } = await pool.query<LogRow>(
       `SELECT * FROM cortex_core.meta_actions_log
@@ -197,7 +226,7 @@ router.get('/pending', async (_req, res) => {
 });
 
 // ---------- GET /history ----------
-router.get('/history', async (req, res) => {
+router.get('/history', isAdmin, async (req, res) => {
   try {
     const entityId = typeof req.query.entityId === 'string' ? req.query.entityId : null;
     const limit = Math.min(parseInt(String(req.query.limit ?? '100'), 10) || 100, 500);
@@ -221,7 +250,7 @@ router.get('/history', async (req, res) => {
 });
 
 // ---------- POST /:logId/ignore ----------
-router.post('/:logId/ignore', async (req, res) => {
+router.post('/:logId/ignore', isAdmin, async (req, res) => {
   try {
     const logId = parseInt(req.params.logId, 10);
     if (!Number.isFinite(logId)) return res.status(400).json({ error: 'logId inválido' });
@@ -296,7 +325,7 @@ async function executeAction(
 }
 
 // ---------- POST /pause ----------
-router.post('/pause', async (req, res) => {
+router.post('/pause', requireMetaWriter, async (req, res) => {
   const parsed = pauseResumeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Payload inválido', details: parsed.error.issues });
@@ -305,7 +334,7 @@ router.post('/pause', async (req, res) => {
 });
 
 // ---------- POST /resume ----------
-router.post('/resume', async (req, res) => {
+router.post('/resume', requireMetaWriter, async (req, res) => {
   const parsed = pauseResumeSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Payload inválido', details: parsed.error.issues });
@@ -314,7 +343,7 @@ router.post('/resume', async (req, res) => {
 });
 
 // ---------- POST /budget ----------
-router.post('/budget', async (req, res) => {
+router.post('/budget', requireMetaWriter, async (req, res) => {
   const parsed = budgetSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Payload inválido', details: parsed.error.issues });
@@ -333,7 +362,7 @@ router.post('/budget', async (req, res) => {
 // Ação manual em massa (pausar/ativar vários ad/adset/campaign de uma vez).
 // Cada item gera seu próprio registro no audit trail e roda sequencialmente
 // (respeita rate limit da Meta API). Retorna resultado por item.
-router.post('/bulk', async (req, res) => {
+router.post('/bulk', requireMetaWriter, async (req, res) => {
   const parsed = bulkSchema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ error: 'Payload inválido', details: parsed.error.issues });
@@ -388,6 +417,63 @@ router.post('/bulk', async (req, res) => {
         logId: -1,
         error: sanitizeError(err).message,
       });
+    }
+  }
+
+  const okCount = results.filter((r) => r.ok).length;
+  res.json({ ok: okCount === results.length, okCount, total: results.length, results });
+});
+
+// ---------- POST /bulk-budget ----------
+// Aumenta/diminui o orçamento diário de vários conjuntos/campanhas por um %.
+// Cada item lê o valor atual no Meta, aplica o % e respeita os guard-rails (±30%, teto).
+router.post('/bulk-budget', requireMetaWriter, async (req, res) => {
+  const parsed = bulkBudgetSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ error: 'Payload inválido', details: parsed.error.issues });
+  }
+  const { pct, reason, items } = parsed.data;
+  const user = (req as any).user;
+
+  const results: Array<{
+    level: 'adset' | 'campaign';
+    entityId: string;
+    ok: boolean;
+    logId: number;
+    newDailyBudgetCents?: number | null;
+    error?: string;
+  }> = [];
+
+  for (const item of items) {
+    let logId = -1;
+    try {
+      logId = await insertLog({
+        actorType: 'human',
+        actorUserId: user.id,
+        actorEmail: user.email,
+        level: item.level,
+        entityId: item.entityId,
+        action: 'budget_update',
+        payloadJson: { pct },
+        reason,
+        status: 'executing',
+        confirmedByUserId: user.id,
+        confirmedAt: new Date(),
+      });
+
+      const result = await increaseDailyBudgetByPct(item.level, item.entityId, pct);
+      await finalizeLog(logId, result, result.previousValue);
+
+      results.push({
+        level: item.level,
+        entityId: item.entityId,
+        ok: result.ok,
+        logId,
+        newDailyBudgetCents: result.newValue?.daily_budget_cents ?? null,
+        error: result.ok ? undefined : result.error?.message,
+      });
+    } catch (err) {
+      results.push({ level: item.level, entityId: item.entityId, ok: false, logId, error: sanitizeError(err).message });
     }
   }
 

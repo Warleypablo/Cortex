@@ -1,8 +1,8 @@
-import React, { useRef } from "react";
+import React, { useRef, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { ArrowUpDown, ExternalLink, ChevronRight, ChevronDown, Sparkles, Loader2 } from "lucide-react";
+import { ArrowUpDown, ExternalLink, ChevronRight, ChevronDown, Sparkles, Loader2, Pencil, Check, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { formatCurrency as formatCurrencyUtil, formatPercent as formatPercentUtil } from "@/lib/utils";
 import type { CriativoData, Level, SortConfig } from "@/lib/criativosMetrics";
@@ -69,6 +69,8 @@ export interface CriativosTableProps {
   onSort: (key: keyof CriativoData) => void;
   expandedColumns: Set<string>;
   toggleColumn: (c: string) => void;
+  expandedRows: Set<string>;
+  onToggleRow: (id: string) => void;
   getCellColor: (value: number | null, metricKey: string) => string;
   pendingByEntity: Map<string, { entity_id: string }>;
   isAdmin: boolean;
@@ -76,6 +78,8 @@ export interface CriativosTableProps {
   onToggleSelect: (id: string, checked: boolean) => void;
   onToggleSelectAll: (checked: boolean, ids: string[]) => void;
   onToggleStatus: (row: CriativoData) => void;
+  onEditBudget: (row: CriativoData, newReais: number) => Promise<boolean>;
+  onGoToBudgetOwner: (row: CriativoData) => void;
   togglingIds: Set<string>;
   columns: ColumnDef[];
   columnWidths: Record<string, number>;
@@ -93,6 +97,8 @@ export function CriativosTable({
   onSort,
   expandedColumns,
   toggleColumn,
+  expandedRows,
+  onToggleRow,
   getCellColor,
   pendingByEntity,
   isAdmin,
@@ -100,6 +106,8 @@ export function CriativosTable({
   onToggleSelect,
   onToggleSelectAll,
   onToggleStatus,
+  onEditBudget,
+  onGoToBudgetOwner,
   togglingIds,
   columns,
   columnWidths,
@@ -108,6 +116,34 @@ export function CriativosTable({
   const tableRef = useRef<HTMLTableElement>(null);
   const colRefs = useRef<Record<string, HTMLTableColElement | null>>({});
   const resizingRef = useRef<{ resizeKey: string; uid: string; startX: number; startW: number; statusBaseLeft?: number; live: number } | null>(null);
+
+  // Edição inline de orçamento (campanha CBO / conjunto ABO)
+  const [editingBudget, setEditingBudget] = useState<{ id: string; value: string } | null>(null);
+  const [savingBudget, setSavingBudget] = useState(false);
+
+  // Só é editável quem tem permissão de escrita (isAdmin = allowlist) E quando o orçamento
+  // mora neste nível (orcamentoInfo === 'own') — i.e. campanha CBO ou conjunto ABO.
+  const canEditBudget = (row: CriativoData): boolean => {
+    if (!isAdmin) return false;
+    if (level !== "campanha" && level !== "conjunto") return false;
+    return row.orcamentoInfo === "own" && row.orcamentoDiario != null;
+  };
+
+  // Aceita "286,65", "286.65" ou "1.286,65" (pt-BR) → número em reais.
+  const parseReais = (s: string): number => {
+    let t = s.trim().replace(/[R$\s]/g, "");
+    if (t.includes(",")) t = t.replace(/\./g, "").replace(",", ".");
+    return parseFloat(t);
+  };
+
+  const saveBudget = async (row: CriativoData) => {
+    if (!editingBudget) return;
+    const newReais = parseReais(editingBudget.value);
+    setSavingBudget(true);
+    const ok = await onEditBudget(row, newReais);
+    setSavingBudget(false);
+    if (ok) setEditingBudget(null);
+  };
 
   const widthOf = (key: string, fb: number) =>
     columnWidths[key] && columnWidths[key] > 0 ? columnWidths[key] : fb;
@@ -323,10 +359,23 @@ export function CriativosTable({
         );
       case "id":
         return <td key={c.uid} className={cn(baseTd, "font-mono text-muted-foreground")} style={style} title={row.id}>{row.id || "-"}</td>;
-      case "name":
+      case "name": {
+        const hasBreakdown = ((row.mql || 0) + (row.nmqls || 0)) > 0;
+        const isRowExpanded = expandedRows.has(row.id);
         return (
           <td key={c.uid} className={cn(baseTd, "font-medium")} style={style} title={row.adName}>
             <div className="flex items-center gap-1.5">
+              {hasBreakdown ? (
+                <button
+                  onClick={(e) => { e.stopPropagation(); onToggleRow(row.id); }}
+                  className="shrink-0 text-muted-foreground hover:text-foreground"
+                  title="Ver taxa de conversão por MQL × NMQL"
+                >
+                  {isRowExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+                </button>
+              ) : (
+                <span className="inline-block w-3.5 shrink-0" />
+              )}
               <span className="truncate">{row.adName}</span>
               {pendingByEntity.has(row.id) && (
                 <Badge variant="secondary" className="shrink-0 text-[10px] h-4 px-1 bg-purple-100 text-purple-800 dark:bg-purple-900/40 dark:text-purple-200" title="Proposta pendente do agente">
@@ -336,6 +385,7 @@ export function CriativosTable({
             </div>
           </td>
         );
+      }
       case "status":
         return (
           <td key={c.uid} className={baseTd} style={style}>
@@ -345,6 +395,95 @@ export function CriativosTable({
       case "metric": {
         const def = c.def!;
         const value = row[def.key] as number | null;
+        // Orçamento: editável inline (lápis) p/ quem tem permissão, no nível dono do budget.
+        if (def.key === "orcamentoDiario") {
+          const editable = canEditBudget(row);
+          const isEditing = editingBudget?.id === row.id;
+          if (isEditing) {
+            const base = value; // valor atual em reais (p/ os atalhos de %)
+            const applyPct = (p: number) => {
+              if (base != null && base > 0) setEditingBudget({ id: row.id, value: (base * (1 + p / 100)).toFixed(2) });
+            };
+            return (
+              <td key={c.uid} className={cn(baseTd, "text-right")}>
+                <div className="flex flex-col items-end gap-1">
+                  <div className="flex items-center gap-1 justify-end">
+                    <input
+                      autoFocus
+                      type="text"
+                      inputMode="decimal"
+                      value={editingBudget!.value}
+                      onChange={(e) => setEditingBudget({ id: row.id, value: e.target.value })}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") saveBudget(row);
+                        if (e.key === "Escape") setEditingBudget(null);
+                      }}
+                      disabled={savingBudget}
+                      className="w-20 h-6 px-1 text-right text-xs rounded border border-input bg-background text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
+                    />
+                    <button onClick={() => saveBudget(row)} disabled={savingBudget} className="text-emerald-600 hover:text-emerald-500 disabled:opacity-50" title="Salvar (Enter)">
+                      {savingBudget ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Check className="w-3.5 h-3.5" />}
+                    </button>
+                    <button onClick={() => setEditingBudget(null)} disabled={savingBudget} className="text-muted-foreground hover:text-foreground disabled:opacity-50" title="Cancelar (Esc)">
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                  {base != null && base > 0 && (
+                    <div className="flex items-center gap-0.5">
+                      {[10, 20, 30].map((p) => (
+                        <button
+                          key={p}
+                          onClick={() => applyPct(p)}
+                          disabled={savingBudget}
+                          className="px-1 py-0.5 text-[10px] rounded bg-muted hover:bg-primary/20 text-muted-foreground hover:text-primary disabled:opacity-50"
+                          title={`Aumentar ${p}% sobre o valor atual`}
+                        >
+                          +{p}%
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </td>
+            );
+          }
+          // Orçamento mora em outro nível → mensagem clicável que leva pra aba certa (igual Meta).
+          if (row.orcamentoInfo === "usa_conjunto" || row.orcamentoInfo === "usa_campanha") {
+            const isConjunto = row.orcamentoInfo === "usa_conjunto";
+            const full = isConjunto ? "Usando o orçamento do conjunto de anúncios" : "Usando o orçamento da campanha";
+            return (
+              <td key={c.uid} className={cn(baseTd, "text-right")}>
+                <button
+                  onClick={() => onGoToBudgetOwner(row)}
+                  className="w-full truncate text-right text-[11px] italic text-muted-foreground hover:text-primary hover:underline"
+                  title={`${full} — clique para abrir a aba de ${isConjunto ? "Conjuntos" : "Campanhas"}`}
+                >
+                  {full}
+                </button>
+              </td>
+            );
+          }
+          // Orçamento mora aqui → valor + "Diário" + lápis (se editável).
+          return (
+            <td key={c.uid} className={cn(baseTd, "text-right")}>
+              <div className="flex items-center gap-1 justify-end group/budget">
+                <div className="flex flex-col items-end leading-tight">
+                  <span>{fmt(def.format, value)}</span>
+                  {value != null && <span className="text-[10px] text-muted-foreground">Diário</span>}
+                </div>
+                {editable && (
+                  <button
+                    onClick={() => setEditingBudget({ id: row.id, value: value != null ? value.toFixed(2) : "" })}
+                    className="opacity-0 group-hover/budget:opacity-100 text-muted-foreground hover:text-primary transition-opacity shrink-0"
+                    title="Editar orçamento diário no Meta Ads"
+                  >
+                    <Pencil className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+            </td>
+          );
+        }
         const colorClass = def.color ? getCellColor(value, def.colorKey || (def.key as string)) : "";
         return <td key={c.uid} className={cn(baseTd, "text-right", colorClass)}>{fmt(def.format, value)}</td>;
       }
@@ -376,6 +515,60 @@ export function CriativosTable({
     }
   };
 
+  // ── Sub-linhas de breakdown: taxa de conversão por MQL × NMQL ──
+  // Taxa conv. da faixa = (leads da faixa) / (visualizações da LP). MQL + NMQL = taxa total.
+  // A barra representa a fatia da faixa sobre o total de leads (juntas preenchem 100%).
+  const renderSubRow = (
+    c: RCol,
+    row: CriativoData,
+    band: { key: string; label: string; count: number; conv: number | null; share: number; barCls: string },
+  ) => {
+    // Fundo sólido (não translúcido) p/ as colunas congeladas não deixarem vazar o conteúdo ao rolar.
+    const stickyCls = c.sticky ? "sticky z-20 bg-muted overflow-hidden" : "bg-muted";
+    const lastCls = c.lastFrozen ? "border-r border-zinc-700/50" : "";
+    const baseTd = cn("px-2 py-1.5 text-xs align-middle", stickyCls, lastCls);
+    const style = c.sticky ? stickyLeft(c) : undefined;
+
+    if (c.kind === "name") {
+      return (
+        <td key={c.uid} className={cn(baseTd, "text-muted-foreground")} style={style}>
+          <div className="flex items-center gap-1.5 pl-5">
+            <span className="font-medium">{band.label}</span>
+            <span className="text-[11px] opacity-70">{formatNumber(band.count)} leads</span>
+          </div>
+        </td>
+      );
+    }
+    if (c.kind === "metric" && c.def!.key === "taxaConversao") {
+      return (
+        <td key={c.uid} className={baseTd}>
+          <div className="flex items-center gap-1.5">
+            <div className="flex-1 h-1.5 rounded-full bg-black/10 dark:bg-white/10 overflow-hidden">
+              <div className={cn("h-full rounded-full", band.barCls)} style={{ width: `${Math.min(band.share, 100)}%` }} />
+            </div>
+            <span className="tabular-nums text-right shrink-0 w-12">{band.conv !== null ? formatPercent(band.conv) : "-"}</span>
+          </div>
+        </td>
+      );
+    }
+    if (c.kind === "var") return <td key={c.uid} className="px-2 py-1.5 bg-muted/40" />;
+    return <td key={c.uid} className={baseTd} style={style} />;
+  };
+
+  const buildBands = (row: CriativoData) => {
+    const lpv = row.landingPageViews || 0;
+    const mql = row.mql || 0;
+    const nmql = row.nmqls || 0;
+    const leads = mql + nmql;
+    const conv = (n: number) => (lpv > 0 ? r2((n / lpv) * 100) : null);
+    const share = (n: number) => (leads > 0 ? (n / leads) * 100 : 0);
+    return [
+      { key: "mql", label: "MQL", count: mql, conv: conv(mql), share: share(mql), barCls: "bg-emerald-500" },
+      { key: "nmql", label: "NMQL", count: nmql, conv: conv(nmql), share: share(nmql), barCls: "bg-amber-500" },
+    ];
+  };
+  const r2 = (v: number) => parseFloat(v.toFixed(2));
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -403,11 +596,21 @@ export function CriativosTable({
           )}
         </thead>
         <tbody>
-          {rows.map((row) => (
-            <tr key={row.id} className="hover:bg-muted/40 [&>td]:border-b [&>td]:border-border" data-testid={`row-criativo-${row.id}`}>
-              {allCols.map((c) => renderBody(c, row))}
-            </tr>
-          ))}
+          {rows.map((row) => {
+            const isRowExpanded = expandedRows.has(row.id);
+            return (
+              <React.Fragment key={row.id}>
+                <tr className="hover:bg-muted/40 [&>td]:border-b [&>td]:border-border" data-testid={`row-criativo-${row.id}`}>
+                  {allCols.map((c) => renderBody(c, row))}
+                </tr>
+                {isRowExpanded && buildBands(row).map((band) => (
+                  <tr key={`${row.id}:${band.key}`} className="[&>td]:border-b [&>td]:border-border/50" data-testid={`row-criativo-${row.id}-${band.key}`}>
+                    {allCols.map((c) => renderSubRow(c, row, band))}
+                  </tr>
+                ))}
+              </React.Fragment>
+            );
+          })}
           {rows.length === 0 && (
             <tr>
               <td colSpan={allCols.length} className="text-center py-8 text-muted-foreground">

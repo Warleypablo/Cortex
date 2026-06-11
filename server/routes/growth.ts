@@ -1059,6 +1059,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           a.adset_id,
           s.adset_name,
           s.effective_status as adset_status,
+          c.daily_budget as campaign_daily_budget,
+          c.lifetime_budget as campaign_lifetime_budget,
+          s.daily_budget as adset_daily_budget,
+          s.lifetime_budget as adset_lifetime_budget,
           SUM(i.spend::numeric) as investimento,
           SUM(i.impressions) as impressions,
           SUM(i.clicks) as clicks,
@@ -1080,7 +1084,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
           AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
         GROUP BY i.ad_id, a.ad_name, a.effective_status, a.created_time, a.preview_shareable_link,
-                 a.campaign_id, c.campaign_name, c.effective_status, a.adset_id, s.adset_name, s.effective_status
+                 a.campaign_id, c.campaign_name, c.effective_status, a.adset_id, s.adset_name, s.effective_status,
+                 c.daily_budget, c.lifetime_budget, s.daily_budget, s.lifetime_budget
         ORDER BY SUM(i.spend::numeric) DESC
       `);
       
@@ -1193,6 +1198,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           a.adset_id,
           s.adset_name,
           s.effective_status as adset_status,
+          c.daily_budget as campaign_daily_budget,
+          c.lifetime_budget as campaign_lifetime_budget,
+          s.daily_budget as adset_daily_budget,
+          s.lifetime_budget as adset_lifetime_budget,
           0 as investimento, 0 as impressions, 0 as clicks, 0 as reach,
           0 as outbound_clicks, 0 as cpm, 0 as video_plays,
           0 as video_p25, 0 as video_p50, 0 as video_p75, 0 as video_p100,
@@ -1309,6 +1318,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             adsetId: row.adset_id || null,
             adsetName: row.adset_name || null,
             adsetStatus: normalizeStatus(row.adset_status),
+            // Orçamento (já em reais no banco). CBO = budget na campanha; ABO = budget no conjunto.
+            campaignDailyBudget: row.campaign_daily_budget != null ? parseFloat(row.campaign_daily_budget) : null,
+            campaignLifetimeBudget: row.campaign_lifetime_budget != null ? parseFloat(row.campaign_lifetime_budget) : null,
+            adsetDailyBudget: row.adset_daily_budget != null ? parseFloat(row.adset_daily_budget) : null,
+            adsetLifetimeBudget: row.adset_lifetime_budget != null ? parseFloat(row.adset_lifetime_budget) : null,
             investimento: Math.round(investimento),
             // contadores brutos do Meta (para agregação por nível no frontend)
             impressions,
