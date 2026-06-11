@@ -1,4 +1,4 @@
-import { LayoutGrid, TrendingUp, TrendingDown, Activity, Sparkles, AlertTriangle } from "lucide-react";
+import { LayoutGrid, TrendingUp, TrendingDown, Activity, Sparkles, AlertTriangle, DollarSign } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ChurnCliente, SquadDetail } from "./types";
 import SlideLayout from "./SlideLayout";
@@ -141,6 +141,25 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
             { label: "Churn Total", labelCompact: "Churn Total", pct: sq.churnTotalPct ?? sq.churnPct, brl: sq.churnTotalBrl ?? sq.churnBrl, clientes: churnClientes },
             { label: "Churn s/ Abonados", labelCompact: "Churn s/ Abono", pct: sq.churnPct, brl: sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado) },
           ];
+          const faturamentoTotal = sq.mrr + sq.pontual;
+          const evolCard = (
+            <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
+              <div className="flex items-center gap-1.5">
+                {evolUp ? (
+                  <TrendingUp className="h-3 w-3 text-zinc-500" />
+                ) : (
+                  <TrendingDown className="h-3 w-3 text-zinc-500" />
+                )}
+                <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{isCompact ? "Evol. MRR" : "Evolução MRR"}</p>
+              </div>
+              <p
+                className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`}
+                style={{ color: evolColor }}
+              >
+                {isCompact ? `${evolSign} ${fmtBRL(evolAbs)}` : `${evolSign} R$ ${evolAbs.toLocaleString("pt-BR")}`}
+              </p>
+            </div>
+          );
           // O último card é o "novo" no build-up — anima mais marcadamente
           const isLast = idx === details.length - 1;
 
@@ -221,23 +240,19 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                   </p>
                 </div>
 
-                {/* Evolução MRR */}
-                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 col-span-2 ${isCompact ? "p-2" : "p-3"}`}>
+                {/* Faturamento Total = MRR ativo + pontual entregue no mês */}
+                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
                   <div className="flex items-center gap-1.5">
-                    {evolUp ? (
-                      <TrendingUp className="h-3 w-3 text-zinc-500" />
-                    ) : (
-                      <TrendingDown className="h-3 w-3 text-zinc-500" />
-                    )}
-                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{isCompact ? "Evol. MRR" : "Evolução MRR"}</p>
+                    <DollarSign className="h-3 w-3 text-zinc-500" />
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{isCompact ? "Faturamento" : "Faturamento Total"}</p>
                   </div>
-                  <p
-                    className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`}
-                    style={{ color: evolColor }}
-                  >
-                    {evolSign} R$ {evolAbs.toLocaleString("pt-BR")}
+                  <p className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`} style={{ color: "#fff" }}>
+                    {fmtBRL(faturamentoTotal)}
                   </p>
                 </div>
+
+                {/* Hero/compact: Evolução fecha a 2ª linha ao lado do Faturamento */}
+                {(isHero || isCompact) && evolCard}
 
                 {/* Churn Total e Churn s/ Abonados (coluna abonar_churn) */}
                 {churnCards.map((card) => {
@@ -245,7 +260,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                   return (
                     <Tooltip key={card.label}>
                       <TooltipTrigger asChild>
-                        <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 cursor-default ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-3" : ""}`}>
+                        <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 cursor-default ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
                           <div className="flex items-center gap-1.5">
                             <AlertTriangle className="h-3 w-3 text-zinc-500" />
                             <p className="text-[9px] text-zinc-500 uppercase tracking-wider">
@@ -259,11 +274,10 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                             >
                               {card.pct.toFixed(1).replace(".", ",")}%
                             </p>
-                            {!isCompact && (
-                              <p className="text-[10px] text-zinc-600 tabular-nums">
-                                {fmtBRL(card.brl)} / {fmtBRL(sq.mrrBase || 0)}
-                              </p>
-                            )}
+                            {/* Valor monetário do churn sempre visível; base só no hero (espaço) */}
+                            <p className={`tabular-nums ${isCompact ? "text-[9px] text-zinc-500" : "text-[10px] text-zinc-600"}`}>
+                              {isHero ? `${fmtBRL(card.brl)} / ${fmtBRL(sq.mrrBase || 0)}` : fmtBRL(card.brl)}
+                            </p>
                           </div>
                           {/* Mini progress bar — só fora do compact */}
                           {!isCompact && (
@@ -286,6 +300,9 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                     </Tooltip>
                   );
                 })}
+
+                {/* Densidade média: Evolução fecha a linha dos churns */}
+                {!isHero && !isCompact && evolCard}
               </div>
             </div>
           );

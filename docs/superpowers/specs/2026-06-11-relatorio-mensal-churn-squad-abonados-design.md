@@ -44,10 +44,15 @@ GROUP BY squad
 
 ### Frontend — `client/src/pages/relatorio-mensal/SlideSquadSingle.tsx`
 
-Card de Churn vira dois cards (% grande + R$ / base inline + progress bar). Para caber na
-altura fixa do slide, os KPIs ficam em 2 linhas: MRR / Pontual / Evolução em cima e os dois
-churns embaixo (1-4 squads). Com 5+ squads (2 linhas de cards) usa densidade compacta
-(labels curtos "Churn Total" / "Churn s/ Abono", sem R$ base nem progress bar).
+Card de Churn vira dois cards com % grande + valor monetário sempre visível (base "/ R$ X"
+só no hero, onde há espaço). KPIs por densidade:
+
+- **1-4 squads:** linha 1 = MRR / Pontual / Faturamento Total; linha 2 = Churn Total /
+  Churn s/ Abonados / Evolução MRR.
+- **5+ squads (2 linhas de cards, densidade compacta):** MRR / Pontual; Faturamento /
+  Evol. MRR; Churn Total / Churn s/ Abono — labels curtos, sem progress bar.
+
+**Faturamento Total** = MRR ativo + pontual entregue no mês (calculado no frontend).
 
 **Tooltip de clientes:** hover em qualquer card de churn lista os clientes churnados do squad
 (nome do cliente via `LEFT JOIN cup_clientes ON parent_id = task_id`, valor exato, badge
