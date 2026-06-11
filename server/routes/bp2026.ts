@@ -59,7 +59,7 @@ export const LINHAS: Array<{
   direcao: Direcao;
 }> = [
   { metrica: "mrr_ativo", titulo: "(+) MRR Ativo", tipoAgregacao: "estoque", direcao: "maior_melhor" },
-  { metrica: "receita_pontual", titulo: "(+) Receita Pontual", tipoAgregacao: "fluxo", direcao: "maior_melhor" },
+  { metrica: "receita_pontual", titulo: "(+) Venda Pontual", tipoAgregacao: "fluxo", direcao: "maior_melhor" },
   { metrica: "outras_receitas", titulo: "(+) Outras Receitas", tipoAgregacao: "fluxo", direcao: "maior_melhor" },
 ];
 
