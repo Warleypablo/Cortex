@@ -263,7 +263,7 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       const metrica = String(req.query.metrica ?? "");
       const mes = Number(req.query.mes);
       const def = TODAS_DEFS.find((d) => d.metrica === metrica);
-      const conhecida = def || metrica in HANDLERS_SUBABAS;
+      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica);
       if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }
@@ -290,7 +290,7 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       let rateio: { fracao: number; totalBruto: number; totalRateado: number } | undefined;
       let notaDinamica: string | undefined;
 
-      if (metrica in METRICAS_BUCKET) {
+      if (Object.hasOwn(METRICAS_BUCKET, metrica)) {
         const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA[METRICAS_BUCKET[metrica]], mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
@@ -449,7 +449,7 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         notaDinamica = `${ganhos.realizado} deals ganhos ÷ ${reun.realizado} reuniões no mês`;
       } else if (metrica === "colaboradores") {
         ({ grupos, realizado } = await detPessoas(db, mes, null, "setor"));
-      } else if (metrica in SETOR_FILTROS) {
+      } else if (Object.hasOwn(SETOR_FILTROS, metrica)) {
         ({ grupos, realizado } = await detPessoas(db, mes, SETOR_FILTROS[metrica], metrica.startsWith("pessoas") ? "setor" : "squad"));
       } else if (metrica === "clientes") {
         ({ grupos, realizado } = await detSnapshot(db, mes, null, "cliente", "contagem"));
@@ -514,7 +514,7 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         grupos = agruparItens(todos, LIMITE_ITENS);
         realizado = todos.reduce((s, i) => s + i.valor, 0);
         notaDinamica = "Saldo do fim do mês = saldo bancário atual − fluxos quitados posteriores.";
-      } else if (metrica in PREDICADOS_SGA_SUB || metrica === "sga_outras") {
+      } else if (Object.hasOwn(PREDICADOS_SGA_SUB, metrica) || metrica === "sga_outras") {
         const chave = metrica === "sga_outras" ? "sga_outras_sub" : metrica;
         const itens = await itensDespesaBucket(db, PREDICADOS_SGA_SUB[chave], mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
