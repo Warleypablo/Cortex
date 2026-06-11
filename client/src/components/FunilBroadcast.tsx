@@ -234,10 +234,11 @@ export default function FunilTab({ from, to }: { from: string; to: string }) {
               ) : f ? (
                 <div className="space-y-4">
                   {/* Etapas até "Compareceu" são encadeadas (cada uma subconjunto da anterior).
-                      "Venda" NÃO é subconjunto de "Compareceu": exige data_reuniao_agendada +
-                      'Negócio Ganho', mas NÃO exige data_reuniao_realizada. Por isso o % de Venda
-                      usa reuniao_marcada como base (não compareceu) — senão passaria de 100%
-                      quando há negócio ganho sem a reunião marcada como realizada.
+                      "Venda" tem âncora própria de causalidade (data_fechamento >= resposta) e
+                      NÃO exige reunião marcada/realizada no Bitrix — SDRs nem sempre preenchem
+                      essas datas. Por isso o % de Venda usa reuniao_marcada como base apenas
+                      como aproximação da etapa anterior (pode passar de 100% se houver venda
+                      sem reunião registrada).
                       Positivas/negativas/neutras NÃO são degrau — são o detalhamento dos
                       respondedores, mostrado nos chips abaixo. */}
                   <FunnelBar label="Enviadas" value={f.enviadas} base={f.enviadas} color="bg-sky-500" />

@@ -40,9 +40,13 @@ function parsePeriod(req: Request): { from: Date; to: Date } {
 const MARKETING_SOURCES = ["workflow", "bulk_actions", "campaign"] as const;
 
 // ─── Política de causalidade (atribuição de reunião/comparecimento/venda) ───
-// As colunas d.data_reuniao_agendada/realizada do Bitrix são `date` (sem hora).
-// Atribuímos uma etapa ao broadcast quando ela cai no MESMO DIA da resposta ou
-// depois: `d.data_reuniao_agendada >= reply_at::date`.
+// As colunas d.data_reuniao_agendada/realizada/fechamento do Bitrix são `date`
+// (sem hora). Atribuímos uma etapa ao broadcast quando ela cai no MESMO DIA da
+// resposta ou depois:
+//   • reunião marcada/compareceu → `d.data_reuniao_agendada >= reply_at::date`
+//   • venda → `d.data_fechamento >= reply_at::date` (âncora própria: 100% dos
+//     "Negócio Ganho" têm data_fechamento, mas só ~70% têm data_reuniao_agendada —
+//     exigir a data da reunião subcontava vendas; decisão jun/2026)
 //
 // Decisão (alinhada com o time, jun/2026): manter `>=`, não `>`.
 //   • `>=` inclui reuniões/vendas marcadas no mesmo dia do reply — o caso comum
@@ -1086,7 +1090,7 @@ async function listBroadcasts(req: Request, res: Response) {
       for (const row of ((mRes as any).rows ?? [])) meetingsMap.set(row.broadcast_id, row.reunioes ?? 0);
     }
 
-    // Negócios ganhos + receita atribuída por disparo (causalidade: reunião agendada pós-resposta).
+    // Negócios ganhos + receita atribuída por disparo (causalidade: fechamento pós-resposta).
     // DISTINCT por deal pra não somar receita duplicada quando há várias respostas do mesmo lead.
     const salesMap = new Map<string, { ganhos: number; receita: number }>();
     if (waIds.length) {
@@ -1098,7 +1102,7 @@ async function listBroadcasts(req: Request, res: Response) {
           JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
           WHERE e.broadcast_id IN (${sql.join(waIds.map((id) => sql`${id}`), sql`,`)})
             AND d.stage_name = 'Negócio Ganho'
-            AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date
+            AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date
         )
         SELECT broadcast_id, COUNT(*)::int AS ganhos, COALESCE(SUM(valor), 0)::float AS receita
         FROM won GROUP BY broadcast_id
@@ -1496,7 +1500,7 @@ async function getBroadcastFunnel(req: Request, res: Response) {
           WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.data_reuniao_realizada IS NOT NULL
         )::int AS compareceu,
         COUNT(DISTINCT fr.bitrix_deal_id) FILTER (
-          WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date
+          WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= fr.reply_at::date
         )::int AS venda
       FROM fr LEFT JOIN "Bitrix".crm_deal d ON d.id = fr.bitrix_deal_id
     `);
@@ -1621,7 +1625,7 @@ async function getBroadcastsSummary(req: Request, res: Response) {
         -- causalidade (>=): inclui etapas no mesmo dia da resposta (ver nota no topo)
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)::int AS reuniao_marcada,
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
-        count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)::int AS venda
+        count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= fr.reply_at::date)::int AS venda
       FROM fr LEFT JOIN "Bitrix".crm_deal d ON d.id = fr.bitrix_deal_id
     `);
 
@@ -1707,7 +1711,7 @@ async function getBasesPerformance(req: Request, res: Response) {
           COUNT(DISTINCT e.ghl_contact_id)::int AS responderam,
           -- causalidade (>=): inclui reunião/venda no mesmo dia da resposta (ver nota no topo)
           COUNT(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
-          COUNT(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
+          COUNT(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
         FROM cortex_core.broadcast_lead_events e
         LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
         GROUP BY 1
@@ -1807,7 +1811,7 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
       -- causalidade (>=): inclui reunião/venda no mesmo dia da resposta (ver nota no topo)
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
-      count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
+      count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
     FROM cortex_core.broadcast_lead_events e
     LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
     WHERE e.reply_at BETWEEN ${from} AND ${to}
@@ -1864,7 +1868,7 @@ async function getRelatorio(req: Request, res: Response) {
         SELECT e.broadcast_id,
           -- causalidade (>=): inclui reunião/venda no mesmo dia da resposta (ver nota no topo)
           count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
-          count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS vendas
+          count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
         FROM cortex_core.broadcast_lead_events e LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id GROUP BY 1
       )`;
     const basesRes = await db.execute(sql`
