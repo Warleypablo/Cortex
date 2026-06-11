@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-11 | fix(relatorio-mensal): precisão do R$ de churn e base de cálculo no tooltip
+
+**O que foi feito:**
+- Valores de churn nos cards de squad ganharam 1 casa decimal no formato "k" (R$ 31,7k em vez de R$ 32k).
+- Tooltip dos cards de churn mostra a fórmula do percentual: `R$ churn ÷ R$ base (MRR início do mês)` — evita confusão com o MRR de fim de mês, que daria taxa menor.
+
+**Por que:**
+- Pedido do Mestre: R$ 32k arredondado escondia precisão, e o % calculado sobre o MRR de fim de mês não batia com o card (22,5% vs 19,1% na Selva). A base correta (convenção padrão de churn rate) é o MRR do início do mês.
+
+**Arquivos alterados:**
+- `client/src/pages/relatorio-mensal/SlideSquadSingle.tsx` - formatter `fmtBRLk1` e linha de base no `ChurnClientesTooltip`
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-06-11 | feat(relatorio-mensal): cards de churn total e s/ abonados por squad
 
 **O que foi feito:**
