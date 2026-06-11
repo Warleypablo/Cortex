@@ -521,7 +521,7 @@ export function registerBp2026Routes(app: Express, db: any) {
 
       // 12. Detalhamentos: SG&A e CAC por sub-linha, Outras Receitas por categoria
       const { sga: sgaDetalhe, cac: cacDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
-        db, orcado, mesCorrente, mesFechado,
+        db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado,
       });
 
       const payload = {

@@ -44,6 +44,8 @@ const DERIVADAS: Record<string, string[]> = {
   sga_total_detalhe: ["sga_uzk", "sga_backoffice", "sga_software", "sga_ocupacao", "beneficio_total_empresa", "sga_premiacoes", "sga_eventos", "sga_outras"],
   // CAC
   cac_total_detalhe: ["cac_pre_vendas", "cac_vendas", "cac_gerencia", "cac_comissoes", "cac_growth", "cac_ads", "cac_eventos", "cac_brindes", "cac_viagens", "cac_outras_sub"],
+  cac_pct_receita: ["cac_total_detalhe", "funil_vendas_mrr", "funil_vendas_pontual"],
+  cac_payback_mrr: ["cac_total_detalhe", "funil_vendas_mrr"],
   // Outras Receitas
   or_total_detalhe: ["or_receita_variavel", "or_stack_digital", "or_demais"],
 };

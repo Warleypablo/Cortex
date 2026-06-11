@@ -30,6 +30,9 @@ const NOTA_DEMAIS =
 interface Deps {
   db: any;
   orcado: Record<string, Record<number, number>>;
+  // séries de vendas do handler (Bitrix) — denominadores das linhas de eficiência do CAC
+  vendasMrrPorMes: Record<number, number>;
+  pontualPorMes: Record<number, number>;
   mesCorrente: number;
   mesFechado: number;
 }
@@ -74,15 +77,16 @@ const SUB_SGA: DefSub[] = [
 ];
 
 export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; cac: Linha[]; outrasReceitas: Linha[] }> {
-  const { db, orcado, mesCorrente, mesFechado } = deps;
+  const { db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado } = deps;
 
   const mensal = (porMes: Record<number, number>) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? porMes[i + 1] ?? 0 : null));
 
   const fazLinha = (
-    def: { metrica: string; titulo: string; direcao: Linha["direcao"]; nota?: string; destaque?: boolean },
+    def: { metrica: string; titulo: string; direcao: Linha["direcao"]; unidade?: Linha["unidade"]; nota?: string; destaque?: boolean },
     serie: (number | null)[],
-    orcadoMes: (m: number) => number
+    orcadoMes: (m: number) => number,
+    ytdOverride?: { orcado: number; realizado: number | null }
   ): Linha => {
     const meses: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
       const mes = i + 1;
@@ -92,8 +96,10 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     });
     const ytd = mesFechado === 0
       ? { orcado: 0, realizado: null as number | null, atingimento: null as number | null }
-      : (() => { const v = calcYtd(meses, mesFechado, "fluxo"); return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) }; })();
-    return { ...def, tipoAgregacao: "fluxo", unidade: "brl", meses, ytd };
+      : ytdOverride
+        ? { ...ytdOverride, atingimento: calcAtingimento(ytdOverride.orcado, ytdOverride.realizado) }
+        : (() => { const v = calcYtd(meses, mesFechado, "fluxo"); return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) }; })();
+    return { ...def, tipoAgregacao: "fluxo", unidade: def.unidade ?? "brl", meses, ytd };
   };
 
   // ---- SG&A: caixa por predicado de sub-linha ----
@@ -143,6 +149,46 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     (m) => SUB_CAC.reduce((acc, d) => acc + (d.semOrcado ? 0 : orcado[d.metrica]?.[m] ?? 0), 0)
   );
 
+  // ---- eficiência da aquisição: despesa CAC ÷ o que ela comprou no mês ----
+  const cacTotalSerie = somaSeries(cacSeries);
+  const cacOrcMes = (m: number) => SUB_CAC.reduce((acc, d) => acc + (d.semOrcado ? 0 : orcado[d.metrica]?.[m] ?? 0), 0);
+  const razao = (num: number | null, den: number | null) =>
+    num === null || den === null || !den ? null : num / den;
+  const receitaAdquirida = (m: number) => (vendasMrrPorMes[m] ?? 0) + (pontualPorMes[m] ?? 0);
+  const receitaAdqOrc = (m: number) => (orcado["vendas_mrr"]?.[m] ?? 0) + (orcado["vendas_pontual"]?.[m] ?? 0);
+
+  const pctSerie = Array.from({ length: 12 }, (_, i) =>
+    i + 1 <= mesCorrente ? razao(cacTotalSerie[i], receitaAdquirida(i + 1)) : null
+  );
+  const paybackSerie = Array.from({ length: 12 }, (_, i) =>
+    i + 1 <= mesCorrente ? razao(cacTotalSerie[i], vendasMrrPorMes[i + 1] ?? 0) : null
+  );
+  // YTDs de razão: Σ numerador ÷ Σ denominador (não média de razões)
+  const somaAte = (f: (m: number) => number) =>
+    Array.from({ length: mesFechado }, (_, i) => f(i + 1)).reduce((a, b) => a + b, 0);
+  const cacYtdReal = mesFechado === 0 ? null :
+    cacTotalSerie.slice(0, mesFechado).reduce<number | null>((acc, v) => (v === null ? acc : (acc ?? 0) + v), null);
+  const cacPctReceita = fazLinha(
+    { metrica: "cac_pct_receita", titulo: "CAC % receita adquirida", direcao: "menor_melhor", unidade: "pct",
+      nota: "Despesa CAC do mês ÷ vendas do mês (MRR + pontual, Bitrix) — quanto de cada real novo foi consumido para adquiri-lo." },
+    pctSerie,
+    (m) => razao(cacOrcMes(m), receitaAdqOrc(m)) ?? 0,
+    mesFechado === 0 ? undefined : {
+      orcado: razao(somaAte(cacOrcMes), somaAte(receitaAdqOrc)) ?? 0,
+      realizado: razao(cacYtdReal, somaAte(receitaAdquirida)),
+    }
+  );
+  const cacPayback = fazLinha(
+    { metrica: "cac_payback_mrr", titulo: "Payback em MRR (meses)", direcao: "menor_melhor", unidade: "dec",
+      nota: "Despesa CAC do mês ÷ MRR vendido no mês — quantos meses do MRR adquirido pagam a aquisição." },
+    paybackSerie,
+    (m) => razao(cacOrcMes(m), orcado["vendas_mrr"]?.[m] ?? 0) ?? 0,
+    mesFechado === 0 ? undefined : {
+      orcado: razao(somaAte(cacOrcMes), somaAte((m) => orcado["vendas_mrr"]?.[m] ?? 0)) ?? 0,
+      realizado: razao(cacYtdReal, somaAte((m) => vendasMrrPorMes[m] ?? 0)),
+    }
+  );
+
   // ---- Outras Receitas: competência, 3 agregações condicionais (mesmo regime do DRE) ----
   const outrasResult = await db.execute(sql`
     SELECT EXTRACT(MONTH FROM data_competencia)::int AS mes,
@@ -176,5 +222,5 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     (m) => orcado["outras_receitas"]?.[m] ?? 0
   );
 
-  return { sga: [sgaTotal, ...sgaLinhas], cac: [cacTotal, ...cacLinhas], outrasReceitas: [orTotal, variavelL, stackL, demaisL] };
+  return { sga: [sgaTotal, ...sgaLinhas], cac: [cacTotal, ...cacLinhas, cacPctReceita, cacPayback], outrasReceitas: [orTotal, variavelL, stackL, demaisL] };
 }
