@@ -109,6 +109,9 @@ interface ChurnContract {
   status_conta?: string | null;
   ultimo_dia_operacao?: string | null;
   is_abonado?: boolean;
+  valor_pontual?: number;
+  // Sintético: marcado no recorte "abonados" quando valorr veio do valor pontual
+  valor_eh_pontual?: boolean;
 }
 
 interface ChurnPorSquad {
@@ -671,8 +674,17 @@ export default function ChurnDetalhamento() {
       });
       if (filterAbono === "abonados") {
         // Abonados viram a população analisada: sem o flag, todos os
-        // cálculos (taxa, squads, motivos, gráficos) os tratam como churn
-        filtered = filtered.map(c => ({ ...c, is_abonado: false }));
+        // cálculos (taxa, squads, motivos, gráficos) os tratam como churn.
+        // Entregas pontuais (sem MRR) entram pelo valor pontual (valorp).
+        filtered = filtered.map(c => {
+          const usaPontual = !(c.valorr > 0) && (c.valor_pontual || 0) > 0;
+          return {
+            ...c,
+            is_abonado: false,
+            valorr: usaPontual ? (c.valor_pontual || 0) : c.valorr,
+            valor_eh_pontual: usaPontual,
+          };
+        });
       }
     }
 
@@ -707,7 +719,7 @@ export default function ChurnDetalhamento() {
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
-      return { total_churned: 0, total_pausados: 0, mrr_perdido: 0, mrr_pausado: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0, total_abonado: 0, mrr_abonado: 0, abonado_por_motivo: {} as Record<string, { count: number; mrr: number }> };
+      return { total_churned: 0, total_pausados: 0, mrr_perdido: 0, mrr_pausado: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0, total_abonado: 0, mrr_abonado: 0, valor_pontual_incluido: 0, abonado_por_motivo: {} as Record<string, { count: number; mrr: number }> };
     }
 
     // Separar contratos regulares de abonados
@@ -724,6 +736,9 @@ export default function ChurnDetalhamento() {
 
     const totalAbonado = abonados.length;
     const mrrAbonado = abonados.reduce((sum, c) => sum + (c.valorr || 0), 0);
+
+    // Quanto do mrr_perdido veio de entregas pontuais (recorte "abonados")
+    const valorPontualIncluido = regulares.reduce((sum, c) => sum + (c.valor_eh_pontual ? (c.valorr || 0) : 0), 0);
 
     // Breakdown abonado por motivo
     const abonadoPorMotivo: Record<string, { count: number; mrr: number }> = {};
@@ -744,6 +759,7 @@ export default function ChurnDetalhamento() {
       ticket_medio: ticketMedio,
       total_abonado: totalAbonado,
       mrr_abonado: mrrAbonado,
+      valor_pontual_incluido: valorPontualIncluido,
       abonado_por_motivo: abonadoPorMotivo,
     };
   }, [filteredContratos]);
@@ -2053,6 +2069,9 @@ export default function ChurnDetalhamento() {
                   </div>
                   <div className={`text-2xl font-bold ${filterAbono === "abonados" ? "text-amber-700 dark:text-amber-300" : "text-red-700 dark:text-red-300"}`}>{formatCurrency(filteredMetricas.mrr_perdido)}</div>
                   <div className={`text-xs mt-1 ${filterAbono === "abonados" ? "text-amber-600/70 dark:text-amber-400/70" : "text-red-600/70 dark:text-red-400/70"}`}>{filteredMetricas.total_churned} contratos {filterAbono === "abonados" ? "abonados" : "encerrados"}</div>
+                  {filterAbono === "abonados" && (filteredMetricas.valor_pontual_incluido || 0) > 0 && (
+                    <div className="text-[11px] mt-1 text-amber-600/70 dark:text-amber-400/70">inclui {formatCurrencyNoDecimals(filteredMetricas.valor_pontual_incluido || 0)} de entregas pontuais</div>
+                  )}
                   {filterAbono !== "abonados" && churnPlanejado.mrrPlanejado > 0 && (
                     <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800/50">
                       <div className="flex items-center justify-between">
