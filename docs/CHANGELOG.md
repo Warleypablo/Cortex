@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-11 | feat(youtube): start/callback do OAuth públicos (sem login no Cortex)
+
+**O que foi feito:**
+- `registerYoutubeOAuthRoutes` foi dividida em `registerYoutubeOAuthPublicRoutes` (`/start` + `/callback`) e `registerYoutubeOAuthStatusRoute` (`/status`).
+- `/start` e `/callback` passaram a ser registrados **antes** do `app.use("/api", isAuthenticated)`, igual ao módulo Instagram. `/status` segue protegido.
+
+**Por que:**
+- Donos de canal externos (ex.: Victor, sem conta no Cortex) precisam conseguir autorizar com a própria conta Google. Com a rota atrás do login, eles travariam.
+
+**Arquivos alterados:**
+- `server/routes/youtubeOAuth.ts` - split em função pública (start/callback) e protegida (status).
+- `server/routes.ts` - registra a pública antes do gate de auth e a de status depois.
+
+**Impacto arquitetural:** `/api/oauth/youtube/start` e `/callback` agora são públicos (não expõem dados; só iniciam o consent e gravam credencial). `/status` continua autenticado.
+
+---
+
 ## 2026-06-11 | fix(youtube): credencial OAuth por canal (1 conta → N Brand Accounts)
 
 **O que foi feito:**
