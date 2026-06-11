@@ -16,6 +16,7 @@ interface ReceitasResponse {
   funil: BPLinha[];
   capacity: BPLinha[];
   sgaDetalhe: BPLinha[];
+  cacDetalhe: BPLinha[];
   outrasDetalhe: BPLinha[];
   atualizadoEm: string;
 }
@@ -61,6 +62,7 @@ export default function BP2026() {
           <TabsTrigger value="funil">Funil Comercial</TabsTrigger>
           <TabsTrigger value="capacity">Capacity</TabsTrigger>
           <TabsTrigger value="sga">SG&amp;A</TabsTrigger>
+          <TabsTrigger value="cac">CAC</TabsTrigger>
           <TabsTrigger value="outras">Outras Receitas</TabsTrigger>
         </TabsList>
         <TabsContent value="dre" className="mt-4">
@@ -111,6 +113,14 @@ export default function BP2026() {
             onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
+        <TabsContent value="cac" className="mt-4">
+          <BPDreTable
+            linhas={data.cacDetalhe}
+            mesCorrente={data.mesCorrente}
+            mesFechado={data.mesFechado}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
+          />
+        </TabsContent>
         <TabsContent value="outras" className="mt-4">
           <BPDreTable
             linhas={data.outrasDetalhe}
@@ -125,7 +135,8 @@ export default function BP2026() {
         mes={detalhe?.mes ?? null}
         linhas={[
           ...data.linhas, ...data.metricasGerais, ...data.revenue,
-          ...data.funil, ...data.capacity, ...data.sgaDetalhe, ...data.outrasDetalhe,
+          ...data.funil, ...data.capacity, ...data.sgaDetalhe, ...data.cacDetalhe,
+          ...data.outrasDetalhe,
         ]}
         onClose={() => setDetalhe(null)}
       />
