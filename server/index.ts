@@ -581,6 +581,35 @@ app.use((req, res, next) => {
   setInterval(() => runBitrixContactsSync(), BITRIX_CONTACTS_SYNC_INTERVAL);
   console.log(`[bitrix-contacts-sync-job] Scheduled every ${BITRIX_CONTACTS_SYNC_INTERVAL / 3600000}h`);
 
+  // Bitrix deals refresh horário (campos do funil de broadcast: estágio, datas de
+  // reunião, fechamento, valores). O espelho completo do crm_deal é de um processo
+  // externo ~diário; este job mantém o funil fresco entre as cargas dele.
+  const BITRIX_DEALS_SYNC_INTERVAL = 60 * 60 * 1000; // 1h
+  const runBitrixDealsSync = async () => {
+    try {
+      console.log("[bitrix-deals-sync-job] Starting scheduled Bitrix deals refresh...");
+      const { syncBitrixDeals } = await import("../scripts/sync-bitrix-deals");
+      const { totalSynced, totalSeen } = await syncBitrixDeals();
+      (globalThis as any).__bitrixDealsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        totalSynced,
+        totalSeen,
+        status: "success",
+      };
+      console.log(`[bitrix-deals-sync-job] Refresh complete: ${totalSynced}/${totalSeen} deals`);
+    } catch (err: any) {
+      console.error("[bitrix-deals-sync-job] Refresh failed:", err.message);
+      (globalThis as any).__bitrixDealsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  setTimeout(() => runBitrixDealsSync(), 240000); // 4min após boot
+  setInterval(() => runBitrixDealsSync(), BITRIX_DEALS_SYNC_INTERVAL);
+  console.log(`[bitrix-deals-sync-job] Scheduled every ${BITRIX_DEALS_SYNC_INTERVAL / 3600000}h`);
+
   // Google Ads keywords sync a cada 12 horas
   const GOOGLE_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
   const runGoogleAdsSync = async () => {
