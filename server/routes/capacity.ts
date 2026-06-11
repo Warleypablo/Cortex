@@ -1,5 +1,6 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
+import { z } from "zod";
 import { parseAggRow, buildResponse } from "./capacityTimes.helpers";
 
 // Tabela de referência: nível do Gestor de Performance → metas
@@ -24,6 +25,18 @@ function normalizeSquad(squad: string | null): string {
   if (!squad) return "";
   return squad.replace(/^[^\p{L}]+/u, "").trim();
 }
+
+const capacityMetaSchema = z.object({
+  nome: z.string().trim().min(1, "nome é obrigatório"),
+  match_responsavel: z.string().trim().min(1, "match_responsavel é obrigatório"),
+  categoria: z.string().trim().min(1, "categoria é obrigatória"),
+  cap_recorrente: z.number().int().nonnegative().nullable(),
+  cap_mrr: z.number().nonnegative().nullable(),
+  cap_pontual: z.number().int().nonnegative().nullable(),
+  cap_contas: z.number().int().nonnegative().nullable(),
+  ordem: z.number().int().nonnegative().default(0),
+  ativo: z.boolean().default(true),
+});
 
 export function registerCapacityRoutes(app: Express, db: any) {
 
@@ -208,6 +221,134 @@ export function registerCapacityRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error fetching capacity-times contratos:", error);
       res.status(500).json({ error: "Failed to fetch contratos" });
+    }
+  });
+
+  // ── CRUD de capacity_metas (edição manual) ──
+
+  function normalizeMetaRow(r: any) {
+    const numOrNull = (v: any) => (v === null || v === undefined ? null : Number(v));
+    return {
+      id: Number(r.id),
+      nome: String(r.nome),
+      match_responsavel: String(r.match_responsavel),
+      categoria: String(r.categoria),
+      cap_recorrente: numOrNull(r.cap_recorrente),
+      cap_mrr: numOrNull(r.cap_mrr),
+      cap_pontual: numOrNull(r.cap_pontual),
+      cap_contas: numOrNull(r.cap_contas),
+      ordem: Number(r.ordem),
+      ativo: Boolean(r.ativo),
+    };
+  }
+
+  // GET /api/capacity-metas — lista TODAS as metas (inclusive inativas)
+  app.get("/api/capacity-metas", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT id, nome, match_responsavel, categoria,
+               cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem, ativo
+        FROM cortex_core.capacity_metas
+        ORDER BY ordem, nome
+      `);
+      res.json(result.rows.map(normalizeMetaRow));
+    } catch (error) {
+      console.error("[api] Error fetching capacity-metas:", error);
+      res.status(500).json({ error: "Failed to fetch capacity-metas" });
+    }
+  });
+
+  // GET /api/capacity-metas/responsaveis — responsáveis reais de cup_contratos (dropdown + prévia)
+  app.get("/api/capacity-metas/responsaveis", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT TRIM(r.parte) AS responsavel,
+               COUNT(DISTINCT c.id_subtask) AS contratos,
+               COALESCE(SUM(c.valorr), 0)   AS mrr
+        FROM "Clickup".cup_contratos c
+        CROSS JOIN LATERAL regexp_split_to_table(c.responsavel, ';') AS r(parte)
+        WHERE c.status IN ('ativo','onboarding','em cancelamento')
+          AND c.responsavel IS NOT NULL AND c.responsavel <> ''
+          AND TRIM(r.parte) <> ''
+        GROUP BY TRIM(r.parte)
+        ORDER BY mrr DESC
+      `);
+      res.json(result.rows.map((r: any) => ({
+        responsavel: String(r.responsavel),
+        contratos: Number(r.contratos),
+        mrr: Number(r.mrr),
+      })));
+    } catch (error) {
+      console.error("[api] Error fetching responsaveis:", error);
+      res.status(500).json({ error: "Failed to fetch responsaveis" });
+    }
+  });
+
+  // POST /api/capacity-metas — cria operador
+  app.post("/api/capacity-metas", async (req, res) => {
+    const parsed = capacityMetaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "dados inválidos" });
+    }
+    const m = parsed.data;
+    try {
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.capacity_metas
+          (nome, match_responsavel, categoria, cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem, ativo)
+        VALUES (${m.nome}, ${m.match_responsavel}, ${m.categoria}, ${m.cap_recorrente},
+                ${m.cap_mrr}, ${m.cap_pontual}, ${m.cap_contas}, ${m.ordem}, ${m.ativo})
+        RETURNING id
+      `);
+      res.status(201).json({ id: Number((result.rows[0] as any).id) });
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ error: "Operador já cadastrado nesse time" });
+      }
+      console.error("[api] Error creating capacity-meta:", error);
+      res.status(500).json({ error: "Failed to create capacity-meta" });
+    }
+  });
+
+  // PUT /api/capacity-metas/:id — atualiza operador
+  app.put("/api/capacity-metas/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+    const parsed = capacityMetaSchema.safeParse(req.body);
+    if (!parsed.success) {
+      return res.status(400).json({ error: parsed.error.issues[0]?.message ?? "dados inválidos" });
+    }
+    const m = parsed.data;
+    try {
+      const result = await db.execute(sql`
+        UPDATE cortex_core.capacity_metas SET
+          nome = ${m.nome}, match_responsavel = ${m.match_responsavel}, categoria = ${m.categoria},
+          cap_recorrente = ${m.cap_recorrente}, cap_mrr = ${m.cap_mrr},
+          cap_pontual = ${m.cap_pontual}, cap_contas = ${m.cap_contas},
+          ordem = ${m.ordem}, ativo = ${m.ativo}, atualizado_em = NOW()
+        WHERE id = ${id}
+        RETURNING id
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "operador não encontrado" });
+      res.json({ id });
+    } catch (error: any) {
+      if (error?.code === "23505") {
+        return res.status(409).json({ error: "Operador já cadastrado nesse time" });
+      }
+      console.error("[api] Error updating capacity-meta:", error);
+      res.status(500).json({ error: "Failed to update capacity-meta" });
+    }
+  });
+
+  // DELETE /api/capacity-metas/:id — hard delete
+  app.delete("/api/capacity-metas/:id", async (req, res) => {
+    const id = Number(req.params.id);
+    if (!Number.isInteger(id)) return res.status(400).json({ error: "id inválido" });
+    try {
+      await db.execute(sql`DELETE FROM cortex_core.capacity_metas WHERE id = ${id}`);
+      res.status(204).end();
+    } catch (error) {
+      console.error("[api] Error deleting capacity-meta:", error);
+      res.status(500).json({ error: "Failed to delete capacity-meta" });
     }
   });
 

@@ -16,7 +16,15 @@
  *  GET /api/oauth/tiktok/status                  → lista advertisers + perfis autorizados
  *
  * Tokens encriptados via server/utils/encryption.ts (reusa INSTAGRAM_ENCRYPTION_KEY).
- * Requer envs TIKTOK_APP_ID e TIKTOK_APP_SECRET.
+ *
+ * São DOIS apps TikTok diferentes (não dá pra usar o mesmo):
+ *   - ADVERTISER usa o app de Marketing API (business-api.tiktok.com)
+ *       → envs TIKTOK_APP_ID / TIKTOK_APP_SECRET
+ *   - ACCOUNT (orgânico) usa um app de Login Kit (developers.tiktok.com), que é o
+ *     único tipo com Display API. Tem client_key/secret próprios
+ *       → envs TIKTOK_LOGIN_APP_ID / TIKTOK_LOGIN_APP_SECRET
+ *         (faz fallback p/ TIKTOK_APP_ID/SECRET se não setados — útil enquanto o app
+ *          de Login Kit não existe, mas o fluxo orgânico só funciona de fato com ele)
  *
  * Atenção a 2 convenções diferentes de auth header:
  *   - Marketing API (advertiser): header `Access-Token: <token>`
@@ -59,6 +67,15 @@ function consumeState(s?: string): boolean {
   if (!s || !pendingStates.has(s)) return false;
   pendingStates.delete(s);
   return true;
+}
+
+// Credenciais do app de Login Kit (orgânico). Fallback p/ o app de Marketing API
+// só pra não quebrar boot — mas o fluxo orgânico exige um app de Login Kit de verdade.
+function loginCreds(): { clientKey?: string; clientSecret?: string } {
+  return {
+    clientKey: process.env.TIKTOK_LOGIN_APP_ID || process.env.TIKTOK_APP_ID,
+    clientSecret: process.env.TIKTOK_LOGIN_APP_SECRET || process.env.TIKTOK_APP_SECRET,
+  };
 }
 
 function baseUrl(req: Request): string {
@@ -191,10 +208,10 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
   // FLUXO ACCOUNT HOLDER (orgânico)
   // =========================================================
   app.get('/api/oauth/tiktok/account/start', (req: Request, res: Response) => {
-    const appId = process.env.TIKTOK_APP_ID;
-    if (!appId) return res.status(500).json({ error: 'TIKTOK_APP_ID não configurado' });
+    const { clientKey } = loginCreds();
+    if (!clientKey) return res.status(500).json({ error: 'TIKTOK_LOGIN_APP_ID não configurado' });
     const url = new URL(TT_USER_AUTH);
-    url.searchParams.set('client_key', appId);
+    url.searchParams.set('client_key', clientKey);
     url.searchParams.set('scope', TT_ACCOUNT_SCOPES.join(','));
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('redirect_uri', `${baseUrl(req)}/api/oauth/tiktok/account/callback`);
@@ -210,9 +227,8 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
     if (!code) return res.status(400).send('Faltou o code do TikTok.');
     if (!consumeState(state)) return res.status(400).send('State inválido ou expirado. Autorize de novo.');
 
-    const appId = process.env.TIKTOK_APP_ID;
-    const secret = process.env.TIKTOK_APP_SECRET;
-    if (!appId || !secret) return res.status(500).send('TIKTOK_APP_ID/SECRET não configurados.');
+    const { clientKey, clientSecret } = loginCreds();
+    if (!clientKey || !clientSecret) return res.status(500).send('TIKTOK_LOGIN_APP_ID/SECRET não configurados.');
 
     try {
       // 1. Trocar code por tokens
@@ -220,8 +236,8 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body: new URLSearchParams({
-          client_key: appId,
-          client_secret: secret,
+          client_key: clientKey,
+          client_secret: clientSecret,
           code,
           grant_type: 'authorization_code',
           redirect_uri: `${baseUrl(req)}/api/oauth/tiktok/account/callback`,

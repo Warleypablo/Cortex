@@ -73,6 +73,7 @@ const Organograma = lazyWithRetry(() => import("@/pages/Organograma"));
 const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
 const ChurnPredicao = lazyWithRetry(() => import("@/pages/ChurnPredicao"));
 const ChurnProduto = lazyWithRetry(() => import("@/pages/ChurnProduto"));
+const ChurnAbonados = lazyWithRetry(() => import("@/pages/ChurnAbonados"));
 const AnalisePreditiva = lazyWithRetry(() => import("@/pages/gestao/AnalisePreditiva"));
 const TvLeaderboard = lazyWithRetry(() => import("@/pages/gestao/TvLeaderboard"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
@@ -84,6 +85,7 @@ const TechHub = lazyWithRetry(() => import("@/pages/TechHub"));
 const TechResponsavel = lazyWithRetry(() => import("@/pages/TechResponsavel"));
 const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
 const DRE = lazyWithRetry(() => import("@/pages/DRE"));
+const BP2026 = lazyWithRetry(() => import("@/pages/BP2026"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
 const InstagramDashboard = lazyWithRetry(() => import("@/pages/InstagramDashboard"));
@@ -97,6 +99,7 @@ const AdminAvisos = lazyWithRetry(() => import("@/pages/AdminAvisos"));
 const AccessDenied = lazyWithRetry(() => import("@/pages/AccessDenied"));
 const Login = lazyWithRetry(() => import("@/pages/Login"));
 const Privacy = lazyWithRetry(() => import("@/pages/Privacy"));
+const Terms = lazyWithRetry(() => import("@/pages/Terms"));
 const DashboardClosers = lazyWithRetry(() => import("@/pages/DashboardClosers"));
 const DashboardSDRs = lazyWithRetry(() => import("@/pages/DashboardSDRs"));
 const DetailClosers = lazyWithRetry(() => import("@/pages/DetailClosers"));
@@ -321,6 +324,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/churn-detalhamento">{() => <ProtectedRoute path="/dashboard/churn-detalhamento" component={ChurnDetalhamento} />}</Route>
       <Route path="/dashboard/churn-predicao">{() => <ProtectedRoute path="/dashboard/churn-predicao" component={ChurnPredicao} />}</Route>
       <Route path="/dashboard/churn-produto">{() => <ProtectedRoute path="/dashboard/churn-produto" component={ChurnProduto} />}</Route>
+      <Route path="/dashboard/churn-abonados">{() => <ProtectedRoute path="/dashboard/churn-abonados" component={ChurnAbonados} />}</Route>
       <Route path="/lt-ltv-churn">{() => <ProtectedRoute path="/lt-ltv-churn" component={LtLtvChurn} />}</Route>
       <Route path="/ltv-clientes">{() => <ProtectedRoute path="/ltv-clientes" component={LtvClientes} />}</Route>
       <Route path="/estoque-pontual">{() => <ProtectedRoute path="/estoque-pontual" component={EstoquePontual} />}</Route>
@@ -346,6 +350,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/contribuicao-operador">{() => <ProtectedRoute path="/dashboard/contribuicao-operador" component={ContribuicaoOperador} />}</Route>
       <Route path="/dashboard/contribuicao-squad">{() => <ProtectedRoute path="/dashboard/contribuicao-squad" component={ContribuicaoSquad} />}</Route>
       <Route path="/dashboard/dre">{() => <ProtectedRoute path="/dashboard/dre" component={DRE} />}</Route>
+      <Route path="/bp-2026">{() => <ProtectedRoute path="/bp-2026" component={BP2026} />}</Route>
       <Route path="/dashboard/notas-fiscais">{() => <ProtectedRoute path="/dashboard/notas-fiscais" component={NotasFiscais} />}</Route>
       <Route path="/financeiro/negativacao">{() => <ProtectedRoute path="/financeiro/negativacao" component={Negativacao} />}</Route>
       <Route path="/triagem">{() => <ProtectedRoute path="/triagem" component={Triagem} />}</Route>
@@ -472,6 +477,8 @@ function Router() {
         <Route path="/loginclientes" component={LoginCliente} />
         <Route path="/privacy" component={Privacy} />
         <Route path="/privacidade" component={Privacy} />
+        <Route path="/terms" component={Terms} />
+        <Route path="/termos" component={Terms} />
         <Route path="/portal-cliente" component={PortalCliente} />
         <Route path="/portal/creator" component={PortalCreator} />
         <Route><ProtectedRouter /></Route>
@@ -493,7 +500,11 @@ function AppLayout() {
   const isPresentationMode = location === "/dashboard/comercial/apresentacao" || location === "/presentation" || location === "/presentation/fechamento-semanal";
   const isPortalCliente = location.startsWith("/portal-cliente");
   const isPortalCreator = location.startsWith("/portal/creator");
-  const isPrivacy = location === "/privacy" || location === "/privacidade";
+  const isPrivacy =
+    location === "/privacy" ||
+    location === "/privacidade" ||
+    location === "/terms" ||
+    location === "/termos";
 
   const style = {
     "--sidebar-width": "16rem",
