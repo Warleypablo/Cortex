@@ -31,7 +31,7 @@ const NOTA_CHURN =
   "Taxa do mês = churn (não abonado) do produto ÷ MRR da linha no fim do mês anterior.";
 
 // mapeamento: produto exato; quando vazio (snapshots até jan/2026), fallback pelo nome do serviço
-const CASE_PRODUTO = sql`CASE
+export const CASE_PRODUTO = sql`CASE
   WHEN TRIM(COALESCE(produto, '')) = 'Performance' THEN 'performance'
   WHEN TRIM(COALESCE(produto, '')) = 'Creators' THEN 'creators'
   WHEN TRIM(COALESCE(produto, '')) = 'Social Media' THEN 'social'
@@ -45,7 +45,7 @@ const CASE_PRODUTO = sql`CASE
 
 // vw_cup_churn_ajustado não tem coluna servico (cup_churn só tem produto);
 // churn de 2026 já tem produto preenchido, então o CASE por produto é suficiente.
-const CASE_PRODUTO_CHURN = sql`CASE
+export const CASE_PRODUTO_CHURN = sql`CASE
   WHEN TRIM(COALESCE(produto, '')) = 'Performance' THEN 'performance'
   WHEN TRIM(COALESCE(produto, '')) = 'Creators' THEN 'creators'
   WHEN TRIM(COALESCE(produto, '')) = 'Social Media' THEN 'social'
