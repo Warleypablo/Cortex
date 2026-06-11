@@ -47,6 +47,8 @@ interface TeamSummary {
   util_pct: number | null;
   gap_mrr: number;
   mrr_cancelamento: number;
+  // Quantas pessoas do time têm cap de MRR definida — cap/espaço só consideram essas
+  pessoas_com_cap: number;
 }
 
 function formatCurrency(value: number): string {
@@ -372,6 +374,7 @@ function summarizeSquad(g: SquadGroup): TeamSummary {
     util_pct: avgUtil(rows),
     gap_mrr: sum(rows.map((r) => (r.cap_mrr !== null ? r.cap_mrr - r.mrr_operando : 0))),
     mrr_cancelamento: sum(rows.map((r) => r.mrr_cancelamento)),
+    pessoas_com_cap: rows.filter((r) => r.cap_mrr !== null && r.cap_mrr !== 0).length,
   };
 }
 function summarizeComercial(time: string, rows: ComercialRow[]): TeamSummary {
@@ -384,6 +387,7 @@ function summarizeComercial(time: string, rows: ComercialRow[]): TeamSummary {
     util_pct: avgUtil(rows),
     gap_mrr: sum(rows.map((r) => r.dif_mrr)),
     mrr_cancelamento: sum(rows.map((r) => r.mrr_cancelamento)),
+    pessoas_com_cap: rows.filter((r) => r.cap_mrr !== null && r.cap_mrr !== 0).length,
   };
 }
 
@@ -392,12 +396,15 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
   const totalCap = sum(teams.map((t) => t.cap_mrr));
   const totalGap = sum(teams.map((t) => t.gap_mrr));
   const totalCancel = sum(teams.map((t) => t.mrr_cancelamento));
+  const totalPessoas = sum(teams.map((t) => t.pessoas));
+  const totalComCap = sum(teams.map((t) => t.pessoas_com_cap));
+  const capParcial = totalComCap > 0 && totalComCap < totalPessoas;
   const chartData = teams.filter((t) => t.util_pct !== null).map((t) => ({ time: t.time, util: t.util_pct as number }));
 
-  const cards = [
+  const cards: { label: string; value: string; tone?: string; sub?: string }[] = [
     { label: "MRR Operando (total)", value: formatCurrency(totalOperando) },
-    { label: "Capacity MRR (total)", value: formatCurrency(totalCap) },
-    { label: "Espaço de crescimento", value: formatCurrency(totalGap), tone: totalGap < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400" },
+    { label: "Capacity MRR (total)", value: formatCurrency(totalCap), sub: capParcial ? `cobre ${totalComCap} de ${totalPessoas} pessoas` : undefined },
+    { label: "Espaço de crescimento", value: formatCurrency(totalGap), tone: totalGap < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400", sub: capParcial ? "só de quem tem cap de MRR" : undefined },
     { label: "MRR em cancelamento (risco)", value: formatCurrency(totalCancel), tone: totalCancel > 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white" },
   ];
 
@@ -409,6 +416,7 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
             <CardContent className="pt-4 pb-4">
               <p className="text-xs text-gray-500 dark:text-zinc-400">{c.label}</p>
               <p className={cn("text-xl font-bold", c.tone ?? "text-gray-900 dark:text-white")}>{c.value}</p>
+              {c.sub && <p className="text-[10px] text-amber-600 dark:text-amber-400">{c.sub}</p>}
             </CardContent>
           </Card>
         ))}
@@ -457,8 +465,13 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
                     <TableCell className={td("text-right")}>{t.pessoas}</TableCell>
                     <TableCell className={td("text-right")}>{formatCurrency(t.mrr_operando)}</TableCell>
                     <TableCell className={td("text-right")}>{moneyOrDash(ticket(t.mrr_operando, t.contas))}</TableCell>
-                    <TableCell className="text-right text-gray-500 dark:text-zinc-400">{t.cap_mrr > 0 ? formatCurrency(t.cap_mrr) : "—"}</TableCell>
-                    <TableCell className={cn("text-right", t.gap_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{formatCurrency(t.gap_mrr)}</TableCell>
+                    <TableCell className="text-right text-gray-500 dark:text-zinc-400">
+                      {t.cap_mrr > 0 ? formatCurrency(t.cap_mrr) : "—"}
+                      {t.pessoas_com_cap > 0 && t.pessoas_com_cap < t.pessoas && (
+                        <div className="text-[10px] text-amber-600 dark:text-amber-400" title="Cap. MRR e Espaço consideram só as pessoas com cap definida">{t.pessoas_com_cap}/{t.pessoas} com cap</div>
+                      )}
+                    </TableCell>
+                    <TableCell className={cn("text-right", t.pessoas_com_cap === 0 ? "text-gray-500 dark:text-zinc-400" : t.gap_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{t.pessoas_com_cap === 0 ? "—" : formatCurrency(t.gap_mrr)}</TableCell>
                     <TableCell className={cn("text-right", t.mrr_cancelamento > 0 ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-zinc-400")}>{t.mrr_cancelamento > 0 ? formatCurrency(t.mrr_cancelamento) : "—"}</TableCell>
                     <TableCell className="text-right"><UtilBar pct={t.util_pct} /></TableCell>
                   </TableRow>

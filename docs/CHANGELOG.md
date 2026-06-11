@@ -6,6 +6,7 @@
 - Tab e título do time de vendedores renomeados de "Selca" para "Selva" (CapacityTimes + label do dialog de operador).
 - "Aura" removida das categorias base do dialog de operador — a squad foi absorvida pela Pulse.
 - Banco local atualizado (`UPDATE capacity_metas SET categoria='Pulse' WHERE categoria='Aura'`, 3 operadores) para espelhar prod, que já estava migrado.
+- Indicador de cobertura de cap: linha do time mostra "X/Y com cap" quando só parte das pessoas tem cap de MRR (Pulse pós-fusão: 5/8), Espaço MRR vira "—" para time sem nenhuma cap (Olimpo), e os cards do topo indicam "cobre X de Y pessoas" / "só de quem tem cap de MRR". Resolve a aparente contradição de MRR Operando > Cap. MRR com Espaço positivo.
 
 **Por que:**
 - O nome correto do time comercial é Selva, e a squad Aura deixou de existir ("tudo o que era Aura virou Pulse"). Prod já tinha os 8 operadores em Pulse; o local ainda mostrava a tab Aura.
