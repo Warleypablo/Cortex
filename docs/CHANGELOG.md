@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-11 | fix(churn): exibir valor pontual no recorte de abonados
+
+**O que foi feito:**
+- Endpoint `/api/analytics/churn-detalhamento` passou a trazer `valor_pontual` (valorp de `cup_contratos`, JOIN por `id_subtask = task_id`).
+- No recorte "Abonados" da tela de Detalhamento de Churn, contratos sem MRR (`valorr` nulo/zero) passam a usar o valor pontual nos cards, taxa de abono, ranking de squad e gráficos.
+- Card "MRR Abonado" indica quanto do total veio de entregas pontuais (ex.: "inclui R$ 16.491 de entregas pontuais").
+
+**Por que:**
+- Em junho/2026 todos os abonados eram entregas pontuais de Creators (valor_r NULL em cup_churn) — o recorte mostrava R$ 0, taxa 0.0% e "Churn por Squad" vazio, apesar de "3 contratos abonados". As visões "Todos"/"Não abonados" seguem MRR puro (taxa de churn não infla com pontual).
+
+**Arquivos alterados:**
+- `server/routes.ts` - JOIN com cup_contratos e campo valor_pontual no payload.
+- `client/src/pages/ChurnDetalhamento.tsx` - fallback de valor pontual no recorte abonados + nota de transparência no card.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-11 | feat(youtube): start/callback do OAuth públicos (sem login no Cortex)
 
 **O que foi feito:**

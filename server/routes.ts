@@ -4746,9 +4746,11 @@ Estruture sua resposta em:
           c.possibilidade_retencao,
           c.evitabilidade_churn,
           c.reteve,
-          c.abonar_churn
+          c.abonar_churn,
+          ct.valorp as valor_p
         FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
+        LEFT JOIN "Clickup".cup_contratos ct ON ct.id_subtask = c.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           AND ${dateFilter}
         ORDER BY c.data_solicitacao_encerramento DESC
@@ -4797,6 +4799,7 @@ Estruture sua resposta em:
           status_conta: row.status_conta || null,
           ultimo_dia_operacao: row.ultimo_dia_operacao || null,
           is_abonado: isAbonado,
+          valor_pontual: Number(row.valor_p) || 0,
         };
       });
 
