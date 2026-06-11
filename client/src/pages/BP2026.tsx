@@ -15,6 +15,8 @@ interface ReceitasResponse {
   revenue: BPLinha[];
   funil: BPLinha[];
   capacity: BPLinha[];
+  sgaDetalhe: BPLinha[];
+  outrasDetalhe: BPLinha[];
   atualizadoEm: string;
 }
 
@@ -58,6 +60,8 @@ export default function BP2026() {
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="funil">Funil Comercial</TabsTrigger>
           <TabsTrigger value="capacity">Capacity</TabsTrigger>
+          <TabsTrigger value="sga">SG&amp;A</TabsTrigger>
+          <TabsTrigger value="outras">Outras Receitas</TabsTrigger>
         </TabsList>
         <TabsContent value="dre" className="mt-4">
           <BPDreTable
@@ -91,6 +95,20 @@ export default function BP2026() {
         <TabsContent value="capacity" className="mt-4">
           <BPDreTable
             linhas={data.capacity}
+            mesCorrente={data.mesCorrente}
+            mesFechado={data.mesFechado}
+          />
+        </TabsContent>
+        <TabsContent value="sga" className="mt-4">
+          <BPDreTable
+            linhas={data.sgaDetalhe}
+            mesCorrente={data.mesCorrente}
+            mesFechado={data.mesFechado}
+          />
+        </TabsContent>
+        <TabsContent value="outras" className="mt-4">
+          <BPDreTable
+            linhas={data.outrasDetalhe}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
           />
