@@ -41,6 +41,7 @@ const C = (
 export const ALL_COLUMNS: ColumnDef[] = [
   // Investimento
   C("investimento", "Invest", "Investimento", "currency", { defaultWidth: 104 }),
+  C("orcamentoDiario", "Orçamento", "Investimento", "currency", { defaultWidth: 116 }),
   C("cpm", "CPM", "Investimento", "currency", { color: true, invert: true }),
   // Vídeo
   C("videoHook", "Video hook", "Vídeo", "percent", { color: true }),

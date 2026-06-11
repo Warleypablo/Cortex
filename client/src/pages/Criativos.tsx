@@ -19,11 +19,12 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/co
 import { CriativosTable } from "@/components/criativos/CriativosTable";
 import { aggregateByLevel, sortRows, type CriativoData, type Level, type SortConfig } from "@/lib/criativosMetrics";
 import { loadConfig, persistConfig, loadViews, persistViews, resolveColumns, type ColumnConfig, type SavedView } from "@/lib/criativosColumns";
-import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle, Building2, Megaphone, Layers3, Image as ImageIcon } from "lucide-react";
+import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle, Building2, Megaphone, Layers3, Wallet, Image as ImageIcon } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
 import { getMetricColor, getColorClasses, getBenchmarkColor, CRIATIVOS_BENCHMARK_MAP } from "@/lib/metricFormatting";
 import { apiRequest, queryClient } from "@/lib/queryClient";
+import { canWriteMeta } from "@shared/constants";
 import type { MetricRulesetWithThresholds } from "@shared/schema";
 import type { DateRange } from "react-day-picker";
 import { useToast } from "@/hooks/use-toast";
@@ -112,8 +113,11 @@ export default function Criativos() {
   const [scope, setScope] = useState<{ fromLevel: Level; ids: string[] } | null>(null);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [statusOverride, setStatusOverride] = useState<Map<string, string>>(new Map());
+  const [budgetOverride, setBudgetOverride] = useState<Map<string, number>>(new Map());
   const [bulkAction, setBulkAction] = useState<null | "pause" | "resume">(null);
   const [bulkPending, setBulkPending] = useState(false);
+  const [bulkBudgetPct, setBulkBudgetPct] = useState<string>("");
+  const [bulkBudgetPending, setBulkBudgetPending] = useState(false);
 
   const { toast } = useToast();
   const [configOpen, setConfigOpen] = useState(false);
@@ -126,6 +130,9 @@ export default function Criativos() {
     queryKey: ["/api/auth/me"],
   });
   const isAdmin = authUser?.role === "admin";
+  // Permissão de ESCRITA no Meta (pausar/selecionar/editar orçamento): allowlist por e-mail.
+  // Os demais usuários ficam read-only, mesmo admins.
+  const canEditMeta = canWriteMeta(authUser?.email);
 
   // Agente de IA (Analisar com IA / Propostas) pausado por enquanto.
   // Mantém um mapa vazio para a coluna de badge "IA" na tabela.
@@ -239,6 +246,17 @@ export default function Criativos() {
       const next = new Set(prev);
       if (next.has(col)) next.delete(col);
       else next.add(col);
+      return next;
+    });
+  };
+
+  // Linhas expandidas (breakdown MQL × NMQL da taxa de conversão)
+  const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
+  const toggleRow = (id: string) => {
+    setExpandedRows(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
       return next;
     });
   };
@@ -384,10 +402,15 @@ export default function Criativos() {
   // Aplica override otimista de status (pause/resume reflete na hora;
   // o DB sincroniza com a Meta só a cada 6h)
   const applyOverride = useCallback((rows: CriativoData[]): CriativoData[] =>
-    statusOverride.size === 0
+    statusOverride.size === 0 && budgetOverride.size === 0
       ? rows
-      : rows.map(r => statusOverride.has(r.id) ? { ...r, status: statusOverride.get(r.id)! } : r),
-  [statusOverride]);
+      : rows.map(r => {
+          let out = r;
+          if (statusOverride.has(r.id)) out = { ...out, status: statusOverride.get(r.id)! };
+          if (budgetOverride.has(r.id)) out = { ...out, orcamentoDiario: budgetOverride.get(r.id)! };
+          return out;
+        }),
+  [statusOverride, budgetOverride]);
 
   // Linhas do nível atual: agrega → ordena → aplica override
   const activeRows = useMemo(() =>
@@ -427,6 +450,21 @@ export default function Criativos() {
     setSelectedIds(new Set());
   };
 
+  // Clicou na mensagem "Usando o orçamento do conjunto/da campanha" → leva pra aba dona do budget.
+  const goToBudgetOwner = (row: CriativoData) => {
+    if (row.orcamentoInfo === "usa_conjunto" && level === "campanha") {
+      // Campanha ABO → abre os Conjuntos dessa campanha (drill-down).
+      setScope({ fromLevel: "campanha", ids: [row.id] });
+      setSelectedIds(new Set());
+      setLevel("conjunto");
+    } else if (row.orcamentoInfo === "usa_campanha" && level === "conjunto") {
+      // Conjunto sob CBO → sobe pra aba de Campanhas (onde mora o orçamento).
+      setScope(null);
+      setSelectedIds(new Set());
+      setLevel("campanha");
+    }
+  };
+
   const toggleSelect = (id: string, checked: boolean) => {
     setSelectedIds(prev => {
       const next = new Set(prev);
@@ -462,6 +500,77 @@ export default function Criativos() {
       toast({ title: "Falha ao alterar status", description: err.message, variant: "destructive" });
     } finally {
       setTogglingIds(prev => { const s = new Set(prev); s.delete(row.id); return s; });
+    }
+  };
+
+  // Edita o orçamento diário da campanha (CBO) ou conjunto (ABO) direto no Meta Ads.
+  // Retorna true em caso de sucesso. Guard-rail de ±30%/teto é validado no backend.
+  const handleEditBudget = async (row: CriativoData, newReais: number): Promise<boolean> => {
+    const apiLevel = apiLevelFor(level);
+    if (apiLevel === "ad") return false;
+    const newDailyBudgetCents = Math.round(newReais * 100);
+    if (!Number.isFinite(newDailyBudgetCents) || newDailyBudgetCents <= 0) {
+      toast({ title: "Valor inválido", description: "Informe um orçamento maior que zero.", variant: "destructive" });
+      return false;
+    }
+    try {
+      const res = await fetch("/api/meta/actions/budget", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ level: apiLevel, entityId: row.id, newDailyBudgetCents, reason: "Edição manual de orçamento via aba Criativos" }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `Erro ${res.status}`);
+      setBudgetOverride(prev => new Map(prev).set(row.id, newReais));
+      queryClient.invalidateQueries({ queryKey: ["/api/growth/criativos"] });
+      toast({ title: "Orçamento atualizado", description: `${row.adName}: ${formatCurrency(newReais)}/dia` });
+      return true;
+    } catch (err: any) {
+      toast({ title: "Falha ao atualizar orçamento", description: err.message, variant: "destructive" });
+      return false;
+    }
+  };
+
+  // Ajuste de orçamento em massa por % nas linhas selecionadas (só as que têm orçamento próprio).
+  const handleBulkBudget = async (pct: number) => {
+    const apiLevel = apiLevelFor(level);
+    if (apiLevel !== "campaign" && apiLevel !== "adset") return;
+    const ownRows = activeRows.filter(r => selectedIds.has(r.id) && r.orcamentoInfo === "own" && r.orcamentoDiario != null);
+    if (ownRows.length === 0) {
+      toast({ title: "Nada para ajustar", description: "Selecione campanhas (CBO) ou conjuntos (ABO) com orçamento próprio.", variant: "destructive" });
+      return;
+    }
+    setBulkBudgetPending(true);
+    try {
+      const res = await fetch("/api/meta/actions/bulk-budget", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          pct,
+          reason: `Ajuste de orçamento ${pct > 0 ? "+" : ""}${pct}% em massa via aba Criativos`,
+          items: ownRows.map(r => ({ level: apiLevel, entityId: r.id })),
+        }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j.error || `Erro ${res.status}`);
+      setBudgetOverride(prev => {
+        const m = new Map(prev);
+        (j.results || []).filter((r: any) => r.ok && r.newDailyBudgetCents != null).forEach((r: any) => m.set(r.entityId, r.newDailyBudgetCents / 100));
+        return m;
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/growth/criativos"] });
+      const total = j.total ?? ownRows.length;
+      const okCount = j.okCount ?? 0;
+      const failed = total - okCount;
+      toast({ title: "Orçamento ajustado", description: `${okCount}/${total} aplicados${failed > 0 ? ` · ${failed} bloqueados (trava ±30% ou teto)` : ""}` });
+      setSelectedIds(new Set());
+      setBulkBudgetPct("");
+    } catch (err: any) {
+      toast({ title: "Falha no ajuste em massa", description: err.message, variant: "destructive" });
+    } finally {
+      setBulkBudgetPending(false);
     }
   };
 
@@ -777,7 +886,34 @@ export default function Criativos() {
 
               {/* Ações à direita */}
               <div className="flex items-center gap-2 flex-wrap">
-                {isAdmin && level !== "conta" && (
+                {canEditMeta && (level === "campanha" || level === "conjunto") && (
+                  <div className="flex items-center gap-1 mr-1">
+                    <Select value={bulkBudgetPct} onValueChange={setBulkBudgetPct}>
+                      <SelectTrigger className="h-8 w-[118px]" data-testid="select-bulk-budget-pct">
+                        <SelectValue placeholder="Orçamento %" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="10">+10%</SelectItem>
+                        <SelectItem value="20">+20%</SelectItem>
+                        <SelectItem value="30">+30%</SelectItem>
+                        <SelectItem value="-10">−10%</SelectItem>
+                        <SelectItem value="-20">−20%</SelectItem>
+                        <SelectItem value="-30">−30%</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="h-8"
+                      disabled={bulkBudgetPending || selectedIds.size === 0 || !bulkBudgetPct}
+                      onClick={() => handleBulkBudget(parseInt(bulkBudgetPct, 10))}
+                      data-testid="button-bulk-budget-apply"
+                    >
+                      {bulkBudgetPending ? <Loader2 className="w-3.5 h-3.5 mr-1 animate-spin" /> : <Wallet className="w-3.5 h-3.5 mr-1" />} Aplicar
+                    </Button>
+                  </div>
+                )}
+                {canEditMeta && level !== "conta" && (
                   <div className="flex items-center gap-2 mr-1">
                     <Button size="sm" variant="outline" className="h-8" disabled={bulkPending || selectedIds.size === 0} onClick={() => setBulkAction("resume")} data-testid="button-bulk-ativar">
                       <Power className="w-3.5 h-3.5 mr-1" /> Ativar
@@ -802,13 +938,17 @@ export default function Criativos() {
               onSort={handleSort}
               expandedColumns={expandedColumns}
               toggleColumn={toggleColumn}
+              expandedRows={expandedRows}
+              onToggleRow={toggleRow}
               getCellColor={getCellColor}
               pendingByEntity={pendingByEntity}
-              isAdmin={!!isAdmin}
+              isAdmin={canEditMeta}
               selectedIds={selectedIds}
               onToggleSelect={toggleSelect}
               onToggleSelectAll={toggleSelectAll}
               onToggleStatus={handleToggleStatus}
+              onEditBudget={handleEditBudget}
+              onGoToBudgetOwner={goToBudgetOwner}
               togglingIds={togglingIds}
               columns={visibleColumns}
               columnWidths={colConfig.widths}
