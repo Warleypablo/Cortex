@@ -49,6 +49,15 @@ altura fixa do slide, os KPIs ficam em 2 linhas: MRR / Pontual / Evolução em c
 churns embaixo (1-4 squads). Com 5+ squads (2 linhas de cards) usa densidade compacta
 (labels curtos "Churn Total" / "Churn s/ Abono", sem R$ base nem progress bar).
 
+**Tooltip de clientes:** hover em qualquer card de churn lista os clientes churnados do squad
+(nome do cliente via `LEFT JOIN cup_clientes ON parent_id = task_id`, valor exato, badge
+"abonado"). O card "s/ Abonados" filtra os abonados. Lista vem da própria query 16
+(`json_agg` com `valor_r > 0`), limitada a 12 itens + "+ N outros" no frontend.
+
+**Normalização de squad:** os lookups por squad (churn, pontual entregue, MRR anterior)
+usam nome normalizado (sem emoji, sem sufixo "(OFF)", lowercase) para casar fontes que
+divergem após renomeação do squad — ex.: snapshot "✨ Aura" × cup_churn "✨ Aura (OFF)".
+
 ## Validação (maio/2026, endpoint × SQL direto)
 
 | Squad   | Total            | s/ Abonados      |

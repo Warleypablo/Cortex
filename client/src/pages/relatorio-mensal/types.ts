@@ -139,6 +139,12 @@ export interface ReceitaChurnMes {
   churnPct: number;
 }
 
+export interface ChurnCliente {
+  nome: string;
+  valor: number;
+  abonado: boolean;
+}
+
 export interface SquadDetail {
   squad: string;
   mrr: number;
@@ -149,6 +155,7 @@ export interface SquadDetail {
   churnBrl: number;
   churnTotalPct: number;  // churn total, sem descontar abonados
   churnTotalBrl: number;
+  churnClientes: ChurnCliente[];
   mrrBase: number;
   evolucaoMrr: number;
 }

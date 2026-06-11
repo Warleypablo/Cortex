@@ -6,6 +6,8 @@
 - Seção "Detalhes por Squad" do Relatório Mensal passou a exibir dois cards de churn: **Churn Total** (todos os churns do mês) e **Churn s/ Abonados** (desconta apenas `abonar_churn = 'Sim'`).
 - A query de churn por squad deixou de excluir os motivos "artificiais" (`Inadimplente 1º Mês`, `Não começou`, `Erro na Venda`) — a coluna `abonar_churn` de `cup_churn` é o único critério de abono nessa seção.
 - Layout do card de squad reorganizado para caber na altura do slide: MRR / Pontual / Evolução na primeira linha, os dois churns na segunda (R$ base inline); com 5+ squads usa densidade compacta.
+- Tooltip no hover dos cards de churn lista os clientes churnados (nome via `cup_clientes`, valor exato, badge "abonado"); "Churn s/ Abonados" filtra os abonados da lista.
+- Lookups por squad (churn, pontual, MRR anterior) normalizados por nome — squads renomeados com sufixo "(OFF)" voltam a casar entre as fontes (corrigiu Aura zerada).
 
 **Por que:**
 - Dar visibilidade do churn bruto vs. churn líquido de abonos no reporte mensal, com critério único e auditável (coluna de abono), em vez de heurística por motivo de cancelamento.
