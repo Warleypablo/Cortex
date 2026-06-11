@@ -1,5 +1,98 @@
 # Changelog
 
+## 2026-06-11 | feat(youtube): start/callback do OAuth públicos (sem login no Cortex)
+
+**O que foi feito:**
+- `registerYoutubeOAuthRoutes` foi dividida em `registerYoutubeOAuthPublicRoutes` (`/start` + `/callback`) e `registerYoutubeOAuthStatusRoute` (`/status`).
+- `/start` e `/callback` passaram a ser registrados **antes** do `app.use("/api", isAuthenticated)`, igual ao módulo Instagram. `/status` segue protegido.
+
+**Por que:**
+- Donos de canal externos (ex.: Victor, sem conta no Cortex) precisam conseguir autorizar com a própria conta Google. Com a rota atrás do login, eles travariam.
+
+**Arquivos alterados:**
+- `server/routes/youtubeOAuth.ts` - split em função pública (start/callback) e protegida (status).
+- `server/routes.ts` - registra a pública antes do gate de auth e a de status depois.
+
+**Impacto arquitetural:** `/api/oauth/youtube/start` e `/callback` agora são públicos (não expõem dados; só iniciam o consent e gravam credencial). `/status` continua autenticado.
+
+---
+
+## 2026-06-11 | fix(youtube): credencial OAuth por canal (1 conta → N Brand Accounts)
+
+**O que foi feito:**
+- `youtube.credentials` deixou de ser `UNIQUE(google_user_id)` e passou a ser chaveada por `channel_id` (uma credencial por canal).
+- O callback OAuth agora descobre o canal (`channels.list`) **antes** de gravar a credencial e cria/atualiza uma credencial por canal com `ON CONFLICT (channel_id)`.
+- Migração idempotente em `scripts/create-youtube-tables.ts` (adiciona `channel_id`, remove o unique antigo, cria `uq_yt_credentials_channel`).
+- Schema Drizzle (`shared/schema.ts`) atualizado para refletir o novo modelo.
+
+**Por que:**
+- A conta `ferramentas@turbopartners.com.br` vai gerenciar **4 canais** (Brand Accounts). Cada autorização traz o **mesmo** `google_user_id` mas um `refresh_token` diferente, válido só para o canal selecionado. Com o `UNIQUE(google_user_id)` antigo, a Nª autorização sobrescrevia o token das anteriores e o sync puxava todos os canais com o token do último → os demais retornavam 403.
+
+**Arquivos alterados:**
+- `server/routes/youtubeOAuth.ts` - reordena o callback e grava 1 credencial por canal.
+- `scripts/create-youtube-tables.ts` - DDL base + migração idempotente da credencial.
+- `shared/schema.ts` - `youtubeCredentials` sem unique em `google_user_id`, com `channel_id` unique.
+
+**Impacto arquitetural:** Modelo de credenciais YouTube passa de 1-por-conta para 1-por-canal. Requer rodar `npx tsx scripts/create-youtube-tables.ts` em prod (idempotente) antes de autorizar os canais.
+
+---
+
+## 2026-06-11 | docs(youtube): passo-a-passo de acesso via Conta de Marca (client Interno)
+
+**O que foi feito:**
+- Reescreve `docs/youtube-acesso-canais.md` do caminho External para o caminho Conta de Marca (Brand Account).
+- Adiciona Passo 0 obrigatório: validar a pipeline inteira num canal de teste não-monetizado antes de mexer nos canais reais.
+- Esclarece que "Conta de Marca" não é uma marca-guarda-chuva da Turbo — cada canal continua do dono e o acesso da Turbo é leitura revogável.
+- Registra a pendência técnica do `UNIQUE(google_user_id)` para múltiplos canais na mesma conta Turbo.
+
+**Por que:**
+- Os canais dos sócios são contas pessoais; canal comum não aceita adicionar usuários e conta pessoal não vira `@turbopartners`. Conta de Marca permite adicionar a Turbo como proprietária e autorizar com o client Interno atual — eliminando a verificação do Google e a expiração de token de 7 dias do caminho External.
+
+**Arquivos alterados:**
+- `docs/youtube-acesso-canais.md` - substitui o procedimento External pelo procedimento Brand Account (Passos 0–4 + pendência técnica + diagrama do fluxo).
+
+**Impacto arquitetural:** Nenhum (apenas documentação). Define o caminho que tornará desnecessário o projeto GCP External dedicado.
+
+---
+
+## 2026-06-09 | docs(utm): content por tipo de destino (site-/lp-) + bio multi-link na Constituição v1.4
+
+**O que foi feito:**
+- `utm_content` ganhou **duas lógicas** (§4.2): **link fixo** (bio/linktree/banner/sobre) → `content={tipo-de-destino}` — `site-{pagina}` (site institucional), `lp-{slug}` (landing page), `whatsapp` —, sem data; **post** (feed/stories/reels/descrição/DM) → `content={nome-do-post}-{aaaa-mm-dd}`.
+- Prefixo `link-` **descontinuado** e substituído por `site-`/`lp-`, que carregam o tipo real de destino (permite agrupar "LP vs site institucional" no relatório).
+- Documentado o caso de **bio com múltiplos links nativos** (até 5 no Instagram): todos usam `term=bio`, diferenciados por `content` (tipo de destino, sem data). `campaign` muda só quando o botão pertence a iniciativa específica.
+- Adicionada nota sobre WhatsApp: UTM em `wa.me`/`api.whatsapp.com` não é capturada; rastrear via página de redirect tracked (`/wpp`).
+- Constituição versionada para v1.4; exemplos do guia de links e da aba Guia do `/utm-builder` alinhados.
+
+**Por que:**
+- Surgiu na prática: bio do Instagram passou a permitir 5 links e o time não sabia como diferenciar cada botão no relatório (resposta: via `content`). O prefixo `link-` era redundante (o `term` já dizia que era link); `site-`/`lp-` carregam informação útil (tipo de destino), permitindo separar tráfego de LP vs site no relatório.
+
+**Arquivos alterados:**
+- `docs/utm-constituicao.md` - nova regra de content por tipo de destino (§4.2), seção de bio multi-link, nota WhatsApp, versão v1.4 + histórico.
+- `docs/utm-links-canais.md` - links fixos → `content=site-home`, observações reescritas (tipo de destino + bio multi-link), referência v1.4.
+- `client/src/pages/UtmBuilder.tsx` - exemplos da aba Guia alinhados (link fixo `lp-`/`site-`, post nome+data); só texto, sem mudança de lógica.
+
+**Impacto arquitetural:** Nenhum. Mudança de convenção/documentação; nenhuma alteração de schema, rota ou lógica de geração de UTM.
+
+---
+
+## 2026-06-08 | feat(youtube): rotas admin de sync + status (destrava métricas)
+
+**O que foi feito:**
+- Criado `server/routes/youtubeAdmin.ts` com `POST /api/admin/youtube/sync` (snapshot de canais + vídeos + métricas diárias de canal/vídeo) e `GET /api/admin/youtube/status` (canais autorizados, range das métricas diárias e últimas execuções).
+- Registrado `registerYoutubeAdminRoutes(app, db)` em `server/routes.ts`, logo após o OAuth do YouTube.
+
+**Por que:**
+- O serviço `youtubeSync.ts` (`syncAllChannels`) já estava pronto, mas era órfão: só o OAuth do YouTube estava registrado, sem nenhuma rota ou cron que disparasse o sync. Resultado: dava pra autorizar os canais, mas as métricas nunca entravam no banco. Todos os outros canais (LinkedIn, TikTok, Google, Google Ads) já tinham rota admin equivalente.
+
+**Arquivos alterados:**
+- `server/routes/youtubeAdmin.ts` - novo: endpoints admin de sync e status do YouTube (usa `db`/Drizzle, pois `syncAllChannels` faz queries via `db.execute`).
+- `server/routes.ts` - import + registro de `registerYoutubeAdminRoutes`.
+
+**Impacto arquitetural:** Nenhum — espelha o padrão admin já existente dos outros canais; nenhuma mudança de schema.
+
+---
+
 ## 2026-06-11 | feat(criativos): orçamento editável (CBO/ABO), split MQL×NMQL e escrita por allowlist
 
 **O que foi feito:**

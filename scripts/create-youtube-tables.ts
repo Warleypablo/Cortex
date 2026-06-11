@@ -4,7 +4,7 @@
  * Idempotente — pode rodar várias vezes sem efeito colateral.
  *
  * Tabelas criadas (todas em youtube):
- *  - youtube_credentials         — refresh_token OAuth encriptado, por usuário Google
+ *  - youtube_credentials         — refresh_token OAuth encriptado, UMA credencial por canal
  *  - youtube_channels            — metadata dos canais (Turbocast, TurboPartners, André, Vitor)
  *  - youtube_videos              — vídeos publicados (snapshot de contadores cumulativos)
  *  - youtube_video_daily_metrics — métricas diárias por vídeo (Analytics API)
@@ -48,14 +48,29 @@ async function main() {
   await exec('youtube.credentials', `
     CREATE TABLE IF NOT EXISTS youtube.credentials (
       id                  SERIAL PRIMARY KEY,
-      google_user_id      VARCHAR(100) NOT NULL UNIQUE,
+      google_user_id      VARCHAR(100) NOT NULL,
       google_email        VARCHAR(255),
+      channel_id          VARCHAR(50),
       refresh_token_enc   TEXT NOT NULL,
       scopes              TEXT NOT NULL,
       authorized_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       last_used_at        TIMESTAMPTZ,
       active              BOOLEAN NOT NULL DEFAULT TRUE
     )
+  `);
+
+  // --- Migração: credencial passa a ser POR CANAL (não por conta Google) ---
+  // Motivo: uma conta (ex.: ferramentas@) gerencia vários canais Brand Account;
+  // cada autorização traz o mesmo google_user_id mas um refresh_token distinto,
+  // válido só para o canal selecionado. O UNIQUE(google_user_id) antigo fazia a
+  // 2ª autorização sobrescrever a 1ª. Agora a chave é channel_id. Idempotente.
+  await exec('migra credentials → channel_id', `
+    ALTER TABLE youtube.credentials ADD COLUMN IF NOT EXISTS channel_id VARCHAR(50);
+    ALTER TABLE youtube.credentials DROP CONSTRAINT IF EXISTS credentials_google_user_id_key;
+  `);
+  await exec('uq_yt_credentials_channel', `
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_yt_credentials_channel
+    ON youtube.credentials(channel_id)
   `);
 
   await exec('youtube.channels', `

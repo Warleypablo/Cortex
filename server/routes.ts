@@ -23,7 +23,8 @@ import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
-import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
+import { registerYoutubeOAuthPublicRoutes, registerYoutubeOAuthStatusRoute } from "./routes/youtubeOAuth";
+import { registerYoutubeAdminRoutes } from "./routes/youtubeAdmin";
 import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
 import { registerGoogleAdminRoutes } from "./routes/googleAdmin";
 import { registerLinkedinOAuthRoutes } from "./routes/linkedinOAuth";
@@ -456,6 +457,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Instagram Module (before isAuthenticated — OAuth routes need to be accessible)
   registerInstagramRoutes(app, db, storage);
+
+  // YouTube OAuth start/callback (before isAuthenticated — donos de canal externos
+  // autorizam com a própria conta Google, sem login no Cortex). O /status fica protegido.
+  registerYoutubeOAuthPublicRoutes(app, db);
 
   // FCA Report — auth via bearer token (não usa sessão)
   registerFcaRoutes(app);
@@ -8064,8 +8069,11 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Growth — Evolução Temporal (matriz métricas × meses/semanas)
   registerGrowthTimeseriesRoutes(app, db);
 
-  // YouTube OAuth (autorização dos canais Turbocast/TurboPartners/André/Vitor)
-  registerYoutubeOAuthRoutes(app, db);
+  // YouTube OAuth — /status (protegido; start/callback são públicos, registrados acima)
+  registerYoutubeOAuthStatusRoute(app, db);
+
+  // YouTube — admin: sync (snapshot + vídeos + métricas diárias canal/vídeo) + status
+  registerYoutubeAdminRoutes(app, db);
 
   // Google Ads — admin: sync de campanhas + métricas + status
   registerGoogleAdsAdminRoutes(app);

@@ -30,10 +30,12 @@ export interface YoutubeSyncResult {
 }
 
 function getAuthFor(refreshToken: string) {
-  const clientId = process.env.GOOGLE_CLIENT_ID;
-  const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+  // Mesmo client usado no OAuth: dedicado do YouTube se existir, senão Data Central.
+  // O refresh_token é específico do client — se trocar o client, é preciso reautorizar.
+  const clientId = process.env.YOUTUBE_CLIENT_ID || process.env.GOOGLE_CLIENT_ID;
+  const clientSecret = process.env.YOUTUBE_CLIENT_SECRET || process.env.GOOGLE_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    throw new Error('GOOGLE_CLIENT_ID/SECRET ausentes — necessários pro YouTube (Data Central)');
+    throw new Error('YOUTUBE_CLIENT_ID/SECRET (ou fallback GOOGLE_CLIENT_ID/SECRET) ausentes');
   }
   const oauth2 = new google.auth.OAuth2(clientId, clientSecret);
   oauth2.setCredentials({ refresh_token: refreshToken });
