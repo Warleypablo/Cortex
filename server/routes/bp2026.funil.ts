@@ -35,7 +35,7 @@ function razao(num: number | null, den: number | null): number | null {
   return num / den;
 }
 
-export async function montarFunil(deps: Deps): Promise<Linha[]> {
+export async function montarFunil(deps: Deps): Promise<{ linhas: Linha[]; ganhosPorMes: Record<number, number> }> {
   const { db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado } = deps;
 
   // contagens do funil por mês (uma query): deals ganhos por tipo + reuniões realizadas
@@ -129,7 +129,9 @@ export async function montarFunil(deps: Deps): Promise<Linha[]> {
       realizado: razao(somaAte(numS), somaAte(denS)),
     };
 
-  return [
+  const ganhosPorMes: Record<number, number> = {};
+  for (let m = 1; m <= 12; m++) ganhosPorMes[m] = cnt[m]?.ganhos ?? 0;
+  const linhas: Linha[] = [
     fazLinha({ metrica: "funil_vendas_mrr", titulo: "Vendas MRR", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl", destaque: true, nota: NOTA_PRODUTO }, vendasMrr, orcDe("vendas_mrr")),
     fazLinha({ metrica: "funil_vendas_pontual", titulo: "Vendas Pontual", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl", destaque: true }, vendasPontual, orcDe("vendas_pontual")),
     fazLinha({ metrica: "contratos_vendidos_mrr", titulo: "Contratos vendidos — MRR", tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "int" }, contratosMrr, (m) => orcContratosMrr[m]),
@@ -151,4 +153,5 @@ export async function montarFunil(deps: Deps): Promise<Linha[]> {
         ),
       }),
   ];
+  return { linhas, ganhosPorMes };
 }

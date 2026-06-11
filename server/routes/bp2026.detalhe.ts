@@ -11,7 +11,7 @@ import {
 import { CASE_PRODUTO, CASE_PRODUTO_CHURN } from "./bp2026.revenue";
 import {
   LINHAS, LINHAS_DEDUCOES, LINHAS_CSV, LINHAS_OPEX, LINHAS_POS_EBITDA,
-  type DefLinha,
+  somaDespesaCaixaPorMes, type DefLinha,
 } from "./bp2026";
 
 const ANO = 2026;
@@ -240,7 +240,7 @@ const TITULOS_SUBABAS: Record<string, string> = {
   churn_pct_performance: "Churn — Performance", churn_pct_creators: "Churn — Creators",
   churn_pct_social: "Churn — Social", churn_pct_gc: "Churn — Gestão de Comunidade",
   churn_pct_others: "Churn — Others",
-  saldo_caixa: "Saldo de Caixa",
+  saldo_caixa: "Saldo de Caixa", cac_por_cliente: "CAC por cliente adquirido",
   sga_uzk: "UZK", sga_backoffice: "Backoffice", sga_software: "Software", sga_ocupacao: "Ocupação",
   beneficio_total_empresa: "Benefício Caju", sga_premiacoes: "Premiações",
   sga_eventos: "Eventos e Brindes Internos", sga_outras: "Outras despesas",
@@ -446,6 +446,13 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         ({ grupos, realizado } = await detDealsBitrix(db, mes, "pontual", "contagem", "Vendas pontuais (Bitrix)"));
       } else if (metrica === "reunioes") {
         ({ grupos, realizado } = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas"));
+      } else if (metrica === "cac_por_cliente") {
+        const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (clientes adquiridos)");
+        const cacPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac);
+        const despesa = cacPorMes[mes] ?? 0;
+        grupos = ganhos.grupos;
+        realizado = ganhos.realizado ? despesa / ganhos.realizado : 0;
+        notaDinamica = `despesa CAC R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${ganhos.realizado} deals ganhos no mês`;
       } else if (metrica === "taxa_conversao") {
         const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (numerador)");
         const reun = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas");

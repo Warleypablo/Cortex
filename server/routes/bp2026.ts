@@ -509,7 +509,7 @@ export function registerBp2026Routes(app: Express, db: any) {
       const revenue = await montarRevenue({ db, orcado, mesCorrente, mesFechado });
 
       // 10. Funil Comercial (sub-aba)
-      const funil = await montarFunil({ db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado });
+      const { linhas: funil, ganhosPorMes } = await montarFunil({ db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado });
 
       // 11. Capacity (sub-aba) — contratos Performance extraídos do retorno da Revenue
       const contratosPerformanceSerie =
@@ -521,7 +521,7 @@ export function registerBp2026Routes(app: Express, db: any) {
 
       // 12. Detalhamentos: SG&A e CAC por sub-linha, Outras Receitas por categoria
       const { sga: sgaDetalhe, cac: cacDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
-        db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado,
+        db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, mesCorrente, mesFechado,
       });
 
       const payload = {

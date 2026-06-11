@@ -33,6 +33,7 @@ interface Deps {
   // séries de vendas do handler (Bitrix) — denominadores das linhas de eficiência do CAC
   vendasMrrPorMes: Record<number, number>;
   pontualPorMes: Record<number, number>;
+  ganhosPorMes: Record<number, number>; // deals ganhos (MRR ou pontual) — proxy de clientes adquiridos
   mesCorrente: number;
   mesFechado: number;
 }
@@ -77,7 +78,7 @@ const SUB_SGA: DefSub[] = [
 ];
 
 export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; cac: Linha[]; outrasReceitas: Linha[] }> {
-  const { db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado } = deps;
+  const { db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, mesCorrente, mesFechado } = deps;
 
   const mensal = (porMes: Record<number, number>) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? porMes[i + 1] ?? 0 : null));
@@ -178,6 +179,24 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
       realizado: razao(cacYtdReal, somaAte(receitaAdquirida)),
     }
   );
+  // CAC monetário: despesa ÷ deals ganhos (proxy de clientes adquiridos);
+  // orçado ÷ deals esperados pelo BP (reuniões necessárias × taxa de conversão)
+  const ganhosOrc = (m: number) =>
+    (orcado["reunioes_necessarias"]?.[m] ?? 0) * (orcado["taxa_conversao"]?.[m] ?? 0);
+  const porClienteSerie = Array.from({ length: 12 }, (_, i) =>
+    i + 1 <= mesCorrente ? razao(cacTotalSerie[i], ganhosPorMes[i + 1] ?? 0) : null
+  );
+  const cacPorCliente = fazLinha(
+    { metrica: "cac_por_cliente", titulo: "CAC por cliente adquirido", direcao: "menor_melhor", unidade: "brl",
+      nota: "Despesa CAC do mês ÷ deals ganhos no Bitrix — proxy de clientes adquiridos (o CRM não separa cliente novo de cross-sell). Orçado ÷ deals esperados pelo BP (reuniões × conversão). Base para LTV/CAC." },
+    porClienteSerie,
+    (m) => razao(cacOrcMes(m), ganhosOrc(m)) ?? 0,
+    mesFechado === 0 ? undefined : {
+      orcado: razao(somaAte(cacOrcMes), somaAte(ganhosOrc)) ?? 0,
+      realizado: razao(cacYtdReal, somaAte((m) => ganhosPorMes[m] ?? 0)),
+    }
+  );
+
   const cacPayback = fazLinha(
     { metrica: "cac_payback_mrr", titulo: "Payback em MRR (meses)", direcao: "menor_melhor", unidade: "dec",
       nota: "Despesa CAC do mês ÷ MRR vendido no mês — quantos meses do MRR adquirido pagam a aquisição." },
@@ -222,5 +241,5 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     (m) => orcado["outras_receitas"]?.[m] ?? 0
   );
 
-  return { sga: [sgaTotal, ...sgaLinhas], cac: [cacTotal, ...cacLinhas, cacPctReceita, cacPayback], outrasReceitas: [orTotal, variavelL, stackL, demaisL] };
+  return { sga: [sgaTotal, ...sgaLinhas], cac: [cacTotal, ...cacLinhas, cacPorCliente, cacPctReceita, cacPayback], outrasReceitas: [orTotal, variavelL, stackL, demaisL] };
 }
