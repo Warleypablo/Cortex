@@ -44,9 +44,10 @@ GROUP BY squad
 
 ### Frontend — `client/src/pages/relatorio-mensal/SlideSquadSingle.tsx`
 
-Card de Churn vira dois cards (mesmo formato: % grande + R$ / base + progress bar),
-Evolução MRR passa a ocupar largura total (`col-span-2`). Labels compactos para 7+ squads:
-"Churn Total" / "Churn s/ Abono".
+Card de Churn vira dois cards (% grande + R$ / base inline + progress bar). Para caber na
+altura fixa do slide, os KPIs ficam em 2 linhas: MRR / Pontual / Evolução em cima e os dois
+churns embaixo (1-4 squads). Com 5+ squads (2 linhas de cards) usa densidade compacta
+(labels curtos "Churn Total" / "Churn s/ Abono", sem R$ base nem progress bar).
 
 ## Validação (maio/2026, endpoint × SQL direto)
 

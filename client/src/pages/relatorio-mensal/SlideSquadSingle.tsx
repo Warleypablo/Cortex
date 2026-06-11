@@ -68,7 +68,8 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
     4;
 
   const isHero = details.length === 1;
-  const isCompact = details.length >= 7;
+  // 5+ squads = 2 linhas de cards; usa densidade compacta para caber na altura do slide
+  const isCompact = details.length >= 5;
 
   return (
     <SlideLayout section="commerce" padding="28px 36px">
@@ -119,7 +120,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
             >
               {/* Header com avatar colorido */}
               <div
-                className={`flex items-center gap-3 ${isCompact ? "px-3 py-2" : "px-5 py-4"}`}
+                className={`flex items-center gap-3 ${isCompact ? "px-3 py-2" : isHero ? "px-5 py-4" : "px-5 py-3"}`}
                 style={{ borderBottom: `1px solid ${color}25` }}
               >
                 <div
@@ -155,10 +156,10 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                 </div>
               </div>
 
-              {/* KPIs em grid 2x2 */}
-              <div className={`grid grid-cols-2 ${isHero ? "p-6 gap-5" : isCompact ? "p-2 gap-2" : "p-4 gap-3"}`}>
+              {/* KPIs: hero/compact em 2 colunas; densidade média em 6 colunas (2 linhas) */}
+              <div className={`grid ${isHero || isCompact ? "grid-cols-2" : "grid-cols-6"} ${isHero ? "p-6 gap-5" : isCompact ? "p-2 gap-2" : "p-3 gap-2"}`}>
                 {/* MRR Ativo */}
-                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"}`}>
+                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
                   <div className="flex items-center gap-1.5">
                     <Activity className="h-3 w-3 text-zinc-500" />
                     <p className="text-[9px] text-zinc-500 uppercase tracking-wider">MRR Ativo</p>
@@ -169,7 +170,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                 </div>
 
                 {/* Pontual Entregue */}
-                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"}`}>
+                <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
                   <div className="flex items-center gap-1.5">
                     <Sparkles className="h-3 w-3 text-zinc-500" />
                     <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{isCompact ? "Pontual" : "Pontual Entregue"}</p>
@@ -178,46 +179,6 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                     {fmtBRL(sq.pontual)}
                   </p>
                 </div>
-
-                {/* Churn Total e Churn s/ Abonados (coluna abonar_churn) */}
-                {churnCards.map((card) => {
-                  const cardColor = card.pct >= 8 ? "#ef4444" : "#22c55e";
-                  return (
-                    <div key={card.label} className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"}`}>
-                      <div className="flex items-center gap-1.5">
-                        <AlertTriangle className="h-3 w-3 text-zinc-500" />
-                        <p className="text-[9px] text-zinc-500 uppercase tracking-wider">
-                          {isCompact ? card.labelCompact : card.label}
-                        </p>
-                      </div>
-                      <div className="flex items-baseline gap-2">
-                        <p
-                          className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`}
-                          style={{ color: cardColor }}
-                        >
-                          {card.pct.toFixed(1).replace(".", ",")}%
-                        </p>
-                      </div>
-                      {!isCompact && (
-                        <p className="text-[10px] text-zinc-600 tabular-nums">
-                          {fmtBRL(card.brl)} / {fmtBRL(sq.mrrBase || 0)}
-                        </p>
-                      )}
-                      {/* Mini progress bar — só fora do compact */}
-                      {!isCompact && (
-                        <div className="h-1 rounded-full bg-white/5 overflow-hidden mt-1">
-                          <div
-                            className="h-full rounded-full transition-all"
-                            style={{
-                              width: `${Math.min(card.pct * 5, 100)}%`,
-                              background: cardColor,
-                            }}
-                          />
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
 
                 {/* Evolução MRR */}
                 <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 col-span-2 ${isCompact ? "p-2" : "p-3"}`}>
@@ -236,6 +197,46 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                     {evolSign} R$ {evolAbs.toLocaleString("pt-BR")}
                   </p>
                 </div>
+
+                {/* Churn Total e Churn s/ Abonados (coluna abonar_churn) */}
+                {churnCards.map((card) => {
+                  const cardColor = card.pct >= 8 ? "#ef4444" : "#22c55e";
+                  return (
+                    <div key={card.label} className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-3" : ""}`}>
+                      <div className="flex items-center gap-1.5">
+                        <AlertTriangle className="h-3 w-3 text-zinc-500" />
+                        <p className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                          {isCompact ? card.labelCompact : card.label}
+                        </p>
+                      </div>
+                      <div className="flex items-baseline gap-2">
+                        <p
+                          className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`}
+                          style={{ color: cardColor }}
+                        >
+                          {card.pct.toFixed(1).replace(".", ",")}%
+                        </p>
+                        {!isCompact && (
+                          <p className="text-[10px] text-zinc-600 tabular-nums">
+                            {fmtBRL(card.brl)} / {fmtBRL(sq.mrrBase || 0)}
+                          </p>
+                        )}
+                      </div>
+                      {/* Mini progress bar — só fora do compact */}
+                      {!isCompact && (
+                        <div className="h-1 rounded-full bg-white/5 overflow-hidden mt-1">
+                          <div
+                            className="h-full rounded-full transition-all"
+                            style={{
+                              width: `${Math.min(card.pct * 5, 100)}%`,
+                              background: cardColor,
+                            }}
+                          />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             </div>
           );
