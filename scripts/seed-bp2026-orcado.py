@@ -83,6 +83,15 @@ LINHAS = [
     ("SG&A", 14, "sga_outras"),
     ("Outras Receitas", 3, "or_receita_variavel"),
     ("Outras Receitas", 7, "or_stack_digital"),
+    ("CAC", 7, "cac_pre_vendas"),
+    ("CAC", 8, "cac_vendas"),
+    ("CAC", 9, "cac_gerencia"),
+    ("CAC", 10, "cac_comissoes"),
+    ("CAC", 11, "cac_growth"),
+    ("CAC", 12, "cac_ads"),
+    ("CAC", 13, "cac_eventos"),
+    ("CAC", 14, "cac_brindes"),
+    ("CAC", 15, "cac_viagens"),
 ]
 # Totais conhecidos da planilha, para verificação anti-drift
 TOTAIS_ESPERADOS = {
@@ -159,6 +168,15 @@ TOTAIS_ESPERADOS = {
     "sga_outras": 213032.0,
     "or_receita_variavel": 120000.0,
     "or_stack_digital": 78000.0,
+    "cac_pre_vendas": 439200.0,
+    "cac_vendas": 410600.0,
+    "cac_gerencia": 255000.0,
+    "cac_comissoes": 953313.70653,
+    "cac_growth": 396000.0,
+    "cac_ads": 1360000.0,
+    "cac_eventos": 380000.0,
+    "cac_brindes": 195000.0,
+    "cac_viagens": 60000.0,
 }
 
 # Métricas com células vazias na planilha (tratadas como 0). Ex.: Bônus só tem jan-mar.

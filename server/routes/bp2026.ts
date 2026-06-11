@@ -519,8 +519,8 @@ export function registerBp2026Routes(app: Express, db: any) {
         db, orcado, contratosPerformance: contratosPerformanceSerie, mesCorrente, mesFechado,
       });
 
-      // 12. Detalhamentos: SG&A por sub-linha e Outras Receitas por categoria
-      const { sga: sgaDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
+      // 12. Detalhamentos: SG&A e CAC por sub-linha, Outras Receitas por categoria
+      const { sga: sgaDetalhe, cac: cacDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
         db, orcado, mesCorrente, mesFechado,
       });
 
@@ -543,6 +543,7 @@ export function registerBp2026Routes(app: Express, db: any) {
         funil,
         capacity,
         sgaDetalhe,
+        cacDetalhe,
         outrasDetalhe,
         atualizadoEm: new Date().toISOString(),
       };

@@ -6,6 +6,7 @@ import { sql } from "drizzle-orm";
 import { agruparItens, ratear, type ItemDetalhe, type GrupoDetalhe } from "./bp2026.helpers";
 import {
   PREDICADOS_DESPESA, PREDICADO_OUTRAS_RECEITAS, PREDICADOS_SGA_SUB, PREDICADOS_OUTRAS_SUB,
+  PREDICADOS_CAC_SUB,
 } from "./bp2026.predicados";
 import { CASE_PRODUTO, CASE_PRODUTO_CHURN } from "./bp2026.revenue";
 import {
@@ -26,7 +27,7 @@ const DERIVADAS = [
   "aov_venda_mrr", "aov_venda_pontual",
   "gestores_necessarios", "designers_necessarios", "necessidade_gestores",
   "contratos_por_gestor", "contas_por_designer",
-  "sga_total_detalhe", "or_total_detalhe",
+  "sga_total_detalhe", "or_total_detalhe", "cac_total_detalhe",
 ];
 
 // métricas de despesa cujo detalhe é o bucket puro (parcelas por quitação, grupos por categoria)
@@ -245,6 +246,10 @@ const TITULOS_SUBABAS: Record<string, string> = {
   sga_eventos: "Eventos e Brindes Internos", sga_outras: "Outras despesas",
   or_receita_variavel: "Receita Variável", or_stack_digital: "Stack Digital",
   or_demais: "Demais (Mentoria, Infoproduto, Turbooh…)",
+  cac_pre_vendas: "Pré Vendas", cac_vendas: "Vendas", cac_gerencia: "Gerência",
+  cac_comissoes: "Comissões", cac_growth: "Growth", cac_ads: "ADs",
+  cac_eventos: "Eventos", cac_brindes: "Brindes", cac_viagens: "Viagens",
+  cac_outras_sub: "Outras comerciais (não orçadas)",
 };
 const HANDLERS_SUBABAS = TITULOS_SUBABAS; // mesmo conjunto de chaves (roteadas no switch abaixo)
 
@@ -517,6 +522,10 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       } else if (Object.hasOwn(PREDICADOS_SGA_SUB, metrica) || metrica === "sga_outras") {
         const chave = metrica === "sga_outras" ? "sga_outras_sub" : metrica;
         const itens = await itensDespesaBucket(db, PREDICADOS_SGA_SUB[chave], mes);
+        grupos = agruparItens(itens, LIMITE_ITENS);
+        realizado = itens.reduce((s, i) => s + i.valor, 0);
+      } else if (Object.hasOwn(PREDICADOS_CAC_SUB, metrica)) {
+        const itens = await itensDespesaBucket(db, PREDICADOS_CAC_SUB[metrica], mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
       } else if (metrica === "beneficio_total_empresa") {

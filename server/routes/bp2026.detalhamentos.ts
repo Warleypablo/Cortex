@@ -4,7 +4,7 @@
 // despesas em caixa (QUITADO), receitas por competência.
 import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd, type MesValor } from "./bp2026.helpers";
-import { PREDICADOS_DESPESA, PREDICADOS_SGA_SUB, PREDICADOS_OUTRAS_SUB } from "./bp2026.predicados";
+import { PREDICADOS_DESPESA, PREDICADOS_SGA_SUB, PREDICADOS_OUTRAS_SUB, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { somaDespesaCaixaPorMes } from "./bp2026";
 
 interface MesLinha extends MesValor { atingimento: number | null }
@@ -41,6 +41,27 @@ interface DefSub {
   nota?: string;
 }
 
+const NOTA_CAC_TOTAL =
+  "Soma das sub-linhas comerciais — deve bater com a linha CAC do DRE " +
+  "(mesmos prefixos de categoria).";
+const NOTA_COMISSOES = "Inclui Indique e Ganhe (06.04.05).";
+const NOTA_CAC_OUTRAS =
+  "Categorias que entram no CAC do DRE mas não têm linha no BP " +
+  "(Outras Despesas Comerciais, Patrocínios).";
+
+const SUB_CAC: { metrica: string; titulo: string; predicado: keyof typeof PREDICADOS_CAC_SUB; nota?: string; semOrcado?: boolean }[] = [
+  { metrica: "cac_pre_vendas", titulo: "Pré Vendas", predicado: "cac_pre_vendas" },
+  { metrica: "cac_vendas", titulo: "Vendas", predicado: "cac_vendas" },
+  { metrica: "cac_gerencia", titulo: "Gerência", predicado: "cac_gerencia" },
+  { metrica: "cac_comissoes", titulo: "Comissões", predicado: "cac_comissoes", nota: NOTA_COMISSOES },
+  { metrica: "cac_growth", titulo: "Growth", predicado: "cac_growth" },
+  { metrica: "cac_ads", titulo: "ADs", predicado: "cac_ads" },
+  { metrica: "cac_eventos", titulo: "Eventos", predicado: "cac_eventos" },
+  { metrica: "cac_brindes", titulo: "Brindes", predicado: "cac_brindes" },
+  { metrica: "cac_viagens", titulo: "Viagens", predicado: "cac_viagens" },
+  { metrica: "cac_outras_sub", titulo: "Outras comerciais (não orçadas)", predicado: "cac_outras_sub", nota: NOTA_CAC_OUTRAS, semOrcado: true },
+];
+
 const SUB_SGA: DefSub[] = [
   { metrica: "sga_uzk", titulo: "UZK", predicado: "sga_uzk" },
   { metrica: "sga_backoffice", titulo: "Backoffice", predicado: "sga_backoffice" },
@@ -52,7 +73,7 @@ const SUB_SGA: DefSub[] = [
   { metrica: "sga_outras", titulo: "Outras despesas", predicado: "sga_outras_sub" },
 ];
 
-export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; outrasReceitas: Linha[] }> {
+export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; cac: Linha[]; outrasReceitas: Linha[] }> {
   const { db, orcado, mesCorrente, mesFechado } = deps;
 
   const mensal = (porMes: Record<number, number>) =>
@@ -103,6 +124,25 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; o
     (m) => SUB_SGA.reduce((acc, d) => acc + (orcado[d.metrica]?.[m] ?? 0), 0)
   );
 
+  // ---- CAC: caixa por predicado de sub-linha (mesma mecânica do SG&A) ----
+  const cacLinhas: Linha[] = [];
+  const cacSeries: (number | null)[][] = [];
+  for (const def of SUB_CAC) {
+    const porMes = await somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB[def.predicado]);
+    const serie = mensal(porMes);
+    cacSeries.push(serie);
+    cacLinhas.push(fazLinha(
+      { metrica: def.metrica, titulo: def.titulo, direcao: "menor_melhor", nota: def.nota },
+      serie,
+      (m) => def.semOrcado ? 0 : orcado[def.metrica]?.[m] ?? 0
+    ));
+  }
+  const cacTotal = fazLinha(
+    { metrica: "cac_total_detalhe", titulo: "CAC (soma das sub-linhas)", direcao: "menor_melhor", nota: NOTA_CAC_TOTAL, destaque: true },
+    somaSeries(cacSeries),
+    (m) => SUB_CAC.reduce((acc, d) => acc + (d.semOrcado ? 0 : orcado[d.metrica]?.[m] ?? 0), 0)
+  );
+
   // ---- Outras Receitas: competência, 3 agregações condicionais (mesmo regime do DRE) ----
   const outrasResult = await db.execute(sql`
     SELECT EXTRACT(MONTH FROM data_competencia)::int AS mes,
@@ -136,5 +176,5 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; o
     (m) => orcado["outras_receitas"]?.[m] ?? 0
   );
 
-  return { sga: [sgaTotal, ...sgaLinhas], outrasReceitas: [orTotal, variavelL, stackL, demaisL] };
+  return { sga: [sgaTotal, ...sgaLinhas], cac: [cacTotal, ...cacLinhas], outrasReceitas: [orTotal, variavelL, stackL, demaisL] };
 }

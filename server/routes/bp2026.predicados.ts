@@ -49,3 +49,20 @@ export const PREDICADOS_OUTRAS_SUB: Record<string, SQL> = {
   or_stack: sql`categoria_nome LIKE '03.03%'`,
   or_demais: sql`categoria_nome LIKE '04.01%' OR categoria_nome LIKE '04.03%'`,
 };
+
+// Sub-linhas do detalhamento CAC (bloco esquerdo da aba CAC da planilha).
+// União = predicado cac do DRE para as categorias existentes hoje; categorias
+// novas dentro de 06.04/06.06/06.07 fora das enumeradas apareceriam como
+// divergência no smoke (cac_total_detalhe ≡ célula cac).
+export const PREDICADOS_CAC_SUB: Record<string, SQL> = {
+  cac_pre_vendas: sql`categoria_nome LIKE '06.04.03%'`,
+  cac_vendas: sql`categoria_nome LIKE '06.04.02%'`,
+  cac_gerencia: sql`categoria_nome LIKE '06.04.01%'`,
+  cac_comissoes: sql`categoria_nome LIKE '06.04.04%' OR categoria_nome LIKE '06.04.05%'`,
+  cac_growth: sql`categoria_nome LIKE '06.06.02%'`,
+  cac_ads: sql`categoria_nome LIKE '06.06.01%'`,
+  cac_eventos: sql`categoria_nome LIKE '06.07.01%'`,
+  cac_brindes: sql`categoria_nome LIKE '06.07.02%'`,
+  cac_viagens: sql`categoria_nome LIKE '05.04.02%' OR categoria_nome LIKE '06.05.04%'`,
+  cac_outras_sub: sql`categoria_nome LIKE '06.05.05%' OR categoria_nome LIKE '06.07.03%'`,
+};
