@@ -7,8 +7,12 @@
  *
  *  GET /api/oauth/youtube/callback
  *      → recebe o code, troca por refresh_token + access_token, descobre
- *        quais canais aquela conta gerencia e salva tudo encriptado em
- *        youtube.credentials e youtube.channels.
+ *        qual canal foi selecionado (seletor de marca) e salva UMA credencial
+ *        POR CANAL em youtube.credentials, linkando youtube.channels.
+ *        Como a mesma conta (ex.: ferramentas@) gerencia vários canais Brand
+ *        Account, cada autorização traz o mesmo google_user_id mas um
+ *        refresh_token distinto — por isso a credencial é chaveada por channel_id,
+ *        não por google_user_id (senão a 2ª autorização sobrescrevia a 1ª).
  *
  *  GET /api/oauth/youtube/status
  *      → lista canais autorizados e estado das credenciais.
@@ -91,20 +95,10 @@ export function registerYoutubeOAuthRoutes(app: Express, db: any) {
 
       const refreshTokenEnc = encryptToken(tokens.refresh_token);
 
-      const credRes = await db.execute(sql`
-        INSERT INTO youtube.credentials
-          (google_user_id, google_email, refresh_token_enc, scopes, authorized_at, last_used_at, active)
-        VALUES (${googleUserId}, ${googleEmail}, ${refreshTokenEnc}, ${YT_SCOPES.join(' ')}, NOW(), NOW(), TRUE)
-        ON CONFLICT (google_user_id) DO UPDATE
-          SET refresh_token_enc = EXCLUDED.refresh_token_enc,
-              google_email      = EXCLUDED.google_email,
-              scopes            = EXCLUDED.scopes,
-              authorized_at     = NOW(),
-              active            = TRUE
-        RETURNING id
-      `);
-      const credentialId = (credRes as any).rows?.[0]?.id ?? (credRes as any)[0]?.id;
-
+      // Descobre o canal ANTES de gravar a credencial: com o seletor de marca,
+      // channels.list(mine=true) retorna o canal selecionado nesta autorização.
+      // O refresh_token só é válido para esse canal, então gravamos uma credencial
+      // por canal (chave channel_id).
       const yt = google.youtube({ version: 'v3', auth: oauth2 });
       const list = await yt.channels.list({
         part: ['id', 'snippet', 'statistics'],
@@ -113,11 +107,37 @@ export function registerYoutubeOAuthRoutes(app: Express, db: any) {
       });
 
       const channels = list.data.items || [];
+      if (channels.length === 0) {
+        return res.status(400).send(
+          'Nenhum canal encontrado para essa conta/seleção. Se for Brand Account, ' +
+          'confirme que a conta foi adicionada como Proprietário/Gerente do canal e ' +
+          'que você escolheu o canal certo no seletor de marca.'
+        );
+      }
+
       const linked: string[] = [];
       for (const ch of channels) {
         const channelId = ch.id!;
         const snippet = ch.snippet || {};
         const stats = ch.statistics || {};
+
+        // 1) Credencial POR CANAL — re-autorizar o mesmo canal atualiza só o token dele.
+        const credRes = await db.execute(sql`
+          INSERT INTO youtube.credentials
+            (google_user_id, google_email, channel_id, refresh_token_enc, scopes, authorized_at, last_used_at, active)
+          VALUES (${googleUserId}, ${googleEmail}, ${channelId}, ${refreshTokenEnc}, ${YT_SCOPES.join(' ')}, NOW(), NOW(), TRUE)
+          ON CONFLICT (channel_id) DO UPDATE
+            SET refresh_token_enc = EXCLUDED.refresh_token_enc,
+                google_user_id    = EXCLUDED.google_user_id,
+                google_email      = EXCLUDED.google_email,
+                scopes            = EXCLUDED.scopes,
+                authorized_at     = NOW(),
+                active            = TRUE
+          RETURNING id
+        `);
+        const credentialId = (credRes as any).rows?.[0]?.id ?? (credRes as any)[0]?.id;
+
+        // 2) Upsert do canal, linkando à sua credencial.
         await db.execute(sql`
           INSERT INTO youtube.channels (
             channel_id, title, custom_url, description, thumbnail_url, country,
