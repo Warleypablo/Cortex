@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-11 | fix(youtube): credencial OAuth por canal (1 conta → N Brand Accounts)
+
+**O que foi feito:**
+- `youtube.credentials` deixou de ser `UNIQUE(google_user_id)` e passou a ser chaveada por `channel_id` (uma credencial por canal).
+- O callback OAuth agora descobre o canal (`channels.list`) **antes** de gravar a credencial e cria/atualiza uma credencial por canal com `ON CONFLICT (channel_id)`.
+- Migração idempotente em `scripts/create-youtube-tables.ts` (adiciona `channel_id`, remove o unique antigo, cria `uq_yt_credentials_channel`).
+- Schema Drizzle (`shared/schema.ts`) atualizado para refletir o novo modelo.
+
+**Por que:**
+- A conta `ferramentas@turbopartners.com.br` vai gerenciar **4 canais** (Brand Accounts). Cada autorização traz o **mesmo** `google_user_id` mas um `refresh_token` diferente, válido só para o canal selecionado. Com o `UNIQUE(google_user_id)` antigo, a Nª autorização sobrescrevia o token das anteriores e o sync puxava todos os canais com o token do último → os demais retornavam 403.
+
+**Arquivos alterados:**
+- `server/routes/youtubeOAuth.ts` - reordena o callback e grava 1 credencial por canal.
+- `scripts/create-youtube-tables.ts` - DDL base + migração idempotente da credencial.
+- `shared/schema.ts` - `youtubeCredentials` sem unique em `google_user_id`, com `channel_id` unique.
+
+**Impacto arquitetural:** Modelo de credenciais YouTube passa de 1-por-conta para 1-por-canal. Requer rodar `npx tsx scripts/create-youtube-tables.ts` em prod (idempotente) antes de autorizar os canais.
+
+---
+
 ## 2026-06-11 | docs(youtube): passo-a-passo de acesso via Conta de Marca (client Interno)
 
 **O que foi feito:**
