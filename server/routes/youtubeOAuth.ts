@@ -51,7 +51,9 @@ function getOauthClient(req: Request) {
   return new google.auth.OAuth2(clientId, clientSecret, redirectUri);
 }
 
-export function registerYoutubeOAuthRoutes(app: Express, db: any) {
+// Rotas PÚBLICAS (registradas ANTES do isAuthenticated): o dono do canal autoriza
+// com a própria conta Google sem precisar de login no Cortex — igual ao módulo Instagram.
+export function registerYoutubeOAuthPublicRoutes(app: Express, db: any) {
   // --- START ---
   app.get('/api/oauth/youtube/start', (req: Request, res: Response) => {
     try {
@@ -189,7 +191,10 @@ export function registerYoutubeOAuthRoutes(app: Express, db: any) {
       res.status(500).send(`Erro no callback: ${e.message}`);
     }
   });
+}
 
+// Rota PROTEGIDA (fica atrás do isAuthenticated): lista os canais autorizados.
+export function registerYoutubeOAuthStatusRoute(app: Express, db: any) {
   // --- STATUS ---
   app.get('/api/oauth/youtube/status', async (_req: Request, res: Response) => {
     try {
