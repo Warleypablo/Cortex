@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-11 | docs(youtube): passo-a-passo de acesso via Conta de Marca (client Interno)
+
+**O que foi feito:**
+- Reescreve `docs/youtube-acesso-canais.md` do caminho External para o caminho Conta de Marca (Brand Account).
+- Adiciona Passo 0 obrigatório: validar a pipeline inteira num canal de teste não-monetizado antes de mexer nos canais reais.
+- Esclarece que "Conta de Marca" não é uma marca-guarda-chuva da Turbo — cada canal continua do dono e o acesso da Turbo é leitura revogável.
+- Registra a pendência técnica do `UNIQUE(google_user_id)` para múltiplos canais na mesma conta Turbo.
+
+**Por que:**
+- Os canais dos sócios são contas pessoais; canal comum não aceita adicionar usuários e conta pessoal não vira `@turbopartners`. Conta de Marca permite adicionar a Turbo como proprietária e autorizar com o client Interno atual — eliminando a verificação do Google e a expiração de token de 7 dias do caminho External.
+
+**Arquivos alterados:**
+- `docs/youtube-acesso-canais.md` - substitui o procedimento External pelo procedimento Brand Account (Passos 0–4 + pendência técnica + diagrama do fluxo).
+
+**Impacto arquitetural:** Nenhum (apenas documentação). Define o caminho que tornará desnecessário o projeto GCP External dedicado.
+
+---
+
 ## 2026-06-09 | docs(utm): content por tipo de destino (site-/lp-) + bio multi-link na Constituição v1.4
 
 **O que foi feito:**
