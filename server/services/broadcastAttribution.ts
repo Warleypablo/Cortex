@@ -6,7 +6,8 @@
  *     na MESMA conversation_id antes da resposta → reconstrói o broadcast_id no mesmo
  *     formato de listBroadcasts (wa-YYYYMMDD-source-hash8);
  *  2. classifica o sentimento da resposta (replyClassifier);
- *  3. resolve telefone do contato GHL → "Bitrix".crm_contact → crm_deal.contact_id;
+ *  3. resolve telefone do contato GHL (fallback: phone do raw da conversa, pois o sync
+ *     de contatos é incompleto) → "Bitrix".crm_contact → crm_deal.contact_id;
  *  4. faz upsert em cortex_core.broadcast_lead_events (idempotente por reply_message_id).
  *
  * As etapas reunião/comparecimento/venda NÃO entram aqui — são lidas live do crm_deal
@@ -72,9 +73,11 @@ export async function attributeBroadcastReplies(opts: {
       FROM replies r
     )
     SELECT a.reply_message_id, a.conversation_id, a.ghl_contact_id, a.reply_body,
-           a.reply_at, a.broadcast_id, c.phone AS lead_phone
+           a.reply_at, a.broadcast_id,
+           COALESCE(c.phone, cv.raw->>'phone') AS lead_phone
     FROM attributed a
     LEFT JOIN cortex_core.ghl_contacts c ON c.id = a.ghl_contact_id
+    LEFT JOIN cortex_core.ghl_conversations cv ON cv.id = a.conversation_id
     WHERE a.broadcast_id IS NOT NULL
       ${broadcastId ? sql`AND a.broadcast_id = ${broadcastId}` : sql``}
   `);
@@ -85,19 +88,23 @@ export async function attributeBroadcastReplies(opts: {
   }
 
   // 2) Pula as já gravadas — MAS reprocessa as que ficaram com sentimento de fallback
-  //    (classificação IA falhou no passado, ex.: chave inválida). Self-heal.
+  //    (classificação IA falhou no passado, ex.: chave inválida) e as que ficaram sem
+  //    telefone mas que agora dá pra resolver (contato sincronizado depois, ou fallback
+  //    pelo phone da conversa). Self-heal.
   let pending = rows;
   if (!reclassify) {
     const ids = rows.map((x) => x.reply_message_id);
+    const phoneNow = new Map(rows.map((x) => [x.reply_message_id, x.lead_phone]));
     // node-pg liga o array como $1::text[] (o template sql do drizzle não casa array em ANY()).
     const existing = await pool.query(
-      `SELECT reply_message_id, sentiment_motivo FROM cortex_core.broadcast_lead_events WHERE reply_message_id = ANY($1::text[])`,
+      `SELECT reply_message_id, sentiment_motivo, lead_phone FROM cortex_core.broadcast_lead_events WHERE reply_message_id = ANY($1::text[])`,
       [ids],
     );
-    // "OK" = já gravada E o sentimento não veio de uma falha de IA.
+    // "OK" = já gravada, sentimento não veio de falha de IA, e não há telefone novo a ganhar.
     const okSeen = new Set(
       (existing.rows ?? [])
         .filter((x: any) => !/falha|indispon/i.test(x.sentiment_motivo ?? ""))
+        .filter((x: any) => !(x.lead_phone == null && phoneNow.get(x.reply_message_id) != null))
         .map((x: any) => x.reply_message_id),
     );
     pending = rows.filter((x) => !okSeen.has(x.reply_message_id));

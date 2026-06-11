@@ -1538,14 +1538,15 @@ async function getBroadcastLeads(req: Request, res: Response) {
         SELECT DISTINCT ON (COALESCE(e.ghl_contact_id, e.lead_phone, e.reply_message_id))
           e.reply_message_id, e.lead_phone, e.sentiment, e.sentiment_motivo, e.sentiment_fonte,
           e.reply_body, e.reply_at, e.bitrix_deal_id,
-          COALESCE(c.contact_name, ct.name) AS nome,
+          COALESCE(c.contact_name, ct.name, cv.raw->>'contactName', cv.raw->>'fullName') AS nome,
           COALESCE(c.company_name, d.company_name) AS empresa,
-          COALESCE(c.email, ct.email) AS email,
+          COALESCE(c.email, ct.email, cv.raw->>'email') AS email,
           d.stage_name, d.data_reuniao_agendada, d.data_reuniao_realizada, d.data_fechamento,
           d.valor_recorrente, d.valor_pontual,
           COUNT(*) OVER (PARTITION BY COALESCE(e.ghl_contact_id, e.lead_phone, e.reply_message_id))::int AS n_respostas
         FROM cortex_core.broadcast_lead_events e
         LEFT JOIN cortex_core.ghl_contacts c ON c.id = e.ghl_contact_id
+        LEFT JOIN cortex_core.ghl_conversations cv ON cv.id = e.conversation_id
         LEFT JOIN "Bitrix".crm_contact ct ON ct.id = e.bitrix_contact_id
         LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
         WHERE e.broadcast_id = ${id}
