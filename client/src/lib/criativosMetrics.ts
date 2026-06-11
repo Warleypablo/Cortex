@@ -19,6 +19,19 @@ export interface CriativoData {
   adsetId: string | null;
   adsetName: string | null;
   adsetStatus?: string;
+  // orçamento (vindo da API no nível de anúncio; em reais). CBO = budget na campanha; ABO = no conjunto.
+  campaignDailyBudget?: number | null;
+  campaignLifetimeBudget?: number | null;
+  adsetDailyBudget?: number | null;
+  adsetLifetimeBudget?: number | null;
+  // orçamento diário exibido (derivado por nível, com dedupe de conjuntos/campanhas)
+  orcamentoDiario?: number | null;
+  // como renderizar o orçamento nesta linha/nível (espelha o Meta Ads):
+  // 'own' = orçamento mora neste nível (mostra valor, editável)
+  // 'usa_conjunto' = campanha ABO → "Usando o orçamento do conjunto de anúncios"
+  // 'usa_campanha' = conjunto sob CBO → "Usando o orçamento da campanha"
+  // null = sem orçamento aplicável (ex.: nível de anúncio)
+  orcamentoInfo?: "own" | "usa_conjunto" | "usa_campanha" | null;
   // contadores brutos (presentes nas linhas de anúncio vindas da API)
   impressions?: number;
   outboundClicks?: number;
@@ -245,12 +258,82 @@ interface GroupMeta {
   adsetStatus?: string;
 }
 
+/** Indica se a campanha do anúncio usa orçamento de campanha (CBO). */
+function isCbo(r: CriativoData): boolean {
+  return (r.campaignDailyBudget || 0) > 0 || (r.campaignLifetimeBudget || 0) > 0;
+}
+
+type BudgetCell = { value: number | null; info: "own" | "usa_conjunto" | "usa_campanha" | null };
+
+// Soma do daily_budget dos conjuntos distintos de uma campanha (ABO).
+// activeOnly = considera apenas conjuntos ativos (pausados não gastam, não entram no total).
+function sumDistinctAdsets(campRows: CriativoData[], activeOnly = false): number {
+  const seen = new Map<string, number>();
+  for (const a of campRows) {
+    const id = a.adsetId || "—";
+    if (seen.has(id)) continue;
+    if (activeOnly && a.adsetStatus !== "Ativo") { seen.set(id, 0); continue; }
+    seen.set(id, a.adsetDailyBudget || 0);
+  }
+  return Array.from(seen.values()).reduce((s, v) => s + v, 0);
+}
+
+/**
+ * Espelha a coluna "Orçamento" do Meta Ads, que varia conforme a aba (nível):
+ * - Campanha: CBO → mostra o valor (editável); ABO → "Usando o orçamento do conjunto".
+ * - Conjunto: ABO → mostra o valor (editável); CBO → "Usando o orçamento da campanha".
+ * - Conta: visão agregada → soma de todas as campanhas (não editável).
+ * - Anúncio: sem orçamento aplicável.
+ */
+function computeBudget(rows: CriativoData[], level: Level): BudgetCell {
+  if (!rows.length) return { value: null, info: null };
+  const r = rows[0];
+
+  if (level === "campanha") {
+    if (isCbo(r)) return { value: r.campaignDailyBudget ?? null, info: "own" };
+    return { value: null, info: "usa_conjunto" }; // ABO → orçamento mora nos conjuntos
+  }
+
+  if (level === "conjunto") {
+    if ((r.adsetDailyBudget || 0) > 0) return { value: r.adsetDailyBudget!, info: "own" };
+    if (isCbo(r)) return { value: null, info: "usa_campanha" }; // CBO → orçamento mora na campanha
+    return { value: null, info: null };
+  }
+
+  if (level === "conta") {
+    // Total = orçamento diário do que REALMENTE roda (somente ativos). Campanhas/conjuntos
+    // pausados têm budget configurado mas gastam R$0/dia — incluí-los inflaria o total.
+    const byCampaign = new Map<string, CriativoData[]>();
+    for (const a of rows) {
+      const id = a.campaignId || "—";
+      const arr = byCampaign.get(id);
+      if (arr) arr.push(a);
+      else byCampaign.set(id, [a]);
+    }
+    let total = 0;
+    Array.from(byCampaign.values()).forEach((campRows) => {
+      const c = campRows[0];
+      if (isCbo(c)) {
+        if (c.campaignStatus === "Ativo") total += c.campaignDailyBudget || 0; // CBO ativo
+      } else {
+        total += sumDistinctAdsets(campRows, true); // ABO: só conjuntos ativos
+      }
+    });
+    return { value: total > 0 ? total : null, info: "own" };
+  }
+
+  return { value: null, info: null }; // anúncio
+}
+
 /** Agrega um conjunto de linhas (anúncios) em uma única linha CriativoData. */
-export function aggregateGroup(rows: CriativoData[], meta: GroupMeta): CriativoData {
+export function aggregateGroup(rows: CriativoData[], meta: GroupMeta, level: Level): CriativoData {
   const derived = computeDerived(sumRaw(rows));
+  const budget = computeBudget(rows, level);
   return {
     link: "",
     plataforma: "Meta Ads",
+    orcamentoDiario: budget.value,
+    orcamentoInfo: budget.info,
     ...meta,
     ...derived,
   } as CriativoData;
@@ -263,7 +346,10 @@ function deriveStatus(rows: CriativoData[]): string {
 
 /** Agrega as linhas de anúncio para o nível pedido. */
 export function aggregateByLevel(rows: CriativoData[], level: Level): CriativoData[] {
-  if (level === "anuncio") return rows;
+  if (level === "anuncio") {
+    // Nível de anúncio não tem orçamento próprio (mora no conjunto/campanha).
+    return rows.map((r) => ({ ...r, orcamentoDiario: null, orcamentoInfo: null }));
+  }
 
   if (level === "conta") {
     return rows.length
@@ -273,7 +359,7 @@ export function aggregateByLevel(rows: CriativoData[], level: Level): CriativoDa
           status: deriveStatus(rows),
           campaignId: null, campaignName: null,
           adsetId: null, adsetName: null,
-        })]
+        }, level)]
       : [];
   }
 
@@ -297,7 +383,7 @@ export function aggregateByLevel(rows: CriativoData[], level: Level): CriativoDa
         campaignName: first.campaignName,
         campaignStatus: first.campaignStatus,
         adsetId: null, adsetName: null,
-      }));
+      }, level));
     } else {
       out.push(aggregateGroup(grp, {
         id: key,
@@ -308,7 +394,7 @@ export function aggregateByLevel(rows: CriativoData[], level: Level): CriativoDa
         adsetId: key,
         adsetName: first.adsetName,
         adsetStatus: first.adsetStatus,
-      }));
+      }, level));
     }
   });
   return out;
