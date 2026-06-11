@@ -573,20 +573,34 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         `),
 
         // 16. Churn por squad no mês de dados (usa cup_churn - tabela curada)
+        // Total = todos os churns; "sem abonados" desconta apenas pela coluna abonar_churn.
+        // clientes: lista p/ tooltip (nome do cliente via cup_clientes; só contratos com valor_r > 0)
         db.execute(sql`
           SELECT
-            squad,
-            COALESCE(SUM(valor_r), 0)::numeric as churn_brl,
-            COUNT(*)::int as churn_count
-          FROM cortex_core.vw_cup_churn_ajustado
-          WHERE data_solicitacao_encerramento IS NOT NULL
-            AND data_solicitacao_encerramento >= ${dataStart}
-            AND data_solicitacao_encerramento < ${dataEnd}
-            AND COALESCE(abonar_churn, '') != 'Sim'
-            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
-            AND squad IS NOT NULL
-            AND TRIM(squad) != ''
-          GROUP BY squad
+            v.squad,
+            COALESCE(SUM(v.valor_r), 0)::numeric as churn_total_brl,
+            COUNT(*)::int as churn_total_count,
+            COALESCE(SUM(v.valor_r) FILTER (WHERE COALESCE(v.abonar_churn, '') != 'Sim'), 0)::numeric as churn_brl,
+            (COUNT(*) FILTER (WHERE COALESCE(v.abonar_churn, '') != 'Sim'))::int as churn_count,
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'nome', COALESCE(cl.nome, v.nome),
+                  'valor', COALESCE(v.valor_r, 0),
+                  'abonado', COALESCE(v.abonar_churn, '') = 'Sim'
+                )
+                ORDER BY v.valor_r DESC NULLS LAST
+              ) FILTER (WHERE COALESCE(v.valor_r, 0) > 0),
+              '[]'::json
+            ) as clientes
+          FROM cortex_core.vw_cup_churn_ajustado v
+          LEFT JOIN "Clickup".cup_clientes cl ON v.parent_id = cl.task_id
+          WHERE v.data_solicitacao_encerramento IS NOT NULL
+            AND v.data_solicitacao_encerramento >= ${dataStart}
+            AND v.data_solicitacao_encerramento < ${dataEnd}
+            AND v.squad IS NOT NULL
+            AND TRIM(v.squad) != ''
+          GROUP BY v.squad
         `),
 
         // 16b. Pontual entregue no mês por squad (cup_contratos com data_entrega no mês)
@@ -1283,18 +1297,24 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         retencoesValor: parseFloat(turboRetencoes.retencoes_valor) || 0,
       };
 
+      // Normaliza nome de squad p/ casar fontes diferentes (emoji, sufixo "(OFF)", caixa)
+      // — ex.: snapshot tem "✨ Aura" e cup_churn "✨ Aura (OFF)" após desativação do squad
+      const normalizeSquadName = (s: string): string =>
+        (s || "").replace(/^[^A-Za-z]+/, "").replace(/\s*\(OFF\)\s*$/i, "").trim().toLowerCase();
+
       // Pontual entregue no mês por squad (cup_contratos.data_entrega no mês)
       // Substitui o "pontual" vindo do snapshot (que era backlog em aberto)
       const pontualEntregueBySquad: Record<string, number> = {};
       (pontualEntregueSquadResult.rows as any[]).forEach((row: any) => {
-        pontualEntregueBySquad[row.squad] = parseFloat(row.pontual) || 0;
+        const key = normalizeSquadName(row.squad);
+        pontualEntregueBySquad[key] = (pontualEntregueBySquad[key] || 0) + (parseFloat(row.pontual) || 0);
       });
 
       // Build ranking squads — ordena por (mrr + pontual entregue no mês) desc
       const rankingSquads = (rankingSquadsResult.rows as any[])
         .map((row: any) => {
           const mrr = parseFloat(row.mrr) || 0;
-          const pontual = pontualEntregueBySquad[row.squad] || 0;
+          const pontual = pontualEntregueBySquad[normalizeSquadName(row.squad)] || 0;
           return {
             squad: row.squad,
             mrr,
@@ -1308,38 +1328,52 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         .map(({ _total, ...rest }, i) => ({ ...rest, posicao: i + 1 }));
 
       // Build squad details (merge ranking + churn + evolução)
-      const churnBySquad: Record<string, { brl: number; count: number }> = {};
+      const churnBySquad: Record<string, { brl: number; count: number; totalBrl: number; totalCount: number; clientes: any[] }> = {};
       (churnSquadsResult.rows as any[]).forEach((row: any) => {
-        churnBySquad[row.squad] = {
+        const key = normalizeSquadName(row.squad);
+        const prev = churnBySquad[key];
+        const cur = {
           brl: parseFloat(row.churn_brl) || 0,
           count: parseInt(row.churn_count) || 0,
+          totalBrl: parseFloat(row.churn_total_brl) || 0,
+          totalCount: parseInt(row.churn_total_count) || 0,
+          clientes: Array.isArray(row.clientes) ? row.clientes : [],
         };
+        churnBySquad[key] = prev
+          ? {
+              brl: prev.brl + cur.brl,
+              count: prev.count + cur.count,
+              totalBrl: prev.totalBrl + cur.totalBrl,
+              totalCount: prev.totalCount + cur.totalCount,
+              clientes: [...prev.clientes, ...cur.clientes],
+            }
+          : cur;
       });
 
       const mrrAnteriorBySquad: Record<string, number> = {};
       (mrrAnteriorSquadsResult.rows as any[]).forEach((row: any) => {
-        mrrAnteriorBySquad[row.squad] = parseFloat(row.mrr) || 0;
+        const key = normalizeSquadName(row.squad);
+        mrrAnteriorBySquad[key] = (mrrAnteriorBySquad[key] || 0) + (parseFloat(row.mrr) || 0);
       });
 
       // Squads ocultos do slide "Detalhes por Squad" (não impacta ranking nem totais)
       const SQUADS_OCULTOS_DETALHES = new Set(["comercial", "makers", "turbo interno", "squad x"]);
-      const normalizeSquadName = (s: string): string =>
-        (s || "").replace(/^[^A-Za-z]+/, "").replace(/\s*\(OFF\)\s*$/i, "").trim().toLowerCase();
 
       const squadDetails = (rankingSquadsResult.rows as any[])
         .filter((row: any) => !SQUADS_OCULTOS_DETALHES.has(normalizeSquadName(row.squad)))
         .map((row: any) => {
         const mrr = parseFloat(row.mrr) || 0;
-        const pontual = pontualEntregueBySquad[row.squad] || 0;  // pontual entregue no mês (não em aberto)
+        const pontual = pontualEntregueBySquad[normalizeSquadName(row.squad)] || 0;  // pontual entregue no mês (não em aberto)
         const contratos = parseInt(row.contratos) || 0;
         const clientes = parseInt(row.clientes) || 0;
-        const churn = churnBySquad[row.squad] || { brl: 0, count: 0 };
-        const mrrAnt = mrrAnteriorBySquad[row.squad] || 0;
+        const churn = churnBySquad[normalizeSquadName(row.squad)] || { brl: 0, count: 0, totalBrl: 0, totalCount: 0, clientes: [] };
+        const mrrAnt = mrrAnteriorBySquad[normalizeSquadName(row.squad)] || 0;
         const ticketMedio = contratos > 0 ? mrr / contratos : 0;
         // Churn % = churn do mês / MRR do mês anterior.
         // Squad novo (sem base no mês anterior): usa MRR do próprio mês como base.
         const churnBase = mrrAnt > 0 ? mrrAnt : mrr;
         const churnPct = churnBase > 0 ? (churn.brl / churnBase) * 100 : 0;
+        const churnTotalPct = churnBase > 0 ? (churn.totalBrl / churnBase) * 100 : 0;
 
         return {
           squad: row.squad,
@@ -1349,6 +1383,9 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           clientes,
           churnPct: Math.round(churnPct * 10) / 10,
           churnBrl: churn.brl,
+          churnTotalPct: Math.round(churnTotalPct * 10) / 10,
+          churnTotalBrl: churn.totalBrl,
+          churnClientes: [...churn.clientes].sort((a, b) => (b.valor || 0) - (a.valor || 0)),
           mrrBase: churnBase,
           evolucaoMrr: mrr - mrrAnt,
         };
