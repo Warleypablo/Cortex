@@ -485,7 +485,7 @@ export default function CapacityTimes() {
   const squads = data?.squads ?? [];
   const teams: TeamSummary[] = [
     ...squads.map(summarizeSquad),
-    summarizeComercial("Selca", data?.vendedor ?? []),
+    summarizeComercial("Selva", data?.vendedor ?? []),
     summarizeComercial("Accounts", data?.account ?? []),
     summarizeComercial("Squadra", data?.gestor ?? []),
   ];
@@ -509,7 +509,7 @@ export default function CapacityTimes() {
             {squads.map((s) => (
               <TabsTrigger key={s.squad} value={s.squad}>{s.squad} ({s.rows.length})</TabsTrigger>
             ))}
-            <TabsTrigger value="vendedor">Selca ({data?.vendedor.length ?? 0})</TabsTrigger>
+            <TabsTrigger value="vendedor">Selva ({data?.vendedor.length ?? 0})</TabsTrigger>
             <TabsTrigger value="account">Accounts ({data?.account.length ?? 0})</TabsTrigger>
             <TabsTrigger value="gestor">Squadra ({data?.gestor.length ?? 0})</TabsTrigger>
             <TabsTrigger value="__config__">⚙️ Configurar</TabsTrigger>
@@ -524,7 +524,7 @@ export default function CapacityTimes() {
               <SquadTab group={s} onOperadorClick={setSelectedOperador} />
             </TabsContent>
           ))}
-          <TabsContent value="vendedor"><ComercialTab title="Selca" rows={data?.vendedor ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
+          <TabsContent value="vendedor"><ComercialTab title="Selva" rows={data?.vendedor ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
           <TabsContent value="account"><ComercialTab title="Accounts" rows={data?.account ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
           <TabsContent value="gestor"><ComercialTab title="Squadra" rows={data?.gestor ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
           <TabsContent value="__config__"><CapacityMetasConfig /></TabsContent>

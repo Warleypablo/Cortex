@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-11 | fix(capacity): renomeia Selca para Selva e remove squad Aura (virou Pulse)
+
+**O que foi feito:**
+- Tab e título do time de vendedores renomeados de "Selca" para "Selva" (CapacityTimes + label do dialog de operador).
+- "Aura" removida das categorias base do dialog de operador — a squad foi absorvida pela Pulse.
+- Banco local atualizado (`UPDATE capacity_metas SET categoria='Pulse' WHERE categoria='Aura'`, 3 operadores) para espelhar prod, que já estava migrado.
+
+**Por que:**
+- O nome correto do time comercial é Selva, e a squad Aura deixou de existir ("tudo o que era Aura virou Pulse"). Prod já tinha os 8 operadores em Pulse; o local ainda mostrava a tab Aura.
+
+**Arquivos alterados:**
+- `client/src/pages/CapacityTimes.tsx` - labels Selca → Selva (overview, tab e conteúdo).
+- `client/src/components/capacity-times/CapacityMetaDialog.tsx` - label "Selva (vendedor)" e CATEGORIAS_BASE sem "Aura".
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-11 | feat(youtube): start/callback do OAuth públicos (sem login no Cortex)
 
 **O que foi feito:**

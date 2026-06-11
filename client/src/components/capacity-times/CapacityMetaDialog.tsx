@@ -16,12 +16,12 @@ import type { CapacityMeta, ResponsavelOption } from "./CapacityMetasConfig";
 
 // Labels amigáveis para as categorias comerciais; operacionais usam o próprio nome.
 export const CATEGORIA_LABELS: Record<string, string> = {
-  vendedor: "Selca (vendedor)",
+  vendedor: "Selva (vendedor)",
   account: "Accounts (account)",
   gestor: "Squadra (gestor)",
 };
 
-const CATEGORIAS_BASE = ["Pulse", "Aura", "Olimpo", "vendedor", "account", "gestor"];
+const CATEGORIAS_BASE = ["Pulse", "Olimpo", "vendedor", "account", "gestor"];
 const NOVA = "__nova__";
 
 interface FormState {
