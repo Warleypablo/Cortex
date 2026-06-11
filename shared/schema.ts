@@ -3495,8 +3495,14 @@ export const youtubeSchema = pgSchema("youtube");
 
 export const youtubeCredentials = youtubeSchema.table("credentials", {
   id: serial("id").primaryKey(),
-  googleUserId: varchar("google_user_id", { length: 100 }).notNull().unique(),
+  // NÃO é único: uma conta Google (ex.: ferramentas@) gerencia vários canais Brand
+  // Account, e cada autorização traz o MESMO google_user_id porém um refresh_token
+  // diferente, válido só para o canal selecionado no seletor de marca.
+  googleUserId: varchar("google_user_id", { length: 100 }).notNull(),
   googleEmail: varchar("google_email", { length: 255 }),
+  // Canal ao qual este refresh_token dá acesso. É a chave real da credencial
+  // (UNIQUE) — uma credencial por canal.
+  channelId: varchar("channel_id", { length: 50 }).unique(),
   refreshTokenEnc: text("refresh_token_enc").notNull(), // encriptado com encryptToken()
   scopes: text("scopes").notNull(),
   authorizedAt: timestamp("authorized_at", { withTimezone: true }).notNull().defaultNow(),
