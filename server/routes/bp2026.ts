@@ -11,18 +11,25 @@ import {
   type MesValor,
   type TipoAgregacao,
 } from "./bp2026.helpers";
+import { montarMetricasGerais } from "./bp2026.metricas";
+import { montarRevenue } from "./bp2026.revenue";
+import { montarFunil } from "./bp2026.funil";
+import { montarCapacity } from "./bp2026.capacity";
+import { montarDetalhamentos } from "./bp2026.detalhamentos";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
 
-export type Direcao = "maior_melhor" | "menor_melhor";
+export type Direcao = "maior_melhor" | "menor_melhor" | "neutro";
 
 export interface DefLinha {
   metrica: string;
   titulo: string;
   tipoAgregacao: TipoAgregacao;
   direcao: Direcao;
+  unidade?: "brl" | "int" | "pct";
   nota?: string;
+  destaque?: boolean;
 }
 
 interface LinhaReceita {
@@ -30,7 +37,9 @@ interface LinhaReceita {
   titulo: string;
   tipoAgregacao: TipoAgregacao;
   direcao: Direcao;
+  unidade?: "brl" | "int" | "pct";
   nota?: string;
+  destaque?: boolean;
   meses: Array<{
     mes: number;
     orcado: number;
@@ -107,7 +116,7 @@ export const LINHAS_POS_EBITDA: DefLinha[] = [
 
 // Soma mensal de despesas em regime caixa (QUITADO por data_quitacao em 2026),
 // filtrada por um predicado de categorias.
-async function somaDespesaCaixaPorMes(
+export async function somaDespesaCaixaPorMes(
   db: any,
   predicadoCategorias: ReturnType<typeof sql>
 ): Promise<Record<number, number>> {
@@ -182,18 +191,22 @@ export function registerBp2026Routes(app: Express, db: any) {
            AND s.d < (make_date(2026, gs.mes, 1) + INTERVAL '1 month')
           GROUP BY gs.mes
         )
-        SELECT a.mes, a.snapshot_dia::text AS snapshot_dia, SUM(h.valorr::numeric) AS mrr
+        SELECT a.mes, a.snapshot_dia::text AS snapshot_dia, SUM(h.valorr::numeric) AS mrr,
+               COUNT(DISTINCT h.id_task) AS clientes,
+               COUNT(DISTINCT h.id_subtask) AS contratos
         FROM alvo a
         JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = a.snapshot_dia
         WHERE h.status IN ('ativo', 'onboarding', 'triagem')
         GROUP BY a.mes, a.snapshot_dia
         ORDER BY a.mes
       `);
-      const mrrPorMes: Record<number, { valor: number; snapshotDia: string }> = {};
+      const mrrPorMes: Record<number, { valor: number; snapshotDia: string; clientes: number; contratos: number }> = {};
       for (const row of mrrResult.rows as any[]) {
         mrrPorMes[Number(row.mes)] = {
           valor: parseFloat(row.mrr),
           snapshotDia: row.snapshot_dia,
+          clientes: parseInt(row.clientes),
+          contratos: parseInt(row.contratos),
         };
       }
 
@@ -210,6 +223,21 @@ export function registerBp2026Routes(app: Express, db: any) {
       const pontualPorMes: Record<number, number> = {};
       for (const row of pontualResult.rows as any[]) {
         pontualPorMes[Number(row.mes)] = parseFloat(row.total);
+      }
+
+      // 3b. Vendas MRR: deals ganhos com valor_recorrente > 0 no Bitrix
+      // (movido do bp2026.metricas.ts para ser compartilhado com o módulo de Funil)
+      const vendasMrrResult = await db.execute(sql`
+        SELECT EXTRACT(MONTH FROM data_fechamento)::int AS mes,
+               SUM(valor_recorrente::numeric) AS total
+        FROM "Bitrix".crm_deal
+        WHERE stage_name = 'Negócio Ganho' AND valor_recorrente > 0
+          AND data_fechamento >= '2026-01-01' AND data_fechamento < '2027-01-01'
+        GROUP BY 1 ORDER BY 1
+      `);
+      const vendasMrrPorMes: Record<number, number> = {};
+      for (const row of vendasMrrResult.rows as any[]) {
+        vendasMrrPorMes[Number(row.mes)] = parseFloat(row.total);
       }
 
       // 4. Outras receitas: Conta Azul por competência
@@ -467,6 +495,35 @@ export function registerBp2026Routes(app: Express, db: any) {
 
       // 7. YTD por linha — acumula apenas meses fechados; mês corrente (parcial) fica de fora
       // mesFechado já calculado acima (hoisted para uso em fonteAproximada)
+
+      // 8. Métricas Gerais (sub-aba)
+      const realizadoDre: Record<string, (number | null)[]> = {};
+      for (const l of linhas) realizadoDre[l.metrica] = l.meses.map((m) => m.realizado);
+      const metricasGerais = await montarMetricasGerais({
+        db, orcado, realizadoDre,
+        mrrInfoPorMes: mrrPorMes,
+        pontualPorMes, vendasMrrPorMes, dfcPorMes, mesCorrente, mesFechado,
+      });
+
+      // 9. Revenue por linha de serviço (sub-aba)
+      const revenue = await montarRevenue({ db, orcado, mesCorrente, mesFechado });
+
+      // 10. Funil Comercial (sub-aba)
+      const { linhas: funil, ganhosPorMes } = await montarFunil({ db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado });
+
+      // 11. Capacity (sub-aba) — contratos Performance extraídos do retorno da Revenue
+      const contratosPerformanceSerie =
+        revenue.find((l) => l.metrica === "contratos_performance")?.meses.map((m) => m.realizado) ??
+        Array.from({ length: 12 }, () => null);
+      const capacity = await montarCapacity({
+        db, orcado, contratosPerformance: contratosPerformanceSerie, mesCorrente, mesFechado,
+      });
+
+      // 12. Detalhamentos: SG&A e CAC por sub-linha, Outras Receitas por categoria
+      const { sga: sgaDetalhe, cac: cacDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
+        db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, mesCorrente, mesFechado,
+      });
+
       const payload = {
         ano: ANO,
         mesCorrente,
@@ -481,6 +538,13 @@ export function registerBp2026Routes(app: Express, db: any) {
             return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) };
           })(),
         })),
+        metricasGerais,
+        revenue,
+        funil,
+        capacity,
+        sgaDetalhe,
+        cacDetalhe,
+        outrasDetalhe,
         atualizadoEm: new Date().toISOString(),
       };
 

@@ -1,23 +1,39 @@
-// server/routes/bp2026.detalhe.ts
-// Detalhamento por célula (métrica × mês) da matriz /bp-2026.
-// Usa os MESMOS predicados da agregação — célula e detalhe não podem divergir.
-import type { Express } from "express";
-import { sql } from "drizzle-orm";
-import { agruparItens, ratear, type ItemDetalhe, type GrupoDetalhe } from "./bp2026.helpers";
-import {
-  PREDICADOS_DESPESA, PREDICADO_OUTRAS_RECEITAS, PREDICADOS_SGA_SUB, PREDICADOS_OUTRAS_SUB,
-  PREDICADOS_CAC_SUB,
-} from "./bp2026.predicados";
+# BP 2026 Parte 12 (drill-down nas sub-abas) — Implementation Plan
+
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+
+**Goal:** Células clicáveis nas 6 sub-abas com o drawer do DRE: derivadas → composição client-side; fontes diretas → listas de itens do `/api/bp2026/detalhe`.
+
+**Architecture:** `bp2026.detalhe.ts` ganha handlers parametrizados (deals Bitrix, pessoas Inhire, snapshot por produto, churn, saldo, buckets) num REGISTRO config-driven; `CASE_PRODUTO`/`CASE_PRODUTO_CHURN` exportados do revenue; client estende DERIVADAS, formata por unidade e exibe contagens.
+
+**Spec:** `docs/superpowers/specs/2026-06-10-bp2026-parte12-drill-subabas-design.md` (tabelas de derivadas e fontes — parte deste plano).
+
+**Contexto:** worktree `/Users/mac0267/Cortex/.claude/worktrees/bp2026-metricas-gerais`, branch `feature/bp2026-metricas-gerais` (PR #248). FATOS investigados: `caz_bancos` tem `nmbanco` e `balance`; `cup_clientes` TEM colunas `servico` e `squad` → o `CASE_PRODUTO` (colunas sem qualificador) DEVE rodar em subquery isolada sobre `cup_data_hist`, com o join de `cup_clientes` por fora. `vw_cup_churn_ajustado` tem nome, valor_r, motivo_cancelamento, data_solicitacao_encerramento, produto, abonar_churn. `rh_pessoal` tem nome, cargo, setor, squad, admissao, demissao.
+
+---
+
+### Task 1: Server — detalhe das sub-abas
+
+**Files:**
+- Modify: `server/routes/bp2026.revenue.ts` (exports)
+- Modify: `server/routes/bp2026.detalhe.ts`
+
+Leia inteiros antes: `bp2026.detalhe.ts`, `bp2026.revenue.ts`, `bp2026.metricas.ts` (mapeamento de setores), `bp2026.predicados.ts`, spec.
+
+- [ ] **Step 1: Exports no revenue.** Em `bp2026.revenue.ts`, adicionar `export` nas consts `CASE_PRODUTO` e `CASE_PRODUTO_CHURN` (sem outras mudanças).
+
+- [ ] **Step 2: Estender `bp2026.detalhe.ts`.** Mudanças:
+
+(a) Imports adicionais:
+
+```typescript
+import { PREDICADOS_DESPESA, PREDICADO_OUTRAS_RECEITAS, PREDICADOS_SGA_SUB, PREDICADOS_OUTRAS_SUB } from "./bp2026.predicados";
 import { CASE_PRODUTO, CASE_PRODUTO_CHURN } from "./bp2026.revenue";
-import {
-  LINHAS, LINHAS_DEDUCOES, LINHAS_CSV, LINHAS_OPEX, LINHAS_POS_EBITDA,
-  somaDespesaCaixaPorMes, type DefLinha,
-} from "./bp2026";
+```
 
-const ANO = 2026;
-const LIMITE_ITENS = 50;
-const LIMITE_ITENS_DFC = 10;
+(b) DERIVADAS do servidor — substituir a const por:
 
+```typescript
 const DERIVADAS = [
   "receita_total_faturavel", "receita_liquida", "margem_bruta", "ebitda", "geracao_caixa",
   // sub-abas (composição client-side)
@@ -27,55 +43,26 @@ const DERIVADAS = [
   "aov_venda_mrr", "aov_venda_pontual",
   "gestores_necessarios", "designers_necessarios", "necessidade_gestores",
   "contratos_por_gestor", "contas_por_designer",
-  "sga_total_detalhe", "or_total_detalhe", "cac_total_detalhe", "cac_pct_receita", "cac_payback_mrr", "mrr_delta_nao_explicado",
+  "sga_total_detalhe", "or_total_detalhe",
 ];
+```
 
-// métricas de despesa cujo detalhe é o bucket puro (parcelas por quitação, grupos por categoria)
-const METRICAS_BUCKET: Record<string, string> = {
-  impostos_receita: "impostos_receita",
-  csv_salarios: "csv_salarios",
-  csv_stack: "csv_stack",
-  cac: "cac",
-  bonus: "bonus",
-  impostos_diretos: "impostos_diretos",
-  capex: "capex",
-};
+(c) Aceitar métricas das sub-abas: a checagem `TODAS_DEFS.find(...)` rejeita metricas que não são do DRE. Trocar a validação por:
 
-const TODAS_DEFS: DefLinha[] = [
-  ...LINHAS, ...LINHAS_DEDUCOES, ...LINHAS_CSV, ...LINHAS_OPEX, ...LINHAS_POS_EBITDA,
-  { metrica: "dfc_real", titulo: "(=) Fluxo de Caixa (DFC)", tipoAgregacao: "fluxo", direcao: "maior_melhor" },
-];
+```typescript
+      const def = TODAS_DEFS.find((d) => d.metrica === metrica);
+      const conhecida = def || metrica in HANDLERS_SUBABAS;
+      if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
+        return res.status(400).json({ error: "metrica/mes inválidos" });
+      }
+      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? metrica;
+```
 
-function normalizaCategoria(c: string | null): string {
-  return (c ?? "(sem categoria)").trim().replace(/\s+/g, " ");
-}
+(usar `titulo` no response em vez de `def.titulo`, e `def?.nota` onde hoje é `def.nota`.)
 
-async function itensDespesaBucket(
-  db: any, predicado: ReturnType<typeof sql>, mes: number
-): Promise<ItemDetalhe[]> {
-  const result = await db.execute(sql`
-    SELECT p.categoria_nome,
-           COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
-           COALESCE(p.descricao, '') AS descricao,
-           p.data_quitacao::text AS data,
-           COALESCE(p.valor_pago::numeric, 0) AS valor
-    FROM "Conta Azul".caz_parcelas p
-    LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
-    WHERE p.tipo_evento = 'DESPESA' AND p.status = 'QUITADO'
-      AND EXTRACT(YEAR FROM p.data_quitacao) = ${ANO}
-      AND EXTRACT(MONTH FROM p.data_quitacao) = ${mes}
-      AND (${predicado})
-    ORDER BY valor DESC
-  `);
-  return (result.rows as any[]).map((r) => ({
-    grupo: normalizaCategoria(r.categoria_nome),
-    nome: r.nome,
-    detalhe: r.descricao,
-    data: r.data,
-    valor: parseFloat(r.valor),
-  }));
-}
+(d) Helpers parametrizados (adicionar antes de `registerBp2026DetalheRoutes`):
 
+```typescript
 type ResultadoDet = { grupos: GrupoDetalhe[]; realizado: number; notaDinamica?: string };
 
 // deals Bitrix do mês: vendas (mrr|pontual|ambos) ou reuniões; modo soma|contagem
@@ -220,7 +207,11 @@ async function detChurn(
   const somaRs = itens.reduce((s, i) => s + i.valor, 0);
   return { resultado: { grupos: agruparItens(itens, LIMITE_ITENS), realizado: somaRs }, somaRs };
 }
+```
 
+(e) Registro de títulos e o roteamento das sub-abas — adicionar:
+
+```typescript
 const TITULOS_SUBABAS: Record<string, string> = {
   vendas_mrr: "Vendas MRR", funil_vendas_mrr: "Vendas MRR",
   vendas_pontual: "Vendas Pontual", funil_vendas_pontual: "Vendas Pontual",
@@ -240,16 +231,12 @@ const TITULOS_SUBABAS: Record<string, string> = {
   churn_pct_performance: "Churn — Performance", churn_pct_creators: "Churn — Creators",
   churn_pct_social: "Churn — Social", churn_pct_gc: "Churn — Gestão de Comunidade",
   churn_pct_others: "Churn — Others",
-  saldo_caixa: "Saldo de Caixa", cac_por_cliente: "CAC por cliente adquirido",
+  saldo_caixa: "Saldo de Caixa",
   sga_uzk: "UZK", sga_backoffice: "Backoffice", sga_software: "Software", sga_ocupacao: "Ocupação",
   beneficio_total_empresa: "Benefício Caju", sga_premiacoes: "Premiações",
   sga_eventos: "Eventos e Brindes Internos", sga_outras: "Outras despesas",
   or_receita_variavel: "Receita Variável", or_stack_digital: "Stack Digital",
   or_demais: "Demais (Mentoria, Infoproduto, Turbooh…)",
-  cac_pre_vendas: "Pré Vendas", cac_vendas: "Vendas", cac_gerencia: "Gerência",
-  cac_comissoes: "Comissões", cac_growth: "Growth", cac_ads: "ADs",
-  cac_eventos: "Eventos", cac_brindes: "Brindes", cac_viagens: "Viagens",
-  cac_outras_sub: "Outras comerciais (não orçadas)",
 };
 const HANDLERS_SUBABAS = TITULOS_SUBABAS; // mesmo conjunto de chaves (roteadas no switch abaixo)
 
@@ -261,181 +248,11 @@ const SETOR_FILTROS: Record<string, ReturnType<typeof sql>> = {
   gestores_atuais: sql`TRIM(cargo) = 'Gestor de Performance'`,
   designers_atuais: sql`TRIM(cargo) = 'Designer'`,
 };
+```
 
-export function registerBp2026DetalheRoutes(app: Express, db: any) {
-  app.get("/api/bp2026/detalhe", async (req, res) => {
-    try {
-      const metrica = String(req.query.metrica ?? "");
-      const mes = Number(req.query.mes);
-      const def = TODAS_DEFS.find((d) => d.metrica === metrica);
-      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica);
-      if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
-        return res.status(400).json({ error: "metrica/mes inválidos" });
-      }
-      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? metrica;
+(f) No corpo do handler GET, ANTES do `else` final que retorna 400, adicionar o roteamento (o `realizado`/`grupos`/`notaDinamica` seguem o padrão existente; declarar `let notaDinamica: string | undefined;` junto de `rateio`):
 
-      let orcado: number | null = null;
-      const orcRes = await db.execute(sql`
-        SELECT valor::numeric AS valor FROM cortex_core.bp2026_orcado
-        WHERE metrica = ${metrica} AND mes = ${mes}
-      `);
-      if (orcRes.rows.length) orcado = parseFloat((orcRes.rows[0] as any).valor);
-      // dfc_real não tem orçado persistido (usa o da Geração de Caixa, derivada);
-      // o frontend lê o orçado da célula no payload da matriz — aqui permanece null.
-
-      const agora = new Date();
-      const anoAtual = agora.getFullYear();
-      const mesCorrente = anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;
-      if (mes > mesCorrente) {
-        return res.json({ metrica, mes, titulo, orcado, realizado: null, grupos: [], nota: def?.nota });
-      }
-
-      let grupos: GrupoDetalhe[] = [];
-      let realizado = 0;
-      let rateio: { fracao: number; totalBruto: number; totalRateado: number } | undefined;
-      let notaDinamica: string | undefined;
-
-      if (Object.hasOwn(METRICAS_BUCKET, metrica)) {
-        const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA[METRICAS_BUCKET[metrica]], mes);
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "mrr_ativo") {
-        const result = await db.execute(sql`
-          WITH alvo AS (
-            SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
-            WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
-              AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
-          )
-          SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
-                 COALESCE(h.servico, '') AS servico,
-                 COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
-                 COALESCE(h.valorr::numeric, 0) AS valor
-          FROM "Clickup".cup_data_hist h
-          JOIN alvo a ON h.data_snapshot::date = a.d
-          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
-          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
-          ORDER BY valor DESC
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: r.squad, nome: r.cliente, detalhe: r.servico, data: null, valor: parseFloat(r.valor),
-        }));
-        // MRR lista todos os contratos (spec: sem corte) — squads têm até ~100 clientes
-        grupos = agruparItens(itens, Number.MAX_SAFE_INTEGER);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "receita_pontual") {
-        const result = await db.execute(sql`
-          SELECT COALESCE(title, '(sem título)') AS nome, COALESCE(closer::text, '') AS closer,
-                 data_fechamento::date::text AS data, valor_pontual::numeric AS valor
-          FROM "Bitrix".crm_deal
-          WHERE stage_name = 'Negócio Ganho' AND valor_pontual > 0
-            AND EXTRACT(YEAR FROM data_fechamento) = ${ANO}
-            AND EXTRACT(MONTH FROM data_fechamento) = ${mes}
-          ORDER BY valor DESC
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: "Vendas pontuais (Bitrix)", nome: r.nome,
-          detalhe: r.closer ? `closer ${r.closer}` : "", data: r.data, valor: parseFloat(r.valor),
-        }));
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "outras_receitas") {
-        const result = await db.execute(sql`
-          SELECT p.categoria_nome,
-                 COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
-                 COALESCE(p.descricao, '') AS descricao, p.data_competencia::text AS data,
-                 COALESCE(p.valor_liquido::numeric, 0) AS valor
-          FROM "Conta Azul".caz_parcelas p
-          LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
-          WHERE p.tipo_evento = 'RECEITA'
-            AND EXTRACT(YEAR FROM p.data_competencia) = ${ANO}
-            AND EXTRACT(MONTH FROM p.data_competencia) = ${mes}
-            AND (${PREDICADO_OUTRAS_RECEITAS})
-          ORDER BY valor DESC
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: normalizaCategoria(r.categoria_nome), nome: r.nome, detalhe: r.descricao,
-          data: r.data, valor: parseFloat(r.valor),
-        }));
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "inadimplencia") {
-        const vencidas = await db.execute(sql`
-          SELECT COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
-                 COALESCE(p.descricao, '') AS descricao, p.data_vencimento::text AS data,
-                 COALESCE(p.nao_pago::numeric, 0) AS valor
-          FROM "Conta Azul".caz_parcelas p
-          LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
-          WHERE p.tipo_evento = 'RECEITA' AND p.nao_pago::numeric > 0
-            AND p.data_vencimento <= CURRENT_DATE
-            AND EXTRACT(YEAR FROM p.data_vencimento) = ${ANO}
-            AND EXTRACT(MONTH FROM p.data_vencimento) = ${mes}
-          ORDER BY valor DESC
-        `);
-        const itensVencidas: ItemDetalhe[] = (vencidas.rows as any[]).map((r) => ({
-          grupo: "Vencidas não pagas (foto atual)", nome: r.nome, detalhe: r.descricao,
-          data: r.data, valor: parseFloat(r.valor),
-        }));
-        const itensEstornos = (await itensDespesaBucket(db, PREDICADOS_DESPESA.estornos, mes))
-          .map((i) => ({ ...i, grupo: "Estornos e devoluções" }));
-        const todos = [...itensVencidas, ...itensEstornos];
-        grupos = agruparItens(todos, LIMITE_ITENS);
-        realizado = todos.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "csv_beneficio" || metrica === "sga") {
-        const orcRateio = await db.execute(sql`
-          SELECT metrica, valor::numeric AS valor FROM cortex_core.bp2026_orcado
-          WHERE mes = ${mes} AND metrica IN ('csv_beneficio', 'beneficio_total_empresa')
-        `);
-        const orcMap: Record<string, number> = {};
-        for (const r of orcRateio.rows as any[]) orcMap[r.metrica] = parseFloat(r.valor);
-        const itensCaju = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
-        const totalBruto = itensCaju.reduce((s, i) => s + i.valor, 0);
-        if (metrica === "csv_beneficio") {
-          const fracao = orcMap["beneficio_total_empresa"]
-            ? (orcMap["csv_beneficio"] ?? 0) / orcMap["beneficio_total_empresa"] : 0;
-          grupos = agruparItens(itensCaju, LIMITE_ITENS);
-          realizado = ratear(totalBruto, orcMap["csv_beneficio"] ?? 0, orcMap["beneficio_total_empresa"] ?? 0) ?? 0;
-          rateio = { fracao, totalBruto, totalRateado: realizado };
-        } else {
-          const itensBucket = await itensDespesaBucket(db, PREDICADOS_DESPESA.sga_bucket, mes);
-          const complemento = ratear(
-            totalBruto,
-            (orcMap["beneficio_total_empresa"] ?? 0) - (orcMap["csv_beneficio"] ?? 0),
-            orcMap["beneficio_total_empresa"] ?? 0
-          ) ?? 0;
-          const todos: ItemDetalhe[] = [
-            ...itensBucket,
-            { grupo: "Complemento do benefício (rateio)", nome: "Caju — parcela não atribuída ao CSV",
-              detalhe: "benefício total × fração orçada do SG&A", data: null, valor: complemento },
-          ];
-          grupos = agruparItens(todos, LIMITE_ITENS);
-          realizado = todos.reduce((s, i) => s + i.valor, 0);
-        }
-      } else if (metrica === "dfc_real") {
-        const result = await db.execute(sql`
-          SELECT p.tipo_evento, p.categoria_nome,
-                 COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
-                 COALESCE(p.descricao, '') AS descricao, p.data_quitacao::text AS data,
-                 COALESCE(p.valor_pago::numeric, 0) AS valor
-          FROM "Conta Azul".caz_parcelas p
-          LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
-          WHERE p.status = 'QUITADO'
-            AND EXTRACT(YEAR FROM p.data_quitacao) = ${ANO}
-            AND EXTRACT(MONTH FROM p.data_quitacao) = ${mes}
-          ORDER BY valor DESC
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: `${r.tipo_evento === "RECEITA" ? "(+)" : "(−)"} ${normalizaCategoria(r.categoria_nome)}`,
-          nome: r.nome, detalhe: r.descricao, data: r.data, valor: parseFloat(r.valor),
-        }));
-        grupos = agruparItens(itens, LIMITE_ITENS_DFC);
-        grupos.sort((a, b) =>
-          a.titulo.startsWith("(+)") === b.titulo.startsWith("(+)")
-            ? b.total - a.total
-            : a.titulo.startsWith("(+)") ? -1 : 1
-        );
-        const entradas = itens.filter((i) => i.grupo.startsWith("(+)")).reduce((s, i) => s + i.valor, 0);
-        const saidas = itens.filter((i) => i.grupo.startsWith("(−)")).reduce((s, i) => s + i.valor, 0);
-        realizado = entradas - saidas;
+```typescript
       } else if (metrica === "vendas_mrr" || metrica === "funil_vendas_mrr") {
         ({ grupos, realizado } = await detDealsBitrix(db, mes, "mrr", "soma", "Vendas MRR (Bitrix)"));
       } else if (metrica === "vendas_pontual" || metrica === "funil_vendas_pontual") {
@@ -446,13 +263,6 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         ({ grupos, realizado } = await detDealsBitrix(db, mes, "pontual", "contagem", "Vendas pontuais (Bitrix)"));
       } else if (metrica === "reunioes") {
         ({ grupos, realizado } = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas"));
-      } else if (metrica === "cac_por_cliente") {
-        const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (clientes adquiridos)");
-        const cacPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac);
-        const despesa = cacPorMes[mes] ?? 0;
-        grupos = ganhos.grupos;
-        realizado = ganhos.realizado ? despesa / ganhos.realizado : 0;
-        notaDinamica = `despesa CAC R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${ganhos.realizado} deals ganhos no mês`;
       } else if (metrica === "taxa_conversao") {
         const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (numerador)");
         const reun = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas");
@@ -461,7 +271,7 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         notaDinamica = `${ganhos.realizado} deals ganhos ÷ ${reun.realizado} reuniões no mês`;
       } else if (metrica === "colaboradores") {
         ({ grupos, realizado } = await detPessoas(db, mes, null, "setor"));
-      } else if (Object.hasOwn(SETOR_FILTROS, metrica)) {
+      } else if (metrica in SETOR_FILTROS) {
         ({ grupos, realizado } = await detPessoas(db, mes, SETOR_FILTROS[metrica], metrica.startsWith("pessoas") ? "setor" : "squad"));
       } else if (metrica === "clientes") {
         ({ grupos, realizado } = await detSnapshot(db, mes, null, "cliente", "contagem"));
@@ -504,6 +314,7 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const itensContas: ItemDetalhe[] = (contasRes.rows as any[]).map((r) => ({
           grupo: "Contas bancárias (saldo atual)", nome: r.nome, detalhe: "", data: null, valor: parseFloat(r.valor),
         }));
+        const saldoAtual = itensContas.reduce((s, i) => s + i.valor, 0);
         // fluxos posteriores (DFC líquido por mês m+1..mesCorrente)
         const fluxosRes = await db.execute(sql`
           SELECT EXTRACT(MONTH FROM data_quitacao)::int AS m,
@@ -526,13 +337,9 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         grupos = agruparItens(todos, LIMITE_ITENS);
         realizado = todos.reduce((s, i) => s + i.valor, 0);
         notaDinamica = "Saldo do fim do mês = saldo bancário atual − fluxos quitados posteriores.";
-      } else if (Object.hasOwn(PREDICADOS_SGA_SUB, metrica) || metrica === "sga_outras") {
+      } else if (metrica in PREDICADOS_SGA_SUB || metrica === "sga_outras") {
         const chave = metrica === "sga_outras" ? "sga_outras_sub" : metrica;
         const itens = await itensDespesaBucket(db, PREDICADOS_SGA_SUB[chave], mes);
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (Object.hasOwn(PREDICADOS_CAC_SUB, metrica)) {
-        const itens = await itensDespesaBucket(db, PREDICADOS_CAC_SUB[metrica], mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
       } else if (metrica === "beneficio_total_empresa") {
@@ -562,13 +369,59 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
       } else {
-        return res.status(400).json({ error: "metrica/mes inválidos" });
-      }
+```
 
-      res.json({ metrica, mes, titulo, orcado, realizado, grupos, rateio, nota: def?.nota, notaDinamica });
-    } catch (error) {
-      console.error("[bp2026] Erro em /api/bp2026/detalhe:", error);
-      res.status(500).json({ error: "Erro ao montar detalhamento" });
-    }
-  });
+ATENÇÕES:
+- `mrr_gc`: `metrica.slice(4)` = "gc" ✓; `contratos_gc`: slice(10) = "gc" ✓. `mrr_ativo` é tratado ANTES (branch existente) — a ordem dos branches importa: os existentes ficam primeiro.
+- O `notaDinamica` entra no `res.json({ ..., notaDinamica })`.
+- `saldo_caixa` precisa de `mesCorrente`, já calculado acima no handler.
+- `detSnapshot` nivel "cliente": GROUP BY exige agregação de squad — usar `MIN(b.squad)` como já indicado no template do SQL.
+
+- [ ] **Step 3: Smoke** (porta 3972, criar e DELETAR): para cada tipo, conferir `realizado` do detalhe ≡ célula da matriz (mês 5): vendas_mrr (soma), contratos_vendidos_mrr (contagem), reunioes (contagem), taxa_conversao (taxa + notaDinamica), colaboradores (contagem), clientes (contagem), churn_mes (soma), mrr_creators (soma), contratos_creators (contagem), churn_pct_performance (taxa + notaDinamica com denominador), saldo_caixa (valor), sga_uzk (soma), or_stack_digital (soma), beneficio_total_empresa (soma = célula da sub-aba SG&A, NÃO a do DRE). Derivadas novas → 400 (ex.: receita_total, aov_creators). tsc grep bp2026 vazio; vitest 14/14.
+
+- [ ] **Step 4: Commit** — `feat(bp2026): detalhe por célula para as métricas das sub-abas`
+
+---
+
+### Task 2: Frontend — drill nas 6 abas
+
+**Files:**
+- Modify: `client/src/components/bp2026/BPCellDetail.tsx`
+- Modify: `client/src/pages/BP2026.tsx`
+
+- [ ] **Step 1: BPCellDetail.** Mudanças:
+  1. Estender `DERIVADAS` com as entradas da tabela do spec (seção "Derivadas") — copiar exatamente os componentes de lá.
+  2. `DetalheResponse` ganha `notaDinamica?: string;` — renderizar como a `nota` (mesmo estilo), acima dela.
+  3. Formatação por unidade: importar `fmtValor`? Não existe export — adicionar helper local:
+
+```typescript
+function fmtUnidade(v: number | null | undefined, unidade?: "brl" | "int" | "pct" | "dec"): string {
+  if (v === null || v === undefined) return "—";
+  if (unidade === "pct") return `${(v * 100).toFixed(1)}%`;
+  if (unidade === "int") return Math.round(v).toLocaleString("pt-BR");
+  if (unidade === "dec") return v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
+```
+
+  Usar no header (`Orçado {fmtUnidade(celula?.orcado, linha?.unidade)} · Realizado {...}`) e na composição de derivadas (cada componente formatado pela unidade do componente: `fmtUnidade(cm?.realizado, comp?.unidade)`).
+  4. Contagens: quando `linha?.unidade === "int"`, o total do grupo mostra a contagem em vez de R$: `g.itens.length + (g.itensOmitidos?.qtd ?? 0)` com sufixo nenhum; e a coluna de valor do item só é renderizada quando `it.valor !== 0`.
+
+- [ ] **Step 2: BP2026.tsx.** As 6 `BPDreTable` das sub-abas ganham `onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}` (igual à do DRE); `BPCellDetail` recebe:
+
+```tsx
+        linhas={[
+          ...data.linhas, ...data.metricasGerais, ...data.revenue,
+          ...data.funil, ...data.capacity, ...data.sgaDetalhe, ...data.outrasDetalhe,
+        ]}
+```
+
+- [ ] **Step 3:** tsc grep vazio; dev server; curl 200. Validação visual do controller (drill em células de cada aba, dark+light).
+
+- [ ] **Step 4: Commit** — `feat(bp2026): drill-down nas seis sub-abas com composição e listas por unidade`
+
+---
+
+### Task 3: Verificação final e PR
+
+- [ ] `npx vitest run`; review final; push; atualizar PR #248 (corpo: seção Parte 12) via REST.

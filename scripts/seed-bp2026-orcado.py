@@ -23,7 +23,75 @@ LINHAS = [
     ("Overview", 17, "bonus"),
     ("Overview", 19, "impostos_diretos"),
     ("Overview", 20, "capex"),
+    ("Overview", 25, "receita_total"),
+    ("Overview", 26, "despesa_total"),
+    ("Overview", 27, "vendas_mrr"),
+    ("Overview", 28, "vendas_pontual"),
+    ("Overview", 29, "colaboradores"),
+    ("Overview", 30, "receita_cabeca"),
+    ("Overview", 31, "mrr_cabeca"),
+    ("Overview", 32, "clientes"),
+    ("Overview", 33, "contratos"),
+    ("Overview", 34, "ticket_cliente"),
+    ("Overview", 35, "ticket_contrato"),
+    ("Overview", 36, "churn_mes"),
+    ("Overview", 37, "aliquota_efetiva"),
+    ("Overview", 39, "margem_geracao"),
+    ("Overview", 40, "saldo_caixa"),
+    ("Overview", 43, "pessoas_csv"),
+    ("Overview", 44, "pessoas_cac"),
+    ("Overview", 45, "pessoas_sgea"),
     ("SG&A", 11, "beneficio_total_empresa"),  # denominador do rateio do benefício
+    ("Revenue", 7, "mrr_performance", 4),
+    ("Revenue", 8, "aov_performance", 4),
+    ("Revenue", 9, "contratos_performance", 4),
+    ("Revenue", 10, "churn_pct_performance", 4),
+    ("Revenue", 12, "mrr_creators", 4),
+    ("Revenue", 13, "aov_creators", 4),
+    ("Revenue", 14, "contratos_creators", 4),
+    ("Revenue", 15, "churn_pct_creators", 4),
+    ("Revenue", 17, "mrr_social", 4),
+    ("Revenue", 18, "aov_social", 4),
+    ("Revenue", 19, "contratos_social", 4),
+    ("Revenue", 20, "churn_pct_social", 4),
+    ("Revenue", 22, "mrr_gc", 4),
+    ("Revenue", 23, "aov_gc", 4),
+    ("Revenue", 24, "contratos_gc", 4),
+    ("Revenue", 25, "churn_pct_gc", 4),
+    ("Revenue", 27, "mrr_others", 4),
+    ("Revenue", 28, "aov_others", 4),
+    ("Revenue", 29, "contratos_others", 4),
+    ("Revenue", 30, "churn_pct_others", 4),
+    ("CAC", 69, "aov_venda_pontual", 17),
+    ("CAC", 70, "aov_venda_mrr", 17),
+    ("CAC", 71, "taxa_conversao", 17),
+    ("CAC", 72, "reunioes_necessarias", 17),
+    ("CSV", 13, "capacity_gestores", 4),
+    ("CSV", 14, "gestores_necessarios", 4),
+    ("CSV", 15, "gestores_atuais", 4),
+    ("CSV", 17, "contratos_por_gestor", 4),
+    ("CSV", 55, "capacity_designers", 4),
+    ("CSV", 56, "designers_necessarios", 4),
+    ("CSV", 57, "designers_atuais", 4),
+    ("CSV", 59, "contas_por_designer", 4),
+    ("SG&A", 7, "sga_uzk"),
+    ("SG&A", 8, "sga_backoffice"),
+    ("SG&A", 9, "sga_software"),
+    ("SG&A", 10, "sga_ocupacao"),
+    ("SG&A", 12, "sga_premiacoes"),
+    ("SG&A", 13, "sga_eventos"),
+    ("SG&A", 14, "sga_outras"),
+    ("Outras Receitas", 3, "or_receita_variavel"),
+    ("Outras Receitas", 7, "or_stack_digital"),
+    ("CAC", 7, "cac_pre_vendas"),
+    ("CAC", 8, "cac_vendas"),
+    ("CAC", 9, "cac_gerencia"),
+    ("CAC", 10, "cac_comissoes"),
+    ("CAC", 11, "cac_growth"),
+    ("CAC", 12, "cac_ads"),
+    ("CAC", 13, "cac_eventos"),
+    ("CAC", 14, "cac_brindes"),
+    ("CAC", 15, "cac_viagens"),
 ]
 # Totais conhecidos da planilha, para verificação anti-drift
 TOTAIS_ESPERADOS = {
@@ -40,7 +108,75 @@ TOTAIS_ESPERADOS = {
     "bonus": 100000.0,
     "impostos_diretos": 2583101.7,
     "capex": 420000.0,
+    "receita_total": 24518198.06,
+    "despesa_total": 20023941.87,
+    "vendas_mrr": 3075000.0,
+    "vendas_pontual": 4230000.0,
+    "colaboradores": 1704.0,
+    "receita_cabeca": 181563.68,
+    "mrr_cabeca": 146258.20,
+    "clientes": 5231.49,
+    "contratos": 7246.86,
+    "ticket_cliente": 59490.94,
+    "ticket_contrato": 42974.33,
+    "churn_mes": 1889827.03,
+    "aliquota_efetiva": 2.27,
+    "margem_geracao": 1.96,
+    "saldo_caixa": 28936413.23,
+    "pessoas_csv": 1203.0,
+    "pessoas_cac": 359.0,
+    "pessoas_sgea": 142.0,
     "beneficio_total_empresa": 736000.0,
+    "mrr_performance": 7426334.8933,
+    "aov_performance": 34141.465714,
+    "contratos_performance": 2604.204968,
+    "churn_pct_performance": 1.08,
+    "mrr_creators": 5004613.2318,
+    "aov_creators": 56074.061264,
+    "contratos_creators": 1063.612613,
+    "churn_pct_creators": 1.08,
+    "mrr_social": 4014651.4263,
+    "aov_social": 26732.128216,
+    "contratos_social": 1795.775497,
+    "churn_pct_social": 1.08,
+    "mrr_gc": 2634209.6604,
+    "aov_gc": 108740.581448,
+    "contratos_gc": 286.346478,
+    "churn_pct_gc": 1.08,
+    "mrr_others": 1918268.8799,
+    "aov_others": 20565.197133,
+    "contratos_others": 1112.449569,
+    "churn_pct_others": 1.08,
+    "aov_venda_pontual": 118080.0,
+    "aov_venda_mrr": 51480.0,
+    "taxa_conversao": 3.3,
+    "reunioes_necessarias": 2918.7741306,
+    "capacity_gestores": 144.0,
+    "gestores_necessarios": 217.017081,
+    "gestores_atuais": 258.0,
+    "contratos_por_gestor": 121.090493,
+    "capacity_designers": 312.0,
+    "designers_necessarios": 100.16173,
+    "designers_atuais": 111.0,
+    "contas_por_designer": 281.36058,
+    "sga_uzk": 960000.0,
+    "sga_backoffice": 616000.0,
+    "sga_software": 565344.0,
+    "sga_ocupacao": 404840.0,
+    "sga_premiacoes": 60000.0,
+    "sga_eventos": 180000.0,
+    "sga_outras": 213032.0,
+    "or_receita_variavel": 120000.0,
+    "or_stack_digital": 78000.0,
+    "cac_pre_vendas": 439200.0,
+    "cac_vendas": 410600.0,
+    "cac_gerencia": 255000.0,
+    "cac_comissoes": 953313.70653,
+    "cac_growth": 396000.0,
+    "cac_ads": 1360000.0,
+    "cac_eventos": 380000.0,
+    "cac_brindes": 195000.0,
+    "cac_viagens": 60000.0,
 }
 
 # Métricas com células vazias na planilha (tratadas como 0). Ex.: Bônus só tem jan-mar.
@@ -49,19 +185,22 @@ PERMITE_VAZIO = {"bonus"}
 wb = openpyxl.load_workbook(XLSX, data_only=True)
 
 stmts = []
-for aba, row, metrica in LINHAS:
+for entrada in LINHAS:
+    aba, row, metrica = entrada[0], entrada[1], entrada[2]
+    col_inicial = entrada[3] if len(entrada) > 3 else 3  # C; aba Revenue usa 4 (D)
     ws = wb[aba]
-    valores = [ws.cell(row=row, column=col).value for col in range(3, 15)]  # C..N
+    valores = [ws.cell(row=row, column=col).value for col in range(col_inicial, col_inicial + 12)]
     if metrica in PERMITE_VAZIO:
         valores = [v if isinstance(v, (int, float)) else 0 for v in valores]
     assert all(isinstance(v, (int, float)) for v in valores), f"{metrica}: célula vazia/não numérica: {valores}"
     total = sum(valores)
     esperado = TOTAIS_ESPERADOS[metrica]
-    assert abs(total - esperado) < 1, f"{metrica}: total lido {total:.1f} != esperado {esperado:.1f}"
+    tol = 0.01 if esperado < 10 else 1
+    assert abs(total - esperado) < tol, f"{metrica}: total lido {total:.2f} != esperado {esperado:.2f}"
     stmts.append(f"DELETE FROM cortex_core.bp2026_orcado WHERE metrica = '{metrica}';")
     for mes, valor in enumerate(valores, 1):
         stmts.append(
-            f"INSERT INTO cortex_core.bp2026_orcado (metrica, mes, valor) VALUES ('{metrica}', {mes}, {round(valor, 2)});"
+            f"INSERT INTO cortex_core.bp2026_orcado (metrica, mes, valor) VALUES ('{metrica}', {mes}, {round(valor, 6)});"
         )
 
 with open("/tmp/seed-bp2026-orcado.sql", "w") as f:
