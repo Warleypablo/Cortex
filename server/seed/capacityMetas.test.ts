@@ -1,12 +1,18 @@
-import { describe, it, expect } from "vitest";
-import { CAPACITY_METAS_SEED } from "./capacityMetas";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import { COMMERCIAL_CATEGORIAS } from "../routes/capacityTimes.helpers";
+
+const mockExecute = vi.hoisted(() => vi.fn());
+vi.mock("../db", () => ({ db: { execute: mockExecute } }));
+
+import { seedCapacityMetas, CAPACITY_METAS_SEED } from "./capacityMetas";
+
+beforeEach(() => vi.clearAllMocks());
 
 describe("CAPACITY_METAS_SEED", () => {
   it("tem a contagem esperada por categoria", () => {
     const byCat = (c: string) => CAPACITY_METAS_SEED.filter((m) => m.categoria === c).length;
-    expect(byCat("Pulse")).toBe(5);
-    expect(byCat("Aura")).toBe(3);
+    expect(byCat("Pulse")).toBe(8); // inclui 3 ex-Aura migrados (Aura descontinuada)
+    expect(byCat("Aura")).toBe(0);
     expect(byCat("Olimpo")).toBe(3);
     expect(byCat("vendedor")).toBe(6);
     expect(byCat("account")).toBe(4);
@@ -34,5 +40,21 @@ describe("CAPACITY_METAS_SEED", () => {
         expect(m.cap_recorrente).not.toBeNull();
       }
     }
+  });
+});
+
+describe("seedCapacityMetas (bootstrap)", () => {
+  it("não insere quando a tabela já tem linhas", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ n: 28 }] }); // SELECT COUNT(*)
+    await seedCapacityMetas();
+    expect(mockExecute).toHaveBeenCalledTimes(1); // só o COUNT, nenhum INSERT
+  });
+
+  it("insere todas as linhas do seed quando a tabela está vazia", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{ n: 0 }] }); // COUNT = 0
+    mockExecute.mockResolvedValue({ rows: [] });             // INSERTs
+    await seedCapacityMetas();
+    // 1 COUNT + N INSERTs
+    expect(mockExecute).toHaveBeenCalledTimes(1 + CAPACITY_METAS_SEED.length);
   });
 });
