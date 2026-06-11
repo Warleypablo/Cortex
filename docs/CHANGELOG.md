@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-11 | fix(criativos): filtro de status respeita o nível da tab (sem enviesar métricas)
+
+**O que foi feito:**
+- O filtro Ativo/Pausado passou a ser aplicado no nível da tab atual (anúncio / conjunto / campanha), **depois** da agregação — antes ele pré-filtrava no nível do anúncio no backend.
+- Agora, na tab Conjunto/Campanha, vê-se só as entidades ativas, mas cada uma soma **todos** os seus anúncios-filhos (inclusive pausados).
+- A linha de totais da tabela soma apenas as entidades visíveis do nível atual.
+- Os cards de KPI do topo viraram totais da **conta inteira** (ignoram o filtro de status).
+- O frontend passou a buscar sempre todos os status; a filtragem é 100% no client.
+
+**Por que:**
+- Pré-filtrar anúncios por status enviesava as métricas agregadas de conjuntos/campanhas (somava só os anúncios ativos da entidade, escondendo o resultado real).
+
+**Arquivos alterados:**
+- `client/src/pages/Criativos.tsx` - separa agregação por nível do filtro de status; total recalculado sobre as entidades visíveis; queries de criativos/compare/kpis sem o param de status.
+
+**Impacto arquitetural:** Nenhum — backend inalterado; o endpoint sem o param `status` já assume `Todos` por padrão.
+
+---
+
 ## 2026-06-11 | feat(criativos): orçamento editável (CBO/ABO), split MQL×NMQL e escrita por allowlist
 
 **O que foi feito:**
