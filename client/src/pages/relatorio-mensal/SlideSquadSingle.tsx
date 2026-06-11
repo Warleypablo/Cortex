@@ -54,7 +54,14 @@ function fmtBRLExato(v: number): string {
   return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
-function ChurnClientesTooltip({ titulo, clientes }: { titulo: string; clientes: ChurnCliente[] }) {
+// Variante com 1 casa decimal no "k" — usada nos valores de churn, onde a precisão importa
+function fmtBRLk1(v: number): string {
+  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(2).replace(".", ",")}M`;
+  if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(1).replace(".", ",")}k`;
+  return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
+}
+
+function ChurnClientesTooltip({ titulo, clientes, valorChurn, mrrBase }: { titulo: string; clientes: ChurnCliente[]; valorChurn: number; mrrBase: number }) {
   if (clientes.length === 0) {
     return <p className="text-xs text-zinc-400">Nenhum churn no período</p>;
   }
@@ -63,8 +70,11 @@ function ChurnClientesTooltip({ titulo, clientes }: { titulo: string; clientes: 
   const valorRestante = restantes.reduce((acc, c) => acc + c.valor, 0);
   return (
     <div className="max-w-xs">
-      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
+      <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-0.5">
         {titulo} · {clientes.length} cliente{clientes.length > 1 ? "s" : ""}
+      </p>
+      <p className="text-[10px] text-zinc-500 tabular-nums mb-1.5">
+        {fmtBRLExato(valorChurn)} ÷ {fmtBRLExato(mrrBase)} (MRR início do mês)
       </p>
       <ul className="space-y-0.5">
         {visiveis.map((c, i) => (
@@ -276,7 +286,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                             </p>
                             {/* Valor monetário do churn sempre visível; base só no hero (espaço) */}
                             <p className={`tabular-nums ${isCompact ? "text-[9px] text-zinc-500" : "text-[10px] text-zinc-600"}`}>
-                              {isHero ? `${fmtBRL(card.brl)} / ${fmtBRL(sq.mrrBase || 0)}` : fmtBRL(card.brl)}
+                              {isHero ? `${fmtBRLk1(card.brl)} / ${fmtBRLk1(sq.mrrBase || 0)}` : fmtBRLk1(card.brl)}
                             </p>
                           </div>
                           {/* Mini progress bar — só fora do compact */}
@@ -295,7 +305,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                       </TooltipTrigger>
                       {/* Slide é sempre escuro — força tooltip dark independente do tema do app */}
                       <TooltipContent side="top" className="bg-zinc-900 border border-white/10 text-zinc-100 shadow-xl">
-                        <ChurnClientesTooltip titulo={card.label} clientes={card.clientes} />
+                        <ChurnClientesTooltip titulo={card.label} clientes={card.clientes} valorChurn={card.brl} mrrBase={sq.mrrBase || 0} />
                       </TooltipContent>
                     </Tooltip>
                   );
