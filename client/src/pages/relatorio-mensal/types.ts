@@ -145,8 +145,10 @@ export interface SquadDetail {
   pontual: number;
   ticketMedio: number;
   clientes: number;
-  churnPct: number;
+  churnPct: number;       // churn descontando abonados (abonar_churn != 'Sim')
   churnBrl: number;
+  churnTotalPct: number;  // churn total, sem descontar abonados
+  churnTotalBrl: number;
   mrrBase: number;
   evolucaoMrr: number;
 }

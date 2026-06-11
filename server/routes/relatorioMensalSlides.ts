@@ -573,17 +573,18 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         `),
 
         // 16. Churn por squad no mês de dados (usa cup_churn - tabela curada)
+        // Total = todos os churns; "sem abonados" desconta apenas pela coluna abonar_churn
         db.execute(sql`
           SELECT
             squad,
-            COALESCE(SUM(valor_r), 0)::numeric as churn_brl,
-            COUNT(*)::int as churn_count
+            COALESCE(SUM(valor_r), 0)::numeric as churn_total_brl,
+            COUNT(*)::int as churn_total_count,
+            COALESCE(SUM(valor_r) FILTER (WHERE COALESCE(abonar_churn, '') != 'Sim'), 0)::numeric as churn_brl,
+            (COUNT(*) FILTER (WHERE COALESCE(abonar_churn, '') != 'Sim'))::int as churn_count
           FROM cortex_core.vw_cup_churn_ajustado
           WHERE data_solicitacao_encerramento IS NOT NULL
             AND data_solicitacao_encerramento >= ${dataStart}
             AND data_solicitacao_encerramento < ${dataEnd}
-            AND COALESCE(abonar_churn, '') != 'Sim'
-            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
             AND squad IS NOT NULL
             AND TRIM(squad) != ''
           GROUP BY squad
@@ -1308,11 +1309,13 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         .map(({ _total, ...rest }, i) => ({ ...rest, posicao: i + 1 }));
 
       // Build squad details (merge ranking + churn + evolução)
-      const churnBySquad: Record<string, { brl: number; count: number }> = {};
+      const churnBySquad: Record<string, { brl: number; count: number; totalBrl: number; totalCount: number }> = {};
       (churnSquadsResult.rows as any[]).forEach((row: any) => {
         churnBySquad[row.squad] = {
           brl: parseFloat(row.churn_brl) || 0,
           count: parseInt(row.churn_count) || 0,
+          totalBrl: parseFloat(row.churn_total_brl) || 0,
+          totalCount: parseInt(row.churn_total_count) || 0,
         };
       });
 
@@ -1333,13 +1336,14 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         const pontual = pontualEntregueBySquad[row.squad] || 0;  // pontual entregue no mês (não em aberto)
         const contratos = parseInt(row.contratos) || 0;
         const clientes = parseInt(row.clientes) || 0;
-        const churn = churnBySquad[row.squad] || { brl: 0, count: 0 };
+        const churn = churnBySquad[row.squad] || { brl: 0, count: 0, totalBrl: 0, totalCount: 0 };
         const mrrAnt = mrrAnteriorBySquad[row.squad] || 0;
         const ticketMedio = contratos > 0 ? mrr / contratos : 0;
         // Churn % = churn do mês / MRR do mês anterior.
         // Squad novo (sem base no mês anterior): usa MRR do próprio mês como base.
         const churnBase = mrrAnt > 0 ? mrrAnt : mrr;
         const churnPct = churnBase > 0 ? (churn.brl / churnBase) * 100 : 0;
+        const churnTotalPct = churnBase > 0 ? (churn.totalBrl / churnBase) * 100 : 0;
 
         return {
           squad: row.squad,
@@ -1349,6 +1353,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           clientes,
           churnPct: Math.round(churnPct * 10) / 10,
           churnBrl: churn.brl,
+          churnTotalPct: Math.round(churnTotalPct * 10) / 10,
+          churnTotalBrl: churn.totalBrl,
           mrrBase: churnBase,
           evolucaoMrr: mrr - mrrAnt,
         };

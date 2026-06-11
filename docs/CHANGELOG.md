@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-11 | feat(relatorio-mensal): cards de churn total e s/ abonados por squad
+
+**O que foi feito:**
+- Seção "Detalhes por Squad" do Relatório Mensal passou a exibir dois cards de churn: **Churn Total** (todos os churns do mês) e **Churn s/ Abonados** (desconta apenas `abonar_churn = 'Sim'`).
+- A query de churn por squad deixou de excluir os motivos "artificiais" (`Inadimplente 1º Mês`, `Não começou`, `Erro na Venda`) — a coluna `abonar_churn` de `cup_churn` é o único critério de abono nessa seção.
+- Card de Evolução MRR passou a ocupar a largura total do grid do squad.
+
+**Por que:**
+- Dar visibilidade do churn bruto vs. churn líquido de abonos no reporte mensal, com critério único e auditável (coluna de abono), em vez de heurística por motivo de cancelamento.
+
+**Arquivos alterados:**
+- `server/routes/relatorioMensalSlides.ts` - query 16 com `FILTER` calculando total e sem abonados; `squadDetails` ganhou `churnTotalPct`/`churnTotalBrl`
+- `client/src/pages/relatorio-mensal/types.ts` - novos campos em `SquadDetail`
+- `client/src/pages/relatorio-mensal/SlideSquadSingle.tsx` - dois cards de churn + Evolução MRR em `col-span-2`
+- `docs/superpowers/specs/2026-06-11-relatorio-mensal-churn-squad-abonados-design.md` - design doc
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-06-11 | feat(youtube): start/callback do OAuth públicos (sem login no Cortex)
 
 **O que foi feito:**
