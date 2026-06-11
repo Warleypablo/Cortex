@@ -193,10 +193,13 @@ export default function Criativos() {
     return [];
   }, [selectedCampaignIds, selectedProdutos, campanhasFiltradas]);
 
+  // Buscamos SEMPRE todos os status. O filtro Ativo/Pausado é aplicado no client,
+  // no nível da tab atual — assim um conjunto/campanha ativo soma todos os seus
+  // anúncios (inclusive pausados), sem enviesar as métricas agregadas.
   const { data: criativos = [], isLoading } = useQuery<CriativoData[]>({
-    queryKey: ['/api/growth/criativos', startDate, endDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
+    queryKey: ['/api/growth/criativos', startDate, endDate, selectedPlataformas, selectedCampaignIds, selectedProdutos],
     queryFn: async () => {
-      const params = new URLSearchParams({ startDate, endDate, status: statusFilter });
+      const params = new URLSearchParams({ startDate, endDate });
       if (selectedPlataformas.length > 0) {
         params.append('plataforma', selectedPlataformas.join(','));
       }
@@ -214,10 +217,10 @@ export default function Criativos() {
   const compareEndDate = compareEnabled && compareRange?.to ? format(compareRange.to, 'yyyy-MM-dd') : '';
 
   const { data: compareData = [] } = useQuery<CriativoData[]>({
-    queryKey: ['/api/growth/criativos/compare', compareStartDate, compareEndDate, statusFilter, selectedPlataformas, selectedCampaignIds, selectedProdutos],
+    queryKey: ['/api/growth/criativos/compare', compareStartDate, compareEndDate, selectedPlataformas, selectedCampaignIds, selectedProdutos],
     queryFn: async () => {
       if (!compareStartDate || !compareEndDate) return [];
-      const params = new URLSearchParams({ startDate: compareStartDate, endDate: compareEndDate, status: statusFilter });
+      const params = new URLSearchParams({ startDate: compareStartDate, endDate: compareEndDate });
       if (selectedPlataformas.length > 0) {
         params.append('plataforma', selectedPlataformas.join(','));
       }
@@ -261,11 +264,12 @@ export default function Criativos() {
     });
   };
 
-  // KPIs com comparação
+  // KPIs com comparação — cards do topo são totais da CONTA inteira; não seguem
+  // o filtro Ativo/Pausado (que controla só as linhas da tabela por nível).
   const { data: kpisData, isLoading: kpisLoading } = useQuery<{ current: KpiData; compare: KpiData | null }>({
-    queryKey: ['/api/growth/criativos/kpis', startDate, endDate, compareEnabled, compareRange?.from, compareRange?.to, statusFilter, selectedCampaignIds, selectedProdutos],
+    queryKey: ['/api/growth/criativos/kpis', startDate, endDate, compareEnabled, compareRange?.from, compareRange?.to, selectedCampaignIds, selectedProdutos],
     queryFn: async () => {
-      const params = new URLSearchParams({ startDate, endDate, status: statusFilter });
+      const params = new URLSearchParams({ startDate, endDate });
       if (activeCampaignIds.length > 0) {
         params.append('campanhaIds', activeCampaignIds.join(','));
       }
@@ -412,10 +416,25 @@ export default function Criativos() {
         }),
   [statusOverride, budgetOverride]);
 
-  // Linhas do nível atual: agrega → ordena → aplica override
+  // Linhas do nível atual: agrega (somando TODOS os anúncios-filhos) → aplica
+  // override otimista. O filtro de status vem DEPOIS da agregação, então um
+  // conjunto/campanha ativo soma todos os seus anúncios (inclusive pausados).
+  const levelRows = useMemo(() =>
+    applyOverride(aggregateByLevel(scopedRows, level)),
+  [scopedRows, level, applyOverride]);
+
+  // Filtro de status no nível da TAB atual: cada linha já carrega o status da sua
+  // própria entidade (ad / conjunto / campanha). No nível "conta" não filtramos —
+  // a tab é a conta inteira como uma única linha.
+  const statusFilteredRows = useMemo(() =>
+    statusFilter === "Todos" || level === "conta"
+      ? levelRows
+      : levelRows.filter(r => r.status === statusFilter),
+  [levelRows, statusFilter, level]);
+
   const activeRows = useMemo(() =>
-    applyOverride(sortRows(aggregateByLevel(scopedRows, level), sortConfig)),
-  [scopedRows, level, sortConfig, applyOverride]);
+    sortRows(statusFilteredRows, sortConfig),
+  [statusFilteredRows, sortConfig]);
 
   const handleSort = (key: keyof CriativoData) => {
     setSortConfig(prev => ({
@@ -424,12 +443,13 @@ export default function Criativos() {
     }));
   };
 
-  // Linha de totais (agregação de conta sobre as linhas filtradas) — somável,
-  // os derivados são recalculados a partir das somas (não média de médias)
+  // Linha de totais: soma das ENTIDADES VISÍVEIS (já filtradas por status no nível
+  // da tab) — somável, derivados recalculados a partir das somas (não média de
+  // médias). Reflete exatamente o conjunto de linhas mostrado na tabela.
   const averages = useMemo(() => {
-    if (scopedRows.length === 0) return null;
-    return aggregateByLevel(scopedRows, "conta")[0] ?? null;
-  }, [scopedRows]);
+    if (statusFilteredRows.length === 0) return null;
+    return aggregateByLevel(statusFilteredRows, "conta")[0] ?? null;
+  }, [statusFilteredRows]);
 
   // ── Handlers de seleção, toggle e ação em massa ──
   const apiLevelFor = (l: Level): "ad" | "adset" | "campaign" =>
