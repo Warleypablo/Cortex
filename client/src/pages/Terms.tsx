@@ -172,7 +172,7 @@ function TermsPT() {
 
       <Section title="12. Contato">
         <p>
-          Dúvidas sobre estes Termos: <strong>privacidade@turbopartners.com.br</strong>
+          Dúvidas sobre estes Termos: <strong>contato@turbopartners.com.br</strong>
         </p>
       </Section>
     </>
@@ -283,7 +283,7 @@ function TermsEN() {
 
       <Section title="12. Contact">
         <p>
-          Questions about these Terms: <strong>privacidade@turbopartners.com.br</strong>
+          Questions about these Terms: <strong>contato@turbopartners.com.br</strong>
         </p>
       </Section>
     </>
