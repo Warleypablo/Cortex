@@ -19,7 +19,7 @@ const DERIVADAS: Record<string, string[]> = {
   // Métricas Gerais
   receita_total: ["receita_total_faturavel", "inadimplencia"],
   despesa_total: ["impostos_receita", "csv_salarios", "csv_beneficio", "csv_stack", "cac", "sga", "bonus", "impostos_diretos", "capex"],
-  receita_cabeca: ["receita_total", "colaboradores"],
+  receita_cabeca: ["receita_total_faturavel", "colaboradores"],
   mrr_cabeca: ["mrr_ativo", "colaboradores"],
   ticket_cliente: ["receita_total_faturavel", "clientes"],
   ticket_contrato: ["receita_total_faturavel", "contratos"],
