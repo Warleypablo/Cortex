@@ -72,7 +72,7 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
   receita_total_faturavel: {
     definicao: "Receita total que a operação tem contratada/vendida no mês.",
     fonte: "Derivada das três linhas acima.",
-    calculo: "MRR Ativo + Receita Pontual + Outras Receitas.",
+    calculo: "MRR Ativo + Venda Pontual + Outras Receitas.",
   },
   inadimplencia: {
     definicao: "Receita vencida e não recebida (foto atual) mais estornos e devoluções.",
@@ -169,7 +169,7 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
   vendas_pontual: {
     definicao: "Receita pontual vendida no mês.",
     fonte: FONTE_BITRIX,
-    calculo: "Soma de valor_pontual dos deals ganhos no mês (mesma série da Receita Pontual do DRE).",
+    calculo: "Soma de valor_pontual dos deals ganhos no mês (mesma série da Venda Pontual da aba Overview).",
   },
   colaboradores: {
     definicao: "Headcount total ativo no fim do mês.",
