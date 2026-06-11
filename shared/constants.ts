@@ -4,6 +4,20 @@ export interface SelectOption {
   color?: string;
 }
 
+// Quem pode executar ações de escrita no Meta Ads pela aba Criativos
+// (pausar/ativar, seleção em massa e editar orçamento). Os demais ficam read-only.
+// Restrição explícita por e-mail — NÃO depende de role admin.
+export const META_WRITE_ALLOWED_EMAILS: string[] = [
+  "caio.malini@turbopartners.com.br",
+  "vinicius.ichino@turbopartners.com.br",
+  "warleyreserva4@gmail.com", // conta admin (Warley)
+];
+
+export function canWriteMeta(email: string | null | undefined): boolean {
+  if (!email) return false;
+  return META_WRITE_ALLOWED_EMAILS.includes(email.trim().toLowerCase());
+}
+
 export const CLIENT_STATUS_OPTIONS: SelectOption[] = [
   { value: "triagem", label: "Triagem" },
   { value: "onboarding", label: "Onboarding" },
