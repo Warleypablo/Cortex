@@ -145,7 +145,9 @@ export function BPCellDetail({ metrica, mes, linhas, onClose }: Props) {
           ) : (
             <>
               {data.grupos.map((g) => {
-                const isInt = linha?.unidade === "int";
+                // grupos cujos itens não carregam valor próprio (contagens e numeradores
+                // de taxa) mostram a quantidade; os demais, a soma em R$
+                const isInt = linha?.unidade === "int" || g.itens.every((it) => it.valor === 0);
                 const totalGrupo = isInt
                   ? (g.itens.length + (g.itensOmitidos?.qtd ?? 0)).toLocaleString("pt-BR")
                   : fmt(g.total);
