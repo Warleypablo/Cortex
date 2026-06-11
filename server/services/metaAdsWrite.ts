@@ -350,3 +350,53 @@ export async function updateDailyBudget(
 export async function readEntitySnapshot(level: MetaEntityLevel, id: string) {
   return getEntityStatus(level, id);
 }
+
+/**
+ * Ajusta o orçamento diário por um percentual (+/-). Lê o valor atual no Meta,
+ * calcula o novo (atual × (1 + pct/100)) e aplica via updateDailyBudget — herdando
+ * os mesmos guard-rails (±30% por alteração e teto absoluto).
+ */
+export async function increaseDailyBudgetByPct(
+  level: 'adset' | 'campaign',
+  id: string,
+  pct: number,
+): Promise<MetaWriteResult> {
+  try {
+    const before = await getEntityStatus(level, id);
+    const currentCents = before.dailyBudgetCents ?? 0;
+    if (currentCents <= 0) {
+      return {
+        ok: false,
+        status: 422,
+        entityId: id,
+        previousValue: { daily_budget_cents: currentCents, name: before.name },
+        error: { code: 'NO_OWN_BUDGET', message: 'Entidade não tem orçamento diário próprio (CBO/ABO no outro nível)' },
+      };
+    }
+    const newCents = Math.round(currentCents * (1 + pct / 100));
+    const validation = validateBudgetChange(currentCents, newCents);
+    if (!validation.ok) {
+      return {
+        ok: false,
+        status: 422,
+        entityId: id,
+        previousValue: { daily_budget_cents: currentCents, name: before.name },
+        error: { code: 'BUDGET_GUARDRAIL', message: validation.reason || 'Budget change rejected' },
+      };
+    }
+    const res = await metaFetch(id, { method: 'POST', bodyParams: { daily_budget: String(newCents) } });
+    if (res.status >= 400 || !res.data?.success) {
+      return mapErrorToResult(id, res);
+    }
+    await mirrorBudgetLocally(level, id, newCents);
+    return {
+      ok: true,
+      status: res.status,
+      entityId: id,
+      previousValue: { daily_budget_cents: currentCents, name: before.name },
+      newValue: { daily_budget_cents: newCents },
+    };
+  } catch (err) {
+    return { ok: false, status: 500, entityId: id, error: { message: sanitizeError(err).message } };
+  }
+}
