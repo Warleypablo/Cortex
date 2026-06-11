@@ -10,11 +10,40 @@ const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 const DERIVADAS: Record<string, string[]> = {
+  // DRE originais
   receita_total_faturavel: ["mrr_ativo", "receita_pontual", "outras_receitas"],
   receita_liquida: ["receita_total_faturavel", "inadimplencia", "impostos_receita"],
   margem_bruta: ["receita_liquida", "csv_salarios", "csv_beneficio", "csv_stack"],
   ebitda: ["margem_bruta", "cac", "sga", "bonus"],
   geracao_caixa: ["ebitda", "impostos_diretos", "capex"],
+  // Métricas Gerais
+  receita_total: ["receita_total_faturavel", "inadimplencia"],
+  despesa_total: ["impostos_receita", "csv_salarios", "csv_beneficio", "csv_stack", "cac", "sga", "bonus", "impostos_diretos", "capex"],
+  receita_cabeca: ["receita_total", "colaboradores"],
+  mrr_cabeca: ["mrr_ativo", "colaboradores"],
+  ticket_cliente: ["mrr_ativo", "clientes"],
+  ticket_contrato: ["mrr_ativo", "contratos"],
+  aliquota_efetiva: ["impostos_receita", "impostos_diretos", "receita_total_faturavel"],
+  margem_geracao: ["geracao_caixa", "receita_total_faturavel"],
+  // Revenue — AOV por produto (5 linhas × 2 componentes)
+  aov_performance: ["mrr_performance", "contratos_performance"],
+  aov_creators: ["mrr_creators", "contratos_creators"],
+  aov_social: ["mrr_social", "contratos_social"],
+  aov_gc: ["mrr_gc", "contratos_gc"],
+  aov_others: ["mrr_others", "contratos_others"],
+  // Funil
+  aov_venda_mrr: ["funil_vendas_mrr", "contratos_vendidos_mrr"],
+  aov_venda_pontual: ["funil_vendas_pontual", "contratos_vendidos_pontual"],
+  // Capacity
+  gestores_necessarios: ["cap_contratos_performance"],
+  designers_necessarios: ["cap_contratos_performance"],
+  necessidade_gestores: ["gestores_necessarios", "gestores_atuais"],
+  contratos_por_gestor: ["cap_contratos_performance", "gestores_atuais"],
+  contas_por_designer: ["cap_contratos_performance", "designers_atuais"],
+  // SG&A
+  sga_total_detalhe: ["sga_uzk", "sga_backoffice", "sga_software", "sga_ocupacao", "beneficio_total_empresa", "sga_premiacoes", "sga_eventos", "sga_outras"],
+  // Outras Receitas
+  or_total_detalhe: ["or_receita_variavel", "or_stack_digital", "or_demais"],
 };
 
 interface ItemDet { nome: string; detalhe: string; data: string | null; valor: number }
@@ -24,11 +53,20 @@ interface DetalheResponse {
   orcado: number | null; realizado: number | null;
   grupos: GrupoDet[];
   rateio?: { fracao: number; totalBruto: number; totalRateado: number };
+  notaDinamica?: string;
   nota?: string;
 }
 
 function fmt(v: number | null | undefined): string {
   return v === null || v === undefined ? "—" : `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
+}
+
+function fmtUnidade(v: number | null | undefined, unidade?: "brl" | "int" | "pct" | "dec"): string {
+  if (v === null || v === undefined) return "—";
+  if (unidade === "pct") return `${(v * 100).toFixed(1)}%`;
+  if (unidade === "int") return Math.round(v).toLocaleString("pt-BR");
+  if (unidade === "dec") return v.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+  return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
 interface Props {
@@ -58,7 +96,7 @@ export function BPCellDetail({ metrica, mes, linhas, onClose }: Props) {
             {linha?.titulo} · {mes ? MESES[mes - 1] : ""} 2026
           </SheetTitle>
           <SheetDescription className="text-gray-600 dark:text-zinc-400">
-            Orçado {fmt(celula?.orcado)} · Realizado {fmt(celula?.realizado)}
+            Orçado {fmtUnidade(celula?.orcado, linha?.unidade)} · Realizado {fmtUnidade(celula?.realizado, linha?.unidade)}
             {celula?.atingimento != null && (
               <>
                 {" · "}
@@ -81,12 +119,12 @@ export function BPCellDetail({ metrica, mes, linhas, onClose }: Props) {
                 const cm = comp?.meses[mes - 1];
                 return (
                   <div key={m} className="flex items-center justify-between gap-2 rounded border border-gray-100 dark:border-zinc-800 px-3 py-2 text-sm">
-                    <span className="text-gray-800 dark:text-zinc-200">{comp?.titulo}</span>
+                    <span className="text-gray-800 dark:text-zinc-200">{comp?.titulo ?? m}</span>
                     <span className="flex items-baseline gap-2 shrink-0">
                       <span className="text-[11px] tabular-nums text-gray-500 dark:text-zinc-500">
-                        orç {fmt(cm?.orcado)}
+                        orç {fmtUnidade(cm?.orcado, comp?.unidade)}
                       </span>
-                      <span className="tabular-nums text-gray-900 dark:text-white">{fmt(cm?.realizado)}</span>
+                      <span className="tabular-nums text-gray-900 dark:text-white">{fmtUnidade(cm?.realizado, comp?.unidade)}</span>
                       <span className={`text-[11px] font-semibold tabular-nums ${corAtingimento(cm?.atingimento ?? null, comp?.direcao)}`}>
                         {cm?.atingimento != null ? `${(cm.atingimento * 100).toFixed(1)}%` : "—"}
                       </span>
@@ -106,39 +144,50 @@ export function BPCellDetail({ metrica, mes, linhas, onClose }: Props) {
             <p className="text-sm text-gray-500 dark:text-zinc-500">Sem itens neste mês.</p>
           ) : (
             <>
-              {data.grupos.map((g) => (
-                <details key={g.titulo} open={data.grupos.length <= 3} className="rounded-lg border border-gray-200 dark:border-zinc-700">
-                  <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white">
-                    <span>{g.titulo}</span>
-                    <span className="tabular-nums">{fmt(g.total)}</span>
-                  </summary>
-                  <div className="border-t border-gray-100 dark:border-zinc-800">
-                    {g.itens.map((it, idx) => (
-                      <div key={idx} className="flex items-start justify-between gap-2 px-3 py-1.5 text-xs border-b border-gray-50 dark:border-zinc-800/50 last:border-0">
-                        <div className="min-w-0">
-                          <p className="truncate text-gray-800 dark:text-zinc-200">{it.nome}</p>
-                          {(it.detalhe || it.data) && (
-                            <p className="truncate text-gray-500 dark:text-zinc-500">
-                              {[it.detalhe, it.data].filter(Boolean).join(" · ")}
-                            </p>
+              {data.grupos.map((g) => {
+                const isInt = linha?.unidade === "int";
+                const totalGrupo = isInt
+                  ? (g.itens.length + (g.itensOmitidos?.qtd ?? 0)).toLocaleString("pt-BR")
+                  : fmt(g.total);
+                return (
+                  <details key={g.titulo} open={data.grupos.length <= 3} className="rounded-lg border border-gray-200 dark:border-zinc-700">
+                    <summary className="flex cursor-pointer items-center justify-between px-3 py-2 text-sm font-semibold text-gray-900 dark:text-white">
+                      <span>{g.titulo}</span>
+                      <span className="tabular-nums">{totalGrupo}</span>
+                    </summary>
+                    <div className="border-t border-gray-100 dark:border-zinc-800">
+                      {g.itens.map((it, idx) => (
+                        <div key={idx} className="flex items-start justify-between gap-2 px-3 py-1.5 text-xs border-b border-gray-50 dark:border-zinc-800/50 last:border-0">
+                          <div className="min-w-0">
+                            <p className="truncate text-gray-800 dark:text-zinc-200">{it.nome}</p>
+                            {(it.detalhe || it.data) && (
+                              <p className="truncate text-gray-500 dark:text-zinc-500">
+                                {[it.detalhe, it.data].filter(Boolean).join(" · ")}
+                              </p>
+                            )}
+                          </div>
+                          {(!isInt || it.valor !== 0) && (
+                            <span className="shrink-0 tabular-nums text-gray-900 dark:text-white">{fmt(it.valor)}</span>
                           )}
                         </div>
-                        <span className="shrink-0 tabular-nums text-gray-900 dark:text-white">{fmt(it.valor)}</span>
-                      </div>
-                    ))}
-                    {g.itensOmitidos && (
-                      <p className="px-3 py-1.5 text-xs text-gray-500 dark:text-zinc-500">
-                        +{g.itensOmitidos.qtd} itens ({fmt(g.itensOmitidos.valor)})
-                      </p>
-                    )}
-                  </div>
-                </details>
-              ))}
+                      ))}
+                      {g.itensOmitidos && (
+                        <p className="px-3 py-1.5 text-xs text-gray-500 dark:text-zinc-500">
+                          +{g.itensOmitidos.qtd} itens ({isInt ? g.itensOmitidos.qtd.toLocaleString("pt-BR") : fmt(g.itensOmitidos.valor)})
+                        </p>
+                      )}
+                    </div>
+                  </details>
+                );
+              })}
               {data.rateio && (
                 <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 px-3 py-2 text-xs text-amber-800 dark:text-amber-300">
                   Caju total {fmt(data.rateio.totalBruto)} × fração orçada {(data.rateio.fracao * 100).toFixed(1)}% =
                   <strong> {fmt(data.rateio.totalRateado)}</strong> (valor da célula)
                 </div>
+              )}
+              {data.notaDinamica && (
+                <p className="text-xs text-gray-500 dark:text-zinc-500">{data.notaDinamica}</p>
               )}
               {data.nota && (
                 <p className="text-xs text-gray-500 dark:text-zinc-500">{data.nota}</p>

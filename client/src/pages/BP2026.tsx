@@ -76,6 +76,7 @@ export default function BP2026() {
             linhas={data.metricasGerais}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
         <TabsContent value="revenue" className="mt-4">
@@ -83,6 +84,7 @@ export default function BP2026() {
             linhas={data.revenue}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
         <TabsContent value="funil" className="mt-4">
@@ -90,6 +92,7 @@ export default function BP2026() {
             linhas={data.funil}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
         <TabsContent value="capacity" className="mt-4">
@@ -97,6 +100,7 @@ export default function BP2026() {
             linhas={data.capacity}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
         <TabsContent value="sga" className="mt-4">
@@ -104,6 +108,7 @@ export default function BP2026() {
             linhas={data.sgaDetalhe}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
         <TabsContent value="outras" className="mt-4">
@@ -111,13 +116,17 @@ export default function BP2026() {
             linhas={data.outrasDetalhe}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
       </Tabs>
       <BPCellDetail
         metrica={detalhe?.metrica ?? null}
         mes={detalhe?.mes ?? null}
-        linhas={data.linhas}
+        linhas={[
+          ...data.linhas, ...data.metricasGerais, ...data.revenue,
+          ...data.funil, ...data.capacity, ...data.sgaDetalhe, ...data.outrasDetalhe,
+        ]}
         onClose={() => setDetalhe(null)}
       />
       <p className="text-xs text-gray-500 dark:text-zinc-500">
