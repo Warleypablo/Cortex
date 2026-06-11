@@ -16,6 +16,7 @@ import { montarRevenue } from "./bp2026.revenue";
 import { montarFunil } from "./bp2026.funil";
 import { montarCapacity } from "./bp2026.capacity";
 import { montarDetalhamentos } from "./bp2026.detalhamentos";
+import { INFO_METRICAS } from "./bp2026.info";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -524,11 +525,15 @@ export function registerBp2026Routes(app: Express, db: any) {
         db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, mesCorrente, mesFechado,
       });
 
+      // documentação por linha (o que é / fonte / cálculo) — dicionário único
+      const anexarInfo = <T extends { metrica: string }>(ls: T[]) =>
+        ls.map((l) => ({ ...l, info: INFO_METRICAS[l.metrica] }));
+
       const payload = {
         ano: ANO,
         mesCorrente,
         mesFechado,
-        linhas: linhas.map((l) => ({
+        linhas: anexarInfo(linhas.map((l) => ({
           ...l,
           ytd: (() => {
             if (mesFechado === 0) {
@@ -537,14 +542,14 @@ export function registerBp2026Routes(app: Express, db: any) {
             const v = calcYtd(l.meses, mesFechado, l.tipoAgregacao);
             return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) };
           })(),
-        })),
-        metricasGerais,
-        revenue,
-        funil,
-        capacity,
-        sgaDetalhe,
-        cacDetalhe,
-        outrasDetalhe,
+        }))),
+        metricasGerais: anexarInfo(metricasGerais),
+        revenue: anexarInfo(revenue),
+        funil: anexarInfo(funil),
+        capacity: anexarInfo(capacity),
+        sgaDetalhe: anexarInfo(sgaDetalhe),
+        cacDetalhe: anexarInfo(cacDetalhe),
+        outrasDetalhe: anexarInfo(outrasDetalhe),
         atualizadoEm: new Date().toISOString(),
       };
 

@@ -56,7 +56,7 @@ export default function BP2026() {
       </div>
       <Tabs defaultValue="dre">
         <TabsList>
-          <TabsTrigger value="dre">DRE</TabsTrigger>
+          <TabsTrigger value="dre">Overview</TabsTrigger>
           <TabsTrigger value="metricas">Métricas Gerais</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="funil">Funil Comercial</TabsTrigger>

@@ -19,6 +19,7 @@ export interface BPLinha {
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
   unidade?: "brl" | "int" | "pct" | "dec";
   nota?: string;
+  info?: { definicao: string; fonte: string; calculo: string };
   destaque?: boolean;
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
@@ -157,23 +158,32 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                 >
                   <span className="flex items-center gap-1.5">
                     {linha.titulo}
-                    {ehEstoque && (
+                    {(linha.info || linha.nota || ehEstoque) && (
                       <Tooltip>
                         <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
+                          <Info className="h-3 w-3 shrink-0 text-gray-400 dark:text-zinc-500" />
                         </TooltipTrigger>
-                        <TooltipContent>
-                          Métrica de estoque (posição): o acumulado mostra a posição no
-                          último mês fechado, não a soma dos meses.
+                        <TooltipContent className="max-w-80 space-y-1.5">
+                          {linha.info && (
+                            <>
+                              <p>{linha.info.definicao}</p>
+                              <p>
+                                <span className="font-semibold">Fonte:</span> {linha.info.fonte}
+                              </p>
+                              <p>
+                                <span className="font-semibold">Cálculo:</span> {linha.info.calculo}
+                              </p>
+                            </>
+                          )}
+                          {linha.nota && (
+                            <p className="border-t border-white/20 pt-1.5">{linha.nota}</p>
+                          )}
+                          {ehEstoque && (
+                            <p className="text-[11px] opacity-80">
+                              Métrica de posição: o acumulado mostra o último mês fechado, não a soma.
+                            </p>
+                          )}
                         </TooltipContent>
-                      </Tooltip>
-                    )}
-                    {linha.nota && (
-                      <Tooltip>
-                        <TooltipTrigger asChild>
-                          <Info className="h-3 w-3 text-gray-400 dark:text-zinc-500" />
-                        </TooltipTrigger>
-                        <TooltipContent className="max-w-72">{linha.nota}</TooltipContent>
                       </Tooltip>
                     )}
                   </span>
