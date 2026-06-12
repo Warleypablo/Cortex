@@ -4,12 +4,12 @@
 
 **O que foi feito:**
 - Slide "Detalhes por Squad" passou a calcular **NRR** = churn s/ abonados − expansão (upsell/cross-sell) do mês.
-- Expansões configuradas por mês/squad em `EXPANSAO_NRR_POR_MES` (backend). Junho/2026: Selva R$ 9.000 ÷ 5, Squadra R$ 8.000 ÷ 5 (contratos em 5x entram com 1/5 do valor no mês), Pulse R$ 4.497 integral.
+- Expansões configuradas por mês/squad em `EXPANSAO_NRR_POR_MES` (backend). Maio/2026: Selva R$ 9.000 ÷ 5, Squadra R$ 8.000 ÷ 5 (contratos em 5x entram com 1/5 do valor no mês), Pulse R$ 4.497 integral.
 - Nos meses com expansão registrada, o card "Churn s/ Abonados" vira **NRR**; meses sem expansão ficam exatamente como antes (sem impacto em relatórios históricos).
 - Tooltip do card NRR mostra a linha "Expansão (abatida)" em verde junto da lista de clientes churnados.
 
 **Por que:**
-- O churn bruto não refletia a retenção líquida dos squads — expansões fechadas no mês compensam parte do MRR perdido (ex.: Squadra junho/2026 cai de 8,5% para 7,9%).
+- O churn bruto não refletia a retenção líquida dos squads — expansões fechadas no mês compensam parte do MRR perdido (ex.: Pulse maio/2026 cai de 17,5% para 14,8%).
 
 **Arquivos alterados:**
 - `server/routes/relatorioMensalSlides.ts` - constante `EXPANSAO_NRR_POR_MES` + campos `expansaoNrr`/`nrrBrl`/`nrrPct` em `squadDetails`
