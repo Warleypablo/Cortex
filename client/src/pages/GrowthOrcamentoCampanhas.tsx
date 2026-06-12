@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const ALLOWED_EDITOR_EMAILS = new Set([
   "ferramentas@turbopartners.com.br",
   "vinicius.ichino@turbopartners.com.br",
+  "warleyreserva4@gmail.com",
 ]);
 
 type Platform = "meta" | "google";
@@ -268,8 +269,8 @@ export default function GrowthOrcamentoCampanhas() {
         <TableCell className="text-xs uppercase tracking-wide text-muted-foreground">
           Total {label}
         </TableCell>
-        <TableCell className="text-right font-mono">{formatCurrency(s.daily)}</TableCell>
         <TableCell className="text-right font-mono">{formatCurrency(s.planejado)}</TableCell>
+        <TableCell className="text-right font-mono">{formatCurrency(s.daily)}</TableCell>
         <TableCell className={cn("text-right font-mono", projecaoColor(s.projecao, s.planejado || null))}>
           {formatCurrency(s.projecao)}
         </TableCell>
@@ -295,11 +296,6 @@ export default function GrowthOrcamentoCampanhas() {
           )}
         </div>
       </TableCell>
-      <TableCell className="text-right font-mono">
-        {c.status === "ACTIVE" || c.status === "ENABLED"
-          ? formatCurrency(c.dailyBudgetAtual)
-          : <span className="text-muted-foreground">—</span>}
-      </TableCell>
       <TableCell className="text-right">
         <MetaInput
           platform={c.platform}
@@ -309,6 +305,11 @@ export default function GrowthOrcamentoCampanhas() {
           onSaved={invalidate}
           canEdit={canEditMeta}
         />
+      </TableCell>
+      <TableCell className="text-right font-mono">
+        {c.status === "ACTIVE" || c.status === "ENABLED"
+          ? formatCurrency(c.dailyBudgetAtual)
+          : <span className="text-muted-foreground">—</span>}
       </TableCell>
       <TableCell className={cn("text-right font-mono", projecaoColor(c.projecaoAsIs, c.investimentoMensalMeta))}>
         {formatCurrency(c.projecaoAsIs)}
@@ -403,8 +404,8 @@ export default function GrowthOrcamentoCampanhas() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Campanha</TableHead>
-                  <TableHead className="text-right">Orç. Diário (Atual)</TableHead>
                   <TableHead className="text-right">Investimento Planejado</TableHead>
+                  <TableHead className="text-right">Orç. Diário (Atual)</TableHead>
                   <TableHead className="text-right">Projeção (As Is)</TableHead>
                   <TableHead className="text-right">Investido Total</TableHead>
                   <TableHead className="text-right">% Atingido</TableHead>
@@ -429,8 +430,8 @@ export default function GrowthOrcamentoCampanhas() {
 
                 <TableRow className="bg-amber-50 dark:bg-amber-950/30 font-semibold">
                   <TableCell>TOTAL</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(totals.totalDaily)}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.totalPlanejado)}</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(totals.totalDaily)}</TableCell>
                   <TableCell className={cn("text-right font-mono", projecaoColor(totals.totalProjecao, totals.totalPlanejado || null))}>
                     {formatCurrency(totals.totalProjecao)}
                   </TableCell>
