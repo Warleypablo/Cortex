@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-12 | feat(capacity): dois percentuais — Capacity por MRR e por quantidade de contas
+
+**O que foi feito:**
+- Backend (`/api/capacity-times`) passou a retornar `util_mrr_pct` (MRR operando / cap. MRR) e `util_contas_pct` separados para todas as linhas; `util_pct` legado mantido (MRR quando há cap, senão contas).
+- CS/squads: % contas = (contas recorrentes + pontuais) / (cap. recorrente + cap. pontual). Comerciais: % contas = contas ativas / cap. contas.
+- Tabelas (squads, comerciais e comparativo da Visão Geral) trocam a coluna única "Utilização" por **% MRR** e **% Contas**, cada uma com barra e cores por faixa.
+- Cards dos times mostram "Capacity MRR (média)" e "Capacity Contas (média)".
+- Gráficos "Utilização por pessoa" e "Utilização média por time" viram barras agrupadas MRR × Contas com legenda.
+
+**Por que:**
+- Um percentual único escondia visões diferentes de lotação: alguém pode estar estourado em MRR e com folga em contas (ex.: Victor/Pulse 118% MRR × 95% contas) ou vice-versa.
+
+**Arquivos alterados:**
+- `server/routes/capacityTimes.helpers.ts` - campos `util_mrr_pct`/`util_contas_pct` em CsRow e ComercialRow
+- `server/routes/capacityTimes.helpers.test.ts` - cobertura dos dois percentuais
+- `client/src/pages/CapacityTimes.tsx` - colunas, cards e gráficos agrupados
+
+**Impacto arquitetural:** Nenhum — novos campos na API sem breaking change
+
+---
+
 ## 2026-06-12 | feat(relatorio-mensal): NRR por squad — expansão abatida do churn
 
 **O que foi feito:**
