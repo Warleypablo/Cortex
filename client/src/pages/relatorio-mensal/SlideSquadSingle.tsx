@@ -54,8 +54,8 @@ function fmtBRLExato(v: number): string {
   return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
-function ChurnClientesTooltip({ titulo, clientes }: { titulo: string; clientes: ChurnCliente[] }) {
-  if (clientes.length === 0) {
+function ChurnClientesTooltip({ titulo, clientes, expansao = 0 }: { titulo: string; clientes: ChurnCliente[]; expansao?: number }) {
+  if (clientes.length === 0 && expansao <= 0) {
     return <p className="text-xs text-zinc-400">Nenhum churn no período</p>;
   }
   const visiveis = clientes.slice(0, TOOLTIP_MAX_CLIENTES);
@@ -80,6 +80,12 @@ function ChurnClientesTooltip({ titulo, clientes }: { titulo: string; clientes: 
           <li className="flex items-baseline justify-between gap-4 text-xs text-zinc-400">
             <span>+ {restantes.length} outros</span>
             <span className="tabular-nums shrink-0">{fmtBRLExato(valorRestante)}</span>
+          </li>
+        )}
+        {expansao > 0 && (
+          <li className="flex items-baseline justify-between gap-4 text-xs border-t border-white/10 mt-1 pt-1">
+            <span className="text-emerald-400">Expansão (abatida)</span>
+            <span className="tabular-nums shrink-0 text-emerald-400">− {fmtBRLExato(expansao)}</span>
           </li>
         )}
       </ul>
@@ -137,9 +143,13 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
           const evolSign = evolUp ? "+" : "−";
           const evolAbs = Math.abs(Math.round(sq.evolucaoMrr));
           const churnClientes = sq.churnClientes ?? [];
+          // Com expansão registrada no mês, o card "Churn s/ Abonados" vira NRR (churn − expansão)
+          const expansaoNrr = sq.expansaoNrr ?? 0;
           const churnCards = [
-            { label: "Churn Total", labelCompact: "Churn Total", pct: sq.churnTotalPct ?? sq.churnPct, brl: sq.churnTotalBrl ?? sq.churnBrl, clientes: churnClientes },
-            { label: "Churn s/ Abonados", labelCompact: "Churn s/ Abono", pct: sq.churnPct, brl: sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado) },
+            { label: "Churn Total", labelCompact: "Churn Total", pct: sq.churnTotalPct ?? sq.churnPct, brl: sq.churnTotalBrl ?? sq.churnBrl, clientes: churnClientes, expansao: 0 },
+            expansaoNrr > 0
+              ? { label: "NRR", labelCompact: "NRR", pct: sq.nrrPct ?? sq.churnPct, brl: sq.nrrBrl ?? sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado), expansao: expansaoNrr }
+              : { label: "Churn s/ Abonados", labelCompact: "Churn s/ Abono", pct: sq.churnPct, brl: sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado), expansao: 0 },
           ];
           const faturamentoTotal = sq.mrr + sq.pontual;
           const evolCard = (
@@ -285,7 +295,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                               <div
                                 className="h-full rounded-full transition-all"
                                 style={{
-                                  width: `${Math.min(card.pct * 5, 100)}%`,
+                                  width: `${Math.min(Math.max(card.pct, 0) * 5, 100)}%`,
                                   background: cardColor,
                                 }}
                               />
@@ -295,7 +305,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                       </TooltipTrigger>
                       {/* Slide é sempre escuro — força tooltip dark independente do tema do app */}
                       <TooltipContent side="top" className="bg-zinc-900 border border-white/10 text-zinc-100 shadow-xl">
-                        <ChurnClientesTooltip titulo={card.label} clientes={card.clientes} />
+                        <ChurnClientesTooltip titulo={card.label} clientes={card.clientes} expansao={card.expansao} />
                       </TooltipContent>
                     </Tooltip>
                   );
