@@ -1726,6 +1726,49 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.log("[api] Google Ads data not available for performance-plataformas");
       }
 
+      // ---- De-para ID→nome para mídia paga (campanha / conjunto / anúncio) ----
+      // utm_campaign/utm_term/utm_content gravam os IDs numéricos do Google e do Meta.
+      // Resolvemos para nomes legíveis sem alterar a key crua (que mantém o agrupamento).
+      //   Google: campaign=campaign_id, term=ad_group_id, content=keyword (já texto).
+      //   Meta:   campaign=campaign_id, term=adset_id (pode ter sufixo -Placement), content=ad_id.
+      const googleCampNames = new Map<string, string>();
+      const googleAdGroupNames = new Map<string, string>();
+      const metaCampNames = new Map<string, string>();
+      const metaAdsetNames = new Map<string, string>();
+      const metaAdNames = new Map<string, string>();
+      try {
+        const gc = await db.execute(sql`SELECT campaign_id::text AS id, name FROM google.campaigns`);
+        for (const r of gc.rows as any[]) if (r.name) googleCampNames.set(r.id, r.name);
+        const ga = await db.execute(sql`SELECT ad_group_id::text AS id, name FROM google.ad_groups`);
+        for (const r of ga.rows as any[]) if (r.name) googleAdGroupNames.set(r.id, r.name);
+      } catch (e) { /* schema google ausente → mantém IDs */ }
+      try {
+        const mc = await db.execute(sql`SELECT campaign_id::text AS id, campaign_name FROM meta_ads.meta_campaigns`);
+        for (const r of mc.rows as any[]) if (r.campaign_name) metaCampNames.set(r.id, r.campaign_name);
+        const ms = await db.execute(sql`SELECT adset_id::text AS id, adset_name FROM meta_ads.meta_adsets`);
+        for (const r of ms.rows as any[]) if (r.adset_name) metaAdsetNames.set(r.id, r.adset_name);
+        const ma = await db.execute(sql`SELECT ad_id::text AS id, ad_name FROM meta_ads.meta_ads`);
+        for (const r of ma.rows as any[]) if (r.ad_name) metaAdNames.set(r.id, r.ad_name);
+      } catch (e) { /* schema meta_ads ausente → mantém IDs */ }
+
+      // Extrai o ID numérico líder (Meta usa sufixos tipo "1203...450-Instagram_Feed").
+      const leadingId = (v: string): string => { const m = String(v).match(/^(\d{5,})/); return m ? m[1] : ''; };
+      const resolveLeafName = (source: string, level: 'campaign' | 'term' | 'content', raw: string): string => {
+        const id = leadingId(raw);
+        if (!id) return raw;
+        if (source === 'google') {
+          if (level === 'campaign') return googleCampNames.get(id) || raw;
+          if (level === 'term') return googleAdGroupNames.get(id) || raw;
+          return raw; // content = texto da keyword
+        }
+        if (source === 'facebook' || source === 'meta' || source === 'instagram') {
+          if (level === 'campaign') return metaCampNames.get(id) || raw;
+          if (level === 'term') return metaAdsetNames.get(id) || raw;
+          if (level === 'content') return metaAdNames.get(id) || raw;
+        }
+        return raw;
+      };
+
       // ---- Montar árvore: medium → source → campaign → term → content ----
       const MEDIUM_LABELS: Record<string, string> = {
         paid: 'Mídia Paga', organic: 'Orgânico', crm: 'CRM',
@@ -1766,11 +1809,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         let srcNode = medNode.children.get(s);
         if (!srcNode) { srcNode = makeNode(`s${SEP}${m}${SEP}${s}`, sourceLabel(s), 'source', 997); medNode.children.set(s, srcNode); }
         let campNode = srcNode.children.get(c);
-        if (!campNode) { campNode = makeNode(`c${SEP}${m}${SEP}${s}${SEP}${c}`, c, 'campaign', 0); srcNode.children.set(c, campNode); }
+        if (!campNode) { campNode = makeNode(`c${SEP}${m}${SEP}${s}${SEP}${c}`, resolveLeafName(s, 'campaign', c), 'campaign', 0); srcNode.children.set(c, campNode); }
         let termNode = campNode.children.get(t);
-        if (!termNode) { termNode = makeNode(`t${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}`, t, 'term', 0); campNode.children.set(t, termNode); }
+        if (!termNode) { termNode = makeNode(`t${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}`, resolveLeafName(s, 'term', t), 'term', 0); campNode.children.set(t, termNode); }
         let contentNode = termNode.children.get(ct);
-        if (!contentNode) { contentNode = makeNode(`x${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}${SEP}${ct}`, ct, 'content', 0); termNode.children.set(ct, contentNode); }
+        if (!contentNode) { contentNode = makeNode(`x${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}${SEP}${ct}`, resolveLeafName(s, 'content', ct), 'content', 0); termNode.children.set(ct, contentNode); }
         addRaw(contentNode.own, raw);
       }
 
