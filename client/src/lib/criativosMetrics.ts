@@ -331,7 +331,7 @@ export function aggregateGroup(rows: CriativoData[], meta: GroupMeta, level: Lev
   const budget = computeBudget(rows, level);
   return {
     link: "",
-    plataforma: "Meta Ads",
+    plataforma: rows[0]?.plataforma || "Meta Ads",
     orcamentoDiario: budget.value,
     orcamentoInfo: budget.info,
     ...meta,

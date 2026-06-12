@@ -191,6 +191,242 @@ async function resolveMetaCampaignIdsForFunil(db: any, realFunilValues: string[]
   }
 }
 
+// Normaliza status do Google (ENABLED/PAUSED/REMOVED) p/ o vocabulário da tela.
+function normalizeGoogleStatus(raw: string | null): string {
+  if (!raw) return 'Desconhecido';
+  const u = raw.toUpperCase();
+  if (u === 'ENABLED') return 'Ativo';
+  if (u === 'PAUSED') return 'Pausado';
+  if (['REMOVED', 'DISABLED'].includes(u)) return 'Inativo';
+  return 'Desconhecido';
+}
+
+// Acumulador de CRM (mesmos contadores das linhas de anúncio do Meta).
+type CrmAcc = {
+  leads: number; mqls: number; nmqls: number; rm: number; rmMql: number; rmNmql: number;
+  rr: number; rrMql: number; rrNmql: number; vendas: number; vendasMql: number; vendasNmql: number;
+  clientesUnicos: number; valorPontual: number; valorRecorrente: number; contratos: number;
+};
+const emptyCrm = (): CrmAcc => ({
+  leads: 0, mqls: 0, nmqls: 0, rm: 0, rmMql: 0, rmNmql: 0, rr: 0, rrMql: 0, rrNmql: 0,
+  vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0, valorPontual: 0, valorRecorrente: 0, contratos: 0,
+});
+const addCrm = (a: CrmAcc, b: CrmAcc) => {
+  a.leads += b.leads; a.mqls += b.mqls; a.nmqls += b.nmqls; a.rm += b.rm; a.rmMql += b.rmMql; a.rmNmql += b.rmNmql;
+  a.rr += b.rr; a.rrMql += b.rrMql; a.rrNmql += b.rrNmql; a.vendas += b.vendas; a.vendasMql += b.vendasMql; a.vendasNmql += b.vendasNmql;
+  a.clientesUnicos += b.clientesUnicos; a.valorPontual += b.valorPontual; a.valorRecorrente += b.valorRecorrente; a.contratos += b.contratos;
+};
+
+/**
+ * Constrói linhas de criativo do Google Ads no formato CriativoData (compatível com a tela).
+ *
+ * Métricas NATIVAS (custo/impressões/clicks/conversões) vêm no nível de ANÚNCIO, somadas no
+ * período (google.ad_daily_metrics). O CRM (leads→vendas, do Bitrix) só atribui a campanha
+ * (utm_campaign) e ad group (utm_term) — não ao anúncio. Por isso o CRM de cada ad group é
+ * anexado a uma "linha portadora" (o anúncio de maior gasto do grupo); leads de campanha sem
+ * ad group identificado vão para o anúncio de maior gasto da campanha. Assim os somatórios do
+ * frontend (anúncio → conjunto → campanha → conta) reconstroem os totais corretamente.
+ */
+export async function buildGoogleCriativos(db: any, startDate: string, endDate: string): Promise<any[]> {
+  const MQL = `(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+  const NMQL = `NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+
+  // 1. Anúncios + métricas nativas agregadas no período + nomes de ad group/campanha.
+  const adsRes = await db.execute(sql`
+    SELECT a.ad_id::text AS ad_id, a.ad_group_id::text AS ad_group_id, a.campaign_id::text AS campaign_id,
+           a.name AS ad_name, a.ad_type, a.status AS ad_status, a.final_urls, a.headlines,
+           ag.name AS adset_name, ag.status AS adset_status,
+           c.name AS campaign_name, c.status AS campaign_status, c.budget_amount_micros,
+           COALESCE(m.impressions, 0) AS impressions, COALESCE(m.clicks, 0) AS clicks,
+           COALESCE(m.cost_micros, 0) AS cost_micros, COALESCE(m.conversions, 0) AS conversions,
+           COALESCE(m.conversion_value, 0) AS conversion_value, COALESCE(m.video_views, 0) AS video_views
+    FROM google.ads a
+    LEFT JOIN google.ad_groups ag ON ag.ad_group_id = a.ad_group_id
+    LEFT JOIN google.campaigns c ON c.campaign_id = a.campaign_id
+    LEFT JOIN (
+      SELECT ad_id, SUM(impressions) AS impressions, SUM(clicks) AS clicks, SUM(cost_micros) AS cost_micros,
+             SUM(conversions) AS conversions, SUM(conversion_value) AS conversion_value, SUM(video_views) AS video_views
+      FROM google.ad_daily_metrics
+      WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+      GROUP BY ad_id
+    ) m ON m.ad_id = a.ad_id
+  `);
+
+  // 2. CRM por (utm_campaign, utm_term) — mesmas regras do funil (source canônico google).
+  const crmRes = await db.execute(sql.raw(`
+    SELECT d.utm_campaign AS campaign_key, d.utm_term AS term_key,
+      COUNT(*) AS leads,
+      SUM(CASE WHEN ${MQL} THEN 1 ELSE 0 END) AS mqls,
+      SUM(CASE WHEN ${NMQL} THEN 1 ELSE 0 END) AS nmqls,
+      SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) AS rm,
+      SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND ${MQL} THEN 1 ELSE 0 END) AS rm_mql,
+      SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND ${NMQL} THEN 1 ELSE 0 END) AS rm_nmql,
+      SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) AS rr,
+      SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND ${MQL} THEN 1 ELSE 0 END) AS rr_mql,
+      SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND ${NMQL} THEN 1 ELSE 0 END) AS rr_nmql,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) AS vendas,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' AND ${MQL} THEN 1 ELSE 0 END) AS vendas_mql,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' AND ${NMQL} THEN 1 ELSE 0 END) AS vendas_nmql,
+      COUNT(DISTINCT CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.company_name, d.contact_name, d.title) END) AS clientes_unicos,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) ELSE 0 END) AS valor_pontual,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_recorrente, 0) ELSE 0 END) AS valor_recorrente,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN
+        CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1
+        ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END
+      ELSE 0 END) AS contratos
+    FROM "Bitrix".crm_deal d
+    WHERE d.created_at >= '${startDate}'::date AND d.created_at <= '${endDate}'::date + INTERVAL '1 day'
+      AND (LOWER(COALESCE(d.utm_source, '')) LIKE '%google%' OR LOWER(COALESCE(d.utm_source, '')) LIKE '%gads%' OR LOWER(COALESCE(d.utm_source, '')) LIKE '%adwords%')
+      AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+    GROUP BY d.utm_campaign, d.utm_term
+  `));
+
+  const leadingId = (v: any): string => { const m = String(v ?? '').match(/^(\d{5,})/); return m ? m[1] : ''; };
+  const rowToCrm = (r: any): CrmAcc => ({
+    leads: parseInt(r.leads) || 0, mqls: parseInt(r.mqls) || 0, nmqls: parseInt(r.nmqls) || 0,
+    rm: parseInt(r.rm) || 0, rmMql: parseInt(r.rm_mql) || 0, rmNmql: parseInt(r.rm_nmql) || 0,
+    rr: parseInt(r.rr) || 0, rrMql: parseInt(r.rr_mql) || 0, rrNmql: parseInt(r.rr_nmql) || 0,
+    vendas: parseInt(r.vendas) || 0, vendasMql: parseInt(r.vendas_mql) || 0, vendasNmql: parseInt(r.vendas_nmql) || 0,
+    clientesUnicos: parseInt(r.clientes_unicos) || 0,
+    valorPontual: parseFloat(r.valor_pontual) || 0, valorRecorrente: parseFloat(r.valor_recorrente) || 0,
+    contratos: parseInt(r.contratos) || 0,
+  });
+
+  // Conjunto de ad groups conhecidos (que têm anúncios) p/ decidir atribuição ad group vs campanha.
+  const adRows = adsRes.rows as any[];
+  const knownAdGroups = new Set(adRows.map((a) => a.ad_group_id));
+  const adGroupCrm = new Map<string, CrmAcc>();   // ad_group_id → CRM
+  const campaignCrm = new Map<string, CrmAcc>();  // campaign_id → CRM (leads sem ad group identificado)
+  for (const r of crmRes.rows as any[]) {
+    const crm = rowToCrm(r);
+    const agId = leadingId(r.term_key);
+    const campId = leadingId(r.campaign_key);
+    if (agId && knownAdGroups.has(agId)) {
+      const cur = adGroupCrm.get(agId) || emptyCrm(); addCrm(cur, crm); adGroupCrm.set(agId, cur);
+    } else if (campId) {
+      const cur = campaignCrm.get(campId) || emptyCrm(); addCrm(cur, crm); campaignCrm.set(campId, cur);
+    }
+  }
+
+  // Linha portadora: anúncio de maior gasto dentro de um grupo de ad rows.
+  const topSpender = (rows: any[]): any | null =>
+    rows.length ? rows.reduce((best, r) => (Number(r.cost_micros) > Number(best.cost_micros) ? r : best), rows[0]) : null;
+
+  // CRM anexado por ad_id (só na linha portadora; demais ficam zerados).
+  const crmByAd = new Map<string, CrmAcc>();
+  const byAdGroup = new Map<string, any[]>();
+  const byCampaign = new Map<string, any[]>();
+  for (const a of adRows) {
+    if (a.ad_group_id) { const arr = byAdGroup.get(a.ad_group_id) || []; arr.push(a); byAdGroup.set(a.ad_group_id, arr); }
+    if (a.campaign_id) { const arr = byCampaign.get(a.campaign_id) || []; arr.push(a); byCampaign.set(a.campaign_id, arr); }
+  }
+  for (const [agId, crm] of Array.from(adGroupCrm.entries())) {
+    const carrier = topSpender(byAdGroup.get(agId) || []);
+    if (carrier) { const cur = crmByAd.get(carrier.ad_id) || emptyCrm(); addCrm(cur, crm); crmByAd.set(carrier.ad_id, cur); }
+  }
+  for (const [campId, crm] of Array.from(campaignCrm.entries())) {
+    const carrier = topSpender(byCampaign.get(campId) || []);
+    if (carrier) { const cur = crmByAd.get(carrier.ad_id) || emptyCrm(); addCrm(cur, crm); crmByAd.set(carrier.ad_id, cur); }
+  }
+
+  // 3. Montar linhas no formato CriativoData. Mantém só anúncios com gasto, CRM, ou ativos.
+  const r1 = (v: number) => parseFloat(v.toFixed(1));
+  const r2 = (v: number) => parseFloat(v.toFixed(2));
+  const out: any[] = [];
+  for (const a of adRows) {
+    const investimento = Number(a.cost_micros) / 1_000_000;
+    const impressions = parseInt(a.impressions) || 0;
+    const clicks = parseInt(a.clicks) || 0;
+    const crm = crmByAd.get(a.ad_id) || emptyCrm();
+    const adStatus = normalizeGoogleStatus(a.ad_status);
+    const isActive = adStatus === 'Ativo';
+    if (investimento <= 0 && crm.leads === 0 && crm.vendas === 0 && !isActive) continue;
+
+    const receita = crm.valorPontual + crm.valorRecorrente;
+    const ctr = impressions > 0 && clicks > 0 ? r2((clicks / impressions) * 100) : null;
+    const cpm = impressions > 0 ? Math.round((investimento / impressions) * 1000) : null;
+    // Nome de exibição: nome do anúncio → 1ª headline → tipo+id.
+    let display = a.ad_name as string | null;
+    if (!display && a.headlines) { try { const h = JSON.parse(a.headlines); if (Array.isArray(h) && h[0]) display = h[0]; } catch {} }
+    if (!display) display = `${a.ad_type || 'Anúncio'} ${a.ad_id}`;
+    let link = '';
+    if (a.final_urls) { try { const u = JSON.parse(a.final_urls); if (Array.isArray(u) && u[0]) link = u[0]; } catch {} }
+
+    out.push({
+      id: a.ad_id,
+      adName: display,
+      link,
+      dataCriacao: null,
+      status: adStatus,
+      plataforma: 'Google Ads',
+      campaignId: a.campaign_id || null,
+      campaignName: a.campaign_name || a.campaign_id || null,
+      campaignStatus: normalizeGoogleStatus(a.campaign_status),
+      adsetId: a.ad_group_id || null,
+      adsetName: a.adset_name || a.ad_group_id || null,
+      adsetStatus: normalizeGoogleStatus(a.adset_status),
+      // Google: orçamento é da campanha (diário). Conjunto não tem budget próprio aqui.
+      campaignDailyBudget: a.budget_amount_micros != null ? Number(a.budget_amount_micros) / 1_000_000 : null,
+      campaignLifetimeBudget: null,
+      adsetDailyBudget: null,
+      adsetLifetimeBudget: null,
+      investimento: Math.round(investimento),
+      // contadores nativos do Google (clicks entram como outboundClicks p/ CTR funcionar)
+      impressions,
+      outboundClicks: clicks,
+      landingPageViews: 0,
+      reach: 0,
+      video3sec: 0,
+      videoThruplay: 0,
+      videoHook: null,
+      videoHold: null,
+      ctr,
+      cpm,
+      connectRate: null,
+      taxaConversao: null,
+      // CRM (carregado na linha portadora do ad group / campanha)
+      leads: crm.leads,
+      cpl: crm.leads > 0 ? Math.round(investimento / crm.leads) : null,
+      mql: crm.mqls,
+      cpmql: crm.mqls > 0 ? r2(investimento / crm.mqls) : null,
+      cpra: investimento > 0 && crm.rm > 0 ? Math.round(investimento / crm.rm) : null,
+      cpraMql: investimento > 0 && crm.rmMql > 0 ? Math.round(investimento / crm.rmMql) : null,
+      cpraNmql: investimento > 0 && crm.rmNmql > 0 ? Math.round(investimento / crm.rmNmql) : null,
+      cprr: investimento > 0 && crm.rr > 0 ? Math.round(investimento / crm.rr) : null,
+      cprrMql: investimento > 0 && crm.rrMql > 0 ? Math.round(investimento / crm.rrMql) : null,
+      cprrNmql: investimento > 0 && crm.rrNmql > 0 ? Math.round(investimento / crm.rrNmql) : null,
+      percMql: crm.leads > 0 ? r1((crm.mqls / crm.leads) * 100) : null,
+      descartadoPerc: null, descartadoMqlPerc: null, descartadoNmqlPerc: null,
+      percRa: crm.leads > 0 ? r1((crm.rm / crm.leads) * 100) : null,
+      percRaMql: crm.mqls > 0 ? r1((crm.rmMql / crm.mqls) * 100) : null,
+      percRaNmql: crm.nmqls > 0 ? r1((crm.rmNmql / crm.nmqls) * 100) : null,
+      percRr: crm.leads > 0 ? r1((crm.rr / crm.leads) * 100) : null,
+      percRrMql: crm.mqls > 0 ? r1((crm.rrMql / crm.mqls) * 100) : null,
+      percRrNmql: crm.nmqls > 0 ? r1((crm.rrNmql / crm.nmqls) * 100) : null,
+      percRrVendas: crm.rr > 0 ? r1((crm.vendas / crm.rr) * 100) : null,
+      percRrMqlVendas: crm.rrMql > 0 ? r1((crm.vendasMql / crm.rrMql) * 100) : null,
+      percRrNmqlVendas: crm.rrNmql > 0 ? r1((crm.vendasNmql / crm.rrNmql) * 100) : null,
+      nmqls: crm.nmqls,
+      rm: crm.rm, rmMql: crm.rmMql, rmNmql: crm.rmNmql,
+      rr: crm.rr, rrMql: crm.rrMql, rrNmql: crm.rrNmql,
+      vendas: crm.vendas, vendasMql: crm.vendasMql, vendasNmql: crm.vendasNmql,
+      contratos: crm.contratos,
+      descartados: 0, descartadosMql: 0, descartadosNmql: 0,
+      clientesUnicos: crm.clientesUnicos,
+      leadTime: null,
+      aov: crm.clientesUnicos > 0 ? Math.round(receita / crm.clientesUnicos) : null,
+      receita: receita || null,
+      receitaPontual: crm.valorPontual,
+      receitaRecorrente: crm.valorRecorrente,
+      cacGeral: crm.vendas > 0 ? Math.round(investimento / crm.vendas) : null,
+      cacUnico: crm.clientesUnicos > 0 ? Math.round(investimento / crm.clientesUnicos) : null,
+      cacContrato: crm.contratos > 0 ? Math.round(investimento / crm.contratos) : null,
+      roas: investimento > 0 ? r2(receita / investimento) : null,
+    });
+  }
+  return out;
+}
+
 export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Ensure landing_page_views column exists
   db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`)
@@ -1038,13 +1274,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Parse plataforma filter (supports comma-separated for multi-select)
       const plataformas = plataformaParam === 'Todos' ? [] : plataformaParam.split(',').map(p => p.trim());
 
-      // Por enquanto só temos dados do Meta Ads
-      // Se nenhuma plataforma selecionada incluir Meta Ads (ou "Todos"), retornar vazio
-      if (plataformas.length > 0 && !plataformas.includes('Meta Ads') && !plataformas.includes('Todos')) {
-        console.log("[api] Growth Criativos - Plataformas:", plataformas, "- sem dados disponíveis");
-        return res.json([]);
-      }
-      
+      // Plataformas com dados: Meta Ads e Google Ads. "Todos"/vazio = ambas.
+      const wantsMeta = plataformas.length === 0 || plataformas.includes('Meta Ads') || plataformas.includes('Todos');
+      const wantsGoogle = plataformas.length === 0 || plataformas.includes('Google Ads') || plataformas.includes('Todos');
+
+      let criativos: any[] = [];
+
+      if (wantsMeta) {
       // Buscar dados agregados por anúncio do Meta Ads com info do anúncio e campanha (apenas conta interna Turbo Partners)
       const adsDataResult = await db.execute(sql`
         SELECT
@@ -1225,7 +1461,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       ];
 
       // Combinar dados de ads com deals
-      const criativos = allAdsRows
+      criativos = allAdsRows
         .map(row => {
           const adId = row.ad_id;
           const investimento = parseFloat(row.investimento) || 0;
@@ -1398,9 +1634,28 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           if (campanhaIdSet && !campanhaIdSet.has(String(c.campaignId))) return false;
           return true;
         });
-      
+      } // fim if (wantsMeta)
+
+      // Google Ads: mesmo formato de linha, métricas nativas + CRM por ad group/campanha.
+      if (wantsGoogle) {
+        try {
+          const googleRows = (await buildGoogleCriativos(db, startDate, endDate)).filter((c: any) => {
+            if (status !== 'Todos') {
+              if (status === 'Ativo' && c.status !== 'Ativo') return false;
+              if (status === 'Pausado' && c.status !== 'Pausado') return false;
+            }
+            if (campanhaId && String(c.campaignId) !== String(campanhaId)) return false;
+            if (campanhaIdSet && !campanhaIdSet.has(String(c.campaignId))) return false;
+            return true;
+          });
+          criativos = criativos.concat(googleRows);
+        } catch (e: any) {
+          console.log("[api] Growth Criativos - Google indisponível:", e?.message || e);
+        }
+      }
+
       console.log("[api] Growth Criativos - Total:", criativos.length, "Status:", status);
-      
+
       res.json(criativos);
     } catch (error) {
       console.error("[api] Error fetching growth criativos:", error);
