@@ -7,16 +7,16 @@ const MESES_PT = [
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
-// Expansão (upsell/cross-sell) por mês e squad — abatida do churn s/ abonados
-// para formar o NRR no slide "Detalhes por Squad".
-// Contratos de expansão parcelados em 5x entram com 1/5 do valor no mês;
-// valores à vista entram integrais. Chaves de squad normalizadas
-// (sem emoji, sem "(OFF)", minúsculas — ver normalizeSquadName).
-const EXPANSAO_NRR_POR_MES: Record<string, Record<string, number>> = {
+// Vendas de expansão (upsell/cross-sell) por mês e squad — slide "Detalhes por Squad".
+// `vendas` é o valor total vendido no mês (card "Total de Vendas"); `abatimento` é a
+// parcela descontada do churn s/ abonados para formar o NRR: contratos parcelados em
+// 5x abatem 1/5 do valor no mês, vendas à vista abatem o valor integral.
+// Chaves de squad normalizadas (sem emoji, sem "(OFF)", minúsculas — ver normalizeSquadName).
+const VENDAS_EXPANSAO_POR_MES: Record<string, Record<string, { vendas: number; abatimento: number }>> = {
   "2026-05": {
-    selva: 9000 / 5,
-    squadra: 8000 / 5,
-    pulse: 4497,
+    selva: { vendas: 9000, abatimento: 9000 / 5 },
+    squadra: { vendas: 8000, abatimento: 8000 / 5 },
+    pulse: { vendas: 4497, abatimento: 4497 },
   },
 };
 
@@ -1372,7 +1372,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
       // Squads ocultos do slide "Detalhes por Squad" (não impacta ranking nem totais)
       const SQUADS_OCULTOS_DETALHES = new Set(["comercial", "makers", "turbo interno", "squad x"]);
 
-      const expansaoNrrMes = EXPANSAO_NRR_POR_MES[`${anoDados}-${String(mesDados).padStart(2, "0")}`] || {};
+      const vendasExpansaoMes = VENDAS_EXPANSAO_POR_MES[`${anoDados}-${String(mesDados).padStart(2, "0")}`] || {};
 
       const squadDetails = (rankingSquadsResult.rows as any[])
         .filter((row: any) => !SQUADS_OCULTOS_DETALHES.has(normalizeSquadName(row.squad)))
@@ -1389,8 +1389,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         const churnBase = mrrAnt > 0 ? mrrAnt : mrr;
         const churnPct = churnBase > 0 ? (churn.brl / churnBase) * 100 : 0;
         const churnTotalPct = churnBase > 0 ? (churn.totalBrl / churnBase) * 100 : 0;
-        // NRR = churn s/ abonados − expansão do mês (pode ficar negativo = retenção líquida positiva)
-        const expansaoNrr = expansaoNrrMes[normalizeSquadName(row.squad)] || 0;
+        // NRR = churn s/ abonados − abatimento da expansão (pode ficar negativo = retenção líquida positiva)
+        const vendaExpansao = vendasExpansaoMes[normalizeSquadName(row.squad)];
+        const vendasMes = vendaExpansao?.vendas || 0;
+        const expansaoNrr = vendaExpansao?.abatimento || 0;
         const nrrBrl = churn.brl - expansaoNrr;
         const nrrPct = churnBase > 0 ? (nrrBrl / churnBase) * 100 : 0;
 
@@ -1405,6 +1407,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           churnTotalPct: Math.round(churnTotalPct * 10) / 10,
           churnTotalBrl: churn.totalBrl,
           churnClientes: [...churn.clientes].sort((a, b) => (b.valor || 0) - (a.valor || 0)),
+          vendasMes,
           expansaoNrr,
           nrrBrl,
           nrrPct: Math.round(nrrPct * 10) / 10,

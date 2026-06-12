@@ -5,8 +5,9 @@
 **O que foi feito:**
 - Slide "Detalhes por Squad" passou a calcular **NRR** = churn s/ abonados − expansão (upsell/cross-sell) do mês.
 - Expansões configuradas por mês/squad em `EXPANSAO_NRR_POR_MES` (backend). Maio/2026: Selva R$ 9.000 ÷ 5, Squadra R$ 8.000 ÷ 5 (contratos em 5x entram com 1/5 do valor no mês), Pulse R$ 4.497 integral.
-- Nos meses com expansão registrada, o card "Churn s/ Abonados" vira **NRR**; meses sem expansão ficam exatamente como antes (sem impacto em relatórios históricos).
+- Todo squad exibe sempre os cards **Total de Vendas** (valor cheio vendido no mês), **Churn s/ Abonados** e **NRR**, mesmo zerados — squads sem expansão mostram Vendas R$ 0 e NRR = churn s/ abonados.
 - Tooltip do card NRR mostra a linha "Expansão (abatida)" em verde junto da lista de clientes churnados.
+- Layout do card de squad com 8 KPIs: densidade média em 2 linhas de 4 (grid de 8 colunas); compacto (5+ squads) em 3 colunas sem ícones, com labels sem quebra de linha.
 
 **Por que:**
 - O churn bruto não refletia a retenção líquida dos squads — expansões fechadas no mês compensam parte do MRR perdido (ex.: Pulse maio/2026 cai de 17,5% para 14,8%).

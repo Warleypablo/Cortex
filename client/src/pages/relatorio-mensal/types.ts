@@ -156,8 +156,9 @@ export interface SquadDetail {
   churnTotalPct: number;  // churn total, sem descontar abonados
   churnTotalBrl: number;
   churnClientes: ChurnCliente[];
-  expansaoNrr: number;    // expansão (upsell) do mês abatida do churn p/ formar o NRR
-  nrrBrl: number;         // churn s/ abonados − expansão (negativo = retenção líquida positiva)
+  vendasMes: number;      // total de vendas de expansão (upsell/cross-sell) do mês
+  expansaoNrr: number;    // parcela da expansão abatida do churn p/ formar o NRR (5x → 1/5; à vista → integral)
+  nrrBrl: number;         // churn s/ abonados − abatimento (negativo = retenção líquida positiva)
   nrrPct: number;
   mrrBase: number;
   evolucaoMrr: number;
