@@ -7,6 +7,7 @@ const TURBO_PARTNERS_ACCOUNT_ID = "act_1331413260627780";
 const ALLOWED_EDITOR_EMAILS = new Set([
   "ferramentas@turbopartners.com.br",
   "vinicius.ichino@turbopartners.com.br",
+  "warleyreserva4@gmail.com",
 ]);
 
 type Platform = "meta" | "google";

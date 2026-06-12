@@ -16,6 +16,7 @@ import { useAuth } from "@/contexts/AuthContext";
 const ALLOWED_EDITOR_EMAILS = new Set([
   "ferramentas@turbopartners.com.br",
   "vinicius.ichino@turbopartners.com.br",
+  "warleyreserva4@gmail.com",
 ]);
 
 type Platform = "meta" | "google";
@@ -152,6 +153,28 @@ function MetaInput({
   );
 }
 
+interface RowSums {
+  daily: number;
+  planejado: number;
+  projecao: number;
+  investido: number;
+}
+
+function sumRows(rows: Campanha[]): RowSums {
+  let daily = 0;
+  let planejado = 0;
+  let projecao = 0;
+  let investido = 0;
+  for (const c of rows) {
+    const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
+    daily += isActive ? c.dailyBudgetAtual : 0;
+    planejado += c.investimentoMensalMeta ?? 0;
+    projecao += c.projecaoAsIs;
+    investido += c.investidoTotal;
+  }
+  return { daily, planejado, projecao, investido };
+}
+
 function PlatformIcon({ platform }: { platform: Platform }) {
   if (platform === "meta") return <Facebook className="w-4 h-4" />;
   return <SearchIcon className="w-4 h-4" />;
@@ -210,38 +233,54 @@ export default function GrowthOrcamentoCampanhas() {
   const { metaRows, googleRows, totals } = useMemo(() => {
     const metaRows: Campanha[] = [];
     const googleRows: Campanha[] = [];
-    let totalDaily = 0;
-    let totalDailyMeta = 0;
-    let totalMensalMeta = 0;
-    let totalProjecao = 0;
-    let totalInvestido = 0;
     for (const c of data?.campanhas ?? []) {
       if (c.platform === "meta") metaRows.push(c);
       else if (SHOW_GOOGLE) googleRows.push(c);
-      else continue; // Google escondido — não soma aos totais.
-      const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
-      totalDaily += isActive ? c.dailyBudgetAtual : 0;
-      totalDailyMeta += c.orcamentoDiarioMeta ?? 0;
-      totalMensalMeta += c.investimentoMensalMeta ?? 0;
-      totalProjecao += c.projecaoAsIs;
-      totalInvestido += c.investidoTotal;
+      // Google escondido — não soma aos totais.
     }
+    const allRows = SHOW_GOOGLE ? [...metaRows, ...googleRows] : metaRows;
+    const s = sumRows(allRows);
     return {
       metaRows,
       googleRows,
-      totals: { totalDaily, totalDailyMeta, totalMensalMeta, totalProjecao, totalInvestido },
+      totals: {
+        totalDaily: s.daily,
+        totalPlanejado: s.planejado,
+        totalProjecao: s.projecao,
+        totalInvestido: s.investido,
+      },
     };
   }, [data]);
 
   const groupHeader = (label: string, color: string, count: number) => (
     <TableRow className={cn("font-semibold", color)}>
-      <TableCell colSpan={7} className="py-2">
+      <TableCell colSpan={6} className="py-2">
         <span className="uppercase tracking-wide text-xs">
           {label} <span className="opacity-60">({count})</span>
         </span>
       </TableCell>
     </TableRow>
   );
+
+  const subtotalRow = (label: string, rows: Campanha[]) => {
+    const s = sumRows(rows);
+    return (
+      <TableRow className="border-t-2 bg-muted/40 font-medium">
+        <TableCell className="text-xs uppercase tracking-wide text-muted-foreground">
+          Total {label}
+        </TableCell>
+        <TableCell className="text-right font-mono">{formatCurrency(s.planejado)}</TableCell>
+        <TableCell className="text-right font-mono">{formatCurrency(s.daily)}</TableCell>
+        <TableCell className={cn("text-right font-mono", projecaoColor(s.projecao, s.planejado || null))}>
+          {formatCurrency(s.projecao)}
+        </TableCell>
+        <TableCell className="text-right font-mono">{formatCurrency(s.investido)}</TableCell>
+        <TableCell className="text-right text-xs text-muted-foreground">
+          {s.planejado > 0 ? `${((s.investido / s.planejado) * 100).toFixed(1)}%` : "—"}
+        </TableCell>
+      </TableRow>
+    );
+  };
 
   const renderRow = (c: Campanha) => (
     <TableRow key={`${c.platform}-${c.campaignId}`} data-testid={`row-${c.platform}-${c.campaignId}`}>
@@ -257,14 +296,6 @@ export default function GrowthOrcamentoCampanhas() {
           )}
         </div>
       </TableCell>
-      <TableCell className="text-right font-mono">
-        {c.status === "ACTIVE" || c.status === "ENABLED"
-          ? formatCurrency(c.dailyBudgetAtual)
-          : <span className="text-muted-foreground">—</span>}
-      </TableCell>
-      <TableCell className="text-right font-mono">
-        {c.orcamentoDiarioMeta !== null ? formatCurrency(c.orcamentoDiarioMeta) : <span className="text-muted-foreground">—</span>}
-      </TableCell>
       <TableCell className="text-right">
         <MetaInput
           platform={c.platform}
@@ -274,6 +305,11 @@ export default function GrowthOrcamentoCampanhas() {
           onSaved={invalidate}
           canEdit={canEditMeta}
         />
+      </TableCell>
+      <TableCell className="text-right font-mono">
+        {c.status === "ACTIVE" || c.status === "ENABLED"
+          ? formatCurrency(c.dailyBudgetAtual)
+          : <span className="text-muted-foreground">—</span>}
       </TableCell>
       <TableCell className={cn("text-right font-mono", projecaoColor(c.projecaoAsIs, c.investimentoMensalMeta))}>
         {formatCurrency(c.projecaoAsIs)}
@@ -338,11 +374,11 @@ export default function GrowthOrcamentoCampanhas() {
         <Card>
           <CardHeader className="pb-2">
             <CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2">
-              <Target className="w-3.5 h-3.5" /> Meta Mensal Total
+              <Target className="w-3.5 h-3.5" /> Planejado Total
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold font-mono">{formatCurrency(totals.totalMensalMeta)}</div>
+            <div className="text-2xl font-bold font-mono">{formatCurrency(totals.totalPlanejado)}</div>
           </CardContent>
         </Card>
         <Card>
@@ -353,9 +389,6 @@ export default function GrowthOrcamentoCampanhas() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold font-mono">{formatCurrency(totals.totalDaily)}</div>
-            <div className="text-xs text-muted-foreground mt-1">
-              Meta p/ bater: <span className="font-mono">{formatCurrency(totals.totalDailyMeta)}</span>
-            </div>
           </CardContent>
         </Card>
       </div>
@@ -371,9 +404,8 @@ export default function GrowthOrcamentoCampanhas() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Campanha</TableHead>
+                  <TableHead className="text-right">Investimento Planejado</TableHead>
                   <TableHead className="text-right">Orç. Diário (Atual)</TableHead>
-                  <TableHead className="text-right">Orç. Diário (Meta)</TableHead>
-                  <TableHead className="text-right">Investimento Mensal (Meta)</TableHead>
                   <TableHead className="text-right">Projeção (As Is)</TableHead>
                   <TableHead className="text-right">Investido Total</TableHead>
                   <TableHead className="text-right">% Atingido</TableHead>
@@ -386,6 +418,7 @@ export default function GrowthOrcamentoCampanhas() {
                   metaRows.length,
                 )}
                 {metaRows.map(renderRow)}
+                {metaRows.length > 0 && subtotalRow("Meta", metaRows)}
 
                 {googleRows.length > 0 && groupHeader(
                   "Google Ads",
@@ -393,19 +426,19 @@ export default function GrowthOrcamentoCampanhas() {
                   googleRows.length,
                 )}
                 {googleRows.map(renderRow)}
+                {googleRows.length > 0 && subtotalRow("Google Ads", googleRows)}
 
                 <TableRow className="bg-amber-50 dark:bg-amber-950/30 font-semibold">
                   <TableCell>TOTAL</TableCell>
+                  <TableCell className="text-right font-mono">{formatCurrency(totals.totalPlanejado)}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.totalDaily)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(totals.totalDailyMeta)}</TableCell>
-                  <TableCell className="text-right font-mono">{formatCurrency(totals.totalMensalMeta)}</TableCell>
-                  <TableCell className={cn("text-right font-mono", projecaoColor(totals.totalProjecao, totals.totalMensalMeta || null))}>
+                  <TableCell className={cn("text-right font-mono", projecaoColor(totals.totalProjecao, totals.totalPlanejado || null))}>
                     {formatCurrency(totals.totalProjecao)}
                   </TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.totalInvestido)}</TableCell>
                   <TableCell className="text-right font-mono">
-                    {totals.totalMensalMeta > 0
-                      ? `${((totals.totalInvestido / totals.totalMensalMeta) * 100).toFixed(1)}%`
+                    {totals.totalPlanejado > 0
+                      ? `${((totals.totalInvestido / totals.totalPlanejado) * 100).toFixed(1)}%`
                       : "—"}
                   </TableCell>
                 </TableRow>

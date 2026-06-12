@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-12 | feat(relatorio-mensal): NRR por squad — expansão abatida do churn
+
+**O que foi feito:**
+- Slide "Detalhes por Squad" passou a calcular **NRR** = churn s/ abonados − expansão (upsell/cross-sell) do mês.
+- Expansões configuradas por mês/squad em `EXPANSAO_NRR_POR_MES` (backend). Maio/2026: Selva R$ 9.000 ÷ 5, Squadra R$ 8.000 ÷ 5 (contratos em 5x entram com 1/5 do valor no mês), Pulse R$ 4.497 integral.
+- Todo squad exibe sempre os cards **Total de Vendas** (valor cheio vendido no mês), **Churn s/ Abonados** e **NRR**, mesmo zerados — squads sem expansão mostram Vendas R$ 0 e NRR = churn s/ abonados.
+- Tooltip do card NRR mostra a linha "Expansão (abatida)" em verde junto da lista de clientes churnados.
+- Layout do card de squad com 8 KPIs: densidade média em 2 linhas de 4 (grid de 8 colunas); compacto (5+ squads) em 3 colunas sem ícones, com labels sem quebra de linha.
+
+**Por que:**
+- O churn bruto não refletia a retenção líquida dos squads — expansões fechadas no mês compensam parte do MRR perdido (ex.: Pulse maio/2026 cai de 17,5% para 14,8%).
+
+**Arquivos alterados:**
+- `server/routes/relatorioMensalSlides.ts` - constante `EXPANSAO_NRR_POR_MES` + campos `expansaoNrr`/`nrrBrl`/`nrrPct` em `squadDetails`
+- `client/src/pages/relatorio-mensal/types.ts` - novos campos em `SquadDetail`
+- `client/src/pages/relatorio-mensal/SlideSquadSingle.tsx` - card NRR condicional + linha de expansão no tooltip
+
+**Impacto arquitetural:** Nenhum — novos campos na API sem breaking change
+
+---
+
 ## 2026-06-11 | fix(capacity): renomeia Selca para Selva e remove squad Aura (virou Pulse)
 
 **O que foi feito:**
@@ -16,6 +37,29 @@
 - `client/src/components/capacity-times/CapacityMetaDialog.tsx` - label "Selva (vendedor)" e CATEGORIAS_BASE sem "Aura".
 
 **Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-06-11 | feat(relatorio-mensal): cards de churn total e s/ abonados por squad
+
+**O que foi feito:**
+- Seção "Detalhes por Squad" do Relatório Mensal passou a exibir dois cards de churn: **Churn Total** (todos os churns do mês) e **Churn s/ Abonados** (desconta apenas `abonar_churn = 'Sim'`).
+- A query de churn por squad deixou de excluir os motivos "artificiais" (`Inadimplente 1º Mês`, `Não começou`, `Erro na Venda`) — a coluna `abonar_churn` de `cup_churn` é o único critério de abono nessa seção.
+- Layout do card de squad reorganizado para caber na altura do slide: MRR / Pontual / Evolução na primeira linha, os dois churns na segunda (R$ base inline); com 5+ squads usa densidade compacta.
+- Tooltip no hover dos cards de churn lista os clientes churnados (nome via `cup_clientes`, valor exato, badge "abonado"); "Churn s/ Abonados" filtra os abonados da lista.
+- Card de **Faturamento Total** por squad (MRR ativo + pontual entregue) e valor monetário do churn visível em todas as densidades (antes o compacto mostrava só o %).
+- Lookups por squad (churn, pontual, MRR anterior) normalizados por nome — squads renomeados com sufixo "(OFF)" voltam a casar entre as fontes (corrigiu Aura zerada).
+
+**Por que:**
+- Dar visibilidade do churn bruto vs. churn líquido de abonos no reporte mensal, com critério único e auditável (coluna de abono), em vez de heurística por motivo de cancelamento.
+
+**Arquivos alterados:**
+- `server/routes/relatorioMensalSlides.ts` - query 16 com `FILTER` calculando total e sem abonados; `squadDetails` ganhou `churnTotalPct`/`churnTotalBrl`
+- `client/src/pages/relatorio-mensal/types.ts` - novos campos em `SquadDetail`
+- `client/src/pages/relatorio-mensal/SlideSquadSingle.tsx` - dois cards de churn + Evolução MRR em `col-span-2`
+- `docs/superpowers/specs/2026-06-11-relatorio-mensal-churn-squad-abonados-design.md` - design doc
+
+**Impacto arquitetural:** Nenhum
 
 ---
 
