@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-12 | feat(relatorio-mensal): NRR por squad — expansão abatida do churn
+
+**O que foi feito:**
+- Slide "Detalhes por Squad" passou a calcular **NRR** = churn s/ abonados − expansão (upsell/cross-sell) do mês.
+- Expansões configuradas por mês/squad em `EXPANSAO_NRR_POR_MES` (backend). Maio/2026: Selva R$ 9.000 ÷ 5, Squadra R$ 8.000 ÷ 5 (contratos em 5x entram com 1/5 do valor no mês), Pulse R$ 4.497 integral.
+- Todo squad exibe sempre os cards **Total de Vendas** (valor cheio vendido no mês), **Churn s/ Abonados** e **NRR**, mesmo zerados — squads sem expansão mostram Vendas R$ 0 e NRR = churn s/ abonados.
+- Tooltip do card NRR mostra a linha "Expansão (abatida)" em verde junto da lista de clientes churnados.
+- Layout do card de squad com 8 KPIs: densidade média em 2 linhas de 4 (grid de 8 colunas); compacto (5+ squads) em 3 colunas sem ícones, com labels sem quebra de linha.
+
+**Por que:**
+- O churn bruto não refletia a retenção líquida dos squads — expansões fechadas no mês compensam parte do MRR perdido (ex.: Pulse maio/2026 cai de 17,5% para 14,8%).
+
+**Arquivos alterados:**
+- `server/routes/relatorioMensalSlides.ts` - constante `EXPANSAO_NRR_POR_MES` + campos `expansaoNrr`/`nrrBrl`/`nrrPct` em `squadDetails`
+- `client/src/pages/relatorio-mensal/types.ts` - novos campos em `SquadDetail`
+- `client/src/pages/relatorio-mensal/SlideSquadSingle.tsx` - card NRR condicional + linha de expansão no tooltip
+
+**Impacto arquitetural:** Nenhum — novos campos na API sem breaking change
+
+---
+
 ## 2026-06-11 | feat(relatorio-mensal): cards de churn total e s/ abonados por squad
 
 **O que foi feito:**
