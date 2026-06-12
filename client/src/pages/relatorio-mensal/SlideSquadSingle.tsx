@@ -1,4 +1,4 @@
-import { LayoutGrid, TrendingUp, TrendingDown, Activity, Sparkles, AlertTriangle, DollarSign } from "lucide-react";
+import { LayoutGrid, TrendingUp, TrendingDown, Activity, Sparkles, AlertTriangle, DollarSign, Coins } from "lucide-react";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { ChurnCliente, SquadDetail } from "./types";
 import SlideLayout from "./SlideLayout";
@@ -54,8 +54,8 @@ function fmtBRLExato(v: number): string {
   return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
-function ChurnClientesTooltip({ titulo, clientes }: { titulo: string; clientes: ChurnCliente[] }) {
-  if (clientes.length === 0) {
+function ChurnClientesTooltip({ titulo, clientes, expansao = 0 }: { titulo: string; clientes: ChurnCliente[]; expansao?: number }) {
+  if (clientes.length === 0 && expansao <= 0) {
     return <p className="text-xs text-zinc-400">Nenhum churn no período</p>;
   }
   const visiveis = clientes.slice(0, TOOLTIP_MAX_CLIENTES);
@@ -80,6 +80,12 @@ function ChurnClientesTooltip({ titulo, clientes }: { titulo: string; clientes: 
           <li className="flex items-baseline justify-between gap-4 text-xs text-zinc-400">
             <span>+ {restantes.length} outros</span>
             <span className="tabular-nums shrink-0">{fmtBRLExato(valorRestante)}</span>
+          </li>
+        )}
+        {expansao > 0 && (
+          <li className="flex items-baseline justify-between gap-4 text-xs border-t border-white/10 mt-1 pt-1">
+            <span className="text-emerald-400">Expansão (abatida)</span>
+            <span className="tabular-nums shrink-0 text-emerald-400">− {fmtBRLExato(expansao)}</span>
           </li>
         )}
       </ul>
@@ -137,20 +143,35 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
           const evolSign = evolUp ? "+" : "−";
           const evolAbs = Math.abs(Math.round(sq.evolucaoMrr));
           const churnClientes = sq.churnClientes ?? [];
+          const expansaoNrr = sq.expansaoNrr ?? 0;
+          // NRR = churn s/ abonados − abatimento da expansão; sempre exibido, mesmo sem expansão no mês
           const churnCards = [
-            { label: "Churn Total", labelCompact: "Churn Total", pct: sq.churnTotalPct ?? sq.churnPct, brl: sq.churnTotalBrl ?? sq.churnBrl, clientes: churnClientes },
-            { label: "Churn s/ Abonados", labelCompact: "Churn s/ Abono", pct: sq.churnPct, brl: sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado) },
+            { label: "Churn Total", labelCompact: "Churn Total", pct: sq.churnTotalPct ?? sq.churnPct, brl: sq.churnTotalBrl ?? sq.churnBrl, clientes: churnClientes, expansao: 0, spanCompact: false },
+            { label: "Churn s/ Abonados", labelCompact: "S/ Abono", pct: sq.churnPct, brl: sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado), expansao: 0, spanCompact: false },
+            // spanCompact: no compact (3 colunas) o NRR fecha a última linha ocupando 2 células
+            { label: "NRR", labelCompact: "NRR", pct: sq.nrrPct ?? sq.churnPct, brl: sq.nrrBrl ?? sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado), expansao: expansaoNrr, spanCompact: true },
           ];
           const faturamentoTotal = sq.mrr + sq.pontual;
+          const vendasCard = (
+            <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
+              <div className="flex items-center gap-1.5">
+                {!isCompact && <Coins className="h-3 w-3 shrink-0 text-zinc-500" />}
+                <p className="text-[9px] text-zinc-500 uppercase tracking-wider whitespace-nowrap">{isCompact ? "Vendas" : "Total de Vendas"}</p>
+              </div>
+              <p className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`} style={{ color: "#fff" }}>
+                {fmtBRL(sq.vendasMes ?? 0)}
+              </p>
+            </div>
+          );
           const evolCard = (
             <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
               <div className="flex items-center gap-1.5">
-                {evolUp ? (
-                  <TrendingUp className="h-3 w-3 text-zinc-500" />
+                {!isCompact && (evolUp ? (
+                  <TrendingUp className="h-3 w-3 shrink-0 text-zinc-500" />
                 ) : (
-                  <TrendingDown className="h-3 w-3 text-zinc-500" />
-                )}
-                <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{isCompact ? "Evol. MRR" : "Evolução MRR"}</p>
+                  <TrendingDown className="h-3 w-3 shrink-0 text-zinc-500" />
+                ))}
+                <p className="text-[9px] text-zinc-500 uppercase tracking-wider whitespace-nowrap">{isCompact ? "Evol. MRR" : "Evolução MRR"}</p>
               </div>
               <p
                 className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`}
@@ -216,13 +237,13 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                 </div>
               </div>
 
-              {/* KPIs: hero/compact em 2 colunas; densidade média em 6 colunas (2 linhas) */}
-              <div className={`grid ${isHero || isCompact ? "grid-cols-2" : "grid-cols-6"} ${isHero ? "p-6 gap-5" : isCompact ? "p-2 gap-2" : "p-3 gap-2"}`}>
+              {/* KPIs: hero em 2 colunas (4 linhas); compact em 3 colunas (3 linhas); média em 8 colunas (2 linhas de 4) */}
+              <div className={`grid ${isHero ? "grid-cols-2" : isCompact ? "grid-cols-3" : "grid-cols-8"} ${isHero ? "p-6 gap-5" : isCompact ? "p-2 gap-2" : "p-3 gap-2"}`}>
                 {/* MRR Ativo */}
                 <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
                   <div className="flex items-center gap-1.5">
-                    <Activity className="h-3 w-3 text-zinc-500" />
-                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">MRR Ativo</p>
+                    {!isCompact && <Activity className="h-3 w-3 shrink-0 text-zinc-500" />}
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider whitespace-nowrap">MRR Ativo</p>
                   </div>
                   <p className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`} style={{ color: "#fff" }}>
                     {fmtBRL(sq.mrr)}
@@ -232,8 +253,8 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                 {/* Pontual Entregue */}
                 <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
                   <div className="flex items-center gap-1.5">
-                    <Sparkles className="h-3 w-3 text-zinc-500" />
-                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{isCompact ? "Pontual" : "Pontual Entregue"}</p>
+                    {!isCompact && <Sparkles className="h-3 w-3 shrink-0 text-zinc-500" />}
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider whitespace-nowrap">{isCompact ? "Pontual" : "Pontual Entregue"}</p>
                   </div>
                   <p className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`} style={{ color: "#fff" }}>
                     {fmtBRL(sq.pontual)}
@@ -243,27 +264,30 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                 {/* Faturamento Total = MRR ativo + pontual entregue no mês */}
                 <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
                   <div className="flex items-center gap-1.5">
-                    <DollarSign className="h-3 w-3 text-zinc-500" />
-                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{isCompact ? "Faturamento" : "Faturamento Total"}</p>
+                    {!isCompact && <DollarSign className="h-3 w-3 shrink-0 text-zinc-500" />}
+                    <p className="text-[9px] text-zinc-500 uppercase tracking-wider whitespace-nowrap">{isCompact ? "Faturamento" : "Faturamento Total"}</p>
                   </div>
                   <p className={`font-black tabular-nums ${isHero ? "text-3xl" : isCompact ? "text-sm" : "text-xl"}`} style={{ color: "#fff" }}>
                     {fmtBRL(faturamentoTotal)}
                   </p>
                 </div>
 
-                {/* Hero/compact: Evolução fecha a 2ª linha ao lado do Faturamento */}
-                {(isHero || isCompact) && evolCard}
+                {/* Evolução fecha a linha do Faturamento */}
+                {evolCard}
 
-                {/* Churn Total e Churn s/ Abonados (coluna abonar_churn) */}
+                {/* Total de Vendas (expansão do mês) abre a linha dos churns */}
+                {vendasCard}
+
+                {/* Churn Total, Churn s/ Abonados (coluna abonar_churn) e NRR */}
                 {churnCards.map((card) => {
                   const cardColor = card.pct >= 8 ? "#ef4444" : "#22c55e";
                   return (
                     <Tooltip key={card.label}>
                       <TooltipTrigger asChild>
-                        <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 cursor-default ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""}`}>
+                        <div className={`rounded-xl bg-white/[0.03] border border-white/5 flex flex-col gap-1 cursor-default ${isCompact ? "p-2" : "p-3"} ${!isHero && !isCompact ? "col-span-2" : ""} ${isCompact && card.spanCompact ? "col-span-2" : ""}`}>
                           <div className="flex items-center gap-1.5">
-                            <AlertTriangle className="h-3 w-3 text-zinc-500" />
-                            <p className="text-[9px] text-zinc-500 uppercase tracking-wider">
+                            {!isCompact && <AlertTriangle className="h-3 w-3 shrink-0 text-zinc-500" />}
+                            <p className="text-[9px] text-zinc-500 uppercase tracking-wider whitespace-nowrap">
                               {isCompact ? card.labelCompact : card.label}
                             </p>
                           </div>
@@ -275,7 +299,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                               {card.pct.toFixed(1).replace(".", ",")}%
                             </p>
                             {/* Valor monetário do churn sempre visível; base só no hero (espaço) */}
-                            <p className={`tabular-nums ${isCompact ? "text-[9px] text-zinc-500" : "text-[10px] text-zinc-600"}`}>
+                            <p className={`tabular-nums whitespace-nowrap ${isCompact ? "text-[9px] text-zinc-500" : "text-[10px] text-zinc-600"}`}>
                               {isHero ? `${fmtBRL(card.brl)} / ${fmtBRL(sq.mrrBase || 0)}` : fmtBRL(card.brl)}
                             </p>
                           </div>
@@ -285,7 +309,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                               <div
                                 className="h-full rounded-full transition-all"
                                 style={{
-                                  width: `${Math.min(card.pct * 5, 100)}%`,
+                                  width: `${Math.min(Math.max(card.pct, 0) * 5, 100)}%`,
                                   background: cardColor,
                                 }}
                               />
@@ -295,14 +319,12 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                       </TooltipTrigger>
                       {/* Slide é sempre escuro — força tooltip dark independente do tema do app */}
                       <TooltipContent side="top" className="bg-zinc-900 border border-white/10 text-zinc-100 shadow-xl">
-                        <ChurnClientesTooltip titulo={card.label} clientes={card.clientes} />
+                        <ChurnClientesTooltip titulo={card.label} clientes={card.clientes} expansao={card.expansao} />
                       </TooltipContent>
                     </Tooltip>
                   );
                 })}
 
-                {/* Densidade média: Evolução fecha a linha dos churns */}
-                {!isHero && !isCompact && evolCard}
               </div>
             </div>
           );
