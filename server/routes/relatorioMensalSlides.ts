@@ -13,7 +13,7 @@ const MESES_PT = [
 // valores à vista entram integrais. Chaves de squad normalizadas
 // (sem emoji, sem "(OFF)", minúsculas — ver normalizeSquadName).
 const EXPANSAO_NRR_POR_MES: Record<string, Record<string, number>> = {
-  "2026-06": {
+  "2026-05": {
     selva: 9000 / 5,
     squadra: 8000 / 5,
     pulse: 4497,
