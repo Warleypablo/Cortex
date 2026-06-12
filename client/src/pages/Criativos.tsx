@@ -82,7 +82,7 @@ function formatCurrency(value: number | null): string {
 
 export default function Criativos() {
   usePageTitle("Criativos");
-  useSetPageInfo("Criativos", "Performance de Anúncios Meta Ads");
+  useSetPageInfo("Criativos", "Performance de Anúncios (Meta + Google Ads)");
   const [dateRange, setDateRange] = useState({
     from: startOfMonth(new Date()),
     to: new Date(),
