@@ -128,6 +128,44 @@ async function main() {
   await exec('idx_google_cdm_date',
     `CREATE INDEX IF NOT EXISTS idx_google_cdm_date ON google.campaign_daily_metrics(report_date)`);
 
+  // Anúncios individuais (ad_group_ad). Google não expõe preview compartilhável por
+  // anúncio como o Meta — guardamos nome, tipo, URL final e textos (headlines/descrições).
+  await exec('google.ads', `
+    CREATE TABLE IF NOT EXISTS google.ads (
+      ad_id        BIGINT PRIMARY KEY,
+      ad_group_id  BIGINT NOT NULL REFERENCES google.ad_groups(ad_group_id) ON DELETE CASCADE,
+      campaign_id  BIGINT,
+      name         TEXT,
+      ad_type      TEXT,
+      status       TEXT,
+      final_urls   TEXT,
+      headlines    TEXT,
+      descriptions TEXT,
+      updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )`);
+  await exec('idx_google_ads_adgroup',
+    `CREATE INDEX IF NOT EXISTS idx_google_ads_adgroup ON google.ads(ad_group_id)`);
+  await exec('idx_google_ads_campaign',
+    `CREATE INDEX IF NOT EXISTS idx_google_ads_campaign ON google.ads(campaign_id)`);
+
+  await exec('google.ad_daily_metrics', `
+    CREATE TABLE IF NOT EXISTS google.ad_daily_metrics (
+      report_date      DATE NOT NULL,
+      ad_id            BIGINT NOT NULL REFERENCES google.ads(ad_id) ON DELETE CASCADE,
+      device_type      VARCHAR(20) NOT NULL DEFAULT 'UNSPECIFIED',
+      network_type     VARCHAR(30) NOT NULL DEFAULT 'UNSPECIFIED',
+      impressions      BIGINT NOT NULL DEFAULT 0,
+      clicks           BIGINT NOT NULL DEFAULT 0,
+      cost_micros      BIGINT NOT NULL DEFAULT 0,
+      conversions      NUMERIC NOT NULL DEFAULT 0,
+      conversion_value NUMERIC NOT NULL DEFAULT 0,
+      video_views      BIGINT NOT NULL DEFAULT 0,
+      synced_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (report_date, ad_id, device_type, network_type)
+    )`);
+  await exec('idx_google_adm_date',
+    `CREATE INDEX IF NOT EXISTS idx_google_adm_date ON google.ad_daily_metrics(report_date)`);
+
   await exec('google.sync_runs', `
     CREATE TABLE IF NOT EXISTS google.sync_runs (
       id          SERIAL PRIMARY KEY,
