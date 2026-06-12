@@ -84,4 +84,12 @@ export const PAID_MEDIA_HINTS: Record<string, { campaign: string; term: string; 
     term: '{adgroupid}-{network}-{device}-{matchtype}-{keyword}',
     content: '{creative}',
   },
+  // TikTok injeta os IDs no clique via macros __...__ (sintaxe própria, ≠ Meta {{...}}).
+  // Espelha o desenho do Meta: campaign = ID da campanha, term = ID do conjunto + placement,
+  // content = ID do anúncio. __AID__ = ad group (conjunto), __CID__ = ad (anúncio).
+  tiktok: {
+    campaign: '__CAMPAIGN_ID__',
+    term: '__AID__-__PLACEMENT__',
+    content: '__CID__',
+  },
 };
