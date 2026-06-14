@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-14 | feat(criativos): seleção persistente por nível com drill-down derivado
+
+**O que foi feito:**
+- Cada aba da página Criativos (campanha/conjunto/anúncio) agora mantém a própria seleção ao trocar de aba; antes a seleção era apagada a cada navegação
+- O drill-down (filtro de escopo) passou a ser **derivado** da seleção dos níveis ancestrais: selecionar um conjunto e abrir "Anúncios" mostra só os anúncios daquele conjunto, e voltar para "Conjuntos" mantém o conjunto marcado
+- Badge "N selecionado" passa a aparecer em qualquer aba com seleção (não só na ativa), para deixar a seleção persistida visível
+- Chip "Filtrando por…" e os labels das abas refletem a cadeia de seleção persistente
+- Removidos o estado manual `scope` e o mapa `LEVEL_DEPTH` (agora derivados de `selByLevel`)
+
+**Por que:**
+- O usuário precisava navegar entre níveis (campanha → conjunto → anúncio) sem perder o que havia selecionado, como no Meta Ads Manager — antes era preciso reselecionar a cada troca de aba
+
+**Arquivos alterados:**
+- `client/src/pages/Criativos.tsx` - seleção por nível (`selByLevel`), `scope` derivado dos ancestrais, handlers de seleção/limpeza ajustados e badges/labels persistentes
+
+**Impacto arquitetural:** Nenhum — mudança de estado/UI local na página; sem alterações de API, dados ou contrato de componentes.
+
+---
+
 ## 2026-06-14 | feat(criativos): toast persistente de confirmação para ações no Meta Ads
 
 **O que foi feito:**
