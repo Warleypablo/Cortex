@@ -514,10 +514,15 @@ export default function Criativos() {
         const j = await res.json().catch(() => ({}));
         throw new Error(j.error || `Erro ${res.status}`);
       }
-      toast({ title: wasActive ? "Pausado" : "Ativado", description: row.adName });
+      toast({
+        title: wasActive ? "✅ Pausado na Meta Ads" : "✅ Ativado na Meta Ads",
+        description: row.adName,
+        variant: "success",
+        duration: Infinity,
+      });
     } catch (err: any) {
       setStatusOverride(prev => new Map(prev).set(row.id, wasActive ? "Ativo" : "Pausado"));
-      toast({ title: "Falha ao alterar status", description: err.message, variant: "destructive" });
+      toast({ title: "❌ Falha ao alterar status na Meta Ads", description: err.message, variant: "destructive", duration: Infinity });
     } finally {
       setTogglingIds(prev => { const s = new Set(prev); s.delete(row.id); return s; });
     }
@@ -544,10 +549,10 @@ export default function Criativos() {
       if (!res.ok) throw new Error(j.error || `Erro ${res.status}`);
       setBudgetOverride(prev => new Map(prev).set(row.id, newReais));
       queryClient.invalidateQueries({ queryKey: ["/api/growth/criativos"] });
-      toast({ title: "Orçamento atualizado", description: `${row.adName}: ${formatCurrency(newReais)}/dia` });
+      toast({ title: "✅ Orçamento atualizado na Meta Ads", description: `${row.adName}: ${formatCurrency(newReais)}/dia`, variant: "success", duration: Infinity });
       return true;
     } catch (err: any) {
-      toast({ title: "Falha ao atualizar orçamento", description: err.message, variant: "destructive" });
+      toast({ title: "❌ Falha ao atualizar orçamento na Meta Ads", description: err.message, variant: "destructive", duration: Infinity });
       return false;
     }
   };
@@ -584,11 +589,16 @@ export default function Criativos() {
       const total = j.total ?? ownRows.length;
       const okCount = j.okCount ?? 0;
       const failed = total - okCount;
-      toast({ title: "Orçamento ajustado", description: `${okCount}/${total} aplicados${failed > 0 ? ` · ${failed} bloqueados (trava ±30% ou teto)` : ""}` });
+      toast({
+        title: failed > 0 ? "⚠️ Orçamento ajustado com bloqueios na Meta Ads" : "✅ Orçamento ajustado na Meta Ads",
+        description: `${okCount}/${total} aplicados${failed > 0 ? ` · ${failed} bloqueados (trava ±30% ou teto)` : ""}`,
+        variant: failed > 0 ? "destructive" : "success",
+        duration: Infinity,
+      });
       setSelectedIds(new Set());
       setBulkBudgetPct("");
     } catch (err: any) {
-      toast({ title: "Falha no ajuste em massa", description: err.message, variant: "destructive" });
+      toast({ title: "❌ Falha no ajuste em massa na Meta Ads", description: err.message, variant: "destructive", duration: Infinity });
     } finally {
       setBulkBudgetPending(false);
     }
@@ -619,10 +629,19 @@ export default function Criativos() {
         (j.results || []).filter((r: any) => r.ok).forEach((r: any) => m.set(r.entityId, newStatus));
         return m;
       });
-      toast({ title: "Ação em massa concluída", description: `${j.okCount ?? 0}/${j.total ?? ids.length} aplicados` });
+      const okCount = j.okCount ?? 0;
+      const total = j.total ?? ids.length;
+      const failed = total - okCount;
+      const verbo = bulkAction === "pause" ? "pausados" : "ativados";
+      toast({
+        title: failed > 0 ? "⚠️ Concluído com falhas na Meta Ads" : `✅ ${verbo} na Meta Ads`,
+        description: `${okCount}/${total} ${verbo}${failed > 0 ? ` · ${failed} não aplicaram` : ""}`,
+        variant: failed > 0 ? "destructive" : "success",
+        duration: Infinity,
+      });
       setSelectedIds(new Set());
     } catch (err: any) {
-      toast({ title: "Falha na ação em massa", description: err.message, variant: "destructive" });
+      toast({ title: "❌ Falha na ação em massa na Meta Ads", description: err.message, variant: "destructive", duration: Infinity });
     } finally {
       setBulkPending(false);
       setBulkAction(null);
