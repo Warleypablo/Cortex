@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-14 | feat(criativos): toast persistente de confirmação para ações no Meta Ads
+
+**O que foi feito:**
+- Toasts de pausar/ativar (individual e em massa) e de orçamento na aba Criativos agora ficam fixos na tela até o usuário fechar (`duration: Infinity`), em vez de sumirem sozinhos em ~5s
+- Adicionada variante `success` (verde) ao componente Toast; erros continuam vermelhos (`destructive`)
+- Ação em massa com falha parcial passa a ser sinalizada como aviso vermelho (com `X/Y aplicados`), não mais como sucesso
+- Botão de fechar (X) do toast agora fica sempre visível, não só ao passar o mouse
+
+**Por que:**
+- Ao pausar anúncios, o feedback de conclusão sumia rápido demais e o usuário não tinha certeza se a mudança foi de fato aplicada na Meta Ads (inclusive em casos do bug de Erro 500 em produção)
+
+**Arquivos alterados:**
+- `client/src/components/ui/toast.tsx` - nova variante `success` e botão de fechar sempre visível
+- `client/src/pages/Criativos.tsx` - toasts das ações do Meta agora persistentes, com variante por resultado e detecção de falha parcial
+
+**Impacto arquitetural:** Nenhum — apenas feedback de UI; nenhuma mudança em API ou dados.
+
+---
+
 ## 2026-06-11 | feat(relatorio-mensal): cards de churn total e s/ abonados por squad
 
 **O que foi feito:**
