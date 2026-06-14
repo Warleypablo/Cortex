@@ -65,6 +65,17 @@ const LEVEL_SINGULAR: Record<Level, string> = {
   anuncio: "anúncio",
 };
 
+// Ancestrais de cada nível (do mais profundo p/ o mais raso) — define o drill-down:
+// o filtro do nível atual vem da seleção do ancestral mais profundo que tiver algo
+// selecionado (ex.: na aba Anúncios, filtra pelos conjuntos selecionados; se não
+// houver, pelas campanhas selecionadas).
+const SCOPE_ANCESTORS: Record<Level, Level[]> = {
+  conta: [],
+  campanha: [],
+  conjunto: ["campanha"],
+  anuncio: ["conjunto", "campanha"],
+};
+
 function formatNumber(value: number | null): string {
   if (value === null) return '-';
   return new Intl.NumberFormat("pt-BR").format(value);
@@ -107,10 +118,27 @@ export default function Criativos() {
   const handleResize = useCallback((key: string, width: number) => {
     setColConfig((c) => ({ ...c, widths: { ...c.widths, [key]: width } }));
   }, []);
-  // Seleção em massa + toggle de status (pausar/ativar)
-  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
-  // Drill-down (filtro por entidades selecionadas, estilo Meta Ads Manager)
-  const [scope, setScope] = useState<{ fromLevel: Level; ids: string[] } | null>(null);
+  // Seleção em massa POR NÍVEL: cada aba (campanha/conjunto/anúncio) mantém a
+  // própria seleção, que PERSISTE ao trocar de aba (estilo Meta Ads Manager).
+  // Selecionar um conjunto e abrir "Anúncios" mostra só os anúncios dele; voltar
+  // p/ "Conjuntos" mantém o conjunto marcado.
+  const [selByLevel, setSelByLevel] = useState<Record<Level, Set<string>>>(() => ({
+    conta: new Set(), campanha: new Set(), conjunto: new Set(), anuncio: new Set(),
+  }));
+  const selectedIds = selByLevel[level];
+  const setLevelSelection = useCallback(
+    (lvl: Level, updater: (prev: Set<string>) => Set<string>) =>
+      setSelByLevel(prev => ({ ...prev, [lvl]: updater(prev[lvl]) })),
+    [],
+  );
+  // Drill-down DERIVADO: filtro do nível atual = seleção do ancestral mais profundo.
+  const scope = useMemo<{ fromLevel: Level; ids: string[] } | null>(() => {
+    for (const anc of SCOPE_ANCESTORS[level]) {
+      const ids = selByLevel[anc];
+      if (ids.size > 0) return { fromLevel: anc, ids: Array.from(ids) };
+    }
+    return null;
+  }, [level, selByLevel]);
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [statusOverride, setStatusOverride] = useState<Map<string, string>>(new Map());
   const [budgetOverride, setBudgetOverride] = useState<Map<string, number>>(new Map());
@@ -455,45 +483,31 @@ export default function Criativos() {
   const apiLevelFor = (l: Level): "ad" | "adset" | "campaign" =>
     l === "campanha" ? "campaign" : l === "conjunto" ? "adset" : "ad";
 
-  const LEVEL_DEPTH: Record<Level, number> = { conta: 0, campanha: 1, conjunto: 2, anuncio: 3 };
-
-  const handleLevelChange = (l: string) => {
-    const target = l as Level;
-    // Drill-down: havia seleção em campanha/conjunto e estamos indo p/ um nível mais profundo
-    if (selectedIds.size > 0 && (level === "campanha" || level === "conjunto") && LEVEL_DEPTH[target] > LEVEL_DEPTH[level]) {
-      setScope({ fromLevel: level, ids: Array.from(selectedIds) });
-    } else if (scope && LEVEL_DEPTH[target] <= LEVEL_DEPTH[scope.fromLevel]) {
-      // voltou para o nível de origem (ou acima): limpa o filtro de drill-down
-      setScope(null);
-    }
-    setLevel(target);
-    setSelectedIds(new Set());
-  };
+  // Trocar de aba apenas muda o nível: a seleção de cada nível persiste e o
+  // drill-down (scope) é recalculado a partir das seleções dos ancestrais.
+  const handleLevelChange = (l: string) => setLevel(l as Level);
 
   // Clicou na mensagem "Usando o orçamento do conjunto/da campanha" → leva pra aba dona do budget.
   const goToBudgetOwner = (row: CriativoData) => {
     if (row.orcamentoInfo === "usa_conjunto" && level === "campanha") {
-      // Campanha ABO → abre os Conjuntos dessa campanha (drill-down).
-      setScope({ fromLevel: "campanha", ids: [row.id] });
-      setSelectedIds(new Set());
+      // Campanha ABO → seleciona a campanha e abre os Conjuntos dela (drill-down).
+      setLevelSelection("campanha", () => new Set([row.id]));
       setLevel("conjunto");
     } else if (row.orcamentoInfo === "usa_campanha" && level === "conjunto") {
       // Conjunto sob CBO → sobe pra aba de Campanhas (onde mora o orçamento).
-      setScope(null);
-      setSelectedIds(new Set());
       setLevel("campanha");
     }
   };
 
   const toggleSelect = (id: string, checked: boolean) => {
-    setSelectedIds(prev => {
+    setLevelSelection(level, prev => {
       const next = new Set(prev);
       if (checked) next.add(id); else next.delete(id);
       return next;
     });
   };
   const toggleSelectAll = (checked: boolean, ids: string[]) => {
-    setSelectedIds(checked ? new Set(ids) : new Set());
+    setLevelSelection(level, () => checked ? new Set(ids) : new Set());
   };
 
   const handleToggleStatus = async (row: CriativoData) => {
@@ -595,7 +609,7 @@ export default function Criativos() {
         variant: failed > 0 ? "destructive" : "success",
         duration: Infinity,
       });
-      setSelectedIds(new Set());
+      setLevelSelection(level, () => new Set());
       setBulkBudgetPct("");
     } catch (err: any) {
       toast({ title: "❌ Falha no ajuste em massa na Meta Ads", description: err.message, variant: "destructive", duration: Infinity });
@@ -639,7 +653,7 @@ export default function Criativos() {
         variant: failed > 0 ? "destructive" : "success",
         duration: Infinity,
       });
-      setSelectedIds(new Set());
+      setLevelSelection(level, () => new Set());
     } catch (err: any) {
       toast({ title: "❌ Falha na ação em massa na Meta Ads", description: err.message, variant: "destructive", duration: Infinity });
     } finally {
@@ -668,17 +682,19 @@ export default function Criativos() {
   const cacVar = kpis && kpisCompare ? calcVariation(kpis.cac, kpisCompare.cac, true) : null;
   const aovVar = kpis && kpisCompare ? calcVariation(kpis.aov, kpisCompare.aov) : null;
 
-  // ── Tabs: badge de seleção + relabel das abas profundas (drill-down) ──
-  const selCount = selectedIds.size;
+  // ── Tabs: badge de seleção (por nível, persistente) + relabel das abas (drill-down) ──
   const plur = (n: number, sing: string) => `${n} ${sing}${n === 1 ? "" : "s"}`;
-  const renderSelBadge = (lvl: Level) =>
-    level === lvl && selCount > 0 ? (
+  // O badge aparece em QUALQUER aba que tenha seleção — não só na ativa — para
+  // que a seleção persistida fique visível ao navegar entre as abas.
+  const renderSelBadge = (lvl: Level) => {
+    const count = selByLevel[lvl].size;
+    return count > 0 ? (
       <span className="ml-1 inline-flex items-center gap-1 rounded bg-primary text-primary-foreground text-[11px] px-1.5 py-0.5">
-        {plur(selCount, "selecionado")}
+        {plur(count, "selecionado")}
         <span
           role="button"
           onPointerDown={(e) => e.stopPropagation()}
-          onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }}
+          onClick={(e) => { e.stopPropagation(); setLevelSelection(lvl, () => new Set()); }}
           className="hover:opacity-80"
           title="Limpar seleção"
         >
@@ -686,10 +702,13 @@ export default function Criativos() {
         </span>
       </span>
     ) : null;
-  const conjuntoLabel = level === "campanha" && selCount > 0 ? `Conjuntos para ${plur(selCount, "campanha")}` : "Conjuntos";
+  };
+  const campSelCount = selByLevel.campanha.size;
+  const conjSelCount = selByLevel.conjunto.size;
+  const conjuntoLabel = campSelCount > 0 ? `Conjuntos para ${plur(campSelCount, "campanha")}` : "Conjuntos";
   const anuncioLabel =
-    level === "campanha" && selCount > 0 ? `Anúncios para ${plur(selCount, "campanha")}`
-    : level === "conjunto" && selCount > 0 ? `Anúncios para ${plur(selCount, "conjunto")}`
+    conjSelCount > 0 ? `Anúncios para ${plur(conjSelCount, "conjunto")}`
+    : campSelCount > 0 ? `Anúncios para ${plur(campSelCount, "campanha")}`
     : "Anúncios";
 
   return (
@@ -831,7 +850,7 @@ export default function Criativos() {
               <div className="flex items-center gap-2">
                 <span className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 text-primary text-xs px-2 py-1">
                   Filtrando por {plur(scope.ids.length, scope.fromLevel === "campanha" ? "campanha" : "conjunto")}
-                  <button onClick={() => setScope(null)} className="hover:opacity-80" title="Remover filtro">
+                  <button onClick={() => setLevelSelection(scope.fromLevel, () => new Set())} className="hover:opacity-80" title="Remover filtro">
                     <X className="w-3 h-3" />
                   </button>
                 </span>
