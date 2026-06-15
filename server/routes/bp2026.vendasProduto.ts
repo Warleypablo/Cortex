@@ -57,26 +57,27 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
   }));
 
   const cnpjs = Array.from(new Set(deals.map((d) => d.cnpjNorm).filter(Boolean)));
+  const cnpjsLiteral = `{${cnpjs.join(",")}}`;
   const mixRec: MixClickup = new Map();
   const mixPont: MixClickup = new Map();
   if (cnpjs.length) {
     const mixRows = (await db.execute(sql`
       SELECT regexp_replace(COALESCE(cc.cnpj,''),'\\D','','g') AS cnpj_norm,
              CASE
-               WHEN c.produto = 'Performance' THEN 'Performance'
-               WHEN c.produto IN ('Creators','Creators - Recorrente') THEN 'Creators'
-               WHEN c.produto = 'Social Media' THEN 'Social'
-               WHEN c.produto = 'Gestão de Comunidade' THEN 'Gestão de Comunidade'
-               WHEN c.produto = 'Ecommerce' THEN 'E-commerce'
-               WHEN c.produto = 'Site' THEN 'Site Institucional'
-               WHEN c.produto = 'Landing Page' THEN 'Landing Page'
+               WHEN TRIM(COALESCE(c.produto,'')) = 'Performance' THEN 'Performance'
+               WHEN TRIM(COALESCE(c.produto,'')) IN ('Creators','Creators - Recorrente') THEN 'Creators'
+               WHEN TRIM(COALESCE(c.produto,'')) = 'Social Media' THEN 'Social'
+               WHEN TRIM(COALESCE(c.produto,'')) = 'Gestão de Comunidade' THEN 'Gestão de Comunidade'
+               WHEN TRIM(COALESCE(c.produto,'')) = 'Ecommerce' THEN 'E-commerce'
+               WHEN TRIM(COALESCE(c.produto,'')) = 'Site' THEN 'Site Institucional'
+               WHEN TRIM(COALESCE(c.produto,'')) = 'Landing Page' THEN 'Landing Page'
                ELSE 'Others'
              END AS segmento,
              COALESCE(SUM(c.valorr::numeric),0) AS rec,
              COALESCE(SUM(c.valorp::numeric),0) AS pont
       FROM "Clickup".cup_clientes cc
       JOIN "Clickup".cup_contratos c ON c.id_task = cc.task_id
-      WHERE regexp_replace(COALESCE(cc.cnpj,''),'\\D','','g') = ANY(${cnpjs})
+      WHERE regexp_replace(COALESCE(cc.cnpj,''),'\\D','','g') = ANY(${cnpjsLiteral}::text[])
       GROUP BY 1, 2
     `)).rows as any[];
     for (const row of mixRows) {
