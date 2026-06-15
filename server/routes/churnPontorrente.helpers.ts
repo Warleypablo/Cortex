@@ -67,12 +67,18 @@ export interface Filtros {
   ate?: string;  // 'YYYY-MM' (mês de início <=)
 }
 
+// Produtos que de fato são vendidos como ponto-recorrente. O campo `produto` da
+// cup_contratos vem sujo em ~4 linhas (Email Marketing e contratos mal-etiquetados
+// como Broadcast/Gameplan), então restringimos o universo a estes três.
+export const PRODUTOS_PONTORRENTE = ["Creators", "Performance", "Social Media"];
+
 /** Agrupa as linhas em jornadas (id_task × produto), conforme a base do funil. */
 export function toJornadas(rows: RawRow[], base: "vendido" | "entregue"): Jornada[] {
   const groups = new Map<string, RawRow[]>();
   for (const r of rows) {
     if (extractNivelEntrega(r.servico) == null) continue;
     if (!r.idTask || !r.produto) continue;
+    if (!PRODUTOS_PONTORRENTE.includes(r.produto.trim())) continue;
     const key = `${r.idTask}|||${r.produto}`;
     (groups.get(key) ?? groups.set(key, []).get(key)!).push(r);
   }

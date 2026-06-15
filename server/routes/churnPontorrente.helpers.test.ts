@@ -72,6 +72,14 @@ describe("toJornadas (base vendido)", () => {
   it("descarta linhas sem nível extraível", () => {
     expect(toJornadas(rows, "vendido").some((j) => j.idTask === "Z")).toBe(false);
   });
+  it("exclui produtos fora de Creators/Performance/Social Media", () => {
+    const noisy: RawRow[] = [
+      row({ idTask: "EM", produto: "Broadcast", servico: "Email Marketing - 2 Entrega", status: "entregue" }),
+      row({ idTask: "GP", produto: "Gameplan", servico: "Entrega 1 - Performance - Starter", status: "cancelado/inativo" }),
+      row({ idTask: "OK", produto: "Social Media", servico: "Entrega 1 - Social Media", status: "entregue" }),
+    ];
+    expect(toJornadas(noisy, "vendido").map((j) => j.produto)).toEqual(["Social Media"]);
+  });
 });
 
 describe("toJornadas (base entregue)", () => {
