@@ -44,7 +44,9 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
   const cellBg = (pct: number) => `rgba(99,102,241,${(0.10 + (pct / 100) * 0.6).toFixed(2)})`;
 
   const drillList = drill
-    ? (rowsMap.get(drill.linha) ?? []).filter((j) => j.nivelMax >= drill.nivel).sort((a, b) => b.valorp - a.valorp)
+    ? (rowsMap.get(drill.linha) ?? [])
+        .filter((j) => drill.nivel === 0 || j.nivelMax >= drill.nivel)
+        .sort((a, b) => b.valorp - a.valorp)
     : [];
 
   return (
@@ -85,7 +87,16 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
                 return (
                   <tr key={linha} className="border-t border-gray-100 dark:border-zinc-800">
                     <td className="py-2 pr-4 text-left whitespace-nowrap text-gray-700 dark:text-zinc-200">{linha}</td>
-                    <td className="px-3 py-2 text-center font-semibold text-gray-800 dark:text-zinc-100 tabular-nums">{total}</td>
+                    <td className="px-1.5 py-1.5 text-center">
+                      <button
+                        type="button"
+                        onClick={() => setDrill({ linha, nivel: 0 })}
+                        className="w-full rounded-md px-2 py-1.5 font-semibold tabular-nums text-gray-800 transition hover:ring-2 hover:ring-indigo-400 dark:text-zinc-100"
+                        title="Ver todos os contratos da safra (inclui churnados)"
+                      >
+                        {total}
+                      </button>
+                    </td>
                     {niveis.map((n) => {
                       const c = reached(js, n);
                       const pct = total > 0 ? Math.round((c / total) * 100) : 0;
@@ -117,10 +128,16 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>
-              {drill ? `${drill.linha} · atingiram a Entrega ${drill.nivel}` : ""}
+              {drill
+                ? drill.nivel === 0
+                  ? `${drill.linha} · safra completa`
+                  : `${drill.linha} · atingiram a Entrega ${drill.nivel}`
+                : ""}
             </DialogTitle>
             <DialogDescription>
-              {drillList.length} contrato(s) — ordenado por valor pontual
+              {drill?.nivel === 0
+                ? `${drillList.length} contrato(s) da safra — inclui churnados, ordenado por valor`
+                : `${drillList.length} contrato(s) — ordenado por valor pontual`}
             </DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
