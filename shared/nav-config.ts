@@ -54,6 +54,7 @@ export const PERMISSION_KEYS = {
     CAPACITY_TIMES: 'gestao.capacity_times',
     CHURN_PRODUTO: 'gestao.churn_produto',
     CHURN_ABONADOS: 'gestao.churn_abonados',
+    CHURN_PONTORRENTE: 'gestao.churn_pontorrente',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -241,6 +242,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/churn-predicao': PERMISSION_KEYS.GESTAO.CHURN_PREDICAO,
   '/dashboard/churn-produto': PERMISSION_KEYS.GESTAO.CHURN_PRODUTO,
   '/dashboard/churn-abonados': PERMISSION_KEYS.GESTAO.CHURN_ABONADOS,
+  '/dashboard/churn-pontorrente': PERMISSION_KEYS.GESTAO.CHURN_PONTORRENTE,
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
   '/gestao/tv-leaderboard': PERMISSION_KEYS.GESTAO.TV_LEADERBOARD,
@@ -476,6 +478,7 @@ export const NAV_CONFIG = {
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
         { title: 'Churn por Produto', url: '/dashboard/churn-produto', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_PRODUTO },
         { title: 'Churns Abonados', url: '/dashboard/churn-abonados', icon: 'Shield', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_ABONADOS },
+        { title: 'Churn Pontorrente', url: '/dashboard/churn-pontorrente', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_PONTORRENTE },
         { title: 'Análise de Squads', url: '/dashboard/analise-squads', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GESTAO.ANALISE_SQUADS },
         { title: 'BP Produtos', url: '/bp-produtos', icon: 'BarChart3', permissionKey: PERMISSION_KEYS.GESTAO.BP_PRODUTOS },
         { title: 'Triagem Inteligente', url: '/triagem', icon: 'ShieldAlert', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },

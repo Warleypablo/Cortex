@@ -79,6 +79,7 @@ import { registerEstoquePontualRoutes } from "./routes/estoquePontual";
 import { registerBp2026Routes } from "./routes/bp2026";
 import { registerBp2026DetalheRoutes } from "./routes/bp2026.detalhe";
 import { registerCreatorsPontualRoutes } from "./routes/creatorsPontual";
+import { registerChurnPontorrenteRoutes } from "./routes/churnPontorrente";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
@@ -8211,6 +8212,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   registerBp2026Routes(app, db);
   registerBp2026DetalheRoutes(app, db);
   registerCreatorsPontualRoutes(app, db);
+  registerChurnPontorrenteRoutes(app, db);
 
   // ============================================
   // Sugestões API
