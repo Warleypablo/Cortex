@@ -90,6 +90,12 @@ describe("buildResponse", () => {
     expect(g.mrr_ativo).toBe(43004);
     expect(g.mrr_cancelamento).toBe(0);
   });
+
+  it("comercial expõe os dois percentuais: MRR e contas", () => {
+    const g = buildResponse(rows).vendedor[0];
+    expect(g.util_mrr_pct).toBe(utilPct(43004, 107510));
+    expect(g.util_contas_pct).toBe(utilPct(12, 30));
+  });
 });
 
 describe("toCsRow", () => {
@@ -109,5 +115,20 @@ describe("toCsRow", () => {
   it("cai para total de contas quando cap_mrr é 0", () => {
     const r = toCsRow({ ...base, cap_mrr: 0 });
     expect(r.util_pct).toBe(utilPct(17, 20));
+  });
+  it("expõe os dois percentuais separados (MRR e contas)", () => {
+    const r = toCsRow({ ...base, cap_mrr: 45000 });
+    expect(r.util_mrr_pct).toBe(utilPct(36488, 45000));
+    // contas = (6 rec + 11 pont) / (20 cap rec + 0 cap pont)
+    expect(r.util_contas_pct).toBe(utilPct(17, 20));
+  });
+  it("soma cap_pontual no denominador de contas quando definido", () => {
+    const r = toCsRow({ ...base, cap_mrr: 45000, cap_pontual: 10 });
+    expect(r.util_contas_pct).toBe(utilPct(17, 30));
+  });
+  it("util_mrr_pct é null sem cap_mrr; util_contas_pct é null sem caps de contas", () => {
+    const r = toCsRow({ ...base, cap_mrr: null, cap_recorrente: null });
+    expect(r.util_mrr_pct).toBeNull();
+    expect(r.util_contas_pct).toBeNull();
   });
 });
