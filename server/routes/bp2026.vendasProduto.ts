@@ -11,9 +11,12 @@ import {
   type DealVenda, type MixClickup, type AovMedio, type ProdutoRowMix,
 } from "./bp2026.vendasProduto.helpers";
 import {
-  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SERVICOS_BITRIX, segmentosPorNatureza,
+  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SERVICOS_BITRIX,
   type SegmentoBP, type Natureza,
 } from "../okr2026/servicosBitrix";
+
+// portal Bitrix para montar o link do deal (mesmo base usado no FunilBroadcast)
+const BITRIX_BASE = "https://turbopartners.bitrix24.com.br";
 
 interface MesLinha { mes: number; orcado: number; realizado: number | null; atingimento: number | null }
 interface Linha {
@@ -220,13 +223,12 @@ export function parseMetricaProduto(metrica: string):
   return null;
 }
 
-export interface ItemVendaDet { grupo: string; nome: string; detalhe: string; data: string | null; valor: number }
+export interface ItemVendaDet { grupo: string; nome: string; detalhe: string; data: string | null; valor: number; url?: string }
 
 export async function detalheVendaProdutoMes(
   db: any, natureza: Natureza, segmento: SegmentoBP, mes: number, modo: "valor" | "contrato"
 ): Promise<{ itens: ItemVendaDet[]; total: number }> {
   const { deals, prMix, mixRec, mixPont, aovRec, aovPont, meta } = await carregarAtribuicaoVendas(db);
-  const mix = natureza === "recorrente" ? mixRec : mixPont;
   const itens: ItemVendaDet[] = [];
   let total = 0;
   for (const d of deals) {
@@ -235,35 +237,24 @@ export async function detalheVendaProdutoMes(
       .find((p) => p.natureza === natureza && p.segmento === segmento);
     if (!parte) continue;
 
-    // caminho de atribuição (espelha distribuirDeal/distribuirNatureza)
     const valNat = natureza === "recorrente" ? d.valorRec : d.valorPont;
-    const segs0 = segmentosPorNatureza(d.ids)[natureza];
-    const segs = segs0.length ? segs0 : (valNat > 0 ? (["Others"] as SegmentoBP[]) : []);
-    const pr = prMix.get(d.id);
-    const m = mix.get(d.cnpjNorm);
-    const caminho = segs.length <= 1
-      ? "Produto único (valor do Bitrix)"
-      : (pr && segs.every((s) => (pr.get(s) ?? 0) > 0)) ? "Multi-produto (product rows do Bitrix)"
-      : (m && segs.every((s) => (m.get(s) ?? 0) > 0)) ? "Multi-produto (mix do ClickUp)"
-      : "Multi-produto (rateio por AOV médio)";
-
+    const rateado = Math.round(valNat) !== Math.round(parte.valor); // multi-produto: valor do deal foi dividido
     const nomesServicos = d.ids.map((id) => SERVICOS_BITRIX[id]?.nome).filter(Boolean).join(", ") || "(sem serviço)";
     const md = meta.get(d.id)!;
-    const atribuido = `R$ ${Math.round(parte.valor).toLocaleString("pt-BR")}`;
-    const dealTotal = segs.length > 1 ? `deal ${natureza === "recorrente" ? "MRR" : "pontual"} R$ ${Math.round(valNat).toLocaleString("pt-BR")}` : "";
     const detalhePartes = [
       nomesServicos,
       md.closer ? `closer ${md.closer}` : "",
-      dealTotal,
-      modo === "contrato" ? `atribuído ${atribuido}` : "",
+      rateado ? `deal ${natureza === "recorrente" ? "MRR" : "pontual"} R$ ${Math.round(valNat).toLocaleString("pt-BR")}` : "",
+      modo === "contrato" ? `atribuído R$ ${Math.round(parte.valor).toLocaleString("pt-BR")}` : "",
     ].filter(Boolean);
 
     itens.push({
-      grupo: caminho,
+      grupo: "Deals",
       nome: md.titulo,
       detalhe: detalhePartes.join(" · "),
       data: md.data,
       valor: modo === "valor" ? parte.valor : 0,
+      url: `${BITRIX_BASE}/crm/deal/details/${d.id}/`,
     });
     total += modo === "valor" ? parte.valor : 1;
   }

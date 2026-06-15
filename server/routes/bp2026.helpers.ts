@@ -53,6 +53,7 @@ export interface ItemDetalhe {
   detalhe: string;
   data: string | null;
   valor: number;
+  url?: string;
 }
 
 export interface GrupoDetalhe {
