@@ -14,6 +14,7 @@ interface ReceitasResponse {
   metricasGerais: BPLinha[];
   revenue: BPLinha[];
   funil: BPLinha[];
+  vendasProduto: BPLinha[];
   capacity: BPLinha[];
   sgaDetalhe: BPLinha[];
   cacDetalhe: BPLinha[];
@@ -60,6 +61,7 @@ export default function BP2026() {
           <TabsTrigger value="metricas">Métricas Gerais</TabsTrigger>
           <TabsTrigger value="revenue">Revenue</TabsTrigger>
           <TabsTrigger value="funil">Funil Comercial</TabsTrigger>
+          <TabsTrigger value="vendasProduto">Vendas por Produto</TabsTrigger>
           <TabsTrigger value="capacity">Capacity</TabsTrigger>
           <TabsTrigger value="sga">SG&amp;A</TabsTrigger>
           <TabsTrigger value="cac">CAC</TabsTrigger>
@@ -92,6 +94,14 @@ export default function BP2026() {
         <TabsContent value="funil" className="mt-4">
           <BPDreTable
             linhas={data.funil}
+            mesCorrente={data.mesCorrente}
+            mesFechado={data.mesFechado}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
+          />
+        </TabsContent>
+        <TabsContent value="vendasProduto" className="mt-4">
+          <BPDreTable
+            linhas={data.vendasProduto}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
             onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
