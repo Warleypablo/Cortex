@@ -61,7 +61,7 @@ const DERIVADAS: Record<string, string[]> = {
   or_total_detalhe: ["or_receita_variavel", "or_stack_digital", "or_demais"],
 };
 
-interface ItemDet { nome: string; detalhe: string; data: string | null; valor: number }
+interface ItemDet { nome: string; detalhe: string; data: string | null; valor: number; url?: string }
 interface GrupoDet { titulo: string; total: number; itens: ItemDet[]; itensOmitidos?: { qtd: number; valor: number } }
 interface DetalheResponse {
   metrica: string; mes: number; titulo: string;
@@ -176,7 +176,11 @@ export function BPCellDetail({ metrica, mes, linhas, onClose }: Props) {
                       {g.itens.map((it, idx) => (
                         <div key={idx} className="flex items-start justify-between gap-2 px-3 py-1.5 text-xs border-b border-gray-50 dark:border-zinc-800/50 last:border-0">
                           <div className="min-w-0">
-                            <p className="truncate text-gray-800 dark:text-zinc-200">{it.nome}</p>
+                            <p className="truncate text-gray-800 dark:text-zinc-200">
+                              {it.url ? (
+                                <a href={it.url} target="_blank" rel="noreferrer" className="text-blue-600 hover:underline dark:text-blue-400">{it.nome}</a>
+                              ) : it.nome}
+                            </p>
                             {(it.detalhe || it.data) && (
                               <p className="truncate text-gray-500 dark:text-zinc-500">
                                 {[it.detalhe, it.data].filter(Boolean).join(" · ")}
