@@ -101,9 +101,17 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
   const serie = (f: (m: number) => number | null) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? f(i + 1) : null));
 
+  const razao = (num: number | null, den: number | null): number | null =>
+    (num === null || den === null || !den) ? null : num / den;
+  const somaAte = (s: (number | null)[]) =>
+    s.slice(0, mesFechado).reduce<number | null>((acc, v) => (v === null ? acc : (acc ?? 0) + v), null);
+  const somaOrcAte = (metricaKey: string) =>
+    Array.from({ length: mesFechado }, (_, i) => orcado[metricaKey]?.[i + 1] ?? 0).reduce((a, b) => a + b, 0);
+
   const fazLinha = (
     metrica: string, titulo: string, grupo: string, segmento: string,
-    unidade: Linha["unidade"], serieReal: (number | null)[], orcadoMetrica: string
+    unidade: Linha["unidade"], serieReal: (number | null)[], orcadoMetrica: string,
+    ytdOverride?: { orcado: number; realizado: number | null }
   ): Linha => {
     const meses: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
       const o = orcado[orcadoMetrica]?.[i + 1] ?? 0;
@@ -112,7 +120,9 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
     });
     const ytd = mesFechado === 0
       ? { orcado: 0, realizado: null, atingimento: null }
-      : (() => { const v = calcYtd(meses, mesFechado, "fluxo"); return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) }; })();
+      : ytdOverride
+        ? { ...ytdOverride, atingimento: calcAtingimento(ytdOverride.orcado, ytdOverride.realizado) }
+        : (() => { const v = calcYtd(meses, mesFechado, "fluxo"); return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) }; })();
     return { metrica, titulo, tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade, grupo, segmento, meses, ytd };
   };
 
@@ -136,7 +146,11 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
       const medidaCtr = b.medidaValor === "vendas_mrr" ? "contratos_vendidos_mrr" : "contratos_vendidos_pontual";
       linhas.push(fazLinha(`${b.medidaValor}_${SLUG[seg]}`, `${seg} — ${b.grupo === "Recorrente" ? "MRR" : "Pontual"}`, b.grupo, seg, "brl", valorReal, orcKey(b.medidaValor, seg)));
       linhas.push(fazLinha(`${medidaCtr}_${SLUG[seg]}`, `${seg} — Contratos`, b.grupo, seg, "int", ctrReal, orcKey(medidaCtr, seg)));
-      linhas.push(fazLinha(`${medidaAov}_${SLUG[seg]}`, `${seg} — AOV`, b.grupo, seg, "brl", aovReal, orcKey(medidaAov, seg)));
+      const aovYtd = mesFechado === 0 ? undefined : {
+        orcado: razao(somaOrcAte(orcKey(b.medidaValor, seg)), somaOrcAte(orcKey(medidaCtr, seg))) ?? 0,
+        realizado: razao(somaAte(valorReal), somaAte(ctrReal)),
+      };
+      linhas.push(fazLinha(`${medidaAov}_${SLUG[seg]}`, `${seg} — AOV`, b.grupo, seg, "brl", aovReal, orcKey(medidaAov, seg), aovYtd));
     }
   }
   return linhas;
