@@ -1,5 +1,59 @@
 # Changelog
 
+## 2026-06-14 | feat(criativos): exibe o motivo real da falha nos toasts de ação em massa
+
+**O que foi feito:**
+- Os toasts de pausar/ativar e de ajuste de orçamento em massa agora exibem a mensagem de erro retornada pela Meta para os itens que falharam, em vez de apenas "N não aplicaram"
+- Novo helper `summarizeErrors` que deduplica e resume os erros por item (mostra os 2 principais + contagem dos demais)
+
+**Por que:**
+- Ao tentar pausar conjuntos a ação falhava ("0/7 pausados · 7 não aplicaram") sem informar a causa, impossibilitando o diagnóstico do problema na Meta Ads
+
+**Arquivos alterados:**
+- `client/src/pages/Criativos.tsx` - `summarizeErrors` e descrição dos toasts de massa passando a incluir o erro real (ReactNode em 2 linhas)
+
+**Impacto arquitetural:** Nenhum — apenas feedback de UI; o backend já retornava o erro por item em `results[].error`.
+
+---
+
+## 2026-06-14 | feat(criativos): seleção persistente por nível com drill-down derivado
+
+**O que foi feito:**
+- Cada aba da página Criativos (campanha/conjunto/anúncio) agora mantém a própria seleção ao trocar de aba; antes a seleção era apagada a cada navegação
+- O drill-down (filtro de escopo) passou a ser **derivado** da seleção dos níveis ancestrais: selecionar um conjunto e abrir "Anúncios" mostra só os anúncios daquele conjunto, e voltar para "Conjuntos" mantém o conjunto marcado
+- Badge "N selecionado" passa a aparecer em qualquer aba com seleção (não só na ativa), para deixar a seleção persistida visível
+- Chip "Filtrando por…" e os labels das abas refletem a cadeia de seleção persistente
+- Removidos o estado manual `scope` e o mapa `LEVEL_DEPTH` (agora derivados de `selByLevel`)
+
+**Por que:**
+- O usuário precisava navegar entre níveis (campanha → conjunto → anúncio) sem perder o que havia selecionado, como no Meta Ads Manager — antes era preciso reselecionar a cada troca de aba
+
+**Arquivos alterados:**
+- `client/src/pages/Criativos.tsx` - seleção por nível (`selByLevel`), `scope` derivado dos ancestrais, handlers de seleção/limpeza ajustados e badges/labels persistentes
+
+**Impacto arquitetural:** Nenhum — mudança de estado/UI local na página; sem alterações de API, dados ou contrato de componentes.
+
+---
+
+## 2026-06-14 | feat(criativos): toast persistente de confirmação para ações no Meta Ads
+
+**O que foi feito:**
+- Toasts de pausar/ativar (individual e em massa) e de orçamento na aba Criativos agora ficam fixos na tela até o usuário fechar (`duration: Infinity`), em vez de sumirem sozinhos em ~5s
+- Adicionada variante `success` (verde) ao componente Toast; erros continuam vermelhos (`destructive`)
+- Ação em massa com falha parcial passa a ser sinalizada como aviso vermelho (com `X/Y aplicados`), não mais como sucesso
+- Botão de fechar (X) do toast agora fica sempre visível, não só ao passar o mouse
+
+**Por que:**
+- Ao pausar anúncios, o feedback de conclusão sumia rápido demais e o usuário não tinha certeza se a mudança foi de fato aplicada na Meta Ads (inclusive em casos do bug de Erro 500 em produção)
+
+**Arquivos alterados:**
+- `client/src/components/ui/toast.tsx` - nova variante `success` e botão de fechar sempre visível
+- `client/src/pages/Criativos.tsx` - toasts das ações do Meta agora persistentes, com variante por resultado e detecção de falha parcial
+
+**Impacto arquitetural:** Nenhum — apenas feedback de UI; nenhuma mudança em API ou dados.
+
+---
+
 ## 2026-06-12 | feat(capacity): dois percentuais — Capacity por MRR e por quantidade de contas
 
 **O que foi feito:**
