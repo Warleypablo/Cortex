@@ -35,7 +35,7 @@ export default function ChurnPontorrente() {
         <>
           <OverviewCards data={data.overview} />
           <MatrizCohort jornadas={data.jornadas} />
-          <ChurnPorDimensao data={data.churnPorDimensao} />
+          <ChurnPorDimensao jornadas={data.jornadas} />
           <DetalhamentoTable rows={data.detalhamento} />
         </>
       )}
