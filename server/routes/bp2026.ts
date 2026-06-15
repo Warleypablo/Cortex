@@ -14,6 +14,7 @@ import {
 import { montarMetricasGerais } from "./bp2026.metricas";
 import { montarRevenue } from "./bp2026.revenue";
 import { montarFunil } from "./bp2026.funil";
+import { montarVendasProduto } from "./bp2026.vendasProduto";
 import { montarCapacity } from "./bp2026.capacity";
 import { montarDetalhamentos } from "./bp2026.detalhamentos";
 import { INFO_METRICAS } from "./bp2026.info";
@@ -512,6 +513,9 @@ export function registerBp2026Routes(app: Express, db: any) {
       // 10. Funil Comercial (sub-aba)
       const { linhas: funil, ganhosPorMes } = await montarFunil({ db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado });
 
+      // 12b. Vendas por Produto (sub-aba)
+      const vendasProduto = await montarVendasProduto({ db, orcado, mesCorrente, mesFechado });
+
       // 11. Capacity (sub-aba) — contratos Performance extraídos do retorno da Revenue
       const contratosPerformanceSerie =
         revenue.find((l) => l.metrica === "contratos_performance")?.meses.map((m) => m.realizado) ??
@@ -546,6 +550,7 @@ export function registerBp2026Routes(app: Express, db: any) {
         metricasGerais: anexarInfo(metricasGerais),
         revenue: anexarInfo(revenue),
         funil: anexarInfo(funil),
+        vendasProduto: anexarInfo(vendasProduto),
         capacity: anexarInfo(capacity),
         sgaDetalhe: anexarInfo(sgaDetalhe),
         cacDetalhe: anexarInfo(cacDetalhe),
