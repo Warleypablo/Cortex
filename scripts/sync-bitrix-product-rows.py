@@ -42,6 +42,7 @@ def segmento(nome: str) -> str:
     if "commerce" in n: return "E-commerce"
     if "site" in n: return "Site Institucional"
     if "landing" in n: return "Landing Page"
+    if "crm" in n: return "CRM"
     return "Others"
 
 # deals ganhos 2026 com valor (mesmo universo do assembler)

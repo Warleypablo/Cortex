@@ -10,6 +10,8 @@ describe("de-para de serviços Bitrix", () => {
     expect(SERVICOS_BITRIX[868].segmento).toBe("E-commerce");
     expect(SERVICOS_BITRIX[880].segmento).toBe("Site Institucional");
     expect(SERVICOS_BITRIX[882].segmento).toBe("Landing Page");
+    expect(SERVICOS_BITRIX[850].segmento).toBe("Creators"); // Creators Pontual = linha Creators no pontual
+    expect(SERVICOS_BITRIX[854].segmento).toBe("CRM");
   });
 
   it("classifica natureza recorrente vs pontual", () => {
@@ -34,6 +36,6 @@ describe("de-para de serviços Bitrix", () => {
   it("segmentosPorNatureza devolve segmentos distintos por natureza", () => {
     const r = segmentosPorNatureza([846, 848, 850, 868]);
     expect(r.recorrente.sort()).toEqual(["Performance", "Social"].sort());
-    expect(r.pontual.sort()).toEqual(["E-commerce", "Others"].sort());
+    expect(r.pontual.sort()).toEqual(["Creators", "E-commerce"].sort());
   });
 });
