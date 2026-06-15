@@ -28,6 +28,12 @@ export interface DetalheRow {
   valorp: number;
   dataEncerramento: string | null;
 }
+export interface EntregaStage {
+  nivel: number;
+  situacao: "entregue" | "em_andamento" | "churn";
+  valorp: number;
+  motivoCancelamento: string | null;
+}
 export interface Jornada {
   idTask: string;
   produto: string;
@@ -42,6 +48,7 @@ export interface Jornada {
   motivoCancelamento: string | null;
   dataInicioPrimeira: string | null;
   dataEncerramento: string | null;
+  entregas: EntregaStage[];
 }
 export interface ChurnPontorrentePayload {
   overview: Overview;

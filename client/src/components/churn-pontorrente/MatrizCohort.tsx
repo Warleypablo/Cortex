@@ -11,13 +11,18 @@ type DimKey = "mes" | "produto" | "squad" | "responsavel";
 const DIM_LABEL: Record<DimKey, string> = {
   mes: "Mês de início", produto: "Produto", squad: "Squad", responsavel: "Responsável",
 };
-
 type Metrica = "retencao" | "churn";
 
 const SIT: Record<Jornada["situacaoFinal"], { label: string; cls: string }> = {
   entregue: { label: "Concluído", cls: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300" },
   em_andamento: { label: "Em andamento", cls: "bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300" },
   churn: { label: "Churn", cls: "bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300" },
+};
+
+type DrillRow = {
+  cliente: string | null; produto: string; entrega: string;
+  situacao: Jornada["situacaoFinal"]; valorp: number; motivo: string | null;
+  responsavel: string | null; squad: string | null;
 };
 
 function cohortKey(j: Jornada, dim: DimKey): string {
@@ -28,8 +33,21 @@ function cohortKey(j: Jornada, dim: DimKey): string {
 }
 
 const reached = (js: Jornada[], n: number) => js.filter((j) => j.nivelMax >= n).length;
-const churnAt = (js: Jornada[], n: number) => js.filter((j) => j.nivelMax === n && j.situacaoFinal === "churn").length;
-const churnAll = (js: Jornada[]) => js.filter((j) => j.situacaoFinal === "churn");
+const churnAt = (js: Jornada[], n: number) =>
+  js.reduce((a, j) => a + j.entregas.filter((e) => e.nivel === n && e.situacao === "churn").length, 0);
+const churnStages = (js: Jornada[]) =>
+  js.flatMap((j) => j.entregas.filter((e) => e.situacao === "churn").map((e) => ({ j, e })));
+
+const jornadaRow = (j: Jornada): DrillRow => ({
+  cliente: j.nomeCliente, produto: j.produto, entrega: `${j.nivelMax}ª (atual)`,
+  situacao: j.situacaoFinal, valorp: j.valorp, motivo: j.motivoCancelamento,
+  responsavel: j.responsavel, squad: j.squad,
+});
+const stageRow = (j: Jornada, e: Jornada["entregas"][number]): DrillRow => ({
+  cliente: j.nomeCliente, produto: j.produto, entrega: `${e.nivel}ª`,
+  situacao: "churn", valorp: e.valorp, motivo: e.motivoCancelamento,
+  responsavel: j.responsavel, squad: j.squad,
+});
 
 type Drill = { linha: string; kind: "safra" | "reached" | "churnAt" | "churnSafra"; nivel: number };
 
@@ -50,28 +68,27 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
   if (dim === "mes") linhas.sort((a, b) => a[0].localeCompare(b[0]));
   else linhas.sort((a, b) => b[1].length - a[1].length);
 
-  // escalas dos heatmaps
   const maxChurnCell = Math.max(0, ...linhas.flatMap(([, js]) => niveis.map((n) => churnAt(js, n))));
-  const maxChurnSafra = Math.max(0, ...linhas.map(([, js]) => churnAll(js).length));
+  const maxChurnSafra = Math.max(0, ...linhas.map(([, js]) => churnStages(js).length));
   const indigo = (pct: number) => `rgba(99,102,241,${(0.10 + (pct / 100) * 0.6).toFixed(2)})`;
   const red = (c: number, max: number) => (c > 0 && max > 0 ? `rgba(239,68,68,${(0.15 + (c / max) * 0.65).toFixed(2)})` : undefined);
 
-  const drillList = drill
-    ? (rowsMap.get(drill.linha) ?? [])
-        .filter((j) =>
-          drill.kind === "safra" ? true
-          : drill.kind === "reached" ? j.nivelMax >= drill.nivel
-          : drill.kind === "churnAt" ? j.nivelMax === drill.nivel && j.situacaoFinal === "churn"
-          : j.situacaoFinal === "churn", // churnSafra
-        )
-        .sort((a, b) => b.valorp - a.valorp)
-    : [];
+  let drillRows: DrillRow[] = [];
+  if (drill) {
+    const js = rowsMap.get(drill.linha) ?? [];
+    if (drill.kind === "safra") drillRows = js.map(jornadaRow);
+    else if (drill.kind === "reached") drillRows = js.filter((j) => j.nivelMax >= drill.nivel).map(jornadaRow);
+    else if (drill.kind === "churnAt")
+      drillRows = churnStages(js).filter(({ e }) => e.nivel === drill.nivel).map(({ j, e }) => stageRow(j, e));
+    else drillRows = churnStages(js).map(({ j, e }) => stageRow(j, e));
+    drillRows.sort((a, b) => b.valorp - a.valorp);
+  }
 
   const drillTitle = (d: Drill) =>
     d.kind === "safra" ? `${d.linha} · safra completa`
     : d.kind === "reached" ? `${d.linha} · atingiram a Entrega ${d.nivel}`
-    : d.kind === "churnAt" ? `${d.linha} · churn na Entrega ${d.nivel}`
-    : `${d.linha} · churn da safra`;
+    : d.kind === "churnAt" ? `${d.linha} · cancelamentos na Entrega ${d.nivel}`
+    : `${d.linha} · cancelamentos da safra`;
 
   return (
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
@@ -80,7 +97,7 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
           <CardTitle className="text-base">Cohort de continuidade</CardTitle>
           <p className="text-xs text-gray-500 dark:text-zinc-400">
             {metrica === "churn"
-              ? "Quantos churnaram em cada entrega, por safra — clique numa célula para ver os contratos"
+              ? "Cancelamentos de contrato em cada entrega, por safra — clique numa célula para ver os contratos"
               : "Quantos atingiram cada entrega, por safra — clique numa célula para ver os contratos"}
           </p>
         </div>
@@ -123,8 +140,8 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
             <tbody>
               {linhas.map(([linha, js]) => {
                 const total = js.length;
-                const churned = churnAll(js);
-                const churnValor = churned.reduce((a, j) => a + j.valorp, 0);
+                const cs = churnStages(js);
+                const churnValor = cs.reduce((a, { e }) => a + e.valorp, 0);
                 return (
                   <tr key={linha} className="border-t border-gray-100 dark:border-zinc-800">
                     <td className="py-1.5 pr-2 text-left whitespace-nowrap">
@@ -160,7 +177,7 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
                             onClick={() => setDrill({ linha, kind: isChurn ? "churnAt" : "reached", nivel: n })}
                             style={{ backgroundColor: bg }}
                             className="w-full rounded-md px-2 py-1.5 tabular-nums transition hover:ring-2 hover:ring-indigo-400 disabled:cursor-default disabled:opacity-40"
-                            title={isChurn ? `${c} churn na entrega ${n} — clique para ver` : `${c} de ${total} (${pct}%) — clique para ver`}
+                            title={isChurn ? `${c} cancelamento(s) na entrega ${n} — clique para ver` : `${c} de ${total} (${pct}%) — clique para ver`}
                           >
                             <span className="font-semibold text-gray-900 dark:text-zinc-100">{c}</span>
                             {!isChurn && <span className="ml-1 text-[10px] text-gray-600 dark:text-zinc-400">{pct}%</span>}
@@ -171,13 +188,13 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
                     <td className="px-1.5 py-1.5 text-center">
                       <button
                         type="button"
-                        disabled={churned.length === 0}
+                        disabled={cs.length === 0}
                         onClick={() => setDrill({ linha, kind: "churnSafra", nivel: 0 })}
-                        style={{ backgroundColor: red(churned.length, maxChurnSafra) }}
+                        style={{ backgroundColor: red(cs.length, maxChurnSafra) }}
                         className="w-full rounded-md px-2 py-1.5 tabular-nums transition hover:ring-2 hover:ring-red-400 disabled:cursor-default disabled:opacity-40"
-                        title="Ver os contratos churnados da safra"
+                        title="Ver os cancelamentos da safra"
                       >
-                        <span className="font-semibold text-red-700 dark:text-red-300">{churned.length}</span>
+                        <span className="font-semibold text-red-700 dark:text-red-300">{cs.length}</span>
                         {churnValor > 0 && (
                           <span className="ml-1 text-[10px] text-red-600/80 dark:text-red-400/80">{formatCurrencyNoDecimals(churnValor)}</span>
                         )}
@@ -195,7 +212,7 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
         <DialogContent className="max-w-4xl">
           <DialogHeader>
             <DialogTitle>{drill ? drillTitle(drill) : ""}</DialogTitle>
-            <DialogDescription>{drillList.length} contrato(s) — ordenado por valor pontual</DialogDescription>
+            <DialogDescription>{drillRows.length} contrato(s) — ordenado por valor pontual</DialogDescription>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto">
             <Table>
@@ -203,7 +220,7 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
                 <TableRow>
                   <TableHead>Cliente</TableHead>
                   <TableHead>Produto</TableHead>
-                  <TableHead className="text-center">Nível atual</TableHead>
+                  <TableHead className="text-center">Entrega</TableHead>
                   <TableHead>Situação</TableHead>
                   <TableHead className="text-right">Valor pontual</TableHead>
                   <TableHead>Responsável</TableHead>
@@ -212,20 +229,20 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {drillList.map((j) => (
-                  <TableRow key={`${j.idTask}-${j.produto}`}>
-                    <TableCell>{j.nomeCliente ?? "—"}</TableCell>
-                    <TableCell>{j.produto}</TableCell>
-                    <TableCell className="text-center tabular-nums">{j.nivelMax}ª</TableCell>
+                {drillRows.map((r, i) => (
+                  <TableRow key={i}>
+                    <TableCell>{r.cliente ?? "—"}</TableCell>
+                    <TableCell>{r.produto}</TableCell>
+                    <TableCell className="text-center tabular-nums">{r.entrega}</TableCell>
                     <TableCell>
-                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${SIT[j.situacaoFinal].cls}`}>
-                        {SIT[j.situacaoFinal].label}
+                      <span className={`rounded px-2 py-0.5 text-xs font-medium ${SIT[r.situacao].cls}`}>
+                        {SIT[r.situacao].label}
                       </span>
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrencyNoDecimals(j.valorp)}</TableCell>
-                    <TableCell>{j.responsavel ?? "—"}</TableCell>
-                    <TableCell>{j.squad ?? "—"}</TableCell>
-                    <TableCell>{j.motivoCancelamento ?? "—"}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrencyNoDecimals(r.valorp)}</TableCell>
+                    <TableCell>{r.responsavel ?? "—"}</TableCell>
+                    <TableCell>{r.squad ?? "—"}</TableCell>
+                    <TableCell>{r.motivo ?? "—"}</TableCell>
                   </TableRow>
                 ))}
               </TableBody>

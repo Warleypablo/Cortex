@@ -43,6 +43,13 @@ export interface RawRow {
   nomeCliente: string | null;
 }
 
+export interface EntregaStage {
+  nivel: number;
+  situacao: Situacao;
+  valorp: number;
+  motivoCancelamento: string | null;
+}
+
 export interface Jornada {
   idTask: string;
   produto: string;
@@ -57,6 +64,7 @@ export interface Jornada {
   motivoCancelamento: string | null;
   dataInicioPrimeira: string | null;
   dataEncerramento: string | null;
+  entregas: EntregaStage[];
 }
 
 export interface Filtros {
@@ -107,6 +115,13 @@ export function toJornadas(rows: RawRow[], base: "vendido" | "entregue"): Jornad
       .map((s) => s.dataInicio)
       .filter((d): d is string => !!d)
       .sort();
+    // Etapas (todos os estágios da jornada) — base para churn por contrato/entrega.
+    const entregas: EntregaStage[] = stages.map((s) => ({
+      nivel: Math.min(extractNivelEntrega(s.servico)!, MAX_NIVEL),
+      situacao: classifySituacao(s.status),
+      valorp: s.valorp ?? 0,
+      motivoCancelamento: s.motivoCancelamento,
+    }));
     const [idTask, produto] = key.split("|||");
     jornadas.push({
       idTask, produto,
@@ -121,6 +136,7 @@ export function toJornadas(rows: RawRow[], base: "vendido" | "entregue"): Jornad
       motivoCancelamento: topo.motivoCancelamento,
       dataInicioPrimeira: datasInicio[0] ?? null,
       dataEncerramento: topo.dataEncerramento,
+      entregas,
     });
   }
   return jornadas;

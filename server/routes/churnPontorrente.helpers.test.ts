@@ -65,6 +65,8 @@ describe("toJornadas (base vendido)", () => {
     expect(a.situacaoFinal).toBe("churn");
     expect(a.valorp).toBe(1000);
     expect(a.motivoCancelamento).toBe("Inadimplente");
+    expect(a.entregas).toHaveLength(2);
+    expect(a.entregas.filter((e) => e.situacao === "churn").map((e) => e.nivel)).toEqual([4]);
     const b = js.find((j) => j.idTask === "B")!;
     expect(b.nivelMax).toBe(2);
     expect(b.situacaoFinal).toBe("em_andamento");
