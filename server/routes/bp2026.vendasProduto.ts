@@ -239,13 +239,18 @@ export async function detalheVendaProdutoMes(
 
     const valNat = natureza === "recorrente" ? d.valorRec : d.valorPont;
     const rateado = Math.round(valNat) !== Math.round(parte.valor); // multi-produto: valor do deal foi dividido
-    const nomesServicos = d.ids.map((id) => SERVICOS_BITRIX[id]?.nome).filter(Boolean).join(", ") || "(sem serviço)";
     const md = meta.get(d.id)!;
+    // produto desta célula = o(s) serviço(s) do deal que pertencem ao segmento clicado
+    const servicosDoSegmento = d.ids
+      .filter((id) => SERVICOS_BITRIX[id]?.segmento === segmento)
+      .map((id) => SERVICOS_BITRIX[id]!.nome);
+    const produtoLabel = servicosDoSegmento.length ? servicosDoSegmento.join(", ") : segmento;
+    const atribuido = `R$ ${Math.round(parte.valor).toLocaleString("pt-BR")}`;
     const detalhePartes = [
-      nomesServicos,
+      produtoLabel,                                   // produto (serviço do segmento), claro e primeiro
+      modo === "contrato" ? atribuido : "",           // no modo contagem o valor vai no texto
       md.closer ? `closer ${md.closer}` : "",
-      rateado ? `deal ${natureza === "recorrente" ? "MRR" : "pontual"} R$ ${Math.round(valNat).toLocaleString("pt-BR")}` : "",
-      modo === "contrato" ? `atribuído R$ ${Math.round(parte.valor).toLocaleString("pt-BR")}` : "",
+      rateado ? `de deal ${natureza === "recorrente" ? "MRR" : "pontual"} R$ ${Math.round(valNat).toLocaleString("pt-BR")}` : "",
     ].filter(Boolean);
 
     itens.push({
