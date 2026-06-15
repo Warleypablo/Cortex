@@ -30,7 +30,9 @@ export interface CsRow {
   mrr_onboarding: number;
   mrr_cancelamento: number;
   cap_mrr: number | null;
-  util_pct: number | null;
+  util_mrr_pct: number | null;    // mrr_operando / cap_mrr
+  util_contas_pct: number | null; // (rec+pont) / (cap rec + cap pont)
+  util_pct: number | null;        // legado: MRR quando há cap, senão contas/cap_recorrente
 }
 
 export interface ComercialRow {
@@ -44,7 +46,9 @@ export interface ComercialRow {
   contas_ativas: number;
   cap_contas: number | null;
   dif_contas: number | null;
-  util_pct: number | null;
+  util_mrr_pct: number | null;    // mrr_atual / cap_mrr
+  util_contas_pct: number | null; // contas_ativas / cap_contas
+  util_pct: number | null;        // legado: igual a util_mrr_pct
 }
 
 export interface SquadGroup {
@@ -99,9 +103,14 @@ export function parseAggRow(raw: any): CapacityAggRow {
 
 export function toCsRow(r: CapacityAggRow): CsRow {
   const op_total = r.op_recorrente + r.op_pontual;
-  // cap_mrr null OU 0 = sem meta de MRR configurada (CS de capacity único) → utilização pelo total de contas (rec+pont)
+  // Capacity por MRR e por contas lado a lado.
+  // Contas do CS = (rec + pont) sobre a soma dos caps de contas (rec + pont).
+  const cap_contas_total = (r.cap_recorrente ?? 0) + (r.cap_pontual ?? 0);
+  const util_mrr_pct = utilPct(r.mrr_operando, r.cap_mrr);
+  const util_contas_pct = utilPct(op_total, cap_contas_total > 0 ? cap_contas_total : null);
+  // Legado (% único): cap_mrr null OU 0 = sem meta de MRR (CS de capacity único) → contas (rec+pont) / cap_recorrente
   const util_pct = (r.cap_mrr !== null && r.cap_mrr !== 0)
-    ? utilPct(r.mrr_operando, r.cap_mrr)
+    ? util_mrr_pct
     : utilPct(op_total, r.cap_recorrente);
   return {
     nome: r.nome,
@@ -115,11 +124,14 @@ export function toCsRow(r: CapacityAggRow): CsRow {
     mrr_onboarding: r.mrr_onboarding,
     mrr_cancelamento: r.mrr_cancelamento,
     cap_mrr: r.cap_mrr,
+    util_mrr_pct,
+    util_contas_pct,
     util_pct,
   };
 }
 
 export function toComercialRow(r: CapacityAggRow): ComercialRow {
+  const util_mrr_pct = utilPct(r.mrr_operando, r.cap_mrr);
   return {
     nome: r.nome,
     mrr_atual: r.mrr_operando,
@@ -131,7 +143,9 @@ export function toComercialRow(r: CapacityAggRow): ComercialRow {
     contas_ativas: r.op_recorrente,
     cap_contas: r.cap_contas,
     dif_contas: diff(r.cap_contas, r.op_recorrente),
-    util_pct: utilPct(r.mrr_operando, r.cap_mrr),
+    util_mrr_pct,
+    util_contas_pct: utilPct(r.op_recorrente, r.cap_contas),
+    util_pct: util_mrr_pct,
   };
 }
 

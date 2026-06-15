@@ -54,6 +54,67 @@
 
 ---
 
+## 2026-06-12 | feat(capacity): dois percentuais — Capacity por MRR e por quantidade de contas
+
+**O que foi feito:**
+- Backend (`/api/capacity-times`) passou a retornar `util_mrr_pct` (MRR operando / cap. MRR) e `util_contas_pct` separados para todas as linhas; `util_pct` legado mantido (MRR quando há cap, senão contas).
+- CS/squads: % contas = (contas recorrentes + pontuais) / (cap. recorrente + cap. pontual). Comerciais: % contas = contas ativas / cap. contas.
+- Tabelas (squads, comerciais e comparativo da Visão Geral) trocam a coluna única "Utilização" por **% MRR** e **% Contas**, cada uma com barra e cores por faixa.
+- Cards dos times mostram "Capacity MRR (média)" e "Capacity Contas (média)".
+- Gráficos "Utilização por pessoa" e "Utilização média por time" viram barras agrupadas MRR × Contas com legenda.
+
+**Por que:**
+- Um percentual único escondia visões diferentes de lotação: alguém pode estar estourado em MRR e com folga em contas (ex.: Victor/Pulse 118% MRR × 95% contas) ou vice-versa.
+
+**Arquivos alterados:**
+- `server/routes/capacityTimes.helpers.ts` - campos `util_mrr_pct`/`util_contas_pct` em CsRow e ComercialRow
+- `server/routes/capacityTimes.helpers.test.ts` - cobertura dos dois percentuais
+- `client/src/pages/CapacityTimes.tsx` - colunas, cards e gráficos agrupados
+
+**Impacto arquitetural:** Nenhum — novos campos na API sem breaking change
+
+---
+
+## 2026-06-12 | feat(relatorio-mensal): NRR por squad — expansão abatida do churn
+
+**O que foi feito:**
+- Slide "Detalhes por Squad" passou a calcular **NRR** = churn s/ abonados − expansão (upsell/cross-sell) do mês.
+- Expansões configuradas por mês/squad em `EXPANSAO_NRR_POR_MES` (backend). Maio/2026: Selva R$ 9.000 ÷ 5, Squadra R$ 8.000 ÷ 5 (contratos em 5x entram com 1/5 do valor no mês), Pulse R$ 4.497 integral.
+- Todo squad exibe sempre os cards **Total de Vendas** (valor cheio vendido no mês), **Churn s/ Abonados** e **NRR**, mesmo zerados — squads sem expansão mostram Vendas R$ 0 e NRR = churn s/ abonados.
+- Tooltip do card NRR mostra a linha "Expansão (abatida)" em verde junto da lista de clientes churnados.
+- Layout do card de squad com 8 KPIs: densidade média em 2 linhas de 4 (grid de 8 colunas); compacto (5+ squads) em 3 colunas sem ícones, com labels sem quebra de linha.
+
+**Por que:**
+- O churn bruto não refletia a retenção líquida dos squads — expansões fechadas no mês compensam parte do MRR perdido (ex.: Pulse maio/2026 cai de 17,5% para 14,8%).
+
+**Arquivos alterados:**
+- `server/routes/relatorioMensalSlides.ts` - constante `EXPANSAO_NRR_POR_MES` + campos `expansaoNrr`/`nrrBrl`/`nrrPct` em `squadDetails`
+- `client/src/pages/relatorio-mensal/types.ts` - novos campos em `SquadDetail`
+- `client/src/pages/relatorio-mensal/SlideSquadSingle.tsx` - card NRR condicional + linha de expansão no tooltip
+
+**Impacto arquitetural:** Nenhum — novos campos na API sem breaking change
+
+---
+
+## 2026-06-11 | fix(capacity): renomeia Selca para Selva e remove squad Aura (virou Pulse)
+
+**O que foi feito:**
+- Tab e título do time de vendedores renomeados de "Selca" para "Selva" (CapacityTimes + label do dialog de operador).
+- "Aura" removida das categorias base do dialog de operador — a squad foi absorvida pela Pulse.
+- Banco local atualizado (`UPDATE capacity_metas SET categoria='Pulse' WHERE categoria='Aura'`, 3 operadores) para espelhar prod, que já estava migrado.
+- Indicador de cobertura de cap: linha do time mostra "X/Y com cap" quando só parte das pessoas tem cap de MRR (Pulse pós-fusão: 5/8), Espaço MRR vira "—" para time sem nenhuma cap (Olimpo), e os cards do topo indicam "cobre X de Y pessoas" / "só de quem tem cap de MRR". Resolve a aparente contradição de MRR Operando > Cap. MRR com Espaço positivo.
+
+**Por que:**
+- O nome correto do time comercial é Selva, e a squad Aura deixou de existir ("tudo o que era Aura virou Pulse"). Prod já tinha os 8 operadores em Pulse; o local ainda mostrava a tab Aura.
+
+**Arquivos alterados:**
+- `client/src/pages/CapacityTimes.tsx` - labels Selca → Selva (overview, tab e conteúdo).
+- `client/src/components/capacity-times/CapacityMetaDialog.tsx` - label "Selva (vendedor)" e CATEGORIAS_BASE sem "Aura".
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-11 | feat(relatorio-mensal): cards de churn total e s/ abonados por squad
 
 **O que foi feito:**

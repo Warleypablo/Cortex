@@ -11,7 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Gauge, AlertTriangle, TrendingDown } from "lucide-react";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
 
 interface CsRow {
@@ -21,6 +21,8 @@ interface CsRow {
   op_total: number;
   mrr_operando: number; mrr_ativo: number; mrr_onboarding: number; mrr_cancelamento: number;
   cap_mrr: number | null;
+  util_mrr_pct: number | null;
+  util_contas_pct: number | null;
   util_pct: number | null;
 }
 interface ComercialRow {
@@ -28,6 +30,8 @@ interface ComercialRow {
   mrr_atual: number; mrr_ativo: number; mrr_onboarding: number; mrr_cancelamento: number;
   cap_mrr: number | null; dif_mrr: number | null;
   contas_ativas: number; cap_contas: number | null; dif_contas: number | null;
+  util_mrr_pct: number | null;
+  util_contas_pct: number | null;
   util_pct: number | null;
 }
 interface SquadGroup {
@@ -44,9 +48,12 @@ interface TeamSummary {
   contas: number;
   mrr_operando: number;
   cap_mrr: number;
-  util_pct: number | null;
+  util_mrr_pct: number | null;    // média das utilizações por MRR
+  util_contas_pct: number | null; // média das utilizações por contas
   gap_mrr: number;
   mrr_cancelamento: number;
+  // Quantas pessoas do time têm cap de MRR definida — cap/espaço só consideram essas
+  pessoas_com_cap: number;
 }
 
 function formatCurrency(value: number): string {
@@ -64,11 +71,9 @@ function utilBarColor(pct: number | null): string {
   if (pct >= 70) return "bg-yellow-500";
   return "bg-green-500";
 }
-function getBarColor(pct: number): string {
-  if (pct >= 90) return "#ef4444";
-  if (pct >= 70) return "#eab308";
-  return "#22c55e";
-}
+// Cores fixas dos dois percentuais nos gráficos agrupados (MRR × Contas)
+const COLOR_MRR = "#3b82f6";
+const COLOR_CONTAS = "#a855f7";
 function pctText(pct: number | null): string {
   return pct === null ? "—" : `${pct}%`;
 }
@@ -82,10 +87,10 @@ function moneyOrDash(v: number | null): string {
 function sum(nums: (number | null)[]): number {
   return nums.reduce<number>((a, b) => a + (b ?? 0), 0);
 }
-function avgUtil(items: { util_pct: number | null }[]): number | null {
-  const vals = items.map((i) => i.util_pct).filter((v): v is number => v !== null);
-  if (!vals.length) return null;
-  return Math.round((vals.reduce((a, b) => a + b, 0) / vals.length) * 10) / 10;
+function avgOf(vals: (number | null)[]): number | null {
+  const v = vals.filter((x): x is number => x !== null);
+  if (!v.length) return null;
+  return Math.round((v.reduce((a, b) => a + b, 0) / v.length) * 10) / 10;
 }
 function pct(part: number, whole: number): number | null {
   if (!whole) return null;
@@ -134,7 +139,7 @@ function td(extra = "") { return cn("text-gray-900 dark:text-white", extra); }
 
 function StatCards({ cards }: { cards: { label: string; value: string; tone?: string }[] }) {
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+    <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-3", cards.length >= 7 ? "lg:grid-cols-7" : "lg:grid-cols-6")}>
       {cards.map((c) => (
         <Card key={c.label} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
           <CardContent className="pt-4 pb-4">
@@ -186,23 +191,25 @@ function Alerts({ people }: { people: { nome: string; util_pct: number | null }[
   );
 }
 
-function UtilChart({ people }: { people: { nome: string; util_pct: number | null }[] }) {
-  const data = people.filter((p) => p.util_pct !== null).map((p) => ({ nome: p.nome, util: p.util_pct as number }))
-    .sort((a, b) => b.util - a.util);
+function UtilChart({ people }: { people: { nome: string; util_mrr_pct: number | null; util_contas_pct: number | null }[] }) {
+  const data = people
+    .filter((p) => p.util_mrr_pct !== null || p.util_contas_pct !== null)
+    .map((p) => ({ nome: p.nome, mrr: p.util_mrr_pct, contas: p.util_contas_pct }))
+    .sort((a, b) => (b.mrr ?? b.contas ?? 0) - (a.mrr ?? a.contas ?? 0));
   if (!data.length) return null;
   return (
     <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-      <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-700 dark:text-zinc-300">Utilização por pessoa</CardTitle></CardHeader>
+      <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-700 dark:text-zinc-300">Utilização por pessoa — MRR × Contas</CardTitle></CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={Math.max(160, data.length * 30)}>
+        <ResponsiveContainer width="100%" height={Math.max(200, data.length * 44)}>
           <BarChart data={data} layout="vertical" margin={{ left: 90, right: 30 }}>
             <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
             <XAxis type="number" domain={[0, "auto"]} tick={{ fill: "#9ca3af", fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
             <YAxis type="category" dataKey="nome" width={110} tick={{ fill: "#9ca3af", fontSize: 12 }} />
-            <Tooltip formatter={(v: number) => [`${v}%`, "Utilização"]} contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }} />
-            <Bar dataKey="util" radius={[0, 4, 4, 0]} maxBarSize={22}>
-              {data.map((e, i) => <Cell key={i} fill={getBarColor(e.util)} />)}
-            </Bar>
+            <Tooltip formatter={(v: number, name: string) => [`${v}%`, name]} contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }} />
+            <Legend wrapperStyle={{ fontSize: 12 }} />
+            <Bar dataKey="mrr" name="Capacity MRR" fill={COLOR_MRR} radius={[0, 4, 4, 0]} maxBarSize={14} />
+            <Bar dataKey="contas" name="Capacity Contas" fill={COLOR_CONTAS} radius={[0, 4, 4, 0]} maxBarSize={14} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
@@ -229,7 +236,8 @@ function CsTable({ rows, onOperadorClick }: { rows: CsRow[]; onOperadorClick: (n
             <TableHead className={th("text-right")} title="MRR recorrente / contas recorrentes">Ticket Médio</TableHead>
             <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
             <TableHead className={th("text-right")}>Cap. MRR</TableHead>
-            <TableHead className={th("text-right")}>Utilização</TableHead>
+            <TableHead className={th("text-right")} title="MRR Operando / Cap. MRR">% MRR</TableHead>
+            <TableHead className={th("text-right")} title="Contas (rec + pont) / Caps de contas (rec + pont)">% Contas</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -252,7 +260,8 @@ function CsTable({ rows, onOperadorClick }: { rows: CsRow[]; onOperadorClick: (n
               <TableCell className={td("text-right")}>{moneyOrDash(ticket(r.mrr_operando, r.op_recorrente))}</TableCell>
               <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(r.mrr_operando, teamMrr))}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_mrr)}</TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_pct} /></TableCell>
+              <TableCell className="text-right"><UtilBar pct={r.util_mrr_pct} /></TableCell>
+              <TableCell className="text-right"><UtilBar pct={r.util_contas_pct} /></TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -278,7 +287,8 @@ function ComercialTable({ rows, onOperadorClick }: { rows: ComercialRow[]; onOpe
             <TableHead className={th("text-right")}>Contas</TableHead>
             <TableHead className={th("text-right")}>Cap. Contas</TableHead>
             <TableHead className={th("text-right")}>Δ Contas</TableHead>
-            <TableHead className={th("text-right")}>Utilização</TableHead>
+            <TableHead className={th("text-right")} title="MRR Atual / Cap. MRR">% MRR</TableHead>
+            <TableHead className={th("text-right")} title="Contas ativas / Cap. Contas">% Contas</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -298,7 +308,8 @@ function ComercialTable({ rows, onOperadorClick }: { rows: ComercialRow[]; onOpe
               <TableCell className={td("text-right")}>{r.contas_ativas}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_contas)}</TableCell>
               <TableCell className={cn("text-right", r.dif_contas === null ? "text-gray-400 dark:text-zinc-500" : r.dif_contas < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_contas)}</TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_pct} /></TableCell>
+              <TableCell className="text-right"><UtilBar pct={r.util_mrr_pct} /></TableCell>
+              <TableCell className="text-right"><UtilBar pct={r.util_contas_pct} /></TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -315,13 +326,16 @@ function SquadTab({ group, onOperadorClick }: { group: SquadGroup; onOperadorCli
   const totRec = sum(rows.map((r) => r.op_recorrente));
   const totCancel = sum(rows.map((r) => r.mrr_cancelamento));
   const riscoPct = pct(totCancel, totMrr);
+  const mediaMrr = avgOf(rows.map((r) => r.util_mrr_pct));
+  const mediaContas = avgOf(rows.map((r) => r.util_contas_pct));
   const cards = [
     { label: "Pessoas", value: String(rows.length) },
     { label: "Recorrente (op / cap)", value: `${totRec} / ${sum(rows.map((r) => r.cap_recorrente))}` },
     { label: "MRR Operando", value: formatCurrency(totMrr) },
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totRec)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
-    { label: "Utilização média", value: pctText(avgUtil(rows)), tone: utilColor(avgUtil(rows)) },
+    { label: "Capacity MRR (média)", value: pctText(mediaMrr), tone: utilColor(mediaMrr) },
+    { label: "Capacity Contas (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
   ];
   return (
     <div className="space-y-4">
@@ -340,13 +354,16 @@ function ComercialTab({ title, rows, onOperadorClick }: { title: string; rows: C
   const totMrr = sum(rows.map((r) => r.mrr_atual));
   const totContas = sum(rows.map((r) => r.contas_ativas));
   const riscoPct = pct(sum(rows.map((r) => r.mrr_cancelamento)), totMrr);
+  const mediaMrr = avgOf(rows.map((r) => r.util_mrr_pct));
+  const mediaContas = avgOf(rows.map((r) => r.util_contas_pct));
   const cards = [
     { label: "Pessoas", value: String(rows.length) },
     { label: "Contas (op / cap)", value: `${totContas} / ${sum(rows.map((r) => r.cap_contas))}` },
     { label: "MRR Atual", value: formatCurrency(totMrr) },
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totContas)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
-    { label: "Utilização média", value: pctText(avgUtil(rows)), tone: utilColor(avgUtil(rows)) },
+    { label: "Capacity MRR (média)", value: pctText(mediaMrr), tone: utilColor(mediaMrr) },
+    { label: "Capacity Contas (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
   ];
   return (
     <div className="space-y-4">
@@ -369,9 +386,11 @@ function summarizeSquad(g: SquadGroup): TeamSummary {
     contas: sum(rows.map((r) => r.op_recorrente)),
     mrr_operando: sum(rows.map((r) => r.mrr_operando)),
     cap_mrr: sum(rows.map((r) => r.cap_mrr)),
-    util_pct: avgUtil(rows),
+    util_mrr_pct: avgOf(rows.map((r) => r.util_mrr_pct)),
+    util_contas_pct: avgOf(rows.map((r) => r.util_contas_pct)),
     gap_mrr: sum(rows.map((r) => (r.cap_mrr !== null ? r.cap_mrr - r.mrr_operando : 0))),
     mrr_cancelamento: sum(rows.map((r) => r.mrr_cancelamento)),
+    pessoas_com_cap: rows.filter((r) => r.cap_mrr !== null && r.cap_mrr !== 0).length,
   };
 }
 function summarizeComercial(time: string, rows: ComercialRow[]): TeamSummary {
@@ -381,9 +400,11 @@ function summarizeComercial(time: string, rows: ComercialRow[]): TeamSummary {
     contas: sum(rows.map((r) => r.contas_ativas)),
     mrr_operando: sum(rows.map((r) => r.mrr_atual)),
     cap_mrr: sum(rows.map((r) => r.cap_mrr)),
-    util_pct: avgUtil(rows),
+    util_mrr_pct: avgOf(rows.map((r) => r.util_mrr_pct)),
+    util_contas_pct: avgOf(rows.map((r) => r.util_contas_pct)),
     gap_mrr: sum(rows.map((r) => r.dif_mrr)),
     mrr_cancelamento: sum(rows.map((r) => r.mrr_cancelamento)),
+    pessoas_com_cap: rows.filter((r) => r.cap_mrr !== null && r.cap_mrr !== 0).length,
   };
 }
 
@@ -392,12 +413,17 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
   const totalCap = sum(teams.map((t) => t.cap_mrr));
   const totalGap = sum(teams.map((t) => t.gap_mrr));
   const totalCancel = sum(teams.map((t) => t.mrr_cancelamento));
-  const chartData = teams.filter((t) => t.util_pct !== null).map((t) => ({ time: t.time, util: t.util_pct as number }));
+  const totalPessoas = sum(teams.map((t) => t.pessoas));
+  const totalComCap = sum(teams.map((t) => t.pessoas_com_cap));
+  const capParcial = totalComCap > 0 && totalComCap < totalPessoas;
+  const chartData = teams
+    .filter((t) => t.util_mrr_pct !== null || t.util_contas_pct !== null)
+    .map((t) => ({ time: t.time, mrr: t.util_mrr_pct, contas: t.util_contas_pct }));
 
-  const cards = [
+  const cards: { label: string; value: string; tone?: string; sub?: string }[] = [
     { label: "MRR Operando (total)", value: formatCurrency(totalOperando) },
-    { label: "Capacity MRR (total)", value: formatCurrency(totalCap) },
-    { label: "Espaço de crescimento", value: formatCurrency(totalGap), tone: totalGap < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400" },
+    { label: "Capacity MRR (total)", value: formatCurrency(totalCap), sub: capParcial ? `cobre ${totalComCap} de ${totalPessoas} pessoas` : undefined },
+    { label: "Espaço de crescimento", value: formatCurrency(totalGap), tone: totalGap < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400", sub: capParcial ? "só de quem tem cap de MRR" : undefined },
     { label: "MRR em cancelamento (risco)", value: formatCurrency(totalCancel), tone: totalCancel > 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white" },
   ];
 
@@ -409,6 +435,7 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
             <CardContent className="pt-4 pb-4">
               <p className="text-xs text-gray-500 dark:text-zinc-400">{c.label}</p>
               <p className={cn("text-xl font-bold", c.tone ?? "text-gray-900 dark:text-white")}>{c.value}</p>
+              {c.sub && <p className="text-[10px] text-amber-600 dark:text-amber-400">{c.sub}</p>}
             </CardContent>
           </Card>
         ))}
@@ -416,17 +443,17 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
 
       {chartData.length > 0 && (
         <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-          <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-700 dark:text-zinc-300">Utilização média por time</CardTitle></CardHeader>
+          <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-700 dark:text-zinc-300">Utilização média por time — MRR × Contas</CardTitle></CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={Math.max(180, chartData.length * 34)}>
+            <ResponsiveContainer width="100%" height={Math.max(220, chartData.length * 52)}>
               <BarChart data={chartData} layout="vertical" margin={{ left: 70, right: 30 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
                 <XAxis type="number" domain={[0, "auto"]} tick={{ fill: "#9ca3af", fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
                 <YAxis type="category" dataKey="time" width={90} tick={{ fill: "#9ca3af", fontSize: 12 }} />
-                <Tooltip formatter={(v: number) => [`${v}%`, "Utilização"]} contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }} />
-                <Bar dataKey="util" radius={[0, 4, 4, 0]} maxBarSize={26}>
-                  {chartData.map((e, i) => <Cell key={i} fill={getBarColor(e.util)} />)}
-                </Bar>
+                <Tooltip formatter={(v: number, name: string) => [`${v}%`, name]} contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }} />
+                <Legend wrapperStyle={{ fontSize: 12 }} />
+                <Bar dataKey="mrr" name="Capacity MRR" fill={COLOR_MRR} radius={[0, 4, 4, 0]} maxBarSize={18} />
+                <Bar dataKey="contas" name="Capacity Contas" fill={COLOR_CONTAS} radius={[0, 4, 4, 0]} maxBarSize={18} />
               </BarChart>
             </ResponsiveContainer>
           </CardContent>
@@ -447,7 +474,8 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
                   <TableHead className={th("text-right")}>Cap. MRR</TableHead>
                   <TableHead className={th("text-right")}>Espaço MRR</TableHead>
                   <TableHead className={th("text-right")}>Em Cancelamento</TableHead>
-                  <TableHead className={th("text-right")}>Utilização</TableHead>
+                  <TableHead className={th("text-right")} title="Média das utilizações por MRR do time">% MRR</TableHead>
+                  <TableHead className={th("text-right")} title="Média das utilizações por contas do time">% Contas</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -457,10 +485,16 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
                     <TableCell className={td("text-right")}>{t.pessoas}</TableCell>
                     <TableCell className={td("text-right")}>{formatCurrency(t.mrr_operando)}</TableCell>
                     <TableCell className={td("text-right")}>{moneyOrDash(ticket(t.mrr_operando, t.contas))}</TableCell>
-                    <TableCell className="text-right text-gray-500 dark:text-zinc-400">{t.cap_mrr > 0 ? formatCurrency(t.cap_mrr) : "—"}</TableCell>
-                    <TableCell className={cn("text-right", t.gap_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{formatCurrency(t.gap_mrr)}</TableCell>
+                    <TableCell className="text-right text-gray-500 dark:text-zinc-400">
+                      {t.cap_mrr > 0 ? formatCurrency(t.cap_mrr) : "—"}
+                      {t.pessoas_com_cap > 0 && t.pessoas_com_cap < t.pessoas && (
+                        <div className="text-[10px] text-amber-600 dark:text-amber-400" title="Cap. MRR e Espaço consideram só as pessoas com cap definida">{t.pessoas_com_cap}/{t.pessoas} com cap</div>
+                      )}
+                    </TableCell>
+                    <TableCell className={cn("text-right", t.pessoas_com_cap === 0 ? "text-gray-500 dark:text-zinc-400" : t.gap_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{t.pessoas_com_cap === 0 ? "—" : formatCurrency(t.gap_mrr)}</TableCell>
                     <TableCell className={cn("text-right", t.mrr_cancelamento > 0 ? "text-red-600 dark:text-red-400" : "text-gray-500 dark:text-zinc-400")}>{t.mrr_cancelamento > 0 ? formatCurrency(t.mrr_cancelamento) : "—"}</TableCell>
-                    <TableCell className="text-right"><UtilBar pct={t.util_pct} /></TableCell>
+                    <TableCell className="text-right"><UtilBar pct={t.util_mrr_pct} /></TableCell>
+                    <TableCell className="text-right"><UtilBar pct={t.util_contas_pct} /></TableCell>
                   </TableRow>
                 ))}
               </TableBody>
@@ -485,7 +519,7 @@ export default function CapacityTimes() {
   const squads = data?.squads ?? [];
   const teams: TeamSummary[] = [
     ...squads.map(summarizeSquad),
-    summarizeComercial("Selca", data?.vendedor ?? []),
+    summarizeComercial("Selva", data?.vendedor ?? []),
     summarizeComercial("Accounts", data?.account ?? []),
     summarizeComercial("Squadra", data?.gestor ?? []),
   ];
@@ -509,7 +543,7 @@ export default function CapacityTimes() {
             {squads.map((s) => (
               <TabsTrigger key={s.squad} value={s.squad}>{s.squad} ({s.rows.length})</TabsTrigger>
             ))}
-            <TabsTrigger value="vendedor">Selca ({data?.vendedor.length ?? 0})</TabsTrigger>
+            <TabsTrigger value="vendedor">Selva ({data?.vendedor.length ?? 0})</TabsTrigger>
             <TabsTrigger value="account">Accounts ({data?.account.length ?? 0})</TabsTrigger>
             <TabsTrigger value="gestor">Squadra ({data?.gestor.length ?? 0})</TabsTrigger>
             <TabsTrigger value="__config__">⚙️ Configurar</TabsTrigger>
@@ -524,7 +558,7 @@ export default function CapacityTimes() {
               <SquadTab group={s} onOperadorClick={setSelectedOperador} />
             </TabsContent>
           ))}
-          <TabsContent value="vendedor"><ComercialTab title="Selca" rows={data?.vendedor ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
+          <TabsContent value="vendedor"><ComercialTab title="Selva" rows={data?.vendedor ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
           <TabsContent value="account"><ComercialTab title="Accounts" rows={data?.account ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
           <TabsContent value="gestor"><ComercialTab title="Squadra" rows={data?.gestor ?? []} onOperadorClick={setSelectedOperador} /></TabsContent>
           <TabsContent value="__config__"><CapacityMetasConfig /></TabsContent>
