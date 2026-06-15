@@ -2,14 +2,17 @@
 // Sub-aba Vendas por Produto: vendas MRR/Pontual, contratos e AOV por segmento BP.
 // Realizado: Bitrix.crm_deal (servicos_vendidos) com valor atribuído pela cascata
 // (produto único -> mix ClickUp -> AOV). Total por natureza fecha com o funil agregado.
+// O drill-down (detalheVendaProdutoMes) reusa a MESMA atribuição — célula e detalhe
+// não podem divergir.
 import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd } from "./bp2026.helpers";
 import {
-  agregarVendasProduto, aovMedioPorSegmento, parseServicosVendidos,
-  type DealVenda, type MixClickup,
+  agregarVendasProduto, aovMedioPorSegmento, parseServicosVendidos, distribuirDeal,
+  type DealVenda, type MixClickup, type AovMedio,
 } from "./bp2026.vendasProduto.helpers";
 import {
-  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, type SegmentoBP,
+  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SERVICOS_BITRIX, segmentosPorNatureza,
+  type SegmentoBP, type Natureza,
 } from "../okr2026/servicosBitrix";
 
 interface MesLinha { mes: number; orcado: number; realizado: number | null; atingimento: number | null }
@@ -24,6 +27,9 @@ const SLUG: Record<SegmentoBP, string> = {
   "Gestão de Comunidade": "gc", "Others": "others",
   "E-commerce": "ecommerce", "Site Institucional": "site", "Landing Page": "landing",
 };
+const SEG_POR_SLUG: Record<string, SegmentoBP> = Object.fromEntries(
+  (Object.entries(SLUG) as [SegmentoBP, string][]).map(([seg, slug]) => [slug, seg])
+) as Record<string, SegmentoBP>;
 const orcKey = (medida: string, seg: SegmentoBP) => `${medida}_${SLUG[seg]}`;
 
 interface Deps {
@@ -33,28 +39,46 @@ interface Deps {
   mesFechado: number;
 }
 
-export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
-  const { db, orcado, mesCorrente, mesFechado } = deps;
+// ---- Carregamento compartilhado: deals + mix ClickUp + AOV médio (usado pela
+// agregação da sub-aba E pelo drill-down, para que não divirjam) ----
+export interface AtribuicaoVendas {
+  deals: DealVenda[];
+  mixRec: MixClickup;
+  mixPont: MixClickup;
+  aovRec: AovMedio;
+  aovPont: AovMedio;
+  meta: Map<number, { titulo: string; data: string | null; closer: string }>;
+}
 
+export async function carregarAtribuicaoVendas(db: any): Promise<AtribuicaoVendas> {
   const dealsRows = (await db.execute(sql`
     SELECT id,
            EXTRACT(MONTH FROM data_fechamento)::int AS mes,
            regexp_replace(COALESCE(cnpj,''),'\\D','','g') AS cnpj_norm,
            COALESCE(valor_recorrente::numeric,0) AS vr,
            COALESCE(valor_pontual::numeric,0) AS vp,
-           servicos_vendidos
+           servicos_vendidos,
+           COALESCE(title,'(sem título)') AS title,
+           data_fechamento::date::text AS data,
+           COALESCE(closer::text,'') AS closer
     FROM "Bitrix".crm_deal
     WHERE stage_name = 'Negócio Ganho'
       AND data_fechamento >= '2026-01-01' AND data_fechamento < '2027-01-01'
       AND (COALESCE(valor_recorrente,0) > 0 OR COALESCE(valor_pontual,0) > 0)
   `)).rows as any[];
 
-  const deals: DealVenda[] = dealsRows.map((r) => ({
-    id: Number(r.id), mes: Number(r.mes),
-    cnpjNorm: r.cnpj_norm && [14, 11].includes(r.cnpj_norm.length) ? r.cnpj_norm : "",
-    valorRec: parseFloat(r.vr), valorPont: parseFloat(r.vp),
-    ids: parseServicosVendidos(r.servicos_vendidos),
-  }));
+  const deals: DealVenda[] = [];
+  const meta = new Map<number, { titulo: string; data: string | null; closer: string }>();
+  for (const r of dealsRows) {
+    const id = Number(r.id);
+    deals.push({
+      id, mes: Number(r.mes),
+      cnpjNorm: r.cnpj_norm && [14, 11].includes(r.cnpj_norm.length) ? r.cnpj_norm : "",
+      valorRec: parseFloat(r.vr), valorPont: parseFloat(r.vp),
+      ids: parseServicosVendidos(r.servicos_vendidos),
+    });
+    meta.set(id, { titulo: r.title, data: r.data, closer: r.closer });
+  }
 
   const cnpjs = Array.from(new Set(deals.map((d) => d.cnpjNorm).filter(Boolean)));
   const cnpjsLiteral = `{${cnpjs.join(",")}}`;
@@ -96,6 +120,13 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
 
   const aovRec = aovMedioPorSegmento(deals, "recorrente");
   const aovPont = aovMedioPorSegmento(deals, "pontual");
+  return { deals, mixRec, mixPont, aovRec, aovPont, meta };
+}
+
+export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
+  const { db, orcado, mesCorrente, mesFechado } = deps;
+
+  const { deals, mixRec, mixPont, aovRec, aovPont } = await carregarAtribuicaoVendas(db);
   const agg = agregarVendasProduto(deals, mixRec, mixPont, aovRec, aovPont);
 
   const serie = (f: (m: number) => number | null) =>
@@ -154,4 +185,70 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
     }
   }
   return linhas;
+}
+
+// ---- Drill-down: deals que compõem uma célula (segmento × mês) ----
+const MEDIDAS_PRODUTO = ["vendas_mrr", "vendas_pontual", "contratos_vendidos_mrr", "contratos_vendidos_pontual"] as const;
+
+export function parseMetricaProduto(metrica: string):
+  { natureza: Natureza; segmento: SegmentoBP; modo: "valor" | "contrato"; titulo: string } | null {
+  for (const medida of MEDIDAS_PRODUTO) {
+    if (!metrica.startsWith(medida + "_")) continue;
+    const slug = metrica.slice(medida.length + 1);
+    const segmento = SEG_POR_SLUG[slug];
+    if (!segmento) return null;
+    const natureza: Natureza = medida.endsWith("pontual") ? "pontual" : "recorrente";
+    const modo = medida.startsWith("contratos") ? "contrato" : "valor";
+    const label = modo === "contrato" ? "Contratos" : (natureza === "recorrente" ? "MRR" : "Pontual");
+    return { natureza, segmento, modo, titulo: `${segmento} — ${label}` };
+  }
+  return null;
+}
+
+export interface ItemVendaDet { grupo: string; nome: string; detalhe: string; data: string | null; valor: number }
+
+export async function detalheVendaProdutoMes(
+  db: any, natureza: Natureza, segmento: SegmentoBP, mes: number, modo: "valor" | "contrato"
+): Promise<{ itens: ItemVendaDet[]; total: number }> {
+  const { deals, mixRec, mixPont, aovRec, aovPont, meta } = await carregarAtribuicaoVendas(db);
+  const mix = natureza === "recorrente" ? mixRec : mixPont;
+  const itens: ItemVendaDet[] = [];
+  let total = 0;
+  for (const d of deals) {
+    if (d.mes !== mes) continue;
+    const parte = distribuirDeal(d, mixRec, mixPont, aovRec, aovPont)
+      .find((p) => p.natureza === natureza && p.segmento === segmento);
+    if (!parte) continue;
+
+    // caminho de atribuição (espelha distribuirDeal/distribuirNatureza)
+    const valNat = natureza === "recorrente" ? d.valorRec : d.valorPont;
+    const segs0 = segmentosPorNatureza(d.ids)[natureza];
+    const segs = segs0.length ? segs0 : (valNat > 0 ? (["Others"] as SegmentoBP[]) : []);
+    const m = mix.get(d.cnpjNorm);
+    const caminho = segs.length <= 1
+      ? "Produto único (valor do Bitrix)"
+      : (m && segs.every((s) => (m.get(s) ?? 0) > 0)) ? "Multi-produto (mix do ClickUp)" : "Multi-produto (rateio por AOV médio)";
+
+    const nomesServicos = d.ids.map((id) => SERVICOS_BITRIX[id]?.nome).filter(Boolean).join(", ") || "(sem serviço)";
+    const md = meta.get(d.id)!;
+    const atribuido = `R$ ${Math.round(parte.valor).toLocaleString("pt-BR")}`;
+    const dealTotal = segs.length > 1 ? `deal ${natureza === "recorrente" ? "MRR" : "pontual"} R$ ${Math.round(valNat).toLocaleString("pt-BR")}` : "";
+    const detalhePartes = [
+      nomesServicos,
+      md.closer ? `closer ${md.closer}` : "",
+      dealTotal,
+      modo === "contrato" ? `atribuído ${atribuido}` : "",
+    ].filter(Boolean);
+
+    itens.push({
+      grupo: caminho,
+      nome: md.titulo,
+      detalhe: detalhePartes.join(" · "),
+      data: md.data,
+      valor: modo === "valor" ? parte.valor : 0,
+    });
+    total += modo === "valor" ? parte.valor : 1;
+  }
+  itens.sort((a, b) => b.valor - a.valor);
+  return { itens, total };
 }
