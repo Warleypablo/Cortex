@@ -3,7 +3,7 @@
 export type Natureza = "recorrente" | "pontual";
 export type SegmentoBP =
   | "Performance" | "Creators" | "Social" | "Gestão de Comunidade"
-  | "E-commerce" | "Site Institucional" | "Landing Page" | "Others";
+  | "E-commerce" | "Site Institucional" | "Landing Page" | "CRM" | "Others";
 
 export interface ServicoBitrix { id: number; nome: string; natureza: Natureza; segmento: SegmentoBP; }
 
@@ -15,7 +15,7 @@ export const SERVICOS_BITRIX: Record<number, ServicoBitrix> = {
   876: { id: 876, nome: "Personalizado Recorrente", natureza: "recorrente", segmento: "Others" },
   858: { id: 858, nome: "Sustentação", natureza: "recorrente", segmento: "Others" },
   860: { id: 860, nome: "E-mail Marketing", natureza: "recorrente", segmento: "Others" },
-  854: { id: 854, nome: "CRM", natureza: "recorrente", segmento: "Others" },
+  854: { id: 854, nome: "CRM", natureza: "pontual", segmento: "CRM" },
   878: { id: 878, nome: "SEO Full", natureza: "recorrente", segmento: "Others" },
   1678: { id: 1678, nome: "Turbooh", natureza: "recorrente", segmento: "Others" },
   864: { id: 864, nome: "Automação", natureza: "recorrente", segmento: "Others" },
@@ -24,7 +24,7 @@ export const SERVICOS_BITRIX: Record<number, ServicoBitrix> = {
   868: { id: 868, nome: "E-commerce", natureza: "pontual", segmento: "E-commerce" },
   880: { id: 880, nome: "Site Institucional", natureza: "pontual", segmento: "Site Institucional" },
   882: { id: 882, nome: "Landing Page", natureza: "pontual", segmento: "Landing Page" },
-  850: { id: 850, nome: "Creators Pontual", natureza: "pontual", segmento: "Others" },
+  850: { id: 850, nome: "Creators Pontual", natureza: "pontual", segmento: "Creators" },
   856: { id: 856, nome: "CRO Pontual", natureza: "pontual", segmento: "Others" },
   874: { id: 874, nome: "Personalizado Pontual", natureza: "pontual", segmento: "Others" },
   1684: { id: 1684, nome: "TikTok Shop", natureza: "pontual", segmento: "Others" },
@@ -36,7 +36,7 @@ export const SERVICOS_BITRIX: Record<number, ServicoBitrix> = {
 };
 
 export const SEGMENTOS_RECORRENTES: SegmentoBP[] = ["Performance", "Creators", "Social", "Gestão de Comunidade", "Others"];
-export const SEGMENTOS_PONTUAIS: SegmentoBP[] = ["E-commerce", "Site Institucional", "Landing Page", "Others"];
+export const SEGMENTOS_PONTUAIS: SegmentoBP[] = ["E-commerce", "Site Institucional", "Landing Page", "Creators", "CRM", "Others"];
 
 // Parse "[846, 852]" / "False" / "[]" / null -> number[]
 export function parseServicosVendidos(raw: string | null | undefined): number[] {

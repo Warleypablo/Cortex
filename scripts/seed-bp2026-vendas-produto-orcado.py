@@ -9,9 +9,8 @@ e gera as métricas consumidas pela sub-aba "Vendas por Produto":
   vendas_pontual_<seg> / contratos_vendidos_pontual_<seg> / aov_venda_pontual_<seg>
 
 Segmentos recorrentes: performance, creators, social, gc, others.
-Segmentos pontuais: ecommerce, site, landing, others.
-"Others pontual" agrega os buckets da planilha que não são E-commerce/Site/Landing
-(Creators pontual + CRM + Others), pois no modelo BP eles colapsam em Others.
+Segmentos pontuais: ecommerce, site, landing, creators, crm, others (cada um lido
+direto da linha correspondente da aba CAC).
 
 Gera /tmp/seed-bp2026-vendas-produto-orcado.sql. Aborta se a soma por produto
 divergir do total agregado (vendas_mrr=215k.., vendas_pontual=270k..).
@@ -33,14 +32,14 @@ ROWS_DIRETAS = [
     ("vendas_mrr_social", 20), ("aov_venda_mrr_social", 21), ("contratos_vendidos_mrr_social", 22),
     ("vendas_mrr_gc", 25), ("aov_venda_mrr_gc", 26), ("contratos_vendidos_mrr_gc", 27),
     ("vendas_mrr_others", 30), ("aov_venda_mrr_others", 31), ("contratos_vendidos_mrr_others", 32),
-    # Pontual nomeados
+    # Pontual nomeados (Creators e CRM separados; Others = só o bucket residual de 15%)
     ("vendas_pontual_ecommerce", 40), ("aov_venda_pontual_ecommerce", 41), ("contratos_vendidos_pontual_ecommerce", 42),
     ("vendas_pontual_site", 45), ("aov_venda_pontual_site", 46), ("contratos_vendidos_pontual_site", 47),
     ("vendas_pontual_landing", 50), ("aov_venda_pontual_landing", 51), ("contratos_vendidos_pontual_landing", 52),
+    ("vendas_pontual_creators", 55), ("aov_venda_pontual_creators", 56), ("contratos_vendidos_pontual_creators", 57),
+    ("vendas_pontual_crm", 60), ("aov_venda_pontual_crm", 61), ("contratos_vendidos_pontual_crm", 62),
+    ("vendas_pontual_others", 65), ("aov_venda_pontual_others", 66), ("contratos_vendidos_pontual_others", 67),
 ]
-# "Others pontual" = soma dos buckets Creators(55/57) + CRM(60/62) + Others(65/67); AOV derivado.
-PONTUAL_OTHERS_MRR_ROWS = [55, 60, 65]
-PONTUAL_OTHERS_CTR_ROWS = [57, 62, 67]
 
 # Totais agregados esperados por mês (anti-drift) — já existentes em bp2026_orcado.
 VENDAS_MRR_TOTAL = [215000]*3 + [240000]*3 + [270000]*3 + [300000]*3
@@ -57,15 +56,6 @@ def ler(row):
 series = {}  # metrica -> [12]
 for metrica, row in ROWS_DIRETAS:
     series[metrica] = ler(row)
-
-# Others pontual: agrega MRR e contratos; AOV = MRR / contratos
-mrr_others = [sum(ler(r)[m] for r in PONTUAL_OTHERS_MRR_ROWS) for m in range(12)]
-ctr_others = [sum(ler(r)[m] for r in PONTUAL_OTHERS_CTR_ROWS) for m in range(12)]
-series["vendas_pontual_others"] = mrr_others
-series["contratos_vendidos_pontual_others"] = ctr_others
-series["aov_venda_pontual_others"] = [
-    (mrr_others[m] / ctr_others[m]) if ctr_others[m] else 0 for m in range(12)
-]
 
 # --- Verificação anti-drift: soma por produto == total agregado, mês a mês ---
 def soma(prefixos, m):

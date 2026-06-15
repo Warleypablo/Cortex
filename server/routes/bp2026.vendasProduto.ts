@@ -28,7 +28,7 @@ interface Linha {
 const SLUG: Record<SegmentoBP, string> = {
   "Performance": "performance", "Creators": "creators", "Social": "social",
   "Gestão de Comunidade": "gc", "Others": "others",
-  "E-commerce": "ecommerce", "Site Institucional": "site", "Landing Page": "landing",
+  "E-commerce": "ecommerce", "Site Institucional": "site", "Landing Page": "landing", "CRM": "crm",
 };
 const SEG_POR_SLUG: Record<string, SegmentoBP> = Object.fromEntries(
   (Object.entries(SLUG) as [SegmentoBP, string][]).map(([seg, slug]) => [slug, seg])
@@ -99,6 +99,7 @@ export async function carregarAtribuicaoVendas(db: any): Promise<AtribuicaoVenda
                WHEN TRIM(COALESCE(c.produto,'')) = 'Ecommerce' THEN 'E-commerce'
                WHEN TRIM(COALESCE(c.produto,'')) = 'Site' THEN 'Site Institucional'
                WHEN TRIM(COALESCE(c.produto,'')) = 'Landing Page' THEN 'Landing Page'
+               WHEN TRIM(COALESCE(c.produto,'')) = 'CRM de Vendas' THEN 'CRM'
                ELSE 'Others'
              END AS segmento,
              COALESCE(SUM(c.valorr::numeric),0) AS rec,
