@@ -483,6 +483,18 @@ export default function Criativos() {
   const apiLevelFor = (l: Level): "ad" | "adset" | "campaign" =>
     l === "campanha" ? "campaign" : l === "conjunto" ? "adset" : "ad";
 
+  // Resume os erros reais retornados por item numa ação em massa (deduplica e
+  // mostra os mais relevantes) para exibir o MOTIVO da falha no toast.
+  const summarizeErrors = (results: any[]): string => {
+    const msgs = (results || [])
+      .filter(r => r && !r.ok && r.error)
+      .map(r => String(r.error).trim());
+    const uniq = Array.from(new Set(msgs));
+    if (uniq.length === 0) return "";
+    const shown = uniq.slice(0, 2).join(" • ");
+    return uniq.length > 2 ? `${shown} (+${uniq.length - 2} outro${uniq.length - 2 > 1 ? "s" : ""})` : shown;
+  };
+
   // Trocar de aba apenas muda o nível: a seleção de cada nível persiste e o
   // drill-down (scope) é recalculado a partir das seleções dos ancestrais.
   const handleLevelChange = (l: string) => setLevel(l as Level);
@@ -603,9 +615,15 @@ export default function Criativos() {
       const total = j.total ?? ownRows.length;
       const okCount = j.okCount ?? 0;
       const failed = total - okCount;
+      const errMsg = failed > 0 ? summarizeErrors(j.results) : "";
       toast({
         title: failed > 0 ? "⚠️ Orçamento ajustado com bloqueios na Meta Ads" : "✅ Orçamento ajustado na Meta Ads",
-        description: `${okCount}/${total} aplicados${failed > 0 ? ` · ${failed} bloqueados (trava ±30% ou teto)` : ""}`,
+        description: (
+          <div className="space-y-0.5">
+            <div>{okCount}/{total} aplicados{failed > 0 ? ` · ${failed} bloqueados (trava ±30% ou teto)` : ""}</div>
+            {errMsg && <div className="font-medium break-words">Erro: {errMsg}</div>}
+          </div>
+        ),
         variant: failed > 0 ? "destructive" : "success",
         duration: Infinity,
       });
@@ -647,9 +665,15 @@ export default function Criativos() {
       const total = j.total ?? ids.length;
       const failed = total - okCount;
       const verbo = bulkAction === "pause" ? "pausados" : "ativados";
+      const errMsg = failed > 0 ? summarizeErrors(j.results) : "";
       toast({
         title: failed > 0 ? "⚠️ Concluído com falhas na Meta Ads" : `✅ ${verbo} na Meta Ads`,
-        description: `${okCount}/${total} ${verbo}${failed > 0 ? ` · ${failed} não aplicaram` : ""}`,
+        description: (
+          <div className="space-y-0.5">
+            <div>{okCount}/{total} {verbo}{failed > 0 ? ` · ${failed} não aplicaram` : ""}</div>
+            {errMsg && <div className="font-medium break-words">Erro: {errMsg}</div>}
+          </div>
+        ),
         variant: failed > 0 ? "destructive" : "success",
         duration: Infinity,
       });
