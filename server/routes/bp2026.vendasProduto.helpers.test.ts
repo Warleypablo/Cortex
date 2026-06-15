@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { distribuirDeal, aovMedioPorSegmento } from "./bp2026.vendasProduto.helpers";
 
+const noPr = new Map<number, Map<any, number>>();
 const noMix = new Map<string, Map<any, number>>();
 const aovVazio = {} as Record<string, number>;
 
@@ -8,7 +9,7 @@ describe("distribuirDeal", () => {
   it("produto único: valor inteiro vai para o segmento", () => {
     const r = distribuirDeal(
       { id: 1, cnpjNorm: "X", mes: 6, valorRec: 2997, valorPont: 0, ids: [846] },
-      noMix, noMix, aovVazio, aovVazio
+      noPr, noMix, noMix, aovVazio, aovVazio
     );
     expect(r).toEqual([{ segmento: "Performance", natureza: "recorrente", valor: 2997, contrato: 1 }]);
   });
@@ -17,7 +18,7 @@ describe("distribuirDeal", () => {
     const mixRec = new Map([["BAD", new Map<any, number>([["Performance", 2801], ["Social", 2501], ["Creators", 5498]])]]);
     const r = distribuirDeal(
       { id: 2, cnpjNorm: "BAD", mes: 5, valorRec: 10800, valorPont: 0, ids: [846, 848, 852] },
-      mixRec, noMix, aovVazio, aovVazio
+      noPr, mixRec, noMix, aovVazio, aovVazio
     );
     const total = r.reduce((s, x) => s + x.valor, 0);
     expect(Math.round(total)).toBe(10800);
@@ -25,12 +26,24 @@ describe("distribuirDeal", () => {
     expect(Math.round(perf.valor)).toBe(2801);
   });
 
+  it("product rows do Bitrix têm prioridade sobre o mix do ClickUp (Repeat)", () => {
+    const prMix = new Map([[27418, new Map<any, number>([["Performance", 6000], ["Creators", 8000]])]]);
+    // ClickUp com proporção bem diferente — NÃO deve ser usado quando há product rows
+    const mixRec = new Map([["RPT", new Map<any, number>([["Performance", 9000], ["Creators", 1000]])]]);
+    const r = distribuirDeal(
+      { id: 27418, cnpjNorm: "RPT", mes: 1, valorRec: 14000, valorPont: 0, ids: [846, 852] },
+      prMix, mixRec, noMix, {}, {}
+    );
+    expect(Math.round(r.find((x) => x.segmento === "Performance")!.valor)).toBe(6000);
+    expect(Math.round(r.find((x) => x.segmento === "Creators")!.valor)).toBe(8000);
+  });
+
   it("mix parcial (ClickUp não cobre todos os segmentos) -> fallback AOV no deal todo (Flico)", () => {
     const mixRec = new Map([["FLI", new Map<any, number>([["Social", 2734]])]]);
     const aovRec = { Performance: 4000, Social: 2000, Creators: 6000 };
     const r = distribuirDeal(
       { id: 3, cnpjNorm: "FLI", mes: 5, valorRec: 11500, valorPont: 0, ids: [846, 848, 852] },
-      mixRec, noMix, aovRec, {}
+      noPr, mixRec, noMix, aovRec, {}
     );
     const total = r.reduce((s, x) => s + x.valor, 0);
     expect(Math.round(total)).toBe(11500);
@@ -40,7 +53,7 @@ describe("distribuirDeal", () => {
   it("rec e pont no mesmo deal: cada natureza usa seu valor (Clube45-like)", () => {
     const r = distribuirDeal(
       { id: 4, cnpjNorm: "Y", mes: 5, valorRec: 6000, valorPont: 7000, ids: [846, 868] },
-      noMix, noMix, aovVazio, aovVazio
+      noPr, noMix, noMix, aovVazio, aovVazio
     );
     expect(r.find((x) => x.segmento === "Performance")!.valor).toBe(6000);
     expect(r.find((x) => x.segmento === "E-commerce")!.valor).toBe(7000);
@@ -49,7 +62,7 @@ describe("distribuirDeal", () => {
   it("conta 1 contrato por segmento distinto da natureza", () => {
     const r = distribuirDeal(
       { id: 5, cnpjNorm: "Z", mes: 5, valorRec: 6000, valorPont: 0, ids: [846, 848] },
-      new Map([["Z", new Map<any, number>([["Performance", 1], ["Social", 1]])]]), noMix, {}, {}
+      noPr, new Map([["Z", new Map<any, number>([["Performance", 1], ["Social", 1]])]]), noMix, {}, {}
     );
     expect(r.filter((x) => x.contrato === 1).length).toBe(2);
   });
