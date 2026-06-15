@@ -3,11 +3,10 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
 } from "recharts";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { cancelamentosDe } from "./utils";
+import { ChurnMesDrawer } from "./ChurnMesDrawer";
 import type { Jornada } from "./types";
 
 const mesKey = (d: string | null) => (d ? d.slice(0, 7) : "(sem data)");
@@ -72,42 +71,12 @@ export function ChurnPorMes({ jornadas }: { jornadas: Jornada[] }) {
         )}
       </CardContent>
 
-      <Dialog open={!!drillMes} onOpenChange={(o) => !o && setDrillMes(null)}>
-        <DialogContent className="max-w-4xl">
-          <DialogHeader>
-            <DialogTitle>Cancelamentos em {drillMes}</DialogTitle>
-            <DialogDescription>{drillList.length} contrato(s) — ordenado por valor pontual</DialogDescription>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-y-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Produto</TableHead>
-                  <TableHead className="text-center">Entrega</TableHead>
-                  <TableHead className="text-right">Valor pontual</TableHead>
-                  <TableHead>Responsável</TableHead>
-                  <TableHead>Squad</TableHead>
-                  <TableHead>Motivo</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {drillList.map((c, i) => (
-                  <TableRow key={i}>
-                    <TableCell>{c.nomeCliente ?? "—"}</TableCell>
-                    <TableCell>{c.produto}</TableCell>
-                    <TableCell className="text-center tabular-nums">{c.nivel}ª</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrencyNoDecimals(c.valorp)}</TableCell>
-                    <TableCell>{c.responsavel ?? "—"}</TableCell>
-                    <TableCell>{c.squad ?? "—"}</TableCell>
-                    <TableCell>{c.motivo ?? "—"}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <ChurnMesDrawer
+        mes={drillMes}
+        cancelamentos={drillList}
+        open={!!drillMes}
+        onOpenChange={(o) => !o && setDrillMes(null)}
+      />
     </Card>
   );
 }
