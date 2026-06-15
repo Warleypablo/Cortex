@@ -59,7 +59,6 @@ export interface ChurnPontorrentePayload {
   filtrosDisponiveis: { produtos: string[]; squads: string[]; responsaveis: string[] };
 }
 export interface FiltrosState {
-  base: "vendido" | "entregue";
   produto?: string;
   squad?: string;
   responsavel?: string;

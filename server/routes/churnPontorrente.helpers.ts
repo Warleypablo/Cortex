@@ -201,6 +201,38 @@ export interface Overview {
   valorpPerdido: number;
 }
 
+/** Um cancelamento = um contrato (etapa) cancelado, com o contexto da jornada. */
+export interface Cancelamento {
+  idTask: string;
+  produto: string;
+  nomeCliente: string | null;
+  nivel: number;
+  valorp: number;
+  motivoCancelamento: string | null;
+  squad: string | null;
+  responsavel: string | null;
+  csResponsavel: string | null;
+  vendedor: string | null;
+  dataEncerramento: string | null;
+}
+
+/** Achata as jornadas em cancelamentos por contrato/entrega (situação churn). */
+export function cancelamentosDe(jornadas: Jornada[]): Cancelamento[] {
+  const out: Cancelamento[] = [];
+  for (const j of jornadas) {
+    for (const e of j.entregas) {
+      if (e.situacao !== "churn") continue;
+      out.push({
+        idTask: j.idTask, produto: j.produto, nomeCliente: j.nomeCliente,
+        nivel: e.nivel, valorp: e.valorp, motivoCancelamento: e.motivoCancelamento,
+        squad: j.squad, responsavel: j.responsavel, csResponsavel: j.csResponsavel,
+        vendedor: j.vendedor, dataEncerramento: j.dataEncerramento,
+      });
+    }
+  }
+  return out;
+}
+
 export function buildOverview(jornadas: Jornada[]): Overview {
   const funil = buildFunil(jornadas);
   const nivel1 = funil[0]?.atingiram ?? 0;
@@ -209,13 +241,13 @@ export function buildOverview(jornadas: Jornada[]): Overview {
   const dropMedio = drops.length
     ? Math.round((drops.reduce((a, b) => a + b, 0) / drops.length) * 10) / 10
     : 0;
-  const churned = jornadas.filter((j) => j.situacaoFinal === "churn");
+  const canc = cancelamentosDe(jornadas);
   return {
     jornadas: jornadas.length,
     retencaoUltima: nivel1 > 0 ? Math.round((ultimo / nivel1) * 1000) / 10 : 0,
     dropMedio,
-    churnConfirmado: churned.length,
-    valorpPerdido: churned.reduce((a, j) => a + j.valorp, 0),
+    churnConfirmado: canc.length,
+    valorpPerdido: canc.reduce((a, c) => a + c.valorp, 0),
   };
 }
 
@@ -223,20 +255,20 @@ export type Dim = "motivo" | "squad" | "responsavel" | "cs";
 export interface DimRow { label: string; qtd: number; valorp: number; }
 
 export function aggregateChurnPorDimensao(jornadas: Jornada[], dim: Dim): DimRow[] {
-  const pick = (j: Jornada): string => {
-    const v = dim === "motivo" ? j.motivoCancelamento
-      : dim === "squad" ? j.squad
-      : dim === "responsavel" ? j.responsavel
-      : j.csResponsavel;
+  const pick = (c: Cancelamento): string => {
+    const v = dim === "motivo" ? c.motivoCancelamento
+      : dim === "squad" ? c.squad
+      : dim === "responsavel" ? c.responsavel
+      : c.csResponsavel;
     const t = (v ?? "").trim();
     return t === "" ? "(não informado)" : t;
   };
   const map = new Map<string, DimRow>();
-  for (const j of jornadas.filter((x) => x.situacaoFinal === "churn")) {
-    const label = pick(j);
+  for (const c of cancelamentosDe(jornadas)) {
+    const label = pick(c);
     const cur = map.get(label) ?? { label, qtd: 0, valorp: 0 };
     cur.qtd += 1;
-    cur.valorp += j.valorp;
+    cur.valorp += c.valorp;
     map.set(label, cur);
   }
   return Array.from(map.values()).sort((a, b) => b.qtd - a.qtd || b.valorp - a.valorp);
@@ -256,19 +288,18 @@ export interface DetalheRow {
 }
 
 export function buildDetalhamento(jornadas: Jornada[]): DetalheRow[] {
-  return jornadas
-    .filter((j) => j.situacaoFinal === "churn")
-    .map((j) => ({
-      nomeCliente: j.nomeCliente,
-      produto: j.produto,
-      nivelCaiu: j.nivelMax,
-      motivo: j.motivoCancelamento,
-      responsavel: j.responsavel,
-      cs: j.csResponsavel,
-      squad: j.squad,
-      vendedor: j.vendedor,
-      valorp: j.valorp,
-      dataEncerramento: j.dataEncerramento,
+  return cancelamentosDe(jornadas)
+    .map((c) => ({
+      nomeCliente: c.nomeCliente,
+      produto: c.produto,
+      nivelCaiu: c.nivel,
+      motivo: c.motivoCancelamento,
+      responsavel: c.responsavel,
+      cs: c.csResponsavel,
+      squad: c.squad,
+      vendedor: c.vendedor,
+      valorp: c.valorp,
+      dataEncerramento: c.dataEncerramento,
     }))
     .sort((a, b) => b.valorp - a.valorp);
 }

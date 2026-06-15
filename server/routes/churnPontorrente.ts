@@ -6,7 +6,6 @@ export function registerChurnPontorrenteRoutes(app: Express, db: any) {
   // Snapshot completo do churn de contratos ponto-recorrentes (filtros aplicados em memória).
   app.get("/api/churn-pontorrente", async (req, res) => {
     try {
-      const base = req.query.base === "entregue" ? "entregue" : "vendido";
       const filtros: Filtros = {
         produto: (req.query.produto as string) || undefined,
         squad: (req.query.squad as string) || undefined,
@@ -51,7 +50,7 @@ export function registerChurnPontorrenteRoutes(app: Express, db: any) {
         nomeCliente: r.nomeCliente ?? null,
       }));
 
-      res.json(buildPayload(rows, base, filtros));
+      res.json(buildPayload(rows, "vendido", filtros));
     } catch (error) {
       console.error("[api] Error fetching churn-pontorrente:", error);
       res.status(500).json({ error: "Failed to fetch churn-pontorrente" });

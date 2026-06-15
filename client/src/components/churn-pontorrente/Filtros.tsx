@@ -1,5 +1,4 @@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Button } from "@/components/ui/button";
 import type { FiltrosState } from "./types";
 
 const TODOS = "todos";
@@ -50,17 +49,6 @@ export function Filtros({
         className="h-9 rounded-md border border-gray-200 bg-white px-2 text-sm dark:border-zinc-700 dark:bg-zinc-900"
         aria-label="Início (até)"
       />
-
-      <div className="ml-auto flex overflow-hidden rounded-md border border-gray-200 dark:border-zinc-700">
-        {(["vendido", "entregue"] as const).map((b) => (
-          <Button
-            key={b} type="button" variant={value.base === b ? "default" : "ghost"}
-            size="sm" className="rounded-none" onClick={() => set({ base: b })}
-          >
-            {b === "vendido" ? "Vendido" : "Só entregue"}
-          </Button>
-        ))}
-      </div>
     </div>
   );
 }

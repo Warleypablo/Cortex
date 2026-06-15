@@ -158,9 +158,14 @@ describe("buildOverview", () => {
     expect(ov.churnConfirmado).toBe(2);      // A e C
     expect(ov.valorpPerdido).toBe(1800);     // 1000 + 800
   });
-  it("base entregue zera o churn (entrega 4 cancelada some)", () => {
-    const ov = buildOverview(toJornadas(cenario, "entregue"));
-    expect(ov.churnConfirmado).toBe(0);
+  it("conta cancelamentos por contrato (jornada com 2 entregas canceladas)", () => {
+    const rows: RawRow[] = [
+      row({ idTask: "M", servico: "Entrega 1 - Creators", status: "cancelado/inativo", valorp: 100, motivoCancelamento: "Erro na Venda" }),
+      row({ idTask: "M", servico: "Entrega 2 - Creators", status: "cancelado/inativo", valorp: 200, motivoCancelamento: "Inadimplente" }),
+    ];
+    const ov = buildOverview(toJornadas(rows, "vendido"));
+    expect(ov.churnConfirmado).toBe(2);
+    expect(ov.valorpPerdido).toBe(300);
   });
 });
 

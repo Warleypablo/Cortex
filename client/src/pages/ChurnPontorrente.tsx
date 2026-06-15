@@ -11,10 +11,9 @@ import type { ChurnPontorrentePayload, FiltrosState } from "@/components/churn-p
 
 export default function ChurnPontorrente() {
   useSetPageInfo("Churn Pontorrente", "Drop-off entre entregas dos contratos ponto-recorrentes");
-  const [filtros, setFiltros] = useState<FiltrosState>({ base: "vendido" });
+  const [filtros, setFiltros] = useState<FiltrosState>({});
 
   const url = buildUrl("/api/churn-pontorrente", {
-    base: filtros.base,
     produto: filtros.produto,
     squad: filtros.squad,
     responsavel: filtros.responsavel,

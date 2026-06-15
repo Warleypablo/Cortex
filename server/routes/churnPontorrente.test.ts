@@ -42,13 +42,6 @@ describe("GET /api/churn-pontorrente", () => {
     expect(res.body.detalhamento[0].produto).toBe("Performance");
   });
 
-  it("base=entregue zera o churn", async () => {
-    mockExecute.mockResolvedValueOnce({ rows: dbRows });
-    const res = await request(makeApp()).get("/api/churn-pontorrente?base=entregue");
-    expect(res.status).toBe(200);
-    expect(res.body.overview.churnConfirmado).toBe(0);
-  });
-
   it("retorna 500 em erro de banco", async () => {
     mockExecute.mockRejectedValueOnce(new Error("db down"));
     const res = await request(makeApp()).get("/api/churn-pontorrente");

@@ -25,7 +25,7 @@ export function OverviewCards({ data }: { data: Overview }) {
       <Kpi icon={Users} label="Jornadas pontorrente" value={String(data.jornadas)} />
       <Kpi icon={Percent} label="Retenção até a última entrega" value={`${data.retencaoUltima}%`} />
       <Kpi icon={TrendingDown} label="Drop-off médio / degrau" value={`${data.dropMedio}%`} />
-      <Kpi icon={UserX} label="Churn confirmado" value={String(data.churnConfirmado)} />
+      <Kpi icon={UserX} label="Contratos cancelados" value={String(data.churnConfirmado)} />
       <Kpi icon={DollarSign} label="Valor pontual perdido" value={formatCurrencyNoDecimals(data.valorpPerdido)} />
     </div>
   );
