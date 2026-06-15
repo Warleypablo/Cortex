@@ -86,7 +86,16 @@ export function MatrizCohort({ jornadas }: { jornadas: Jornada[] }) {
                 const total = js.length;
                 return (
                   <tr key={linha} className="border-t border-gray-100 dark:border-zinc-800">
-                    <td className="py-2 pr-4 text-left whitespace-nowrap text-gray-700 dark:text-zinc-200">{linha}</td>
+                    <td className="py-1.5 pr-2 text-left whitespace-nowrap">
+                      <button
+                        type="button"
+                        onClick={() => setDrill({ linha, nivel: 0 })}
+                        className="rounded px-1.5 py-1 text-left font-medium text-gray-700 transition hover:text-indigo-600 hover:underline dark:text-zinc-200 dark:hover:text-indigo-400"
+                        title="Ver todos os contratos da safra (inclui churnados)"
+                      >
+                        {linha}
+                      </button>
+                    </td>
                     <td className="px-1.5 py-1.5 text-center">
                       <button
                         type="button"
