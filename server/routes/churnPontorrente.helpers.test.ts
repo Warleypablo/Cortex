@@ -190,6 +190,7 @@ describe("buildPayload", () => {
     expect(p.overview.jornadas).toBe(3);
     expect(p.funil).toHaveLength(4);
     expect(p.detalhamento).toHaveLength(2);
+    expect(p.jornadas).toHaveLength(3);
     expect(p.filtrosDisponiveis.produtos).toEqual(["Creators", "Performance"]);
   });
   it("aplica filtro de produto sem mexer nos filtros disponíveis", () => {

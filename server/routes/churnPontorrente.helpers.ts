@@ -262,6 +262,7 @@ export interface ChurnPontorrentePayload {
   funil: FunilNivel[];
   churnPorDimensao: { motivo: DimRow[]; squad: DimRow[]; responsavel: DimRow[]; cs: DimRow[] };
   detalhamento: DetalheRow[];
+  jornadas: Jornada[];
   filtrosDisponiveis: { produtos: string[]; squads: string[]; responsaveis: string[] };
 }
 
@@ -293,6 +294,7 @@ export function buildPayload(
       cs: aggregateChurnPorDimensao(jornadas, "cs"),
     },
     detalhamento: buildDetalhamento(jornadas),
+    jornadas,
     filtrosDisponiveis,
   };
 }

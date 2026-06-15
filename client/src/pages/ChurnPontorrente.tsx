@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Filtros } from "@/components/churn-pontorrente/Filtros";
 import { OverviewCards } from "@/components/churn-pontorrente/OverviewCards";
-import { FunilContinuidade } from "@/components/churn-pontorrente/FunilContinuidade";
+import { MatrizCohort } from "@/components/churn-pontorrente/MatrizCohort";
 import { ChurnPorDimensao } from "@/components/churn-pontorrente/ChurnPorDimensao";
 import { DetalhamentoTable } from "@/components/churn-pontorrente/DetalhamentoTable";
 import { fetchJson, buildUrl } from "@/components/churn-pontorrente/utils";
@@ -35,7 +35,7 @@ export default function ChurnPontorrente() {
       ) : (
         <>
           <OverviewCards data={data.overview} />
-          <FunilContinuidade data={data.funil} />
+          <MatrizCohort jornadas={data.jornadas} />
           <ChurnPorDimensao data={data.churnPorDimensao} />
           <DetalhamentoTable rows={data.detalhamento} />
         </>

@@ -28,11 +28,27 @@ export interface DetalheRow {
   valorp: number;
   dataEncerramento: string | null;
 }
+export interface Jornada {
+  idTask: string;
+  produto: string;
+  nomeCliente: string | null;
+  nivelMax: number;
+  situacaoFinal: "entregue" | "em_andamento" | "churn";
+  valorp: number;
+  squad: string | null;
+  responsavel: string | null;
+  csResponsavel: string | null;
+  vendedor: string | null;
+  motivoCancelamento: string | null;
+  dataInicioPrimeira: string | null;
+  dataEncerramento: string | null;
+}
 export interface ChurnPontorrentePayload {
   overview: Overview;
   funil: FunilNivel[];
   churnPorDimensao: { motivo: DimRow[]; squad: DimRow[]; responsavel: DimRow[]; cs: DimRow[] };
   detalhamento: DetalheRow[];
+  jornadas: Jornada[];
   filtrosDisponiveis: { produtos: string[]; squads: string[]; responsaveis: string[] };
 }
 export interface FiltrosState {
