@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-14 | feat(criativos): exibe o motivo real da falha nos toasts de ação em massa
+
+**O que foi feito:**
+- Os toasts de pausar/ativar e de ajuste de orçamento em massa agora exibem a mensagem de erro retornada pela Meta para os itens que falharam, em vez de apenas "N não aplicaram"
+- Novo helper `summarizeErrors` que deduplica e resume os erros por item (mostra os 2 principais + contagem dos demais)
+
+**Por que:**
+- Ao tentar pausar conjuntos a ação falhava ("0/7 pausados · 7 não aplicaram") sem informar a causa, impossibilitando o diagnóstico do problema na Meta Ads
+
+**Arquivos alterados:**
+- `client/src/pages/Criativos.tsx` - `summarizeErrors` e descrição dos toasts de massa passando a incluir o erro real (ReactNode em 2 linhas)
+
+**Impacto arquitetural:** Nenhum — apenas feedback de UI; o backend já retornava o erro por item em `results[].error`.
+
+---
+
 ## 2026-06-14 | feat(criativos): seleção persistente por nível com drill-down derivado
 
 **O que foi feito:**
