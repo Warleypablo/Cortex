@@ -72,6 +72,10 @@ export interface Filtros {
 // como Broadcast/Gameplan), então restringimos o universo a estes três.
 export const PRODUTOS_PONTORRENTE = ["Creators", "Performance", "Social Media"];
 
+// Ciclo padrão do produto = 4 entregas. Há jornadas raras com 5ª entrega (1 em prod)
+// que distorcem a "retenção até a última entrega"; capamos o nível em 4.
+export const MAX_NIVEL = 4;
+
 /** Agrupa as linhas em jornadas (id_task × produto), conforme a base do funil. */
 export function toJornadas(rows: RawRow[], base: "vendido" | "entregue"): Jornada[] {
   const groups = new Map<string, RawRow[]>();
@@ -107,7 +111,7 @@ export function toJornadas(rows: RawRow[], base: "vendido" | "entregue"): Jornad
     jornadas.push({
       idTask, produto,
       nomeCliente: topo.nomeCliente,
-      nivelMax: topoNivel,
+      nivelMax: Math.min(topoNivel, MAX_NIVEL),
       situacaoFinal: classifySituacao(topo.status),
       valorp: topo.valorp ?? 0,
       squad: topo.squad,

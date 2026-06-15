@@ -72,6 +72,15 @@ describe("toJornadas (base vendido)", () => {
   it("descarta linhas sem nível extraível", () => {
     expect(toJornadas(rows, "vendido").some((j) => j.idTask === "Z")).toBe(false);
   });
+  it("capa o nível máximo em 4 (5ª entrega é exceção)", () => {
+    const rows5: RawRow[] = [
+      row({ idTask: "F", servico: "Entrega 4 - Creators", status: "entregue", valorp: 50 }),
+      row({ idTask: "F", servico: "Entrega 5 - Creators", status: "ativo", valorp: 100 }),
+    ];
+    const j = toJornadas(rows5, "vendido")[0];
+    expect(j.nivelMax).toBe(4);
+    expect(j.situacaoFinal).toBe("em_andamento"); // status do estágio mais alto (5ª, ativo)
+  });
   it("exclui produtos fora de Creators/Performance/Social Media", () => {
     const noisy: RawRow[] = [
       row({ idTask: "EM", produto: "Broadcast", servico: "Email Marketing - 2 Entrega", status: "entregue" }),
