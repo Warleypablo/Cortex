@@ -35,6 +35,16 @@ const DERIVADAS: Record<string, string[]> = {
   // Funil
   aov_venda_mrr: ["funil_vendas_mrr", "contratos_vendidos_mrr"],
   aov_venda_pontual: ["funil_vendas_pontual", "contratos_vendidos_pontual"],
+  // Vendas por Produto — AOV por segmento (valor ÷ contratos)
+  aov_venda_mrr_performance: ["vendas_mrr_performance", "contratos_vendidos_mrr_performance"],
+  aov_venda_mrr_creators: ["vendas_mrr_creators", "contratos_vendidos_mrr_creators"],
+  aov_venda_mrr_social: ["vendas_mrr_social", "contratos_vendidos_mrr_social"],
+  aov_venda_mrr_gc: ["vendas_mrr_gc", "contratos_vendidos_mrr_gc"],
+  aov_venda_mrr_others: ["vendas_mrr_others", "contratos_vendidos_mrr_others"],
+  aov_venda_pontual_ecommerce: ["vendas_pontual_ecommerce", "contratos_vendidos_pontual_ecommerce"],
+  aov_venda_pontual_site: ["vendas_pontual_site", "contratos_vendidos_pontual_site"],
+  aov_venda_pontual_landing: ["vendas_pontual_landing", "contratos_vendidos_pontual_landing"],
+  aov_venda_pontual_others: ["vendas_pontual_others", "contratos_vendidos_pontual_others"],
   // Capacity
   gestores_necessarios: ["cap_contratos_performance"],
   designers_necessarios: ["cap_contratos_performance"],

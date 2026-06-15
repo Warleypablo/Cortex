@@ -9,6 +9,7 @@ import {
   PREDICADOS_CAC_SUB,
 } from "./bp2026.predicados";
 import { CASE_PRODUTO, CASE_PRODUTO_CHURN } from "./bp2026.revenue";
+import { parseMetricaProduto, detalheVendaProdutoMes } from "./bp2026.vendasProduto";
 import {
   LINHAS, LINHAS_DEDUCOES, LINHAS_CSV, LINHAS_OPEX, LINHAS_POS_EBITDA,
   somaDespesaCaixaPorMes, type DefLinha,
@@ -268,11 +269,12 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       const metrica = String(req.query.metrica ?? "");
       const mes = Number(req.query.mes);
       const def = TODAS_DEFS.find((d) => d.metrica === metrica);
-      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica);
+      const prod = parseMetricaProduto(metrica);
+      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod;
       if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }
-      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? metrica;
+      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo ?? metrica;
 
       let orcado: number | null = null;
       const orcRes = await db.execute(sql`
@@ -299,6 +301,10 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA[METRICAS_BUCKET[metrica]], mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
+      } else if (prod) {
+        const { itens, total } = await detalheVendaProdutoMes(db, prod.natureza, prod.segmento, mes, prod.modo);
+        grupos = agruparItens(itens, LIMITE_ITENS);
+        realizado = total;
       } else if (metrica === "mrr_ativo") {
         const result = await db.execute(sql`
           WITH alvo AS (
