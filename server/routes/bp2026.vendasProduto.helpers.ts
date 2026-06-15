@@ -8,6 +8,8 @@ export interface DealVenda {
   valorRec: number; valorPont: number; ids: number[];
 }
 export type MixClickup = Map<string, Map<SegmentoBP, number>>;
+// product rows do Bitrix por deal (deal.id -> valor por segmento) — fonte exata de mix
+export type ProdutoRowMix = Map<number, Map<SegmentoBP, number>>;
 export type AovMedio = Record<string, number>;
 export interface ParteDeal { segmento: SegmentoBP; natureza: Natureza; valor: number; contrato: 1 }
 
@@ -31,27 +33,36 @@ function pesosAov(segmentos: SegmentoBP[], aov: AovMedio): Map<SegmentoBP, numbe
   return m;
 }
 
+// Tenta cada fonte de pesos na ordem dada (product rows -> mix ClickUp); se nenhuma
+// cobrir todos os segmentos, cai no rateio por AOV médio. Em todos os casos o total
+// distribuído == valor (pesar normaliza pela soma dos pesos).
 function distribuirNatureza(
   valor: number, segmentos: SegmentoBP[], natureza: Natureza,
-  mix: Map<SegmentoBP, number> | undefined, aov: AovMedio
+  fontes: Array<Map<SegmentoBP, number> | undefined>, aov: AovMedio
 ): ParteDeal[] {
   if (valor <= 0 || segmentos.length === 0) return [];
   if (segmentos.length === 1) {
     return [{ segmento: segmentos[0], natureza, valor, contrato: 1 }];
   }
-  const pesado = pesar(valor, segmentos, mix) ?? pesar(valor, segmentos, pesosAov(segmentos, aov))!;
-  return segmentos.map((s) => ({ segmento: s, natureza, valor: pesado.get(s) ?? 0, contrato: 1 as const }));
+  let pesado: Map<SegmentoBP, number> | null = null;
+  for (const f of fontes) {
+    pesado = pesar(valor, segmentos, f);
+    if (pesado) break;
+  }
+  if (!pesado) pesado = pesar(valor, segmentos, pesosAov(segmentos, aov))!;
+  return segmentos.map((s) => ({ segmento: s, natureza, valor: pesado!.get(s) ?? 0, contrato: 1 as const }));
 }
 
 export function distribuirDeal(
-  deal: DealVenda, mixRec: MixClickup, mixPont: MixClickup, aovRec: AovMedio, aovPont: AovMedio
+  deal: DealVenda, prMix: ProdutoRowMix, mixRec: MixClickup, mixPont: MixClickup, aovRec: AovMedio, aovPont: AovMedio
 ): ParteDeal[] {
   const { recorrente, pontual } = segmentosPorNatureza(deal.ids);
   const segRec = recorrente.length ? recorrente : (deal.valorRec > 0 ? (["Others"] as SegmentoBP[]) : []);
   const segPont = pontual.length ? pontual : (deal.valorPont > 0 ? (["Others"] as SegmentoBP[]) : []);
+  const pr = prMix.get(deal.id); // product rows aplicam-se às duas naturezas (pesar filtra por segmento)
   return [
-    ...distribuirNatureza(deal.valorRec, segRec, "recorrente", mixRec.get(deal.cnpjNorm), aovRec),
-    ...distribuirNatureza(deal.valorPont, segPont, "pontual", mixPont.get(deal.cnpjNorm), aovPont),
+    ...distribuirNatureza(deal.valorRec, segRec, "recorrente", [pr, mixRec.get(deal.cnpjNorm)], aovRec),
+    ...distribuirNatureza(deal.valorPont, segPont, "pontual", [pr, mixPont.get(deal.cnpjNorm)], aovPont),
   ];
 }
 
@@ -73,11 +84,11 @@ export function aovMedioPorSegmento(deals: DealVenda[], natureza: Natureza): Aov
 
 export interface CelulaSeg { mrr: number; pont: number; contratosRec: number; contratosPont: number }
 export function agregarVendasProduto(
-  deals: DealVenda[], mixRec: MixClickup, mixPont: MixClickup, aovRec: AovMedio, aovPont: AovMedio
+  deals: DealVenda[], prMix: ProdutoRowMix, mixRec: MixClickup, mixPont: MixClickup, aovRec: AovMedio, aovPont: AovMedio
 ): Map<number, Map<SegmentoBP, CelulaSeg>> {
   const out = new Map<number, Map<SegmentoBP, CelulaSeg>>();
   for (const d of deals) {
-    const partes = distribuirDeal(d, mixRec, mixPont, aovRec, aovPont);
+    const partes = distribuirDeal(d, prMix, mixRec, mixPont, aovRec, aovPont);
     const porMes = out.get(d.mes) ?? new Map<SegmentoBP, CelulaSeg>();
     for (const p of partes) {
       const c = porMes.get(p.segmento) ?? { mrr: 0, pont: 0, contratosRec: 0, contratosPont: 0 };

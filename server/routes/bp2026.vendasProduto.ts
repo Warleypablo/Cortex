@@ -8,7 +8,7 @@ import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd } from "./bp2026.helpers";
 import {
   agregarVendasProduto, aovMedioPorSegmento, parseServicosVendidos, distribuirDeal,
-  type DealVenda, type MixClickup, type AovMedio,
+  type DealVenda, type MixClickup, type AovMedio, type ProdutoRowMix,
 } from "./bp2026.vendasProduto.helpers";
 import {
   SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SERVICOS_BITRIX, segmentosPorNatureza,
@@ -43,6 +43,7 @@ interface Deps {
 // agregação da sub-aba E pelo drill-down, para que não divirjam) ----
 export interface AtribuicaoVendas {
   deals: DealVenda[];
+  prMix: ProdutoRowMix;
   mixRec: MixClickup;
   mixPont: MixClickup;
   aovRec: AovMedio;
@@ -118,16 +119,30 @@ export async function carregarAtribuicaoVendas(db: any): Promise<AtribuicaoVenda
     }
   }
 
+  // product rows do Bitrix (valor exato por serviço), sincronizadas em
+  // cortex_core.bitrix_deal_produto_valor — fonte de mix de maior prioridade
+  const prMix: ProdutoRowMix = new Map();
+  const prRows = (await db.execute(sql`
+    SELECT deal_id, segmento, valor::numeric AS valor
+    FROM cortex_core.bitrix_deal_produto_valor
+  `)).rows as any[];
+  for (const r of prRows) {
+    const id = Number(r.deal_id);
+    const m = prMix.get(id) ?? new Map<SegmentoBP, number>();
+    m.set(r.segmento as SegmentoBP, parseFloat(r.valor));
+    prMix.set(id, m);
+  }
+
   const aovRec = aovMedioPorSegmento(deals, "recorrente");
   const aovPont = aovMedioPorSegmento(deals, "pontual");
-  return { deals, mixRec, mixPont, aovRec, aovPont, meta };
+  return { deals, prMix, mixRec, mixPont, aovRec, aovPont, meta };
 }
 
 export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
   const { db, orcado, mesCorrente, mesFechado } = deps;
 
-  const { deals, mixRec, mixPont, aovRec, aovPont } = await carregarAtribuicaoVendas(db);
-  const agg = agregarVendasProduto(deals, mixRec, mixPont, aovRec, aovPont);
+  const { deals, prMix, mixRec, mixPont, aovRec, aovPont } = await carregarAtribuicaoVendas(db);
+  const agg = agregarVendasProduto(deals, prMix, mixRec, mixPont, aovRec, aovPont);
 
   const serie = (f: (m: number) => number | null) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? f(i + 1) : null));
@@ -210,13 +225,13 @@ export interface ItemVendaDet { grupo: string; nome: string; detalhe: string; da
 export async function detalheVendaProdutoMes(
   db: any, natureza: Natureza, segmento: SegmentoBP, mes: number, modo: "valor" | "contrato"
 ): Promise<{ itens: ItemVendaDet[]; total: number }> {
-  const { deals, mixRec, mixPont, aovRec, aovPont, meta } = await carregarAtribuicaoVendas(db);
+  const { deals, prMix, mixRec, mixPont, aovRec, aovPont, meta } = await carregarAtribuicaoVendas(db);
   const mix = natureza === "recorrente" ? mixRec : mixPont;
   const itens: ItemVendaDet[] = [];
   let total = 0;
   for (const d of deals) {
     if (d.mes !== mes) continue;
-    const parte = distribuirDeal(d, mixRec, mixPont, aovRec, aovPont)
+    const parte = distribuirDeal(d, prMix, mixRec, mixPont, aovRec, aovPont)
       .find((p) => p.natureza === natureza && p.segmento === segmento);
     if (!parte) continue;
 
@@ -224,10 +239,13 @@ export async function detalheVendaProdutoMes(
     const valNat = natureza === "recorrente" ? d.valorRec : d.valorPont;
     const segs0 = segmentosPorNatureza(d.ids)[natureza];
     const segs = segs0.length ? segs0 : (valNat > 0 ? (["Others"] as SegmentoBP[]) : []);
+    const pr = prMix.get(d.id);
     const m = mix.get(d.cnpjNorm);
     const caminho = segs.length <= 1
       ? "Produto único (valor do Bitrix)"
-      : (m && segs.every((s) => (m.get(s) ?? 0) > 0)) ? "Multi-produto (mix do ClickUp)" : "Multi-produto (rateio por AOV médio)";
+      : (pr && segs.every((s) => (pr.get(s) ?? 0) > 0)) ? "Multi-produto (product rows do Bitrix)"
+      : (m && segs.every((s) => (m.get(s) ?? 0) > 0)) ? "Multi-produto (mix do ClickUp)"
+      : "Multi-produto (rateio por AOV médio)";
 
     const nomesServicos = d.ids.map((id) => SERVICOS_BITRIX[id]?.nome).filter(Boolean).join(", ") || "(sem serviço)";
     const md = meta.get(d.id)!;
