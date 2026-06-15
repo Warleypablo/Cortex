@@ -78,7 +78,7 @@ export function toJornadas(rows: RawRow[], base: "vendido" | "entregue"): Jornad
   }
 
   const jornadas: Jornada[] = [];
-  for (const [key, stages] of groups) {
+  for (const [key, stages] of Array.from(groups.entries())) {
     const elegiveis = base === "entregue"
       ? stages.filter((s) => classifySituacao(s.status) === "entregue")
       : stages;
@@ -213,7 +213,7 @@ export function aggregateChurnPorDimensao(jornadas: Jornada[], dim: Dim): DimRow
     cur.valorp += j.valorp;
     map.set(label, cur);
   }
-  return [...map.values()].sort((a, b) => b.qtd - a.qtd || b.valorp - a.valorp);
+  return Array.from(map.values()).sort((a, b) => b.qtd - a.qtd || b.valorp - a.valorp);
 }
 
 export interface DetalheRow {
@@ -258,7 +258,7 @@ export interface ChurnPontorrentePayload {
 function distinctSorted(values: (string | null)[]): string[] {
   const set = new Set<string>();
   for (const v of values) { const t = (v ?? "").trim(); if (t) set.add(t); }
-  return [...set].sort((a, b) => a.localeCompare(b, "pt-BR"));
+  return Array.from(set).sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
 export function buildPayload(
