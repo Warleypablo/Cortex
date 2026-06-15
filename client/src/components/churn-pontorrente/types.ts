@@ -33,6 +33,7 @@ export interface EntregaStage {
   situacao: "entregue" | "em_andamento" | "churn";
   valorp: number;
   motivoCancelamento: string | null;
+  dataEncerramento: string | null;
 }
 export interface Jornada {
   idTask: string;

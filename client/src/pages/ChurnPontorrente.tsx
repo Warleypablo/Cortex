@@ -3,7 +3,8 @@ import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Filtros } from "@/components/churn-pontorrente/Filtros";
 import { OverviewCards } from "@/components/churn-pontorrente/OverviewCards";
-import { MatrizCohort } from "@/components/churn-pontorrente/MatrizCohort";
+import { InsightsChurn } from "@/components/churn-pontorrente/InsightsChurn";
+import { ChurnPorMes } from "@/components/churn-pontorrente/ChurnPorMes";
 import { ChurnPorEntrega } from "@/components/churn-pontorrente/ChurnPorEntrega";
 import { ChurnPorDimensao } from "@/components/churn-pontorrente/ChurnPorDimensao";
 import { DetalhamentoTable } from "@/components/churn-pontorrente/DetalhamentoTable";
@@ -34,8 +35,9 @@ export default function ChurnPontorrente() {
         <div className="h-24 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
       ) : (
         <>
+          <InsightsChurn jornadas={data.jornadas} />
           <OverviewCards data={data.overview} />
-          <MatrizCohort jornadas={data.jornadas} />
+          <ChurnPorMes jornadas={data.jornadas} />
           <ChurnPorEntrega jornadas={data.jornadas} />
           <ChurnPorDimensao jornadas={data.jornadas} />
           <DetalhamentoTable rows={data.detalhamento} />

@@ -48,6 +48,7 @@ export interface EntregaStage {
   situacao: Situacao;
   valorp: number;
   motivoCancelamento: string | null;
+  dataEncerramento: string | null;
 }
 
 export interface Jornada {
@@ -121,6 +122,7 @@ export function toJornadas(rows: RawRow[], base: "vendido" | "entregue"): Jornad
       situacao: classifySituacao(s.status),
       valorp: s.valorp ?? 0,
       motivoCancelamento: s.motivoCancelamento,
+      dataEncerramento: s.dataEncerramento,
     }));
     const [idTask, produto] = key.split("|||");
     jornadas.push({
@@ -226,7 +228,7 @@ export function cancelamentosDe(jornadas: Jornada[]): Cancelamento[] {
         idTask: j.idTask, produto: j.produto, nomeCliente: j.nomeCliente,
         nivel: e.nivel, valorp: e.valorp, motivoCancelamento: e.motivoCancelamento,
         squad: j.squad, responsavel: j.responsavel, csResponsavel: j.csResponsavel,
-        vendedor: j.vendedor, dataEncerramento: j.dataEncerramento,
+        vendedor: j.vendedor, dataEncerramento: e.dataEncerramento,
       });
     }
   }

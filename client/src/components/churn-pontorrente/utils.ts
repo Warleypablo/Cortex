@@ -37,7 +37,7 @@ export function cancelamentosDe(jornadas: Jornada[]): Cancelamento[] {
       out.push({
         produto: j.produto, nomeCliente: j.nomeCliente, nivel: e.nivel, valorp: e.valorp,
         motivo: e.motivoCancelamento, squad: j.squad, responsavel: j.responsavel,
-        cs: j.csResponsavel, vendedor: j.vendedor, dataEncerramento: j.dataEncerramento,
+        cs: j.csResponsavel, vendedor: j.vendedor, dataEncerramento: e.dataEncerramento,
       });
     }
   }
