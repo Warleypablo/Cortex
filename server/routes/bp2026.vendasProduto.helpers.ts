@@ -1,0 +1,93 @@
+import {
+  SERVICOS_BITRIX, parseServicosVendidos, segmentosPorNatureza,
+  type SegmentoBP, type Natureza,
+} from "../okr2026/servicosBitrix";
+
+export interface DealVenda {
+  id: number; cnpjNorm: string; mes: number;
+  valorRec: number; valorPont: number; ids: number[];
+}
+export type MixClickup = Map<string, Map<SegmentoBP, number>>;
+export type AovMedio = Record<string, number>;
+export interface ParteDeal { segmento: SegmentoBP; natureza: Natureza; valor: number; contrato: 1 }
+
+function pesar(valor: number, segmentos: SegmentoBP[], pesos: Map<SegmentoBP, number> | undefined): Map<SegmentoBP, number> | null {
+  if (!pesos) return null;
+  let soma = 0;
+  for (const s of segmentos) {
+    const p = pesos.get(s);
+    if (!p || p <= 0) return null;
+    soma += p;
+  }
+  if (soma <= 0) return null;
+  const out = new Map<SegmentoBP, number>();
+  for (const s of segmentos) out.set(s, (valor * (pesos.get(s) as number)) / soma);
+  return out;
+}
+
+function pesosAov(segmentos: SegmentoBP[], aov: AovMedio): Map<SegmentoBP, number> {
+  const m = new Map<SegmentoBP, number>();
+  for (const s of segmentos) m.set(s, aov[s] && aov[s] > 0 ? aov[s] : 1);
+  return m;
+}
+
+function distribuirNatureza(
+  valor: number, segmentos: SegmentoBP[], natureza: Natureza,
+  mix: Map<SegmentoBP, number> | undefined, aov: AovMedio
+): ParteDeal[] {
+  if (valor <= 0 || segmentos.length === 0) return [];
+  if (segmentos.length === 1) {
+    return [{ segmento: segmentos[0], natureza, valor, contrato: 1 }];
+  }
+  const pesado = pesar(valor, segmentos, mix) ?? pesar(valor, segmentos, pesosAov(segmentos, aov))!;
+  return segmentos.map((s) => ({ segmento: s, natureza, valor: pesado.get(s) ?? 0, contrato: 1 as const }));
+}
+
+export function distribuirDeal(
+  deal: DealVenda, mixRec: MixClickup, mixPont: MixClickup, aovRec: AovMedio, aovPont: AovMedio
+): ParteDeal[] {
+  const { recorrente, pontual } = segmentosPorNatureza(deal.ids);
+  const segRec = recorrente.length ? recorrente : (deal.valorRec > 0 ? (["Others"] as SegmentoBP[]) : []);
+  const segPont = pontual.length ? pontual : (deal.valorPont > 0 ? (["Others"] as SegmentoBP[]) : []);
+  return [
+    ...distribuirNatureza(deal.valorRec, segRec, "recorrente", mixRec.get(deal.cnpjNorm), aovRec),
+    ...distribuirNatureza(deal.valorPont, segPont, "pontual", mixPont.get(deal.cnpjNorm), aovPont),
+  ];
+}
+
+export function aovMedioPorSegmento(deals: DealVenda[], natureza: Natureza): AovMedio {
+  const acc: Record<string, { soma: number; n: number }> = {};
+  for (const d of deals) {
+    const seg = segmentosPorNatureza(d.ids)[natureza];
+    if (seg.length !== 1) continue;
+    const valor = natureza === "recorrente" ? d.valorRec : d.valorPont;
+    if (valor <= 0) continue;
+    const k = seg[0];
+    acc[k] = acc[k] ?? { soma: 0, n: 0 };
+    acc[k].soma += valor; acc[k].n += 1;
+  }
+  const out: AovMedio = {};
+  for (const k of Object.keys(acc)) out[k] = acc[k].soma / acc[k].n;
+  return out;
+}
+
+export interface CelulaSeg { mrr: number; pont: number; contratosRec: number; contratosPont: number }
+export function agregarVendasProduto(
+  deals: DealVenda[], mixRec: MixClickup, mixPont: MixClickup, aovRec: AovMedio, aovPont: AovMedio
+): Map<number, Map<SegmentoBP, CelulaSeg>> {
+  const out = new Map<number, Map<SegmentoBP, CelulaSeg>>();
+  for (const d of deals) {
+    const partes = distribuirDeal(d, mixRec, mixPont, aovRec, aovPont);
+    const porMes = out.get(d.mes) ?? new Map<SegmentoBP, CelulaSeg>();
+    for (const p of partes) {
+      const c = porMes.get(p.segmento) ?? { mrr: 0, pont: 0, contratosRec: 0, contratosPont: 0 };
+      if (p.natureza === "recorrente") { c.mrr += p.valor; c.contratosRec += p.contrato; }
+      else { c.pont += p.valor; c.contratosPont += p.contrato; }
+      porMes.set(p.segmento, c);
+    }
+    out.set(d.mes, porMes);
+  }
+  return out;
+}
+
+export { parseServicosVendidos, SERVICOS_BITRIX };
