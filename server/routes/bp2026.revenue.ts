@@ -177,5 +177,25 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
       fazLinha({ metrica: `churn_pct_${chave}`, titulo: `Churn — ${titulo}`, tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "pct", nota: NOTA_CHURN }, churnPctSerie, churnYtd)
     );
   }
+
+  // Linha de total "MRR Ativo" no topo = soma dos 5 produtos (orçado e realizado),
+  // espelhando a planilha (Receita Recorrente). Drill-down reusa o detalhe de mrr_ativo.
+  const mesesTotal: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
+    const mes = i + 1;
+    const orc = LINHAS_SERVICO.reduce((acc, { chave }) => acc + (orcado[`mrr_${chave}`]?.[mes] ?? 0), 0);
+    const real = mes <= mesCorrente
+      ? LINHAS_SERVICO.reduce((acc, { chave }) => acc + (snap[chave]?.[mes]?.mrr ?? 0), 0)
+      : null;
+    return { mes, orcado: orc, realizado: real, atingimento: calcAtingimento(orc, real) };
+  });
+  const vTot = calcYtd(mesesTotal, mesFechado, "estoque");
+  linhas.unshift({
+    metrica: "mrr_ativo", titulo: "MRR Ativo", tipoAgregacao: "estoque",
+    direcao: "maior_melhor", unidade: "brl", destaque: true, meses: mesesTotal,
+    ytd: mesFechado === 0
+      ? { orcado: 0, realizado: null, atingimento: null }
+      : { ...vTot, atingimento: calcAtingimento(vTot.orcado, vTot.realizado) },
+  });
+
   return linhas;
 }
