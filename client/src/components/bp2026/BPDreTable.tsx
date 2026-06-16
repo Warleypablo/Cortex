@@ -21,9 +21,13 @@ export interface BPLinha {
   nota?: string;
   info?: { definicao: string; fonte: string; calculo: string };
   destaque?: boolean;
+  grupo?: string;      // bloco (ex.: Recorrente / Pontual) — agrupa linhas na tabela
+  segmento?: string;   // produto (ex.: Performance / Creators) — sub-cabeçalho por produto
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
+
+const TOTAL_COLUNAS = 14; // Linha + 12 meses + YTD
 
 const MESES_CURTOS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -131,17 +135,46 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
           </tr>
         </thead>
         <tbody>
-          {linhas.map((linha) => {
-            const ehTotal =
-              linha.destaque ??
-              (linha.metrica === "receita_total_faturavel" ||
-                linha.metrica === "receita_liquida" ||
-                linha.metrica === "margem_bruta" ||
-                linha.metrica === "ebitda" ||
-                linha.metrica === "geracao_caixa" ||
-                linha.metrica === "dfc_real");
-            const ehEstoque = linha.tipoAgregacao === "estoque";
-            return (
+          {(() => {
+            const render: JSX.Element[] = [];
+            let grupoAnterior: string | undefined;
+            let segAnterior: string | undefined;
+            linhas.forEach((linha) => {
+              // cabeçalho de bloco (ex.: Recorrente / Pontual)
+              if (linha.grupo && linha.grupo !== grupoAnterior) {
+                render.push(
+                  <tr key={`bloco-${linha.grupo}`} className="bg-gray-100 dark:bg-zinc-800/80">
+                    <td colSpan={TOTAL_COLUNAS} className="sticky left-0 z-10 bg-gray-100 dark:bg-zinc-800/80 px-4 py-2 text-xs font-bold uppercase tracking-wide text-gray-500 dark:text-zinc-400 border-t-2 border-gray-300 dark:border-zinc-600">
+                      {linha.grupo}
+                    </td>
+                  </tr>
+                );
+                grupoAnterior = linha.grupo;
+                segAnterior = undefined;
+              }
+              // sub-cabeçalho de produto (ex.: Performance / Creators)
+              if (linha.segmento && linha.segmento !== segAnterior) {
+                render.push(
+                  <tr key={`seg-${linha.grupo}-${linha.segmento}`} className="bg-gray-50 dark:bg-zinc-800/40">
+                    <td colSpan={TOTAL_COLUNAS} className="sticky left-0 z-10 bg-gray-50 dark:bg-zinc-800/40 px-4 py-1.5 text-xs font-semibold text-gray-700 dark:text-zinc-300 border-t border-gray-200 dark:border-zinc-700">
+                      {linha.segmento}
+                    </td>
+                  </tr>
+                );
+                segAnterior = linha.segmento;
+              }
+              const ehTotal =
+                linha.destaque ??
+                (linha.metrica === "receita_total_faturavel" ||
+                  linha.metrica === "receita_liquida" ||
+                  linha.metrica === "margem_bruta" ||
+                  linha.metrica === "ebitda" ||
+                  linha.metrica === "geracao_caixa" ||
+                  linha.metrica === "dfc_real");
+              const ehEstoque = linha.tipoAgregacao === "estoque";
+              // sob um sub-cabeçalho de produto, encurta o título (remove "Produto — ")
+              const tituloLinha = linha.segmento ? linha.titulo.replace(`${linha.segmento} — `, "") : linha.titulo;
+              render.push(
               <tr
                 key={linha.metrica}
                 className={
@@ -154,10 +187,10 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                 <td
                   className={`sticky left-0 z-10 px-4 py-3 whitespace-nowrap align-top ${
                     ehTotal ? "bg-gray-100 dark:bg-zinc-800" : "bg-white dark:bg-zinc-900"
-                  }`}
+                  } ${linha.segmento ? "pl-8" : ""}`}
                 >
                   <span className="flex items-center gap-1.5">
-                    {linha.titulo}
+                    {tituloLinha}
                     {(linha.info || linha.nota || ehEstoque) && (
                       <Tooltip>
                         <TooltipTrigger asChild>
@@ -223,8 +256,10 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                   />
                 </td>
               </tr>
-            );
-          })}
+              );
+            });
+            return render;
+          })()}
         </tbody>
       </table>
     </div>
