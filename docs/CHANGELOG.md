@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-16 | fix(investors-report): Fat./Cabeça passa a ser mensal
+
+**O que foi feito:**
+- "Fat. / Cabeça" deixa de ser YTD acumulado (R$ 72k) e passa a ser o **faturamento médio mensal** dos meses fechados ÷ headcount (~R$ 13k/mês)
+
+**Por que:**
+- Para casar com "MRR / Cabeça" (mensal) e ser comparável; o acumulado anual no mesmo card confundia
+
+**Arquivos alterados:**
+- `server/routes.ts` — conta `meses_fechados` e calcula faturamento médio mensal por cabeça
+- `client/src/pages/InvestorsReport.tsx` — subtítulo "realizado / mês (média)"
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-16 | feat(investors-report): Fat./Cabeça (YTD) ao lado de MRR/Cabeça
 
 **O que foi feito:**
