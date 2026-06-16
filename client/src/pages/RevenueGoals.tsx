@@ -80,21 +80,21 @@ interface DiaDetalhesData {
   }[];
 }
 
+interface HistoricoInadimplenciaItem {
+  mes: number;
+  ano: number;
+  mesNome: string;
+  inadimplente: number;
+  previsto: number;
+  percentual: number;
+}
+
 const mesesNomes = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"
 ];
 
 const mesesAbreviados = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-// Histórico de inadimplência (estático, fechado por mês). Mês corrente é exibido ao vivo.
-const historicoInadimplencia: { mes: string; valor: number; pct: number }[] = [
-  { mes: "Janeiro", valor: 46000, pct: 3.55 },
-  { mes: "Fevereiro", valor: 43000, pct: 3.23 },
-  { mes: "Março", valor: 49000, pct: 3.50 },
-  { mes: "Abril", valor: 52000, pct: 3.33 },
-  { mes: "Maio", valor: 71000, pct: 4.79 },
-];
 
 function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
@@ -200,6 +200,15 @@ export default function RevenueGoals() {
       return response.json();
     },
     enabled: !!selectedDay,
+  });
+
+  const { data: historicoInad, isLoading: isLoadingHistorico } = useQuery<HistoricoInadimplenciaItem[]>({
+    queryKey: ['/api/financeiro/revenue-goals/historico-inadimplencia'],
+    queryFn: async () => {
+      const response = await fetch('/api/financeiro/revenue-goals/historico-inadimplencia');
+      if (!response.ok) throw new Error('Failed to fetch historico inadimplencia');
+      return response.json();
+    },
   });
 
   const handleBarClick = (data: any) => {
@@ -422,57 +431,57 @@ export default function RevenueGoals() {
             </CardContent>
           </Card>
 
-          {/* Histórico de Inadimplência */}
+          {/* Histórico de Inadimplência (dinâmico, meses fechados do ano) */}
           <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg">
             <CardHeader className="pb-2">
               <CardTitle className="text-lg">Inadimplência</CardTitle>
-              <CardDescription>Histórico mensal (valor e % sobre o previsto)</CardDescription>
+              <CardDescription>
+                Meses fechados de {historicoInad?.[0]?.ano ?? new Date().getFullYear()} · valor em aberto e % sobre o previsto
+              </CardDescription>
             </CardHeader>
             <CardContent className="pt-4">
-              <div className="overflow-hidden rounded-lg border border-gray-100 dark:border-zinc-800">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="border-b border-gray-100 dark:border-zinc-800 text-[11px] uppercase tracking-wide text-muted-foreground">
-                      <th className="text-left font-medium px-4 py-2.5">Mês</th>
-                      <th className="text-right font-medium px-4 py-2.5">Valor</th>
-                      <th className="text-right font-medium px-4 py-2.5">% Inadimplência</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {/* Mês corrente — valor de referência (estático) */}
-                    <tr className="bg-muted/40 border-b border-gray-100 dark:border-zinc-800">
-                      <td className="px-4 py-2.5 font-semibold">Mês Corrente</td>
-                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
-                        {formatCurrencyCompact(177000)}
-                      </td>
-                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-muted-foreground">
-                        —
-                      </td>
-                    </tr>
-                    {historicoInadimplencia.map((m) => (
-                      <tr
-                        key={m.mes}
-                        className="border-b border-gray-50 dark:border-zinc-800/50 last:border-0"
-                      >
-                        <td className="px-4 py-2.5 text-muted-foreground">{m.mes}</td>
-                        <td className="px-4 py-2.5 text-right tabular-nums">
-                          {formatCurrencyCompact(m.valor)}
-                        </td>
-                        <td
-                          className={cn(
-                            "px-4 py-2.5 text-right tabular-nums font-medium",
-                            m.pct >= 4
-                              ? "text-red-600 dark:text-red-400"
-                              : "text-emerald-600 dark:text-emerald-400"
-                          )}
-                        >
-                          {formatPercent(m.pct)}
-                        </td>
+              {isLoadingHistorico ? (
+                <Skeleton className="h-48 w-full rounded-lg" />
+              ) : !historicoInad || historicoInad.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  Sem meses fechados no ano ainda.
+                </p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-gray-100 dark:border-zinc-800">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 dark:border-zinc-800 text-[11px] uppercase tracking-wide text-muted-foreground">
+                        <th className="text-left font-medium px-4 py-2.5">Mês</th>
+                        <th className="text-right font-medium px-4 py-2.5">Valor</th>
+                        <th className="text-right font-medium px-4 py-2.5">% Inadimplência</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                    </thead>
+                    <tbody>
+                      {historicoInad.map((m) => (
+                        <tr
+                          key={`${m.ano}-${m.mes}`}
+                          className="border-b border-gray-50 dark:border-zinc-800/50 last:border-0"
+                        >
+                          <td className="px-4 py-2.5 text-muted-foreground">{m.mesNome}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            {formatCurrencyCompact(m.inadimplente)}
+                          </td>
+                          <td
+                            className={cn(
+                              "px-4 py-2.5 text-right tabular-nums font-medium",
+                              m.percentual >= 4
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            )}
+                          >
+                            {formatPercent(m.percentual)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
 

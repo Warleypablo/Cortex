@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-16 | feat(revenue-goals): histórico de inadimplência dinâmico (substitui hardcode)
+
+**O que foi feito:**
+- Novo endpoint `GET /api/financeiro/revenue-goals/historico-inadimplencia` que calcula a inadimplência por mês a partir de `"Conta Azul".caz_receber`, para os meses já fechados do ano corrente
+- O card "Inadimplência" da tela Metas de Receita agora consome o endpoint (com loading/empty state) em vez dos valores hardcoded
+- Meses rolam automaticamente: em junho mostra Jan–Mai; em julho, Jan–Jun; vira o ano e recomeça
+- Removida a linha estática "Mês Corrente" (mês aberto infla o número; o atual já aparece ao vivo no card grande "Inadimplente")
+
+**Por que:**
+- A versão anterior tinha os valores fixos no código; o solicitante pediu que fosse dinâmico de acordo com os meses
+- A fórmula foi validada contra produção e reproduz exatamente os números de referência (Jan–Mar idênticos; Abr/Mai mais baixos porque clientes pagaram desde o print original) — dinâmico = sempre atualizado
+
+**Arquivos alterados:**
+- `server/storage.ts` - novo método `getHistoricoInadimplencia()` (mesma definição de inadimplência de `getRevenueGoals`, agrupada por mês)
+- `server/routes.ts` - nova rota do histórico
+- `client/src/pages/RevenueGoals.tsx` - consome o endpoint via React Query; remove o array estático e a linha de mês corrente
+
+**Impacto arquitetural:** Nenhum (novo endpoint isolado, sem mudança de schema)
+
+---
+
 ## 2026-06-16 | feat(revenue-goals): card de histórico de inadimplência
 
 **O que foi feito:**
