@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-16 | fix(investors-report): corrige receita histórica zerada (caz_receber → caz_vendas)
+
+**O que foi feito:**
+- Trocada a fonte de receita histórica do Investors Report de `caz_receber` para `caz_vendas` (faturamento emitido), pois `caz_receber`/`caz_parcelas` não têm dados de caixa antes de set/out-2025
+- Corte dinâmico entre base "emitido" (histórico, `caz_vendas`) e "caixa" (recente, `caz_parcelas`) no 1º mês cheio de parcelas (out/2025)
+- Removidos meses futuros (notas/parcelas agendadas até 2031) e o buraco de jul/ago-2025
+- Adicionado campo `fonte` ('emitido' | 'caixa') na série; frontend marca a transição no gráfico de faturamento e o período passa a iniciar em 2023
+
+**Por que:**
+- Todo o bloco histórico do relatório (gráficos de faturamento/margem/receita×despesas/caixa acumulado + tabelas anual e mensal + KPIs YoY e Margem Média) mostrava faturamento R$ 0 de 2023 a 2025 contra despesas reais, gerando "geração de caixa" de −90k a −950k/mês — dados incorretos para investidores
+
+**Arquivos alterados:**
+- `server/routes.ts` — reescrita da query `evolucaoFaturamento` no endpoint `/api/investors-report` (modelo híbrido emitido/caixa) e inclusão de `fonte` no payload
+- `client/src/pages/InvestorsReport.tsx` — campo `fonte` na interface, marcador de transição (`ReferenceLine`) + nota no gráfico, período inicia em 2023
+
+**Impacto arquitetural:** Nenhum — mudança contida no endpoint e na página. Endpoint de PDF (`/api/investors-report/pdf`) usa só `caz_parcelas` (apenas meses recentes) e não foi alterado; fica como follow-up se quiserem histórico no PDF.
+
+---
+
 ## 2026-06-16 | feat(revenue-goals): histórico de inadimplência dinâmico (substitui hardcode)
 
 **O que foi feito:**
