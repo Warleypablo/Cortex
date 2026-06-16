@@ -67,10 +67,13 @@ function makeTpId(seq: number): string {
 }
 
 export async function generateNextTpId(): Promise<string> {
+  // NB: usar [0-9] em vez de \d — dentro do template literal `sql`...`` o JS
+  // colapsa "\d" para "d", o que gera a regex inválida ^TP(d+)$ (casa zero linhas)
+  // e fazia esta função retornar sempre TP01.
   const r = await db.execute(sql`
-    SELECT MAX(CAST(SUBSTRING(tp_id FROM '^TP(\d+)$') AS INTEGER)) AS max_seq
+    SELECT MAX(CAST(SUBSTRING(tp_id FROM '^TP([0-9]+)$') AS INTEGER)) AS max_seq
     FROM cortex_core.creatives_library
-    WHERE tp_id ~ '^TP\d+$'
+    WHERE tp_id ~ '^TP[0-9]+$'
   `);
   const row = (r as any).rows?.[0] ?? (r as any)[0];
   const max = Number(row?.max_seq ?? 0) || 0;
