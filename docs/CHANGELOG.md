@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-16 | feat(planejamento): campo de direcionamento pra IA na geração de copy
+
+**O que foi feito:**
+- Adiciona o campo opcional "Direcionamento pra IA" no editor de disparo (aba Planejamento), entre Título e Copy
+- O texto é enviado como `contexto` na chamada de `/api/ghl/plano/gerar-copy`, entrando no prompt como "Contexto adicional"
+- Campo efêmero: não é salvo no disparo e zera ao abrir/fechar/trocar de slot (chaveado por `slotKey`)
+
+**Por que:**
+- Permite ao planejador orientar a IA (ângulo, oferta, tom, o que evitar) antes de gerar a copy, em vez de depender só de base + objetivo
+
+**Arquivos alterados:**
+- `client/src/components/PlanejamentoMensal.tsx` - novo estado `direcionamento`, campo Textarea no modal, reset via `useEffect`, e envio do `contexto` no `gerarCopy`
+
+**Impacto arquitetural:** Nenhum — frontend-only; o backend (`postGerarCopyPlano` → `gerarCopies`) já aceitava `contexto`.
+
+---
+
 ## 2026-06-08 | chore(criativos): pausa o agente de IA (Analisar com IA / Propostas)
 
 **O que foi feito:**
