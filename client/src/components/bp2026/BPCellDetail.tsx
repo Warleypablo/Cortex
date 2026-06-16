@@ -35,8 +35,16 @@ const DERIVADAS: Record<string, string[]> = {
   // Funil
   aov_venda_mrr: ["funil_vendas_mrr", "contratos_vendidos_mrr"],
   aov_venda_pontual: ["funil_vendas_pontual", "contratos_vendidos_pontual"],
-  // AOV por produto (aov_venda_mrr_<seg> / aov_venda_pontual_<seg>) NÃO entra aqui:
-  // o drill-down vai ao servidor e lista os deals (numerador), auditável como o valor.
+  // Vendas por Produto — AOV por segmento = Vendas ÷ Contratos (mostra o cálculo)
+  aov_venda_mrr_performance: ["vendas_mrr_performance", "contratos_vendidos_mrr_performance"],
+  aov_venda_mrr_creators: ["vendas_mrr_creators", "contratos_vendidos_mrr_creators"],
+  aov_venda_mrr_social: ["vendas_mrr_social", "contratos_vendidos_mrr_social"],
+  aov_venda_mrr_gc: ["vendas_mrr_gc", "contratos_vendidos_mrr_gc"],
+  aov_venda_mrr_others: ["vendas_mrr_others", "contratos_vendidos_mrr_others"],
+  aov_venda_pontual_ecommerce: ["vendas_pontual_ecommerce", "contratos_vendidos_pontual_ecommerce"],
+  aov_venda_pontual_site: ["vendas_pontual_site", "contratos_vendidos_pontual_site"],
+  aov_venda_pontual_landing: ["vendas_pontual_landing", "contratos_vendidos_pontual_landing"],
+  aov_venda_pontual_others: ["vendas_pontual_others", "contratos_vendidos_pontual_others"],
   // Capacity
   gestores_necessarios: ["cap_contratos_performance"],
   designers_necessarios: ["cap_contratos_performance"],
@@ -118,9 +126,30 @@ export function BPCellDetail({ metrica, mes, linhas, onClose }: Props) {
         <div className="mt-4 space-y-4">
           {ehDerivada && linha && mes ? (
             <div className="space-y-1">
-              <p className="text-xs text-gray-500 dark:text-zinc-500 mb-2">
-                Composição do mês (clique nas linhas-fonte da matriz para ver itens):
-              </p>
+              {metrica?.startsWith("aov") ? (() => {
+                const numL = linhas.find((l) => l.metrica === DERIVADAS[metrica!][0]);
+                const denL = linhas.find((l) => l.metrica === DERIVADAS[metrica!][1]);
+                const num = numL?.meses[mes - 1];
+                const den = denL?.meses[mes - 1];
+                return (
+                  <div className="mb-2 rounded-lg border border-gray-200 dark:border-zinc-700 px-3 py-2 text-sm">
+                    <p className="mb-1 text-xs font-medium text-gray-500 dark:text-zinc-500">
+                      Cálculo: {numL?.titulo ?? "Vendas"} ÷ {denL?.titulo ?? "Contratos"}
+                    </p>
+                    <p className="text-gray-800 dark:text-zinc-200">
+                      Realizado: {fmtUnidade(num?.realizado, numL?.unidade)} ÷ {fmtUnidade(den?.realizado, denL?.unidade)} ={" "}
+                      <span className="font-semibold">{fmtUnidade(celula?.realizado, linha?.unidade)}</span>
+                    </p>
+                    <p className="text-[11px] text-gray-500 dark:text-zinc-500">
+                      Orçado: {fmtUnidade(num?.orcado, numL?.unidade)} ÷ {fmtUnidade(den?.orcado, denL?.unidade)} = {fmtUnidade(celula?.orcado, linha?.unidade)}
+                    </p>
+                  </div>
+                );
+              })() : (
+                <p className="text-xs text-gray-500 dark:text-zinc-500 mb-2">
+                  Composição do mês (clique nas linhas-fonte da matriz para ver itens):
+                </p>
+              )}
               {DERIVADAS[metrica!].map((m) => {
                 const comp = linhas.find((l) => l.metrica === m);
                 const cm = comp?.meses[mes - 1];
