@@ -65,8 +65,9 @@ interface InvestorsReportData {
   receita: {
     mrrAtivo: number;
     aovRecorrente: number;
-    faturamentoMes: number;
+    faturamentoAno: number;
     taxaInadimplencia: number;
+    margemAno: number;
   };
   equipe: {
     headcount: number;
@@ -217,13 +218,9 @@ export default function InvestorsReport() {
     }), { faturamento: 0, despesas: 0, geracaoCaixa: 0 });
   }, [filteredData]);
 
-  // Margem média PONDERADA (Σ geração de caixa ÷ Σ faturamento), não a média simples dos %s
-  // mensais — esta era distorcida por meses de receita baixa (ex.: fev/23 com margem de -222%).
-  const avgMargem = useMemo(() => {
-    const totalFat = chartDataWithMetrics.reduce((acc, item) => acc + item.faturamento, 0);
-    const totalGer = chartDataWithMetrics.reduce((acc, item) => acc + item.geracaoCaixa, 0);
-    return totalFat > 0 ? (totalGer / totalFat) * 100 : 0;
-  }, [chartDataWithMetrics]);
+  // Margem do ano corrente (YTD), mesma janela da inadimplência — calculada no backend
+  // como margem ponderada (Σ geração ÷ Σ faturamento) de jan até o mês atual.
+  const avgMargem = data?.receita.margemAno ?? 0;
 
   // Mês em que a base de receita muda de "emitido" (caz_vendas, histórico) para "caixa" (caz_parcelas).
   // Usado para sinalizar a quebra de metodologia nos gráficos. null = série sem transição no período.
@@ -493,13 +490,13 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-emerald-500/20 rounded">
                       <Briefcase className="h-4 w-4 text-emerald-400" />
                     </div>
-                    <span className="text-muted-foreground text-sm">Fat. Mês Atual</span>
+                    <span className="text-muted-foreground text-sm">Faturamento (Ano)</span>
                   </div>
                   <div className="text-3xl font-bold text-foreground" data-testid="kpi-faturamento">
-                    {formatCurrencyShort(data?.receita.faturamentoMes || 0)}
+                    {formatCurrencyShort(data?.receita.faturamentoAno || 0)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Realizado ERP
+                    Realizado no ano (YTD)
                   </div>
                 </div>
               )}
@@ -546,7 +543,7 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-red-500/20 rounded">
                       <AlertTriangle className="h-4 w-4 text-red-400" />
                     </div>
-                    <span className="text-muted-foreground text-sm">Inadimplência</span>
+                    <span className="text-muted-foreground text-sm">Inadimplência (Ano)</span>
                   </div>
                   <div className="text-2xl font-bold text-red-400" data-testid="kpi-inadimplencia">
                     {formatDecimal(data?.receita.taxaInadimplencia || 0)}%
@@ -606,7 +603,7 @@ export default function InvestorsReport() {
                     <div className={`p-1.5 rounded ${avgMargem >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
                       <Percent className="h-4 w-4" style={{ color: avgMargem >= 0 ? '#4ade80' : '#f87171' }} />
                     </div>
-                    <span className="text-muted-foreground text-sm">Margem Média</span>
+                    <span className="text-muted-foreground text-sm">Margem (Ano)</span>
                   </div>
                   <div className={`text-2xl font-bold ${avgMargem >= 0 ? 'text-green-400' : 'text-red-400'}`} data-testid="kpi-margem">
                     {formatDecimal(avgMargem)}%
@@ -701,7 +698,7 @@ export default function InvestorsReport() {
                       labelStyle={{ color: '#f8fafc' }}
                     />
                     <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} />
-                    <ReferenceLine y={avgMargem} stroke="#1978D5" strokeDasharray="5 5" strokeWidth={1} label={{ value: `Média: ${avgMargem.toFixed(1)}%`, position: 'right', fill: '#1978D5', fontSize: 10 }} />
+                    <ReferenceLine y={avgMargem} stroke="#1978D5" strokeDasharray="5 5" strokeWidth={1} label={{ value: `Margem ano: ${avgMargem.toFixed(1)}%`, position: 'right', fill: '#1978D5', fontSize: 10 }} />
                     <Area type="monotone" dataKey="margem" stroke="#3b82f6" fill="url(#gradientMargem)" strokeWidth={0} />
                     <Line type="monotone" dataKey="margem" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, fill: '#3b82f6' }} activeDot={{ r: 5 }} />
                   </ComposedChart>
