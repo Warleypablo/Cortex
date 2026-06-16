@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-16 | feat(broadcast): card de KPI "Custo / reunião" no resumo
+
+**O que foi feito:**
+- Adiciona "Custo / reunião" como card de KPI destacado na linha principal do resumo de Broadcast (entre Reuniões e Vendas)
+- Lê `custos.custo_reuniao` (investimento ÷ reuniões atribuídas), que o backend já retornava em `/api/ghl/broadcasts/summary`
+- Grid de KPIs ajustado de 6 → 7 colunas
+
+**Por que:**
+- A métrica já existia só no detalhe de "Gastos"; promovida a KPI pra leitura rápida da eficiência do canal
+
+**Arquivos alterados:**
+- `client/src/pages/GhlMarketing.tsx` - novo StatCard "Custo / reunião" + grid lg:grid-cols-7
+
+**Impacto arquitetural:** Nenhum — frontend-only, sem mudança de API/dados.
+
+---
+
 ## 2026-06-16 | feat(planejamento): campo de direcionamento pra IA na geração de copy
 
 **O que foi feito:**
