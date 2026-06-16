@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-16 | fix(investors-report): gráficos de evolução só com meses fechados (remove distorções)
+
+**O que foi feito:**
+- Série de evolução (4 gráficos + tabelas + YoY) passa a terminar no último mês fechado (exclui o mês corrente parcial) e a começar no 1º mês cheio de `caz_vendas` (mar/23, não fev/23 parcial)
+
+**Por que:**
+- O mês corrente parcial aparecia como crash no faturamento, pico falso na margem (+63%) e salto falso no caixa acumulado; fev/23 (caz_vendas começou em 13/02) dava margem de −222% e achatava o eixo do gráfico de margem
+- Bônus: o YoY deixa de ser puxado para baixo pelo mês parcial
+
+**Arquivos alterados:**
+- `server/routes.ts` — `hist_start` = 1º mês cheio de caz_vendas; janela de `dados_recentes` termina em `< DATE_TRUNC('month', CURRENT_DATE)`
+
+**Impacto arquitetural:** Nenhum. KPIs de faturamento/inadimplência seguem incluindo o mês corrente (realizado até o momento); apenas a série temporal usa meses fechados.
+
+---
+
 ## 2026-06-16 | fix(investors-report): Fat./Cabeça passa a ser mensal
 
 **O que foi feito:**
