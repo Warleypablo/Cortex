@@ -5,10 +5,11 @@
  *  - Cada dia mostra slots planejados + datas comerciais + alertas de cadência.
  *  - Editor de slot: base/objetivo/padrão/status/título/copy + geração de copy por IA
  *    a partir do padrão que mais converteu naquela base (cruzamento real).
+ *  - Direcionamento pra IA: brief opcional e efêmero (não persiste) que orienta a geração.
  *
  * Dados: /api/ghl/plano (GET/POST/PATCH/DELETE) e /api/ghl/plano/gerar-copy.
  */
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -52,10 +53,17 @@ export default function PlanejamentoMensal() {
   const [ref, setRef] = useState<Date>(() => startOfMonth(addMonths(new Date(), 1)));
   const [editing, setEditing] = useState<Partial<Slot> | null>(null);
   const [variacoes, setVariacoes] = useState<Array<{ titulo: string; padrao: string; copy: string }>>([]);
+  // Direcionamento pra IA: brief opcional/efêmero — só molda a geração, não é salvo no slot (Opção B).
+  const [direcionamento, setDirecionamento] = useState("");
   const [gerando, setGerando] = useState(false);
   const [salvando, setSalvando] = useState(false);
   const [gerandoMes, setGerandoMes] = useState(false);
   const [msgMes, setMsgMes] = useState<string | null>(null);
+
+  // Zera o direcionamento ao abrir/fechar/trocar de slot (efêmero). Chaveia pela identidade do
+  // slot — editar outros campos do slot não atropela o que o usuário já digitou aqui.
+  const slotKey = editing ? `${editing.id ?? "novo"}` : null;
+  useEffect(() => { setDirecionamento(""); }, [slotKey]);
 
   const from = format(startOfMonth(ref), "yyyy-MM-dd");
   const to = format(endOfMonth(ref), "yyyy-MM-dd");
@@ -103,7 +111,10 @@ export default function PlanejamentoMensal() {
     if (!editing?.base || !editing?.objetivo) return;
     setGerando(true); setVariacoes([]);
     try {
-      const r = await jsonReq("/api/ghl/plano/gerar-copy", "POST", { base: editing.base, objetivo: editing.objetivo });
+      const r = await jsonReq("/api/ghl/plano/gerar-copy", "POST", {
+        base: editing.base, objetivo: editing.objetivo,
+        contexto: direcionamento.trim() || undefined,
+      });
       setVariacoes(r.variacoes ?? []);
       if (r.padraoAlvo && !editing.padrao) setEditing((e) => ({ ...e!, padrao: r.padraoAlvo }));
     } catch { setVariacoes([]); }
@@ -223,6 +234,12 @@ export default function PlanejamentoMensal() {
                 </div>
               </div>
               <div><Label className="text-xs">Título</Label><Input value={editing.titulo ?? ""} onChange={(e) => setEditing({ ...editing, titulo: e.target.value })} placeholder="Ex.: Pré-Black Friday — base Ecommerce" /></div>
+              <div>
+                <Label className="text-xs">Direcionamento pra IA (opcional)</Label>
+                <Textarea rows={2} value={direcionamento} onChange={(e) => setDirecionamento(e.target.value)}
+                  placeholder="Oriente a copy: ângulo, oferta, tom, o que evitar… Ex.: foca em quem já comprou e parou; tom mais urgente por causa do fim do tri." />
+                <p className="text-[11px] text-muted-foreground mt-1">Só orienta a geração da IA — não é salvo no disparo.</p>
+              </div>
               <div>
                 <div className="flex items-center justify-between">
                   <Label className="text-xs">Copy</Label>
