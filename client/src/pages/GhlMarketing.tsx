@@ -866,6 +866,7 @@ interface BroadcastRow {
   delivery_pct: number | null;
   open_pct: number | null;
   conversations_generated: number;
+  oportunidades: number | null;
   meetings_scheduled: number | null;
   ganhos: number | null;
   receita: number | null;
@@ -982,11 +983,12 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
 
   return (
     <div className="space-y-4">
-      {/* KPI cards: Investimento · Disparos · Respostas · Reuniões · Custo/reunião · Vendas · CAC */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
+      {/* KPI cards: Investimento · Disparos · Respostas · Oportunidades · Reuniões · Custo/reunião · Vendas · CAC */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
         <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"} />
         <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp" />
-        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint={fnl ? `${fmtInt(fnl.positivas)} positivas` : undefined} />
+        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint="responderam ao disparo" />
+        <StatCard label="Oportunidades" value={fnl ? fmtInt(fnl.positivas) : "—"} hint="responderam positivo" />
         <StatCard label="Reuniões" value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"} hint="atribuídas (pós-resposta)" />
         <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="investimento ÷ reuniões" />
         <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
@@ -1154,6 +1156,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                     <SortableTh label="Entrega" k="delivery_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <SortableTh label="Abertura" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <SortableTh label="Conversas" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <TableHead className="text-right" title="Oportunidades = respondentes com sentimento positivo">Oportunidades</TableHead>
                     <TableHead className="text-right" title="Reuniões atribuídas ao disparo (agendadas após a resposta)">Reuniões</TableHead>
                     <TableHead className="text-right" title="Negócios ganhos atribuídos (venda após resposta)">Ganhos</TableHead>
                     <TableHead className="text-right" title="Receita dos negócios ganhos atribuídos">Receita</TableHead>
@@ -1206,6 +1209,9 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                       </TableCell>
                       <TableCell className="text-right tabular-nums align-top py-3">{fmtInt(b.conversations_generated)}</TableCell>
                       <TableCell className="text-right tabular-nums align-top py-3">
+                        {b.oportunidades != null && b.oportunidades > 0 ? <span className="font-medium text-emerald-600 dark:text-emerald-400">{fmtInt(b.oportunidades)}</span> : (b.oportunidades != null ? "0" : "—")}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3">
                         {b.meetings_scheduled != null ? <span className="font-medium">{fmtInt(b.meetings_scheduled)}</span> : "—"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums align-top py-3">
@@ -1232,7 +1238,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                   ))}
                   {sorted.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
+                      <TableCell colSpan={13} className="text-center text-muted-foreground py-6">
                         Nenhum broadcast encontrado com esses filtros
                       </TableCell>
                     </TableRow>

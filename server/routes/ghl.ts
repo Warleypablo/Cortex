@@ -1110,6 +1110,24 @@ async function listBroadcasts(req: Request, res: Response) {
       for (const row of ((sRes as any).rows ?? [])) salesMap.set(row.broadcast_id, { ganhos: row.ganhos ?? 0, receita: row.receita ?? 0 });
     }
 
+    // Oportunidades por disparo = respondentes cuja 1ª resposta teve sentimento POSITIVO
+    // (mesma definição de "positivas" do funil: 1 linha por respondedor, sentimento da 1ª resposta).
+    const oppMap = new Map<string, number>();
+    if (waIds.length) {
+      const oRes = await db.execute(sql`
+        WITH fr AS (
+          SELECT DISTINCT ON (e.broadcast_id, COALESCE(e.ghl_contact_id, e.lead_phone, e.reply_message_id))
+            e.broadcast_id, e.sentiment
+          FROM cortex_core.broadcast_lead_events e
+          WHERE e.broadcast_id IN (${sql.join(waIds.map((id) => sql`${id}`), sql`,`)})
+          ORDER BY e.broadcast_id, COALESCE(e.ghl_contact_id, e.lead_phone, e.reply_message_id), e.reply_at ASC
+        )
+        SELECT broadcast_id, COUNT(*) FILTER (WHERE sentiment = 'positiva')::int AS oportunidades
+        FROM fr GROUP BY broadcast_id
+      `);
+      for (const row of ((oRes as any).rows ?? [])) oppMap.set(row.broadcast_id, row.oportunidades ?? 0);
+    }
+
     // Monta o response final
     const broadcasts = rows.map((r) => {
       const isEmail = r.channel === "Email";
@@ -1146,6 +1164,7 @@ async function listBroadcasts(req: Request, res: Response) {
         delivery_pct,
         open_pct,
         conversations_generated: conversationsMap.get(r.id) ?? 0,
+        oportunidades: isEmail ? null : (oppMap.get(r.id) ?? 0), // respondentes positivos (oportunidades)
         meetings_scheduled: isEmail ? null : (meetingsMap.get(r.id) ?? 0), // reuniões atribuídas (pós-resposta)
         ganhos: isEmail ? null : (salesMap.get(r.id)?.ganhos ?? 0), // negócios ganhos atribuídos
         receita: isEmail ? null : (salesMap.get(r.id)?.receita ?? 0), // receita atribuída (R$)
