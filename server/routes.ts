@@ -3375,15 +3375,18 @@ Estruture sua resposta em:
       // O campo `fonte` ('caixa' | 'emitido') marca a transição para o frontend sinalizar a quebra de base.
       const faturamentoResult = await db.execute(sql`
         WITH bounds AS (
-          -- cutoff = 1º mês cheio de caz_parcelas; hist_start = 1º mês com receita emitida (caz_vendas)
+          -- cutoff = 1º mês cheio de caz_parcelas; hist_start = 1º mês CHEIO de caz_vendas
+          -- (o 1º mês de cada fonte é parcial — ex.: caz_vendas começou em 13/fev/23 — e
+          --  distorceria a série, então pulamos para o mês seguinte completo)
           SELECT
             DATE_TRUNC('month', MIN(COALESCE(data_quitacao, data_vencimento))) + INTERVAL '1 month' AS cutoff,
-            (SELECT DATE_TRUNC('month', MIN(data)) FROM "Conta Azul".caz_vendas) AS hist_start
+            (SELECT DATE_TRUNC('month', MIN(data)) FROM "Conta Azul".caz_vendas) + INTERVAL '1 month' AS hist_start
           FROM "Conta Azul".caz_parcelas
           WHERE tipo_evento = 'RECEITA'
         ),
         dados_recentes AS (
-          -- A partir do corte até o fim do mês atual: caixa real via caz_parcelas
+          -- A partir do corte até o último mês FECHADO (exclui o mês corrente, ainda parcial,
+          -- que apareceria como queda no faturamento e pico falso na margem/caixa)
           SELECT
             TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
             'caixa' as fonte,
@@ -3393,7 +3396,7 @@ Estruture sua resposta em:
               THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
           FROM "Conta Azul".caz_parcelas, bounds
           WHERE COALESCE(data_quitacao, data_vencimento) >= bounds.cutoff
-            AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
+            AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE)
             AND tipo_evento IN ('RECEITA', 'DESPESA')
           GROUP BY 1
         ),
