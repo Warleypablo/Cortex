@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-16 | feat(investors-report): Fat./Cabeça (YTD) ao lado de MRR/Cabeça
+
+**O que foi feito:**
+- "Receita/Cabeça" renomeado para "MRR / Cabeça" (recorrente/mês = MRR ativo ÷ headcount)
+- Novo card "Fat. / Cabeça" = faturamento realizado no ano (YTD) ÷ headcount
+- Row de KPIs secundários passa de 4 para 5 colunas
+
+**Por que:**
+- A pedido: exibir produtividade tanto pela carteira recorrente (MRR) quanto pelo faturamento realizado
+
+**Arquivos alterados:**
+- `server/routes.ts` — novo campo `equipe.faturamentoPorCabeca`
+- `client/src/pages/InvestorsReport.tsx` — card novo + relabel + grid de 5 colunas
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-16 | fix(investors-report): margem do ano ignora mês corrente (parcial)
 
 **O que foi feito:**
