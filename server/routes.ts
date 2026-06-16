@@ -3443,12 +3443,15 @@ Estruture sua resposta em:
       
       // Faturamento, inadimplência e margem do ANO corrente (YTD: janeiro → mês atual).
       // Base caixa (caz_parcelas.valor_pago) — o ano corrente está todo no período "caixa".
+      // Faturamento e inadimplência incluem o mês corrente (realizado até o momento).
+      // Margem usa apenas meses FECHADOS (exclui o mês corrente, ainda parcial, que distorceria o %).
       const faturamentoAnoResult = await db.execute(sql`
         SELECT
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_ano,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas_ano,
           COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto_ano,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia_ano
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia_ano,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE) THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_fechado,
+          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE) THEN valor_pago::numeric ELSE 0 END), 0) as despesas_fechado
         FROM "Conta Azul".caz_parcelas
         WHERE COALESCE(data_quitacao, data_vencimento) >= DATE_TRUNC('year', CURRENT_DATE)
           AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
@@ -3459,18 +3462,20 @@ Estruture sua resposta em:
       const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0 };
-      const faturamentoAno = faturamentoAnoResult.rows[0] || { faturamento_ano: 0, despesas_ano: 0, valor_bruto_ano: 0, inadimplencia_ano: 0 };
+      const faturamentoAno = faturamentoAnoResult.rows[0] || { faturamento_ano: 0, valor_bruto_ano: 0, inadimplencia_ano: 0, faturamento_fechado: 0, despesas_fechado: 0 };
 
       const headcount = Number(equipe.headcount) || 1;
       const mrrAtivo = Number(contratos.mrr_ativo) || 0;
       const receitaPorCabeca = headcount > 0 ? mrrAtivo / headcount : 0;
 
       const faturamentoAnoValor = Number(faturamentoAno.faturamento_ano) || 0;
-      const despesasAnoValor = Number(faturamentoAno.despesas_ano) || 0;
+      const faturamentoFechado = Number(faturamentoAno.faturamento_fechado) || 0;
+      const despesasFechado = Number(faturamentoAno.despesas_fechado) || 0;
       const valorBrutoAno = Number(faturamentoAno.valor_bruto_ano) || 1;
       const inadimplenciaAno = Number(faturamentoAno.inadimplencia_ano) || 0;
       const taxaInadimplencia = valorBrutoAno > 0 ? (inadimplenciaAno / valorBrutoAno) * 100 : 0;
-      const margemAno = faturamentoAnoValor > 0 ? ((faturamentoAnoValor - despesasAnoValor) / faturamentoAnoValor) * 100 : 0;
+      // Margem só de meses fechados (exclui o mês corrente, ainda parcial)
+      const margemAno = faturamentoFechado > 0 ? ((faturamentoFechado - despesasFechado) / faturamentoFechado) * 100 : 0;
       
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 1;
       const clientesAtivos = Number(clientes.clientes_ativos) || 1;
