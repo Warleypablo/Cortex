@@ -241,6 +241,10 @@ const TITULOS_SUBABAS: Record<string, string> = {
   churn_pct_performance: "Churn — Performance", churn_pct_creators: "Churn — Creators",
   churn_pct_social: "Churn — Social", churn_pct_gc: "Churn — Gestão de Comunidade",
   churn_pct_others: "Churn — Others",
+  churn_rs_total: "Churn R$ Total",
+  churn_rs_performance: "Churn R$ — Performance", churn_rs_creators: "Churn R$ — Creators",
+  churn_rs_social: "Churn R$ — Social", churn_rs_gc: "Churn R$ — Gestão de Comunidade",
+  churn_rs_others: "Churn R$ — Others",
   saldo_caixa: "Saldo de Caixa", cac_por_cliente: "CAC por cliente adquirido",
   sga_uzk: "UZK", sga_backoffice: "Backoffice", sga_software: "Software", sga_ocupacao: "Ocupação",
   beneficio_total_empresa: "Benefício Caju", sga_premiacoes: "Premiações",
@@ -502,6 +506,13 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const den = parseFloat((denRes.rows[0] as any).mrr);
         realizado = den ? somaRs / den : 0;
         notaDinamica = `churn R$ ${Math.round(somaRs).toLocaleString("pt-BR")} ÷ MRR R$ ${Math.round(den).toLocaleString("pt-BR")} (fim do mês anterior)`;
+      } else if (metrica === "churn_rs_total") {
+        ({ resultado: { grupos, realizado } } = await detChurn(db, mes, null));
+      } else if (metrica.startsWith("churn_rs_")) {
+        const linhaP = metrica.slice(9);
+        const { resultado, somaRs } = await detChurn(db, mes, linhaP);
+        grupos = resultado.grupos;
+        realizado = somaRs;
       } else if (metrica === "saldo_caixa") {
         const contasRes = await db.execute(sql`
           SELECT COALESCE(NULLIF(TRIM(nmbanco), ''), '(sem nome)') AS nome, balance::numeric AS valor
