@@ -220,5 +220,31 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
       : { ...vTot, atingimento: calcAtingimento(vTot.orcado, vTot.realizado) },
   });
 
+  // Churn R$ consolidado = soma dos 5 produtos (orçado derivado + realizado)
+  const mesesChurnTotal: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
+    const mes = i + 1;
+    const real = mes <= mesCorrente
+      ? LINHAS_SERVICO.reduce((acc, { chave: ch }) => acc + (churnRs[ch]?.[mes] ?? 0), 0)
+      : null;
+    const orc = LINHAS_SERVICO.reduce((acc, { chave: ch }) => {
+      const mrrOrcAnterior = orcado[`mrr_${ch}`]?.[mes - 1] ?? 0;
+      return acc + (orcado[`churn_pct_${ch}`]?.[mes] ?? 0) * mrrOrcAnterior;
+    }, 0);
+    return { mes, orcado: orc, realizado: real, atingimento: calcAtingimento(orc, real) };
+  });
+  const vChurnTot = calcYtd(mesesChurnTotal, mesFechado, "fluxo");
+  linhas.unshift({
+    metrica: "churn_rs_total",
+    titulo: "Churn R$ Total",
+    tipoAgregacao: "fluxo",
+    direcao: "menor_melhor",
+    unidade: "brl",
+    nota: "Soma do churn não abonado de todos os produtos. Orçado derivado de churn% × MRR orçado do mês anterior.",
+    meses: mesesChurnTotal,
+    ytd: mesFechado === 0
+      ? { orcado: 0, realizado: null, atingimento: null }
+      : { ...vChurnTot, atingimento: calcAtingimento(vChurnTot.orcado, vChurnTot.realizado) },
+  });
+
   return linhas;
 }
