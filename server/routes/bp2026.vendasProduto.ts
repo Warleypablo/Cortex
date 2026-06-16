@@ -213,7 +213,10 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
 }
 
 // ---- Drill-down: deals que compõem uma célula (segmento × mês) ----
-const MEDIDAS_PRODUTO = ["vendas_mrr", "vendas_pontual", "contratos_vendidos_mrr", "contratos_vendidos_pontual"] as const;
+const MEDIDAS_PRODUTO = [
+  "vendas_mrr", "vendas_pontual", "contratos_vendidos_mrr", "contratos_vendidos_pontual",
+  "aov_venda_mrr", "aov_venda_pontual",
+] as const;
 
 export function parseMetricaProduto(metrica: string):
   { natureza: Natureza; segmento: SegmentoBP; modo: "valor" | "contrato"; titulo: string } | null {
@@ -223,8 +226,11 @@ export function parseMetricaProduto(metrica: string):
     const segmento = SEG_POR_SLUG[slug];
     if (!segmento) return null;
     const natureza: Natureza = medida.endsWith("pontual") ? "pontual" : "recorrente";
-    const modo = medida.startsWith("contratos") ? "contrato" : "valor";
-    const label = modo === "contrato" ? "Contratos" : (natureza === "recorrente" ? "MRR" : "Pontual");
+    const ehAov = medida.startsWith("aov_venda");
+    const ehContrato = medida.startsWith("contratos");
+    // AOV audita pela lista de deals (numerador) — mesma do valor; modo "valor"
+    const modo: "valor" | "contrato" = ehContrato ? "contrato" : "valor";
+    const label = ehAov ? "AOV" : ehContrato ? "Contratos" : (natureza === "recorrente" ? "MRR" : "Pontual");
     return { natureza, segmento, modo, titulo: `${segmento} — ${label}` };
   }
   return null;
