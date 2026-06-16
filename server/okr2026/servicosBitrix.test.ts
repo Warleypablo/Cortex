@@ -14,6 +14,13 @@ describe("de-para de serviços Bitrix", () => {
     expect(SERVICOS_BITRIX[854].segmento).toBe("CRM");
   });
 
+  it("E-mail Marketing e Automação contam como CRM pontual", () => {
+    expect(SERVICOS_BITRIX[860].segmento).toBe("CRM");
+    expect(SERVICOS_BITRIX[860].natureza).toBe("pontual");
+    expect(SERVICOS_BITRIX[864].segmento).toBe("CRM");
+    expect(SERVICOS_BITRIX[864].natureza).toBe("pontual");
+  });
+
   it("classifica natureza recorrente vs pontual", () => {
     expect(SERVICOS_BITRIX[846].natureza).toBe("recorrente");
     expect(SERVICOS_BITRIX[850].natureza).toBe("pontual");
