@@ -14,11 +14,14 @@ export const SERVICOS_BITRIX: Record<number, ServicoBitrix> = {
   870: { id: 870, nome: "Gestão de Comunidade", natureza: "recorrente", segmento: "Gestão de Comunidade" },
   876: { id: 876, nome: "Personalizado Recorrente", natureza: "recorrente", segmento: "Others" },
   858: { id: 858, nome: "Sustentação", natureza: "recorrente", segmento: "Others" },
-  860: { id: 860, nome: "E-mail Marketing", natureza: "recorrente", segmento: "Others" },
+  // E-mail Marketing e Automação compõem o produto CRM e são vendidos sempre como
+  // pontual (cross-sell). Antes caíam em Others › Pontual porque, marcados como
+  // "recorrente", o valor pontual do deal não achava segmento e usava o fallback Others.
+  860: { id: 860, nome: "E-mail Marketing", natureza: "pontual", segmento: "CRM" },
   854: { id: 854, nome: "CRM", natureza: "pontual", segmento: "CRM" },
   878: { id: 878, nome: "SEO Full", natureza: "recorrente", segmento: "Others" },
   1678: { id: 1678, nome: "Turbooh", natureza: "recorrente", segmento: "Others" },
-  864: { id: 864, nome: "Automação", natureza: "recorrente", segmento: "Others" },
+  864: { id: 864, nome: "Automação", natureza: "pontual", segmento: "CRM" },
   866: { id: 866, nome: "Blog Post", natureza: "recorrente", segmento: "Others" },
   884: { id: 884, nome: "Agente de IA", natureza: "recorrente", segmento: "Others" },
   868: { id: 868, nome: "E-commerce", natureza: "pontual", segmento: "E-commerce" },
