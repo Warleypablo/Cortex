@@ -610,7 +610,7 @@ export default function InvestorsReport() {
                   <div className="text-2xl font-bold text-foreground" data-testid="kpi-faturamento-cabeca">
                     {formatCurrency(data?.equipe.faturamentoPorCabeca || 0)}
                   </div>
-                  <div className="text-xs text-muted-foreground">realizado no ano (YTD)</div>
+                  <div className="text-xs text-muted-foreground">realizado / mês (média)</div>
                 </div>
               )}
             </CardContent>
