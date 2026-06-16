@@ -3476,6 +3476,8 @@ Estruture sua resposta em:
       const taxaInadimplencia = valorBrutoAno > 0 ? (inadimplenciaAno / valorBrutoAno) * 100 : 0;
       // Margem só de meses fechados (exclui o mês corrente, ainda parcial)
       const margemAno = faturamentoFechado > 0 ? ((faturamentoFechado - despesasFechado) / faturamentoFechado) * 100 : 0;
+      // Faturamento realizado no ano (YTD) por colaborador ativo
+      const faturamentoPorCabeca = headcount > 0 ? faturamentoAnoValor / headcount : 0;
       
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 1;
       const clientesAtivos = Number(clientes.clientes_ativos) || 1;
@@ -3503,6 +3505,7 @@ Estruture sua resposta em:
           headcount: headcount,
           tempoMedioMeses: Number(Number(equipe.tempo_medio_meses).toFixed(1)) || 0,
           receitaPorCabeca: Number(receitaPorCabeca.toFixed(2)),
+          faturamentoPorCabeca: Number(faturamentoPorCabeca.toFixed(2)),
         },
         distribuicaoSetor: setorResult.rows.map((r: any) => ({
           setor: r.setor,

@@ -73,6 +73,7 @@ interface InvestorsReportData {
     headcount: number;
     tempoMedioMeses: number;
     receitaPorCabeca: number;
+    faturamentoPorCabeca: number;
   };
   distribuicaoSetor: Array<{ setor: string; quantidade: number }>;
   evolucaoFaturamento: Array<{
@@ -532,7 +533,7 @@ export default function InvestorsReport() {
         </div>
 
         {/* KPIs Row 2 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
@@ -583,11 +584,33 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-pink-500/20 rounded">
                       <DollarSign className="h-4 w-4 text-pink-400" />
                     </div>
-                    <span className="text-muted-foreground text-sm">Receita/Cabeça</span>
+                    <span className="text-muted-foreground text-sm">MRR / Cabeça</span>
                   </div>
                   <div className="text-2xl font-bold text-foreground" data-testid="kpi-receita-cabeca">
                     {formatCurrency(data?.equipe.receitaPorCabeca || 0)}
                   </div>
+                  <div className="text-xs text-muted-foreground">recorrente / mês</div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardContent className="pt-5 pb-4">
+              {isLoading ? (
+                <Skeleton className="h-14 w-full" />
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-emerald-500/20 rounded">
+                      <DollarSign className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <span className="text-muted-foreground text-sm">Fat. / Cabeça</span>
+                  </div>
+                  <div className="text-2xl font-bold text-foreground" data-testid="kpi-faturamento-cabeca">
+                    {formatCurrency(data?.equipe.faturamentoPorCabeca || 0)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">realizado no ano (YTD)</div>
                 </div>
               )}
             </CardContent>
