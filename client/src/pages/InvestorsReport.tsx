@@ -217,10 +217,12 @@ export default function InvestorsReport() {
     }), { faturamento: 0, despesas: 0, geracaoCaixa: 0 });
   }, [filteredData]);
 
+  // Margem média PONDERADA (Σ geração de caixa ÷ Σ faturamento), não a média simples dos %s
+  // mensais — esta era distorcida por meses de receita baixa (ex.: fev/23 com margem de -222%).
   const avgMargem = useMemo(() => {
-    if (chartDataWithMetrics.length === 0) return 0;
-    const sum = chartDataWithMetrics.reduce((acc, item) => acc + item.margem, 0);
-    return sum / chartDataWithMetrics.length;
+    const totalFat = chartDataWithMetrics.reduce((acc, item) => acc + item.faturamento, 0);
+    const totalGer = chartDataWithMetrics.reduce((acc, item) => acc + item.geracaoCaixa, 0);
+    return totalFat > 0 ? (totalGer / totalFat) * 100 : 0;
   }, [chartDataWithMetrics]);
 
   // Mês em que a base de receita muda de "emitido" (caz_vendas, histórico) para "caixa" (caz_parcelas).
