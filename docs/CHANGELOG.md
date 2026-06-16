@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-16 | feat(investors-report): faturamento, inadimplência e margem em base anual (YTD)
+
+**O que foi feito:**
+- Card "Fat. Mês Atual" → "Faturamento (Ano)": soma realizada de jan até o mês corrente
+- "Inadimplência (Ano)": acumulada do ano corrente (jan→mês atual), não só do mês vigente
+- "Margem (Ano)": mesma janela YTD, margem ponderada (Σ geração ÷ Σ faturamento), calculada no backend
+- Uma única query `caz_parcelas` (jan→mês atual) alimenta os três KPIs
+
+**Por que:**
+- Métricas de um único mês oscilavam demais (mês parcial inflava inadimplência, subestimava faturamento); a visão anual é mais estável e adequada para investidores
+
+**Arquivos alterados:**
+- `server/routes.ts` — query YTD (`faturamentoAnoResult`) e novos campos `faturamentoAno`/`margemAno`; `taxaInadimplencia` agora YTD
+- `client/src/pages/InvestorsReport.tsx` — cards e linha de referência da margem consomem os campos anuais
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-16 | fix(investors-report): margem média ponderada (corrige −2,6% espúrio)
 
 **O que foi feito:**
