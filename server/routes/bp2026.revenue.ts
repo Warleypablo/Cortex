@@ -30,6 +30,10 @@ const NOTA_OTHERS =
 const NOTA_CHURN =
   "Taxa do mês = churn (não abonado) do produto ÷ MRR da linha no fim do mês anterior.";
 
+const NOTA_CHURN_RS =
+  "Valor absoluto de churn não abonado por produto. " +
+  "Orçado derivado de churn% × MRR orçado do mês anterior.";
+
 // mapeamento: produto exato; quando vazio (snapshots até jan/2026), fallback pelo nome do serviço
 export const CASE_PRODUTO = sql`CASE
   WHEN TRIM(COALESCE(produto, '')) = 'Performance' THEN 'performance'
@@ -170,16 +174,60 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
       churnYtd = { orcado: denOrc ? numOrc / denOrc : 0, realizado: somaDen ? somaChurn / somaDen : null };
     }
 
+    // Churn R$ por produto: meses construídos manualmente para que o orçado mensal
+    // seja derivado (churn_pct_orc × mrr_orc mês anterior) em vez de buscado no banco.
+    const mesesChurnRs: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
+      const mes = i + 1;
+      const mrrOrcAnterior = orcado[`mrr_${chave}`]?.[mes - 1] ?? 0;
+      const o = (orcado[`churn_pct_${chave}`]?.[mes] ?? 0) * mrrOrcAnterior;
+      const r = mes <= mesCorrente ? (c[mes] ?? 0) : null;
+      return { mes, orcado: o, realizado: r, atingimento: calcAtingimento(o, r) };
+    });
+    const vChurnRs = calcYtd(mesesChurnRs, mesFechado, "fluxo");
+
     linhas.push(
       fazLinha({ metrica: `mrr_${chave}`, titulo: `MRR — ${titulo}`, tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "brl", destaque: true, ...(chave === "others" ? { nota: NOTA_OTHERS } : {}) }, mrrSerie),
       fazLinha({ metrica: `contratos_${chave}`, titulo: `Contratos — ${titulo}`, tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "int" }, contratosSerie),
       fazLinha({ metrica: `aov_${chave}`, titulo: `AOV — ${titulo}`, tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, aovSerie, aovYtd),
-      fazLinha({ metrica: `churn_pct_${chave}`, titulo: `Churn — ${titulo}`, tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "pct", nota: NOTA_CHURN }, churnPctSerie, churnYtd)
+      fazLinha({ metrica: `churn_pct_${chave}`, titulo: `Churn — ${titulo}`, tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "pct", nota: NOTA_CHURN }, churnPctSerie, churnYtd),
+      {
+        metrica: `churn_rs_${chave}`, titulo: `Churn R$ — ${titulo}`,
+        tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "brl", nota: NOTA_CHURN_RS,
+        meses: mesesChurnRs,
+        ytd: mesFechado === 0
+          ? { orcado: 0, realizado: null, atingimento: null }
+          : { ...vChurnRs, atingimento: calcAtingimento(vChurnRs.orcado, vChurnRs.realizado) },
+      }
     );
   }
 
-  // Linha de total "MRR Ativo" no topo = soma dos 5 produtos (orçado e realizado),
-  // espelhando a planilha (Receita Recorrente). Drill-down reusa o detalhe de mrr_ativo.
+  // Churn R$ consolidado inserido antes de mrr_ativo (unshift é LIFO: mrr_ativo ficará primeiro)
+  const mesesChurnTotal: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
+    const mes = i + 1;
+    const real = mes <= mesCorrente
+      ? LINHAS_SERVICO.reduce((acc, { chave: ch }) => acc + (churnRs[ch]?.[mes] ?? 0), 0)
+      : null;
+    const orc = LINHAS_SERVICO.reduce((acc, { chave: ch }) => {
+      const mrrOrcAnterior = orcado[`mrr_${ch}`]?.[mes - 1] ?? 0; // mes-1=0 → 0 (dez/2025 não orçado)
+      return acc + (orcado[`churn_pct_${ch}`]?.[mes] ?? 0) * mrrOrcAnterior;
+    }, 0);
+    return { mes, orcado: orc, realizado: real, atingimento: calcAtingimento(orc, real) };
+  });
+  const vChurnTot = calcYtd(mesesChurnTotal, mesFechado, "fluxo");
+  linhas.unshift({
+    metrica: "churn_rs_total",
+    titulo: "Churn R$ Total",
+    tipoAgregacao: "fluxo",
+    direcao: "menor_melhor",
+    unidade: "brl",
+    nota: "Soma do churn não abonado de todos os produtos. Orçado derivado de churn% × MRR orçado do mês anterior.",
+    meses: mesesChurnTotal,
+    ytd: mesFechado === 0
+      ? { orcado: 0, realizado: null, atingimento: null }
+      : { ...vChurnTot, atingimento: calcAtingimento(vChurnTot.orcado, vChurnTot.realizado) },
+  });
+
+  // Linha "MRR Ativo" = soma dos 5 produtos; fica no topo após o segundo unshift
   const mesesTotal: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
     const mes = i + 1;
     const orc = LINHAS_SERVICO.reduce((acc, { chave }) => acc + (orcado[`mrr_${chave}`]?.[mes] ?? 0), 0);
