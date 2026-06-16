@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-16 | fix(investors-report): margem média ponderada (corrige −2,6% espúrio)
+
+**O que foi feito:**
+- KPI "Margem Média" e a linha de referência do gráfico de margem agora usam margem **ponderada** (Σ geração de caixa ÷ Σ faturamento) em vez de média aritmética simples dos %s mensais
+
+**Por que:**
+- A média simples era dominada por meses de receita baixa (ex.: fev/23 com margem de −222% sobre R$ 30k), exibindo −2,6% quando a margem real ponderada é ~+7,8%
+
+**Arquivos alterados:**
+- `client/src/pages/InvestorsReport.tsx` — `avgMargem` recalculado como ponderado
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-16 | fix(investors-report): corrige receita histórica zerada (caz_receber → caz_vendas)
 
 **O que foi feito:**
