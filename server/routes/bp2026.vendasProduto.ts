@@ -21,7 +21,7 @@ const BITRIX_BASE = "https://turbopartners.bitrix24.com.br";
 interface MesLinha { mes: number; orcado: number; realizado: number | null; atingimento: number | null }
 interface Linha {
   metrica: string; titulo: string; tipoAgregacao: "fluxo"; direcao: "maior_melhor";
-  unidade: "brl" | "int" | "pct"; grupo: string; segmento: string;
+  unidade: "brl" | "int" | "pct"; grupo: string; segmento: string; destaque?: boolean;
   meses: MesLinha[]; ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
 
@@ -161,7 +161,8 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
   const fazLinha = (
     metrica: string, titulo: string, grupo: string, segmento: string,
     unidade: Linha["unidade"], serieReal: (number | null)[], orcadoMetrica: string,
-    ytdOverride?: { orcado: number; realizado: number | null }
+    ytdOverride?: { orcado: number; realizado: number | null },
+    destaque = false
   ): Linha => {
     const meses: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
       const o = orcado[orcadoMetrica]?.[i + 1] ?? 0;
@@ -173,7 +174,7 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
       : ytdOverride
         ? { ...ytdOverride, atingimento: calcAtingimento(ytdOverride.orcado, ytdOverride.realizado) }
         : (() => { const v = calcYtd(meses, mesFechado, "fluxo"); return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) }; })();
-    return { metrica, titulo, tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade, grupo, segmento, meses, ytd };
+    return { metrica, titulo, tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade, grupo, segmento, destaque, meses, ytd };
   };
 
   const cel = (m: number, seg: SegmentoBP) => agg.get(m)?.get(seg);
@@ -185,6 +186,11 @@ export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
   ];
 
   for (const b of blocos) {
+    // linha de TOTAL do bloco (soma dos produtos) no topo, em destaque;
+    // orçado = total agregado (vendas_mrr / vendas_pontual); drill-down lista todos os deals
+    const totalReal = serie((m) => b.segmentos.reduce((s, seg) => s + b.pegaValor(cel(m, seg)), 0));
+    const totalTitulo = b.medidaValor === "vendas_mrr" ? "Total MRR" : "Total Pontual";
+    linhas.push(fazLinha(b.medidaValor, totalTitulo, b.grupo, "", "brl", totalReal, b.medidaValor, undefined, true));
     for (const seg of b.segmentos) {
       const valorReal = serie((m) => b.pegaValor(cel(m, seg)));
       const ctrReal = serie((m) => b.pegaCtr(cel(m, seg)));
