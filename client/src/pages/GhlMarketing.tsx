@@ -961,7 +961,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
   // Resumo executivo: entrega WhatsApp por status + funil atribuído (causalidade pós-resposta).
   const summary = useQuery<{
     whatsapp: { total: number; enviado: number; entregue: number; lida: number; erro: number; entrega_pct: number | null; leitura_pct: number | null; erro_pct: number | null };
-    funil: { responderam: number; positivas: number; reuniao_marcada: number; compareceu: number; venda: number };
+    funil: { responderam: number; positivas: number; oportunidades: number; reuniao_marcada: number; compareceu: number; venda: number };
     custos: { gasto_total: number; gasto_por_disparo: number | null; custo_reuniao: number | null; cac: number | null; estimado: boolean; unit_cost: number; n_manual: number };
   }>({
     queryKey: ["/api/ghl/broadcasts/summary", from, to],
@@ -988,7 +988,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
         <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"} />
         <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp" />
         <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint="responderam ao disparo" />
-        <StatCard label="Oportunidades" value={fnl ? fmtInt(fnl.positivas) : "—"} hint="responderam positivo" />
+        <StatCard label="Oportunidades" value={fnl ? fmtInt(fnl.oportunidades) : "—"} hint="responderam positivo ou marcaram reunião" />
         <StatCard label="Reuniões" value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"} hint="atribuídas (pós-resposta)" />
         <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="investimento ÷ reuniões" />
         <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
@@ -1049,15 +1049,36 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
             );
           })}
           {(() => {
+            // Oportunidades é métrica de pessoa (respondentes positivos OU que marcaram reunião),
+            // não de mensagem — por isso fica separada das barras de entrega, com taxa sobre as entregues.
+            const opp = fnl?.oportunidades ?? 0;
+            const entregue = wa?.entregue ?? 0;
+            const pct = entregue > 0 ? (100 * opp) / entregue : 0;
+            return (
+              <div className="space-y-1 pt-2 border-t border-border">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">Oportunidades</span>
+                  <span className="text-muted-foreground" title="oportunidades ÷ entregues"><strong className="text-emerald-600 dark:text-emerald-400">{fmtInt(opp)}</strong> · {pct.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 w-full rounded bg-muted/40 overflow-hidden">
+                  <div className="h-full bg-amber-500" style={{ width: `${Math.max(pct, 1)}%` }} />
+                </div>
+                <p className="text-[11px] text-muted-foreground">Respondentes positivos ou que marcaram reunião (taxa sobre entregues)</p>
+              </div>
+            );
+          })()}
+          {(() => {
             // Taxas com denominador padrão de mercado (não sobre o total): entrega sobre o que saiu,
             // leitura sobre o que foi entregue (abertura real). Erro segue sobre o total enviado.
             const enviado = wa?.enviado ?? 0, entregue = wa?.entregue ?? 0, lida = wa?.lida ?? 0, erro = wa?.erro ?? 0, total = wa?.total ?? 0;
+            const opp = fnl?.oportunidades ?? 0;
             const taxa = (num: number, den: number) => (den > 0 ? `${((100 * num) / den).toFixed(1)}%` : "—");
             return (
               <div className="flex flex-wrap gap-4 pt-2 text-sm border-t border-border">
                 <div title="entregues ÷ enviadas"><span className="text-muted-foreground">Taxa de entrega: </span><strong>{taxa(entregue, enviado)}</strong></div>
                 <div title="lidas ÷ entregues (abertura real)"><span className="text-muted-foreground">Taxa de leitura: </span><strong>{taxa(lida, entregue)}</strong></div>
                 <div title="falhas ÷ total enviado"><span className="text-muted-foreground">Taxa de erro: </span><strong>{taxa(erro, total)}</strong></div>
+                <div title="oportunidades ÷ entregues"><span className="text-muted-foreground">Taxa de oportunidade: </span><strong>{taxa(opp, entregue)}</strong></div>
               </div>
             );
           })()}
@@ -1156,7 +1177,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                     <SortableTh label="Entrega" k="delivery_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <SortableTh label="Abertura" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <SortableTh label="Conversas" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <TableHead className="text-right" title="Oportunidades = respondentes com sentimento positivo">Oportunidades</TableHead>
+                    <TableHead className="text-right" title="Oportunidades = respondentes com 1ª resposta positiva OU que marcaram reunião (intenção qualificada)">Oportunidades</TableHead>
                     <TableHead className="text-right" title="Reuniões atribuídas ao disparo (agendadas após a resposta)">Reuniões</TableHead>
                     <TableHead className="text-right" title="Negócios ganhos atribuídos (venda após resposta)">Ganhos</TableHead>
                     <TableHead className="text-right" title="Receita dos negócios ganhos atribuídos">Receita</TableHead>
