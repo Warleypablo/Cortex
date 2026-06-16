@@ -3117,6 +3117,16 @@ Estruture sua resposta em:
     }
   });
 
+  app.get("/api/financeiro/revenue-goals/historico-inadimplencia", async (req, res) => {
+    try {
+      const data = await storage.getHistoricoInadimplencia();
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching historico inadimplencia:", error);
+      res.status(500).json({ error: "Failed to fetch historico inadimplencia" });
+    }
+  });
+
   app.get("/api/financeiro/revenue-goals/detalhes-dia", async (req, res) => {
     try {
       const dataParam = req.query.data as string;
