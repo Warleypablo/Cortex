@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-16 | fix(investors-report): margem do ano ignora mês corrente (parcial)
+
+**O que foi feito:**
+- A "Margem (Ano)" passa a considerar apenas meses fechados (jan → mês anterior); faturamento e inadimplência seguem incluindo o mês corrente
+
+**Por que:**
+- O mês corrente é parcial — suas despesas ainda não entraram por completo, inflando a margem (18,7% com junho vs 13,7% real só com meses fechados)
+
+**Arquivos alterados:**
+- `server/routes.ts` — `margemAno` calculada a partir de `faturamento_fechado`/`despesas_fechado` (corte em `DATE_TRUNC('month', CURRENT_DATE)`)
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-16 | feat(investors-report): faturamento, inadimplência e margem em base anual (YTD)
 
 **O que foi feito:**
