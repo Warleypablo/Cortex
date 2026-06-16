@@ -3337,7 +3337,7 @@ Estruture sua resposta em:
         SELECT 
           COUNT(*) as total_contratos,
           COUNT(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_recorrentes,
-          COUNT(CASE WHEN valorp > 0 THEN 1 END) as contratos_pontuais,
+          COUNT(CASE WHEN valorp > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_pontuais,
           COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr_ativo,
           COALESCE(AVG(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN valorr END), 0) as aov_recorrente
         FROM "Clickup".cup_contratos
@@ -3579,7 +3579,7 @@ Estruture sua resposta em:
         SELECT 
           COUNT(*) as total_contratos,
           COUNT(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_recorrentes,
-          COUNT(CASE WHEN valorp > 0 THEN 1 END) as contratos_pontuais,
+          COUNT(CASE WHEN valorp > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_pontuais,
           COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr_ativo,
           COALESCE(AVG(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN valorr END), 0) as aov_recorrente,
           COALESCE(SUM(CASE WHEN status = 'churn' THEN valorr ELSE 0 END), 0) as mrr_churn
