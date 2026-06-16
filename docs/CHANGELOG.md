@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-16 | fix(investors-report): contratos pontuais conta só os ativos
+
+**O que foi feito:**
+- "Tipos de Contrato" (card + pizza): pontuais passa a contar apenas `valorp>0 AND status IN ('ativo','onboarding','triagem')`, igual aos recorrentes
+
+**Por que:**
+- A contagem antiga (`valorp>0` sem status) somava 1.121 incluindo 742 entregues + 98 cancelados, gerando um mix falso de 20/80; o mix real de contratos ativos é ~51/49 (274 recorrentes / 262 pontuais)
+
+**Arquivos alterados:**
+- `server/routes.ts` — filtro de status em `contratos_pontuais` nos endpoints da página e do PDF
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-16 | fix(investors-report): gráficos de evolução só com meses fechados (remove distorções)
 
 **O que foi feito:**
