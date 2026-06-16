@@ -3368,65 +3368,74 @@ Estruture sua resposta em:
         ORDER BY quantidade DESC
       `);
       
-      // Faturamento histórico estendido - combina caz_parcelas (últimos 12 meses) com caz_receber/caz_pagar (histórico anterior)
-      // Para dados recentes usa caz_parcelas (mais detalhado), para histórico usa caz_receber e caz_pagar
+      // Faturamento histórico estendido (modelo HÍBRIDO):
+      //  - A partir do 1º mês cheio de caz_parcelas (out/2025): receita/despesa em CAIXA (valor_pago).
+      //  - Antes desse corte: faturamento EMITIDO (caz_vendas) + despesas pagas (caz_pagar),
+      //    pois caz_parcelas/caz_receber não possuem caixa anterior a set/2025.
+      // O campo `fonte` ('caixa' | 'emitido') marca a transição para o frontend sinalizar a quebra de base.
       const faturamentoResult = await db.execute(sql`
-        WITH dados_recentes AS (
-          -- Últimos 12 meses via caz_parcelas (mais detalhado)
-          SELECT 
+        WITH bounds AS (
+          -- cutoff = 1º mês cheio de caz_parcelas; hist_start = 1º mês com receita emitida (caz_vendas)
+          SELECT
+            DATE_TRUNC('month', MIN(COALESCE(data_quitacao, data_vencimento))) + INTERVAL '1 month' AS cutoff,
+            (SELECT DATE_TRUNC('month', MIN(data)) FROM "Conta Azul".caz_vendas) AS hist_start
+          FROM "Conta Azul".caz_parcelas
+          WHERE tipo_evento = 'RECEITA'
+        ),
+        dados_recentes AS (
+          -- A partir do corte até o fim do mês atual: caixa real via caz_parcelas
+          SELECT
             TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
+            'caixa' as fonte,
             COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
             COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' 
+            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO'
               THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
-          FROM "Conta Azul".caz_parcelas
-          WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
+          FROM "Conta Azul".caz_parcelas, bounds
+          WHERE COALESCE(data_quitacao, data_vencimento) >= bounds.cutoff
+            AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
             AND tipo_evento IN ('RECEITA', 'DESPESA')
-          GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+          GROUP BY 1
         ),
         dados_historicos AS (
-          -- Dados anteriores via caz_receber e caz_pagar
-          SELECT 
+          -- Antes do corte: receita emitida (caz_vendas) + despesas pagas (caz_pagar)
+          SELECT
             mes,
+            'emitido' as fonte,
             SUM(faturamento) as faturamento,
             SUM(despesas) as despesas,
-            SUM(valor_bruto) as valor_bruto,
             0 as inadimplencia
           FROM (
-            -- Receitas de caz_receber
-            SELECT 
-              TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM') as mes,
-              COALESCE(SUM(pago::numeric), 0) as faturamento,
-              0 as despesas,
-              COALESCE(SUM(total::numeric), 0) as valor_bruto
-            FROM "Conta Azul".caz_receber
-            WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
-              AND COALESCE(data_vencimento, data_criacao) < CURRENT_DATE - INTERVAL '12 months'
-              AND COALESCE(data_vencimento, data_criacao) >= CURRENT_DATE - INTERVAL '5 years'
-            GROUP BY TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM')
-            
+            -- Receita emitida (notas) de caz_vendas — única fonte de receita com histórico
+            SELECT
+              TO_CHAR(data, 'YYYY-MM') as mes,
+              COALESCE(SUM(total::numeric), 0) as faturamento,
+              0 as despesas
+            FROM "Conta Azul".caz_vendas, bounds
+            WHERE data >= bounds.hist_start
+              AND data < bounds.cutoff
+            GROUP BY 1
+
             UNION ALL
-            
-            -- Despesas de caz_pagar
-            SELECT 
+
+            -- Despesas pagas de caz_pagar
+            SELECT
               TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM') as mes,
               0 as faturamento,
-              COALESCE(SUM(pago::numeric), 0) as despesas,
-              0 as valor_bruto
-            FROM "Conta Azul".caz_pagar
+              COALESCE(SUM(pago::numeric), 0) as despesas
+            FROM "Conta Azul".caz_pagar, bounds
             WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
-              AND COALESCE(data_vencimento, data_criacao) < CURRENT_DATE - INTERVAL '12 months'
-              AND COALESCE(data_vencimento, data_criacao) >= CURRENT_DATE - INTERVAL '5 years'
-            GROUP BY TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM')
+              AND COALESCE(data_vencimento, data_criacao) >= bounds.hist_start
+              AND COALESCE(data_vencimento, data_criacao) < bounds.cutoff
+            GROUP BY 1
           ) combined
           GROUP BY mes
         )
-        -- Combina dados recentes e históricos
-        SELECT mes, faturamento, despesas, valor_bruto, inadimplencia
+        -- Combina dados recentes (caixa) e históricos (emitido)
+        SELECT mes, fonte, faturamento, despesas, inadimplencia
         FROM dados_recentes
         UNION ALL
-        SELECT mes, faturamento, despesas, valor_bruto, inadimplencia
+        SELECT mes, fonte, faturamento, despesas, inadimplencia
         FROM dados_historicos
         WHERE mes NOT IN (SELECT mes FROM dados_recentes)
         ORDER BY mes DESC
@@ -3493,6 +3502,7 @@ Estruture sua resposta em:
           const despesas = Number(r.despesas) || 0;
           return {
             mes: r.mes,
+            fonte: r.fonte as 'caixa' | 'emitido',
             faturamento,
             despesas,
             geracaoCaixa: faturamento - despesas,

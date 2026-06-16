@@ -74,9 +74,10 @@ interface InvestorsReportData {
     receitaPorCabeca: number;
   };
   distribuicaoSetor: Array<{ setor: string; quantidade: number }>;
-  evolucaoFaturamento: Array<{ 
-    mes: string; 
-    faturamento: number; 
+  evolucaoFaturamento: Array<{
+    mes: string;
+    fonte: 'caixa' | 'emitido';
+    faturamento: number;
     despesas: number;
     geracaoCaixa: number;
     inadimplencia: number;
@@ -96,12 +97,12 @@ const COLORS = ['#1978D5', '#041F60', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'
 
 export default function InvestorsReport() {
   usePageTitle("Relatório para Investidores");
-  useSetPageInfo("Investors Report", "Métricas financeiras consolidadas • 2022-2025");
-  
-  const [startPeriod, setStartPeriod] = useState({ month: 1, year: 2022 });
+  useSetPageInfo("Investors Report", "Métricas financeiras consolidadas • 2023-presente");
+
+  const [startPeriod, setStartPeriod] = useState({ month: 1, year: 2023 });
   const [endPeriod, setEndPeriod] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
-    start: new Date('2022-01-01'),
+    start: new Date('2023-01-01'),
     end: new Date()
   });
   const [isCapturing, setIsCapturing] = useState(false);
@@ -220,6 +221,13 @@ export default function InvestorsReport() {
     if (chartDataWithMetrics.length === 0) return 0;
     const sum = chartDataWithMetrics.reduce((acc, item) => acc + item.margem, 0);
     return sum / chartDataWithMetrics.length;
+  }, [chartDataWithMetrics]);
+
+  // Mês em que a base de receita muda de "emitido" (caz_vendas, histórico) para "caixa" (caz_parcelas).
+  // Usado para sinalizar a quebra de metodologia nos gráficos. null = série sem transição no período.
+  const transicaoFonte = useMemo(() => {
+    const idx = chartDataWithMetrics.findIndex(item => item.fonte === 'caixa');
+    return idx > 0 ? chartDataWithMetrics[idx].mesLabel : null;
   }, [chartDataWithMetrics]);
 
   const handleExportPDF = async () => {
@@ -371,7 +379,7 @@ export default function InvestorsReport() {
               <MonthYearPicker
                 value={startPeriod}
                 onChange={setStartPeriod}
-                minYear={2022}
+                minYear={2023}
                 maxYear={new Date().getFullYear()}
               />
             </div>
@@ -380,7 +388,7 @@ export default function InvestorsReport() {
               <MonthYearPicker
                 value={endPeriod}
                 onChange={setEndPeriod}
-                minYear={2022}
+                minYear={2023}
                 maxYear={new Date().getFullYear()}
               />
             </div>
@@ -616,7 +624,10 @@ export default function InvestorsReport() {
                 <TrendingUp className="h-5 w-5 text-emerald-400" />
                 Evolução do Faturamento
               </CardTitle>
-              <CardDescription className="text-muted-foreground">Receita mensal ao longo do tempo</CardDescription>
+              <CardDescription className="text-muted-foreground">
+                Receita mensal ao longo do tempo
+                {transicaoFonte && <span className="block text-[11px] mt-0.5 text-amber-400/80">Até a marca: faturamento emitido (notas) • Após: receita em caixa</span>}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -642,6 +653,10 @@ export default function InvestorsReport() {
                       contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                       labelStyle={{ color: '#f8fafc' }}
                     />
+                    {transicaoFonte && (
+                      <ReferenceLine x={transicaoFonte} stroke="#f59e0b" strokeDasharray="4 4" strokeWidth={1.5}
+                        label={{ value: 'emitido → caixa', position: 'insideTopRight', fill: '#f59e0b', fontSize: 9 }} />
+                    )}
                     <Area type="monotone" dataKey="faturamento" stroke="#10b981" fill="url(#gradientFat)" strokeWidth={0} />
                     <Line type="monotone" dataKey="faturamento" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
                   </LineChart>
