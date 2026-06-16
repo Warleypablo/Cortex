@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { formatCurrency, formatPercent, cn } from "@/lib/utils";
+import { formatCurrency, formatCurrencyCompact, formatPercent, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
@@ -86,6 +86,15 @@ const mesesNomes = [
 ];
 
 const mesesAbreviados = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+// Histórico de inadimplência (estático, fechado por mês). Mês corrente é exibido ao vivo.
+const historicoInadimplencia: { mes: string; valor: number; pct: number }[] = [
+  { mes: "Janeiro", valor: 46000, pct: 3.55 },
+  { mes: "Fevereiro", valor: 43000, pct: 3.23 },
+  { mes: "Março", valor: 49000, pct: 3.50 },
+  { mes: "Abril", valor: 52000, pct: 3.33 },
+  { mes: "Maio", valor: 71000, pct: 4.79 },
+];
 
 function CustomTooltip({ active, payload, label }: any) {
   if (active && payload && payload.length) {
@@ -409,6 +418,60 @@ export default function RevenueGoals() {
                     <Line yAxisId="lines" type="monotone" dataKey="recebidoAcumulado" name="Recebido Acumulado" stroke="#10b981" strokeWidth={2} strokeDasharray="5 5" dot={false} activeDot={{ r: 5, strokeWidth: 2, fill: '#10b981' }} />
                   </ComposedChart>
                 </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Histórico de Inadimplência */}
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Inadimplência</CardTitle>
+              <CardDescription>Histórico mensal (valor e % sobre o previsto)</CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              <div className="overflow-hidden rounded-lg border border-gray-100 dark:border-zinc-800">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="border-b border-gray-100 dark:border-zinc-800 text-[11px] uppercase tracking-wide text-muted-foreground">
+                      <th className="text-left font-medium px-4 py-2.5">Mês</th>
+                      <th className="text-right font-medium px-4 py-2.5">Valor</th>
+                      <th className="text-right font-medium px-4 py-2.5">% Inadimplência</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {/* Mês corrente — valor de referência (estático) */}
+                    <tr className="bg-muted/40 border-b border-gray-100 dark:border-zinc-800">
+                      <td className="px-4 py-2.5 font-semibold">Mês Corrente</td>
+                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
+                        {formatCurrencyCompact(177000)}
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-semibold tabular-nums text-muted-foreground">
+                        —
+                      </td>
+                    </tr>
+                    {historicoInadimplencia.map((m) => (
+                      <tr
+                        key={m.mes}
+                        className="border-b border-gray-50 dark:border-zinc-800/50 last:border-0"
+                      >
+                        <td className="px-4 py-2.5 text-muted-foreground">{m.mes}</td>
+                        <td className="px-4 py-2.5 text-right tabular-nums">
+                          {formatCurrencyCompact(m.valor)}
+                        </td>
+                        <td
+                          className={cn(
+                            "px-4 py-2.5 text-right tabular-nums font-medium",
+                            m.pct >= 4
+                              ? "text-red-600 dark:text-red-400"
+                              : "text-emerald-600 dark:text-emerald-400"
+                          )}
+                        >
+                          {formatPercent(m.pct)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
             </CardContent>
           </Card>
