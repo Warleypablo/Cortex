@@ -1038,7 +1038,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
               <div key={row.label} className="space-y-1">
                 <div className="flex justify-between text-sm">
                   <span>{row.label}</span>
-                  <span className="text-muted-foreground"><strong className="text-foreground">{fmtInt(row.value)}</strong> · {pct.toFixed(1)}%</span>
+                  <span className="text-muted-foreground" title="% sobre o total de mensagens"><strong className="text-foreground">{fmtInt(row.value)}</strong> · {pct.toFixed(1)}%</span>
                 </div>
                 <div className="h-2 w-full rounded bg-muted/40 overflow-hidden">
                   <div className={`h-full ${row.color}`} style={{ width: `${Math.max(pct, 1)}%` }} />
@@ -1046,11 +1046,19 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
               </div>
             );
           })}
-          <div className="flex gap-4 pt-2 text-sm border-t border-border">
-            <div><span className="text-muted-foreground">Taxa de entrega: </span><strong>{wa?.entrega_pct != null ? `${wa.entrega_pct}%` : "—"}</strong></div>
-            <div><span className="text-muted-foreground">Taxa de leitura: </span><strong>{wa?.leitura_pct != null ? `${wa.leitura_pct}%` : "—"}</strong></div>
-            <div><span className="text-muted-foreground">Taxa de erro: </span><strong>{wa?.erro_pct != null ? `${wa.erro_pct}%` : "—"}</strong></div>
-          </div>
+          {(() => {
+            // Taxas com denominador padrão de mercado (não sobre o total): entrega sobre o que saiu,
+            // leitura sobre o que foi entregue (abertura real). Erro segue sobre o total enviado.
+            const enviado = wa?.enviado ?? 0, entregue = wa?.entregue ?? 0, lida = wa?.lida ?? 0, erro = wa?.erro ?? 0, total = wa?.total ?? 0;
+            const taxa = (num: number, den: number) => (den > 0 ? `${((100 * num) / den).toFixed(1)}%` : "—");
+            return (
+              <div className="flex flex-wrap gap-4 pt-2 text-sm border-t border-border">
+                <div title="entregues ÷ enviadas"><span className="text-muted-foreground">Taxa de entrega: </span><strong>{taxa(entregue, enviado)}</strong></div>
+                <div title="lidas ÷ entregues (abertura real)"><span className="text-muted-foreground">Taxa de leitura: </span><strong>{taxa(lida, entregue)}</strong></div>
+                <div title="falhas ÷ total enviado"><span className="text-muted-foreground">Taxa de erro: </span><strong>{taxa(erro, total)}</strong></div>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
