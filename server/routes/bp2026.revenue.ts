@@ -30,6 +30,10 @@ const NOTA_OTHERS =
 const NOTA_CHURN =
   "Taxa do mês = churn (não abonado) do produto ÷ MRR da linha no fim do mês anterior.";
 
+const NOTA_CHURN_RS =
+  "Valor absoluto de churn não abonado por produto. " +
+  "Orçado derivado de churn% × MRR orçado do mês anterior.";
+
 // mapeamento: produto exato; quando vazio (snapshots até jan/2026), fallback pelo nome do serviço
 export const CASE_PRODUTO = sql`CASE
   WHEN TRIM(COALESCE(produto, '')) = 'Performance' THEN 'performance'
@@ -170,11 +174,30 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
       churnYtd = { orcado: denOrc ? numOrc / denOrc : 0, realizado: somaDen ? somaChurn / somaDen : null };
     }
 
+    // Churn R$ por produto: realizado = valor nominal; orçado derivado de pct × mrr anterior
+    const churnRsSerie = Array.from({ length: 12 }, (_, i) =>
+      i + 1 <= mesCorrente ? (c[i + 1] ?? 0) : null
+    );
+
+    let churnRsYtd: { orcado: number; realizado: number | null } | undefined;
+    if (mesFechado > 0) {
+      let somaReal = 0;
+      let somaOrc = 0;
+      for (let m = 1; m <= mesFechado; m++) {
+        somaReal += c[m] ?? 0;
+        // mrr_orc do mês m-1: mes=0 não existe no banco → 0 (correto para janeiro)
+        const mrrOrcAnterior = orcado[`mrr_${chave}`]?.[m - 1] ?? 0;
+        somaOrc += (orcado[`churn_pct_${chave}`]?.[m] ?? 0) * mrrOrcAnterior;
+      }
+      churnRsYtd = { orcado: somaOrc, realizado: somaReal };
+    }
+
     linhas.push(
       fazLinha({ metrica: `mrr_${chave}`, titulo: `MRR — ${titulo}`, tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "brl", destaque: true, ...(chave === "others" ? { nota: NOTA_OTHERS } : {}) }, mrrSerie),
       fazLinha({ metrica: `contratos_${chave}`, titulo: `Contratos — ${titulo}`, tipoAgregacao: "estoque", direcao: "maior_melhor", unidade: "int" }, contratosSerie),
       fazLinha({ metrica: `aov_${chave}`, titulo: `AOV — ${titulo}`, tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade: "brl" }, aovSerie, aovYtd),
-      fazLinha({ metrica: `churn_pct_${chave}`, titulo: `Churn — ${titulo}`, tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "pct", nota: NOTA_CHURN }, churnPctSerie, churnYtd)
+      fazLinha({ metrica: `churn_pct_${chave}`, titulo: `Churn — ${titulo}`, tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "pct", nota: NOTA_CHURN }, churnPctSerie, churnYtd),
+      fazLinha({ metrica: `churn_rs_${chave}`, titulo: `Churn R$ — ${titulo}`, tipoAgregacao: "fluxo", direcao: "menor_melhor", unidade: "brl", nota: NOTA_CHURN_RS }, churnRsSerie, churnRsYtd)
     );
   }
 
