@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-16 | fix(broadcast): taxas de entrega/leitura com denominador correto
+
+**O que foi feito:**
+- Taxa de leitura passou a ser lidas ÷ entregues (abertura real ~45%) em vez de lidas ÷ total (~33%)
+- Taxa de entrega passou a ser entregues ÷ enviadas; taxa de erro mantida sobre o total
+- Tooltips em cada taxa (e nas barras, que seguem distribuição ÷ total) explicando o denominador
+
+**Por que:**
+- A taxa de leitura sobre o total subestimava a abertura; o padrão de mercado é sobre as entregues
+
+**Arquivos alterados:**
+- `client/src/pages/GhlMarketing.tsx` - rodapé de "Status de entrega" calcula as taxas no frontend a partir dos contadores
+
+**Impacto arquitetural:** Nenhum — frontend-only; backend (`leitura_pct`/`entrega_pct`) intacto pra não afetar outros consumidores.
+
+---
+
 ## 2026-06-16 | feat(broadcast): card de KPI "Custo / reunião" no resumo
 
 **O que foi feito:**
