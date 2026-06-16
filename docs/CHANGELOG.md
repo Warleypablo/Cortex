@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-16 | fix(broadcast): Oportunidade conta reunião + card Status de entrega
+
+**O que foi feito:**
+- Oportunidade deixou de ser só `sentiment = 'positiva'` e passou a contar respondentes com **1ª resposta positiva OU que marcaram reunião** (em qualquer evento). A reunião é o sinal de intenção mais forte que existe
+- Aplicado nos 3 pontos: KPI "Oportunidades" do resumo (`getBroadcastsSummary.funil.oportunidades`), coluna da lista (`listBroadcasts.oppMap`) e tooltip
+- Adicionada linha **"Oportunidades"** + **"Taxa de oportunidade"** (opp ÷ entregues) ao card *Status de entrega*
+- Garantido o invariante **oportunidades ≥ reuniões** em todas as views (0 violações no histórico)
+
+**Por que:**
+- Havia disparos com Reuniões > 0 e Oportunidades = 0 — logicamente impossível. Investigação (jun/2026): **42 das 48 reuniões (87%)** vieram de respostas que o classificador rotulou "neutra"/"negativa", então oportunidade por sentimento sozinho subcontava (192 → 228 no histórico; 9 disparos eram afetados)
+
+**Arquivos alterados:**
+- `server/routes/ghl.ts` - nova coluna `oportunidades` no funil do summary; `oppMap` redefinido com `BOOL_OR(reunião)` por respondente
+- `client/src/pages/GhlMarketing.tsx` - KPI usa `fnl.oportunidades`; nova linha + taxa no card Status de entrega; tipo e tooltips atualizados
+
+**Impacto arquitetural:** Nenhum — reusa `broadcast_lead_events` + `Bitrix.crm_deal` com a mesma política de causalidade (`data_reuniao_agendada >= reply_at`); partição de sentimento do funil (positivas/neutras/…) permanece intacta.
+
+---
+
 ## 2026-06-16 | feat(broadcast): métrica de Oportunidades (respondentes positivos)
 
 **O que foi feito:**
