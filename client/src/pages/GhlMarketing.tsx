@@ -982,12 +982,13 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
 
   return (
     <div className="space-y-4">
-      {/* KPI cards: Investimento · Disparos · Respostas · Reuniões · Vendas · CAC */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* KPI cards: Investimento · Disparos · Respostas · Reuniões · Custo/reunião · Vendas · CAC */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3">
         <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"} />
         <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp" />
         <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint={fnl ? `${fmtInt(fnl.positivas)} positivas` : undefined} />
         <StatCard label="Reuniões" value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"} hint="atribuídas (pós-resposta)" />
+        <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="investimento ÷ reuniões" />
         <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
         <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas" />
       </div>
