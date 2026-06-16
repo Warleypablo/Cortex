@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-16 | feat(broadcast): métrica de Oportunidades (respondentes positivos)
+
+**O que foi feito:**
+- Novo KPI "Oportunidades" no topo do resumo de Broadcast = respostas com sentimento positivo (usa `funil.positivas`, já retornado pelo summary)
+- Nova coluna "Oportunidades" na tabela de disparos, calculada por broadcast
+- `listBroadcasts` agrega respondentes positivos por broadcast (1 linha por respondedor, sentimento da 1ª resposta) → campo `oportunidades`
+- Hint de "Respostas" ajustado (não duplica "positivas") e grid de KPIs de 7 → 8 colunas
+
+**Por que:**
+- Medir oportunidades qualificadas (quem respondeu com intenção), não só volume de respostas/entrega
+
+**Arquivos alterados:**
+- `server/routes/ghl.ts` - `oppMap` em `listBroadcasts` + campo `oportunidades` no response
+- `client/src/pages/GhlMarketing.tsx` - KPI + coluna + tipo `BroadcastRow.oportunidades`
+
+**Impacto arquitetural:** Nenhum — reusa `broadcast_lead_events` e a definição de sentimento já existente.
+
+---
+
 ## 2026-06-16 | fix(broadcast): taxas de entrega/leitura com denominador correto
 
 **O que foi feito:**
