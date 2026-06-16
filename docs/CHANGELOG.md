@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-16 | feat(revenue-goals): card de histórico de inadimplência
+
+**O que foi feito:**
+- Novo card "Inadimplência" na tela Metas de Receita (`/dashboard/revenue-goals`), com tabela compacta do histórico mensal (valor + % sobre o previsto)
+- Linha "Mês Corrente" em destaque (R$ 177K, valor de referência fixo) no topo, seguida dos meses fechados (Jan–Mai)
+- Percentuais coloridos: verde até a meta ideal (4%) e vermelho acima
+- Posicionado logo acima do bloco "Metas de Inadimplência", agrupando todo o conteúdo de inadimplência
+
+**Por que:**
+- Pedido do Rodrigo: ter na própria tela de Revenue Goal uma visão rápida do histórico de inadimplência mês a mês para acompanhamento
+- Dados estáticos (sem mudança de backend); o "Mês Corrente" usa valor de referência fixo porque o cálculo ao vivo de um mês ainda aberto infla o número (tudo não pago entra como inadimplente)
+
+**Arquivos alterados:**
+- `client/src/pages/RevenueGoals.tsx` - adiciona constante `historicoInadimplencia`, importa `formatCurrencyCompact` e renderiza o card de tabela
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-06-14 | feat(criativos): exibe o motivo real da falha nos toasts de ação em massa
 
 **O que foi feito:**
