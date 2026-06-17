@@ -65,18 +65,21 @@ interface InvestorsReportData {
   receita: {
     mrrAtivo: number;
     aovRecorrente: number;
-    faturamentoMes: number;
+    faturamentoAno: number;
     taxaInadimplencia: number;
+    margemAno: number;
   };
   equipe: {
     headcount: number;
     tempoMedioMeses: number;
     receitaPorCabeca: number;
+    faturamentoPorCabeca: number;
   };
   distribuicaoSetor: Array<{ setor: string; quantidade: number }>;
-  evolucaoFaturamento: Array<{ 
-    mes: string; 
-    faturamento: number; 
+  evolucaoFaturamento: Array<{
+    mes: string;
+    fonte: 'caixa' | 'emitido';
+    faturamento: number;
     despesas: number;
     geracaoCaixa: number;
     inadimplencia: number;
@@ -96,12 +99,12 @@ const COLORS = ['#1978D5', '#041F60', '#10b981', '#8b5cf6', '#ec4899', '#06b6d4'
 
 export default function InvestorsReport() {
   usePageTitle("Relatório para Investidores");
-  useSetPageInfo("Investors Report", "Métricas financeiras consolidadas • 2022-2025");
-  
-  const [startPeriod, setStartPeriod] = useState({ month: 1, year: 2022 });
+  useSetPageInfo("Investors Report", "Métricas financeiras consolidadas • 2023-presente");
+
+  const [startPeriod, setStartPeriod] = useState({ month: 1, year: 2023 });
   const [endPeriod, setEndPeriod] = useState({ month: new Date().getMonth() + 1, year: new Date().getFullYear() });
   const [dateRange, setDateRange] = useState<{ start: Date; end: Date }>({
-    start: new Date('2022-01-01'),
+    start: new Date('2023-01-01'),
     end: new Date()
   });
   const [isCapturing, setIsCapturing] = useState(false);
@@ -216,10 +219,15 @@ export default function InvestorsReport() {
     }), { faturamento: 0, despesas: 0, geracaoCaixa: 0 });
   }, [filteredData]);
 
-  const avgMargem = useMemo(() => {
-    if (chartDataWithMetrics.length === 0) return 0;
-    const sum = chartDataWithMetrics.reduce((acc, item) => acc + item.margem, 0);
-    return sum / chartDataWithMetrics.length;
+  // Margem do ano corrente (YTD), mesma janela da inadimplência — calculada no backend
+  // como margem ponderada (Σ geração ÷ Σ faturamento) de jan até o mês atual.
+  const avgMargem = data?.receita.margemAno ?? 0;
+
+  // Mês em que a base de receita muda de "emitido" (caz_vendas, histórico) para "caixa" (caz_parcelas).
+  // Usado para sinalizar a quebra de metodologia nos gráficos. null = série sem transição no período.
+  const transicaoFonte = useMemo(() => {
+    const idx = chartDataWithMetrics.findIndex(item => item.fonte === 'caixa');
+    return idx > 0 ? chartDataWithMetrics[idx].mesLabel : null;
   }, [chartDataWithMetrics]);
 
   const handleExportPDF = async () => {
@@ -371,7 +379,7 @@ export default function InvestorsReport() {
               <MonthYearPicker
                 value={startPeriod}
                 onChange={setStartPeriod}
-                minYear={2022}
+                minYear={2023}
                 maxYear={new Date().getFullYear()}
               />
             </div>
@@ -380,7 +388,7 @@ export default function InvestorsReport() {
               <MonthYearPicker
                 value={endPeriod}
                 onChange={setEndPeriod}
-                minYear={2022}
+                minYear={2023}
                 maxYear={new Date().getFullYear()}
               />
             </div>
@@ -483,13 +491,13 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-emerald-500/20 rounded">
                       <Briefcase className="h-4 w-4 text-emerald-400" />
                     </div>
-                    <span className="text-muted-foreground text-sm">Fat. Mês Atual</span>
+                    <span className="text-muted-foreground text-sm">Faturamento (Ano)</span>
                   </div>
                   <div className="text-3xl font-bold text-foreground" data-testid="kpi-faturamento">
-                    {formatCurrencyShort(data?.receita.faturamentoMes || 0)}
+                    {formatCurrencyShort(data?.receita.faturamentoAno || 0)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Realizado ERP
+                    Realizado no ano (YTD)
                   </div>
                 </div>
               )}
@@ -525,7 +533,7 @@ export default function InvestorsReport() {
         </div>
 
         {/* KPIs Row 2 */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
           <Card className="bg-card border-border">
             <CardContent className="pt-5 pb-4">
               {isLoading ? (
@@ -536,7 +544,7 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-red-500/20 rounded">
                       <AlertTriangle className="h-4 w-4 text-red-400" />
                     </div>
-                    <span className="text-muted-foreground text-sm">Inadimplência</span>
+                    <span className="text-muted-foreground text-sm">Inadimplência (Ano)</span>
                   </div>
                   <div className="text-2xl font-bold text-red-400" data-testid="kpi-inadimplencia">
                     {formatDecimal(data?.receita.taxaInadimplencia || 0)}%
@@ -576,11 +584,33 @@ export default function InvestorsReport() {
                     <div className="p-1.5 bg-pink-500/20 rounded">
                       <DollarSign className="h-4 w-4 text-pink-400" />
                     </div>
-                    <span className="text-muted-foreground text-sm">Receita/Cabeça</span>
+                    <span className="text-muted-foreground text-sm">MRR / Cabeça</span>
                   </div>
                   <div className="text-2xl font-bold text-foreground" data-testid="kpi-receita-cabeca">
                     {formatCurrency(data?.equipe.receitaPorCabeca || 0)}
                   </div>
+                  <div className="text-xs text-muted-foreground">recorrente / mês</div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card className="bg-card border-border">
+            <CardContent className="pt-5 pb-4">
+              {isLoading ? (
+                <Skeleton className="h-14 w-full" />
+              ) : (
+                <div className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <div className="p-1.5 bg-emerald-500/20 rounded">
+                      <DollarSign className="h-4 w-4 text-emerald-400" />
+                    </div>
+                    <span className="text-muted-foreground text-sm">Fat. / Cabeça</span>
+                  </div>
+                  <div className="text-2xl font-bold text-foreground" data-testid="kpi-faturamento-cabeca">
+                    {formatCurrency(data?.equipe.faturamentoPorCabeca || 0)}
+                  </div>
+                  <div className="text-xs text-muted-foreground">realizado / mês (média)</div>
                 </div>
               )}
             </CardContent>
@@ -596,7 +626,7 @@ export default function InvestorsReport() {
                     <div className={`p-1.5 rounded ${avgMargem >= 0 ? 'bg-green-500/20' : 'bg-red-500/20'}`}>
                       <Percent className="h-4 w-4" style={{ color: avgMargem >= 0 ? '#4ade80' : '#f87171' }} />
                     </div>
-                    <span className="text-muted-foreground text-sm">Margem Média</span>
+                    <span className="text-muted-foreground text-sm">Margem (Ano)</span>
                   </div>
                   <div className={`text-2xl font-bold ${avgMargem >= 0 ? 'text-green-400' : 'text-red-400'}`} data-testid="kpi-margem">
                     {formatDecimal(avgMargem)}%
@@ -616,7 +646,10 @@ export default function InvestorsReport() {
                 <TrendingUp className="h-5 w-5 text-emerald-400" />
                 Evolução do Faturamento
               </CardTitle>
-              <CardDescription className="text-muted-foreground">Receita mensal ao longo do tempo</CardDescription>
+              <CardDescription className="text-muted-foreground">
+                Receita mensal ao longo do tempo
+                {transicaoFonte && <span className="block text-[11px] mt-0.5 text-amber-400/80">Até a marca: faturamento emitido (notas) • Após: receita em caixa</span>}
+              </CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
@@ -642,7 +675,11 @@ export default function InvestorsReport() {
                       contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                       labelStyle={{ color: '#f8fafc' }}
                     />
-                    <Area type="monotone" dataKey="faturamento" stroke="#10b981" fill="url(#gradientFat)" strokeWidth={0} />
+                    {transicaoFonte && (
+                      <ReferenceLine x={transicaoFonte} stroke="#f59e0b" strokeDasharray="4 4" strokeWidth={1.5}
+                        label={{ value: 'emitido → caixa', position: 'insideTopRight', fill: '#f59e0b', fontSize: 9 }} />
+                    )}
+                    <Area type="monotone" dataKey="faturamento" stroke="#10b981" fill="url(#gradientFat)" strokeWidth={0} tooltipType="none" legendType="none" />
                     <Line type="monotone" dataKey="faturamento" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -684,8 +721,8 @@ export default function InvestorsReport() {
                       labelStyle={{ color: '#f8fafc' }}
                     />
                     <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} />
-                    <ReferenceLine y={avgMargem} stroke="#1978D5" strokeDasharray="5 5" strokeWidth={1} label={{ value: `Média: ${avgMargem.toFixed(1)}%`, position: 'right', fill: '#1978D5', fontSize: 10 }} />
-                    <Area type="monotone" dataKey="margem" stroke="#3b82f6" fill="url(#gradientMargem)" strokeWidth={0} />
+                    <ReferenceLine y={avgMargem} stroke="#1978D5" strokeDasharray="5 5" strokeWidth={1} label={{ value: `Margem ano: ${avgMargem.toFixed(1)}%`, position: 'right', fill: '#1978D5', fontSize: 10 }} />
+                    <Area type="monotone" dataKey="margem" stroke="#3b82f6" fill="url(#gradientMargem)" strokeWidth={0} tooltipType="none" legendType="none" />
                     <Line type="monotone" dataKey="margem" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, fill: '#3b82f6' }} activeDot={{ r: 5 }} />
                   </ComposedChart>
                 </ResponsiveContainer>

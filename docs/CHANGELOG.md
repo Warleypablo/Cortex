@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-17 | fix(investors-report): margem/faturamento em base única de competência (caz_receber+caz_pagar)
+
+**O que foi feito:**
+- `faturamentoResult` (`server/routes.ts`): a série mensal de faturamento/despesa/margem passa a usar uma fonte única em regime de COMPETÊNCIA — receita = `caz_receber.total` e despesa = `caz_pagar.total`, ambas por `data_vencimento`. Substitui o modelo híbrido anterior (receita emitida `caz_vendas` + despesa paga `caz_pagar`).
+- A série começa no 1º mês de `caz_receber` (`bounds.inicio`) para não gerar meses só-despesa (margem -∞); estende-se sozinha para trás quando o histórico de `caz_receber`/`caz_pagar` é repopulado.
+- `faturamentoAnoResult` (KPIs YTD): alinhado à mesma fonte para o card "Margem (Ano)" não divergir do gráfico. Removido `valor_bruto_ano`; taxa de inadimplência passa a usar o faturamento do ano como base.
+- Tooltip dos gráficos de Margem e Faturamento: a `Area` decorativa recebe `tooltipType="none"`/`legendType="none"`, removendo a entrada duplicada (antes "Margem" aparecia 2x no tooltip).
+
+**Por que:**
+- A margem mensal exibia picos falsos (set/25 39,3%, abr/25 34,2%) porque misturava receita por EMISSÃO (`caz_vendas` lança o valor cheio da nota no mês da emissão) com despesa por CAIXA (`caz_pagar`) — regimes temporais incompatíveis. Usar `total` (faturado) em vez de `pago` (recebido) também evita a subnotação dos meses recentes enquanto as faturas ainda não foram quitadas.
+
+**Arquivos alterados:**
+- `server/routes.ts` - queries `faturamentoResult` e `faturamentoAnoResult`
+- `client/src/pages/InvestorsReport.tsx` - `tooltipType`/`legendType` nas Areas de Margem e Faturamento
+
+**Impacto arquitetural:** Enquanto `caz_receber`/`caz_pagar` só tiverem histórico desde out/2025, a série exibe out/2025→presente; repopular o histórico estende a série sem mudança de código.
+
+---
+
 ## 2026-06-16 | fix(bp2026-revenue): churn R$ orçado usa MRR do mesmo mês
 
 **O que foi feito:**
@@ -73,6 +92,139 @@
 - `server/routes/bp2026.info.ts` - textos de fonte/cálculo do churn e do MRR vazado
 
 **Impacto arquitetural:** Nenhum. A view `vw_cup_churn_ajustado` não foi alterada, preservando os demais dashboards (ex.: evolução mensal de churn) que dependem da definição ajustada.
+
+---
+
+## 2026-06-16 | fix(investors-report): contratos pontuais conta só os ativos
+
+**O que foi feito:**
+- "Tipos de Contrato" (card + pizza): pontuais passa a contar apenas `valorp>0 AND status IN ('ativo','onboarding','triagem')`, igual aos recorrentes
+
+**Por que:**
+- A contagem antiga (`valorp>0` sem status) somava 1.121 incluindo 742 entregues + 98 cancelados, gerando um mix falso de 20/80; o mix real de contratos ativos é ~51/49 (274 recorrentes / 262 pontuais)
+
+**Arquivos alterados:**
+- `server/routes.ts` — filtro de status em `contratos_pontuais` nos endpoints da página e do PDF
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-06-16 | fix(investors-report): gráficos de evolução só com meses fechados (remove distorções)
+
+**O que foi feito:**
+- Série de evolução (4 gráficos + tabelas + YoY) passa a terminar no último mês fechado (exclui o mês corrente parcial) e a começar no 1º mês cheio de `caz_vendas` (mar/23, não fev/23 parcial)
+
+**Por que:**
+- O mês corrente parcial aparecia como crash no faturamento, pico falso na margem (+63%) e salto falso no caixa acumulado; fev/23 (caz_vendas começou em 13/02) dava margem de −222% e achatava o eixo do gráfico de margem
+- Bônus: o YoY deixa de ser puxado para baixo pelo mês parcial
+
+**Arquivos alterados:**
+- `server/routes.ts` — `hist_start` = 1º mês cheio de caz_vendas; janela de `dados_recentes` termina em `< DATE_TRUNC('month', CURRENT_DATE)`
+
+**Impacto arquitetural:** Nenhum. KPIs de faturamento/inadimplência seguem incluindo o mês corrente (realizado até o momento); apenas a série temporal usa meses fechados.
+
+---
+
+## 2026-06-16 | fix(investors-report): Fat./Cabeça passa a ser mensal
+
+**O que foi feito:**
+- "Fat. / Cabeça" deixa de ser YTD acumulado (R$ 72k) e passa a ser o **faturamento médio mensal** dos meses fechados ÷ headcount (~R$ 13k/mês)
+
+**Por que:**
+- Para casar com "MRR / Cabeça" (mensal) e ser comparável; o acumulado anual no mesmo card confundia
+
+**Arquivos alterados:**
+- `server/routes.ts` — conta `meses_fechados` e calcula faturamento médio mensal por cabeça
+- `client/src/pages/InvestorsReport.tsx` — subtítulo "realizado / mês (média)"
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-06-16 | feat(investors-report): Fat./Cabeça (YTD) ao lado de MRR/Cabeça
+
+**O que foi feito:**
+- "Receita/Cabeça" renomeado para "MRR / Cabeça" (recorrente/mês = MRR ativo ÷ headcount)
+- Novo card "Fat. / Cabeça" = faturamento realizado no ano (YTD) ÷ headcount
+- Row de KPIs secundários passa de 4 para 5 colunas
+
+**Por que:**
+- A pedido: exibir produtividade tanto pela carteira recorrente (MRR) quanto pelo faturamento realizado
+
+**Arquivos alterados:**
+- `server/routes.ts` — novo campo `equipe.faturamentoPorCabeca`
+- `client/src/pages/InvestorsReport.tsx` — card novo + relabel + grid de 5 colunas
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-06-16 | fix(investors-report): margem do ano ignora mês corrente (parcial)
+
+**O que foi feito:**
+- A "Margem (Ano)" passa a considerar apenas meses fechados (jan → mês anterior); faturamento e inadimplência seguem incluindo o mês corrente
+
+**Por que:**
+- O mês corrente é parcial — suas despesas ainda não entraram por completo, inflando a margem (18,7% com junho vs 13,7% real só com meses fechados)
+
+**Arquivos alterados:**
+- `server/routes.ts` — `margemAno` calculada a partir de `faturamento_fechado`/`despesas_fechado` (corte em `DATE_TRUNC('month', CURRENT_DATE)`)
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-06-16 | feat(investors-report): faturamento, inadimplência e margem em base anual (YTD)
+
+**O que foi feito:**
+- Card "Fat. Mês Atual" → "Faturamento (Ano)": soma realizada de jan até o mês corrente
+- "Inadimplência (Ano)": acumulada do ano corrente (jan→mês atual), não só do mês vigente
+- "Margem (Ano)": mesma janela YTD, margem ponderada (Σ geração ÷ Σ faturamento), calculada no backend
+- Uma única query `caz_parcelas` (jan→mês atual) alimenta os três KPIs
+
+**Por que:**
+- Métricas de um único mês oscilavam demais (mês parcial inflava inadimplência, subestimava faturamento); a visão anual é mais estável e adequada para investidores
+
+**Arquivos alterados:**
+- `server/routes.ts` — query YTD (`faturamentoAnoResult`) e novos campos `faturamentoAno`/`margemAno`; `taxaInadimplencia` agora YTD
+- `client/src/pages/InvestorsReport.tsx` — cards e linha de referência da margem consomem os campos anuais
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-06-16 | fix(investors-report): margem média ponderada (corrige −2,6% espúrio)
+
+**O que foi feito:**
+- KPI "Margem Média" e a linha de referência do gráfico de margem agora usam margem **ponderada** (Σ geração de caixa ÷ Σ faturamento) em vez de média aritmética simples dos %s mensais
+
+**Por que:**
+- A média simples era dominada por meses de receita baixa (ex.: fev/23 com margem de −222% sobre R$ 30k), exibindo −2,6% quando a margem real ponderada é ~+7,8%
+
+**Arquivos alterados:**
+- `client/src/pages/InvestorsReport.tsx` — `avgMargem` recalculado como ponderado
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-06-16 | fix(investors-report): corrige receita histórica zerada (caz_receber → caz_vendas)
+
+**O que foi feito:**
+- Trocada a fonte de receita histórica do Investors Report de `caz_receber` para `caz_vendas` (faturamento emitido), pois `caz_receber`/`caz_parcelas` não têm dados de caixa antes de set/out-2025
+- Corte dinâmico entre base "emitido" (histórico, `caz_vendas`) e "caixa" (recente, `caz_parcelas`) no 1º mês cheio de parcelas (out/2025)
+- Removidos meses futuros (notas/parcelas agendadas até 2031) e o buraco de jul/ago-2025
+- Adicionado campo `fonte` ('emitido' | 'caixa') na série; frontend marca a transição no gráfico de faturamento e o período passa a iniciar em 2023
+
+**Por que:**
+- Todo o bloco histórico do relatório (gráficos de faturamento/margem/receita×despesas/caixa acumulado + tabelas anual e mensal + KPIs YoY e Margem Média) mostrava faturamento R$ 0 de 2023 a 2025 contra despesas reais, gerando "geração de caixa" de −90k a −950k/mês — dados incorretos para investidores
+
+**Arquivos alterados:**
+- `server/routes.ts` — reescrita da query `evolucaoFaturamento` no endpoint `/api/investors-report` (modelo híbrido emitido/caixa) e inclusão de `fonte` no payload
+- `client/src/pages/InvestorsReport.tsx` — campo `fonte` na interface, marcador de transição (`ReferenceLine`) + nota no gráfico, período inicia em 2023
+
+**Impacto arquitetural:** Nenhum — mudança contida no endpoint e na página. Endpoint de PDF (`/api/investors-report/pdf`) usa só `caz_parcelas` (apenas meses recentes) e não foi alterado; fica como follow-up se quiserem histórico no PDF.
 
 ---
 
