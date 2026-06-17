@@ -20,7 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ChevronLeft, ChevronRight, Plus, Loader2, Sparkles, Trash2, AlertTriangle, CalendarClock } from "lucide-react";
-import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, format, addMonths, isSameMonth } from "date-fns";
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, format, addMonths, isSameMonth, isToday } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
 import { OBJETIVOS, PADROES_COPY_LABEL, STATUS_ORDER, STATUS_CONFIG, type PadraoKey } from "@shared/ghl-broadcast/types";
@@ -141,6 +141,7 @@ export default function PlanejamentoMensal() {
         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setRef((r) => addMonths(r, -1))}><ChevronLeft className="w-4 h-4" /></Button>
         <div className="text-lg font-semibold capitalize min-w-[180px] text-center">{format(ref, "MMMM yyyy", { locale: ptBR })}</div>
         <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => setRef((r) => addMonths(r, 1))}><ChevronRight className="w-4 h-4" /></Button>
+        <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => setRef(startOfMonth(new Date()))} title="Ir para o mês atual">Hoje</Button>
         {q.isLoading && <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />}
         <div className="flex-1" />
         <Button size="sm" variant="outline" onClick={gerarMes} disabled={gerandoMes} title="Gera o mês inteiro com IA: melhores bases/padrões do mês anterior + datas comerciais + cadência">
@@ -165,10 +166,15 @@ export default function PlanejamentoMensal() {
           const slots = slotsPorDia[ymd] ?? [];
           const datas = datasPorDia[ymd] ?? [];
           const foraDoMes = !isSameMonth(dia, ref);
+          const hoje = isToday(dia);
           return (
-            <div key={ymd} className={`min-h-[110px] rounded border border-border p-1.5 flex flex-col gap-1 ${foraDoMes ? "opacity-40" : ""}`}>
+            <div key={ymd} className={`min-h-[110px] rounded border p-1.5 flex flex-col gap-1 ${hoje ? "border-primary ring-2 ring-primary/60 bg-primary/5" : "border-border"} ${foraDoMes ? "opacity-40" : ""}`}>
               <div className="flex items-center justify-between">
-                <span className="text-xs font-medium">{format(dia, "d")}</span>
+                {hoje ? (
+                  <span className="inline-flex items-center justify-center min-w-5 h-5 px-1 rounded-full bg-primary text-primary-foreground text-xs font-semibold" title="Hoje">{format(dia, "d")}</span>
+                ) : (
+                  <span className="text-xs font-medium">{format(dia, "d")}</span>
+                )}
                 <button className="text-muted-foreground hover:text-foreground" onClick={() => { setEditing(novoSlot(ymd)); setVariacoes([]); }}>
                   <Plus className="w-3 h-3" />
                 </button>
