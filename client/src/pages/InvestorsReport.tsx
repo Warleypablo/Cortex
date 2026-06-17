@@ -84,6 +84,12 @@ interface InvestorsReportData {
     geracaoCaixa: number;
     inadimplencia: number;
   }>;
+  evolucaoChurn: Array<{
+    mes: string;
+    mrrChurn: number;
+    taxaChurn: number | null;
+    qtd: number;
+  }>;
 }
 
 interface GeracaoCaixaDFC {
@@ -164,6 +170,32 @@ export default function InvestorsReport() {
       };
     });
   }, [filteredData]);
+
+  const churnChartData = useMemo(() => {
+    if (!data?.evolucaoChurn) return [];
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return data.evolucaoChurn
+      .filter(item => {
+        const [year, month] = item.mes.split('-').map(Number);
+        const itemDate = new Date(year, month - 1, 1);
+        return itemDate >= dateRange.start && itemDate <= dateRange.end;
+      })
+      .map(item => {
+        const [year, month] = item.mes.split('-');
+        return {
+          ...item,
+          mesLabel: `${monthNames[parseInt(month) - 1]}/${year.slice(2)}`,
+        };
+      });
+  }, [data?.evolucaoChurn, dateRange]);
+
+  const churnMediaTaxa = useMemo(() => {
+    const taxas = churnChartData
+      .map(d => d.taxaChurn)
+      .filter((t): t is number => t !== null);
+    if (!taxas.length) return null;
+    return Math.round((taxas.reduce((a, b) => a + b, 0) / taxas.length) * 10) / 10;
+  }, [churnChartData]);
 
   const annualSummary = useMemo(() => {
     const byYear: Record<string, { faturamento: number; despesas: number; geracaoCaixa: number; meses: number }> = {};
@@ -830,6 +862,59 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Charts Row 2.5: Evolução do Churn */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+              <TrendingDown className="h-5 w-5 text-red-400" />
+              Evolução do Churn
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              MRR perdido por mês e taxa de churn (% do MRR ativo do mês anterior)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : !churnChartData.length ? (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                Nenhum dado no período
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={churnChartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
+                  <XAxis dataKey="mesLabel" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => formatCurrencyShort(v)} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip
+                    formatter={(value: number, name: string, props: any) =>
+                      props.dataKey === 'taxaChurn'
+                        ? [`${formatDecimal(value)}%`, name]
+                        : [formatCurrency(value), name]
+                    }
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    labelStyle={{ color: '#f8fafc' }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  {churnMediaTaxa !== null && (
+                    <ReferenceLine
+                      yAxisId="right"
+                      y={churnMediaTaxa}
+                      stroke="#f59e0b"
+                      strokeDasharray="3 3"
+                      strokeWidth={1.5}
+                      label={{ value: `Média ${formatDecimal(churnMediaTaxa)}%`, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }}
+                    />
+                  )}
+                  <Bar yAxisId="left" dataKey="mrrChurn" fill="#ef4444" name="MRR Perdido" radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="right" type="monotone" dataKey="taxaChurn" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3, fill: '#f59e0b' }} name="Taxa de Churn %" connectNulls={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Charts Row 3: Pie Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
