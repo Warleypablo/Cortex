@@ -303,12 +303,20 @@ export default function InvestorsReport() {
     };
   }, [annualSummary, annualSummaryCompetencia, fullAnnualSummaryCompetencia]);
 
-  const totals = useMemo(() => {
-    return filteredData.reduce((acc, item) => ({
-      faturamento: acc.faturamento + item.faturamento,
-      despesas: acc.despesas + item.despesas,
-      geracaoCaixa: acc.geracaoCaixa + item.geracaoCaixa
-    }), { faturamento: 0, despesas: 0, geracaoCaixa: 0 });
+  // Totais SEPARADOS por regime — somar competência (≤2025) com caixa (2026) num único
+  // total misturaria metodologias. Cada subtotal é coerente dentro do seu regime.
+  const totalsByRegime = useMemo(() => {
+    const init = () => ({ faturamento: 0, despesas: 0, geracaoCaixa: 0, meses: 0 });
+    const comp = init();
+    const caixa = init();
+    filteredData.forEach(item => {
+      const t = item.fonte === 'caixa' ? caixa : comp;
+      t.faturamento += item.faturamento;
+      t.despesas += item.despesas;
+      t.geracaoCaixa += item.geracaoCaixa;
+      t.meses += 1;
+    });
+    return { comp, caixa };
   }, [filteredData]);
 
   // Margem do ano corrente (YTD), mesma janela da inadimplência — calculada no backend
@@ -1140,7 +1148,7 @@ export default function InvestorsReport() {
               Histórico Mensal Detalhado
             </CardTitle>
             <CardDescription className="text-muted-foreground">
-              {chartDataWithMetrics.length} meses • Total: {formatCurrency(totals.faturamento)}
+              {chartDataWithMetrics.length} meses • Faturamento: competência {formatCurrencyShort(totalsByRegime.comp.faturamento)} + caixa {formatCurrencyShort(totalsByRegime.caixa.faturamento)}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1187,18 +1195,34 @@ export default function InvestorsReport() {
                         </td>
                       </tr>
                     ))}
-                    <tr className="bg-muted/70 font-bold border-t-2 border-blue-500/30">
-                      <td className="py-3 px-3 text-foreground">TOTAL</td>
-                      <td className="py-3 px-3 text-right text-emerald-400">{formatCurrency(totals.faturamento)}</td>
-                      <td className="py-3 px-3 text-right text-red-400">{formatCurrency(totals.despesas)}</td>
-                      <td className={`py-3 px-3 text-right ${totals.geracaoCaixa >= 0 ? 'text-blue-400' : 'text-red-500'}`}>
-                        {formatCurrency(totals.geracaoCaixa)}
-                      </td>
-                      <td className={`py-3 px-3 text-right ${totals.faturamento > 0 && (totals.geracaoCaixa / totals.faturamento) >= 0 ? 'text-green-400' : 'text-red-400'}`}>
-                        {totals.faturamento > 0 ? formatDecimal((totals.geracaoCaixa / totals.faturamento) * 100) : '0'}%
-                      </td>
-                      <td className="py-3 px-3 text-right text-muted-foreground">—</td>
-                    </tr>
+                    {totalsByRegime.comp.meses > 0 && (
+                      <tr className="bg-muted/50 font-semibold border-t-2 border-amber-500/30">
+                        <td className="py-2.5 px-3 text-amber-300">Subtotal competência ({totalsByRegime.comp.meses}m)</td>
+                        <td className="py-2.5 px-3 text-right text-emerald-400">{formatCurrency(totalsByRegime.comp.faturamento)}</td>
+                        <td className="py-2.5 px-3 text-right text-red-400">{formatCurrency(totalsByRegime.comp.despesas)}</td>
+                        <td className={`py-2.5 px-3 text-right ${totalsByRegime.comp.geracaoCaixa >= 0 ? 'text-blue-400' : 'text-red-500'}`}>
+                          {formatCurrency(totalsByRegime.comp.geracaoCaixa)}
+                        </td>
+                        <td className={`py-2.5 px-3 text-right ${totalsByRegime.comp.faturamento > 0 && totalsByRegime.comp.geracaoCaixa >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {totalsByRegime.comp.faturamento > 0 ? formatDecimal((totalsByRegime.comp.geracaoCaixa / totalsByRegime.comp.faturamento) * 100) : '0'}%
+                        </td>
+                        <td className="py-2.5 px-3 text-right text-muted-foreground">—</td>
+                      </tr>
+                    )}
+                    {totalsByRegime.caixa.meses > 0 && (
+                      <tr className="bg-muted/70 font-bold border-t-2 border-purple-500/30">
+                        <td className="py-3 px-3 text-purple-300">Subtotal caixa ({totalsByRegime.caixa.meses}m)</td>
+                        <td className="py-3 px-3 text-right text-emerald-400">{formatCurrency(totalsByRegime.caixa.faturamento)}</td>
+                        <td className="py-3 px-3 text-right text-red-400">{formatCurrency(totalsByRegime.caixa.despesas)}</td>
+                        <td className={`py-3 px-3 text-right ${totalsByRegime.caixa.geracaoCaixa >= 0 ? 'text-blue-400' : 'text-red-500'}`}>
+                          {formatCurrency(totalsByRegime.caixa.geracaoCaixa)}
+                        </td>
+                        <td className={`py-3 px-3 text-right ${totalsByRegime.caixa.faturamento > 0 && totalsByRegime.caixa.geracaoCaixa >= 0 ? 'text-green-400' : 'text-red-400'}`}>
+                          {totalsByRegime.caixa.faturamento > 0 ? formatDecimal((totalsByRegime.caixa.geracaoCaixa / totalsByRegime.caixa.faturamento) * 100) : '0'}%
+                        </td>
+                        <td className="py-3 px-3 text-right text-purple-400">{formatCurrency(totalsByRegime.caixa.geracaoCaixa)}</td>
+                      </tr>
+                    )}
                   </tbody>
                 </table>
               </div>
