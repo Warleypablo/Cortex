@@ -59,7 +59,12 @@ function classifyPlatform(source: string, medium: string): keyof Ga4PlatformBrea
   if ((s.includes('facebook') || s.includes('meta') || s.includes('instagram') || s === 'ig' || s === 'fb') && isPaid) {
     return 'meta_ads';
   }
-  if ((s.includes('google') || s.includes('adwords') || s.includes('gads')) && (m === 'cpc' || m === 'ppc' || m === 'paidsearch')) {
+  // Google paga — aceita qualquer medium pago (isPaid). A Constituição UTM Turbo
+  // (docs/utm-constituicao.md §5.2) padroniza o Google Ads como utm_medium=paid;
+  // antes só cpc/ppc/paidsearch eram reconhecidos, então o tráfego taggeado como
+  // `paid` caía em "outros" e zerava as Sessões do Google. cpc/ppc seguem cobertos
+  // (auto-tagging gclid → GA4 reporta medium=cpc).
+  if ((s.includes('google') || s.includes('adwords') || s.includes('gads')) && isPaid) {
     return 'google_ads';
   }
   // Ads pagas de TikTok/LinkedIn — convenção utm_source=tiktok_ads/linkedin_ads,
