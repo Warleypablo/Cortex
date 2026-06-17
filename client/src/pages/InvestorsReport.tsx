@@ -86,6 +86,16 @@ interface InvestorsReportData {
   }>;
 }
 
+interface GeracaoCaixaDFC {
+  ano: number;
+  series: Array<{
+    mes: string;
+    mesLabel: string;
+    geracaoMes: number;
+    caixaAcumulado: number;
+  }>;
+}
+
 const formatCurrencyShort = (value: number) => {
   return formatCurrencyCompact(value);
 };
@@ -119,6 +129,12 @@ export default function InvestorsReport() {
   
   const { data, isLoading, error } = useQuery<InvestorsReportData>({
     queryKey: ['/api/investors-report'],
+  });
+
+  // Geração de caixa acumulada em base CAIXA (linha da DFC), ano corrente.
+  // Independente do seletor de período da página (sempre Jan → último mês fechado).
+  const { data: geracaoCaixaData, isLoading: isLoadingCaixa } = useQuery<GeracaoCaixaDFC>({
+    queryKey: ['/api/investors-report/geracao-caixa'],
   });
 
   const filteredData = useMemo(() => {
@@ -777,18 +793,20 @@ export default function InvestorsReport() {
                 <TrendingUp className="h-5 w-5 text-purple-400" />
                 Geração de Caixa Acumulada
               </CardTitle>
-              <CardDescription className="text-muted-foreground">Evolução do caixa no período</CardDescription>
+              <CardDescription className="text-muted-foreground">
+                Regime de caixa (DFC) — acumulado em {geracaoCaixaData?.ano ?? new Date().getFullYear()}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {isLoadingCaixa ? (
                 <Skeleton className="h-[280px] w-full" />
-              ) : !chartDataWithMetrics.length ? (
+              ) : !geracaoCaixaData?.series.length ? (
                 <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado no período
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={chartDataWithMetrics} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <ComposedChart data={geracaoCaixaData.series} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
                     <defs>
                       <linearGradient id="gradientCaixa" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
