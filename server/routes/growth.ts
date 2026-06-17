@@ -4011,6 +4011,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.warn('[orcado-realizado/instagram] posts count failed:', err?.message || err);
       }
 
+      // Chegou no site (GA4 — bucket orgânico do Instagram)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.organico_instagram;
+      const visualizacoesPagina = ga4.byPlatformPageViews.organico_instagram;
+
       res.json({
         postsPublicados,
         comecaramSeguir, deixaramSeguir, percPerdaSeguidores,
@@ -4026,6 +4031,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cliquesPorDominio,
         leadsPorOrigem,
         investimentoPago,
+        // Chegou no site (GA4 orgânico do Instagram)
+        sessoes,
+        visualizacoesPagina,
+        sessoesAvailable: ga4.available,
         hasConnection: true,
         snapshotCount: snapshots.length,
       });
@@ -4117,6 +4126,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const somaViews = parseFloat(rr.soma_views) || 0;
       const retencaoMedia = somaViews > 0 ? (parseFloat(rr.soma_pond) / somaViews) / 100 : 0;
 
+      // Engajamento do canal = (curtidas + comentários + compartilhamentos) ÷ views,
+      // espelhando o % Engajamento do Instagram (Interações ÷ alcance/views).
+      const ytCurtidas = parseInt(d.curtidas) || 0;
+      const ytComentarios = parseInt(d.comentarios) || 0;
+      const ytShares = parseInt(d.compartilhamentos) || 0;
+      const ytInteracoes = ytCurtidas + ytComentarios + ytShares;
+      const engajamento = visualizacoes > 0 ? ytInteracoes / visualizacoes : 0;
+
+      // Chegou no site (GA4 — bucket orgânico do YouTube)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.organico_youtube;
+      const visualizacoesPagina = ga4.byPlatformPageViews.organico_youtube;
+
       res.json({
         // Audiência (espelha o breakdown de seguidores do Instagram, seguidor → inscrito)
         comecaramInscrever: subsGained,
@@ -4128,15 +4150,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         // compat com consumidores antigos
         inscritos,
         ganhoLiquidoInscritos: deltaInscritos,
-        // Conteúdo / distribuição
+        // Conteúdo / distribuição / qualidade
         visualizacoes,
         horasAssistidas: Math.round(minutos / 60),
         avgViewDuration,
         retencaoMedia,
-        curtidas: parseInt(d.curtidas) || 0,
-        comentarios: parseInt(d.comentarios) || 0,
-        compartilhamentos: parseInt(d.compartilhamentos) || 0,
+        curtidas: ytCurtidas,
+        comentarios: ytComentarios,
+        compartilhamentos: ytShares,
+        interacoes: ytInteracoes,
+        engajamento,
         videosPublicados: parseInt((vRes.rows[0] as any).n) || 0,
+        // Chegou no site (GA4 orgânico do YouTube)
+        sessoes,
+        visualizacoesPagina,
+        sessoesAvailable: ga4.available,
         hasConnection: canais > 0,
       });
     } catch (error) {
@@ -4501,6 +4529,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.warn('[orcado-realizado/linkedin] posts count failed:', err?.message || err);
       }
 
+      // Chegou no site (GA4 — bucket orgânico do LinkedIn)
+      const ga4Li = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+
       res.json({
         postsPublicados,
         // Audiência (espelha o breakdown de seguidores do Instagram/YouTube)
@@ -4523,6 +4554,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         reacoes: parseInt(s.reacoes) || 0,
         comentarios: parseInt(s.comentarios) || 0,
         compartilhamentos: parseInt(s.compartilhamentos) || 0,
+        // Chegou no site (GA4 orgânico do LinkedIn)
+        sessoes: ga4Li.byPlatform.organico_linkedin,
+        visualizacoesPagina: ga4Li.byPlatformPageViews.organico_linkedin,
+        sessoesAvailable: ga4Li.available,
         hasConnection: orgs > 0,
       });
     } catch (error) {
