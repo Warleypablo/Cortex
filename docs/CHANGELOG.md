@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-17 | chore(ads-creation): script one-off de upload de criativos Ana (Bastidores)
+
+**O que foi feito:**
+- Cadastro do lote Ana "Bastidores" (9x16, hooks h1–h3, b1/c1) na Biblioteca de Criativos como TP1616–TP1618
+- `subir-ana-bastidores.ts`: cria um conjunto único (148) na campanha Creators ABO teste e os 3 ads dentro, todos PAUSED, R$20/dia
+- Variante do fluxo Bready: referencia os `video_id` 9x16 já subidos manualmente no Meta (sem download do Drive / sem re-upload)
+- Config do conjunto clonada do Ana 115 (OFFSITE_CONVERSIONS/LEAD, pixel, targeting BR aberto); copy completa Ana/Creators + UTM dinâmica limpa
+
+**Por que:**
+- Registrar o one-off de subida da Ana, espelhando os scripts do Bready (`subir-bready*.ts`)
+- Garantir consistência da copy/UTM com os ads Ana existentes (o ad antigo carregava o typo "tum_term =")
+
+**Arquivos novos:**
+- `subir-ana-bastidores.ts` - script one-off de criação dos ads da Ana
+
 ## 2026-05-19 | feat(utm): UTM Builder + Constituição UTM Turbo v1.1
 
 **O que foi feito:**
