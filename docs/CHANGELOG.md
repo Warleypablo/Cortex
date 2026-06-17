@@ -1,5 +1,44 @@
 # Changelog
 
+## 2026-06-16 | fix(criativos): filtro de Produto por nome de campanha (cross-plataforma)
+
+**O que foi feito:**
+- O filtro de Produto passa a casar pelo **nome da campanha** (padrão `[Produto]`) em **todas as plataformas** (Meta/Google/TikTok), via novo param `produtos` no `/api/growth/criativos` e `/criativos/kpis`
+- Seleção **manual** de campanha continua por ID (`campanhaIds`, Meta)
+
+**Por que:**
+- O filtro de Produto derivava os IDs de campanha **só do Meta** (`/criativos/campanhas`), então selecionar um produto **zerava Google e TikTok** (IDs não batiam). Verificado: filtrar produto derrubava o Google de 274 → 0 linhas
+- As campanhas de Google já usam o mesmo padrão `[Produto]` no nome (`[Creators]`, `[UGC]`, `[Commerce]`…), então o match por nome funciona cross-plataforma (ex.: `[TP]` mantém 268/274 linhas do Google)
+
+**Arquivos alterados:**
+- `client/src/pages/Criativos.tsx` - `appendScopeParams`: produto → `produtos` (nomes); campanha manual → `campanhaIds` (IDs)
+- `server/routes/growth.ts` - `matchProduto()` aplicado aos 3 builds (Meta/Google/TikTok) e aos KPIs (join em `meta_campaigns` p/ o nome)
+
+---
+
+## 2026-06-16 | feat(criativos): métricas nativas por plataforma + TikTok ad-level na aba Criativos
+
+**O que foi feito:**
+- A aba Criativos agora mostra **métricas nativas específicas de cada plataforma** ao selecionar o filtro de Plataforma: ao escolher Google/TikTok somem as métricas exclusivas do Meta (Video hook/hold, Connect rate) e aparecem as nativas da plataforma (Video views, Conv. plataforma, Valor conv.). As métricas de pré-vendas/vendas (leads, MQL, RA, RR, vendas, CAC) continuam vindo do Bitrix, iguais para todas as plataformas
+- **TikTok Ads** entra na aba a nível de anúncio (espelhando Meta/Google): novo `buildTiktokCriativos` casa o CRM por anúncio via `utm_content = __CID__ = ad_id` (padrão de UTM pago do TikTok da Turbo) e plugado no endpoint `/api/growth/criativos`
+- **Google**: `buildGoogleCriativos` passa a expor os contadores nativos do Google por anúncio (conversões, valor de conversão, video views) que já existiam no banco
+- Pipeline ad-level do TikTok: nova migration (`tiktok.ad_groups`, `tiktok.ads`, `tiktok.ad_insights_daily`) + `syncTiktokAds` expandido para puxar adgroups, anúncios e métricas por anúncio (`data_level=AUCTION_AD`)
+
+**Por que:**
+- Pedido do Ichino: cada plataforma tem métricas de marketing próprias (hook/hold do Meta ≠ video views do Google/TikTok), mas o funil de pré-vendas/vendas é uniforme via Bitrix. Google e TikTok começaram a receber investimento agora e precisam aparecer por anúncio
+
+**Arquivos alterados:**
+- `client/src/lib/criativosColumns.ts` - campo `platforms` no registry + colunas nativas (videoViews/conversions/conversionValue) + helper `columnAppliesToPlatforms`
+- `client/src/lib/criativosMetrics.ts` - novos contadores somáveis (conversions/conversionValue/videoViews)
+- `client/src/pages/Criativos.tsx` - filtro dinâmico de colunas por plataforma + opção TikTok Ads
+- `server/routes/growth.ts` - `buildTiktokCriativos`, contadores nativos no Google, `wantsTiktok` no endpoint
+- `server/services/tiktokAdsSync.ts` - sync de adgroups/ads/métricas por anúncio
+- `scripts/create-tiktok-ads-adlevel-tables.ts` - migration das tabelas ad-level do TikTok (idempotente)
+
+**Impacto arquitetural:** Novas tabelas em `tiktok.*` (rodar a migration em prod com usuário privilegiado). Casamento de vendas por anúncio do TikTok/Google fica pronto e "liga sozinho" quando o tracking de UTM (`{creative}` no Google; macro `__CID__` no TikTok) começar a popular o Bitrix.
+
+---
+
 ## 2026-06-16 | feat(revenue-goals): histórico de inadimplência dinâmico (substitui hardcode)
 
 **O que foi feito:**
