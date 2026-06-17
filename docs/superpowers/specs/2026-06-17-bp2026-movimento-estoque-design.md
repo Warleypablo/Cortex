@@ -145,9 +145,24 @@ Usado pela aba Pontual e pelo bloco Ponte do MRR.
   renderizar a Ponte do MRR (`mostrarOrcado={false}`) acima da tabela atual; nova `TabsTrigger`
   "Pontual" + `TabsContent` com `BPDreTable mostrarOrcado={false}`.
 
+## Drill-down (auditabilidade) — adicionado em 2026-06-17 a pedido do Warley
+
+As células das duas views abrem o mesmo drawer de detalhe das outras abas
+(`/api/bp2026/detalhe` + `BPCellDetail`). Mapeamento:
+- **Ponte MRR:** `ponte_mrr_ini` → contratos ativos no snapshot do mês anterior; `ponte_mrr_vendas`
+  → deals MRR ganhos no Bitrix (= `vendas_mrr`); `ponte_mrr_churn` → itens de churn bruto (= `churn_rs_total`);
+  `ponte_mrr_fim` → contratos ativos no snapshot do mês (= `mrr_ativo`); `ponte_mrr_delta` →
+  **derivada** (composição client-side das 4 linhas, igual ao `mrr_delta_nao_explicado`, pois é resíduo).
+- **Pontual:** `pontual_estoque_ini`/`estoque_fim`/`status_*` → contratos em estoque no snapshot
+  (anterior/atual/por status); `pontual_venda`/`entrega`/`churn`/`deletados`/`saida_atipica`/`reajuste`
+  → os contratos que se moveram naquela categoria no mês (via snapshot-diff, com nome do cliente).
+
+Nome do cliente: `LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task` (a coluna
+`cup_data_hist.cliente` está vazia; o join cobre 100%). A lógica de classificação por categoria é
+single-source no helper (`classificarPonteItens` em `bp2026.pontual.helpers.ts`).
+
 ## Fora de escopo (YAGNI)
 
-- Drill-down nas células da ponte/pontual (as outras abas têm, mas não foi pedido; pode vir depois).
 - Quebra por produto/segmento (decidido: consolidado).
 - Comparação com orçado nas pontes (decidido: só realizado).
 - Mexer na view `vw_cup_churn_ajustado` ou no módulo `/estoque-pontual` existente.

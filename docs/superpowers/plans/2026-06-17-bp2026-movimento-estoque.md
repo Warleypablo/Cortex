@@ -1084,3 +1084,333 @@ Expected: PR criado contra `main`.
 **2. Placeholder scan:** Sem TBD/TODO; todo passo de código tem o código; comandos com saída esperada. ✓
 
 **3. Type consistency:** `RegPontual`, `PonteMes`, `LinhaPontual`, `montarLinhasPontual`, `montarPontual`, `montarPonteMrr` e o retorno `{ linhas, ponteMrr }` de `montarRevenue` usados de forma idêntica entre tasks. Métricas `pontual_*` e `ponte_mrr_*` batem entre helper, INFO e teste. ✓
+
+---
+
+# ADENDO (2026-06-17): Drill-down / auditabilidade das células
+
+A pedido do Warley, as células das duas views passam a abrir o drawer de detalhe (igual às demais
+abas). Tasks 7-9. Convenção e validação iguais às do plano principal (worktree isolado, só-realizado,
+validar contra produção port-free, commits Conventional + co-author).
+
+### Task 7: Helper `classificarPonteItens` (itens por categoria do snapshot-diff)
+
+**Files:**
+- Modify: `server/routes/bp2026.pontual.helpers.ts`
+- Test: `server/routes/bp2026.pontual.helpers.test.ts`
+
+**Interfaces:**
+- Produces: `RegPontualItem = RegPontual & { cliente: string; squad?: string }`; `CategoriaPonte = "venda"|"entrega"|"churn"|"deletados"|"saida_atipica"|"reajuste"`; `ItemPonte = { idSubtask; cliente; status; valor; detalhe }`; `classificarPonteItens(ant: RegPontualItem[], atual: RegPontualItem[]): Record<CategoriaPonte, ItemPonte[]>`.
+
+- [ ] **Step 1: Add the test** to `bp2026.pontual.helpers.test.ts` (append a new describe):
+
+```ts
+import { classificarPonteItens } from "./bp2026.pontual.helpers";
+
+describe("classificarPonteItens", () => {
+  const antI = [
+    { idSubtask: "A", valorp: 1000, status: "ativo", cliente: "Cli A" },
+    { idSubtask: "B", valorp: 500, status: "triagem", cliente: "Cli B" },
+    { idSubtask: "C", valorp: 300, status: "pausado", cliente: "Cli C" },
+    { idSubtask: "D", valorp: 200, status: "ativo", cliente: "Cli D" },
+    { idSubtask: "E", valorp: 100, status: "entregue", cliente: "Cli E" },
+    { idSubtask: "G", valorp: 150, status: "ativo", cliente: "Cli G" },
+  ];
+  const atualI = [
+    { idSubtask: "A", valorp: 1100, status: "ativo", cliente: "Cli A" },
+    { idSubtask: "B", valorp: 500, status: "entregue", cliente: "Cli B" },
+    { idSubtask: "C", valorp: 300, status: "cancelado/inativo", cliente: "Cli C" },
+    { idSubtask: "G", valorp: 0, status: "ativo", cliente: "Cli G" },
+    { idSubtask: "F", valorp: 700, status: "triagem", cliente: "Cli F" },
+  ];
+  const out = classificarPonteItens(antI, atualI);
+  it("lista os contratos de cada categoria", () => {
+    expect(out.venda.map((i) => i.idSubtask)).toEqual(["F"]);
+    expect(out.entrega.map((i) => i.idSubtask)).toEqual(["B"]);
+    expect(out.churn.map((i) => i.idSubtask)).toEqual(["C"]);
+    expect(out.deletados.map((i) => i.idSubtask)).toEqual(["D"]);
+    expect(out.saida_atipica.map((i) => i.idSubtask)).toEqual(["G"]);
+    expect(out.reajuste.map((i) => i.idSubtask)).toEqual(["A"]);
+    expect(out.reajuste[0].valor).toBe(100);
+    expect(out.venda[0].valor).toBe(700);
+    expect(out.entrega[0].valor).toBe(500);
+  });
+  it("soma dos itens por categoria casa com classificarPonte", () => {
+    const sum = (a: { valor: number }[]) => a.reduce((s, i) => s + i.valor, 0);
+    expect(sum(out.venda)).toBe(700);
+    expect(sum(out.entrega)).toBe(500);
+    expect(sum(out.churn)).toBe(300);
+    expect(sum(out.deletados)).toBe(200);
+    expect(sum(out.saida_atipica)).toBe(150);
+    expect(sum(out.reajuste)).toBe(100);
+  });
+});
+```
+
+- [ ] **Step 2: Run it — RED** (`classificarPonteItens` not exported):
+Run: `npx vitest run server/routes/bp2026.pontual.helpers.test.ts`
+Expected: FAIL (import error / not a function).
+
+- [ ] **Step 3: Implement** in `bp2026.pontual.helpers.ts` (append after `classificarPonte`). `ehEstoquePontual`, `CHURN_STATUS` are already in this file:
+
+```ts
+export interface RegPontualItem extends RegPontual {
+  cliente: string;
+  squad?: string;
+}
+
+export type CategoriaPonte = "venda" | "entrega" | "churn" | "deletados" | "saida_atipica" | "reajuste";
+
+export interface ItemPonte {
+  idSubtask: string;
+  cliente: string;
+  status: string;
+  valor: number;
+  detalhe: string;
+}
+
+const brl = (v: number) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
+
+// Mesma classificação de classificarPonte, mas emitindo os contratos de cada categoria de movimento.
+export function classificarPonteItens(
+  ant: RegPontualItem[],
+  atual: RegPontualItem[],
+): Record<CategoriaPonte, ItemPonte[]> {
+  const antMap = new Map(ant.map((r) => [r.idSubtask, r]));
+  const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
+  const out: Record<CategoriaPonte, ItemPonte[]> = {
+    venda: [], entrega: [], churn: [], deletados: [], saida_atipica: [], reajuste: [],
+  };
+  for (const r of ant) {
+    if (!ehEstoquePontual(r)) continue;
+    const a = atualMap.get(r.idSubtask);
+    if (!a) { out.deletados.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: r.status, valor: r.valorp, detalhe: "sumiu do snapshot" }); continue; }
+    if (ehEstoquePontual(a)) {
+      const delta = a.valorp - r.valorp;
+      if (delta !== 0) out.reajuste.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: a.status, valor: delta, detalhe: `${brl(r.valorp)} → ${brl(a.valorp)}` });
+      continue;
+    }
+    if (a.status === "entregue") out.entrega.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: a.status, valor: r.valorp, detalhe: "" });
+    else if (CHURN_STATUS.has(a.status)) out.churn.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: a.status, valor: r.valorp, detalhe: "" });
+    else out.saida_atipica.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: a.status, valor: r.valorp, detalhe: `valorp ${brl(a.valorp)}` });
+  }
+  for (const r of atual) {
+    if (!ehEstoquePontual(r)) continue;
+    const prev = antMap.get(r.idSubtask);
+    if (!prev || !ehEstoquePontual(prev)) out.venda.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: r.status, valor: r.valorp, detalhe: "" });
+  }
+  return out;
+}
+```
+
+- [ ] **Step 4: Run — GREEN**: `npx vitest run server/routes/bp2026.pontual.helpers.test.ts` → all pass (now 10 tests).
+- [ ] **Step 5: Commit**:
+```bash
+git add server/routes/bp2026.pontual.helpers.ts server/routes/bp2026.pontual.helpers.test.ts
+git commit -m "feat(bp2026): classificarPonteItens — contratos por categoria p/ drill-down
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+```
+
+### Task 8: Handlers de detalhe (bp2026.detalhe.ts)
+
+**Files:**
+- Modify: `server/routes/bp2026.detalhe.ts`
+
+**Interfaces:**
+- Consumes: `classificarPonteItens`, `ehEstoquePontual`, `STATUS_DECOMP`, `RegPontualItem`, `CategoriaPonte` (Task 7); existing `detDealsBitrix`, `detChurn`, `agruparItens`.
+
+- [ ] **Step 1: Verificar não-colisão com `prod`.** Em `bp2026.detalhe.ts` o ramo `else if (prod)` (parseMetricaProduto) roda ANTES dos novos. Confirme que `parseMetricaProduto` (em `bp2026.vendasProduto.ts`) retorna `null` para `ponte_mrr_*` e `pontual_*` (eles não casam com o padrão `vendas_(mrr|pontual)_<seg>`). Rode um check rápido: `grep -n "parseMetricaProduto" server/routes/bp2026.vendasProduto.ts` e leia a função. Se por acaso casar, adicione `&& !metrica.startsWith("pontual_") && !metrica.startsWith("ponte_")` na guarda do `prod`. (Esperado: não casa — `pontual_venda` ≠ `vendas_pontual_*`.)
+
+- [ ] **Step 2: Adicionar imports** no topo de `bp2026.detalhe.ts`:
+```ts
+import {
+  classificarPonteItens, ehEstoquePontual, STATUS_DECOMP,
+  type RegPontualItem, type CategoriaPonte,
+} from "./bp2026.pontual.helpers";
+```
+
+- [ ] **Step 3: Adicionar `ponte_mrr_delta` ao array `DERIVADAS`** (server) — ele é resíduo, resolvido client-side:
+```ts
+  "sga_total_detalhe", "or_total_detalhe", "cac_total_detalhe", "cac_pct_receita", "cac_payback_mrr", "mrr_delta_nao_explicado",
+  "ponte_mrr_delta",
+```
+
+- [ ] **Step 4: Adicionar títulos em `TITULOS_SUBABAS`** (para as métricas serem "conhecidas"):
+```ts
+  ponte_mrr_ini: "(=) MRR inicial", ponte_mrr_vendas: "(+) Vendas MRR",
+  ponte_mrr_churn: "(−) Churn", ponte_mrr_fim: "(=) MRR final",
+  pontual_estoque_ini: "(=) Estoque inicial", pontual_venda: "(+) Venda",
+  pontual_entrega: "(−) Entrega", pontual_churn: "(−) Churn",
+  pontual_deletados: "(−) Deletados", pontual_saida_atipica: "(−) Saída atípica",
+  pontual_reajuste: "(±) Reajuste de valor", pontual_estoque_fim: "(=) Estoque final",
+  pontual_status_ativo: "Em execução (ativo)", pontual_status_triagem: "Triagem",
+  pontual_status_pausado: "Pausado", pontual_status_onboarding: "Onboarding",
+  pontual_status_em_cancelamento: "Em cancelamento", pontual_status_outros: "Outros status",
+```
+
+- [ ] **Step 5: Adicionar os helpers** (antes de `registerBp2026DetalheRoutes`):
+```ts
+// snapshot de MRR ativo do mês (anterior=false) ou do mês anterior (anterior=true)
+async function detMrrSnapshot(db: any, mes: number, anterior: boolean): Promise<ResultadoDet> {
+  const ini = anterior ? sql`(make_date(${ANO}, ${mes}, 1) - INTERVAL '1 month')` : sql`make_date(${ANO}, ${mes}, 1)`;
+  const fim = anterior ? sql`make_date(${ANO}, ${mes}, 1)` : sql`(make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')`;
+  const result = await db.execute(sql`
+    WITH alvo AS (
+      SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+      WHERE data_snapshot::date >= ${ini}::date AND data_snapshot::date < ${fim}::date
+    )
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(h.servico, '') AS servico,
+           COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
+           COALESCE(h.valorr::numeric, 0) AS valor
+    FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+    WHERE h.status IN ('ativo', 'onboarding', 'triagem') ORDER BY valor DESC
+  `);
+  const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+    grupo: r.squad, nome: r.cliente, detalhe: r.servico, data: null, valor: parseFloat(r.valor),
+  }));
+  return { grupos: agruparItens(itens, Number.MAX_SAFE_INTEGER), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
+// contratos pontuais (valorp>0) do último snapshot do mês (anterior=false) ou do mês anterior (anterior=true)
+async function carregaPontualSnapshot(db: any, mes: number, anterior: boolean): Promise<RegPontualItem[]> {
+  const ini = anterior ? sql`(make_date(${ANO}, ${mes}, 1) - INTERVAL '1 month')` : sql`make_date(${ANO}, ${mes}, 1)`;
+  const fim = anterior ? sql`make_date(${ANO}, ${mes}, 1)` : sql`(make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')`;
+  const result = await db.execute(sql`
+    WITH alvo AS (
+      SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+      WHERE data_snapshot::date >= ${ini}::date AND data_snapshot::date < ${fim}::date
+    )
+    SELECT h.id_subtask, h.valorp::numeric AS valorp, h.status,
+           COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad
+    FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+    WHERE h.valorp::numeric > 0
+  `);
+  return (result.rows as any[]).map((r) => ({
+    idSubtask: String(r.id_subtask), valorp: parseFloat(r.valorp), status: r.status,
+    cliente: r.cliente, squad: r.squad,
+  }));
+}
+
+// estoque pontual de um snapshot (opcional filtro de status); grupos por squad
+async function detPontualSnapshot(
+  db: any, mes: number, anterior: boolean, pred?: (r: RegPontualItem) => boolean
+): Promise<ResultadoDet> {
+  const regs = (await carregaPontualSnapshot(db, mes, anterior)).filter(ehEstoquePontual);
+  const filtrados = pred ? regs.filter(pred) : regs;
+  const itens: ItemDetalhe[] = filtrados.map((r) => ({
+    grupo: r.squad ?? "(sem squad)", nome: r.cliente, detalhe: `status ${r.status}`, data: null, valor: r.valorp,
+  }));
+  return { grupos: agruparItens(itens, Number.MAX_SAFE_INTEGER), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
+const TITULO_CATEGORIA: Record<CategoriaPonte, string> = {
+  venda: "Entradas no estoque (vendas)", entrega: "Saídas por entrega", churn: "Saídas por churn",
+  deletados: "Deletados do ClickUp", saida_atipica: "Saídas atípicas", reajuste: "Reajustes de valor",
+};
+
+// contratos que se moveram numa categoria do mês (snapshot anterior × atual)
+async function detPontualMovimento(db: any, mes: number, categoria: CategoriaPonte): Promise<ResultadoDet> {
+  const [ant, atual] = await Promise.all([
+    carregaPontualSnapshot(db, mes, true), carregaPontualSnapshot(db, mes, false),
+  ]);
+  const itensCat = classificarPonteItens(ant, atual)[categoria];
+  const itens: ItemDetalhe[] = itensCat.map((it) => ({
+    grupo: TITULO_CATEGORIA[categoria], nome: it.cliente,
+    detalhe: [it.detalhe, `status ${it.status}`].filter(Boolean).join(" · "),
+    data: null, valor: it.valor,
+  }));
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+```
+
+- [ ] **Step 6: Adicionar os ramos do switch** (logo antes do `} else {` final de fallback):
+```ts
+      } else if (metrica === "ponte_mrr_ini") {
+        ({ grupos, realizado } = await detMrrSnapshot(db, mes, true));
+      } else if (metrica === "ponte_mrr_fim") {
+        ({ grupos, realizado } = await detMrrSnapshot(db, mes, false));
+      } else if (metrica === "ponte_mrr_vendas") {
+        ({ grupos, realizado } = await detDealsBitrix(db, mes, "mrr", "soma", "Vendas MRR (Bitrix)"));
+      } else if (metrica === "ponte_mrr_churn") {
+        ({ resultado: { grupos, realizado } } = await detChurn(db, mes, null));
+      } else if (metrica === "pontual_estoque_ini") {
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, true));
+      } else if (metrica === "pontual_estoque_fim") {
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false));
+      } else if (metrica === "pontual_status_outros") {
+        const conhecidos = new Set(STATUS_DECOMP.map((s) => s.chave));
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => !conhecidos.has(r.status)));
+      } else if (metrica.startsWith("pontual_status_")) {
+        const chaveMetrica = metrica.slice("pontual_status_".length);
+        const def2 = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica);
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false));
+      } else if (["pontual_venda", "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste"].includes(metrica)) {
+        ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte));
+```
+
+- [ ] **Step 7: tsc** — `npm run check`: confirmar zero novos erros em `bp2026.detalhe.ts` (repo tem erros pré-existentes não relacionados).
+
+- [ ] **Step 8: Commit**:
+```bash
+git add server/routes/bp2026.detalhe.ts
+git commit -m "feat(bp2026): drill-down das células da ponte MRR e do pontual
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+```
+
+### Task 9: Frontend — tornar as células clicáveis
+
+**Files:**
+- Modify: `client/src/pages/BP2026.tsx`
+- Modify: `client/src/components/bp2026/BPCellDetail.tsx`
+
+- [ ] **Step 1: `BP2026.tsx`** — adicionar `onCellClick` às DUAS tabelas novas (ponteMrr no topo da Revenue e a tabela da aba Pontual), mantendo `mostrarOrcado={false}`:
+```tsx
+            <BPDreTable
+              linhas={data.ponteMrr}
+              mesCorrente={data.mesCorrente}
+              mesFechado={data.mesFechado}
+              mostrarOrcado={false}
+              onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
+            />
+```
+e na aba Pontual:
+```tsx
+          <BPDreTable
+            linhas={data.pontual}
+            mesCorrente={data.mesCorrente}
+            mesFechado={data.mesFechado}
+            mostrarOrcado={false}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
+          />
+```
+
+- [ ] **Step 2: `BP2026.tsx`** — re-incluir `...data.ponteMrr` e `...data.pontual` no array `linhas` do `BPCellDetail` (necessário p/ o drawer resolver as linhas e p/ a composição da derivada `ponte_mrr_delta`):
+```tsx
+        linhas={[
+          ...data.linhas, ...data.metricasGerais, ...data.revenue, ...data.ponteMrr,
+          ...data.pontual, ...data.funil, ...data.vendasProduto, ...data.capacity, ...data.sgaDetalhe,
+          ...data.cacDetalhe, ...data.outrasDetalhe,
+        ]}
+```
+
+- [ ] **Step 3: `BPCellDetail.tsx`** — adicionar a derivada `ponte_mrr_delta` ao mapa `DERIVADAS` (composição das 4 linhas da ponte):
+```tsx
+  mrr_delta_nao_explicado: ["mrr_ativo", "vendas_mrr", "churn_mes"],
+  ponte_mrr_delta: ["ponte_mrr_ini", "ponte_mrr_vendas", "ponte_mrr_churn", "ponte_mrr_fim"],
+```
+
+- [ ] **Step 4: tsc** — `npm run check`: zero novos erros em `BP2026.tsx`/`BPCellDetail.tsx`. NÃO subir o dev server (porta 3000 ocupada por sessão concorrente; o controller valida em porta separada).
+
+- [ ] **Step 5: Commit**:
+```bash
+git add client/src/pages/BP2026.tsx client/src/components/bp2026/BPCellDetail.tsx
+git commit -m "feat(bp2026): células da ponte MRR e do pontual abrem drill-down
+
+Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>"
+```
