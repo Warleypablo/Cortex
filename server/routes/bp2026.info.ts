@@ -14,7 +14,7 @@ const FONTE_BITRIX = "Bitrix CRM — deals em 'Negócio Ganho' por data de fecha
 const FONTE_CAZ_CAIXA = "Conta Azul — parcelas de despesa QUITADAS por data de quitação (regime caixa)";
 const FONTE_CAZ_COMP = "Conta Azul — parcelas de receita por data de competência";
 const FONTE_INHIRE = "Inhire — rh_pessoal, ativos no fim do mês (admissão ≤ fim do mês < demissão)";
-const FONTE_CHURN = "ClickUp — vw_cup_churn_ajustado por data de solicitação de encerramento (não abonados; exclui 'Inadimplente 1º Mês', 'Não começou' e 'Erro na Venda')";
+const FONTE_CHURN = "ClickUp — vw_cup_churn_ajustado por data de solicitação de encerramento (churn bruto, alinhado ao gráfico 'Churn Commerce MoM' do ClickUp; inclui abonados e todos os motivos)";
 
 // linhas de serviço da Revenue (mesmo CASE de produto da agregação)
 const LINHAS_SERVICO: Record<string, string> = {
@@ -209,10 +209,10 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
   churn_mes: {
     definicao: "MRR perdido em cancelamentos solicitados no mês.",
     fonte: FONTE_CHURN,
-    calculo: "Soma de valor_r dos encerramentos não abonados solicitados no mês.",
+    calculo: "Soma de valor_r de todos os encerramentos solicitados no mês (bruto, inclui abonados).",
   },
   mrr_delta_nao_explicado: {
-    definicao: "MRR que vazou sem virar churn declarado: downgrades, abonados, vendas não ativadas, reajustes.",
+    definicao: "MRR que vazou sem virar churn declarado: downgrades, vendas não ativadas, reajustes (abonados já entram no churn bruto).",
     fonte: "Derivada (ponte do MRR).",
     calculo: "MRR do mês anterior + Vendas MRR − Churn − MRR real do mês. Lê-se em R$; janeiro compara contra dez/2025 real e não tem orçado.",
   },
