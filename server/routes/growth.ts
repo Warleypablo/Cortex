@@ -4223,6 +4223,18 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const percPerdaSeguidores = (comecaramSeguir + deixaramSeguir) > 0
         ? deixaramSeguir / (comecaramSeguir + deixaramSeguir) : 0;
 
+      // Engajamento do canal = (curtidas + comentários + compartilhamentos) ÷ views,
+      // espelhando o % Engajamento do Instagram (Interações ÷ Alcance). No TikTok as
+      // views são o análogo do alcance.
+      const visualizacoes = parseInt(v.visualizacoes) || 0;
+      const interacoes = (parseInt(v.curtidas) || 0) + (parseInt(v.comentarios) || 0) + (parseInt(v.compartilhamentos) || 0);
+      const engajamento = visualizacoes > 0 ? interacoes / visualizacoes : 0;
+
+      // Estágio "chegou no site" via GA4 (bucket orgânico do TikTok)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.organico_tiktok;
+      const visualizacoesPagina = ga4.byPlatformPageViews.organico_tiktok;
+
       res.json({
         // Audiência (espelha o breakdown de seguidores do Instagram/YouTube/LinkedIn)
         comecaramSeguir,
@@ -4234,10 +4246,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         // compat
         seguidores: totalSeguidores,
         crescimentoSeguidores: deltaSeguidores,
-        // Distribuição
-        visualizacoes: parseInt(v.visualizacoes) || 0,
+        // Distribuição + engajamento
+        visualizacoes,
         compartilhamentos: parseInt(v.compartilhamentos) || 0,
         videosPublicados: parseInt((vpubRes.rows[0] as any).n) || 0,
+        interacoes,
+        engajamento,
+        // Chegou no site (GA4 orgânico do TikTok)
+        sessoes,
+        visualizacoesPagina,
+        sessoesAvailable: ga4.available,
         // vaidade (não exibidos, mantidos por compat)
         curtidas: parseInt(v.curtidas) || 0,
         comentarios: parseInt(v.comentarios) || 0,
