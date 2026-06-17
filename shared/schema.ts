@@ -3303,6 +3303,114 @@ export const insertInstagramPostMetricSchema = createInsertSchema(instagramPostM
 export type InstagramPostMetric = typeof instagramPostMetrics.$inferSelect;
 export type InsertInstagramPostMetric = z.infer<typeof insertInstagramPostMetricSchema>;
 
+// ── CRM Instagram (Garimpo de Engajamento → Social Selling) ─────────────────
+// Perfis que engajaram no IG da Turbo (comentário/DM), organizados em pipeline
+// comercial. Score e temperatura são COMPUTADOS na query (não viram estado).
+
+export const prospectingProfiles = cortexCoreSchema.table(
+  "prospecting_profiles",
+  {
+    id: serial("id").primaryKey(),
+    // @handle real do Instagram — só conhecido pela via de comentário (Graph API).
+    // Null pra leads de DM (GHL não entrega handle, só nome de exibição).
+    igUsername: text("ig_username"),
+    // Nome de exibição (rótulo humano). Pra DM vem do contact_name do GHL.
+    displayName: text("display_name"),
+    igUserId: text("ig_user_id"),
+    bio: text("bio"),
+    followersCount: integer("followers_count"),
+    profilePictureUrl: text("profile_picture_url"),
+    lastMediaPermalink: text("last_media_permalink"),
+    // engajador | oportunidade | negocio
+    stage: text("stage").notNull().default("engajador"),
+    // null | creator_ugc | job_candidate | competitor | poor_fit (legado)
+    subcategory: text("subcategory"),
+    // Tag de qualificação do SDR (ver shared/crmInstagramTags.ts).
+    // colaborador/desqualificado removem do Pipeline (blocklist).
+    qualification: text("qualification"),
+    // Observação livre do SDR; vai pro COMMENTS do Bitrix na criação do deal.
+    observacao: text("observacao"),
+    ownerUserId: text("owner_user_id"),
+    lockedBy: text("locked_by"),
+    lockedAt: timestamp("locked_at"),
+    bitrixDealId: integer("bitrix_deal_id"),
+    ghlContactId: text("ghl_contact_id"),
+    isExistingContact: boolean("is_existing_contact").default(false),
+    icpTags: text("icp_tags").array(),
+    firstSeen: timestamp("first_seen").defaultNow(),
+    lastInteractionAt: timestamp("last_interaction_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    // Postgres trata NULLs como distintos: leads de DM (ig_username NULL) coexistem;
+    // a unicidade vale entre @handles reais (via comentário).
+    uniqueIndex("uq_prospect_ig_username").on(table.igUsername),
+    // Chave de dedup estável dos leads de DM (GHL).
+    uniqueIndex("uq_prospect_ghl_contact").on(table.ghlContactId),
+    index("idx_prospect_stage").on(table.stage),
+    index("idx_prospect_owner").on(table.ownerUserId),
+    index("idx_prospect_last_interaction").on(table.lastInteractionAt),
+  ],
+);
+
+export const insertProspectingProfileSchema = createInsertSchema(prospectingProfiles)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+export type ProspectingProfile = typeof prospectingProfiles.$inferSelect;
+export type InsertProspectingProfile = z.infer<typeof insertProspectingProfileSchema>;
+
+export const prospectingInteractions = cortexCoreSchema.table(
+  "prospecting_interactions",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id")
+      .notNull()
+      .references(() => prospectingProfiles.id, { onDelete: "cascade" }),
+    // comment | spontaneous_dm
+    type: text("type").notNull(),
+    igMediaId: text("ig_media_id"),
+    text: text("text"),
+    // organic | dm
+    source: text("source"),
+    // chave de dedup idempotente: id do comentário ou id da msg do GHL
+    externalRef: text("external_ref").notNull(),
+    occurredAt: timestamp("occurred_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_prospect_int_profile").on(table.profileId),
+    uniqueIndex("uq_prospect_int_external_ref").on(table.externalRef),
+    index("idx_prospect_int_occurred").on(table.occurredAt),
+  ],
+);
+
+export const insertProspectingInteractionSchema = createInsertSchema(prospectingInteractions)
+  .omit({ id: true, createdAt: true });
+export type ProspectingInteraction = typeof prospectingInteractions.$inferSelect;
+export type InsertProspectingInteraction = z.infer<typeof insertProspectingInteractionSchema>;
+
+export const prospectingStatusLog = cortexCoreSchema.table(
+  "prospecting_status_log",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id")
+      .notNull()
+      .references(() => prospectingProfiles.id, { onDelete: "cascade" }),
+    fromStage: text("from_stage"),
+    toStage: text("to_stage").notNull(),
+    byUser: text("by_user"),
+    at: timestamp("at").defaultNow(),
+  },
+  (table) => [
+    index("idx_prospect_log_profile").on(table.profileId),
+  ],
+);
+
+export const insertProspectingStatusLogSchema = createInsertSchema(prospectingStatusLog)
+  .omit({ id: true, at: true });
+export type ProspectingStatusLog = typeof prospectingStatusLog.$inferSelect;
+export type InsertProspectingStatusLog = z.infer<typeof insertProspectingStatusLogSchema>;
+
 // ==================== CROSSSELL ====================
 
 export const crosssellOportunidades = cortexCoreSchema.table("crosssell_oportunidades", {

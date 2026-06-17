@@ -2569,3 +2569,120 @@ export async function initializeItemAliasMapTable(): Promise<void> {
     console.error('[database] erro ao inicializar item_alias_map:', error);
   }
 }
+
+// CRM Instagram (Garimpo de Engajamento → Social Selling)
+export async function initializeCrmInstagramTables(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.prospecting_profiles (
+        id SERIAL PRIMARY KEY,
+        ig_username TEXT,
+        display_name TEXT,
+        ig_user_id TEXT,
+        bio TEXT,
+        followers_count INTEGER,
+        profile_picture_url TEXT,
+        last_media_permalink TEXT,
+        stage TEXT NOT NULL DEFAULT 'engajador',
+        subcategory TEXT,
+        qualification TEXT,
+        observacao TEXT,
+        owner_user_id TEXT,
+        locked_by TEXT,
+        locked_at TIMESTAMP,
+        bitrix_deal_id INTEGER,
+        ghl_contact_id TEXT,
+        is_existing_contact BOOLEAN DEFAULT FALSE,
+        icp_tags TEXT[],
+        first_seen TIMESTAMP DEFAULT NOW(),
+        last_interaction_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_stage ON cortex_core.prospecting_profiles (stage)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_owner ON cortex_core.prospecting_profiles (owner_user_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_last_interaction ON cortex_core.prospecting_profiles (last_interaction_at)`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.prospecting_interactions (
+        id SERIAL PRIMARY KEY,
+        profile_id INTEGER NOT NULL REFERENCES cortex_core.prospecting_profiles(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        ig_media_id TEXT,
+        text TEXT,
+        source TEXT,
+        external_ref TEXT NOT NULL,
+        occurred_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_int_external_ref ON cortex_core.prospecting_interactions (external_ref)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_int_profile ON cortex_core.prospecting_interactions (profile_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_int_occurred ON cortex_core.prospecting_interactions (occurred_at)`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.prospecting_status_log (
+        id SERIAL PRIMARY KEY,
+        profile_id INTEGER NOT NULL REFERENCES cortex_core.prospecting_profiles(id) ON DELETE CASCADE,
+        from_stage TEXT,
+        to_stage TEXT NOT NULL,
+        by_user TEXT,
+        at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_log_profile ON cortex_core.prospecting_status_log (profile_id)`);
+
+    // ── Migração idempotente: re-chaveamento por ghl_contact_id + display_name ──
+    // Roda DEPOIS das três tabelas existirem (o dedup referencia interactions/status_log).
+    // Separa nome de exibição do @handle real; conserta leads de DM exibidos como
+    // "@nome com emoji" e dá dedup estável. Guardas garantem rodar 1x sem efeito
+    // destrutivo em execuções futuras.
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS display_name TEXT`);
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS qualification TEXT`);
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS observacao TEXT`);
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ALTER COLUMN ig_username DROP NOT NULL`);
+    // 1) backfill do nome a partir do ig_username legado (só leads de DM ainda não migrados)
+    await db.execute(sql`
+      UPDATE cortex_core.prospecting_profiles
+      SET display_name = ig_username
+      WHERE display_name IS NULL AND ig_username IS NOT NULL AND ghl_contact_id IS NOT NULL
+    `);
+    // 2) zera o @handle dos leads de DM (era nome de exibição, não handle real).
+    //    Guarda ig_username = display_name evita apagar handle real de lead de comentário.
+    await db.execute(sql`
+      UPDATE cortex_core.prospecting_profiles
+      SET ig_username = NULL
+      WHERE ghl_contact_id IS NOT NULL AND ig_username IS NOT NULL AND ig_username = display_name
+    `);
+    // 3) dedup defensivo: se houver ghl_contact_id duplicado, mantém o menor id,
+    //    repointa interações/log e remove os duplicados (antes do índice único).
+    await db.execute(sql`
+      WITH dups AS (
+        SELECT ghl_contact_id, MIN(id) AS keep_id, ARRAY_AGG(id) AS ids
+        FROM cortex_core.prospecting_profiles
+        WHERE ghl_contact_id IS NOT NULL
+        GROUP BY ghl_contact_id HAVING COUNT(*) > 1
+      ),
+      repoint_int AS (
+        UPDATE cortex_core.prospecting_interactions pi SET profile_id = d.keep_id
+        FROM dups d WHERE pi.profile_id = ANY(d.ids) AND pi.profile_id <> d.keep_id
+        RETURNING 1
+      ),
+      repoint_log AS (
+        UPDATE cortex_core.prospecting_status_log sl SET profile_id = d.keep_id
+        FROM dups d WHERE sl.profile_id = ANY(d.ids) AND sl.profile_id <> d.keep_id
+        RETURNING 1
+      )
+      DELETE FROM cortex_core.prospecting_profiles p
+      USING dups d
+      WHERE p.ghl_contact_id = d.ghl_contact_id AND p.id <> d.keep_id
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_ig_username ON cortex_core.prospecting_profiles (ig_username)`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_ghl_contact ON cortex_core.prospecting_profiles (ghl_contact_id)`);
+
+    console.log('[database] CRM Instagram tables initialized');
+  } catch (error) {
+    console.error('[database] erro ao inicializar CRM Instagram tables:', error);
+  }
+}

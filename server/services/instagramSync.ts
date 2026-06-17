@@ -368,6 +368,78 @@ export async function syncMediaInsights(mediaId: string, accessToken: string, me
   }
 }
 
+// CRM Instagram — busca comentários nominais de uma mídia (com paginação).
+// Degrada gracioso: se o escopo/superfície não permitir username, retorna o que vier.
+export type IgComment = {
+  id: string;
+  text?: string;
+  timestamp?: string;
+  username?: string;
+  fromId?: string;
+};
+
+export async function fetchMediaComments(
+  mediaId: string,
+  accessToken: string,
+  maxComments: number = 300
+): Promise<IgComment[]> {
+  const out: IgComment[] = [];
+  const fields = "id,text,timestamp,username,from{id,username}";
+  try {
+    let resp: any = await callGraphAPI(`/${mediaId}/comments`, accessToken, { fields, limit: "50" }, 1);
+    while (resp) {
+      for (const c of resp.data || []) {
+        out.push({
+          id: c.id,
+          text: c.text,
+          timestamp: c.timestamp,
+          username: c.username || c.from?.username || undefined,
+          fromId: c.from?.id || undefined,
+        });
+      }
+      if (out.length >= maxComments) break;
+      const after = resp.paging?.cursors?.after;
+      if (!after || !resp.paging?.next) break;
+      resp = await callGraphAPI(`/${mediaId}/comments`, accessToken, { fields, limit: "50", after }, 1);
+    }
+  } catch (err: any) {
+    console.warn(`[crm-instagram] fetchMediaComments falhou para ${mediaId}:`, err.message);
+  }
+  return out;
+}
+
+// CRM Instagram — contexto de perfil de um comentarista via Business Discovery.
+// Best-effort: só funciona para contas Business/Creator e pode não estar disponível
+// na superfície Instagram Login API. Retorna null em qualquer falha.
+export type IgProfileContext = {
+  bio?: string;
+  followersCount?: number;
+  profilePictureUrl?: string;
+  lastMediaPermalink?: string;
+};
+
+export async function fetchBusinessProfile(
+  selfIgUserId: string,
+  targetUsername: string,
+  accessToken: string
+): Promise<IgProfileContext | null> {
+  try {
+    const res = await callGraphAPI(`/${selfIgUserId}`, accessToken, {
+      fields: `business_discovery.username(${targetUsername}){followers_count,biography,profile_picture_url,media.limit(1){permalink}}`,
+    }, 0);
+    const bd = res?.business_discovery;
+    if (!bd) return null;
+    return {
+      bio: bd.biography,
+      followersCount: bd.followers_count,
+      profilePictureUrl: bd.profile_picture_url,
+      lastMediaPermalink: bd.media?.data?.[0]?.permalink,
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function revokeAccess(accessToken: string): Promise<void> {
   const { apiVersion } = getConfig();
   const url = new URL(`${GRAPH_API_BASE}/${apiVersion}/me/permissions`);
