@@ -23,6 +23,8 @@ export interface BPLinha {
   destaque?: boolean;
   grupo?: string;      // bloco (ex.: Recorrente / Pontual) — agrupa linhas na tabela
   segmento?: string;   // produto (ex.: Performance / Creators) — sub-cabeçalho por produto
+  subItem?: boolean;    // linha-filha (ex.: "% do CAC total") — indentada e atenuada
+  semDetalhe?: boolean; // célula não abre drill-down
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -187,7 +189,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                 <td
                   className={`sticky left-0 z-10 px-4 py-3 whitespace-nowrap align-top ${
                     ehTotal ? "bg-gray-100 dark:bg-zinc-800" : "bg-white dark:bg-zinc-900"
-                  } ${linha.segmento ? "pl-8" : ""}`}
+                  } ${linha.segmento ? "pl-8" : ""} ${linha.subItem ? "pl-8 text-xs text-gray-500 dark:text-zinc-500" : ""}`}
                 >
                   <span className="flex items-center gap-1.5">
                     {tituloLinha}
@@ -222,7 +224,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                   </span>
                 </td>
                 {linha.meses.map((m) => {
-                    const clicavel = !!onCellClick && m.realizado !== null;
+                    const clicavel = !!onCellClick && m.realizado !== null && !linha.subItem && !linha.semDetalhe;
                     return (
                       <td
                         key={m.mes}
