@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-06-17 | refactor(broadcast): remove bases IA (IA - MQLs, IA - Todos) do planejamento
+
+**O que foi feito:**
+- Removidas as bases **"IA - MQLs"** e **"IA - Todos"** do catálogo `BASE_TAG_MAP` — como `BASES_DISPONIVEIS = Object.keys(BASE_TAG_MAP)`, isso propaga automaticamente pro dropdown do Planejamento, pro loop do classificador e pro pool do gerador de plano (sobram **13 bases**)
+- Limpeza das referências em `regras-calendario.ts` (limites mensais), `matriz-validacao.ts` (BASE_CATEGORIAS, COMPATIBILIDADE_BASE_PADRAO/OFERTA, texto de sugestão) e do tipo órfão `CategoriaBase "funil_ia"` em `types.ts`
+- Removidos os 2 INSERTs de base IA do seed `seed-2026-06-broadcast-plan.sql` (re-rodar não recria os slots) + deletada 1 linha órfã `base='IA - Todos'` em `broadcast_plan`
+- Comentário stale do gerador atualizado (13 bases, não 18)
+
+**Por que:**
+- Descontinuar o funil IA como base de planejamento de broadcast
+
+**O que NÃO foi tocado (de propósito):**
+- A **oferta `IA`** (produto, em `COMPATIBILIDADE_BASE_OFERTA`) — é serviço, não base
+- A **tag `[lead]_ia`** em `tag-migration-map.ts` — é dado de tag do contato, independente da base
+
+**Arquivos alterados:**
+- `shared/ghl-broadcast/base-tag-map.ts`, `regras-calendario.ts`, `matriz-validacao.ts`, `types.ts` - remoção das bases IA
+- `migrations/seed-2026-06-broadcast-plan.sql` - remoção dos INSERTs IA
+- `server/routes/ghl.ts` - comentário
+
+**Impacto arquitetural:** Nenhum estrutural — todos os lookups de base têm fallback (getBaseFiltro→null, limiteMensal→3, compatibilidade→{}). A remoção foi mapeada e verificada adversarialmente via workflow multi-agente (pegou o seed SQL que um grep ingênuo de `shared/server/client` não veria).
+
+---
+
 ## 2026-06-17 | feat(broadcast): filtros e ordenação integrados no card da lista
 
 **O que foi feito:**
