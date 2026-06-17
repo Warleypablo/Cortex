@@ -679,7 +679,7 @@ export default function InvestorsReport() {
                       <ReferenceLine x={transicaoFonte} stroke="#f59e0b" strokeDasharray="4 4" strokeWidth={1.5}
                         label={{ value: 'emitido → caixa', position: 'insideTopRight', fill: '#f59e0b', fontSize: 9 }} />
                     )}
-                    <Area type="monotone" dataKey="faturamento" stroke="#10b981" fill="url(#gradientFat)" strokeWidth={0} />
+                    <Area type="monotone" dataKey="faturamento" stroke="#10b981" fill="url(#gradientFat)" strokeWidth={0} tooltipType="none" legendType="none" />
                     <Line type="monotone" dataKey="faturamento" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
                   </LineChart>
                 </ResponsiveContainer>
@@ -722,7 +722,7 @@ export default function InvestorsReport() {
                     />
                     <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} />
                     <ReferenceLine y={avgMargem} stroke="#1978D5" strokeDasharray="5 5" strokeWidth={1} label={{ value: `Margem ano: ${avgMargem.toFixed(1)}%`, position: 'right', fill: '#1978D5', fontSize: 10 }} />
-                    <Area type="monotone" dataKey="margem" stroke="#3b82f6" fill="url(#gradientMargem)" strokeWidth={0} />
+                    <Area type="monotone" dataKey="margem" stroke="#3b82f6" fill="url(#gradientMargem)" strokeWidth={0} tooltipType="none" legendType="none" />
                     <Line type="monotone" dataKey="margem" stroke="#3b82f6" strokeWidth={2.5} dot={{ r: 3, fill: '#3b82f6' }} activeDot={{ r: 5 }} />
                   </ComposedChart>
                 </ResponsiveContainer>
