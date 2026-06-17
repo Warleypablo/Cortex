@@ -3514,6 +3514,63 @@ Estruture sua resposta em:
     }
   });
 
+  // Geração de caixa acumulada (regime de CAIXA, base DFC) — ano corrente.
+  // Reaproveita EXATAMENTE a linha de geração de caixa da DFC (storage.getDfc):
+  // caz_parcelas, status QUITADO, por data_quitacao, valor_pago−desconto,
+  // RECEITAS (cat. 03/04) − DESPESAS (cat. 05/06/07/08), incluindo o ajuste de
+  // conciliação (cat. 09) que a DFC injeta sob DESPESAS. Garante paridade 100%
+  // com a tela /dfc. Independe do seletor de período da página: sempre vai de
+  // janeiro do ano corrente até o último mês FECHADO (exclui o mês parcial atual).
+  app.get("/api/investors-report/geracao-caixa", async (_req, res) => {
+    try {
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const hoje = new Date();
+      const ano = hoje.getFullYear();
+
+      // Último mês fechado = último dia do mês anterior ao atual.
+      // (dia 0 do mês atual = último dia do mês anterior)
+      const fimMesAnterior = new Date(ano, hoje.getMonth(), 0);
+
+      // Se estamos em janeiro, ainda não há mês fechado neste ano → série vazia.
+      if (fimMesAnterior.getFullYear() < ano) {
+        return res.json({ ano, series: [] });
+      }
+
+      const dataInicio = `${ano}-01-01`;
+      const dataFim = `${fimMesAnterior.getFullYear()}-${String(fimMesAnterior.getMonth() + 1).padStart(2, '0')}-${String(fimMesAnterior.getDate()).padStart(2, '0')}`;
+      const mesFimStr = dataFim.substring(0, 7); // 'YYYY-MM'
+
+      const dfc = await storage.getDfc(dataInicio, dataFim);
+      const receitas = dfc.nodes.find((n) => n.categoriaId === 'RECEITAS');
+      const despesas = dfc.nodes.find((n) => n.categoriaId === 'DESPESAS');
+
+      // Meses do ano corrente até o último mês fechado, na ordem cronológica.
+      const mesesDoAno = dfc.meses
+        .filter((m) => m.startsWith(`${ano}-`) && m <= mesFimStr)
+        .sort();
+
+      let caixaAcumulado = 0;
+      const series = mesesDoAno.map((mes) => {
+        const rec = receitas?.valuesByMonth[mes] || 0;
+        const desp = Math.abs(despesas?.valuesByMonth[mes] || 0); // mesma fórmula da DFC (calculateMonthlyData)
+        const geracaoMes = rec - desp;
+        caixaAcumulado += geracaoMes;
+        const month = parseInt(mes.split('-')[1], 10);
+        return {
+          mes,
+          mesLabel: `${monthNames[month - 1]}/${String(ano).slice(2)}`,
+          geracaoMes,
+          caixaAcumulado,
+        };
+      });
+
+      res.json({ ano, series });
+    } catch (error) {
+      console.error("[api] Error fetching investors-report geração de caixa:", error);
+      res.status(500).json({ error: "Failed to fetch geração de caixa data" });
+    }
+  });
+
   // Endpoint para exportar Investors Report como PDF - Versão Técnica Detalhada
   app.get("/api/investors-report/pdf", async (req, res) => {
     try {
