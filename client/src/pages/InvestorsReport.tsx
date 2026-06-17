@@ -84,6 +84,7 @@ interface InvestorsReportData {
     geracaoCaixa: number;
     inadimplencia: number;
   }>;
+  evolucaoFaturamentoCompetencia?: Array<{ mes: string; faturamento: number }>;
   evolucaoChurn: Array<{
     mes: string;
     mrrChurn: number;
@@ -250,44 +251,57 @@ export default function InvestorsReport() {
       }));
   }, [filteredData]);
 
-  const fullAnnualSummary = useMemo(() => {
-    if (!data?.evolucaoFaturamento) return {};
-    const byYear: Record<string, { faturamento: number; despesas: number; geracaoCaixa: number; meses: number }> = {};
-    
-    data.evolucaoFaturamento.forEach(item => {
-      const year = item.mes.split('-')[0];
-      if (!byYear[year]) {
-        byYear[year] = { faturamento: 0, despesas: 0, geracaoCaixa: 0, meses: 0 };
-      }
-      byYear[year].faturamento += item.faturamento;
-      byYear[year].despesas += item.despesas;
-      byYear[year].geracaoCaixa += item.geracaoCaixa;
-      byYear[year].meses += 1;
+  // Faturamento de COMPETÊNCIA por ano — base do Cresc. YoY (comparação like-for-like).
+  // O regime de caixa vale para os demais cards/gráficos; o YoY fica em competência
+  // porque 2025 não tem histórico em caixa (caz_parcelas começa em set/2025).
+  const annualSummaryCompetencia = useMemo(() => {
+    const byYear: Record<string, { faturamento: number; meses: number }> = {};
+    (data?.evolucaoFaturamentoCompetencia ?? []).forEach(item => {
+      const [year, month] = item.mes.split('-').map(Number);
+      const itemDate = new Date(year, month - 1, 1);
+      if (itemDate < dateRange.start || itemDate > dateRange.end) return; // respeita o seletor de período
+      const y = item.mes.split('-')[0];
+      if (!byYear[y]) byYear[y] = { faturamento: 0, meses: 0 };
+      byYear[y].faturamento += item.faturamento;
+      byYear[y].meses += 1;
     });
-    
     return byYear;
-  }, [data?.evolucaoFaturamento]);
+  }, [data?.evolucaoFaturamentoCompetencia, dateRange]);
+
+  const fullAnnualSummaryCompetencia = useMemo(() => {
+    const byYear: Record<string, { faturamento: number; meses: number }> = {};
+    (data?.evolucaoFaturamentoCompetencia ?? []).forEach(item => {
+      const y = item.mes.split('-')[0];
+      if (!byYear[y]) byYear[y] = { faturamento: 0, meses: 0 };
+      byYear[y].faturamento += item.faturamento;
+      byYear[y].meses += 1;
+    });
+    return byYear;
+  }, [data?.evolucaoFaturamentoCompetencia]);
 
   const yoyGrowth = useMemo(() => {
     if (annualSummary.length === 0) return null;
-    
-    const currentYearData = annualSummary[0];
-    const currentYear = currentYearData.year;
+
+    const currentYear = annualSummary[0].year;
     const previousYear = String(parseInt(currentYear) - 1);
-    
-    const previousYearData = fullAnnualSummary[previousYear];
-    
-    if (!previousYearData || previousYearData.faturamento === 0) return null;
-    
-    const adjustedPrevious = (previousYearData.faturamento / previousYearData.meses) * currentYearData.meses;
-    const growth = ((currentYearData.faturamento - adjustedPrevious) / adjustedPrevious) * 100;
-    
+
+    // Comparação em COMPETÊNCIA nos dois anos (like-for-like).
+    const currentYearComp = annualSummaryCompetencia[currentYear];
+    const previousYearComp = fullAnnualSummaryCompetencia[previousYear];
+
+    if (!currentYearComp || currentYearComp.meses === 0) return null;
+    if (!previousYearComp || previousYearComp.faturamento === 0) return null;
+
+    // Anualiza a média mensal do ano anterior ao nº de meses já decorridos do ano atual.
+    const adjustedPrevious = (previousYearComp.faturamento / previousYearComp.meses) * currentYearComp.meses;
+    const growth = ((currentYearComp.faturamento - adjustedPrevious) / adjustedPrevious) * 100;
+
     return {
       growth,
       currentYear,
       previousYear
     };
-  }, [annualSummary, fullAnnualSummary]);
+  }, [annualSummary, annualSummaryCompetencia, fullAnnualSummaryCompetencia]);
 
   const totals = useMemo(() => {
     return filteredData.reduce((acc, item) => ({

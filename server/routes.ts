@@ -3426,6 +3426,23 @@ Estruture sua resposta em:
         caixaResult.rows as any[],
         hojeYM,
       );
+
+      // Faturamento de COMPETÊNCIA por mês (caz_receber.total), TODOS os meses até o
+      // último fechado. Usado SÓ pelo Cresc. YoY, que compara like-for-like
+      // (competência × competência) — caixa só existe de 2026 em diante, então um
+      // YoY em caixa misturaria 2026-caixa com 2025-competência.
+      const competenciaFullResult = await db.execute(sql`
+        WITH bounds AS (
+          SELECT DATE_TRUNC('month', MIN(data_vencimento)) AS inicio
+          FROM "Conta Azul".caz_receber
+        )
+        SELECT TO_CHAR(data_vencimento, 'YYYY-MM') as mes, COALESCE(SUM(total::numeric), 0) as faturamento
+        FROM "Conta Azul".caz_receber, bounds
+        WHERE data_vencimento >= bounds.inicio
+          AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY 1
+        ORDER BY 1
+      `);
       
       // Faturamento, inadimplência e margem do ANO corrente (YTD: janeiro → mês atual).
       // Mesma base do gráfico: COMPETÊNCIA (caz_receber.total / caz_pagar.total, por data_vencimento).
@@ -3577,6 +3594,11 @@ Estruture sua resposta em:
             inadimplencia: m.inadimplencia,
           })),
         transicaoMes: regime.transicaoMes,
+        // Série de competência (caz_receber) só para o Cresc. YoY (comparação like-for-like).
+        evolucaoFaturamentoCompetencia: (competenciaFullResult.rows as any[]).map((r) => ({
+          mes: r.mes,
+          faturamento: Number(r.faturamento) || 0,
+        })),
         evolucaoChurn,
         vendasMensais: vendasResult.rows.map((r: any) => ({
           mes: r.mes,
