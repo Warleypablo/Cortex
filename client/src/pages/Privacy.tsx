@@ -83,7 +83,7 @@ function PrivacyPT() {
           O Cortex é operado pela <strong>Turbo Partners LTDA</strong>, agência de marketing digital com sede na
           Rua Carlos Fernando Lindenberg Filho, 90, Monte Belo, Vitória/ES, CEP 29053-315. A Turbo é
           enquadrada como agente de tratamento de pequeno porte conforme Resolução CD/ANPD nº 2/2022 e mantém
-          canal direto de atendimento ao titular pelo e-mail <strong>privacidade@turbopartners.com.br</strong>.
+          canal direto de atendimento ao titular pelo e-mail <strong>contato@turbopartners.com.br</strong>.
         </p>
       </Section>
 
@@ -222,7 +222,7 @@ function PrivacyPT() {
         </ul>
         <p>
           Para exercer qualquer um desses direitos, envie e-mail para{" "}
-          <strong>privacidade@turbopartners.com.br</strong> identificando-se. Responderemos em até 15 dias úteis.
+          <strong>contato@turbopartners.com.br</strong> identificando-se. Responderemos em até 15 dias úteis.
         </p>
       </Section>
 
@@ -268,7 +268,7 @@ function PrivacyPT() {
       <Section title="14. Contato">
         <p>
           Para qualquer dúvida sobre privacidade ou exercício de direitos:{" "}
-          <strong>privacidade@turbopartners.com.br</strong>
+          <strong>contato@turbopartners.com.br</strong>
         </p>
       </Section>
     </>
@@ -293,7 +293,7 @@ function PrivacyEN() {
           headquartered at Rua Carlos Fernando Lindenberg Filho, 90, Monte Belo, Vitória/ES, ZIP 29053-315,
           Brazil. Turbo Partners is classified as a small-size data processing agent under Brazilian ANPD
           Resolution 2/2022 and maintains a direct support channel for data subjects at{" "}
-          <strong>privacidade@turbopartners.com.br</strong>.
+          <strong>contato@turbopartners.com.br</strong>.
         </p>
       </Section>
 
@@ -430,7 +430,7 @@ function PrivacyEN() {
         </ul>
         <p>
           To exercise any of these rights, send an e-mail to{" "}
-          <strong>privacidade@turbopartners.com.br</strong> identifying yourself. We will respond within 15
+          <strong>contato@turbopartners.com.br</strong> identifying yourself. We will respond within 15
           business days.
         </p>
       </Section>
@@ -477,7 +477,7 @@ function PrivacyEN() {
       <Section title="14. Contact">
         <p>
           For any privacy-related questions or to exercise rights:{" "}
-          <strong>privacidade@turbopartners.com.br</strong>
+          <strong>contato@turbopartners.com.br</strong>
         </p>
       </Section>
     </>

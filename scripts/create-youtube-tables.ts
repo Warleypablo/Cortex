@@ -1,10 +1,10 @@
 /**
- * Migration: cria tabelas YouTube em cortex_core (mesmo padrão Instagram).
+ * Migration: cria tabelas YouTube em youtube (mesmo padrão Instagram).
  *
  * Idempotente — pode rodar várias vezes sem efeito colateral.
  *
- * Tabelas criadas (todas em cortex_core):
- *  - youtube_credentials         — refresh_token OAuth encriptado, por usuário Google
+ * Tabelas criadas (todas em youtube):
+ *  - youtube_credentials         — refresh_token OAuth encriptado, UMA credencial por canal
  *  - youtube_channels            — metadata dos canais (Turbocast, TurboPartners, André, Vitor)
  *  - youtube_videos              — vídeos publicados (snapshot de contadores cumulativos)
  *  - youtube_video_daily_metrics — métricas diárias por vídeo (Analytics API)
@@ -41,13 +41,16 @@ async function exec(label: string, sql: string) {
 }
 
 async function main() {
-  console.log('Criando tabelas youtube_* em cortex_core...\n');
+  console.log('Criando tabelas em youtube...\n');
 
-  await exec('cortex_core.youtube_credentials', `
-    CREATE TABLE IF NOT EXISTS cortex_core.youtube_credentials (
+  await exec('schema youtube', `CREATE SCHEMA IF NOT EXISTS youtube`);
+
+  await exec('youtube.credentials', `
+    CREATE TABLE IF NOT EXISTS youtube.credentials (
       id                  SERIAL PRIMARY KEY,
-      google_user_id      VARCHAR(100) NOT NULL UNIQUE,
+      google_user_id      VARCHAR(100) NOT NULL,
       google_email        VARCHAR(255),
+      channel_id          VARCHAR(50),
       refresh_token_enc   TEXT NOT NULL,
       scopes              TEXT NOT NULL,
       authorized_at       TIMESTAMPTZ NOT NULL DEFAULT NOW(),
@@ -56,8 +59,22 @@ async function main() {
     )
   `);
 
-  await exec('cortex_core.youtube_channels', `
-    CREATE TABLE IF NOT EXISTS cortex_core.youtube_channels (
+  // --- Migração: credencial passa a ser POR CANAL (não por conta Google) ---
+  // Motivo: uma conta (ex.: ferramentas@) gerencia vários canais Brand Account;
+  // cada autorização traz o mesmo google_user_id mas um refresh_token distinto,
+  // válido só para o canal selecionado. O UNIQUE(google_user_id) antigo fazia a
+  // 2ª autorização sobrescrever a 1ª. Agora a chave é channel_id. Idempotente.
+  await exec('migra credentials → channel_id', `
+    ALTER TABLE youtube.credentials ADD COLUMN IF NOT EXISTS channel_id VARCHAR(50);
+    ALTER TABLE youtube.credentials DROP CONSTRAINT IF EXISTS credentials_google_user_id_key;
+  `);
+  await exec('uq_yt_credentials_channel', `
+    CREATE UNIQUE INDEX IF NOT EXISTS uq_yt_credentials_channel
+    ON youtube.credentials(channel_id)
+  `);
+
+  await exec('youtube.channels', `
+    CREATE TABLE IF NOT EXISTS youtube.channels (
       channel_id                VARCHAR(50) PRIMARY KEY,
       title                     VARCHAR(255),
       custom_url                VARCHAR(255),
@@ -69,15 +86,15 @@ async function main() {
       view_count                BIGINT,
       video_count               INTEGER,
       hidden_subscriber_count   BOOLEAN,
-      credential_id             INTEGER REFERENCES cortex_core.youtube_credentials(id) ON DELETE SET NULL,
+      credential_id             INTEGER REFERENCES youtube.credentials(id) ON DELETE SET NULL,
       synced_at                 TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
 
-  await exec('cortex_core.youtube_videos', `
-    CREATE TABLE IF NOT EXISTS cortex_core.youtube_videos (
+  await exec('youtube.videos', `
+    CREATE TABLE IF NOT EXISTS youtube.videos (
       video_id                 VARCHAR(50) PRIMARY KEY,
-      channel_id               VARCHAR(50) NOT NULL REFERENCES cortex_core.youtube_channels(channel_id) ON DELETE CASCADE,
+      channel_id               VARCHAR(50) NOT NULL REFERENCES youtube.channels(channel_id) ON DELETE CASCADE,
       title                    VARCHAR(500),
       description              TEXT,
       published_at             TIMESTAMPTZ,
@@ -94,13 +111,13 @@ async function main() {
       synced_at                TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )
   `);
-  await exec('idx_yt_videos_channel', `CREATE INDEX IF NOT EXISTS idx_yt_videos_channel ON cortex_core.youtube_videos(channel_id)`);
-  await exec('idx_yt_videos_published', `CREATE INDEX IF NOT EXISTS idx_yt_videos_published ON cortex_core.youtube_videos(published_at)`);
+  await exec('idx_yt_videos_channel', `CREATE INDEX IF NOT EXISTS idx_yt_videos_channel ON youtube.videos(channel_id)`);
+  await exec('idx_yt_videos_published', `CREATE INDEX IF NOT EXISTS idx_yt_videos_published ON youtube.videos(published_at)`);
 
-  await exec('cortex_core.youtube_video_daily_metrics', `
-    CREATE TABLE IF NOT EXISTS cortex_core.youtube_video_daily_metrics (
+  await exec('youtube.video_daily_metrics', `
+    CREATE TABLE IF NOT EXISTS youtube.video_daily_metrics (
       id                          SERIAL PRIMARY KEY,
-      video_id                    VARCHAR(50) NOT NULL REFERENCES cortex_core.youtube_videos(video_id) ON DELETE CASCADE,
+      video_id                    VARCHAR(50) NOT NULL REFERENCES youtube.videos(video_id) ON DELETE CASCADE,
       channel_id                  VARCHAR(50) NOT NULL,
       report_date                 DATE NOT NULL,
       views                       INTEGER,
@@ -120,15 +137,15 @@ async function main() {
   `);
   await exec('uq_yt_video_daily_video_date', `
     CREATE UNIQUE INDEX IF NOT EXISTS uq_yt_video_daily_video_date
-    ON cortex_core.youtube_video_daily_metrics(video_id, report_date)
+    ON youtube.video_daily_metrics(video_id, report_date)
   `);
-  await exec('idx_yt_video_daily_date', `CREATE INDEX IF NOT EXISTS idx_yt_video_daily_date ON cortex_core.youtube_video_daily_metrics(report_date)`);
-  await exec('idx_yt_video_daily_channel', `CREATE INDEX IF NOT EXISTS idx_yt_video_daily_channel ON cortex_core.youtube_video_daily_metrics(channel_id)`);
+  await exec('idx_yt_video_daily_date', `CREATE INDEX IF NOT EXISTS idx_yt_video_daily_date ON youtube.video_daily_metrics(report_date)`);
+  await exec('idx_yt_video_daily_channel', `CREATE INDEX IF NOT EXISTS idx_yt_video_daily_channel ON youtube.video_daily_metrics(channel_id)`);
 
-  await exec('cortex_core.youtube_channel_daily_metrics', `
-    CREATE TABLE IF NOT EXISTS cortex_core.youtube_channel_daily_metrics (
+  await exec('youtube.channel_daily_metrics', `
+    CREATE TABLE IF NOT EXISTS youtube.channel_daily_metrics (
       id                          SERIAL PRIMARY KEY,
-      channel_id                  VARCHAR(50) NOT NULL REFERENCES cortex_core.youtube_channels(channel_id) ON DELETE CASCADE,
+      channel_id                  VARCHAR(50) NOT NULL REFERENCES youtube.channels(channel_id) ON DELETE CASCADE,
       report_date                 DATE NOT NULL,
       views                       INTEGER,
       estimated_minutes_watched   INTEGER,
@@ -143,12 +160,12 @@ async function main() {
   `);
   await exec('uq_yt_channel_daily_channel_date', `
     CREATE UNIQUE INDEX IF NOT EXISTS uq_yt_channel_daily_channel_date
-    ON cortex_core.youtube_channel_daily_metrics(channel_id, report_date)
+    ON youtube.channel_daily_metrics(channel_id, report_date)
   `);
-  await exec('idx_yt_channel_daily_date', `CREATE INDEX IF NOT EXISTS idx_yt_channel_daily_date ON cortex_core.youtube_channel_daily_metrics(report_date)`);
+  await exec('idx_yt_channel_daily_date', `CREATE INDEX IF NOT EXISTS idx_yt_channel_daily_date ON youtube.channel_daily_metrics(report_date)`);
 
-  await exec('cortex_core.youtube_sync_runs', `
-    CREATE TABLE IF NOT EXISTS cortex_core.youtube_sync_runs (
+  await exec('youtube.sync_runs', `
+    CREATE TABLE IF NOT EXISTS youtube.sync_runs (
       id                SERIAL PRIMARY KEY,
       job_type          VARCHAR(50) NOT NULL,
       channel_id        VARCHAR(50),
@@ -163,10 +180,10 @@ async function main() {
   console.log('\nVerificando estrutura final...');
   const r = await pool.query(`
     SELECT table_name FROM information_schema.tables
-    WHERE table_schema = 'cortex_core' AND table_name LIKE 'youtube_%'
+    WHERE table_schema = 'youtube' AND table_name LIKE 'youtube_%'
     ORDER BY table_name
   `);
-  console.log('\nTabelas youtube_* em cortex_core:');
+  console.log('\nTabelas youtube_* em youtube:');
   for (const row of r.rows) console.log(`   • ${row.table_name}`);
 
   await pool.end();

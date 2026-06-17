@@ -15,7 +15,7 @@ export type Classificacao = "excelente" | "bom" | "medio" | "alerta";
 export const BENCHMARKS_TURBO = {
   // WhatsApp — alta open rate (28-50%)
   wpp: {
-    premium: 50, // Clientes, Mix da Nata, Show me the money
+    premium: 50, // Clientes
     mql: 28, // MQLs (Geral, Creators, CRM)
     leads_30_100k: 24,
     congelados: 30, // Reativação — surpreende positivamente

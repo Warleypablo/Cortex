@@ -74,6 +74,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useIsColaboradoresRestrito } from "@/hooks/useIsColaboradoresRestrito";
 import { Label } from "@/components/ui/label";
 import { TableSkeleton } from "@/components/ui/table-skeleton";
 
@@ -705,6 +706,7 @@ function AddColaboradorDialog() {
   const [newColaboradorId, setNewColaboradorId] = useState<number | null>(null);
   const [selectedTemplateId, setSelectedTemplateId] = useState("");
   const { toast } = useToast();
+  const isRestrito = useIsColaboradoresRestrito();
 
   const { data: cargos = [], isLoading: cargosLoading } = useQuery<CargoOption[]>({
     queryKey: ["/api/rh/cargos"],
@@ -1085,6 +1087,7 @@ function AddColaboradorDialog() {
                 )}
               />
 
+              {!isRestrito && (
               <FormField
                 control={form.control}
                 name="salario"
@@ -1092,19 +1095,20 @@ function AddColaboradorDialog() {
                   <FormItem>
                     <FormLabel>Salário</FormLabel>
                     <FormControl>
-                      <Input 
-                        {...field} 
-                        value={field.value || ""} 
-                        data-testid="input-salario" 
-                        type="number" 
+                      <Input
+                        {...field}
+                        value={field.value || ""}
+                        data-testid="input-salario"
+                        type="number"
                         step="0.01"
-                        placeholder="0.00" 
+                        placeholder="0.00"
                       />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
                 )}
               />
+              )}
 
               <FormField
                 control={form.control}
@@ -1889,6 +1893,7 @@ const ColaboradorTableRow = memo(function ColaboradorTableRow({
   getColaboradorPhoto,
   getSquadWithEmoji,
 }: ColaboradorTableRowProps) {
+  const isRestrito = useIsColaboradoresRestrito();
   const handleRowClick = useCallback((e: React.MouseEvent) => {
     const target = e.target as HTMLElement;
     if (target.closest('button') || target.closest('[role="button"]')) {
@@ -1964,11 +1969,13 @@ const ColaboradorTableRow = memo(function ColaboradorTableRow({
           )}
         </div>
       </TableCell>
+      {!isRestrito && (
       <TableCell className="py-3">
         <div className="text-sm font-medium" data-testid={`text-salario-${colaborador.id}`}>
           {colaborador.salario ? formatCurrency(parseFloat(String(colaborador.salario))) : "-"}
         </div>
       </TableCell>
+      )}
       <TableCell className="py-3">
         {colaborador.squad ? (
           <Badge
@@ -2240,6 +2247,7 @@ export default function Colaboradores() {
   const [selectedExportColumns, setSelectedExportColumns] = useState<string[]>(
     EXPORT_COLUMNS.map((column) => column.key),
   );
+  const isRestrito = useIsColaboradoresRestrito();
 
   const toggleExportColumn = useCallback((key: string) => {
     setSelectedExportColumns((prev) => {
@@ -2752,6 +2760,7 @@ export default function Colaboradores() {
                 </div>
               </CardContent>
             </Card>
+            {!isRestrito && (
             <Card className="hover-elevate">
               <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-2">
                 <div className="flex items-center gap-1">
@@ -2773,6 +2782,7 @@ export default function Colaboradores() {
                 </div>
               </CardContent>
             </Card>
+            )}
           </div>
 
           <FilterChips
@@ -2835,8 +2845,9 @@ export default function Colaboradores() {
                           {getSortIcon('cargo')}
                         </div>
                       </TableHead>
-                      <TableHead 
-                        className="min-w-[120px] bg-muted/50 cursor-pointer select-none" 
+                      {!isRestrito && (
+                      <TableHead
+                        className="min-w-[120px] bg-muted/50 cursor-pointer select-none"
                         onClick={() => handleSort('salario')}
                         data-testid="table-header-salario"
                       >
@@ -2845,6 +2856,7 @@ export default function Colaboradores() {
                           {getSortIcon('salario')}
                         </div>
                       </TableHead>
+                      )}
                       <TableHead 
                         className="min-w-[140px] bg-muted/50 cursor-pointer select-none" 
                         onClick={() => handleSort('squad')}

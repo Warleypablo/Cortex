@@ -13,8 +13,6 @@ import type { Alerta, PadraoKey, ResultadoValidacao, StatusMensagem, StatusValid
 
 export const LIMITES_MENSAIS: Record<string, number> = {
   // Premium (queimam rápido)
-  "Mix da Nata": 2,
-  "Show me the money": 3,
   Clientes: 2,
   "Creators - MQLs": 3,
   "IA - MQLs": 2,
@@ -27,7 +25,6 @@ export const LIMITES_MENSAIS: Record<string, number> = {
   // Reativação (alta sensibilidade)
   Congelados: 2,
   // Amplas
-  "Show me the money expandido": 2,
   "Geral - Todos": 2,
   "CRM - Todos": 2,
   "Creators - Todos": 3,

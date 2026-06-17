@@ -7,12 +7,13 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable, initializeCrmInstagramTables } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeCapacityMetasTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable, initializeBroadcastLeadEventsTable, initializeBroadcastClassificationTable, initializeBroadcastPlanTable, initializeMetaActionsLogTable, initializeCrmInstagramTables } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 import { runAllForecasts } from "./services/predictiveEngine";
 import rateLimit from "express-rate-limit";
 import path from "path";
+import { seedCapacityMetas } from "./seed/capacityMetas";
 
 function requireEnv(name: string): string {
   const val = process.env[name];
@@ -141,11 +142,16 @@ app.use((req, res, next) => {
     initializeChamadosTables(),
     initializeNotasFiscaisTable(),
     initializeCapacityTable(),
+    initializeCapacityMetasTable(),
     initializeContratoTemplatesTable(),
     initializePredictionsTable(),
     initializeMetricRulesetsTables(),
     initializeItemAliasMapTable(),
     initializeSaldoDiarioSnapshotsTable(),
+    initializeBroadcastLeadEventsTable(),
+    initializeBroadcastClassificationTable(),
+    initializeBroadcastPlanTable(),
+    initializeMetaActionsLogTable(),
     initializeCrmInstagramTables(),
   ]);
 
@@ -159,6 +165,7 @@ app.use((req, res, next) => {
   await Promise.all([
     seedDefaultDashboardViews(),
     seedChamadoCategories(),
+    seedCapacityMetas(),
   ]);
   
   // Phase 4: Create performance indexes on external database tables
@@ -169,7 +176,12 @@ app.use((req, res, next) => {
   
   // Register Object Storage routes
   registerObjectStorageRoutes(app);
-  
+
+  // Meta Ads actions (pausar/ativar/budget manual + bulk). O agente de IA
+  // (criativosAgent) está pausado por enquanto — não montado.
+  const { default: metaActionsRouter } = await import('./routes/metaActions');
+  app.use('/api/meta/actions', metaActionsRouter);
+
   const server = await registerRoutes(app);
 
   // Job automático para criar snapshot diário de contratos
@@ -551,6 +563,63 @@ app.use((req, res, next) => {
   setTimeout(() => runMotivoPerdaSync(), 120000); // 2min após boot
   setInterval(() => runMotivoPerdaSync(), MOTIVO_PERDA_SYNC_INTERVAL);
   console.log(`[motivo-perda-sync-job] Scheduled every ${MOTIVO_PERDA_SYNC_INTERVAL / 3600000}h`);
+
+  // Bitrix contatos sync diário (telefone → match com respondedores de broadcast)
+  const BITRIX_CONTACTS_SYNC_INTERVAL = 24 * 60 * 60 * 1000; // 24h
+  const runBitrixContactsSync = async () => {
+    try {
+      console.log("[bitrix-contacts-sync-job] Starting scheduled Bitrix contacts sync...");
+      const { syncBitrixContacts } = await import("../scripts/sync-bitrix-contacts");
+      const { totalSynced, totalSeen, semTelefone } = await syncBitrixContacts();
+      (globalThis as any).__bitrixContactsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        totalSynced,
+        totalSeen,
+        semTelefone,
+        status: "success",
+      };
+      console.log(`[bitrix-contacts-sync-job] Sync complete: ${totalSynced}/${totalSeen} contatos (${semTelefone} sem telefone)`);
+    } catch (err: any) {
+      console.error("[bitrix-contacts-sync-job] Sync failed:", err.message);
+      (globalThis as any).__bitrixContactsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  setTimeout(() => runBitrixContactsSync(), 180000); // 3min após boot
+  setInterval(() => runBitrixContactsSync(), BITRIX_CONTACTS_SYNC_INTERVAL);
+  console.log(`[bitrix-contacts-sync-job] Scheduled every ${BITRIX_CONTACTS_SYNC_INTERVAL / 3600000}h`);
+
+  // Bitrix deals refresh horário (campos do funil de broadcast: estágio, datas de
+  // reunião, fechamento, valores). O espelho completo do crm_deal é de um processo
+  // externo ~diário; este job mantém o funil fresco entre as cargas dele.
+  const BITRIX_DEALS_SYNC_INTERVAL = 60 * 60 * 1000; // 1h
+  const runBitrixDealsSync = async () => {
+    try {
+      console.log("[bitrix-deals-sync-job] Starting scheduled Bitrix deals refresh...");
+      const { syncBitrixDeals } = await import("../scripts/sync-bitrix-deals");
+      const { totalSynced, totalSeen } = await syncBitrixDeals();
+      (globalThis as any).__bitrixDealsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        totalSynced,
+        totalSeen,
+        status: "success",
+      };
+      console.log(`[bitrix-deals-sync-job] Refresh complete: ${totalSynced}/${totalSeen} deals`);
+    } catch (err: any) {
+      console.error("[bitrix-deals-sync-job] Refresh failed:", err.message);
+      (globalThis as any).__bitrixDealsSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  setTimeout(() => runBitrixDealsSync(), 240000); // 4min após boot
+  setInterval(() => runBitrixDealsSync(), BITRIX_DEALS_SYNC_INTERVAL);
+  console.log(`[bitrix-deals-sync-job] Scheduled every ${BITRIX_DEALS_SYNC_INTERVAL / 3600000}h`);
 
   // Google Ads keywords sync a cada 12 horas
   const GOOGLE_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h

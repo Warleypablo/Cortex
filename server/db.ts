@@ -773,6 +773,7 @@ export async function initializeSysSchema(): Promise<void> {
     
     // Create canonical view
     await createCanonicalContractsView();
+    await initializeLtLtvChurnViews();
 
     console.log('[database] cortex_core schema fully initialized');
   } catch (error) {
@@ -1322,6 +1323,53 @@ async function createCanonicalContractsView(): Promise<void> {
   `);
   
   console.log('[database] vw_contratos_canon view created');
+}
+
+export async function initializeLtLtvChurnViews(): Promise<void> {
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW cortex_core.vw_lt_contratos AS
+    WITH base AS (
+      SELECT
+        co.id_subtask,
+        co.id_task,
+        cl.nome AS nome_cliente,
+        co.servico, co.produto, co.squad, co.vendedor,
+        co.cs_responsavel, co.responsavel,
+        co.status, co.valorr, co.valorp,
+        co.data_inicio, co.data_encerramento,
+        ch.ultimo_dia_operacao,
+        ch.data_solicitacao_encerramento,
+        ch.motivo_cancelamento, ch.submotivo_cancelamento,
+        ch.evitabilidade_churn, ch.possibilidade_retencao, ch.reteve,
+        ch.cluster, ch.tipo_negocio, ch.plano,
+        CASE WHEN co.valorr > 0 THEN 'recorrente'
+             WHEN co.valorp > 0 THEN 'pontual'
+             ELSE 'sem_valor' END AS tipo_receita,
+        COALESCE(co.data_encerramento, ch.ultimo_dia_operacao) AS data_fim,
+        (co.status IN ('ativo','onboarding','pausado','em cancelamento','triagem')) AS is_ativo,
+        (co.status = 'cancelado/inativo') AS is_churned
+      FROM "Clickup".cup_contratos co
+      LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = co.id_task
+      LEFT JOIN "Clickup".cup_churn ch ON ch.task_id = co.id_subtask
+    ),
+    calc AS (
+      SELECT b.*,
+        (b.data_fim IS NOT NULL AND b.data_fim < b.data_inicio) AS data_inconsistente,
+        CASE
+          WHEN b.data_inicio IS NULL THEN NULL
+          WHEN b.is_ativo THEN (CURRENT_DATE - b.data_inicio)
+          WHEN b.data_fim IS NOT NULL AND b.data_fim >= b.data_inicio THEN (b.data_fim - b.data_inicio)
+          ELSE NULL
+        END AS lt_dias
+      FROM base b
+    )
+    SELECT c.*,
+      ROUND((c.lt_dias / 30.44)::numeric, 2) AS lt_meses,
+      CASE WHEN c.tipo_receita = 'recorrente' AND c.lt_dias IS NOT NULL
+           THEN ROUND((c.valorr * c.lt_dias / 30.44)::numeric, 2) END AS ltv_recorrente
+    FROM calc c
+  `);
+  console.log('[database] vw_lt_contratos view created');
 }
 
 export async function initializeDashboardTables(): Promise<void> {
@@ -2216,6 +2264,109 @@ export async function initializeCapacityTable(): Promise<void> {
   }
 }
 
+export async function initializeCapacityMetasTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.capacity_metas (
+        id                SERIAL PRIMARY KEY,
+        nome              TEXT NOT NULL,
+        match_responsavel TEXT NOT NULL,
+        categoria         TEXT NOT NULL,
+        cap_recorrente    INTEGER,
+        cap_mrr           NUMERIC,
+        cap_pontual       INTEGER,
+        cap_contas        INTEGER,
+        ordem             INTEGER DEFAULT 0,
+        ativo             BOOLEAN DEFAULT TRUE,
+        atualizado_em     TIMESTAMP DEFAULT NOW(),
+        UNIQUE(match_responsavel, categoria)
+      )
+    `);
+    console.log('[database] capacity_metas table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing capacity_metas table:', error);
+  }
+}
+
+// Atribuição lead-a-lead de broadcast: cada resposta de WhatsApp ligada ao disparo de
+// origem (via conversationId) + ao deal do Bitrix (via telefone). Etapas de funil
+// (reunião/comparecimento/venda) NÃO são guardadas aqui — vêm live de "Bitrix".crm_deal.
+export async function initializeBroadcastLeadEventsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_lead_events (
+        id                SERIAL PRIMARY KEY,
+        broadcast_id      TEXT NOT NULL,
+        conversation_id   TEXT,
+        ghl_contact_id    TEXT,
+        lead_phone        TEXT,
+        lead_phone_norm   VARCHAR(20),
+        reply_message_id  TEXT NOT NULL UNIQUE,
+        reply_body        TEXT,
+        reply_at          TIMESTAMPTZ,
+        sentiment         TEXT,
+        sentiment_motivo  TEXT,
+        sentiment_fonte   TEXT,
+        bitrix_contact_id INTEGER,
+        bitrix_deal_id    INTEGER,
+        attributed_at     TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_lead_events_broadcast_idx ON cortex_core.broadcast_lead_events (broadcast_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_lead_events_phone_idx ON cortex_core.broadcast_lead_events (lead_phone_norm)`);
+    console.log('[database] broadcast_lead_events table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_lead_events table:', error);
+  }
+}
+
+// Classificação por disparo: padrão de copy (Claude) + base inferida pelas tags dos
+// destinatários. Cache pra não reprocessar a IA. Alimenta Resumo e Inteligência.
+export async function initializeBroadcastClassificationTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_classification (
+        broadcast_id   TEXT PRIMARY KEY,
+        padrao         TEXT,
+        padrao_motivo  TEXT,
+        base           TEXT,
+        base_match_pct NUMERIC,
+        classified_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('[database] broadcast_classification table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_classification table:', error);
+  }
+}
+
+// Plano editorial de broadcasts (planejamento do mês): slots com base/data/objetivo/
+// padrão/status + copy gerada. Planejamento interno (não dispara no Funnels nesta fase).
+export async function initializeBroadcastPlanTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_plan (
+        id          SERIAL PRIMARY KEY,
+        plan_date   DATE NOT NULL,
+        canal       TEXT DEFAULT 'WhatsApp',
+        base        TEXT,
+        objetivo    TEXT,
+        padrao      TEXT,
+        titulo      TEXT,
+        copy_text   TEXT,
+        status      TEXT DEFAULT 'backlog',
+        created_by  TEXT,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_plan_date_idx ON cortex_core.broadcast_plan (plan_date)`);
+    console.log('[database] broadcast_plan table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_plan table:', error);
+  }
+}
+
 export async function initializePredictionsTable(): Promise<void> {
   try {
     await db.execute(sql`
@@ -2332,6 +2483,45 @@ export async function migrateMetricRulesetsContext(): Promise<void> {
     console.log('[database] metric_rulesets context migration complete');
   } catch (error) {
     console.error('[database] Error migrating metric_rulesets:', error);
+  }
+}
+
+export async function initializeMetaActionsLogTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.meta_actions_log (
+        id SERIAL PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        actor_type VARCHAR(16) NOT NULL,
+        actor_user_id VARCHAR(64),
+        actor_email VARCHAR(255),
+        level VARCHAR(16) NOT NULL,
+        entity_id VARCHAR(64) NOT NULL,
+        entity_name TEXT,
+        action VARCHAR(32) NOT NULL,
+        payload_json JSONB NOT NULL,
+        previous_value_json JSONB,
+        reason TEXT NOT NULL,
+        agent_rationale_text TEXT,
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        meta_error_json JSONB,
+        confirmed_by_user_id VARCHAR(64),
+        confirmed_at TIMESTAMPTZ
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_meta_actions_log_entity
+        ON cortex_core.meta_actions_log(entity_id, status)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_meta_actions_log_pending
+        ON cortex_core.meta_actions_log(status)
+        WHERE status = 'pending'
+    `);
+    console.log('[database] Meta actions log table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing meta actions log table:', error);
   }
 }
 

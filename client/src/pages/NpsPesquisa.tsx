@@ -30,7 +30,7 @@ const AREAS = [
   "Tech (IA)",
   "Design",
   "Gente e Gestão",
-  "Comunicação",
+  "Social Media",
   "Comunicação - Aura",
   "Comunicação - Olimpo",
   "Gestor de performance - SQUADRA",

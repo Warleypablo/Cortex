@@ -9,6 +9,8 @@ import { createUserSchema, updatePermissionsSchema, updateRoleSchema } from "./m
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser } from "./auth/userDb";
 import { db } from "./db";
 import { sql, type SQL } from "drizzle-orm";
+import { computeEvolucaoChurn } from "./investorsReport/churn";
+import { buildRegime, REGIME_CUTOVER } from "./investorsReport/regime";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
 import { chat as unifiedAssistantChat } from "./services/unifiedAssistant";
 import type { UnifiedAssistantRequest, AssistantContext } from "@shared/schema";
@@ -23,8 +25,14 @@ import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
-import { registerYoutubeOAuthRoutes } from "./routes/youtubeOAuth";
+import { registerYoutubeOAuthPublicRoutes, registerYoutubeOAuthStatusRoute } from "./routes/youtubeOAuth";
+import { registerYoutubeAdminRoutes } from "./routes/youtubeAdmin";
 import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
+import { registerGoogleAdminRoutes } from "./routes/googleAdmin";
+import { registerLinkedinOAuthRoutes } from "./routes/linkedinOAuth";
+import { registerLinkedinAdminRoutes } from "./routes/linkedinAdmin";
+import { registerTiktokOAuthRoutes } from "./routes/tiktokOAuth";
+import { registerTiktokAdminRoutes } from "./routes/tiktokAdmin";
 import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMixReceitaRoutes } from "./routes/mixReceita";
@@ -45,6 +53,7 @@ import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
 import { registerSaldoDiarioRoutes } from "./routes/saldoDiario";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
+import { registerFechamentoSemanalRoutes } from "./routes/fechamentoSemanal";
 import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
@@ -61,11 +70,19 @@ import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
 import { registerCrmInstagramRoutes } from "./routes/crmInstagram";
+import { registerGrowthDfcCacRoutes } from "./routes/growthDfcCac";
 import { registerGhlPublicRoutes, registerGhlApiRoutes } from "./routes/ghl";
 import { registerNegativacaoRoutes } from "./routes/negativacao";
 import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
 import { registerInternalTrainingsRoutes } from "./routes/internalTrainings";
+import { registerLtLtvChurnRoutes } from "./routes/ltLtvChurn";
+import { registerChurnProdutoMotivoRoutes } from "./routes/churnProdutoMotivo";
+import { registerEstoquePontualRoutes } from "./routes/estoquePontual";
+import { registerBp2026Routes } from "./routes/bp2026";
+import { registerBp2026DetalheRoutes } from "./routes/bp2026.detalhe";
+import { registerCreatorsPontualRoutes } from "./routes/creatorsPontual";
+import { registerChurnPontorrenteRoutes } from "./routes/churnPontorrente";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
@@ -444,6 +461,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Instagram Module (before isAuthenticated — OAuth routes need to be accessible)
   registerInstagramRoutes(app, db, storage);
+
+  // YouTube OAuth start/callback (before isAuthenticated — donos de canal externos
+  // autorizam com a própria conta Google, sem login no Cortex). O /status fica protegido.
+  registerYoutubeOAuthPublicRoutes(app, db);
 
   // FCA Report — auth via bearer token (não usa sessão)
   registerFcaRoutes(app);
@@ -2116,8 +2137,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   // Evolução Mensal - MRR histórico por squad e operador com churn
   app.get("/api/dashboard/evolucao-mensal", async (req, res) => {
     try {
-      const { meses } = req.query;
+      const { meses, semAbono } = req.query;
       const numMeses = Math.min(Math.max(parseInt(meses as string) || 6, 1), 36);
+      const excluirAbono = semAbono !== 'true';
       
       const startDate = new Date();
       startDate.setMonth(startDate.getMonth() - numMeses);
@@ -2176,7 +2198,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ORDER BY mes, squad, responsavel
       `);
       
-      // Buscar churns por mês da tabela curada cup_churn (excluindo churn abonado)
+      // Buscar churns por mês da tabela curada cup_churn
       const churnResult = await db.execute(sql`
         SELECT
           TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as mes,
@@ -2188,7 +2210,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
         WHERE data_solicitacao_encerramento IS NOT NULL
           AND data_solicitacao_encerramento >= ${startDateStr}::date
           AND valor_r > 0
-          AND COALESCE(abonar_churn, '') != 'Sim'
+          ${excluirAbono ? sql`AND COALESCE(abonar_churn, '') != 'Sim'` : sql``}
           AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND squad NOT IN ('🌟 Aurea', '🗝️ Bloomfield', '🔥 Chama', '🏹 Hunters', '👾 Squad X', '👑 Supreme', '🖥️ Tech', '🚀 Turbo Interno')
         GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM'), squad, responsavel_geral
@@ -3101,6 +3123,16 @@ Estruture sua resposta em:
     }
   });
 
+  app.get("/api/financeiro/revenue-goals/historico-inadimplencia", async (req, res) => {
+    try {
+      const data = await storage.getHistoricoInadimplencia();
+      res.json(data);
+    } catch (error) {
+      console.error("[api] Error fetching historico inadimplencia:", error);
+      res.status(500).json({ error: "Failed to fetch historico inadimplencia" });
+    }
+  });
+
   app.get("/api/financeiro/revenue-goals/detalhes-dia", async (req, res) => {
     try {
       const dataParam = req.query.data as string;
@@ -3311,7 +3343,7 @@ Estruture sua resposta em:
         SELECT 
           COUNT(*) as total_contratos,
           COUNT(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_recorrentes,
-          COUNT(CASE WHEN valorp > 0 THEN 1 END) as contratos_pontuais,
+          COUNT(CASE WHEN valorp > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_pontuais,
           COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr_ativo,
           COALESCE(AVG(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN valorr END), 0) as aov_recorrente
         FROM "Clickup".cup_contratos
@@ -3342,95 +3374,184 @@ Estruture sua resposta em:
         ORDER BY quantidade DESC
       `);
       
-      // Faturamento histórico estendido - combina caz_parcelas (últimos 12 meses) com caz_receber/caz_pagar (histórico anterior)
-      // Para dados recentes usa caz_parcelas (mais detalhado), para histórico usa caz_receber e caz_pagar
-      const faturamentoResult = await db.execute(sql`
-        WITH dados_recentes AS (
-          -- Últimos 12 meses via caz_parcelas (mais detalhado)
-          SELECT 
-            TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' 
-              THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
-          FROM "Conta Azul".caz_parcelas
-          WHERE COALESCE(data_quitacao, data_vencimento) >= CURRENT_DATE - INTERVAL '12 months'
-            AND tipo_evento IN ('RECEITA', 'DESPESA')
-          GROUP BY TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM')
+      // Série mensal HÍBRIDA de regime (ver server/investorsReport/regime.ts):
+      //  - meses < REGIME_CUTOVER: COMPETÊNCIA (caz_receber.total por data_vencimento;
+      //    despesa paga de caz_pagar). Histórico repopulado até 2023.
+      //  - meses >= REGIME_CUTOVER: CAIXA (caz_parcelas.valor_pago por data_quitacao).
+      // O merge, a margem e os agregados YTD são feitos por buildRegime().
+      const competenciaResult = await db.execute(sql`
+        WITH bounds AS (
+          SELECT DATE_TRUNC('month', MIN(data_vencimento)) AS inicio
+          FROM "Conta Azul".caz_receber
         ),
-        dados_historicos AS (
-          -- Dados anteriores via caz_receber e caz_pagar
-          SELECT 
-            mes,
-            SUM(faturamento) as faturamento,
-            SUM(despesas) as despesas,
-            SUM(valor_bruto) as valor_bruto,
-            0 as inadimplencia
-          FROM (
-            -- Receitas de caz_receber
-            SELECT 
-              TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM') as mes,
-              COALESCE(SUM(pago::numeric), 0) as faturamento,
-              0 as despesas,
-              COALESCE(SUM(total::numeric), 0) as valor_bruto
-            FROM "Conta Azul".caz_receber
-            WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
-              AND COALESCE(data_vencimento, data_criacao) < CURRENT_DATE - INTERVAL '12 months'
-              AND COALESCE(data_vencimento, data_criacao) >= CURRENT_DATE - INTERVAL '5 years'
-            GROUP BY TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM')
-            
-            UNION ALL
-            
-            -- Despesas de caz_pagar
-            SELECT 
-              TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM') as mes,
-              0 as faturamento,
-              COALESCE(SUM(pago::numeric), 0) as despesas,
-              0 as valor_bruto
-            FROM "Conta Azul".caz_pagar
-            WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
-              AND COALESCE(data_vencimento, data_criacao) < CURRENT_DATE - INTERVAL '12 months'
-              AND COALESCE(data_vencimento, data_criacao) >= CURRENT_DATE - INTERVAL '5 years'
-            GROUP BY TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM')
-          ) combined
-          GROUP BY mes
+        receita AS (
+          SELECT
+            TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
+            COALESCE(SUM(total::numeric), 0) as faturamento,
+            COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE AND COALESCE(nao_pago, 0) > 0
+              THEN nao_pago::numeric ELSE 0 END), 0) as inadimplencia
+          FROM "Conta Azul".caz_receber, bounds
+          WHERE data_vencimento >= bounds.inicio
+            AND data_vencimento < ${REGIME_CUTOVER}::date
+          GROUP BY 1
+        ),
+        despesa AS (
+          -- Despesa paga por data de pagamento (caz_pagar). NÃO usar total: inclui
+          -- provisões/parcelamentos a pagar que não saíram do caixa e inflavam o mês.
+          SELECT
+            TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
+            COALESCE(SUM(pago::numeric), 0) as despesas
+          FROM "Conta Azul".caz_pagar, bounds
+          WHERE COALESCE(data_quitacao, data_vencimento) >= bounds.inicio
+            AND COALESCE(data_quitacao, data_vencimento) < ${REGIME_CUTOVER}::date
+          GROUP BY 1
         )
-        -- Combina dados recentes e históricos
-        SELECT mes, faturamento, despesas, valor_bruto, inadimplencia
-        FROM dados_recentes
-        UNION ALL
-        SELECT mes, faturamento, despesas, valor_bruto, inadimplencia
-        FROM dados_historicos
-        WHERE mes NOT IN (SELECT mes FROM dados_recentes)
-        ORDER BY mes DESC
+        SELECT r.mes, r.faturamento, COALESCE(d.despesas, 0) as despesas, r.inadimplencia
+        FROM receita r
+        LEFT JOIN despesa d USING (mes)
       `);
-      
-      // Faturamento do mês atual - alinhado com Dashboard Financeiro
-      // Usa valor_pago (já representa valores pagos, sem precisar filtrar por status)
-      const faturamentoMesResult = await db.execute(sql`
-        SELECT 
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_mes,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto_mes,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia_mes
+
+      // CAIXA (>= REGIME_CUTOVER): receita/despesa efetivamente movimentadas em
+      // caz_parcelas, por data_quitacao. valor_pago = o que entrou/saiu do caixa.
+      const caixaResult = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_quitacao, 'YYYY-MM') as mes,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'RECEITA'), 0) as faturamento,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'DESPESA'), 0) as despesas
         FROM "Conta Azul".caz_parcelas
-        WHERE TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') = TO_CHAR(CURRENT_DATE, 'YYYY-MM')
-          AND tipo_evento IN ('RECEITA', 'DESPESA')
+        WHERE data_quitacao >= ${REGIME_CUTOVER}::date
+        GROUP BY 1
+      `);
+
+      // hojeYM define o ano do YTD e qual mês é o parcial (excluído da margem fechada).
+      const hojeYM = new Date().toISOString().slice(0, 7);
+      const regime = buildRegime(
+        competenciaResult.rows as any[],
+        caixaResult.rows as any[],
+        hojeYM,
+      );
+
+      // Faturamento de COMPETÊNCIA por mês (caz_receber.total), TODOS os meses até o
+      // último fechado. Usado SÓ pelo Cresc. YoY, que compara like-for-like
+      // (competência × competência) — caixa só existe de 2026 em diante, então um
+      // YoY em caixa misturaria 2026-caixa com 2025-competência.
+      const competenciaFullResult = await db.execute(sql`
+        WITH bounds AS (
+          SELECT DATE_TRUNC('month', MIN(data_vencimento)) AS inicio
+          FROM "Conta Azul".caz_receber
+        )
+        SELECT TO_CHAR(data_vencimento, 'YYYY-MM') as mes, COALESCE(SUM(total::numeric), 0) as faturamento
+        FROM "Conta Azul".caz_receber, bounds
+        WHERE data_vencimento >= bounds.inicio
+          AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY 1
+        ORDER BY 1
       `);
       
-      
+      // Faturamento, inadimplência e margem do ANO corrente (YTD: janeiro → mês atual).
+      // Mesma base do gráfico: COMPETÊNCIA (caz_receber.total / caz_pagar.total, por data_vencimento).
+      // Faturamento e inadimplência incluem o mês corrente (realizado até o momento).
+      // Margem usa apenas meses FECHADOS (exclui o mês corrente, ainda parcial, que distorceria o %).
+      const faturamentoAnoResult = await db.execute(sql`
+        WITH receita AS (
+          SELECT
+            COALESCE(SUM(total::numeric) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'), 0) as faturamento_ano,
+            COALESCE(SUM(total::numeric) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)), 0) as faturamento_fechado,
+            COALESCE(SUM(nao_pago::numeric) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND data_vencimento < CURRENT_DATE), 0) as inadimplencia_ano,
+            COUNT(DISTINCT TO_CHAR(data_vencimento, 'YYYY-MM')) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)) as meses_fechados
+          FROM "Conta Azul".caz_receber
+        ),
+        despesa AS (
+          -- Despesa em CAIXA (valor pago por data de pagamento), alinhada com a DFC.
+          SELECT
+            COALESCE(SUM(pago::numeric) FILTER (WHERE COALESCE(data_quitacao, data_vencimento) >= DATE_TRUNC('year', CURRENT_DATE)
+              AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE)), 0) as despesas_fechado
+          FROM "Conta Azul".caz_pagar
+        )
+        SELECT r.faturamento_ano, r.faturamento_fechado, r.inadimplencia_ano, r.meses_fechados, d.despesas_fechado
+        FROM receita r, despesa d
+      `);
+
+      // Evolução do churn (cup_churn) — churn BRUTO alinhado ao ClickUp:
+      // valor_r > 0 e status de churn real (cancelado/inativo + em cancelamento),
+      // SEM filtros de abono/motivo. Mesma definição usada pelo BP 2026.
+      const churnResult = await db.execute(sql`
+        SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') AS mes,
+               COALESCE(SUM(valor_r), 0) AS mrr_churn,
+               COUNT(*) AS qtd
+        FROM "Clickup".cup_churn
+        WHERE valor_r > 0
+          AND status IN ('cancelado/inativo', 'em cancelamento')
+          AND data_solicitacao_encerramento IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
+      // Denominador da taxa de churn: MRR ativo do FIM de cada mês
+      // (último snapshot de cup_data_hist no mês). Padrão idêntico ao BP 2026.
+      const mrrFimResult = await db.execute(sql`
+        WITH alvo AS (
+          SELECT DATE_TRUNC('month', data_snapshot)::date AS mes,
+                 MAX(data_snapshot::date) AS d
+          FROM "Clickup".cup_data_hist
+          GROUP BY 1
+        )
+        SELECT TO_CHAR(a.mes, 'YYYY-MM') AS mes,
+               SUM(h.valorr::numeric) FILTER (
+                 WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+               ) AS mrr_fim
+        FROM alvo a
+        JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = a.d
+        GROUP BY 1
+      `);
+
+      const evolucaoChurn = computeEvolucaoChurn(
+        churnResult.rows as any[],
+        mrrFimResult.rows as any[],
+      );
+
+      // Vendas mensais (Bitrix) — deals ganhos por data_fechamento, separados em
+      // recorrente (MRR novo) e pontual. Mesma definição do Relatório Mensal.
+      const vendasResult = await db.execute(sql`
+        SELECT TO_CHAR(data_fechamento, 'YYYY-MM') AS mes,
+               COALESCE(SUM(valor_recorrente), 0) AS vendas_recorrente,
+               COALESCE(SUM(valor_pontual), 0)    AS vendas_pontual,
+               COUNT(*)                            AS num_deals
+        FROM "Bitrix".crm_deal
+        WHERE stage_name = 'Negócio Ganho'
+          AND data_fechamento IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
       const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0 };
-      const faturamentoMes = faturamentoMesResult.rows[0] || { faturamento_mes: 0, valor_bruto_mes: 0, inadimplencia_mes: 0 };
-      
+      const faturamentoAno = faturamentoAnoResult.rows[0] || { faturamento_ano: 0, inadimplencia_ano: 0, faturamento_fechado: 0, despesas_fechado: 0, meses_fechados: 0 };
+
       const headcount = Number(equipe.headcount) || 1;
       const mrrAtivo = Number(contratos.mrr_ativo) || 0;
       const receitaPorCabeca = headcount > 0 ? mrrAtivo / headcount : 0;
-      
-      const valorBrutoMes = Number(faturamentoMes.valor_bruto_mes) || 1;
-      const inadimplenciaMes = Number(faturamentoMes.inadimplencia_mes) || 0;
-      const taxaInadimplencia = valorBrutoMes > 0 ? (inadimplenciaMes / valorBrutoMes) * 100 : 0;
+
+      // Inadimplência (Ano) permanece em COMPETÊNCIA: % = não-pago / faturamento devido (YTD).
+      // O denominador é o faturamento de competência (caz_receber), NÃO o caixa — em caixa
+      // "inadimplência" não existe.
+      const faturamentoAnoCompetencia = Number(faturamentoAno.faturamento_ano) || 0;
+      const inadimplenciaAno = Number(faturamentoAno.inadimplencia_ano) || 0;
+      const taxaInadimplencia = faturamentoAnoCompetencia > 0 ? (inadimplenciaAno / faturamentoAnoCompetencia) * 100 : 0;
+
+      // Faturamento e Margem (Ano) em CAIXA (YTD do ano corrente), vindos do módulo de regime.
+      const faturamentoAnoValor = regime.ytd.faturamentoAno;
+      const margemAno = regime.ytd.margemAno;
+      // Faturamento médio MENSAL (meses fechados, caixa) por colaborador ativo.
+      const faturamentoMensalMedio = regime.ytd.mesesFechados > 0
+        ? regime.ytd.faturamentoFechado / regime.ytd.mesesFechados
+        : 0;
+      const faturamentoPorCabeca = headcount > 0 ? faturamentoMensalMedio / headcount : 0;
       
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 1;
       const clientesAtivos = Number(clientes.clientes_ativos) || 1;
@@ -3450,33 +3571,96 @@ Estruture sua resposta em:
         receita: {
           mrrAtivo: mrrAtivo,
           aovRecorrente: Number(contratos.aov_recorrente) || 0,
-          faturamentoMes: Number(faturamentoMes.faturamento_mes) || 0,
+          faturamentoAno: faturamentoAnoValor,
           taxaInadimplencia: Number(taxaInadimplencia.toFixed(2)),
+          margemAno: Number(margemAno.toFixed(2)),
         },
         equipe: {
           headcount: headcount,
           tempoMedioMeses: Number(Number(equipe.tempo_medio_meses).toFixed(1)) || 0,
           receitaPorCabeca: Number(receitaPorCabeca.toFixed(2)),
+          faturamentoPorCabeca: Number(faturamentoPorCabeca.toFixed(2)),
         },
         distribuicaoSetor: setorResult.rows.map((r: any) => ({
           setor: r.setor,
           quantidade: Number(r.quantidade),
         })),
-        evolucaoFaturamento: faturamentoResult.rows.map((r: any) => {
-          const faturamento = Number(r.faturamento) || 0;
-          const despesas = Number(r.despesas) || 0;
-          return {
-            mes: r.mes,
-            faturamento,
-            despesas,
-            geracaoCaixa: faturamento - despesas,
-            inadimplencia: Number(r.inadimplencia) || 0,
-          };
-        }).reverse(),
+        // Série já ordenada asc; exclui o mês corrente parcial (mes < hojeYM) para
+        // não desenhar um "dip" no fim do gráfico com o mês ainda em andamento.
+        evolucaoFaturamento: regime.series
+          .filter((m) => m.mes < hojeYM)
+          .map((m) => ({
+            mes: m.mes,
+            fonte: m.fonte,
+            faturamento: m.faturamento,
+            despesas: m.despesas,
+            geracaoCaixa: m.faturamento - m.despesas,
+            inadimplencia: m.inadimplencia,
+          })),
+        transicaoMes: regime.transicaoMes,
+        // Série de competência (caz_receber) só para o Cresc. YoY (comparação like-for-like).
+        evolucaoFaturamentoCompetencia: (competenciaFullResult.rows as any[]).map((r) => ({
+          mes: r.mes,
+          faturamento: Number(r.faturamento) || 0,
+        })),
+        evolucaoChurn,
+        vendasMensais: vendasResult.rows.map((r: any) => ({
+          mes: r.mes,
+          vendasRecorrente: Number(r.vendas_recorrente) || 0,
+          vendasPontual: Number(r.vendas_pontual) || 0,
+          numDeals: Number(r.num_deals) || 0,
+        })),
       });
     } catch (error) {
       console.error("[api] Error fetching investors report:", error);
       res.status(500).json({ error: "Failed to fetch investors report data" });
+    }
+  });
+
+  // Geração de caixa acumulada (regime de CAIXA) — ano corrente.
+  // Usa a MESMA base caixa da série de Receita vs Despesas: caz_parcelas.valor_pago
+  // por data_quitacao, RECEITA − DESPESA por tipo_evento. Assim geracaoMes reconcilia
+  // por construção com (faturamento − despesas) do gráfico de Receita vs Despesas.
+  // (Antes usava storage.getDfc, que injetava um ajuste de conciliação artificial.)
+  // Vai de janeiro do ano corrente até o último mês FECHADO (exclui o mês parcial atual).
+  app.get("/api/investors-report/geracao-caixa", async (_req, res) => {
+    try {
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const ano = new Date().getFullYear();
+
+      const caixaResult = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_quitacao, 'YYYY-MM') as mes,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'RECEITA'), 0) as receita,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'DESPESA'), 0) as despesa
+        FROM "Conta Azul".caz_parcelas
+        WHERE data_quitacao >= ${`${ano}-01-01`}::date
+          AND data_quitacao < DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
+      let caixaAcumulado = 0;
+      const series = (caixaResult.rows as any[]).map((r) => {
+        const receita = Number(r.receita) || 0;
+        const despesa = Number(r.despesa) || 0;
+        const geracaoMes = receita - despesa;
+        caixaAcumulado += geracaoMes;
+        const month = parseInt(r.mes.split('-')[1], 10);
+        return {
+          mes: r.mes,
+          mesLabel: `${monthNames[month - 1]}/${String(ano).slice(2)}`,
+          receita,
+          despesa,
+          geracaoMes,
+          caixaAcumulado,
+        };
+      });
+
+      res.json({ ano, series });
+    } catch (error) {
+      console.error("[api] Error fetching investors-report geração de caixa:", error);
+      res.status(500).json({ error: "Failed to fetch geração de caixa data" });
     }
   });
 
@@ -3523,7 +3707,7 @@ Estruture sua resposta em:
         SELECT 
           COUNT(*) as total_contratos,
           COUNT(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_recorrentes,
-          COUNT(CASE WHEN valorp > 0 THEN 1 END) as contratos_pontuais,
+          COUNT(CASE WHEN valorp > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN 1 END) as contratos_pontuais,
           COALESCE(SUM(CASE WHEN status IN ('ativo', 'onboarding', 'triagem') THEN valorr ELSE 0 END), 0) as mrr_ativo,
           COALESCE(AVG(CASE WHEN valorr > 0 AND status IN ('ativo', 'onboarding', 'triagem') THEN valorr END), 0) as aov_recorrente,
           COALESCE(SUM(CASE WHEN status = 'churn' THEN valorr ELSE 0 END), 0) as mrr_churn
@@ -4656,6 +4840,28 @@ Estruture sua resposta em:
     } catch (error) {
       console.error("[api] Error fetching NRR:", error);
       res.status(500).json({ error: "Failed to fetch NRR" });
+    }
+  });
+
+  app.patch("/api/churn/abonar/:taskId", async (req, res) => {
+    const { taskId } = req.params;
+    const { abonar } = req.body as { abonar: boolean };
+    if (!taskId) {
+      return res.status(400).json({ error: "taskId obrigatório" });
+    }
+    if (typeof abonar !== "boolean") {
+      return res.status(400).json({ error: "abonar deve ser boolean" });
+    }
+    try {
+      await db.execute(sql`
+        UPDATE "Clickup".cup_churn
+        SET abonar_churn = ${abonar ? "Sim" : null}
+        WHERE task_id = ${taskId}
+      `);
+      res.json({ ok: true });
+    } catch (error) {
+      console.error("[churn/abonar] erro:", error);
+      res.status(500).json({ error: "Falha ao atualizar abonar_churn" });
     }
   });
 
@@ -8032,14 +8238,33 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Growth — Evolução Temporal (matriz métricas × meses/semanas)
   registerGrowthTimeseriesRoutes(app, db);
 
-  // YouTube OAuth (autorização dos canais Turbocast/TurboPartners/André/Vitor)
-  registerYoutubeOAuthRoutes(app, db);
+  // YouTube OAuth — /status (protegido; start/callback são públicos, registrados acima)
+  registerYoutubeOAuthStatusRoute(app, db);
+
+  // YouTube — admin: sync (snapshot + vídeos + métricas diárias canal/vídeo) + status
+  registerYoutubeAdminRoutes(app, db);
 
   // Google Ads — admin: sync de campanhas + métricas + status
   registerGoogleAdsAdminRoutes(app);
 
+  // Google (Turbo-only, schema `google`) — admin: sync + status
+  registerGoogleAdminRoutes(app);
+
+  // LinkedIn OAuth (autorização orgânica da Company Page Turbo Partners)
+  registerLinkedinOAuthRoutes(app, db);
+
+  // LinkedIn — admin: sync orgânico (seguidores + page views + engajamento) + status
+  registerLinkedinAdminRoutes(app);
+
+  // TikTok OAuth (advertiser/Ads + account holder/orgânico)
+  registerTiktokOAuthRoutes(app, db);
+
+  // TikTok — admin: sync orgânico (perfil + vídeos + métricas) + status
+  registerTiktokAdminRoutes(app);
+
   // Growth AI Module - registered from separate file
   registerGrowthAiRoutes(app, db);
+  registerGrowthDfcCacRoutes(app, db);
 
   // SDR Assistant Module - registered from separate file
   registerSdrAssistantRoutes(app, db);
@@ -8100,6 +8325,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Comercial (Closers, SDRs, Vendas) - registered from separate file
   registerComercialRoutes(app);
 
+  // Fechamento Semanal - novos contratos e saúde de squads
+  registerFechamentoSemanalRoutes(app);
+
   // Cross-Sell Management - registered from separate file
   registerCrossSellRoutes(app);
 
@@ -8144,6 +8372,15 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Treinamentos Internos Module - registered from separate file
   registerInternalTrainingsRoutes(app);
+
+  // LT/LTV/Churn Dashboard - registered from separate file
+  registerLtLtvChurnRoutes(app, db);
+  registerChurnProdutoMotivoRoutes(app, db);
+  registerEstoquePontualRoutes(app, db);
+  registerBp2026Routes(app, db);
+  registerBp2026DetalheRoutes(app, db);
+  registerCreatorsPontualRoutes(app, db);
+  registerChurnPontorrenteRoutes(app, db);
 
   // ============================================
   // Sugestões API

@@ -30,7 +30,7 @@ import { Tooltip as TooltipUI, TooltipContent, TooltipProvider, TooltipTrigger }
 import {
   ArrowUpCircle, ArrowDownCircle, Building2,
   CalendarDays, Receipt,
-  Loader2, X, UserCheck, UserX, AlertTriangle, BarChart3, Download
+  Loader2, X, UserCheck, UserX, AlertTriangle, BarChart3, Download, Info
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -428,6 +428,20 @@ export default function FluxoCaixa() {
             </>
           )}
         </div>
+
+        {/* Observação sobre a natureza dos valores */}
+        {!isLoadingInsights && (
+          <div
+            className="flex items-start gap-2 mb-6 rounded-lg border border-gray-200 dark:border-zinc-700 bg-gray-50 dark:bg-zinc-800/50 px-3 py-2"
+            data-testid="aviso-valores-previstos"
+          >
+            <Info className="w-4 h-4 mt-0.5 shrink-0 text-gray-500 dark:text-zinc-400" />
+            <p className="text-xs text-gray-600 dark:text-zinc-400">
+              Os valores de entradas e saídas consideram o <strong>total previsto</strong> no período
+              (recebido + a receber, pago + a pagar) — não apenas o efetivamente realizado.
+            </p>
+          </div>
+        )}
 
         {/* Classificação de Clientes - Filtro do Gráfico */}
         <div className="grid grid-cols-3 gap-4 mb-6" data-testid="filtro-classificacao">
