@@ -32,7 +32,7 @@ const NOTA_CHURN =
 
 const NOTA_CHURN_RS =
   "Valor absoluto de churn bruto por produto, alinhado ao gráfico do ClickUp (inclui abonados e todos os motivos). " +
-  "Orçado derivado de churn% × MRR orçado do mês anterior.";
+  "Orçado derivado de churn% × MRR orçado do mesmo mês (igual à planilha Revenue).";
 
 // mapeamento: produto exato; quando vazio (snapshots até jan/2026), fallback pelo nome do serviço
 export const CASE_PRODUTO = sql`CASE
@@ -174,11 +174,11 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
     }
 
     // Churn R$ por produto: meses construídos manualmente para que o orçado mensal
-    // seja derivado (churn_pct_orc × mrr_orc mês anterior) em vez de buscado no banco.
+    // seja derivado (churn_pct_orc × mrr_orc do MESMO mês, como na planilha Revenue) em vez de buscado no banco.
     const mesesChurnRs: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
       const mes = i + 1;
-      const mrrOrcAnterior = orcado[`mrr_${chave}`]?.[mes - 1] ?? 0;
-      const o = (orcado[`churn_pct_${chave}`]?.[mes] ?? 0) * mrrOrcAnterior;
+      const mrrOrcMes = orcado[`mrr_${chave}`]?.[mes] ?? 0;
+      const o = (orcado[`churn_pct_${chave}`]?.[mes] ?? 0) * mrrOrcMes;
       const r = mes <= mesCorrente ? (c[mes] ?? 0) : null;
       return { mes, orcado: o, realizado: r, atingimento: calcAtingimento(o, r) };
     });
@@ -207,8 +207,8 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
       ? LINHAS_SERVICO.reduce((acc, { chave: ch }) => acc + (churnRs[ch]?.[mes] ?? 0), 0)
       : null;
     const orc = LINHAS_SERVICO.reduce((acc, { chave: ch }) => {
-      const mrrOrcAnterior = orcado[`mrr_${ch}`]?.[mes - 1] ?? 0; // mes-1=0 → 0 (dez/2025 não orçado)
-      return acc + (orcado[`churn_pct_${ch}`]?.[mes] ?? 0) * mrrOrcAnterior;
+      const mrrOrcMes = orcado[`mrr_${ch}`]?.[mes] ?? 0; // MESMO mês (igual à planilha Revenue, linha "Churn Total")
+      return acc + (orcado[`churn_pct_${ch}`]?.[mes] ?? 0) * mrrOrcMes;
     }, 0);
     return { mes, orcado: orc, realizado: real, atingimento: calcAtingimento(orc, real) };
   });
@@ -219,7 +219,7 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
     tipoAgregacao: "fluxo",
     direcao: "menor_melhor",
     unidade: "brl",
-    nota: "Soma do churn bruto de todos os produtos, alinhado ao gráfico do ClickUp (inclui abonados e todos os motivos). Orçado derivado de churn% × MRR orçado do mês anterior.",
+    nota: "Soma do churn bruto de todos os produtos, alinhado ao gráfico do ClickUp (inclui abonados e todos os motivos). Orçado derivado de churn% × MRR orçado do mesmo mês (igual à planilha Revenue).",
     meses: mesesChurnTotal,
     ytd: mesFechado === 0
       ? { orcado: 0, realizado: null, atingimento: null }
