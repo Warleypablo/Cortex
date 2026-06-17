@@ -449,18 +449,17 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
   const MQL = `(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
   const NMQL = `NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
 
-  // 1. Anúncios + métricas nativas agregadas no período + nomes de ad group/campanha.
+  // 1. Anúncios + métricas nativas agregadas no período + nome do ad group.
+  // Só tabelas do schema controlado por esta feature (tiktok.ads/ad_groups/ad_insights_daily).
   const adsRes = await db.execute(sql`
     SELECT a.ad_id::text AS ad_id, a.adgroup_id::text AS adgroup_id, a.campaign_id::text AS campaign_id,
            a.ad_name, a.operation_status AS ad_status, a.landing_page_url,
            ag.adgroup_name, ag.operation_status AS adgroup_status,
-           c.campaign_name, c.operation_status AS campaign_status, c.budget AS campaign_budget,
            COALESCE(m.spend, 0) AS spend, COALESCE(m.impressions, 0) AS impressions,
            COALESCE(m.clicks, 0) AS clicks, COALESCE(m.conversions, 0) AS conversions,
            COALESCE(m.video_views, 0) AS video_views
     FROM tiktok.ads a
     LEFT JOIN tiktok.ad_groups ag ON ag.adgroup_id = a.adgroup_id
-    LEFT JOIN tiktok.ad_campaigns c ON c.campaign_id = a.campaign_id
     LEFT JOIN (
       SELECT ad_id, SUM(spend) AS spend, SUM(impressions) AS impressions, SUM(clicks) AS clicks,
              SUM(conversions) AS conversions, SUM(video_views) AS video_views
@@ -469,6 +468,26 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       GROUP BY ad_id
     ) m ON m.ad_id = a.ad_id
   `);
+
+  // 1b. Metadados de campanha (nome/status/budget) vêm de tiktok.ad_campaigns, que é do
+  // PR de nível-campanha e pode ter outro owner no banco. Lemos de forma OPCIONAL: se não
+  // houver acesso/tabela, seguimos com fallback (campaign_id como nome).
+  const campMeta = new Map<string, { name: string | null; status: string | null; budget: number | null }>();
+  try {
+    const campRes = await db.execute(sql`
+      SELECT campaign_id::text AS campaign_id, campaign_name, operation_status, budget
+      FROM tiktok.ad_campaigns
+    `);
+    for (const c of campRes.rows as any[]) {
+      campMeta.set(String(c.campaign_id), {
+        name: c.campaign_name || null,
+        status: c.operation_status || null,
+        budget: c.budget != null ? Number(c.budget) : null,
+      });
+    }
+  } catch (e: any) {
+    console.log("[api] buildTiktokCriativos - ad_campaigns indisponível (fallback p/ campaign_id):", e?.message || e);
+  }
 
   // 2. CRM por anúncio (utm_content = ad_id), só tráfego pago do TikTok.
   const crmRes = await db.execute(sql.raw(`
@@ -529,6 +548,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
     const receita = crm.valorPontual + crm.valorRecorrente;
     const ctr = impressions > 0 && clicks > 0 ? r2((clicks / impressions) * 100) : null;
     const cpm = impressions > 0 ? Math.round((investimento / impressions) * 1000) : null;
+    const camp = campMeta.get(String(a.campaign_id)) || { name: null, status: null, budget: null };
 
     out.push({
       id: a.ad_id,
@@ -538,13 +558,13 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       status: adStatus,
       plataforma: 'TikTok Ads',
       campaignId: a.campaign_id || null,
-      campaignName: a.campaign_name || a.campaign_id || null,
-      campaignStatus: normalizeTiktokStatus(a.campaign_status),
+      campaignName: camp.name || a.campaign_id || null,
+      campaignStatus: normalizeTiktokStatus(camp.status),
       adsetId: a.adgroup_id || null,
       adsetName: a.adgroup_name || a.adgroup_id || null,
       adsetStatus: normalizeTiktokStatus(a.adgroup_status),
       // TikTok: budget pode morar na campanha ou no ad group; expomos só o da campanha por ora.
-      campaignDailyBudget: a.campaign_budget != null ? Number(a.campaign_budget) : null,
+      campaignDailyBudget: camp.budget,
       campaignLifetimeBudget: null,
       adsetDailyBudget: null,
       adsetLifetimeBudget: null,

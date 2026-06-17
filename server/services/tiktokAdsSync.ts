@@ -165,12 +165,6 @@ export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsRes
           const list: any[] = data?.list || [];
           for (const g of list) {
             if (!g.campaign_id) continue;
-            // garante a campanha (FK) caso não tenha vindo no /campaign/get/
-            await pool.query(
-              `INSERT INTO tiktok.ad_campaigns (campaign_id, advertiser_id, synced_at)
-               VALUES ($1,$2, NOW()) ON CONFLICT (campaign_id) DO NOTHING`,
-              [String(g.campaign_id), String(advertiser_id)],
-            );
             await pool.query(
               `INSERT INTO tiktok.ad_groups
                  (adgroup_id, campaign_id, advertiser_id, adgroup_name, operation_status, budget, budget_mode, raw, synced_at)

@@ -31,12 +31,16 @@ const pool = new Pool({
   ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
 });
 
-async function exec(label: string, sql: string) {
+async function exec(label: string, sql: string, opts: { ignoreErrors?: boolean } = {}) {
   process.stdout.write(`  ${label} ... `);
   try {
     await pool.query(sql);
     console.log('✅');
   } catch (e: any) {
+    if (opts.ignoreErrors) {
+      console.log(`⚠️  ignorado (${e.code || e.message.split('\n')[0]})`);
+      return;
+    }
     console.log(`❌ ${e.message}`);
     throw e;
   }
@@ -45,7 +49,9 @@ async function exec(label: string, sql: string) {
 async function main() {
   console.log('Criando tabelas TikTok Ads (ad-level) em tiktok...\n');
 
-  await exec('schema tiktok', `CREATE SCHEMA IF NOT EXISTS tiktok`);
+  // CREATE SCHEMA exige privilégio no BANCO (não na schema). Como a schema tiktok já
+  // existe (orgânico), basta ter CREATE na schema p/ as tabelas — ignoramos se falhar aqui.
+  await exec('schema tiktok', `CREATE SCHEMA IF NOT EXISTS tiktok`, { ignoreErrors: true });
 
   // Pré-requisitos (idempotentes): advertisers + ad_campaigns — caso o script de campanha
   // não tenha rodado neste banco. Definições alinhadas com create-tiktok-ads-tables.ts.
@@ -70,11 +76,12 @@ async function main() {
       synced_at         TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
 
-  // Conjuntos (adgroups).
+  // Conjuntos (adgroups). Sem FK explícita (tabelas-pai podem ser de outro owner no
+  // banco; a integridade é garantida pelo sync, que insere os pais antes dos filhos).
   await exec('tiktok.ad_groups', `
     CREATE TABLE IF NOT EXISTS tiktok.ad_groups (
       adgroup_id        VARCHAR(40) PRIMARY KEY,
-      campaign_id       VARCHAR(40) NOT NULL REFERENCES tiktok.ad_campaigns(campaign_id) ON DELETE CASCADE,
+      campaign_id       VARCHAR(40) NOT NULL,
       advertiser_id     VARCHAR(40) NOT NULL,
       adgroup_name      TEXT,
       operation_status  TEXT,
@@ -88,7 +95,7 @@ async function main() {
   await exec('tiktok.ads', `
     CREATE TABLE IF NOT EXISTS tiktok.ads (
       ad_id             VARCHAR(40) PRIMARY KEY,
-      adgroup_id        VARCHAR(40) NOT NULL REFERENCES tiktok.ad_groups(adgroup_id) ON DELETE CASCADE,
+      adgroup_id        VARCHAR(40) NOT NULL,
       campaign_id       VARCHAR(40) NOT NULL,
       advertiser_id     VARCHAR(40) NOT NULL,
       ad_name           TEXT,
@@ -103,7 +110,7 @@ async function main() {
   // spend/impressions/clicks/conversions/video_views são valores do DIA (não cumulativos).
   await exec('tiktok.ad_insights_daily', `
     CREATE TABLE IF NOT EXISTS tiktok.ad_insights_daily (
-      ad_id         VARCHAR(40) NOT NULL REFERENCES tiktok.ads(ad_id) ON DELETE CASCADE,
+      ad_id         VARCHAR(40) NOT NULL,
       stat_date     DATE NOT NULL,
       advertiser_id VARCHAR(40) NOT NULL,
       spend         NUMERIC,
