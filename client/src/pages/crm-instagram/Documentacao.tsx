@@ -11,6 +11,55 @@ export default function Documentacao() {
       </section>
 
       <section>
+        <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Como operar no dia a dia</h3>
+        <p className="mb-2">
+          Rotina do SDR na aba <strong>Pipeline</strong> — a fila já chega priorizada (quem mandou DM
+          primeiro, depois quem comentou mais vezes; o mais recente no topo) com a temperatura do lead.
+        </p>
+        <ol className="list-decimal pl-5 space-y-1.5">
+          <li>
+            <strong>Pegar o card</strong> — clique em <strong>"Pegar"</strong>. Você vira o dono e o card
+            trava por 15 min pra nenhum outro SDR abordar o mesmo perfil (seu balão aparece no card).
+          </li>
+          <li>
+            <strong>Avaliar</strong> — confira o selo <strong>"Já é contato"</strong> (se já está na nossa
+            base do GHL), o nº de interações e a temperatura (🔥 ≤15d · 🌡 16–30d · ❄️ &gt;30d).
+          </li>
+          <li>
+            <strong>Abordar</strong> — lead de DM: botão <strong>"Responder no GHL"</strong> (abre a
+            conversa no GHL). Lead só de comentário: <strong>"Abrir no Instagram"</strong> (responde/DM
+            por lá).
+          </li>
+          <li>
+            <strong>Qualificar</strong> — aplique uma <strong>tag</strong> (creator, empresário,
+            influenciadora, talento…). Marcar <strong>desqualificado</strong> ou <strong>colaborador</strong>{" "}
+            tira o card do Pipeline (some da fila, mas continua na aba Qualificação).
+          </li>
+          <li>
+            <strong>Anotar</strong> — use <strong>"Adicionar observação"</strong> para contexto; se virar
+            deal, isso vai pros comentários do Bitrix.
+          </li>
+          <li>
+            <strong>Avançar o estágio</strong> — Engajador → Oportunidade conforme você trabalha o lead.
+          </li>
+          <li>
+            <strong>Criar no Bitrix</strong> — quando vira lead comercial, clique em{" "}
+            <strong>"Criar no Bitrix"</strong>. O deal nasce com origem/link do Instagram preenchidos e
+            atribuído a você (Responsável + campo SDR). Telefone e e-mail são opcionais.
+          </li>
+          <li>
+            <strong>Soltar</strong> — se não vai trabalhar o card agora, <strong>"Soltar"</strong> devolve
+            ele pra fila para outro SDR pegar.
+          </li>
+        </ol>
+        <p className="mt-2 text-xs text-gray-500 dark:text-zinc-400">
+          Outras abas: <strong>Qualificação</strong> lista todos os perfis com a tag editável (base
+          completa); <strong>Social Media</strong> mostra o desempenho dos posts e quantos engajadores
+          de cada post entraram no funil (depende da reconexão do Instagram — ver pendências com o time).
+        </p>
+      </section>
+
+      <section>
         <h3 className="font-semibold text-gray-900 dark:text-white mb-1">Estágios</h3>
         <ul className="list-disc pl-5 space-y-1">
           <li><strong>Engajador</strong> — alguém interagiu (comentário ou DM). Entrada do funil.</li>
