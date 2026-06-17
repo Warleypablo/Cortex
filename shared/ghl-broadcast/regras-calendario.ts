@@ -15,7 +15,6 @@ export const LIMITES_MENSAIS: Record<string, number> = {
   // Premium (queimam rápido)
   Clientes: 2,
   "Creators - MQLs": 3,
-  "IA - MQLs": 2,
   // Principais (volume médio)
   "Geral - MQLs": 4,
   "CRM - MQLs": 4,
@@ -28,7 +27,6 @@ export const LIMITES_MENSAIS: Record<string, number> = {
   "Geral - Todos": 2,
   "CRM - Todos": 2,
   "Creators - Todos": 3,
-  "IA - Todos": 2,
   // Nutrição (sem oferta direta — toleram mais)
   "Geral - Abaixo de 30k": 4,
   "Creators - Abaixo de 30k": 4,

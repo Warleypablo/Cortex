@@ -2265,7 +2265,7 @@ async function postPlanoGerarMes(req: Request, res: Response) {
           escolhida = cand; cursor = (cursor + i + 1) % pool.length; break;
         }
       }
-      if (!escolhida) continue; // só se a semana já consumiu todas as bases do pool (impossível com 18)
+      if (!escolhida) continue; // só se a semana já consumiu todas as bases do pool (impossível com 13)
       usadasNaSemana.add(escolhida.base);
       monthCount.set(escolhida.base, (monthCount.get(escolhida.base) ?? 0) + 1);
       const sz = sazonalPorDia.get(dia);

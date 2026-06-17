@@ -99,29 +99,6 @@ A gente acompanha empresários aqui do ES de perto e o padrão se repete: o 1º 
 Dá tempo de virar essa chave antes de julho.
 
 Quer que eu monte um diagnóstico rápido do seu marketing pra fechar o ano no azul? Me responde aqui.','pronta','auto-IA·editado',NOW(),NOW());
-INSERT INTO cortex_core.broadcast_plan (plan_date,canal,base,objetivo,padrao,titulo,copy_text,status,created_by,created_at,updated_at) VALUES ('2026-06-16'::date,'WhatsApp','IA - MQLs','Agendar reunião','HOOK_PROVOCATIVO','IA sem estrategia nao escala','IA não vai escalar seu negócio. Sozinha, ela só acelera a bagunça que já existe.
-
-O que separa quem fatura mais com IA dos que só "testam ferramenta" é uma coisa: ter o processo certo ANTES de automatizar.
-
-Quem não tem isso gasta tempo brincando de prompt e não muda o caixa.
-
-Posso te mostrar onde a IA realmente move o ponteiro no seu caso, numa conversa rápida de diagnóstico.
-
-Faz sentido pra você? Me responde aqui.','pronta','auto-IA·editado',NOW(),NOW());
-INSERT INTO cortex_core.broadcast_plan (plan_date,canal,base,objetivo,padrao,titulo,copy_text,status,created_by,created_at,updated_at) VALUES ('2026-06-17'::date,'WhatsApp','IA - Todos','Agendar reunião','CONTRASTE','IA: jeito errado vs certo','Tem gente jogando dinheiro fora com IA e nem percebe.
-
-O jeito errado (o que quase todo mundo faz):
-✗ Pede texto pro ChatGPT e cola no anúncio
-✗ Testa ferramenta nova toda semana sem método
-✗ Usa IA só pra "escrever post"
-
-O jeito certo:
-✓ IA conectada no seu funil, gerando lead e vendendo
-✓ Operação que roda no automático enquanto você escala
-
-A diferença separa quem brinca de IA de quem fatura com ela.
-
-Quer que eu te mostre onde o seu negócio tá perdendo isso? Responde aqui que eu te explico.','pronta','auto-IA·editado',NOW(),NOW());
 INSERT INTO cortex_core.broadcast_plan (plan_date,canal,base,objetivo,padrao,titulo,copy_text,status,created_by,created_at,updated_at) VALUES ('2026-06-18'::date,'WhatsApp','CRM - Todos','Agendar reunião','CONTRASTE','CRM: jeito errado x certo','Tem empresa que perde venda não por falta de lead, mas por falta de processo.
 
 O jeito que trava:

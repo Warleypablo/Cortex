@@ -110,7 +110,6 @@ export type CategoriaBase =
   | "regional_es"
   | "funil_geral"
   | "funil_creators"
-  | "funil_ia"
   | "crm"
   | "base_ampla"
   | "nutricao_only";

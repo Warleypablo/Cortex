@@ -193,14 +193,6 @@ export const BASE_TAG_MAP: Record<string, BaseFiltro> = {
     tagsAny: ["[segmento]_es"],
   },
 
-  // ── Funil IA ──────────────────────────────────────────────────────────
-  "IA - MQLs": {
-    tagsAll: ["[status]_mql", "[lead]_ia"],
-  },
-  "IA - Todos": {
-    tagsAny: ["[lead]_ia"],
-  },
-
   // ── Amplas ────────────────────────────────────────────────────────────
   "Geral - Todos": {
     tagsAny: ["[lead]_geral"],

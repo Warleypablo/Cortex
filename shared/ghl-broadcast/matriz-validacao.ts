@@ -30,8 +30,6 @@ export const BASE_CATEGORIAS: Record<string, CategoriaBase[]> = {
   "Geral - Abaixo de 30k": ["leads_abaixo_30k", "funil_geral", "nutricao_only"],
   "Creators - Abaixo de 30k": ["leads_abaixo_30k", "funil_creators", "nutricao_only"],
   "Contatos Espírito Santo": ["regional_es"],
-  "IA - MQLs": ["mql", "funil_ia"],
-  "IA - Todos": ["funil_ia"],
   "Geral - Todos": ["funil_geral", "base_ampla"],
   "Creators - Todos": ["funil_creators", "base_ampla"],
 };
@@ -73,7 +71,7 @@ const REGRAS_BLOCK: Regra[] = [
       baseTem(ctx.base, "leads_abaixo_30k"),
     motivo:
       "Oferta de tíquete alto (>R$10k) não cabe em base com faturamento <R$30k/mês — sem fôlego financeiro.",
-    sugestao: "Use bases MQLs (Geral - MQLs, Creators - MQLs, IA - MQLs).",
+    sugestao: "Use bases MQLs (Geral - MQLs, Creators - MQLs).",
   },
   {
     chave: "oferta_nova_para_clientes",
@@ -203,7 +201,6 @@ export const COMPATIBILIDADE_BASE_PADRAO: Record<string, Partial<Record<PadraoKe
   "Geral - Abaixo de 30k": { URGENCIA_SAZONAL: "~", EVENTO: "++", REATIVACAO: "-", CASE_STUDY: "~", HOOK_PROVOCATIVO: "~", CONTRASTE: "++", PERSONALIZACAO_NICHO: "-" },
   "Creators - Abaixo de 30k": { URGENCIA_SAZONAL: "~", EVENTO: "++", REATIVACAO: "-", CASE_STUDY: "~", HOOK_PROVOCATIVO: "~", CONTRASTE: "++", PERSONALIZACAO_NICHO: "-" },
   "Contatos Espírito Santo": { URGENCIA_SAZONAL: "++", EVENTO: "++", REATIVACAO: "~", CASE_STUDY: "+", HOOK_PROVOCATIVO: "+", CONTRASTE: "+", PERSONALIZACAO_NICHO: "+" },
-  "IA - MQLs": { URGENCIA_SAZONAL: "+", EVENTO: "+", REATIVACAO: "-", CASE_STUDY: "+", HOOK_PROVOCATIVO: "++", CONTRASTE: "+", PERSONALIZACAO_NICHO: "~" },
 };
 
 export const COMPATIBILIDADE_BASE_OFERTA: Record<string, Partial<Record<OfertaKey, "+" | "~" | "-">>> = {
@@ -217,7 +214,6 @@ export const COMPATIBILIDADE_BASE_OFERTA: Record<string, Partial<Record<OfertaKe
   "Geral - Abaixo de 30k": { CREATORS: "-", PERFORMANCE: "-", COMUNICACAO: "~", LP: "~", CRM: "-", IFV: "-", ESTRUTURA_MARKETING: "-", SEO: "-", IA: "~", EVENTO: "+", NUTRICAO: "+", UPSELL: "-" },
   "Creators - Abaixo de 30k": { CREATORS: "~", PERFORMANCE: "-", COMUNICACAO: "~", LP: "~", CRM: "-", IFV: "-", ESTRUTURA_MARKETING: "-", SEO: "-", IA: "-", EVENTO: "+", NUTRICAO: "+", UPSELL: "-" },
   "Contatos Espírito Santo": { CREATORS: "+", PERFORMANCE: "+", COMUNICACAO: "+", LP: "+", CRM: "+", IFV: "+", ESTRUTURA_MARKETING: "~", SEO: "~", IA: "~", EVENTO: "+", NUTRICAO: "~", UPSELL: "-" },
-  "IA - MQLs": { CREATORS: "~", PERFORMANCE: "~", COMUNICACAO: "~", LP: "~", CRM: "~", IFV: "~", ESTRUTURA_MARKETING: "-", SEO: "~", IA: "+", EVENTO: "+", NUTRICAO: "~", UPSELL: "-" },
 };
 
 export function compatibilidadePadroes(base: string): Partial<Record<PadraoKey, NivelCompat>> {
