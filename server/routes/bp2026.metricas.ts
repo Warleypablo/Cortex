@@ -22,7 +22,7 @@ const NOTA_SALDO =
 
 const NOTA_PONTE =
   "MRR do mês anterior + vendas − churn − MRR real do mês: o que vazou sem virar " +
-  "churn declarado (downgrades, abonados, vendas não ativadas, reajustes). " +
+  "churn declarado (downgrades, vendas não ativadas, reajustes — abonados já entram no churn bruto). " +
   "Janeiro compara contra o MRR real de dez/2025 e não tem orçado (base não seedada).";
 
 const NOTA_TICKET =
@@ -120,9 +120,8 @@ export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
     SELECT EXTRACT(MONTH FROM data_solicitacao_encerramento)::int AS mes,
            SUM(valor_r) AS total
     FROM cortex_core.vw_cup_churn_ajustado
+    -- churn BRUTO (alinhado ao ClickUp): sem excluir abonados nem motivos inválidos
     WHERE data_solicitacao_encerramento >= '2026-01-01' AND data_solicitacao_encerramento < '2027-01-01'
-      AND COALESCE(abonar_churn, '') != 'Sim'
-      AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
       AND valor_r > 0
     GROUP BY 1 ORDER BY 1
   `);
@@ -187,7 +186,7 @@ export async function montarMetricasGerais(deps: Deps): Promise<Linha[]> {
   const margemGeracao = Array.from({ length: 12 }, (_, i) => razao(geracao[i], fat[i]));
 
   // ponte do MRR: (MRR anterior + vendas − churn) − MRR real = vazamento não explicado
-  // (downgrades, churns abonados, vendas ainda não ativadas, reajustes de contrato)
+  // (downgrades, vendas ainda não ativadas, reajustes de contrato — abonados já contam no churn bruto)
   const ponteMrr = Array.from({ length: 12 }, (_, i) => {
     const m = i + 1;
     if (m > mesCorrente) return null;
