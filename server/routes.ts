@@ -3368,105 +3368,80 @@ Estruture sua resposta em:
         ORDER BY quantidade DESC
       `);
       
-      // Faturamento histórico estendido (modelo HÍBRIDO):
-      //  - A partir do 1º mês cheio de caz_parcelas (out/2025): receita/despesa em CAIXA (valor_pago).
-      //  - Antes desse corte: faturamento EMITIDO (caz_vendas) + despesas pagas (caz_pagar),
-      //    pois caz_parcelas/caz_receber não possuem caixa anterior a set/2025.
-      // O campo `fonte` ('caixa' | 'emitido') marca a transição para o frontend sinalizar a quebra de base.
+      // Faturamento mensal (regime de COMPETÊNCIA): receita devida (caz_receber.total) e
+      // despesa devida (caz_pagar.total), ambas pela data_vencimento. Série começa no 1º mês
+      // de caz_receber para não gerar meses só-despesa (margem -∞); estende-se automaticamente
+      // para trás quando o histórico de caz_receber/caz_pagar é repopulado.
+      // Usa `total` (faturado) e não `pago` (recebido) de propósito: `pago` subnota os meses
+      // recentes enquanto faturas ainda não foram quitadas, criando picos negativos espúrios.
       const faturamentoResult = await db.execute(sql`
         WITH bounds AS (
-          -- cutoff = 1º mês cheio de caz_parcelas; hist_start = 1º mês CHEIO de caz_vendas
-          -- (o 1º mês de cada fonte é parcial — ex.: caz_vendas começou em 13/fev/23 — e
-          --  distorceria a série, então pulamos para o mês seguinte completo)
-          SELECT
-            DATE_TRUNC('month', MIN(COALESCE(data_quitacao, data_vencimento))) + INTERVAL '1 month' AS cutoff,
-            (SELECT DATE_TRUNC('month', MIN(data)) FROM "Conta Azul".caz_vendas) + INTERVAL '1 month' AS hist_start
-          FROM "Conta Azul".caz_parcelas
-          WHERE tipo_evento = 'RECEITA'
+          SELECT DATE_TRUNC('month', MIN(data_vencimento)) AS inicio
+          FROM "Conta Azul".caz_receber
         ),
-        dados_recentes AS (
-          -- A partir do corte até o último mês FECHADO (exclui o mês corrente, ainda parcial,
-          -- que apareceria como queda no faturamento e pico falso na margem/caixa)
+        receita AS (
           SELECT
-            TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
-            'caixa' as fonte,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' THEN valor_pago::numeric ELSE 0 END), 0) as despesas,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO'
-              THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia
-          FROM "Conta Azul".caz_parcelas, bounds
-          WHERE COALESCE(data_quitacao, data_vencimento) >= bounds.cutoff
-            AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE)
-            AND tipo_evento IN ('RECEITA', 'DESPESA')
+            TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
+            COALESCE(SUM(total::numeric), 0) as faturamento,
+            COALESCE(SUM(CASE WHEN data_vencimento < CURRENT_DATE AND COALESCE(nao_pago, 0) > 0
+              THEN nao_pago::numeric ELSE 0 END), 0) as inadimplencia
+          FROM "Conta Azul".caz_receber, bounds
+          WHERE data_vencimento >= bounds.inicio
+            AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)
           GROUP BY 1
         ),
-        dados_historicos AS (
-          -- Antes do corte: receita emitida (caz_vendas) + despesas pagas (caz_pagar)
+        despesa AS (
           SELECT
-            mes,
-            'emitido' as fonte,
-            SUM(faturamento) as faturamento,
-            SUM(despesas) as despesas,
-            0 as inadimplencia
-          FROM (
-            -- Receita emitida (notas) de caz_vendas — única fonte de receita com histórico
-            SELECT
-              TO_CHAR(data, 'YYYY-MM') as mes,
-              COALESCE(SUM(total::numeric), 0) as faturamento,
-              0 as despesas
-            FROM "Conta Azul".caz_vendas, bounds
-            WHERE data >= bounds.hist_start
-              AND data < bounds.cutoff
-            GROUP BY 1
-
-            UNION ALL
-
-            -- Despesas pagas de caz_pagar
-            SELECT
-              TO_CHAR(COALESCE(data_vencimento, data_criacao), 'YYYY-MM') as mes,
-              0 as faturamento,
-              COALESCE(SUM(pago::numeric), 0) as despesas
-            FROM "Conta Azul".caz_pagar, bounds
-            WHERE UPPER(status) IN ('PAGO', 'ACQUITTED')
-              AND COALESCE(data_vencimento, data_criacao) >= bounds.hist_start
-              AND COALESCE(data_vencimento, data_criacao) < bounds.cutoff
-            GROUP BY 1
-          ) combined
-          GROUP BY mes
+            TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
+            COALESCE(SUM(total::numeric), 0) as despesas
+          FROM "Conta Azul".caz_pagar, bounds
+          WHERE data_vencimento >= bounds.inicio
+            AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)
+          GROUP BY 1
         )
-        -- Combina dados recentes (caixa) e históricos (emitido)
-        SELECT mes, fonte, faturamento, despesas, inadimplencia
-        FROM dados_recentes
-        UNION ALL
-        SELECT mes, fonte, faturamento, despesas, inadimplencia
-        FROM dados_historicos
-        WHERE mes NOT IN (SELECT mes FROM dados_recentes)
-        ORDER BY mes DESC
+        SELECT
+          r.mes,
+          'caixa' as fonte,
+          r.faturamento,
+          COALESCE(d.despesas, 0) as despesas,
+          r.inadimplencia
+        FROM receita r
+        LEFT JOIN despesa d USING (mes)
+        ORDER BY r.mes DESC
       `);
       
       // Faturamento, inadimplência e margem do ANO corrente (YTD: janeiro → mês atual).
-      // Base caixa (caz_parcelas.valor_pago) — o ano corrente está todo no período "caixa".
+      // Mesma base do gráfico: COMPETÊNCIA (caz_receber.total / caz_pagar.total, por data_vencimento).
       // Faturamento e inadimplência incluem o mês corrente (realizado até o momento).
       // Margem usa apenas meses FECHADOS (exclui o mês corrente, ainda parcial, que distorceria o %).
       const faturamentoAnoResult = await db.execute(sql`
-        SELECT
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_ano,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_bruto ELSE 0 END), 0) as valor_bruto_ano,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND data_vencimento < CURRENT_DATE AND status != 'QUITADO' THEN COALESCE(nao_pago, 0) + COALESCE(perda, 0) ELSE 0 END), 0) as inadimplencia_ano,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE) THEN valor_pago::numeric ELSE 0 END), 0) as faturamento_fechado,
-          COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE) THEN valor_pago::numeric ELSE 0 END), 0) as despesas_fechado,
-          COUNT(DISTINCT CASE WHEN tipo_evento = 'RECEITA' AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE) THEN TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') END) as meses_fechados
-        FROM "Conta Azul".caz_parcelas
-        WHERE COALESCE(data_quitacao, data_vencimento) >= DATE_TRUNC('year', CURRENT_DATE)
-          AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'
-          AND tipo_evento IN ('RECEITA', 'DESPESA')
+        WITH receita AS (
+          SELECT
+            COALESCE(SUM(total::numeric) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE) + INTERVAL '1 month'), 0) as faturamento_ano,
+            COALESCE(SUM(total::numeric) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)), 0) as faturamento_fechado,
+            COALESCE(SUM(nao_pago::numeric) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND data_vencimento < CURRENT_DATE), 0) as inadimplencia_ano,
+            COUNT(DISTINCT TO_CHAR(data_vencimento, 'YYYY-MM')) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)) as meses_fechados
+          FROM "Conta Azul".caz_receber
+        ),
+        despesa AS (
+          SELECT
+            COALESCE(SUM(total::numeric) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
+              AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)), 0) as despesas_fechado
+          FROM "Conta Azul".caz_pagar
+        )
+        SELECT r.faturamento_ano, r.faturamento_fechado, r.inadimplencia_ano, r.meses_fechados, d.despesas_fechado
+        FROM receita r, despesa d
       `);
       
       
       const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0 };
-      const faturamentoAno = faturamentoAnoResult.rows[0] || { faturamento_ano: 0, valor_bruto_ano: 0, inadimplencia_ano: 0, faturamento_fechado: 0, despesas_fechado: 0, meses_fechados: 0 };
+      const faturamentoAno = faturamentoAnoResult.rows[0] || { faturamento_ano: 0, inadimplencia_ano: 0, faturamento_fechado: 0, despesas_fechado: 0, meses_fechados: 0 };
 
       const headcount = Number(equipe.headcount) || 1;
       const mrrAtivo = Number(contratos.mrr_ativo) || 0;
@@ -3475,9 +3450,8 @@ Estruture sua resposta em:
       const faturamentoAnoValor = Number(faturamentoAno.faturamento_ano) || 0;
       const faturamentoFechado = Number(faturamentoAno.faturamento_fechado) || 0;
       const despesasFechado = Number(faturamentoAno.despesas_fechado) || 0;
-      const valorBrutoAno = Number(faturamentoAno.valor_bruto_ano) || 1;
       const inadimplenciaAno = Number(faturamentoAno.inadimplencia_ano) || 0;
-      const taxaInadimplencia = valorBrutoAno > 0 ? (inadimplenciaAno / valorBrutoAno) * 100 : 0;
+      const taxaInadimplencia = faturamentoAnoValor > 0 ? (inadimplenciaAno / faturamentoAnoValor) * 100 : 0;
       // Margem só de meses fechados (exclui o mês corrente, ainda parcial)
       const margemAno = faturamentoFechado > 0 ? ((faturamentoFechado - despesasFechado) / faturamentoFechado) * 100 : 0;
       // Faturamento médio MENSAL (meses fechados) por colaborador ativo
