@@ -17,6 +17,7 @@ import { montarFunil } from "./bp2026.funil";
 import { montarVendasProduto } from "./bp2026.vendasProduto";
 import { montarCapacity } from "./bp2026.capacity";
 import { montarDetalhamentos } from "./bp2026.detalhamentos";
+import { montarPontual } from "./bp2026.pontual";
 import { INFO_METRICAS } from "./bp2026.info";
 
 const ANO = 2026;
@@ -510,6 +511,9 @@ export function registerBp2026Routes(app: Express, db: any) {
       // 9. Revenue por linha de serviço (sub-aba)
       const revenue = await montarRevenue({ db, orcado, mesCorrente, mesFechado });
 
+      // 9b. Pontual (sub-aba): movimento do estoque pontual via snapshot-diff
+      const pontual = await montarPontual({ db, mesCorrente, mesFechado });
+
       // 10. Funil Comercial (sub-aba)
       const { linhas: funil, ganhosPorMes } = await montarFunil({ db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado });
 
@@ -549,6 +553,7 @@ export function registerBp2026Routes(app: Express, db: any) {
         }))),
         metricasGerais: anexarInfo(metricasGerais),
         revenue: anexarInfo(revenue),
+        pontual: anexarInfo(pontual),
         funil: anexarInfo(funil),
         vendasProduto: anexarInfo(vendasProduto),
         capacity: anexarInfo(capacity),
