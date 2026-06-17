@@ -7,17 +7,15 @@
 import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd } from "./bp2026.helpers";
 import {
-  agregarVendasProduto, aovMedioPorSegmento, parseServicosVendidos, distribuirDeal,
+  aovMedioPorSegmento, parseServicosVendidos,
   agregarVendasProdutoClickup, contratosDoSegmento,
   type DealVenda, type MixClickup, type AovMedio, type ProdutoRowMix,
   type CelulaSeg, type TotalMes, type AggVendasClickup, type ContratoRow,
 } from "./bp2026.vendasProduto.helpers";
 import {
-  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SERVICOS_BITRIX, SLUG,
+  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SLUG,
   type SegmentoBP, type Natureza,
 } from "../okr2026/servicosBitrix";
-
-const BITRIX_BASE = "https://turbopartners.bitrix24.com.br";
 const ANO = 2026;
 
 interface MesLinha { mes: number; orcado: number; realizado: number | null; atingimento: number | null }
@@ -277,44 +275,44 @@ export function parseMetricaProduto(metrica: string):
 
 export interface ItemVendaDet { grupo: string; nome: string; detalhe: string; data: string | null; valor: number; url?: string }
 
+// monta itens do drill-down a partir das linhas de contrato (pura, testável)
+export function montarItensVendaProduto(
+  rows: ContratoRow[], natureza: Natureza, segmento: SegmentoBP, modo: "valor" | "contrato"
+): { itens: ItemVendaDet[]; total: number } {
+  const doSeg = contratosDoSegmento(rows, natureza, segmento);
+  const valorDe = (c: ContratoRow) => (natureza === "recorrente" ? c.valorr : c.valorp);
+  const itens: ItemVendaDet[] = doSeg.map((c) => ({
+    grupo: "Contratos",
+    nome: c.cliente,
+    detalhe: [c.servico || c.produto, c.status].filter(Boolean).join(" · "),
+    data: c.data,
+    valor: modo === "valor" ? valorDe(c) : 0,
+  }));
+  itens.sort((a, b) => b.valor - a.valor);
+  const total = modo === "valor" ? doSeg.reduce((s, c) => s + valorDe(c), 0) : doSeg.length;
+  return { itens, total };
+}
+
 export async function detalheVendaProdutoMes(
   db: any, natureza: Natureza, segmento: SegmentoBP, mes: number, modo: "valor" | "contrato"
 ): Promise<{ itens: ItemVendaDet[]; total: number }> {
-  const { deals, prMix, mixRec, mixPont, aovRec, aovPont, meta } = await carregarAtribuicaoVendas(db);
-  const itens: ItemVendaDet[] = [];
-  let total = 0;
-  for (const d of deals) {
-    if (d.mes !== mes) continue;
-    const parte = distribuirDeal(d, prMix, mixRec, mixPont, aovRec, aovPont)
-      .find((p) => p.natureza === natureza && p.segmento === segmento);
-    if (!parte) continue;
-
-    const valNat = natureza === "recorrente" ? d.valorRec : d.valorPont;
-    const rateado = Math.round(valNat) !== Math.round(parte.valor); // multi-produto: valor do deal foi dividido
-    const md = meta.get(d.id)!;
-    // produto desta célula = o(s) serviço(s) do deal que pertencem ao segmento clicado
-    const servicosDoSegmento = d.ids
-      .filter((id) => SERVICOS_BITRIX[id]?.segmento === segmento)
-      .map((id) => SERVICOS_BITRIX[id]!.nome);
-    const produtoLabel = servicosDoSegmento.length ? servicosDoSegmento.join(", ") : segmento;
-    const atribuido = `R$ ${Math.round(parte.valor).toLocaleString("pt-BR")}`;
-    const detalhePartes = [
-      produtoLabel,                                   // produto (serviço do segmento), claro e primeiro
-      modo === "contrato" ? atribuido : "",           // no modo contagem o valor vai no texto
-      md.closer ? `closer ${md.closer}` : "",
-      rateado ? `de deal ${natureza === "recorrente" ? "MRR" : "pontual"} R$ ${Math.round(valNat).toLocaleString("pt-BR")}` : "",
-    ].filter(Boolean);
-
-    itens.push({
-      grupo: "Deals",
-      nome: md.titulo,
-      detalhe: detalhePartes.join(" · "),
-      data: md.data,
-      valor: modo === "valor" ? parte.valor : 0,
-      url: `${BITRIX_BASE}/crm/deal/details/${d.id}/`,
-    });
-    total += modo === "valor" ? parte.valor : 1;
-  }
-  itens.sort((a, b) => b.valor - a.valor);
-  return { itens, total };
+  const rows = (await db.execute(sql`
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+           COALESCE(c.servico, '') AS servico,
+           COALESCE(c.status, '') AS status,
+           COALESCE(c.valorr::numeric, 0)::float AS valorr,
+           COALESCE(c.valorp::numeric, 0)::float AS valorp,
+           c.data_criado::text AS data
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+    WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+      AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+      AND LOWER(TRIM(c.status)) <> 'não usar'
+  `)).rows as any[];
+  const contratos: ContratoRow[] = rows.map((r) => ({
+    cliente: String(r.cliente), produto: String(r.produto), servico: String(r.servico),
+    status: String(r.status), valorr: Number(r.valorr), valorp: Number(r.valorp), data: r.data ?? null,
+  }));
+  return montarItensVendaProduto(contratos, natureza, segmento, modo);
 }

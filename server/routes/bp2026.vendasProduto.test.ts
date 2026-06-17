@@ -1,7 +1,7 @@
 // server/routes/bp2026.vendasProduto.test.ts
 import { describe, it, expect } from "vitest";
-import { montarVendasProduto } from "./bp2026.vendasProduto";
-import type { CelulaSeg } from "./bp2026.vendasProduto.helpers";
+import { montarVendasProduto, montarItensVendaProduto } from "./bp2026.vendasProduto";
+import type { CelulaSeg, ContratoRow } from "./bp2026.vendasProduto.helpers";
 import type { SegmentoBP } from "../okr2026/servicosBitrix";
 
 function mkAgg(mes: number, seg: SegmentoBP, c: CelulaSeg) {
@@ -52,5 +52,23 @@ describe("montarVendasProduto", () => {
     expect(linhas.some((l) => l.metrica === "contratos_vendidos_mrr_performance")).toBe(true);
     // não há mais linha-total in-bloco "Total MRR"
     expect(linhas.some((l) => l.metrica === "vendas_mrr" && !l.segmento)).toBe(false);
+  });
+});
+
+describe("montarItensVendaProduto", () => {
+  const rows: ContratoRow[] = [
+    { cliente: "Alpha", produto: "Performance", servico: "Gestão", status: "ativo", valorr: 300, valorp: 0, data: "2026-01-10" },
+    { cliente: "Beta", produto: "Performance", servico: "Gestão", status: "cancelado/inativo", valorr: 200, valorp: 0, data: "2026-01-20" },
+  ];
+  it("modo valor: total = soma dos valores da natureza, ordenado desc", () => {
+    const { itens, total } = montarItensVendaProduto(rows, "recorrente", "Performance", "valor");
+    expect(total).toBe(500);
+    expect(itens.map((i) => i.nome)).toEqual(["Alpha", "Beta"]);
+    expect(itens[0].valor).toBe(300);
+    expect(itens[0].grupo).toBe("Contratos");
+  });
+  it("modo contrato: total = contagem", () => {
+    const { total } = montarItensVendaProduto(rows, "recorrente", "Performance", "contrato");
+    expect(total).toBe(2);
   });
 });
