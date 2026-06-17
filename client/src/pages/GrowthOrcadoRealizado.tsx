@@ -1808,16 +1808,17 @@ export default function GrowthOrcadoRealizado() {
     funnel: PlatformFunnelData | undefined,
   ): Metric[] => {
     const O = ORCADO_GOOGLE_ADS;
-    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
+    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'gads_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'gads_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
       { id: 'gads_ctr', name: 'CTR', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
+      { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'gads_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      // Visualizações de Página e Connect Rate removidos do Aprofundado do Google:
-      // ambos vinham do GA4 e VdP era redundante com Sessões neste contexto.
-      // O foco é Tx Conversão da Página (Leads ÷ Sessões).
+      // Connect Rate segue removido do Aprofundado do Google (despriorizado). A Tx
+      // Conversão da Página usa Visualizações de Página (Leads ÷ VdP), coerente com
+      // o Connect Rate do TikTok/LinkedIn e com o funil do Meta (que usa LPV do pixel).
       { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('gads', funnel, O, d.investimento ?? null)];
@@ -1964,8 +1965,8 @@ export default function GrowthOrcadoRealizado() {
   // TikTok Ads platform metrics (mídia paga — lê tiktok.ad_metrics_daily via endpoint)
   const buildTiktokAdsMetrics = (d: TiktokAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_TIKTOK_ADS;
-    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
+    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'tta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'tta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -1987,8 +1988,8 @@ export default function GrowthOrcadoRealizado() {
   // LinkedIn Ads platform metrics (mídia paga — lê linkedin.ad_metrics_daily via endpoint)
   const buildLinkedinAdsMetrics = (d: LinkedinAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_LINKEDIN_ADS;
-    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
+    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'lia_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'lia_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },

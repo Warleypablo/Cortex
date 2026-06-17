@@ -3724,7 +3724,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const sessoes = ga4.byPlatform.google_ads;
       // Padrão GA4 (igual aos outros canais)
       const visualizacoesPagina = ga4.byPlatformPageViews.google_ads;
-      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+      // Connect Rate = VdP ÷ Cliques (não exibido no Aprofundado do Google, mas
+      // mantido idêntico a TikTok/LinkedIn Ads p/ consistência).
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
         investimento,
