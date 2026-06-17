@@ -69,6 +69,7 @@ import { registerUtmRoutes } from "./routes/utm";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerCrmInstagramRoutes } from "./routes/crmInstagram";
 import { registerGrowthDfcCacRoutes } from "./routes/growthDfcCac";
 import { registerGhlPublicRoutes, registerGhlApiRoutes } from "./routes/ghl";
 import { registerNegativacaoRoutes } from "./routes/negativacao";
@@ -475,6 +476,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // GHL APIs internas (sob /api → autenticadas pelo isAuthenticated acima)
   registerGhlApiRoutes(app);
+
+  // CRM Instagram (garimpo de engajamento → social selling)
+  registerCrmInstagramRoutes(app, db, storage);
 
   app.get("/api/debug/users", isAuthenticated, isAdmin, async (req, res) => {
     try {
