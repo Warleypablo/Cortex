@@ -162,11 +162,17 @@ export default function InvestorsReport() {
   const chartDataWithMetrics = useMemo(() => {
     let accumulated = 0;
     return filteredData.map(item => {
-      accumulated += item.geracaoCaixa;
       const margem = item.faturamento > 0 ? ((item.geracaoCaixa / item.faturamento) * 100) : 0;
+      // Acumulado de geração de caixa só conta os meses em regime de CAIXA;
+      // meses de competência ficam sem acumulado (null → "—" na tabela).
+      let caixaAcumulado: number | null = null;
+      if (item.fonte === 'caixa') {
+        accumulated += item.geracaoCaixa;
+        caixaAcumulado = accumulated;
+      }
       return {
         ...item,
-        caixaAcumulado: accumulated,
+        caixaAcumulado,
         margem: Math.round(margem * 10) / 10,
         mesLabel: (() => {
           const [year, month] = item.mes.split('-');
@@ -1146,7 +1152,14 @@ export default function InvestorsReport() {
                   <tbody className="divide-y divide-border">
                     {chartDataWithMetrics.slice().reverse().map((item, index) => (
                       <tr key={item.mes} className="hover:bg-muted/50" data-testid={`historico-${index}`}>
-                        <td className="py-2 px-3 font-medium text-foreground">{item.mesLabel}</td>
+                        <td className="py-2 px-3 font-medium text-foreground">
+                          <span className="inline-flex items-center gap-2">
+                            {item.mesLabel}
+                            <span className={`text-[10px] px-1.5 py-0.5 rounded ${item.fonte === 'caixa' ? 'bg-purple-500/15 text-purple-300' : 'bg-amber-500/15 text-amber-300'}`}>
+                              {item.fonte === 'caixa' ? 'caixa' : 'competência'}
+                            </span>
+                          </span>
+                        </td>
                         <td className="py-2 px-3 text-right text-emerald-400">{formatCurrencyShort(item.faturamento)}</td>
                         <td className="py-2 px-3 text-right text-red-400">{formatCurrencyShort(item.despesas)}</td>
                         <td className={`py-2 px-3 text-right font-semibold ${item.geracaoCaixa >= 0 ? 'text-blue-400' : 'text-red-500'}`}>
@@ -1155,8 +1168,8 @@ export default function InvestorsReport() {
                         <td className={`py-2 px-3 text-right ${item.margem >= 0 ? 'text-green-400' : 'text-red-400'}`}>
                           {item.margem}%
                         </td>
-                        <td className={`py-2 px-3 text-right font-medium ${item.caixaAcumulado >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
-                          {formatCurrencyShort(item.caixaAcumulado)}
+                        <td className={`py-2 px-3 text-right font-medium ${item.caixaAcumulado == null ? 'text-muted-foreground' : item.caixaAcumulado >= 0 ? 'text-purple-400' : 'text-red-400'}`}>
+                          {item.caixaAcumulado == null ? '—' : formatCurrencyShort(item.caixaAcumulado)}
                         </td>
                       </tr>
                     ))}
