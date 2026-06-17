@@ -883,9 +883,16 @@ export default function InvestorsReport() {
           {/* Caixa Acumulado */}
           <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-                <TrendingUp className="h-5 w-5 text-purple-400" />
-                Geração de Caixa por Mês
+              <CardTitle className="text-base font-medium flex items-center justify-between gap-2 text-foreground">
+                <span className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-purple-400" />
+                  Geração de Caixa por Mês
+                </span>
+                {geracaoCaixaData?.series?.length ? (
+                  <Badge variant="outline" className="border-purple-500/50 text-purple-400 px-3 py-1">
+                    Acumulado {geracaoCaixaData.ano}: {formatCurrency(geracaoCaixaData.series[geracaoCaixaData.series.length - 1].caixaAcumulado)}
+                  </Badge>
+                ) : null}
               </CardTitle>
               <CardDescription className="text-muted-foreground">
                 Regime de caixa (DFC) — gerado por mês em {geracaoCaixaData?.ano ?? new Date().getFullYear()}
