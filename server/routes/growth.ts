@@ -3724,7 +3724,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const sessoes = ga4.byPlatform.google_ads;
       // Padrão GA4 (igual aos outros canais)
       const visualizacoesPagina = ga4.byPlatformPageViews.google_ads;
-      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+      // Connect Rate = VdP ÷ Cliques (não exibido no Aprofundado do Google, mas
+      // mantido idêntico a TikTok/LinkedIn Ads p/ consistência).
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
         investimento,
@@ -4009,6 +4011,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.warn('[orcado-realizado/instagram] posts count failed:', err?.message || err);
       }
 
+      // Chegou no site (GA4 — bucket orgânico do Instagram)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.organico_instagram;
+      const visualizacoesPagina = ga4.byPlatformPageViews.organico_instagram;
+
       res.json({
         postsPublicados,
         comecaramSeguir, deixaramSeguir, percPerdaSeguidores,
@@ -4024,6 +4031,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cliquesPorDominio,
         leadsPorOrigem,
         investimentoPago,
+        // Chegou no site (GA4 orgânico do Instagram)
+        sessoes,
+        visualizacoesPagina,
+        sessoesAvailable: ga4.available,
         hasConnection: true,
         snapshotCount: snapshots.length,
       });
@@ -4115,6 +4126,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const somaViews = parseFloat(rr.soma_views) || 0;
       const retencaoMedia = somaViews > 0 ? (parseFloat(rr.soma_pond) / somaViews) / 100 : 0;
 
+      // Engajamento do canal = (curtidas + comentários + compartilhamentos) ÷ views,
+      // espelhando o % Engajamento do Instagram (Interações ÷ alcance/views).
+      const ytCurtidas = parseInt(d.curtidas) || 0;
+      const ytComentarios = parseInt(d.comentarios) || 0;
+      const ytShares = parseInt(d.compartilhamentos) || 0;
+      const ytInteracoes = ytCurtidas + ytComentarios + ytShares;
+      const engajamento = visualizacoes > 0 ? ytInteracoes / visualizacoes : 0;
+
+      // Chegou no site (GA4 — bucket orgânico do YouTube)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.organico_youtube;
+      const visualizacoesPagina = ga4.byPlatformPageViews.organico_youtube;
+
       res.json({
         // Audiência (espelha o breakdown de seguidores do Instagram, seguidor → inscrito)
         comecaramInscrever: subsGained,
@@ -4126,15 +4150,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         // compat com consumidores antigos
         inscritos,
         ganhoLiquidoInscritos: deltaInscritos,
-        // Conteúdo / distribuição
+        // Conteúdo / distribuição / qualidade
         visualizacoes,
         horasAssistidas: Math.round(minutos / 60),
         avgViewDuration,
         retencaoMedia,
-        curtidas: parseInt(d.curtidas) || 0,
-        comentarios: parseInt(d.comentarios) || 0,
-        compartilhamentos: parseInt(d.compartilhamentos) || 0,
+        curtidas: ytCurtidas,
+        comentarios: ytComentarios,
+        compartilhamentos: ytShares,
+        interacoes: ytInteracoes,
+        engajamento,
         videosPublicados: parseInt((vRes.rows[0] as any).n) || 0,
+        // Chegou no site (GA4 orgânico do YouTube)
+        sessoes,
+        visualizacoesPagina,
+        sessoesAvailable: ga4.available,
         hasConnection: canais > 0,
       });
     } catch (error) {
@@ -4221,6 +4251,18 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const percPerdaSeguidores = (comecaramSeguir + deixaramSeguir) > 0
         ? deixaramSeguir / (comecaramSeguir + deixaramSeguir) : 0;
 
+      // Engajamento do canal = (curtidas + comentários + compartilhamentos) ÷ views,
+      // espelhando o % Engajamento do Instagram (Interações ÷ Alcance). No TikTok as
+      // views são o análogo do alcance.
+      const visualizacoes = parseInt(v.visualizacoes) || 0;
+      const interacoes = (parseInt(v.curtidas) || 0) + (parseInt(v.comentarios) || 0) + (parseInt(v.compartilhamentos) || 0);
+      const engajamento = visualizacoes > 0 ? interacoes / visualizacoes : 0;
+
+      // Estágio "chegou no site" via GA4 (bucket orgânico do TikTok)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.organico_tiktok;
+      const visualizacoesPagina = ga4.byPlatformPageViews.organico_tiktok;
+
       res.json({
         // Audiência (espelha o breakdown de seguidores do Instagram/YouTube/LinkedIn)
         comecaramSeguir,
@@ -4232,10 +4274,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         // compat
         seguidores: totalSeguidores,
         crescimentoSeguidores: deltaSeguidores,
-        // Distribuição
-        visualizacoes: parseInt(v.visualizacoes) || 0,
+        // Distribuição + engajamento
+        visualizacoes,
         compartilhamentos: parseInt(v.compartilhamentos) || 0,
         videosPublicados: parseInt((vpubRes.rows[0] as any).n) || 0,
+        interacoes,
+        engajamento,
+        // Chegou no site (GA4 orgânico do TikTok)
+        sessoes,
+        visualizacoesPagina,
+        sessoesAvailable: ga4.available,
         // vaidade (não exibidos, mantidos por compat)
         curtidas: parseInt(v.curtidas) || 0,
         comentarios: parseInt(v.comentarios) || 0,
@@ -4277,7 +4325,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.tiktok_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.tiktok_ads;
-      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (TikTok), alinhado à
+      // definição clássica de mídia (landing page views ÷ cliques). TikTok não expõe
+      // landing_page_views nativo, então o pageviews do GA4 é o proxy mais fiel.
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
         investimento,
@@ -4346,7 +4397,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.linkedin_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.linkedin_ads;
-      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (LinkedIn), alinhado à
+      // definição clássica de mídia (landing page views ÷ cliques) e ao TikTok Ads.
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
         investimento,
@@ -4476,6 +4529,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.warn('[orcado-realizado/linkedin] posts count failed:', err?.message || err);
       }
 
+      // Chegou no site (GA4 — bucket orgânico do LinkedIn)
+      const ga4Li = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+
       res.json({
         postsPublicados,
         // Audiência (espelha o breakdown de seguidores do Instagram/YouTube)
@@ -4498,6 +4554,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         reacoes: parseInt(s.reacoes) || 0,
         comentarios: parseInt(s.comentarios) || 0,
         compartilhamentos: parseInt(s.compartilhamentos) || 0,
+        // Chegou no site (GA4 orgânico do LinkedIn)
+        sessoes: ga4Li.byPlatform.organico_linkedin,
+        visualizacoesPagina: ga4Li.byPlatformPageViews.organico_linkedin,
+        sessoesAvailable: ga4Li.available,
         hasConnection: orgs > 0,
       });
     } catch (error) {
