@@ -175,3 +175,51 @@ export function montarLinhasPontual(
 
   return linhas;
 }
+
+export interface RegPontualItem extends RegPontual {
+  cliente: string;
+  squad?: string;
+}
+
+export type CategoriaPonte = "venda" | "entrega" | "churn" | "deletados" | "saida_atipica" | "reajuste";
+
+export interface ItemPonte {
+  idSubtask: string;
+  cliente: string;
+  status: string;
+  valor: number;
+  detalhe: string;
+}
+
+const brl = (v: number) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
+
+// Mesma classificação de classificarPonte, mas emitindo os contratos de cada categoria de movimento.
+export function classificarPonteItens(
+  ant: RegPontualItem[],
+  atual: RegPontualItem[],
+): Record<CategoriaPonte, ItemPonte[]> {
+  const antMap = new Map(ant.map((r) => [r.idSubtask, r]));
+  const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
+  const out: Record<CategoriaPonte, ItemPonte[]> = {
+    venda: [], entrega: [], churn: [], deletados: [], saida_atipica: [], reajuste: [],
+  };
+  for (const r of ant) {
+    if (!ehEstoquePontual(r)) continue;
+    const a = atualMap.get(r.idSubtask);
+    if (!a) { out.deletados.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: r.status, valor: r.valorp, detalhe: "sumiu do snapshot" }); continue; }
+    if (ehEstoquePontual(a)) {
+      const delta = a.valorp - r.valorp;
+      if (delta !== 0) out.reajuste.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: a.status, valor: delta, detalhe: `${brl(r.valorp)} → ${brl(a.valorp)}` });
+      continue;
+    }
+    if (a.status === "entregue") out.entrega.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: a.status, valor: r.valorp, detalhe: "" });
+    else if (CHURN_STATUS.has(a.status)) out.churn.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: a.status, valor: r.valorp, detalhe: "" });
+    else out.saida_atipica.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: a.status, valor: r.valorp, detalhe: `valorp ${brl(a.valorp)}` });
+  }
+  for (const r of atual) {
+    if (!ehEstoquePontual(r)) continue;
+    const prev = antMap.get(r.idSubtask);
+    if (!prev || !ehEstoquePontual(prev)) out.venda.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: r.status, valor: r.valorp, detalhe: "" });
+  }
+  return out;
+}

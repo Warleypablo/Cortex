@@ -5,6 +5,7 @@ import {
   decomporStatus,
   montarLinhasPontual,
 } from "./bp2026.pontual.helpers";
+import { classificarPonteItens } from "./bp2026.pontual.helpers";
 
 const ant = [
   { idSubtask: "A", valorp: 1000, status: "ativo" },        // permanece (reajuste +100)
@@ -93,5 +94,44 @@ describe("montarLinhasPontual", () => {
     expect(by("pontual_estoque_ini").ytd.realizado).toBe(2150);
     expect(by("pontual_venda").ytd.realizado).toBe(700);
     expect(by("pontual_estoque_fim").ytd.realizado).toBe(1800);
+  });
+});
+
+describe("classificarPonteItens", () => {
+  const antI = [
+    { idSubtask: "A", valorp: 1000, status: "ativo", cliente: "Cli A" },
+    { idSubtask: "B", valorp: 500, status: "triagem", cliente: "Cli B" },
+    { idSubtask: "C", valorp: 300, status: "pausado", cliente: "Cli C" },
+    { idSubtask: "D", valorp: 200, status: "ativo", cliente: "Cli D" },
+    { idSubtask: "E", valorp: 100, status: "entregue", cliente: "Cli E" },
+    { idSubtask: "G", valorp: 150, status: "ativo", cliente: "Cli G" },
+  ];
+  const atualI = [
+    { idSubtask: "A", valorp: 1100, status: "ativo", cliente: "Cli A" },
+    { idSubtask: "B", valorp: 500, status: "entregue", cliente: "Cli B" },
+    { idSubtask: "C", valorp: 300, status: "cancelado/inativo", cliente: "Cli C" },
+    { idSubtask: "G", valorp: 0, status: "ativo", cliente: "Cli G" },
+    { idSubtask: "F", valorp: 700, status: "triagem", cliente: "Cli F" },
+  ];
+  const out = classificarPonteItens(antI, atualI);
+  it("lista os contratos de cada categoria", () => {
+    expect(out.venda.map((i) => i.idSubtask)).toEqual(["F"]);
+    expect(out.entrega.map((i) => i.idSubtask)).toEqual(["B"]);
+    expect(out.churn.map((i) => i.idSubtask)).toEqual(["C"]);
+    expect(out.deletados.map((i) => i.idSubtask)).toEqual(["D"]);
+    expect(out.saida_atipica.map((i) => i.idSubtask)).toEqual(["G"]);
+    expect(out.reajuste.map((i) => i.idSubtask)).toEqual(["A"]);
+    expect(out.reajuste[0].valor).toBe(100);
+    expect(out.venda[0].valor).toBe(700);
+    expect(out.entrega[0].valor).toBe(500);
+  });
+  it("soma dos itens por categoria casa com classificarPonte", () => {
+    const sum = (a: { valor: number }[]) => a.reduce((s, i) => s + i.valor, 0);
+    expect(sum(out.venda)).toBe(700);
+    expect(sum(out.entrega)).toBe(500);
+    expect(sum(out.churn)).toBe(300);
+    expect(sum(out.deletados)).toBe(200);
+    expect(sum(out.saida_atipica)).toBe(150);
+    expect(sum(out.reajuste)).toBe(100);
   });
 });
