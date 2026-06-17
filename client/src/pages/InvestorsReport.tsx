@@ -229,12 +229,14 @@ export default function InvestorsReport() {
   }, [churnChartData]);
 
   const annualSummary = useMemo(() => {
-    const byYear: Record<string, { faturamento: number; despesas: number; geracaoCaixa: number; meses: number }> = {};
-    
+    const byYear: Record<string, { faturamento: number; despesas: number; geracaoCaixa: number; meses: number; fonte: 'caixa' | 'competencia' }> = {};
+
     filteredData.forEach(item => {
       const year = item.mes.split('-')[0];
       if (!byYear[year]) {
-        byYear[year] = { faturamento: 0, despesas: 0, geracaoCaixa: 0, meses: 0 };
+        // Regime do ano: como o corte é no início de 2026, todos os meses de um ano
+        // compartilham a mesma fonte; o 1º item define o regime do ano.
+        byYear[year] = { faturamento: 0, despesas: 0, geracaoCaixa: 0, meses: 0, fonte: item.fonte };
       }
       byYear[year].faturamento += item.faturamento;
       byYear[year].despesas += item.despesas;
@@ -330,9 +332,10 @@ export default function InvestorsReport() {
     return idx > 0 ? chartDataWithMetrics[idx].mesLabel : null;
   }, [chartDataWithMetrics]);
 
-  // O gráfico de Margem mostra SÓ o regime de caixa (2026+). A margem de competência
-  // (pré-2026) usa outra metodologia e poluía a série com picos não comparáveis.
-  const margemChartData = useMemo(
+  // Subconjunto SÓ do regime de caixa (2026+) — usado pelos gráficos de Margem e
+  // Receita vs Despesas. A série de competência (pré-2026) usa outra metodologia e
+  // não é comparável (faturado × recebido).
+  const caixaChartData = useMemo(
     () => chartDataWithMetrics.filter(item => item.fonte === 'caixa'),
     [chartDataWithMetrics]
   );
@@ -809,13 +812,13 @@ export default function InvestorsReport() {
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
-              ) : !margemChartData.length ? (
+              ) : !caixaChartData.length ? (
                 <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado no período
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={margemChartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <ComposedChart data={caixaChartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
                     <defs>
                       <linearGradient id="gradientMargem" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
@@ -888,22 +891,22 @@ export default function InvestorsReport() {
                 <BarChart3 className="h-5 w-5 text-blue-400" />
                 Receita vs Despesas
               </CardTitle>
-              <CardDescription className="text-muted-foreground">Comparativo mensal</CardDescription>
+              <CardDescription className="text-muted-foreground">Comparativo mensal — regime de caixa (2026)</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
-              ) : !chartDataWithMetrics.length ? (
+              ) : !caixaChartData.length ? (
                 <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado no período
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={chartDataWithMetrics} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <ComposedChart data={caixaChartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
                     <XAxis dataKey="mesLabel" tick={{ fontSize: 10, fill: '#94a3b8' }} />
                     <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => formatCurrencyShort(v)} />
-                    <Tooltip 
+                    <Tooltip
                       formatter={(value: number, name: string) => [formatCurrency(value), name]}
                       contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
                       labelStyle={{ color: '#f8fafc' }}
@@ -1101,7 +1104,7 @@ export default function InvestorsReport() {
               <Calendar className="h-5 w-5 text-blue-400" />
               Resumo por Ano
             </CardTitle>
-            <CardDescription className="text-muted-foreground">Totais consolidados</CardDescription>
+            <CardDescription className="text-muted-foreground">Totais consolidados • competência até 2025 · caixa em 2026</CardDescription>
           </CardHeader>
           <CardContent>
             {isLoading ? (
@@ -1126,7 +1129,14 @@ export default function InvestorsReport() {
                   <tbody className="divide-y divide-border">
                     {annualSummary.map((item) => (
                       <tr key={item.year} className="hover:bg-muted/50 transition-colors" data-testid={`resumo-anual-${item.year}`}>
-                        <td className="py-3 px-4 font-bold text-xl text-foreground">{item.year}</td>
+                        <td className="py-3 px-4 font-bold text-xl text-foreground">
+                          <span className="inline-flex items-center gap-2">
+                            {item.year}
+                            <span className={`text-[10px] font-normal px-1.5 py-0.5 rounded ${item.fonte === 'caixa' ? 'bg-purple-500/15 text-purple-300' : 'bg-amber-500/15 text-amber-300'}`}>
+                              {item.fonte === 'caixa' ? 'caixa' : 'competência'}
+                            </span>
+                          </span>
+                        </td>
                         <td className="py-3 px-4 text-center">
                           <Badge variant="secondary">{item.meses}</Badge>
                         </td>
