@@ -14,7 +14,7 @@ const FONTE_BITRIX = "Bitrix CRM — deals em 'Negócio Ganho' por data de fecha
 const FONTE_CAZ_CAIXA = "Conta Azul — parcelas de despesa QUITADAS por data de quitação (regime caixa)";
 const FONTE_CAZ_COMP = "Conta Azul — parcelas de receita por data de competência";
 const FONTE_INHIRE = "Inhire — rh_pessoal, ativos no fim do mês (admissão ≤ fim do mês < demissão)";
-const FONTE_CHURN = "ClickUp — vw_cup_churn_ajustado por data de solicitação de encerramento (churn bruto, alinhado ao gráfico 'Churn Commerce MoM' do ClickUp; inclui abonados e todos os motivos)";
+const FONTE_CHURN = "ClickUp — vw_cup_churn_ajustado por data de solicitação de encerramento (churn bruto, alinhado ao gráfico 'Churn Commerce MoM' do ClickUp; inclui abonados e todos os motivos, mas só status de churn real — cancelado/inativo e em cancelamento; exclui 'entregue' e 'pausado')";
 
 // linhas de serviço da Revenue (mesmo CASE de produto da agregação)
 const LINHAS_SERVICO: Record<string, string> = {

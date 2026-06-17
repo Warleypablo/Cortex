@@ -210,6 +210,7 @@ async function detChurn(
     WHERE EXTRACT(YEAR FROM data_solicitacao_encerramento) = ${ANO}
       AND EXTRACT(MONTH FROM data_solicitacao_encerramento) = ${mes}
       AND valor_r > 0
+      AND status IN ('cancelado/inativo', 'em cancelamento')
     ORDER BY valor DESC
   `);
   const rows = (result.rows as any[]).filter((r) => (linhaProduto ? r.linha === linhaProduto : true));
