@@ -14,6 +14,8 @@ import { eq, desc, sql, inArray, and, asc } from "drizzle-orm";
 const EXTERNAL_USER_PASSWORDS: Record<string, string> = {
   'ajame@icloud.com': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
   'warleyreserva4@gmail.com': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
+  'gilvan.badke@emeg.vix.br': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
+  'elindenberg@redegazeta.com.br': '$2b$10$fCajbl5u9ulRxVQSthFoUuEmH/qlxSnFWM6YaJlM2HkNHJa1BJ7Z6',
 };
 
 async function logAuthEvent(params: {
