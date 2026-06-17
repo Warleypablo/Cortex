@@ -885,10 +885,10 @@ export default function InvestorsReport() {
             <CardHeader className="pb-2">
               <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
                 <TrendingUp className="h-5 w-5 text-purple-400" />
-                Geração de Caixa Acumulada
+                Geração de Caixa por Mês
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                Regime de caixa (DFC) — acumulado em {geracaoCaixaData?.ano ?? new Date().getFullYear()}
+                Regime de caixa (DFC) — gerado por mês em {geracaoCaixaData?.ano ?? new Date().getFullYear()}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -916,8 +916,8 @@ export default function InvestorsReport() {
                       labelStyle={{ color: '#f8fafc' }}
                     />
                     <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} />
-                    <Area type="monotone" dataKey="caixaAcumulado" stroke="#8b5cf6" fill="url(#gradientCaixa)" strokeWidth={0} name="Caixa Acumulado" />
-                    <Line type="monotone" dataKey="caixaAcumulado" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6' }} activeDot={{ r: 5 }} name="Caixa Acumulado" />
+                    <Area type="monotone" dataKey="geracaoMes" stroke="#8b5cf6" fill="url(#gradientCaixa)" strokeWidth={0} name="Geração no Mês" />
+                    <Line type="monotone" dataKey="geracaoMes" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6' }} activeDot={{ r: 5 }} name="Geração no Mês" />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
