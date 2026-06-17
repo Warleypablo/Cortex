@@ -100,9 +100,12 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
            ${CASE_PRODUTO_CHURN} AS linha,
            SUM(valor_r) AS total
     FROM cortex_core.vw_cup_churn_ajustado
-    -- churn BRUTO (alinhado ao gráfico "Churn Commerce MoM" do ClickUp): sem excluir abonados nem motivos inválidos
+    -- churn BRUTO (alinhado ao gráfico "Churn Commerce MoM" do ClickUp): inclui abonados e todos os motivos,
+    -- mas conta só status de churn real (cancelado/inativo + em cancelamento); 'entregue' (pontual concluído)
+    -- e 'pausado' (pausa, não cancelamento) NÃO são churn e ficam de fora.
     WHERE data_solicitacao_encerramento >= '2026-01-01' AND data_solicitacao_encerramento < '2027-01-01'
       AND valor_r > 0
+      AND status IN ('cancelado/inativo', 'em cancelamento')
     GROUP BY 1, 2
     ORDER BY 1
   `);
