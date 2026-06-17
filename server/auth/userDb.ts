@@ -318,6 +318,11 @@ function migrateAllowedRoutes(routes: string[] | null): string[] {
 }
 
 function dbUserToUser(dbUser: typeof authUsers.$inferSelect): User {
+  // Usuários externos (investidores, login sem Google) ficam restritos ao
+  // Investors Report — não recebem os auto-adds (E-NPS, sugestões, etc.) da
+  // migração de rotas. Admins externos (ex.: warleyreserva) seguem normais.
+  const isExternal = (dbUser.googleId || '').startsWith('external-');
+  const isAdmin = dbUser.role === 'admin';
   return {
     id: dbUser.id,
     googleId: dbUser.googleId,
@@ -326,7 +331,9 @@ function dbUserToUser(dbUser: typeof authUsers.$inferSelect): User {
     picture: dbUser.picture || '',
     createdAt: dbUser.createdAt?.toISOString() || new Date().toISOString(),
     role: dbUser.role as 'admin' | 'user',
-    allowedRoutes: migrateAllowedRoutes(dbUser.allowedRoutes),
+    allowedRoutes: (isExternal && !isAdmin)
+      ? EXTERNAL_USER_ROUTES
+      : migrateAllowedRoutes(dbUser.allowedRoutes),
     department: (dbUser.department as 'admin' | 'comercial' | 'financeiro' | 'operacao') || null,
   };
 }
