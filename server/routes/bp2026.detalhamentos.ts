@@ -6,12 +6,14 @@ import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd, type MesValor } from "./bp2026.helpers";
 import { PREDICADOS_DESPESA, PREDICADOS_SGA_SUB, PREDICADOS_OUTRAS_SUB, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { somaDespesaCaixaPorMes } from "./bp2026";
+import { ratearSeriePorPeso, participacaoPct, razaoYtd } from "./bp2026.cac.helpers";
 
 interface MesLinha extends MesValor { atingimento: number | null }
 interface Linha {
   metrica: string; titulo: string; tipoAgregacao: "fluxo" | "estoque";
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
   unidade?: "brl" | "int" | "pct" | "dec"; nota?: string; destaque?: boolean;
+  grupo?: string; subItem?: boolean; semDetalhe?: boolean;
   meses: MesLinha[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -34,6 +36,8 @@ interface Deps {
   vendasMrrPorMes: Record<number, number>;
   pontualPorMes: Record<number, number>;
   ganhosPorMes: Record<number, number>; // deals ganhos (MRR ou pontual) — proxy de clientes adquiridos
+  // realizado de contratos recorrentes vendidos por produto (slug -> série 12 meses, null no futuro)
+  contratosVendidosRec: Record<string, (number | null)[]>;
   mesCorrente: number;
   mesFechado: number;
 }
@@ -52,6 +56,18 @@ const NOTA_COMISSOES = "Inclui Indique e Ganhe (06.04.05).";
 const NOTA_CAC_OUTRAS =
   "Categorias que entram no CAC do DRE mas não têm linha no BP " +
   "(Outras Despesas Comerciais, Patrocínios).";
+
+const NOTA_CAC_PRODUTO =
+  "CAC total do mês rateado pela participação do produto nos contratos recorrentes " +
+  "vendidos (Bitrix). Soma dos produtos = CAC total. Pontual não recebe bucket próprio.";
+
+const PRODUTOS_CAC: { slug: string; titulo: string }[] = [
+  { slug: "performance", titulo: "Performance" },
+  { slug: "creators", titulo: "Creators" },
+  { slug: "social", titulo: "Social" },
+  { slug: "gc", titulo: "Gestão de Comunidade" },
+  { slug: "others", titulo: "Others" },
+];
 
 const SUB_CAC: { metrica: string; titulo: string; predicado: keyof typeof PREDICADOS_CAC_SUB; nota?: string; semOrcado?: boolean }[] = [
   { metrica: "cac_pre_vendas", titulo: "Pré Vendas", predicado: "cac_pre_vendas" },
@@ -78,7 +94,7 @@ const SUB_SGA: DefSub[] = [
 ];
 
 export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; cac: Linha[]; outrasReceitas: Linha[] }> {
-  const { db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, mesCorrente, mesFechado } = deps;
+  const { db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec, mesCorrente, mesFechado } = deps;
 
   const mensal = (porMes: Record<number, number>) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? porMes[i + 1] ?? 0 : null));
@@ -241,5 +257,55 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     (m) => orcado["outras_receitas"]?.[m] ?? 0
   );
 
-  return { sga: [sgaTotal, ...sgaLinhas], cac: [cacTotal, ...cacLinhas, cacPorCliente, cacPctReceita, cacPayback], outrasReceitas: [orTotal, variavelL, stackL, demaisL] };
+  // ---- linha-filha "% do CAC total" sob cada sub-linha de custo ----
+  const cacOrcSerie = Array.from({ length: 12 }, (_, i) => cacOrcMes(i + 1));
+  const subOrcSerie = (def: typeof SUB_CAC[number]) =>
+    Array.from({ length: 12 }, (_, i) => (def.semOrcado ? 0 : orcado[def.metrica]?.[i + 1] ?? 0));
+
+  const cacLinhasComPct: Linha[] = [];
+  SUB_CAC.forEach((def, k) => {
+    cacLinhasComPct.push(cacLinhas[k]);
+    const pctReal = participacaoPct(cacSeries[k], cacTotalSerie);
+    const orcDoMes = subOrcSerie(def);
+    const pctChild: Linha = {
+      ...fazLinha(
+        { metrica: `${def.metrica}_pct_total`, titulo: "↳ % do CAC total", direcao: "neutro", unidade: "pct" },
+        pctReal,
+        (m) => razao(orcDoMes[m - 1], cacOrcSerie[m - 1]) ?? 0,
+        mesFechado === 0 ? undefined : {
+          orcado: razaoYtd(orcDoMes, cacOrcSerie, mesFechado) ?? 0,
+          realizado: razaoYtd(cacSeries[k], cacTotalSerie, mesFechado),
+        },
+      ),
+      subItem: true,
+      semDetalhe: true,
+    };
+    // linha de composição: sem semântica de meta
+    pctChild.meses = pctChild.meses.map((m) => ({ ...m, atingimento: null }));
+    pctChild.ytd = { ...pctChild.ytd, atingimento: null };
+    cacLinhasComPct.push(pctChild);
+  });
+
+  // ---- bloco "CAC por Produto": rateio do CAC pelos contratos vendidos ----
+  const orcContratos: Record<string, (number | null)[]> = {};
+  for (const p of PRODUTOS_CAC) {
+    orcContratos[p.slug] = Array.from({ length: 12 }, (_, i) => orcado[`contratos_vendidos_mrr_${p.slug}`]?.[i + 1] ?? 0);
+  }
+  const allocReal = ratearSeriePorPeso(cacTotalSerie, contratosVendidosRec);
+  const allocOrc = ratearSeriePorPeso(cacOrcSerie, orcContratos);
+  const cacPorProduto: Linha[] = PRODUTOS_CAC.map((p) => ({
+    ...fazLinha(
+      { metrica: `cac_produto_${p.slug}`, titulo: p.titulo, direcao: "menor_melhor", nota: NOTA_CAC_PRODUTO },
+      allocReal[p.slug],
+      (m) => allocOrc[p.slug][m - 1] ?? 0,
+    ),
+    grupo: "CAC por Produto",
+    semDetalhe: true,
+  }));
+
+  return {
+    sga: [sgaTotal, ...sgaLinhas],
+    cac: [cacTotal, ...cacLinhasComPct, cacPorCliente, cacPctReceita, cacPayback, ...cacPorProduto],
+    outrasReceitas: [orTotal, variavelL, stackL, demaisL],
+  };
 }

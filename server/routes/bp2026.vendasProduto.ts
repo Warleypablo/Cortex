@@ -40,6 +40,7 @@ interface Deps {
   orcado: Record<string, Record<number, number>>;
   mesCorrente: number;
   mesFechado: number;
+  atrib?: AtribuicaoVendas; // reaproveita a atribuição já carregada pelo handler
 }
 
 // ---- Carregamento compartilhado: deals + mix ClickUp + AOV médio (usado pela
@@ -145,7 +146,7 @@ export async function carregarAtribuicaoVendas(db: any): Promise<AtribuicaoVenda
 export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
   const { db, orcado, mesCorrente, mesFechado } = deps;
 
-  const { deals, prMix, mixRec, mixPont, aovRec, aovPont } = await carregarAtribuicaoVendas(db);
+  const { deals, prMix, mixRec, mixPont, aovRec, aovPont } = deps.atrib ?? await carregarAtribuicaoVendas(db);
   const agg = agregarVendasProduto(deals, prMix, mixRec, mixPont, aovRec, aovPont);
 
   const serie = (f: (m: number) => number | null) =>
