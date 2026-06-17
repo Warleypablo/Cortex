@@ -3591,51 +3591,41 @@ Estruture sua resposta em:
     }
   });
 
-  // Geração de caixa acumulada (regime de CAIXA, base DFC) — ano corrente.
-  // Reaproveita EXATAMENTE a linha de geração de caixa da DFC (storage.getDfc):
-  // caz_parcelas, status QUITADO, por data_quitacao, valor_pago−desconto,
-  // RECEITAS (cat. 03/04) − DESPESAS (cat. 05/06/07/08), incluindo o ajuste de
-  // conciliação (cat. 09) que a DFC injeta sob DESPESAS. Garante paridade 100%
-  // com a tela /dfc. Independe do seletor de período da página: sempre vai de
-  // janeiro do ano corrente até o último mês FECHADO (exclui o mês parcial atual).
+  // Geração de caixa acumulada (regime de CAIXA) — ano corrente.
+  // Usa a MESMA base caixa da série de Receita vs Despesas: caz_parcelas.valor_pago
+  // por data_quitacao, RECEITA − DESPESA por tipo_evento. Assim geracaoMes reconcilia
+  // por construção com (faturamento − despesas) do gráfico de Receita vs Despesas.
+  // (Antes usava storage.getDfc, que injetava um ajuste de conciliação artificial.)
+  // Vai de janeiro do ano corrente até o último mês FECHADO (exclui o mês parcial atual).
   app.get("/api/investors-report/geracao-caixa", async (_req, res) => {
     try {
       const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      const hoje = new Date();
-      const ano = hoje.getFullYear();
+      const ano = new Date().getFullYear();
 
-      // Último mês fechado = último dia do mês anterior ao atual.
-      // (dia 0 do mês atual = último dia do mês anterior)
-      const fimMesAnterior = new Date(ano, hoje.getMonth(), 0);
-
-      // Se estamos em janeiro, ainda não há mês fechado neste ano → série vazia.
-      if (fimMesAnterior.getFullYear() < ano) {
-        return res.json({ ano, series: [] });
-      }
-
-      const dataInicio = `${ano}-01-01`;
-      const dataFim = `${fimMesAnterior.getFullYear()}-${String(fimMesAnterior.getMonth() + 1).padStart(2, '0')}-${String(fimMesAnterior.getDate()).padStart(2, '0')}`;
-      const mesFimStr = dataFim.substring(0, 7); // 'YYYY-MM'
-
-      const dfc = await storage.getDfc(dataInicio, dataFim);
-      const receitas = dfc.nodes.find((n) => n.categoriaId === 'RECEITAS');
-      const despesas = dfc.nodes.find((n) => n.categoriaId === 'DESPESAS');
-
-      // Meses do ano corrente até o último mês fechado, na ordem cronológica.
-      const mesesDoAno = dfc.meses
-        .filter((m) => m.startsWith(`${ano}-`) && m <= mesFimStr)
-        .sort();
+      const caixaResult = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_quitacao, 'YYYY-MM') as mes,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'RECEITA'), 0) as receita,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'DESPESA'), 0) as despesa
+        FROM "Conta Azul".caz_parcelas
+        WHERE data_quitacao >= ${`${ano}-01-01`}::date
+          AND data_quitacao < DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY 1
+        ORDER BY 1
+      `);
 
       let caixaAcumulado = 0;
-      const series = mesesDoAno.map((mes) => {
-        const rec = receitas?.valuesByMonth[mes] || 0;
-        const desp = Math.abs(despesas?.valuesByMonth[mes] || 0); // mesma fórmula da DFC (calculateMonthlyData)
-        const geracaoMes = rec - desp;
+      const series = (caixaResult.rows as any[]).map((r) => {
+        const receita = Number(r.receita) || 0;
+        const despesa = Number(r.despesa) || 0;
+        const geracaoMes = receita - despesa;
         caixaAcumulado += geracaoMes;
-        const month = parseInt(mes.split('-')[1], 10);
+        const month = parseInt(r.mes.split('-')[1], 10);
         return {
-          mes,
+          mes: r.mes,
           mesLabel: `${monthNames[month - 1]}/${String(ano).slice(2)}`,
+          receita,
+          despesa,
           geracaoMes,
           caixaAcumulado,
         };
