@@ -453,6 +453,33 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
     calculo: "Despesa CAC ÷ Vendas MRR do mês. YTD = Σ ÷ Σ.",
   },
 
+  // ===== Ponte do MRR (recorrente) =====
+  ponte_mrr_ini: {
+    definicao: "MRR ativo no fim do mês anterior (posição de abertura da ponte).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês anterior (status ativo/onboarding/triagem). Janeiro abre com dez/2025.",
+    calculo: "Soma de valorr da base ativa no snapshot anterior.",
+  },
+  ponte_mrr_vendas: {
+    definicao: "Novo MRR vendido no mês (new business).",
+    fonte: FONTE_BITRIX,
+    calculo: "Σ valor_recorrente dos deals ganhos no mês.",
+  },
+  ponte_mrr_churn: {
+    definicao: "MRR perdido por churn no mês (saída).",
+    fonte: FONTE_CHURN,
+    calculo: "Soma do churn bruto em R$ de todos os produtos no mês (sinal negativo na ponte).",
+  },
+  ponte_mrr_delta: {
+    definicao: "Ajuste que fecha a ponte: MRR não explicado (downgrades, reajustes, vendas não ativadas).",
+    fonte: "Derivada das demais linhas da ponte.",
+    calculo: "MRR final − MRR inicial − vendas + churn. Negativo quando houve vazamento de MRR.",
+  },
+  ponte_mrr_fim: {
+    definicao: "MRR ativo no fim do mês (posição de fechamento).",
+    fonte: FONTE_SNAPSHOT,
+    calculo: "MRR inicial + vendas − churn + Δ não explicado.",
+  },
+
   // ===== Pontual (movimento do estoque) =====
   pontual_estoque_ini: {
     definicao: "Valor do estoque de pontual no fim do mês anterior (posição de abertura).",
