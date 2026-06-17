@@ -3,10 +3,10 @@ import { computeEvolucaoChurn, type ChurnRow, type MrrFimRow } from './churn';
 
 describe('computeEvolucaoChurn', () => {
   it('calcula a taxa como churn do mês ÷ MRR do fim do mês anterior', () => {
-    const churn: ChurnRow[] = [{ mes: '2026-01', mrr_churn: '162431', qtd: '68' }];
-    const mrrFim: MrrFimRow[] = [{ mes: '2025-12', mrr_fim: '1030089' }];
+    const churn: ChurnRow[] = [{ mes: '2026-03', mrr_churn: '151063', qtd: '55' }];
+    const mrrFim: MrrFimRow[] = [{ mes: '2026-02', mrr_fim: '1139795' }];
     expect(computeEvolucaoChurn(churn, mrrFim)).toEqual([
-      { mes: '2026-01', mrrChurn: 162431, taxaChurn: 15.8, qtd: 68 },
+      { mes: '2026-03', mrrChurn: 151063, taxaChurn: 13.3, qtd: 55 },
     ]);
   });
 
