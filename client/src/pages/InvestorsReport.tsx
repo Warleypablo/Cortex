@@ -1081,7 +1081,7 @@ export default function InvestorsReport() {
                       <th className="text-center py-3 px-4 font-medium">Meses</th>
                       <th className="text-right py-3 px-4 font-medium">Faturamento</th>
                       <th className="text-right py-3 px-4 font-medium">Despesas</th>
-                      <th className="text-right py-3 px-4 font-medium">Geração Caixa</th>
+                      <th className="text-right py-3 px-4 font-medium">Resultado</th>
                       <th className="text-right py-3 px-4 font-medium">Margem</th>
                     </tr>
                   </thead>
@@ -1135,7 +1135,7 @@ export default function InvestorsReport() {
                       <th className="text-left py-2 px-3 font-medium">Mês</th>
                       <th className="text-right py-2 px-3 font-medium">Faturamento</th>
                       <th className="text-right py-2 px-3 font-medium">Despesas</th>
-                      <th className="text-right py-2 px-3 font-medium">Geração Caixa</th>
+                      <th className="text-right py-2 px-3 font-medium">Resultado</th>
                       <th className="text-right py-2 px-3 font-medium">Margem</th>
                       <th className="text-right py-2 px-3 font-medium">Acumulado</th>
                     </tr>
