@@ -52,6 +52,46 @@ export default function Documentacao() {
           então o garimpo trabalha o sinal quente (comentário + DM), que também é o mais qualificado.
         </p>
       </section>
+
+      <section className="rounded-lg border border-dashed border-blue-300 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4">
+        <div className="flex items-center gap-2 mb-2">
+          <span className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
+            Roadmap
+          </span>
+          <span className="text-xs text-gray-500 dark:text-zinc-400">próximas implementações</span>
+        </div>
+        <p className="mb-3">
+          A meta é ampliar o garimpo para além de comentário/DM, capturando todos os sinais de
+          engajamento — no espírito do protótipo{" "}
+          <a
+            href="https://garimpo-engajamento.vercel.app/"
+            target="_blank"
+            rel="noreferrer"
+            className="text-blue-600 dark:text-blue-400 hover:underline"
+          >
+            garimpo-engajamento
+          </a>
+          .
+        </p>
+        <ul className="list-disc pl-5 space-y-2">
+          <li>
+            <strong>Capturar curtidas (quem curtiu)</strong> — identificar nominalmente quem curtiu cada
+            post e trazer esses perfis para o funil, não só quem comentou/mandou DM.
+          </li>
+          <li>
+            <strong>Capturar novos seguidores (quem seguiu)</strong> — usar o "passou a seguir" como sinal
+            de interesse para alimentar a fila de prospecção.
+          </li>
+          <li>
+            <strong>Lead scoring enriquecido</strong> — incorporar esses novos sinais (curtida, seguir,
+            salvar, compartilhar) ao score 0–100, refinando a priorização da fila e a temperatura do lead.
+          </li>
+        </ul>
+        <p className="mt-3 text-xs text-gray-500 dark:text-zinc-400">
+          Depende de um mecanismo de captura além da API oficial (que não entrega curtidas/seguidores
+          nominalmente) — a definir.
+        </p>
+      </section>
     </div>
   );
 }
