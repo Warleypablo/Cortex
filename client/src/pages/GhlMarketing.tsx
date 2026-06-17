@@ -884,7 +884,30 @@ type SortKey =
   | "delivered"
   | "delivery_pct"
   | "open_pct"
-  | "conversations_generated";
+  | "conversations_generated"
+  | "oportunidades"
+  | "meetings_scheduled"
+  | "ganhos"
+  | "receita"
+  | "aov"
+  | "spend_brl"
+  | "cac";
+
+// Opções do seletor "Ordenar por" — toda métrica da tabela, com maior/menor via o toggle de direção.
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "date", label: "Data" },
+  { key: "list_size", label: "Base (lista)" },
+  { key: "delivery_pct", label: "Taxa de entrega" },
+  { key: "open_pct", label: "Taxa de abertura" },
+  { key: "conversations_generated", label: "Conversas" },
+  { key: "oportunidades", label: "Oportunidades" },
+  { key: "meetings_scheduled", label: "Reuniões" },
+  { key: "ganhos", label: "Ganhos" },
+  { key: "receita", label: "Receita" },
+  { key: "aov", label: "Ticket médio (AOV)" },
+  { key: "spend_brl", label: "Gasto" },
+  { key: "cac", label: "CAC" },
+];
 
 function BibliotecaTab({ from, to }: { from: string; to: string }) {
   const [channel, setChannel] = useState<string>("all");
@@ -931,12 +954,20 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
 
   // Ordenação local (em cima da página atual, já que a paginação é no servidor por data desc)
+  // AOV e CAC são derivados (não são campos da linha) — resolvidos aqui pra serem ordenáveis.
+  const sortValueOf = (b: BroadcastRow, k: SortKey): number | string | null => {
+    if (k === "aov") return b.ganhos && b.receita ? b.receita / b.ganhos : null;
+    if (k === "cac") return b.ganhos && b.spend_brl != null ? b.spend_brl / b.ganhos : null;
+    return (b as any)[k];
+  };
+
   const sorted = useMemo(() => {
     if (!data?.broadcasts) return [];
     const rows = [...data.broadcasts];
     rows.sort((a, b) => {
-      const av = (a as any)[sortKey];
-      const bv = (b as any)[sortKey];
+      const av = sortValueOf(a, sortKey);
+      const bv = sortValueOf(b, sortKey);
+      // Nulos (— na tabela) sempre por último, independente da direção.
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
       if (bv == null) return -1;
@@ -1085,88 +1116,109 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
         </CardContent>
       </Card>
 
-      {/* Filtros */}
+      {/* Lista de broadcasts — filtros (canal/busca) e ordenação integrados no header */}
       <Card>
-        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-          <div>
-            <Label className="text-xs">Canal</Label>
-            <Select value={channel} onValueChange={setChannel}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="Email">Email</SelectItem>
-                <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="md:col-span-2">
-            <Label className="text-xs">Busca (nome, assunto ou corpo)</Label>
-            <div className="flex gap-1">
-              <Input
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") setSearch(searchInput); }}
-                placeholder="Ex.: convite, workshop, black friday..."
-                className="text-sm"
-              />
-              <button
-                onClick={() => setSearch(searchInput)}
-                className="px-2 hover:bg-muted rounded"
-                title="Buscar"
-                aria-label="Buscar"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-              {search && (
+        <CardHeader className="space-y-3">
+          <CardTitle className="text-base flex justify-between items-baseline">
+            <span>Broadcasts ({data ? fmtInt(data.total) : "—"})</span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2 text-sm font-normal">
                 <button
-                  onClick={() => { setSearch(""); setSearchInput(""); }}
-                  className="px-2 hover:bg-muted rounded"
-                  title="Limpar busca"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
+                  aria-label="Página anterior"
                 >
-                  <X className="w-4 h-4" />
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-              )}
+                <span className="text-muted-foreground">Página {page + 1} de {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
+                  aria-label="Próxima página"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </CardTitle>
+
+          {/* Filtros + ordenação */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+            <div className="lg:col-span-2">
+              <Label className="text-xs">Canal</Label>
+              <Select value={channel} onValueChange={setChannel}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="Email">Email</SelectItem>
+                  <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2 lg:col-span-5">
+              <Label className="text-xs">Busca (nome, assunto ou corpo)</Label>
+              <div className="flex gap-1">
+                <Input
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") setSearch(searchInput); }}
+                  placeholder="Ex.: convite, workshop, black friday..."
+                  className="text-sm"
+                />
+                <button
+                  onClick={() => setSearch(searchInput)}
+                  className="px-2 hover:bg-muted rounded"
+                  title="Buscar"
+                  aria-label="Buscar"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+                {search && (
+                  <button
+                    onClick={() => { setSearch(""); setSearchInput(""); }}
+                    className="px-2 hover:bg-muted rounded"
+                    title="Limpar busca"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="lg:col-span-3">
+              <Label className="text-xs">Ordenar por</Label>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((o) => (
+                    <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="lg:col-span-2">
+              <Label className="text-xs">Ordem</Label>
+              <button
+                onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm hover:bg-muted"
+                title="Inverter ordem"
+                aria-label="Inverter ordem"
+              >
+                <span>{sortDir === "desc" ? "Maior → menor" : "Menor → maior"}</span>
+                <span className="text-muted-foreground">{sortDir === "desc" ? "▼" : "▲"}</span>
+              </button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {isLoading && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
-        </div>
-      )}
-      {error && <div className="text-destructive">Erro: {(error as Error).message}</div>}
-
-      {data && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex justify-between items-baseline">
-              <span>Broadcasts ({fmtInt(data.total)})</span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2 text-sm font-normal">
-                  <button
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={page === 0}
-                    className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
-                    aria-label="Página anterior"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="text-muted-foreground">Página {page + 1} de {totalPages}</span>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                    disabled={page >= totalPages - 1}
-                    className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
-                    aria-label="Próxima página"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground py-6">
+              <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+            </div>
+          ) : error ? (
+            <div className="text-destructive py-6">Erro: {(error as Error).message}</div>
+          ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -1177,13 +1229,13 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                     <SortableTh label="Entrega" k="delivery_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <SortableTh label="Abertura" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <SortableTh label="Conversas" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <TableHead className="text-right" title="Oportunidades = respondentes com 1ª resposta positiva OU que marcaram reunião (intenção qualificada)">Oportunidades</TableHead>
-                    <TableHead className="text-right" title="Reuniões atribuídas ao disparo (agendadas após a resposta)">Reuniões</TableHead>
-                    <TableHead className="text-right" title="Negócios ganhos atribuídos (venda após resposta)">Ganhos</TableHead>
-                    <TableHead className="text-right" title="Receita dos negócios ganhos atribuídos">Receita</TableHead>
-                    <TableHead className="text-right" title="Ticket médio = receita ÷ negócios ganhos">AOV</TableHead>
-                    <TableHead className="text-right">Gasto</TableHead>
-                    <TableHead className="text-right" title="Custo de aquisição = gasto ÷ negócios ganhos">CAC</TableHead>
+                    <SortableTh label="Oportunidades" k="oportunidades" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Oportunidades = respondentes com 1ª resposta positiva OU que marcaram reunião (intenção qualificada)" />
+                    <SortableTh label="Reuniões" k="meetings_scheduled" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Reuniões atribuídas ao disparo (agendadas após a resposta)" />
+                    <SortableTh label="Ganhos" k="ganhos" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Negócios ganhos atribuídos (venda após resposta)" />
+                    <SortableTh label="Receita" k="receita" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Receita dos negócios ganhos atribuídos" />
+                    <SortableTh label="AOV" k="aov" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Ticket médio = receita ÷ negócios ganhos" />
+                    <SortableTh label="Gasto" k="spend_brl" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="CAC" k="cac" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Custo de aquisição = gasto ÷ negócios ganhos" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1267,9 +1319,9 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Modal de detalhes */}
       {detail && (
@@ -1289,6 +1341,7 @@ function SortableTh({
   onClick,
   align,
   className,
+  title,
 }: {
   label: string;
   k: SortKey;
@@ -1297,10 +1350,12 @@ function SortableTh({
   onClick: (k: SortKey) => void;
   align?: "right" | "left";
   className?: string;
+  title?: string;
 }) {
   const active = sortKey === k;
   return (
     <TableHead
+      title={title}
       className={cn(
         "cursor-pointer select-none hover:bg-muted/50 whitespace-nowrap",
         align === "right" && "text-right",
