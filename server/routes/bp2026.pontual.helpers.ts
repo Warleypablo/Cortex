@@ -27,6 +27,7 @@ export interface PonteMes {
   estoqueFim: number;
 }
 
+// IMPORTANTE: manter a árvore de classificação em sincronia com classificarPonteItens (mesma lógica; uma soma, a outra lista). Desync quebra a reconciliação drill×célula — coberto pelo teste de soma por categoria.
 // Classifica a transição de cada contrato (id_subtask) entre o estoque do snapshot
 // anterior e o do atual. Venda inclui contratos que (re)entraram no estoque.
 export function classificarPonte(ant: RegPontual[], atual: RegPontual[]): PonteMes {
@@ -193,6 +194,7 @@ export interface ItemPonte {
 
 const brl = (v: number) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 
+// IMPORTANTE: manter a árvore de classificação em sincronia com classificarPonte (mesma lógica; esta lista os contratos, aquela soma). Ver teste "soma dos itens por categoria casa".
 // Mesma classificação de classificarPonte, mas emitindo os contratos de cada categoria de movimento.
 export function classificarPonteItens(
   ant: RegPontualItem[],
