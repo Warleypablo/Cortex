@@ -7,6 +7,7 @@ import { calcAtingimento, calcYtd, type MesValor } from "./bp2026.helpers";
 import { PREDICADOS_DESPESA, PREDICADOS_SGA_SUB, PREDICADOS_OUTRAS_SUB, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { somaDespesaCaixaPorMes } from "./bp2026";
 import { ratearSeriePorPeso, participacaoPct, razaoYtd } from "./bp2026.cac.helpers";
+import { SEGMENTOS_RECORRENTES, SLUG } from "../okr2026/servicosBitrix";
 
 interface MesLinha extends MesValor { atingimento: number | null }
 interface Linha {
@@ -61,13 +62,10 @@ const NOTA_CAC_PRODUTO =
   "CAC total do mês rateado pela participação do produto nos contratos recorrentes " +
   "vendidos (Bitrix). Soma dos produtos = CAC total. Pontual não recebe bucket próprio.";
 
-const PRODUTOS_CAC: { slug: string; titulo: string }[] = [
-  { slug: "performance", titulo: "Performance" },
-  { slug: "creators", titulo: "Creators" },
-  { slug: "social", titulo: "Social" },
-  { slug: "gc", titulo: "Gestão de Comunidade" },
-  { slug: "others", titulo: "Others" },
-];
+// derivado da fonte única (servicosBitrix): garante que CAC por produto cubra
+// exatamente os mesmos produtos da aba Vendas por Produto (invariante soma = CAC total)
+const PRODUTOS_CAC: { slug: string; titulo: string }[] =
+  SEGMENTOS_RECORRENTES.map((seg) => ({ slug: SLUG[seg], titulo: seg }));
 
 const SUB_CAC: { metrica: string; titulo: string; predicado: keyof typeof PREDICADOS_CAC_SUB; nota?: string; semOrcado?: boolean }[] = [
   { metrica: "cac_pre_vendas", titulo: "Pré Vendas", predicado: "cac_pre_vendas" },
