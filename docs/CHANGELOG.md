@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-16 | fix(bp2026-revenue): churn R$ orçado usa MRR do mesmo mês
+
+**O que foi feito:**
+- Corrigida a derivação do orçado nominal de Churn R$ (total e por produto) em `bp2026.revenue.ts`: de `churn% × MRR orçado do mês ANTERIOR` (`mrr_orc[mes-1]`) para `churn% × MRR orçado do MESMO mês` (`mrr_orc[mes]`).
+- Resultado bate com a planilha "BP 2026 - Turbo - Financials.xlsx", aba Revenue, linha "Churn Total": jan=104.117, fev=114.096, mar=123.177, abr=133.691, mai=143.259, jun=151.966.
+
+**Por que:**
+- O orçado de Churn R$ de janeiro aparecia como "não orç." porque o "mês anterior" seria dez/2025, que não está seedado na `cortex_core.bp2026_orcado` (só meses 1-12) → derivava 0. Além disso, todos os meses ficavam deslocados uma casa (o orçado de fev mostrava o valor de janeiro da planilha). A planilha calcula churn do mês = churn% × MRR do mesmo mês.
+
+**Arquivos alterados:**
+- `server/routes/bp2026.revenue.ts` - índice de mês na derivação do churn R$ orçado (2 lugares) + notas
+
+**Impacto arquitetural:** Nenhum. Só corrige o índice de mês na derivação; não altera fonte de dados nem schema.
+
+---
+
 ## 2026-06-16 | fix(criativos): filtro de Produto por nome de campanha (cross-plataforma)
 
 **O que foi feito:**
