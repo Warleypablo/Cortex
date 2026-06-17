@@ -17,11 +17,16 @@ const TT_BIZ_API = 'https://business-api.tiktok.com/open_api/v1.3';
 
 // Métricas básicas pedidas no report. cpc/cpm/ctr são derivados na leitura.
 const REPORT_METRICS = ['spend', 'impressions', 'clicks', 'conversion'];
+// Métricas a nível de anúncio (inclui video_play_actions → video_views).
+const AD_REPORT_METRICS = ['spend', 'impressions', 'clicks', 'conversion', 'video_play_actions'];
 
 export interface TiktokAdsResult {
   advertisers: number;
   campaigns: number;
   metricRows: number;
+  adGroups: number;
+  ads: number;
+  adMetricRows: number;
   errors: string[];
 }
 
@@ -47,7 +52,7 @@ const numOrNull = (v: any) => (v === undefined || v === null || v === '' ? null 
  * @param days janela de dias para trás a sincronizar (default 30).
  */
 export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsResult> {
-  const result: TiktokAdsResult = { advertisers: 0, campaigns: 0, metricRows: 0, errors: [] };
+  const result: TiktokAdsResult = { advertisers: 0, campaigns: 0, metricRows: 0, adGroups: 0, ads: 0, adMetricRows: 0, errors: [] };
 
   const runRes = await pool.query(
     `INSERT INTO tiktok.sync_runs (kind, status) VALUES ('ads', 'running') RETURNING id`,
@@ -148,6 +153,120 @@ export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsRes
           mpage = (pageInfo.total_page && mpage < pageInfo.total_page) ? mpage + 1 : 0;
         } while (mpage && ++mguard < 100);
 
+        // 3. Ad groups (conjuntos) — metadados, paginado.
+        let gpage = 1, gguard = 0;
+        do {
+          const data = await ttGet('/adgroup/get/', token, {
+            advertiser_id,
+            fields: ['adgroup_id', 'adgroup_name', 'campaign_id', 'operation_status', 'budget', 'budget_mode'],
+            page: gpage,
+            page_size: 100,
+          });
+          const list: any[] = data?.list || [];
+          for (const g of list) {
+            if (!g.campaign_id) continue;
+            // garante a campanha (FK) caso não tenha vindo no /campaign/get/
+            await pool.query(
+              `INSERT INTO tiktok.ad_campaigns (campaign_id, advertiser_id, synced_at)
+               VALUES ($1,$2, NOW()) ON CONFLICT (campaign_id) DO NOTHING`,
+              [String(g.campaign_id), String(advertiser_id)],
+            );
+            await pool.query(
+              `INSERT INTO tiktok.ad_groups
+                 (adgroup_id, campaign_id, advertiser_id, adgroup_name, operation_status, budget, budget_mode, raw, synced_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
+               ON CONFLICT (adgroup_id) DO UPDATE SET
+                 campaign_id = EXCLUDED.campaign_id, advertiser_id = EXCLUDED.advertiser_id,
+                 adgroup_name = EXCLUDED.adgroup_name, operation_status = EXCLUDED.operation_status,
+                 budget = EXCLUDED.budget, budget_mode = EXCLUDED.budget_mode, raw = EXCLUDED.raw, synced_at = NOW()`,
+              [String(g.adgroup_id), String(g.campaign_id), String(advertiser_id), g.adgroup_name || null,
+               g.operation_status || null, numOrNull(g.budget), g.budget_mode || null, JSON.stringify(g)],
+            );
+            result.adGroups++;
+          }
+          const pageInfo = data?.page_info || {};
+          gpage = (pageInfo.total_page && gpage < pageInfo.total_page) ? gpage + 1 : 0;
+        } while (gpage && ++gguard < 100);
+
+        // 4. Anúncios — metadados, paginado.
+        let apage = 1, aguard = 0;
+        do {
+          const data = await ttGet('/ad/get/', token, {
+            advertiser_id,
+            fields: ['ad_id', 'ad_name', 'adgroup_id', 'campaign_id', 'operation_status', 'ad_format', 'landing_page_url'],
+            page: apage,
+            page_size: 100,
+          });
+          const list: any[] = data?.list || [];
+          for (const ad of list) {
+            if (!ad.adgroup_id || !ad.campaign_id) continue;
+            // garante adgroup (FK) caso não tenha vindo no /adgroup/get/
+            await pool.query(
+              `INSERT INTO tiktok.ad_groups (adgroup_id, campaign_id, advertiser_id, synced_at)
+               VALUES ($1,$2,$3, NOW()) ON CONFLICT (adgroup_id) DO NOTHING`,
+              [String(ad.adgroup_id), String(ad.campaign_id), String(advertiser_id)],
+            );
+            await pool.query(
+              `INSERT INTO tiktok.ads
+                 (ad_id, adgroup_id, campaign_id, advertiser_id, ad_name, operation_status, ad_format, landing_page_url, raw, synced_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOW())
+               ON CONFLICT (ad_id) DO UPDATE SET
+                 adgroup_id = EXCLUDED.adgroup_id, campaign_id = EXCLUDED.campaign_id, advertiser_id = EXCLUDED.advertiser_id,
+                 ad_name = EXCLUDED.ad_name, operation_status = EXCLUDED.operation_status, ad_format = EXCLUDED.ad_format,
+                 landing_page_url = EXCLUDED.landing_page_url, raw = EXCLUDED.raw, synced_at = NOW()`,
+              [String(ad.ad_id), String(ad.adgroup_id), String(ad.campaign_id), String(advertiser_id),
+               ad.ad_name || null, ad.operation_status || null, ad.ad_format || null, ad.landing_page_url || null, JSON.stringify(ad)],
+            );
+            result.ads++;
+          }
+          const pageInfo = data?.page_info || {};
+          apage = (pageInfo.total_page && apage < pageInfo.total_page) ? apage + 1 : 0;
+        } while (apage && ++aguard < 200);
+
+        // 5. Métricas diárias por ANÚNCIO — report/integrated/get, data_level=AUCTION_AD.
+        let ampage = 1, amguard = 0;
+        do {
+          const data = await ttGet('/report/integrated/get/', token, {
+            advertiser_id,
+            report_type: 'BASIC',
+            data_level: 'AUCTION_AD',
+            dimensions: ['ad_id', 'stat_time_day'],
+            metrics: AD_REPORT_METRICS,
+            start_date: startDate,
+            end_date: endDate,
+            page: ampage,
+            page_size: 1000,
+          });
+          const list: any[] = data?.list || [];
+          for (const row of list) {
+            const dim = row.dimensions || {};
+            const met = row.metrics || {};
+            const adId = String(dim.ad_id || '');
+            const statDate = String(dim.stat_time_day || '').slice(0, 10);
+            if (!adId || !statDate) continue;
+            // só insere métrica se o anúncio existe (FK). Anúncios excluídos podem aparecer no
+            // report mas não no /ad/get/ — nesses casos pulamos a métrica.
+            const adExists = await pool.query(`SELECT 1 FROM tiktok.ads WHERE ad_id = $1`, [adId]);
+            if (adExists.rowCount === 0) continue;
+            await pool.query(
+              `INSERT INTO tiktok.ad_insights_daily
+                 (ad_id, stat_date, advertiser_id, spend, impressions, clicks, conversions, video_views, raw, synced_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOW())
+               ON CONFLICT (ad_id, stat_date) DO UPDATE SET
+                 advertiser_id = EXCLUDED.advertiser_id, spend = EXCLUDED.spend,
+                 impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
+                 conversions = EXCLUDED.conversions, video_views = EXCLUDED.video_views,
+                 raw = EXCLUDED.raw, synced_at = NOW()`,
+              [adId, statDate, String(advertiser_id),
+               numOrNull(met.spend), numOrNull(met.impressions), numOrNull(met.clicks),
+               numOrNull(met.conversion), numOrNull(met.video_play_actions), JSON.stringify(row)],
+            );
+            result.adMetricRows++;
+          }
+          const pageInfo = data?.page_info || {};
+          ampage = (pageInfo.total_page && ampage < pageInfo.total_page) ? ampage + 1 : 0;
+        } while (ampage && ++amguard < 200);
+
         result.advertisers++;
       } catch (e: any) {
         result.errors.push(`advertiser ${advertiser_id}: ${e.message}`);
@@ -168,6 +287,6 @@ export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsRes
     console.error('[tiktok-ads] erro:', err.message);
   }
 
-  console.log(`[tiktok-ads] ${result.advertisers} advertisers, ${result.campaigns} campanhas, ${result.metricRows} linhas de métrica, ${result.errors.length} erros`);
+  console.log(`[tiktok-ads] ${result.advertisers} advertisers, ${result.campaigns} campanhas, ${result.adGroups} adgroups, ${result.ads} anúncios, ${result.metricRows} métricas campanha, ${result.adMetricRows} métricas anúncio, ${result.errors.length} erros`);
   return result;
 }

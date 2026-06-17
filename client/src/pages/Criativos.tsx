@@ -18,7 +18,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { CriativosTable } from "@/components/criativos/CriativosTable";
 import { aggregateByLevel, sortRows, type CriativoData, type Level, type SortConfig } from "@/lib/criativosMetrics";
-import { loadConfig, persistConfig, loadViews, persistViews, resolveColumns, type ColumnConfig, type SavedView } from "@/lib/criativosColumns";
+import { loadConfig, persistConfig, loadViews, persistViews, resolveColumns, columnAppliesToPlatforms, type ColumnConfig, type SavedView } from "@/lib/criativosColumns";
 import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle, Building2, Megaphone, Layers3, Wallet, Image as ImageIcon } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { cn } from "@/lib/utils";
@@ -114,7 +114,12 @@ export default function Criativos() {
   const [colViews, setColViews] = useState<SavedView[]>(loadViews);
   useEffect(() => { persistConfig(colConfig); }, [colConfig]);
   useEffect(() => { persistViews(colViews); }, [colViews]);
-  const visibleColumns = useMemo(() => resolveColumns(colConfig), [colConfig]);
+  // Colunas visíveis = config do usuário, filtrada pelas métricas nativas da
+  // plataforma selecionada (ex.: Google esconde hook/hold do Meta e mostra conversões).
+  const visibleColumns = useMemo(
+    () => resolveColumns(colConfig).filter((c) => columnAppliesToPlatforms(c, selectedPlataformas)),
+    [colConfig, selectedPlataformas],
+  );
   const handleResize = useCallback((key: string, width: number) => {
     setColConfig((c) => ({ ...c, widths: { ...c.widths, [key]: width } }));
   }, []);
@@ -920,6 +925,7 @@ export default function Criativos() {
                   options={[
                     { value: 'Meta Ads', label: 'Meta Ads' },
                     { value: 'Google Ads', label: 'Google Ads' },
+                    { value: 'TikTok Ads', label: 'TikTok Ads' },
                     { value: 'LinkedIn Ads', label: 'LinkedIn Ads' },
                   ]}
                   selected={selectedPlataformas}
