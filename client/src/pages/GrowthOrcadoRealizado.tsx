@@ -1741,7 +1741,7 @@ export default function GrowthOrcadoRealizado() {
   // ===== Platform-specific metric builders for Aprofundado view =====
 
   // Helper: build lead/MQL metrics for a platform (rest of funnel comes from MQL/NMQL/Total sections)
-  const buildFunnelMetrics = (prefix: string, funnel: PlatformFunnelData | undefined, orcado: any, investimento: number | null): Metric[] => {
+  const buildFunnelMetrics = (prefix: string, funnel: PlatformFunnelData | undefined, orcado: any, investimento: number | null, includeInvestimento = false): Metric[] => {
     const f = funnel || {} as PlatformFunnelData;
     const invest = investimento !== null && investimento > 0 ? investimento : 0;
     const cpl = invest > 0 && (f.leads || 0) > 0 ? invest / f.leads : null;
@@ -1750,7 +1750,15 @@ export default function GrowthOrcadoRealizado() {
     // vivem nas seções VENDAS — MQL, VENDAS — não-MQL e Total. Mantê-las nos
     // breakdowns por plataforma duplicava no lugar errado e dava R$ NaN nos
     // canais orgânicos (sem investimento). Alinhado com o consolidado de Marketing.
+    // includeInvestimento: emite a linha de Investimento aqui (só p/ orgânicos —
+    // os pagos já têm a linha no topo). Garante as 6 métricas-padrão do Consolidado
+    // em TODA plataforma (Investimento · Leads · MQLs · CPL · CPMQL · % MQLs);
+    // sem verba, mostra R$ 0.
+    const investimentoRow: Metric[] = includeInvestimento ? [
+      { id: `${prefix}_investimento`, name: 'Investimento', type: 'manual', orcado: orcado.investimento ?? null, realizado: investimento ?? 0, percentual: calcPercentual(orcado.investimento ?? null, investimento), format: 'currency' },
+    ] : [];
     return [
+      ...investimentoRow,
       { id: `${prefix}_leads`, name: 'Leads', type: 'formula', orcado: orcado.leads, realizado: f.leads ?? 0, percentual: calcPercentual(orcado.leads, f.leads), format: 'number' },
       { id: `${prefix}_mqls`, name: 'MQLs', type: 'formula', orcado: orcado.mqls, realizado: f.mqls ?? 0, percentual: calcPercentual(orcado.mqls, f.mqls), format: 'number' },
       { id: `${prefix}_cpl`, name: 'CPL', type: 'formula', orcado: orcado.cpl, realizado: cpl, percentual: calcPercentual(orcado.cpl, cpl), format: 'currency' },
@@ -1806,9 +1814,10 @@ export default function GrowthOrcadoRealizado() {
       { id: 'gads_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'gads_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
       { id: 'gads_ctr', name: 'CTR', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
-      { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'gads_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      { id: 'gads_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
+      // Visualizações de Página e Connect Rate removidos do Aprofundado do Google:
+      // ambos vinham do GA4 e VdP era redundante com Sessões neste contexto.
+      // O foco é Tx Conversão da Página (Leads ÷ Sessões).
       { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('gads', funnel, O, d.investimento ?? null)];
@@ -1855,7 +1864,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ig_ctrVisitasCliques', name: 'CTR Visitas > Cliques', type: 'formula', orcado: O.ctrVisitasCliques, realizado: d.ctrVisitasCliques ?? null, percentual: calcPercentual(O.ctrVisitasCliques, d.ctrVisitasCliques), format: 'percent' },
       { id: 'ig_cliquesLinkBio', name: 'Cliques no Link Bio', type: 'formula', orcado: O.cliquesLinkBio, realizado: d.cliquesLinkBio ?? 0, percentual: calcPercentual(O.cliquesLinkBio, d.cliquesLinkBio), format: 'number' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('ig', funnel, O, d.investimentoPago ?? null)];
+    return [...topMetrics, ...buildFunnelMetrics('ig', funnel, O, d.investimentoPago ?? null, true)];
   };
 
   const instagramPlatformMetrics: Metric[] = useMemo(() => {
@@ -1889,7 +1898,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'yt_avgViewDuration', name: 'Duração Média (s)', type: 'formula', orcado: O.avgViewDuration, realizado: d.avgViewDuration ?? 0, percentual: calcPercentual(O.avgViewDuration, d.avgViewDuration), format: 'number' },
       { id: 'yt_horasAssistidas', name: 'Horas Assistidas', type: 'formula', orcado: O.horasAssistidas, realizado: d.horasAssistidas ?? 0, percentual: calcPercentual(O.horasAssistidas, d.horasAssistidas), format: 'number' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('yt', funnel, O, null)];
+    return [...topMetrics, ...buildFunnelMetrics('yt', funnel, O, null, true)];
   };
 
   const youtubePlatformMetrics: Metric[] = useMemo(() => {
@@ -1918,7 +1927,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'li_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.pageViews ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.pageViews), format: 'number' },
       { id: 'li_taxaEngajamento', name: 'Taxa de Engajamento', type: 'formula', orcado: O.taxaEngajamento, realizado: d.engajamento ?? null, percentual: calcPercentual(O.taxaEngajamento, d.engajamento), format: 'percent' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('li', funnel, O, null)];
+    return [...topMetrics, ...buildFunnelMetrics('li', funnel, O, null, true)];
   };
 
   const linkedinPlatformMetrics: Metric[] = useMemo(() => {
@@ -1943,7 +1952,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'tt_visualizacoes', name: 'Visualizações', type: 'formula', orcado: O.visualizacoes, realizado: d.visualizacoes ?? 0, percentual: calcPercentual(O.visualizacoes, d.visualizacoes), format: 'number' },
       { id: 'tt_compartilhamentos', name: 'Compartilhamentos', type: 'formula', orcado: O.compartilhamentos, realizado: d.compartilhamentos ?? 0, percentual: calcPercentual(O.compartilhamentos, d.compartilhamentos), format: 'number' },
     ];
-    return [...topMetrics, ...buildFunnelMetrics('tt', funnel, O, null)];
+    return [...topMetrics, ...buildFunnelMetrics('tt', funnel, O, null, true)];
   };
 
   const tiktokPlatformMetrics: Metric[] = useMemo(() => {
@@ -2420,21 +2429,13 @@ export default function GrowthOrcadoRealizado() {
     'total_contratos_ganhos',
     'total_faturamento', 'total_cac_ads', 'total_cac_contrato',
     'total_ticket_acel', 'total_ticket_impl',
-    // Consolidado por plataforma — só o essencial, por tipo de canal.
-    // Pagos: eficiência (Invest · Connect Rate · Tx Conversão) + resultado (Leads → %MQL)
-    ...['meta', 'gads', 'tta', 'lia'].flatMap(p => [
-      `${p}_investimento`, `${p}_connectRate`, `${p}_taxaConversaoPagina`,
-      `${p}_leads`, `${p}_mqls`, `${p}_cpl`, `${p}_cpmql`, `${p}_percMqls`,
+    // Consolidado por plataforma — SEMPRE as 6 métricas-padrão de Marketing em
+    // toda plataforma (paga ou orgânica), na mesma ordem da referência:
+    // Investimento · Leads · MQLs · CPL · CPMQL · % MQLs. Orgânicos sem verba
+    // mostram R$ 0 (a linha de Investimento é injetada via buildFunnelMetrics).
+    ...['meta', 'gads', 'tta', 'lia', 'ig', 'yt', 'li', 'tt'].flatMap(p => [
+      `${p}_investimento`, `${p}_leads`, `${p}_mqls`, `${p}_cpl`, `${p}_cpmql`, `${p}_percMqls`,
     ]),
-    // Instagram orgânico: clique na bio + posts + resultado (pode ter verba de boost → CPL/CPMQL)
-    'ig_postsPublicados', 'ig_cliquesLinkBio',
-    'ig_leads', 'ig_mqls', 'ig_cpl', 'ig_cpmql', 'ig_percMqls',
-    // YouTube orgânico: vídeos publicados + resultado
-    'yt_videosPublicados', 'yt_leads', 'yt_mqls', 'yt_percMqls',
-    // LinkedIn orgânico: posts publicados + resultado
-    'li_postsPublicados', 'li_leads', 'li_mqls', 'li_percMqls',
-    // TikTok orgânico: vídeos publicados + resultado
-    'tt_videosPublicados', 'tt_leads', 'tt_mqls', 'tt_percMqls',
   ]);
 
   const consolidadoSections: MetricSection[] = useMemo(() => {
