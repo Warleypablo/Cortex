@@ -62,16 +62,7 @@ export default function Documentacao() {
         </div>
         <p className="mb-3">
           A meta é ampliar o garimpo para além de comentário/DM, capturando todos os sinais de
-          engajamento — no espírito do protótipo{" "}
-          <a
-            href="https://garimpo-engajamento.vercel.app/"
-            target="_blank"
-            rel="noreferrer"
-            className="text-blue-600 dark:text-blue-400 hover:underline"
-          >
-            garimpo-engajamento
-          </a>
-          .
+          engajamento.
         </p>
         <ul className="list-disc pl-5 space-y-2">
           <li>
@@ -87,10 +78,22 @@ export default function Documentacao() {
             salvar, compartilhar) ao score 0–100, refinando a priorização da fila e a temperatura do lead.
           </li>
         </ul>
-        <p className="mt-3 text-xs text-gray-500 dark:text-zinc-400">
-          Depende de um mecanismo de captura além da API oficial (que não entrega curtidas/seguidores
-          nominalmente) — a definir.
-        </p>
+        <div className="mt-3 text-xs text-gray-500 dark:text-zinc-400">
+          <p className="mb-1">
+            A API oficial não entrega curtidas/seguidores nominalmente, então a captura depende de um
+            serviço externo de scraping/automação. Opções a avaliar:
+          </p>
+          <ul className="list-disc pl-5 space-y-0.5">
+            <li><strong>Apify</strong> — actors prontos de Instagram (likers, followers, comentários).</li>
+            <li><strong>Scrapfly / ScraperAPI</strong> — APIs de scraping com proxy e anti-bot.</li>
+            <li><strong>Bright Data</strong> — coleta em escala via rede de proxies.</li>
+            <li><strong>Phantombuster</strong> — automação no IG para extrair likers/seguidores.</li>
+          </ul>
+          <p className="mt-1">
+            Trade-off: scraping viola os termos do Instagram e tem risco de bloqueio da conta — é uma
+            decisão de produto antes de implementar.
+          </p>
+        </div>
       </section>
     </div>
   );
