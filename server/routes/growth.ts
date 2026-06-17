@@ -4277,7 +4277,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.tiktok_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.tiktok_ads;
-      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (TikTok), alinhado à
+      // definição clássica de mídia (landing page views ÷ cliques). TikTok não expõe
+      // landing_page_views nativo, então o pageviews do GA4 é o proxy mais fiel.
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
         investimento,
@@ -4346,7 +4349,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.linkedin_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.linkedin_ads;
-      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (LinkedIn), alinhado à
+      // definição clássica de mídia (landing page views ÷ cliques) e ao TikTok Ads.
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
         investimento,
