@@ -3480,6 +3480,20 @@ Estruture sua resposta em:
         mrrFimResult.rows as any[],
       );
 
+      // Vendas mensais (Bitrix) — deals ganhos por data_fechamento, separados em
+      // recorrente (MRR novo) e pontual. Mesma definição do Relatório Mensal.
+      const vendasResult = await db.execute(sql`
+        SELECT TO_CHAR(data_fechamento, 'YYYY-MM') AS mes,
+               COALESCE(SUM(valor_recorrente), 0) AS vendas_recorrente,
+               COALESCE(SUM(valor_pontual), 0)    AS vendas_pontual,
+               COUNT(*)                            AS num_deals
+        FROM "Bitrix".crm_deal
+        WHERE stage_name = 'Negócio Ganho'
+          AND data_fechamento IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
       const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0 };
@@ -3546,6 +3560,12 @@ Estruture sua resposta em:
           };
         }).reverse(),
         evolucaoChurn,
+        vendasMensais: vendasResult.rows.map((r: any) => ({
+          mes: r.mes,
+          vendasRecorrente: Number(r.vendas_recorrente) || 0,
+          vendasPontual: Number(r.vendas_pontual) || 0,
+          numDeals: Number(r.num_deals) || 0,
+        })),
       });
     } catch (error) {
       console.error("[api] Error fetching investors report:", error);

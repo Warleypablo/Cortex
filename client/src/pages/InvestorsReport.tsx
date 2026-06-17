@@ -90,6 +90,12 @@ interface InvestorsReportData {
     taxaChurn: number | null;
     qtd: number;
   }>;
+  vendasMensais: Array<{
+    mes: string;
+    vendasRecorrente: number;
+    vendasPontual: number;
+    numDeals: number;
+  }>;
 }
 
 interface GeracaoCaixaDFC {
@@ -188,6 +194,24 @@ export default function InvestorsReport() {
         };
       });
   }, [data?.evolucaoChurn, dateRange]);
+
+  const vendasChartData = useMemo(() => {
+    if (!data?.vendasMensais) return [];
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return data.vendasMensais
+      .filter(item => {
+        const [year, month] = item.mes.split('-').map(Number);
+        const itemDate = new Date(year, month - 1, 1);
+        return itemDate >= dateRange.start && itemDate <= dateRange.end;
+      })
+      .map(item => {
+        const [year, month] = item.mes.split('-');
+        return {
+          ...item,
+          mesLabel: `${monthNames[parseInt(month) - 1]}/${year.slice(2)}`,
+        };
+      });
+  }, [data?.vendasMensais, dateRange]);
 
   const churnMediaTaxa = useMemo(() => {
     const taxas = churnChartData
@@ -778,6 +802,44 @@ export default function InvestorsReport() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Charts Row 1.5: Vendas por Mês */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+              <DollarSign className="h-5 w-5 text-emerald-400" />
+              Vendas por Mês (Recorrente e Pontual)
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Vendas fechadas no mês (Bitrix) — recorrente (MRR novo) e pontual
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : !vendasChartData.length ? (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                Nenhum dado no período
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={vendasChartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
+                  <XAxis dataKey="mesLabel" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => formatCurrencyShort(v)} />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    labelStyle={{ color: '#f8fafc' }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  <Line type="monotone" dataKey="vendasRecorrente" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} name="Vendas Recorrente" connectNulls={false} />
+                  <Line type="monotone" dataKey="vendasPontual" stroke="#1978D5" strokeWidth={2.5} dot={{ r: 3, fill: '#1978D5' }} name="Vendas Pontual" connectNulls={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Charts Row 2: Receita vs Despesas + Caixa Acumulado */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
