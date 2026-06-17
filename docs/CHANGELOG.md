@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-17 | fix(bp2026): churn conta só status cancelado/em cancelamento, exclui entregue/pausado
+
+**O que foi feito:**
+- Adicionado filtro `status IN ('cancelado/inativo', 'em cancelamento')` nas 3 queries de churn do BP 2026: `montarRevenue` (`bp2026.revenue.ts`, "Churn R$ Total" e por produto), churn do mês em `bp2026.metricas.ts`, e o detalhamento `detChurn` em `bp2026.detalhe.ts`.
+- Atualizado o tooltip `FONTE_CHURN` (`bp2026.info.ts`) explicando que só contam status de churn real.
+
+**Por que:**
+- A linha "Churn R$ Total" da aba Revenue somava todos os registros de `vw_cup_churn_ajustado` com `valor_r > 0`, incluindo contratos com status `entregue` (projeto pontual concluído — não é churn) e `pausado` (pausa ≠ cancelamento). Isso inflava o churn: Mai/2026 exibia 184.823 quando o gráfico "Churn Commerce MoM" do ClickUp (fonte de verdade) mostra 172.826. Diferenças também em Fev (+1.997), Abr (+2.997) e Jun (+8.997).
+- Com o filtro, os 6 meses de 2026 batem exatamente com o ClickUp (validado via SQL em produção).
+
+**Arquivos alterados:**
+- `server/routes/bp2026.revenue.ts` - filtro de status na query de churn por produto
+- `server/routes/bp2026.metricas.ts` - filtro de status na query de churn do mês
+- `server/routes/bp2026.detalhe.ts` - filtro de status no detalhamento de churn
+- `server/routes/bp2026.info.ts` - tooltip FONTE_CHURN atualizado
+
+**Impacto arquitetural:** Nenhum — apenas predicado adicional nas queries existentes. A view `vw_cup_churn_ajustado` permanece intacta para os demais dashboards.
+
+---
+
 ## 2026-06-17 | fix(investors-report): margem/faturamento em base única de competência (caz_receber+caz_pagar)
 
 **O que foi feito:**
