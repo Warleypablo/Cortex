@@ -52,7 +52,9 @@ const ADMIN_EMAILS = [
 // Emails externos permitidos (investidores, consultores, etc.)
 const ALLOWED_EXTERNAL_EMAILS = [
   'ajame@icloud.com',
-  'warleyreserva4@gmail.com'
+  'warleyreserva4@gmail.com',
+  'gilvan.badke@emeg.vix.br',
+  'elindenberg@redegazeta.com.br'
 ];
 
 // Rotas permitidas para usuários externos (apenas Investors Report)
