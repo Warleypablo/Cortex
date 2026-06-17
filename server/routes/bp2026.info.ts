@@ -281,6 +281,31 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
     fonte: "Derivada.",
     calculo: "Vendas Pontual ÷ contratos vendidos pontual. YTD = Σ ÷ Σ.",
   },
+  vp_receita_total: {
+    definicao: "Receita total vendida no mês (MRR + Pontual), por data de criação do contrato.",
+    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado (exceto status "não usar").',
+    calculo: "Σ valorr + Σ valorp dos contratos criados no mês. Orçado = vendas_mrr + vendas_pontual.",
+  },
+  vp_receita_mrr: {
+    definicao: "MRR novo vendido no mês (bookings; não é a base ativa).",
+    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado.',
+    calculo: "Σ valorr dos contratos criados no mês. Orçado = vendas_mrr.",
+  },
+  vp_receita_pontual: {
+    definicao: "Receita pontual vendida no mês.",
+    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado.',
+    calculo: "Σ valorp dos contratos criados no mês. Orçado = vendas_pontual.",
+  },
+  vp_num_contratos: {
+    definicao: "Contratos criados no mês.",
+    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado.',
+    calculo: "COUNT(*) dos contratos criados no mês. Orçado = Σ contratos_vendidos_* (pode contar 2× um contrato com MRR e Pontual).",
+  },
+  vp_num_clientes: {
+    definicao: "Clientes distintos com contrato criado no mês.",
+    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado.',
+    calculo: "COUNT(DISTINCT id_task) dos contratos criados no mês. Sem orçado (não há meta de clientes novos).",
+  },
   reunioes: {
     definicao: "Reuniões comerciais realizadas no mês.",
     fonte: "Bitrix CRM — deals com data_reuniao_realizada no mês (qualquer estágio).",
