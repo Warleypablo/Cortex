@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-17 | feat(planejamento): marcador do dia atual no calendário + botão Hoje
+
+**O que foi feito:**
+- A célula do dia atual no calendário da aba Planejamento ganha anel + fundo em `primary`, e o número do dia vira um círculo preenchido (padrão Google/Apple Calendar)
+- Botão **"Hoje"** na navegação pula direto pro mês atual (a aba abre no mês seguinte por padrão, então o marcador só aparecia ao navegar)
+
+**Por que:**
+- Dar referência visual imediata de "onde estamos" no calendário de planejamento
+
+**Arquivos alterados:**
+- `client/src/components/PlanejamentoMensal.tsx` - `isToday` da date-fns; estilo condicional da célula/número; botão Hoje
+
+**Impacto arquitetural:** Nenhum — frontend-only. Cor `primary` escolhida por não colidir com as cores de status dos slots (violet/rose/amber/emerald/blue).
+
+---
+
 ## 2026-06-17 | refactor(broadcast): remove bases IA (IA - MQLs, IA - Todos) do planejamento
 
 **O que foi feito:**
