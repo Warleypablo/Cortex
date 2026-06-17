@@ -39,6 +39,10 @@ export interface CriativoData {
   reach?: number;
   video3sec?: number;
   videoThruplay?: number;
+  // contadores nativos de Google/TikTok (somáveis). Meta não os preenche.
+  conversions?: number;       // conversões reportadas pela plataforma (Google/TikTok)
+  conversionValue?: number;   // valor de conversão (Google)
+  videoViews?: number;        // views de vídeo (Google/TikTok)
   nmqls?: number;
   rm?: number;
   rmMql?: number;
@@ -109,6 +113,9 @@ interface RawTotals {
   reach: number;
   video3sec: number;
   videoThruplay: number;
+  conversions: number;
+  conversionValue: number;
+  videoViews: number;
   leads: number;
   mql: number;
   nmqls: number;
@@ -135,7 +142,8 @@ interface RawTotals {
 function zeros(): RawTotals {
   return {
     investimento: 0, impressions: 0, outboundClicks: 0, landingPageViews: 0, reach: 0,
-    video3sec: 0, videoThruplay: 0, leads: 0, mql: 0, nmqls: 0,
+    video3sec: 0, videoThruplay: 0, conversions: 0, conversionValue: 0, videoViews: 0,
+    leads: 0, mql: 0, nmqls: 0,
     rm: 0, rmMql: 0, rmNmql: 0, rr: 0, rrMql: 0, rrNmql: 0,
     vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0, contratos: 0,
     descartados: 0, descartadosMql: 0, descartadosNmql: 0,
@@ -153,6 +161,9 @@ function sumRaw(rows: CriativoData[]): RawTotals {
     t.reach += r.reach || 0;
     t.video3sec += r.video3sec || 0;
     t.videoThruplay += r.videoThruplay || 0;
+    t.conversions += r.conversions || 0;
+    t.conversionValue += r.conversionValue || 0;
+    t.videoViews += r.videoViews || 0;
     t.leads += r.leads || 0;
     t.mql += r.mql || 0;
     t.nmqls += r.nmqls || 0;
@@ -197,6 +208,9 @@ function computeDerived(t: RawTotals) {
     reach: t.reach,
     video3sec: t.video3sec,
     videoThruplay: t.videoThruplay,
+    conversions: t.conversions,
+    conversionValue: t.conversionValue,
+    videoViews: t.videoViews,
     leads: t.leads,
     mql: t.mql,
     nmqls: t.nmqls,

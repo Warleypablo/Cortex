@@ -16,7 +16,17 @@ export interface ColumnDef {
   invert?: boolean; // na comparação, menor é melhor
   defaultVisible: boolean;
   defaultWidth: number;
+  // Plataformas que possuem essa métrica NATIVA. undefined = universal (vale p/ todas;
+  // ex.: métricas do Bitrix — leads, MQL, RA, RR, vendas — e CPM/CTR comuns a todas).
+  // Quando definido, a coluna só aparece se a plataforma selecionada estiver na lista
+  // (ou se nenhuma plataforma específica estiver selecionada — visão "Todas").
+  platforms?: string[];
 }
+
+// Rótulos de plataforma usados nas tags de coluna e no filtro.
+export const PLAT_META = "Meta Ads";
+export const PLAT_GOOGLE = "Google Ads";
+export const PLAT_TIKTOK = "TikTok Ads";
 
 // Largura especial da coluna de nome (congelada, redimensionável).
 export const NAME_COL_KEY = "__name__";
@@ -44,12 +54,19 @@ export const ALL_COLUMNS: ColumnDef[] = [
   C("orcamentoDiario", "Orçamento", "Investimento", "currency", { defaultWidth: 116 }),
   C("cpm", "CPM", "Investimento", "currency", { color: true, invert: true }),
   // Vídeo
-  C("videoHook", "Video hook", "Vídeo", "percent", { color: true }),
-  C("videoHold", "Video hold", "Vídeo", "percent", { color: true }),
+  // Hook/Hold são nativas do Meta (3s / thruplay sobre impressões).
+  C("videoHook", "Video hook", "Vídeo", "percent", { color: true, platforms: [PLAT_META] }),
+  C("videoHold", "Video hold", "Vídeo", "percent", { color: true, platforms: [PLAT_META] }),
+  // Video views: contador nativo do Google e do TikTok.
+  C("videoViews", "Video views", "Vídeo", "number", { platforms: [PLAT_GOOGLE, PLAT_TIKTOK] }),
   // Tráfego
   C("ctr", "CTR", "Tráfego", "percent", { color: true }),
-  C("connectRate", "Connect rate", "Tráfego", "percent", { color: true, defaultWidth: 104 }),
+  // Connect rate depende de landing_page_views (só Meta reporta) → nativa do Meta.
+  C("connectRate", "Connect rate", "Tráfego", "percent", { color: true, defaultWidth: 104, platforms: [PLAT_META] }),
   C("taxaConversao", "Taxa conv.", "Tráfego", "percent", { color: true, defaultWidth: 96 }),
+  // Conversões reportadas pela própria plataforma (pixel/tag) — Google e TikTok.
+  C("conversions", "Conv. plat.", "Tráfego", "number", { platforms: [PLAT_GOOGLE, PLAT_TIKTOK], defaultWidth: 96 }),
+  C("conversionValue", "Valor conv.", "Tráfego", "currency", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 104 }),
   // Leads
   C("leads", "Leads", "Leads", "number"),
   C("cpl", "CPL", "Leads", "currency", { color: true, invert: true }),
@@ -143,6 +160,18 @@ export function resolveColumns(cfg: ColumnConfig): ColumnDef[] {
   return cfg.order
     .map((k) => COLUMN_BY_KEY.get(k))
     .filter((c): c is ColumnDef => !!c && cfg.visible.includes(c.key as string));
+}
+
+/**
+ * Decide se uma coluna se aplica às plataformas selecionadas.
+ * - Coluna universal (sem `platforms`) → sempre aplica.
+ * - Nenhuma plataforma selecionada (visão "Todas") → mostra todas as nativas.
+ * - Plataforma(s) selecionada(s) → só aparece se houver interseção.
+ */
+export function columnAppliesToPlatforms(def: ColumnDef, selected: string[]): boolean {
+  if (!def.platforms || def.platforms.length === 0) return true;
+  if (!selected || selected.length === 0) return true;
+  return def.platforms.some((p) => selected.includes(p));
 }
 
 export function columnWidth(cfg: ColumnConfig, key: string, fallback: number): number {
