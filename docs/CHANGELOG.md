@@ -3,13 +3,15 @@
 ## 2026-06-17 | fix(investors-report): margem/faturamento em base única de competência (caz_receber+caz_pagar)
 
 **O que foi feito:**
-- `faturamentoResult` (`server/routes.ts`): a série mensal de faturamento/despesa/margem passa a usar uma fonte única em regime de COMPETÊNCIA — receita = `caz_receber.total` e despesa = `caz_pagar.total`, ambas por `data_vencimento`. Substitui o modelo híbrido anterior (receita emitida `caz_vendas` + despesa paga `caz_pagar`).
+- `faturamentoResult` (`server/routes.ts`): a série mensal de faturamento/despesa/margem passa a usar `caz_receber` + `caz_pagar`. Receita = `caz_receber.total` (faturado/competência, por `data_vencimento`); despesa = `caz_pagar.pago` (CAIXA, por data de pagamento). Substitui o modelo híbrido anterior (receita emitida `caz_vendas` + despesa paga `caz_pagar`).
 - A série começa no 1º mês de `caz_receber` (`bounds.inicio`) para não gerar meses só-despesa (margem -∞); estende-se sozinha para trás quando o histórico de `caz_receber`/`caz_pagar` é repopulado.
 - `faturamentoAnoResult` (KPIs YTD): alinhado à mesma fonte para o card "Margem (Ano)" não divergir do gráfico. Removido `valor_bruto_ano`; taxa de inadimplência passa a usar o faturamento do ano como base.
 - Tooltip dos gráficos de Margem e Faturamento: a `Area` decorativa recebe `tooltipType="none"`/`legendType="none"`, removendo a entrada duplicada (antes "Margem" aparecia 2x no tooltip).
 
 **Por que:**
-- A margem mensal exibia picos falsos (set/25 39,3%, abr/25 34,2%) porque misturava receita por EMISSÃO (`caz_vendas` lança o valor cheio da nota no mês da emissão) com despesa por CAIXA (`caz_pagar`) — regimes temporais incompatíveis. Usar `total` (faturado) em vez de `pago` (recebido) também evita a subnotação dos meses recentes enquanto as faturas ainda não foram quitadas.
+- A margem mensal exibia picos falsos (set/25 39,3%, abr/25 34,2%) porque misturava receita por EMISSÃO (`caz_vendas` lança o valor cheio da nota no mês da emissão) com despesa por CAIXA (`caz_pagar`) — regimes temporais incompatíveis.
+- **Receita usa `.total`** (faturado) e não `.pago` (recebido) porque na receita há inadimplência/atraso — `.pago` subnotaria os meses recentes.
+- **Despesa usa `.pago`** (caixa) e não `.total` porque o `caz_pagar.total` inclui provisões/parcelamentos a pagar (ex.: "6/24 - comissão", "9/10 - COFINS", pró-labore parcelado) que não saíram do caixa — inflavam o mês (mai/26: total R$1,44M vs pago R$1,18M). O `.pago` por data de pagamento bate com a DFC (`caz_parcelas`). Como as despesas são pagas no mês, competência≈caixa, então usar o pago não distorce.
 
 **Arquivos alterados:**
 - `server/routes.ts` - queries `faturamentoResult` e `faturamentoAnoResult`

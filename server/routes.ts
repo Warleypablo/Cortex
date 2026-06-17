@@ -3391,12 +3391,15 @@ Estruture sua resposta em:
           GROUP BY 1
         ),
         despesa AS (
+          -- Despesa em CAIXA: valor PAGO por data de pagamento (alinha com a DFC).
+          -- NÃO usar total: inclui provisões/parcelamentos a pagar (ex.: "6/24 - comissão",
+          -- "9/10 - COFINS", pró-labore parcelado) que não saíram do caixa e inflavam o mês.
           SELECT
-            TO_CHAR(data_vencimento, 'YYYY-MM') as mes,
-            COALESCE(SUM(total::numeric), 0) as despesas
+            TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
+            COALESCE(SUM(pago::numeric), 0) as despesas
           FROM "Conta Azul".caz_pagar, bounds
-          WHERE data_vencimento >= bounds.inicio
-            AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)
+          WHERE COALESCE(data_quitacao, data_vencimento) >= bounds.inicio
+            AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE)
           GROUP BY 1
         )
         SELECT
@@ -3428,9 +3431,10 @@ Estruture sua resposta em:
           FROM "Conta Azul".caz_receber
         ),
         despesa AS (
+          -- Despesa em CAIXA (valor pago por data de pagamento), alinhada com a DFC.
           SELECT
-            COALESCE(SUM(total::numeric) FILTER (WHERE data_vencimento >= DATE_TRUNC('year', CURRENT_DATE)
-              AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)), 0) as despesas_fechado
+            COALESCE(SUM(pago::numeric) FILTER (WHERE COALESCE(data_quitacao, data_vencimento) >= DATE_TRUNC('year', CURRENT_DATE)
+              AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE)), 0) as despesas_fechado
           FROM "Conta Azul".caz_pagar
         )
         SELECT r.faturamento_ano, r.faturamento_fechado, r.inadimplencia_ano, r.meses_fechados, d.despesas_fechado
