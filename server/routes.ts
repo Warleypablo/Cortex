@@ -9,6 +9,7 @@ import { createUserSchema, updatePermissionsSchema, updateRoleSchema } from "./m
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser } from "./auth/userDb";
 import { db } from "./db";
 import { sql, type SQL } from "drizzle-orm";
+import { computeEvolucaoChurn } from "./investorsReport/churn";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
 import { chat as unifiedAssistantChat } from "./services/unifiedAssistant";
 import type { UnifiedAssistantRequest, AssistantContext } from "@shared/schema";
@@ -3440,8 +3441,45 @@ Estruture sua resposta em:
         SELECT r.faturamento_ano, r.faturamento_fechado, r.inadimplencia_ano, r.meses_fechados, d.despesas_fechado
         FROM receita r, despesa d
       `);
-      
-      
+
+      // Evolução do churn (cup_churn) — churn BRUTO alinhado ao ClickUp:
+      // valor_r > 0 e status de churn real (cancelado/inativo + em cancelamento),
+      // SEM filtros de abono/motivo. Mesma definição usada pelo BP 2026.
+      const churnResult = await db.execute(sql`
+        SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') AS mes,
+               COALESCE(SUM(valor_r), 0) AS mrr_churn,
+               COUNT(*) AS qtd
+        FROM "Clickup".cup_churn
+        WHERE valor_r > 0
+          AND status IN ('cancelado/inativo', 'em cancelamento')
+          AND data_solicitacao_encerramento IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
+      // Denominador da taxa de churn: MRR ativo do FIM de cada mês
+      // (último snapshot de cup_data_hist no mês). Padrão idêntico ao BP 2026.
+      const mrrFimResult = await db.execute(sql`
+        WITH alvo AS (
+          SELECT DATE_TRUNC('month', data_snapshot)::date AS mes,
+                 MAX(data_snapshot::date) AS d
+          FROM "Clickup".cup_data_hist
+          GROUP BY 1
+        )
+        SELECT TO_CHAR(a.mes, 'YYYY-MM') AS mes,
+               SUM(h.valorr::numeric) FILTER (
+                 WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+               ) AS mrr_fim
+        FROM alvo a
+        JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = a.d
+        GROUP BY 1
+      `);
+
+      const evolucaoChurn = computeEvolucaoChurn(
+        churnResult.rows as any[],
+        mrrFimResult.rows as any[],
+      );
+
       const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0 };
@@ -3507,6 +3545,7 @@ Estruture sua resposta em:
             inadimplencia: Number(r.inadimplencia) || 0,
           };
         }).reverse(),
+        evolucaoChurn,
       });
     } catch (error) {
       console.error("[api] Error fetching investors report:", error);
