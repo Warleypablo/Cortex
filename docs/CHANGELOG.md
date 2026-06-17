@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-16 | fix(bp2026-revenue): alinha Churn R$ ao ClickUp usando churn bruto
+
+**O que foi feito:**
+- Removidos os filtros de exclusão (`abonar_churn = 'Sim'` e `motivo_cancelamento NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')`) das 3 queries de churn do BP 2026: agregação por produto (`bp2026.revenue.ts`), "Churn do Mês" (`bp2026.metricas.ts`) e drill-down `detChurn` (`bp2026.detalhe.ts`). Mantido `valor_r > 0`.
+- O "Churn R$ Total", churn por produto, churn % e "Churn do Mês" passam a refletir o churn BRUTO, batendo com o gráfico "Churn Commerce MoM" do ClickUp (jan e mar exatos; resíduo dos demais meses = drift de snapshot do print).
+- Abonados saem da "ponte do MRR" (MRR vazado) e passam a ser churn explícito.
+- Notas/tooltips e `bp2026.info.ts` atualizados para "churn bruto".
+
+**Por que:**
+- O BP usava a definição de churn ajustado/oficial (`vw_cup_churn_ajustado` com exclusões), enquanto o ClickUp mostra churn bruto. A divergência crescia mês a mês (jan = R$0 excluído; mai ≈ R$56k excluído), gerando desconfiança no número. Decisão do solicitante: alinhar ao ClickUp (bruto).
+
+**Arquivos alterados:**
+- `server/routes/bp2026.revenue.ts` - query de churn por produto sem exclusões; notas atualizadas
+- `server/routes/bp2026.metricas.ts` - query de "Churn do Mês" sem exclusões; nota da ponte do MRR
+- `server/routes/bp2026.detalhe.ts` - drill-down `detChurn` sem exclusões; comentário
+- `server/routes/bp2026.info.ts` - textos de fonte/cálculo do churn e do MRR vazado
+
+**Impacto arquitetural:** Nenhum. A view `vw_cup_churn_ajustado` não foi alterada, preservando os demais dashboards (ex.: evolução mensal de churn) que dependem da definição ajustada.
+
+---
+
 ## 2026-06-16 | feat(revenue-goals): histórico de inadimplência dinâmico (substitui hardcode)
 
 **O que foi feito:**
