@@ -10,6 +10,7 @@ import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, create
 import { db } from "./db";
 import { sql, type SQL } from "drizzle-orm";
 import { computeEvolucaoChurn } from "./investorsReport/churn";
+import { buildRegime, REGIME_CUTOVER } from "./investorsReport/regime";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
 import { chat as unifiedAssistantChat } from "./services/unifiedAssistant";
 import type { UnifiedAssistantRequest, AssistantContext } from "@shared/schema";
@@ -3369,13 +3370,12 @@ Estruture sua resposta em:
         ORDER BY quantidade DESC
       `);
       
-      // Faturamento mensal (regime de COMPETÊNCIA): receita devida (caz_receber.total) e
-      // despesa devida (caz_pagar.total), ambas pela data_vencimento. Série começa no 1º mês
-      // de caz_receber para não gerar meses só-despesa (margem -∞); estende-se automaticamente
-      // para trás quando o histórico de caz_receber/caz_pagar é repopulado.
-      // Usa `total` (faturado) e não `pago` (recebido) de propósito: `pago` subnota os meses
-      // recentes enquanto faturas ainda não foram quitadas, criando picos negativos espúrios.
-      const faturamentoResult = await db.execute(sql`
+      // Série mensal HÍBRIDA de regime (ver server/investorsReport/regime.ts):
+      //  - meses < REGIME_CUTOVER: COMPETÊNCIA (caz_receber.total por data_vencimento;
+      //    despesa paga de caz_pagar). Histórico repopulado até 2023.
+      //  - meses >= REGIME_CUTOVER: CAIXA (caz_parcelas.valor_pago por data_quitacao).
+      // O merge, a margem e os agregados YTD são feitos por buildRegime().
+      const competenciaResult = await db.execute(sql`
         WITH bounds AS (
           SELECT DATE_TRUNC('month', MIN(data_vencimento)) AS inicio
           FROM "Conta Azul".caz_receber
@@ -3388,30 +3388,60 @@ Estruture sua resposta em:
               THEN nao_pago::numeric ELSE 0 END), 0) as inadimplencia
           FROM "Conta Azul".caz_receber, bounds
           WHERE data_vencimento >= bounds.inicio
-            AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)
+            AND data_vencimento < ${REGIME_CUTOVER}::date
           GROUP BY 1
         ),
         despesa AS (
-          -- Despesa em CAIXA: valor PAGO por data de pagamento (alinha com a DFC).
-          -- NÃO usar total: inclui provisões/parcelamentos a pagar (ex.: "6/24 - comissão",
-          -- "9/10 - COFINS", pró-labore parcelado) que não saíram do caixa e inflavam o mês.
+          -- Despesa paga por data de pagamento (caz_pagar). NÃO usar total: inclui
+          -- provisões/parcelamentos a pagar que não saíram do caixa e inflavam o mês.
           SELECT
             TO_CHAR(COALESCE(data_quitacao, data_vencimento), 'YYYY-MM') as mes,
             COALESCE(SUM(pago::numeric), 0) as despesas
           FROM "Conta Azul".caz_pagar, bounds
           WHERE COALESCE(data_quitacao, data_vencimento) >= bounds.inicio
-            AND COALESCE(data_quitacao, data_vencimento) < DATE_TRUNC('month', CURRENT_DATE)
+            AND COALESCE(data_quitacao, data_vencimento) < ${REGIME_CUTOVER}::date
           GROUP BY 1
         )
-        SELECT
-          r.mes,
-          'caixa' as fonte,
-          r.faturamento,
-          COALESCE(d.despesas, 0) as despesas,
-          r.inadimplencia
+        SELECT r.mes, r.faturamento, COALESCE(d.despesas, 0) as despesas, r.inadimplencia
         FROM receita r
         LEFT JOIN despesa d USING (mes)
-        ORDER BY r.mes DESC
+      `);
+
+      // CAIXA (>= REGIME_CUTOVER): receita/despesa efetivamente movimentadas em
+      // caz_parcelas, por data_quitacao. valor_pago = o que entrou/saiu do caixa.
+      const caixaResult = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_quitacao, 'YYYY-MM') as mes,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'RECEITA'), 0) as faturamento,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'DESPESA'), 0) as despesas
+        FROM "Conta Azul".caz_parcelas
+        WHERE data_quitacao >= ${REGIME_CUTOVER}::date
+        GROUP BY 1
+      `);
+
+      // hojeYM define o ano do YTD e qual mês é o parcial (excluído da margem fechada).
+      const hojeYM = new Date().toISOString().slice(0, 7);
+      const regime = buildRegime(
+        competenciaResult.rows as any[],
+        caixaResult.rows as any[],
+        hojeYM,
+      );
+
+      // Faturamento de COMPETÊNCIA por mês (caz_receber.total), TODOS os meses até o
+      // último fechado. Usado SÓ pelo Cresc. YoY, que compara like-for-like
+      // (competência × competência) — caixa só existe de 2026 em diante, então um
+      // YoY em caixa misturaria 2026-caixa com 2025-competência.
+      const competenciaFullResult = await db.execute(sql`
+        WITH bounds AS (
+          SELECT DATE_TRUNC('month', MIN(data_vencimento)) AS inicio
+          FROM "Conta Azul".caz_receber
+        )
+        SELECT TO_CHAR(data_vencimento, 'YYYY-MM') as mes, COALESCE(SUM(total::numeric), 0) as faturamento
+        FROM "Conta Azul".caz_receber, bounds
+        WHERE data_vencimento >= bounds.inicio
+          AND data_vencimento < DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY 1
+        ORDER BY 1
       `);
       
       // Faturamento, inadimplência e margem do ANO corrente (YTD: janeiro → mês atual).
@@ -3503,16 +3533,20 @@ Estruture sua resposta em:
       const mrrAtivo = Number(contratos.mrr_ativo) || 0;
       const receitaPorCabeca = headcount > 0 ? mrrAtivo / headcount : 0;
 
-      const faturamentoAnoValor = Number(faturamentoAno.faturamento_ano) || 0;
-      const faturamentoFechado = Number(faturamentoAno.faturamento_fechado) || 0;
-      const despesasFechado = Number(faturamentoAno.despesas_fechado) || 0;
+      // Inadimplência (Ano) permanece em COMPETÊNCIA: % = não-pago / faturamento devido (YTD).
+      // O denominador é o faturamento de competência (caz_receber), NÃO o caixa — em caixa
+      // "inadimplência" não existe.
+      const faturamentoAnoCompetencia = Number(faturamentoAno.faturamento_ano) || 0;
       const inadimplenciaAno = Number(faturamentoAno.inadimplencia_ano) || 0;
-      const taxaInadimplencia = faturamentoAnoValor > 0 ? (inadimplenciaAno / faturamentoAnoValor) * 100 : 0;
-      // Margem só de meses fechados (exclui o mês corrente, ainda parcial)
-      const margemAno = faturamentoFechado > 0 ? ((faturamentoFechado - despesasFechado) / faturamentoFechado) * 100 : 0;
-      // Faturamento médio MENSAL (meses fechados) por colaborador ativo
-      const mesesFechados = Number(faturamentoAno.meses_fechados) || 0;
-      const faturamentoMensalMedio = mesesFechados > 0 ? faturamentoFechado / mesesFechados : 0;
+      const taxaInadimplencia = faturamentoAnoCompetencia > 0 ? (inadimplenciaAno / faturamentoAnoCompetencia) * 100 : 0;
+
+      // Faturamento e Margem (Ano) em CAIXA (YTD do ano corrente), vindos do módulo de regime.
+      const faturamentoAnoValor = regime.ytd.faturamentoAno;
+      const margemAno = regime.ytd.margemAno;
+      // Faturamento médio MENSAL (meses fechados, caixa) por colaborador ativo.
+      const faturamentoMensalMedio = regime.ytd.mesesFechados > 0
+        ? regime.ytd.faturamentoFechado / regime.ytd.mesesFechados
+        : 0;
       const faturamentoPorCabeca = headcount > 0 ? faturamentoMensalMedio / headcount : 0;
       
       const contratosRecorrentes = Number(contratos.contratos_recorrentes) || 1;
@@ -3547,18 +3581,24 @@ Estruture sua resposta em:
           setor: r.setor,
           quantidade: Number(r.quantidade),
         })),
-        evolucaoFaturamento: faturamentoResult.rows.map((r: any) => {
-          const faturamento = Number(r.faturamento) || 0;
-          const despesas = Number(r.despesas) || 0;
-          return {
-            mes: r.mes,
-            fonte: r.fonte as 'caixa' | 'emitido',
-            faturamento,
-            despesas,
-            geracaoCaixa: faturamento - despesas,
-            inadimplencia: Number(r.inadimplencia) || 0,
-          };
-        }).reverse(),
+        // Série já ordenada asc; exclui o mês corrente parcial (mes < hojeYM) para
+        // não desenhar um "dip" no fim do gráfico com o mês ainda em andamento.
+        evolucaoFaturamento: regime.series
+          .filter((m) => m.mes < hojeYM)
+          .map((m) => ({
+            mes: m.mes,
+            fonte: m.fonte,
+            faturamento: m.faturamento,
+            despesas: m.despesas,
+            geracaoCaixa: m.faturamento - m.despesas,
+            inadimplencia: m.inadimplencia,
+          })),
+        transicaoMes: regime.transicaoMes,
+        // Série de competência (caz_receber) só para o Cresc. YoY (comparação like-for-like).
+        evolucaoFaturamentoCompetencia: (competenciaFullResult.rows as any[]).map((r) => ({
+          mes: r.mes,
+          faturamento: Number(r.faturamento) || 0,
+        })),
         evolucaoChurn,
         vendasMensais: vendasResult.rows.map((r: any) => ({
           mes: r.mes,
@@ -3573,51 +3613,41 @@ Estruture sua resposta em:
     }
   });
 
-  // Geração de caixa acumulada (regime de CAIXA, base DFC) — ano corrente.
-  // Reaproveita EXATAMENTE a linha de geração de caixa da DFC (storage.getDfc):
-  // caz_parcelas, status QUITADO, por data_quitacao, valor_pago−desconto,
-  // RECEITAS (cat. 03/04) − DESPESAS (cat. 05/06/07/08), incluindo o ajuste de
-  // conciliação (cat. 09) que a DFC injeta sob DESPESAS. Garante paridade 100%
-  // com a tela /dfc. Independe do seletor de período da página: sempre vai de
-  // janeiro do ano corrente até o último mês FECHADO (exclui o mês parcial atual).
+  // Geração de caixa acumulada (regime de CAIXA) — ano corrente.
+  // Usa a MESMA base caixa da série de Receita vs Despesas: caz_parcelas.valor_pago
+  // por data_quitacao, RECEITA − DESPESA por tipo_evento. Assim geracaoMes reconcilia
+  // por construção com (faturamento − despesas) do gráfico de Receita vs Despesas.
+  // (Antes usava storage.getDfc, que injetava um ajuste de conciliação artificial.)
+  // Vai de janeiro do ano corrente até o último mês FECHADO (exclui o mês parcial atual).
   app.get("/api/investors-report/geracao-caixa", async (_req, res) => {
     try {
       const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
-      const hoje = new Date();
-      const ano = hoje.getFullYear();
+      const ano = new Date().getFullYear();
 
-      // Último mês fechado = último dia do mês anterior ao atual.
-      // (dia 0 do mês atual = último dia do mês anterior)
-      const fimMesAnterior = new Date(ano, hoje.getMonth(), 0);
-
-      // Se estamos em janeiro, ainda não há mês fechado neste ano → série vazia.
-      if (fimMesAnterior.getFullYear() < ano) {
-        return res.json({ ano, series: [] });
-      }
-
-      const dataInicio = `${ano}-01-01`;
-      const dataFim = `${fimMesAnterior.getFullYear()}-${String(fimMesAnterior.getMonth() + 1).padStart(2, '0')}-${String(fimMesAnterior.getDate()).padStart(2, '0')}`;
-      const mesFimStr = dataFim.substring(0, 7); // 'YYYY-MM'
-
-      const dfc = await storage.getDfc(dataInicio, dataFim);
-      const receitas = dfc.nodes.find((n) => n.categoriaId === 'RECEITAS');
-      const despesas = dfc.nodes.find((n) => n.categoriaId === 'DESPESAS');
-
-      // Meses do ano corrente até o último mês fechado, na ordem cronológica.
-      const mesesDoAno = dfc.meses
-        .filter((m) => m.startsWith(`${ano}-`) && m <= mesFimStr)
-        .sort();
+      const caixaResult = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_quitacao, 'YYYY-MM') as mes,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'RECEITA'), 0) as receita,
+          COALESCE(SUM(valor_pago::numeric) FILTER (WHERE tipo_evento = 'DESPESA'), 0) as despesa
+        FROM "Conta Azul".caz_parcelas
+        WHERE data_quitacao >= ${`${ano}-01-01`}::date
+          AND data_quitacao < DATE_TRUNC('month', CURRENT_DATE)
+        GROUP BY 1
+        ORDER BY 1
+      `);
 
       let caixaAcumulado = 0;
-      const series = mesesDoAno.map((mes) => {
-        const rec = receitas?.valuesByMonth[mes] || 0;
-        const desp = Math.abs(despesas?.valuesByMonth[mes] || 0); // mesma fórmula da DFC (calculateMonthlyData)
-        const geracaoMes = rec - desp;
+      const series = (caixaResult.rows as any[]).map((r) => {
+        const receita = Number(r.receita) || 0;
+        const despesa = Number(r.despesa) || 0;
+        const geracaoMes = receita - despesa;
         caixaAcumulado += geracaoMes;
-        const month = parseInt(mes.split('-')[1], 10);
+        const month = parseInt(r.mes.split('-')[1], 10);
         return {
-          mes,
+          mes: r.mes,
           mesLabel: `${monthNames[month - 1]}/${String(ano).slice(2)}`,
+          receita,
+          despesa,
           geracaoMes,
           caixaAcumulado,
         };
