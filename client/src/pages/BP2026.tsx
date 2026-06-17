@@ -96,6 +96,7 @@ export default function BP2026() {
               mesCorrente={data.mesCorrente}
               mesFechado={data.mesFechado}
               mostrarOrcado={false}
+              onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
             />
           </div>
           <BPDreTable
@@ -162,6 +163,7 @@ export default function BP2026() {
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
             mostrarOrcado={false}
+            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
       </Tabs>
@@ -169,8 +171,8 @@ export default function BP2026() {
         metrica={detalhe?.metrica ?? null}
         mes={detalhe?.mes ?? null}
         linhas={[
-          ...data.linhas, ...data.metricasGerais, ...data.revenue,
-          ...data.funil, ...data.vendasProduto, ...data.capacity, ...data.sgaDetalhe,
+          ...data.linhas, ...data.metricasGerais, ...data.revenue, ...data.ponteMrr,
+          ...data.pontual, ...data.funil, ...data.vendasProduto, ...data.capacity, ...data.sgaDetalhe,
           ...data.cacDetalhe, ...data.outrasDetalhe,
         ]}
         onClose={() => setDetalhe(null)}
