@@ -69,11 +69,13 @@ interface CelulaProps {
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
   unidade: "brl" | "int" | "pct" | "dec";
   parcial?: boolean;
+  semMeta?: boolean; // linha de composição (ex.: "% do total"): sem semântica orçado-vs-realizado
 }
 
-function Celula({ orcado, realizado, atingimento, direcao, unidade, parcial }: CelulaProps) {
+function Celula({ orcado, realizado, atingimento, direcao, unidade, parcial, semMeta }: CelulaProps) {
   // gasto/receita sem orçamento: precisa saltar aos olhos, não virar "—"
-  const naoOrcado = atingimento === null && orcado === 0 && realizado !== null && realizado > 0;
+  // (suprimido em linhas de composição, onde orçado 0 é esperado e não significa "não orçado")
+  const naoOrcado = !semMeta && atingimento === null && orcado === 0 && realizado !== null && realizado > 0;
   // mês parcial: atingimento sem cor semântica (compara dias corridos com mês cheio)
   const corAting = parcial
     ? "text-gray-400 dark:text-zinc-500"
@@ -243,7 +245,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                               </TooltipContent>
                             </Tooltip>
                           )}
-                          <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} direcao={linha.direcao} unidade={linha.unidade ?? "brl"} parcial={m.mes === mesCorrente && mesCorrente > mesFechado} />
+                          <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} direcao={linha.direcao} unidade={linha.unidade ?? "brl"} parcial={m.mes === mesCorrente && mesCorrente > mesFechado} semMeta={linha.subItem} />
                         </span>
                       </td>
                     );
@@ -255,6 +257,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick }: Pro
                     atingimento={linha.ytd.atingimento}
                     direcao={linha.direcao}
                     unidade={linha.unidade ?? "brl"}
+                    semMeta={linha.subItem}
                   />
                 </td>
               </tr>

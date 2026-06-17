@@ -11,7 +11,7 @@ import {
   type DealVenda, type MixClickup, type AovMedio, type ProdutoRowMix,
 } from "./bp2026.vendasProduto.helpers";
 import {
-  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SERVICOS_BITRIX,
+  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SERVICOS_BITRIX, SLUG,
   type SegmentoBP, type Natureza,
 } from "../okr2026/servicosBitrix";
 
@@ -25,11 +25,6 @@ interface Linha {
   meses: MesLinha[]; ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
 
-const SLUG: Record<SegmentoBP, string> = {
-  "Performance": "performance", "Creators": "creators", "Social": "social",
-  "Gestão de Comunidade": "gc", "Others": "others",
-  "E-commerce": "ecommerce", "Site Institucional": "site", "Landing Page": "landing", "CRM": "crm",
-};
 const SEG_POR_SLUG: Record<string, SegmentoBP> = Object.fromEntries(
   (Object.entries(SLUG) as [SegmentoBP, string][]).map(([seg, slug]) => [slug, seg])
 ) as Record<string, SegmentoBP>;
