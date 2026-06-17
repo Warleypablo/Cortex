@@ -873,7 +873,6 @@ export default function InvestorsReport() {
                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
                     <Bar dataKey="faturamento" fill="#10b981" name="Faturamento" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="despesas" fill="#ef4444" name="Despesas" radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="geracaoCaixa" stroke="#1978D5" strokeWidth={2.5} dot={{ r: 3, fill: '#1978D5' }} name="Geração Caixa" />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
