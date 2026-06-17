@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-17 | feat(broadcast): filtros e ordenação integrados no card da lista
+
+**O que foi feito:**
+- **Canal** e **Busca** migraram do card de filtros separado para o header do card *Broadcasts* — o card agora é sempre renderizado, com estados de loading/erro/vazio dentro do corpo
+- Novo seletor **"Ordenar por"** cobrindo **todas** as métricas (Base, Taxa de entrega, Taxa de abertura, Conversas, Oportunidades, Reuniões, Ganhos, Receita, AOV, Gasto, CAC, Data) + toggle **"Maior → menor / Menor → maior"**
+- Colunas Oportunidades / Reuniões / Ganhos / Receita / AOV / Gasto / CAC agora **ordenáveis por clique** no cabeçalho (antes só 5 colunas tinham `SortableTh`)
+- AOV e CAC (derivados de receita/ganhos e gasto/ganhos) resolvidos no comparador; valores nulos (`—`) sempre por último, independente da direção
+
+**Por que:**
+- Reunir filtro e lista num único bloco e dar controle explícito de ranking (maior/menor base, maior taxa de entrega, etc.) sem depender de clicar coluna a coluna
+
+**Arquivos alterados:**
+- `client/src/pages/GhlMarketing.tsx` - `SortKey` expandido + `SORT_OPTIONS`; comparador com AOV/CAC; card unificado com controles no header; `SortableTh` ganha prop `title`
+
+**Impacto arquitetural:** Nenhum — frontend-only. Ordenação continua local (sobre a página atual de até 50 itens), como já era.
+
+---
+
 ## 2026-06-16 | fix(broadcast): Oportunidade conta reunião + card Status de entrega
 
 **O que foi feito:**
