@@ -330,6 +330,13 @@ export default function InvestorsReport() {
     return idx > 0 ? chartDataWithMetrics[idx].mesLabel : null;
   }, [chartDataWithMetrics]);
 
+  // O gráfico de Margem mostra SÓ o regime de caixa (2026+). A margem de competência
+  // (pré-2026) usa outra metodologia e poluía a série com picos não comparáveis.
+  const margemChartData = useMemo(
+    () => chartDataWithMetrics.filter(item => item.fonte === 'caixa'),
+    [chartDataWithMetrics]
+  );
+
   const handleExportPDF = async () => {
     try {
       const startDateStr = format(dateRange.start, 'yyyy-MM-dd');
@@ -797,18 +804,18 @@ export default function InvestorsReport() {
                 <Percent className="h-5 w-5 text-blue-400" />
                 Evolução da Margem
               </CardTitle>
-              <CardDescription className="text-muted-foreground">Margem operacional mensal (%)</CardDescription>
+              <CardDescription className="text-muted-foreground">Margem operacional mensal (%) — regime de caixa (2026)</CardDescription>
             </CardHeader>
             <CardContent>
               {isLoading ? (
                 <Skeleton className="h-[280px] w-full" />
-              ) : !chartDataWithMetrics.length ? (
+              ) : !margemChartData.length ? (
                 <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado no período
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={chartDataWithMetrics} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <ComposedChart data={margemChartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
                     <defs>
                       <linearGradient id="gradientMargem" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#3b82f6" stopOpacity={0.3}/>
