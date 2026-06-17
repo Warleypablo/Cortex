@@ -17,6 +17,7 @@ import {
   type SegmentoBP, type Natureza,
 } from "../okr2026/servicosBitrix";
 const ANO = 2026;
+const CLICKUP_TASK_BASE = "https://app.clickup.com/t";
 
 interface MesLinha { mes: number; orcado: number; realizado: number | null; atingimento: number | null }
 interface Linha {
@@ -286,6 +287,7 @@ export function montarItensVendaProduto(
     detalhe: [c.servico || c.produto, c.status].filter(Boolean).join(" · "),
     data: c.data,
     valor: modo === "valor" ? valorDe(c) : 0,
+    url: `${CLICKUP_TASK_BASE}/${c.idSubtask}`,
   }));
   itens.sort((a, b) => b.valor - a.valor);
   const total = modo === "valor" ? doSeg.reduce((s, c) => s + valorDe(c), 0) : doSeg.length;
@@ -296,7 +298,8 @@ export async function detalheVendaProdutoMes(
   db: any, natureza: Natureza, segmento: SegmentoBP, mes: number, modo: "valor" | "contrato"
 ): Promise<{ itens: ItemVendaDet[]; total: number }> {
   const rows = (await db.execute(sql`
-    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+    SELECT c.id_subtask AS id_subtask,
+           COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
            COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
            COALESCE(c.servico, '') AS servico,
            COALESCE(c.status, '') AS status,
@@ -310,6 +313,7 @@ export async function detalheVendaProdutoMes(
       AND LOWER(TRIM(c.status)) <> 'não usar'
   `)).rows as any[];
   const contratos: ContratoRow[] = rows.map((r) => ({
+    idSubtask: String(r.id_subtask),
     cliente: String(r.cliente), produto: String(r.produto), servico: String(r.servico),
     status: String(r.status), valorr: Number(r.valorr), valorp: Number(r.valorp), data: r.data ?? null,
   }));

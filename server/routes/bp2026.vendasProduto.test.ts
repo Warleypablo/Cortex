@@ -57,8 +57,8 @@ describe("montarVendasProduto", () => {
 
 describe("montarItensVendaProduto", () => {
   const rows: ContratoRow[] = [
-    { cliente: "Alpha", produto: "Performance", servico: "Gestão", status: "ativo", valorr: 300, valorp: 0, data: "2026-01-10" },
-    { cliente: "Beta", produto: "Performance", servico: "Gestão", status: "cancelado/inativo", valorr: 200, valorp: 0, data: "2026-01-20" },
+    { idSubtask: "86alpha", cliente: "Alpha", produto: "Performance", servico: "Gestão", status: "ativo", valorr: 300, valorp: 0, data: "2026-01-10" },
+    { idSubtask: "86beta", cliente: "Beta", produto: "Performance", servico: "Gestão", status: "cancelado/inativo", valorr: 200, valorp: 0, data: "2026-01-20" },
   ];
   it("modo valor: total = soma dos valores da natureza, ordenado desc", () => {
     const { itens, total } = montarItensVendaProduto(rows, "recorrente", "Performance", "valor");
@@ -66,6 +66,7 @@ describe("montarItensVendaProduto", () => {
     expect(itens.map((i) => i.nome)).toEqual(["Alpha", "Beta"]);
     expect(itens[0].valor).toBe(300);
     expect(itens[0].grupo).toBe("Contratos");
+    expect(itens[0].url).toBe("https://app.clickup.com/t/86alpha");
   });
   it("modo contrato: total = contagem", () => {
     const { total } = montarItensVendaProduto(rows, "recorrente", "Performance", "contrato");

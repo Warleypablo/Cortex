@@ -132,9 +132,9 @@ describe("agregarVendasProdutoClickup", () => {
 
 describe("contratosDoSegmento", () => {
   const rows: ContratoRow[] = [
-    { cliente: "A", produto: "Performance", servico: "x", status: "ativo", valorr: 100, valorp: 0, data: null },
-    { cliente: "B", produto: "Ecommerce", servico: "y", status: "ativo", valorr: 50, valorp: 900, data: null },
-    { cliente: "C", produto: "Performance", servico: "z", status: "ativo", valorr: 0, valorp: 0, data: null },
+    { idSubtask: "86a", cliente: "A", produto: "Performance", servico: "x", status: "ativo", valorr: 100, valorp: 0, data: null },
+    { idSubtask: "86b", cliente: "B", produto: "Ecommerce", servico: "y", status: "ativo", valorr: 50, valorp: 900, data: null },
+    { idSubtask: "86c", cliente: "C", produto: "Performance", servico: "z", status: "ativo", valorr: 0, valorp: 0, data: null },
   ];
   it("filtra por natureza e reatribui Others", () => {
     expect(contratosDoSegmento(rows, "recorrente", "Performance").map((r) => r.cliente)).toEqual(["A"]);
