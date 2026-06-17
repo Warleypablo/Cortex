@@ -108,7 +108,7 @@ export { parseServicosVendidos, SERVICOS_BITRIX };
 import { segmentoDeProduto } from "./bp2026.produtoSegmento";
 
 export interface VendaProdutoRow { mes: number; produto: string; mrr: number; pont: number; contratosMrr: number; contratosPont: number }
-export interface TotalMesRow { mes: number; contratos: number; clientes: number }
+export interface TotalMesRow { mes: number; clientes: number }
 export interface TotalMes { mrr: number; pont: number; contratos: number; clientes: number }
 export interface AggVendasClickup {
   agg: Map<number, Map<SegmentoBP, CelulaSeg>>;
@@ -148,16 +148,18 @@ export function agregarVendasProdutoClickup(
       const c = cel(r.mes, segNoBloco(seg, "recorrente"));
       c.mrr += r.mrr; c.contratosRec += r.contratosMrr;
       tot(r.mes).mrr += r.mrr;
+      tot(r.mes).contratos += r.contratosMrr;
     }
     if (r.pont || r.contratosPont) {
       const c = cel(r.mes, segNoBloco(seg, "pontual"));
       c.pont += r.pont; c.contratosPont += r.contratosPont;
       tot(r.mes).pont += r.pont;
+      tot(r.mes).contratos += r.contratosPont;
     }
   }
   for (const tr of totalRows) {
     const t = tot(tr.mes);
-    t.contratos = tr.contratos; t.clientes = tr.clientes;
+    t.clientes = tr.clientes;
   }
   return { agg, totais };
 }

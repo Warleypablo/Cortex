@@ -91,7 +91,7 @@ describe("agregarVendasProdutoClickup", () => {
       { mes: 1, produto: "Performance", mrr: 1000, pont: 0, contratosMrr: 2, contratosPont: 0 },
       { mes: 1, produto: "Creators", mrr: 0, pont: 500, contratosMrr: 0, contratosPont: 3 },
     ];
-    const tot: TotalMesRow[] = [{ mes: 1, contratos: 5, clientes: 4 }];
+    const tot: TotalMesRow[] = [{ mes: 1, clientes: 4 }];
     const { agg, totais } = agregarVendasProdutoClickup(prod, tot);
     expect(agg.get(1)!.get("Performance")).toEqual({ mrr: 1000, pont: 0, contratosRec: 2, contratosPont: 0 });
     expect(agg.get(1)!.get("Creators")!.pont).toBe(500);
@@ -117,6 +117,16 @@ describe("agregarVendasProdutoClickup", () => {
     ];
     const { agg } = agregarVendasProdutoClickup(prod, []);
     expect(agg.get(3)!.get("Creators")).toEqual({ mrr: 100, pont: 200, contratosRec: 1, contratosPont: 1 });
+  });
+
+  it("totais.contratos = soma dos contratos por natureza (deriva dos blocos, não de totalRows)", () => {
+    const prod: VendaProdutoRow[] = [
+      { mes: 5, produto: "Creators", mrr: 100, pont: 200, contratosMrr: 1, contratosPont: 1 }, // dual: conta 2
+      { mes: 5, produto: "Performance", mrr: 50, pont: 0, contratosMrr: 1, contratosPont: 0 },  // 1
+    ];
+    const { totais } = agregarVendasProdutoClickup(prod, [{ mes: 5, clientes: 9 }]);
+    expect(totais.get(5)!.contratos).toBe(3); // 1+1 (Creators) + 1 (Performance)
+    expect(totais.get(5)!.clientes).toBe(9);  // vem de totalRows
   });
 });
 

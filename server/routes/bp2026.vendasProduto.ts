@@ -48,7 +48,6 @@ export async function carregarVendasProdutoClickup(db: any): Promise<AggVendasCl
   `)).rows as any[];
   const totRows = (await db.execute(sql`
     SELECT EXTRACT(MONTH FROM data_criado)::int AS mes,
-           COUNT(*)::int AS contratos,
            COUNT(DISTINCT id_task)::int AS clientes
     FROM "Clickup".cup_contratos
     WHERE data_criado >= ${ini} AND data_criado < ${fim}
@@ -61,7 +60,7 @@ export async function carregarVendasProdutoClickup(db: any): Promise<AggVendasCl
       mrr: Number(r.mrr), pont: Number(r.pont),
       contratosMrr: Number(r.contratos_mrr), contratosPont: Number(r.contratos_pont),
     })),
-    totRows.map((r) => ({ mes: Number(r.mes), contratos: Number(r.contratos), clientes: Number(r.clientes) })),
+    totRows.map((r) => ({ mes: Number(r.mes), clientes: Number(r.clientes) })),
   );
 }
 
