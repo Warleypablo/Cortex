@@ -1474,8 +1474,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const status = req.query.status as string || 'Todos'; // Todos, Ativo, Pausado
       const plataformaParam = req.query.plataforma as string || 'Todos'; // supports comma-separated
       const campanhaId = req.query.campanhaId as string || ''; // campaign_id filter
-      const campanhaIds = req.query.campanhaIds as string || ''; // comma-separated campaign_ids (produto filter)
+      const campanhaIds = req.query.campanhaIds as string || ''; // comma-separated campaign_ids (seleção manual de campanha — Meta)
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
+      // Filtro de PRODUTO por NOME de campanha (padrão [Produto]), cross-plataforma.
+      const produtos = (req.query.produtos as string || '').split(',').map(p => p.trim()).filter(Boolean);
+      const matchProduto = (campaignName: string | null | undefined) =>
+        produtos.length === 0 || produtos.some(p => (campaignName || '').includes(`[${p}]`));
 
       // Validar formato de data
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1842,9 +1846,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             if (status === 'Ativo' && c.status !== 'Ativo') return false;
             if (status === 'Pausado' && c.status !== 'Pausado') return false;
           }
-          // Filtro por campanha
+          // Filtro por campanha (manual, por ID) e por produto (nome [Produto])
           if (campanhaId && String(c.campaignId) !== String(campanhaId)) return false;
           if (campanhaIdSet && !campanhaIdSet.has(String(c.campaignId))) return false;
+          if (!matchProduto(c.campaignName)) return false;
           return true;
         });
       } // fim if (wantsMeta)
@@ -1859,6 +1864,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             }
             if (campanhaId && String(c.campaignId) !== String(campanhaId)) return false;
             if (campanhaIdSet && !campanhaIdSet.has(String(c.campaignId))) return false;
+            if (!matchProduto(c.campaignName)) return false;
             return true;
           });
           criativos = criativos.concat(googleRows);
@@ -1877,6 +1883,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             }
             if (campanhaId && String(c.campaignId) !== String(campanhaId)) return false;
             if (campanhaIdSet && !campanhaIdSet.has(String(c.campaignId))) return false;
+            if (!matchProduto(c.campaignName)) return false;
             return true;
           });
           criativos = criativos.concat(tiktokRows);
@@ -1906,6 +1913,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const campanhaId = req.query.campanhaId as string || '';
       const campanhaIds = req.query.campanhaIds as string || '';
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
+      const produtos = (req.query.produtos as string || '').split(',').map(p => p.trim()).filter(Boolean);
+      const matchProduto = (campaignName: string | null | undefined) =>
+        produtos.length === 0 || produtos.some(p => (campaignName || '').includes(`[${p}]`));
 
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
@@ -1925,21 +1935,24 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SELECT
             i.ad_id,
             a.campaign_id,
+            c.campaign_name,
             a.effective_status as ad_status,
             SUM(i.spend::numeric) as investimento
           FROM meta_ads.meta_insights_daily i
           LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
+          LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
           WHERE i.date_start >= ${sd}::date AND i.date_start <= ${ed}::date
             AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
-          GROUP BY i.ad_id, a.campaign_id, a.effective_status
+          GROUP BY i.ad_id, a.campaign_id, c.campaign_name, a.effective_status
         `);
 
-        // Filtrar por status e campanha em JS
+        // Filtrar por status, campanha (ID) e produto (nome [Produto]) em JS
         let adRows = (adsResult.rows as any[]);
         if (status === 'Ativo') adRows = adRows.filter((r: any) => r.ad_status?.toUpperCase() === 'ACTIVE');
         if (status === 'Pausado') adRows = adRows.filter((r: any) => ['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(r.ad_status?.toUpperCase()));
         if (campanhaId) adRows = adRows.filter((r: any) => String(r.campaign_id) === String(campanhaId));
         if (campanhaIdSet) adRows = adRows.filter((r: any) => campanhaIdSet.has(String(r.campaign_id)));
+        if (produtos.length > 0) adRows = adRows.filter((r: any) => matchProduto(r.campaign_name));
 
         const totalInvestimento = adRows.reduce((s: number, r: any) => s + (parseFloat(r.investimento) || 0), 0);
         const adIdSet = new Set(adRows.map((r: any) => String(r.ad_id)));

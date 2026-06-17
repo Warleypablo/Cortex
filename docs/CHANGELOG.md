@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-16 | fix(criativos): filtro de Produto por nome de campanha (cross-plataforma)
+
+**O que foi feito:**
+- O filtro de Produto passa a casar pelo **nome da campanha** (padrão `[Produto]`) em **todas as plataformas** (Meta/Google/TikTok), via novo param `produtos` no `/api/growth/criativos` e `/criativos/kpis`
+- Seleção **manual** de campanha continua por ID (`campanhaIds`, Meta)
+
+**Por que:**
+- O filtro de Produto derivava os IDs de campanha **só do Meta** (`/criativos/campanhas`), então selecionar um produto **zerava Google e TikTok** (IDs não batiam). Verificado: filtrar produto derrubava o Google de 274 → 0 linhas
+- As campanhas de Google já usam o mesmo padrão `[Produto]` no nome (`[Creators]`, `[UGC]`, `[Commerce]`…), então o match por nome funciona cross-plataforma (ex.: `[TP]` mantém 268/274 linhas do Google)
+
+**Arquivos alterados:**
+- `client/src/pages/Criativos.tsx` - `appendScopeParams`: produto → `produtos` (nomes); campanha manual → `campanhaIds` (IDs)
+- `server/routes/growth.ts` - `matchProduto()` aplicado aos 3 builds (Meta/Google/TikTok) e aos KPIs (join em `meta_campaigns` p/ o nome)
+
+---
+
 ## 2026-06-16 | feat(criativos): métricas nativas por plataforma + TikTok ad-level na aba Criativos
 
 **O que foi feito:**

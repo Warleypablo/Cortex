@@ -219,12 +219,17 @@ export default function Criativos() {
     }).filter((id): id is string => !!id);
   }, [campanhaFilters, campanhasFiltradas]);
 
-  // IDs de campanhas ativas (por seleção manual ou produto)
-  const activeCampaignIds = useMemo(() => {
-    if (selectedCampaignIds.length > 0) return selectedCampaignIds;
-    if (selectedProdutos.length > 0) return campanhasFiltradas.map(c => c.id);
-    return [];
-  }, [selectedCampaignIds, selectedProdutos, campanhasFiltradas]);
+  // Filtro de escopo enviado ao backend:
+  // - Seleção MANUAL de campanha → por ID (campanhaIds). IDs do Meta; preciso e específico.
+  // - PRODUTO → por NOME de campanha (produtos), casando o padrão [Produto] em TODAS as
+  //   plataformas (Meta/Google/TikTok). Antes ia por ID do Meta, o que zerava Google/TikTok.
+  const appendScopeParams = useCallback((params: URLSearchParams) => {
+    if (selectedCampaignIds.length > 0) {
+      params.append('campanhaIds', selectedCampaignIds.join(','));
+    } else if (selectedProdutos.length > 0) {
+      params.append('produtos', selectedProdutos.join(','));
+    }
+  }, [selectedCampaignIds, selectedProdutos]);
 
   // Buscamos SEMPRE todos os status. O filtro Ativo/Pausado é aplicado no client,
   // no nível da tab atual — assim um conjunto/campanha ativo soma todos os seus
@@ -236,9 +241,7 @@ export default function Criativos() {
       if (selectedPlataformas.length > 0) {
         params.append('plataforma', selectedPlataformas.join(','));
       }
-      if (activeCampaignIds.length > 0) {
-        params.append('campanhaIds', activeCampaignIds.join(','));
-      }
+      appendScopeParams(params);
       const res = await fetch(`/api/growth/criativos?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch criativos');
       return res.json();
@@ -257,9 +260,7 @@ export default function Criativos() {
       if (selectedPlataformas.length > 0) {
         params.append('plataforma', selectedPlataformas.join(','));
       }
-      if (activeCampaignIds.length > 0) {
-        params.append('campanhaIds', activeCampaignIds.join(','));
-      }
+      appendScopeParams(params);
       const res = await fetch(`/api/growth/criativos?${params.toString()}`, { credentials: 'include' });
       if (!res.ok) throw new Error('Failed to fetch compare criativos');
       return res.json();
@@ -303,9 +304,7 @@ export default function Criativos() {
     queryKey: ['/api/growth/criativos/kpis', startDate, endDate, compareEnabled, compareRange?.from, compareRange?.to, selectedCampaignIds, selectedProdutos],
     queryFn: async () => {
       const params = new URLSearchParams({ startDate, endDate });
-      if (activeCampaignIds.length > 0) {
-        params.append('campanhaIds', activeCampaignIds.join(','));
-      }
+      appendScopeParams(params);
       if (compareEnabled && compareRange?.from && compareRange?.to) {
         params.append('compareStartDate', format(compareRange.from, 'yyyy-MM-dd'));
         params.append('compareEndDate', format(compareRange.to, 'yyyy-MM-dd'));
