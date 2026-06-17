@@ -78,7 +78,7 @@ interface InvestorsReportData {
   distribuicaoSetor: Array<{ setor: string; quantidade: number }>;
   evolucaoFaturamento: Array<{
     mes: string;
-    fonte: 'caixa' | 'emitido';
+    fonte: 'caixa' | 'competencia';
     faturamento: number;
     despesas: number;
     geracaoCaixa: number;
@@ -143,7 +143,7 @@ export default function InvestorsReport() {
     queryKey: ['/api/investors-report'],
   });
 
-  // Geração de caixa acumulada em base CAIXA (linha da DFC), ano corrente.
+  // Geração de caixa acumulada em base CAIXA (caz_parcelas), ano corrente.
   // Independente do seletor de período da página (sempre Jan → último mês fechado).
   const { data: geracaoCaixaData, isLoading: isLoadingCaixa } = useQuery<GeracaoCaixaDFC>({
     queryKey: ['/api/investors-report/geracao-caixa'],
@@ -295,7 +295,7 @@ export default function InvestorsReport() {
   // como margem ponderada (Σ geração ÷ Σ faturamento) de jan até o mês atual.
   const avgMargem = data?.receita.margemAno ?? 0;
 
-  // Mês em que a base de receita muda de "emitido" (caz_vendas, histórico) para "caixa" (caz_parcelas).
+  // Mês em que a base muda de competência (caz_receber, histórico pré-2026) para caixa (caz_parcelas).
   // Usado para sinalizar a quebra de metodologia nos gráficos. null = série sem transição no período.
   const transicaoFonte = useMemo(() => {
     const idx = chartDataWithMetrics.findIndex(item => item.fonte === 'caixa');
@@ -569,7 +569,7 @@ export default function InvestorsReport() {
                     {formatCurrencyShort(data?.receita.faturamentoAno || 0)}
                   </div>
                   <div className="text-xs text-muted-foreground">
-                    Realizado no ano (YTD)
+                    Recebido no ano (YTD, caixa)
                   </div>
                 </div>
               )}
@@ -620,6 +620,9 @@ export default function InvestorsReport() {
                   </div>
                   <div className="text-2xl font-bold text-red-400" data-testid="kpi-inadimplencia">
                     {formatDecimal(data?.receita.taxaInadimplencia || 0)}%
+                  </div>
+                  <div className="text-xs text-muted-foreground">
+                    competência
                   </div>
                 </div>
               )}
@@ -720,7 +723,7 @@ export default function InvestorsReport() {
               </CardTitle>
               <CardDescription className="text-muted-foreground">
                 Receita mensal ao longo do tempo
-                {transicaoFonte && <span className="block text-[11px] mt-0.5 text-amber-400/80">Até a marca: faturamento emitido (notas) • Após: receita em caixa</span>}
+                {transicaoFonte && <span className="block text-[11px] mt-0.5 text-amber-400/80">Até a marca: competência (faturado) • Após: caixa (recebido)</span>}
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -749,7 +752,7 @@ export default function InvestorsReport() {
                     />
                     {transicaoFonte && (
                       <ReferenceLine x={transicaoFonte} stroke="#f59e0b" strokeDasharray="4 4" strokeWidth={1.5}
-                        label={{ value: 'emitido → caixa', position: 'insideTopRight', fill: '#f59e0b', fontSize: 9 }} />
+                        label={{ value: 'competência → caixa', position: 'insideTopRight', fill: '#f59e0b', fontSize: 9 }} />
                     )}
                     <Area type="monotone" dataKey="faturamento" stroke="#10b981" fill="url(#gradientFat)" strokeWidth={0} tooltipType="none" legendType="none" />
                     <Line type="monotone" dataKey="faturamento" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} activeDot={{ r: 5 }} />
@@ -894,7 +897,7 @@ export default function InvestorsReport() {
                 ) : null}
               </CardTitle>
               <CardDescription className="text-muted-foreground">
-                Regime de caixa (DFC) — gerado por mês em {geracaoCaixaData?.ano ?? new Date().getFullYear()}
+                Regime de caixa — gerado por mês em {geracaoCaixaData?.ano ?? new Date().getFullYear()}
               </CardDescription>
             </CardHeader>
             <CardContent>
