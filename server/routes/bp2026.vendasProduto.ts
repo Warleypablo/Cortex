@@ -48,11 +48,15 @@ export async function carregarVendasProdutoClickup(db: any): Promise<AggVendasCl
     GROUP BY 1, 2
   `)).rows as any[];
   const totRows = (await db.execute(sql`
-    SELECT EXTRACT(MONTH FROM data_criado)::int AS mes,
-           COUNT(DISTINCT id_task)::int AS clientes
-    FROM "Clickup".cup_contratos
-    WHERE data_criado >= ${ini} AND data_criado < ${fim}
-      AND LOWER(TRIM(status)) <> 'não usar'
+    WITH primeiro AS (
+      SELECT id_task, MIN(data_criado) AS dt
+      FROM "Clickup".cup_contratos
+      WHERE LOWER(TRIM(status)) <> 'não usar' AND id_task IS NOT NULL
+      GROUP BY id_task
+    )
+    SELECT EXTRACT(MONTH FROM dt)::int AS mes, COUNT(*)::int AS clientes
+    FROM primeiro
+    WHERE dt >= ${ini} AND dt < ${fim}
     GROUP BY 1
   `)).rows as any[];
   return agregarVendasProdutoClickup(

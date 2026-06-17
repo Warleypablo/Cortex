@@ -302,9 +302,9 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
     calculo: "Σ contratos com MRR + Σ contratos pontuais por segmento (= soma das linhas por produto). Um contrato com MRR e Pontual conta nas duas naturezas — mesma base do orçado (Σ contratos_vendidos_*).",
   },
   vp_num_clientes: {
-    definicao: "Clientes distintos com contrato criado no mês.",
-    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado.',
-    calculo: "COUNT(DISTINCT id_task) dos contratos criados no mês. Sem orçado (não há meta de clientes novos).",
+    definicao: "Clientes novos no mês — datados pela criação do cliente (1ª venda).",
+    fonte: 'ClickUp — "Clickup".cup_contratos (cup_clientes não tem data de criação).',
+    calculo: "Cliente contado uma vez, no mês do seu 1º contrato (MIN data_criado por id_task). Sem orçado.",
   },
   reunioes: {
     definicao: "Reuniões comerciais realizadas no mês.",
