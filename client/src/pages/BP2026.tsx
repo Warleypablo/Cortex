@@ -13,6 +13,8 @@ interface ReceitasResponse {
   linhas: BPLinha[];
   metricasGerais: BPLinha[];
   revenue: BPLinha[];
+  ponteMrr: BPLinha[];
+  pontual: BPLinha[];
   funil: BPLinha[];
   vendasProduto: BPLinha[];
   capacity: BPLinha[];
@@ -66,6 +68,7 @@ export default function BP2026() {
           <TabsTrigger value="sga">SG&amp;A</TabsTrigger>
           <TabsTrigger value="cac">CAC</TabsTrigger>
           <TabsTrigger value="outras">Outras Receitas</TabsTrigger>
+          <TabsTrigger value="pontual">Pontual</TabsTrigger>
         </TabsList>
         <TabsContent value="dre" className="mt-4">
           <BPDreTable
@@ -83,7 +86,18 @@ export default function BP2026() {
             onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
-        <TabsContent value="revenue" className="mt-4">
+        <TabsContent value="revenue" className="mt-4 space-y-6">
+          <div>
+            <h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
+              Ponte do MRR — movimento mensal (só realizado)
+            </h3>
+            <BPDreTable
+              linhas={data.ponteMrr}
+              mesCorrente={data.mesCorrente}
+              mesFechado={data.mesFechado}
+              mostrarOrcado={false}
+            />
+          </div>
           <BPDreTable
             linhas={data.revenue}
             mesCorrente={data.mesCorrente}
@@ -139,13 +153,24 @@ export default function BP2026() {
             onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
+        <TabsContent value="pontual" className="mt-4 space-y-2">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300">
+            Movimento do estoque de contratos pontuais (só realizado)
+          </h3>
+          <BPDreTable
+            linhas={data.pontual}
+            mesCorrente={data.mesCorrente}
+            mesFechado={data.mesFechado}
+            mostrarOrcado={false}
+          />
+        </TabsContent>
       </Tabs>
       <BPCellDetail
         metrica={detalhe?.metrica ?? null}
         mes={detalhe?.mes ?? null}
         linhas={[
-          ...data.linhas, ...data.metricasGerais, ...data.revenue,
-          ...data.funil, ...data.vendasProduto, ...data.capacity, ...data.sgaDetalhe,
+          ...data.linhas, ...data.metricasGerais, ...data.revenue, ...data.ponteMrr,
+          ...data.pontual, ...data.funil, ...data.vendasProduto, ...data.capacity, ...data.sgaDetalhe,
           ...data.cacDetalhe, ...data.outrasDetalhe,
         ]}
         onClose={() => setDetalhe(null)}
