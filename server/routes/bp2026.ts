@@ -14,7 +14,7 @@ import {
 import { montarMetricasGerais } from "./bp2026.metricas";
 import { montarRevenue } from "./bp2026.revenue";
 import { montarFunil } from "./bp2026.funil";
-import { montarVendasProduto, carregarAtribuicaoVendas } from "./bp2026.vendasProduto";
+import { montarVendasProduto, carregarAtribuicaoVendas, carregarVendasProdutoClickup } from "./bp2026.vendasProduto";
 import { agregarVendasProduto } from "./bp2026.vendasProduto.helpers";
 import { SEGMENTOS_RECORRENTES, SLUG } from "../okr2026/servicosBitrix";
 import { montarCapacity } from "./bp2026.capacity";
@@ -524,7 +524,8 @@ export function registerBp2026Routes(app: Express, db: any) {
         contratosVendidosRec[SLUG[seg]] = Array.from({ length: 12 }, (_, i) =>
           i + 1 <= mesCorrente ? (agg.get(i + 1)?.get(seg)?.contratosRec ?? 0) : null);
       }
-      const vendasProduto = await montarVendasProduto({ db, orcado, mesCorrente, mesFechado, atrib });
+      const { agg: aggVendas, totais: totaisVendas } = await carregarVendasProdutoClickup(db);
+      const vendasProduto = montarVendasProduto({ agg: aggVendas, totais: totaisVendas, orcado, mesCorrente, mesFechado });
 
       // 11. Capacity (sub-aba) — contratos Performance extraídos do retorno da Revenue
       const contratosPerformanceSerie =

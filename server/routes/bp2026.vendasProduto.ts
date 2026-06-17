@@ -1,27 +1,30 @@
 // server/routes/bp2026.vendasProduto.ts
 // Sub-aba Vendas por Produto: vendas MRR/Pontual, contratos e AOV por segmento BP.
-// Realizado: Bitrix.crm_deal (servicos_vendidos) com valor atribuído pela cascata
-// (produto único -> mix ClickUp -> AOV). Total por natureza fecha com o funil agregado.
-// O drill-down (detalheVendaProdutoMes) reusa a MESMA atribuição — célula e detalhe
-// não podem divergir.
+// Realizado: "Clickup".cup_contratos por data_criado, com produto mapeado a segmento
+// (bp2026.produtoSegmento). O drill-down lista os contratos do ClickUp.
+// NOTA: carregarAtribuicaoVendas/parseMetricaProduto permanecem — a atribuição Bitrix
+// ainda é usada pelo CAC (contratosVendidosRec em bp2026.ts).
 import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd } from "./bp2026.helpers";
 import {
   agregarVendasProduto, aovMedioPorSegmento, parseServicosVendidos, distribuirDeal,
+  agregarVendasProdutoClickup, contratosDoSegmento,
   type DealVenda, type MixClickup, type AovMedio, type ProdutoRowMix,
+  type CelulaSeg, type TotalMes, type AggVendasClickup, type ContratoRow,
 } from "./bp2026.vendasProduto.helpers";
 import {
   SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SERVICOS_BITRIX, SLUG,
   type SegmentoBP, type Natureza,
 } from "../okr2026/servicosBitrix";
 
-// portal Bitrix para montar o link do deal (mesmo base usado no FunilBroadcast)
 const BITRIX_BASE = "https://turbopartners.bitrix24.com.br";
+const ANO = 2026;
 
 interface MesLinha { mes: number; orcado: number; realizado: number | null; atingimento: number | null }
 interface Linha {
   metrica: string; titulo: string; tipoAgregacao: "fluxo"; direcao: "maior_melhor";
   unidade: "brl" | "int" | "pct"; grupo: string; segmento: string; destaque?: boolean;
+  semDetalhe?: boolean;
   meses: MesLinha[]; ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
 
@@ -30,12 +33,46 @@ const SEG_POR_SLUG: Record<string, SegmentoBP> = Object.fromEntries(
 ) as Record<string, SegmentoBP>;
 const orcKey = (medida: string, seg: SegmentoBP) => `${medida}_${SLUG[seg]}`;
 
+// Carrega vendas por produto do ClickUp (data_criado) e agrega no formato da matriz.
+export async function carregarVendasProdutoClickup(db: any): Promise<AggVendasClickup> {
+  const ini = `${ANO}-01-01`, fim = `${ANO + 1}-01-01`;
+  const prodRows = (await db.execute(sql`
+    SELECT EXTRACT(MONTH FROM data_criado)::int AS mes,
+           COALESCE(NULLIF(TRIM(produto), ''), '(sem produto)') AS produto,
+           COALESCE(SUM(valorr::numeric), 0)::float AS mrr,
+           COALESCE(SUM(valorp::numeric), 0)::float AS pont,
+           COUNT(*) FILTER (WHERE COALESCE(valorr,0) > 0)::int AS contratos_mrr,
+           COUNT(*) FILTER (WHERE COALESCE(valorp,0) > 0)::int AS contratos_pont
+    FROM "Clickup".cup_contratos
+    WHERE data_criado >= ${ini} AND data_criado < ${fim}
+      AND LOWER(TRIM(status)) <> 'não usar'
+    GROUP BY 1, 2
+  `)).rows as any[];
+  const totRows = (await db.execute(sql`
+    SELECT EXTRACT(MONTH FROM data_criado)::int AS mes,
+           COUNT(*)::int AS contratos,
+           COUNT(DISTINCT id_task)::int AS clientes
+    FROM "Clickup".cup_contratos
+    WHERE data_criado >= ${ini} AND data_criado < ${fim}
+      AND LOWER(TRIM(status)) <> 'não usar'
+    GROUP BY 1
+  `)).rows as any[];
+  return agregarVendasProdutoClickup(
+    prodRows.map((r) => ({
+      mes: Number(r.mes), produto: String(r.produto),
+      mrr: Number(r.mrr), pont: Number(r.pont),
+      contratosMrr: Number(r.contratos_mrr), contratosPont: Number(r.contratos_pont),
+    })),
+    totRows.map((r) => ({ mes: Number(r.mes), contratos: Number(r.contratos), clientes: Number(r.clientes) })),
+  );
+}
+
 interface Deps {
-  db: any;
+  agg: Map<number, Map<SegmentoBP, CelulaSeg>>;
+  totais: Map<number, TotalMes>;
   orcado: Record<string, Record<number, number>>;
   mesCorrente: number;
   mesFechado: number;
-  atrib?: AtribuicaoVendas; // reaproveita a atribuição já carregada pelo handler
 }
 
 // ---- Carregamento compartilhado: deals + mix ClickUp + AOV médio (usado pela
@@ -138,71 +175,82 @@ export async function carregarAtribuicaoVendas(db: any): Promise<AtribuicaoVenda
   return { deals, prMix, mixRec, mixPont, aovRec, aovPont, meta };
 }
 
-export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
-  const { db, orcado, mesCorrente, mesFechado } = deps;
-
-  const { deals, prMix, mixRec, mixPont, aovRec, aovPont } = deps.atrib ?? await carregarAtribuicaoVendas(db);
-  const agg = agregarVendasProduto(deals, prMix, mixRec, mixPont, aovRec, aovPont);
+export function montarVendasProduto(deps: Deps): Linha[] {
+  const { agg, totais, orcado, mesCorrente, mesFechado } = deps;
 
   const serie = (f: (m: number) => number | null) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? f(i + 1) : null));
-
+  const orcOf = (src: string | ((m: number) => number), mes: number): number =>
+    typeof src === "function" ? src(mes) : (orcado[src]?.[mes] ?? 0);
   const razao = (num: number | null, den: number | null): number | null =>
     (num === null || den === null || !den) ? null : num / den;
   const somaAte = (s: (number | null)[]) =>
     s.slice(0, mesFechado).reduce<number | null>((acc, v) => (v === null ? acc : (acc ?? 0) + v), null);
-  const somaOrcAte = (metricaKey: string) =>
-    Array.from({ length: mesFechado }, (_, i) => orcado[metricaKey]?.[i + 1] ?? 0).reduce((a, b) => a + b, 0);
+  const somaOrcAte = (src: string | ((m: number) => number)) =>
+    Array.from({ length: mesFechado }, (_, i) => orcOf(src, i + 1)).reduce((a, b) => a + b, 0);
 
   const fazLinha = (
     metrica: string, titulo: string, grupo: string, segmento: string,
-    unidade: Linha["unidade"], serieReal: (number | null)[], orcadoMetrica: string,
-    ytdOverride?: { orcado: number; realizado: number | null },
-    destaque = false
+    unidade: Linha["unidade"], serieReal: (number | null)[], orcSrc: string | ((m: number) => number),
+    opts: { ytdOverride?: { orcado: number; realizado: number | null }; destaque?: boolean; semDetalhe?: boolean } = {}
   ): Linha => {
     const meses: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
-      const o = orcado[orcadoMetrica]?.[i + 1] ?? 0;
+      const o = orcOf(orcSrc, i + 1);
       const r = serieReal[i];
       return { mes: i + 1, orcado: o, realizado: r, atingimento: calcAtingimento(o, r) };
     });
     const ytd = mesFechado === 0
       ? { orcado: 0, realizado: null, atingimento: null }
-      : ytdOverride
-        ? { ...ytdOverride, atingimento: calcAtingimento(ytdOverride.orcado, ytdOverride.realizado) }
+      : opts.ytdOverride
+        ? { ...opts.ytdOverride, atingimento: calcAtingimento(opts.ytdOverride.orcado, opts.ytdOverride.realizado) }
         : (() => { const v = calcYtd(meses, mesFechado, "fluxo"); return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) }; })();
-    return { metrica, titulo, tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade, grupo, segmento, destaque, meses, ytd };
+    return {
+      metrica, titulo, tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade, grupo, segmento,
+      destaque: opts.destaque, semDetalhe: opts.semDetalhe, meses, ytd,
+    };
   };
 
-  const cel = (m: number, seg: SegmentoBP) => agg.get(m)?.get(seg);
   const linhas: Linha[] = [];
+  const t = (m: number) => totais.get(m);
 
-  const blocos: Array<{ grupo: string; segmentos: SegmentoBP[]; medidaValor: "vendas_mrr" | "vendas_pontual"; pegaValor: (c: any) => number; pegaCtr: (c: any) => number }> = [
-    { grupo: "Recorrente", segmentos: SEGMENTOS_RECORRENTES, medidaValor: "vendas_mrr", pegaValor: (c) => c?.mrr ?? 0, pegaCtr: (c) => c?.contratosRec ?? 0 },
-    { grupo: "Pontual", segmentos: SEGMENTOS_PONTUAIS, medidaValor: "vendas_pontual", pegaValor: (c) => c?.pont ?? 0, pegaCtr: (c) => c?.contratosPont ?? 0 },
+  // ---- Bloco "Visão Geral" (totais; sem drill-down) ----
+  const orcReceitaTotal = (m: number) => (orcado["vendas_mrr"]?.[m] ?? 0) + (orcado["vendas_pontual"]?.[m] ?? 0);
+  const orcContratosTotal = (m: number) =>
+    SEGMENTOS_RECORRENTES.reduce((s, seg) => s + (orcado[`contratos_vendidos_mrr_${SLUG[seg]}`]?.[m] ?? 0), 0) +
+    SEGMENTOS_PONTUAIS.reduce((s, seg) => s + (orcado[`contratos_vendidos_pontual_${SLUG[seg]}`]?.[m] ?? 0), 0);
+  const VG = "Visão Geral";
+  linhas.push(fazLinha("vp_receita_total", "Receita Total", VG, "", "brl",
+    serie((m) => (t(m)?.mrr ?? 0) + (t(m)?.pont ?? 0)), orcReceitaTotal, { destaque: true, semDetalhe: true }));
+  linhas.push(fazLinha("vp_receita_mrr", "Receita MRR", VG, "", "brl",
+    serie((m) => t(m)?.mrr ?? 0), "vendas_mrr", { semDetalhe: true }));
+  linhas.push(fazLinha("vp_receita_pontual", "Receita Pontual", VG, "", "brl",
+    serie((m) => t(m)?.pont ?? 0), "vendas_pontual", { semDetalhe: true }));
+  linhas.push(fazLinha("vp_num_contratos", "Nº de Contratos", VG, "", "int",
+    serie((m) => t(m)?.contratos ?? 0), orcContratosTotal, { semDetalhe: true }));
+  linhas.push(fazLinha("vp_num_clientes", "Nº de Clientes", VG, "", "int",
+    serie((m) => t(m)?.clientes ?? 0), () => 0, { semDetalhe: true }));
+
+  // ---- Blocos Recorrente / Pontual por segmento ----
+  const cel = (m: number, seg: SegmentoBP) => agg.get(m)?.get(seg);
+  const blocos = [
+    { grupo: "Recorrente", segmentos: SEGMENTOS_RECORRENTES, medida: "vendas_mrr", medidaCtr: "contratos_vendidos_mrr", medidaAov: "aov_venda_mrr", label: "MRR",
+      pegaValor: (c?: CelulaSeg) => c?.mrr ?? 0, pegaCtr: (c?: CelulaSeg) => c?.contratosRec ?? 0 },
+    { grupo: "Pontual", segmentos: SEGMENTOS_PONTUAIS, medida: "vendas_pontual", medidaCtr: "contratos_vendidos_pontual", medidaAov: "aov_venda_pontual", label: "Pontual",
+      pegaValor: (c?: CelulaSeg) => c?.pont ?? 0, pegaCtr: (c?: CelulaSeg) => c?.contratosPont ?? 0 },
   ];
-
   for (const b of blocos) {
-    // linha de TOTAL do bloco (soma dos produtos) no topo, em destaque;
-    // orçado = total agregado (vendas_mrr / vendas_pontual); drill-down lista todos os deals
-    const totalReal = serie((m) => b.segmentos.reduce((s, seg) => s + b.pegaValor(cel(m, seg)), 0));
-    const totalTitulo = b.medidaValor === "vendas_mrr" ? "Total MRR" : "Total Pontual";
-    linhas.push(fazLinha(b.medidaValor, totalTitulo, b.grupo, "", "brl", totalReal, b.medidaValor, undefined, true));
     for (const seg of b.segmentos) {
+      const slug = SLUG[seg];
       const valorReal = serie((m) => b.pegaValor(cel(m, seg)));
       const ctrReal = serie((m) => b.pegaCtr(cel(m, seg)));
-      const aovReal = Array.from({ length: 12 }, (_, i) => {
-        const v = valorReal[i], n = ctrReal[i];
-        return v === null || n === null || !n ? null : v / n;
-      });
-      const medidaAov = b.medidaValor === "vendas_mrr" ? "aov_venda_mrr" : "aov_venda_pontual";
-      const medidaCtr = b.medidaValor === "vendas_mrr" ? "contratos_vendidos_mrr" : "contratos_vendidos_pontual";
-      linhas.push(fazLinha(`${b.medidaValor}_${SLUG[seg]}`, `${seg} — ${b.grupo === "Recorrente" ? "MRR" : "Pontual"}`, b.grupo, seg, "brl", valorReal, orcKey(b.medidaValor, seg)));
-      linhas.push(fazLinha(`${medidaCtr}_${SLUG[seg]}`, `${seg} — Contratos`, b.grupo, seg, "int", ctrReal, orcKey(medidaCtr, seg)));
+      const aovReal = Array.from({ length: 12 }, (_, i) => razao(valorReal[i], ctrReal[i]));
+      linhas.push(fazLinha(`${b.medida}_${slug}`, `${seg} — ${b.label}`, b.grupo, seg, "brl", valorReal, `${b.medida}_${slug}`));
+      linhas.push(fazLinha(`${b.medidaCtr}_${slug}`, `${seg} — Contratos`, b.grupo, seg, "int", ctrReal, `${b.medidaCtr}_${slug}`));
       const aovYtd = mesFechado === 0 ? undefined : {
-        orcado: razao(somaOrcAte(orcKey(b.medidaValor, seg)), somaOrcAte(orcKey(medidaCtr, seg))) ?? 0,
+        orcado: razao(somaOrcAte(`${b.medida}_${slug}`), somaOrcAte(`${b.medidaCtr}_${slug}`)) ?? 0,
         realizado: razao(somaAte(valorReal), somaAte(ctrReal)),
       };
-      linhas.push(fazLinha(`${medidaAov}_${SLUG[seg]}`, `${seg} — AOV`, b.grupo, seg, "brl", aovReal, orcKey(medidaAov, seg), aovYtd));
+      linhas.push(fazLinha(`${b.medidaAov}_${slug}`, `${seg} — AOV`, b.grupo, seg, "brl", aovReal, `${b.medidaAov}_${slug}`, { ytdOverride: aovYtd }));
     }
   }
   return linhas;
