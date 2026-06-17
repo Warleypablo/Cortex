@@ -195,7 +195,7 @@ async function detSnapshot(
   return { grupos: agruparItens(itens, Number.MAX_SAFE_INTEGER), realizado };
 }
 
-// churn do mês (filtros do BP), filtro opcional por linha de produto; grupos por motivo
+// churn BRUTO do mês (alinhado ao ClickUp), filtro opcional por linha de produto; grupos por motivo
 async function detChurn(
   db: any, mes: number, linhaProduto: string | null
 ): Promise<{ resultado: ResultadoDet; somaRs: number }> {
@@ -209,8 +209,6 @@ async function detChurn(
     FROM cortex_core.vw_cup_churn_ajustado
     WHERE EXTRACT(YEAR FROM data_solicitacao_encerramento) = ${ANO}
       AND EXTRACT(MONTH FROM data_solicitacao_encerramento) = ${mes}
-      AND COALESCE(abonar_churn, '') != 'Sim'
-      AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
       AND valor_r > 0
     ORDER BY valor DESC
   `);

@@ -28,10 +28,10 @@ const NOTA_OTHERS =
   "Até jan/2026 o campo produto não era preenchido — nesses meses a classificação usa o nome do serviço.";
 
 const NOTA_CHURN =
-  "Taxa do mês = churn (não abonado) do produto ÷ MRR da linha no fim do mês anterior.";
+  "Taxa do mês = churn bruto do produto ÷ MRR da linha no fim do mês anterior (alinhado ao ClickUp).";
 
 const NOTA_CHURN_RS =
-  "Valor absoluto de churn não abonado por produto. " +
+  "Valor absoluto de churn bruto por produto, alinhado ao gráfico do ClickUp (inclui abonados e todos os motivos). " +
   "Orçado derivado de churn% × MRR orçado do mês anterior.";
 
 // mapeamento: produto exato; quando vazio (snapshots até jan/2026), fallback pelo nome do serviço
@@ -100,9 +100,8 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
            ${CASE_PRODUTO_CHURN} AS linha,
            SUM(valor_r) AS total
     FROM cortex_core.vw_cup_churn_ajustado
+    -- churn BRUTO (alinhado ao gráfico "Churn Commerce MoM" do ClickUp): sem excluir abonados nem motivos inválidos
     WHERE data_solicitacao_encerramento >= '2026-01-01' AND data_solicitacao_encerramento < '2027-01-01'
-      AND COALESCE(abonar_churn, '') != 'Sim'
-      AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
       AND valor_r > 0
     GROUP BY 1, 2
     ORDER BY 1
@@ -220,7 +219,7 @@ export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Dep
     tipoAgregacao: "fluxo",
     direcao: "menor_melhor",
     unidade: "brl",
-    nota: "Soma do churn não abonado de todos os produtos. Orçado derivado de churn% × MRR orçado do mês anterior.",
+    nota: "Soma do churn bruto de todos os produtos, alinhado ao gráfico do ClickUp (inclui abonados e todos os motivos). Orçado derivado de churn% × MRR orçado do mês anterior.",
     meses: mesesChurnTotal,
     ytd: mesFechado === 0
       ? { orcado: 0, realizado: null, atingimento: null }
