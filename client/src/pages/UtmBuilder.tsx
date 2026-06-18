@@ -1468,17 +1468,60 @@ function GuiaFundamentos() {
             <div><strong>source</strong> — plataforma técnica de onde saiu o clique (facebook, google, instagram, linkedin…)</div>
             <div><strong>campaign</strong> — iniciativa de marketing (always-on, social-selling, lancamento-X)</div>
             <div><strong>term</strong> — onde fisicamente o link foi colado (feed, stories, bio, dm…)</div>
-            <div><strong>content</strong> — identificador da peça específica (tipo de destino, ou slug + data — ver regra abaixo)</div>
+            <div><strong>content</strong> — identificador da peça específica (tipo de destino, ou slug + data — ver detalhe na aba de cada canal)</div>
           </div>
-          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm space-y-2">
-            <div className="font-semibold text-gray-900 dark:text-white">Regra de ouro do <code className="font-mono">content</code> (v1.4): tem duas lógicas</div>
-            <div className="text-gray-700 dark:text-zinc-300">
-              <strong>Link fixo</strong> (bio, linktree, banner, "Sobre") → <code className="font-mono">content</code> = <strong>tipo de destino</strong>, <strong>sem data</strong>. Ex: <code className="font-mono">lp-creators</code>, <code className="font-mono">site-home</code>, <code className="font-mono">whatsapp</code>. O link não muda, então não há "post" a identificar.
+        </CardContent>
+      </Card>
+
+      {/* PROIBIÇÕES GLOBAIS */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+            <ShieldAlert className="w-5 h-5" />
+            Proibições (valem pra todo canal)
+          </h3>
+          <ul className="text-sm space-y-2 text-gray-700 dark:text-zinc-300">
+            <li>• <strong>Nunca</strong> usar <code className="font-mono">fb</code>, <code className="font-mono">meta</code> ou <code className="font-mono">ig</code> — Meta Ads é sempre <code className="font-mono">facebook</code>, Instagram orgânico é <code className="font-mono">instagram</code>.</li>
+            <li>• <strong>Linktree não é source.</strong> O source é a rede onde o clique nasceu (instagram, tiktok…). Linktree vai como <code className="font-mono">term=linktree</code>.</li>
+            <li>• Nome de cliente, colaborador, influencer <strong>nunca em source</strong>. Vai em <code className="font-mono">campaign</code>.</li>
+            <li>• Sem espaço, sem underline, sem maiúscula, sem acento. Sempre lowercase com hífen.</li>
+            <li>• Ferramenta de envio (RD, Mailchimp, Apollo) não entra no UTM. source é só o canal de entrega.</li>
+          </ul>
+        </CardContent>
+      </Card>
+
+      {/* ALWAYS-ON */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+            O que é <code className="font-mono text-base">campaign=always-on</code>?
+          </h3>
+          <p className="text-sm text-gray-700 dark:text-zinc-300">
+            <strong>Always-on</strong> = presença contínua, <strong>sem data de início ou fim</strong>. É o valor <strong>padrão</strong> de <code className="font-mono">campaign</code> para todo conteúdo recorrente que <strong>não</strong> faz parte de uma campanha nomeada específica. Pensa nele como o "sempre ligado" da marca: o link existe o tempo todo, não amarrado a um lançamento.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="border border-emerald-200 dark:border-emerald-800 bg-emerald-50 dark:bg-emerald-950/40 rounded-lg p-3">
+              <h4 className="font-semibold text-emerald-700 dark:text-emerald-300 text-sm mb-2">Use always-on quando…</h4>
+              <ul className="text-sm space-y-1 text-gray-700 dark:text-zinc-300">
+                <li>• link fixo na bio / "Sobre" / banner</li>
+                <li>• post do dia a dia, sem campanha por trás</li>
+                <li>• descrição de vídeo recorrente</li>
+                <li>• DM de rotina (fora de iniciativa nomeada)</li>
+              </ul>
             </div>
-            <div className="text-gray-700 dark:text-zinc-300">
-              <strong>Post</strong> (feed, stories, reels, descrição de vídeo, DM) → <code className="font-mono">content</code> = <strong>nome do post + data</strong>. Ex: <code className="font-mono">creators-ugc-2026-05-26</code>. <span className="text-gray-500 dark:text-zinc-500">Não repita o formato: se <code className="font-mono">term=descricao-video</code>, não use <code className="font-mono">video-creators-…</code>.</span>
+            <div className="border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40 rounded-lg p-3">
+              <h4 className="font-semibold text-amber-700 dark:text-amber-300 text-sm mb-2">NÃO use quando o link tem objetivo/data próprios</h4>
+              <ul className="text-sm space-y-1 text-gray-700 dark:text-zinc-300">
+                <li>• lançamento → <code className="font-mono text-xs">lancamento-&#123;slug&#125;-&#123;aaaa-mm&#125;</code></li>
+                <li>• SDR nas DMs → <code className="font-mono text-xs">social-selling</code></li>
+                <li>• ManyChat / bots → <code className="font-mono text-xs">automacoes</code></li>
+                <li>• evento, parceria, régua → nome próprio</li>
+              </ul>
             </div>
           </div>
+          <p className="text-xs text-gray-600 dark:text-zinc-400">
+            <strong>Por que importa:</strong> no relatório, o always-on é a sua linha de base contínua. Separá-lo das campanhas pontuais deixa claro o que vem do "fluxo de sempre" e o que vem de picos de iniciativas específicas.
+          </p>
         </CardContent>
       </Card>
 
@@ -1508,16 +1551,6 @@ function GuiaFundamentos() {
                   <td className="px-3 py-2 text-gray-900 dark:text-white">E-Commerce</td>
                   <td className="px-3 py-2 font-mono text-xs text-gray-900 dark:text-white">ecommerce</td>
                   <td className="px-3 py-2 text-gray-700 dark:text-zinc-300">Shopify (todo projeto é em Shopify)</td>
-                </tr>
-                <tr className="border-t border-gray-200 dark:border-zinc-700">
-                  <td className="px-3 py-2 text-gray-900 dark:text-white">Estruturação Comercial</td>
-                  <td className="px-3 py-2 font-mono text-xs text-gray-900 dark:text-white">comercial</td>
-                  <td className="px-3 py-2 text-gray-700 dark:text-zinc-300">—</td>
-                </tr>
-                <tr className="border-t border-gray-200 dark:border-zinc-700">
-                  <td className="px-3 py-2 text-gray-900 dark:text-white">Flash</td>
-                  <td className="px-3 py-2 font-mono text-xs text-gray-900 dark:text-white">flash</td>
-                  <td className="px-3 py-2 text-gray-700 dark:text-zinc-300">—</td>
                 </tr>
               </tbody>
             </table>
@@ -1616,23 +1649,6 @@ function GuiaFundamentos() {
           <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-gray-700 dark:text-zinc-300">
             <strong>Atenção WhatsApp:</strong> UTM colada direto num link <code className="font-mono">wa.me</code> / <code className="font-mono">api.whatsapp.com</code> <strong>não rastreia</strong> — o WhatsApp ignora os parâmetros e o lead nunca chega ao Bitrix. Para rastrear o botão de WhatsApp, aponte para uma página de redirect tracked (ex: <code className="font-mono">pages.turbopartners.com.br/wpp?…</code>) que registra a UTM e redireciona pro <code className="font-mono">wa.me</code>.
           </div>
-        </CardContent>
-      </Card>
-
-      {/* PROIBIÇÕES GLOBAIS */}
-      <Card>
-        <CardContent className="p-6 space-y-3">
-          <h3 className="text-lg font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
-            <ShieldAlert className="w-5 h-5" />
-            Proibições (valem pra todo canal)
-          </h3>
-          <ul className="text-sm space-y-2 text-gray-700 dark:text-zinc-300">
-            <li>• <strong>Nunca</strong> usar <code className="font-mono">fb</code>, <code className="font-mono">meta</code> ou <code className="font-mono">ig</code> — Meta Ads é sempre <code className="font-mono">facebook</code>, Instagram orgânico é <code className="font-mono">instagram</code>.</li>
-            <li>• <strong>Linktree não é source.</strong> O source é a rede onde o clique nasceu (instagram, tiktok…). Linktree vai como <code className="font-mono">term=linktree</code>.</li>
-            <li>• Nome de cliente, colaborador, influencer <strong>nunca em source</strong>. Vai em <code className="font-mono">campaign</code>.</li>
-            <li>• Sem espaço, sem underline, sem maiúscula, sem acento. Sempre lowercase com hífen.</li>
-            <li>• Ferramenta de envio (RD, Mailchimp, Apollo) não entra no UTM. source é só o canal de entrega.</li>
-          </ul>
         </CardContent>
       </Card>
 
