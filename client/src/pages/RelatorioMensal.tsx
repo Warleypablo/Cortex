@@ -31,7 +31,6 @@ import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
 import SlideSquadSingle from "./relatorio-mensal/SlideSquadSingle";
 import SlideTopOperadores from "./relatorio-mensal/SlideTopOperadores";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
-import SlideTopicosDiscussao from "./relatorio-mensal/SlideTopicosDiscussao";
 import SlideNPS from "./relatorio-mensal/SlideNPS";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
 import SlideTurboStore from "./relatorio-mensal/SlideTurboStore";
@@ -45,7 +44,6 @@ const FIXED_SLIDE_NAMES = [
   "Pontual", "Entregas Pontuais Commerce",
   "NPS",
   "Capa Tech", "Area Tech", "Entregas Pontuais Tech",
-  "Tópicos",
   "Turbo Store",
   "Frase", "Q&A"
 ];
@@ -306,10 +304,9 @@ export default function RelatorioMensal() {
       case 19: return <SlideCapaTech />;
       case 20: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
       case 21: return <SlideEntregasPontuaisTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 22: return <SlideTopicosDiscussao />;
-      case 23: return <SlideTurboStore />;
-      case 24: return <SlideFraseEncerramento />;
-      case 25: return <SlideQRCode />;
+      case 22: return <SlideTurboStore />;
+      case 23: return <SlideFraseEncerramento />;
+      case 24: return <SlideQRCode />;
       default: return null;
     }
   };
