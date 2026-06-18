@@ -32,8 +32,7 @@ const DERIVADAS = [
   "aov_venda_mrr", "aov_venda_pontual",
   "gestores_necessarios", "designers_necessarios", "necessidade_gestores",
   "contratos_por_gestor", "contas_por_designer",
-  "sga_total_detalhe", "or_total_detalhe", "cac_total_detalhe", "cac_pct_receita", "cac_payback_mrr", "mrr_delta_nao_explicado",
-  "ponte_mrr_delta",
+  "sga_total_detalhe", "or_total_detalhe", "cac_total_detalhe", "cac_pct_receita", "cac_payback_mrr",
 ];
 
 // métricas de despesa cujo detalhe é o bucket puro (parcelas por quitação, grupos por categoria)
@@ -259,8 +258,6 @@ const TITULOS_SUBABAS: Record<string, string> = {
   cac_comissoes: "Comissões", cac_growth: "Growth", cac_ads: "ADs",
   cac_eventos: "Eventos", cac_brindes: "Brindes", cac_viagens: "Viagens",
   cac_outras_sub: "Outras comerciais (não orçadas)",
-  ponte_mrr_ini: "(=) MRR inicial", ponte_mrr_vendas: "(+) Vendas MRR",
-  ponte_mrr_churn: "(−) Churn", ponte_mrr_fim: "(=) MRR final",
   pontual_estoque_ini: "(=) Estoque inicial", pontual_venda: "(+) Venda",
   pontual_entrega: "(−) Entrega", pontual_churn: "(−) Churn",
   pontual_deletados: "(−) Deletados", pontual_saida_atipica: "(−) Saída atípica",
@@ -645,14 +642,6 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "ponte_mrr_ini") {
-        ({ grupos, realizado } = await detMrrSnapshot(db, mes, true));
-      } else if (metrica === "ponte_mrr_fim") {
-        ({ grupos, realizado } = await detMrrSnapshot(db, mes, false));
-      } else if (metrica === "ponte_mrr_vendas") {
-        ({ grupos, realizado } = await detDealsBitrix(db, mes, "mrr", "soma", "Vendas MRR (Bitrix)"));
-      } else if (metrica === "ponte_mrr_churn") {
-        ({ resultado: { grupos, realizado } } = await detChurn(db, mes, null));
       } else if (metrica === "pontual_estoque_ini") {
         ({ grupos, realizado } = await detPontualSnapshot(db, mes, true));
       } else if (metrica === "pontual_estoque_fim") {
