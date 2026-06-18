@@ -1450,6 +1450,51 @@ function TabGuia() {
 function GuiaFundamentos() {
   return (
     <div className="space-y-6">
+      {/* O QUE É / COMO FUNCIONA / PADRÃO */}
+      <Card>
+        <CardContent className="p-6 space-y-4">
+          <div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">O que é UTM — e por que a Turbo usa</h2>
+            <p className="text-sm text-gray-700 dark:text-zinc-300 mt-2">
+              <strong>UTM</strong> é um conjunto de parâmetros que a gente adiciona no <strong>fim de uma URL</strong> pra marcar de onde o clique veio. Sem isso, um lead que cai no site é <strong>anônimo</strong> — ninguém sabe se veio de um anúncio, de um post no Instagram, de um e-mail ou de uma indicação. Com UTM, cada lead carrega a própria origem até o <strong>Bitrix</strong>, e o relatório de funil consegue <strong>creditar o canal e a campanha</strong> que trouxeram a venda.
+            </p>
+          </div>
+
+          <div>
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-2">Como funciona, do começo ao fim</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {[
+                { n: 1, t: "Gere o link", d: "Na aba Gerar link, monte a URL com as UTMs pelos dropdowns." },
+                { n: 2, t: "Divulgue", d: "Cole onde for publicar: bio, anúncio, e-mail, descrição, QR…" },
+                { n: 3, t: "Pessoa clica", d: "Ela cai numa página da Turbo que captura os parâmetros da URL." },
+                { n: 4, t: "Vira relatório", d: "Os campos viram colunas no Bitrix e alimentam o funil por origem." },
+              ].map((p) => (
+                <div key={p.n} className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs font-bold">{p.n}</span>
+                    <span className="font-semibold text-gray-900 dark:text-white text-sm">{p.t}</span>
+                  </div>
+                  <p className="text-xs text-gray-600 dark:text-zinc-400">{p.d}</p>
+                </div>
+              ))}
+            </div>
+            <p className="text-xs text-gray-500 dark:text-zinc-500 mt-2">
+              Por isso o link precisa apontar pra uma página <strong>tracked</strong> da Turbo. Link sem UTM (ou com UTM errada) = lead órfão que ninguém sabe de onde veio.
+            </p>
+          </div>
+
+          <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3">
+            <h3 className="text-sm font-bold text-gray-900 dark:text-white mb-1">Nosso padrão (Constituição UTM Turbo v1.4)</h3>
+            <ul className="text-sm space-y-1 text-gray-700 dark:text-zinc-300">
+              <li>• <strong>Vocabulário fechado:</strong> os valores de cada campo são padronizados — não se inventa na hora.</li>
+              <li>• <strong>Formato:</strong> tudo minúsculo, com hífen, sem acento e sem espaço (ex: <code className="font-mono">always-on</code>).</li>
+              <li>• <strong>5 campos sempre:</strong> source, medium, campaign, term e content — preenchidos do mesmo jeito por todo o time.</li>
+              <li>• <strong>Gere sempre pelo gerador</strong> (aba Gerar link). Os dropdowns garantem o padrão — não digite UTM à mão.</li>
+            </ul>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Intro */}
       <Card>
         <CardContent className="p-6 space-y-3">
@@ -1467,9 +1512,6 @@ function GuiaFundamentos() {
           <p className="text-xs text-gray-600 dark:text-zinc-400">
             <strong>Rótulo PT × valor na URL:</strong> as abas estão em português (Pago, Orgânico), mas o valor que entra na UTM é o que aparece em <code className="font-mono">código</code> (<code className="font-mono">paid</code>, <code className="font-mono">organic</code>). O dropdown da aba Gerar link já preenche o valor certo — você não digita à mão.
           </p>
-          <div className="bg-gray-50 dark:bg-zinc-800/60 border border-gray-200 dark:border-zinc-700 rounded-lg p-3 text-sm text-gray-700 dark:text-zinc-300">
-            <strong>Por que isso importa:</strong> esses 5 campos viram colunas no Bitrix e alimentam o relatório de funil. Link <strong>sem</strong> UTM (ou com UTM errada) = lead órfão, que ninguém sabe de onde veio — e não dá pra creditar o canal que trouxe a venda.
-          </div>
         </CardContent>
       </Card>
 
