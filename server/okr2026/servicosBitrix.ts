@@ -41,6 +41,13 @@ export const SERVICOS_BITRIX: Record<number, ServicoBitrix> = {
 export const SEGMENTOS_RECORRENTES: SegmentoBP[] = ["Performance", "Creators", "Social", "Gestão de Comunidade", "Others"];
 export const SEGMENTOS_PONTUAIS: SegmentoBP[] = ["E-commerce", "Site Institucional", "Landing Page", "Creators", "CRM", "Others"];
 
+// slug curto por segmento — fonte única (chaves de orçado, métricas por produto, CAC por produto)
+export const SLUG: Record<SegmentoBP, string> = {
+  "Performance": "performance", "Creators": "creators", "Social": "social",
+  "Gestão de Comunidade": "gc", "Others": "others",
+  "E-commerce": "ecommerce", "Site Institucional": "site", "Landing Page": "landing", "CRM": "crm",
+};
+
 // Parse "[846, 852]" / "False" / "[]" / null -> number[]
 export function parseServicosVendidos(raw: string | null | undefined): number[] {
   if (!raw || raw === "False" || raw === "[]") return [];
