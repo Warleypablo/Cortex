@@ -56,7 +56,7 @@ const OUTRO_VALUE = "__outro__";
 
 export default function UtmBuilder() {
   usePageTitle("Gerador de UTMs");
-  useSetPageInfo("Gerador de UTMs", "Constituição UTM Turbo v1");
+  useSetPageInfo("Gerador de UTMs", "Constituição UTM Turbo v1.4");
 
   // Badge de pendências — só busca se for admin ou time de Growth
   const { data: user } = useQuery<AuthUser>({ queryKey: ["/api/auth/me"] });
@@ -1334,7 +1334,126 @@ function Secao({ titulo, descricao, children }: { titulo: string; descricao?: st
   );
 }
 
+// Sub-abas do Guia — uma por canal. "Fundamentos" concentra o que é transversal.
+const GUIA_CANAIS: { value: string; label: string }[] = [
+  { value: "fundamentos", label: "Fundamentos" },
+  { value: "instagram", label: "Instagram" },
+  { value: "youtube", label: "YouTube" },
+  { value: "tiktok", label: "TikTok" },
+  { value: "linkedin", label: "LinkedIn" },
+  { value: "paga", label: "Mídia Paga" },
+  { value: "eventos", label: "Eventos" },
+  { value: "crm", label: "CRM" },
+  { value: "outbound", label: "Outbound" },
+  { value: "referral", label: "Referral" },
+  { value: "proprios", label: "Canais próprios" },
+];
+
+// Cabeçalho padrão de cada canal: título + time(s) responsável(is) + resumo de uma linha.
+function CanalHeader({ titulo, times, resumo }: { titulo: string; times: string[]; resumo: string }) {
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-3">
+        <h2 className="text-xl font-bold text-gray-900 dark:text-white">{titulo}</h2>
+        <div className="flex flex-wrap gap-2">
+          {times.map((t) => (
+            <Badge key={t} variant="secondary" className="text-xs font-medium">
+              Time: {t}
+            </Badge>
+          ))}
+        </div>
+        <p className="text-sm text-gray-700 dark:text-zinc-300">{resumo}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Lista numerada do "como fazer" no gerador.
+function Passos({ items }: { items: React.ReactNode[] }) {
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-3">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <Link2 className="w-4 h-4" />
+          Passo a passo — aba "Gerar link"
+        </h3>
+        <ol className="space-y-2.5">
+          {items.map((it, i) => (
+            <li key={i} className="flex gap-3 text-sm text-gray-700 dark:text-zinc-300">
+              <span className="shrink-0 w-6 h-6 rounded-full bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-300 flex items-center justify-center text-xs font-bold">
+                {i + 1}
+              </span>
+              <span className="pt-0.5">{it}</span>
+            </li>
+          ))}
+        </ol>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Bloco "não faça" específico do canal.
+function ProibicoesCanal({ items }: { items: React.ReactNode[] }) {
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-2">
+        <h3 className="text-base font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
+          <ShieldAlert className="w-4 h-4" />
+          Não faça
+        </h3>
+        <ul className="text-sm space-y-1.5 text-gray-700 dark:text-zinc-300">
+          {items.map((it, i) => (
+            <li key={i}>• {it}</li>
+          ))}
+        </ul>
+      </CardContent>
+    </Card>
+  );
+}
+
+// Bloco de exemplos prontos (copiáveis).
+function Exemplos({ children }: { children: React.ReactNode }) {
+  return (
+    <Card>
+      <CardContent className="p-6 space-y-3">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+          <BookOpen className="w-4 h-4" />
+          Exemplos prontos
+        </h3>
+        <div className="space-y-3">{children}</div>
+      </CardContent>
+    </Card>
+  );
+}
+
 function TabGuia() {
+  return (
+    <Tabs defaultValue="fundamentos" className="w-full">
+      <TabsList className="mb-6 flex flex-wrap h-auto justify-start gap-1 p-1">
+        {GUIA_CANAIS.map((c) => (
+          <TabsTrigger key={c.value} value={c.value} data-testid={`guia-tab-${c.value}`}>
+            {c.label}
+          </TabsTrigger>
+        ))}
+      </TabsList>
+
+      <TabsContent value="fundamentos"><GuiaFundamentos /></TabsContent>
+      <TabsContent value="instagram"><GuiaInstagram /></TabsContent>
+      <TabsContent value="youtube"><GuiaYoutube /></TabsContent>
+      <TabsContent value="tiktok"><GuiaTiktok /></TabsContent>
+      <TabsContent value="linkedin"><GuiaLinkedin /></TabsContent>
+      <TabsContent value="paga"><GuiaPaga /></TabsContent>
+      <TabsContent value="eventos"><GuiaEventos /></TabsContent>
+      <TabsContent value="crm"><GuiaCrm /></TabsContent>
+      <TabsContent value="outbound"><GuiaOutbound /></TabsContent>
+      <TabsContent value="referral"><GuiaReferral /></TabsContent>
+      <TabsContent value="proprios"><GuiaProprios /></TabsContent>
+    </Tabs>
+  );
+}
+
+// ── FUNDAMENTOS (transversal: conceitos, content, slugs, bio vs linktree, proibições) ──
+function GuiaFundamentos() {
   return (
     <div className="space-y-6">
       {/* Intro */}
@@ -1342,7 +1461,7 @@ function TabGuia() {
         <CardContent className="p-6 space-y-3">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Como preencher cada UTM</h2>
           <p className="text-sm text-gray-700 dark:text-zinc-300">
-            Esses exemplos seguem a <strong>Constituição UTM Turbo v1.4</strong>. Use a aba <strong>Gerar link</strong> pra montar com dropdowns — o guia abaixo serve pra entender o padrão e copiar exemplos prontos.
+            Tudo aqui segue a <strong>Constituição UTM Turbo v1.4</strong>. Monte os links na aba <strong>Gerar link</strong> (os dropdowns já garantem o padrão). Use estas sub-abas por <strong>canal</strong> pra saber exatamente o que preencher no seu time. Comece entendendo os 5 campos:
           </p>
           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm space-y-1">
             <div><strong>medium</strong> — categoria do canal (paid, organic, eventos, referral, crm, outbound + os canais-próprios victor/andre/rodrigo)</div>
@@ -1500,275 +1619,12 @@ function TabGuia() {
         </CardContent>
       </Card>
 
-      {/* PAID */}
-      <Secao
-        titulo="Mídia Paga (Meta, Google, YouTube)"
-        descricao="Time não escreve UTM. A plataforma substitui os tokens automaticamente no momento do clique. Configurado uma vez no Tracking template / URL parameters."
-      >
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="Meta Ads (Facebook + Instagram)"
-            descricao="URL parameters no nível do anúncio. Tokens já configurados em server/services/adsCreation/creator.ts."
-            url="utm_source=facebook&utm_medium=paid&utm_campaign={{campaign.id}}&utm_term={{adset.id}}-{{placement}}&utm_content={{ad.id}}"
-          />
-          <ExemploCard
-            titulo="Google Ads (Search, Display, YouTube)"
-            descricao="Tracking template a nível de conta. YouTube Ads roda dentro do Google Ads — o token {network} retorna youtube automaticamente."
-            url="{lpurl}?utm_source=google&utm_medium=paid&utm_campaign={campaignid}&utm_term={adgroupid}-{network}-{device}-{matchtype}-{keyword}&utm_content={creative}"
-          />
-        </div>
-      </Secao>
-
-      {/* INSTAGRAM ORGÂNICO */}
-      <Secao
-        titulo="Instagram orgânico"
-        descricao="source = instagram. Mesmo quando passa por Linktree, o source continua sendo instagram (Linktree vira term)."
-      >
-        <TermoTabela
-          rows={[
-            { term: "bio", onde: "link único na bio do perfil" },
-            { term: "feed", onde: "post no feed/timeline" },
-            { term: "stories", onde: "stories temporários" },
-            { term: "reels", onde: "Reels" },
-            { term: "destaques", onde: "Story Highlights (destaques fixados)" },
-            { term: "dm", onde: "mensagem direta (social-selling do SDR)" },
-            { term: "linktree", onde: "passou pelo intermediário Linktree" },
-          ]}
-        />
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="Link fixo na bio (pra LP de Creators)"
-            descricao="Link fixo — content = tipo de destino (lp-), sem data."
-            url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=lp-creators"
-          />
-          <ExemploCard
-            titulo="SDR mandando link via DM (social-selling)"
-            descricao="Iniciativa coordenada do time de Pré-vendas conversando nas DMs."
-            url="https://turbopartners.com.br/diagnostico?utm_source=instagram&utm_medium=organic&utm_campaign=social-selling&utm_term=dm&utm_content=leandro-2026-05-26"
-          />
-          <ExemploCard
-            titulo="Stories de lançamento de produto"
-            descricao="Campanha pontual — slug no formato lancamento-{produto}-{aaaa-mm}."
-            url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=lancamento-creators-2026-05&utm_term=stories&utm_content=story-cta-final"
-          />
-          <ExemploCard
-            titulo="ManyChat respondendo comentário (automação)"
-            descricao="Bots e fluxos automáticos no Instagram."
-            url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=automacoes&utm_term=dm&utm_content=manychat-quero-creators"
-          />
-        </div>
-      </Secao>
-
-      {/* LINKEDIN ORGÂNICO */}
-      <Secao
-        titulo="LinkedIn orgânico"
-        descricao="source = linkedin. Vale igual para página oficial da Turbo e para post no perfil pessoal de colaborador."
-      >
-        <TermoTabela
-          rows={[
-            { term: "bio", onde: "seção \"Sobre\" do perfil/página" },
-            { term: "feed", onde: "post no feed (página ou perfil pessoal)" },
-            { term: "dm", onde: "mensagem direta (social-selling do SDR)" },
-          ]}
-        />
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="Post no feed da página"
-            descricao="Conteúdo recorrente da página oficial."
-            url="https://turbopartners.com.br/creators?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-05-26"
-          />
-          <ExemploCard
-            titulo="SDR via DM (social-selling)"
-            descricao="Pré-vendas conversando ativamente nas DMs do LinkedIn da Turbo."
-            url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=organic&utm_campaign=social-selling&utm_term=dm&utm_content=camila-2026-05-26"
-          />
-          <ExemploCard
-            titulo={`Link no "Sobre" da página`}
-            descricao="Link fixo na seção de bio."
-            url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=lp-diagnostico"
-          />
-        </div>
-      </Secao>
-
-      {/* YOUTUBE ORGÂNICO */}
-      <Secao
-        titulo="YouTube orgânico"
-        descricao="source = youtube. Conteúdo do canal Turbo. Se você aparece como convidado em canal de terceiro, vai como referral/influencer (não organic)."
-      >
-        <TermoTabela
-          rows={[
-            { term: "descricao-video", onde: "descrição abaixo do vídeo" },
-            { term: "descricao-shorts", onde: "descrição de YouTube Shorts" },
-            { term: "card", onde: "cards interativos no canto do vídeo" },
-            { term: "bio", onde: "seção \"Sobre\" do canal" },
-            { term: "banner", onde: "links clicáveis no cabeçalho/banner do canal" },
-          ]}
-        />
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="Link na descrição de vídeo"
-            descricao="Caso mais comum — slug do vídeo + data."
-            url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-ugc-2026-05-26"
-          />
-          <ExemploCard
-            titulo="Link na descrição de Shorts"
-            descricao="Vídeos curtos do YouTube Shorts."
-            url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-shorts&utm_content=hook-rafa-2026-05-26"
-          />
-          <ExemploCard
-            titulo="Banner do canal"
-            descricao="Links fixos no cabeçalho do canal."
-            url="https://turbopartners.com.br/diagnostico?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=banner&utm_content=lp-diagnostico"
-          />
-          <ExemploCard
-            titulo="Card de lançamento dentro do vídeo"
-            descricao="Card interativo apontando pra LP de lançamento."
-            url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=organic&utm_campaign=lancamento-creators-2026-05&utm_term=card&utm_content=cta-final-creators"
-          />
-        </div>
-      </Secao>
-
-      {/* TIKTOK ORGÂNICO */}
-      <Secao
-        titulo="TikTok orgânico"
-        descricao="source = tiktok. Conteúdo da conta oficial da Turbo no TikTok."
-      >
-        <TermoTabela
-          rows={[
-            { term: "bio", onde: "link único na bio do perfil" },
-            { term: "feed", onde: "vídeos no feed" },
-            { term: "dm", onde: "mensagem direta (social-selling)" },
-            { term: "linktree", onde: "passou pelo intermediário Linktree" },
-          ]}
-        />
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="Link na bio do TikTok"
-            descricao="Único link clicável no perfil do TikTok."
-            url="https://turbopartners.com.br/diagnostico?utm_source=tiktok&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=lp-diagnostico"
-          />
-        </div>
-      </Secao>
-
-      {/* MEDIUMS-EXCEÇÃO */}
-      <Secao
-        titulo="Canais próprios: victor, andre, rodrigo"
-        descricao="Exceções: figuras-chave com canal próprio robusto (YouTube, Instagram, LinkedIn, TikTok). O medium é o nome da figura — não organic. Naming idêntico ao organic (term por plataforma, content por tipo de destino/post)."
-      >
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="Victor — bio do canal no YouTube apontando pra Turbo"
-            descricao="Link fixo — content = tipo de destino, sem data."
-            url="https://turbopartners.com.br/?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=bio&utm_content=site-home"
-          />
-          <ExemploCard
-            titulo="André — descrição de vídeo no canal dele"
-            descricao="Post — nome + data."
-            url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=andre&utm_campaign=always-on&utm_term=descricao-video&utm_content=video-creators-2026-05-28"
-          />
-          <ExemploCard
-            titulo="Rodrigo — link da Turbo na Linktree do Instagram dele"
-            descricao="Linktree continua sendo term, não source. medium = a figura."
-            url="https://turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=always-on&utm_term=linktree&utm_content=site-home"
-          />
-        </div>
-        <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
-          <strong>Quando NÃO usar:</strong> conteúdo do canal/página <strong>da Turbo</strong> que só cita a figura → <code className="font-mono">organic</code>. Anúncio pago com a figura no criativo → <code className="font-mono">paid</code> (a figura vai no <code className="font-mono">content</code> do ad, não no medium).
-        </p>
-      </Secao>
-
-      {/* REFERRAL */}
-      <Secao
-        titulo="Referral (cliente, colaborador, influencer, marketplace)"
-        descricao="Alguém externo trazendo lead. O source é o tipo de relação, e o campaign é o nome da entidade."
-      >
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="Footer da clínica do Dr. Rafael (cliente)"
-            descricao="Cliente colocando link da Turbo no footer do site dele."
-            url="https://turbopartners.com.br/?utm_source=cliente&utm_medium=referral&utm_campaign=dr-rafael&utm_term=footer&utm_content=rodape-home"
-          />
-          <ExemploCard
-            titulo="Colaborador (informal) indicando via WhatsApp pessoal"
-            descricao="Não confunde com social-selling (que é iniciativa coordenada nas DMs oficiais)."
-            url="https://turbopartners.com.br/?utm_source=colaborador&utm_medium=referral&utm_campaign=lucas&utm_term=indicacao&utm_content=whatsapp-amigo-loja-x"
-          />
-          <ExemploCard
-            titulo="Influencer postando link"
-            descricao="Criador externo divulgando Turbo no conteúdo dele."
-            url="https://turbopartners.com.br/?utm_source=influencer&utm_medium=referral&utm_campaign=joao-silva&utm_term=bio-influencer&utm_content=stories-link-bio"
-          />
-        </div>
-      </Secao>
-
-      {/* CRM */}
-      <Secao
-        titulo="CRM (base própria — email, WhatsApp broadcast, SMS)"
-        descricao="Comunicação ativa pra quem já é lead/cliente. source é o canal de entrega, não a ferramenta de envio."
-      >
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="Régua de WhatsApp da Turma 6 do Dr. Rafael"
-            descricao="Toque específico (12 de 41) numa régua de quentes."
-            url="https://turbopartners.com.br/agendar?utm_source=whatsapp&utm_medium=crm&utm_campaign=turma-6-rafa-mais-proximo&utm_term=lista-quentes&utm_content=touchpoint-12-audio-convite"
-          />
-          <ExemploCard
-            titulo="E-mail de nutrição do funil Creators"
-            descricao="Disparo de email para MQLs não convertidos."
-            url="https://turbopartners.com.br/diagnostico?utm_source=email&utm_medium=crm&utm_campaign=nutricao-creators-2026-11&utm_term=mql-nao-convertido&utm_content=cta-agendar-diagnostico"
-          />
-        </div>
-      </Secao>
-
-      {/* OUTBOUND */}
-      <Secao
-        titulo="Outbound (prospecção fria — SDR)"
-        descricao="Lead que nunca interagiu antes. source é o canal final de envio."
-      >
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="Cold email do SDR"
-            descricao="Cadência de prospecção via Apollo/Reply/Lemlist."
-            url="https://turbopartners.com.br/diagnostico?utm_source=email&utm_medium=outbound&utm_campaign=cadencia-q4-donos-agencia&utm_term=agencia-50-funcionarios&utm_content=email-2-quebra-objecao"
-          />
-          <ExemploCard
-            titulo="Cold outreach LinkedIn"
-            descricao="DM fria via Sales Navigator (não confunde com DM social-selling em organic)."
-            url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=outbound&utm_campaign=cadencia-q4-donos-agencia&utm_term=agencia-50-funcionarios&utm_content=linkedin-msg-1"
-          />
-          <ExemploCard
-            titulo="Follow-up de cold call (WhatsApp pós-ligação)"
-            descricao="Ligação não é canal de UTM — usa o canal real de envio (whatsapp/email)."
-            url="https://turbopartners.com.br/diagnostico?utm_source=whatsapp&utm_medium=outbound&utm_campaign=cadencia-q4-donos-agencia&utm_term=pos-ligacao&utm_content=follow-up-call-2026-05-26"
-          />
-        </div>
-      </Secao>
-
-      {/* EVENTOS */}
-      <Secao
-        titulo="Eventos"
-        descricao="source = slug do evento (lowercase, sem acento, hífen). Se for evento próprio, prefixa com turbo-."
-      >
-        <div className="space-y-3">
-          <ExemploCard
-            titulo="QR code no slide final de palestra (RD Summit)"
-            descricao="Evento de terceiro — nome direto."
-            url="https://turbopartners.com.br/diagnostico?utm_source=rd-summit-2026&utm_medium=eventos&utm_campaign=presencial-2026&utm_term=palestra&utm_content=slide-final-cta"
-          />
-          <ExemploCard
-            titulo="Workshop próprio da Turbo"
-            descricao="Evento próprio — prefixo turbo-."
-            url="https://turbopartners.com.br/diagnostico?utm_source=turbo-workshop-creators-sp&utm_medium=eventos&utm_campaign=presencial-2026&utm_term=qrcode-cracha&utm_content=mesa-recepcao"
-          />
-        </div>
-      </Secao>
-
-      {/* PROIBIÇÕES */}
+      {/* PROIBIÇÕES GLOBAIS */}
       <Card>
         <CardContent className="p-6 space-y-3">
           <h3 className="text-lg font-bold text-red-600 dark:text-red-400 flex items-center gap-2">
             <ShieldAlert className="w-5 h-5" />
-            Proibições
+            Proibições (valem pra todo canal)
           </h3>
           <ul className="text-sm space-y-2 text-gray-700 dark:text-zinc-300">
             <li>• <strong>Nunca</strong> usar <code className="font-mono">fb</code>, <code className="font-mono">meta</code> ou <code className="font-mono">ig</code> — Meta Ads é sempre <code className="font-mono">facebook</code>, Instagram orgânico é <code className="font-mono">instagram</code>.</li>
@@ -1786,6 +1642,491 @@ function TabGuia() {
           Documento de referência completo: <code className="font-mono">docs/utm-constituicao.md</code> · Constituição UTM Turbo v1.4 · Vigência a partir de 21/05/2026
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// ── INSTAGRAM ──
+function GuiaInstagram() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="Instagram orgânico"
+        times={["Conteúdo/Social", "SDR — só DM"]}
+        resumo="source = instagram. Mesmo quando o link passa por Linktree, o source continua instagram (a Linktree vira term=linktree)."
+      />
+      <Passos
+        items={[
+          <><code className="font-mono">medium</code> = <code className="font-mono">organic</code></>,
+          <><code className="font-mono">source</code> = <code className="font-mono">instagram</code></>,
+          <><code className="font-mono">term</code> = onde você está colando o link (veja a tabela abaixo): <code className="font-mono">bio</code>, <code className="font-mono">feed</code>, <code className="font-mono">stories</code>, <code className="font-mono">reels</code>, <code className="font-mono">destaques</code>, <code className="font-mono">dm</code>, <code className="font-mono">linktree</code></>,
+          <><code className="font-mono">campaign</code>: <code className="font-mono">always-on</code> (presença contínua) · <code className="font-mono">lancamento-&#123;slug&#125;-&#123;aaaa-mm&#125;</code> (lançamento) · <code className="font-mono">social-selling</code> (DM do SDR) · <code className="font-mono">automacoes</code> (ManyChat/bot)</>,
+          <><code className="font-mono">content</code>: <strong>link fixo</strong> (bio/linktree) → tipo de destino <strong>sem data</strong> (<code className="font-mono">lp-creators</code>); <strong>post</strong> (feed/stories/reels/dm) → <strong>nome + data</strong> (<code className="font-mono">creators-2026-05-26</code>)</>,
+          <>Clique em <strong>Copiar e salvar</strong> — o link entra no Histórico do time.</>,
+        ]}
+      />
+      <Secao titulo="term — onde fica" >
+        <TermoTabela
+          rows={[
+            { term: "bio", onde: "link único na bio do perfil" },
+            { term: "feed", onde: "post no feed/timeline" },
+            { term: "stories", onde: "stories temporários" },
+            { term: "reels", onde: "Reels" },
+            { term: "destaques", onde: "Story Highlights (destaques fixados)" },
+            { term: "dm", onde: "mensagem direta (social-selling do SDR)" },
+            { term: "linktree", onde: "passou pelo intermediário Linktree" },
+          ]}
+        />
+      </Secao>
+      <Exemplos>
+        <ExemploCard
+          titulo="Link fixo na bio (pra LP de Creators)"
+          descricao="Link fixo — content = tipo de destino (lp-), sem data."
+          url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=lp-creators"
+        />
+        <ExemploCard
+          titulo="SDR mandando link via DM (social-selling)"
+          descricao="Iniciativa coordenada do time de Pré-vendas conversando nas DMs."
+          url="https://turbopartners.com.br/diagnostico?utm_source=instagram&utm_medium=organic&utm_campaign=social-selling&utm_term=dm&utm_content=leandro-2026-05-26"
+        />
+        <ExemploCard
+          titulo="Stories de lançamento de produto"
+          descricao="Campanha pontual — slug no formato lancamento-{produto}-{aaaa-mm}."
+          url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=lancamento-creators-2026-05&utm_term=stories&utm_content=story-cta-final"
+        />
+        <ExemploCard
+          titulo="ManyChat respondendo comentário (automação)"
+          descricao="Bots e fluxos automáticos no Instagram."
+          url="https://turbopartners.com.br/creators?utm_source=instagram&utm_medium=organic&utm_campaign=automacoes&utm_term=dm&utm_content=manychat-quero-creators"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>Nunca <code className="font-mono">ig</code> — Instagram orgânico é sempre <code className="font-mono">instagram</code>.</>,
+          <>Linktree não é source: vai como <code className="font-mono">term=linktree</code>, e o source continua <code className="font-mono">instagram</code>.</>,
+          <>DM do SDR é <code className="font-mono">social-selling</code> (organic), não outbound.</>,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── YOUTUBE ──
+function GuiaYoutube() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="YouTube orgânico"
+        times={["Conteúdo/Social"]}
+        resumo="source = youtube. Conteúdo do canal da Turbo. Se você aparece como convidado em canal de terceiro, isso é referral/influencer (não organic)."
+      />
+      <Passos
+        items={[
+          <><code className="font-mono">medium</code> = <code className="font-mono">organic</code></>,
+          <><code className="font-mono">source</code> = <code className="font-mono">youtube</code></>,
+          <><code className="font-mono">term</code> = onde o link está (tabela abaixo): <code className="font-mono">descricao-video</code>, <code className="font-mono">descricao-shorts</code>, <code className="font-mono">card</code>, <code className="font-mono">bio</code>, <code className="font-mono">banner</code></>,
+          <><code className="font-mono">campaign</code>: <code className="font-mono">always-on</code> · <code className="font-mono">lancamento-&#123;slug&#125;-&#123;aaaa-mm&#125;</code> (lançamento)</>,
+          <><code className="font-mono">content</code>: <strong>link fixo</strong> (bio/banner) → tipo de destino sem data (<code className="font-mono">lp-diagnostico</code>); <strong>post</strong> (descrição) → nome + data (<code className="font-mono">creators-ugc-2026-05-26</code>)</>,
+          <>Clique em <strong>Copiar e salvar</strong>.</>,
+        ]}
+      />
+      <Secao titulo="term — onde fica">
+        <TermoTabela
+          rows={[
+            { term: "descricao-video", onde: "descrição abaixo do vídeo" },
+            { term: "descricao-shorts", onde: "descrição de YouTube Shorts" },
+            { term: "card", onde: "cards interativos no canto do vídeo" },
+            { term: "bio", onde: "seção \"Sobre\" do canal" },
+            { term: "banner", onde: "links clicáveis no cabeçalho/banner do canal" },
+          ]}
+        />
+      </Secao>
+      <Exemplos>
+        <ExemploCard
+          titulo="Link na descrição de vídeo"
+          descricao="Caso mais comum — slug do vídeo + data."
+          url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-ugc-2026-05-26"
+        />
+        <ExemploCard
+          titulo="Link na descrição de Shorts"
+          descricao="Vídeos curtos do YouTube Shorts."
+          url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-shorts&utm_content=hook-rafa-2026-05-26"
+        />
+        <ExemploCard
+          titulo="Banner do canal"
+          descricao="Links fixos no cabeçalho do canal."
+          url="https://turbopartners.com.br/diagnostico?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=banner&utm_content=lp-diagnostico"
+        />
+        <ExemploCard
+          titulo="Card de lançamento dentro do vídeo"
+          descricao="Card interativo apontando pra LP de lançamento."
+          url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=organic&utm_campaign=lancamento-creators-2026-05&utm_term=card&utm_content=cta-final-creators"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>Convidado em canal de terceiro <strong>não é</strong> organic — é <code className="font-mono">referral/influencer</code>.</>,
+          <>Banner e bio são link fixo → <code className="font-mono">content</code> sem data.</>,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── TIKTOK ──
+function GuiaTiktok() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="TikTok orgânico"
+        times={["Conteúdo/Social"]}
+        resumo="source = tiktok. Conteúdo da conta oficial da Turbo no TikTok."
+      />
+      <Passos
+        items={[
+          <><code className="font-mono">medium</code> = <code className="font-mono">organic</code></>,
+          <><code className="font-mono">source</code> = <code className="font-mono">tiktok</code></>,
+          <><code className="font-mono">term</code> = onde o link está: <code className="font-mono">bio</code>, <code className="font-mono">feed</code>, <code className="font-mono">dm</code>, <code className="font-mono">linktree</code></>,
+          <><code className="font-mono">campaign</code>: <code className="font-mono">always-on</code> · <code className="font-mono">lancamento-&#123;slug&#125;-&#123;aaaa-mm&#125;</code> · <code className="font-mono">social-selling</code> (DM)</>,
+          <><code className="font-mono">content</code>: link fixo (bio/linktree) → tipo de destino sem data; post (feed/dm) → nome + data</>,
+          <>Clique em <strong>Copiar e salvar</strong>.</>,
+        ]}
+      />
+      <Secao titulo="term — onde fica">
+        <TermoTabela
+          rows={[
+            { term: "bio", onde: "link único na bio do perfil" },
+            { term: "feed", onde: "vídeos no feed" },
+            { term: "dm", onde: "mensagem direta (social-selling)" },
+            { term: "linktree", onde: "passou pelo intermediário Linktree" },
+          ]}
+        />
+      </Secao>
+      <Exemplos>
+        <ExemploCard
+          titulo="Link na bio do TikTok"
+          descricao="Único link clicável no perfil do TikTok."
+          url="https://turbopartners.com.br/diagnostico?utm_source=tiktok&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=lp-diagnostico"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>Linktree não é source: vai como <code className="font-mono">term=linktree</code>, source continua <code className="font-mono">tiktok</code>.</>,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── LINKEDIN ──
+function GuiaLinkedin() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="LinkedIn orgânico"
+        times={["Conteúdo/Social", "SDR — DM"]}
+        resumo="source = linkedin. Vale igual para a página oficial da Turbo e para post no perfil pessoal de colaborador."
+      />
+      <Passos
+        items={[
+          <><code className="font-mono">medium</code> = <code className="font-mono">organic</code></>,
+          <><code className="font-mono">source</code> = <code className="font-mono">linkedin</code></>,
+          <><code className="font-mono">term</code> = onde o link está: <code className="font-mono">bio</code> (Sobre), <code className="font-mono">feed</code> (post), <code className="font-mono">dm</code></>,
+          <><code className="font-mono">campaign</code>: <code className="font-mono">always-on</code> · <code className="font-mono">social-selling</code> (DM do SDR) · <code className="font-mono">lancamento-&#123;slug&#125;-&#123;aaaa-mm&#125;</code></>,
+          <><code className="font-mono">content</code>: link fixo (Sobre) → tipo de destino sem data; post (feed/dm) → nome + data</>,
+          <>Clique em <strong>Copiar e salvar</strong>.</>,
+        ]}
+      />
+      <Secao titulo="term — onde fica">
+        <TermoTabela
+          rows={[
+            { term: "bio", onde: "seção \"Sobre\" do perfil/página" },
+            { term: "feed", onde: "post no feed (página ou perfil pessoal)" },
+            { term: "dm", onde: "mensagem direta (social-selling do SDR)" },
+          ]}
+        />
+      </Secao>
+      <Exemplos>
+        <ExemploCard
+          titulo="Post no feed da página"
+          descricao="Conteúdo recorrente da página oficial."
+          url="https://turbopartners.com.br/creators?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-05-26"
+        />
+        <ExemploCard
+          titulo="SDR via DM (social-selling)"
+          descricao="Pré-vendas conversando ativamente nas DMs do LinkedIn da Turbo."
+          url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=organic&utm_campaign=social-selling&utm_term=dm&utm_content=camila-2026-05-26"
+        />
+        <ExemploCard
+          titulo={`Link no "Sobre" da página`}
+          descricao="Link fixo na seção de bio."
+          url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=lp-diagnostico"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>DM do SDR no LinkedIn oficial é <code className="font-mono">social-selling</code> (organic). DM fria via Sales Navigator é <code className="font-mono">outbound</code> — não confunda.</>,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── MÍDIA PAGA ──
+function GuiaPaga() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="Mídia Paga (Meta, Google, YouTube Ads)"
+        times={["Mídia/Tráfego"]}
+        resumo="Você NÃO escreve UTM à mão. As plataformas substituem os tokens automaticamente no momento do clique. Configura-se uma vez por conta."
+      />
+      <Passos
+        items={[
+          <><strong>Meta Ads:</strong> cole os URL parameters no nível do anúncio (já configurados em <code className="font-mono">server/services/adsCreation/creator.ts</code>).</>,
+          <><strong>Google Ads:</strong> cole o Tracking template <strong>a nível de conta</strong> e confirme que o <strong>Auto-tagging</strong> está ativado.</>,
+          <>No Google, sempre teste no botão <strong>"Test"</strong> antes de salvar.</>,
+          <>Não preencha <code className="font-mono">campaign</code>/<code className="font-mono">term</code>/<code className="font-mono">content</code> à mão — os tokens (<code className="font-mono">&#123;&#123;campaign.id&#125;&#125;</code>, <code className="font-mono">&#123;campaignid&#125;</code>) fazem isso sozinhos.</>,
+        ]}
+      />
+      <Exemplos>
+        <ExemploCard
+          titulo="Meta Ads (Facebook + Instagram)"
+          descricao="URL parameters no nível do anúncio. Tokens já configurados em server/services/adsCreation/creator.ts."
+          url="utm_source=facebook&utm_medium=paid&utm_campaign={{campaign.id}}&utm_term={{adset.id}}-{{placement}}&utm_content={{ad.id}}"
+        />
+        <ExemploCard
+          titulo="Google Ads (Search, Display, YouTube)"
+          descricao="Tracking template a nível de conta. YouTube Ads roda dentro do Google Ads — o token {network} retorna youtube automaticamente."
+          url="{lpurl}?utm_source=google&utm_medium=paid&utm_campaign={campaignid}&utm_term={adgroupid}-{network}-{device}-{matchtype}-{keyword}&utm_content={creative}"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>Nunca <code className="font-mono">fb</code> ou <code className="font-mono">meta</code> — Meta Ads é sempre <code className="font-mono">facebook</code>.</>,
+          <>Não montar UTM manual pra anúncio: deixe os tokens da plataforma preencherem.</>,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── EVENTOS ──
+function GuiaEventos() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="Eventos"
+        times={["Marketing/Eventos"]}
+        resumo="source = slug do evento (lowercase, sem acento, hífen). Evento próprio da Turbo → prefixo turbo-. Evento de terceiro → nome direto."
+      />
+      <Passos
+        items={[
+          <><code className="font-mono">medium</code> = <code className="font-mono">eventos</code></>,
+          <><code className="font-mono">source</code> = slug do evento (ex: <code className="font-mono">rd-summit-2026</code>, <code className="font-mono">turbo-workshop-creators-sp</code>)</>,
+          <><code className="font-mono">campaign</code> = tipo + ano (ex: <code className="font-mono">presencial-2026</code>, <code className="font-mono">workshop-online-2026-11</code>)</>,
+          <><code className="font-mono">term</code> = mecanismo do clique: <code className="font-mono">palestra</code>, <code className="font-mono">estande</code>, <code className="font-mono">qrcode-cracha</code>, <code className="font-mono">material-impresso</code></>,
+          <><code className="font-mono">content</code> = ação específica (ex: <code className="font-mono">slide-final-cta</code>, <code className="font-mono">mesa-recepcao</code>)</>,
+          <>Clique em <strong>Copiar e salvar</strong> e gere o QR Code a partir do link.</>,
+        ]}
+      />
+      <Exemplos>
+        <ExemploCard
+          titulo="QR code no slide final de palestra (RD Summit)"
+          descricao="Evento de terceiro — nome direto."
+          url="https://turbopartners.com.br/diagnostico?utm_source=rd-summit-2026&utm_medium=eventos&utm_campaign=presencial-2026&utm_term=palestra&utm_content=slide-final-cta"
+        />
+        <ExemploCard
+          titulo="Workshop próprio da Turbo"
+          descricao="Evento próprio — prefixo turbo-."
+          url="https://turbopartners.com.br/diagnostico?utm_source=turbo-workshop-creators-sp&utm_medium=eventos&utm_campaign=presencial-2026&utm_term=qrcode-cracha&utm_content=mesa-recepcao"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>Sem acento no slug do evento (<code className="font-mono">sao-paulo</code>, não <code className="font-mono">são-paulo</code>).</>,
+          <>Evento próprio da Turbo leva prefixo <code className="font-mono">turbo-</code>.</>,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── CRM ──
+function GuiaCrm() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="CRM (base própria — email, WhatsApp broadcast, SMS)"
+        times={["CRM/Marketing"]}
+        resumo="Comunicação ativa pra quem já é lead/cliente. source = canal de entrega (email/whatsapp/sms), NÃO a ferramenta de envio (RD, Mailchimp)."
+      />
+      <Passos
+        items={[
+          <><code className="font-mono">medium</code> = <code className="font-mono">crm</code></>,
+          <><code className="font-mono">source</code> = <code className="font-mono">email</code>, <code className="font-mono">whatsapp</code> ou <code className="font-mono">sms</code></>,
+          <><code className="font-mono">campaign</code> = nome do fluxo/campanha (ex: <code className="font-mono">nutricao-creators-2026-11</code>, <code className="font-mono">turma-6-rafa-mais-proximo</code>)</>,
+          <><code className="font-mono">term</code> = segmento da lista (ex: <code className="font-mono">lista-quentes</code>, <code className="font-mono">mql-nao-convertido</code>)</>,
+          <><code className="font-mono">content</code> = touchpoint específico (ex: <code className="font-mono">touchpoint-12-audio-convite</code>)</>,
+          <>Clique em <strong>Copiar e salvar</strong>.</>,
+        ]}
+      />
+      <Exemplos>
+        <ExemploCard
+          titulo="Régua de WhatsApp da Turma 6 do Dr. Rafael"
+          descricao="Toque específico (12 de 41) numa régua de quentes."
+          url="https://turbopartners.com.br/agendar?utm_source=whatsapp&utm_medium=crm&utm_campaign=turma-6-rafa-mais-proximo&utm_term=lista-quentes&utm_content=touchpoint-12-audio-convite"
+        />
+        <ExemploCard
+          titulo="E-mail de nutrição do funil Creators"
+          descricao="Disparo de email para MQLs não convertidos."
+          url="https://turbopartners.com.br/diagnostico?utm_source=email&utm_medium=crm&utm_campaign=nutricao-creators-2026-11&utm_term=mql-nao-convertido&utm_content=cta-agendar-diagnostico"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>Ferramenta de envio (RD, Mailchimp) não entra no UTM — <code className="font-mono">source</code> é só o canal (<code className="font-mono">email</code>).</>,
+          <>UTM em link <code className="font-mono">wa.me</code> <strong>não rastreia</strong>. Rastreie via página de redirect <code className="font-mono">/wpp</code>.</>,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── OUTBOUND ──
+function GuiaOutbound() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="Outbound (prospecção fria — SDR)"
+        times={["SDR/Pré-vendas"]}
+        resumo="Lead que nunca interagiu antes. source = canal final de envio. Ligação não é canal de UTM — usa o canal que de fato enviou o link."
+      />
+      <Passos
+        items={[
+          <><code className="font-mono">medium</code> = <code className="font-mono">outbound</code></>,
+          <><code className="font-mono">source</code> = <code className="font-mono">email</code>, <code className="font-mono">linkedin</code> ou <code className="font-mono">whatsapp</code></>,
+          <><code className="font-mono">campaign</code> = nome da cadência (ex: <code className="font-mono">cadencia-q4-donos-agencia</code>)</>,
+          <><code className="font-mono">term</code> = perfil do lead (ex: <code className="font-mono">agencia-50-funcionarios</code>, <code className="font-mono">dono-clinica-odonto</code>)</>,
+          <><code className="font-mono">content</code> = touchpoint/template (ex: <code className="font-mono">email-2-quebra-objecao</code>, <code className="font-mono">linkedin-msg-1</code>)</>,
+          <>Clique em <strong>Copiar e salvar</strong>.</>,
+        ]}
+      />
+      <Exemplos>
+        <ExemploCard
+          titulo="Cold email do SDR"
+          descricao="Cadência de prospecção via Apollo/Reply/Lemlist."
+          url="https://turbopartners.com.br/diagnostico?utm_source=email&utm_medium=outbound&utm_campaign=cadencia-q4-donos-agencia&utm_term=agencia-50-funcionarios&utm_content=email-2-quebra-objecao"
+        />
+        <ExemploCard
+          titulo="Cold outreach LinkedIn"
+          descricao="DM fria via Sales Navigator (não confunde com DM social-selling em organic)."
+          url="https://turbopartners.com.br/diagnostico?utm_source=linkedin&utm_medium=outbound&utm_campaign=cadencia-q4-donos-agencia&utm_term=agencia-50-funcionarios&utm_content=linkedin-msg-1"
+        />
+        <ExemploCard
+          titulo="Follow-up de cold call (WhatsApp pós-ligação)"
+          descricao="Ligação não é canal de UTM — usa o canal real de envio (whatsapp/email)."
+          url="https://turbopartners.com.br/diagnostico?utm_source=whatsapp&utm_medium=outbound&utm_campaign=cadencia-q4-donos-agencia&utm_term=pos-ligacao&utm_content=follow-up-call-2026-05-26"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>DM fria do LinkedIn é <code className="font-mono">outbound</code>, não <code className="font-mono">social-selling</code>.</>,
+          <>Cold call não tem source próprio: usa o canal que enviou o link, com <code className="font-mono">term=pos-ligacao</code>.</>,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── REFERRAL ──
+function GuiaReferral() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="Referral (cliente, colaborador, influencer, marketplace)"
+        times={["Parcerias/Growth"]}
+        resumo="Alguém externo trazendo lead. source = tipo de relação; campaign = nome da entidade (cliente, pessoa, influencer)."
+      />
+      <Passos
+        items={[
+          <><code className="font-mono">medium</code> = <code className="font-mono">referral</code></>,
+          <><code className="font-mono">source</code> = tipo de relação: <code className="font-mono">cliente</code>, <code className="font-mono">colaborador</code>, <code className="font-mono">influencer</code>, <code className="font-mono">afiliado</code>, <code className="font-mono">marketplace</code></>,
+          <><code className="font-mono">campaign</code> = nome da entidade em slug (ex: <code className="font-mono">dr-rafael</code>, <code className="font-mono">lucas</code>, <code className="font-mono">joao-silva</code>)</>,
+          <><code className="font-mono">term</code> = mecanismo (ex: <code className="font-mono">footer</code>, <code className="font-mono">indicacao</code>, <code className="font-mono">prova-social</code>, <code className="font-mono">bio-influencer</code>)</>,
+          <><code className="font-mono">content</code> = local específico do link (ex: <code className="font-mono">rodape-home</code>, <code className="font-mono">stories-link-bio</code>)</>,
+          <>Clique em <strong>Copiar e salvar</strong>.</>,
+        ]}
+      />
+      <Exemplos>
+        <ExemploCard
+          titulo="Footer da clínica do Dr. Rafael (cliente)"
+          descricao="Cliente colocando link da Turbo no footer do site dele."
+          url="https://turbopartners.com.br/?utm_source=cliente&utm_medium=referral&utm_campaign=dr-rafael&utm_term=footer&utm_content=rodape-home"
+        />
+        <ExemploCard
+          titulo="Colaborador (informal) indicando via WhatsApp pessoal"
+          descricao="Não confunde com social-selling (que é iniciativa coordenada nas DMs oficiais)."
+          url="https://turbopartners.com.br/?utm_source=colaborador&utm_medium=referral&utm_campaign=lucas&utm_term=indicacao&utm_content=whatsapp-amigo-loja-x"
+        />
+        <ExemploCard
+          titulo="Influencer postando link"
+          descricao="Criador externo divulgando Turbo no conteúdo dele."
+          url="https://turbopartners.com.br/?utm_source=influencer&utm_medium=referral&utm_campaign=joao-silva&utm_term=bio-influencer&utm_content=stories-link-bio"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>Nome de cliente/colaborador/influencer <strong>nunca em source</strong> — vai em <code className="font-mono">campaign</code>.</>,
+          <>Colaborador informal (WhatsApp pessoal) ≠ <code className="font-mono">social-selling</code> (que é iniciativa coordenada de SDR nas DMs oficiais).</>,
+        ]}
+      />
+    </div>
+  );
+}
+
+// ── CANAIS PRÓPRIOS (victor / andre / rodrigo) ──
+function GuiaProprios() {
+  return (
+    <div className="space-y-6">
+      <CanalHeader
+        titulo="Canais próprios: victor, andre, rodrigo"
+        times={["Growth / a figura"]}
+        resumo="Exceções: figuras-chave com canal próprio robusto (YouTube, Instagram, LinkedIn, TikTok). O medium é o nome da figura — não organic. O naming é idêntico ao organic."
+      />
+      <Passos
+        items={[
+          <><code className="font-mono">medium</code> = <code className="font-mono">victor</code>, <code className="font-mono">andre</code> ou <code className="font-mono">rodrigo</code></>,
+          <><code className="font-mono">source</code> = a plataforma da figura (<code className="font-mono">youtube</code>, <code className="font-mono">instagram</code>, <code className="font-mono">linkedin</code>, <code className="font-mono">tiktok</code>)</>,
+          <><code className="font-mono">campaign</code> = <code className="font-mono">always-on</code> (default) · <code className="font-mono">lancamento-&#123;slug&#125;-&#123;aaaa-mm&#125;</code> (parceria pontual)</>,
+          <><code className="font-mono">term</code> = mesmo vocabulário do organic por plataforma (<code className="font-mono">bio</code>, <code className="font-mono">descricao-video</code>, <code className="font-mono">feed</code>, <code className="font-mono">linktree</code>…)</>,
+          <><code className="font-mono">content</code>: link fixo → tipo de destino sem data; post → nome + data</>,
+          <>Clique em <strong>Copiar e salvar</strong>.</>,
+        ]}
+      />
+      <Exemplos>
+        <ExemploCard
+          titulo="Victor — bio do canal no YouTube apontando pra Turbo"
+          descricao="Link fixo — content = tipo de destino, sem data."
+          url="https://turbopartners.com.br/?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=bio&utm_content=site-home"
+        />
+        <ExemploCard
+          titulo="André — descrição de vídeo no canal dele"
+          descricao="Post — nome + data."
+          url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=andre&utm_campaign=always-on&utm_term=descricao-video&utm_content=video-creators-2026-05-28"
+        />
+        <ExemploCard
+          titulo="Rodrigo — link da Turbo na Linktree do Instagram dele"
+          descricao="Linktree continua sendo term, não source. medium = a figura."
+          url="https://turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=always-on&utm_term=linktree&utm_content=site-home"
+        />
+      </Exemplos>
+      <ProibicoesCanal
+        items={[
+          <>Conteúdo do canal/página <strong>da Turbo</strong> que só cita a figura → <code className="font-mono">organic</code>.</>,
+          <>Anúncio pago com a figura no criativo → <code className="font-mono">paid</code> (a figura vai no <code className="font-mono">content</code> do ad, não no medium).</>,
+        ]}
+      />
     </div>
   );
 }
