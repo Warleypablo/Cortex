@@ -16,6 +16,7 @@ import {
   MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, Tag, StickyNote, History,
 } from "lucide-react";
 import { QUALIFICATION_TAGS, TAG_LABELS, BLOCKING_TAGS, type QualificationTag } from "@shared/crmInstagramTags";
+import { HistoryPanel } from "./LeadHistory";
 
 type Profile = {
   id: number;
@@ -59,10 +60,10 @@ function initials(name: string | null): string {
   return ((parts[0]?.[0] || "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "?";
 }
 
-// Cor do score (qualificação): verde quente → cinza frio.
+// Cor do score (qualificação): verde alto → cinza baixo. Escala aditiva (soma de pontos).
 function scoreColor(score: number): string {
-  if (score >= 70) return "bg-emerald-600 text-white";
-  if (score >= 40) return "bg-amber-500 text-white";
+  if (score >= 10) return "bg-emerald-600 text-white";
+  if (score >= 5) return "bg-amber-500 text-white";
   return "bg-gray-300 dark:bg-zinc-700 text-gray-700 dark:text-zinc-300";
 }
 
@@ -184,6 +185,7 @@ function ProfileCard({
   const lockedByOther = p.isLocked && p.lockedBy && p.lockedBy !== meId;
   const idx = STAGES.findIndex((s) => s.key === p.stage);
   const [showHistory, setShowHistory] = useState(false);
+  const igHandle = p.igUsername;
 
   return (
     <div
@@ -200,7 +202,20 @@ function ProfileCard({
             >
               {p.score}
             </span>
-            <span className="font-medium text-gray-900 dark:text-white truncate">{profileLabel(p)}</span>
+            {igHandle ? (
+              <a
+                href={`https://instagram.com/${igHandle}`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="font-medium text-gray-900 dark:text-white truncate hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                title={`Abrir @${igHandle} no Instagram`}
+              >
+                {profileLabel(p)}
+              </a>
+            ) : (
+              <span className="font-medium text-gray-900 dark:text-white truncate">{profileLabel(p)}</span>
+            )}
             <span title={p.temperature}>{TEMP_EMOJI[p.temperature]}</span>
           </div>
           <div className="text-xs text-gray-500 dark:text-zinc-400">
@@ -216,10 +231,14 @@ function ProfileCard({
 
       <div className="mt-2 flex flex-wrap gap-1">
         {p.dmCount > 0 && (
-          <Badge variant="secondary" className="gap-1"><Mail className="h-3 w-3" />DM {p.dmCount}</Badge>
+          <Badge variant="secondary" className="gap-1" title={`${p.dmCount} mensagem(ns) direta(s)`}>
+            <Mail className="h-3 w-3" />{p.dmCount} {p.dmCount === 1 ? "DM" : "DMs"}
+          </Badge>
         )}
         {p.commentCount > 0 && (
-          <Badge variant="secondary" className="gap-1"><MessageCircle className="h-3 w-3" />{p.commentCount}</Badge>
+          <Badge variant="secondary" className="gap-1" title={`${p.commentCount} comentário(s)`}>
+            <MessageCircle className="h-3 w-3" />{p.commentCount} {p.commentCount === 1 ? "coment." : "coments."}
+          </Badge>
         )}
         {p.isExistingContact && (
           <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white gap-1">
@@ -248,7 +267,7 @@ function ProfileCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {p.ghlContactId && p.ghlLocationId ? (
+        {p.ghlContactId && p.ghlLocationId && (
           // Lead com conversa no GHL: SDR responde dentro do GHL (sem logar no IG).
           <Button size="sm" className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white" asChild>
             <a
@@ -259,14 +278,15 @@ function ProfileCard({
               <MessageCircle className="h-3 w-3" />Responder no GHL
             </a>
           </Button>
-        ) : p.igUsername ? (
-          // Lead só de comentário: sem thread no GHL → abre o perfil no Instagram.
+        )}
+        {igHandle && (
+          // Tem @handle (lead de comentário): abre o perfil no Instagram.
           <Button size="sm" variant="outline" className="h-7 text-xs gap-1" asChild>
-            <a href={`https://instagram.com/${p.igUsername}`} target="_blank" rel="noreferrer">
-              <ExternalLink className="h-3 w-3" />Abrir no Instagram
+            <a href={`https://instagram.com/${igHandle}`} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-3 w-3" />Instagram
             </a>
           </Button>
-        ) : null}
+        )}
         {!p.ownerUserId ? (
           <Button size="sm" variant="ghost" className="h-7 text-xs" title="Pegar e travar pra mim por 15min" onClick={onClaim}>Pegar</Button>
         ) : p.ownerUserId === meId ? (
@@ -308,76 +328,6 @@ function ProfileCard({
         <QualifyMenu current={p.qualification} onQualify={onQualify} />
         <NoteButton current={p.observacao} onSave={onObservacao} />
       </div>
-    </div>
-  );
-}
-
-type Interaction = {
-  id: number;
-  type: string;
-  igMediaId: string | null;
-  text: string | null;
-  source: string | null;
-  occurredAt: string;
-  postCaption: string | null;
-  points: number;
-};
-
-// Tempo relativo curto pro histórico: "Hoje", "Ontem", "N dias".
-function relTime(iso: string): string {
-  const days = (Date.now() - new Date(iso).getTime()) / 86_400_000;
-  if (days < 1) return "Hoje";
-  if (days < 2) return "Ontem";
-  return `${Math.floor(days)} dias`;
-}
-
-// Histórico de interações do lead (lazy: só busca quando expandido).
-// Hoje cobre comentário + DM (o que a API oficial entrega); curtida/save/seguir
-// entram quando a captura por scraper existir.
-function HistoryPanel({ id }: { id: number }) {
-  const { data, isLoading } = useQuery<{ interactions: Interaction[] }>({
-    queryKey: [`/api/crm-instagram/profiles/${id}`],
-  });
-
-  if (isLoading) {
-    return <div className="mt-2 text-xs text-gray-400">Carregando histórico...</div>;
-  }
-  const items = data?.interactions || [];
-
-  return (
-    <div className="mt-2 space-y-1.5 border-t border-gray-100 dark:border-zinc-800 pt-2">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-400">
-        Histórico de interações
-      </div>
-      {items.length === 0 && (
-        <div className="text-xs text-gray-400">Sem interações registradas.</div>
-      )}
-      {items.map((it) => {
-        const isDm = it.type === "spontaneous_dm";
-        const Icon = isDm ? Mail : MessageCircle;
-        const label = isDm
-          ? "Mandou DM"
-          : it.postCaption
-            ? `Comentou em "${it.postCaption.slice(0, 30)}${it.postCaption.length > 30 ? "…" : ""}"`
-            : "Comentou";
-        return (
-          <div key={it.id} className="flex items-center gap-2 text-xs">
-            <Icon className={`h-3.5 w-3.5 shrink-0 ${isDm ? "text-blue-500" : "text-gray-400"}`} />
-            <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-zinc-300">{label}</span>
-            {it.source && (
-              <span className="shrink-0 rounded bg-gray-100 dark:bg-zinc-800 px-1 text-[10px] text-gray-500 dark:text-zinc-400">
-                {it.source === "dm" ? "DM" : "orgânico"}
-              </span>
-            )}
-            {it.points > 0 && (
-              <span className="shrink-0 rounded bg-emerald-100 dark:bg-emerald-900/40 px-1 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
-                +{it.points} pts
-              </span>
-            )}
-            <span className="shrink-0 text-[10px] text-gray-400">{relTime(it.occurredAt)}</span>
-          </div>
-        );
-      })}
     </div>
   );
 }

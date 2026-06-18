@@ -3,7 +3,7 @@ import { useSetPageInfo } from "@/contexts/PageContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Pipeline from "./Pipeline";
 import Qualificacao from "./Qualificacao";
-import SocialMedia from "./SocialMedia";
+import LeadScoring from "./LeadScoring";
 import Documentacao from "./Documentacao";
 
 export default function CrmInstagramLayout() {
@@ -16,7 +16,7 @@ export default function CrmInstagramLayout() {
         <TabsList>
           <TabsTrigger value="pipeline">Pipeline</TabsTrigger>
           <TabsTrigger value="qualificacao">Qualificação</TabsTrigger>
-          <TabsTrigger value="social">Social Media</TabsTrigger>
+          <TabsTrigger value="scoring">Lead Scoring</TabsTrigger>
           <TabsTrigger value="docs">Documentação</TabsTrigger>
         </TabsList>
 
@@ -26,8 +26,8 @@ export default function CrmInstagramLayout() {
         <TabsContent value="qualificacao" className="mt-4">
           <Qualificacao />
         </TabsContent>
-        <TabsContent value="social" className="mt-4">
-          <SocialMedia />
+        <TabsContent value="scoring" className="mt-4">
+          <LeadScoring />
         </TabsContent>
         <TabsContent value="docs" className="mt-4">
           <Documentacao />

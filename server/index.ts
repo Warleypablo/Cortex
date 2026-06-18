@@ -730,6 +730,21 @@ app.use((req, res, next) => {
   setInterval(() => runCrmIgGhlIngestJob(), GHL_SYNC_INTERVAL);
   console.log(`[crm-instagram-ghl-ingest] Scheduled every ${GHL_SYNC_INTERVAL / 60000} min`);
 
+  // CRM Instagram — ingestão de curtidas via Apify (1x/dia). No-op sem APIFY_TOKEN.
+  if (process.env.APIFY_TOKEN && process.env.APIFY_POST_LIKERS_ACTOR_ID) {
+    const runCrmIgApifyLikesJob = async () => {
+      try {
+        const { ingestApifyPostLikers } = await import("./services/crmInstagramApifyIngest");
+        await ingestApifyPostLikers();
+      } catch (e: any) {
+        console.error("[crm-instagram-apify] erro:", e.message);
+      }
+    };
+    setTimeout(() => runCrmIgApifyLikesJob(), 6 * 60 * 1000); // 6min após boot
+    setInterval(() => runCrmIgApifyLikesJob(), 24 * 60 * 60 * 1000); // 1x/dia
+    console.log("[crm-instagram-apify] Scheduled daily (likes scraper)");
+  }
+
   // GHL tags snapshot diário às 00:10
   const scheduleNextGhlTagsSnapshot = () => {
     const now = new Date();
