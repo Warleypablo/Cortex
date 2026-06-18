@@ -246,7 +246,7 @@ export function registerGrowthTimeseriesRoutes(app: Express, db: any) {
         try {
           const colsResult = await db.execute(sql`
             SELECT column_name FROM information_schema.columns
-            WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+            WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
           `);
           const columns = colsResult.rows.map((r: any) => r.column_name);
           const dateCol = columns.includes("report_date") ? "report_date"
@@ -258,7 +258,7 @@ export function registerGrowthTimeseriesRoutes(app: Express, db: any) {
             const gRes = await db.execute(sql.raw(`
               SELECT to_char(${dateCol}, 'YYYY-MM') AS bucket,
                 COALESCE(SUM(cost_micros) / 1000000.0, 0) AS investimento
-              FROM google_ads.campaign_daily_metrics
+              FROM google.campaign_daily_metrics
               WHERE ${dateCol} >= '${yearStart}'::date AND ${dateCol} <= '${yearEnd}'::date
               GROUP BY to_char(${dateCol}, 'YYYY-MM')
             `));

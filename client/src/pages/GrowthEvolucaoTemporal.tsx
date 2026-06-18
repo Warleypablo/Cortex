@@ -222,6 +222,7 @@ interface MetricDef {
   format: MetricFormat;
   section: SectionKey;
   inverted?: boolean;
+  sub?: boolean;
   realizado: (d: { mql?: MqlData; naoMql?: NaoMqlData; ads?: AdsData }) => number | null;
   orcado: (b: BudgetMonth) => number | null;
 }
@@ -258,6 +259,12 @@ const METRIC_DEFS: MetricDef[] = [
       return ads.visualizacoesPagina > 0 ? ads.leads / ads.visualizacoesPagina : 0;
     },
     orcado: (b) => b.marketing?.taxaConversaoPagina ?? null },
+  { id: "ads_taxa_conversao_pagina_mql", name: "MQL", format: "percent", section: "marketing", sub: true,
+    realizado: ({ ads }) => (ads && ads.visualizacoesPagina > 0 ? ads.mqls / ads.visualizacoesPagina : null),
+    orcado: () => null },
+  { id: "ads_taxa_conversao_pagina_nmql", name: "Não-MQL", format: "percent", section: "marketing", sub: true,
+    realizado: ({ ads }) => (ads && ads.visualizacoesPagina > 0 ? (ads.leads - ads.mqls) / ads.visualizacoesPagina : null),
+    orcado: () => null },
   { id: "ads_connect_rate", name: "Connect Rate", format: "percent", section: "marketing",
     realizado: ({ ads }) => ads?.connectRate ?? null,
     orcado: (b) => b.marketing?.connectRate ?? null },
@@ -883,7 +890,14 @@ export default function GrowthEvolucaoTemporal() {
                       </TableRow>
                       {rows.map((m) => (
                         <TableRow key={m.id} className="hover:bg-muted/30">
-                          <TableCell className="sticky left-0 bg-background font-medium text-sm">
+                          <TableCell
+                            className={cn(
+                              "sticky left-0 bg-background text-sm",
+                              m.sub ? "font-normal text-muted-foreground" : "font-medium",
+                            )}
+                            style={m.sub ? { paddingLeft: "2rem" } : undefined}
+                          >
+                            {m.sub && <span className="text-muted-foreground/60 mr-1">└</span>}
                             {m.name}
                           </TableCell>
                           {columns.map((col) => renderCell(m, col))}

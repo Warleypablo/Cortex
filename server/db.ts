@@ -773,6 +773,7 @@ export async function initializeSysSchema(): Promise<void> {
     
     // Create canonical view
     await createCanonicalContractsView();
+    await initializeLtLtvChurnViews();
 
     console.log('[database] cortex_core schema fully initialized');
   } catch (error) {
@@ -1322,6 +1323,53 @@ async function createCanonicalContractsView(): Promise<void> {
   `);
   
   console.log('[database] vw_contratos_canon view created');
+}
+
+export async function initializeLtLtvChurnViews(): Promise<void> {
+  await db.execute(sql`
+    CREATE OR REPLACE VIEW cortex_core.vw_lt_contratos AS
+    WITH base AS (
+      SELECT
+        co.id_subtask,
+        co.id_task,
+        cl.nome AS nome_cliente,
+        co.servico, co.produto, co.squad, co.vendedor,
+        co.cs_responsavel, co.responsavel,
+        co.status, co.valorr, co.valorp,
+        co.data_inicio, co.data_encerramento,
+        ch.ultimo_dia_operacao,
+        ch.data_solicitacao_encerramento,
+        ch.motivo_cancelamento, ch.submotivo_cancelamento,
+        ch.evitabilidade_churn, ch.possibilidade_retencao, ch.reteve,
+        ch.cluster, ch.tipo_negocio, ch.plano,
+        CASE WHEN co.valorr > 0 THEN 'recorrente'
+             WHEN co.valorp > 0 THEN 'pontual'
+             ELSE 'sem_valor' END AS tipo_receita,
+        COALESCE(co.data_encerramento, ch.ultimo_dia_operacao) AS data_fim,
+        (co.status IN ('ativo','onboarding','pausado','em cancelamento','triagem')) AS is_ativo,
+        (co.status = 'cancelado/inativo') AS is_churned
+      FROM "Clickup".cup_contratos co
+      LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = co.id_task
+      LEFT JOIN "Clickup".cup_churn ch ON ch.task_id = co.id_subtask
+    ),
+    calc AS (
+      SELECT b.*,
+        (b.data_fim IS NOT NULL AND b.data_fim < b.data_inicio) AS data_inconsistente,
+        CASE
+          WHEN b.data_inicio IS NULL THEN NULL
+          WHEN b.is_ativo THEN (CURRENT_DATE - b.data_inicio)
+          WHEN b.data_fim IS NOT NULL AND b.data_fim >= b.data_inicio THEN (b.data_fim - b.data_inicio)
+          ELSE NULL
+        END AS lt_dias
+      FROM base b
+    )
+    SELECT c.*,
+      ROUND((c.lt_dias / 30.44)::numeric, 2) AS lt_meses,
+      CASE WHEN c.tipo_receita = 'recorrente' AND c.lt_dias IS NOT NULL
+           THEN ROUND((c.valorr * c.lt_dias / 30.44)::numeric, 2) END AS ltv_recorrente
+    FROM calc c
+  `);
+  console.log('[database] vw_lt_contratos view created');
 }
 
 export async function initializeDashboardTables(): Promise<void> {
@@ -2216,6 +2264,109 @@ export async function initializeCapacityTable(): Promise<void> {
   }
 }
 
+export async function initializeCapacityMetasTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.capacity_metas (
+        id                SERIAL PRIMARY KEY,
+        nome              TEXT NOT NULL,
+        match_responsavel TEXT NOT NULL,
+        categoria         TEXT NOT NULL,
+        cap_recorrente    INTEGER,
+        cap_mrr           NUMERIC,
+        cap_pontual       INTEGER,
+        cap_contas        INTEGER,
+        ordem             INTEGER DEFAULT 0,
+        ativo             BOOLEAN DEFAULT TRUE,
+        atualizado_em     TIMESTAMP DEFAULT NOW(),
+        UNIQUE(match_responsavel, categoria)
+      )
+    `);
+    console.log('[database] capacity_metas table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing capacity_metas table:', error);
+  }
+}
+
+// Atribuição lead-a-lead de broadcast: cada resposta de WhatsApp ligada ao disparo de
+// origem (via conversationId) + ao deal do Bitrix (via telefone). Etapas de funil
+// (reunião/comparecimento/venda) NÃO são guardadas aqui — vêm live de "Bitrix".crm_deal.
+export async function initializeBroadcastLeadEventsTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_lead_events (
+        id                SERIAL PRIMARY KEY,
+        broadcast_id      TEXT NOT NULL,
+        conversation_id   TEXT,
+        ghl_contact_id    TEXT,
+        lead_phone        TEXT,
+        lead_phone_norm   VARCHAR(20),
+        reply_message_id  TEXT NOT NULL UNIQUE,
+        reply_body        TEXT,
+        reply_at          TIMESTAMPTZ,
+        sentiment         TEXT,
+        sentiment_motivo  TEXT,
+        sentiment_fonte   TEXT,
+        bitrix_contact_id INTEGER,
+        bitrix_deal_id    INTEGER,
+        attributed_at     TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_lead_events_broadcast_idx ON cortex_core.broadcast_lead_events (broadcast_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_lead_events_phone_idx ON cortex_core.broadcast_lead_events (lead_phone_norm)`);
+    console.log('[database] broadcast_lead_events table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_lead_events table:', error);
+  }
+}
+
+// Classificação por disparo: padrão de copy (Claude) + base inferida pelas tags dos
+// destinatários. Cache pra não reprocessar a IA. Alimenta Resumo e Inteligência.
+export async function initializeBroadcastClassificationTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_classification (
+        broadcast_id   TEXT PRIMARY KEY,
+        padrao         TEXT,
+        padrao_motivo  TEXT,
+        base           TEXT,
+        base_match_pct NUMERIC,
+        classified_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    console.log('[database] broadcast_classification table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_classification table:', error);
+  }
+}
+
+// Plano editorial de broadcasts (planejamento do mês): slots com base/data/objetivo/
+// padrão/status + copy gerada. Planejamento interno (não dispara no Funnels nesta fase).
+export async function initializeBroadcastPlanTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.broadcast_plan (
+        id          SERIAL PRIMARY KEY,
+        plan_date   DATE NOT NULL,
+        canal       TEXT DEFAULT 'WhatsApp',
+        base        TEXT,
+        objetivo    TEXT,
+        padrao      TEXT,
+        titulo      TEXT,
+        copy_text   TEXT,
+        status      TEXT DEFAULT 'backlog',
+        created_by  TEXT,
+        created_at  TIMESTAMPTZ DEFAULT NOW(),
+        updated_at  TIMESTAMPTZ DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS broadcast_plan_date_idx ON cortex_core.broadcast_plan (plan_date)`);
+    console.log('[database] broadcast_plan table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing broadcast_plan table:', error);
+  }
+}
+
 export async function initializePredictionsTable(): Promise<void> {
   try {
     await db.execute(sql`
@@ -2335,6 +2486,45 @@ export async function migrateMetricRulesetsContext(): Promise<void> {
   }
 }
 
+export async function initializeMetaActionsLogTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.meta_actions_log (
+        id SERIAL PRIMARY KEY,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+        actor_type VARCHAR(16) NOT NULL,
+        actor_user_id VARCHAR(64),
+        actor_email VARCHAR(255),
+        level VARCHAR(16) NOT NULL,
+        entity_id VARCHAR(64) NOT NULL,
+        entity_name TEXT,
+        action VARCHAR(32) NOT NULL,
+        payload_json JSONB NOT NULL,
+        previous_value_json JSONB,
+        reason TEXT NOT NULL,
+        agent_rationale_text TEXT,
+        status VARCHAR(16) NOT NULL DEFAULT 'pending',
+        meta_error_json JSONB,
+        confirmed_by_user_id VARCHAR(64),
+        confirmed_at TIMESTAMPTZ
+      )
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_meta_actions_log_entity
+        ON cortex_core.meta_actions_log(entity_id, status)
+    `);
+    await db.execute(sql`
+      CREATE INDEX IF NOT EXISTS idx_meta_actions_log_pending
+        ON cortex_core.meta_actions_log(status)
+        WHERE status = 'pending'
+    `);
+    console.log('[database] Meta actions log table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing meta actions log table:', error);
+  }
+}
+
 export async function initializeItemAliasMapTable(): Promise<void> {
   try {
     await db.execute(sql`
@@ -2377,5 +2567,122 @@ export async function initializeItemAliasMapTable(): Promise<void> {
     console.log('[database] item_alias_map table initialized');
   } catch (error) {
     console.error('[database] erro ao inicializar item_alias_map:', error);
+  }
+}
+
+// CRM Instagram (Garimpo de Engajamento → Social Selling)
+export async function initializeCrmInstagramTables(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.prospecting_profiles (
+        id SERIAL PRIMARY KEY,
+        ig_username TEXT,
+        display_name TEXT,
+        ig_user_id TEXT,
+        bio TEXT,
+        followers_count INTEGER,
+        profile_picture_url TEXT,
+        last_media_permalink TEXT,
+        stage TEXT NOT NULL DEFAULT 'engajador',
+        subcategory TEXT,
+        qualification TEXT,
+        observacao TEXT,
+        owner_user_id TEXT,
+        locked_by TEXT,
+        locked_at TIMESTAMP,
+        bitrix_deal_id INTEGER,
+        ghl_contact_id TEXT,
+        is_existing_contact BOOLEAN DEFAULT FALSE,
+        icp_tags TEXT[],
+        first_seen TIMESTAMP DEFAULT NOW(),
+        last_interaction_at TIMESTAMP,
+        created_at TIMESTAMP DEFAULT NOW(),
+        updated_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_stage ON cortex_core.prospecting_profiles (stage)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_owner ON cortex_core.prospecting_profiles (owner_user_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_last_interaction ON cortex_core.prospecting_profiles (last_interaction_at)`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.prospecting_interactions (
+        id SERIAL PRIMARY KEY,
+        profile_id INTEGER NOT NULL REFERENCES cortex_core.prospecting_profiles(id) ON DELETE CASCADE,
+        type TEXT NOT NULL,
+        ig_media_id TEXT,
+        text TEXT,
+        source TEXT,
+        external_ref TEXT NOT NULL,
+        occurred_at TIMESTAMP NOT NULL,
+        created_at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_int_external_ref ON cortex_core.prospecting_interactions (external_ref)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_int_profile ON cortex_core.prospecting_interactions (profile_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_int_occurred ON cortex_core.prospecting_interactions (occurred_at)`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.prospecting_status_log (
+        id SERIAL PRIMARY KEY,
+        profile_id INTEGER NOT NULL REFERENCES cortex_core.prospecting_profiles(id) ON DELETE CASCADE,
+        from_stage TEXT,
+        to_stage TEXT NOT NULL,
+        by_user TEXT,
+        at TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_prospect_log_profile ON cortex_core.prospecting_status_log (profile_id)`);
+
+    // ── Migração idempotente: re-chaveamento por ghl_contact_id + display_name ──
+    // Roda DEPOIS das três tabelas existirem (o dedup referencia interactions/status_log).
+    // Separa nome de exibição do @handle real; conserta leads de DM exibidos como
+    // "@nome com emoji" e dá dedup estável. Guardas garantem rodar 1x sem efeito
+    // destrutivo em execuções futuras.
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS display_name TEXT`);
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS qualification TEXT`);
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ADD COLUMN IF NOT EXISTS observacao TEXT`);
+    await db.execute(sql`ALTER TABLE cortex_core.prospecting_profiles ALTER COLUMN ig_username DROP NOT NULL`);
+    // 1) backfill do nome a partir do ig_username legado (só leads de DM ainda não migrados)
+    await db.execute(sql`
+      UPDATE cortex_core.prospecting_profiles
+      SET display_name = ig_username
+      WHERE display_name IS NULL AND ig_username IS NOT NULL AND ghl_contact_id IS NOT NULL
+    `);
+    // 2) zera o @handle dos leads de DM (era nome de exibição, não handle real).
+    //    Guarda ig_username = display_name evita apagar handle real de lead de comentário.
+    await db.execute(sql`
+      UPDATE cortex_core.prospecting_profiles
+      SET ig_username = NULL
+      WHERE ghl_contact_id IS NOT NULL AND ig_username IS NOT NULL AND ig_username = display_name
+    `);
+    // 3) dedup defensivo: se houver ghl_contact_id duplicado, mantém o menor id,
+    //    repointa interações/log e remove os duplicados (antes do índice único).
+    await db.execute(sql`
+      WITH dups AS (
+        SELECT ghl_contact_id, MIN(id) AS keep_id, ARRAY_AGG(id) AS ids
+        FROM cortex_core.prospecting_profiles
+        WHERE ghl_contact_id IS NOT NULL
+        GROUP BY ghl_contact_id HAVING COUNT(*) > 1
+      ),
+      repoint_int AS (
+        UPDATE cortex_core.prospecting_interactions pi SET profile_id = d.keep_id
+        FROM dups d WHERE pi.profile_id = ANY(d.ids) AND pi.profile_id <> d.keep_id
+        RETURNING 1
+      ),
+      repoint_log AS (
+        UPDATE cortex_core.prospecting_status_log sl SET profile_id = d.keep_id
+        FROM dups d WHERE sl.profile_id = ANY(d.ids) AND sl.profile_id <> d.keep_id
+        RETURNING 1
+      )
+      DELETE FROM cortex_core.prospecting_profiles p
+      USING dups d
+      WHERE p.ghl_contact_id = d.ghl_contact_id AND p.id <> d.keep_id
+    `);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_ig_username ON cortex_core.prospecting_profiles (ig_username)`);
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_ghl_contact ON cortex_core.prospecting_profiles (ghl_contact_id)`);
+
+    console.log('[database] CRM Instagram tables initialized');
+  } catch (error) {
+    console.error('[database] erro ao inicializar CRM Instagram tables:', error);
   }
 }

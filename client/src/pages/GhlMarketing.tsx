@@ -20,6 +20,11 @@ import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { avaliarPerformance, CLASSIFICACAO_TAILWIND, CLASSIFICACAO_LABEL, BENCHMARKS_TURBO, type Classificacao } from "@shared/ghl-broadcast/benchmarks";
+import FunilTab from "@/components/FunilBroadcast";
+import BasesInteligencia from "@/components/BasesInteligencia";
+import EvolucaoBroadcast from "@/components/EvolucaoBroadcast";
+import RelatorioBroadcast from "@/components/RelatorioBroadcast";
+import PlanejamentoMensal from "@/components/PlanejamentoMensal";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -818,7 +823,7 @@ function DiagnosticoTab({ from, to }: { from: string; to: string }) {
             <div>
               <div className="font-medium mb-1">WhatsApp — open rate esperado</div>
               <ul className="text-muted-foreground space-y-0.5 ml-3">
-                <li>Premium (Clientes, Mix da Nata, SMTM): <strong>{BENCHMARKS_TURBO.wpp.premium}%</strong></li>
+                <li>Premium (Clientes): <strong>{BENCHMARKS_TURBO.wpp.premium}%</strong></li>
                 <li>MQLs (Geral, Creators, CRM): <strong>{BENCHMARKS_TURBO.wpp.mql}%</strong></li>
                 <li>Congelados: <strong>{BENCHMARKS_TURBO.wpp.congelados}%</strong></li>
                 <li>Leads 30-100k: <strong>{BENCHMARKS_TURBO.wpp.leads_30_100k}%</strong></li>
@@ -862,6 +867,8 @@ interface BroadcastRow {
   open_pct: number | null;
   conversations_generated: number;
   meetings_scheduled: number | null;
+  ganhos: number | null;
+  receita: number | null;
   has_open_tracking: boolean;
   spend_brl: number | null;
   spend_is_manual: boolean;
@@ -950,6 +957,21 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
     };
   }, [data]);
 
+  // Resumo executivo: entrega WhatsApp por status + funil atribuído (causalidade pós-resposta).
+  const summary = useQuery<{
+    whatsapp: { total: number; enviado: number; entregue: number; lida: number; erro: number; entrega_pct: number | null; leitura_pct: number | null; erro_pct: number | null };
+    funil: { responderam: number; positivas: number; reuniao_marcada: number; compareceu: number; venda: number };
+    custos: { gasto_total: number; gasto_por_disparo: number | null; custo_reuniao: number | null; cac: number | null; estimado: boolean; unit_cost: number; n_manual: number };
+  }>({
+    queryKey: ["/api/ghl/broadcasts/summary", from, to],
+    queryFn: () => fetchJson(`/api/ghl/broadcasts/summary?from=${from}&to=${to}`),
+  });
+  const wa = summary.data?.whatsapp;
+  const fnl = summary.data?.funil;
+  const custos = summary.data?.custos;
+  const fmtBRL = (n: number | null | undefined) =>
+    n == null ? "—" : n.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
+
   function toggleSort(k: SortKey) {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
@@ -960,17 +982,76 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
 
   return (
     <div className="space-y-4">
-      {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-        <StatCard label="E-mails enviados" value={fmtInt(kpis.emailCount)} hint="campanhas no período" />
-        <StatCard label="Broadcasts WhatsApp" value={fmtInt(kpis.waCount)} hint="disparos no período" />
-        <StatCard
-          label="% Entrega média"
-          value={kpis.avgDelivery != null ? `${kpis.avgDelivery.toFixed(1)}%` : "—"}
-        />
-        <StatCard label="Conversas" value={fmtInt(kpis.conversations)} hint="janela 7d após envio" />
-        <StatCard label="Reuniões" value="—" hint="Fase 2 — requer cruzamento Bitrix" />
+      {/* KPI cards: Investimento · Disparos · Respostas · Reuniões · Vendas · CAC */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"} />
+        <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp" />
+        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint={fnl ? `${fmtInt(fnl.positivas)} positivas` : undefined} />
+        <StatCard label="Reuniões" value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"} hint="atribuídas (pós-resposta)" />
+        <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
+        <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas" />
       </div>
+
+      {/* Evolução do período (2/3) + Gastos (1/3) */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+        <div className="lg:col-span-2">
+          <EvolucaoBroadcast from={from} to={to} />
+        </div>
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base">Gastos</CardTitle>
+            <p className="text-xs text-muted-foreground">Investimento no período</p>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="text-3xl font-bold">{custos ? fmtBRL(custos.gasto_total) : "—"}</div>
+              <div className="text-xs text-muted-foreground">
+                {custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : `inclui ${custos.n_manual} override(s) manual(is)`) : "gasto total"}
+              </div>
+            </div>
+            <div className="space-y-2 text-sm border-t border-border pt-3">
+              <div className="flex justify-between"><span className="text-muted-foreground">Gasto / disparo</span><span className="font-medium">{custos ? fmtBRL(custos.gasto_por_disparo) : "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">Custo / reunião</span><span className="font-medium">{custos ? fmtBRL(custos.custo_reuniao) : "—"}</span></div>
+              <div className="flex justify-between"><span className="text-muted-foreground">CAC (custo / venda)</span><span className="font-medium">{custos ? fmtBRL(custos.cac) : "—"}</span></div>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Status de entrega / taxa de abertura (distribuição WABA) */}
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Status de entrega</CardTitle>
+          <p className="text-xs text-muted-foreground">Distribuição das mensagens e taxa de abertura</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {[
+            { label: "Enviadas", value: wa?.enviado ?? 0, color: "bg-sky-500" },
+            { label: "Entregues", value: wa?.entregue ?? 0, color: "bg-cyan-500" },
+            { label: "Lidas (abertura)", value: wa?.lida ?? 0, color: "bg-emerald-500" },
+            { label: "Erro", value: wa?.erro ?? 0, color: "bg-rose-500" },
+          ].map((row) => {
+            const total = wa?.total ?? 0;
+            const pct = total ? (100 * row.value) / total : 0;
+            return (
+              <div key={row.label} className="space-y-1">
+                <div className="flex justify-between text-sm">
+                  <span>{row.label}</span>
+                  <span className="text-muted-foreground"><strong className="text-foreground">{fmtInt(row.value)}</strong> · {pct.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 w-full rounded bg-muted/40 overflow-hidden">
+                  <div className={`h-full ${row.color}`} style={{ width: `${Math.max(pct, 1)}%` }} />
+                </div>
+              </div>
+            );
+          })}
+          <div className="flex gap-4 pt-2 text-sm border-t border-border">
+            <div><span className="text-muted-foreground">Taxa de entrega: </span><strong>{wa?.entrega_pct != null ? `${wa.entrega_pct}%` : "—"}</strong></div>
+            <div><span className="text-muted-foreground">Taxa de leitura: </span><strong>{wa?.leitura_pct != null ? `${wa.leitura_pct}%` : "—"}</strong></div>
+            <div><span className="text-muted-foreground">Taxa de erro: </span><strong>{wa?.erro_pct != null ? `${wa.erro_pct}%` : "—"}</strong></div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Filtros */}
       <Card>
@@ -1058,116 +1139,91 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <SortableTh label="Data" k="date" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="sticky left-0 bg-background z-10" />
-                    <SortableTh label="Canal" k="channel" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-                    <SortableTh label="Nome / Template" k="name" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} className="min-w-[240px]" />
-                    <TableHead className="min-w-[280px]">Mensagem (preview)</TableHead>
-                    <TableHead className="min-w-[200px]" title="Top 3 tags mais frequentes nos recipients do broadcast">Tags disparadas</TableHead>
-                    <SortableTh label="Tamanho lista" k="list_size" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <SortableTh label="Entregues" k="delivered" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <SortableTh label="Entrega %" k="delivery_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <SortableTh label="Abertura %" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <SortableTh label="Conversas (7d)" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <TableHead className="text-right text-muted-foreground" title="Depende de cruzamento Bitrix — Fase 2">Reuniões (7d)</TableHead>
+                    <SortableTh label="Data" k="date" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+                    <TableHead className="min-w-[340px]">Disparo</TableHead>
+                    <SortableTh label="Lista" k="list_size" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Entrega" k="delivery_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Abertura" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="Conversas" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <TableHead className="text-right" title="Reuniões atribuídas ao disparo (agendadas após a resposta)">Reuniões</TableHead>
+                    <TableHead className="text-right" title="Negócios ganhos atribuídos (venda após resposta)">Ganhos</TableHead>
+                    <TableHead className="text-right" title="Receita dos negócios ganhos atribuídos">Receita</TableHead>
+                    <TableHead className="text-right" title="Ticket médio = receita ÷ negócios ganhos">AOV</TableHead>
                     <TableHead className="text-right">Gasto</TableHead>
-                    <TableHead className="min-w-[160px]">Feedback SDR</TableHead>
+                    <TableHead className="text-right" title="Custo de aquisição = gasto ÷ negócios ganhos">CAC</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {sorted.map((b) => (
-                    <TableRow
-                      key={b.id}
-                      onClick={() => setDetail(b)}
-                      className="cursor-pointer hover:bg-muted/40"
-                    >
-                      <TableCell className="text-xs whitespace-nowrap sticky left-0 bg-background z-10">
-                        {b.date ? format(new Date(b.date), "dd/MM/yy HH:mm", { locale: ptBR }) : "—"}
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant="outline" className="text-xs">
-                          {b.channel === "WhatsApp" ? (
-                            <><MessageCircle className="w-3 h-3 mr-1" /> WhatsApp</>
-                          ) : (
-                            <><Mail className="w-3 h-3 mr-1" /> Email</>
-                          )}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="max-w-[260px] truncate text-xs">
-                        {b.channel === "Email" ? (
-                          <div>
-                            <div className="font-medium truncate" title={b.name ?? undefined}>{b.name ?? "Sem nome"}</div>
-                            <div className="text-muted-foreground truncate" title={b.subject ?? undefined}>{b.subject ?? "—"}</div>
-                          </div>
-                        ) : (
-                          <div>
-                            <div className="font-medium">WhatsApp broadcast</div>
-                            <div className="text-muted-foreground text-xs">
-                              {b.source ?? "—"} · {b.date ? format(new Date(b.date), "dd/MM/yyyy", { locale: ptBR }) : ""}
-                            </div>
-                          </div>
-                        )}
-                      </TableCell>
-                      <TableCell className="max-w-[320px] text-xs">
-                        <div className="truncate text-muted-foreground" title={b.preview ?? undefined}>
-                          {b.preview?.replace(/\s+/g, " ").slice(0, 140) || "—"}
+                    <TableRow key={b.id} onClick={() => setDetail(b)} className="cursor-pointer hover:bg-muted/40">
+                      <TableCell className="align-top whitespace-nowrap py-3">
+                        <div className="flex items-center gap-1.5 text-sm font-medium">
+                          {b.channel === "WhatsApp"
+                            ? <MessageCircle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                            : <Mail className="w-3.5 h-3.5 text-blue-500 shrink-0" />}
+                          {b.date ? format(new Date(b.date), "dd/MM/yy", { locale: ptBR }) : "—"}
                         </div>
+                        <div className="text-[10px] text-muted-foreground pl-5">{b.date ? format(new Date(b.date), "HH:mm", { locale: ptBR }) : ""}</div>
                       </TableCell>
-                      <TableCell className="text-xs">
-                        {b.top_tags.length ? (
-                          <div className="flex flex-col gap-0.5">
-                            {b.top_tags.map((t) => (
-                              <div key={t.tag} className="flex items-center gap-1.5">
-                                <span className="font-mono text-[10px] truncate max-w-[140px]" title={t.tag}>{t.tag}</span>
-                                <span className="text-muted-foreground text-[10px]">{t.pct.toFixed(0)}%</span>
-                              </div>
+                      <TableCell className="max-w-[440px] align-top py-3">
+                        {b.channel === "Email" && b.name && (
+                          <div className="text-sm font-medium truncate" title={b.name}>{b.name}</div>
+                        )}
+                        <div className="text-sm text-foreground/90 line-clamp-2" title={b.preview ?? undefined}>
+                          {b.preview?.replace(/\s+/g, " ") || (b.subject ?? "—")}
+                        </div>
+                        {b.top_tags.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {b.top_tags.slice(0, 2).map((t) => (
+                              <span key={t.tag} className="text-[10px] rounded bg-muted px-1.5 py-0.5 text-muted-foreground font-mono" title={`${t.tag} · ${t.pct.toFixed(0)}%`}>
+                                {t.tag}
+                              </span>
                             ))}
+                            {b.top_tags.length > 2 && <span className="text-[10px] text-muted-foreground self-center">+{b.top_tags.length - 2}</span>}
                           </div>
-                        ) : (
-                          <span className="text-muted-foreground" title="Email broadcasts sem webhook não têm lista de recipients">—</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">{fmtInt(b.list_size)}</TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">{fmtInt(b.delivered)}</TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">
+                      <TableCell className="text-right tabular-nums align-top py-3">{fmtInt(b.list_size)}</TableCell>
+                      <TableCell className="text-right align-top py-3">
                         <PctBadge value={b.delivery_pct} />
+                        <div className="text-[10px] text-muted-foreground mt-0.5">{fmtInt(b.delivered)} entregues</div>
                       </TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">
-                        {b.channel === "WhatsApp" ? (
-                          <span className="text-muted-foreground" title="GHL não envia opens de WhatsApp via API">—</span>
-                        ) : b.has_open_tracking ? (
+                      <TableCell className="text-right align-top py-3">
+                        {b.channel === "WhatsApp" || b.has_open_tracking ? (
                           <PctBadge value={b.open_pct} />
                         ) : (
-                          <span className="text-muted-foreground" title="Webhook GHL não cadastrado em prod">sem webhook</span>
+                          <span className="text-muted-foreground text-[11px]" title="Webhook GHL não cadastrado em prod">sem webhook</span>
                         )}
                       </TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">{fmtInt(b.conversations_generated)}</TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap text-muted-foreground" title="Depende de cruzamento GHL ↔ Bitrix — Fase 2">—</TableCell>
-                      <TableCell className="text-xs text-right whitespace-nowrap">
+                      <TableCell className="text-right tabular-nums align-top py-3">{fmtInt(b.conversations_generated)}</TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3">
+                        {b.meetings_scheduled != null ? <span className="font-medium">{fmtInt(b.meetings_scheduled)}</span> : "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3">
+                        {b.ganhos != null && b.ganhos > 0 ? <span className="font-medium text-emerald-600 dark:text-emerald-400">{fmtInt(b.ganhos)}</span> : "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3 whitespace-nowrap">
+                        {b.receita != null && b.receita > 0 ? fmtBRL(b.receita) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3 whitespace-nowrap">
+                        {b.ganhos != null && b.ganhos > 0 && b.receita ? fmtBRL(b.receita / b.ganhos) : "—"}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3 whitespace-nowrap">
                         {b.spend_brl != null ? (
-                          <span title={b.spend_is_manual ? "Valor manual" : "Calculado: entregues × preço unitário do canal"}>
-                            R$ {b.spend_brl.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                          <span title={b.spend_is_manual ? "Valor manual" : "Calculado: entregues × preço unitário"}>
+                            {fmtBRL(b.spend_brl)}
                             {b.spend_is_manual && <span className="ml-1 text-[10px] text-muted-foreground">man.</span>}
                           </span>
-                        ) : b.channel === "Email" ? (
-                          <span className="text-muted-foreground" title="Email tem custo mensal fixo no GHL, não por mensagem">—</span>
-                        ) : (
-                          <span className="text-muted-foreground">—</span>
-                        )}
+                        ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
-                      <TableCell className="text-xs max-w-[200px]">
-                        {b.sdr_feedback ? (
-                          <span className="truncate block text-muted-foreground" title={b.sdr_feedback}>
-                            {b.sdr_feedback}
-                          </span>
-                        ) : (
-                          <span className="text-muted-foreground text-[10px] italic">— (clique pra editar)</span>
-                        )}
+                      <TableCell className="text-right tabular-nums align-top py-3 whitespace-nowrap">
+                        {b.ganhos != null && b.ganhos > 0 && b.spend_brl != null ? fmtBRL(b.spend_brl / b.ganhos) : "—"}
                       </TableCell>
                     </TableRow>
                   ))}
                   {sorted.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={13} className="text-center text-muted-foreground py-6">
+                      <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
                         Nenhum broadcast encontrado com esses filtros
                       </TableCell>
                     </TableRow>
@@ -1360,6 +1416,18 @@ function BroadcastDetailModal({ broadcast, onClose }: { broadcast: BroadcastRow;
                   {saveOk && <span className="text-emerald-600 text-xs inline-flex items-center gap-1"><Check className="w-3 h-3" /> Salvo</span>}
                 </div>
               </div>
+              {broadcast.top_tags?.length > 0 && (
+                <div className="border-t pt-3">
+                  <div className="text-xs text-muted-foreground mb-2">Tags disparadas (top {broadcast.top_tags.length} nos recipients):</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {broadcast.top_tags.map((t) => (
+                      <span key={t.tag} className="text-xs rounded bg-muted px-2 py-0.5 font-mono" title={`${t.pct.toFixed(0)}% dos recipients têm essa tag`}>
+                        {t.tag} <span className="text-muted-foreground">{t.pct.toFixed(0)}%</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
               <div className="border-t pt-3">
                 <div className="text-xs text-muted-foreground mb-2">Conteúdo da mensagem:</div>
                 {broadcast.channel === "Email" && d.sample_content_type === "text/html" && d.sample_body ? (
@@ -1944,11 +2012,6 @@ export default function GhlMarketing() {
   const from = format(dateRange.from, "yyyy-MM-dd");
   const to = format(dateRange.to, "yyyy-MM-dd");
 
-  const { data: overview } = useQuery<{ counts: any; lastSyncs: any[] }>({
-    queryKey: ["/api/ghl/overview"],
-    queryFn: () => fetchJson("/api/ghl/overview"),
-  });
-
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
       <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
@@ -1961,16 +2024,6 @@ export default function GhlMarketing() {
           }}
           align="start"
         />
-        {overview?.counts && (
-          <div className="text-xs text-muted-foreground flex flex-wrap gap-3">
-            <span><strong>{fmtInt(overview.counts.contacts)}</strong> contatos</span>
-            <span><strong>{fmtInt(overview.counts.conversations)}</strong> conversas</span>
-            <span><strong>{fmtInt(overview.counts.messages)}</strong> mensagens</span>
-            <span><strong>{fmtInt(overview.counts.email_campaigns)}</strong> campanhas</span>
-            <span><strong>{fmtInt(overview.counts.tags)}</strong> tags</span>
-            <span><strong>{fmtInt(overview.counts.email_events)}</strong> events</span>
-          </div>
-        )}
       </div>
 
       <Tabs defaultValue="biblioteca" className="w-full">
@@ -1978,14 +2031,20 @@ export default function GhlMarketing() {
           <TabsTrigger value="biblioteca" data-testid="tab-biblioteca">
             <BookOpen className="w-4 h-4 mr-2" /> Broadcast
           </TabsTrigger>
-          <TabsTrigger value="tags" data-testid="tab-tags">
-            <TagIcon className="w-4 h-4 mr-2" /> Listas
-          </TabsTrigger>
           <TabsTrigger value="automacoes" data-testid="tab-automacoes">
             <Zap className="w-4 h-4 mr-2" /> Automações
           </TabsTrigger>
-          <TabsTrigger value="calendario" data-testid="tab-calendario">
-            <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
+          <TabsTrigger value="funil" data-testid="tab-funil">
+            <Activity className="w-4 h-4 mr-2" /> Funil
+          </TabsTrigger>
+          <TabsTrigger value="bases" data-testid="tab-bases">
+            <BarChart2 className="w-4 h-4 mr-2" /> Bases
+          </TabsTrigger>
+          <TabsTrigger value="relatorio" data-testid="tab-relatorio">
+            <TrendingUp className="w-4 h-4 mr-2" /> Relatório
+          </TabsTrigger>
+          <TabsTrigger value="planejamento" data-testid="tab-planejamento">
+            <Wand2 className="w-4 h-4 mr-2" /> Planejamento
           </TabsTrigger>
           <TabsTrigger value="gerador" data-testid="tab-gerador">
             <Sparkles className="w-4 h-4 mr-2" /> Gerador IA
@@ -1995,14 +2054,20 @@ export default function GhlMarketing() {
         <TabsContent value="biblioteca" className="mt-6">
           <BibliotecaTab from={from} to={to} />
         </TabsContent>
-        <TabsContent value="tags" className="mt-6">
-          <TagsTab />
-        </TabsContent>
         <TabsContent value="automacoes" className="mt-6">
           <AutomacoesTab />
         </TabsContent>
-        <TabsContent value="calendario" className="mt-6">
-          <CalendarioTab />
+        <TabsContent value="funil" className="mt-6">
+          <FunilTab from={from} to={to} />
+        </TabsContent>
+        <TabsContent value="bases" className="mt-6">
+          <BasesInteligencia from={from} to={to} />
+        </TabsContent>
+        <TabsContent value="relatorio" className="mt-6">
+          <RelatorioBroadcast from={from} to={to} />
+        </TabsContent>
+        <TabsContent value="planejamento" className="mt-6">
+          <PlanejamentoMensal />
         </TabsContent>
         <TabsContent value="gerador" className="mt-6">
           <GeradorTab />
