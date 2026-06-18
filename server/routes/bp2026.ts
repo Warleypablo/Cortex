@@ -510,8 +510,8 @@ export function registerBp2026Routes(app: Express, db: any) {
         pontualPorMes, vendasMrrPorMes, dfcPorMes, mesCorrente, mesFechado,
       });
 
-      // 9. Revenue por linha de serviço + ponte do MRR consolidada (sub-aba)
-      const { linhas: revenue, ponteMrr } = await montarRevenue({ db, orcado, vendasMrrPorMes, mesCorrente, mesFechado });
+      // 9. Revenue por linha de serviço (sub-aba)
+      const revenue = await montarRevenue({ db, orcado, vendasMrrPorMes, mesCorrente, mesFechado });
 
       // 9b. Pontual (sub-aba): movimento do estoque pontual via snapshot-diff
       const pontual = await montarPontual({ db, mesCorrente, mesFechado });
@@ -564,7 +564,6 @@ export function registerBp2026Routes(app: Express, db: any) {
         }))),
         metricasGerais: anexarInfo(metricasGerais),
         revenue: anexarInfo(revenue),
-        ponteMrr: anexarInfo(ponteMrr),
         pontual: anexarInfo(pontual),
         funil: anexarInfo(funil),
         vendasProduto: anexarInfo(vendasProduto),

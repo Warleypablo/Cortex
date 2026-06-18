@@ -13,7 +13,6 @@ interface ReceitasResponse {
   linhas: BPLinha[];
   metricasGerais: BPLinha[];
   revenue: BPLinha[];
-  ponteMrr: BPLinha[];
   pontual: BPLinha[];
   funil: BPLinha[];
   vendasProduto: BPLinha[];
@@ -86,19 +85,7 @@ export default function BP2026() {
             onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
-        <TabsContent value="revenue" className="mt-4 space-y-6">
-          <div>
-            <h3 className="mb-2 text-sm font-semibold text-gray-700 dark:text-zinc-300">
-              Ponte do MRR — movimento mensal (só realizado)
-            </h3>
-            <BPDreTable
-              linhas={data.ponteMrr}
-              mesCorrente={data.mesCorrente}
-              mesFechado={data.mesFechado}
-              mostrarOrcado={false}
-              onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
-            />
-          </div>
+        <TabsContent value="revenue" className="mt-4">
           <BPDreTable
             linhas={data.revenue}
             mesCorrente={data.mesCorrente}
@@ -171,7 +158,7 @@ export default function BP2026() {
         metrica={detalhe?.metrica ?? null}
         mes={detalhe?.mes ?? null}
         linhas={[
-          ...data.linhas, ...data.metricasGerais, ...data.revenue, ...data.ponteMrr,
+          ...data.linhas, ...data.metricasGerais, ...data.revenue,
           ...data.pontual, ...data.funil, ...data.vendasProduto, ...data.capacity, ...data.sgaDetalhe,
           ...data.cacDetalhe, ...data.outrasDetalhe,
         ]}
