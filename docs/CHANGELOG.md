@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-18 | feat(relatorio-mensal): Vendas YTD e Vendas CX & Upsell após a Capa Comercial
+
+**O que foi feito:**
+- Reordenados os slides do Reporte Mensal: "Vendas YTD" e "Vendas CX & Upsell" movidos para **depois** da "Capa Comercial" (antes vinham antes dela).
+- Nova ordem da seção: Faturamento YTD → Capa Comercial → Vendas YTD → Vendas CX & Upsell → Ranking Closers.
+- Ajustado `FIXED_SLIDE_NAMES` e o switch de render (`case 5`→Capa Comercial, `6`→Vendas YTD, `7`→Vendas CX & Upsell) em `RelatorioMensal.tsx`. Sem mudança na contagem total de slides.
+
+**Por que:**
+- Os slides de vendas pertencem à seção Comercial e devem aparecer após a capa da seção.
+
+**Arquivos alterados:**
+- `client/src/pages/RelatorioMensal.tsx` - reorder do array e do switch
+
+**Impacto arquitetural:** Nenhum — apenas reordenação.
+
 ## 2026-06-18 | feat(relatorio-mensal): remove slide "Tópicos de Discussão"
 
 **O que foi feito:**
