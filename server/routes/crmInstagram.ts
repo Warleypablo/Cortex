@@ -5,7 +5,7 @@ import { bitrixDealAdd, bitrixFindUserIdByEmail } from "../services/bitrixClient
 
 // Campo customizado "SDR" no Bitrix (tipo employee). Responsável = ASSIGNED_BY_ID.
 const BITRIX_SDR_FIELD = "UF_CRM_1752257983";
-import { temperatureFrom, leadScore } from "../../shared/crmInstagramScoring";
+import { temperatureFrom, leadScore, interactionPoints } from "../../shared/crmInstagramScoring";
 import { BLOCKING_TAGS, isQualificationTag } from "../../shared/crmInstagramTags";
 
 const STAGES = ["engajador", "oportunidade", "negocio"] as const;
@@ -113,13 +113,26 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
       `)).rows[0];
       if (!profile) return res.status(404).json({ message: "não encontrado" });
 
-      const interactions = (await db.execute(sql`
-        SELECT id, type, ig_media_id, text, source, occurred_at
-        FROM cortex_core.prospecting_interactions
-        WHERE profile_id = ${id}
-        ORDER BY occurred_at DESC
+      const interactionRows = (await db.execute(sql`
+        SELECT pi.id, pi.type, pi.ig_media_id, pi.text, pi.source, pi.occurred_at,
+               pm.caption AS post_caption
+        FROM cortex_core.prospecting_interactions pi
+        LEFT JOIN cortex_core.instagram_post_metrics pm ON pm.ig_media_id = pi.ig_media_id
+        WHERE pi.profile_id = ${id}
+        ORDER BY pi.occurred_at DESC
         LIMIT 200
       `)).rows;
+
+      const interactions = (interactionRows as any[]).map((r) => ({
+        id: r.id,
+        type: r.type,
+        igMediaId: r.ig_media_id,
+        text: r.text,
+        source: r.source,
+        occurredAt: r.occurred_at,
+        postCaption: r.post_caption,
+        points: interactionPoints(r.type),
+      }));
 
       const log = (await db.execute(sql`
         SELECT from_stage, to_stage, by_user, at

@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { temperatureFrom, leadScore } from "./crmInstagramScoring";
+import { temperatureFrom, leadScore, interactionPoints } from "./crmInstagramScoring";
 
 const NOW = new Date("2026-06-08T12:00:00Z").getTime();
 const daysAgo = (d: number) => new Date(NOW - d * 86_400_000).toISOString();
@@ -57,5 +57,12 @@ describe("leadScore", () => {
     expect(max).toBeGreaterThanOrEqual(0);
     const min = leadScore({ dmCount: 0, commentCount: 0, lastInteractionAt: null }, NOW);
     expect(min).toBeGreaterThanOrEqual(0);
+  });
+
+  it("interactionPoints: DM pesa mais que comentário; tipo desconhecido = 0", () => {
+    expect(interactionPoints("spontaneous_dm")).toBe(40);
+    expect(interactionPoints("comment")).toBe(8);
+    expect(interactionPoints("like")).toBe(0);
+    expect(interactionPoints("")).toBe(0);
   });
 });

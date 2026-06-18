@@ -57,3 +57,17 @@ export function leadScore(s: LeadSignals, now: number = Date.now()): number {
 
   return Math.max(0, Math.min(100, Math.round(score)));
 }
+
+/**
+ * Pontos que cada tipo de interação contribui pro lead score — usado no
+ * Histórico de Interações. Espelha os pesos de leadScore (DM pesa mais que
+ * comentário). Curtida/save/seguir entram aqui quando a captura existir.
+ */
+export const INTERACTION_POINTS: Record<string, number> = {
+  spontaneous_dm: 40,
+  comment: 8,
+};
+
+export function interactionPoints(type: string): number {
+  return INTERACTION_POINTS[type] ?? 0;
+}

@@ -31,9 +31,10 @@ export default function Documentacao() {
             por lá).
           </li>
           <li>
-            <strong>Qualificar</strong> — aplique uma <strong>tag</strong> (creator, empresário,
-            influenciadora, talento…). Marcar <strong>desqualificado</strong> ou <strong>colaborador</strong>{" "}
-            tira o card do Pipeline (some da fila, mas continua na aba Qualificação).
+            <strong>Qualificar</strong> — aplique uma <strong>tag</strong>. As tags{" "}
+            <strong>colaborador, creator, influenciadora, talento</strong> e <strong>desqualificado</strong>{" "}
+            tiram o card do Pipeline (somem da fila, mas continuam na aba Qualificação). Só{" "}
+            <strong>empresário</strong> permanece no funil.
           </li>
           <li>
             <strong>Anotar</strong> — use <strong>"Adicionar observação"</strong> para contexto; se virar
