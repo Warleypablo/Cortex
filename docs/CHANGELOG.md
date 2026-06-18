@@ -1,5 +1,81 @@
 # Changelog
 
+## 2026-06-18 | style(relatorio-mensal): slide Pontual preenche o espaço após remoção do bloco
+
+**O que foi feito:**
+- A "Linha 2" do slide Pontual (gráfico "Entregas por Produto × Mês" + lista "Em Aberto por Serviço") passou de altura fixa (`260px`) para `flex-1 min-h-0` + `grid-rows-1`, ocupando o espaço que sobrou após a remoção do bloco "Tempo Médio de Entrega por Produto".
+
+**Por que:**
+- Sem o bloco removido, a tela ficava com um vazio grande embaixo; agora os dois gráficos enquadram e preenchem o slide.
+
+**Arquivos alterados:**
+- `client/src/pages/relatorio-mensal/SlidePontual.tsx`
+
+**Impacto arquitetural:** Nenhum — ajuste de layout.
+
+## 2026-06-18 | feat(relatorio-mensal): remove "Tempo Médio de Entrega por Produto" do slide Pontual
+
+**O que foi feito:**
+- Removido o bloco "Tempo Médio de Entrega por Produto (últimos 6 meses)" do slide Pontual (`SlidePontual.tsx`).
+- Limpeza dos órfãos: variáveis `tempoMedioEntrega`/`topTempoMedio`/`maxDias` e import `Clock` removidos do componente.
+- Backend/tipo `PontualData.tempoMedioEntrega` mantido intacto (apenas a exibição foi removida).
+
+**Por que:**
+- Solicitado: a métrica não é mais necessária na tela de Pontual.
+
+**Arquivos alterados:**
+- `client/src/pages/relatorio-mensal/SlidePontual.tsx`
+
+**Impacto arquitetural:** Nenhum — remoção de bloco de UI.
+
+## 2026-06-18 | feat(relatorio-mensal): Vendas YTD e Vendas CX & Upsell após a Capa Comercial
+
+**O que foi feito:**
+- Reordenados os slides do Reporte Mensal: "Vendas YTD" e "Vendas CX & Upsell" movidos para **depois** da "Capa Comercial" (antes vinham antes dela).
+- Nova ordem da seção: Faturamento YTD → Capa Comercial → Vendas YTD → Vendas CX & Upsell → Ranking Closers.
+- Ajustado `FIXED_SLIDE_NAMES` e o switch de render (`case 5`→Capa Comercial, `6`→Vendas YTD, `7`→Vendas CX & Upsell) em `RelatorioMensal.tsx`. Sem mudança na contagem total de slides.
+
+**Por que:**
+- Os slides de vendas pertencem à seção Comercial e devem aparecer após a capa da seção.
+
+**Arquivos alterados:**
+- `client/src/pages/RelatorioMensal.tsx` - reorder do array e do switch
+
+**Impacto arquitetural:** Nenhum — apenas reordenação.
+
+## 2026-06-18 | feat(relatorio-mensal): remove slide "Tópicos de Discussão"
+
+**O que foi feito:**
+- Removido o slide `SlideTopicosDiscussao` do Reporte Mensal: tirado de `FIXED_SLIDE_NAMES`, removido o `case` do switch de render e o import; componente `SlideTopicosDiscussao.tsx` deletado (não usado em mais nenhum lugar).
+- Switch reajustado: Turbo Store → `case 22`, Frase → `23`, Q&A → `24`. Deck passa de 32 para 31 slides; Turbo Store fica logo antes do fechamento.
+
+**Por que:**
+- Solicitado: a aba de tópicos de discussão não é mais necessária no reporte.
+
+**Arquivos alterados:**
+- `client/src/pages/RelatorioMensal.tsx` - removido do array, switch e import
+- `client/src/pages/relatorio-mensal/SlideTopicosDiscussao.tsx` (deletado)
+
+**Impacto arquitetural:** Nenhum.
+
+## 2026-06-18 | feat(relatorio-mensal): slide "Turbo Store" antes do fechamento
+
+**O que foi feito:**
+- Novo slide `SlideTurboStore.tsx` no Reporte Mensal, posicionado logo antes do bloco de fechamento (Frase + Q&A).
+- Layout: screenshot do site da loja em moldura de navegador à esquerda + QR code de acesso à direita ("Escaneie para acessar a loja"), tema commerce (ciano), dark mode.
+- Inserido `"Turbo Store"` em `FIXED_SLIDE_NAMES` (índice 23) e ajustado o switch de render (`case 23`→Store, `24`→Frase, `25`→Q&A) em `RelatorioMensal.tsx`. Deck passa de 31 para 32 slides.
+- Imagens adicionadas em `client/src/assets/`: `turbo-store.png` (print do site) e `turbo-store-qr.jpeg` (QR da loja).
+
+**Por que:**
+- Divulgar a Turbo Store no reporte mensal, com QR para acesso direto à loja.
+
+**Arquivos alterados:**
+- `client/src/pages/relatorio-mensal/SlideTurboStore.tsx` (novo)
+- `client/src/pages/RelatorioMensal.tsx` - ordem dos slides + render
+- `client/src/assets/turbo-store.png`, `client/src/assets/turbo-store-qr.jpeg` (novos)
+
+**Impacto arquitetural:** Nenhum — slide estático adicional.
+
 ## 2026-06-17 | fix(bp2026): churn conta só status cancelado/em cancelamento, exclui entregue/pausado
 
 **O que foi feito:**

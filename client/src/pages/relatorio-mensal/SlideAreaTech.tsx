@@ -1,282 +1,177 @@
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer, PieChart, Pie, Cell,
+  ResponsiveContainer, Cell,
 } from "recharts";
-import type { TechSlideData } from "./types";
+import { Rocket } from "lucide-react";
 import SlideLayout from "./SlideLayout";
-import { ChartCard, SecondaryCard } from "./SlideComponents";
+import { SlideHeader, SecondaryCard, ChartCard } from "./SlideComponents";
 
-interface Props {
-  techData: TechSlideData;
-  mesLabel: string;
-}
-
-const TIPO_COLORS: Record<string, string> = {
-  "LP Shopify": "#f97316",
-  "Landing Page": "#ec4899",
-  "E-Commerce Standard": "#22c55e",
-  "Ecommerce": "#22c55e",
-  "Site": "#3b82f6",
-  "CRO": "#eab308",
-  "Sustentacao": "#8b5cf6",
-  "Alteracao": "#6366f1",
-  "Integracao": "#71717a",
-  "Outros": "#71717a",
+// Dados hardcoded espelhando o Painel ClickUp — Projetos Tech (https://tech-dash.pages.dev/).
+// Capturados em 2026-06-18. Atualizar manualmente a cada reporte enquanto não houver integração.
+const RESUMO = {
+  entregueAno: 849514,
+  projetosAno: 70,
+  ticketMedioAno: 12135.91,
+  metaAnual: 2400000,
 };
 
-function getColor(tipo: string): string {
-  return TIPO_COLORS[tipo] || "#71717a";
-}
+const TRIMESTRES = [
+  { label: "Q1", realizado: 458705, meta: 450000 },
+  { label: "Q2", realizado: 390809, meta: 600000 },
+  { label: "Q3", realizado: 0, meta: 650000 },
+  { label: "Q4", realizado: 0, meta: 700000 },
+];
+
+const TOP_ACCOUNTS = [
+  { nome: "Davi Ferraz", projetos: 26, valor: 365580 },
+  { nome: "Bibiana Paz", projetos: 20, valor: 247694 },
+  { nome: "Vinicius Paiva", projetos: 18, valor: 182240 },
+  { nome: "Hiuri Liberato", projetos: 4, valor: 29000 },
+  { nome: "Breno Carmo", projetos: 2, valor: 25000 },
+];
+
+const MEDALHAS = ["🥇", "🥈", "🥉"];
+const ACCENT = "#60a5fa"; // azul do tema tech
+const META_COLOR = "#3f3f46";
 
 function fmtBRL(v: number): string {
-  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
-  if (v >= 1_000) return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
+  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(2).replace(".", ",")}M`;
   return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
 function fmtK(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
+  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1).replace(".", ",")}M`;
   if (v >= 1_000) return `${Math.round(v / 1_000)}k`;
   return `${Math.round(v)}`;
 }
 
-function ChartTooltipContent({ active, payload, label, isCurrency }: any) {
+function QuarterTooltip({ active, payload, label }: any) {
   if (!active || !payload?.length) return null;
   return (
     <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs">
       <p className="font-bold text-white mb-1">{label}</p>
       {payload.map((p: any) => (
-        <p key={p.dataKey} style={{ color: p.fill || p.color }}>
-          {p.name}: {isCurrency ? fmtBRL(p.value) : p.value}
+        <p key={p.dataKey} style={{ color: p.dataKey === "realizado" ? ACCENT : "#a1a1aa" }}>
+          {p.dataKey === "realizado" ? "Realizado" : "Meta"}: {fmtBRL(p.value)}
         </p>
       ))}
     </div>
   );
 }
 
-const RADIAN = Math.PI / 180;
-function renderPieLabel({ cx, cy, midAngle, innerRadius, outerRadius, value }: any) {
-  if (!value) return null;
-  const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
-  const x = cx + radius * Math.cos(-midAngle * RADIAN);
-  const y = cy + radius * Math.sin(-midAngle * RADIAN);
+function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
   return (
-    <text x={x} y={y} fill="white" textAnchor="middle" dominantBaseline="central" fontSize={14} fontWeight="bold">
-      {value}
-    </text>
+    <SecondaryCard className="flex flex-col items-center justify-center p-3 text-center">
+      <p className="text-[10px] text-zinc-500 uppercase tracking-widest mb-1">{label}</p>
+      <p className={`text-2xl font-black tabular-nums ${accent}`}>{value}</p>
+      {sub && <p className="text-[10px] text-zinc-500 mt-1">{sub}</p>}
+    </SecondaryCard>
   );
 }
 
-function BarLabel({ x, y, width, height, value }: any) {
-  if (!value || height < 14) return null;
-  return (
-    <text
-      x={x + width / 2}
-      y={y + height / 2}
-      fill="white"
-      textAnchor="middle"
-      dominantBaseline="central"
-      fontSize={10}
-      fontWeight="bold"
-    >
-      {typeof value === "number" && value >= 1000 ? fmtK(value) : value}
-    </text>
-  );
+interface Props {
+  // Mantidos por compatibilidade com o caller — slide agora usa dados hardcoded do tech-dash.
+  techData?: unknown;
+  mesLabel?: string;
 }
 
-function makeStackTopLabel(data: Record<string, any>[], tiposList: string[], isCurrency: boolean) {
-  return ({ x, y, width, index }: any) => {
-    if (index == null || !data[index]) return null;
-    const row = data[index];
-    const total = tiposList.reduce((s, t) => s + ((row[t] as number) || 0), 0);
-    if (!total) return null;
-    return (
-      <text x={x + width / 2} y={y - 6} fill="white" textAnchor="middle" fontSize={12} fontWeight="bold">
-        {isCurrency ? fmtK(total) : total}
-      </text>
-    );
-  };
-}
-
-export default function SlideAreaTech({ techData, mesLabel }: Props) {
-  if (!techData) {
-    return (
-      <SlideLayout section="tech">
-        <div className="flex-1 flex items-center justify-center text-zinc-500">
-          Carregando dados Tech...
-        </div>
-      </SlideLayout>
-    );
-  }
-
-  const { kpis, entregasPorTipo, receitaPorTipo, emAbertoPorTipo, mesLabel: techMesLabel } = techData;
-  const displayLabel = techMesLabel || mesLabel;
-
-  // Filtrar apenas meses com dados (soma dos valores numericos > 0)
-  const hasData = (row: Record<string, any>) =>
-    Object.entries(row).some(([k, v]) => k !== "month" && k !== "label" && typeof v === "number" && v > 0);
-  const entregasFiltered = entregasPorTipo.filter(hasData);
-  const receitaFiltered = receitaPorTipo.filter(hasData);
-
-  const tipos = entregasPorTipo.length > 0
-    ? Object.keys(entregasPorTipo[0]).filter(k => k !== "month" && k !== "label")
-    : [];
-
-  const totalAbertoValor = emAbertoPorTipo.reduce((s, t) => s + t.valor, 0);
-
-  const pieData = emAbertoPorTipo.filter(t => t.quantidade > 0);
+export default function SlideAreaTech(_props: Props) {
+  const pctMeta = (RESUMO.entregueAno / RESUMO.metaAnual) * 100;
+  const maxAccount = TOP_ACCOUNTS[0].valor;
 
   return (
     <SlideLayout section="tech" padding="28px 36px">
-      {/* Title */}
-      <div className="shrink-0 mb-5">
-        <h2 className="text-4xl font-black text-center tracking-tight" style={{ fontFamily: "serif" }}>
-          Area Tech
-        </h2>
-        <div className="h-px bg-gradient-to-r from-transparent via-blue-500/40 to-transparent mt-3" />
-      </div>
+      <SlideHeader
+        icon={Rocket}
+        iconColor="text-blue-400"
+        title="Área Tech"
+        subtitle="Projetos Tech · 2026"
+        badge="Painel ClickUp"
+        gradientColor="#3b82f6"
+      />
 
-      {/* Top row */}
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0 mb-4">
-        {/* KPI cards */}
-        <div className="flex gap-3">
-          {/* Projetos Entregues */}
-          <SecondaryCard className="flex-1 flex flex-col items-center justify-center p-3">
-            <p className="text-xs text-zinc-300 text-center mb-2">Projetos<br />entregues</p>
-            <p className="text-4xl font-black mb-3">{kpis.entregues}</p>
-            <span className="text-xs text-emerald-400 border border-emerald-500/30 rounded-lg px-3 py-1">
-              Valor: {fmtBRL(kpis.valorEntregues)}
-            </span>
-          </SecondaryCard>
+      {/* KPIs — Visão Geral 2026 */}
+      <div className="grid grid-cols-4 gap-3 shrink-0 mb-4">
+        <KpiCard label="Entregue em 2026" value={fmtBRL(RESUMO.entregueAno)} sub={`${RESUMO.projetosAno} projetos`} accent="text-blue-400" />
+        <KpiCard label="Projetos entregues" value={String(RESUMO.projetosAno)} sub="no ano" accent="text-white" />
+        <KpiCard label="Ticket médio" value={fmtBRL(RESUMO.ticketMedioAno)} sub="média do ano" accent="text-cyan-400" />
 
-          {/* Tempo Medio */}
-          <SecondaryCard className="flex-1 flex flex-col items-center justify-center p-3">
-            <p className="text-xs text-zinc-300 text-center mb-2">Tempo medio<br />por projeto</p>
-            <p className="text-4xl font-black mb-3">{kpis.tempoMedio}</p>
-            <span className="text-xs text-zinc-500 invisible px-3 py-1">—</span>
-          </SecondaryCard>
-
-          {/* Adicionados */}
-          <SecondaryCard className="flex-1 flex flex-col items-center justify-center p-3">
-            <p className="text-xs text-zinc-300 text-center mb-2">Adicionados em<br />{displayLabel}</p>
-            <p className="text-4xl font-black mb-3">{kpis.adicionados}</p>
-            <span className="text-xs text-cyan-400 border border-cyan-500/30 rounded-lg px-3 py-1">
-              {fmtBRL(kpis.valorAdicionados)}
-            </span>
-          </SecondaryCard>
-        </div>
-
-        {/* Stacked Bar: N Projetos Entregues */}
-        <ChartCard className="">
-          <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <p className="text-sm font-bold text-zinc-200">N° Projetos Entregues</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              {tipos.map(tipo => (
-                <div key={tipo} className="flex items-center gap-1">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getColor(tipo) }} />
-                  <span className="text-xs text-zinc-400">{tipo}</span>
-                </div>
-              ))}
-            </div>
+        {/* Meta anual com barra de progresso */}
+        <SecondaryCard className="flex flex-col justify-center p-3" borderColor={ACCENT}>
+          <div className="flex items-baseline justify-between mb-1">
+            <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Meta anual</p>
+            <p className="text-lg font-black tabular-nums" style={{ color: ACCENT }}>{pctMeta.toFixed(0)}%</p>
           </div>
-          <div className="flex-1 min-h-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={entregasFiltered} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a40" />
-                <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
-                <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} allowDecimals={false} width={30} />
-                <Tooltip content={<ChartTooltipContent isCurrency={false} />} />
-                {tipos.map((tipo, i) => (
-                  <Bar
-                    key={tipo}
-                    dataKey={tipo}
-                    name={tipo}
-                    stackId="a"
-                    fill={getColor(tipo)}
-                    radius={i === tipos.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
-                    label={i === tipos.length - 1 ? makeStackTopLabel(entregasFiltered, tipos, false) : <BarLabel />}
-                  />
-                ))}
-              </BarChart>
-            </ResponsiveContainer>
+          <div className="h-2 rounded-full bg-zinc-800 overflow-hidden mb-1">
+            <div className="h-full rounded-full" style={{ width: `${pctMeta}%`, backgroundColor: ACCENT }} />
           </div>
-        </ChartCard>
-      </div>
-
-      {/* Bottom row */}
-      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
-        {/* Pie: Projetos em Aberto */}
-        <ChartCard className="">
-          <p className="text-sm font-bold text-zinc-200 text-center mb-1">Projetos em Aberto</p>
-          <div className="flex-1 min-h-0 flex items-center">
-            <div className="w-1/2 h-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    dataKey="quantidade"
-                    nameKey="tipo"
-                    cx="50%"
-                    cy="50%"
-                    outerRadius="85%"
-                    label={renderPieLabel}
-                    labelLine={false}
-                    stroke="none"
-                  >
-                    {pieData.map((entry) => (
-                      <Cell key={entry.tipo} fill={getColor(entry.tipo)} />
-                    ))}
-                  </Pie>
-                </PieChart>
-              </ResponsiveContainer>
-            </div>
-            <div className="w-1/2 flex flex-col gap-2 pl-4">
-              {pieData.map((entry) => (
-                <div key={entry.tipo} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full shrink-0" style={{ backgroundColor: getColor(entry.tipo) }} />
-                  <span className="text-xs text-zinc-300">{entry.tipo}</span>
-                </div>
-              ))}
-            </div>
-          </div>
-          <p className="text-xs text-cyan-400 text-center mt-1 shrink-0">
-            {fmtBRL(totalAbertoValor)} em projetos abertos
+          <p className="text-[10px] text-zinc-500 tabular-nums">
+            {fmtBRL(RESUMO.entregueAno)} / {fmtBRL(RESUMO.metaAnual)}
           </p>
-        </ChartCard>
+        </SecondaryCard>
+      </div>
 
-        {/* Stacked Bar: Receita Tech */}
-        <ChartCard className="">
-          <div className="flex items-center gap-3 mb-1 flex-wrap">
-            <p className="text-sm font-bold text-zinc-200">Receita Tech</p>
-            <div className="flex items-center gap-2 flex-wrap">
-              {tipos.map(tipo => (
-                <div key={tipo} className="flex items-center gap-1">
-                  <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: getColor(tipo) }} />
-                  <span className="text-xs text-zinc-400">{tipo}</span>
-                </div>
-              ))}
+      {/* Grid: Trimestres + Top Accounts */}
+      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
+        {/* Realizado vs Meta por trimestre */}
+        <ChartCard>
+          <div className="flex items-center gap-4 mb-1">
+            <p className="text-sm font-bold text-zinc-200">Realizado vs Meta por Trimestre</p>
+            <div className="flex items-center gap-3">
+              <span className="flex items-center gap-1 text-xs text-zinc-400">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: ACCENT }} /> Realizado
+              </span>
+              <span className="flex items-center gap-1 text-xs text-zinc-400">
+                <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: META_COLOR }} /> Meta
+              </span>
             </div>
           </div>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={receitaFiltered} margin={{ top: 20, right: 10, left: 0, bottom: 0 }}>
+              <BarChart data={TRIMESTRES} margin={{ top: 20, right: 10, left: 0, bottom: 4 }} barGap={2}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a40" />
-                <XAxis dataKey="label" tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
-                <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} tickFormatter={fmtK} width={45} />
-                <Tooltip content={<ChartTooltipContent isCurrency={true} />} />
-                {tipos.map((tipo, i) => (
-                  <Bar
-                    key={tipo}
-                    dataKey={tipo}
-                    name={tipo}
-                    stackId="a"
-                    fill={getColor(tipo)}
-                    radius={i === tipos.length - 1 ? [3, 3, 0, 0] : [0, 0, 0, 0]}
-                    label={i === tipos.length - 1 ? makeStackTopLabel(receitaFiltered, tipos, true) : <BarLabel />}
-                  />
-                ))}
+                <XAxis dataKey="label" height={22} interval={0} tick={{ fill: "#d4d4d8", fontSize: 12, fontWeight: 600 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} />
+                <YAxis tick={{ fill: "#a1a1aa", fontSize: 10 }} axisLine={{ stroke: "#3f3f46" }} tickLine={false} tickFormatter={fmtK} width={42} />
+                <Tooltip content={<QuarterTooltip />} cursor={{ fill: "#ffffff08" }} />
+                <Bar dataKey="meta" fill={META_COLOR} radius={[3, 3, 0, 0]} />
+                <Bar dataKey="realizado" radius={[3, 3, 0, 0]}>
+                  {TRIMESTRES.map((t) => (
+                    <Cell key={t.label} fill={t.realizado >= t.meta ? "#22c55e" : ACCENT} />
+                  ))}
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
+          </div>
+        </ChartCard>
+
+        {/* Top Accounts 2026 */}
+        <ChartCard>
+          <p className="text-sm font-bold text-zinc-200 mb-2">Top Accounts · 2026</p>
+          <div className="flex-1 flex flex-col justify-center gap-2">
+            {TOP_ACCOUNTS.map((acc, i) => (
+              <div key={acc.nome} className="flex items-center gap-3">
+                <span className="w-6 text-center text-base shrink-0">
+                  {MEDALHAS[i] ?? <span className="text-xs text-zinc-500">{i + 1}º</span>}
+                </span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-sm font-semibold text-white truncate">{acc.nome}</span>
+                    <span className="text-sm font-bold tabular-nums shrink-0" style={{ color: ACCENT }}>
+                      {fmtBRL(acc.valor)}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2 mt-0.5">
+                    <div className="flex-1 h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                      <div
+                        className="h-full rounded-full"
+                        style={{ width: `${(acc.valor / maxAccount) * 100}%`, backgroundColor: i < 3 ? ACCENT : "#52525b" }}
+                      />
+                    </div>
+                    <span className="text-[10px] text-zinc-500 shrink-0 w-16 text-right">{acc.projetos} projetos</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </ChartCard>
       </div>

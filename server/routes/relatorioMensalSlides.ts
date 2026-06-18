@@ -20,6 +20,15 @@ const VENDAS_EXPANSAO_POR_MES: Record<string, Record<string, { vendas: number; a
   },
 };
 
+// Override manual de pontual entregue por operador no ranking "MRR + Pontual" (slide Top Operadores).
+// Fonte da verdade: tech-dash (Painel ClickUp Projetos Tech, accountsMonthly). O cup_contratos
+// atribui ao operador valores que divergem da lista curada de Projetos Tech (ex.: Davi Ferraz em
+// maio aparece com 124.835 no cup_contratos vs 95.500 no tech-dash). Corrigir manualmente por
+// reporte enquanto não houver integração automática com o tech-dash.
+const PONTUAL_OPERADOR_OVERRIDE: Record<string, Record<string, number>> = {
+  "2026-05": { "Davi Ferraz": 95500 },
+};
+
 async function initCustomSlidesTable(db: any) {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS cortex_core.relatorio_slides_custom (
@@ -130,6 +139,13 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
       const dataStart = `${anoDados}-${String(mesDados).padStart(2, '0')}-01`;
       const dataEnd = `${nextAnoDados}-${String(nextMesDados).padStart(2, '0')}-01`;
       const ytdStart = `${anoDados}-01-01`;
+
+      // Override de pontual entregue (fonte: tech-dash) — aplicado no ranking topMrrPontual.
+      // overrideNomeAlvo = null desativa o override (comparação SQL com NULL nunca é verdadeira),
+      // então o cálculo segue o cup_contratos normalmente.
+      const daviPontualOverride = PONTUAL_OPERADOR_OVERRIDE[mesParam]?.["Davi Ferraz"] ?? null;
+      const overrideNomeAlvo = daviPontualOverride !== null ? "Davi Ferraz" : null;
+      const overrideValorPontual = daviPontualOverride ?? 0;
 
       // Run all queries in parallel
       const [
@@ -378,6 +394,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         `),
 
         // 11. Churn (cup_churn curada) e Pausados (cup_contratos) no mês de dados
+        // Churn do slide Turbo Commerce INCLUI abonados (sem filtro abonar_churn) — decisão de 2026-06-18.
+        // Mantém de fora apenas os 3 motivos que não são churn de cliente estabelecido.
         db.execute(sql`
           WITH churn_data AS (
             SELECT
@@ -387,7 +405,6 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             WHERE data_solicitacao_encerramento IS NOT NULL
               AND data_solicitacao_encerramento >= ${dataStart}
               AND data_solicitacao_encerramento < ${dataEnd}
-              AND COALESCE(abonar_churn, '') != 'Sim'
               AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           ),
           pausados_data AS (
@@ -524,6 +541,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             GROUP BY ms.month
           ),
           churn_mensal AS (
+            -- Série do gráfico Faturamento x Churn (Turbo Commerce): INCLUI abonados (sem filtro
+            -- abonar_churn), alinhado ao card Cancelados. Mantém de fora os 3 motivos não-churn.
             SELECT
               TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as month,
               COALESCE(SUM(valor_r), 0) as churn_brl
@@ -531,7 +550,6 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             WHERE data_solicitacao_encerramento IS NOT NULL
               AND data_solicitacao_encerramento >= dr.range_start
               AND data_solicitacao_encerramento < dr.range_end
-              AND COALESCE(abonar_churn, '') != 'Sim'
               AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
             GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM')
           ),
@@ -1024,7 +1042,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           ),
           ranking AS (
             SELECT COALESCE(m.nome, p.nome) as nome,
-                   COALESCE(m.mrr, 0) + COALESCE(p.pontual, 0) as valor
+                   COALESCE(m.mrr, 0) +
+                   CASE WHEN COALESCE(m.nome, p.nome) = ${overrideNomeAlvo}
+                        THEN ${overrideValorPontual}
+                        ELSE COALESCE(p.pontual, 0) END as valor
             FROM mrr_por_resp m
             FULL OUTER JOIN pontual_por_resp p ON m.nome = p.nome
             ORDER BY valor DESC

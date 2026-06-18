@@ -1,190 +1,144 @@
-import { Code2 } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
-import type { TechSlideData } from "./types";
+import { Timer, AlertTriangle } from "lucide-react";
 import SlideLayout from "./SlideLayout";
 import { SlideHeader, SecondaryCard, ChartCard } from "./SlideComponents";
 
-interface Props {
-  techData: TechSlideData;
-  mesLabel: string;
-}
+// Dados hardcoded espelhando a aba "Projetos" do Painel ClickUp — Projetos Tech
+// (https://tech-dash.pages.dev/projetos), recorte Q2 2026. Capturados em 2026-06-18.
+// Atualizar manualmente a cada reporte enquanto não houver integração.
+const PERIODO = "Q2 2026";
 
-const MESES_PT_FULL = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
-const MESES_ALL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-const TIPO_COLORS: Record<string, string> = {
-  "LP Shopify": "#f97316",
-  "Landing Page": "#ec4899",
-  "E-Commerce Standard": "#22c55e",
-  "Ecommerce": "#22c55e",
-  "Site": "#3b82f6",
-  "CRO": "#eab308",
-  "Sustentacao": "#8b5cf6",
-  "Alteracao": "#6366f1",
-  "Integracao": "#71717a",
-  "Outros": "#71717a",
+const RESUMO = {
+  totalProjetos: 31,
+  tipos: 6,
+  tempoMedio: 32.9,
+  tempoMediano: 29.3,
+  noPrazo: 97,
+  metaPrazo: 90,
+  antesPrazo: 83,
+  metaAntes: 30,
+  gargalo: "Design Review",
 };
 
-function getColor(tipo: string): string {
-  return TIPO_COLORS[tipo] || "#71717a";
+// Fluxo do pipeline (ordem de trabalho). Design Review é o gargalo (maior tempo médio).
+const TEMPO_POR_STATUS = [
+  { status: "Pronto p/ Design", dias: 4.0, color: "#2dd4bf" },
+  { status: "Design", dias: 3.8, color: "#4ade80" },
+  { status: "Design Review", dias: 8.7, color: "#16a34a" },
+  { status: "Pronto p/ Dev", dias: 1.7, color: "#60a5fa" },
+  { status: "Desenvolvimento", dias: 5.1, color: "#818cf8" },
+  { status: "Dev Review", dias: 6.0, color: "#a78bfa" },
+  { status: "Pronto p/ Lançar", dias: 3.5, color: "#fb923c" },
+];
+
+// Ordenado por volume de projetos entregues no trimestre.
+const TEMPO_POR_TIPO = [
+  { tipo: "E-Commerce Standard", projetos: 14, dias: 39.8, color: "#22c55e" },
+  { tipo: "CRO", projetos: 8, dias: 17.5, color: "#eab308" },
+  { tipo: "Landing Page", projetos: 5, dias: 29.9, color: "#ec4899" },
+  { tipo: "Site", projetos: 2, dias: 63.3, color: "#3b82f6" },
+  { tipo: "Ecommerce Plus", projetos: 1, dias: 37.5, color: "#14b8a6" },
+  { tipo: "Integração", projetos: 1, dias: 8.2, color: "#71717a" },
+];
+
+function fmtDias(v: number): string {
+  return `${v.toFixed(1).replace(".", ",")}d`;
 }
 
-function fmtBRL(v: number): string {
-  if (v >= 1_000_000) return `R$ ${(v / 1_000_000).toFixed(2).replace(".", ",")}M`;
-  if (v >= 1_000) return `R$ ${(v / 1_000).toFixed(0)}k`;
-  return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
-}
-
-function fmtK(v: number): string {
-  if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
-  if (v >= 1_000) return `${Math.round(v / 1_000)}k`;
-  return `${Math.round(v)}`;
-}
-
-function ChartTooltip({ active, payload, label }: any) {
-  if (!active || !payload?.length) return null;
+function KpiCard({ label, value, sub, accent }: { label: string; value: string; sub?: string; accent: string }) {
   return (
-    <div className="bg-zinc-900 border border-zinc-700 rounded-lg px-3 py-2 text-xs min-w-[160px]">
-      <p className="font-bold text-white mb-1.5">{label}</p>
-      <div className="space-y-0.5">
-        {payload.map((p: any) => (
-          p.value > 0 && (
-            <div key={p.dataKey} className="flex justify-between gap-3">
-              <span style={{ color: p.fill }}>{p.name}:</span>
-              <span style={{ color: p.fill }} className="font-bold">{fmtBRL(p.value)}</span>
-            </div>
-          )
-        ))}
-      </div>
-    </div>
+    <SecondaryCard className="p-3 flex flex-col justify-center gap-0.5">
+      <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{label}</p>
+      <p className={`text-2xl font-black tabular-nums ${accent}`}>{value}</p>
+      {sub && <p className="text-[10px] text-zinc-600">{sub}</p>}
+    </SecondaryCard>
   );
 }
 
-export default function SlideEntregasPontuaisTech({ techData, mesLabel }: Props) {
-  if (!techData) {
-    return (
-      <SlideLayout section="tech">
-        <div className="flex-1 flex items-center justify-center text-zinc-500">
-          Carregando dados Tech...
-        </div>
-      </SlideLayout>
-    );
-  }
+interface Props {
+  // Mantidos por compatibilidade com o caller — slide agora usa dados hardcoded do tech-dash.
+  techData?: unknown;
+  mesLabel?: string;
+}
 
-  const { kpis, entregasPorTipo, receitaPorTipo } = techData;
-
-  const mesLabelParts = mesLabel.split(" ");
-  const reportYear = parseInt(mesLabelParts[mesLabelParts.length - 1] || "0") || new Date().getFullYear();
-  const reportMesNome = mesLabelParts[0] || "";
-  const reportMesIdx = MESES_PT_FULL.findIndex(m => m.toLowerCase() === reportMesNome.toLowerCase());
-  const safeMesIdx = reportMesIdx >= 0 ? reportMesIdx : 11;
-  const mesAtual = MESES_ALL[safeMesIdx] || mesLabel;
-
-  // Extrair lista de tipos das chaves (excluindo month e label)
-  const tiposList = entregasPorTipo.length > 0
-    ? Object.keys(entregasPorTipo[0]).filter(k => k !== "month" && k !== "label")
-    : [];
-
-  // Filtrar Jan → mês selecionado do ano
-  const ytdEntregas = entregasPorTipo.filter(m => {
-    const parts = m.month.split("-").map(Number);
-    return parts[0] === reportYear && parts[1] <= (safeMesIdx + 1);
-  });
-  const ytdReceita = receitaPorTipo.filter(m => {
-    const parts = m.month.split("-").map(Number);
-    return parts[0] === reportYear && parts[1] <= (safeMesIdx + 1);
-  });
-
-  // YTD totais
-  const projetosYtd = ytdEntregas.reduce((s, m) =>
-    s + tiposList.reduce((t, tipo) => t + ((m[tipo] as number) || 0), 0), 0);
-  const receitaYtd = ytdReceita.reduce((s, m) =>
-    s + tiposList.reduce((t, tipo) => t + ((m[tipo] as number) || 0), 0), 0);
-
-  // Chart data: Jan → mês selecionado
-  const chartData = MESES_ALL.slice(0, safeMesIdx + 1).map((lbl, i) => {
-    const monthKey = `${reportYear}-${String(i + 1).padStart(2, "0")}`;
-    const found = ytdReceita.find(m => m.month === monthKey);
-    const row: any = { label: lbl };
-    for (const tipo of tiposList) row[tipo] = found ? ((found[tipo] as number) || 0) : 0;
-    return row;
-  });
+export default function SlideEntregasPontuaisTech(_props: Props) {
+  const maxStatus = Math.max(...TEMPO_POR_STATUS.map((s) => s.dias));
+  const maxTipo = Math.max(...TEMPO_POR_TIPO.map((t) => t.dias));
+  const prazoOk = RESUMO.noPrazo >= RESUMO.metaPrazo;
+  const antesOk = RESUMO.antesPrazo >= RESUMO.metaAntes;
 
   return (
-    <SlideLayout section="tech" padding="24px 32px">
+    <SlideLayout section="tech" padding="28px 36px">
       <SlideHeader
-        icon={Code2}
+        icon={Timer}
         iconColor="text-blue-400"
-        title={`Entregas Pontuais Tech — ${mesLabel}`}
+        title="Entregas Tech · Performance"
+        subtitle={`${PERIODO} · Pronto p/ Design → Deploy`}
+        badge="Painel ClickUp"
         gradientColor="#3b82f6"
       />
 
-      <div className="grid grid-cols-3 gap-3 mb-3 shrink-0">
-        <SecondaryCard className="p-4 flex flex-col justify-center gap-1" borderColor="#3b82f6">
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Projetos Entregues YTD</p>
-          <p className="text-2xl font-black text-blue-400">{projetosYtd}</p>
-          <p className="text-[10px] text-zinc-600">Jan → {mesAtual}</p>
-        </SecondaryCard>
-
-        <SecondaryCard className="p-4 flex flex-col justify-center gap-1">
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Receita YTD</p>
-          <p className="text-2xl font-black text-emerald-400">{fmtBRL(receitaYtd)}</p>
-          <p className="text-[10px] text-zinc-600">Jan → {mesAtual}</p>
-        </SecondaryCard>
-
-        <SecondaryCard className="p-4 flex flex-col justify-center gap-1">
-          <p className="text-[10px] text-zinc-500 uppercase tracking-wide mb-1">Tempo Médio / Projeto</p>
-          <p className="text-2xl font-black text-cyan-400">{kpis.tempoMedio} dias</p>
-          <p className="text-[10px] text-zinc-600">{mesAtual}</p>
-        </SecondaryCard>
+      {/* KPIs */}
+      <div className="grid grid-cols-4 gap-3 shrink-0 mb-4">
+        <KpiCard label="Projetos entregues" value={String(RESUMO.totalProjetos)} sub={`${RESUMO.tipos} tipos · ${PERIODO}`} accent="text-blue-400" />
+        <KpiCard label="Tempo médio" value={fmtDias(RESUMO.tempoMedio)} sub={`mediano ${fmtDias(RESUMO.tempoMediano)}`} accent="text-cyan-400" />
+        <KpiCard label="Entregues no prazo" value={`${RESUMO.noPrazo}%`} sub={`meta ${RESUMO.metaPrazo}%`} accent={prazoOk ? "text-emerald-400" : "text-red-400"} />
+        <KpiCard label="Antes do prazo" value={`${RESUMO.antesPrazo}%`} sub={`meta ${RESUMO.metaAntes}%`} accent={antesOk ? "text-emerald-400" : "text-red-400"} />
       </div>
 
-      <ChartCard className="flex-1">
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-bold text-zinc-300">Receita por Tipo × Mês — Jan → {mesAtual}</p>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {tiposList.map(tipo => (
-              <div key={tipo} className="flex items-center gap-1">
-                <div className="w-2 h-2 rounded-full" style={{ backgroundColor: getColor(tipo) }} />
-                <span className="text-[9px] text-zinc-500">{tipo}</span>
+      {/* Grid: Tempo por Status + Tempo por Tipo */}
+      <div className="flex-1 grid grid-cols-2 gap-4 min-h-0">
+        {/* Tempo médio por status */}
+        <ChartCard>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm font-bold text-zinc-200">Tempo Médio por Status</p>
+            <span className="flex items-center gap-1 text-[10px] text-amber-400">
+              <AlertTriangle className="h-3 w-3" /> gargalo: {RESUMO.gargalo}
+            </span>
+          </div>
+          <div className="flex-1 flex flex-col justify-center gap-2">
+            {TEMPO_POR_STATUS.map((s) => {
+              const isGargalo = s.status === RESUMO.gargalo;
+              return (
+                <div key={s.status} className="flex items-center gap-2">
+                  <span className={`text-[11px] w-28 shrink-0 text-right ${isGargalo ? "text-amber-300 font-semibold" : "text-zinc-400"}`}>
+                    {s.status}
+                  </span>
+                  <div className="flex-1 h-4 rounded bg-zinc-800/60 overflow-hidden">
+                    <div
+                      className="h-full rounded flex items-center justify-end pr-1.5"
+                      style={{ width: `${(s.dias / maxStatus) * 100}%`, backgroundColor: s.color }}
+                    >
+                      <span className="text-[10px] font-bold text-black/70 tabular-nums">{fmtDias(s.dias)}</span>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </ChartCard>
+
+        {/* Tempo médio por tipo */}
+        <ChartCard>
+          <p className="text-sm font-bold text-zinc-200 mb-2">Tempo Médio por Tipo de Projeto</p>
+          <div className="flex-1 flex flex-col justify-center gap-2.5">
+            {TEMPO_POR_TIPO.map((t) => (
+              <div key={t.tipo}>
+                <div className="flex items-baseline justify-between gap-2 mb-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: t.color }} />
+                    <span className="text-sm text-white truncate">{t.tipo}</span>
+                    <span className="text-[10px] text-zinc-500 shrink-0">{t.projetos} proj</span>
+                  </div>
+                  <span className="text-sm font-bold tabular-nums shrink-0" style={{ color: t.color }}>{fmtDias(t.dias)}</span>
+                </div>
+                <div className="h-1.5 rounded-full bg-zinc-800 overflow-hidden">
+                  <div className="h-full rounded-full" style={{ width: `${(t.dias / maxTipo) * 100}%`, backgroundColor: t.color }} />
+                </div>
               </div>
             ))}
           </div>
-        </div>
-        <div className="flex-1 min-h-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={chartData} margin={{ top: 10, right: 5, left: 0, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" />
-              <XAxis
-                dataKey="label"
-                tick={{ fill: "#a1a1aa", fontSize: 11 }}
-                axisLine={{ stroke: "#3f3f46" }}
-                tickLine={false}
-              />
-              <YAxis
-                tick={{ fill: "#a1a1aa", fontSize: 10 }}
-                axisLine={{ stroke: "#3f3f46" }}
-                tickLine={false}
-                tickFormatter={fmtK}
-                width={50}
-              />
-              <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
-              {tiposList.map((tipo, i) => (
-                <Bar
-                  key={tipo}
-                  dataKey={tipo}
-                  name={tipo}
-                  stackId="a"
-                  barSize={32}
-                  fill={getColor(tipo)}
-                  fillOpacity={0.85}
-                  radius={i === tiposList.length - 1 ? [4, 4, 0, 0] : [0, 0, 0, 0]}
-                />
-              ))}
-            </BarChart>
-          </ResponsiveContainer>
-        </div>
-      </ChartCard>
+        </ChartCard>
+      </div>
     </SlideLayout>
   );
 }

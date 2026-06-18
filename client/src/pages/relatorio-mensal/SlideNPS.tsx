@@ -3,15 +3,16 @@ import SlideLayout from "./SlideLayout";
 import { SlideHeader, SecondaryCard } from "./SlideComponents";
 
 // Dados hardcoded — atualizar manualmente até existir fonte (cortex_core.nps_clientes ou integração externa).
+// Atualizado para maio/2026 (taxa de resposta 25%) a partir da pesquisa de NPS de clientes.
 const NPS_DATA = {
-  score: 37.1,
-  promotores: 60.0,
-  neutros: 17.1,
-  detratores: 22.9,
+  score: 58.6,
+  promotores: 71.4,
+  neutros: 15.7,
+  detratores: 12.9,
   melhoresClientes: [
-    { nome: "Consiga Empréstimo", lt: "5 meses", accent: "#22c55e" },
-    { nome: "America Rental Car", lt: "3 anos",  accent: "#14b8a6" },
-    { nome: "Livraria da Vila",   lt: "3 anos",  accent: "#a78bfa" },
+    { nome: "Click Cannabis", lt: "7 meses",         accent: "#22c55e" },
+    { nome: "Creamy",         lt: "2 meses",         accent: "#14b8a6" },
+    { nome: "WinStage",       lt: "1 ano e 3 meses", accent: "#a78bfa" },
   ],
 };
 
