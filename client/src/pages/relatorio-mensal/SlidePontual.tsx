@@ -194,8 +194,8 @@ export default function SlidePontual({ pontualData, mesLabel }: Props) {
         </SecondaryCard>
       </div>
 
-      {/* Linha 2 — Gráfico + Lista em aberto por serviço */}
-      <div className="grid grid-cols-7 gap-3 mb-3" style={{ height: 260 }}>
+      {/* Linha 2 — Gráfico + Lista em aberto por serviço (preenche o espaço restante) */}
+      <div className="grid grid-cols-7 grid-rows-1 gap-3 flex-1 min-h-0">
         {/* Gráfico: Entregas por produto × mês */}
         <ChartCard title="Entregas por Produto × Mês" className="col-span-5">
           <ResponsiveContainer width="100%" height="100%">
