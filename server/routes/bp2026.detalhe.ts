@@ -14,6 +14,10 @@ import {
   LINHAS, LINHAS_DEDUCOES, LINHAS_CSV, LINHAS_OPEX, LINHAS_POS_EBITDA,
   somaDespesaCaixaPorMes, type DefLinha,
 } from "./bp2026";
+import {
+  classificarPonteItens, ehEstoquePontual, STATUS_DECOMP,
+  type RegPontualItem, type CategoriaPonte,
+} from "./bp2026.pontual.helpers";
 
 const ANO = 2026;
 const LIMITE_ITENS = 50;
@@ -29,6 +33,7 @@ const DERIVADAS = [
   "gestores_necessarios", "designers_necessarios", "necessidade_gestores",
   "contratos_por_gestor", "contas_por_designer",
   "sga_total_detalhe", "or_total_detalhe", "cac_total_detalhe", "cac_pct_receita", "cac_payback_mrr", "mrr_delta_nao_explicado",
+  "ponte_mrr_delta",
 ];
 
 // métricas de despesa cujo detalhe é o bucket puro (parcelas por quitação, grupos por categoria)
@@ -254,6 +259,15 @@ const TITULOS_SUBABAS: Record<string, string> = {
   cac_comissoes: "Comissões", cac_growth: "Growth", cac_ads: "ADs",
   cac_eventos: "Eventos", cac_brindes: "Brindes", cac_viagens: "Viagens",
   cac_outras_sub: "Outras comerciais (não orçadas)",
+  ponte_mrr_ini: "(=) MRR inicial", ponte_mrr_vendas: "(+) Vendas MRR",
+  ponte_mrr_churn: "(−) Churn", ponte_mrr_fim: "(=) MRR final",
+  pontual_estoque_ini: "(=) Estoque inicial", pontual_venda: "(+) Venda",
+  pontual_entrega: "(−) Entrega", pontual_churn: "(−) Churn",
+  pontual_deletados: "(−) Deletados", pontual_saida_atipica: "(−) Saída atípica",
+  pontual_reajuste: "(±) Reajuste de valor", pontual_estoque_fim: "(=) Estoque final",
+  pontual_status_ativo: "Em execução (ativo)", pontual_status_triagem: "Triagem",
+  pontual_status_pausado: "Pausado", pontual_status_onboarding: "Onboarding",
+  pontual_status_em_cancelamento: "Em cancelamento", pontual_status_outros: "Outros status",
 };
 const HANDLERS_SUBABAS = TITULOS_SUBABAS; // mesmo conjunto de chaves (roteadas no switch abaixo)
 
@@ -265,6 +279,82 @@ const SETOR_FILTROS: Record<string, ReturnType<typeof sql>> = {
   gestores_atuais: sql`TRIM(cargo) = 'Gestor de Performance'`,
   designers_atuais: sql`TRIM(cargo) = 'Designer'`,
 };
+
+// snapshot de MRR ativo do mês (anterior=false) ou do mês anterior (anterior=true)
+async function detMrrSnapshot(db: any, mes: number, anterior: boolean): Promise<ResultadoDet> {
+  const ini = anterior ? sql`(make_date(${ANO}, ${mes}, 1) - INTERVAL '1 month')` : sql`make_date(${ANO}, ${mes}, 1)`;
+  const fim = anterior ? sql`make_date(${ANO}, ${mes}, 1)` : sql`(make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')`;
+  const result = await db.execute(sql`
+    WITH alvo AS (
+      SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+      WHERE data_snapshot::date >= ${ini}::date AND data_snapshot::date < ${fim}::date
+    )
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(h.servico, '') AS servico,
+           COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
+           COALESCE(h.valorr::numeric, 0) AS valor
+    FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+    WHERE h.status IN ('ativo', 'onboarding', 'triagem') ORDER BY valor DESC
+  `);
+  const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+    grupo: r.squad, nome: r.cliente, detalhe: r.servico, data: null, valor: parseFloat(r.valor),
+  }));
+  return { grupos: agruparItens(itens, Number.MAX_SAFE_INTEGER), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
+// contratos pontuais (valorp>0) do último snapshot do mês (anterior=false) ou do mês anterior (anterior=true)
+async function carregaPontualSnapshot(db: any, mes: number, anterior: boolean): Promise<RegPontualItem[]> {
+  const ini = anterior ? sql`(make_date(${ANO}, ${mes}, 1) - INTERVAL '1 month')` : sql`make_date(${ANO}, ${mes}, 1)`;
+  const fim = anterior ? sql`make_date(${ANO}, ${mes}, 1)` : sql`(make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')`;
+  const result = await db.execute(sql`
+    WITH alvo AS (
+      SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+      WHERE data_snapshot::date >= ${ini}::date AND data_snapshot::date < ${fim}::date
+    )
+    SELECT h.id_subtask, h.valorp::numeric AS valorp, h.status,
+           COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad
+    FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+    WHERE h.valorp::numeric > 0
+  `);
+  return (result.rows as any[]).map((r) => ({
+    idSubtask: String(r.id_subtask), valorp: parseFloat(r.valorp), status: r.status,
+    cliente: r.cliente, squad: r.squad,
+  }));
+}
+
+// estoque pontual de um snapshot (opcional filtro de status); grupos por squad
+async function detPontualSnapshot(
+  db: any, mes: number, anterior: boolean, pred?: (r: RegPontualItem) => boolean
+): Promise<ResultadoDet> {
+  const regs = (await carregaPontualSnapshot(db, mes, anterior)).filter(ehEstoquePontual);
+  const filtrados = pred ? regs.filter(pred) : regs;
+  const itens: ItemDetalhe[] = filtrados.map((r) => ({
+    grupo: r.squad ?? "(sem squad)", nome: r.cliente, detalhe: `status ${r.status}`, data: null, valor: r.valorp,
+  }));
+  return { grupos: agruparItens(itens, Number.MAX_SAFE_INTEGER), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
+const TITULO_CATEGORIA: Record<CategoriaPonte, string> = {
+  venda: "Entradas no estoque (vendas)", entrega: "Saídas por entrega", churn: "Saídas por churn",
+  deletados: "Deletados do ClickUp", saida_atipica: "Saídas atípicas", reajuste: "Reajustes de valor",
+};
+
+// contratos que se moveram numa categoria do mês (snapshot anterior × atual)
+async function detPontualMovimento(db: any, mes: number, categoria: CategoriaPonte): Promise<ResultadoDet> {
+  const [ant, atual] = await Promise.all([
+    carregaPontualSnapshot(db, mes, true), carregaPontualSnapshot(db, mes, false),
+  ]);
+  const itensCat = classificarPonteItens(ant, atual)[categoria];
+  const itens: ItemDetalhe[] = itensCat.map((it) => ({
+    grupo: TITULO_CATEGORIA[categoria], nome: it.cliente,
+    detalhe: [it.detalhe, `status ${it.status}`].filter(Boolean).join(" · "),
+    data: null, valor: it.valor,
+  }));
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
 
 export function registerBp2026DetalheRoutes(app: Express, db: any) {
   app.get("/api/bp2026/detalhe", async (req, res) => {
@@ -555,6 +645,27 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
+      } else if (metrica === "ponte_mrr_ini") {
+        ({ grupos, realizado } = await detMrrSnapshot(db, mes, true));
+      } else if (metrica === "ponte_mrr_fim") {
+        ({ grupos, realizado } = await detMrrSnapshot(db, mes, false));
+      } else if (metrica === "ponte_mrr_vendas") {
+        ({ grupos, realizado } = await detDealsBitrix(db, mes, "mrr", "soma", "Vendas MRR (Bitrix)"));
+      } else if (metrica === "ponte_mrr_churn") {
+        ({ resultado: { grupos, realizado } } = await detChurn(db, mes, null));
+      } else if (metrica === "pontual_estoque_ini") {
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, true));
+      } else if (metrica === "pontual_estoque_fim") {
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false));
+      } else if (metrica === "pontual_status_outros") {
+        const conhecidos: Set<string> = new Set(STATUS_DECOMP.map((s) => s.chave));
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => !conhecidos.has(r.status)));
+      } else if (metrica.startsWith("pontual_status_")) {
+        const chaveMetrica = metrica.slice("pontual_status_".length);
+        const def2 = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica);
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false));
+      } else if (["pontual_venda", "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste"].includes(metrica)) {
+        ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte));
       } else if (metrica === "or_receita_variavel" || metrica === "or_stack_digital" || metrica === "or_demais") {
         const pred = metrica === "or_receita_variavel" ? PREDICADOS_OUTRAS_SUB.or_variavel
           : metrica === "or_stack_digital" ? PREDICADOS_OUTRAS_SUB.or_stack : PREDICADOS_OUTRAS_SUB.or_demais;

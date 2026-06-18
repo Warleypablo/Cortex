@@ -1239,6 +1239,7 @@ export default function GrowthOrcadoRealizado() {
     frequenciaAlcance: number; ctrAlcanceVisitas: number; visitasPerfil: number;
     percEngajamento: number; interacoes: number; ctrAlcanceCliques: number;
     ctrVisitasCliques: number; cliquesLinkBio: number;
+    sessoes?: number; visualizacoesPagina?: number; sessoesAvailable?: boolean;
     cliquesLinkBioFonte?: 'linktree_ga4' | 'instagram_profile_taps';
     cliquesPorLink?: Array<{ linkUrl: string; linkDomain: string; clicks: number }>;
     cliquesPorDominio?: Array<{ domain: string; clicks: number }>;
@@ -1255,6 +1256,8 @@ export default function GrowthOrcadoRealizado() {
     horasAssistidas: number; avgViewDuration: number; retencaoMedia: number;
     curtidas: number; comentarios: number;
     compartilhamentos: number; videosPublicados: number; hasConnection: boolean;
+    ctrImpressoes?: number; interacoes?: number; engajamento?: number;
+    sessoes?: number; visualizacoesPagina?: number; sessoesAvailable?: boolean;
   }
 
   interface TiktokDetailMetrics {
@@ -1263,6 +1266,8 @@ export default function GrowthOrcadoRealizado() {
     seguidores: number; crescimentoSeguidores: number; visualizacoes: number;
     curtidas: number; comentarios: number; compartilhamentos: number;
     videosPublicados: number; hasConnection: boolean;
+    interacoes?: number; engajamento?: number;
+    sessoes?: number; visualizacoesPagina?: number; sessoesAvailable?: boolean;
   }
 
   interface TiktokAdsDetailMetrics {
@@ -1286,6 +1291,7 @@ export default function GrowthOrcadoRealizado() {
     seguidores: number; novosSeguidores: number; impressoes: number;
     cliques: number; ctr: number; reacoes: number; comentarios: number; compartilhamentos: number;
     engajamento: number; pageViews: number; hasConnection: boolean;
+    sessoes?: number; visualizacoesPagina?: number; sessoesAvailable?: boolean;
   }
 
   interface PlatformFunnelData {
@@ -1741,7 +1747,7 @@ export default function GrowthOrcadoRealizado() {
   // ===== Platform-specific metric builders for Aprofundado view =====
 
   // Helper: build lead/MQL metrics for a platform (rest of funnel comes from MQL/NMQL/Total sections)
-  const buildFunnelMetrics = (prefix: string, funnel: PlatformFunnelData | undefined, orcado: any, investimento: number | null): Metric[] => {
+  const buildFunnelMetrics = (prefix: string, funnel: PlatformFunnelData | undefined, orcado: any, investimento: number | null, includeInvestimento = false): Metric[] => {
     const f = funnel || {} as PlatformFunnelData;
     const invest = investimento !== null && investimento > 0 ? investimento : 0;
     const cpl = invest > 0 && (f.leads || 0) > 0 ? invest / f.leads : null;
@@ -1750,7 +1756,15 @@ export default function GrowthOrcadoRealizado() {
     // vivem nas seções VENDAS — MQL, VENDAS — não-MQL e Total. Mantê-las nos
     // breakdowns por plataforma duplicava no lugar errado e dava R$ NaN nos
     // canais orgânicos (sem investimento). Alinhado com o consolidado de Marketing.
+    // includeInvestimento: emite a linha de Investimento aqui (só p/ orgânicos —
+    // os pagos já têm a linha no topo). Garante as 6 métricas-padrão do Consolidado
+    // em TODA plataforma (Investimento · Leads · MQLs · CPL · CPMQL · % MQLs);
+    // sem verba, mostra R$ 0.
+    const investimentoRow: Metric[] = includeInvestimento ? [
+      { id: `${prefix}_investimento`, name: 'Investimento', type: 'manual', orcado: orcado.investimento ?? null, realizado: investimento ?? 0, percentual: calcPercentual(orcado.investimento ?? null, investimento), format: 'currency' },
+    ] : [];
     return [
+      ...investimentoRow,
       { id: `${prefix}_leads`, name: 'Leads', type: 'formula', orcado: orcado.leads, realizado: f.leads ?? 0, percentual: calcPercentual(orcado.leads, f.leads), format: 'number' },
       { id: `${prefix}_mqls`, name: 'MQLs', type: 'formula', orcado: orcado.mqls, realizado: f.mqls ?? 0, percentual: calcPercentual(orcado.mqls, f.mqls), format: 'number' },
       { id: `${prefix}_cpl`, name: 'CPL', type: 'formula', orcado: orcado.cpl, realizado: cpl, percentual: calcPercentual(orcado.cpl, cpl), format: 'currency' },
@@ -1800,15 +1814,17 @@ export default function GrowthOrcadoRealizado() {
     funnel: PlatformFunnelData | undefined,
   ): Metric[] => {
     const O = ORCADO_GOOGLE_ADS;
-    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
+    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'gads_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'gads_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
       { id: 'gads_ctr', name: 'CTR', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
       { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'gads_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      { id: 'gads_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
+      // Connect Rate segue removido do Aprofundado do Google (despriorizado). A Tx
+      // Conversão da Página usa Visualizações de Página (Leads ÷ VdP), coerente com
+      // o Connect Rate do TikTok/LinkedIn e com o funil do Meta (que usa LPV do pixel).
       { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('gads', funnel, O, d.investimento ?? null)];
@@ -1830,30 +1846,29 @@ export default function GrowthOrcadoRealizado() {
     funnel: PlatformFunnelData | undefined,
   ): Metric[] => {
     const O = ORCADO_INSTAGRAM;
+    const vdp = d.visualizacoesPagina ?? 0;
+    const taxaConversaoPagina = vdp > 0 ? ((funnel?.leads ?? 0) / vdp) : 0;
+    // Jornada do lead enxuta (mesmo template do TikTok). Removidas vaidades
+    // (começaram/deixaram seguir, % perda, quebras de visualizações/alcance
+    // org/pago, frequência, CTRs internos, interações isoladas → viram % Engajamento).
     const topMetrics: Metric[] = [
+      // Investimento no topo (IG pode ter verba de boost)
+      { id: 'ig_investimento', name: 'Investimento', type: 'manual', orcado: (O as any).investimento ?? null, realizado: d.investimentoPago ?? 0, percentual: calcPercentual((O as any).investimento ?? null, d.investimentoPago ?? 0), format: 'currency' },
+      // Esforço de conteúdo
       { id: 'ig_postsPublicados', name: 'Posts Publicados', type: 'formula', orcado: (O as any).postsPublicados, realizado: d.postsPublicados ?? 0, percentual: calcPercentual((O as any).postsPublicados, d.postsPublicados), format: 'number' },
-      { id: 'ig_comecaramSeguir', name: 'Começaram a Seguir', type: 'formula', orcado: O.comecaramSeguir, realizado: d.comecaramSeguir ?? 0, percentual: calcPercentual(O.comecaramSeguir, d.comecaramSeguir), format: 'number' },
-      { id: 'ig_deixaramSeguir', name: 'Deixaram de Seguir', type: 'formula', orcado: O.deixaramSeguir, realizado: d.deixaramSeguir ?? 0, percentual: calcPercentual(O.deixaramSeguir, d.deixaramSeguir), format: 'number' },
-      { id: 'ig_percPerdaSeguidores', name: '% Perda de Seguidores', type: 'formula', orcado: O.percPerdaSeguidores, realizado: d.percPerdaSeguidores ?? null, percentual: calcPercentual(O.percPerdaSeguidores, d.percPerdaSeguidores), format: 'percent' },
-      { id: 'ig_deltaSeguidores', name: 'Delta de Seguidores', type: 'formula', orcado: O.deltaSeguidores, realizado: d.deltaSeguidores ?? 0, percentual: calcPercentual(O.deltaSeguidores, d.deltaSeguidores), format: 'number' },
+      // Audiência
       { id: 'ig_totalSeguidores', name: 'Total de Seguidores', type: 'formula', orcado: O.totalSeguidores, realizado: d.totalSeguidores ?? 0, percentual: calcPercentual(O.totalSeguidores, d.totalSeguidores), format: 'number' },
+      { id: 'ig_deltaSeguidores', name: 'Novos Seguidores (líquido)', type: 'formula', orcado: O.deltaSeguidores, realizado: d.deltaSeguidores ?? 0, percentual: calcPercentual(O.deltaSeguidores, d.deltaSeguidores), format: 'number' },
       { id: 'ig_percCrescimentoSeguidores', name: '% Crescimento de Seguidores', type: 'formula', orcado: O.percCrescimentoSeguidores, realizado: d.percCrescimentoSeguidores ?? null, percentual: calcPercentual(O.percCrescimentoSeguidores, d.percCrescimentoSeguidores), format: 'percent' },
-      { id: 'ig_visualizacoesTotais', name: 'Visualizações Totais', type: 'formula', orcado: O.visualizacoesTotais, realizado: d.visualizacoesTotais ?? 0, percentual: calcPercentual(O.visualizacoesTotais, d.visualizacoesTotais), format: 'number' },
-      { id: 'ig_percVisualizacoesOrganicas', name: '% Visualizações Orgânicas', type: 'formula', orcado: O.percVisualizacoesOrganicas, realizado: d.percVisualizacoesOrganicas ?? null, percentual: calcPercentual(O.percVisualizacoesOrganicas, d.percVisualizacoesOrganicas), format: 'percent' },
-      { id: 'ig_visualizacoesOrganicas', name: 'Visualizações Orgânicas', type: 'formula', orcado: O.visualizacoesOrganicas, realizado: d.visualizacoesOrganicas ?? 0, percentual: calcPercentual(O.visualizacoesOrganicas, d.visualizacoesOrganicas), format: 'number' },
-      { id: 'ig_percVisualizacoesPagas', name: '% Visualizações Pagas', type: 'formula', orcado: O.percVisualizacoesPagas, realizado: d.percVisualizacoesPagas ?? null, percentual: calcPercentual(O.percVisualizacoesPagas, d.percVisualizacoesPagas), format: 'percent' },
-      { id: 'ig_visualizacoesPagas', name: 'Visualizações Pagas', type: 'formula', orcado: O.visualizacoesPagas, realizado: d.visualizacoesPagas ?? 0, percentual: calcPercentual(O.visualizacoesPagas, d.visualizacoesPagas), format: 'number' },
-      { id: 'ig_alcanceTotal', name: 'Alcance Total', type: 'formula', orcado: O.alcanceTotal, realizado: d.alcanceTotal ?? 0, percentual: calcPercentual(O.alcanceTotal, d.alcanceTotal), format: 'number' },
-      { id: 'ig_alcanceOrganico', name: 'Alcance Orgânico', type: 'formula', orcado: O.alcanceOrganico, realizado: d.alcanceOrganico ?? 0, percentual: calcPercentual(O.alcanceOrganico, d.alcanceOrganico), format: 'number' },
-      { id: 'ig_alcancePago', name: 'Alcance Pago', type: 'formula', orcado: O.alcancePago, realizado: d.alcancePago ?? 0, percentual: calcPercentual(O.alcancePago, d.alcancePago), format: 'number' },
-      { id: 'ig_frequenciaAlcance', name: 'Frequência de Alcance', type: 'formula', orcado: O.frequenciaAlcance, realizado: d.frequenciaAlcance ?? null, percentual: calcPercentual(O.frequenciaAlcance, d.frequenciaAlcance), format: 'number' },
-      { id: 'ig_ctrAlcanceVisitas', name: 'CTR Alcance > Visitas', type: 'formula', orcado: O.ctrAlcanceVisitas, realizado: d.ctrAlcanceVisitas ?? null, percentual: calcPercentual(O.ctrAlcanceVisitas, d.ctrAlcanceVisitas), format: 'percent' },
+      // Alcance + ativação
+      { id: 'ig_visualizacoesTotais', name: 'Visualizações', type: 'formula', orcado: O.visualizacoesTotais, realizado: d.visualizacoesTotais ?? 0, percentual: calcPercentual(O.visualizacoesTotais, d.visualizacoesTotais), format: 'number' },
+      { id: 'ig_percEngajamento', name: '% de Engajamento', type: 'formula', orcado: O.percEngajamento, realizado: d.percEngajamento ?? null, percentual: calcPercentual(O.percEngajamento, d.percEngajamento), format: 'percent' },
+      // Micro-funil do site: Visitou perfil → Clicou → Carregou página → Sessão → Converteu
       { id: 'ig_visitasPerfil', name: 'Visitas ao Perfil', type: 'formula', orcado: O.visitasPerfil, realizado: d.visitasPerfil ?? 0, percentual: calcPercentual(O.visitasPerfil, d.visitasPerfil), format: 'number' },
-      { id: 'ig_percEngajamento', name: '% Engajamento (Alcance > Interações)', type: 'formula', orcado: O.percEngajamento, realizado: d.percEngajamento ?? null, percentual: calcPercentual(O.percEngajamento, d.percEngajamento), format: 'percent' },
-      { id: 'ig_interacoes', name: 'Interações', type: 'formula', orcado: O.interacoes, realizado: d.interacoes ?? 0, percentual: calcPercentual(O.interacoes, d.interacoes), format: 'number' },
-      { id: 'ig_ctrAlcanceCliques', name: 'CTR Alcance > Cliques', type: 'formula', orcado: O.ctrAlcanceCliques, realizado: d.ctrAlcanceCliques ?? null, percentual: calcPercentual(O.ctrAlcanceCliques, d.ctrAlcanceCliques), format: 'percent' },
-      { id: 'ig_ctrVisitasCliques', name: 'CTR Visitas > Cliques', type: 'formula', orcado: O.ctrVisitasCliques, realizado: d.ctrVisitasCliques ?? null, percentual: calcPercentual(O.ctrVisitasCliques, d.ctrVisitasCliques), format: 'percent' },
-      { id: 'ig_cliquesLinkBio', name: 'Cliques no Link Bio', type: 'formula', orcado: O.cliquesLinkBio, realizado: d.cliquesLinkBio ?? 0, percentual: calcPercentual(O.cliquesLinkBio, d.cliquesLinkBio), format: 'number' },
+      { id: 'ig_cliquesLinkBio', name: 'Cliques no Link', type: 'formula', orcado: O.cliquesLinkBio, realizado: d.cliquesLinkBio ?? 0, percentual: calcPercentual(O.cliquesLinkBio, d.cliquesLinkBio), format: 'number' },
+      { id: 'ig_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: (O as any).visualizacoesPaginaSite ?? null, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual((O as any).visualizacoesPaginaSite ?? null, d.visualizacoesPagina ?? null), format: 'number' },
+      { id: 'ig_sessoes', name: 'Sessões', type: 'formula', orcado: (O as any).sessoes ?? null, realizado: d.sessoes ?? 0, percentual: calcPercentual((O as any).sessoes ?? null, d.sessoes ?? null), format: 'number' },
+      { id: 'ig_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('ig', funnel, O, d.investimentoPago ?? null)];
   };
@@ -1871,23 +1886,33 @@ export default function GrowthOrcadoRealizado() {
   // YouTube platform metrics (orgânico — lê youtube.* via endpoint)
   const buildYoutubeMetrics = (d: YoutubeDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_YOUTUBE;
+    const vdp = d.visualizacoesPagina ?? 0;
+    const taxaConversaoPagina = vdp > 0 ? ((funnel?.leads ?? 0) / vdp) : 0;
+    // Jornada do lead + bloco de QUALIDADE de vídeo (CTR thumbnail, retenção,
+    // duração média, horas assistidas) — pedido específico do YouTube p/ medir
+    // a qualidade dos vídeos. Removidas vaidades (começaram/deixaram inscrever,
+    // % perda).
     const topMetrics: Metric[] = [
+      { id: 'yt_investimento', name: 'Investimento', type: 'manual', orcado: (O as any).investimento ?? null, realizado: 0, percentual: calcPercentual((O as any).investimento ?? null, 0), format: 'currency' },
+      // Esforço de conteúdo
       { id: 'yt_videosPublicados', name: 'Vídeos Publicados', type: 'formula', orcado: O.videosPublicados, realizado: d.videosPublicados ?? 0, percentual: calcPercentual(O.videosPublicados, d.videosPublicados), format: 'number' },
-      // Audiência (inscritos) — espelha o breakdown de seguidores do Instagram
-      { id: 'yt_comecaramInscrever', name: 'Começaram a Inscrever', type: 'formula', orcado: O.comecaramInscrever, realizado: d.comecaramInscrever ?? 0, percentual: calcPercentual(O.comecaramInscrever, d.comecaramInscrever), format: 'number' },
-      { id: 'yt_deixaramInscrever', name: 'Deixaram de Inscrever', type: 'formula', orcado: O.deixaramInscrever, realizado: d.deixaramInscrever ?? 0, percentual: calcPercentual(O.deixaramInscrever, d.deixaramInscrever), format: 'number' },
-      { id: 'yt_percPerdaInscritos', name: '% Perda de Inscritos', type: 'formula', orcado: O.percPerdaInscritos, realizado: d.percPerdaInscritos ?? null, percentual: calcPercentual(O.percPerdaInscritos, d.percPerdaInscritos), format: 'percent' },
-      { id: 'yt_deltaInscritos', name: 'Delta de Inscritos', type: 'formula', orcado: O.deltaInscritos, realizado: d.deltaInscritos ?? 0, percentual: calcPercentual(O.deltaInscritos, d.deltaInscritos), format: 'number' },
+      // Audiência (inscritos)
       { id: 'yt_totalInscritos', name: 'Total de Inscritos', type: 'formula', orcado: O.totalInscritos, realizado: d.totalInscritos ?? 0, percentual: calcPercentual(O.totalInscritos, d.totalInscritos), format: 'number' },
+      { id: 'yt_deltaInscritos', name: 'Novos Inscritos (líquido)', type: 'formula', orcado: O.deltaInscritos, realizado: d.deltaInscritos ?? 0, percentual: calcPercentual(O.deltaInscritos, d.deltaInscritos), format: 'number' },
       { id: 'yt_percCrescimentoInscritos', name: '% Crescimento de Inscritos', type: 'formula', orcado: O.percCrescimentoInscritos, realizado: d.percCrescimentoInscritos ?? null, percentual: calcPercentual(O.percCrescimentoInscritos, d.percCrescimentoInscritos), format: 'percent' },
-      // Conteúdo / distribuição
-      // CTR de thumbnail NÃO existe na YouTube Analytics API pública (Studio-only,
-      // issue 254665034) → entrada manual. Retenção vem do nível de vídeo (agregada).
-      { id: 'yt_ctrImpressoes', name: 'CTR Impressões (Thumbnail)', type: 'manual', orcado: O.ctrImpressoes, realizado: null, percentual: null, format: 'percent' },
+      // Alcance + ativação
       { id: 'yt_visualizacoes', name: 'Visualizações', type: 'formula', orcado: O.visualizacoes, realizado: d.visualizacoes ?? 0, percentual: calcPercentual(O.visualizacoes, d.visualizacoes), format: 'number' },
+      { id: 'yt_engajamento', name: '% de Engajamento', type: 'formula', orcado: (O as any).engajamento ?? null, realizado: d.engajamento ?? null, percentual: calcPercentual((O as any).engajamento ?? null, d.engajamento ?? null), format: 'percent' },
+      // Qualidade de vídeo (CTR de thumbnail é Studio-only → entrada manual)
+      { id: 'yt_ctrImpressoes', name: 'CTR Impressões (Thumbnail)', type: 'manual', orcado: O.ctrImpressoes, realizado: d.ctrImpressoes ?? null, percentual: calcPercentual(O.ctrImpressoes, d.ctrImpressoes ?? null), format: 'percent' },
       { id: 'yt_retencaoMedia', name: 'Retenção Média', type: 'formula', orcado: O.retencaoMedia, realizado: d.retencaoMedia ?? null, percentual: calcPercentual(O.retencaoMedia, d.retencaoMedia), format: 'percent' },
       { id: 'yt_avgViewDuration', name: 'Duração Média (s)', type: 'formula', orcado: O.avgViewDuration, realizado: d.avgViewDuration ?? 0, percentual: calcPercentual(O.avgViewDuration, d.avgViewDuration), format: 'number' },
       { id: 'yt_horasAssistidas', name: 'Horas Assistidas', type: 'formula', orcado: O.horasAssistidas, realizado: d.horasAssistidas ?? 0, percentual: calcPercentual(O.horasAssistidas, d.horasAssistidas), format: 'number' },
+      // Micro-funil do site (Cliques no Link: YouTube não expõe nativamente → vazio)
+      { id: 'yt_cliquesLink', name: 'Cliques no Link', type: 'formula', orcado: (O as any).cliquesLink ?? null, realizado: null, percentual: null, format: 'number' },
+      { id: 'yt_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: (O as any).visualizacoesPagina ?? null, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual((O as any).visualizacoesPagina ?? null, d.visualizacoesPagina ?? null), format: 'number' },
+      { id: 'yt_sessoes', name: 'Sessões', type: 'formula', orcado: (O as any).sessoes ?? null, realizado: d.sessoes ?? 0, percentual: calcPercentual((O as any).sessoes ?? null, d.sessoes ?? null), format: 'number' },
+      { id: 'yt_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('yt', funnel, O, null)];
   };
@@ -1901,22 +1926,27 @@ export default function GrowthOrcadoRealizado() {
   // LinkedIn platform metrics (orgânico — lê linkedin.* via endpoint)
   const buildLinkedinMetrics = (d: LinkedinDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_LINKEDIN;
+    const vdp = d.visualizacoesPagina ?? 0;
+    const taxaConversaoPagina = vdp > 0 ? ((funnel?.leads ?? 0) / vdp) : 0;
+    // Jornada do lead enxuta (mesmo template). Removidas vaidades (começaram/
+    // deixaram seguir, % perda, CTR isolado, page views da própria company page →
+    // a VdP do site vem do GA4). LinkedIn tem cliques reais (Posts API).
     const topMetrics: Metric[] = [
-      // Posts publicados vêm da Posts API (linkedin.posts). Pode vir 0 até o sync
-      // rodar com r_organization_social concedido.
+      { id: 'li_investimento', name: 'Investimento', type: 'manual', orcado: (O as any).investimento ?? null, realizado: 0, percentual: calcPercentual((O as any).investimento ?? null, 0), format: 'currency' },
+      // Esforço de conteúdo (Posts API; 0 até o sync rodar com r_organization_social)
       { id: 'li_postsPublicados', name: 'Posts Publicados', type: 'formula', orcado: O.postsPublicados, realizado: d.postsPublicados ?? 0, percentual: calcPercentual(O.postsPublicados, d.postsPublicados), format: 'number' },
-      // Audiência (seguidores) — espelha o breakdown do Instagram/YouTube
-      { id: 'li_comecaramSeguir', name: 'Começaram a Seguir', type: 'formula', orcado: O.comecaramSeguir, realizado: d.comecaramSeguir ?? 0, percentual: calcPercentual(O.comecaramSeguir, d.comecaramSeguir), format: 'number' },
-      { id: 'li_deixaramSeguir', name: 'Deixaram de Seguir', type: 'formula', orcado: O.deixaramSeguir, realizado: d.deixaramSeguir ?? 0, percentual: calcPercentual(O.deixaramSeguir, d.deixaramSeguir), format: 'number' },
-      { id: 'li_percPerdaSeguidores', name: '% Perda de Seguidores', type: 'formula', orcado: O.percPerdaSeguidores, realizado: d.percPerdaSeguidores ?? null, percentual: calcPercentual(O.percPerdaSeguidores, d.percPerdaSeguidores), format: 'percent' },
-      { id: 'li_deltaSeguidores', name: 'Delta de Seguidores', type: 'formula', orcado: O.deltaSeguidores, realizado: d.deltaSeguidores ?? 0, percentual: calcPercentual(O.deltaSeguidores, d.deltaSeguidores), format: 'number' },
+      // Audiência
       { id: 'li_totalSeguidores', name: 'Total de Seguidores', type: 'formula', orcado: O.totalSeguidores, realizado: d.totalSeguidores ?? 0, percentual: calcPercentual(O.totalSeguidores, d.totalSeguidores), format: 'number' },
+      { id: 'li_deltaSeguidores', name: 'Novos Seguidores (líquido)', type: 'formula', orcado: O.deltaSeguidores, realizado: d.deltaSeguidores ?? 0, percentual: calcPercentual(O.deltaSeguidores, d.deltaSeguidores), format: 'number' },
       { id: 'li_percCrescimentoSeguidores', name: '% Crescimento de Seguidores', type: 'formula', orcado: O.percCrescimentoSeguidores, realizado: d.percCrescimentoSeguidores ?? null, percentual: calcPercentual(O.percCrescimentoSeguidores, d.percCrescimentoSeguidores), format: 'percent' },
-      // Distribuição / intenção
+      // Alcance + ativação
       { id: 'li_impressoes', name: 'Impressões', type: 'formula', orcado: O.impressoes, realizado: d.impressoes ?? 0, percentual: calcPercentual(O.impressoes, d.impressoes), format: 'number' },
-      { id: 'li_ctr', name: 'CTR', type: 'formula', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
-      { id: 'li_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.pageViews ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.pageViews), format: 'number' },
-      { id: 'li_taxaEngajamento', name: 'Taxa de Engajamento', type: 'formula', orcado: O.taxaEngajamento, realizado: d.engajamento ?? null, percentual: calcPercentual(O.taxaEngajamento, d.engajamento), format: 'percent' },
+      { id: 'li_taxaEngajamento', name: '% de Engajamento', type: 'formula', orcado: O.taxaEngajamento, realizado: d.engajamento ?? null, percentual: calcPercentual(O.taxaEngajamento, d.engajamento), format: 'percent' },
+      // Micro-funil do site: Clicou → Carregou página → Sessão → Converteu
+      { id: 'li_cliques', name: 'Cliques no Link', type: 'formula', orcado: (O as any).cliques ?? null, realizado: d.cliques ?? 0, percentual: calcPercentual((O as any).cliques ?? null, d.cliques), format: 'number' },
+      { id: 'li_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina ?? null), format: 'number' },
+      { id: 'li_sessoes', name: 'Sessões', type: 'formula', orcado: (O as any).sessoes ?? null, realizado: d.sessoes ?? 0, percentual: calcPercentual((O as any).sessoes ?? null, d.sessoes ?? null), format: 'number' },
+      { id: 'li_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('li', funnel, O, null)];
   };
@@ -1930,19 +1960,33 @@ export default function GrowthOrcadoRealizado() {
   // TikTok platform metrics (orgânico — lê tiktok.* via endpoint)
   const buildTiktokMetrics = (d: TiktokDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_TIKTOK;
+    // Tx Conversão da Página = Leads ÷ Visualizações de Página (GA4), igual aos Ads.
+    const vdp = d.visualizacoesPagina ?? 0;
+    const taxaConversaoPagina = vdp > 0 ? ((funnel?.leads ?? 0) / vdp) : 0;
+    // Jornada orgânica enxuta (só o que explica a geração de lead): Investimento →
+    // esforço de conteúdo → audiência → alcance/ativação → micro-funil do site →
+    // conversão. Removidas as métricas de vaidade (começaram/deixaram seguir, %
+    // perda, compartilhamentos/curtidas/comentários isolados — viram Engajamento).
     const topMetrics: Metric[] = [
+      // Investimento no topo (R$ 0 no orgânico puro; alinha com a seção dos Ads)
+      { id: 'tt_investimento', name: 'Investimento', type: 'manual', orcado: (O as any).investimento ?? null, realizado: 0, percentual: calcPercentual((O as any).investimento ?? null, 0), format: 'currency' },
+      // Esforço de conteúdo
       { id: 'tt_videosPublicados', name: 'Vídeos Publicados', type: 'formula', orcado: O.videosPublicados, realizado: d.videosPublicados ?? 0, percentual: calcPercentual(O.videosPublicados, d.videosPublicados), format: 'number' },
-      // Audiência (seguidores) — espelha o breakdown do Instagram/YouTube/LinkedIn
-      { id: 'tt_comecaramSeguir', name: 'Começaram a Seguir', type: 'formula', orcado: O.comecaramSeguir, realizado: d.comecaramSeguir ?? 0, percentual: calcPercentual(O.comecaramSeguir, d.comecaramSeguir), format: 'number' },
-      { id: 'tt_deixaramSeguir', name: 'Deixaram de Seguir', type: 'formula', orcado: O.deixaramSeguir, realizado: d.deixaramSeguir ?? 0, percentual: calcPercentual(O.deixaramSeguir, d.deixaramSeguir), format: 'number' },
-      { id: 'tt_percPerdaSeguidores', name: '% Perda de Seguidores', type: 'formula', orcado: O.percPerdaSeguidores, realizado: d.percPerdaSeguidores ?? null, percentual: calcPercentual(O.percPerdaSeguidores, d.percPerdaSeguidores), format: 'percent' },
-      { id: 'tt_deltaSeguidores', name: 'Delta de Seguidores', type: 'formula', orcado: O.deltaSeguidores, realizado: d.deltaSeguidores ?? 0, percentual: calcPercentual(O.deltaSeguidores, d.deltaSeguidores), format: 'number' },
+      // Audiência
       { id: 'tt_totalSeguidores', name: 'Total de Seguidores', type: 'formula', orcado: O.totalSeguidores, realizado: d.totalSeguidores ?? 0, percentual: calcPercentual(O.totalSeguidores, d.totalSeguidores), format: 'number' },
+      { id: 'tt_deltaSeguidores', name: 'Novos Seguidores (líquido)', type: 'formula', orcado: O.deltaSeguidores, realizado: d.deltaSeguidores ?? 0, percentual: calcPercentual(O.deltaSeguidores, d.deltaSeguidores), format: 'number' },
       { id: 'tt_percCrescimentoSeguidores', name: '% Crescimento de Seguidores', type: 'formula', orcado: O.percCrescimentoSeguidores, realizado: d.percCrescimentoSeguidores ?? null, percentual: calcPercentual(O.percCrescimentoSeguidores, d.percCrescimentoSeguidores), format: 'percent' },
-      // Distribuição
+      // Alcance + ativação da audiência
       { id: 'tt_visualizacoes', name: 'Visualizações', type: 'formula', orcado: O.visualizacoes, realizado: d.visualizacoes ?? 0, percentual: calcPercentual(O.visualizacoes, d.visualizacoes), format: 'number' },
-      { id: 'tt_compartilhamentos', name: 'Compartilhamentos', type: 'formula', orcado: O.compartilhamentos, realizado: d.compartilhamentos ?? 0, percentual: calcPercentual(O.compartilhamentos, d.compartilhamentos), format: 'number' },
+      { id: 'tt_engajamento', name: '% de Engajamento', type: 'formula', orcado: (O as any).engajamento ?? null, realizado: d.engajamento ?? null, percentual: calcPercentual((O as any).engajamento ?? null, d.engajamento ?? null), format: 'percent' },
+      // Micro-funil do site: Clicou → Carregou página → Sessão → Converteu.
+      // Cliques no Link fica vazio no TikTok (a API orgânica não expõe esse dado).
+      { id: 'tt_cliquesLink', name: 'Cliques no Link', type: 'formula', orcado: (O as any).cliquesLink ?? null, realizado: null, percentual: null, format: 'number' },
+      { id: 'tt_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: (O as any).visualizacoesPagina ?? null, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual((O as any).visualizacoesPagina ?? null, d.visualizacoesPagina ?? null), format: 'number' },
+      { id: 'tt_sessoes', name: 'Sessões', type: 'formula', orcado: (O as any).sessoes ?? null, realizado: d.sessoes ?? 0, percentual: calcPercentual((O as any).sessoes ?? null, d.sessoes ?? null), format: 'number' },
+      { id: 'tt_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
     ];
+    // includeInvestimento=false: a linha de Investimento já está no topo (acima).
     return [...topMetrics, ...buildFunnelMetrics('tt', funnel, O, null)];
   };
 
@@ -1955,8 +1999,8 @@ export default function GrowthOrcadoRealizado() {
   // TikTok Ads platform metrics (mídia paga — lê tiktok.ad_metrics_daily via endpoint)
   const buildTiktokAdsMetrics = (d: TiktokAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_TIKTOK_ADS;
-    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
+    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'tta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'tta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -1978,8 +2022,8 @@ export default function GrowthOrcadoRealizado() {
   // LinkedIn Ads platform metrics (mídia paga — lê linkedin.ad_metrics_daily via endpoint)
   const buildLinkedinAdsMetrics = (d: LinkedinAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
     const O = ORCADO_LINKEDIN_ADS;
-    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / d.sessoes) : 0;
+    const taxaConversaoPagina = (d.visualizacoesPagina ?? 0) > 0
+      ? ((funnel?.leads ?? 0) / d.visualizacoesPagina) : 0;
     const topMetrics: Metric[] = [
       { id: 'lia_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'lia_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
@@ -2420,21 +2464,13 @@ export default function GrowthOrcadoRealizado() {
     'total_contratos_ganhos',
     'total_faturamento', 'total_cac_ads', 'total_cac_contrato',
     'total_ticket_acel', 'total_ticket_impl',
-    // Consolidado por plataforma — só o essencial, por tipo de canal.
-    // Pagos: eficiência (Invest · Connect Rate · Tx Conversão) + resultado (Leads → %MQL)
-    ...['meta', 'gads', 'tta', 'lia'].flatMap(p => [
-      `${p}_investimento`, `${p}_connectRate`, `${p}_taxaConversaoPagina`,
-      `${p}_leads`, `${p}_mqls`, `${p}_cpl`, `${p}_cpmql`, `${p}_percMqls`,
+    // Consolidado por plataforma — SEMPRE as 6 métricas-padrão de Marketing em
+    // toda plataforma (paga ou orgânica), na mesma ordem da referência:
+    // Investimento · Leads · MQLs · CPL · CPMQL · % MQLs. Orgânicos sem verba
+    // mostram R$ 0 (a linha de Investimento é injetada via buildFunnelMetrics).
+    ...['meta', 'gads', 'tta', 'lia', 'ig', 'yt', 'li', 'tt'].flatMap(p => [
+      `${p}_investimento`, `${p}_leads`, `${p}_mqls`, `${p}_cpl`, `${p}_cpmql`, `${p}_percMqls`,
     ]),
-    // Instagram orgânico: clique na bio + posts + resultado (pode ter verba de boost → CPL/CPMQL)
-    'ig_postsPublicados', 'ig_cliquesLinkBio',
-    'ig_leads', 'ig_mqls', 'ig_cpl', 'ig_cpmql', 'ig_percMqls',
-    // YouTube orgânico: vídeos publicados + resultado
-    'yt_videosPublicados', 'yt_leads', 'yt_mqls', 'yt_percMqls',
-    // LinkedIn orgânico: posts publicados + resultado
-    'li_postsPublicados', 'li_leads', 'li_mqls', 'li_percMqls',
-    // TikTok orgânico: vídeos publicados + resultado
-    'tt_videosPublicados', 'tt_leads', 'tt_mqls', 'tt_percMqls',
   ]);
 
   const consolidadoSections: MetricSection[] = useMemo(() => {

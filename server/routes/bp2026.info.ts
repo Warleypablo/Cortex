@@ -478,6 +478,105 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
     calculo: "Despesa CAC ÷ Vendas MRR do mês. YTD = Σ ÷ Σ.",
   },
 
+  // ===== Ponte do MRR (recorrente) =====
+  ponte_mrr_ini: {
+    definicao: "MRR ativo no fim do mês anterior (posição de abertura da ponte).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês anterior (status ativo/onboarding/triagem). Janeiro abre com dez/2025.",
+    calculo: "Soma de valorr da base ativa no snapshot anterior.",
+  },
+  ponte_mrr_vendas: {
+    definicao: "Novo MRR vendido no mês (new business).",
+    fonte: FONTE_BITRIX,
+    calculo: "Σ valor_recorrente dos deals ganhos no mês.",
+  },
+  ponte_mrr_churn: {
+    definicao: "MRR perdido por churn no mês (saída).",
+    fonte: FONTE_CHURN,
+    calculo: "Soma do churn bruto em R$ de todos os produtos no mês (sinal negativo na ponte).",
+  },
+  ponte_mrr_delta: {
+    definicao: "Ajuste que fecha a ponte: MRR não explicado (downgrades, reajustes, vendas não ativadas).",
+    fonte: "Derivada das demais linhas da ponte.",
+    calculo: "MRR final − MRR inicial − vendas + churn. Negativo quando houve vazamento de MRR.",
+  },
+  ponte_mrr_fim: {
+    definicao: "MRR ativo no fim do mês (posição de fechamento).",
+    fonte: FONTE_SNAPSHOT,
+    calculo: "MRR inicial + vendas − churn + Δ não explicado.",
+  },
+
+  // ===== Pontual (movimento do estoque) =====
+  pontual_estoque_ini: {
+    definicao: "Valor do estoque de pontual no fim do mês anterior (posição de abertura).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês anterior (valorp>0, status fora de entregue/cancelado/não usar).",
+    calculo: "Soma de valorp dos contratos em estoque no snapshot anterior. Janeiro abre com dez/2025.",
+  },
+  pontual_venda: {
+    definicao: "Pontual que entrou no estoque no mês (entrada).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos em estoque no snapshot do mês que não estavam em estoque no anterior. Não é o 'Vendas Pontual' do Bitrix.",
+  },
+  pontual_entrega: {
+    definicao: "Pontual que saiu do estoque por entrega no mês (saída).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos que estavam em estoque e passaram a status 'entregue'.",
+  },
+  pontual_churn: {
+    definicao: "Pontual que saiu do estoque por cancelamento no mês (saída).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos que estavam em estoque e passaram a 'cancelado/inativo' ou 'não usar'.",
+  },
+  pontual_deletados: {
+    definicao: "Pontual que sumiu do snapshot do ClickUp no mês (saída).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos que estavam em estoque e não aparecem mais no snapshot do mês.",
+  },
+  pontual_saida_atipica: {
+    definicao: "Pontual que saiu do estoque por outro motivo (ex.: valorp zerado).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos que saíram do estoque sem ser entrega, churn ou deleção.",
+  },
+  pontual_reajuste: {
+    definicao: "Variação de valor de contratos que permaneceram no estoque no mês.",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ (valorp atual − valorp anterior) dos contratos presentes no estoque nos dois snapshots.",
+  },
+  pontual_estoque_fim: {
+    definicao: "Valor do estoque de pontual no fim do mês (posição de fechamento).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês (valorp>0, status fora de entregue/cancelado/não usar).",
+    calculo: "Estoque inicial + venda − entrega − churn − deletados − saída atípica + reajuste.",
+  },
+  pontual_status_ativo: {
+    definicao: "Parte do estoque final em contratos com status ativo (em execução).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'ativo'.",
+  },
+  pontual_status_triagem: {
+    definicao: "Parte do estoque final em contratos em triagem.",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'triagem'.",
+  },
+  pontual_status_pausado: {
+    definicao: "Parte do estoque final em contratos pausados.",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'pausado'.",
+  },
+  pontual_status_onboarding: {
+    definicao: "Parte do estoque final em contratos em onboarding.",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'onboarding'.",
+  },
+  pontual_status_em_cancelamento: {
+    definicao: "Parte do estoque final em contratos em cancelamento (ainda contam como estoque).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'em cancelamento'.",
+  },
+  pontual_status_outros: {
+    definicao: "Parte do estoque final em contratos com outros status (defensiva).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Estoque final menos a soma dos cinco status conhecidos.",
+  },
+
   // ===== Outras Receitas (detalhamento) =====
   or_total_detalhe: {
     definicao: "Total de outras receitas — idêntico à linha do DRE por construção.",

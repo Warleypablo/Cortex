@@ -51,6 +51,7 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
       const scopes = [
         "instagram_business_basic",
         "instagram_business_manage_insights",
+        "instagram_business_manage_comments",
       ].join(",");
 
       // Use Instagram Login flow (not Facebook Login)
@@ -152,6 +153,7 @@ export function registerInstagramRoutes(app: Express, db: any, _storage: IStorag
           scopes: [
             "instagram_business_basic",
             "instagram_business_manage_insights",
+            "instagram_business_manage_comments",
           ],
           connectedBy: stateData.userId,
           isActive: true,

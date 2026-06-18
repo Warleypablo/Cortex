@@ -90,6 +90,7 @@ const BP2026 = lazyWithRetry(() => import("@/pages/BP2026"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
 const InstagramDashboard = lazyWithRetry(() => import("@/pages/InstagramDashboard"));
+const CrmInstagram = lazyWithRetry(() => import("@/pages/crm-instagram/CrmInstagramLayout"));
 const GrowthDfcCac = lazyWithRetry(() => import("@/pages/GrowthDfcCac"));
 const AuditoriaSistemas = lazyWithRetry(() => import("@/pages/AuditoriaSistemas"));
 const ContribuicaoColaborador = lazyWithRetry(() => import("@/pages/ContribuicaoColaborador"));
@@ -409,6 +410,7 @@ function ProtectedRouter() {
       <Route path="/growth/ai">{() => <ProtectedRoute path="/growth/ai" component={GrowthAI} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
       <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramDashboard} />}</Route>
+      <Route path="/crm-instagram">{() => <ProtectedRoute path="/crm-instagram" component={CrmInstagram} />}</Route>
       <Route path="/growth/dfc-cac">{() => <ProtectedRoute path="/growth/dfc-cac" component={GrowthDfcCac} />}</Route>
       
       {/* Social (Makers) */}
