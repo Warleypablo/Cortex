@@ -1342,18 +1342,24 @@ function TabGuia() {
         <CardContent className="p-6 space-y-3">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Como preencher cada UTM</h2>
           <p className="text-sm text-gray-700 dark:text-zinc-300">
-            Esses exemplos seguem a <strong>Constituição UTM Turbo v1.1</strong>. Use a aba <strong>Gerar link</strong> pra montar com dropdowns — o guia abaixo serve pra entender o padrão e copiar exemplos prontos.
+            Esses exemplos seguem a <strong>Constituição UTM Turbo v1.4</strong>. Use a aba <strong>Gerar link</strong> pra montar com dropdowns — o guia abaixo serve pra entender o padrão e copiar exemplos prontos.
           </p>
           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm space-y-1">
-            <div><strong>medium</strong> — categoria do canal (paid, organic, eventos, referral, crm, outbound)</div>
+            <div><strong>medium</strong> — categoria do canal (paid, organic, eventos, referral, crm, outbound + os canais-próprios victor/andre/rodrigo)</div>
             <div><strong>source</strong> — plataforma técnica de onde saiu o clique (facebook, google, instagram, linkedin…)</div>
             <div><strong>campaign</strong> — iniciativa de marketing (always-on, social-selling, lancamento-X)</div>
             <div><strong>term</strong> — onde fisicamente o link foi colado (feed, stories, bio, dm…)</div>
-            <div><strong>content</strong> — identificador da peça específica (slug + data quando relevante)</div>
+            <div><strong>content</strong> — identificador da peça específica (tipo de destino, ou slug + data — ver regra abaixo)</div>
           </div>
-          <p className="text-xs text-gray-500 dark:text-zinc-500">
-            Regra de ouro do <strong>content</strong>: não repita o formato. Se <code className="font-mono">term=descricao-video</code>, content é só o slug (ex: <code className="font-mono">creators-ugc-2026-05-26</code>) — não <code className="font-mono">video-creators-ugc-…</code>.
-          </p>
+          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm space-y-2">
+            <div className="font-semibold text-gray-900 dark:text-white">Regra de ouro do <code className="font-mono">content</code> (v1.4): tem duas lógicas</div>
+            <div className="text-gray-700 dark:text-zinc-300">
+              <strong>Link fixo</strong> (bio, linktree, banner, "Sobre") → <code className="font-mono">content</code> = <strong>tipo de destino</strong>, <strong>sem data</strong>. Ex: <code className="font-mono">lp-creators</code>, <code className="font-mono">site-home</code>, <code className="font-mono">whatsapp</code>. O link não muda, então não há "post" a identificar.
+            </div>
+            <div className="text-gray-700 dark:text-zinc-300">
+              <strong>Post</strong> (feed, stories, reels, descrição de vídeo, DM) → <code className="font-mono">content</code> = <strong>nome do post + data</strong>. Ex: <code className="font-mono">creators-ugc-2026-05-26</code>. <span className="text-gray-500 dark:text-zinc-500">Não repita o formato: se <code className="font-mono">term=descricao-video</code>, não use <code className="font-mono">video-creators-…</code>.</span>
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -1437,6 +1443,60 @@ function TabGuia() {
           <p className="text-xs text-gray-600 dark:text-zinc-400">
             Em qualquer caso, o <code className="font-mono">content</code> identifica o <strong>tipo de destino</strong> do link fixo: <code className="font-mono">lp-creators</code> (landing page), <code className="font-mono">site-home</code> (site institucional). Não use o prefixo antigo <code className="font-mono">link-</code>.
           </p>
+        </CardContent>
+      </Card>
+
+      {/* BIO COM MÚLTIPLOS LINKS */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Bio com vários links (até 5 no Instagram)</h3>
+          <p className="text-sm text-gray-700 dark:text-zinc-300">
+            A bio nativa hoje aceita <strong>vários links diretos</strong> (até 5 no Instagram), funcionando como uma mini-Linktree dentro do app. Como todos ficam fisicamente na bio, <strong>todos usam <code className="font-mono">term=bio</code></strong> — o que diferencia cada botão é o <code className="font-mono">content</code> (tipo de destino, sem data, porque é link fixo).
+          </p>
+          <p className="text-sm text-gray-700 dark:text-zinc-300">
+            O <code className="font-mono">campaign</code> fica <code className="font-mono">always-on</code> para botões de presença contínua; só muda quando o botão pertence a uma iniciativa específica (ex: <code className="font-mono">creator-summit-2026</code>).
+          </p>
+          <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-zinc-800">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">Botão</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">campaign</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">term</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">content</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">Página Creators</td>
+                  <td className="px-3 py-2 font-mono text-xs">always-on</td>
+                  <td className="px-3 py-2 font-mono text-xs">bio</td>
+                  <td className="px-3 py-2 font-mono text-xs">lp-creators</td>
+                </tr>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">Creator Summit</td>
+                  <td className="px-3 py-2 font-mono text-xs">creator-summit-2026</td>
+                  <td className="px-3 py-2 font-mono text-xs">bio</td>
+                  <td className="px-3 py-2 font-mono text-xs">lp-creator-summit</td>
+                </tr>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">WhatsApp</td>
+                  <td className="px-3 py-2 font-mono text-xs">always-on</td>
+                  <td className="px-3 py-2 font-mono text-xs">bio</td>
+                  <td className="px-3 py-2 font-mono text-xs">whatsapp</td>
+                </tr>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">Site</td>
+                  <td className="px-3 py-2 font-mono text-xs">always-on</td>
+                  <td className="px-3 py-2 font-mono text-xs">bio</td>
+                  <td className="px-3 py-2 font-mono text-xs">site-home</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-gray-700 dark:text-zinc-300">
+            <strong>Atenção WhatsApp:</strong> UTM colada direto num link <code className="font-mono">wa.me</code> / <code className="font-mono">api.whatsapp.com</code> <strong>não rastreia</strong> — o WhatsApp ignora os parâmetros e o lead nunca chega ao Bitrix. Para rastrear o botão de WhatsApp, aponte para uma página de redirect tracked (ex: <code className="font-mono">pages.turbopartners.com.br/wpp?…</code>) que registra a UTM e redireciona pro <code className="font-mono">wa.me</code>.
+          </div>
         </CardContent>
       </Card>
 
@@ -1590,6 +1650,33 @@ function TabGuia() {
         </div>
       </Secao>
 
+      {/* MEDIUMS-EXCEÇÃO */}
+      <Secao
+        titulo="Canais próprios: victor, andre, rodrigo"
+        descricao="Exceções: figuras-chave com canal próprio robusto (YouTube, Instagram, LinkedIn, TikTok). O medium é o nome da figura — não organic. Naming idêntico ao organic (term por plataforma, content por tipo de destino/post)."
+      >
+        <div className="space-y-3">
+          <ExemploCard
+            titulo="Victor — bio do canal no YouTube apontando pra Turbo"
+            descricao="Link fixo — content = tipo de destino, sem data."
+            url="https://turbopartners.com.br/?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=bio&utm_content=site-home"
+          />
+          <ExemploCard
+            titulo="André — descrição de vídeo no canal dele"
+            descricao="Post — nome + data."
+            url="https://turbopartners.com.br/creators?utm_source=youtube&utm_medium=andre&utm_campaign=always-on&utm_term=descricao-video&utm_content=video-creators-2026-05-28"
+          />
+          <ExemploCard
+            titulo="Rodrigo — link da Turbo na Linktree do Instagram dele"
+            descricao="Linktree continua sendo term, não source. medium = a figura."
+            url="https://turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=always-on&utm_term=linktree&utm_content=site-home"
+          />
+        </div>
+        <p className="text-xs text-gray-600 dark:text-zinc-400 mt-1">
+          <strong>Quando NÃO usar:</strong> conteúdo do canal/página <strong>da Turbo</strong> que só cita a figura → <code className="font-mono">organic</code>. Anúncio pago com a figura no criativo → <code className="font-mono">paid</code> (a figura vai no <code className="font-mono">content</code> do ad, não no medium).
+        </p>
+      </Secao>
+
       {/* REFERRAL */}
       <Secao
         titulo="Referral (cliente, colaborador, influencer, marketplace)"
@@ -1696,7 +1783,7 @@ function TabGuia() {
       {/* Footer */}
       <Card>
         <CardContent className="p-4 text-xs text-gray-500 dark:text-zinc-500 text-center">
-          Documento de referência completo: <code className="font-mono">docs/utm-constituicao.md</code> · Constituição UTM Turbo v1.1 · Vigência a partir de 21/05/2026
+          Documento de referência completo: <code className="font-mono">docs/utm-constituicao.md</code> · Constituição UTM Turbo v1.4 · Vigência a partir de 21/05/2026
         </CardContent>
       </Card>
     </div>
