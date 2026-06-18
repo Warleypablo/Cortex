@@ -1,4 +1,4 @@
-import { Package, TrendingUp, TrendingDown, ShoppingCart, Boxes, Clock } from "lucide-react";
+import { Package, TrendingUp, TrendingDown, ShoppingCart, Boxes } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
 import type { PontualData } from "./types";
 import SlideLayout from "./SlideLayout";
@@ -39,7 +39,7 @@ function fmtK(v: number): string {
 }
 
 export default function SlidePontual({ pontualData, mesLabel }: Props) {
-  const { emAberto, aquisicao, entregasMes, variacaoEstoque, entregasPorProdutoMes, tempoMedioEntrega } = pontualData;
+  const { emAberto, aquisicao, entregasMes, variacaoEstoque, entregasPorProdutoMes } = pontualData;
 
   // Determinar Top 5 produtos (agregando valor de todos os meses) + Outros
   const produtoTotais = new Map<string, number>();
@@ -85,10 +85,6 @@ export default function SlidePontual({ pontualData, mesLabel }: Props) {
   const maxServicoValor = topServicosAberto[0]?.valor || 1;
 
   const topEntregasSquad = entregasMes.porSquad.slice(0, 5);
-
-  // Tempo médio: max para barras relativas
-  const maxDias = Math.max(...tempoMedioEntrega.map(t => t.diasMedio), 1);
-  const topTempoMedio = tempoMedioEntrega.slice(0, 8);
 
   const isCrescimento = variacaoEstoque.delta >= 0;
 
@@ -277,34 +273,6 @@ export default function SlidePontual({ pontualData, mesLabel }: Props) {
         </ChartCard>
       </div>
 
-      {/* Linha 3 — Tempo médio de entrega por produto */}
-      <SecondaryCard className="p-3 flex-1 min-h-0 flex flex-col">
-        <div className="flex items-center gap-1.5 mb-2 shrink-0">
-          <Clock className="h-3.5 w-3.5 text-cyan-400" />
-          <p className="text-xs text-zinc-500 uppercase tracking-wide">Tempo Médio de Entrega por Produto</p>
-          <span className="text-[10px] text-zinc-600">(últimos 6 meses)</span>
-        </div>
-        <div className="grid grid-cols-4 gap-x-4 gap-y-1.5 flex-1 min-h-0 overflow-y-auto">
-          {topTempoMedio.map(t => {
-            const pct = (t.diasMedio / maxDias) * 100;
-            return (
-              <div key={t.produto}>
-                <div className="flex items-center justify-between mb-0.5">
-                  <span className="text-[10px] text-zinc-300 truncate max-w-[120px]" title={t.produto}>{t.produto}</span>
-                  <span className="text-[10px] font-bold text-cyan-400">{t.diasMedio}d</span>
-                </div>
-                <div className="w-full h-1 bg-white/[0.04] rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-cyan-500/70 rounded-full"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                <p className="text-[8px] text-zinc-600 mt-0.5">{t.contratos} entregas</p>
-              </div>
-            );
-          })}
-        </div>
-      </SecondaryCard>
     </SlideLayout>
   );
 }

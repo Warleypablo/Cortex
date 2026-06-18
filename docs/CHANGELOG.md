@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-18 | feat(relatorio-mensal): remove "Tempo Médio de Entrega por Produto" do slide Pontual
+
+**O que foi feito:**
+- Removido o bloco "Tempo Médio de Entrega por Produto (últimos 6 meses)" do slide Pontual (`SlidePontual.tsx`).
+- Limpeza dos órfãos: variáveis `tempoMedioEntrega`/`topTempoMedio`/`maxDias` e import `Clock` removidos do componente.
+- Backend/tipo `PontualData.tempoMedioEntrega` mantido intacto (apenas a exibição foi removida).
+
+**Por que:**
+- Solicitado: a métrica não é mais necessária na tela de Pontual.
+
+**Arquivos alterados:**
+- `client/src/pages/relatorio-mensal/SlidePontual.tsx`
+
+**Impacto arquitetural:** Nenhum — remoção de bloco de UI.
+
 ## 2026-06-18 | feat(relatorio-mensal): Vendas YTD e Vendas CX & Upsell após a Capa Comercial
 
 **O que foi feito:**
