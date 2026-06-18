@@ -14,7 +14,9 @@ import {
 import { montarMetricasGerais } from "./bp2026.metricas";
 import { montarRevenue } from "./bp2026.revenue";
 import { montarFunil } from "./bp2026.funil";
-import { montarVendasProduto } from "./bp2026.vendasProduto";
+import { montarVendasProduto, carregarAtribuicaoVendas, carregarVendasProdutoClickup } from "./bp2026.vendasProduto";
+import { agregarVendasProduto } from "./bp2026.vendasProduto.helpers";
+import { SEGMENTOS_RECORRENTES, SLUG } from "../okr2026/servicosBitrix";
 import { montarCapacity } from "./bp2026.capacity";
 import { montarDetalhamentos } from "./bp2026.detalhamentos";
 import { montarPontual } from "./bp2026.pontual";
@@ -518,7 +520,16 @@ export function registerBp2026Routes(app: Express, db: any) {
       const { linhas: funil, ganhosPorMes } = await montarFunil({ db, orcado, vendasMrrPorMes, pontualPorMes, mesCorrente, mesFechado });
 
       // 12b. Vendas por Produto (sub-aba)
-      const vendasProduto = await montarVendasProduto({ db, orcado, mesCorrente, mesFechado });
+      // 12b. Atribuição de vendas: carregada uma vez e reaproveitada (vendas por produto + rateio do CAC)
+      const atrib = await carregarAtribuicaoVendas(db);
+      const agg = agregarVendasProduto(atrib.deals, atrib.prMix, atrib.mixRec, atrib.mixPont, atrib.aovRec, atrib.aovPont);
+      const contratosVendidosRec: Record<string, (number | null)[]> = {};
+      for (const seg of SEGMENTOS_RECORRENTES) {
+        contratosVendidosRec[SLUG[seg]] = Array.from({ length: 12 }, (_, i) =>
+          i + 1 <= mesCorrente ? (agg.get(i + 1)?.get(seg)?.contratosRec ?? 0) : null);
+      }
+      const { agg: aggVendas, totais: totaisVendas } = await carregarVendasProdutoClickup(db);
+      const vendasProduto = montarVendasProduto({ agg: aggVendas, totais: totaisVendas, orcado, mesCorrente, mesFechado });
 
       // 11. Capacity (sub-aba) — contratos Performance extraídos do retorno da Revenue
       const contratosPerformanceSerie =
@@ -530,7 +541,7 @@ export function registerBp2026Routes(app: Express, db: any) {
 
       // 12. Detalhamentos: SG&A e CAC por sub-linha, Outras Receitas por categoria
       const { sga: sgaDetalhe, cac: cacDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
-        db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, mesCorrente, mesFechado,
+        db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec, mesCorrente, mesFechado,
       });
 
       // documentação por linha (o que é / fonte / cálculo) — dicionário único

@@ -23,6 +23,8 @@ export interface BPLinha {
   destaque?: boolean;
   grupo?: string;      // bloco (ex.: Recorrente / Pontual) — agrupa linhas na tabela
   segmento?: string;   // produto (ex.: Performance / Creators) — sub-cabeçalho por produto
+  subItem?: boolean;    // linha-filha (ex.: "% do CAC total") — indentada e atenuada
+  semDetalhe?: boolean; // célula não abre drill-down
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -67,10 +69,11 @@ interface CelulaProps {
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
   unidade: "brl" | "int" | "pct" | "dec";
   parcial?: boolean;
+  semMeta?: boolean; // linha de composição (ex.: "% do total"): sem semântica orçado-vs-realizado
   mostrarOrcado?: boolean;
 }
 
-function Celula({ orcado, realizado, atingimento, direcao, unidade, parcial, mostrarOrcado = true }: CelulaProps) {
+function Celula({ orcado, realizado, atingimento, direcao, unidade, parcial, semMeta, mostrarOrcado = true }: CelulaProps) {
   if (!mostrarOrcado) {
     return (
       <div className="flex flex-col items-end gap-0.5">
@@ -81,7 +84,8 @@ function Celula({ orcado, realizado, atingimento, direcao, unidade, parcial, mos
     );
   }
   // gasto/receita sem orçamento: precisa saltar aos olhos, não virar "—"
-  const naoOrcado = atingimento === null && orcado === 0 && realizado !== null && realizado > 0;
+  // (suprimido em linhas de composição, onde orçado 0 é esperado e não significa "não orçado")
+  const naoOrcado = !semMeta && atingimento === null && orcado === 0 && realizado !== null && realizado > 0;
   // mês parcial: atingimento sem cor semântica (compara dias corridos com mês cheio)
   const corAting = parcial
     ? "text-gray-400 dark:text-zinc-500"
@@ -198,7 +202,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                 <td
                   className={`sticky left-0 z-10 px-4 py-3 whitespace-nowrap align-top ${
                     ehTotal ? "bg-gray-100 dark:bg-zinc-800" : "bg-white dark:bg-zinc-900"
-                  } ${linha.segmento ? "pl-8" : ""}`}
+                  } ${linha.segmento ? "pl-8" : ""} ${linha.subItem ? "pl-8 text-xs text-gray-500 dark:text-zinc-500" : ""}`}
                 >
                   <span className="flex items-center gap-1.5">
                     {tituloLinha}
@@ -233,7 +237,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                   </span>
                 </td>
                 {linha.meses.map((m) => {
-                    const clicavel = !!onCellClick && m.realizado !== null;
+                    const clicavel = !!onCellClick && m.realizado !== null && !linha.subItem && !linha.semDetalhe;
                     return (
                       <td
                         key={m.mes}
@@ -252,7 +256,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                               </TooltipContent>
                             </Tooltip>
                           )}
-                          <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} direcao={linha.direcao} unidade={linha.unidade ?? "brl"} parcial={m.mes === mesCorrente && mesCorrente > mesFechado} mostrarOrcado={mostrarOrcado} />
+                          <Celula orcado={m.orcado} realizado={m.realizado} atingimento={m.atingimento} direcao={linha.direcao} unidade={linha.unidade ?? "brl"} parcial={m.mes === mesCorrente && mesCorrente > mesFechado} semMeta={linha.subItem} mostrarOrcado={mostrarOrcado} />
                         </span>
                       </td>
                     );
@@ -264,6 +268,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                     atingimento={linha.ytd.atingimento}
                     direcao={linha.direcao}
                     unidade={linha.unidade ?? "brl"}
+                    semMeta={linha.subItem}
                     mostrarOrcado={mostrarOrcado}
                   />
                 </td>

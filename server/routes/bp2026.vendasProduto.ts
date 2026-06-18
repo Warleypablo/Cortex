@@ -1,42 +1,77 @@
 // server/routes/bp2026.vendasProduto.ts
 // Sub-aba Vendas por Produto: vendas MRR/Pontual, contratos e AOV por segmento BP.
-// Realizado: Bitrix.crm_deal (servicos_vendidos) com valor atribuído pela cascata
-// (produto único -> mix ClickUp -> AOV). Total por natureza fecha com o funil agregado.
-// O drill-down (detalheVendaProdutoMes) reusa a MESMA atribuição — célula e detalhe
-// não podem divergir.
+// Realizado: "Clickup".cup_contratos por data_criado, com produto mapeado a segmento
+// (bp2026.produtoSegmento). O drill-down lista os contratos do ClickUp.
+// NOTA: carregarAtribuicaoVendas/parseMetricaProduto permanecem — a atribuição Bitrix
+// ainda é usada pelo CAC (contratosVendidosRec em bp2026.ts).
 import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd } from "./bp2026.helpers";
 import {
-  agregarVendasProduto, aovMedioPorSegmento, parseServicosVendidos, distribuirDeal,
+  aovMedioPorSegmento, parseServicosVendidos,
+  agregarVendasProdutoClickup, contratosDoSegmento,
   type DealVenda, type MixClickup, type AovMedio, type ProdutoRowMix,
+  type CelulaSeg, type TotalMes, type AggVendasClickup, type ContratoRow,
 } from "./bp2026.vendasProduto.helpers";
 import {
-  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SERVICOS_BITRIX,
+  SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SLUG,
   type SegmentoBP, type Natureza,
 } from "../okr2026/servicosBitrix";
-
-// portal Bitrix para montar o link do deal (mesmo base usado no FunilBroadcast)
-const BITRIX_BASE = "https://turbopartners.bitrix24.com.br";
+const ANO = 2026;
+const CLICKUP_TASK_BASE = "https://app.clickup.com/t";
 
 interface MesLinha { mes: number; orcado: number; realizado: number | null; atingimento: number | null }
 interface Linha {
   metrica: string; titulo: string; tipoAgregacao: "fluxo"; direcao: "maior_melhor";
   unidade: "brl" | "int" | "pct"; grupo: string; segmento: string; destaque?: boolean;
+  semDetalhe?: boolean;
   meses: MesLinha[]; ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
 
-const SLUG: Record<SegmentoBP, string> = {
-  "Performance": "performance", "Creators": "creators", "Social": "social",
-  "Gestão de Comunidade": "gc", "Others": "others",
-  "E-commerce": "ecommerce", "Site Institucional": "site", "Landing Page": "landing", "CRM": "crm",
-};
 const SEG_POR_SLUG: Record<string, SegmentoBP> = Object.fromEntries(
   (Object.entries(SLUG) as [SegmentoBP, string][]).map(([seg, slug]) => [slug, seg])
 ) as Record<string, SegmentoBP>;
 const orcKey = (medida: string, seg: SegmentoBP) => `${medida}_${SLUG[seg]}`;
 
+// Carrega vendas por produto do ClickUp (data_criado) e agrega no formato da matriz.
+export async function carregarVendasProdutoClickup(db: any): Promise<AggVendasClickup> {
+  const ini = `${ANO}-01-01`, fim = `${ANO + 1}-01-01`;
+  const prodRows = (await db.execute(sql`
+    SELECT EXTRACT(MONTH FROM data_criado)::int AS mes,
+           COALESCE(NULLIF(TRIM(produto), ''), '(sem produto)') AS produto,
+           COALESCE(SUM(valorr::numeric), 0)::float AS mrr,
+           COALESCE(SUM(valorp::numeric), 0)::float AS pont,
+           COUNT(*) FILTER (WHERE COALESCE(valorr,0) > 0)::int AS contratos_mrr,
+           COUNT(*) FILTER (WHERE COALESCE(valorp,0) > 0)::int AS contratos_pont
+    FROM "Clickup".cup_contratos
+    WHERE data_criado >= ${ini} AND data_criado < ${fim}
+      AND LOWER(TRIM(status)) <> 'não usar'
+    GROUP BY 1, 2
+  `)).rows as any[];
+  const totRows = (await db.execute(sql`
+    WITH primeiro AS (
+      SELECT id_task, MIN(data_criado) AS dt
+      FROM "Clickup".cup_contratos
+      WHERE LOWER(TRIM(status)) <> 'não usar' AND id_task IS NOT NULL
+      GROUP BY id_task
+    )
+    SELECT EXTRACT(MONTH FROM dt)::int AS mes, COUNT(*)::int AS clientes
+    FROM primeiro
+    WHERE dt >= ${ini} AND dt < ${fim}
+    GROUP BY 1
+  `)).rows as any[];
+  return agregarVendasProdutoClickup(
+    prodRows.map((r) => ({
+      mes: Number(r.mes), produto: String(r.produto),
+      mrr: Number(r.mrr), pont: Number(r.pont),
+      contratosMrr: Number(r.contratos_mrr), contratosPont: Number(r.contratos_pont),
+    })),
+    totRows.map((r) => ({ mes: Number(r.mes), clientes: Number(r.clientes) })),
+  );
+}
+
 interface Deps {
-  db: any;
+  agg: Map<number, Map<SegmentoBP, CelulaSeg>>;
+  totais: Map<number, TotalMes>;
   orcado: Record<string, Record<number, number>>;
   mesCorrente: number;
   mesFechado: number;
@@ -142,71 +177,82 @@ export async function carregarAtribuicaoVendas(db: any): Promise<AtribuicaoVenda
   return { deals, prMix, mixRec, mixPont, aovRec, aovPont, meta };
 }
 
-export async function montarVendasProduto(deps: Deps): Promise<Linha[]> {
-  const { db, orcado, mesCorrente, mesFechado } = deps;
-
-  const { deals, prMix, mixRec, mixPont, aovRec, aovPont } = await carregarAtribuicaoVendas(db);
-  const agg = agregarVendasProduto(deals, prMix, mixRec, mixPont, aovRec, aovPont);
+export function montarVendasProduto(deps: Deps): Linha[] {
+  const { agg, totais, orcado, mesCorrente, mesFechado } = deps;
 
   const serie = (f: (m: number) => number | null) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? f(i + 1) : null));
-
+  const orcOf = (src: string | ((m: number) => number), mes: number): number =>
+    typeof src === "function" ? src(mes) : (orcado[src]?.[mes] ?? 0);
   const razao = (num: number | null, den: number | null): number | null =>
     (num === null || den === null || !den) ? null : num / den;
   const somaAte = (s: (number | null)[]) =>
     s.slice(0, mesFechado).reduce<number | null>((acc, v) => (v === null ? acc : (acc ?? 0) + v), null);
-  const somaOrcAte = (metricaKey: string) =>
-    Array.from({ length: mesFechado }, (_, i) => orcado[metricaKey]?.[i + 1] ?? 0).reduce((a, b) => a + b, 0);
+  const somaOrcAte = (src: string | ((m: number) => number)) =>
+    Array.from({ length: mesFechado }, (_, i) => orcOf(src, i + 1)).reduce((a, b) => a + b, 0);
 
   const fazLinha = (
     metrica: string, titulo: string, grupo: string, segmento: string,
-    unidade: Linha["unidade"], serieReal: (number | null)[], orcadoMetrica: string,
-    ytdOverride?: { orcado: number; realizado: number | null },
-    destaque = false
+    unidade: Linha["unidade"], serieReal: (number | null)[], orcSrc: string | ((m: number) => number),
+    opts: { ytdOverride?: { orcado: number; realizado: number | null }; destaque?: boolean; semDetalhe?: boolean } = {}
   ): Linha => {
     const meses: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
-      const o = orcado[orcadoMetrica]?.[i + 1] ?? 0;
+      const o = orcOf(orcSrc, i + 1);
       const r = serieReal[i];
       return { mes: i + 1, orcado: o, realizado: r, atingimento: calcAtingimento(o, r) };
     });
     const ytd = mesFechado === 0
       ? { orcado: 0, realizado: null, atingimento: null }
-      : ytdOverride
-        ? { ...ytdOverride, atingimento: calcAtingimento(ytdOverride.orcado, ytdOverride.realizado) }
+      : opts.ytdOverride
+        ? { ...opts.ytdOverride, atingimento: calcAtingimento(opts.ytdOverride.orcado, opts.ytdOverride.realizado) }
         : (() => { const v = calcYtd(meses, mesFechado, "fluxo"); return { ...v, atingimento: calcAtingimento(v.orcado, v.realizado) }; })();
-    return { metrica, titulo, tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade, grupo, segmento, destaque, meses, ytd };
+    return {
+      metrica, titulo, tipoAgregacao: "fluxo", direcao: "maior_melhor", unidade, grupo, segmento,
+      destaque: opts.destaque, semDetalhe: opts.semDetalhe, meses, ytd,
+    };
   };
 
-  const cel = (m: number, seg: SegmentoBP) => agg.get(m)?.get(seg);
   const linhas: Linha[] = [];
+  const t = (m: number) => totais.get(m);
 
-  const blocos: Array<{ grupo: string; segmentos: SegmentoBP[]; medidaValor: "vendas_mrr" | "vendas_pontual"; pegaValor: (c: any) => number; pegaCtr: (c: any) => number }> = [
-    { grupo: "Recorrente", segmentos: SEGMENTOS_RECORRENTES, medidaValor: "vendas_mrr", pegaValor: (c) => c?.mrr ?? 0, pegaCtr: (c) => c?.contratosRec ?? 0 },
-    { grupo: "Pontual", segmentos: SEGMENTOS_PONTUAIS, medidaValor: "vendas_pontual", pegaValor: (c) => c?.pont ?? 0, pegaCtr: (c) => c?.contratosPont ?? 0 },
+  // ---- Bloco "Visão Geral" (totais; sem drill-down) ----
+  const orcReceitaTotal = (m: number) => (orcado["vendas_mrr"]?.[m] ?? 0) + (orcado["vendas_pontual"]?.[m] ?? 0);
+  const orcContratosTotal = (m: number) =>
+    SEGMENTOS_RECORRENTES.reduce((s, seg) => s + (orcado[`contratos_vendidos_mrr_${SLUG[seg]}`]?.[m] ?? 0), 0) +
+    SEGMENTOS_PONTUAIS.reduce((s, seg) => s + (orcado[`contratos_vendidos_pontual_${SLUG[seg]}`]?.[m] ?? 0), 0);
+  const VG = "Visão Geral";
+  linhas.push(fazLinha("vp_receita_total", "Receita Total", VG, "", "brl",
+    serie((m) => (t(m)?.mrr ?? 0) + (t(m)?.pont ?? 0)), orcReceitaTotal, { destaque: true, semDetalhe: true }));
+  linhas.push(fazLinha("vp_receita_mrr", "Receita MRR", VG, "", "brl",
+    serie((m) => t(m)?.mrr ?? 0), "vendas_mrr", { semDetalhe: true }));
+  linhas.push(fazLinha("vp_receita_pontual", "Receita Pontual", VG, "", "brl",
+    serie((m) => t(m)?.pont ?? 0), "vendas_pontual", { semDetalhe: true }));
+  linhas.push(fazLinha("vp_num_contratos", "Nº de Contratos", VG, "", "int",
+    serie((m) => t(m)?.contratos ?? 0), orcContratosTotal, { semDetalhe: true }));
+  linhas.push(fazLinha("vp_num_clientes", "Nº de Clientes", VG, "", "int",
+    serie((m) => t(m)?.clientes ?? 0), () => 0, { semDetalhe: true }));
+
+  // ---- Blocos Recorrente / Pontual por segmento ----
+  const cel = (m: number, seg: SegmentoBP) => agg.get(m)?.get(seg);
+  const blocos = [
+    { grupo: "Recorrente", segmentos: SEGMENTOS_RECORRENTES, medida: "vendas_mrr", medidaCtr: "contratos_vendidos_mrr", medidaAov: "aov_venda_mrr", label: "MRR",
+      pegaValor: (c?: CelulaSeg) => c?.mrr ?? 0, pegaCtr: (c?: CelulaSeg) => c?.contratosRec ?? 0 },
+    { grupo: "Pontual", segmentos: SEGMENTOS_PONTUAIS, medida: "vendas_pontual", medidaCtr: "contratos_vendidos_pontual", medidaAov: "aov_venda_pontual", label: "Pontual",
+      pegaValor: (c?: CelulaSeg) => c?.pont ?? 0, pegaCtr: (c?: CelulaSeg) => c?.contratosPont ?? 0 },
   ];
-
   for (const b of blocos) {
-    // linha de TOTAL do bloco (soma dos produtos) no topo, em destaque;
-    // orçado = total agregado (vendas_mrr / vendas_pontual); drill-down lista todos os deals
-    const totalReal = serie((m) => b.segmentos.reduce((s, seg) => s + b.pegaValor(cel(m, seg)), 0));
-    const totalTitulo = b.medidaValor === "vendas_mrr" ? "Total MRR" : "Total Pontual";
-    linhas.push(fazLinha(b.medidaValor, totalTitulo, b.grupo, "", "brl", totalReal, b.medidaValor, undefined, true));
     for (const seg of b.segmentos) {
+      const slug = SLUG[seg];
       const valorReal = serie((m) => b.pegaValor(cel(m, seg)));
       const ctrReal = serie((m) => b.pegaCtr(cel(m, seg)));
-      const aovReal = Array.from({ length: 12 }, (_, i) => {
-        const v = valorReal[i], n = ctrReal[i];
-        return v === null || n === null || !n ? null : v / n;
-      });
-      const medidaAov = b.medidaValor === "vendas_mrr" ? "aov_venda_mrr" : "aov_venda_pontual";
-      const medidaCtr = b.medidaValor === "vendas_mrr" ? "contratos_vendidos_mrr" : "contratos_vendidos_pontual";
-      linhas.push(fazLinha(`${b.medidaValor}_${SLUG[seg]}`, `${seg} — ${b.grupo === "Recorrente" ? "MRR" : "Pontual"}`, b.grupo, seg, "brl", valorReal, orcKey(b.medidaValor, seg)));
-      linhas.push(fazLinha(`${medidaCtr}_${SLUG[seg]}`, `${seg} — Contratos`, b.grupo, seg, "int", ctrReal, orcKey(medidaCtr, seg)));
+      const aovReal = Array.from({ length: 12 }, (_, i) => razao(valorReal[i], ctrReal[i]));
+      linhas.push(fazLinha(`${b.medida}_${slug}`, `${seg} — ${b.label}`, b.grupo, seg, "brl", valorReal, `${b.medida}_${slug}`));
+      linhas.push(fazLinha(`${b.medidaCtr}_${slug}`, `${seg} — Contratos`, b.grupo, seg, "int", ctrReal, `${b.medidaCtr}_${slug}`));
       const aovYtd = mesFechado === 0 ? undefined : {
-        orcado: razao(somaOrcAte(orcKey(b.medidaValor, seg)), somaOrcAte(orcKey(medidaCtr, seg))) ?? 0,
+        orcado: razao(somaOrcAte(`${b.medida}_${slug}`), somaOrcAte(`${b.medidaCtr}_${slug}`)) ?? 0,
         realizado: razao(somaAte(valorReal), somaAte(ctrReal)),
       };
-      linhas.push(fazLinha(`${medidaAov}_${SLUG[seg]}`, `${seg} — AOV`, b.grupo, seg, "brl", aovReal, orcKey(medidaAov, seg), aovYtd));
+      linhas.push(fazLinha(`${b.medidaAov}_${slug}`, `${seg} — AOV`, b.grupo, seg, "brl", aovReal, `${b.medidaAov}_${slug}`, { ytdOverride: aovYtd }));
     }
   }
   return linhas;
@@ -233,44 +279,47 @@ export function parseMetricaProduto(metrica: string):
 
 export interface ItemVendaDet { grupo: string; nome: string; detalhe: string; data: string | null; valor: number; url?: string }
 
+// monta itens do drill-down a partir das linhas de contrato (pura, testável)
+export function montarItensVendaProduto(
+  rows: ContratoRow[], natureza: Natureza, segmento: SegmentoBP, modo: "valor" | "contrato"
+): { itens: ItemVendaDet[]; total: number } {
+  const doSeg = contratosDoSegmento(rows, natureza, segmento);
+  const valorDe = (c: ContratoRow) => (natureza === "recorrente" ? c.valorr : c.valorp);
+  const itens: ItemVendaDet[] = doSeg.map((c) => ({
+    grupo: "Contratos",
+    nome: c.cliente,
+    detalhe: [c.servico || c.produto, c.status].filter(Boolean).join(" · "),
+    data: c.data,
+    valor: modo === "valor" ? valorDe(c) : 0,
+    url: `${CLICKUP_TASK_BASE}/${c.idSubtask}`,
+  }));
+  itens.sort((a, b) => b.valor - a.valor);
+  const total = modo === "valor" ? doSeg.reduce((s, c) => s + valorDe(c), 0) : doSeg.length;
+  return { itens, total };
+}
+
 export async function detalheVendaProdutoMes(
   db: any, natureza: Natureza, segmento: SegmentoBP, mes: number, modo: "valor" | "contrato"
 ): Promise<{ itens: ItemVendaDet[]; total: number }> {
-  const { deals, prMix, mixRec, mixPont, aovRec, aovPont, meta } = await carregarAtribuicaoVendas(db);
-  const itens: ItemVendaDet[] = [];
-  let total = 0;
-  for (const d of deals) {
-    if (d.mes !== mes) continue;
-    const parte = distribuirDeal(d, prMix, mixRec, mixPont, aovRec, aovPont)
-      .find((p) => p.natureza === natureza && p.segmento === segmento);
-    if (!parte) continue;
-
-    const valNat = natureza === "recorrente" ? d.valorRec : d.valorPont;
-    const rateado = Math.round(valNat) !== Math.round(parte.valor); // multi-produto: valor do deal foi dividido
-    const md = meta.get(d.id)!;
-    // produto desta célula = o(s) serviço(s) do deal que pertencem ao segmento clicado
-    const servicosDoSegmento = d.ids
-      .filter((id) => SERVICOS_BITRIX[id]?.segmento === segmento)
-      .map((id) => SERVICOS_BITRIX[id]!.nome);
-    const produtoLabel = servicosDoSegmento.length ? servicosDoSegmento.join(", ") : segmento;
-    const atribuido = `R$ ${Math.round(parte.valor).toLocaleString("pt-BR")}`;
-    const detalhePartes = [
-      produtoLabel,                                   // produto (serviço do segmento), claro e primeiro
-      modo === "contrato" ? atribuido : "",           // no modo contagem o valor vai no texto
-      md.closer ? `closer ${md.closer}` : "",
-      rateado ? `de deal ${natureza === "recorrente" ? "MRR" : "pontual"} R$ ${Math.round(valNat).toLocaleString("pt-BR")}` : "",
-    ].filter(Boolean);
-
-    itens.push({
-      grupo: "Deals",
-      nome: md.titulo,
-      detalhe: detalhePartes.join(" · "),
-      data: md.data,
-      valor: modo === "valor" ? parte.valor : 0,
-      url: `${BITRIX_BASE}/crm/deal/details/${d.id}/`,
-    });
-    total += modo === "valor" ? parte.valor : 1;
-  }
-  itens.sort((a, b) => b.valor - a.valor);
-  return { itens, total };
+  const rows = (await db.execute(sql`
+    SELECT c.id_subtask AS id_subtask,
+           COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+           COALESCE(c.servico, '') AS servico,
+           COALESCE(c.status, '') AS status,
+           COALESCE(c.valorr::numeric, 0)::float AS valorr,
+           COALESCE(c.valorp::numeric, 0)::float AS valorp,
+           c.data_criado::text AS data
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+    WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+      AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+      AND LOWER(TRIM(c.status)) <> 'não usar'
+  `)).rows as any[];
+  const contratos: ContratoRow[] = rows.map((r) => ({
+    idSubtask: String(r.id_subtask),
+    cliente: String(r.cliente), produto: String(r.produto), servico: String(r.servico),
+    status: String(r.status), valorr: Number(r.valorr), valorp: Number(r.valorp), data: r.data ?? null,
+  }));
+  return montarItensVendaProduto(contratos, natureza, segmento, modo);
 }
