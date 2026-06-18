@@ -34,6 +34,7 @@ import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
 import SlideTopicosDiscussao from "./relatorio-mensal/SlideTopicosDiscussao";
 import SlideNPS from "./relatorio-mensal/SlideNPS";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
+import SlideTurboStore from "./relatorio-mensal/SlideTurboStore";
 import SlideCustom from "./relatorio-mensal/SlideCustom";
 
 const FIXED_SLIDE_NAMES = [
@@ -45,10 +46,11 @@ const FIXED_SLIDE_NAMES = [
   "NPS",
   "Capa Tech", "Area Tech", "Entregas Pontuais Tech",
   "Tópicos",
+  "Turbo Store",
   "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 25
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 26
 
 type SlotEntry =
   | { type: "fixed"; fixedIndex: number; name: string }
@@ -305,8 +307,9 @@ export default function RelatorioMensal() {
       case 20: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
       case 21: return <SlideEntregasPontuaisTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
       case 22: return <SlideTopicosDiscussao />;
-      case 23: return <SlideFraseEncerramento />;
-      case 24: return <SlideQRCode />;
+      case 23: return <SlideTurboStore />;
+      case 24: return <SlideFraseEncerramento />;
+      case 25: return <SlideQRCode />;
       default: return null;
     }
   };

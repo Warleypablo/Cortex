@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-18 | feat(relatorio-mensal): slide "Turbo Store" antes do fechamento
+
+**O que foi feito:**
+- Novo slide `SlideTurboStore.tsx` no Reporte Mensal, posicionado logo antes do bloco de fechamento (Frase + Q&A).
+- Layout: screenshot do site da loja em moldura de navegador à esquerda + QR code de acesso à direita ("Escaneie para acessar a loja"), tema commerce (ciano), dark mode.
+- Inserido `"Turbo Store"` em `FIXED_SLIDE_NAMES` (índice 23) e ajustado o switch de render (`case 23`→Store, `24`→Frase, `25`→Q&A) em `RelatorioMensal.tsx`. Deck passa de 31 para 32 slides.
+- Imagens adicionadas em `client/src/assets/`: `turbo-store.png` (print do site) e `turbo-store-qr.jpeg` (QR da loja).
+
+**Por que:**
+- Divulgar a Turbo Store no reporte mensal, com QR para acesso direto à loja.
+
+**Arquivos alterados:**
+- `client/src/pages/relatorio-mensal/SlideTurboStore.tsx` (novo)
+- `client/src/pages/RelatorioMensal.tsx` - ordem dos slides + render
+- `client/src/assets/turbo-store.png`, `client/src/assets/turbo-store-qr.jpeg` (novos)
+
+**Impacto arquitetural:** Nenhum — slide estático adicional.
+
 ## 2026-06-17 | fix(bp2026): churn conta só status cancelado/em cancelamento, exclui entregue/pausado
 
 **O que foi feito:**
