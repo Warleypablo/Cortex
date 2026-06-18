@@ -1455,15 +1455,97 @@ function GuiaFundamentos() {
         <CardContent className="p-6 space-y-3">
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Como preencher cada UTM</h2>
           <p className="text-sm text-gray-700 dark:text-zinc-300">
-            Tudo aqui segue a <strong>Constituição UTM Turbo v1.4</strong>. Monte os links na aba <strong>Gerar link</strong> (os dropdowns já garantem o padrão). Use estas sub-abas por <strong>canal</strong> pra saber exatamente o que preencher no seu time. Comece entendendo os 5 campos:
+            Tudo aqui segue a <strong>Constituição UTM Turbo v1.4</strong>. Monte os links na aba <strong>Gerar link</strong> (os dropdowns já garantem o padrão). Cada sub-aba abaixo é uma <strong>origem de link</strong> — descubra a sua no roteador e siga o passo a passo. Antes, os 5 campos:
           </p>
           <div className="bg-blue-50 dark:bg-blue-950 border border-blue-200 dark:border-blue-800 rounded-lg p-3 text-sm space-y-1">
-            <div><strong>medium</strong> — categoria do canal (paid, organic, eventos, referral, crm, outbound + os canais-próprios victor/andre/rodrigo)</div>
+            <div><strong>medium</strong> — categoria do canal (paid, organic, eventos, referral, crm, outbound + Sócios: victor/andre/rodrigo)</div>
             <div><strong>source</strong> — plataforma técnica de onde saiu o clique (facebook, google, instagram, linkedin…)</div>
             <div><strong>campaign</strong> — iniciativa de marketing (always-on, social-selling, lancamento-X)</div>
             <div><strong>term</strong> — onde fisicamente o link foi colado (feed, stories, bio, dm…)</div>
-            <div><strong>content</strong> — identificador da peça específica (tipo de destino, ou slug + data — ver detalhe na aba de cada canal)</div>
+            <div><strong>content</strong> — identificador da peça específica (tipo de destino, ou slug + data — ver card "content" abaixo)</div>
           </div>
+          <p className="text-xs text-gray-600 dark:text-zinc-400">
+            <strong>Rótulo PT × valor na URL:</strong> as abas estão em português (Pago, Orgânico), mas o valor que entra na UTM é o que aparece em <code className="font-mono">código</code> (<code className="font-mono">paid</code>, <code className="font-mono">organic</code>). O dropdown da aba Gerar link já preenche o valor certo — você não digita à mão.
+          </p>
+          <div className="bg-gray-50 dark:bg-zinc-800/60 border border-gray-200 dark:border-zinc-700 rounded-lg p-3 text-sm text-gray-700 dark:text-zinc-300">
+            <strong>Por que isso importa:</strong> esses 5 campos viram colunas no Bitrix e alimentam o relatório de funil. Link <strong>sem</strong> UTM (ou com UTM errada) = lead órfão, que ninguém sabe de onde veio — e não dá pra creditar o canal que trouxe a venda.
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ROTEADOR — QUAL ABA USO? */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Não sabe qual aba usar? Pergunte: quem colocou o link no mundo?</h3>
+          <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-zinc-800">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300 w-2/3">Situação</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">Aba</th>
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  { s: "A Turbo postou no canal próprio dela (IG, YouTube, TikTok, LinkedIn)", a: "Orgânico" },
+                  { s: "A Turbo pagou pra aparecer (Meta Ads, Google Ads)", a: "Pago" },
+                  { s: "Um sócio (Victor, André, Rodrigo) postou no canal dele", a: "Sócios" },
+                  { s: "Alguém externo divulgou (cliente, influencer, parceiro, marketplace)", a: "Referral" },
+                  { s: "Disparo ativo pra base própria (email, WhatsApp broadcast, SMS)", a: "CRM" },
+                  { s: "Prospecção fria — lead que nunca interagiu antes", a: "Outbound" },
+                  { s: "Presença ou material em evento (palestra, estande, QR code)", a: "Eventos" },
+                ].map((r) => (
+                  <tr key={r.a} className="border-t border-gray-200 dark:border-zinc-700">
+                    <td className="px-3 py-2 text-gray-700 dark:text-zinc-300">{r.s}</td>
+                    <td className="px-3 py-2 font-semibold text-gray-900 dark:text-white">{r.a}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="text-xs text-gray-500 dark:text-zinc-500">
+            Na dúvida entre dois: o <code className="font-mono">source</code> é sempre a <strong>plataforma técnica de onde o clique saiu</strong>, nunca o nome de uma pessoa, cliente ou ferramenta.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* CONTENT — REGRA CURTA */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">
+            O campo que mais confunde: <code className="font-mono text-base">content</code>
+          </h3>
+          <p className="text-sm text-gray-700 dark:text-zinc-300">O <code className="font-mono">content</code> tem duas lógicas — escolha pela natureza do link:</p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+              <h4 className="font-semibold text-gray-900 dark:text-white text-sm">Link fixo <span className="font-normal text-gray-500 dark:text-zinc-500">(bio, linktree, banner, "Sobre")</span></h4>
+              <p className="text-sm text-gray-700 dark:text-zinc-300 mt-1">→ <code className="font-mono">content</code> = <strong>tipo de destino</strong>, <strong>sem data</strong>.</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">Ex: <code className="font-mono">lp-creators</code>, <code className="font-mono">site-home</code>, <code className="font-mono">whatsapp</code></p>
+            </div>
+            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+              <h4 className="font-semibold text-gray-900 dark:text-white text-sm">Post <span className="font-normal text-gray-500 dark:text-zinc-500">(feed, stories, reels, descrição, DM)</span></h4>
+              <p className="text-sm text-gray-700 dark:text-zinc-300 mt-1">→ <code className="font-mono">content</code> = <strong>nome do post + data</strong>.</p>
+              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">Ex: <code className="font-mono">creators-2026-05-26</code></p>
+            </div>
+          </div>
+          <p className="text-xs text-gray-600 dark:text-zinc-400">
+            <strong>Regra:</strong> não repita no <code className="font-mono">content</code> o que já está no <code className="font-mono">term</code>. Se <code className="font-mono">term=descricao-video</code>, o content é só <code className="font-mono">creators-2026-05-26</code> — não <code className="font-mono">video-creators-…</code>.
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* COMO TESTAR */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Check className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+            Como saber se funcionou
+          </h3>
+          <ul className="text-sm space-y-2 text-gray-700 dark:text-zinc-300">
+            <li>• Depois de <strong>Copiar e salvar</strong>, o link aparece na aba <strong>Histórico</strong> (visível pra todo o time).</li>
+            <li>• Clique no <strong>seu próprio link</strong> uma vez e confirme no <strong>Bitrix</strong> que o registro chegou com a UTM certa (source, medium, campaign…).</li>
+            <li>• Deu errado? Confira se a URL de destino é uma página <strong>tracked</strong> (links <code className="font-mono">wa.me</code> não capturam — use o redirect <code className="font-mono">/wpp</code>).</li>
+          </ul>
         </CardContent>
       </Card>
 
@@ -1552,97 +1634,6 @@ function GuiaFundamentos() {
           <p className="text-xs text-gray-600 dark:text-zinc-400">
             Exemplos: <code className="font-mono">campaign=lancamento-creators-2026-05</code> · link fixo <code className="font-mono">content=lp-creators</code> · post <code className="font-mono">content=ecommerce-2026-05</code>
           </p>
-        </CardContent>
-      </Card>
-
-      {/* BIO VS LINKTREE */}
-      <Card>
-        <CardContent className="p-6 space-y-3">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Bio vs Linktree — qual usar?</h3>
-          <p className="text-sm text-gray-700 dark:text-zinc-300">
-            Os dois existem porque a Turbo usa Linktree no Instagram (e às vezes no TikTok). A regra é simples e depende só de <strong>onde você está colando o link</strong> na hora.
-          </p>
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
-              <h4 className="font-semibold text-gray-900 dark:text-white">
-                <code className="font-mono text-sm">term=bio</code>
-              </h4>
-              <p className="text-sm text-gray-700 dark:text-zinc-300 mt-2">
-                Quando o link com UTM vai <strong>direto na bio do perfil</strong> (campo "site/website" do Instagram/TikTok/LinkedIn). Sem Linktree no meio.
-              </p>
-              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-2">
-                Ex: bio do IG aponta direto pra <code className="font-mono">turbopartners.com.br/creators?utm=…</code>
-              </p>
-            </div>
-            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
-              <h4 className="font-semibold text-gray-900 dark:text-white">
-                <code className="font-mono text-sm">term=linktree</code>
-              </h4>
-              <p className="text-sm text-gray-700 dark:text-zinc-300 mt-2">
-                Quando o link com UTM está cadastrado <strong>dentro da Linktree</strong>. Você está editando a Linktree e colando a URL no campo de algum botão de lá.
-              </p>
-              <p className="text-xs text-gray-500 dark:text-zinc-500 mt-2">
-                Ex: bio do IG aponta pra Linktree, e dentro tem botão "Diagnóstico Creators" com UTM.
-              </p>
-            </div>
-          </div>
-          <p className="text-xs text-gray-600 dark:text-zinc-400">
-            Em qualquer caso, o <code className="font-mono">content</code> identifica o <strong>tipo de destino</strong> do link fixo: <code className="font-mono">lp-creators</code> (landing page), <code className="font-mono">site-home</code> (site institucional). Não use o prefixo antigo <code className="font-mono">link-</code>.
-          </p>
-        </CardContent>
-      </Card>
-
-      {/* BIO COM MÚLTIPLOS LINKS */}
-      <Card>
-        <CardContent className="p-6 space-y-3">
-          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Bio com vários links (até 5 no Instagram)</h3>
-          <p className="text-sm text-gray-700 dark:text-zinc-300">
-            A bio nativa hoje aceita <strong>vários links diretos</strong> (até 5 no Instagram), funcionando como uma mini-Linktree dentro do app. Como todos ficam fisicamente na bio, <strong>todos usam <code className="font-mono">term=bio</code></strong> — o que diferencia cada botão é o <code className="font-mono">content</code> (tipo de destino, sem data, porque é link fixo).
-          </p>
-          <p className="text-sm text-gray-700 dark:text-zinc-300">
-            O <code className="font-mono">campaign</code> fica <code className="font-mono">always-on</code> para botões de presença contínua; só muda quando o botão pertence a uma iniciativa específica (ex: <code className="font-mono">creator-summit-2026</code>).
-          </p>
-          <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-zinc-800">
-                <tr>
-                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">Botão</th>
-                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">campaign</th>
-                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">term</th>
-                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">content</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className="border-t border-gray-200 dark:border-zinc-700">
-                  <td className="px-3 py-2 text-gray-900 dark:text-white">Página Creators</td>
-                  <td className="px-3 py-2 font-mono text-xs">always-on</td>
-                  <td className="px-3 py-2 font-mono text-xs">bio</td>
-                  <td className="px-3 py-2 font-mono text-xs">lp-creators</td>
-                </tr>
-                <tr className="border-t border-gray-200 dark:border-zinc-700">
-                  <td className="px-3 py-2 text-gray-900 dark:text-white">Creator Summit</td>
-                  <td className="px-3 py-2 font-mono text-xs">creator-summit-2026</td>
-                  <td className="px-3 py-2 font-mono text-xs">bio</td>
-                  <td className="px-3 py-2 font-mono text-xs">lp-creator-summit</td>
-                </tr>
-                <tr className="border-t border-gray-200 dark:border-zinc-700">
-                  <td className="px-3 py-2 text-gray-900 dark:text-white">WhatsApp</td>
-                  <td className="px-3 py-2 font-mono text-xs">always-on</td>
-                  <td className="px-3 py-2 font-mono text-xs">bio</td>
-                  <td className="px-3 py-2 font-mono text-xs">whatsapp</td>
-                </tr>
-                <tr className="border-t border-gray-200 dark:border-zinc-700">
-                  <td className="px-3 py-2 text-gray-900 dark:text-white">Site</td>
-                  <td className="px-3 py-2 font-mono text-xs">always-on</td>
-                  <td className="px-3 py-2 font-mono text-xs">bio</td>
-                  <td className="px-3 py-2 font-mono text-xs">site-home</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-gray-700 dark:text-zinc-300">
-            <strong>Atenção WhatsApp:</strong> UTM colada direto num link <code className="font-mono">wa.me</code> / <code className="font-mono">api.whatsapp.com</code> <strong>não rastreia</strong> — o WhatsApp ignora os parâmetros e o lead nunca chega ao Bitrix. Para rastrear o botão de WhatsApp, aponte para uma página de redirect tracked (ex: <code className="font-mono">pages.turbopartners.com.br/wpp?…</code>) que registra a UTM e redireciona pro <code className="font-mono">wa.me</code>.
-          </div>
         </CardContent>
       </Card>
 
@@ -1795,6 +1786,85 @@ function GuiaOrganico() {
         </CardContent>
       </Card>
 
+      {/* BIO VS LINKTREE */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Bio vs Linktree — qual usar?</h3>
+          <p className="text-sm text-gray-700 dark:text-zinc-300">
+            Os dois existem porque a Turbo usa Linktree no Instagram (e às vezes no TikTok). A regra depende só de <strong>onde você está colando o link</strong> na hora.
+          </p>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+              <h4 className="font-semibold text-gray-900 dark:text-white">
+                <code className="font-mono text-sm">term=bio</code>
+              </h4>
+              <p className="text-sm text-gray-700 dark:text-zinc-300 mt-2">
+                Quando o link com UTM vai <strong>direto na bio do perfil</strong> (campo "site/website" do Instagram/TikTok/LinkedIn). Sem Linktree no meio.
+              </p>
+            </div>
+            <div className="border border-gray-200 dark:border-zinc-700 rounded-lg p-3 bg-white dark:bg-zinc-900">
+              <h4 className="font-semibold text-gray-900 dark:text-white">
+                <code className="font-mono text-sm">term=linktree</code>
+              </h4>
+              <p className="text-sm text-gray-700 dark:text-zinc-300 mt-2">
+                Quando o link com UTM está cadastrado <strong>dentro da Linktree</strong>. Você está editando a Linktree e colando a URL no campo de algum botão de lá.
+              </p>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* BIO COM MÚLTIPLOS LINKS */}
+      <Card>
+        <CardContent className="p-6 space-y-3">
+          <h3 className="text-lg font-bold text-gray-900 dark:text-white">Bio com vários links (até 5 no Instagram)</h3>
+          <p className="text-sm text-gray-700 dark:text-zinc-300">
+            A bio nativa hoje aceita <strong>vários links diretos</strong> (até 5 no Instagram), tipo uma mini-Linktree dentro do app. Como todos ficam fisicamente na bio, <strong>todos usam <code className="font-mono">term=bio</code></strong> — o que diferencia cada botão é o <code className="font-mono">content</code> (tipo de destino, sem data, porque é link fixo). O <code className="font-mono">campaign</code> fica <code className="font-mono">always-on</code>, mudando só quando o botão pertence a uma iniciativa (ex: <code className="font-mono">creator-summit-2026</code>).
+          </p>
+          <div className="border border-gray-200 dark:border-zinc-700 rounded-lg overflow-hidden">
+            <table className="w-full text-sm">
+              <thead className="bg-gray-50 dark:bg-zinc-800">
+                <tr>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">Botão</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">campaign</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">term</th>
+                  <th className="text-left px-3 py-2 font-semibold text-gray-700 dark:text-zinc-300">content</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">Página Creators</td>
+                  <td className="px-3 py-2 font-mono text-xs">always-on</td>
+                  <td className="px-3 py-2 font-mono text-xs">bio</td>
+                  <td className="px-3 py-2 font-mono text-xs">lp-creators</td>
+                </tr>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">Creator Summit</td>
+                  <td className="px-3 py-2 font-mono text-xs">creator-summit-2026</td>
+                  <td className="px-3 py-2 font-mono text-xs">bio</td>
+                  <td className="px-3 py-2 font-mono text-xs">lp-creator-summit</td>
+                </tr>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">WhatsApp</td>
+                  <td className="px-3 py-2 font-mono text-xs">always-on</td>
+                  <td className="px-3 py-2 font-mono text-xs">bio</td>
+                  <td className="px-3 py-2 font-mono text-xs">whatsapp</td>
+                </tr>
+                <tr className="border-t border-gray-200 dark:border-zinc-700">
+                  <td className="px-3 py-2 text-gray-900 dark:text-white">Site</td>
+                  <td className="px-3 py-2 font-mono text-xs">always-on</td>
+                  <td className="px-3 py-2 font-mono text-xs">bio</td>
+                  <td className="px-3 py-2 font-mono text-xs">site-home</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <div className="bg-amber-50 dark:bg-amber-950/40 border border-amber-200 dark:border-amber-800 rounded-lg p-3 text-sm text-gray-700 dark:text-zinc-300">
+            <strong>Atenção WhatsApp:</strong> UTM colada direto num link <code className="font-mono">wa.me</code> / <code className="font-mono">api.whatsapp.com</code> <strong>não rastreia</strong> — o WhatsApp ignora os parâmetros e o lead nunca chega ao Bitrix. Para rastrear o botão de WhatsApp, aponte para uma página de redirect tracked (ex: <code className="font-mono">pages.turbopartners.com.br/wpp?…</code>) que registra a UTM e redireciona pro <code className="font-mono">wa.me</code>.
+          </div>
+        </CardContent>
+      </Card>
+
       <ProibicoesCanal
         items={[
           <>Nunca <code className="font-mono">ig</code> ou <code className="font-mono">fb</code> — Instagram orgânico é sempre <code className="font-mono">instagram</code>.</>,
@@ -1812,7 +1882,7 @@ function GuiaPaga() {
   return (
     <div className="space-y-6">
       <CanalHeader
-        titulo="Mídia Paga (Meta, Google, YouTube Ads)"
+        titulo="Pago (Meta, Google, YouTube Ads)"
         times={["Mídia/Tráfego"]}
         resumo="Você NÃO escreve UTM à mão. As plataformas substituem os tokens automaticamente no momento do clique. Configura-se uma vez por conta."
       />
