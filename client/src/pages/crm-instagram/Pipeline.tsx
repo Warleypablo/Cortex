@@ -13,9 +13,10 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
-  MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, Tag, StickyNote,
+  MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, Tag, StickyNote, History,
 } from "lucide-react";
-import { QUALIFICATION_TAGS, TAG_LABELS, type QualificationTag } from "@shared/crmInstagramTags";
+import { QUALIFICATION_TAGS, TAG_LABELS, BLOCKING_TAGS, type QualificationTag } from "@shared/crmInstagramTags";
+import { HistoryPanel } from "./LeadHistory";
 
 type Profile = {
   id: number;
@@ -59,10 +60,10 @@ function initials(name: string | null): string {
   return ((parts[0]?.[0] || "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase() || "?";
 }
 
-// Cor do score (qualificação): verde quente → cinza frio.
+// Cor do score (qualificação): verde alto → cinza baixo. Escala aditiva (soma de pontos).
 function scoreColor(score: number): string {
-  if (score >= 70) return "bg-emerald-600 text-white";
-  if (score >= 40) return "bg-amber-500 text-white";
+  if (score >= 10) return "bg-emerald-600 text-white";
+  if (score >= 5) return "bg-amber-500 text-white";
   return "bg-gray-300 dark:bg-zinc-700 text-gray-700 dark:text-zinc-300";
 }
 
@@ -183,6 +184,8 @@ function ProfileCard({
 }) {
   const lockedByOther = p.isLocked && p.lockedBy && p.lockedBy !== meId;
   const idx = STAGES.findIndex((s) => s.key === p.stage);
+  const [showHistory, setShowHistory] = useState(false);
+  const igHandle = p.igUsername;
 
   return (
     <div
@@ -199,7 +202,20 @@ function ProfileCard({
             >
               {p.score}
             </span>
-            <span className="font-medium text-gray-900 dark:text-white truncate">{profileLabel(p)}</span>
+            {igHandle ? (
+              <a
+                href={`https://instagram.com/${igHandle}`}
+                target="_blank"
+                rel="noreferrer"
+                onClick={(e) => e.stopPropagation()}
+                className="font-medium text-gray-900 dark:text-white truncate hover:text-blue-600 dark:hover:text-blue-400 hover:underline"
+                title={`Abrir @${igHandle} no Instagram`}
+              >
+                {profileLabel(p)}
+              </a>
+            ) : (
+              <span className="font-medium text-gray-900 dark:text-white truncate">{profileLabel(p)}</span>
+            )}
             <span title={p.temperature}>{TEMP_EMOJI[p.temperature]}</span>
           </div>
           <div className="text-xs text-gray-500 dark:text-zinc-400">
@@ -215,10 +231,14 @@ function ProfileCard({
 
       <div className="mt-2 flex flex-wrap gap-1">
         {p.dmCount > 0 && (
-          <Badge variant="secondary" className="gap-1"><Mail className="h-3 w-3" />DM {p.dmCount}</Badge>
+          <Badge variant="secondary" className="gap-1" title={`${p.dmCount} mensagem(ns) direta(s)`}>
+            <Mail className="h-3 w-3" />{p.dmCount} {p.dmCount === 1 ? "DM" : "DMs"}
+          </Badge>
         )}
         {p.commentCount > 0 && (
-          <Badge variant="secondary" className="gap-1"><MessageCircle className="h-3 w-3" />{p.commentCount}</Badge>
+          <Badge variant="secondary" className="gap-1" title={`${p.commentCount} comentário(s)`}>
+            <MessageCircle className="h-3 w-3" />{p.commentCount} {p.commentCount === 1 ? "coment." : "coments."}
+          </Badge>
         )}
         {p.isExistingContact && (
           <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white gap-1">
@@ -247,7 +267,7 @@ function ProfileCard({
       </div>
 
       <div className="mt-3 flex flex-wrap items-center gap-1.5">
-        {p.ghlContactId && p.ghlLocationId ? (
+        {p.ghlContactId && p.ghlLocationId && (
           // Lead com conversa no GHL: SDR responde dentro do GHL (sem logar no IG).
           <Button size="sm" className="h-7 text-xs gap-1 bg-blue-600 hover:bg-blue-700 text-white" asChild>
             <a
@@ -258,14 +278,15 @@ function ProfileCard({
               <MessageCircle className="h-3 w-3" />Responder no GHL
             </a>
           </Button>
-        ) : p.igUsername ? (
-          // Lead só de comentário: sem thread no GHL → abre o perfil no Instagram.
+        )}
+        {igHandle && (
+          // Tem @handle (lead de comentário): abre o perfil no Instagram.
           <Button size="sm" variant="outline" className="h-7 text-xs gap-1" asChild>
-            <a href={`https://instagram.com/${p.igUsername}`} target="_blank" rel="noreferrer">
-              <ExternalLink className="h-3 w-3" />Abrir no Instagram
+            <a href={`https://instagram.com/${igHandle}`} target="_blank" rel="noreferrer">
+              <ExternalLink className="h-3 w-3" />Instagram
             </a>
           </Button>
-        ) : null}
+        )}
         {!p.ownerUserId ? (
           <Button size="sm" variant="ghost" className="h-7 text-xs" title="Pegar e travar pra mim por 15min" onClick={onClaim}>Pegar</Button>
         ) : p.ownerUserId === meId ? (
@@ -283,7 +304,17 @@ function ProfileCard({
         {p.stage === "negocio" && !p.bitrixDealId && (
           <Button size="sm" variant="default" className="h-7 text-xs" onClick={onBitrix}>Criar no Bitrix</Button>
         )}
+        <Button
+          size="sm" variant="ghost"
+          className={`h-7 text-xs gap-1 ${showHistory ? "text-gray-700 dark:text-zinc-300" : "text-gray-400"}`}
+          title="Ver histórico de interações"
+          onClick={() => setShowHistory((s) => !s)}
+        >
+          <History className="h-3 w-3" />Histórico
+        </Button>
       </div>
+
+      {showHistory && <HistoryPanel id={p.id} />}
 
       {p.observacao && (
         <p className="mt-2 flex gap-1 text-xs text-gray-500 dark:text-zinc-400 italic">
@@ -352,7 +383,7 @@ function QualifyMenu({ current, onQualify }: { current: QualificationTag | null;
               onClick={() => { onQualify(t); setOpen(false); }}
             >
               {TAG_LABELS[t]}
-              {(t === "colaborador" || t === "desqualificado") && <span className="text-gray-400"> · some do pipeline</span>}
+              {BLOCKING_TAGS.includes(t) && <span className="text-gray-400"> · some do pipeline</span>}
             </button>
           ))}
           {current && (
