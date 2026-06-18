@@ -2681,6 +2681,17 @@ export async function initializeCrmInstagramTables(): Promise<void> {
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_ig_username ON cortex_core.prospecting_profiles (ig_username)`);
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS uq_prospect_ghl_contact ON cortex_core.prospecting_profiles (ghl_contact_id)`);
 
+    // Config do lead scoring (linha única id=1, JSONB). Vazio = usa DEFAULT_SCORING_CONFIG.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.crm_instagram_scoring_config (
+        id         INTEGER PRIMARY KEY DEFAULT 1,
+        config     JSONB NOT NULL,
+        updated_by TEXT,
+        updated_at TIMESTAMPTZ DEFAULT NOW(),
+        CONSTRAINT crm_ig_scoring_singleton CHECK (id = 1)
+      )
+    `);
+
     console.log('[database] CRM Instagram tables initialized');
   } catch (error) {
     console.error('[database] erro ao inicializar CRM Instagram tables:', error);
