@@ -69,7 +69,7 @@ function razao(num: number | null, den: number | null): number | null {
   return num / den;
 }
 
-export async function montarRevenue({ db, orcado, vendasMrrPorMes, mesCorrente, mesFechado }: Deps): Promise<{ linhas: Linha[]; ponteMrr: Linha[] }> {
+export async function montarRevenue({ db, orcado, vendasMrrPorMes, mesCorrente, mesFechado }: Deps): Promise<Linha[]> {
   // snapshots fim de mês: índice 0 = dez/2025 (denominador do churn de janeiro), 1..12 = 2026
   const snapResult = await db.execute(sql`
     WITH alvo AS (
@@ -248,68 +248,5 @@ export async function montarRevenue({ db, orcado, vendasMrrPorMes, mesCorrente, 
       : { ...vTot, atingimento: calcAtingimento(vTot.orcado, vTot.realizado) },
   });
 
-  // Ponte do MRR consolidada: totais por mês a partir do snap (0 = dez/2025) e do churn.
-  const mrrTotal: Record<number, number> = {};
-  for (let m = 0; m <= 12; m++) {
-    mrrTotal[m] = LINHAS_SERVICO.reduce((acc, { chave }) => acc + (snap[chave]?.[m]?.mrr ?? 0), 0);
-  }
-  const churnTotal: Record<number, number> = {};
-  for (let m = 1; m <= 12; m++) {
-    churnTotal[m] = LINHAS_SERVICO.reduce((acc, { chave }) => acc + (churnRs[chave]?.[m] ?? 0), 0);
-  }
-  const ponteMrr = montarPonteMrr(mrrTotal, churnTotal, vendasMrrPorMes, mesCorrente, mesFechado);
-
-  return { linhas, ponteMrr };
-}
-
-const NOTA_PONTE_INI =
-  "MRR ativo no fim do mês anterior (posição de abertura). Janeiro abre com dez/2025.";
-const NOTA_PONTE_DELTA =
-  "Fecha a ponte: MRR final − inicial − vendas + churn. Captura o que vazou sem virar churn " +
-  "declarado (downgrades, reajustes, vendas não ativadas; abonados já entram no churn bruto).";
-
-// Ponte do MRR consolidada (só realizado). mrrTotal indexado 0..12 (0 = dez/2025);
-// churnTotal e vendasMrr indexados 1..12. Fecha: ini + vendas − churn + delta = fim.
-export function montarPonteMrr(
-  mrrTotal: Record<number, number>,
-  churnTotal: Record<number, number>,
-  vendasMrr: Record<number, number>,
-  mesCorrente: number,
-  mesFechado: number,
-): Linha[] {
-  const ini = (m: number) => mrrTotal[m - 1] ?? 0;
-  const fim = (m: number) => mrrTotal[m] ?? 0;
-  const ven = (m: number) => vendasMrr[m] ?? 0;
-  const chu = (m: number) => churnTotal[m] ?? 0;
-  const delta = (m: number) => fim(m) - ini(m) - ven(m) + chu(m);
-
-  const serie = (f: (m: number) => number) =>
-    Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? f(i + 1) : null));
-  const sumYtd = (f: (m: number) => number): number | null => {
-    if (mesFechado === 0) return null;
-    let s = 0;
-    for (let m = 1; m <= mesFechado; m++) s += f(m);
-    return s;
-  };
-
-  const mk = (
-    metrica: string,
-    titulo: string,
-    tipoAgregacao: "fluxo" | "estoque",
-    s: (number | null)[],
-    ytdReal: number | null,
-    extra: Partial<Linha> = {},
-  ): Linha => ({
-    metrica, titulo, tipoAgregacao, direcao: "neutro", unidade: "brl", ...extra,
-    meses: s.map((r, i) => ({ mes: i + 1, orcado: 0, realizado: r, atingimento: null })),
-    ytd: { orcado: 0, realizado: mesFechado === 0 ? null : ytdReal, atingimento: null },
-  });
-
-  return [
-    mk("ponte_mrr_ini", "(=) MRR inicial", "estoque", serie(ini), ini(1), { nota: NOTA_PONTE_INI }),
-    mk("ponte_mrr_vendas", "(+) Vendas MRR", "fluxo", serie(ven), sumYtd(ven)),
-    mk("ponte_mrr_churn", "(−) Churn", "fluxo", serie((m) => -chu(m)), sumYtd((m) => -chu(m))),
-    mk("ponte_mrr_delta", "(±) Δ não explicado", "fluxo", serie(delta), sumYtd(delta), { nota: NOTA_PONTE_DELTA }),
-    mk("ponte_mrr_fim", "(=) MRR final", "estoque", serie(fim), mesFechado === 0 ? null : fim(mesFechado), { destaque: true }),
-  ];
+  return linhas;
 }
