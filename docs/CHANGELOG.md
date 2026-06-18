@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-06-18 | feat(relatorio-mensal): remove slide "Tópicos de Discussão"
+
+**O que foi feito:**
+- Removido o slide `SlideTopicosDiscussao` do Reporte Mensal: tirado de `FIXED_SLIDE_NAMES`, removido o `case` do switch de render e o import; componente `SlideTopicosDiscussao.tsx` deletado (não usado em mais nenhum lugar).
+- Switch reajustado: Turbo Store → `case 22`, Frase → `23`, Q&A → `24`. Deck passa de 32 para 31 slides; Turbo Store fica logo antes do fechamento.
+
+**Por que:**
+- Solicitado: a aba de tópicos de discussão não é mais necessária no reporte.
+
+**Arquivos alterados:**
+- `client/src/pages/RelatorioMensal.tsx` - removido do array, switch e import
+- `client/src/pages/relatorio-mensal/SlideTopicosDiscussao.tsx` (deletado)
+
+**Impacto arquitetural:** Nenhum.
+
 ## 2026-06-18 | feat(relatorio-mensal): slide "Turbo Store" antes do fechamento
 
 **O que foi feito:**
