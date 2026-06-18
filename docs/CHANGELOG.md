@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-06-18 | style(relatorio-mensal): slide Pontual preenche o espaço após remoção do bloco
+
+**O que foi feito:**
+- A "Linha 2" do slide Pontual (gráfico "Entregas por Produto × Mês" + lista "Em Aberto por Serviço") passou de altura fixa (`260px`) para `flex-1 min-h-0` + `grid-rows-1`, ocupando o espaço que sobrou após a remoção do bloco "Tempo Médio de Entrega por Produto".
+
+**Por que:**
+- Sem o bloco removido, a tela ficava com um vazio grande embaixo; agora os dois gráficos enquadram e preenchem o slide.
+
+**Arquivos alterados:**
+- `client/src/pages/relatorio-mensal/SlidePontual.tsx`
+
+**Impacto arquitetural:** Nenhum — ajuste de layout.
+
 ## 2026-06-18 | feat(relatorio-mensal): remove "Tempo Médio de Entrega por Produto" do slide Pontual
 
 **O que foi feito:**
