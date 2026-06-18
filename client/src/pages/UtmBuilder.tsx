@@ -1932,7 +1932,7 @@ function GuiaEventos() {
           <><code className="font-mono">campaign</code> = tipo + ano (ex: <code className="font-mono">presencial-2026</code>, <code className="font-mono">workshop-online-2026-11</code>)</>,
           <><code className="font-mono">term</code> = mecanismo do clique: <code className="font-mono">palestra</code>, <code className="font-mono">estande</code>, <code className="font-mono">qrcode-cracha</code>, <code className="font-mono">material-impresso</code></>,
           <><code className="font-mono">content</code> = ação específica (ex: <code className="font-mono">slide-final-cta</code>, <code className="font-mono">mesa-recepcao</code>)</>,
-          <>Clique em <strong>Copiar e salvar</strong> e gere o QR Code a partir do link.</>,
+          <>Clique em <strong>Copiar e salvar</strong>. <span className="text-gray-500 dark:text-zinc-500">(Encurtar o link / gerar QR Code fica por sua conta por enquanto — sem ferramenta oficial ainda.)</span></>,
         ]}
       />
       <Exemplos>
