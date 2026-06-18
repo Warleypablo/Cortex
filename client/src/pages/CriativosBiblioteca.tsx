@@ -4,7 +4,6 @@ import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Select,
   SelectContent,
@@ -20,7 +19,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, X, ExternalLink, Loader2, Pencil } from "lucide-react";
+import { Plus, Search, X, ExternalLink, Loader2, Pencil, Trash2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import {
@@ -36,20 +35,33 @@ import {
   useCreativesList,
   useCreativeOptions,
   useBulkUpdateCreatives,
+  useUpdateCreative,
+  useDeleteCreative,
+  useCreativeMetricsByTp,
   type Creative,
 } from "@/hooks/useCreatives";
 import { CreativeFormSheet } from "@/components/criativos/biblioteca/CreativeFormSheet";
+import {
+  InlineText,
+  InlineSelect,
+  InlineDate,
+  InlineValidado,
+} from "@/components/criativos/biblioteca/InlineCells";
+import { formatCurrency, formatPercent, formatDecimal } from "@/lib/utils";
 
 const PAGE_SIZE = 50;
 
-function formatDateBr(iso: string | Date | null | undefined): string {
-  if (!iso) return "—";
-  const d = typeof iso === "string" ? new Date(iso) : iso;
-  if (isNaN(d.getTime())) return "—";
-  const dd = String(d.getUTCDate()).padStart(2, "0");
-  const mm = String(d.getUTCMonth() + 1).padStart(2, "0");
-  const yy = String(d.getUTCFullYear()).slice(-2);
-  return `${dd}/${mm}/${yy}`;
+function MetricCell({
+  value,
+  format,
+}: {
+  value: number | null | undefined;
+  format: (n: number) => string;
+}) {
+  if (value === null || value === undefined) {
+    return <span className="text-gray-300 dark:text-zinc-600">—</span>;
+  }
+  return <span className="tabular-nums">{format(value)}</span>;
 }
 
 export default function CriativosBiblioteca() {
@@ -72,7 +84,29 @@ export default function CriativosBiblioteca() {
   const [bulkEditOpen, setBulkEditOpen] = useState(false);
   const [bulkPatch, setBulkPatch] = useState<Record<string, string>>({});
   const bulkUpdate = useBulkUpdateCreatives();
+  const updateCreative = useUpdateCreative();
+  const deleteCreative = useDeleteCreative();
+  const { data: metricsByTp } = useCreativeMetricsByTp();
   const { toast } = useToast();
+
+  const patchField = (id: number, patch: Partial<Creative>) => {
+    updateCreative.mutate(
+      { id, patch: patch as any },
+      {
+        onError: (e: any) =>
+          toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" }),
+      },
+    );
+  };
+
+  const handleDelete = (row: Creative) => {
+    if (!window.confirm(`Apagar o criativo ${row.tpId}? Esta ação não pode ser desfeita.`)) return;
+    deleteCreative.mutate(row.id, {
+      onSuccess: () => toast({ title: `${row.tpId} apagado` }),
+      onError: (e: any) =>
+        toast({ title: "Erro ao apagar", description: e.message, variant: "destructive" }),
+    });
+  };
 
   const toggleRow = (id: number) =>
     setSelectedIds((prev) => {
@@ -263,18 +297,28 @@ export default function CriativosBiblioteca() {
                   </TableHead>
                   <TableHead className="w-[80px] sticky left-0 bg-background z-10">TP</TableHead>
                   <TableHead className="min-w-[200px]">Nome Drive</TableHead>
-                  <TableHead className="min-w-[120px]">Personagem</TableHead>
-                  <TableHead className="min-w-[120px]">Produto</TableHead>
-                  <TableHead className="min-w-[120px]">Data Postagem</TableHead>
-                  <TableHead className="min-w-[260px]">Nome Final</TableHead>
-                  <TableHead className="w-[100px]">Status</TableHead>
-                  <TableHead className="w-[60px]"></TableHead>
+                  <TableHead className="min-w-[130px]">Personagem</TableHead>
+                  <TableHead className="min-w-[130px]">Produto</TableHead>
+                  <TableHead className="min-w-[130px]">Ângulo</TableHead>
+                  <TableHead className="min-w-[150px]">Data Postagem</TableHead>
+                  <TableHead className="min-w-[240px]">Nome Final</TableHead>
+                  <TableHead className="w-[110px]">Status</TableHead>
+                  <TableHead className="text-right min-w-[90px]">Video Hook</TableHead>
+                  <TableHead className="text-right min-w-[90px]">Video Hold</TableHead>
+                  <TableHead className="text-right min-w-[70px]">CTR</TableHead>
+                  <TableHead className="text-right min-w-[110px]">Investimento</TableHead>
+                  <TableHead className="text-right min-w-[70px]">Leads</TableHead>
+                  <TableHead className="text-right min-w-[70px]">MQLs</TableHead>
+                  <TableHead className="text-right min-w-[80px]">% MQL</TableHead>
+                  <TableHead className="text-right min-w-[70px]">Vendas</TableHead>
+                  <TableHead className="text-right min-w-[100px]">CAC</TableHead>
+                  <TableHead className="w-[80px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-8">
+                    <TableCell colSpan={19} className="text-center py-8">
                       <Loader2 className="h-5 w-5 animate-spin inline mr-2" />
                       Carregando...
                     </TableCell>
@@ -287,13 +331,14 @@ export default function CriativosBiblioteca() {
                     </TableCell>
                   </TableRow>
                 )}
-                {(data?.rows ?? []).map((row) => (
+                {(data?.rows ?? []).map((row) => {
+                  const m = metricsByTp?.get(row.tpId);
+                  return (
                   <TableRow
                     key={row.id}
-                    className="cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800"
-                    onClick={() => setFormState({ mode: "edit", creative: row })}
+                    className="hover:bg-gray-50 dark:hover:bg-zinc-800"
                   >
-                    <TableCell onClick={(e) => e.stopPropagation()}>
+                    <TableCell>
                       <Checkbox
                         checked={selectedIds.has(row.id)}
                         onCheckedChange={() => toggleRow(row.id)}
@@ -302,34 +347,98 @@ export default function CriativosBiblioteca() {
                     <TableCell className="font-mono sticky left-0 bg-background z-10">
                       {row.tpId}
                     </TableCell>
-                    <TableCell className="font-medium">{row.nomeDrive}</TableCell>
-                    <TableCell>{row.personagem || "—"}</TableCell>
-                    <TableCell>{row.produto || "—"}</TableCell>
-                    <TableCell>{formatDateBr(row.dataPostagem)}</TableCell>
+                    <TableCell className="font-medium">
+                      <InlineText
+                        value={row.nomeDrive}
+                        onCommit={(v) => patchField(row.id, { nomeDrive: v ?? "" })}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <InlineSelect
+                        value={row.personagem}
+                        options={options?.personagem ?? []}
+                        onCommit={(v) => patchField(row.id, { personagem: v })}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <InlineSelect
+                        value={row.produto}
+                        options={options?.produto ?? []}
+                        onCommit={(v) => patchField(row.id, { produto: v })}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <InlineText
+                        value={row.angulo}
+                        onCommit={(v) => patchField(row.id, { angulo: v })}
+                      />
+                    </TableCell>
+                    <TableCell>
+                      <InlineDate
+                        value={row.dataPostagem}
+                        onCommit={(v) => patchField(row.id, { dataPostagem: v })}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-xs">{row.nomeFinal}</TableCell>
                     <TableCell>
-                      {row.adValidado ? (
-                        <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                          Validado
-                        </Badge>
-                      ) : (
-                        <Badge variant="outline">Pendente</Badge>
-                      )}
+                      <InlineValidado
+                        value={row.adValidado}
+                        onCommit={(v) => patchField(row.id, { adValidado: v })}
+                      />
                     </TableCell>
-                    <TableCell onClick={(e) => e.stopPropagation()}>
-                      {row.linkDrive && (
-                        <a
-                          href={row.linkDrive}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                    <TableCell className="text-right">
+                      <MetricCell value={m?.videoHook} format={(n) => formatPercent(n, 1)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MetricCell value={m?.videoHold} format={(n) => formatPercent(n, 1)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MetricCell value={m?.ctr} format={(n) => formatPercent(n, 2)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MetricCell value={m?.investimento} format={formatCurrency} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MetricCell value={m?.leads} format={(n) => formatDecimal(n, 0)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MetricCell value={m?.mql} format={(n) => formatDecimal(n, 0)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MetricCell value={m?.percMql} format={(n) => formatPercent(n, 1)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MetricCell value={m?.vendas} format={(n) => formatDecimal(n, 0)} />
+                    </TableCell>
+                    <TableCell className="text-right">
+                      <MetricCell value={m?.cacGeral} format={formatCurrency} />
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex items-center gap-1">
+                        {row.linkDrive && (
+                          <a
+                            href={row.linkDrive}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                            title="Abrir no Drive"
+                          >
+                            <ExternalLink className="h-4 w-4" />
+                          </a>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => handleDelete(row)}
+                          className="text-gray-400 hover:text-red-600 dark:hover:text-red-400"
+                          title="Apagar criativo"
                         >
-                          <ExternalLink className="h-4 w-4" />
-                        </a>
-                      )}
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
           </div>

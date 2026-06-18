@@ -151,7 +151,7 @@ function zeros(): RawTotals {
   };
 }
 
-function sumRaw(rows: CriativoData[]): RawTotals {
+export function sumRaw(rows: CriativoData[]): RawTotals {
   const t = zeros();
   for (const r of rows) {
     t.investimento += r.investimento || 0;
@@ -197,7 +197,7 @@ const r1 = (v: number) => parseFloat(v.toFixed(1));
 const r2 = (v: number) => parseFloat(v.toFixed(2));
 
 /** Recalcula as métricas derivadas a partir das somas dos contadores brutos. */
-function computeDerived(t: RawTotals) {
+export function computeDerived(t: RawTotals) {
   const inv = t.investimento;
   const receita = t.receitaPontual + t.receitaRecorrente;
   return {

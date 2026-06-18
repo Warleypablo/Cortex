@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import type { CreativeLibraryItem } from "@shared/schema";
+import { sumRaw, computeDerived, type CriativoData } from "@/lib/criativosMetrics";
 
 export type Creative = CreativeLibraryItem;
 
@@ -139,6 +140,55 @@ export function useDeleteCreative() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/growth/creatives"] });
+    },
+  });
+}
+
+// ============== Performance por TP (lifetime) ==============
+// Métricas de anúncio (Meta/Google/TikTok) agregadas por TP do criativo.
+// Casamento: o adName do anúncio começa com o TP (nomeFinal = "{TP} - {nomeDrive} - {data}").
+export type CreativeMetrics = ReturnType<typeof computeDerived>;
+
+const TP_RE = /^(TP\d+)\b/i;
+
+export function tpFromAdName(adName: string | null | undefined): string | null {
+  if (!adName) return null;
+  const m = adName.match(TP_RE);
+  return m ? m[1].toUpperCase() : null;
+}
+
+export function useCreativeMetricsByTp() {
+  return useQuery<Map<string, CreativeMetrics>>({
+    queryKey: ["/api/growth/criativos", "biblioteca-lifetime"],
+    staleTime: 5 * 60 * 1000,
+    queryFn: async () => {
+      // Lifetime: janela bem ampla cobre todo o histórico do anúncio.
+      const params = new URLSearchParams({
+        startDate: "2020-01-01",
+        endDate: "2030-12-31",
+        plataforma: "Todos",
+        status: "Todos",
+      });
+      const res = await fetch(`/api/growth/criativos?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Falha ao carregar métricas dos criativos");
+      const rows = (await res.json()) as CriativoData[];
+
+      const byTp = new Map<string, CriativoData[]>();
+      for (const row of rows) {
+        const tp = tpFromAdName(row.adName);
+        if (!tp) continue;
+        const arr = byTp.get(tp);
+        if (arr) arr.push(row);
+        else byTp.set(tp, [row]);
+      }
+
+      const out = new Map<string, CreativeMetrics>();
+      byTp.forEach((tpRows, tp) => {
+        out.set(tp, computeDerived(sumRaw(tpRows)));
+      });
+      return out;
     },
   });
 }
