@@ -394,6 +394,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         `),
 
         // 11. Churn (cup_churn curada) e Pausados (cup_contratos) no mês de dados
+        // Churn do slide Turbo Commerce INCLUI abonados (sem filtro abonar_churn) — decisão de 2026-06-18.
+        // Mantém de fora apenas os 3 motivos que não são churn de cliente estabelecido.
         db.execute(sql`
           WITH churn_data AS (
             SELECT
@@ -403,7 +405,6 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             WHERE data_solicitacao_encerramento IS NOT NULL
               AND data_solicitacao_encerramento >= ${dataStart}
               AND data_solicitacao_encerramento < ${dataEnd}
-              AND COALESCE(abonar_churn, '') != 'Sim'
               AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           ),
           pausados_data AS (
@@ -540,6 +541,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             GROUP BY ms.month
           ),
           churn_mensal AS (
+            -- Série do gráfico Faturamento x Churn (Turbo Commerce): INCLUI abonados (sem filtro
+            -- abonar_churn), alinhado ao card Cancelados. Mantém de fora os 3 motivos não-churn.
             SELECT
               TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as month,
               COALESCE(SUM(valor_r), 0) as churn_brl
@@ -547,7 +550,6 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             WHERE data_solicitacao_encerramento IS NOT NULL
               AND data_solicitacao_encerramento >= dr.range_start
               AND data_solicitacao_encerramento < dr.range_end
-              AND COALESCE(abonar_churn, '') != 'Sim'
               AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
             GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM')
           ),
