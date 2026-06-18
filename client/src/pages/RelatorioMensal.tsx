@@ -38,8 +38,8 @@ import SlideCustom from "./relatorio-mensal/SlideCustom";
 
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
-  "Faturamento YTD", "Vendas YTD", "Vendas CX & Upsell",
-  "Capa Comercial", "Ranking Closers",
+  "Faturamento YTD",
+  "Capa Comercial", "Vendas YTD", "Vendas CX & Upsell", "Ranking Closers",
   "Ranking SDRs", "Contratos", "Capa Commerce", "Ranking Squads", "Squad Details", "Top Operadores", "Turbo Commerce",
   "Pontual", "Entregas Pontuais Commerce",
   "NPS",
@@ -287,9 +287,9 @@ export default function RelatorioMensal() {
       case 2:  return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
       case 3:  return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
       case 4:  return <SlideFaturamentoYtd data={data.faturamentoYtd} mesLabel={data.mesDadosLabel} />;
-      case 5:  return <SlideVendasYtd vendasSeries={data.contratosMes.vendasSeries} mesLabel={data.mesDadosLabel} />;
-      case 6:  return <SlideVendasCxUpsell metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 7:  return <SlideCapaComercial />;
+      case 5:  return <SlideCapaComercial />;
+      case 6:  return <SlideVendasYtd vendasSeries={data.contratosMes.vendasSeries} mesLabel={data.mesDadosLabel} />;
+      case 7:  return <SlideVendasCxUpsell metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
       case 8:  return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
       case 9:  return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
       case 10: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
