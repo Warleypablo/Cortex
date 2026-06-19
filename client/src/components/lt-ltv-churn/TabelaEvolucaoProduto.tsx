@@ -103,14 +103,18 @@ export function TabelaEvolucaoProduto({
                     <td className="sticky left-0 z-10 bg-white px-3 py-2 text-left text-gray-900 dark:bg-zinc-900 dark:text-white">
                       {produto}
                     </td>
-                    {data.meses.map((mes) => (
-                      <td
-                        key={mes}
-                        className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-700 dark:text-zinc-300"
-                      >
-                        {formatCell(data.celulas[produto]?.[mes]?.[campo])}
-                      </td>
-                    ))}
+                    {data.meses.map((mes) => {
+                      const cell = data.celulas[produto]?.[mes];
+                      return (
+                        <td
+                          key={mes}
+                          title={cell ? `n=${cell.n}` : undefined}
+                          className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-gray-700 dark:text-zinc-300"
+                        >
+                          {formatCell(cell?.[campo])}
+                        </td>
+                      );
+                    })}
                   </tr>
                 );
               })}
