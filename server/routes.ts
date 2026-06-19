@@ -9,6 +9,7 @@ import { createUserSchema, updatePermissionsSchema, updateRoleSchema } from "./m
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser } from "./auth/userDb";
 import { db } from "./db";
 import { sql, type SQL } from "drizzle-orm";
+import { computeEvolucaoChurn } from "./investorsReport/churn";
 import { analyzeDfc, chatWithDfc, type ChatMessage } from "./services/dfcAnalysis";
 import { chat as unifiedAssistantChat } from "./services/unifiedAssistant";
 import type { UnifiedAssistantRequest, AssistantContext } from "@shared/schema";
@@ -3440,8 +3441,59 @@ Estruture sua resposta em:
         SELECT r.faturamento_ano, r.faturamento_fechado, r.inadimplencia_ano, r.meses_fechados, d.despesas_fechado
         FROM receita r, despesa d
       `);
-      
-      
+
+      // Evolução do churn (cup_churn) — churn BRUTO alinhado ao ClickUp:
+      // valor_r > 0 e status de churn real (cancelado/inativo + em cancelamento),
+      // SEM filtros de abono/motivo. Mesma definição usada pelo BP 2026.
+      const churnResult = await db.execute(sql`
+        SELECT TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') AS mes,
+               COALESCE(SUM(valor_r), 0) AS mrr_churn,
+               COUNT(*) AS qtd
+        FROM "Clickup".cup_churn
+        WHERE valor_r > 0
+          AND status IN ('cancelado/inativo', 'em cancelamento')
+          AND data_solicitacao_encerramento IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
+      // Denominador da taxa de churn: MRR ativo do FIM de cada mês
+      // (último snapshot de cup_data_hist no mês). Padrão idêntico ao BP 2026.
+      const mrrFimResult = await db.execute(sql`
+        WITH alvo AS (
+          SELECT DATE_TRUNC('month', data_snapshot)::date AS mes,
+                 MAX(data_snapshot::date) AS d
+          FROM "Clickup".cup_data_hist
+          GROUP BY 1
+        )
+        SELECT TO_CHAR(a.mes, 'YYYY-MM') AS mes,
+               SUM(h.valorr::numeric) FILTER (
+                 WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+               ) AS mrr_fim
+        FROM alvo a
+        JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = a.d
+        GROUP BY 1
+      `);
+
+      const evolucaoChurn = computeEvolucaoChurn(
+        churnResult.rows as any[],
+        mrrFimResult.rows as any[],
+      );
+
+      // Vendas mensais (Bitrix) — deals ganhos por data_fechamento, separados em
+      // recorrente (MRR novo) e pontual. Mesma definição do Relatório Mensal.
+      const vendasResult = await db.execute(sql`
+        SELECT TO_CHAR(data_fechamento, 'YYYY-MM') AS mes,
+               COALESCE(SUM(valor_recorrente), 0) AS vendas_recorrente,
+               COALESCE(SUM(valor_pontual), 0)    AS vendas_pontual,
+               COUNT(*)                            AS num_deals
+        FROM "Bitrix".crm_deal
+        WHERE stage_name = 'Negócio Ganho'
+          AND data_fechamento IS NOT NULL
+        GROUP BY 1
+        ORDER BY 1
+      `);
+
       const clientes = clientesResult.rows[0] || { total_clientes: 0, clientes_ativos: 0 };
       const contratos = contratosResult.rows[0] || { total_contratos: 0, contratos_recorrentes: 0, contratos_pontuais: 0, mrr_ativo: 0, aov_recorrente: 0 };
       const equipe = equipeResult.rows[0] || { headcount: 0, tempo_medio_meses: 0 };
@@ -3507,10 +3559,74 @@ Estruture sua resposta em:
             inadimplencia: Number(r.inadimplencia) || 0,
           };
         }).reverse(),
+        evolucaoChurn,
+        vendasMensais: vendasResult.rows.map((r: any) => ({
+          mes: r.mes,
+          vendasRecorrente: Number(r.vendas_recorrente) || 0,
+          vendasPontual: Number(r.vendas_pontual) || 0,
+          numDeals: Number(r.num_deals) || 0,
+        })),
       });
     } catch (error) {
       console.error("[api] Error fetching investors report:", error);
       res.status(500).json({ error: "Failed to fetch investors report data" });
+    }
+  });
+
+  // Geração de caixa acumulada (regime de CAIXA, base DFC) — ano corrente.
+  // Reaproveita EXATAMENTE a linha de geração de caixa da DFC (storage.getDfc):
+  // caz_parcelas, status QUITADO, por data_quitacao, valor_pago−desconto,
+  // RECEITAS (cat. 03/04) − DESPESAS (cat. 05/06/07/08), incluindo o ajuste de
+  // conciliação (cat. 09) que a DFC injeta sob DESPESAS. Garante paridade 100%
+  // com a tela /dfc. Independe do seletor de período da página: sempre vai de
+  // janeiro do ano corrente até o último mês FECHADO (exclui o mês parcial atual).
+  app.get("/api/investors-report/geracao-caixa", async (_req, res) => {
+    try {
+      const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+      const hoje = new Date();
+      const ano = hoje.getFullYear();
+
+      // Último mês fechado = último dia do mês anterior ao atual.
+      // (dia 0 do mês atual = último dia do mês anterior)
+      const fimMesAnterior = new Date(ano, hoje.getMonth(), 0);
+
+      // Se estamos em janeiro, ainda não há mês fechado neste ano → série vazia.
+      if (fimMesAnterior.getFullYear() < ano) {
+        return res.json({ ano, series: [] });
+      }
+
+      const dataInicio = `${ano}-01-01`;
+      const dataFim = `${fimMesAnterior.getFullYear()}-${String(fimMesAnterior.getMonth() + 1).padStart(2, '0')}-${String(fimMesAnterior.getDate()).padStart(2, '0')}`;
+      const mesFimStr = dataFim.substring(0, 7); // 'YYYY-MM'
+
+      const dfc = await storage.getDfc(dataInicio, dataFim);
+      const receitas = dfc.nodes.find((n) => n.categoriaId === 'RECEITAS');
+      const despesas = dfc.nodes.find((n) => n.categoriaId === 'DESPESAS');
+
+      // Meses do ano corrente até o último mês fechado, na ordem cronológica.
+      const mesesDoAno = dfc.meses
+        .filter((m) => m.startsWith(`${ano}-`) && m <= mesFimStr)
+        .sort();
+
+      let caixaAcumulado = 0;
+      const series = mesesDoAno.map((mes) => {
+        const rec = receitas?.valuesByMonth[mes] || 0;
+        const desp = Math.abs(despesas?.valuesByMonth[mes] || 0); // mesma fórmula da DFC (calculateMonthlyData)
+        const geracaoMes = rec - desp;
+        caixaAcumulado += geracaoMes;
+        const month = parseInt(mes.split('-')[1], 10);
+        return {
+          mes,
+          mesLabel: `${monthNames[month - 1]}/${String(ano).slice(2)}`,
+          geracaoMes,
+          caixaAcumulado,
+        };
+      });
+
+      res.json({ ano, series });
+    } catch (error) {
+      console.error("[api] Error fetching investors-report geração de caixa:", error);
+      res.status(500).json({ error: "Failed to fetch geração de caixa data" });
     }
   });
 

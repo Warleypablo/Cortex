@@ -84,6 +84,28 @@ interface InvestorsReportData {
     geracaoCaixa: number;
     inadimplencia: number;
   }>;
+  evolucaoChurn: Array<{
+    mes: string;
+    mrrChurn: number;
+    taxaChurn: number | null;
+    qtd: number;
+  }>;
+  vendasMensais: Array<{
+    mes: string;
+    vendasRecorrente: number;
+    vendasPontual: number;
+    numDeals: number;
+  }>;
+}
+
+interface GeracaoCaixaDFC {
+  ano: number;
+  series: Array<{
+    mes: string;
+    mesLabel: string;
+    geracaoMes: number;
+    caixaAcumulado: number;
+  }>;
 }
 
 const formatCurrencyShort = (value: number) => {
@@ -121,6 +143,12 @@ export default function InvestorsReport() {
     queryKey: ['/api/investors-report'],
   });
 
+  // Geração de caixa acumulada em base CAIXA (linha da DFC), ano corrente.
+  // Independente do seletor de período da página (sempre Jan → último mês fechado).
+  const { data: geracaoCaixaData, isLoading: isLoadingCaixa } = useQuery<GeracaoCaixaDFC>({
+    queryKey: ['/api/investors-report/geracao-caixa'],
+  });
+
   const filteredData = useMemo(() => {
     if (!data?.evolucaoFaturamento) return [];
     
@@ -148,6 +176,50 @@ export default function InvestorsReport() {
       };
     });
   }, [filteredData]);
+
+  const churnChartData = useMemo(() => {
+    if (!data?.evolucaoChurn) return [];
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return data.evolucaoChurn
+      .filter(item => {
+        const [year, month] = item.mes.split('-').map(Number);
+        const itemDate = new Date(year, month - 1, 1);
+        return itemDate >= dateRange.start && itemDate <= dateRange.end;
+      })
+      .map(item => {
+        const [year, month] = item.mes.split('-');
+        return {
+          ...item,
+          mesLabel: `${monthNames[parseInt(month) - 1]}/${year.slice(2)}`,
+        };
+      });
+  }, [data?.evolucaoChurn, dateRange]);
+
+  const vendasChartData = useMemo(() => {
+    if (!data?.vendasMensais) return [];
+    const monthNames = ['Jan', 'Fev', 'Mar', 'Abr', 'Mai', 'Jun', 'Jul', 'Ago', 'Set', 'Out', 'Nov', 'Dez'];
+    return data.vendasMensais
+      .filter(item => {
+        const [year, month] = item.mes.split('-').map(Number);
+        const itemDate = new Date(year, month - 1, 1);
+        return itemDate >= dateRange.start && itemDate <= dateRange.end;
+      })
+      .map(item => {
+        const [year, month] = item.mes.split('-');
+        return {
+          ...item,
+          mesLabel: `${monthNames[parseInt(month) - 1]}/${year.slice(2)}`,
+        };
+      });
+  }, [data?.vendasMensais, dateRange]);
+
+  const churnMediaTaxa = useMemo(() => {
+    const taxas = churnChartData
+      .map(d => d.taxaChurn)
+      .filter((t): t is number => t !== null);
+    if (!taxas.length) return null;
+    return Math.round((taxas.reduce((a, b) => a + b, 0) / taxas.length) * 10) / 10;
+  }, [churnChartData]);
 
   const annualSummary = useMemo(() => {
     const byYear: Record<string, { faturamento: number; despesas: number; geracaoCaixa: number; meses: number }> = {};
@@ -731,6 +803,44 @@ export default function InvestorsReport() {
           </Card>
         </div>
 
+        {/* Charts Row 1.5: Vendas por Mês */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+              <DollarSign className="h-5 w-5 text-emerald-400" />
+              Vendas por Mês (Recorrente e Pontual)
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              Vendas fechadas no mês (Bitrix) — recorrente (MRR novo) e pontual
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : !vendasChartData.length ? (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                Nenhum dado no período
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={vendasChartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
+                  <XAxis dataKey="mesLabel" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => formatCurrencyShort(v)} />
+                  <Tooltip
+                    formatter={(value: number, name: string) => [formatCurrency(value), name]}
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    labelStyle={{ color: '#f8fafc' }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  <Line type="monotone" dataKey="vendasRecorrente" stroke="#10b981" strokeWidth={2.5} dot={{ r: 3, fill: '#10b981' }} name="Vendas Recorrente" connectNulls={false} />
+                  <Line type="monotone" dataKey="vendasPontual" stroke="#1978D5" strokeWidth={2.5} dot={{ r: 3, fill: '#1978D5' }} name="Vendas Pontual" connectNulls={false} />
+                </LineChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+
         {/* Charts Row 2: Receita vs Despesas + Caixa Acumulado */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Receita vs Despesas */}
@@ -763,7 +873,6 @@ export default function InvestorsReport() {
                     <Legend wrapperStyle={{ paddingTop: '10px' }} />
                     <Bar dataKey="faturamento" fill="#10b981" name="Faturamento" radius={[4, 4, 0, 0]} />
                     <Bar dataKey="despesas" fill="#ef4444" name="Despesas" radius={[4, 4, 0, 0]} />
-                    <Line type="monotone" dataKey="geracaoCaixa" stroke="#1978D5" strokeWidth={2.5} dot={{ r: 3, fill: '#1978D5' }} name="Geração Caixa" />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
@@ -773,22 +882,31 @@ export default function InvestorsReport() {
           {/* Caixa Acumulado */}
           <Card className="bg-card border-border">
             <CardHeader className="pb-2">
-              <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
-                <TrendingUp className="h-5 w-5 text-purple-400" />
-                Geração de Caixa Acumulada
+              <CardTitle className="text-base font-medium flex items-center justify-between gap-2 text-foreground">
+                <span className="flex items-center gap-2">
+                  <TrendingUp className="h-5 w-5 text-purple-400" />
+                  Geração de Caixa por Mês
+                </span>
+                {geracaoCaixaData?.series?.length ? (
+                  <Badge variant="outline" className="border-purple-500/50 text-purple-400 px-3 py-1">
+                    Acumulado {geracaoCaixaData.ano}: {formatCurrency(geracaoCaixaData.series[geracaoCaixaData.series.length - 1].caixaAcumulado)}
+                  </Badge>
+                ) : null}
               </CardTitle>
-              <CardDescription className="text-muted-foreground">Evolução do caixa no período</CardDescription>
+              <CardDescription className="text-muted-foreground">
+                Regime de caixa (DFC) — gerado por mês em {geracaoCaixaData?.ano ?? new Date().getFullYear()}
+              </CardDescription>
             </CardHeader>
             <CardContent>
-              {isLoading ? (
+              {isLoadingCaixa ? (
                 <Skeleton className="h-[280px] w-full" />
-              ) : !chartDataWithMetrics.length ? (
+              ) : !geracaoCaixaData?.series.length ? (
                 <div className="flex items-center justify-center h-[280px] text-muted-foreground">
                   Nenhum dado no período
                 </div>
               ) : (
                 <ResponsiveContainer width="100%" height={280}>
-                  <ComposedChart data={chartDataWithMetrics} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <ComposedChart data={geracaoCaixaData.series} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
                     <defs>
                       <linearGradient id="gradientCaixa" x1="0" y1="0" x2="0" y2="1">
                         <stop offset="5%" stopColor="#8b5cf6" stopOpacity={0.4}/>
@@ -804,14 +922,67 @@ export default function InvestorsReport() {
                       labelStyle={{ color: '#f8fafc' }}
                     />
                     <ReferenceLine y={0} stroke="#ef4444" strokeDasharray="3 3" strokeWidth={1.5} />
-                    <Area type="monotone" dataKey="caixaAcumulado" stroke="#8b5cf6" fill="url(#gradientCaixa)" strokeWidth={0} name="Caixa Acumulado" />
-                    <Line type="monotone" dataKey="caixaAcumulado" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6' }} activeDot={{ r: 5 }} name="Caixa Acumulado" />
+                    <Area type="monotone" dataKey="geracaoMes" stroke="#8b5cf6" fill="url(#gradientCaixa)" strokeWidth={0} name="Geração no Mês" />
+                    <Line type="monotone" dataKey="geracaoMes" stroke="#8b5cf6" strokeWidth={2.5} dot={{ r: 3, fill: '#8b5cf6' }} activeDot={{ r: 5 }} name="Geração no Mês" />
                   </ComposedChart>
                 </ResponsiveContainer>
               )}
             </CardContent>
           </Card>
         </div>
+
+        {/* Charts Row 2.5: Evolução do Churn */}
+        <Card className="bg-card border-border">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-base font-medium flex items-center gap-2 text-foreground">
+              <TrendingDown className="h-5 w-5 text-red-400" />
+              Evolução do Churn
+            </CardTitle>
+            <CardDescription className="text-muted-foreground">
+              MRR perdido por mês e taxa de churn (% do MRR ativo do mês anterior)
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            {isLoading ? (
+              <Skeleton className="h-[300px] w-full" />
+            ) : !churnChartData.length ? (
+              <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                Nenhum dado no período
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={300}>
+                <ComposedChart data={churnChartData} margin={{ top: 10, right: 20, left: 10, bottom: 10 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#334155" opacity={0.5} />
+                  <XAxis dataKey="mesLabel" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                  <YAxis yAxisId="left" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => formatCurrencyShort(v)} />
+                  <YAxis yAxisId="right" orientation="right" tick={{ fontSize: 10, fill: '#94a3b8' }} tickFormatter={(v) => `${v}%`} />
+                  <Tooltip
+                    formatter={(value: number, name: string, props: any) =>
+                      props.dataKey === 'taxaChurn'
+                        ? [`${formatDecimal(value)}%`, name]
+                        : [formatCurrency(value), name]
+                    }
+                    contentStyle={{ backgroundColor: '#1e293b', border: '1px solid #334155', borderRadius: '8px' }}
+                    labelStyle={{ color: '#f8fafc' }}
+                  />
+                  <Legend wrapperStyle={{ paddingTop: '10px' }} />
+                  {churnMediaTaxa !== null && (
+                    <ReferenceLine
+                      yAxisId="right"
+                      y={churnMediaTaxa}
+                      stroke="#f59e0b"
+                      strokeDasharray="3 3"
+                      strokeWidth={1.5}
+                      label={{ value: `Média ${formatDecimal(churnMediaTaxa)}%`, fill: '#f59e0b', fontSize: 10, position: 'insideTopRight' }}
+                    />
+                  )}
+                  <Bar yAxisId="left" dataKey="mrrChurn" fill="#ef4444" name="MRR Perdido" radius={[4, 4, 0, 0]} />
+                  <Line yAxisId="right" type="monotone" dataKey="taxaChurn" stroke="#f59e0b" strokeWidth={2.5} dot={{ r: 3, fill: '#f59e0b' }} name="Taxa de Churn %" connectNulls={false} />
+                </ComposedChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
 
         {/* Charts Row 3: Pie Charts */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -910,7 +1081,7 @@ export default function InvestorsReport() {
                       <th className="text-center py-3 px-4 font-medium">Meses</th>
                       <th className="text-right py-3 px-4 font-medium">Faturamento</th>
                       <th className="text-right py-3 px-4 font-medium">Despesas</th>
-                      <th className="text-right py-3 px-4 font-medium">Geração Caixa</th>
+                      <th className="text-right py-3 px-4 font-medium">Resultado</th>
                       <th className="text-right py-3 px-4 font-medium">Margem</th>
                     </tr>
                   </thead>
@@ -964,7 +1135,7 @@ export default function InvestorsReport() {
                       <th className="text-left py-2 px-3 font-medium">Mês</th>
                       <th className="text-right py-2 px-3 font-medium">Faturamento</th>
                       <th className="text-right py-2 px-3 font-medium">Despesas</th>
-                      <th className="text-right py-2 px-3 font-medium">Geração Caixa</th>
+                      <th className="text-right py-2 px-3 font-medium">Resultado</th>
                       <th className="text-right py-2 px-3 font-medium">Margem</th>
                       <th className="text-right py-2 px-3 font-medium">Acumulado</th>
                     </tr>
