@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, X, ExternalLink, Loader2, Pencil, Settings2 } from "lucide-react";
+import { Plus, Search, X, ExternalLink, Loader2, Pencil, Settings2, FileText, FolderOpen } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -358,7 +358,7 @@ export default function CriativosBiblioteca() {
                   <TableHead className="text-right border-r">ROAS</TableHead>
                   <TableHead className="w-[100px]">Data</TableHead>
                   <TableHead className="w-[110px]">Status</TableHead>
-                  <TableHead className="w-[48px]"></TableHead>
+                  <TableHead className="w-[80px]">Links</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -456,16 +456,45 @@ export default function CriativosBiblioteca() {
                         )}
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
-                        {row.linkDrive && (
-                          <a
-                            href={row.linkDrive}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="text-muted-foreground hover:text-foreground"
-                          >
-                            <ExternalLink className="h-4 w-4" />
-                          </a>
-                        )}
+                        <div className="flex items-center gap-2">
+                          {row.roteiroUrl ? (
+                            <a
+                              href={row.roteiroUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Abrir roteiro (Google Doc)"
+                              className="text-blue-600 hover:text-blue-700 dark:text-blue-400"
+                            >
+                              <FileText className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <FileText className="h-4 w-4 text-muted-foreground/30" aria-label="sem roteiro" />
+                          )}
+                          {row.linkDrive ? (
+                            <a
+                              href={row.linkDrive}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Abrir no Drive (arquivo do ad)"
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <ExternalLink className="h-4 w-4" />
+                            </a>
+                          ) : (
+                            <ExternalLink className="h-4 w-4 text-muted-foreground/30" aria-label="sem link do Drive" />
+                          )}
+                          {row.driveFolderId && (
+                            <a
+                              href={`https://drive.google.com/drive/folders/${row.driveFolderId}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              title="Abrir a pasta do ad no Drive"
+                              className="text-muted-foreground hover:text-foreground"
+                            >
+                              <FolderOpen className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   );
