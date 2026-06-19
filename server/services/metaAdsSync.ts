@@ -6,6 +6,7 @@
  */
 
 import { Pool } from 'pg';
+import { linkAdsByName } from './adsCreation/creativeAdLinker';
 
 const META_API_VERSION = 'v18.0';
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
@@ -557,6 +558,20 @@ export async function syncMetaAds(pool: Pool, options?: { since?: string; until?
   } catch (e: any) {
     errors.push(`InsightsByPlatform: ${e.message}`);
     console.error('[MetaSync] Insights by-platform sync failed:', e.message);
+  }
+
+  // 7. Vincula ad_id ↔ tpId da Biblioteca pelos ads batizados com prefixo TP## (nome_match).
+  //    Cobre tanto ads criados via Cortex quanto subidos manualmente no Gerenciador.
+  try {
+    const r = await pool.query(`SELECT ad_id, ad_name FROM meta_ads.meta_ads WHERE ad_name ILIKE 'TP%'`);
+    const link = await linkAdsByName(
+      r.rows.map((x: any) => ({ adId: String(x.ad_id), adName: x.ad_name })),
+      { source: 'name_match' },
+    );
+    console.log(`[MetaSync] Creative links: ${link.linked} novos vínculos (de ${r.rows.length} ads TP##)`);
+  } catch (e: any) {
+    errors.push(`CreativeLinks: ${e.message}`);
+    console.error('[MetaSync] Creative linking failed:', e.message);
   }
 
   result.errors = errors;

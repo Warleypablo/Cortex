@@ -17,7 +17,33 @@ import {
   matchDriveFilesToRows,
   listAllForMatching,
 } from "../services/adsCreation/creativesRepo";
+import {
+  upsertBatch,
+  getBatchByFolderId,
+  extractDriveFolderId,
+  listVocab,
+  upsertVocab,
+} from "../services/adsCreation/creativeBatchesRepo";
+import {
+  getCreativePerformance,
+  getCreativeRanking,
+} from "../services/adsCreation/creativePerformanceRepo";
 import type { User } from "../auth/userDb";
+
+// Janela default: últimos 30 dias (formato YYYY-MM-DD).
+function defaultWindow(q: Request["query"]): { since: string; until: string } {
+  const fmt = (d: Date) => d.toISOString().slice(0, 10);
+  const until = typeof q.until === "string" ? q.until : fmt(new Date());
+  let since: string;
+  if (typeof q.since === "string") {
+    since = q.since;
+  } else {
+    const d = new Date();
+    d.setDate(d.getDate() - 30);
+    since = fmt(d);
+  }
+  return { since, until };
+}
 
 const APPROVER_EMAILS = [
   "vinicius.ichino@turbopartners.com.br",
@@ -156,6 +182,103 @@ export function registerCreativesRoutes(app: Express) {
       res.status(204).end();
     } catch (err: any) {
       res.status(500).json({ message: err.message ?? "erro" });
+    }
+  });
+
+  // ============== Cabeçalho de batch (escrito pela skill turbo-ads-workflow) ==============
+  // Idempotente por pasta do Drive. Aceita driveFolderId OU driveFolderUrl.
+  app.post("/api/growth/creative-batches", guard, async (req: Request, res: Response) => {
+    try {
+      const user = req.user as User;
+      const b = req.body ?? {};
+      const folderId = b.driveFolderId ?? extractDriveFolderId(b.driveFolderUrl);
+      if (!folderId) {
+        return res.status(400).json({ message: "driveFolderId ou driveFolderUrl válido obrigatório" });
+      }
+      const batch = await upsertBatch({
+        driveFolderId: folderId,
+        nomeAd: b.nomeAd ?? null,
+        produto: b.produto ?? null,
+        roteiroUrl: b.roteiroUrl ?? null,
+        clickupTaskId: b.clickupTaskId ?? null,
+        modules: b.modules ?? null,
+        createdBy: user?.email ?? null,
+      });
+      res.status(201).json(batch);
+    } catch (err: any) {
+      console.error("[creatives] batch upsert error:", err);
+      res.status(500).json({ message: err.message ?? "erro" });
+    }
+  });
+
+  app.get("/api/growth/creative-batches/:folderId", guard, async (req: Request, res: Response) => {
+    try {
+      const folderId = extractDriveFolderId(req.params.folderId) ?? req.params.folderId;
+      const batch = await getBatchByFolderId(folderId);
+      if (!batch) return res.status(404).json({ message: "batch não encontrado" });
+      res.json(batch);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message ?? "erro" });
+    }
+  });
+
+  // ============== Vocabulário controlado (dropdowns editáveis) ==============
+  app.get("/api/growth/creative-vocab", guard, async (req: Request, res: Response) => {
+    try {
+      const kind = typeof req.query.kind === "string" ? req.query.kind : undefined;
+      const items = await listVocab(kind);
+      // Agrupa por kind pra consumo direto no frontend
+      const byKind: Record<string, typeof items> = {};
+      for (const it of items) (byKind[it.kind] ??= []).push(it);
+      res.json({ items, byKind });
+    } catch (err: any) {
+      console.error("[creatives] vocab list error:", err);
+      res.status(500).json({ message: err.message ?? "erro" });
+    }
+  });
+
+  app.post("/api/growth/creative-vocab", guard, async (req: Request, res: Response) => {
+    try {
+      const b = req.body ?? {};
+      if (!b.kind || !b.value || !b.label) {
+        return res.status(400).json({ message: "kind, value e label obrigatórios" });
+      }
+      const item = await upsertVocab({
+        kind: String(b.kind),
+        value: String(b.value),
+        label: String(b.label),
+        sortOrder: typeof b.sortOrder === "number" ? b.sortOrder : 0,
+        active: b.active !== false,
+      });
+      res.status(201).json(item);
+    } catch (err: any) {
+      console.error("[creatives] vocab upsert error:", err);
+      res.status(500).json({ message: err.message ?? "erro" });
+    }
+  });
+
+  // ============== Read-back: performance por criativo (TP) ==============
+  app.get("/api/growth/creative-performance", guard, async (req: Request, res: Response) => {
+    try {
+      const { since, until } = defaultWindow(req.query);
+      const rows = await getCreativePerformance({ since, until });
+      res.json({ since, until, rows });
+    } catch (err: any) {
+      console.error("[creatives] performance error:", err);
+      res.status(500).json({ message: err.message ?? "erro" });
+    }
+  });
+
+  // ============== Read-back: ranking por atributo (angulo/persona/tipo/produto/body/cta) ==============
+  app.get("/api/growth/creative-ranking", guard, async (req: Request, res: Response) => {
+    try {
+      const { since, until } = defaultWindow(req.query);
+      const dimension = typeof req.query.dimension === "string" ? req.query.dimension : "angulo";
+      const rows = await getCreativeRanking({ since, until, dimension });
+      res.json({ since, until, dimension, rows });
+    } catch (err: any) {
+      console.error("[creatives] ranking error:", err);
+      res.status(400).json({ message: err.message ?? "erro" });
     }
   });
 

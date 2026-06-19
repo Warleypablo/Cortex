@@ -100,15 +100,21 @@ function normalizeName(name: string): string {
 }
 
 // ============== Parser da convenção de nome de arquivo ==============
-// Padrão: {tipo}-{nomeAd}-{personagem}-{formato}-v{NN}.{ext}
-// Ex:     vv-novosclientes-marina-9x16-v01.mp4
+// Padrão: {tipo}-{nomeAd}-{personagem}-{formato}-h{NN}[-b{NN}][-c{NN}]-v{NN}.{ext}
+// Ex:     vv-novosclientes-marina-9x16-h03-b02-c01-v01.mp4
+// Os códigos h/b/c são OPCIONAIS (degradam): se ausentes, só não tagueiam aquela dimensão.
+// O significado de cada código (h03 → ângulo, b02 → bodyTipo, c01 → ctaTipo) é resolvido
+// depois, contra o `modules` do creative_batches do lote.
 
 export interface ParsedConvention {
   tipo: "vv" | "img" | "car";
   nomeAd: string;
   personagem: string;
   formato: "9x16" | "4x5" | "1x1" | "16x9";
-  variacao: string; // "v01", "v02", ...
+  hookCode?: string; // "h01", "h02", ...
+  bodyCode?: string; // "b01", ...
+  ctaCode?: string;  // "c01", ...
+  variacao: string;  // "v01", "v02", ...
 }
 
 const VALID_EXT = /\.(mp4|mov|jpg|jpeg|png)$/i;
@@ -117,11 +123,23 @@ export function parseFileNameConvention(filename: string): ParsedConvention | nu
   if (!filename || !VALID_EXT.test(filename)) return null;
   let s = filename.replace(VALID_EXT, "").toLowerCase();
 
-  // Parse de trás pra frente.
+  // Parse de trás pra frente: v, depois os modulares opcionais (c, b, h), depois formato.
   const mVar = s.match(/-v(\d{2})$/);
   if (!mVar) return null;
   const variacao = `v${mVar[1]}`;
   s = s.slice(0, -mVar[0].length);
+
+  let ctaCode: string | undefined;
+  const mCta = s.match(/-c(\d{2})$/);
+  if (mCta) { ctaCode = `c${mCta[1]}`; s = s.slice(0, -mCta[0].length); }
+
+  let bodyCode: string | undefined;
+  const mBody = s.match(/-b(\d{2})$/);
+  if (mBody) { bodyCode = `b${mBody[1]}`; s = s.slice(0, -mBody[0].length); }
+
+  let hookCode: string | undefined;
+  const mHook = s.match(/-h(\d{2})$/);
+  if (mHook) { hookCode = `h${mHook[1]}`; s = s.slice(0, -mHook[0].length); }
 
   const mFormato = s.match(/-(9x16|4x5|1x1|16x9)$/);
   if (!mFormato) return null;
@@ -135,7 +153,7 @@ export function parseFileNameConvention(filename: string): ParsedConvention | nu
   const nomeAd = mResto[2];
   const personagem = mResto[3];
 
-  return { tipo, nomeAd, personagem, formato, variacao };
+  return { tipo, nomeAd, personagem, formato, hookCode, bodyCode, ctaCode, variacao };
 }
 
 // ============== Listagem / busca ==============
@@ -285,6 +303,11 @@ export interface CreateCreativeInput {
   personagem?: string | null;
   tipoAd?: string | null;
   observacao?: string | null;
+  bodyTipo?: string | null;
+  ctaTipo?: string | null;
+  roteiroUrl?: string | null;
+  clickupTaskId?: string | null;
+  driveFolderId?: string | null;
   adValidado?: boolean;
   createdBy?: string | null;
 }
@@ -313,6 +336,11 @@ export async function createCreative(input: CreateCreativeInput): Promise<Creati
     personagem: input.personagem ?? null,
     tipoAd: input.tipoAd ?? null,
     observacao: input.observacao ?? null,
+    bodyTipo: input.bodyTipo ?? null,
+    ctaTipo: input.ctaTipo ?? null,
+    roteiroUrl: input.roteiroUrl ?? null,
+    clickupTaskId: input.clickupTaskId ?? null,
+    driveFolderId: input.driveFolderId ?? null,
     nomeFinal,
     adValidado: input.adValidado ?? false,
     createdBy: input.createdBy ?? null,
@@ -403,6 +431,11 @@ export async function bulkInsertStubs(
       personagem: input.personagem ?? null,
       tipoAd: input.tipoAd ?? null,
       observacao: input.observacao ?? null,
+      bodyTipo: input.bodyTipo ?? null,
+      ctaTipo: input.ctaTipo ?? null,
+      roteiroUrl: input.roteiroUrl ?? null,
+      clickupTaskId: input.clickupTaskId ?? null,
+      driveFolderId: input.driveFolderId ?? null,
       nomeFinal,
       adValidado: input.adValidado ?? false,
       createdBy: input.createdBy ?? createdBy ?? null,
@@ -465,6 +498,11 @@ export async function updateCreative(
       personagem: merged.personagem,
       tipoAd: merged.tipoAd,
       observacao: merged.observacao,
+      bodyTipo: merged.bodyTipo,
+      ctaTipo: merged.ctaTipo,
+      roteiroUrl: merged.roteiroUrl,
+      clickupTaskId: merged.clickupTaskId,
+      driveFolderId: merged.driveFolderId,
       nomeFinal,
       adValidado: merged.adValidado,
       updatedAt: new Date(),

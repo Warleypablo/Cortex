@@ -29,6 +29,11 @@ import {
   bulkInsertStubs,
   type CreateCreativeInput,
 } from "../services/adsCreation/creativesRepo";
+import {
+  getBatchByFolderId,
+  extractDriveFolderId,
+  resolveModuleFields,
+} from "../services/adsCreation/creativeBatchesRepo";
 import { metaGet } from "../services/adsCreation/metaApi";
 import type { Briefing } from "../services/adsCreation/types";
 import type { User } from "../auth/userDb";
@@ -331,6 +336,11 @@ export function registerAdsCreationRoutes(app: Express) {
         }
         const tree = await listDriveFolderTree(driveFolderUrl);
 
+        // Cabeçalho de batch (se a skill já gravou): stubs herdam os campos comuns e
+        // resolvem angulo/bodyTipo/ctaTipo via os códigos hNN/bNN/cNN do nome do arquivo.
+        const batchFolderId = extractDriveFolderId(driveFolderUrl);
+        const batch = await getBatchByFolderId(batchFolderId);
+
         // Match contra a Biblioteca pra sinalizar arquivos sem cadastro
         const libraryRows = await listAllForMatching();
         const byFileId = new Map<string, true>();
@@ -357,12 +367,21 @@ export function registerAdsCreationRoutes(app: Express) {
           const linkDrive = `https://drive.google.com/file/d/${f.id}/view`;
           const parsed = parseFileNameConvention(f.name);
           if (parsed) {
+            const mod = resolveModuleFields(parsed, batch);
             autoStubs.push({
               nomeDrive,
               linkDrive,
               driveFileId: f.id,
               personagem: parsed.personagem,
-              angulo: parsed.nomeAd,
+              // ângulo resolvido do hook (h##) via batch; fallback no nome do ad (comportamento legado)
+              angulo: mod.angulo ?? parsed.nomeAd,
+              bodyTipo: mod.bodyTipo ?? null,
+              ctaTipo: mod.ctaTipo ?? null,
+              // campos comuns herdados do cabeçalho do batch
+              produto: batch?.produto ?? null,
+              roteiroUrl: batch?.roteiroUrl ?? null,
+              clickupTaskId: batch?.clickupTaskId ?? null,
+              driveFolderId: batchFolderId ?? null,
             });
             return "auto";
           }
@@ -370,6 +389,10 @@ export function registerAdsCreationRoutes(app: Express) {
             nomeDrive,
             linkDrive,
             driveFileId: f.id,
+            produto: batch?.produto ?? null,
+            roteiroUrl: batch?.roteiroUrl ?? null,
+            clickupTaskId: batch?.clickupTaskId ?? null,
+            driveFolderId: batchFolderId ?? null,
           });
           return "unparseable";
         };
