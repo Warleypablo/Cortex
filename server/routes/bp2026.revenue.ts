@@ -59,6 +59,7 @@ export const CASE_PRODUTO_CHURN = sql`CASE
 interface Deps {
   db: any;
   orcado: Record<string, Record<number, number>>;
+  vendasMrrPorMes: Record<number, number>;
   mesCorrente: number;
   mesFechado: number;
 }
@@ -68,7 +69,7 @@ function razao(num: number | null, den: number | null): number | null {
   return num / den;
 }
 
-export async function montarRevenue({ db, orcado, mesCorrente, mesFechado }: Deps): Promise<Linha[]> {
+export async function montarRevenue({ db, orcado, vendasMrrPorMes, mesCorrente, mesFechado }: Deps): Promise<Linha[]> {
   // snapshots fim de mês: índice 0 = dez/2025 (denominador do churn de janeiro), 1..12 = 2026
   const snapResult = await db.execute(sql`
     WITH alvo AS (

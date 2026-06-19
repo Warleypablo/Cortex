@@ -21,6 +21,13 @@ export type Ga4PlatformBreakdown = {
   google_ads: number;
   tiktok_ads: number;
   linkedin_ads: number;
+  // Orgânico separado por plataforma (medium=organic) — habilita o estágio
+  // "chegou no site" (Sessões/VdP) por canal orgânico. `organico` agrega o
+  // restante (direct + orgânicos sem source de plataforma).
+  organico_instagram: number;
+  organico_youtube: number;
+  organico_linkedin: number;
+  organico_tiktok: number;
   organico: number;
   outros: number;
 };
@@ -59,7 +66,12 @@ function classifyPlatform(source: string, medium: string): keyof Ga4PlatformBrea
   if ((s.includes('facebook') || s.includes('meta') || s.includes('instagram') || s === 'ig' || s === 'fb') && isPaid) {
     return 'meta_ads';
   }
-  if ((s.includes('google') || s.includes('adwords') || s.includes('gads')) && (m === 'cpc' || m === 'ppc' || m === 'paidsearch')) {
+  // Google paga — aceita qualquer medium pago (isPaid). A Constituição UTM Turbo
+  // (docs/utm-constituicao.md §5.2) padroniza o Google Ads como utm_medium=paid;
+  // antes só cpc/ppc/paidsearch eram reconhecidos, então o tráfego taggeado como
+  // `paid` caía em "outros" e zerava as Sessões do Google. cpc/ppc seguem cobertos
+  // (auto-tagging gclid → GA4 reporta medium=cpc).
+  if ((s.includes('google') || s.includes('adwords') || s.includes('gads')) && isPaid) {
     return 'google_ads';
   }
   // Ads pagas de TikTok/LinkedIn — convenção utm_source=tiktok_ads/linkedin_ads,
@@ -70,7 +82,14 @@ function classifyPlatform(source: string, medium: string): keyof Ga4PlatformBrea
   if (s.includes('linkedin') && (s.includes('ads') || isPaid)) {
     return 'linkedin_ads';
   }
-  if (s === '(direct)' || m === '(none)' || m === 'organic') {
+  // Orgânico por plataforma: medium organic/none (ou source direct). O source diz
+  // o canal (Constituição UTM §5.3: utm_source=instagram/youtube/linkedin/tiktok +
+  // utm_medium=organic). Sem source de plataforma (direct etc.) cai em `organico`.
+  if (m === 'organic' || m === '(none)' || s === '(direct)') {
+    if (s.includes('instagram') || s === 'ig') return 'organico_instagram';
+    if (s.includes('youtube') || s === 'yt') return 'organico_youtube';
+    if (s.includes('linkedin')) return 'organico_linkedin';
+    if (s.includes('tiktok')) return 'organico_tiktok';
     return 'organico';
   }
   return 'outros';
@@ -83,7 +102,9 @@ export async function getSessionsByPlatform(
 ): Promise<Ga4SessionsResult> {
   const propertyId = (process.env.LINKTREE_GA4_PROPERTY_ID || '').replace(/\D/g, '');
   const zeroBreakdown = (): Ga4PlatformBreakdown =>
-    ({ meta_ads: 0, google_ads: 0, tiktok_ads: 0, linkedin_ads: 0, organico: 0, outros: 0 });
+    ({ meta_ads: 0, google_ads: 0, tiktok_ads: 0, linkedin_ads: 0,
+       organico_instagram: 0, organico_youtube: 0, organico_linkedin: 0, organico_tiktok: 0,
+       organico: 0, outros: 0 });
   const empty: Ga4SessionsResult = {
     total: 0,
     byPlatform: zeroBreakdown(),
@@ -186,7 +207,9 @@ export async function getGa4SourceMediumDiagnostic(
 ): Promise<Ga4DiagnosticResult> {
   const propertyId = (process.env.LINKTREE_GA4_PROPERTY_ID || '').replace(/\D/g, '');
   const zero = (): Ga4PlatformBreakdown =>
-    ({ meta_ads: 0, google_ads: 0, tiktok_ads: 0, linkedin_ads: 0, organico: 0, outros: 0 });
+    ({ meta_ads: 0, google_ads: 0, tiktok_ads: 0, linkedin_ads: 0,
+       organico_instagram: 0, organico_youtube: 0, organico_linkedin: 0, organico_tiktok: 0,
+       organico: 0, outros: 0 });
 
   if (!propertyId) {
     return { available: false, rows: [], totalsByBucket: zero(), error: 'LINKTREE_GA4_PROPERTY_ID não configurado' };

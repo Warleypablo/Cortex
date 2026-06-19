@@ -7,7 +7,7 @@ import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
 import { pool as dbPool } from "./db";
-import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeCapacityMetasTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable, initializeBroadcastLeadEventsTable, initializeBroadcastClassificationTable, initializeBroadcastPlanTable, initializeMetaActionsLogTable } from "./db";
+import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeCapacityMetasTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable, initializeBroadcastLeadEventsTable, initializeBroadcastClassificationTable, initializeBroadcastPlanTable, initializeMetaActionsLogTable, initializeCrmInstagramTables } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
 import { runAllForecasts } from "./services/predictiveEngine";
@@ -152,6 +152,7 @@ app.use((req, res, next) => {
     initializeBroadcastClassificationTable(),
     initializeBroadcastPlanTable(),
     initializeMetaActionsLogTable(),
+    initializeCrmInstagramTables(),
   ]);
 
   // Phase 1.5: Migrations that depend on tables existing
@@ -526,6 +527,16 @@ app.use((req, res, next) => {
   setInterval(() => runInstagramSync(), IG_SYNC_INTERVAL);
   console.log(`[instagram-sync-job] Scheduled every ${IG_SYNC_INTERVAL / 3600000}h`);
 
+  // CRM Instagram — coletor de comentários (prospecção/social selling) a cada 6h
+  const CRM_IG_COLLECTOR_INTERVAL = 6 * 60 * 60 * 1000; // 6h
+  const runCrmIgCollectorJob = async () => {
+    const { runCrmInstagramCollector } = await import("./services/crmInstagramCollector");
+    await runCrmInstagramCollector();
+  };
+  setTimeout(() => runCrmIgCollectorJob(), 150000); // 2.5min após boot (depois do IG sync)
+  setInterval(() => runCrmIgCollectorJob(), CRM_IG_COLLECTOR_INTERVAL);
+  console.log(`[crm-instagram-collector] Scheduled every ${CRM_IG_COLLECTOR_INTERVAL / 3600000}h`);
+
   // Bitrix motivo de perda sync a cada 6 horas
   const MOTIVO_PERDA_SYNC_INTERVAL = 6 * 60 * 60 * 1000; // 6h
   const runMotivoPerdaSync = async () => {
@@ -709,6 +720,30 @@ app.use((req, res, next) => {
   setTimeout(() => runGhlSync(), 2 * 60 * 1000);
   setInterval(() => runGhlSync(), GHL_SYNC_INTERVAL);
   console.log(`[ghl-sync-job] Scheduled every ${GHL_SYNC_INTERVAL / 60000} min`);
+
+  // CRM Instagram — ingestão de DMs do GHL (após o sync horário do GHL)
+  const runCrmIgGhlIngestJob = async () => {
+    const { runCrmInstagramGhlIngest } = await import("./services/crmInstagramGhlIngest");
+    await runCrmInstagramGhlIngest();
+  };
+  setTimeout(() => runCrmIgGhlIngestJob(), 4 * 60 * 1000); // 4min após boot (depois do GHL sync iniciar)
+  setInterval(() => runCrmIgGhlIngestJob(), GHL_SYNC_INTERVAL);
+  console.log(`[crm-instagram-ghl-ingest] Scheduled every ${GHL_SYNC_INTERVAL / 60000} min`);
+
+  // CRM Instagram — ingestão de curtidas via Apify (1x/dia). No-op sem APIFY_TOKEN.
+  if (process.env.APIFY_TOKEN && process.env.APIFY_POST_LIKERS_ACTOR_ID) {
+    const runCrmIgApifyLikesJob = async () => {
+      try {
+        const { ingestApifyPostLikers } = await import("./services/crmInstagramApifyIngest");
+        await ingestApifyPostLikers();
+      } catch (e: any) {
+        console.error("[crm-instagram-apify] erro:", e.message);
+      }
+    };
+    setTimeout(() => runCrmIgApifyLikesJob(), 6 * 60 * 1000); // 6min após boot
+    setInterval(() => runCrmIgApifyLikesJob(), 24 * 60 * 60 * 1000); // 1x/dia
+    console.log("[crm-instagram-apify] Scheduled daily (likes scraper)");
+  }
 
   // GHL tags snapshot diário às 00:10
   const scheduleNextGhlTagsSnapshot = () => {

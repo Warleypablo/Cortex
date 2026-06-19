@@ -211,11 +211,6 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
     fonte: FONTE_CHURN,
     calculo: "Soma de valor_r de todos os encerramentos solicitados no mês (bruto, inclui abonados).",
   },
-  mrr_delta_nao_explicado: {
-    definicao: "MRR que vazou sem virar churn declarado: downgrades, vendas não ativadas, reajustes (abonados já entram no churn bruto).",
-    fonte: "Derivada (ponte do MRR).",
-    calculo: "MRR do mês anterior + Vendas MRR − Churn − MRR real do mês. Lê-se em R$; janeiro compara contra dez/2025 real e não tem orçado.",
-  },
   aliquota_efetiva: {
     definicao: "Percentual da receita consumido por impostos (sobre receita + diretos).",
     fonte: "Derivada do DRE.",
@@ -280,6 +275,31 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
     definicao: "Ticket médio dos deals pontuais fechados no mês.",
     fonte: "Derivada.",
     calculo: "Vendas Pontual ÷ contratos vendidos pontual. YTD = Σ ÷ Σ.",
+  },
+  vp_receita_total: {
+    definicao: "Receita total vendida no mês (MRR + Pontual), por data de criação do contrato.",
+    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado (exceto status "não usar").',
+    calculo: "Σ valorr + Σ valorp dos contratos criados no mês. Orçado = vendas_mrr + vendas_pontual.",
+  },
+  vp_receita_mrr: {
+    definicao: "MRR novo vendido no mês (bookings; não é a base ativa).",
+    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado.',
+    calculo: "Σ valorr dos contratos criados no mês. Orçado = vendas_mrr.",
+  },
+  vp_receita_pontual: {
+    definicao: "Receita pontual vendida no mês.",
+    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado.',
+    calculo: "Σ valorp dos contratos criados no mês. Orçado = vendas_pontual.",
+  },
+  vp_num_contratos: {
+    definicao: "Contratos vendidos no mês (com receita), por segmento.",
+    fonte: 'ClickUp — "Clickup".cup_contratos, por data_criado.',
+    calculo: "Σ contratos com MRR + Σ contratos pontuais por segmento (= soma das linhas por produto). Um contrato com MRR e Pontual conta nas duas naturezas — mesma base do orçado (Σ contratos_vendidos_*).",
+  },
+  vp_num_clientes: {
+    definicao: "Clientes novos no mês — datados pela criação do cliente (1ª venda).",
+    fonte: 'ClickUp — "Clickup".cup_contratos (cup_clientes não tem data de criação).',
+    calculo: "Cliente contado uma vez, no mês do seu 1º contrato (MIN data_criado por id_task). Sem orçado.",
   },
   reunioes: {
     definicao: "Reuniões comerciais realizadas no mês.",
@@ -451,6 +471,78 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
     definicao: "Quantos meses do MRR vendido pagam a aquisição do mês.",
     fonte: "Derivada.",
     calculo: "Despesa CAC ÷ Vendas MRR do mês. YTD = Σ ÷ Σ.",
+  },
+
+  // ===== Pontual (movimento do estoque) =====
+  pontual_estoque_ini: {
+    definicao: "Valor do estoque de pontual no fim do mês anterior (posição de abertura).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês anterior (valorp>0, status fora de entregue/cancelado/não usar).",
+    calculo: "Soma de valorp dos contratos em estoque no snapshot anterior. Janeiro abre com dez/2025.",
+  },
+  pontual_venda: {
+    definicao: "Pontual que entrou no estoque no mês (entrada).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos em estoque no snapshot do mês que não estavam em estoque no anterior. Não é o 'Vendas Pontual' do Bitrix.",
+  },
+  pontual_entrega: {
+    definicao: "Pontual que saiu do estoque por entrega no mês (saída).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos que estavam em estoque e passaram a status 'entregue'.",
+  },
+  pontual_churn: {
+    definicao: "Pontual que saiu do estoque por cancelamento no mês (saída).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos que estavam em estoque e passaram a 'cancelado/inativo' ou 'não usar'.",
+  },
+  pontual_deletados: {
+    definicao: "Pontual que sumiu do snapshot do ClickUp no mês (saída).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos que estavam em estoque e não aparecem mais no snapshot do mês.",
+  },
+  pontual_saida_atipica: {
+    definicao: "Pontual que saiu do estoque por outro motivo (ex.: valorp zerado).",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos que saíram do estoque sem ser entrega, churn ou deleção.",
+  },
+  pontual_reajuste: {
+    definicao: "Variação de valor de contratos que permaneceram no estoque no mês.",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ (valorp atual − valorp anterior) dos contratos presentes no estoque nos dois snapshots.",
+  },
+  pontual_estoque_fim: {
+    definicao: "Valor do estoque de pontual no fim do mês (posição de fechamento).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês (valorp>0, status fora de entregue/cancelado/não usar).",
+    calculo: "Estoque inicial + venda − entrega − churn − deletados − saída atípica + reajuste.",
+  },
+  pontual_status_ativo: {
+    definicao: "Parte do estoque final em contratos com status ativo (em execução).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'ativo'.",
+  },
+  pontual_status_triagem: {
+    definicao: "Parte do estoque final em contratos em triagem.",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'triagem'.",
+  },
+  pontual_status_pausado: {
+    definicao: "Parte do estoque final em contratos pausados.",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'pausado'.",
+  },
+  pontual_status_onboarding: {
+    definicao: "Parte do estoque final em contratos em onboarding.",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'onboarding'.",
+  },
+  pontual_status_em_cancelamento: {
+    definicao: "Parte do estoque final em contratos em cancelamento (ainda contam como estoque).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Σ valorp dos contratos em estoque com status 'em cancelamento'.",
+  },
+  pontual_status_outros: {
+    definicao: "Parte do estoque final em contratos com outros status (defensiva).",
+    fonte: "ClickUp — cup_data_hist, último snapshot do mês.",
+    calculo: "Estoque final menos a soma dos cinco status conhecidos.",
   },
 
   // ===== Outras Receitas (detalhamento) =====

@@ -23,7 +23,6 @@ const DERIVADAS: Record<string, string[]> = {
   mrr_cabeca: ["mrr_ativo", "colaboradores"],
   ticket_cliente: ["receita_total_faturavel", "clientes"],
   ticket_contrato: ["receita_total_faturavel", "contratos"],
-  mrr_delta_nao_explicado: ["mrr_ativo", "vendas_mrr", "churn_mes"],
   aliquota_efetiva: ["impostos_receita", "impostos_diretos", "receita_total_faturavel"],
   margem_geracao: ["geracao_caixa", "receita_total_faturavel"],
   // Revenue — AOV por produto (5 linhas × 2 componentes)
