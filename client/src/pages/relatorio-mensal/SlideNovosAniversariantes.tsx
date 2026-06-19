@@ -2,6 +2,10 @@ import { UserPlus, Cake } from "lucide-react";
 import type { NovoColaborador, Aniversariante } from "./types";
 import SlideLayout from "./SlideLayout";
 import { SlideHeader } from "./SlideComponents";
+import fotoRodrigoPimenta from "@assets/novo-rodrigo-pimenta.png";
+import fotoRichardAnderson from "@assets/novo-richard-anderson.png";
+import fotoBrenoMoscardini from "@assets/novo-breno-moscardini.png";
+import fotoLeonardoKruger from "@assets/novo-leonardo-kruger.png";
 
 interface Props {
   novos: NovoColaborador[];
@@ -9,13 +13,35 @@ interface Props {
   mesLabel: string;
 }
 
+// Fotos manuais — colaboradores cuja foto do Google é silhueta genérica (ou ausente).
+// O match exige TODOS os tokens (2+) para evitar colisão com homônimos (há outro "Richard"
+// = Fabio Richard; "pimenta" aparece em Rodrigo Silva Pimenta E Breno Moscardini Abrão Pimenta).
+// Tem prioridade sobre a fotoUrl do auth_users (silhueta). Ver memória reference_fotos_nome_clickup_rh.
+const FOTOS_MANUAIS: { tokens: string[]; foto: string }[] = [
+  { tokens: ["rodrigo", "pimenta"], foto: fotoRodrigoPimenta },
+  { tokens: ["richard", "anderson"], foto: fotoRichardAnderson },
+  { tokens: ["breno", "moscardini"], foto: fotoBrenoMoscardini },
+  { tokens: ["leonardo", "kruger"], foto: fotoLeonardoKruger },
+];
+
+function normalizarNome(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function fotoManual(nome: string): string | null {
+  const tokens = normalizarNome(nome).split(/\s+/).filter(Boolean);
+  const match = FOTOS_MANUAIS.find((o) => o.tokens.every((t) => tokens.includes(t)));
+  return match ? match.foto : null;
+}
+
 function Avatar({ nome, fotoUrl }: { nome: string; fotoUrl: string | null }) {
   const initials = nome.split(" ").filter(Boolean).slice(0, 2).map(n => n[0]).join("").toUpperCase();
+  const foto = fotoManual(nome) ?? fotoUrl;
 
-  if (fotoUrl) {
+  if (foto) {
     return (
       <img
-        src={fotoUrl}
+        src={foto}
         alt={nome}
         className="w-14 h-14 rounded-full object-cover ring-2 ring-white/10 shadow-lg shadow-purple-500/10"
         onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
