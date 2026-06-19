@@ -60,7 +60,8 @@ O dashboard lê o MRR de janeiro do snapshot de **31/jan** — exatamente dentro
 
 **Validação pós-backfill (critérios de aceite):**
 - Fill-rate de `produto` nos dias `28/jan–10/fev` ≥ 97%.
-- MRR Performance jan (último snapshot do mês, `CASE_PRODUTO`) ≈ **509.412** (antes: 422.159).
+- MRR Performance jan (último snapshot do mês, `CASE_PRODUTO`) ≈ **506.662** (antes: 422.159).
+  - ⚠️ Nota: os **509.412** citados na seção 1 são da **régua só-por-servico** (auditoria), método diferente do backfill. O backfill usa `produto` (carry-forward `COALESCE(11/fev, 27/dez)`) → resultado ~**506.662**. O gap (~2,7k) vem de contratos que a régua-servico e a régua-produto classificam diferente (ex.: o caso `Gestão de Comunidade`→`Performance` de 27/dez vs 11/fev). A régua-produto é a oficial (consistente com a linha MRR da aba). Valor confirmado igual em local e em dry-run de prod.
 - Soma do MRR de todos os produtos em jan inalterada vs. soma por `servico` (o total não muda; só o mix).
 
 **Aplicação prod + local:** rodar primeiro em local (`cortex_dev`), validar; depois em prod (`dados_turbo`). Conforme [[feedback_db_prod_sync]].
