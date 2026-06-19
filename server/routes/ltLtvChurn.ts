@@ -407,16 +407,22 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       const minMes = meses[0];
       const maxMes = meses[meses.length - 1];
 
+      // Guard: empty axis (cold/empty table — avoids BETWEEN undefined AND undefined)
+      if (meses.length === 0) {
+        return res.json({ meses: [], produtos: [], celulas: {} });
+      }
+
+      // Date strings for parameterized generate_series (avoids repeated MIN scan inside ativos CTE)
+      const minMesDate = `${minMes}-01`;
+      const maxMesDate = `${maxMes}-01`;
+
       const rows: ContratoMesRow[] = [];
 
       if (status === "ativos" || status === "todos") {
         const ativos = (await db.execute(sql`
           WITH meses AS (
             SELECT to_char(d,'YYYY-MM') AS mes, d::date AS m
-            FROM generate_series(
-              (SELECT date_trunc('month', MIN(data_snapshot)) FROM "Clickup".cup_data_hist),
-              date_trunc('month', CURRENT_DATE) - interval '1 month',
-              interval '1 month') d
+            FROM generate_series(${minMesDate}::date, ${maxMesDate}::date, interval '1 month') d
           ),
           snap_ref AS (
             SELECT meses.mes, COALESCE(
