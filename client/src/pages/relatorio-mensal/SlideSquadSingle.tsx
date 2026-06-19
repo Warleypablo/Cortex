@@ -48,8 +48,7 @@ function fmtBRL(v: number): string {
   return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
-// Acima deste número de clientes o tooltip passa a 2 colunas pra não estourar a altura do slide
-const TOOLTIP_DUAS_COLUNAS = 14;
+const TOOLTIP_MAX_CLIENTES = 12;
 
 function fmtBRLExato(v: number): string {
   return `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
@@ -59,14 +58,16 @@ function ChurnClientesTooltip({ titulo, clientes, expansao = 0 }: { titulo: stri
   if (clientes.length === 0 && expansao <= 0) {
     return <p className="text-xs text-zinc-400">Nenhum churn no período</p>;
   }
-  const duasColunas = clientes.length > TOOLTIP_DUAS_COLUNAS;
+  const visiveis = clientes.slice(0, TOOLTIP_MAX_CLIENTES);
+  const restantes = clientes.slice(TOOLTIP_MAX_CLIENTES);
+  const valorRestante = restantes.reduce((acc, c) => acc + c.valor, 0);
   return (
-    <div className={duasColunas ? "max-w-lg" : "max-w-xs"}>
+    <div className="max-w-xs">
       <p className="text-[10px] font-semibold uppercase tracking-wider text-zinc-400 mb-1.5">
         {titulo} · {clientes.length} cliente{clientes.length > 1 ? "s" : ""}
       </p>
-      <ul className={`max-h-[60vh] overflow-y-auto ${duasColunas ? "grid grid-cols-2 gap-x-4 gap-y-0.5" : "space-y-0.5"}`}>
-        {clientes.map((c, i) => (
+      <ul className="space-y-0.5">
+        {visiveis.map((c, i) => (
           <li key={`${c.nome}-${i}`} className="flex items-baseline justify-between gap-4 text-xs">
             <span className={`truncate ${c.abonado ? "text-zinc-400" : "text-zinc-100"}`}>
               {c.nome}
@@ -75,8 +76,14 @@ function ChurnClientesTooltip({ titulo, clientes, expansao = 0 }: { titulo: stri
             <span className="tabular-nums shrink-0 text-zinc-100">{fmtBRLExato(c.valor)}</span>
           </li>
         ))}
+        {restantes.length > 0 && (
+          <li className="flex items-baseline justify-between gap-4 text-xs text-zinc-400">
+            <span>+ {restantes.length} outros</span>
+            <span className="tabular-nums shrink-0">{fmtBRLExato(valorRestante)}</span>
+          </li>
+        )}
         {expansao > 0 && (
-          <li className={`flex items-baseline justify-between gap-4 text-xs border-t border-white/10 mt-1 pt-1 ${duasColunas ? "col-span-2" : ""}`}>
+          <li className="flex items-baseline justify-between gap-4 text-xs border-t border-white/10 mt-1 pt-1">
             <span className="text-emerald-400">Expansão (abatida)</span>
             <span className="tabular-nums shrink-0 text-emerald-400">− {fmtBRLExato(expansao)}</span>
           </li>
