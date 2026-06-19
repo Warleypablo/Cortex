@@ -69,6 +69,8 @@ export function RankingPanel({ win }: { win: PerfWindow }) {
               <TableHead className="text-right">Hold %</TableHead>
               <TableHead className="text-right">CTR</TableHead>
               <TableHead className="text-right">Leads</TableHead>
+              <TableHead className="text-right">MQL</TableHead>
+              <TableHead className="text-right">%MQL</TableHead>
               <TableHead className="text-right">CPL</TableHead>
               <TableHead className="text-right">Vendas</TableHead>
               <TableHead className="text-right">CAC</TableHead>
@@ -78,7 +80,7 @@ export function RankingPanel({ win }: { win: PerfWindow }) {
           <TableBody>
             {isLoading && (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={13} className="text-center py-10 text-muted-foreground">
                   <Loader2 className="h-5 w-5 animate-spin inline mr-2" />
                   Calculando...
                 </TableCell>
@@ -86,7 +88,7 @@ export function RankingPanel({ win }: { win: PerfWindow }) {
             )}
             {!isLoading && rows.length === 0 && (
               <TableRow>
-                <TableCell colSpan={11} className="text-center py-10 text-muted-foreground">
+                <TableCell colSpan={13} className="text-center py-10 text-muted-foreground">
                   Sem dados de performance nessa janela.
                 </TableCell>
               </TableRow>
@@ -108,6 +110,8 @@ export function RankingPanel({ win }: { win: PerfWindow }) {
                 <TableCell className="text-right">{fmtPct(r.holdRate)}</TableCell>
                 <TableCell className="text-right">{fmtPct(r.ctr)}</TableCell>
                 <TableCell className="text-right">{fmtInt(r.leads)}</TableCell>
+                <TableCell className="text-right">{fmtInt(r.mqls)}</TableCell>
+                <TableCell className="text-right">{fmtPct(r.percMql)}</TableCell>
                 <TableCell className="text-right">{fmtBRL(r.cpl)}</TableCell>
                 <TableCell className="text-right">{fmtInt(r.vendas)}</TableCell>
                 <TableCell className="text-right">{fmtBRL(r.cac)}</TableCell>

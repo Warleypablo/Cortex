@@ -48,6 +48,7 @@ export interface CreativeRawRow {
   v3s: number;
   thruplay: number;
   leads: number;
+  mqls: number;
   vendas: number;
   receita: number;
 }
@@ -81,6 +82,10 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
           WHERE d.date_create >= $1::date AND d.date_create < ($2::date + INTERVAL '1 day')
         ) AS leads,
         COUNT(*) FILTER (
+          WHERE d.date_create >= $1::date AND d.date_create < ($2::date + INTERVAL '1 day')
+            AND d.mql = '1'
+        ) AS mqls,
+        COUNT(*) FILTER (
           WHERE d.stage_name = 'Negócio Ganho'
             AND d.data_fechamento >= $1::date AND d.data_fechamento <= $2::date
         ) AS vendas,
@@ -100,6 +105,7 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
            COALESCE(ins.v3s,0)         AS v3s,
            COALESCE(ins.thruplay,0)    AS thruplay,
            COALESCE(crm.leads,0)       AS leads,
+           COALESCE(crm.mqls,0)        AS mqls,
            COALESCE(crm.vendas,0)      AS vendas,
            COALESCE(crm.receita,0)     AS receita
     FROM cortex_core.creatives_library c
@@ -127,6 +133,7 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
     v3s: Number(x.v3s) || 0,
     thruplay: Number(x.thruplay) || 0,
     leads: Number(x.leads) || 0,
+    mqls: Number(x.mqls) || 0,
     vendas: Number(x.vendas) || 0,
     receita: Number(x.receita) || 0,
   }));
@@ -134,15 +141,15 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
 
 interface RawAgg {
   adCount: number; spend: number; impressions: number; clicks: number;
-  v3s: number; thruplay: number; leads: number; vendas: number; receita: number;
+  v3s: number; thruplay: number; leads: number; mqls: number; vendas: number; receita: number;
 }
 
 function emptyAgg(): RawAgg {
-  return { adCount: 0, spend: 0, impressions: 0, clicks: 0, v3s: 0, thruplay: 0, leads: 0, vendas: 0, receita: 0 };
+  return { adCount: 0, spend: 0, impressions: 0, clicks: 0, v3s: 0, thruplay: 0, leads: 0, mqls: 0, vendas: 0, receita: 0 };
 }
 function addAgg(a: RawAgg, x: RawAgg) {
   a.adCount += x.adCount; a.spend += x.spend; a.impressions += x.impressions; a.clicks += x.clicks;
-  a.v3s += x.v3s; a.thruplay += x.thruplay; a.leads += x.leads; a.vendas += x.vendas; a.receita += x.receita;
+  a.v3s += x.v3s; a.thruplay += x.thruplay; a.leads += x.leads; a.mqls += x.mqls; a.vendas += x.vendas; a.receita += x.receita;
 }
 
 /** Métricas derivadas dos contadores brutos. Pagas batem com a aba Criativos (mesma fonte). */
@@ -158,6 +165,8 @@ function derive(r: RawAgg) {
     hookRate: pct(r.v3s, r.impressions),       // 3s / impressões
     holdRate: pct(r.thruplay, r.impressions),  // thruplay / impressões
     leads: r.leads,
+    mqls: r.mqls,
+    percMql: pct(r.mqls, r.leads),             // % dos leads que viraram MQL
     vendas: r.vendas,
     receita: round(r.receita),
     cpl: r.leads > 0 ? round(r.spend / r.leads) : null,

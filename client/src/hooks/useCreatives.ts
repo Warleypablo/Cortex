@@ -158,6 +158,8 @@ export interface CreativeMetrics {
   hookRate: number | null;
   holdRate: number | null;
   leads: number;
+  mqls: number;
+  percMql: number | null;
   vendas: number;
   receita: number;
   cpl: number | null;

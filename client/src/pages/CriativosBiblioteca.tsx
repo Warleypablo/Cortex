@@ -358,8 +358,11 @@ export default function CriativosBiblioteca() {
                   <TableHead className="min-w-[110px]">Produto</TableHead>
                   <TableHead className="text-right border-l">Invest.</TableHead>
                   <TableHead className="text-right">Hook%</TableHead>
+                  <TableHead className="text-right">Hold%</TableHead>
                   <TableHead className="text-right">CTR</TableHead>
                   <TableHead className="text-right">Leads</TableHead>
+                  <TableHead className="text-right">MQL</TableHead>
+                  <TableHead className="text-right">%MQL</TableHead>
                   <TableHead className="text-right">Vendas</TableHead>
                   <TableHead className="text-right">CAC</TableHead>
                   <TableHead className="text-right border-r">ROAS</TableHead>
@@ -371,7 +374,7 @@ export default function CriativosBiblioteca() {
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={16} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={19} className="text-center py-10 text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin inline mr-2" />
                       Carregando...
                     </TableCell>
@@ -379,7 +382,7 @@ export default function CriativosBiblioteca() {
                 )}
                 {!isLoading && (data?.rows ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={16} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={19} className="text-center py-10 text-muted-foreground">
                       Nenhum criativo encontrado.
                     </TableCell>
                   </TableRow>
@@ -441,8 +444,11 @@ export default function CriativosBiblioteca() {
                         {p ? fmtBRL(p.spend) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{p ? fmtPct(p.hookRate) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{p ? fmtPct(p.holdRate) : "—"}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{p ? fmtPct(p.ctr) : "—"}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{p ? fmtInt(p.leads) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{p ? fmtInt(p.mqls) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{p ? fmtPct(p.percMql) : "—"}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{p ? fmtInt(p.vendas) : "—"}</TableCell>
                       <TableCell className="text-right text-sm tabular-nums">{p ? fmtBRL(p.cac) : "—"}</TableCell>
                       <TableCell className={`text-right text-sm tabular-nums border-r ${p ? roasClass(p.roas) : ""}`}>
