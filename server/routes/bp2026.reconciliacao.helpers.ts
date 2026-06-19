@@ -82,7 +82,7 @@ export function computeReconciliacao(produto: string, prev: SnapRow[], cur: Snap
   let mrrInicio = 0;
   let mrrFim = 0;
 
-  for (const id of ids) {
+  for (const id of Array.from(ids)) {
     const p = prevMap.get(id);
     const c = curMap.get(id);
     const wasIn = inPool(p, produto);

@@ -3,34 +3,30 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { computeReconciliacao, type SnapRow } from "./bp2026.reconciliacao.helpers";
+import { CASE_PRODUTO } from "./bp2026.revenue";
 
 const ANO = 2026;
 const PRODUTOS = ["performance", "creators", "social", "gc", "others"];
 
-// CASE_PRODUTO qualificado para contexto com JOIN cup_clientes (evita ambiguidade em servico/produto)
-const CASE_PRODUTO_HIST = sql`CASE
-  WHEN TRIM(COALESCE(h.produto, '')) = 'Performance' THEN 'performance'
-  WHEN TRIM(COALESCE(h.produto, '')) = 'Creators' THEN 'creators'
-  WHEN TRIM(COALESCE(h.produto, '')) = 'Social Media' THEN 'social'
-  WHEN TRIM(COALESCE(h.produto, '')) = 'Gestão de Comunidade' THEN 'gc'
-  WHEN TRIM(COALESCE(h.produto, '')) != '' THEN 'others'
-  WHEN h.servico ILIKE '%performance%' THEN 'performance'
-  WHEN h.servico ILIKE '%creator%' THEN 'creators'
-  WHEN h.servico ILIKE '%social%' THEN 'social'
-  WHEN h.servico ILIKE '%comunidade%' THEN 'gc'
-  ELSE 'others' END`;
-
 export async function fetchSnapRows(db: any, dia: string): Promise<SnapRow[]> {
+  // CASE_PRODUTO roda em CTE isolada sobre cup_data_hist (sem JOIN com cup_clientes,
+  // que também tem coluna servico/produto — evita ambiguidade de coluna).
+  // O JOIN com cup_clientes é feito na query externa, sobre o alias da CTE.
   const result = await db.execute(sql`
-    SELECT h.id_subtask,
+    WITH base AS (
+      SELECT h.id_subtask, h.id_task,
+             COALESCE(h.servico, '') AS servico,
+             LOWER(COALESCE(h.status, '')) AS status,
+             ${CASE_PRODUTO} AS linha,
+             COALESCE(h.valorr::numeric, 0) AS valorr
+      FROM "Clickup".cup_data_hist h
+      WHERE h.data_snapshot::date = ${dia}::date
+    )
+    SELECT b.id_subtask,
            COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
-           COALESCE(h.servico, '') AS servico,
-           LOWER(COALESCE(h.status, '')) AS status,
-           ${CASE_PRODUTO_HIST} AS linha,
-           COALESCE(h.valorr::numeric, 0) AS valorr
-    FROM "Clickup".cup_data_hist h
-    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
-    WHERE h.data_snapshot::date = ${dia}::date
+           b.servico, b.status, b.linha, b.valorr
+    FROM base b
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = b.id_task
   `);
   return (result.rows as any[]).map((r: any) => ({
     id_subtask: r.id_subtask, cliente: r.cliente, servico: r.servico,
