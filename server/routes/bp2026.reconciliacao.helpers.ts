@@ -98,6 +98,9 @@ export function computeReconciliacao(produto: string, prev: SnapRow[], cur: Snap
     };
 
     if (!wasIn && isIn) {
+      // entrada no pool. !wasIn já garante que estava fora do pool em prev,
+      // então p.linha === produto = mesmo produto que voltou (reativação);
+      // p.linha !== produto = veio de outro produto (mudança de produto).
       if (!p) buckets.vendas.push(mov);
       else if (p.linha === produto) buckets.reativacao.push(mov);
       else buckets.mudanca_produto.push(mov);
@@ -111,6 +114,7 @@ export function computeReconciliacao(produto: string, prev: SnapRow[], cur: Snap
     } else if (wasIn && isIn) {
       if (vFim > vIni) buckets.expansao.push(mov);
       else if (vFim < vIni) buckets.churn_downsell.push(mov);
+      // vFim === vIni (estável): delta 0, não entra em bucket de propósito.
     }
   }
 
