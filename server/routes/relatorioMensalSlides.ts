@@ -189,7 +189,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         turboClientesResult,
         turboChurnResult,
         turboCxcsResult,
-        crosssellPorCloserResult,
+        crosssellHistoricoResult,
         turboFaturamentoResult,
         turboRetencoesResult,
         indicacoesResult,
@@ -458,22 +458,29 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND d.data_fechamento < ${dataEnd}
         `),
 
-        // 12b. Cross-sell por closer (source PARTNER, mês de dados)
+        // 12b. Histórico mensal de Cross-sell/Upsell (source PARTNER) — YTD do ano de dados.
+        // Série de jan/{ano} até o mês de referência; generate_series + LEFT JOIN garantem que
+        // meses sem deal apareçam zerados. Total = mrr + pontual (calculado no frontend).
         db.execute(sql`
+          WITH meses AS (
+            SELECT generate_series(
+              DATE_TRUNC('year', ${dataStart}::date),
+              ${dataStart}::date,
+              INTERVAL '1 month'
+            )::date AS mes_inicio
+          )
           SELECT
-            COALESCE(c.nome, 'Sem Responsável') as nome,
-            COALESCE(SUM(d.valor_recorrente), 0)::numeric as mrr,
-            COALESCE(SUM(d.valor_pontual), 0)::numeric as pontual,
-            COUNT(*)::int as contratos
-          FROM "Bitrix".crm_deal d
-          LEFT JOIN "Bitrix".crm_closers c
-            ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
-          WHERE d.stage_name = 'Negócio Ganho'
+            TO_CHAR(m.mes_inicio, 'YYYY-MM') AS mes,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric AS mrr,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric AS pontual
+          FROM meses m
+          LEFT JOIN "Bitrix".crm_deal d
+            ON d.stage_name = 'Negócio Ganho'
             AND d.source = 'PARTNER'
-            AND d.data_fechamento >= ${dataStart}
-            AND d.data_fechamento < ${dataEnd}
-          GROUP BY COALESCE(c.nome, 'Sem Responsável')
-          ORDER BY (COALESCE(SUM(d.valor_recorrente), 0) + COALESCE(SUM(d.valor_pontual), 0)) DESC
+            AND d.data_fechamento >= m.mes_inicio
+            AND d.data_fechamento < (m.mes_inicio + INTERVAL '1 month')
+          GROUP BY m.mes_inicio
+          ORDER BY m.mes_inicio
         `),
 
         // 13. Faturamento pontual do mês (cup_contratos — data_entrega no mês)
@@ -1385,11 +1392,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         crosssellPontual: parseFloat(turboCxcs.crosssell_pontual) || 0,
         cxcsSolicitacoes: parseInt(turboCxcs.solicitacoes) || 0,
         crosssellContratos: parseInt(turboCxcs.solicitacoes) || 0,
-        crosssellPorCloser: (crosssellPorCloserResult.rows as any[]).map((row: any) => ({
-          nome: row.nome,
+        crosssellHistorico: (crosssellHistoricoResult.rows as any[]).map((row: any) => ({
+          mes: row.mes,
           mrr: parseFloat(row.mrr) || 0,
           pontual: parseFloat(row.pontual) || 0,
-          contratos: parseInt(row.contratos) || 0,
         })),
         faturamentoPontual: parseFloat(turboFat.faturamento_pontual) || 0,
         pontualCommerceQtr: parseFloat((pontualCommerceQtrResult.rows as any[])[0]?.pontual_commerce_qtr) || 0,
