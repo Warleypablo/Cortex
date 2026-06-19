@@ -394,7 +394,9 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       const status: "ativos" | "cancelados" | "todos" =
         raw === "cancelados" ? "cancelados" : raw === "todos" ? "todos" : "ativos";
 
-      // Eixo de meses: do 1º mês com snapshot até o mês anterior ao atual.
+      // Eixo de meses: do 1º snapshot (MIN(data_snapshot)) até o mês anterior — histórico
+      // completo. Difere de propósito do gráfico (evolucao-produto), que usa janela móvel de
+      // 12 meses; não "reconciliar" os dois.
       const mesesRows = (await db.execute(sql`
         SELECT to_char(d,'YYYY-MM') AS mes
         FROM generate_series(
@@ -404,13 +406,14 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
         ORDER BY d
       `)).rows as { mes: string }[];
       const meses = mesesRows.map((r) => r.mes);
-      const minMes = meses[0];
-      const maxMes = meses[meses.length - 1];
 
       // Guard: empty axis (cold/empty table — avoids BETWEEN undefined AND undefined)
       if (meses.length === 0) {
         return res.json({ meses: [], produtos: [], celulas: {} });
       }
+
+      const minMes = meses[0];
+      const maxMes = meses[meses.length - 1];
 
       // Date strings for parameterized generate_series (avoids repeated MIN scan inside ativos CTE)
       const minMesDate = `${minMes}-01`;
