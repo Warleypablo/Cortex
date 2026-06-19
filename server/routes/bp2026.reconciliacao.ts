@@ -18,19 +18,21 @@ export async function fetchSnapRows(db: any, dia: string): Promise<SnapRow[]> {
              COALESCE(h.servico, '') AS servico,
              LOWER(COALESCE(h.status, '')) AS status,
              ${CASE_PRODUTO} AS linha,
-             COALESCE(h.valorr::numeric, 0) AS valorr
+             COALESCE(h.valorr::numeric, 0) AS valorr,
+             h.data_inicio::text AS data_inicio
       FROM "Clickup".cup_data_hist h
       WHERE h.data_snapshot::date = ${dia}::date
     )
     SELECT b.id_subtask,
            COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
-           b.servico, b.status, b.linha, b.valorr
+           b.servico, b.status, b.linha, b.valorr, b.data_inicio
     FROM base b
     LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = b.id_task
   `);
   return (result.rows as any[]).map((r: any) => ({
     id_subtask: r.id_subtask, cliente: r.cliente, servico: r.servico,
     status: r.status, linha: r.linha, valorr: parseFloat(r.valorr),
+    dataInicio: r.data_inicio,
   }));
 }
 

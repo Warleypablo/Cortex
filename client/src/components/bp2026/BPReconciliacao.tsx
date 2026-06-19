@@ -11,6 +11,7 @@ const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
 interface ContratoMov {
   id_subtask: string; cliente: string; servico: string;
   valorrIni: number; valorrFim: number; delta: number;
+  dataInicio?: string | null;
   ultimoSnapshot?: string | null; emCupChurn?: boolean;
 }
 interface Componente {
@@ -78,7 +79,9 @@ export function BPReconciliacao({ produto, mes, titulo, onClose }: Props) {
                           <p className="truncate text-gray-800 dark:text-zinc-200">{m.cliente}</p>
                           <p className="truncate text-gray-500 dark:text-zinc-500">
                             {[m.servico,
-                              m.valorrIni && m.valorrFim ? `${fmtAbs(m.valorrIni)} → ${fmtAbs(m.valorrFim)}` : null,
+                              m.dataInicio ? `início ${m.dataInicio}` : null,
+                              m.valorrIni != null && m.valorrFim != null && m.valorrIni !== m.valorrFim
+                                ? `${fmtAbs(m.valorrIni)} → ${fmtAbs(m.valorrFim)}` : null,
                               c.chave === "saidas_sem_rastreio" ? `último ${m.ultimoSnapshot ?? "?"}` : null,
                               c.chave === "saidas_sem_rastreio" && m.emCupChurn === false ? "⚠ ausente em cup_churn" : null,
                             ].filter(Boolean).join(" · ")}

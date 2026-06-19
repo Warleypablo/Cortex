@@ -11,6 +11,7 @@ export interface SnapRow {
   status: string; // minúsculo (cup_data_hist)
   linha: string;  // 'performance' | 'creators' | 'social' | 'gc' | 'others'
   valorr: number;
+  dataInicio?: string | null; // data_inicio do contrato (≈ data_criado) p/ auditoria
 }
 
 export type ComponenteChave =
@@ -25,6 +26,7 @@ export interface ContratoMov {
   valorrIni: number;
   valorrFim: number;
   delta: number;
+  dataInicio?: string | null;
 }
 
 export interface Componente {
@@ -95,6 +97,7 @@ export function computeReconciliacao(produto: string, prev: SnapRow[], cur: Snap
     const mov: ContratoMov = {
       id_subtask: id, cliente: ref.cliente, servico: ref.servico,
       valorrIni: vIni, valorrFim: vFim, delta: vFim - vIni,
+      dataInicio: ref.dataInicio ?? null,
     };
 
     if (!wasIn && isIn) {
