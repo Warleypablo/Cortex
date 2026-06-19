@@ -23,6 +23,7 @@ import { Loader2, Trash2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import {
   useCreativeOptions,
+  useCreativeVocab,
   useCreateCreative,
   useUpdateCreative,
   useDeleteCreative,
@@ -48,6 +49,10 @@ const EMPTY: CreativePayload = {
   plataforma: "",
   personagem: "",
   tipoAd: "",
+  bodyTipo: "",
+  ctaTipo: "",
+  roteiroUrl: "",
+  clickupTaskId: "",
   observacao: "",
   adValidado: false,
 };
@@ -85,6 +90,7 @@ function buildNomeFinalPreview(tpId: string, p: CreativePayload): string {
 export function CreativeFormSheet({ open, mode, creative, onClose }: Props) {
   const { toast } = useToast();
   const { data: options } = useCreativeOptions();
+  const { data: vocab } = useCreativeVocab();
   const createMut = useCreateCreative();
   const updateMut = useUpdateCreative();
   const deleteMut = useDeleteCreative();
@@ -107,6 +113,10 @@ export function CreativeFormSheet({ open, mode, creative, onClose }: Props) {
         plataforma: creative.plataforma ?? "",
         personagem: creative.personagem ?? "",
         tipoAd: creative.tipoAd ?? "",
+        bodyTipo: creative.bodyTipo ?? "",
+        ctaTipo: creative.ctaTipo ?? "",
+        roteiroUrl: creative.roteiroUrl ?? "",
+        clickupTaskId: creative.clickupTaskId ?? "",
         observacao: creative.observacao ?? "",
         adValidado: creative.adValidado ?? false,
       });
@@ -159,6 +169,10 @@ export function CreativeFormSheet({ open, mode, creative, onClose }: Props) {
       plataforma: form.plataforma?.trim() || null,
       personagem: form.personagem?.trim() || null,
       tipoAd: form.tipoAd?.trim() || null,
+      bodyTipo: form.bodyTipo?.trim() || null,
+      ctaTipo: form.ctaTipo?.trim() || null,
+      roteiroUrl: form.roteiroUrl?.trim() || null,
+      clickupTaskId: form.clickupTaskId?.trim() || null,
       observacao: form.observacao?.trim() || null,
     };
     try {
@@ -195,6 +209,37 @@ export function CreativeFormSheet({ open, mode, creative, onClose }: Props) {
         variant: "destructive",
       });
     }
+  };
+
+  // Helper p/ select alimentado pelo vocabulário controlado (creative_vocab).
+  const vocabSelect = (label: string, field: keyof CreativePayload, kind: string) => {
+    const items = vocab?.byKind?.[kind] ?? [];
+    const value = (form[field] as string) ?? "";
+    return (
+      <div className="space-y-1">
+        <Label>{label}</Label>
+        <Select
+          value={value || "__none__"}
+          onValueChange={(v) => update(field, (v === "__none__" ? "" : v) as any)}
+        >
+          <SelectTrigger>
+            <SelectValue placeholder={`Selecione ${label.toLowerCase()}`} />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">— Vazio —</SelectItem>
+            {items.map((it) => (
+              <SelectItem key={it.value} value={it.value}>
+                {it.label}
+              </SelectItem>
+            ))}
+            {/* valor legado fora do vocabulário: mantém visível pra não sumir ao editar */}
+            {value && !items.some((it) => it.value === value) && (
+              <SelectItem value={value}>{value} (legado)</SelectItem>
+            )}
+          </SelectContent>
+        </Select>
+      </div>
+    );
   };
 
   // Helper p/ select com autocomplete + opção "outro"
@@ -292,12 +337,29 @@ export function CreativeFormSheet({ open, mode, creative, onClose }: Props) {
             {optionSelect("Tipo de AD", "tipoAd", options?.tipoAd ?? [])}
           </div>
 
-          <div className="grid grid-cols-1 gap-4">
+          {/* Dimensões modulares — vocabulário controlado (alimentam o ranking de inteligência) */}
+          <div className="grid grid-cols-3 gap-4">
+            {vocabSelect("Ângulo (hook)", "angulo", "angulo")}
+            {vocabSelect("Body / oferta", "bodyTipo", "bodyTipo")}
+            {vocabSelect("Tipo de CTA", "ctaTipo", "ctaTipo")}
+          </div>
+
+          {/* Elo com o roteiro/produção */}
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-1">
-              <Label>Ângulo</Label>
+              <Label>Link do roteiro (Google Doc)</Label>
               <Input
-                value={form.angulo ?? ""}
-                onChange={(e) => update("angulo", e.target.value)}
+                placeholder="https://docs.google.com/document/d/..."
+                value={form.roteiroUrl ?? ""}
+                onChange={(e) => update("roteiroUrl", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label>Task do ClickUp</Label>
+              <Input
+                placeholder="ID ou link da task"
+                value={form.clickupTaskId ?? ""}
+                onChange={(e) => update("clickupTaskId", e.target.value)}
               />
             </div>
           </div>

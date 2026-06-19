@@ -80,6 +80,10 @@ export interface CreativePayload {
   plataforma?: string | null;
   personagem?: string | null;
   tipoAd?: string | null;
+  bodyTipo?: string | null;
+  ctaTipo?: string | null;
+  roteiroUrl?: string | null;
+  clickupTaskId?: string | null;
   observacao?: string | null;
   adValidado?: boolean;
 }
@@ -139,6 +143,99 @@ export function useDeleteCreative() {
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["/api/growth/creatives"] });
+    },
+  });
+}
+
+// ============== Read-back: performance + ranking ==============
+
+export interface CreativeMetrics {
+  spend: number;
+  impressions: number;
+  clicks: number;
+  ctr: number | null;
+  cpm: number | null;
+  hookRate: number | null;
+  holdRate: number | null;
+  leads: number;
+  vendas: number;
+  receita: number;
+  cpl: number | null;
+  cac: number | null;
+  roas: number | null;
+}
+
+export interface CreativePerfRow extends CreativeMetrics {
+  creativeId: number;
+  tpId: string;
+  nomeDrive: string;
+  angulo: string | null;
+  personagem: string | null;
+  tipoAd: string | null;
+  produto: string | null;
+  bodyTipo: string | null;
+  ctaTipo: string | null;
+  adCount: number;
+}
+
+export interface CreativeRankRow extends CreativeMetrics {
+  dimension: string;
+  value: string;
+  criativos: number;
+}
+
+export interface PerfWindow {
+  since: string;
+  until: string;
+}
+
+export function useCreativePerformance(win: PerfWindow) {
+  return useQuery<{ since: string; until: string; rows: CreativePerfRow[] }>({
+    queryKey: ["/api/growth/creative-performance", { since: win.since, until: win.until }],
+    staleTime: 60 * 1000,
+  });
+}
+
+export function useCreativeRanking(win: PerfWindow, dimension: string) {
+  return useQuery<{ since: string; until: string; dimension: string; rows: CreativeRankRow[] }>({
+    queryKey: ["/api/growth/creative-ranking", { since: win.since, until: win.until, dimension }],
+    staleTime: 60 * 1000,
+  });
+}
+
+// ============== Vocabulário controlado ==============
+
+export interface VocabItem {
+  id: number;
+  kind: string;
+  value: string;
+  label: string;
+  sortOrder: number;
+  active: boolean;
+}
+
+export function useCreativeVocab(kind?: string) {
+  return useQuery<{ items: VocabItem[]; byKind: Record<string, VocabItem[]> }>({
+    queryKey: kind
+      ? ["/api/growth/creative-vocab", { kind }]
+      : ["/api/growth/creative-vocab"],
+    staleTime: 5 * 60 * 1000,
+  });
+}
+
+export function useUpsertVocab() {
+  const qc = useQueryClient();
+  return useMutation<
+    VocabItem,
+    Error,
+    { kind: string; value: string; label: string; sortOrder?: number; active?: boolean }
+  >({
+    mutationFn: async (payload) => {
+      const res = await apiRequest("POST", "/api/growth/creative-vocab", payload);
+      return res.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["/api/growth/creative-vocab"] });
     },
   });
 }

@@ -20,9 +20,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, X, ExternalLink, Loader2, Pencil } from "lucide-react";
+import { Plus, Search, X, ExternalLink, Loader2, Pencil, Settings2 } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Dialog,
   DialogContent,
@@ -36,9 +37,23 @@ import {
   useCreativesList,
   useCreativeOptions,
   useBulkUpdateCreatives,
+  useCreativePerformance,
   type Creative,
+  type CreativePerfRow,
 } from "@/hooks/useCreatives";
 import { CreativeFormSheet } from "@/components/criativos/biblioteca/CreativeFormSheet";
+import { RankingPanel } from "@/components/criativos/biblioteca/RankingPanel";
+import { VocabConfigDialog } from "@/components/criativos/biblioteca/VocabConfigDialog";
+import {
+  fmtBRL,
+  fmtInt,
+  fmtPct,
+  fmtRoas,
+  roasClass,
+  windowFromPreset,
+  WINDOW_PRESETS,
+  type WindowPreset,
+} from "@/lib/creativePerfFormat";
 
 const PAGE_SIZE = 50;
 
@@ -168,6 +183,18 @@ export default function CriativosBiblioteca() {
   const { data, isLoading } = useCreativesList(params);
   const { data: options } = useCreativeOptions();
 
+  // ---- Inteligência / performance ----
+  const [tab, setTab] = useState<"biblioteca" | "inteligencia">("biblioteca");
+  const [preset, setPreset] = useState<WindowPreset>("30d");
+  const [vocabOpen, setVocabOpen] = useState(false);
+  const win = useMemo(() => windowFromPreset(preset), [preset]);
+  const { data: perf } = useCreativePerformance(win);
+  const perfMap = useMemo(() => {
+    const m = new Map<number, CreativePerfRow>();
+    for (const r of perf?.rows ?? []) m.set(r.creativeId, r);
+    return m;
+  }, [perf]);
+
   const totalPages = Math.max(1, Math.ceil((data?.total ?? 0) / PAGE_SIZE));
 
   const clearFilters = () => {
@@ -180,18 +207,40 @@ export default function CriativosBiblioteca() {
 
   return (
     <div className="space-y-4">
-      <Card>
-        <CardHeader className="flex flex-row items-center justify-between gap-4">
-          <div>
-            <CardTitle>Biblioteca de Criativos</CardTitle>
-            <p className="text-sm text-gray-600 dark:text-zinc-400 mt-1">
-              {data?.total ?? 0} criativos cadastrados. Esta é a fonte do{" "}
-              <strong>Nome Final</strong> usado no Meta Ads.
-            </p>
+      <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <TabsList>
+            <TabsTrigger value="biblioteca">Biblioteca</TabsTrigger>
+            <TabsTrigger value="inteligencia">Inteligência</TabsTrigger>
+          </TabsList>
+          <div className="flex items-center gap-2">
+            <Select value={preset} onValueChange={(v) => setPreset(v as WindowPreset)}>
+              <SelectTrigger className="w-[170px]">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {WINDOW_PRESETS.map((p) => (
+                  <SelectItem key={p.value} value={p.value}>{p.label}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button variant="outline" size="icon" title="Listas controladas" onClick={() => setVocabOpen(true)}>
+              <Settings2 className="h-4 w-4" />
+            </Button>
+            <Button onClick={() => setFormState({ mode: "create" })}>
+              <Plus className="h-4 w-4 mr-2" /> Novo criativo
+            </Button>
           </div>
-          <Button onClick={() => setFormState({ mode: "create" })}>
-            <Plus className="h-4 w-4 mr-2" /> Novo criativo
-          </Button>
+        </div>
+
+        <TabsContent value="biblioteca" className="mt-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Biblioteca de Criativos</CardTitle>
+          <p className="text-sm text-gray-600 dark:text-zinc-400 mt-1">
+            {data?.total ?? 0} criativos cadastrados. Performance da janela{" "}
+            <strong>{WINDOW_PRESETS.find((p) => p.value === preset)?.label.toLowerCase()}</strong>.
+          </p>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="flex flex-wrap gap-2">
@@ -300,6 +349,13 @@ export default function CriativosBiblioteca() {
                   <TableHead className="w-[150px]">Variação</TableHead>
                   <TableHead className="w-[90px]">Formato</TableHead>
                   <TableHead className="min-w-[110px]">Produto</TableHead>
+                  <TableHead className="text-right border-l">Invest.</TableHead>
+                  <TableHead className="text-right">Hook%</TableHead>
+                  <TableHead className="text-right">CTR</TableHead>
+                  <TableHead className="text-right">Leads</TableHead>
+                  <TableHead className="text-right">Vendas</TableHead>
+                  <TableHead className="text-right">CAC</TableHead>
+                  <TableHead className="text-right border-r">ROAS</TableHead>
                   <TableHead className="w-[100px]">Data</TableHead>
                   <TableHead className="w-[110px]">Status</TableHead>
                   <TableHead className="w-[48px]"></TableHead>
@@ -308,7 +364,7 @@ export default function CriativosBiblioteca() {
               <TableBody>
                 {isLoading && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={16} className="text-center py-10 text-muted-foreground">
                       <Loader2 className="h-5 w-5 animate-spin inline mr-2" />
                       Carregando...
                     </TableCell>
@@ -316,13 +372,14 @@ export default function CriativosBiblioteca() {
                 )}
                 {!isLoading && (data?.rows ?? []).length === 0 && (
                   <TableRow>
-                    <TableCell colSpan={9} className="text-center py-10 text-muted-foreground">
+                    <TableCell colSpan={16} className="text-center py-10 text-muted-foreground">
                       Nenhum criativo encontrado.
                     </TableCell>
                   </TableRow>
                 )}
                 {(data?.rows ?? []).map((row, idx) => {
                   const meta = parseCreative(row.nomeDrive);
+                  const p = perfMap.get(row.id);
                   return (
                     <TableRow
                       key={row.id}
@@ -371,6 +428,18 @@ export default function CriativosBiblioteca() {
                       </TableCell>
                       <TableCell className="text-sm">
                         {row.produto || <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      {/* Performance (janela selecionada) — vinda do read-back por ad_id */}
+                      <TableCell className="text-right text-sm tabular-nums border-l">
+                        {p ? fmtBRL(p.spend) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{p ? fmtPct(p.hookRate) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{p ? fmtPct(p.ctr) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{p ? fmtInt(p.leads) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{p ? fmtInt(p.vendas) : "—"}</TableCell>
+                      <TableCell className="text-right text-sm tabular-nums">{p ? fmtBRL(p.cac) : "—"}</TableCell>
+                      <TableCell className={`text-right text-sm tabular-nums border-r ${p ? roasClass(p.roas) : ""}`}>
+                        {p ? fmtRoas(p.roas) : "—"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
                         {formatDateBr(row.dataPostagem)}
@@ -432,6 +501,24 @@ export default function CriativosBiblioteca() {
           )}
         </CardContent>
       </Card>
+        </TabsContent>
+
+        <TabsContent value="inteligencia" className="mt-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Inteligência de criativos</CardTitle>
+              <p className="text-sm text-gray-600 dark:text-zinc-400 mt-1">
+                Qual <strong>tipo</strong> de criativo converte melhor — vira briefing pro próximo
+                roteiro. Janela{" "}
+                <strong>{WINDOW_PRESETS.find((pp) => pp.value === preset)?.label.toLowerCase()}</strong>.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <RankingPanel win={win} />
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
 
       <CreativeFormSheet
         open={formState.mode !== "closed"}
@@ -502,6 +589,8 @@ export default function CriativosBiblioteca() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <VocabConfigDialog open={vocabOpen} onClose={() => setVocabOpen(false)} />
     </div>
   );
 }
