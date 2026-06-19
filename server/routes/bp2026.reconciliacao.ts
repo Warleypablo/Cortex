@@ -71,21 +71,28 @@ export function registerBp2026ReconciliacaoRoutes(app: Express, db: any) {
         contratos: c.contratos as any[],
       }));
       if (saidas && saidas.contratos.length) {
-        const ids = saidas.contratos.map((m) => m.id_subtask);
-        const enr = await db.execute(sql`
-          SELECT h.id_subtask,
-                 (SELECT MAX(x.data_snapshot::date)::text FROM "Clickup".cup_data_hist x WHERE x.id_subtask = h.id_subtask) AS ultimo,
-                 EXISTS (SELECT 1 FROM "Clickup".cup_churn ch WHERE ch.task_id = h.id_subtask) AS em_churn
-          FROM (SELECT DISTINCT unnest(${ids}::text[]) AS id_subtask) h
+        // lista de ids como $1,$2,... (sql.join evita o binding de array do drizzle)
+        const idList = sql.join(saidas.contratos.map((m) => sql`${m.id_subtask}`), sql`, `);
+        const ultimoRes = await db.execute(sql`
+          SELECT id_subtask, MAX(data_snapshot::date)::text AS ultimo
+          FROM "Clickup".cup_data_hist
+          WHERE id_subtask IN (${idList})
+          GROUP BY id_subtask
         `);
-        const meta = new Map((enr.rows as any[]).map((r) => [r.id_subtask, r]));
+        const churnRes = await db.execute(sql`
+          SELECT DISTINCT task_id AS id_subtask
+          FROM "Clickup".cup_churn
+          WHERE task_id IN (${idList})
+        `);
+        const ultimoMap = new Map((ultimoRes.rows as any[]).map((r) => [r.id_subtask, r.ultimo]));
+        const churnSet = new Set((churnRes.rows as any[]).map((r) => r.id_subtask));
         contratosPorComp = contratosPorComp.map((c) =>
           c.chave !== "saidas_sem_rastreio" ? c : {
             ...c,
             contratos: c.contratos.map((m) => ({
               ...m,
-              ultimoSnapshot: meta.get(m.id_subtask)?.ultimo ?? null,
-              emCupChurn: meta.get(m.id_subtask)?.em_churn ?? false,
+              ultimoSnapshot: ultimoMap.get(m.id_subtask) ?? null,
+              emCupChurn: churnSet.has(m.id_subtask),
             })),
           }
         );
