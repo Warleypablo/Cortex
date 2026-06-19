@@ -91,23 +91,26 @@ export async function getBatchByFolderId(
 }
 
 /**
- * Resolve as dimensões modulares (angulo/bodyTipo/ctaTipo) de um arquivo parseado contra o
- * `modules` do batch. Degrada de boa: código ausente ou batch sem o mapa → campo indefinido.
+ * Resolve o ângulo (única dimensão semântica) do hook (h##) contra o `modules.hooks` do batch.
+ * Body e CTA (b##/c##) são só identificadores — não viram campo semântico.
+ * Degrada de boa: sem código de hook ou sem o mapa → vazio.
  */
+// Normaliza códigos pra casar mesmo com padding diferente: "h03" e "h3" → "h3".
+function normCode(code: string): string {
+  return code.toLowerCase().replace(/^([a-z]+)0*(\d+)$/, "$1$2");
+}
+
 export function resolveModuleFields(
-  parsed: Pick<ParsedConvention, "hookCode" | "bodyCode" | "ctaCode"> | null,
+  parsed: Pick<ParsedConvention, "hookCode"> | null,
   batch: CreativeBatch | null,
-): { angulo?: string; bodyTipo?: string; ctaTipo?: string } {
-  const modules = (batch?.modules as any) || null;
-  if (!parsed || !modules) return {};
-  const out: { angulo?: string; bodyTipo?: string; ctaTipo?: string } = {};
-  if (parsed.hookCode && modules.hooks?.[parsed.hookCode]?.angulo)
-    out.angulo = modules.hooks[parsed.hookCode].angulo;
-  if (parsed.bodyCode && modules.bodies?.[parsed.bodyCode]?.tipo)
-    out.bodyTipo = modules.bodies[parsed.bodyCode].tipo;
-  if (parsed.ctaCode && modules.ctas?.[parsed.ctaCode]?.tipo)
-    out.ctaTipo = modules.ctas[parsed.ctaCode].tipo;
-  return out;
+): { angulo?: string } {
+  const hooks = (batch?.modules as any)?.hooks as Record<string, any> | undefined;
+  if (!parsed?.hookCode || !hooks) return {};
+  const want = normCode(parsed.hookCode);
+  for (const [k, v] of Object.entries(hooks)) {
+    if (normCode(k) === want && v?.angulo) return { angulo: v.angulo as string };
+  }
+  return {};
 }
 
 // ============== Vocabulário controlado ==============

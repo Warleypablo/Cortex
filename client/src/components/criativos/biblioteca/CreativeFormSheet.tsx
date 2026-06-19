@@ -337,11 +337,16 @@ export function CreativeFormSheet({ open, mode, creative, onClose }: Props) {
             {optionSelect("Tipo de AD", "tipoAd", options?.tipoAd ?? [])}
           </div>
 
-          {/* Dimensões modulares — vocabulário controlado (alimentam o ranking de inteligência) */}
-          <div className="grid grid-cols-3 gap-4">
+          {/* Ângulo do hook — única dimensão semântica (alimenta o ranking de inteligência).
+              Body e CTA são só identificadores (qual ativo) e aparecem na coluna Variação. */}
+          <div className="grid grid-cols-2 gap-4">
             {vocabSelect("Ângulo (hook)", "angulo", "angulo")}
-            {vocabSelect("Body / oferta", "bodyTipo", "bodyTipo")}
-            {vocabSelect("Tipo de CTA", "ctaTipo", "ctaTipo")}
+            <div className="space-y-1">
+              <Label className="text-muted-foreground">Variação (hook/body/cta)</Label>
+              <p className="text-sm text-muted-foreground pt-2">
+                Vem do nome do arquivo (ex: <code>h2 b3 c1</code>) — identifica qual ativo foi usado.
+              </p>
+            </div>
           </div>
 
           {/* Elo com o roteiro/produção */}

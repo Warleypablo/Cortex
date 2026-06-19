@@ -23,8 +23,6 @@ import { useCreativeVocab, useUpsertVocab } from "@/hooks/useCreatives";
 
 const KINDS: { value: string; label: string }[] = [
   { value: "angulo", label: "Ângulos (hook)" },
-  { value: "bodyTipo", label: "Body / oferta" },
-  { value: "ctaTipo", label: "Tipo de CTA" },
   { value: "produto", label: "Produtos" },
   { value: "persona", label: "Personas" },
 ];

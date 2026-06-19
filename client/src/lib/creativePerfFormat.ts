@@ -49,8 +49,6 @@ export function windowFromPreset(preset: WindowPreset): { since: string; until: 
 export const RANKING_DIMENSIONS: { value: string; label: string }[] = [
   { value: "angulo", label: "Ângulo (hook)" },
   { value: "personagem", label: "Personagem" },
-  { value: "bodyTipo", label: "Body / oferta" },
-  { value: "ctaTipo", label: "Tipo de CTA" },
   { value: "tipo", label: "Tipo de ad" },
   { value: "produto", label: "Produto" },
 ];

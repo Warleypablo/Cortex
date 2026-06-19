@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, X, ExternalLink, Loader2, Pencil, Settings2, FileText, FolderOpen } from "lucide-react";
+import { Plus, Search, X, ExternalLink, Loader2, Pencil, Settings2, FileText, Eye } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -57,6 +57,12 @@ import {
 
 const PAGE_SIZE = 50;
 
+// Conta da Turbo (act_1331413260627780) — pra deep-link de preview do ad no Gerenciador.
+const META_ACCOUNT_ID = "1331413260627780";
+function adPreviewUrl(adId: string): string {
+  return `https://www.facebook.com/adsmanager/manage/ads?act=${META_ACCOUNT_ID}&selected_ad_ids=${adId}`;
+}
+
 function formatDateBr(iso: string | Date | null | undefined): string {
   if (!iso) return "—";
   const d = typeof iso === "string" ? new Date(iso) : iso;
@@ -75,14 +81,15 @@ const FMT_STYLES: Record<string, string> = {
 };
 
 /**
- * Extrai estrutura do nome do criativo: formato (9x16/4x5...) e variação (hook/body/cta),
- * e devolve um "nome base" limpo (sem o sufixo h_b_c_formato, underscores → espaços).
- * Robusto a separadores `_`, espaço e `-` e a zeros à esquerda (h01).
+ * Extrai estrutura do nome do criativo: formato (9x16/4x5...) e variação (hook/body/cta = QUAL
+ * ativo foi usado), e devolve um "nome base" limpo (sem o sufixo h_b_c_formato).
+ * Robusto a: separadores opcionais (`h9b3c1` colado OU `h9-b3-c1`), `cta`/`c`, e zeros à esquerda.
  */
 function parseCreative(nomeDrive: string) {
   const noExt = (nomeDrive || "").replace(/\.[^.]+$/, "");
   const fmt = noExt.match(/(9x16|4x5|1x1|16x9)/i)?.[1]?.toLowerCase() ?? null;
-  const m = noExt.match(/h\s*0*(\d+)\s*[_\s-]+b\s*0*(\d+)\s*[_\s-]+c\s*0*(\d+)/i);
+  // separadores OPCIONAIS entre os códigos; cta aceita "c1" e "cta1"
+  const m = noExt.match(/h\s*0*(\d+)[_\s-]*b\s*0*(\d+)[_\s-]*c(?:ta)?\s*0*(\d+)/i);
   const hook = m?.[1] ?? null;
   const body = m?.[2] ?? null;
   const cta = m?.[3] ?? null;
@@ -457,6 +464,7 @@ export default function CriativosBiblioteca() {
                       </TableCell>
                       <TableCell onClick={(e) => e.stopPropagation()}>
                         <div className="flex items-center gap-2">
+                          {/* Roteiro (Google Doc) */}
                           {row.roteiroUrl ? (
                             <a
                               href={row.roteiroUrl}
@@ -468,8 +476,9 @@ export default function CriativosBiblioteca() {
                               <FileText className="h-4 w-4" />
                             </a>
                           ) : (
-                            <FileText className="h-4 w-4 text-muted-foreground/30" aria-label="sem roteiro" />
+                            <FileText className="h-4 w-4 text-muted-foreground/25" aria-label="sem roteiro" />
                           )}
+                          {/* Drive (arquivo do ad) */}
                           {row.linkDrive ? (
                             <a
                               href={row.linkDrive}
@@ -481,18 +490,21 @@ export default function CriativosBiblioteca() {
                               <ExternalLink className="h-4 w-4" />
                             </a>
                           ) : (
-                            <ExternalLink className="h-4 w-4 text-muted-foreground/30" aria-label="sem link do Drive" />
+                            <ExternalLink className="h-4 w-4 text-muted-foreground/25" aria-label="sem link do Drive" />
                           )}
-                          {row.driveFolderId && (
+                          {/* Preview do ad (Gerenciador de Anúncios) */}
+                          {p?.adId ? (
                             <a
-                              href={`https://drive.google.com/drive/folders/${row.driveFolderId}`}
+                              href={adPreviewUrl(p.adId)}
                               target="_blank"
                               rel="noreferrer"
-                              title="Abrir a pasta do ad no Drive"
+                              title="Preview do ad no Gerenciador"
                               className="text-muted-foreground hover:text-foreground"
                             >
-                              <FolderOpen className="h-4 w-4" />
+                              <Eye className="h-4 w-4" />
                             </a>
+                          ) : (
+                            <Eye className="h-4 w-4 text-muted-foreground/25" aria-label="sem ad vinculado" />
                           )}
                         </div>
                       </TableCell>

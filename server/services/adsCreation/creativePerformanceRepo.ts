@@ -34,6 +34,7 @@ export interface CreativeRawRow {
   creativeId: number;
   tpId: string;
   nomeDrive: string;
+  adId: string | null; // ad_id representativo (pra link de preview no Gerenciador)
   angulo: string | null;
   personagem: string | null;
   tipoAd: string | null;
@@ -56,6 +57,9 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
   const sql = `
     WITH links AS (
       SELECT DISTINCT creative_id, ad_id FROM cortex_core.creative_ad_links
+    ),
+    ids AS (
+      SELECT creative_id, MIN(ad_id) AS ad_id FROM links GROUP BY creative_id
     ),
     ins AS (
       SELECT l.creative_id,
@@ -87,7 +91,7 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
       JOIN "Bitrix".crm_deal d ON d.utm_content = l.ad_id
       GROUP BY l.creative_id
     )
-    SELECT c.id AS creative_id, c.tp_id, c.nome_drive,
+    SELECT c.id AS creative_id, c.tp_id, c.nome_drive, ids.ad_id,
            c.angulo, c.personagem, c.tipo_ad, c.produto, c.body_tipo, c.cta_tipo,
            COALESCE(ins.ad_count,0)    AS ad_count,
            COALESCE(ins.spend,0)       AS spend,
@@ -99,7 +103,7 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
            COALESCE(crm.vendas,0)      AS vendas,
            COALESCE(crm.receita,0)     AS receita
     FROM cortex_core.creatives_library c
-    JOIN (SELECT DISTINCT creative_id FROM cortex_core.creative_ad_links) lk ON lk.creative_id = c.id
+    JOIN ids ON ids.creative_id = c.id
     LEFT JOIN ins ON ins.creative_id = c.id
     LEFT JOIN crm ON crm.creative_id = c.id
     WHERE c.deleted_at IS NULL
@@ -109,6 +113,7 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
     creativeId: x.creative_id,
     tpId: x.tp_id,
     nomeDrive: x.nome_drive,
+    adId: x.ad_id ?? null,
     angulo: x.angulo,
     personagem: x.personagem,
     tipoAd: x.tipo_ad,
@@ -170,6 +175,7 @@ export async function getCreativePerformance(opts: { since: string; until: strin
       creativeId: r.creativeId,
       tpId: r.tpId,
       nomeDrive: r.nomeDrive,
+      adId: r.adId,
       angulo: r.angulo,
       personagem: r.personagem,
       tipoAd: r.tipoAd,

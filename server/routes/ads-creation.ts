@@ -373,10 +373,9 @@ export function registerAdsCreationRoutes(app: Express) {
               linkDrive,
               driveFileId: f.id,
               personagem: parsed.personagem,
-              // ângulo resolvido do hook (h##) via batch; fallback no nome do ad (comportamento legado)
+              // ângulo resolvido do hook (h##) via batch; fallback no nome do ad (comportamento legado).
+              // body/cta (b##/c##) são só identificadores — ficam no nome, não viram campo semântico.
               angulo: mod.angulo ?? parsed.nomeAd,
-              bodyTipo: mod.bodyTipo ?? null,
-              ctaTipo: mod.ctaTipo ?? null,
               // campos comuns herdados do cabeçalho do batch
               produto: batch?.produto ?? null,
               roteiroUrl: batch?.roteiroUrl ?? null,

@@ -124,21 +124,22 @@ export function parseFileNameConvention(filename: string): ParsedConvention | nu
   let s = filename.replace(VALID_EXT, "").toLowerCase();
 
   // Parse de trás pra frente: v, depois os modulares opcionais (c, b, h), depois formato.
-  const mVar = s.match(/-v(\d{2})$/);
+  // Dígitos 1-2 (h3 ou h03); cta aceita "c2" e "cta2".
+  const mVar = s.match(/-v(\d{1,2})$/);
   if (!mVar) return null;
   const variacao = `v${mVar[1]}`;
   s = s.slice(0, -mVar[0].length);
 
   let ctaCode: string | undefined;
-  const mCta = s.match(/-c(\d{2})$/);
+  const mCta = s.match(/-c(?:ta)?(\d{1,2})$/);
   if (mCta) { ctaCode = `c${mCta[1]}`; s = s.slice(0, -mCta[0].length); }
 
   let bodyCode: string | undefined;
-  const mBody = s.match(/-b(\d{2})$/);
+  const mBody = s.match(/-b(\d{1,2})$/);
   if (mBody) { bodyCode = `b${mBody[1]}`; s = s.slice(0, -mBody[0].length); }
 
   let hookCode: string | undefined;
-  const mHook = s.match(/-h(\d{2})$/);
+  const mHook = s.match(/-h(\d{1,2})$/);
   if (mHook) { hookCode = `h${mHook[1]}`; s = s.slice(0, -mHook[0].length); }
 
   const mFormato = s.match(/-(9x16|4x5|1x1|16x9)$/);

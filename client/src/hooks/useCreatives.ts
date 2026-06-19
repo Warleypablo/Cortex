@@ -169,6 +169,7 @@ export interface CreativePerfRow extends CreativeMetrics {
   creativeId: number;
   tpId: string;
   nomeDrive: string;
+  adId: string | null;
   angulo: string | null;
   personagem: string | null;
   tipoAd: string | null;
