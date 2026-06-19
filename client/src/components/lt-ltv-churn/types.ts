@@ -84,3 +84,17 @@ export interface EvolucaoClientePonto {
   ltMediana: number;
   ltvMediana: number;
 }
+
+export interface EvolucaoProdutoTabelaCelula {
+  lt: number;
+  ltv: number;
+  lt_mediana: number;
+  ltv_mediana: number;
+  n: number;
+}
+
+export interface EvolucaoProdutoTabelaData {
+  meses: string[];
+  produtos: string[];
+  celulas: Record<string, Record<string, EvolucaoProdutoTabelaCelula>>;
+}
