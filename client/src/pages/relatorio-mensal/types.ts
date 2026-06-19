@@ -95,11 +95,10 @@ export interface ContratosMes {
   vendasSeries: VendasMes[];
 }
 
-export interface CrosssellCloser {
-  nome: string;
+export interface CrosssellMes {
+  mes: string; // "YYYY-MM"
   mrr: number;
   pontual: number;
-  contratos: number;
 }
 
 export interface TurboMetrics {
@@ -118,7 +117,7 @@ export interface TurboMetrics {
   crosssellMrr: number;
   crosssellPontual: number;
   crosssellContratos: number;
-  crosssellPorCloser: CrosssellCloser[];
+  crosssellHistorico: CrosssellMes[];
   cxcsSolicitacoes: number;
   faturamentoPontual: number;
   pontualCommerceQtr: number;
