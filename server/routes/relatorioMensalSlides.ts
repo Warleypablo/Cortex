@@ -998,17 +998,32 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           SELECT
             r.nome,
             r.valor,
-            COALESCE(
-              NULLIF(a_id.picture, ''),
-              NULLIF(a_turbo.picture, ''),
-              NULLIF(a_pessoal.picture, '')
-            ) as "fotoUrl",
+            p.foto as "fotoUrl",
             p.cargo
           FROM ranking r
-          LEFT JOIN "Inhire".rh_pessoal p ON LOWER(TRIM(p.nome)) = LOWER(TRIM(r.nome))
-          LEFT JOIN cortex_core.auth_users a_id ON p.user_id IS NOT NULL AND p.user_id = a_id.id
-          LEFT JOIN cortex_core.auth_users a_turbo ON p.email_turbo IS NOT NULL AND LOWER(TRIM(p.email_turbo)) = LOWER(TRIM(a_turbo.email))
-          LEFT JOIN cortex_core.auth_users a_pessoal ON p.email_pessoal IS NOT NULL AND LOWER(TRIM(p.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+          LEFT JOIN LATERAL (
+            -- Match flexível: nome do ClickUp é curto ("Davi Ferraz") e o do RH é completo
+            -- ("Davi de Souza Ferraz Matos"). Casa por nome exato OU primeiro nome igual +
+            -- sobrenome do nome curto presente no nome completo. LIMIT 1 priorizando match
+            -- exato e quem tem foto (evita duplicar o ranking ou casar errado).
+            SELECT rp.cargo,
+              COALESCE(NULLIF(a_id.picture, ''), NULLIF(a_turbo.picture, ''), NULLIF(a_pessoal.picture, '')) AS foto
+            FROM "Inhire".rh_pessoal rp
+            LEFT JOIN cortex_core.auth_users a_id ON rp.user_id IS NOT NULL AND rp.user_id = a_id.id
+            LEFT JOIN cortex_core.auth_users a_turbo ON rp.email_turbo IS NOT NULL AND LOWER(TRIM(rp.email_turbo)) = LOWER(TRIM(a_turbo.email))
+            LEFT JOIN cortex_core.auth_users a_pessoal ON rp.email_pessoal IS NOT NULL AND LOWER(TRIM(rp.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+            WHERE rp.status = 'Ativo'
+              AND (
+                LOWER(TRIM(rp.nome)) = LOWER(TRIM(r.nome))
+                OR (
+                  split_part(LOWER(TRIM(rp.nome)), ' ', 1) = split_part(LOWER(TRIM(r.nome)), ' ', 1)
+                  AND regexp_replace(LOWER(TRIM(r.nome)), '^.* ', '') = ANY(string_to_array(LOWER(TRIM(rp.nome)), ' '))
+                )
+              )
+            ORDER BY (LOWER(TRIM(rp.nome)) = LOWER(TRIM(r.nome))) DESC,
+                     (COALESCE(NULLIF(a_id.picture, ''), NULLIF(a_turbo.picture, ''), NULLIF(a_pessoal.picture, '')) IS NOT NULL) DESC
+            LIMIT 1
+          ) p ON true
           ORDER BY r.valor DESC
         `),
 
@@ -1054,17 +1069,32 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           SELECT
             r.nome,
             r.valor,
-            COALESCE(
-              NULLIF(a_id.picture, ''),
-              NULLIF(a_turbo.picture, ''),
-              NULLIF(a_pessoal.picture, '')
-            ) as "fotoUrl",
+            p.foto as "fotoUrl",
             p.cargo
           FROM ranking r
-          LEFT JOIN "Inhire".rh_pessoal p ON LOWER(TRIM(p.nome)) = LOWER(TRIM(r.nome))
-          LEFT JOIN cortex_core.auth_users a_id ON p.user_id IS NOT NULL AND p.user_id = a_id.id
-          LEFT JOIN cortex_core.auth_users a_turbo ON p.email_turbo IS NOT NULL AND LOWER(TRIM(p.email_turbo)) = LOWER(TRIM(a_turbo.email))
-          LEFT JOIN cortex_core.auth_users a_pessoal ON p.email_pessoal IS NOT NULL AND LOWER(TRIM(p.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+          LEFT JOIN LATERAL (
+            -- Match flexível: nome do ClickUp é curto ("Davi Ferraz") e o do RH é completo
+            -- ("Davi de Souza Ferraz Matos"). Casa por nome exato OU primeiro nome igual +
+            -- sobrenome do nome curto presente no nome completo. LIMIT 1 priorizando match
+            -- exato e quem tem foto (evita duplicar o ranking ou casar errado).
+            SELECT rp.cargo,
+              COALESCE(NULLIF(a_id.picture, ''), NULLIF(a_turbo.picture, ''), NULLIF(a_pessoal.picture, '')) AS foto
+            FROM "Inhire".rh_pessoal rp
+            LEFT JOIN cortex_core.auth_users a_id ON rp.user_id IS NOT NULL AND rp.user_id = a_id.id
+            LEFT JOIN cortex_core.auth_users a_turbo ON rp.email_turbo IS NOT NULL AND LOWER(TRIM(rp.email_turbo)) = LOWER(TRIM(a_turbo.email))
+            LEFT JOIN cortex_core.auth_users a_pessoal ON rp.email_pessoal IS NOT NULL AND LOWER(TRIM(rp.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+            WHERE rp.status = 'Ativo'
+              AND (
+                LOWER(TRIM(rp.nome)) = LOWER(TRIM(r.nome))
+                OR (
+                  split_part(LOWER(TRIM(rp.nome)), ' ', 1) = split_part(LOWER(TRIM(r.nome)), ' ', 1)
+                  AND regexp_replace(LOWER(TRIM(r.nome)), '^.* ', '') = ANY(string_to_array(LOWER(TRIM(rp.nome)), ' '))
+                )
+              )
+            ORDER BY (LOWER(TRIM(rp.nome)) = LOWER(TRIM(r.nome))) DESC,
+                     (COALESCE(NULLIF(a_id.picture, ''), NULLIF(a_turbo.picture, ''), NULLIF(a_pessoal.picture, '')) IS NOT NULL) DESC
+            LIMIT 1
+          ) p ON true
           ORDER BY r.valor DESC
         `),
 
@@ -1088,17 +1118,32 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
           SELECT
             r.nome,
             r.valor,
-            COALESCE(
-              NULLIF(a_id.picture, ''),
-              NULLIF(a_turbo.picture, ''),
-              NULLIF(a_pessoal.picture, '')
-            ) as "fotoUrl",
+            p.foto as "fotoUrl",
             p.cargo
           FROM ranking r
-          LEFT JOIN "Inhire".rh_pessoal p ON LOWER(TRIM(p.nome)) = LOWER(TRIM(r.nome))
-          LEFT JOIN cortex_core.auth_users a_id ON p.user_id IS NOT NULL AND p.user_id = a_id.id
-          LEFT JOIN cortex_core.auth_users a_turbo ON p.email_turbo IS NOT NULL AND LOWER(TRIM(p.email_turbo)) = LOWER(TRIM(a_turbo.email))
-          LEFT JOIN cortex_core.auth_users a_pessoal ON p.email_pessoal IS NOT NULL AND LOWER(TRIM(p.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+          LEFT JOIN LATERAL (
+            -- Match flexível: nome do ClickUp é curto ("Davi Ferraz") e o do RH é completo
+            -- ("Davi de Souza Ferraz Matos"). Casa por nome exato OU primeiro nome igual +
+            -- sobrenome do nome curto presente no nome completo. LIMIT 1 priorizando match
+            -- exato e quem tem foto (evita duplicar o ranking ou casar errado).
+            SELECT rp.cargo,
+              COALESCE(NULLIF(a_id.picture, ''), NULLIF(a_turbo.picture, ''), NULLIF(a_pessoal.picture, '')) AS foto
+            FROM "Inhire".rh_pessoal rp
+            LEFT JOIN cortex_core.auth_users a_id ON rp.user_id IS NOT NULL AND rp.user_id = a_id.id
+            LEFT JOIN cortex_core.auth_users a_turbo ON rp.email_turbo IS NOT NULL AND LOWER(TRIM(rp.email_turbo)) = LOWER(TRIM(a_turbo.email))
+            LEFT JOIN cortex_core.auth_users a_pessoal ON rp.email_pessoal IS NOT NULL AND LOWER(TRIM(rp.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+            WHERE rp.status = 'Ativo'
+              AND (
+                LOWER(TRIM(rp.nome)) = LOWER(TRIM(r.nome))
+                OR (
+                  split_part(LOWER(TRIM(rp.nome)), ' ', 1) = split_part(LOWER(TRIM(r.nome)), ' ', 1)
+                  AND regexp_replace(LOWER(TRIM(r.nome)), '^.* ', '') = ANY(string_to_array(LOWER(TRIM(rp.nome)), ' '))
+                )
+              )
+            ORDER BY (LOWER(TRIM(rp.nome)) = LOWER(TRIM(r.nome))) DESC,
+                     (COALESCE(NULLIF(a_id.picture, ''), NULLIF(a_turbo.picture, ''), NULLIF(a_pessoal.picture, '')) IS NOT NULL) DESC
+            LIMIT 1
+          ) p ON true
           ORDER BY r.valor DESC
         `),
       ]);
