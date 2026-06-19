@@ -34,6 +34,7 @@ import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
 import SlideNPS from "./relatorio-mensal/SlideNPS";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
 import SlideTurboStore from "./relatorio-mensal/SlideTurboStore";
+import SlideTopicosFinais from "./relatorio-mensal/SlideTopicosFinais";
 import SlideCustom from "./relatorio-mensal/SlideCustom";
 
 const FIXED_SLIDE_NAMES = [
@@ -53,7 +54,8 @@ const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 26
 type SlotEntry =
   | { type: "fixed"; fixedIndex: number; name: string }
   | { type: "custom"; data: CustomSlide }
-  | { type: "squad"; squadIndex: number; name: string };
+  | { type: "squad"; squadIndex: number; name: string }
+  | { type: "topico"; revealCount: number; name: string };
 
 const MESES_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -96,6 +98,13 @@ function buildSlotArray(customSlides: CustomSlide[], squadDetails: SquadDetail[]
       }
     } else {
       slots.push({ type: "fixed", fixedIndex: i, name: FIXED_SLIDE_NAMES[i] });
+    }
+    // Tópicos Finais (princípios) — logo após o Turbo Store (índice 22).
+    // Começa com a lista vazia (reveal 0) e cada avanço faz o próximo tópico surgir (0→6 = 7 slides).
+    if (i === 22) {
+      for (let t = 0; t <= 6; t++) {
+        slots.push({ type: "topico", revealCount: t, name: t === 0 ? "Tópicos Finais" : `Tópico ${t}` });
+      }
     }
     // Insert custom slides that go after fixed slide i
     const customs = customSlides
@@ -175,6 +184,7 @@ export default function RelatorioMensal() {
     () => slots.map((s) =>
       s.type === "fixed"  ? s.name :
       s.type === "squad"  ? s.name :
+      s.type === "topico" ? s.name :
       (s.data.titulo || "Slide Custom")
     ),
     [slots]
@@ -320,6 +330,9 @@ export default function RelatorioMensal() {
     }
     if (slot.type === "squad") {
       return <SlideSquadSingle details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.mesDadosLabel} />;
+    }
+    if (slot.type === "topico") {
+      return <SlideTopicosFinais revealCount={slot.revealCount} />;
     }
     return (
       <SlideCustom
