@@ -757,6 +757,20 @@ export async function initializeSysSchema(): Promise<void> {
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_campaign_monthly_budget_month ON cortex_core.campaign_monthly_budget(month)`);
 
+    // Campaign Tags — grupo/tag por campanha (ex: inbound, evento). Tag única por
+    // campanha e estável entre meses (não tem coluna month, ao contrário das metas).
+    // Alimenta as abas de filtro da tela /growth/orcamento-campanhas.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.campaign_tags (
+        platform TEXT NOT NULL CHECK (platform IN ('meta', 'google')),
+        campaign_id TEXT NOT NULL,
+        tag TEXT NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT,
+        PRIMARY KEY (platform, campaign_id)
+      )
+    `);
+
     console.log('[database] cortex_core schema tables created');
 
     // Apply spec - UPSERT catalogs
