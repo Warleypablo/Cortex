@@ -27,10 +27,10 @@ const SHOW_GOOGLE = true;
 // TikTok entra aqui quando a fonte de dados de TikTok for adicionada ao backend.
 const PLATFORM_LABELS: Record<Platform, string> = { meta: "Meta", google: "Google" };
 const PLATFORM_ORDER: Platform[] = ["meta", "google"];
-// Cor aplicada a todas as linhas (cabeçalho da plataforma + campanhas).
-const PLATFORM_STYLES: Record<Platform, { text: string }> = {
-  meta: { text: "text-blue-700 dark:text-blue-400" },
-  google: { text: "text-amber-600 dark:text-amber-400" },
+// Cor de FUNDO aplicada a todas as linhas da plataforma (cabeçalho + campanhas).
+const PLATFORM_STYLES: Record<Platform, { row: string; icon: string }> = {
+  meta: { row: "bg-blue-100 dark:bg-blue-900/40", icon: "text-blue-600 dark:text-blue-400" },
+  google: { row: "bg-amber-100 dark:bg-amber-900/30", icon: "text-amber-600 dark:text-amber-400" },
 };
 
 // Tags/grupos (pools). Manter em sincronia com CAMPAIGN_TAGS no backend.
@@ -490,7 +490,7 @@ export default function GrowthOrcamentoCampanhas() {
   const renderCampaignRow = (c: Campanha) => {
     const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
     return (
-      <TableRow key={`${c.platform}-${c.campaignId}`} className={PLATFORM_STYLES[c.platform].text} data-testid={`row-${c.platform}-${c.campaignId}`}>
+      <TableRow key={`${c.platform}-${c.campaignId}`} className={PLATFORM_STYLES[c.platform].row} data-testid={`row-${c.platform}-${c.campaignId}`}>
         <TableCell className="font-medium pl-12">
           <div className="flex items-center gap-2">
             <span className="truncate max-w-[300px]" title={c.name}>{c.name}</span>
@@ -533,7 +533,7 @@ export default function GrowthOrcamentoCampanhas() {
       blocks.push(
         <TableRow
           key={`plat-${keyPrefix}-${p}`}
-          className={cn("cursor-pointer hover:bg-muted/40 font-medium", st.text)}
+          className={cn("cursor-pointer font-medium", st.row)}
           onClick={() => togglePlatform(key)}
           data-testid={`platform-subheader-${keyPrefix}-${p}`}
         >
@@ -542,7 +542,7 @@ export default function GrowthOrcamentoCampanhas() {
               {isOpen
                 ? <ChevronDown className="w-3.5 h-3.5 shrink-0" />
                 : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
-              <PlatformIcon platform={p} />
+              <PlatformIcon platform={p} className={st.icon} />
               {PLATFORM_LABELS[p]}
               <span className="opacity-60">({prs.length})</span>
             </span>
