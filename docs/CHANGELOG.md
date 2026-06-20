@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-06-20 | feat(orcamento-campanhas): planejamento top-down por etapa do funil
+
+**O que foi feito:**
+- O planejamento de investimento deixou de ser por campanha individual e passou a ser por **etapa do funil**. Define-se o total mensal do pool e distribui-se entre as etapas (Descoberta, Relacionamento, Conversão, Remarketing, Institucional).
+- Alvo de cada etapa em modo **híbrido**: % do total do pool ou valor R$ travado, com **barra de fechamento** ao vivo (mostra distribuído vs total: "fecha 100%", "faltam X" ou "passou X").
+- Tabela reagrupada por etapa dentro da aba (pool). O cabeçalho de cada etapa mostra alvo, orç. diário atual, projeção, investido, % atingido e o ritmo R$/dia necessário para bater o alvo.
+- Campanhas viram execução: só somam o gasto real ao balde da etapa, sem alvo individual. Select de etapa por campanha (manual).
+- DB: `campaign_tags` ganhou coluna `stage` (e `tag` virou nullable); novas tabelas `budget_pool_plan` (total por pool/mês) e `budget_stage_plan` (alvo por etapa, value+unit).
+- Backend: GET retorna `stage` por campanha e `plans` por pool; novos endpoints `PUT /stage`, `/plan/total` e `/plan/stage`.
+
+**Por que:**
+- Calcular meta R$ campanha a campanha era inviável e impreciso. Planejar por etapa (com % do total) deixa o replanejamento instantâneo — mudou o total, todas as etapas em % reescalam sozinhas.
+
+**Arquivos alterados:**
+- `server/db.ts` - coluna stage + tabelas de plano no bootstrap.
+- `server/routes/orcamentoCampanhas.ts` - constante CAMPAIGN_STAGES, stage/plans no GET, endpoints de stage e plano.
+- `client/src/pages/GrowthOrcamentoCampanhas.tsx` - reestruturação por etapa, editores de plano (total + alvo híbrido), barra de fechamento, select de etapa.
+- `scripts/create_campaign_tags.sql` - stage + migração de tag nullable.
+- `scripts/create_budget_plan.sql` - tabelas de plano (referência).
+
+**Impacto arquitetural:** Muda a unidade de planejamento (campanha → etapa). A `campaign_monthly_budget` e o endpoint `/meta` ficam órfãos (não usados na UI nova), preservados por ora; podem ser removidos depois.
+
+---
+
 ## 2026-06-20 | feat(orcamento-campanhas): tags/grupos por campanha com abas de filtro
 
 **O que foi feito:**
