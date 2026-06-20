@@ -23,6 +23,25 @@ type Platform = "meta" | "google";
 
 const SHOW_GOOGLE = true;
 
+// Tags/grupos para classificar campanhas. Manter em sincronia com CAMPAIGN_TAGS
+// no backend (server/routes/orcamentoCampanhas.ts).
+type CampaignTag = "inbound" | "evento";
+const TAG_OPTIONS: { value: CampaignTag; label: string }[] = [
+  { value: "inbound", label: "Inbound" },
+  { value: "evento", label: "Evento" },
+];
+const TAG_LABELS: Record<CampaignTag, string> = { inbound: "Inbound", evento: "Evento" };
+const NO_TAG = "__none__"; // sentinela para "Sem tag" no Select (Radix não aceita value vazio)
+
+// Abas de filtro no topo. "sem-tag" lista campanhas ainda não classificadas.
+type TabValue = "todas" | CampaignTag | "sem-tag";
+const TABS: { value: TabValue; label: string }[] = [
+  { value: "todas", label: "Todas" },
+  { value: "inbound", label: "Inbound" },
+  { value: "evento", label: "Evento" },
+  { value: "sem-tag", label: "Sem tag" },
+];
+
 interface Campanha {
   platform: Platform;
   campaignId: string;
@@ -34,6 +53,7 @@ interface Campanha {
   orcamentoDiarioMeta: number | null;
   projecaoAsIs: number;
   isDelivering: boolean;
+  tag: CampaignTag | null;
 }
 
 interface ApiResponse {
@@ -153,6 +173,59 @@ function MetaInput({
   );
 }
 
+function TagSelect({
+  platform,
+  campaignId,
+  value,
+  onSaved,
+  canEdit,
+}: {
+  platform: Platform;
+  campaignId: string;
+  value: CampaignTag | null;
+  onSaved: () => void;
+  canEdit: boolean;
+}) {
+  const { toast } = useToast();
+
+  if (!canEdit) {
+    return value ? (
+      <Badge variant="secondary" className="text-xs">{TAG_LABELS[value]}</Badge>
+    ) : (
+      <span className="text-muted-foreground text-xs">—</span>
+    );
+  }
+
+  const handleChange = async (next: string) => {
+    const tag = next === NO_TAG ? null : next;
+    try {
+      await apiRequest("PUT", "/api/growth/orcamento-campanhas/tag", { platform, campaignId, tag });
+      onSaved();
+    } catch (err) {
+      toast({ title: "Erro ao salvar grupo", description: String(err), variant: "destructive" });
+    }
+  };
+
+  return (
+    <Select value={value ?? NO_TAG} onValueChange={handleChange}>
+      <SelectTrigger
+        className="h-7 w-[120px] text-xs"
+        data-testid={`select-tag-${platform}-${campaignId}`}
+      >
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NO_TAG}>
+          <span className="text-muted-foreground">Sem tag</span>
+        </SelectItem>
+        {TAG_OPTIONS.map((o) => (
+          <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+}
+
 interface RowSums {
   daily: number;
   planejado: number;
@@ -217,6 +290,7 @@ export default function GrowthOrcamentoCampanhas() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }, []);
   const [month, setMonth] = useState<string>(defaultMonth);
+  const [activeTab, setActiveTab] = useState<TabValue>("todas");
 
   const { data, isLoading } = useQuery<ApiResponse>({
     queryKey: ["/api/growth/orcamento-campanhas", month],
@@ -230,10 +304,29 @@ export default function GrowthOrcamentoCampanhas() {
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["/api/growth/orcamento-campanhas", month] });
 
+  // Contagem por aba sobre TODAS as campanhas (independe da aba ativa).
+  const tabCounts = useMemo(() => {
+    const all = data?.campanhas ?? [];
+    return {
+      todas: all.length,
+      inbound: all.filter((c) => c.tag === "inbound").length,
+      evento: all.filter((c) => c.tag === "evento").length,
+      "sem-tag": all.filter((c) => !c.tag).length,
+    } as Record<TabValue, number>;
+  }, [data]);
+
+  // Campanhas filtradas pela aba ativa — alimenta tabela, subtotais e cards.
+  const filteredCampanhas = useMemo(() => {
+    const all = data?.campanhas ?? [];
+    if (activeTab === "todas") return all;
+    if (activeTab === "sem-tag") return all.filter((c) => !c.tag);
+    return all.filter((c) => c.tag === activeTab);
+  }, [data, activeTab]);
+
   const { metaRows, googleRows, totals } = useMemo(() => {
     const metaRows: Campanha[] = [];
     const googleRows: Campanha[] = [];
-    for (const c of data?.campanhas ?? []) {
+    for (const c of filteredCampanhas) {
       if (c.platform === "meta") metaRows.push(c);
       else if (SHOW_GOOGLE) googleRows.push(c);
       // Google escondido — não soma aos totais.
@@ -250,11 +343,11 @@ export default function GrowthOrcamentoCampanhas() {
         totalInvestido: s.investido,
       },
     };
-  }, [data]);
+  }, [filteredCampanhas]);
 
   const groupHeader = (label: string, color: string, count: number) => (
     <TableRow className={cn("font-semibold", color)}>
-      <TableCell colSpan={6} className="py-2">
+      <TableCell colSpan={7} className="py-2">
         <span className="uppercase tracking-wide text-xs">
           {label} <span className="opacity-60">({count})</span>
         </span>
@@ -269,6 +362,7 @@ export default function GrowthOrcamentoCampanhas() {
         <TableCell className="text-xs uppercase tracking-wide text-muted-foreground">
           Total {label}
         </TableCell>
+        <TableCell />
         <TableCell className="text-right font-mono">{formatCurrency(s.planejado)}</TableCell>
         <TableCell className="text-right font-mono">{formatCurrency(s.daily)}</TableCell>
         <TableCell className={cn("text-right font-mono", projecaoColor(s.projecao, s.planejado || null))}>
@@ -295,6 +389,15 @@ export default function GrowthOrcamentoCampanhas() {
             </Badge>
           )}
         </div>
+      </TableCell>
+      <TableCell>
+        <TagSelect
+          platform={c.platform}
+          campaignId={c.campaignId}
+          value={c.tag}
+          onSaved={invalidate}
+          canEdit={canEditMeta}
+        />
       </TableCell>
       <TableCell className="text-right">
         <MetaInput
@@ -348,6 +451,27 @@ export default function GrowthOrcamentoCampanhas() {
             <span className="font-medium text-foreground">{data.diasRestantes}</span> restantes
           </div>
         )}
+      </div>
+
+      {/* Abas de filtro por grupo. Cards e tabela abaixo refletem a aba ativa. */}
+      <div className="flex items-center gap-1 border-b">
+        {TABS.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => setActiveTab(t.value)}
+            data-testid={`tab-${t.value}`}
+            className={cn(
+              "px-3 py-1.5 text-sm font-medium -mb-px border-b-2 transition-colors",
+              activeTab === t.value
+                ? "border-primary text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground",
+            )}
+          >
+            {t.label}
+            <span className="ml-1.5 text-xs opacity-60">{tabCounts[t.value]}</span>
+          </button>
+        ))}
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
@@ -404,6 +528,7 @@ export default function GrowthOrcamentoCampanhas() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Campanha</TableHead>
+                  <TableHead>Grupo</TableHead>
                   <TableHead className="text-right">Investimento Planejado</TableHead>
                   <TableHead className="text-right">Orç. Diário (Atual)</TableHead>
                   <TableHead className="text-right">Projeção (As Is)</TableHead>
@@ -428,8 +553,17 @@ export default function GrowthOrcamentoCampanhas() {
                 {googleRows.map(renderRow)}
                 {googleRows.length > 0 && subtotalRow("Google Ads", googleRows)}
 
+                {metaRows.length === 0 && googleRows.length === 0 && (
+                  <TableRow>
+                    <TableCell colSpan={7} className="py-8 text-center text-muted-foreground">
+                      Nenhuma campanha nesta aba.
+                    </TableCell>
+                  </TableRow>
+                )}
+
                 <TableRow className="bg-amber-50 dark:bg-amber-950/30 font-semibold">
                   <TableCell>TOTAL</TableCell>
+                  <TableCell />
                   <TableCell className="text-right font-mono">{formatCurrency(totals.totalPlanejado)}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.totalDaily)}</TableCell>
                   <TableCell className={cn("text-right font-mono", projecaoColor(totals.totalProjecao, totals.totalPlanejado || null))}>

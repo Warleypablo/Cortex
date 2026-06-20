@@ -12,6 +12,11 @@ const ALLOWED_EDITOR_EMAILS = new Set([
 
 type Platform = "meta" | "google";
 
+// Tags/grupos válidos para classificar campanhas. Adicionar uma tag nova é só
+// incluir aqui (e no front) — não precisa de migração no banco.
+const CAMPAIGN_TAGS = ["inbound", "evento"] as const;
+type CampaignTag = (typeof CAMPAIGN_TAGS)[number];
+
 interface CampanhaRow {
   platform: Platform;
   campaignId: string;
@@ -23,6 +28,7 @@ interface CampanhaRow {
   orcamentoDiarioMeta: number | null;
   projecaoAsIs: number;
   isDelivering: boolean;
+  tag: CampaignTag | null;
 }
 
 function parseMonthParam(param: string | undefined): { firstDay: string; lastDay: string; year: number; month1Based: number } {
@@ -185,6 +191,17 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         metasMap.set(`${r.platform}:${r.campaign_id}`, Number(r.monthly_budget_target));
       }
 
+      // ===== Tags/grupos por campanha (estáveis entre meses) =====
+      const tagsRes = await db.execute(sql`
+        SELECT platform, campaign_id, tag FROM cortex_core.campaign_tags
+      `);
+      const tagsMap = new Map<string, CampaignTag>();
+      for (const r of tagsRes.rows || []) {
+        if ((CAMPAIGN_TAGS as readonly string[]).includes(r.tag)) {
+          tagsMap.set(`${r.platform}:${r.campaign_id}`, r.tag as CampaignTag);
+        }
+      }
+
       const buildRow = (platform: Platform, row: any): CampanhaRow => {
         const campaignId = String(row.campaign_id);
         const dailyBudgetAtual = Number(row.daily_budget_atual) || 0;
@@ -216,6 +233,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           orcamentoDiarioMeta,
           projecaoAsIs,
           isDelivering,
+          tag: tagsMap.get(`${platform}:${campaignId}`) ?? null,
         };
       };
 
@@ -284,6 +302,49 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error upserting orcamento-campanhas meta:", error);
       res.status(500).json({ error: "Failed to save meta" });
+    }
+  });
+
+  // Upsert/remoção da tag (grupo) de uma campanha. tag = null limpa a classificação.
+  app.put("/api/growth/orcamento-campanhas/tag", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem alterar tags." });
+      }
+      const { platform, campaignId, tag } = req.body || {};
+      if (platform !== "meta" && platform !== "google") {
+        return res.status(400).json({ error: "platform must be 'meta' or 'google'" });
+      }
+      if (!campaignId || typeof campaignId !== "string") {
+        return res.status(400).json({ error: "campaignId is required" });
+      }
+      // tag null/"" => remove; senão precisa ser uma tag válida.
+      const isClearing = tag === null || tag === undefined || tag === "";
+      if (!isClearing && !(CAMPAIGN_TAGS as readonly string[]).includes(tag)) {
+        return res.status(400).json({ error: `tag must be one of: ${CAMPAIGN_TAGS.join(", ")} (or null to clear)` });
+      }
+
+      if (isClearing) {
+        await db.execute(sql`
+          DELETE FROM cortex_core.campaign_tags
+          WHERE platform = ${platform} AND campaign_id = ${campaignId}
+        `);
+      } else {
+        await db.execute(sql`
+          INSERT INTO cortex_core.campaign_tags (platform, campaign_id, tag, updated_by)
+          VALUES (${platform}, ${campaignId}, ${tag}, ${userEmail})
+          ON CONFLICT (platform, campaign_id) DO UPDATE SET
+            tag = EXCLUDED.tag,
+            updated_by = EXCLUDED.updated_by,
+            updated_at = NOW()
+        `);
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error upserting orcamento-campanhas tag:", error);
+      res.status(500).json({ error: "Failed to save tag" });
     }
   });
 }
