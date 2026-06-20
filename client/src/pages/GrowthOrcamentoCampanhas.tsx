@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, TrendingUp, Target, Calendar, Facebook, Search as SearchIcon, Loader2 } from "lucide-react";
+import { DollarSign, TrendingUp, Target, Calendar, Facebook, Search as SearchIcon, Loader2, ChevronRight, ChevronDown } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
@@ -23,10 +23,22 @@ type Platform = "meta" | "google";
 
 const SHOW_GOOGLE = true;
 
-// Ordem e rótulos de plataforma para o sub-agrupamento dentro da etapa.
+// Ordem, rótulos e cores de plataforma para o sub-agrupamento dentro da etapa.
 // TikTok entra aqui quando a fonte de dados de TikTok for adicionada ao backend.
 const PLATFORM_LABELS: Record<Platform, string> = { meta: "Meta", google: "Google" };
 const PLATFORM_ORDER: Platform[] = ["meta", "google"];
+const PLATFORM_STYLES: Record<Platform, { row: string; icon: string; border: string }> = {
+  meta: {
+    row: "bg-blue-50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200",
+    icon: "text-blue-600 dark:text-blue-400",
+    border: "border-l-2 border-blue-400 dark:border-blue-600",
+  },
+  google: {
+    row: "bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200",
+    icon: "text-amber-600 dark:text-amber-400",
+    border: "border-l-2 border-amber-400 dark:border-amber-600",
+  },
+};
 
 // Tags/grupos (pools). Manter em sincronia com CAMPAIGN_TAGS no backend.
 type CampaignTag = "inbound" | "evento";
@@ -126,9 +138,9 @@ function deriveStageTarget(plan: StagePlan | undefined, poolTotal: number | null
   return (plan.value / 100) * poolTotal;
 }
 
-function PlatformIcon({ platform }: { platform: Platform }) {
-  if (platform === "meta") return <Facebook className="w-4 h-4" />;
-  return <SearchIcon className="w-4 h-4" />;
+function PlatformIcon({ platform, className }: { platform: Platform; className?: string }) {
+  if (platform === "meta") return <Facebook className={cn("w-4 h-4", className)} />;
+  return <SearchIcon className={cn("w-4 h-4", className)} />;
 }
 
 // Investido vs alvo: verde abaixo de 80%, amarelo 80-100%, vermelho >=100%.
@@ -379,6 +391,14 @@ export default function GrowthOrcamentoCampanhas() {
   }, []);
   const [month, setMonth] = useState<string>(defaultMonth);
   const [activeTab, setActiveTab] = useState<TabValue>("todas");
+  // Plataformas expandidas (chave `${etapa}:${plataforma}`). Padrão: fechado.
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const togglePlatform = (key: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(key) ? next.delete(key) : next.add(key);
+      return next;
+    });
 
   const { data, isLoading } = useQuery<ApiResponse>({
     queryKey: ["/api/growth/orcamento-campanhas", month],
@@ -478,7 +498,7 @@ export default function GrowthOrcamentoCampanhas() {
     const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
     return (
       <TableRow key={`${c.platform}-${c.campaignId}`} data-testid={`row-${c.platform}-${c.campaignId}`}>
-        <TableCell className="font-medium pl-12">
+        <TableCell className={cn("font-medium pl-12", PLATFORM_STYLES[c.platform].border)}>
           <div className="flex items-center gap-2">
             <span className="truncate max-w-[300px]" title={c.name}>{c.name}</span>
             {c.status === "PAUSED" && <Badge variant="outline" className="text-xs">Pausada</Badge>}
@@ -514,21 +534,31 @@ export default function GrowthOrcamentoCampanhas() {
       const prs = byPlatform.get(p);
       if (!prs || prs.length === 0) continue;
       const s = sumStage(prs);
+      const key = `${keyPrefix}:${p}`;
+      const isOpen = expanded.has(key);
+      const st = PLATFORM_STYLES[p];
       blocks.push(
-        <TableRow key={`plat-${keyPrefix}-${p}`} className="bg-muted/20" data-testid={`platform-subheader-${keyPrefix}-${p}`}>
-          <TableCell colSpan={3} className="py-1 pl-8">
-            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
-              <PlatformIcon platform={p} /> {PLATFORM_LABELS[p]} <span className="opacity-60">({prs.length})</span>
+        <TableRow
+          key={`plat-${keyPrefix}-${p}`}
+          className={cn("cursor-pointer", st.row)}
+          onClick={() => togglePlatform(key)}
+          data-testid={`platform-subheader-${keyPrefix}-${p}`}
+        >
+          <TableCell colSpan={3} className="py-1 pl-6">
+            <span className="flex items-center gap-1.5 text-xs font-medium">
+              {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
+              <PlatformIcon platform={p} className={st.icon} /> {PLATFORM_LABELS[p]}
+              <span className="opacity-60">({prs.length})</span>
             </span>
           </TableCell>
-          <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
-          <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrency(s.daily)}</TableCell>
-          <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrency(s.projecao)}</TableCell>
-          <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrency(s.investido)}</TableCell>
-          <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
+          <TableCell className="text-right text-xs opacity-50">—</TableCell>
+          <TableCell className="text-right font-mono text-xs">{formatCurrency(s.daily)}</TableCell>
+          <TableCell className="text-right font-mono text-xs">{formatCurrency(s.projecao)}</TableCell>
+          <TableCell className="text-right font-mono text-xs">{formatCurrency(s.investido)}</TableCell>
+          <TableCell className="text-right text-xs opacity-50">—</TableCell>
         </TableRow>,
       );
-      for (const c of prs) blocks.push(renderCampaignRow(c));
+      if (isOpen) for (const c of prs) blocks.push(renderCampaignRow(c));
     }
     return blocks;
   };
