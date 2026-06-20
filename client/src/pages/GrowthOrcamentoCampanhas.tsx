@@ -27,15 +27,9 @@ const SHOW_GOOGLE = true;
 // TikTok entra aqui quando a fonte de dados de TikTok for adicionada ao backend.
 const PLATFORM_LABELS: Record<Platform, string> = { meta: "Meta", google: "Google" };
 const PLATFORM_ORDER: Platform[] = ["meta", "google"];
-const PLATFORM_STYLES: Record<Platform, { icon: string; border: string }> = {
-  meta: {
-    icon: "text-blue-600 dark:text-blue-400",
-    border: "border-l-[3px] border-blue-500/70 dark:border-blue-500/60",
-  },
-  google: {
-    icon: "text-amber-600 dark:text-amber-400",
-    border: "border-l-[3px] border-amber-500/70 dark:border-amber-500/60",
-  },
+const PLATFORM_STYLES: Record<Platform, { icon: string }> = {
+  meta: { icon: "text-blue-600 dark:text-blue-400" },
+  google: { icon: "text-amber-600 dark:text-amber-400" },
 };
 
 // Tags/grupos (pools). Manter em sincronia com CAMPAIGN_TAGS no backend.
@@ -496,7 +490,7 @@ export default function GrowthOrcamentoCampanhas() {
     const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
     return (
       <TableRow key={`${c.platform}-${c.campaignId}`} data-testid={`row-${c.platform}-${c.campaignId}`}>
-        <TableCell className={cn("font-medium pl-12", PLATFORM_STYLES[c.platform].border)}>
+        <TableCell className="font-medium pl-12">
           <div className="flex items-center gap-2">
             <span className="truncate max-w-[300px]" title={c.name}>{c.name}</span>
             {c.status === "PAUSED" && <Badge variant="outline" className="text-xs">Pausada</Badge>}
@@ -542,7 +536,7 @@ export default function GrowthOrcamentoCampanhas() {
           onClick={() => togglePlatform(key)}
           data-testid={`platform-subheader-${keyPrefix}-${p}`}
         >
-          <TableCell colSpan={3} className={cn("py-1.5 pl-6", st.border)}>
+          <TableCell colSpan={3} className="py-1.5 pl-6">
             <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
               {isOpen
                 ? <ChevronDown className="w-3.5 h-3.5 shrink-0" />
