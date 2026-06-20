@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-20 | feat(orcamento-campanhas): tags/grupos por campanha com abas de filtro
+
+**O que foi feito:**
+- Nova tabela `cortex_core.campaign_tags` (tag única por campanha, sem coluna `month` — a classificação persiste entre meses).
+- Coluna "Grupo" editável inline na tela /growth/orcamento-campanhas (dropdown Inbound/Evento/Sem tag), restrita aos editores autorizados.
+- Abas de filtro no topo (Todas / Inbound / Evento / Sem tag) com contagem por aba; cards de resumo, subtotais e tabela passam a refletir a aba ativa.
+- Endpoint `PUT /api/growth/orcamento-campanhas/tag` para salvar/limpar a tag, validando contra a constante `CAMPAIGN_TAGS`.
+
+**Por que:**
+- A conta de Meta Ads é compartilhada por times com produtos/orçamentos distintos (ex: funis principais vs. campanhas de evento de outro time), o que polui a visão de orçamento. As abas permitem isolar e somar o orçamento de cada grupo separadamente.
+
+**Arquivos alterados:**
+- `server/db.ts` - criação da tabela `campaign_tags` no bootstrap.
+- `server/routes/orcamentoCampanhas.ts` - constante `CAMPAIGN_TAGS`, anexa `tag` em cada campanha no GET, novo endpoint PUT de tag.
+- `client/src/pages/GrowthOrcamentoCampanhas.tsx` - abas de filtro, coluna Grupo com `TagSelect` inline, filtro/contagem por aba.
+- `scripts/create_campaign_tags.sql` - script de referência da tabela.
+
+**Impacto arquitetural:** Nenhum — segue o mesmo padrão da tabela `campaign_monthly_budget` e dos endpoints existentes da mesma tela.
+
+---
+
 ## 2026-06-18 | style(relatorio-mensal): slide Pontual preenche o espaço após remoção do bloco
 
 **O que foi feito:**
