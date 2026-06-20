@@ -23,6 +23,11 @@ type Platform = "meta" | "google";
 
 const SHOW_GOOGLE = true;
 
+// Ordem e rótulos de plataforma para o sub-agrupamento dentro da etapa.
+// TikTok entra aqui quando a fonte de dados de TikTok for adicionada ao backend.
+const PLATFORM_LABELS: Record<Platform, string> = { meta: "Meta", google: "Google" };
+const PLATFORM_ORDER: Platform[] = ["meta", "google"];
+
 // Tags/grupos (pools). Manter em sincronia com CAMPAIGN_TAGS no backend.
 type CampaignTag = "inbound" | "evento";
 const TAG_OPTIONS: { value: CampaignTag; label: string }[] = [
@@ -473,10 +478,9 @@ export default function GrowthOrcamentoCampanhas() {
     const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
     return (
       <TableRow key={`${c.platform}-${c.campaignId}`} data-testid={`row-${c.platform}-${c.campaignId}`}>
-        <TableCell className="font-medium pl-6">
+        <TableCell className="font-medium pl-12">
           <div className="flex items-center gap-2">
-            <PlatformIcon platform={c.platform} />
-            <span className="truncate max-w-[320px]" title={c.name}>{c.name}</span>
+            <span className="truncate max-w-[300px]" title={c.name}>{c.name}</span>
             {c.status === "PAUSED" && <Badge variant="outline" className="text-xs">Pausada</Badge>}
             {c.status !== "PAUSED" && !c.isDelivering && (
               <Badge variant="outline" className="text-xs" title="Sem gasto nos últimos 3 dias — projeção não extrapola.">
@@ -496,6 +500,37 @@ export default function GrowthOrcamentoCampanhas() {
         <TableCell className="text-right text-muted-foreground">—</TableCell>
       </TableRow>
     );
+  };
+
+  // Dentro de uma etapa, separa as campanhas por plataforma (sub-cabeçalho + subtotal).
+  const renderPlatformBlocks = (rows: Campanha[], keyPrefix: string) => {
+    const byPlatform = new Map<Platform, Campanha[]>();
+    for (const c of rows) {
+      if (!byPlatform.has(c.platform)) byPlatform.set(c.platform, []);
+      byPlatform.get(c.platform)!.push(c);
+    }
+    const blocks: JSX.Element[] = [];
+    for (const p of PLATFORM_ORDER) {
+      const prs = byPlatform.get(p);
+      if (!prs || prs.length === 0) continue;
+      const s = sumStage(prs);
+      blocks.push(
+        <TableRow key={`plat-${keyPrefix}-${p}`} className="bg-muted/20" data-testid={`platform-subheader-${keyPrefix}-${p}`}>
+          <TableCell colSpan={3} className="py-1 pl-8">
+            <span className="flex items-center gap-1.5 text-xs text-muted-foreground">
+              <PlatformIcon platform={p} /> {PLATFORM_LABELS[p]} <span className="opacity-60">({prs.length})</span>
+            </span>
+          </TableCell>
+          <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
+          <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrency(s.daily)}</TableCell>
+          <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrency(s.projecao)}</TableCell>
+          <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrency(s.investido)}</TableCell>
+          <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>
+        </TableRow>,
+      );
+      for (const c of prs) blocks.push(renderCampaignRow(c));
+    }
+    return blocks;
   };
 
   const renderStageGroup = (stage: CampaignStage) => {
@@ -536,7 +571,7 @@ export default function GrowthOrcamentoCampanhas() {
             {target && target > 0 ? `${((s.investido / target) * 100).toFixed(0)}%` : "—"}
           </TableCell>
         </TableRow>
-        {rows.map(renderCampaignRow)}
+        {renderPlatformBlocks(rows, stage)}
       </>
     );
   };
@@ -598,7 +633,7 @@ export default function GrowthOrcamentoCampanhas() {
         </Card>
       </div>
 
-      {/* Painel de planejamento do pool: total + barra de fechamento. */}
+      {/* Painel de planejamento do pool: total do mês + progresso da distribuição. */}
       {poolForTab && (
         <Card>
           <CardContent className="py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
@@ -607,16 +642,22 @@ export default function GrowthOrcamentoCampanhas() {
               <PoolTotalInput pool={poolForTab} month={month} value={plans[poolForTab]?.total ?? null} onSaved={invalidate} canEdit={canEdit} />
             </div>
             {closing && closing.total != null && (
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-muted-foreground">Distribuído:</span>
-                <span className="font-mono">{formatCurrency(closing.sumTargets)}</span>
-                <span className="text-muted-foreground">de {formatCurrency(closing.total)}</span>
-                {Math.abs(closing.diff) < 0.5 ? (
-                  <Badge className="bg-green-600 hover:bg-green-600 text-xs">fecha 100%</Badge>
-                ) : closing.diff > 0 ? (
-                  <Badge variant="outline" className="text-xs text-yellow-600 dark:text-yellow-400">faltam {formatCurrency(closing.diff)}</Badge>
+              <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                {closing.sumTargets === 0 ? (
+                  <span>Defina o alvo de cada etapa abaixo para distribuir o total.</span>
                 ) : (
-                  <Badge variant="outline" className="text-xs text-red-500 dark:text-red-400">passou {formatCurrency(-closing.diff)}</Badge>
+                  <>
+                    <span>Distribuído entre etapas:</span>
+                    <span className="font-mono text-foreground">{formatCurrency(closing.sumTargets)}</span>
+                    <span>de {formatCurrency(closing.total)}</span>
+                    {Math.abs(closing.diff) < 0.5 ? (
+                      <Badge className="bg-green-600 hover:bg-green-600 text-xs">fecha 100%</Badge>
+                    ) : closing.diff > 0 ? (
+                      <Badge variant="outline" className="text-xs">resta distribuir {formatCurrency(closing.diff)}</Badge>
+                    ) : (
+                      <Badge variant="outline" className="text-xs text-red-500 dark:text-red-400">passou {formatCurrency(-closing.diff)}</Badge>
+                    )}
+                  </>
                 )}
               </div>
             )}
@@ -660,7 +701,7 @@ export default function GrowthOrcamentoCampanhas() {
                       <TableCell className="text-right font-mono">{formatCurrency(sumStage(semEtapaRows).investido)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">—</TableCell>
                     </TableRow>
-                    {semEtapaRows.map(renderCampaignRow)}
+                    {renderPlatformBlocks(semEtapaRows, "none")}
                   </>
                 )}
 
