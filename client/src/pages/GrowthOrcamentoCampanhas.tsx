@@ -27,16 +27,14 @@ const SHOW_GOOGLE = true;
 // TikTok entra aqui quando a fonte de dados de TikTok for adicionada ao backend.
 const PLATFORM_LABELS: Record<Platform, string> = { meta: "Meta", google: "Google" };
 const PLATFORM_ORDER: Platform[] = ["meta", "google"];
-const PLATFORM_STYLES: Record<Platform, { row: string; icon: string; border: string }> = {
+const PLATFORM_STYLES: Record<Platform, { icon: string; border: string }> = {
   meta: {
-    row: "bg-blue-50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-200",
     icon: "text-blue-600 dark:text-blue-400",
-    border: "border-l-2 border-blue-400 dark:border-blue-600",
+    border: "border-l-[3px] border-blue-500/70 dark:border-blue-500/60",
   },
   google: {
-    row: "bg-amber-50 dark:bg-amber-950/30 text-amber-900 dark:text-amber-200",
     icon: "text-amber-600 dark:text-amber-400",
-    border: "border-l-2 border-amber-400 dark:border-amber-600",
+    border: "border-l-[3px] border-amber-500/70 dark:border-amber-500/60",
   },
 };
 
@@ -540,22 +538,25 @@ export default function GrowthOrcamentoCampanhas() {
       blocks.push(
         <TableRow
           key={`plat-${keyPrefix}-${p}`}
-          className={cn("cursor-pointer", st.row)}
+          className="cursor-pointer hover:bg-muted/40"
           onClick={() => togglePlatform(key)}
           data-testid={`platform-subheader-${keyPrefix}-${p}`}
         >
-          <TableCell colSpan={3} className="py-1 pl-6">
-            <span className="flex items-center gap-1.5 text-xs font-medium">
-              {isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
-              <PlatformIcon platform={p} className={st.icon} /> {PLATFORM_LABELS[p]}
+          <TableCell colSpan={3} className={cn("py-1.5 pl-6", st.border)}>
+            <span className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+              {isOpen
+                ? <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
+              <PlatformIcon platform={p} className={st.icon} />
+              <span className="text-foreground">{PLATFORM_LABELS[p]}</span>
               <span className="opacity-60">({prs.length})</span>
             </span>
           </TableCell>
-          <TableCell className="text-right text-xs opacity-50">—</TableCell>
-          <TableCell className="text-right font-mono text-xs">{formatCurrency(s.daily)}</TableCell>
-          <TableCell className="text-right font-mono text-xs">{formatCurrency(s.projecao)}</TableCell>
-          <TableCell className="text-right font-mono text-xs">{formatCurrency(s.investido)}</TableCell>
-          <TableCell className="text-right text-xs opacity-50">—</TableCell>
+          <TableCell className="text-right text-xs opacity-40">—</TableCell>
+          <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrency(s.daily)}</TableCell>
+          <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrency(s.projecao)}</TableCell>
+          <TableCell className="text-right font-mono text-xs text-muted-foreground">{formatCurrency(s.investido)}</TableCell>
+          <TableCell className="text-right text-xs opacity-40">—</TableCell>
         </TableRow>,
       );
       if (isOpen) for (const c of prs) blocks.push(renderCampaignRow(c));
@@ -571,11 +572,11 @@ export default function GrowthOrcamentoCampanhas() {
     const reco = target != null && diasRestantes > 0 ? Math.max(0, (target - s.investido) / diasRestantes) : null;
     return (
       <>
-        <TableRow className="bg-muted/60 font-semibold border-t-2" data-testid={`stage-header-${stage}`}>
-          <TableCell colSpan={3} className="py-2">
+        <TableRow className="bg-muted font-bold border-t-2 border-foreground/20" data-testid={`stage-header-${stage}`}>
+          <TableCell colSpan={3} className="py-2.5">
             <div className="flex items-center gap-2">
-              <span className="uppercase tracking-wide text-xs">{STAGE_LABELS[stage]}</span>
-              <span className="opacity-50 text-xs">({rows.length})</span>
+              <span className="uppercase tracking-wide text-sm">{STAGE_LABELS[stage]}</span>
+              <span className="opacity-50 text-xs font-normal">({rows.length})</span>
               {reco != null && (
                 <span className="text-xs font-normal text-muted-foreground">
                   · ritmo p/ alvo: {formatCurrency(reco)}/dia
@@ -720,10 +721,10 @@ export default function GrowthOrcamentoCampanhas() {
 
                 {semEtapaRows.length > 0 && (
                   <>
-                    <TableRow className="bg-muted/30 border-t-2" data-testid="stage-header-none">
-                      <TableCell colSpan={3} className="py-2">
-                        <span className="uppercase tracking-wide text-xs text-muted-foreground">Sem etapa</span>
-                        <span className="opacity-50 text-xs"> ({semEtapaRows.length})</span>
+                    <TableRow className="bg-muted font-bold border-t-2 border-foreground/20" data-testid="stage-header-none">
+                      <TableCell colSpan={3} className="py-2.5">
+                        <span className="uppercase tracking-wide text-sm text-muted-foreground">Sem etapa</span>
+                        <span className="opacity-50 text-xs font-normal"> ({semEtapaRows.length})</span>
                       </TableCell>
                       <TableCell className="text-right text-muted-foreground">—</TableCell>
                       <TableCell className="text-right font-mono">{formatCurrency(sumStage(semEtapaRows).daily)}</TableCell>
