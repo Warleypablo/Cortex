@@ -12,10 +12,17 @@ const ALLOWED_EDITOR_EMAILS = new Set([
 
 type Platform = "meta" | "google";
 
-// Tags/grupos válidos para classificar campanhas. Adicionar uma tag nova é só
-// incluir aqui (e no front) — não precisa de migração no banco.
+// Tags/grupos (pools) válidos para classificar campanhas. Adicionar uma tag
+// nova é só incluir aqui (e no front) — não precisa de migração no banco.
 const CAMPAIGN_TAGS = ["inbound", "evento"] as const;
 type CampaignTag = (typeof CAMPAIGN_TAGS)[number];
+
+// Etapas do funil para o planejamento por etapa. Mesma regra: adicionar/renomear
+// é só editar aqui e no front.
+const CAMPAIGN_STAGES = ["descoberta", "relacionamento", "conversao", "remarketing", "institucional"] as const;
+type CampaignStage = (typeof CAMPAIGN_STAGES)[number];
+
+type PlanUnit = "pct" | "brl";
 
 interface CampanhaRow {
   platform: Platform;
@@ -29,6 +36,13 @@ interface CampanhaRow {
   projecaoAsIs: number;
   isDelivering: boolean;
   tag: CampaignTag | null;
+  stage: CampaignStage | null;
+}
+
+// Plano de um pool no mês: total + alvo por etapa (value + unit).
+interface PoolPlan {
+  total: number | null;
+  stages: Partial<Record<CampaignStage, { value: number; unit: PlanUnit }>>;
 }
 
 function parseMonthParam(param: string | undefined): { firstDay: string; lastDay: string; year: number; month1Based: number } {
@@ -191,14 +205,42 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         metasMap.set(`${r.platform}:${r.campaign_id}`, Number(r.monthly_budget_target));
       }
 
-      // ===== Tags/grupos por campanha (estáveis entre meses) =====
+      // ===== Classificação por campanha (tag/pool + etapa), estável entre meses =====
       const tagsRes = await db.execute(sql`
-        SELECT platform, campaign_id, tag FROM cortex_core.campaign_tags
+        SELECT platform, campaign_id, tag, stage FROM cortex_core.campaign_tags
       `);
       const tagsMap = new Map<string, CampaignTag>();
+      const stagesMap = new Map<string, CampaignStage>();
       for (const r of tagsRes.rows || []) {
-        if ((CAMPAIGN_TAGS as readonly string[]).includes(r.tag)) {
-          tagsMap.set(`${r.platform}:${r.campaign_id}`, r.tag as CampaignTag);
+        const key = `${r.platform}:${r.campaign_id}`;
+        if (r.tag && (CAMPAIGN_TAGS as readonly string[]).includes(r.tag)) {
+          tagsMap.set(key, r.tag as CampaignTag);
+        }
+        if (r.stage && (CAMPAIGN_STAGES as readonly string[]).includes(r.stage)) {
+          stagesMap.set(key, r.stage as CampaignStage);
+        }
+      }
+
+      // ===== Plano de orçamento por pool/etapa do mês =====
+      const poolTotalsRes = await db.execute(sql`
+        SELECT pool, total::float AS total FROM cortex_core.budget_pool_plan
+        WHERE month = ${monthStart}::date
+      `);
+      const stagePlanRes = await db.execute(sql`
+        SELECT pool, stage, value::float AS value, unit FROM cortex_core.budget_stage_plan
+        WHERE month = ${monthStart}::date
+      `);
+      const plans: Record<string, PoolPlan> = {};
+      for (const tag of CAMPAIGN_TAGS) plans[tag] = { total: null, stages: {} };
+      for (const r of poolTotalsRes.rows || []) {
+        if (plans[r.pool]) plans[r.pool].total = Number(r.total);
+      }
+      for (const r of stagePlanRes.rows || []) {
+        if (plans[r.pool] && (CAMPAIGN_STAGES as readonly string[]).includes(r.stage)) {
+          plans[r.pool].stages[r.stage as CampaignStage] = {
+            value: Number(r.value),
+            unit: r.unit === "brl" ? "brl" : "pct",
+          };
         }
       }
 
@@ -234,6 +276,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           projecaoAsIs,
           isDelivering,
           tag: tagsMap.get(`${platform}:${campaignId}`) ?? null,
+          stage: stagesMap.get(`${platform}:${campaignId}`) ?? null,
         };
       };
 
@@ -250,6 +293,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         diasDecorridos,
         diasRestantes,
         campanhas,
+        plans,
       });
     } catch (error) {
       console.error("[api] Error fetching orcamento-campanhas:", error);
@@ -326,9 +370,14 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
       }
 
       if (isClearing) {
+        // Zera só a tag, preservando o stage; remove a linha se ficar vazia.
+        await db.execute(sql`
+          UPDATE cortex_core.campaign_tags SET tag = NULL, updated_by = ${userEmail}, updated_at = NOW()
+          WHERE platform = ${platform} AND campaign_id = ${campaignId}
+        `);
         await db.execute(sql`
           DELETE FROM cortex_core.campaign_tags
-          WHERE platform = ${platform} AND campaign_id = ${campaignId}
+          WHERE platform = ${platform} AND campaign_id = ${campaignId} AND tag IS NULL AND stage IS NULL
         `);
       } else {
         await db.execute(sql`
@@ -345,6 +394,138 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error upserting orcamento-campanhas tag:", error);
       res.status(500).json({ error: "Failed to save tag" });
+    }
+  });
+
+  // Upsert/remoção da etapa (stage) de uma campanha. stage = null limpa.
+  app.put("/api/growth/orcamento-campanhas/stage", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem alterar etapas." });
+      }
+      const { platform, campaignId, stage } = req.body || {};
+      if (platform !== "meta" && platform !== "google") {
+        return res.status(400).json({ error: "platform must be 'meta' or 'google'" });
+      }
+      if (!campaignId || typeof campaignId !== "string") {
+        return res.status(400).json({ error: "campaignId is required" });
+      }
+      const isClearing = stage === null || stage === undefined || stage === "";
+      if (!isClearing && !(CAMPAIGN_STAGES as readonly string[]).includes(stage)) {
+        return res.status(400).json({ error: `stage must be one of: ${CAMPAIGN_STAGES.join(", ")} (or null to clear)` });
+      }
+
+      if (isClearing) {
+        await db.execute(sql`
+          UPDATE cortex_core.campaign_tags SET stage = NULL, updated_by = ${userEmail}, updated_at = NOW()
+          WHERE platform = ${platform} AND campaign_id = ${campaignId}
+        `);
+        await db.execute(sql`
+          DELETE FROM cortex_core.campaign_tags
+          WHERE platform = ${platform} AND campaign_id = ${campaignId} AND tag IS NULL AND stage IS NULL
+        `);
+      } else {
+        await db.execute(sql`
+          INSERT INTO cortex_core.campaign_tags (platform, campaign_id, stage, updated_by)
+          VALUES (${platform}, ${campaignId}, ${stage}, ${userEmail})
+          ON CONFLICT (platform, campaign_id) DO UPDATE SET
+            stage = EXCLUDED.stage,
+            updated_by = EXCLUDED.updated_by,
+            updated_at = NOW()
+        `);
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error upserting orcamento-campanhas stage:", error);
+      res.status(500).json({ error: "Failed to save stage" });
+    }
+  });
+
+  // Upsert/remoção do total mensal de um pool. total = 0/null remove.
+  app.put("/api/growth/orcamento-campanhas/plan/total", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem alterar o plano." });
+      }
+      const { pool, month, total } = req.body || {};
+      if (!(CAMPAIGN_TAGS as readonly string[]).includes(pool)) {
+        return res.status(400).json({ error: `pool must be one of: ${CAMPAIGN_TAGS.join(", ")}` });
+      }
+      if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+        return res.status(400).json({ error: "month must be 'YYYY-MM'" });
+      }
+      const value = Number(total);
+      if (!Number.isFinite(value) || value < 0) {
+        return res.status(400).json({ error: "total must be a non-negative number" });
+      }
+      const monthDate = `${month}-01`;
+
+      if (value === 0) {
+        await db.execute(sql`
+          DELETE FROM cortex_core.budget_pool_plan
+          WHERE pool = ${pool} AND month = ${monthDate}::date
+        `);
+      } else {
+        await db.execute(sql`
+          INSERT INTO cortex_core.budget_pool_plan (pool, month, total, updated_by)
+          VALUES (${pool}, ${monthDate}::date, ${value}, ${userEmail})
+          ON CONFLICT (pool, month) DO UPDATE SET
+            total = EXCLUDED.total, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+        `);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error upserting pool total:", error);
+      res.status(500).json({ error: "Failed to save pool total" });
+    }
+  });
+
+  // Upsert/remoção do alvo de uma etapa (value + unit). value = 0/null remove.
+  app.put("/api/growth/orcamento-campanhas/plan/stage", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem alterar o plano." });
+      }
+      const { pool, month, stage, value, unit } = req.body || {};
+      if (!(CAMPAIGN_TAGS as readonly string[]).includes(pool)) {
+        return res.status(400).json({ error: `pool must be one of: ${CAMPAIGN_TAGS.join(", ")}` });
+      }
+      if (!(CAMPAIGN_STAGES as readonly string[]).includes(stage)) {
+        return res.status(400).json({ error: `stage must be one of: ${CAMPAIGN_STAGES.join(", ")}` });
+      }
+      if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+        return res.status(400).json({ error: "month must be 'YYYY-MM'" });
+      }
+      if (unit !== "pct" && unit !== "brl") {
+        return res.status(400).json({ error: "unit must be 'pct' or 'brl'" });
+      }
+      const v = Number(value);
+      if (!Number.isFinite(v) || v < 0) {
+        return res.status(400).json({ error: "value must be a non-negative number" });
+      }
+      const monthDate = `${month}-01`;
+
+      if (v === 0) {
+        await db.execute(sql`
+          DELETE FROM cortex_core.budget_stage_plan
+          WHERE pool = ${pool} AND month = ${monthDate}::date AND stage = ${stage}
+        `);
+      } else {
+        await db.execute(sql`
+          INSERT INTO cortex_core.budget_stage_plan (pool, month, stage, value, unit, updated_by)
+          VALUES (${pool}, ${monthDate}::date, ${stage}, ${v}, ${unit}, ${userEmail})
+          ON CONFLICT (pool, month, stage) DO UPDATE SET
+            value = EXCLUDED.value, unit = EXCLUDED.unit, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+        `);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error upserting stage plan:", error);
+      res.status(500).json({ error: "Failed to save stage plan" });
     }
   });
 }

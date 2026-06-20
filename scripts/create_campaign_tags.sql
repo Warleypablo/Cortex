@@ -12,11 +12,16 @@
 CREATE TABLE IF NOT EXISTS cortex_core.campaign_tags (
     platform TEXT NOT NULL CHECK (platform IN ('meta', 'google')),
     campaign_id TEXT NOT NULL,
-    tag TEXT NOT NULL,
+    tag TEXT,
+    stage TEXT,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_by TEXT,
     PRIMARY KEY (platform, campaign_id)
 );
 
+-- Migração para bancos onde a tabela já existia (tag NOT NULL, sem stage):
+ALTER TABLE cortex_core.campaign_tags ADD COLUMN IF NOT EXISTS stage TEXT;
+ALTER TABLE cortex_core.campaign_tags ALTER COLUMN tag DROP NOT NULL;
+
 COMMENT ON TABLE cortex_core.campaign_tags IS
-    'Tag/grupo por campanha (manual). platform: meta|google, campaign_id: meta_campaigns.campaign_id ou google.campaigns.campaign_id (como TEXT), tag: ex inbound|evento (validado no app). Tag única e estável entre meses.';
+    'Classificação por campanha (manual). platform: meta|google, campaign_id: meta_campaigns.campaign_id ou google.campaigns.campaign_id (como TEXT), tag: pool ex inbound|evento, stage: etapa ex descoberta|relacionamento|conversao|remarketing|institucional (validados no app). Estável entre meses.';
