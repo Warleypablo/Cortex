@@ -131,6 +131,15 @@ function deriveStageTarget(plan: StagePlan | undefined, poolTotal: number | null
   return (plan.value / 100) * poolTotal;
 }
 
+// Ritmo diário necessário p/ bater o alvo e o gap vs o orçamento diário atual.
+// gap > 0: está abaixo do ritmo (precisa subir). gap < 0: vai estourar (pode baixar).
+function pacing(target: number | null, investido: number, currentDaily: number, diasRestantes: number):
+  { required: number; gap: number } | null {
+  if (target == null || target <= 0 || diasRestantes <= 0) return null;
+  const required = Math.max(0, (target - investido) / diasRestantes);
+  return { required, gap: required - currentDaily };
+}
+
 function PlatformIcon({ platform, className }: { platform: Platform; className?: string }) {
   if (platform === "meta") return <Facebook className={cn("w-4 h-4", className)} />;
   return <SearchIcon className={cn("w-4 h-4", className)} />;
@@ -365,7 +374,7 @@ function sumStage(rows: Campanha[]): StageSums {
   return { daily, projecao, investido };
 }
 
-const COLSPAN = 8;
+const COLSPAN = 9;
 
 export default function GrowthOrcamentoCampanhas() {
   useSetPageInfo(
@@ -487,6 +496,33 @@ export default function GrowthOrcamentoCampanhas() {
   }, [plans, poolForTab]);
 
   // ---- Renderização ----
+  // Célula "Ajuste/dia": quanto subir/baixar o diário p/ ficar no caminho do alvo.
+  const renderAjusteCell = (target: number | null, investido: number, currentDaily: number) => {
+    const a = pacing(target, investido, currentDaily, diasRestantes);
+    if (!a) return <TableCell className="text-right text-muted-foreground text-xs">—</TableCell>;
+    const tol = Math.max(50, a.required * 0.05);
+    let content: string;
+    let color: string;
+    if (Math.abs(a.gap) <= tol) {
+      content = "no ritmo";
+      color = "text-green-600 dark:text-green-400";
+    } else if (a.gap > 0) {
+      content = `+${formatCurrency(a.gap)}/dia`;
+      color = "text-red-500 dark:text-red-400";
+    } else {
+      content = `−${formatCurrency(-a.gap)}/dia`;
+      color = "text-yellow-600 dark:text-yellow-400";
+    }
+    return (
+      <TableCell
+        className={cn("text-right font-mono text-xs whitespace-nowrap", color)}
+        title={`Necessário ${formatCurrency(a.required)}/dia para o alvo · atual ${formatCurrency(currentDaily)}/dia`}
+      >
+        {content}
+      </TableCell>
+    );
+  };
+
   const renderCampaignRow = (c: Campanha) => {
     const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
     return (
@@ -510,6 +546,7 @@ export default function GrowthOrcamentoCampanhas() {
         </TableCell>
         <TableCell className="text-right font-mono">{formatCurrency(c.projecaoAsIs)}</TableCell>
         <TableCell className="text-right font-mono">{formatCurrency(c.investidoTotal)}</TableCell>
+        <TableCell className="text-right text-muted-foreground">—</TableCell>
         <TableCell className="text-right text-muted-foreground">—</TableCell>
       </TableRow>
     );
@@ -552,6 +589,7 @@ export default function GrowthOrcamentoCampanhas() {
           <TableCell className="text-right font-mono text-xs">{formatCurrency(s.projecao)}</TableCell>
           <TableCell className="text-right font-mono text-xs">{formatCurrency(s.investido)}</TableCell>
           <TableCell className="text-right text-xs opacity-40">—</TableCell>
+          <TableCell className="text-right text-xs opacity-40">—</TableCell>
         </TableRow>,
       );
       if (isOpen) for (const c of prs) blocks.push(renderCampaignRow(c));
@@ -564,7 +602,6 @@ export default function GrowthOrcamentoCampanhas() {
     const target = targetForStage(stage);
     if (rows.length === 0 && target == null) return null;
     const s = sumStage(rows);
-    const reco = target != null && diasRestantes > 0 ? Math.max(0, (target - s.investido) / diasRestantes) : null;
     return (
       <>
         <TableRow className="bg-muted font-bold" data-testid={`stage-header-${stage}`}>
@@ -572,11 +609,6 @@ export default function GrowthOrcamentoCampanhas() {
             <div className="flex items-center gap-2">
               <span className="uppercase tracking-wide text-sm">{STAGE_LABELS[stage]}</span>
               <span className="opacity-50 text-xs font-normal">({rows.length})</span>
-              {reco != null && (
-                <span className="text-xs font-normal text-muted-foreground">
-                  · ritmo p/ alvo: {formatCurrency(reco)}/dia
-                </span>
-              )}
             </div>
           </TableCell>
           <TableCell className="text-right">
@@ -596,6 +628,7 @@ export default function GrowthOrcamentoCampanhas() {
           <TableCell className="text-right text-xs text-muted-foreground">
             {target && target > 0 ? `${((s.investido / target) * 100).toFixed(0)}%` : "—"}
           </TableCell>
+          {renderAjusteCell(target, s.investido, s.daily)}
         </TableRow>
         {renderPlatformBlocks(rows, stage)}
       </>
@@ -709,6 +742,7 @@ export default function GrowthOrcamentoCampanhas() {
                   <TableHead className="text-right">Projeção (As Is)</TableHead>
                   <TableHead className="text-right">Investido</TableHead>
                   <TableHead className="text-right">% Atingido</TableHead>
+                  <TableHead className="text-right">Ajuste/dia</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -726,6 +760,7 @@ export default function GrowthOrcamentoCampanhas() {
                       <TableCell className="text-right font-mono">{formatCurrency(sumStage(semEtapaRows).projecao)}</TableCell>
                       <TableCell className="text-right font-mono">{formatCurrency(sumStage(semEtapaRows).investido)}</TableCell>
                       <TableCell className="text-right text-muted-foreground">—</TableCell>
+                      <TableCell className="text-right text-muted-foreground">—</TableCell>
                     </TableRow>
                     {renderPlatformBlocks(semEtapaRows, "none")}
                   </>
@@ -739,7 +774,7 @@ export default function GrowthOrcamentoCampanhas() {
                   </TableRow>
                 )}
 
-                <TableRow className="bg-amber-50 dark:bg-amber-950/30 font-semibold border-t-2">
+                <TableRow className="bg-muted font-semibold border-t-2 border-foreground/20">
                   <TableCell colSpan={3}>TOTAL</TableCell>
                   <TableCell className="text-right font-mono">{poolTotalForTab != null ? formatCurrency(poolTotalForTab) : "—"}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.daily)}</TableCell>
@@ -748,6 +783,7 @@ export default function GrowthOrcamentoCampanhas() {
                   <TableCell className="text-right font-mono">
                     {poolTotalForTab && poolTotalForTab > 0 ? `${((totals.investido / poolTotalForTab) * 100).toFixed(0)}%` : "—"}
                   </TableCell>
+                  {renderAjusteCell(poolTotalForTab, totals.investido, totals.daily)}
                 </TableRow>
               </TableBody>
             </Table>
