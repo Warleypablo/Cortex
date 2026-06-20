@@ -29,8 +29,8 @@ const PLATFORM_LABELS: Record<Platform, string> = { meta: "Meta", google: "Googl
 const PLATFORM_ORDER: Platform[] = ["meta", "google"];
 // Cor de FUNDO aplicada a todas as linhas da plataforma (cabeçalho + campanhas).
 const PLATFORM_STYLES: Record<Platform, { row: string; icon: string }> = {
-  meta: { row: "bg-blue-100 dark:bg-blue-900/40", icon: "text-blue-600 dark:text-blue-400" },
-  google: { row: "bg-amber-100 dark:bg-amber-900/30", icon: "text-amber-600 dark:text-amber-400" },
+  meta: { row: "bg-blue-500/5 dark:bg-blue-400/[0.07]", icon: "text-blue-600 dark:text-blue-400" },
+  google: { row: "bg-amber-500/5 dark:bg-amber-400/[0.07]", icon: "text-amber-600 dark:text-amber-400" },
 };
 
 // Tags/grupos (pools). Manter em sincronia com CAMPAIGN_TAGS no backend.
