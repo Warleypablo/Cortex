@@ -107,61 +107,75 @@ function normalizeName(name: string): string {
 }
 
 // ============== Parser da convenção de nome de arquivo ==============
-// Padrão: {tipo}-{nomeAd}-{personagem}-{formato}-h{NN}[-b{NN}][-c{NN}]-v{NN}.{ext}
-// Ex:     vv-novosclientes-marina-9x16-h03-b02-c01-v01.mp4
-// Os códigos h/b/c são OPCIONAIS (degradam): se ausentes, só não tagueiam aquela dimensão.
-// O significado de cada código (h03 → ângulo, b02 → bodyTipo, c01 → ctaTipo) é resolvido
-// depois, contra o `modules` do creative_batches do lote.
+// Padrão POSICIONAL (campos separados por "-", valores compostos com "_"):
+//   {tipo}-{nomeAd}-{formato}-{angulo}-{persona}-{proporção}-{h#_b#_c#}-v{NN}
+//   vv-bastidores_ana-react-prova_social-ana-9x16-h1_b1_c1-v1.mp4
+// - tipo: vv|img|car · proporção: 9x16|4x5|1x1|16x9 · bloco h/b/c: hook obrig., body/cta opcionais
+// - ângulo é o ÂNGULO DO HOOK; vem direto do nome (o h# fica de identificador/backup)
+// - "_" → espaço (nomeAd/persona) ou "-" (slug de vocabulário: formato/angulo)
 
 export interface ParsedConvention {
   tipo: "vv" | "img" | "car";
   nomeAd: string;
+  formato: string | null;   // formato de ad (react, caixinha-de-perguntas)
+  angulo: string | null;    // ângulo do hook (prova-social)
   personagem: string;
-  formato: "9x16" | "4x5" | "1x1" | "16x9";
-  hookCode?: string; // "h01", "h02", ...
-  bodyCode?: string; // "b01", ...
-  ctaCode?: string;  // "c01", ...
-  variacao: string;  // "v01", "v02", ...
+  proporcao: "9x16" | "4x5" | "1x1" | "16x9";
+  hookCode?: string; // "h1"
+  bodyCode?: string; // "b1"
+  ctaCode?: string;  // "c1"
+  variacao: string;  // "v1"
 }
 
 const VALID_EXT = /\.(mp4|mov|jpg|jpeg|png)$/i;
+const PROPORCOES = ["9x16", "4x5", "1x1", "16x9"];
+const toSpace = (s: string) => s.replace(/_/g, " ").trim();   // nomeAd, persona
+const toSlug = (s: string) => s.replace(/_/g, "-").trim();    // vocab (formato, angulo)
 
 export function parseFileNameConvention(filename: string): ParsedConvention | null {
   if (!filename || !VALID_EXT.test(filename)) return null;
-  let s = filename.replace(VALID_EXT, "").toLowerCase();
+  const parts = filename.replace(VALID_EXT, "").toLowerCase().split("-");
+  if (parts.length < 7) return null;
 
-  // Parse de trás pra frente: v, depois os modulares opcionais (c, b, h), depois formato.
-  // Dígitos 1-2 (h3 ou h03); cta aceita "c2" e "cta2".
-  const mVar = s.match(/-v(\d{1,2})$/);
+  const tipo = parts[0];
+  if (tipo !== "vv" && tipo !== "img" && tipo !== "car") return null;
+
+  // Âncoras a partir do fim: variação (v#), bloco h_b_c, proporção.
+  const mVar = parts[parts.length - 1].match(/^v(\d{1,2})$/);
   if (!mVar) return null;
   const variacao = `v${mVar[1]}`;
-  s = s.slice(0, -mVar[0].length);
 
-  let ctaCode: string | undefined;
-  const mCta = s.match(/-c(?:ta)?(\d{1,2})$/);
-  if (mCta) { ctaCode = `c${mCta[1]}`; s = s.slice(0, -mCta[0].length); }
+  const block = parts[parts.length - 2];
+  if (!/^h\d/.test(block)) return null;
+  let hookCode: string | undefined, bodyCode: string | undefined, ctaCode: string | undefined;
+  for (const code of block.split("_")) {
+    const mh = code.match(/^h(\d{1,2})$/); if (mh) { hookCode = `h${mh[1]}`; continue; }
+    const mb = code.match(/^b(\d{1,2})$/); if (mb) { bodyCode = `b${mb[1]}`; continue; }
+    const mc = code.match(/^c(?:ta)?(\d{1,2})$/); if (mc) { ctaCode = `c${mc[1]}`; continue; }
+  }
 
-  let bodyCode: string | undefined;
-  const mBody = s.match(/-b(\d{1,2})$/);
-  if (mBody) { bodyCode = `b${mBody[1]}`; s = s.slice(0, -mBody[0].length); }
+  const proporcao = parts[parts.length - 3];
+  if (!PROPORCOES.includes(proporcao)) return null;
 
-  let hookCode: string | undefined;
-  const mHook = s.match(/-h(\d{1,2})$/);
-  if (mHook) { hookCode = `h${mHook[1]}`; s = s.slice(0, -mHook[0].length); }
+  // Campos da frente: [nomeAd, formato, angulo, persona] — persona/angulo/formato pela cauda;
+  // o resto (inclui hífen acidental no nomeAd) vira nomeAd.
+  const front = parts.slice(1, parts.length - 3);
+  if (front.length < 4) return null;
+  const personagem = front[front.length - 1];
+  const angulo = front[front.length - 2];
+  const formato = front[front.length - 3];
+  const nomeAd = front.slice(0, front.length - 3).join("-");
 
-  const mFormato = s.match(/-(9x16|4x5|1x1|16x9)$/);
-  if (!mFormato) return null;
-  const formato = mFormato[1] as ParsedConvention["formato"];
-  s = s.slice(0, -mFormato[0].length);
-
-  // Resto: tipo-nomeAd-personagem (nomeAd pode ter hífens)
-  const mResto = s.match(/^(vv|img|car)-(.+)-([a-z0-9]+)$/);
-  if (!mResto) return null;
-  const tipo = mResto[1] as ParsedConvention["tipo"];
-  const nomeAd = mResto[2];
-  const personagem = mResto[3];
-
-  return { tipo, nomeAd, personagem, formato, hookCode, bodyCode, ctaCode, variacao };
+  return {
+    tipo,
+    nomeAd: toSpace(nomeAd),
+    formato: formato ? toSlug(formato) : null,
+    angulo: angulo ? toSlug(angulo) : null,
+    personagem: toSpace(personagem),
+    proporcao: proporcao as ParsedConvention["proporcao"],
+    hookCode, bodyCode, ctaCode,
+    variacao,
+  };
 }
 
 // ============== Listagem / busca ==============
@@ -357,6 +371,8 @@ export interface CreateCreativeInput {
   plataforma?: string | null;
   personagem?: string | null;
   tipoAd?: string | null;
+  formatoAd?: string | null;
+  proporcao?: string | null;
   observacao?: string | null;
   bodyTipo?: string | null;
   ctaTipo?: string | null;
@@ -390,6 +406,8 @@ export async function createCreative(input: CreateCreativeInput): Promise<Creati
     plataforma: input.plataforma ?? null,
     personagem: input.personagem ?? null,
     tipoAd: input.tipoAd ?? null,
+    formatoAd: input.formatoAd ?? null,
+    proporcao: input.proporcao ?? null,
     observacao: input.observacao ?? null,
     bodyTipo: input.bodyTipo ?? null,
     ctaTipo: input.ctaTipo ?? null,
@@ -485,6 +503,8 @@ export async function bulkInsertStubs(
       plataforma: input.plataforma ?? null,
       personagem: input.personagem ?? null,
       tipoAd: input.tipoAd ?? null,
+      formatoAd: input.formatoAd ?? null,
+      proporcao: input.proporcao ?? null,
       observacao: input.observacao ?? null,
       bodyTipo: input.bodyTipo ?? null,
       ctaTipo: input.ctaTipo ?? null,
@@ -552,6 +572,8 @@ export async function updateCreative(
       plataforma: merged.plataforma,
       personagem: merged.personagem,
       tipoAd: merged.tipoAd,
+      formatoAd: merged.formatoAd,
+      proporcao: merged.proporcao,
       observacao: merged.observacao,
       bodyTipo: merged.bodyTipo,
       ctaTipo: merged.ctaTipo,

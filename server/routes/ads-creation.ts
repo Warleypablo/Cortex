@@ -368,14 +368,18 @@ export function registerAdsCreationRoutes(app: Express) {
           const parsed = parseFileNameConvention(f.name);
           if (parsed) {
             const mod = resolveModuleFields(parsed, batch);
+            const TIPO_MAP: Record<string, string> = { vv: "vídeo", img: "estático", car: "carrossel" };
             autoStubs.push({
               nomeDrive,
               linkDrive,
               driveFileId: f.id,
               personagem: parsed.personagem,
-              // ângulo resolvido do hook (h##) via batch; fallback no nome do ad (comportamento legado).
-              // body/cta (b##/c##) são só identificadores — ficam no nome, não viram campo semântico.
-              angulo: mod.angulo ?? parsed.nomeAd,
+              tipoAd: TIPO_MAP[parsed.tipo] ?? null,
+              formatoAd: parsed.formato,    // formato de ad (react, caixinha-de-perguntas)
+              proporcao: parsed.proporcao,  // 9x16, 4x5...
+              // ângulo do HOOK vem direto do nome; h# via batch é backup. body/cta (b#/c#) são só
+              // identificadores (ficam no nome, não viram campo semântico).
+              angulo: parsed.angulo ?? mod.angulo ?? null,
               // campos comuns herdados do cabeçalho do batch
               produto: batch?.produto ?? null,
               roteiroUrl: batch?.roteiroUrl ?? null,

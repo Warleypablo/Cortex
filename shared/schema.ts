@@ -950,7 +950,10 @@ export const creativesLibrary = cortexCoreSchema.table("creatives_library", {
   tipoAd: varchar("tipo_ad", { length: 32 }),
   observacao: text("observacao"),
 
-  // Dimensões modulares adicionais (resolvidas do batch via códigos bNN/cNN do nome do arquivo)
+  // Dimensões da convenção de nome (parseadas do arquivo)
+  formatoAd: varchar("formato_ad", { length: 64 }),   // formato de ad: react, caixinha-de-perguntas
+  proporcao: varchar("proporcao", { length: 16 }),    // 9x16, 4x5, 1x1, 16x9
+  // (legado — body/cta viraram só identificadores na coluna Variação, não campo semântico)
   bodyTipo: varchar("body_tipo", { length: 32 }),
   ctaTipo: varchar("cta_tipo", { length: 32 }),
 

@@ -25,6 +25,8 @@ const DIMENSION_COLUMN: Record<string, string> = {
   personagem: "personagem",
   tipo: "tipo_ad",
   tipoAd: "tipo_ad",
+  formato: "formato_ad",
+  proporcao: "proporcao",
   produto: "produto",
   bodyTipo: "body_tipo",
   ctaTipo: "cta_tipo",
@@ -38,6 +40,8 @@ export interface CreativeRawRow {
   angulo: string | null;
   personagem: string | null;
   tipoAd: string | null;
+  formatoAd: string | null;
+  proporcao: string | null;
   produto: string | null;
   bodyTipo: string | null;
   ctaTipo: string | null;
@@ -102,7 +106,7 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
       GROUP BY l.creative_id
     )
     SELECT c.id AS creative_id, c.tp_id, c.nome_drive, ids.ad_id,
-           c.angulo, c.personagem, c.tipo_ad, c.produto, c.body_tipo, c.cta_tipo,
+           c.angulo, c.personagem, c.tipo_ad, c.formato_ad, c.proporcao, c.produto, c.body_tipo, c.cta_tipo,
            COALESCE(ins.ad_count,0)    AS ad_count,
            COALESCE(ins.spend,0)       AS spend,
            COALESCE(ins.impressions,0) AS impressions,
@@ -129,6 +133,8 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
     angulo: x.angulo,
     personagem: x.personagem,
     tipoAd: x.tipo_ad,
+    formatoAd: x.formato_ad,
+    proporcao: x.proporcao,
     produto: x.produto,
     bodyTipo: x.body_tipo,
     ctaTipo: x.cta_tipo,
@@ -215,6 +221,7 @@ export async function getCreativeRanking(opts: { since: string; until: string; d
   const rows = await fetchCreativeRawRows(since, until);
   const fieldByCol: Record<string, keyof CreativeRawRow> = {
     angulo: "angulo", personagem: "personagem", tipo_ad: "tipoAd",
+    formato_ad: "formatoAd", proporcao: "proporcao",
     produto: "produto", body_tipo: "bodyTipo", cta_tipo: "ctaTipo",
   };
   const field = fieldByCol[col];

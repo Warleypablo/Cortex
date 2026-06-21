@@ -49,6 +49,8 @@ const EMPTY: CreativePayload = {
   plataforma: "",
   personagem: "",
   tipoAd: "",
+  formatoAd: "",
+  proporcao: "",
   bodyTipo: "",
   ctaTipo: "",
   roteiroUrl: "",
@@ -113,6 +115,8 @@ export function CreativeFormSheet({ open, mode, creative, onClose }: Props) {
         plataforma: creative.plataforma ?? "",
         personagem: creative.personagem ?? "",
         tipoAd: creative.tipoAd ?? "",
+        formatoAd: creative.formatoAd ?? "",
+        proporcao: creative.proporcao ?? "",
         bodyTipo: creative.bodyTipo ?? "",
         ctaTipo: creative.ctaTipo ?? "",
         roteiroUrl: creative.roteiroUrl ?? "",
@@ -169,6 +173,8 @@ export function CreativeFormSheet({ open, mode, creative, onClose }: Props) {
       plataforma: form.plataforma?.trim() || null,
       personagem: form.personagem?.trim() || null,
       tipoAd: form.tipoAd?.trim() || null,
+      formatoAd: form.formatoAd?.trim() || null,
+      proporcao: form.proporcao?.trim() || null,
       bodyTipo: form.bodyTipo?.trim() || null,
       ctaTipo: form.ctaTipo?.trim() || null,
       roteiroUrl: form.roteiroUrl?.trim() || null,
@@ -337,17 +343,16 @@ export function CreativeFormSheet({ open, mode, creative, onClose }: Props) {
             {optionSelect("Tipo de AD", "tipoAd", options?.tipoAd ?? [])}
           </div>
 
-          {/* Ângulo do hook — única dimensão semântica (alimenta o ranking de inteligência).
+          {/* Dimensões semânticas do ranking (vêm do nome do arquivo; editáveis aqui).
               Body e CTA são só identificadores (qual ativo) e aparecem na coluna Variação. */}
           <div className="grid grid-cols-2 gap-4">
             {vocabSelect("Ângulo (hook)", "angulo", "angulo")}
-            <div className="space-y-1">
-              <Label className="text-muted-foreground">Variação (hook/body/cta)</Label>
-              <p className="text-sm text-muted-foreground pt-2">
-                Vem do nome do arquivo (ex: <code>h2 b3 c1</code>) — identifica qual ativo foi usado.
-              </p>
-            </div>
+            {vocabSelect("Formato de ad", "formatoAd", "formato")}
           </div>
+          <p className="text-xs text-muted-foreground -mt-2">
+            Variação (hook/body/cta) e proporção vêm do nome do arquivo (ex:{" "}
+            <code>...-9x16-h2_b3_c1-v1</code>) — identificam qual ativo foi usado.
+          </p>
 
           {/* Elo com o roteiro/produção */}
           <div className="grid grid-cols-2 gap-4">
