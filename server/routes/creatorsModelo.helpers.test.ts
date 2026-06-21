@@ -238,6 +238,7 @@ describe("buildCreatorsModeloPayload", () => {
   it("expõe funil, curva, recompra e coorte", () => {
     const p = buildCreatorsModeloPayload(rows, { hoje: "2026-06-21" });
     expect(Array.isArray(p.funilVendido)).toBe(true);
+    expect(Array.isArray(p.funilEntregue)).toBe(true);
     expect(Array.isArray(p.curvaRecorrente)).toBe(true);
     expect(typeof p.recompra.pctRecompra).toBe("number");
     expect(typeof p.coorte.avisoMaturidade).toBe("boolean");

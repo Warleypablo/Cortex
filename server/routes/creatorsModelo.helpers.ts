@@ -326,7 +326,7 @@ export function buildCreatorsModeloPayload(
     }
   }
 
-  const pontParaFunil = toPontRows(periodo);
+  const pontParaFunil = toPontRows(pontRows);
 
   const recUnitsCli = buildUnitsRecorrente(periodo.filter((r) => classifyModelo(r) === "recorrente"), "cliente", hoje);
   const pontUnitsCli = buildUnitsPontual(pontRows, "cliente", hoje);
