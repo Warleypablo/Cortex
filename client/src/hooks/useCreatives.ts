@@ -10,6 +10,9 @@ export interface ListCreativesParams {
   produto?: string;
   etapaFunil?: string;
   adValidado?: boolean;
+  comInvestimento?: boolean; // só criativos com spend > 0 na janela (ordenado por gasto)
+  since?: string;
+  until?: string;
   page?: number;
   pageSize?: number;
 }
@@ -43,6 +46,11 @@ function paramsToQuery(p: ListCreativesParams): Record<string, string> {
   if (p.produto) out.produto = p.produto;
   if (p.etapaFunil) out.etapaFunil = p.etapaFunil;
   if (typeof p.adValidado === "boolean") out.adValidado = String(p.adValidado);
+  if (p.comInvestimento) {
+    out.comInvestimento = "true";
+    if (p.since) out.since = p.since;
+    if (p.until) out.until = p.until;
+  }
   if (p.page) out.page = String(p.page);
   if (p.pageSize) out.pageSize = String(p.pageSize);
   return out;

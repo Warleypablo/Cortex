@@ -7,8 +7,15 @@
  */
 
 import { and, eq, isNull, ilike, or, sql, inArray } from "drizzle-orm";
-import { db } from "../../db";
+import { db, pool } from "../../db";
 import { creativesLibrary, type CreativeLibraryItem, type InsertCreativeLibraryItem } from "@shared/schema";
+
+// snake_case (vindo do pg cru) → camelCase (formato CreativeLibraryItem)
+function rowToCamel(row: Record<string, any>): any {
+  const out: Record<string, any> = {};
+  for (const k in row) out[k.replace(/_([a-z])/g, (_m, c) => c.toUpperCase())] = row[k];
+  return out;
+}
 
 // ============== Tipos compatíveis com sheetReader (não quebra creator.ts) ==============
 export interface CreativeRow {
@@ -216,6 +223,53 @@ export async function listCreatives(filters: ListFilters = {}): Promise<ListResu
     .offset((page - 1) * pageSize);
 
   return { rows, total: Number(count) || 0, page, pageSize };
+}
+
+/**
+ * Variante "Só com investimento": lista apenas criativos que tiveram spend > 0 na janela,
+ * ordenados por gasto (maior primeiro). Mantém os mesmos filtros (q/persona/produto/validado)
+ * e o mesmo formato de retorno, então a UI reusa o mesmo caminho (paginação/edição intactos).
+ */
+export async function listCreativesWithSpend(
+  filters: ListFilters,
+  since: string,
+  until: string,
+): Promise<ListResult> {
+  const page = Math.max(1, filters.page ?? 1);
+  const pageSize = Math.min(200, Math.max(1, filters.pageSize ?? 50));
+
+  const params: any[] = [since, until];
+  const conds: string[] = ["c.deleted_at IS NULL"];
+  if (filters.q) {
+    params.push(`%${filters.q}%`);
+    const i = params.length;
+    conds.push(`(c.nome_drive ILIKE $${i} OR c.tp_id ILIKE $${i} OR c.nome_final ILIKE $${i} OR c.personagem ILIKE $${i})`);
+  }
+  if (filters.personagem) { params.push(filters.personagem); conds.push(`c.personagem = $${params.length}`); }
+  if (filters.produto) { params.push(filters.produto); conds.push(`c.produto = $${params.length}`); }
+  if (typeof filters.adValidado === "boolean") { params.push(filters.adValidado); conds.push(`c.ad_validado = $${params.length}`); }
+
+  const base = `
+    FROM cortex_core.creatives_library c
+    JOIN (
+      SELECT l.creative_id, SUM(i.spend) AS spend
+      FROM cortex_core.creative_ad_links l
+      JOIN meta_ads.meta_insights_daily i
+        ON i.ad_id = l.ad_id AND i.date_start >= $1::date AND i.date_start <= $2::date
+      GROUP BY l.creative_id
+      HAVING SUM(i.spend) > 0
+    ) s ON s.creative_id = c.id
+    WHERE ${conds.join(" AND ")}
+  `;
+
+  const totalRes = await pool.query(`SELECT COUNT(*)::int AS n ${base}`, params);
+  const total = Number(totalRes.rows[0]?.n) || 0;
+
+  const rowsRes = await pool.query(
+    `SELECT c.* ${base} ORDER BY s.spend DESC, c.id DESC LIMIT ${pageSize} OFFSET ${(page - 1) * pageSize}`,
+    params,
+  );
+  return { rows: rowsRes.rows.map(rowToCamel) as CreativeLibraryItem[], total, page, pageSize };
 }
 
 export async function getCreativeById(id: number): Promise<CreativeLibraryItem | null> {

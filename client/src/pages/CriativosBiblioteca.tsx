@@ -20,7 +20,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { Plus, Search, X, ExternalLink, Loader2, Pencil, Settings2, FileText, Eye } from "lucide-react";
+import { Plus, Search, X, ExternalLink, Loader2, Pencil, Settings2, FileText, Eye, Filter } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -116,7 +116,12 @@ export default function CriativosBiblioteca() {
   const [personagem, setPersonagem] = useState<string>("todos");
   const [produto, setProduto] = useState<string>("todos");
   const [adValidado, setAdValidado] = useState<string>("todos");
+  const [soComInvestimento, setSoComInvestimento] = useState(false);
   const [page, setPage] = useState(1);
+
+  // janela (compartilhada com a aba Inteligência e com o filtro "Só com investimento")
+  const [preset, setPreset] = useState<WindowPreset>("30d");
+  const win = useMemo(() => windowFromPreset(preset), [preset]);
 
   const [formState, setFormState] = useState<
     | { mode: "closed" }
@@ -181,10 +186,13 @@ export default function CriativosBiblioteca() {
       produto: produto !== "todos" ? produto : undefined,
       adValidado:
         adValidado === "true" ? true : adValidado === "false" ? false : undefined,
+      comInvestimento: soComInvestimento || undefined,
+      since: soComInvestimento ? win.since : undefined,
+      until: soComInvestimento ? win.until : undefined,
       page,
       pageSize: PAGE_SIZE,
     }),
-    [q, personagem, produto, adValidado, page],
+    [q, personagem, produto, adValidado, soComInvestimento, win, page],
   );
 
   const { data, isLoading } = useCreativesList(params);
@@ -192,9 +200,7 @@ export default function CriativosBiblioteca() {
 
   // ---- Inteligência / performance ----
   const [tab, setTab] = useState<"biblioteca" | "inteligencia">("biblioteca");
-  const [preset, setPreset] = useState<WindowPreset>("30d");
   const [vocabOpen, setVocabOpen] = useState(false);
-  const win = useMemo(() => windowFromPreset(preset), [preset]);
   const { data: perf } = useCreativePerformance(win);
   const perfMap = useMemo(() => {
     const m = new Map<number, CreativePerfRow>();
@@ -209,6 +215,7 @@ export default function CriativosBiblioteca() {
     setPersonagem("todos");
     setProduto("todos");
     setAdValidado("todos");
+    setSoComInvestimento(false);
     setPage(1);
   };
 
@@ -317,6 +324,13 @@ export default function CriativosBiblioteca() {
                 <SelectItem value="false">Não validado</SelectItem>
               </SelectContent>
             </Select>
+            <Button
+              variant={soComInvestimento ? "default" : "outline"}
+              onClick={() => { setSoComInvestimento((v) => !v); setPage(1); }}
+              title="Mostra só criativos que gastaram na janela, ordenados por investimento"
+            >
+              <Filter className="h-4 w-4 mr-2" /> Só com investimento
+            </Button>
             <Button variant="ghost" onClick={clearFilters}>
               <X className="h-4 w-4 mr-2" /> Limpar
             </Button>

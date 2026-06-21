@@ -9,6 +9,7 @@ import type { Express, Request, Response } from "express";
 import { requireEmail } from "../middleware/requireEmail";
 import {
   listCreatives,
+  listCreativesWithSpend,
   getCreativeById,
   createCreative,
   updateCreative,
@@ -81,7 +82,7 @@ export function registerCreativesRoutes(app: Express) {
 
   app.get("/api/growth/creatives", guard, async (req: Request, res: Response) => {
     try {
-      const result = await listCreatives({
+      const filters = {
         q: typeof req.query.q === "string" ? req.query.q : undefined,
         personagem: typeof req.query.personagem === "string" ? req.query.personagem : undefined,
         produto: typeof req.query.produto === "string" ? req.query.produto : undefined,
@@ -89,7 +90,14 @@ export function registerCreativesRoutes(app: Express) {
         adValidado: parseBoolFlag(req.query.adValidado),
         page: req.query.page ? parseInt(String(req.query.page), 10) : undefined,
         pageSize: req.query.pageSize ? parseInt(String(req.query.pageSize), 10) : undefined,
-      });
+      };
+      // "Só com investimento": filtra/ordena por gasto na janela selecionada.
+      if (req.query.comInvestimento === "true") {
+        const { since, until } = defaultWindow(req.query);
+        const result = await listCreativesWithSpend(filters, since, until);
+        return res.json(result);
+      }
+      const result = await listCreatives(filters);
       res.json(result);
     } catch (err: any) {
       console.error("[creatives] list error:", err);
