@@ -84,6 +84,7 @@ import { registerBp2026DetalheRoutes } from "./routes/bp2026.detalhe";
 import { registerBp2026ReconciliacaoRoutes } from "./routes/bp2026.reconciliacao";
 import { registerCreatorsPontualRoutes } from "./routes/creatorsPontual";
 import { registerChurnPontorrenteRoutes } from "./routes/churnPontorrente";
+import { registerCreatorsModeloRoutes } from "./routes/creatorsModelo";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
@@ -8383,6 +8384,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   registerBp2026ReconciliacaoRoutes(app, db);
   registerCreatorsPontualRoutes(app, db);
   registerChurnPontorrenteRoutes(app, db);
+  registerCreatorsModeloRoutes(app, db);
 
   // ============================================
   // Sugestões API
