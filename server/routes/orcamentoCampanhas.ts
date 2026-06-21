@@ -10,7 +10,14 @@ const ALLOWED_EDITOR_EMAILS = new Set([
   "warleyreserva4@gmail.com",
 ]);
 
-type Platform = "meta" | "google";
+// Plataformas suportadas. Adicionar um canal novo = incluir aqui + um bloco de
+// fetch no GET (e os estilos/ícone no front). Os schemas de cada plataforma:
+//   meta → meta_ads.*  |  google → google.*  |  tiktok → tiktok.*  |  linkedin → linkedin.*
+const PLATFORMS = ["meta", "google", "tiktok", "linkedin"] as const;
+type Platform = (typeof PLATFORMS)[number];
+
+// Status considerados "ativos" entre as plataformas (cada uma usa um enum diferente).
+const ACTIVE_STATUSES = new Set(["ACTIVE", "ENABLED", "ENABLE"]);
 
 // Tags/grupos (pools) válidos para classificar campanhas. Adicionar uma tag
 // nova é só incluir aqui (e no front) — não precisa de migração no banco.
@@ -117,10 +124,12 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           GROUP BY campaign_id
         ),
         recent_spend_agg AS (
+          -- Inclui HOJE: campanhas criadas/iniciadas hoje já contam como entregando,
+          -- pra projeção extrapolar o orçamento delas pra frente.
           SELECT campaign_id, SUM(spend)::float AS recent_spend
           FROM meta_ads.meta_insights_daily
           WHERE date_start >= (CURRENT_DATE - INTERVAL '3 days')
-            AND date_start < CURRENT_DATE
+            AND date_start <= CURRENT_DATE
           GROUP BY campaign_id
         ),
         metas_meta AS (
@@ -170,7 +179,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
             SELECT campaign_id, SUM(cost_micros)::numeric AS recent_cost_sum
             FROM google.campaign_daily_metrics
             WHERE ${gaDateCol} >= (CURRENT_DATE - INTERVAL '3 days')
-              AND ${gaDateCol} < CURRENT_DATE
+              AND ${gaDateCol} <= CURRENT_DATE
             GROUP BY campaign_id
           ),
           metas_google AS (
@@ -192,6 +201,84 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           ORDER BY c.name;
         `));
         googleRows = googleRes.rows || [];
+      }
+
+      // ===== TikTok Ads =====
+      // Schema tiktok.* pode não existir ou o role não ter permissão (degrada sem
+      // quebrar Meta/Google). budget só conta como diário quando budget_mode é DAY.
+      let tiktokRows: any[] = [];
+      try {
+        const r = await db.execute(sql`
+          WITH spend_agg AS (
+            SELECT campaign_id, SUM(spend)::float AS investido_total
+            FROM tiktok.ad_metrics_daily
+            WHERE stat_date BETWEEN ${firstDay}::date AND ${lastDay}::date
+            GROUP BY campaign_id
+          ),
+          recent_spend_agg AS (
+            SELECT campaign_id, SUM(spend)::float AS recent_spend
+            FROM tiktok.ad_metrics_daily
+            WHERE stat_date >= (CURRENT_DATE - INTERVAL '3 days') AND stat_date <= CURRENT_DATE
+            GROUP BY campaign_id
+          ),
+          tags AS (SELECT campaign_id FROM cortex_core.campaign_tags WHERE platform = 'tiktok')
+          SELECT
+            c.campaign_id::text AS campaign_id,
+            c.campaign_name AS name,
+            c.operation_status AS status,
+            CASE WHEN c.budget_mode = 'BUDGET_MODE_DAY' THEN COALESCE(c.budget, 0) ELSE 0 END::float AS daily_budget_atual,
+            COALESCE(s.investido_total, 0)::float AS investido_total,
+            COALESCE(rs.recent_spend, 0)::float AS recent_spend
+          FROM tiktok.ad_campaigns c
+          LEFT JOIN spend_agg s ON s.campaign_id = c.campaign_id
+          LEFT JOIN recent_spend_agg rs ON rs.campaign_id = c.campaign_id
+          WHERE c.operation_status = 'ENABLE'
+             OR COALESCE(s.investido_total, 0) > 0
+             OR c.campaign_id::text IN (SELECT campaign_id FROM tags)
+          ORDER BY c.campaign_name
+        `);
+        tiktokRows = r.rows || [];
+      } catch (e: any) {
+        console.warn("[orcamento] TikTok indisponível (schema/permissão):", e?.message);
+      }
+
+      // ===== LinkedIn Ads =====
+      // ad_campaigns não tem orçamento diário no schema → daily_budget_atual = 0
+      // (mostra investido/projeção pelo gasto, sem extrapolar orçamento).
+      let linkedinRows: any[] = [];
+      try {
+        const r = await db.execute(sql`
+          WITH spend_agg AS (
+            SELECT campaign_id, SUM(spend)::float AS investido_total
+            FROM linkedin.ad_metrics_daily
+            WHERE stat_date BETWEEN ${firstDay}::date AND ${lastDay}::date
+            GROUP BY campaign_id
+          ),
+          recent_spend_agg AS (
+            SELECT campaign_id, SUM(spend)::float AS recent_spend
+            FROM linkedin.ad_metrics_daily
+            WHERE stat_date >= (CURRENT_DATE - INTERVAL '3 days') AND stat_date <= CURRENT_DATE
+            GROUP BY campaign_id
+          ),
+          tags AS (SELECT campaign_id FROM cortex_core.campaign_tags WHERE platform = 'linkedin')
+          SELECT
+            c.campaign_id::text AS campaign_id,
+            c.campaign_name AS name,
+            c.status AS status,
+            0::float AS daily_budget_atual,
+            COALESCE(s.investido_total, 0)::float AS investido_total,
+            COALESCE(rs.recent_spend, 0)::float AS recent_spend
+          FROM linkedin.ad_campaigns c
+          LEFT JOIN spend_agg s ON s.campaign_id = c.campaign_id
+          LEFT JOIN recent_spend_agg rs ON rs.campaign_id = c.campaign_id
+          WHERE c.status = 'ACTIVE'
+             OR COALESCE(s.investido_total, 0) > 0
+             OR c.campaign_id::text IN (SELECT campaign_id FROM tags)
+          ORDER BY c.campaign_name
+        `);
+        linkedinRows = r.rows || [];
+      } catch (e: any) {
+        console.warn("[orcamento] LinkedIn indisponível (schema/permissão):", e?.message);
       }
 
       // ===== Metas mensais manuais =====
@@ -251,9 +338,10 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         const recentSpend = Number(row.recent_spend) || 0;
         const investimentoMensalMeta = metasMap.get(`${platform}:${campaignId}`) ?? null;
         // Só projeta gasto futuro se a campanha está ativa E houve entrega real
-        // nos últimos 3 dias (status ACTIVE/ENABLED por si só não garante delivery —
-        // ex: ABO ativa sem nenhum adset rodando, ou ativa mas sem orçamento entregando).
-        const isActiveStatus = row.status === "ACTIVE" || row.status === "ENABLED";
+        // nos últimos 3 dias INCLUINDO hoje (status ACTIVE/ENABLED por si só não
+        // garante delivery — ex: ABO ativa sem nenhum adset rodando. Incluir hoje
+        // faz campanhas recém-criadas que já gastaram hoje entrarem na projeção).
+        const isActiveStatus = ACTIVE_STATUSES.has(String(row.status || "").toUpperCase());
         const isDelivering = isActiveStatus && recentSpend > 0;
         const projecaoAsIs = isDelivering
           ? investidoTotal + dailyBudgetAtual * diasRestantes
@@ -283,6 +371,8 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
       const campanhas: CampanhaRow[] = [
         ...((metaRes.rows || []) as any[]).map((r) => buildRow("meta", r)),
         ...(googleRows as any[]).map((r) => buildRow("google", r)),
+        ...(tiktokRows as any[]).map((r) => buildRow("tiktok", r)),
+        ...(linkedinRows as any[]).map((r) => buildRow("linkedin", r)),
       ];
 
       res.json({
@@ -357,8 +447,8 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         return res.status(403).json({ error: "Apenas editores autorizados podem alterar tags." });
       }
       const { platform, campaignId, tag } = req.body || {};
-      if (platform !== "meta" && platform !== "google") {
-        return res.status(400).json({ error: "platform must be 'meta' or 'google'" });
+      if (!(PLATFORMS as readonly string[]).includes(platform)) {
+        return res.status(400).json({ error: `platform must be one of: ${PLATFORMS.join(", ")}` });
       }
       if (!campaignId || typeof campaignId !== "string") {
         return res.status(400).json({ error: "campaignId is required" });
@@ -405,8 +495,8 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         return res.status(403).json({ error: "Apenas editores autorizados podem alterar etapas." });
       }
       const { platform, campaignId, stage } = req.body || {};
-      if (platform !== "meta" && platform !== "google") {
-        return res.status(400).json({ error: "platform must be 'meta' or 'google'" });
+      if (!(PLATFORMS as readonly string[]).includes(platform)) {
+        return res.status(400).json({ error: `platform must be one of: ${PLATFORMS.join(", ")}` });
       }
       if (!campaignId || typeof campaignId !== "string") {
         return res.status(400).json({ error: "campaignId is required" });

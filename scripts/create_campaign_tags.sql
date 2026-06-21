@@ -10,7 +10,7 @@
 -- só mudar o código, sem migração.
 
 CREATE TABLE IF NOT EXISTS cortex_core.campaign_tags (
-    platform TEXT NOT NULL CHECK (platform IN ('meta', 'google')),
+    platform TEXT NOT NULL,
     campaign_id TEXT NOT NULL,
     tag TEXT,
     stage TEXT,
@@ -19,9 +19,10 @@ CREATE TABLE IF NOT EXISTS cortex_core.campaign_tags (
     PRIMARY KEY (platform, campaign_id)
 );
 
--- Migração para bancos onde a tabela já existia (tag NOT NULL, sem stage):
+-- Migração para bancos onde a tabela já existia (tag NOT NULL, sem stage, CHECK só meta/google):
 ALTER TABLE cortex_core.campaign_tags ADD COLUMN IF NOT EXISTS stage TEXT;
 ALTER TABLE cortex_core.campaign_tags ALTER COLUMN tag DROP NOT NULL;
+ALTER TABLE cortex_core.campaign_tags DROP CONSTRAINT IF EXISTS campaign_tags_platform_check;
 
 COMMENT ON TABLE cortex_core.campaign_tags IS
     'Classificação por campanha (manual). platform: meta|google, campaign_id: meta_campaigns.campaign_id ou google.campaigns.campaign_id (como TEXT), tag: pool ex inbound|evento, stage: etapa ex descoberta|relacionamento|conversao|remarketing|institucional (validados no app). Estável entre meses.';

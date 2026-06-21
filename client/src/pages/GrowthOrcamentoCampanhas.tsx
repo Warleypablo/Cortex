@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, TrendingUp, Target, Calendar, Facebook, Search as SearchIcon, Loader2, ChevronRight, ChevronDown } from "lucide-react";
+import { DollarSign, TrendingUp, Target, Calendar, Facebook, Search as SearchIcon, Loader2, ChevronRight, ChevronDown, Linkedin, Music2 } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
@@ -19,18 +19,24 @@ const ALLOWED_EDITOR_EMAILS = new Set([
   "warleyreserva4@gmail.com",
 ]);
 
-type Platform = "meta" | "google";
+// Plataformas suportadas. Manter em sincronia com PLATFORMS no backend.
+// Adicionar um canal = incluir em PLATFORM_ORDER + LABELS + STYLES + PlatformIcon.
+type Platform = "meta" | "google" | "tiktok" | "linkedin";
 
-const SHOW_GOOGLE = true;
-
-// Ordem, rótulos e cores de plataforma para o sub-agrupamento dentro da etapa.
-// TikTok entra aqui quando a fonte de dados de TikTok for adicionada ao backend.
-const PLATFORM_LABELS: Record<Platform, string> = { meta: "Meta", google: "Google" };
-const PLATFORM_ORDER: Platform[] = ["meta", "google"];
-// Cor de FUNDO aplicada a todas as linhas da plataforma (cabeçalho + campanhas).
+const PLATFORM_LABELS: Record<Platform, string> = {
+  meta: "Meta",
+  google: "Google",
+  tiktok: "TikTok",
+  linkedin: "LinkedIn",
+};
+// Ordem de exibição das plataformas dentro de cada etapa.
+const PLATFORM_ORDER: Platform[] = ["meta", "google", "tiktok", "linkedin"];
+// Cor de FUNDO (leve) aplicada às linhas da plataforma + cor do ícone.
 const PLATFORM_STYLES: Record<Platform, { row: string; icon: string }> = {
   meta: { row: "bg-blue-500/5 dark:bg-blue-400/[0.07]", icon: "text-blue-600 dark:text-blue-400" },
   google: { row: "bg-amber-500/5 dark:bg-amber-400/[0.07]", icon: "text-amber-600 dark:text-amber-400" },
+  tiktok: { row: "bg-rose-500/5 dark:bg-rose-400/[0.07]", icon: "text-rose-500 dark:text-rose-400" },
+  linkedin: { row: "bg-cyan-500/5 dark:bg-cyan-400/[0.07]", icon: "text-cyan-600 dark:text-cyan-400" },
 };
 
 // Tags/grupos (pools). Manter em sincronia com CAMPAIGN_TAGS no backend.
@@ -141,8 +147,14 @@ function pacing(target: number | null, investido: number, currentDaily: number, 
 }
 
 function PlatformIcon({ platform, className }: { platform: Platform; className?: string }) {
-  if (platform === "meta") return <Facebook className={cn("w-4 h-4", className)} />;
-  return <SearchIcon className={cn("w-4 h-4", className)} />;
+  const cls = cn("w-4 h-4", className);
+  switch (platform) {
+    case "meta": return <Facebook className={cls} />;
+    case "google": return <SearchIcon className={cls} />;
+    case "tiktok": return <Music2 className={cls} />;
+    case "linkedin": return <Linkedin className={cls} />;
+    default: return <SearchIcon className={cls} />;
+  }
 }
 
 // Investido vs alvo: verde abaixo de 80%, amarelo 80-100%, vermelho >=100%.
@@ -432,7 +444,6 @@ export default function GrowthOrcamentoCampanhas() {
 
   const filteredCampanhas = useMemo(() => {
     const all = data?.campanhas ?? [];
-    if (!SHOW_GOOGLE) return all.filter((c) => c.platform === "meta");
     if (activeTab === "todas") return all;
     if (activeTab === "sem-tag") return all.filter((c) => !c.tag);
     return all.filter((c) => c.tag === activeTab);

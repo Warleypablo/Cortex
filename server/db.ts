@@ -763,7 +763,7 @@ export async function initializeSysSchema(): Promise<void> {
     // por etapa da tela /growth/orcamento-campanhas.
     await db.execute(sql`
       CREATE TABLE IF NOT EXISTS cortex_core.campaign_tags (
-        platform TEXT NOT NULL CHECK (platform IN ('meta', 'google')),
+        platform TEXT NOT NULL,
         campaign_id TEXT NOT NULL,
         tag TEXT,
         stage TEXT,
@@ -772,9 +772,11 @@ export async function initializeSysSchema(): Promise<void> {
         PRIMARY KEY (platform, campaign_id)
       )
     `);
-    // Migração de tabelas pré-existentes (tag era NOT NULL e não havia stage).
+    // Migração de tabelas pré-existentes (tag era NOT NULL, sem stage, e o CHECK
+    // de platform só aceitava meta/google — agora qualquer canal: tiktok, linkedin...).
     await db.execute(sql`ALTER TABLE cortex_core.campaign_tags ADD COLUMN IF NOT EXISTS stage TEXT`);
     await db.execute(sql`ALTER TABLE cortex_core.campaign_tags ALTER COLUMN tag DROP NOT NULL`);
+    await db.execute(sql`ALTER TABLE cortex_core.campaign_tags DROP CONSTRAINT IF EXISTS campaign_tags_platform_check`);
 
     // Plano de orçamento por pool/mês (total) e por etapa (alvo em % ou R$).
     // pool = valor de tag (inbound/evento). Alimenta o planejamento por etapa.
