@@ -11,7 +11,17 @@ import { TabelaLtLtv } from "@/components/creators-modelo/TabelaLtLtv";
 import { FunilSobrevivencia } from "@/components/creators-modelo/FunilSobrevivencia";
 import { CardRecompra } from "@/components/creators-modelo/CardRecompra";
 
-const MESES = ["2026-01","2026-02","2026-03","2026-04","2026-05","2026-06"];
+function gerarMeses(): string[] {
+  const hoje = new Date();
+  const out: string[] = [];
+  const d = new Date(2024, 0, 1);
+  while (d <= hoje) {
+    out.push(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`);
+    d.setMonth(d.getMonth() + 1);
+  }
+  return out;
+}
+const MESES = gerarMeses();
 
 export default function CreatorsModelo() {
   useSetPageInfo("Creators: Recorrente × Pontual", "Comparação de LT, LTV e churn dos dois modelos");
