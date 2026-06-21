@@ -2,10 +2,8 @@
 import { describe, it, expect } from "vitest";
 import {
   classifyModelo, classifyEstadoRecorrente, classifyEstadoPontual, isSequenciado,
-  type RawRow,
-} from "./creatorsModelo.helpers";
-import {
   buildUnitsRecorrente, buildUnitsPontual, aggregateMetricas, mesesEntre,
+  type RawRow,
 } from "./creatorsModelo.helpers";
 
 const HOJE = "2026-06-21";
@@ -106,6 +104,14 @@ describe("buildUnitsRecorrente", () => {
       "cliente", HOJE,
     );
     expect(units[0].lt).toBeGreaterThan(3); // mar→jun
+  });
+  it("por cliente cancelado: ignora data_fim de contratos inconsistentes (lt null se nenhum válido)", () => {
+    const units = buildUnitsRecorrente(
+      [row({ idTask: "C", tipoReceita: "recorrente", isChurned: true, dataInconsistente: true, dataInicio: "2026-03-01", dataFim: "2026-01-01", ltMeses: 5, ltvRecorrente: 5000 })],
+      "cliente", HOJE,
+    );
+    expect(units[0].lt).toBeNull();   // único fim é inconsistente → sem span válido
+    expect(units[0].ltv).toBe(5000);  // LTV ainda soma
   });
 });
 
