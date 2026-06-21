@@ -1403,6 +1403,7 @@ export function TabelaLtLtv({
                     </span>
                     {!isTotal && <span className="text-gray-500 dark:text-zinc-400"> · {ESTADO_LABEL[estado] ?? estado}</span>}
                   </td>
+                  <td className={td}>{g.metricas.n}</td>
                   <td className={td}>{lt(g)}</td>
                   <td className={td}>{isPont ? ent(g) : "—"}</td>
                   <td className={td}>{formatCurrencyNoDecimals(ltv(g))}</td>
