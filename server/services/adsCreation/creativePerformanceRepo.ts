@@ -50,6 +50,7 @@ export interface CreativeRawRow {
   leads: number;
   mqls: number;
   vendas: number;
+  clientesUnicos: number;
   receita: number;
 }
 
@@ -83,12 +84,16 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
         ) AS leads,
         COUNT(*) FILTER (
           WHERE d.date_create >= $1::date AND d.date_create < ($2::date + INTERVAL '1 day')
-            AND d.mql = '1'
+            AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
         ) AS mqls,
         COUNT(*) FILTER (
           WHERE d.stage_name = 'Negócio Ganho'
             AND d.data_fechamento >= $1::date AND d.data_fechamento <= $2::date
         ) AS vendas,
+        COUNT(DISTINCT COALESCE(d.company_name, d.contact_name, d.title)) FILTER (
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.data_fechamento >= $1::date AND d.data_fechamento <= $2::date
+        ) AS clientes_unicos,
         SUM(CASE WHEN d.stage_name = 'Negócio Ganho'
                   AND d.data_fechamento >= $1::date AND d.data_fechamento <= $2::date
                  THEN COALESCE(d.valor_pontual,0) + COALESCE(d.valor_recorrente,0) ELSE 0 END) AS receita
@@ -104,10 +109,11 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
            COALESCE(ins.clicks,0)      AS clicks,
            COALESCE(ins.v3s,0)         AS v3s,
            COALESCE(ins.thruplay,0)    AS thruplay,
-           COALESCE(crm.leads,0)       AS leads,
-           COALESCE(crm.mqls,0)        AS mqls,
-           COALESCE(crm.vendas,0)      AS vendas,
-           COALESCE(crm.receita,0)     AS receita
+           COALESCE(crm.leads,0)            AS leads,
+           COALESCE(crm.mqls,0)             AS mqls,
+           COALESCE(crm.vendas,0)           AS vendas,
+           COALESCE(crm.clientes_unicos,0)  AS clientes_unicos,
+           COALESCE(crm.receita,0)          AS receita
     FROM cortex_core.creatives_library c
     JOIN ids ON ids.creative_id = c.id
     LEFT JOIN ins ON ins.creative_id = c.id
@@ -135,21 +141,23 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
     leads: Number(x.leads) || 0,
     mqls: Number(x.mqls) || 0,
     vendas: Number(x.vendas) || 0,
+    clientesUnicos: Number(x.clientes_unicos) || 0,
     receita: Number(x.receita) || 0,
   }));
 }
 
 interface RawAgg {
   adCount: number; spend: number; impressions: number; clicks: number;
-  v3s: number; thruplay: number; leads: number; mqls: number; vendas: number; receita: number;
+  v3s: number; thruplay: number; leads: number; mqls: number; vendas: number; clientesUnicos: number; receita: number;
 }
 
 function emptyAgg(): RawAgg {
-  return { adCount: 0, spend: 0, impressions: 0, clicks: 0, v3s: 0, thruplay: 0, leads: 0, mqls: 0, vendas: 0, receita: 0 };
+  return { adCount: 0, spend: 0, impressions: 0, clicks: 0, v3s: 0, thruplay: 0, leads: 0, mqls: 0, vendas: 0, clientesUnicos: 0, receita: 0 };
 }
 function addAgg(a: RawAgg, x: RawAgg) {
   a.adCount += x.adCount; a.spend += x.spend; a.impressions += x.impressions; a.clicks += x.clicks;
-  a.v3s += x.v3s; a.thruplay += x.thruplay; a.leads += x.leads; a.mqls += x.mqls; a.vendas += x.vendas; a.receita += x.receita;
+  a.v3s += x.v3s; a.thruplay += x.thruplay; a.leads += x.leads; a.mqls += x.mqls; a.vendas += x.vendas;
+  a.clientesUnicos += x.clientesUnicos; a.receita += x.receita;
 }
 
 /** Métricas derivadas dos contadores brutos. Pagas batem com a aba Criativos (mesma fonte). */
@@ -170,7 +178,8 @@ function derive(r: RawAgg) {
     vendas: r.vendas,
     receita: round(r.receita),
     cpl: r.leads > 0 ? round(r.spend / r.leads) : null,
-    cac: r.vendas > 0 ? round(r.spend / r.vendas) : null,
+    // CAC por cliente único (igual à aba Criativos), não por nº de vendas
+    cac: r.clientesUnicos > 0 ? round(r.spend / r.clientesUnicos) : null,
     roas: r.spend > 0 ? parseFloat((r.receita / r.spend).toFixed(2)) : null,
   };
 }
