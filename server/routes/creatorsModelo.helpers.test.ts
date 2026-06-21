@@ -4,6 +4,11 @@ import {
   classifyModelo, classifyEstadoRecorrente, classifyEstadoPontual, isSequenciado,
   type RawRow,
 } from "./creatorsModelo.helpers";
+import {
+  buildUnitsRecorrente, buildUnitsPontual, aggregateMetricas, mesesEntre,
+} from "./creatorsModelo.helpers";
+
+const HOJE = "2026-06-21";
 
 function row(p: Partial<RawRow>): RawRow {
   return {
@@ -60,5 +65,90 @@ describe("isSequenciado", () => {
   });
   it("false para falso-positivo 'rótulos'", () => {
     expect(isSequenciado("Entrega de 3 rótulos")).toBe(false);
+  });
+});
+
+describe("mesesEntre", () => {
+  it("conta meses (30.44 dias) entre duas datas", () => {
+    expect(mesesEntre("2026-01-01", "2026-04-01")).toBeCloseTo(2.96, 1);
+  });
+  it("0 quando ate < de", () => {
+    expect(mesesEntre("2026-04-01", "2026-01-01")).toBe(0);
+  });
+});
+
+describe("buildUnitsRecorrente", () => {
+  it("por contrato: usa ltMeses e ltvRecorrente, exclui lt de inconsistentes", () => {
+    const rows = [
+      row({ tipoReceita: "recorrente", valorr: 1000, ltMeses: 5, ltvRecorrente: 5000, isChurned: true, dataInconsistente: false, dataInicio: "2026-01-01" }),
+      row({ tipoReceita: "recorrente", valorr: 2000, ltMeses: 99, ltvRecorrente: 198000, isChurned: true, dataInconsistente: true, dataInicio: "2026-01-01" }),
+    ];
+    const units = buildUnitsRecorrente(rows, "contrato", HOJE);
+    expect(units).toHaveLength(2);
+    expect(units[0].lt).toBe(5);
+    expect(units[0].ltv).toBe(5000);
+    expect(units[1].lt).toBeNull(); // inconsistente → lt não conta
+    expect(units[1].ltv).toBe(198000);
+  });
+  it("por cliente: agrega LTV e usa span de início→fim", () => {
+    const rows = [
+      row({ idTask: "A", tipoReceita: "recorrente", valorr: 1000, ltMeses: 3, ltvRecorrente: 3000, isChurned: true, dataInicio: "2026-01-01", dataFim: "2026-04-01" }),
+      row({ idTask: "A", tipoReceita: "recorrente", valorr: 1000, ltMeses: 2, ltvRecorrente: 2000, isChurned: true, dataInicio: "2026-02-01", dataFim: "2026-04-01" }),
+    ];
+    const units = buildUnitsRecorrente(rows, "cliente", HOJE);
+    expect(units).toHaveLength(1);
+    expect(units[0].ltv).toBe(5000); // soma
+    expect(units[0].lt).toBeCloseTo(2.96, 1); // jan→abr
+  });
+  it("por cliente ativo: span vai até hoje", () => {
+    const units = buildUnitsRecorrente(
+      [row({ idTask: "B", tipoReceita: "recorrente", valorr: 1000, ltMeses: 1, ltvRecorrente: 1000, isChurned: false, dataInicio: "2026-03-01", dataFim: null })],
+      "cliente", HOJE,
+    );
+    expect(units[0].lt).toBeGreaterThan(3); // mar→jun
+  });
+});
+
+describe("buildUnitsPontual", () => {
+  it("por contrato: nEntregas=1, ltv=valorp, lt=0", () => {
+    const units = buildUnitsPontual(
+      [row({ tipoReceita: "pontual", valorp: 5000, status: "entregue" })],
+      "contrato", HOJE,
+    );
+    expect(units[0].nEntregas).toBe(1);
+    expect(units[0].ltv).toBe(5000);
+    expect(units[0].estado).toBe("concluido");
+  });
+  it("por cliente: nEntregas=nº contratos, ltv=soma, lt=span, estado por prioridade", () => {
+    const rows = [
+      row({ idTask: "A", tipoReceita: "pontual", valorp: 5000, status: "entregue", dataInicio: "2026-01-01" }),
+      row({ idTask: "A", tipoReceita: "pontual", valorp: 6000, status: "ativo", dataInicio: "2026-03-01" }),
+    ];
+    const units = buildUnitsPontual(rows, "cliente", HOJE);
+    expect(units).toHaveLength(1);
+    expect(units[0].nEntregas).toBe(2);
+    expect(units[0].ltv).toBe(11000);
+    expect(units[0].lt).toBeCloseTo(1.97, 1); // jan→mar span
+    expect(units[0].estado).toBe("em_producao"); // em produção tem prioridade
+  });
+});
+
+describe("aggregateMetricas", () => {
+  it("calcula média/mediana ignorando lt null", () => {
+    const m = aggregateMetricas([
+      { estado: "ativo", lt: 2, nEntregas: 0, ltv: 1000, idadeMeses: 4 },
+      { estado: "ativo", lt: 4, nEntregas: 0, ltv: 3000, idadeMeses: 6 },
+      { estado: "ativo", lt: null, nEntregas: 0, ltv: 5000, idadeMeses: 8 },
+    ]);
+    expect(m.n).toBe(3);
+    expect(m.ltMesesMedia).toBe(3);     // (2+4)/2, null ignorado
+    expect(m.ltvMedia).toBe(3000);      // (1000+3000+5000)/3
+    expect(m.ltvTotal).toBe(9000);
+    expect(m.ltMesesMediana).toBe(3);
+  });
+  it("zera tudo para lista vazia", () => {
+    const m = aggregateMetricas([]);
+    expect(m.n).toBe(0);
+    expect(m.ltvMedia).toBe(0);
   });
 });
