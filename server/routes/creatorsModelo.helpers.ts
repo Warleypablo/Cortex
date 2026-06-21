@@ -1,5 +1,8 @@
 // server/routes/creatorsModelo.helpers.ts
-import { extractNivelEntrega } from "./churnPontorrente.helpers";
+import {
+  extractNivelEntrega, toJornadas, buildFunil,
+  type RawRow as PontRawRow, type FunilNivel,
+} from "./churnPontorrente.helpers";
 import { mediana } from "./ltLtvChurn.helpers";
 
 export interface RawRow {
@@ -238,5 +241,118 @@ export function aggregateMetricas(units: Unit[]): Metricas {
     ltvMediana: round0(mediana(ltvs)),
     ltvTotal: round0(ltvs.reduce((s, x) => s + x, 0)),
     idadeMediaMeses: round1(avg(idades)),
+  };
+}
+
+// ─── Task 4: payload completo ─────────────────────────────────────────────────
+
+export interface Grupo { modelo: Modelo; estado: string; metricas: Metricas; }
+
+export interface CreatorsModeloPayload {
+  meta: { de: string | null; ate: string | null; hoje: string; nSequenciados: number; nAvulsos: number; pctSequenciados: number; };
+  tabela: { cliente: Grupo[]; contrato: Grupo[]; };
+  funilVendido: FunilNivel[];
+  funilEntregue: FunilNivel[];
+  curvaRecorrente: CurvaPonto[];
+  recompra: Recompra;
+  coorte: { recorrenteIdadeMedia: number; pontualIdadeMedia: number; avisoMaturidade: boolean; };
+}
+
+/** Filtra por mês ('YYYY-MM') de data_inicio, de/ate inclusivos. */
+export function aplicarPeriodo(rows: RawRow[], de?: string, ate?: string): RawRow[] {
+  return rows.filter((r) => {
+    const mes = r.dataInicio ? r.dataInicio.slice(0, 7) : null;
+    if (de && (!mes || mes < de)) return false;
+    if (ate && (!mes || mes > ate)) return false;
+    return true;
+  });
+}
+
+const ESTADOS_REC = ["ativo", "cancelado"] as const;
+const ESTADOS_PONT = ["em_producao", "concluido", "cancelado"] as const;
+
+function gruposDeUnidade(rows: RawRow[], unidade: "cliente" | "contrato", hoje: string): Grupo[] {
+  const recRows = rows.filter((r) => classifyModelo(r) === "recorrente");
+  const pontRows = rows.filter((r) => classifyModelo(r) === "pontual");
+  const recUnits = buildUnitsRecorrente(recRows, unidade, hoje);
+  const pontUnits = buildUnitsPontual(pontRows, unidade, hoje);
+
+  const grupos: Grupo[] = [];
+  for (const e of ESTADOS_REC) {
+    grupos.push({ modelo: "recorrente", estado: e, metricas: aggregateMetricas(recUnits.filter((u) => u.estado === e)) });
+  }
+  grupos.push({ modelo: "recorrente", estado: "total", metricas: aggregateMetricas(recUnits) });
+  for (const e of ESTADOS_PONT) {
+    grupos.push({ modelo: "pontual", estado: e, metricas: aggregateMetricas(pontUnits.filter((u) => u.estado === e)) });
+  }
+  grupos.push({ modelo: "pontual", estado: "total", metricas: aggregateMetricas(pontUnits) });
+  return grupos;
+}
+
+/** Converte RawRow (view) para o RawRow do funil de entregas (churnPontorrente). */
+function toPontRows(rows: RawRow[]): PontRawRow[] {
+  return rows
+    .filter((r) => classifyModelo(r) === "pontual")
+    .map((r) => ({
+      idTask: r.idTask,
+      produto: r.produto,
+      servico: r.servico ?? "",
+      status: r.status,
+      valorp: r.valorp,
+      squad: null, responsavel: null, csResponsavel: null, vendedor: null,
+      motivoCancelamento: null,
+      dataInicio: r.dataInicio,
+      dataEncerramento: r.dataFim,
+      nomeCliente: null,
+    }));
+}
+
+export function buildCreatorsModeloPayload(
+  rows: RawRow[], opts: { de?: string; ate?: string; hoje: string },
+): CreatorsModeloPayload {
+  const { de, ate, hoje } = opts;
+  const periodo = aplicarPeriodo(rows, de, ate);
+
+  const pontRows = periodo.filter((r) => classifyModelo(r) === "pontual");
+  const seqCli = new Set<string>(), avuCli = new Set<string>();
+  {
+    const byCli = new Map<string, RawRow[]>();
+    for (const r of pontRows) {
+      const k = r.idTask ?? r.idSubtask ?? "";
+      (byCli.get(k) ?? byCli.set(k, []).get(k)!).push(r);
+    }
+    for (const [k, items] of Array.from(byCli.entries())) {
+      if (items.some((r) => isSequenciado(r.servico))) seqCli.add(k); else avuCli.add(k);
+    }
+  }
+
+  const pontParaFunil = toPontRows(periodo);
+
+  const recUnitsCli = buildUnitsRecorrente(periodo.filter((r) => classifyModelo(r) === "recorrente"), "cliente", hoje);
+  const pontUnitsCli = buildUnitsPontual(pontRows, "cliente", hoje);
+  const recIdade = aggregateMetricas(recUnitsCli).idadeMediaMeses;
+  const pontIdade = aggregateMetricas(pontUnitsCli).idadeMediaMeses;
+
+  return {
+    meta: {
+      de: de ?? null, ate: ate ?? null, hoje,
+      nSequenciados: seqCli.size,
+      nAvulsos: avuCli.size,
+      pctSequenciados: (seqCli.size + avuCli.size)
+        ? Math.round((seqCli.size / (seqCli.size + avuCli.size)) * 1000) / 10 : 0,
+    },
+    tabela: {
+      cliente: gruposDeUnidade(periodo, "cliente", hoje),
+      contrato: gruposDeUnidade(periodo, "contrato", hoje),
+    },
+    funilVendido: buildFunil(toJornadas(pontParaFunil, "vendido")),
+    funilEntregue: buildFunil(toJornadas(pontParaFunil, "entregue")),
+    curvaRecorrente: buildCurvaRecorrente(periodo, hoje),
+    recompra: buildRecompra(periodo),
+    coorte: {
+      recorrenteIdadeMedia: recIdade,
+      pontualIdadeMedia: pontIdade,
+      avisoMaturidade: Math.abs(recIdade - pontIdade) > 6,
+    },
   };
 }
