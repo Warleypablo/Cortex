@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-21 | feat(orcamento-campanhas): multi-plataforma (TikTok/LinkedIn) + projeção conta hoje
+
+**O que foi feito:**
+- **Projeção (As Is)** passou a considerar o gasto de **hoje** ao decidir se uma campanha "está entregando". Antes a janela era os 3 dias *anteriores* (excluindo hoje), então campanhas criadas/iniciadas hoje não tinham o orçamento extrapolado na projeção — só o gasto já realizado. Agora `date <= CURRENT_DATE`.
+- **Suporte multi-plataforma** na aba: além de Meta e Google, agora há blocos de fetch para **TikTok** (`tiktok.ad_campaigns` / `ad_metrics_daily`) e **LinkedIn** (`linkedin.*`). Cada plataforma tem `try/catch`: se o schema não existir ou faltar permissão, é ignorada sem quebrar as demais.
+- Constante `PLATFORMS` (meta|google|tiktok|linkedin) com type derivado; `ACTIVE_STATUSES` cobre os enums de status de cada canal. Endpoints `/tag` e `/stage` validam contra `PLATFORMS`; removido o CHECK de `platform` em `campaign_tags`.
+- Front: rótulos/ordem/cores/ícones para as 4 plataformas (Meta azul, Google âmbar, TikTok rosa, LinkedIn ciano) e sub-agrupamento por plataforma já genérico.
+
+**Por que:**
+- A aba será usada com todos os canais de mídia paga. Deixar a estrutura pronta faz adicionar um canal ser "só plugar" (constante + bloco de fetch). A correção da projeção evita subestimar o investimento ao subir campanhas novas no meio do mês.
+
+**Arquivos alterados:**
+- `server/routes/orcamentoCampanhas.ts` - janela de entrega inclui hoje; PLATFORMS/ACTIVE_STATUSES; blocos TikTok/LinkedIn; validação de plataforma nos endpoints.
+- `server/db.ts` + `scripts/create_campaign_tags.sql` - remove CHECK de platform em campaign_tags.
+- `client/src/pages/GrowthOrcamentoCampanhas.tsx` - 4 plataformas (type/labels/cores/ícones); remove flag SHOW_GOOGLE.
+
+**Impacto arquitetural:** Adiciona plataformas como dimensão extensível. Em prod, TikTok/LinkedIn só aparecem se o role do app tiver SELECT nos schemas `tiktok`/`linkedin` (localmente o `growth_dev` não tem — queries validadas por sintaxe, mas permission denied).
+
+---
+
 ## 2026-06-20 | feat(orcamento-campanhas): planejamento top-down por etapa do funil
 
 **O que foi feito:**
