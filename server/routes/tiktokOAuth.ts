@@ -45,12 +45,14 @@ const TT_USER_TOKEN = 'https://open.tiktokapis.com/v2/oauth/token/';
 const TT_USER_API = 'https://open.tiktokapis.com/v2';
 
 // Escopos orgânicos (devem estar aprovados no app).
+// 'video.insights' NÃO é pedido: o sync orgânico lê /video/list/ (contadores básicos),
+// não usa insights — e sandbox/trial costuma não liberar esse escopo, o que fazia o
+// consent do TikTok falhar com erro de "scope". user.info.stats já traz seguidores/curtidas.
 const TT_ACCOUNT_SCOPES = [
   'user.info.basic',
   'user.info.profile',
   'user.info.stats',
   'video.list',
-  'video.insights',
 ];
 
 // CSRF: states emitidos no /start, validados no /callback (in-memory, TTL 10 min).
