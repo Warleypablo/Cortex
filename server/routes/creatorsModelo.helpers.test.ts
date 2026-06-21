@@ -4,6 +4,7 @@ import {
   classifyModelo, classifyEstadoRecorrente, classifyEstadoPontual, isSequenciado,
   buildUnitsRecorrente, buildUnitsPontual, aggregateMetricas, mesesEntre,
   buildCurvaRecorrente, buildRecompra,
+  buildCreatorsModeloPayload, aplicarPeriodo,
   type RawRow,
 } from "./creatorsModelo.helpers";
 
@@ -197,5 +198,48 @@ describe("buildRecompra", () => {
     expect(r.totalAvulsos).toBe(2);   // A e B
     expect(r.comRecompra).toBe(1);    // A
     expect(r.pctRecompra).toBe(50);
+  });
+});
+
+describe("aplicarPeriodo", () => {
+  it("filtra por mês de data_inicio (de/ate inclusivos)", () => {
+    const rows = [
+      row({ dataInicio: "2026-01-15" }), row({ dataInicio: "2026-03-10" }), row({ dataInicio: "2026-05-20" }),
+    ];
+    expect(aplicarPeriodo(rows, "2026-03", undefined)).toHaveLength(2);
+    expect(aplicarPeriodo(rows, "2026-03", "2026-03")).toHaveLength(1);
+  });
+});
+
+describe("buildCreatorsModeloPayload", () => {
+  const rows = [
+    row({ idTask: "R1", tipoReceita: "recorrente", valorr: 1000, ltMeses: 4, ltvRecorrente: 4000, isChurned: true, dataInicio: "2026-01-01", dataFim: "2026-05-01" }),
+    row({ idTask: "P1", tipoReceita: "pontual", valorp: 5000, status: "entregue", servico: "Creators Pontual", dataInicio: "2026-03-01" }),
+    row({ idTask: "P2", tipoReceita: "pontual", valorp: 6000, status: "ativo", servico: "1ª Entrega - Creators", dataInicio: "2026-04-01" }),
+  ];
+  it("monta grupos por modelo/estado nas duas unidades", () => {
+    const p = buildCreatorsModeloPayload(rows, { hoje: "2026-06-21" });
+    const recCancelado = p.tabela.cliente.find((g) => g.modelo === "recorrente" && g.estado === "cancelado");
+    expect(recCancelado?.metricas.n).toBe(1);
+    expect(recCancelado?.metricas.ltvMedia).toBe(4000);
+    const pontConcluido = p.tabela.cliente.find((g) => g.modelo === "pontual" && g.estado === "concluido");
+    expect(pontConcluido?.metricas.n).toBe(1);
+  });
+  it("inclui linha total por modelo", () => {
+    const p = buildCreatorsModeloPayload(rows, { hoje: "2026-06-21" });
+    const pontTotal = p.tabela.cliente.find((g) => g.modelo === "pontual" && g.estado === "total");
+    expect(pontTotal?.metricas.n).toBe(2); // P1 + P2
+  });
+  it("monta meta com contagem sequenciado/avulso", () => {
+    const p = buildCreatorsModeloPayload(rows, { hoje: "2026-06-21" });
+    expect(p.meta.nSequenciados).toBe(1); // P2
+    expect(p.meta.nAvulsos).toBe(1);      // P1
+  });
+  it("expõe funil, curva, recompra e coorte", () => {
+    const p = buildCreatorsModeloPayload(rows, { hoje: "2026-06-21" });
+    expect(Array.isArray(p.funilVendido)).toBe(true);
+    expect(Array.isArray(p.curvaRecorrente)).toBe(true);
+    expect(typeof p.recompra.pctRecompra).toBe("number");
+    expect(typeof p.coorte.avisoMaturidade).toBe("boolean");
   });
 });
