@@ -174,6 +174,55 @@ export function buildUnitsPontual(
   return units;
 }
 
+// ─── Task 3: curva de sobrevivência recorrente e recompra pontual ────────────
+
+export interface CurvaPonto { meses: number; pctSobrevivencia: number; n: number; }
+export interface Recompra { totalAvulsos: number; comRecompra: number; pctRecompra: number; }
+
+const MARCOS = [1, 3, 6, 12];
+
+export function buildCurvaRecorrente(rows: RawRow[], hoje: string): CurvaPonto[] {
+  const recs = rows.filter(
+    (r) => classifyModelo(r) === "recorrente" && !r.dataInconsistente && r.dataInicio,
+  );
+  return MARCOS.map((m) => {
+    // tiveram chance de chegar ao marco m
+    const comChance = recs.filter((r) => mesesEntre(r.dataInicio!, hoje) >= m);
+    // sobreviveram ao marco: ativo (continua) OU churned mas durou >= m
+    const sobreviveram = comChance.filter((r) =>
+      !r.isChurned ? true : (r.ltMeses ?? 0) >= m,
+    );
+    return {
+      meses: m,
+      n: comChance.length,
+      pctSobrevivencia: comChance.length
+        ? Math.round((sobreviveram.length / comChance.length) * 1000) / 10
+        : 0,
+    };
+  });
+}
+
+export function buildRecompra(rows: RawRow[]): Recompra {
+  const pont = rows.filter((r) => classifyModelo(r) === "pontual");
+  const byCli = new Map<string, RawRow[]>();
+  for (const r of pont) {
+    const k = r.idTask ?? r.idSubtask ?? "";
+    (byCli.get(k) ?? byCli.set(k, []).get(k)!).push(r);
+  }
+  let totalAvulsos = 0, comRecompra = 0;
+  for (const [, items] of Array.from(byCli.entries())) {
+    const temSequencia = items.some((r) => isSequenciado(r.servico));
+    if (temSequencia) continue;           // só universo avulso
+    totalAvulsos++;
+    if (items.length >= 2) comRecompra++;
+  }
+  return {
+    totalAvulsos,
+    comRecompra,
+    pctRecompra: totalAvulsos ? Math.round((comRecompra / totalAvulsos) * 1000) / 10 : 0,
+  };
+}
+
 export function aggregateMetricas(units: Unit[]): Metricas {
   const lts = units.map((u) => u.lt).filter((x): x is number => x != null);
   const ltvs = units.map((u) => u.ltv);
