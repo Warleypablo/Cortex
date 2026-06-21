@@ -55,20 +55,31 @@ const TT_ACCOUNT_SCOPES = [
   'video.list',
 ];
 
-// CSRF: states emitidos no /start, validados no /callback (in-memory, TTL 10 min).
-const pendingStates = new Map<string, number>();
-function newState(): string {
+// CSRF + PKCE: states emitidos no /start, validados no /callback (in-memory, TTL 10 min).
+// O fluxo "account" (Login Kit) exige PKCE — guardamos o code_verifier junto do state.
+const pendingStates = new Map<string, { ts: number; verifier?: string }>();
+function newState(verifier?: string): string {
   const s = crypto.randomBytes(16).toString('hex');
-  pendingStates.set(s, Date.now());
-  Array.from(pendingStates.entries()).forEach(([k, t]) => {
-    if (Date.now() - t > 600_000) pendingStates.delete(k);
+  pendingStates.set(s, { ts: Date.now(), verifier });
+  Array.from(pendingStates.entries()).forEach(([k, v]) => {
+    if (Date.now() - v.ts > 600_000) pendingStates.delete(k);
   });
   return s;
 }
-function consumeState(s?: string): boolean {
-  if (!s || !pendingStates.has(s)) return false;
+function consumeState(s?: string): { ok: boolean; verifier?: string } {
+  if (!s || !pendingStates.has(s)) return { ok: false };
+  const entry = pendingStates.get(s)!;
   pendingStates.delete(s);
-  return true;
+  return { ok: true, verifier: entry.verifier };
+}
+
+// PKCE do TikTok: code_challenge = HEX(SHA256(code_verifier)), method S256.
+// Atenção: TikTok usa HEX (não base64url, como manda o RFC 7636) — ver doc
+// "Manage User Access Tokens". Sem isso o consent falha com erro "code_challenge".
+function makePkce(): { verifier: string; challenge: string } {
+  const verifier = crypto.randomBytes(32).toString('hex'); // 64 chars, charset válido (43–128)
+  const challenge = crypto.createHash('sha256').update(verifier).digest('hex');
+  return { verifier, challenge };
 }
 
 // Credenciais do app de Login Kit (orgânico). Fallback p/ o app de Marketing API
@@ -112,7 +123,7 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
     const authCode = (req.query.auth_code || req.query.code) as string | undefined;
     const state = req.query.state as string | undefined;
     if (!authCode) return res.status(400).send('Faltou o auth_code do TikTok.');
-    if (!consumeState(state)) return res.status(400).send('State inválido ou expirado. Autorize de novo.');
+    if (!consumeState(state).ok) return res.status(400).send('State inválido ou expirado. Autorize de novo.');
 
     const appId = process.env.TIKTOK_APP_ID;
     const secret = process.env.TIKTOK_APP_SECRET;
@@ -212,12 +223,15 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
   app.get('/api/oauth/tiktok/account/start', (req: Request, res: Response) => {
     const { clientKey } = loginCreds();
     if (!clientKey) return res.status(500).json({ error: 'TIKTOK_LOGIN_APP_ID não configurado' });
+    const { verifier, challenge } = makePkce();
     const url = new URL(TT_USER_AUTH);
     url.searchParams.set('client_key', clientKey);
     url.searchParams.set('scope', TT_ACCOUNT_SCOPES.join(','));
     url.searchParams.set('response_type', 'code');
     url.searchParams.set('redirect_uri', `${baseUrl(req)}/api/oauth/tiktok/account/callback`);
-    url.searchParams.set('state', newState());
+    url.searchParams.set('state', newState(verifier));
+    url.searchParams.set('code_challenge', challenge);
+    url.searchParams.set('code_challenge_method', 'S256');
     res.redirect(url.toString());
   });
 
@@ -227,7 +241,8 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
     const error = req.query.error as string | undefined;
     if (error) return res.status(400).send(`Autorização recusada: ${error}`);
     if (!code) return res.status(400).send('Faltou o code do TikTok.');
-    if (!consumeState(state)) return res.status(400).send('State inválido ou expirado. Autorize de novo.');
+    const consumed = consumeState(state);
+    if (!consumed.ok) return res.status(400).send('State inválido ou expirado. Autorize de novo.');
 
     const { clientKey, clientSecret } = loginCreds();
     if (!clientKey || !clientSecret) return res.status(500).send('TIKTOK_LOGIN_APP_ID/SECRET não configurados.');
@@ -243,6 +258,7 @@ export function registerTiktokOAuthRoutes(app: Express, db: any) {
           code,
           grant_type: 'authorization_code',
           redirect_uri: `${baseUrl(req)}/api/oauth/tiktok/account/callback`,
+          code_verifier: consumed.verifier || '',
         }),
       });
       const tok = await tokRes.json();
