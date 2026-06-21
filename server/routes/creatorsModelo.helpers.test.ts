@@ -243,4 +243,13 @@ describe("buildCreatorsModeloPayload", () => {
     expect(typeof p.recompra.pctRecompra).toBe("number");
     expect(typeof p.coorte.avisoMaturidade).toBe("boolean");
   });
+  it("exclui contrato 'rótulos' do funil (mas conta como avulso)", () => {
+    const rows = [
+      row({ idTask: "X", tipoReceita: "pontual", valorp: 4000, status: "entregue", servico: "Entrega de 3 rótulos", dataInicio: "2026-03-01" }),
+    ];
+    const p = buildCreatorsModeloPayload(rows, { hoje: "2026-06-21" });
+    expect(p.funilVendido).toHaveLength(0);   // rótulos não vira jornada de entrega
+    expect(p.meta.nSequenciados).toBe(0);
+    expect(p.meta.nAvulsos).toBe(1);          // entra como avulso
+  });
 });
