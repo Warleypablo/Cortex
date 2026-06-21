@@ -3,6 +3,7 @@ import { describe, it, expect } from "vitest";
 import {
   classifyModelo, classifyEstadoRecorrente, classifyEstadoPontual, isSequenciado,
   buildUnitsRecorrente, buildUnitsPontual, aggregateMetricas, mesesEntre,
+  buildCurvaRecorrente, buildRecompra,
   type RawRow,
 } from "./creatorsModelo.helpers";
 
@@ -156,5 +157,45 @@ describe("aggregateMetricas", () => {
     const m = aggregateMetricas([]);
     expect(m.n).toBe(0);
     expect(m.ltvMedia).toBe(0);
+  });
+});
+
+describe("buildCurvaRecorrente", () => {
+  it("no marco de 3m: só conta quem teve chance (idade>=3) e sobreviveu (lt>=3 ou ativo)", () => {
+    const rows = [
+      // ativo há 5 meses → sobrevive a 1,3 (idade>=) ; não conta em 6,12
+      row({ tipoReceita: "recorrente", isChurned: false, dataInicio: "2026-01-21", dataFim: null, ltMeses: 5, dataInconsistente: false }),
+      // churned com lt=2 (entrou jan, saiu mar) → teve chance até 3m, NÃO sobreviveu a 3
+      row({ tipoReceita: "recorrente", isChurned: true, dataInicio: "2026-01-01", dataFim: "2026-03-01", ltMeses: 2, dataInconsistente: false }),
+    ];
+    const curva = buildCurvaRecorrente(rows, "2026-06-21");
+    const m3 = curva.find((c) => c.meses === 3)!;
+    expect(m3.n).toBe(2);                 // ambos tiveram chance (idade>=3)
+    expect(m3.pctSobrevivencia).toBe(50); // só o ativo sobreviveu
+  });
+  it("ignora contratos pontuais e inconsistentes", () => {
+    const curva = buildCurvaRecorrente(
+      [row({ tipoReceita: "pontual" }), row({ tipoReceita: "recorrente", dataInconsistente: true })],
+      "2026-06-21",
+    );
+    expect(curva.every((c) => c.n === 0)).toBe(true);
+  });
+});
+
+describe("buildRecompra", () => {
+  it("conta clientes avulsos (sem sequência) com >=2 contratos pontuais", () => {
+    const rows = [
+      // cliente A: 2 contratos avulsos → recomprou
+      row({ idTask: "A", tipoReceita: "pontual", servico: "Creators Pontual" }),
+      row({ idTask: "A", tipoReceita: "pontual", servico: "Creators Scale" }),
+      // cliente B: 1 contrato avulso → não recomprou
+      row({ idTask: "B", tipoReceita: "pontual", servico: "Creators Pontual" }),
+      // cliente C: sequenciado → não entra no universo avulso
+      row({ idTask: "C", tipoReceita: "pontual", servico: "1ª Entrega - Creators" }),
+    ];
+    const r = buildRecompra(rows);
+    expect(r.totalAvulsos).toBe(2);   // A e B
+    expect(r.comRecompra).toBe(1);    // A
+    expect(r.pctRecompra).toBe(50);
   });
 });
