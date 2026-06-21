@@ -104,12 +104,23 @@ export function buildUnitsRecorrente(
   for (const [, items] of Array.from(byCli.entries())) {
     const ativo = items.some((r) => !r.isChurned);
     const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
-    const fins = items.map((r) => r.dataFim).filter((d): d is string => !!d).sort();
+    // Cancelados: só data_fim de contratos consistentes (data_inconsistente =
+    // data_fim < data_inicio corrompe o span). Espelha a régua de ltLtvChurn
+    // (MAX(data_fim) FILTER NOT data_inconsistente).
+    const finsValidos = items
+      .filter((r) => !r.dataInconsistente)
+      .map((r) => r.dataFim)
+      .filter((d): d is string => !!d)
+      .sort();
     const ini = inicios[0] ?? null;
     let lt: number | null = null;
     if (ini) {
-      const fim = ativo ? hoje : (fins[fins.length - 1] ?? null);
-      lt = fim ? mesesEntre(ini, fim) : null;
+      if (ativo) {
+        lt = mesesEntre(ini, hoje);
+      } else {
+        const fim = finsValidos[finsValidos.length - 1] ?? null;
+        lt = fim && fim >= ini ? mesesEntre(ini, fim) : null;
+      }
     }
     units.push({
       estado: ativo ? "ativo" : "cancelado",
