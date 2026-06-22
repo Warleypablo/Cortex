@@ -1,9 +1,11 @@
 /**
- * Sobe o ad h1b1c1 (TP1630) pareado (9x16 + 4x5) na campanha CBO "[FLASH CRM]".
- * Vídeos já estão no Meta (só referência por video_id). Ad criado PAUSED no conjunto
- * pré-setado que já existe na campanha (CBO → sem budget no conjunto).
+ * Sobe os ads do lote CRM Recompra (b1c1, hooks h1–h9 = TP1630–TP1638) pareados (9x16+4x5),
+ * todos PAUSED, no conjunto pré-setado da campanha CBO "[FLASH CRM]" (sem budget no conjunto).
+ * Vídeos já estão no Meta (só referência por video_id).
  *
- * Idempotente: pula se o ad TP1630 já existe no conjunto.
+ * Robusto: idempotente (pula ad que já existe pelo TP) e gentil com a quota dev-tier —
+ * espaça as criações e, em rate-limit duro (80004/80014), espera e tenta de novo; re-rodar
+ * continua de onde parou.
  *
  *   npx tsx subir-crm-flash.ts        # DRY
  *   npx tsx subir-crm-flash.ts --go   # cria (PAUSED)
@@ -11,19 +13,28 @@
 import "dotenv/config";
 import { db } from "./server/db";
 import { creativesLibrary } from "@shared/schema";
-import { eq } from "drizzle-orm";
-import { metaGet, metaPostForm } from "./server/services/adsCreation/metaApi";
+import { inArray } from "drizzle-orm";
+import { metaGet, metaPostForm, MetaRateLimitError } from "./server/services/adsCreation/metaApi";
 
 const ACC = process.env.META_DEFAULT_AD_ACCOUNT_ID!;
 const CAMP = "120252008224000450"; // [TP] [LEADS] [CBO] [FLASH CRM] - Campanha de Teste - [22.06.26]
 const ADSET = "120252008223980450"; // "Novo conjunto de anúncios de Leads" (pré-setado, PAUSED via campanha)
 const PAGE_ID = process.env.META_DEFAULT_PAGE_ID || "111691498031338";
 const IG_USER_ID = process.env.META_DEFAULT_INSTAGRAM_ACTOR_ID || "17841423555147969";
-const TP = "TP1630";
 
-// ─── vídeos já no Meta (PREENCHER após fetch dos IDs) ───
-const VIDEO_9 = "1373715248001174"; // Crm_Recompra_Lucas_h1b1c1_9x16.mp4
-const VIDEO_45 = "1509680107621231"; // Crm_Recompra_Lucas_h1b1c1_4x5.mp4
+// ─── vídeos já no Meta (b1c1, h1–h9), pareados por hook ───
+const VIDEOS: Record<string, { v9: string; v45: string }> = {
+  TP1630: { v9: "1373715248001174", v45: "1509680107621231" }, // h1
+  TP1631: { v9: "27374069562274562", v45: "1567059148170640" }, // h2
+  TP1632: { v9: "1501813371141785", v45: "2012524936027535" }, // h3
+  TP1633: { v9: "27628050873455124", v45: "1669134627474625" }, // h4
+  TP1634: { v9: "1693965168509513", v45: "1016808464372912" }, // h5
+  TP1635: { v9: "1036872112232179", v45: "1315458376907019" }, // h6
+  TP1636: { v9: "886275941181007", v45: "1927776761226484" }, // h7
+  TP1637: { v9: "1421378906461834", v45: "1002261789265052" }, // h8
+  TP1638: { v9: "1093122969977598", v45: "1566242568173543" }, // h9
+};
+const TPS = Object.keys(VIDEOS);
 
 // ─── conteúdo do anúncio ───
 // UTM dinâmica padrão da Turbo (campaign-agnostic — funciona em qualquer campanha).
@@ -67,10 +78,13 @@ const ADVANTAGE_PLUS_OPT_OUT = {
 };
 
 const go = process.argv.includes("--go");
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+const RATE_WAIT_MS = 5 * 60_000; // espera em rate-limit duro
+const MAX_RATE_RETRIES = 8; // ~40min de janela coberta por ad
 
-function pairedCreativeParams(nomeFinal: string) {
-  const LBL_9 = `lbl_9x16_${TP}`;
-  const LBL_4 = `lbl_4x5_${TP}`;
+function pairedCreativeParams(tpId: string, nomeFinal: string, v9: string, v45: string) {
+  const LBL_9 = `lbl_9x16_${tpId}`;
+  const LBL_4 = `lbl_4x5_${tpId}`;
   return {
     name: `Criativo: ${nomeFinal}`,
     object_story_spec: { page_id: PAGE_ID, instagram_user_id: IG_USER_ID },
@@ -81,8 +95,8 @@ function pairedCreativeParams(nomeFinal: string) {
       call_to_action_types: [CTA_TYPE],
       ad_formats: ["SINGLE_VIDEO"],
       videos: [
-        { video_id: VIDEO_9, adlabels: [{ name: LBL_9 }] },
-        { video_id: VIDEO_45, adlabels: [{ name: LBL_4 }] },
+        { video_id: v9, adlabels: [{ name: LBL_9 }] },
+        { video_id: v45, adlabels: [{ name: LBL_4 }] },
       ],
       asset_customization_rules: [
         {
@@ -101,51 +115,72 @@ function pairedCreativeParams(nomeFinal: string) {
   };
 }
 
-(async () => {
-  const [row] = await db.select().from(creativesLibrary).where(eq(creativesLibrary.tpId, TP));
-  if (!row) throw new Error(`${TP} não está na Biblioteca`);
-  const nomeFinal = row.nomeFinal;
+/** Cria 1 ad pareado (creative + ad PAUSED), com retry em rate-limit duro. */
+async function createPairedAd(a: { tpId: string; nomeFinal: string; v9: string; v45: string }): Promise<string> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      const cre = await metaPostForm(`${ACC}/adcreatives`, pairedCreativeParams(a.tpId, a.nomeFinal, a.v9, a.v45));
+      if (!cre.id) throw new Error("creative sem id");
+      const ad = await metaPostForm(`${ACC}/ads`, {
+        name: a.nomeFinal,
+        adset_id: ADSET,
+        creative: { creative_id: cre.id },
+        status: "PAUSED",
+      });
+      if (!ad.id) throw new Error("ad sem id");
+      return ad.id as string;
+    } catch (e) {
+      if (e instanceof MetaRateLimitError && attempt < MAX_RATE_RETRIES) {
+        console.log(`   ⏳ rate-limit em ${a.tpId} — esperando ${RATE_WAIT_MS / 60000}min (tentativa ${attempt + 1}/${MAX_RATE_RETRIES})`);
+        await sleep(RATE_WAIT_MS);
+        continue;
+      }
+      throw e;
+    }
+  }
+}
 
-  // sanity dos placeholders
-  const faltando: string[] = [];
-  if (VIDEO_9.startsWith("__")) faltando.push("VIDEO_9 (id do 9x16)");
-  if (VIDEO_45.startsWith("__")) faltando.push("VIDEO_45 (id do 4x5)");
-  if (MESSAGE.startsWith("__")) faltando.push("MESSAGE (copy)");
-  if (CTA_LINK.startsWith("__")) faltando.push("CTA_LINK (link destino — pode subir pendente)");
+(async () => {
+  const rows = await db.select().from(creativesLibrary).where(inArray(creativesLibrary.tpId, TPS));
+  const byTp = new Map(rows.map((r) => [r.tpId, r]));
+  const ADS = TPS.map((tp) => {
+    const r = byTp.get(tp);
+    if (!r) throw new Error(`${tp} não está na Biblioteca`);
+    return { tpId: tp, nomeFinal: r.nomeFinal, ...VIDEOS[tp] };
+  });
 
   console.log(`Campanha: ${CAMP} (CBO)`);
   console.log(`Conjunto: ${ADSET} (pré-setado)`);
-  console.log(`Ad:       ${nomeFinal}  [9x16 ${VIDEO_9} | 4x5 ${VIDEO_45}]  → PAUSED`);
-  console.log(`CTA:      ${CTA_TYPE}  |  link: ${CTA_LINK}`);
-  console.log(`UTM:      ${URL_TAGS}`);
-  if (faltando.length) console.log(`\n⚠️  faltam preencher: ${faltando.join(", ")}`);
+  console.log(`CTA: ${CTA_TYPE} | link: ${CTA_LINK} (placeholder, pendente)`);
+  console.log(`${ADS.length} ad(s) pareados (9x16+4x5), PAUSED:`);
+  for (const a of ADS) console.log(`  • ${a.nomeFinal}   [9x16 ${a.v9} | 4x5 ${a.v45}]`);
   console.log(`\nmodo: ${go ? "🔴 CRIAR" : "DRY (não cria)"}`);
   if (!go) {
     console.log("(DRY) Rode com --go pra criar.");
     process.exit(0);
   }
-  // Bloqueia se faltar vídeo ou copy (link pode ir pendente conscientemente).
-  const bloqueantes = faltando.filter((f) => !f.startsWith("CTA_LINK"));
-  if (bloqueantes.length) throw new Error(`não dá pra criar — faltam: ${bloqueantes.join(", ")}`);
 
-  // idempotência: ad já existe?
-  const adsExisting = await metaGet(`${ADSET}/ads`, { fields: "name", limit: "100" });
-  const exists = (adsExisting.data ?? []).some((a: { name: string }) => a.name.startsWith(`${TP} `) || a.name === nomeFinal);
-  if (exists) {
-    console.log(`↩︎ ad ${TP} já existe no conjunto — nada a fazer.`);
-    process.exit(0);
+  // idempotência: quais ads já existem no conjunto?
+  const adsExisting = await metaGet(`${ADSET}/ads`, { fields: "name", limit: "200" });
+  const existingNames: string[] = (adsExisting.data ?? []).map((a: { name: string }) => a.name);
+  const todo = ADS.filter((a) => !existingNames.some((n) => n.startsWith(`${a.tpId} `) || n === a.nomeFinal));
+  console.log(`\n${todo.length} ad(s) a criar (de ${ADS.length}); ${ADS.length - todo.length} já existem.`);
+
+  let done = 0;
+  for (const a of todo) {
+    try {
+      const adId = await createPairedAd(a);
+      console.log(`  ✅ ${a.tpId} → ad ${adId} (PAUSED, 9x16+4x5)`);
+      done++;
+      await sleep(8000);
+    } catch (e) {
+      console.error(`  ⛔ parou em ${a.tpId}: ${e instanceof Error ? e.message : e}`);
+      console.error(`     (${done} criado(s) nesse run; re-rodar continua de onde parou)`);
+      break;
+    }
   }
 
-  const cre = await metaPostForm(`${ACC}/adcreatives`, pairedCreativeParams(nomeFinal));
-  if (!cre.id) throw new Error("creative sem id");
-  const ad = await metaPostForm(`${ACC}/ads`, {
-    name: nomeFinal,
-    adset_id: ADSET,
-    creative: { creative_id: cre.id },
-    status: "PAUSED",
-  });
-  if (!ad.id) throw new Error("ad sem id");
-  console.log(`\n✅ ad ${TP} criado: ${ad.id} (PAUSED, 9x16+4x5) | creative ${cre.id}`);
+  console.log(`\nResumo: ${done} criado(s) nesse run · faltam ${todo.length - done}.`);
   console.log(
     "Gerenciador:",
     `https://adsmanager.facebook.com/adsmanager/manage/ads?act=${ACC.replace("act_", "")}&selected_adset_ids=${ADSET}`,
