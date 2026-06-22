@@ -5,6 +5,7 @@ import {
   buildUnitsRecorrente, buildUnitsPontual, aggregateMetricas, mesesEntre,
   buildCurvaRecorrente, buildRecompra,
   buildCreatorsModeloPayload, aplicarPeriodo,
+  buildLtvMaduro, buildPlacar,
   type RawRow,
 } from "./creatorsModelo.helpers";
 
@@ -282,5 +283,51 @@ describe("buildCreatorsModeloPayload", () => {
     expect(p.funilVendido).toHaveLength(0);   // rótulos não vira jornada de entrega
     expect(p.meta.nSequenciados).toBe(0);
     expect(p.meta.nAvulsos).toBe(1);          // entra como avulso
+  });
+});
+
+describe("buildLtvMaduro", () => {
+  it("faixa: blended <= ativo; projeção por churn = MRR x LT cancelado", () => {
+    const rows = [
+      // ativo: MRR 1000, ltv realizado 6000 (6 meses vivos)
+      row({ idTask: "A", tipoReceita: "recorrente", valorr: 1000, ltMeses: 6, ltvRecorrente: 6000, isAtivo: true, isChurned: false, status: "ativo", dataInicio: "2026-01-01" }),
+      // cancelado: MRR 1000, ltv 2000 (2 meses), LT cancelado define a premissa de churn
+      row({ idTask: "B", tipoReceita: "recorrente", valorr: 1000, ltMeses: 2, ltvRecorrente: 2000, isAtivo: false, isChurned: true, dataInconsistente: false, status: "cancelado/inativo", dataInicio: "2026-01-01", dataFim: "2026-03-01" }),
+    ];
+    const m = buildLtvMaduro(rows, "2026-06-21");
+    expect(m.realizadoBlended).toBe(4000);  // (6000+2000)/2
+    expect(m.realizadoAtivo).toBe(6000);    // só o ativo
+    expect(m.premissaChurnMeses).toBe(2);   // LT médio dos cancelados
+    expect(m.projetadoChurn).toBe(2000);    // MRR_ativo(1000) x LT_cancelado(2)
+  });
+});
+
+describe("buildPlacar", () => {
+  const rows = [
+    row({ idTask: "R1", tipoReceita: "recorrente", valorr: 1000, ltMeses: 6, ltvRecorrente: 6000, isAtivo: true, isChurned: false, status: "ativo", dataInicio: "2026-01-01" }),
+    row({ idTask: "R2", tipoReceita: "recorrente", valorr: 1000, ltMeses: 2, ltvRecorrente: 2000, isAtivo: false, isChurned: true, dataInconsistente: false, status: "cancelado/inativo", dataInicio: "2026-01-01", dataFim: "2026-03-01" }),
+    row({ idTask: "P1", tipoReceita: "pontual", valorp: 1000, status: "entregue", servico: "Creators Pontual", dataInicio: "2026-03-01" }),
+    row({ idTask: "P2", tipoReceita: "pontual", valorp: 3000, status: "entregue", servico: "Creators Pontual", dataInicio: "2026-03-01" }),
+  ];
+  it("por cliente é blended×blended e calcula razão", () => {
+    const p = buildPlacar(rows, "2026-06-21");
+    expect(p.porCliente.recorrente).toBe(4000);  // (6000+2000)/2
+    expect(p.porCliente.pontual).toBe(2000);     // (1000+3000)/2
+    expect(p.porCliente.recorrenteAtivo).toBe(6000);
+    expect(p.porCliente.razao).toBe(2);          // 4000/2000
+  });
+  it("volume/caixa soma receita por modelo", () => {
+    const p = buildPlacar(rows, "2026-06-21");
+    expect(p.volume.pontualReceita).toBe(4000);       // 1000+3000
+    expect(p.volume.recorrenteRealizado).toBe(8000);  // 6000+2000
+    expect(p.volume.recorrenteMrrCorrente).toBe(1000); // só o ativo
+    expect(p.volume.pontualClientes).toBe(2);
+    expect(p.volume.recorrenteClientes).toBe(2);
+  });
+  it("break-even = LTV recorrente / ticket pontual (faixa)", () => {
+    const p = buildPlacar(rows, "2026-06-21");
+    expect(p.breakEven.ticketPontual).toBe(2000);     // média valorp entregues (1000+3000)/2
+    expect(p.breakEven.minRecompras).toBe(2);         // blended 4000/2000
+    expect(p.breakEven.maxRecompras).toBe(3);         // ativo 6000/2000
   });
 });
