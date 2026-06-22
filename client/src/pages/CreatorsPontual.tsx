@@ -1,5 +1,4 @@
 import { useQuery } from "@tanstack/react-query";
-import { Link } from "wouter";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { OverviewCards } from "@/components/creators-pontual/OverviewCards";
 import { EntradaSaida } from "@/components/creators-pontual/EntradaSaida";
@@ -34,11 +33,6 @@ export default function CreatorsPontual() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex justify-end">
-        <Link href="/creators-modelo" className="text-xs text-sky-600 dark:text-sky-400 hover:underline">
-          → Creators: Recorrente × Pontual
-        </Link>
-      </div>
       {!overview ? (
         <div className="h-24 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
       ) : (
