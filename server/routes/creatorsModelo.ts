@@ -1,7 +1,7 @@
 // server/routes/creatorsModelo.ts
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
-import { buildCreatorsModeloPayload, type RawRow } from "./creatorsModelo.helpers";
+import { buildRedesignPayload, type RawRow } from "./creatorsModelo.helpers";
 
 export function registerCreatorsModeloRoutes(app: Express, db: any) {
   app.get("/api/creators-modelo", async (req, res) => {
@@ -39,7 +39,7 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       }));
 
       const hoje = new Date().toISOString().slice(0, 10);
-      res.json(buildCreatorsModeloPayload(rows, { de, ate, hoje }));
+      res.json(buildRedesignPayload(rows, { de, ate, hoje }));
     } catch (error) {
       console.error("[api] Error fetching creators-modelo:", error);
       res.status(500).json({ error: "Failed to fetch creators-modelo" });
