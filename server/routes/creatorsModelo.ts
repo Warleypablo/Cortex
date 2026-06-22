@@ -66,6 +66,13 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       const agregador = req.query.agregador === "mediana" ? "mediana" : "media";
       const estadoQ = String(req.query.estado ?? "todos");
       const estado = estadoQ === "ativo" || estadoQ === "cancelado" ? estadoQ : "todos";
+      // período = coorte por data_inicio + recorta os meses do snapshot ('YYYY-MM').
+      const de = typeof req.query.de === "string" && /^\d{4}-\d{2}$/.test(req.query.de) ? req.query.de : null;
+      const ate = typeof req.query.ate === "string" && /^\d{4}-\d{2}$/.test(req.query.ate) ? req.query.ate : null;
+      const mesDe = de ? sql`AND to_char(data_snapshot::date,'YYYY-MM') >= ${de}` : sql``;
+      const mesAte = ate ? sql`AND to_char(data_snapshot::date,'YYYY-MM') <= ${ate}` : sql``;
+      const cohortDe = de ? sql`AND to_char(h.data_inicio::date,'YYYY-MM') >= ${de}` : sql``;
+      const cohortAte = ate ? sql`AND to_char(h.data_inicio::date,'YYYY-MM') <= ${ate}` : sql``;
 
       // grão do recorrente: contrato = por subtask; cliente = por task. Pontual
       // é sempre por task (a jornada é o contrato), espelhando a tabela do topo.
@@ -90,7 +97,9 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       const result = await db.execute(sql`
         WITH meses AS (
           SELECT to_char(data_snapshot::date,'YYYY-MM') AS m, MAX(data_snapshot::date) AS fim
-          FROM "Clickup".cup_data_hist GROUP BY 1
+          FROM "Clickup".cup_data_hist
+          WHERE TRUE ${mesDe} ${mesAte}
+          GROUP BY 1
         ),
         snap AS (
           SELECT mz.m, mz.fim, h.id_task, h.id_subtask,
@@ -100,7 +109,7 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
             h.data_inicio::date AS di
           FROM meses mz
           JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = mz.fim
-          WHERE h.servico ILIKE '%creator%'
+          WHERE h.servico ILIKE '%creator%' ${cohortDe} ${cohortAte}
         ),
         rec_unit AS (
           SELECT m, ${grainRec} AS uid,
@@ -157,6 +166,11 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       const estadoQ = String(req.query.estado ?? "ambos");
       const estado: EstadoFiltro = estadoQ === "ativo" || estadoQ === "cancelado" ? estadoQ : "ambos";
       if (!/^\d{4}-\d{2}$/.test(mes)) return res.status(400).json({ error: "mes inválido" });
+      // mesma coorte por data_inicio do resto da sub-aba
+      const de = typeof req.query.de === "string" && /^\d{4}-\d{2}$/.test(req.query.de) ? req.query.de : null;
+      const ate = typeof req.query.ate === "string" && /^\d{4}-\d{2}$/.test(req.query.ate) ? req.query.ate : null;
+      const cohortDe = de ? sql`AND to_char(h.data_inicio::date,'YYYY-MM') >= ${de}` : sql``;
+      const cohortAte = ate ? sql`AND to_char(h.data_inicio::date,'YYYY-MM') <= ${ate}` : sql``;
 
       const result = await db.execute(sql`
         WITH alvo AS (
@@ -174,7 +188,7 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
         FROM "Clickup".cup_data_hist h
         JOIN alvo ON h.data_snapshot::date = alvo.d
         LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
-        WHERE h.servico ILIKE '%creator%'
+        WHERE h.servico ILIKE '%creator%' ${cohortDe} ${cohortAte}
       `);
       const rows = result.rows as any[];
       if (!rows.length) return res.json({ mes, modelo, clientes: [] });
