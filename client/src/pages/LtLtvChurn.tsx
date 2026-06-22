@@ -12,6 +12,7 @@ import { EvolucaoProduto } from "@/components/lt-ltv-churn/EvolucaoProduto";
 import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import type { OverviewData, ProdutoBenchmark } from "@/components/lt-ltv-churn/types";
 import { TabelaLtLtv } from "@/components/creators-modelo/TabelaLtLtv";
+import { EvolucaoLtLtv } from "@/components/creators-modelo/EvolucaoLtLtv";
 import type { RedesignPayload } from "@/components/creators-modelo/types";
 
 export default function LtLtvChurn() {
@@ -83,12 +84,13 @@ export default function LtLtvChurn() {
           <ContratosTable produto={produtoParam} />
         </TabsContent>
 
-        <TabsContent value="creators">
+        <TabsContent value="creators" className="space-y-6">
           {!creators ? (
             <div className="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
           ) : (
             <TabelaLtLtv data={creators} />
           )}
+          <EvolucaoLtLtv />
         </TabsContent>
       </Tabs>
     </div>
