@@ -1,9 +1,10 @@
 // client/src/components/creators-modelo/EvolucaoLtLtv.tsx
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
+import { EvolucaoAuditoriaDrawer } from "./EvolucaoAuditoriaDrawer";
 import type { Unidade, Agregador, Situacao } from "./types";
 
 interface ModMetric { clientes: number; lt: number | null; ltv: number | null; }
@@ -33,6 +34,7 @@ export function EvolucaoLtLtv({
 }: {
   unidade: Unidade; agregador: Agregador; estado: Situacao;
 }) {
+  const [audit, setAudit] = useState<{ modelo: "recorrente" | "pontual"; mes: string } | null>(null);
   const estadoParam = estado === "ambos" ? "todos" : estado;
   const { data } = useQuery({
     queryKey: ["/api/creators-modelo/evolucao", unidade, agregador, estadoParam],
@@ -47,6 +49,7 @@ export function EvolucaoLtLtv({
   const meses = data?.meses ?? [];
 
   return (
+    <>
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
       <CardHeader>
         <CardTitle className="text-base">Evolução mensal — LT &amp; LTV Recorrente × Pontual</CardTitle>
@@ -85,7 +88,17 @@ export function EvolucaoLtLtv({
                       <td className="px-3 py-2.5 text-gray-500 dark:text-zinc-400">{l.label}</td>
                       {meses.map((m) => (
                         <td key={m.mes} className={`${td}${l.forte ? " font-semibold" : ""}`}>
-                          {l.get(m[g.key])}
+                          {l.label === "Clientes" ? (
+                            <button
+                              onClick={() => setAudit({ modelo: g.key, mes: m.mes })}
+                              className="font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
+                              title="Ver clientes e auditar entregas deste mês"
+                            >
+                              {l.get(m[g.key])}
+                            </button>
+                          ) : (
+                            l.get(m[g.key])
+                          )}
                         </td>
                       ))}
                     </tr>
@@ -97,5 +110,7 @@ export function EvolucaoLtLtv({
         )}
       </CardContent>
     </Card>
+    <EvolucaoAuditoriaDrawer alvo={audit} estado={estado} onClose={() => setAudit(null)} />
+    </>
   );
 }

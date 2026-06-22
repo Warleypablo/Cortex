@@ -2,8 +2,8 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import {
-  buildRedesignPayload, buildClientesDetalhe,
-  type RawRow, type Modelo,
+  buildRedesignPayload, buildClientesDetalhe, buildEvolucaoClientes,
+  type RawRow, type Modelo, type EstadoFiltro, type EvoSnapRow,
 } from "./creatorsModelo.helpers";
 
 /** Busca as linhas de Creators (recorrente + pontual) da view e mapeia para RawRow. */
@@ -145,6 +145,49 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error fetching creators-modelo evolucao:", error);
       res.status(500).json({ error: "Failed to fetch creators-modelo evolucao" });
+    }
+  });
+
+  // Auditoria de uma célula da evolução: clientes de um modelo no snapshot de
+  // fim do mês `mes`, com LT/LTV (régua da evolução) e detalhe das entregas.
+  app.get("/api/creators-modelo/evolucao/clientes", async (req, res) => {
+    try {
+      const mes = String(req.query.mes ?? "");
+      const modelo: Modelo = req.query.modelo === "recorrente" ? "recorrente" : "pontual";
+      const estadoQ = String(req.query.estado ?? "ambos");
+      const estado: EstadoFiltro = estadoQ === "ativo" || estadoQ === "cancelado" ? estadoQ : "ambos";
+      if (!/^\d{4}-\d{2}$/.test(mes)) return res.status(400).json({ error: "mes inválido" });
+
+      const result = await db.execute(sql`
+        WITH alvo AS (
+          SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+          WHERE to_char(data_snapshot::date,'YYYY-MM') = ${mes}
+        )
+        SELECT h.id_task,
+          NULLIF(TRIM(cl.nome), '') AS nome,
+          h.status,
+          COALESCE(h.valorr::numeric,0) AS valorr,
+          COALESCE(h.valorp::numeric,0) AS valorp,
+          h.servico,
+          to_char(h.data_inicio::date,'YYYY-MM-DD') AS data_inicio,
+          to_char((SELECT d FROM alvo),'YYYY-MM-DD') AS fim
+        FROM "Clickup".cup_data_hist h
+        JOIN alvo ON h.data_snapshot::date = alvo.d
+        LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+        WHERE h.servico ILIKE '%creator%'
+      `);
+      const rows = result.rows as any[];
+      if (!rows.length) return res.json({ mes, modelo, clientes: [] });
+      const fim = rows[0].fim as string;
+      const snap: EvoSnapRow[] = rows.map((r) => ({
+        idTask: r.id_task, nome: r.nome ?? null, status: r.status ?? null,
+        valorr: Number(r.valorr) || 0, valorp: Number(r.valorp) || 0,
+        servico: r.servico ?? "", dataInicio: r.data_inicio ?? null,
+      }));
+      res.json({ mes, modelo, clientes: buildEvolucaoClientes(snap, modelo, estado, fim) });
+    } catch (error) {
+      console.error("[api] Error fetching creators-modelo evolucao/clientes:", error);
+      res.status(500).json({ error: "Failed to fetch creators-modelo evolucao clientes" });
     }
   });
 

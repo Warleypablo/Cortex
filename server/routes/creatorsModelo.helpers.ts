@@ -706,3 +706,89 @@ export function buildClientesDetalhe(
   }
   return out.sort((a, b) => b.ltv - a.ltv);
 }
+
+// ─── Auditoria da EVOLUÇÃO: clientes de um snapshot de fim de mês ──────────────
+
+export type EstadoFiltro = "ambos" | "ativo" | "cancelado";
+
+/** Linha de um snapshot de fim de mês (cup_data_hist) p/ auditar a evolução. */
+export interface EvoSnapRow {
+  idTask: string;
+  nome: string | null;
+  status: string | null;
+  valorr: number;
+  valorp: number;
+  servico: string;
+  dataInicio: string | null;
+}
+
+const STATUS_REC_ATIVO = ["ativo", "onboarding", "triagem", "pausado"];
+const STATUS_REC_CANCEL = ["cancelado/inativo", "em cancelamento"];
+
+/**
+ * Reconstrói a lista de clientes por trás de uma célula da tabela de evolução,
+ * usando a MESMA régua do endpoint /evolucao (base presente no snapshot):
+ *  - recorrente: LT = idade da base (1ª compra → fim do mês); LTV = realizado
+ *    (valorr × idade). estado por status no snapshot.
+ *  - pontual: LT = nº de entregas entregues (1 = 1 mês); LTV = valorp entregue.
+ * `fim` = data do snapshot ('YYYY-MM-DD'). Filtra por estado e ordena por LTV.
+ */
+export function buildEvolucaoClientes(
+  rows: EvoSnapRow[], modelo: Modelo, estado: EstadoFiltro, fim: string,
+): ClienteDetalhe[] {
+  const byCli = new Map<string, EvoSnapRow[]>();
+  for (const r of rows) {
+    const k = r.idTask ?? "";
+    (byCli.get(k) ?? byCli.set(k, []).get(k)!).push(r);
+  }
+
+  const out: ClienteDetalhe[] = [];
+  for (const [idTask, items] of Array.from(byCli.entries())) {
+    const modeloRows = items.filter((r) => (modelo === "recorrente" ? r.valorr > 0 : r.valorp > 0));
+    if (modeloRows.length === 0) continue;
+
+    let estadoCli: string;
+    let lt: number | null;
+    let ltv: number;
+
+    if (modelo === "recorrente") {
+      const st = (r: EvoSnapRow) => (r.status ?? "").trim().toLowerCase();
+      const temAtivo = modeloRows.some((r) => STATUS_REC_ATIVO.includes(st(r)));
+      const temCancel = modeloRows.some((r) => STATUS_REC_CANCEL.includes(st(r)));
+      if (!temAtivo && !temCancel) continue; // fantasma (ex.: entregue) — fora
+      estadoCli = temAtivo ? "ativo" : "cancelado";
+      const inicios = modeloRows.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
+      const ini = inicios[0] ?? null;
+      lt = ini ? mesesEntre(ini, fim) : null;
+      ltv = modeloRows.reduce((s, r) => s + (r.dataInicio ? r.valorr * mesesEntre(r.dataInicio, fim) : 0), 0);
+    } else {
+      const estados = modeloRows.map((r) => classifyEstadoPontual(r.status));
+      estadoCli = estados.includes("em_producao") ? "em_producao"
+        : estados.includes("cancelado") ? "cancelado" : "concluido";
+      const nEntregue = modeloRows.filter((r) => isEntregue(r.status)).length;
+      lt = nEntregue > 0 ? nEntregue : null;
+      ltv = modeloRows.filter((r) => isEntregue(r.status)).reduce((s, r) => s + (r.valorp ?? 0), 0);
+    }
+
+    if (estado === "ativo" && estadoCli === "cancelado") continue;
+    if (estado === "cancelado" && estadoCli !== "cancelado") continue;
+
+    const entregas: EntregaDetalhe[] = modeloRows
+      .map((r) => ({
+        servico: r.servico, status: r.status, dataInicio: r.dataInicio, dataFim: null,
+        valor: modelo === "recorrente" ? r.valorr : r.valorp,
+      }))
+      .sort((a, b) => (a.dataInicio ?? "").localeCompare(b.dataInicio ?? ""));
+
+    out.push({
+      idTask,
+      nome: items.find((r) => r.nome != null)?.nome ?? null,
+      estado: estadoCli,
+      nEntregas: modeloRows.length,
+      ltMeses: lt != null ? Math.round(lt * 10) / 10 : null,
+      ltv: Math.round(ltv),
+      entregas,
+    });
+  }
+  return out.sort((a, b) => b.ltv - a.ltv);
+}
