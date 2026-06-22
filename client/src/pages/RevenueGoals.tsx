@@ -2,7 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { formatCurrency, formatPercent, cn } from "@/lib/utils";
+import { formatCurrency, formatCurrencyCompact, formatPercent, cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { MonthYearPicker } from "@/components/ui/month-year-picker";
@@ -78,6 +78,15 @@ interface DiaDetalhesData {
     statusClickup: string | null;
     telefone: string | null;
   }[];
+}
+
+interface HistoricoInadimplenciaItem {
+  mes: number;
+  ano: number;
+  mesNome: string;
+  inadimplente: number;
+  previsto: number;
+  percentual: number;
 }
 
 const mesesNomes = [
@@ -191,6 +200,15 @@ export default function RevenueGoals() {
       return response.json();
     },
     enabled: !!selectedDay,
+  });
+
+  const { data: historicoInad, isLoading: isLoadingHistorico } = useQuery<HistoricoInadimplenciaItem[]>({
+    queryKey: ['/api/financeiro/revenue-goals/historico-inadimplencia'],
+    queryFn: async () => {
+      const response = await fetch('/api/financeiro/revenue-goals/historico-inadimplencia');
+      if (!response.ok) throw new Error('Failed to fetch historico inadimplencia');
+      return response.json();
+    },
   });
 
   const handleBarClick = (data: any) => {
@@ -410,6 +428,60 @@ export default function RevenueGoals() {
                   </ComposedChart>
                 </ResponsiveContainer>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Histórico de Inadimplência (dinâmico, meses fechados do ano) */}
+          <Card className="bg-white dark:bg-zinc-900 border border-gray-100 dark:border-zinc-800 rounded-lg">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg">Inadimplência</CardTitle>
+              <CardDescription>
+                Meses fechados de {historicoInad?.[0]?.ano ?? new Date().getFullYear()} · valor em aberto e % sobre o previsto
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {isLoadingHistorico ? (
+                <Skeleton className="h-48 w-full rounded-lg" />
+              ) : !historicoInad || historicoInad.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  Sem meses fechados no ano ainda.
+                </p>
+              ) : (
+                <div className="overflow-hidden rounded-lg border border-gray-100 dark:border-zinc-800">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-gray-100 dark:border-zinc-800 text-[11px] uppercase tracking-wide text-muted-foreground">
+                        <th className="text-left font-medium px-4 py-2.5">Mês</th>
+                        <th className="text-right font-medium px-4 py-2.5">Valor</th>
+                        <th className="text-right font-medium px-4 py-2.5">% Inadimplência</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {historicoInad.map((m) => (
+                        <tr
+                          key={`${m.ano}-${m.mes}`}
+                          className="border-b border-gray-50 dark:border-zinc-800/50 last:border-0"
+                        >
+                          <td className="px-4 py-2.5 text-muted-foreground">{m.mesNome}</td>
+                          <td className="px-4 py-2.5 text-right tabular-nums">
+                            {formatCurrencyCompact(m.inadimplente)}
+                          </td>
+                          <td
+                            className={cn(
+                              "px-4 py-2.5 text-right tabular-nums font-medium",
+                              m.percentual >= 4
+                                ? "text-red-600 dark:text-red-400"
+                                : "text-emerald-600 dark:text-emerald-400"
+                            )}
+                          >
+                            {formatPercent(m.percentual)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </CardContent>
           </Card>
 

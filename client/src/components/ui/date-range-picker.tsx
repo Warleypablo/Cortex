@@ -282,7 +282,36 @@ export function DateRangePicker({
   const [month, setMonth] = useState<Date>(value?.from || new Date());
   const [compareActive, setCompareActive] = useState(!!compareEnabled);
   const [internalCompareRange, setInternalCompareRange] = useState<DateRange | undefined>(compareRange);
+  const [compareCalendarOpen, setCompareCalendarOpen] = useState(false);
   const [pinnedLabels, setPinnedLabels] = useState<string[]>(getPinnedPresets);
+
+  // classNames compartilhados entre o calendário principal e o de comparação
+  const calendarClassNames = {
+    months: "flex flex-row gap-6",
+    month: "space-y-2",
+    caption: "flex justify-center pb-1 relative items-center px-8",
+    caption_label: "hidden",
+    caption_dropdowns: "flex gap-2 items-center",
+    dropdown: "bg-transparent border-none text-[12px] cursor-pointer hover:text-primary font-semibold appearance-none px-0 py-0",
+    dropdown_month: "",
+    dropdown_year: "",
+    nav: "flex items-center",
+    nav_button: "h-7 w-7 bg-transparent p-0 hover:bg-muted rounded-md transition-colors flex items-center justify-center",
+    nav_button_previous: "absolute left-0",
+    nav_button_next: "absolute right-0",
+    table: "w-full border-collapse mt-1",
+    head_row: "flex",
+    head_cell: "text-muted-foreground w-8 font-medium text-[11px]",
+    row: "flex w-full mt-0.5",
+    cell: "text-center text-xs p-0 relative",
+    day: "h-8 w-8 p-0 font-normal hover:bg-muted rounded-md transition-colors text-xs",
+    day_selected: "bg-primary text-primary-foreground hover:bg-primary font-medium",
+    day_today: "bg-accent text-accent-foreground font-semibold",
+    day_outside: "text-muted-foreground opacity-40",
+    day_disabled: "text-muted-foreground opacity-40",
+    day_range_middle: "bg-primary/15 rounded-none",
+    day_hidden: "invisible",
+  };
 
   useEffect(() => {
     setCompareActive(!!compareEnabled);
@@ -449,32 +478,7 @@ export function DateRangePicker({
                 captionLayout="dropdown-buttons"
                 fromYear={2020}
                 toYear={2030}
-                classNames={{
-                  months: "flex flex-row gap-6",
-                  month: "space-y-2",
-                  caption: "flex justify-center pb-1 relative items-center px-8",
-                  caption_label: "hidden",
-                  caption_dropdowns: "flex gap-2 items-center",
-                  dropdown: "bg-transparent border-none text-[12px] cursor-pointer hover:text-primary font-semibold appearance-none px-0 py-0",
-                  dropdown_month: "",
-                  dropdown_year: "",
-                  nav: "flex items-center",
-                  nav_button: "h-7 w-7 bg-transparent p-0 hover:bg-muted rounded-md transition-colors flex items-center justify-center",
-                  nav_button_previous: "absolute left-0",
-                  nav_button_next: "absolute right-0",
-                  table: "w-full border-collapse mt-1",
-                  head_row: "flex",
-                  head_cell: "text-muted-foreground w-8 font-medium text-[11px]",
-                  row: "flex w-full mt-0.5",
-                  cell: "text-center text-xs p-0 relative",
-                  day: "h-8 w-8 p-0 font-normal hover:bg-muted rounded-md transition-colors text-xs",
-                  day_selected: "bg-primary text-primary-foreground hover:bg-primary font-medium",
-                  day_today: "bg-accent text-accent-foreground font-semibold",
-                  day_outside: "text-muted-foreground opacity-40",
-                  day_disabled: "text-muted-foreground opacity-40",
-                  day_range_middle: "bg-primary/15 rounded-none",
-                  day_hidden: "invisible",
-                }}
+                classNames={calendarClassNames}
               />
 
               {showCompare && (
@@ -485,6 +489,7 @@ export function DateRangePicker({
                       checked={compareActive}
                       onChange={(e) => {
                         setCompareActive(e.target.checked);
+                        setCompareCalendarOpen(false);
                         if (!e.target.checked) {
                           setInternalCompareRange(undefined);
                           if (onCompareChange) onCompareChange(false, undefined);
@@ -498,37 +503,85 @@ export function DateRangePicker({
                     />
                     <span className="text-xs font-medium">Comparar</span>
                   </label>
-                  {compareActive && (
-                    <div className="flex items-center gap-2">
-                      <select
-                        value={COMPARE_PRESETS.findIndex((p) => {
-                          const pr = value ? p.getValue(value) : undefined;
-                          return pr && internalCompareRange?.from &&
-                            pr.from?.toDateString() === internalCompareRange.from?.toDateString() &&
-                            pr.to?.toDateString() === internalCompareRange.to?.toDateString();
-                        })}
-                        onChange={(e) => {
-                          const idx = parseInt(e.target.value);
-                          if (idx >= 0 && value) {
-                            const newRange = COMPARE_PRESETS[idx].getValue(value);
-                            setInternalCompareRange(newRange);
-                            if (onCompareChange) onCompareChange(true, newRange);
-                          }
-                        }}
-                        className="bg-muted border border-border rounded px-2 py-1 text-[11px] font-medium dark:bg-zinc-800 min-w-[140px]"
-                      >
-                        {COMPARE_PRESETS.map((preset, idx) => (
-                          <option key={preset.label} value={idx}>{preset.label}</option>
-                        ))}
-                      </select>
-                      <span className="px-2 py-1 bg-muted border border-border rounded text-[11px] font-medium min-w-[80px] text-center">
-                        {internalCompareRange?.from ? format(internalCompareRange.from, "dd/MM/yy") : "—"}
-                      </span>
-                      <span className="px-2 py-1 bg-muted border border-border rounded text-[11px] font-medium min-w-[80px] text-center">
-                        {internalCompareRange?.to ? format(internalCompareRange.to, "dd/MM/yy") : "—"}
-                      </span>
-                    </div>
-                  )}
+                  {compareActive && (() => {
+                    const matchedIdx = COMPARE_PRESETS.findIndex((p) => {
+                      const pr = value ? p.getValue(value) : undefined;
+                      return pr && internalCompareRange?.from &&
+                        pr.from?.toDateString() === internalCompareRange.from?.toDateString() &&
+                        pr.to?.toDateString() === internalCompareRange.to?.toDateString();
+                    });
+                    const boxCls = (active: boolean) => cn(
+                      "px-2 py-1 rounded text-[11px] font-medium min-w-[84px] text-center border transition-colors cursor-pointer",
+                      active
+                        ? "border-primary bg-primary/10 text-primary"
+                        : "bg-muted border-border hover:bg-muted/70 dark:bg-zinc-800",
+                    );
+                    return (
+                      <div className="space-y-2">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <select
+                            value={matchedIdx === -1 ? "custom" : String(matchedIdx)}
+                            onChange={(e) => {
+                              if (e.target.value === "custom") {
+                                setCompareCalendarOpen(true);
+                                return;
+                              }
+                              const idx = parseInt(e.target.value);
+                              if (idx >= 0 && value) {
+                                const newRange = COMPARE_PRESETS[idx].getValue(value);
+                                setInternalCompareRange(newRange);
+                                setCompareCalendarOpen(false);
+                                if (onCompareChange) onCompareChange(true, newRange);
+                              }
+                            }}
+                            className="bg-muted border border-border rounded px-2 py-1 text-[11px] font-medium dark:bg-zinc-800 min-w-[140px]"
+                          >
+                            {COMPARE_PRESETS.map((preset, idx) => (
+                              <option key={preset.label} value={idx}>{preset.label}</option>
+                            ))}
+                            <option value="custom">Personalizado</option>
+                          </select>
+                          <button
+                            type="button"
+                            onClick={() => setCompareCalendarOpen((o) => !o)}
+                            className={boxCls(compareCalendarOpen)}
+                            title="Clique para escolher o período de comparação"
+                          >
+                            {internalCompareRange?.from ? format(internalCompareRange.from, "dd/MM/yy") : "Início"}
+                          </button>
+                          <span className="text-[11px] text-muted-foreground">até</span>
+                          <button
+                            type="button"
+                            onClick={() => setCompareCalendarOpen((o) => !o)}
+                            className={boxCls(compareCalendarOpen)}
+                            title="Clique para escolher o período de comparação"
+                          >
+                            {internalCompareRange?.to ? format(internalCompareRange.to, "dd/MM/yy") : "Fim"}
+                          </button>
+                        </div>
+                        {compareCalendarOpen && (
+                          <div className="rounded-md border border-border p-2">
+                            <Calendar
+                              mode="range"
+                              selected={internalCompareRange}
+                              onSelect={(r) => {
+                                setInternalCompareRange(r);
+                                if (onCompareChange) onCompareChange(true, r);
+                              }}
+                              numberOfMonths={1}
+                              defaultMonth={internalCompareRange?.from}
+                              locale={ptBR}
+                              weekStartsOn={0}
+                              captionLayout="dropdown-buttons"
+                              fromYear={2020}
+                              toYear={2030}
+                              classNames={{ ...calendarClassNames, months: "flex flex-row" }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </div>

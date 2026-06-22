@@ -9,6 +9,9 @@ export const UTM_MEDIUMS = [
   'referral',
   'crm',
   'outbound',
+  'victor',
+  'andre',
+  'rodrigo',
 ] as const;
 
 export type UtmMedium = typeof UTM_MEDIUMS[number];
@@ -20,15 +23,21 @@ export const UTM_MEDIUM_LABELS: Record<UtmMedium, string> = {
   referral: 'Referral — Alguém externo trazendo lead',
   crm: 'CRM — Comunicação ativa para base própria',
   outbound: 'Outbound — Prospecção fria via SDR',
+  victor: 'Victor — Canal próprio (figura-exceção)',
+  andre: 'André — Canal próprio (figura-exceção)',
+  rodrigo: 'Rodrigo — Canal próprio (figura-exceção)',
 };
 
 export const UTM_SOURCES_BY_MEDIUM: Record<UtmMedium, readonly string[]> = {
   paid: ['facebook', 'google', 'youtube', 'linkedin', 'tiktok', 'pinterest'],
-  organic: ['instagram', 'linkedin', 'youtube', 'tiktok', 'facebook', 'pinterest'],
+  organic: ['instagram', 'linkedin', 'youtube', 'tiktok', 'pinterest'],
   eventos: [], // vocabulário aberto — input livre com slug do nome do evento
   referral: ['cliente', 'colaborador', 'afiliado', 'influencer', 'marketplace'],
   crm: ['email', 'whatsapp', 'sms'],
   outbound: ['email', 'whatsapp', 'linkedin'],
+  victor: ['instagram', 'youtube', 'linkedin', 'tiktok'],
+  andre: ['instagram', 'youtube', 'linkedin', 'tiktok'],
+  rodrigo: ['instagram', 'youtube', 'linkedin', 'tiktok'],
 };
 
 export const UTM_SOURCE_LABELS: Record<string, string> = {
@@ -74,5 +83,13 @@ export const PAID_MEDIA_HINTS: Record<string, { campaign: string; term: string; 
     campaign: '{campaignid}',
     term: '{adgroupid}-{network}-{device}-{matchtype}-{keyword}',
     content: '{creative}',
+  },
+  // TikTok injeta os IDs no clique via macros __...__ (sintaxe própria, ≠ Meta {{...}}).
+  // Espelha o desenho do Meta: campaign = ID da campanha, term = ID do conjunto + placement,
+  // content = ID do anúncio. __AID__ = ad group (conjunto), __CID__ = ad (anúncio).
+  tiktok: {
+    campaign: '__CAMPAIGN_ID__',
+    term: '__AID__-__PLACEMENT__',
+    content: '__CID__',
   },
 };

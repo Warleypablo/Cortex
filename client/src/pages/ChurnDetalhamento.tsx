@@ -1,11 +1,13 @@
 import React, { useState, useMemo } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Switch } from "@/components/ui/switch";
+import { toast } from "sonner";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -495,6 +497,7 @@ export default function ChurnDetalhamento() {
   const [crossAnalysisView, setCrossAnalysisView] = useState<"motivo" | "cluster" | "plano">("motivo");
   const [expandedMotivo, setExpandedMotivo] = useState<string | null>(null);
   const [analysisSubTab, setAnalysisSubTab] = useState<"resumo" | "distribuicao" | "inteligencia">("resumo");
+  const [filterAbono, setFilterAbono] = useState<"todos" | "abonados" | "nao_abonados">("todos");
 
   // Voz do Cliente states
   const [muralSortBy, setMuralSortBy] = useState<"mrr" | "date">("mrr");
@@ -504,6 +507,38 @@ export default function ChurnDetalhamento() {
   const [selectedThemeKeyword, setSelectedThemeKeyword] = useState<string | null>(null);
   const [expandedOpTheme, setExpandedOpTheme] = useState<string | null>(null);
   const [expandedCxTheme, setExpandedCxTheme] = useState<string | null>(null);
+  const [abonadoOverrides, setAbonadoOverrides] = useState<Record<string, boolean>>({});
+  const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const queryClient = useQueryClient();
+
+  const abonarMutation = useMutation({
+    mutationFn: async ({ taskId, abonar }: { taskId: string; abonar: boolean }) => {
+      const res = await fetch(`/api/churn/abonar/${taskId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ abonar }),
+      });
+      if (!res.ok) throw new Error("Falha ao atualizar");
+      return res.json();
+    },
+    onMutate: ({ taskId, abonar }) => {
+      setAbonadoOverrides(prev => ({ ...prev, [taskId]: abonar }));
+      setPendingIds(prev => new Set(prev).add(taskId));
+    },
+    onError: (_err, { taskId }) => {
+      setAbonadoOverrides(prev => {
+        const next = { ...prev };
+        delete next[taskId];
+        return next;
+      });
+      setPendingIds(prev => { const s = new Set(prev); s.delete(taskId); return s; });
+      toast.error("Erro ao atualizar abono");
+    },
+    onSuccess: (_data, { taskId }) => {
+      setPendingIds(prev => { const s = new Set(prev); s.delete(taskId); return s; });
+      queryClient.invalidateQueries({ queryKey: ["/api/analytics/churn-detalhamento"] });
+    },
+  });
 
   // Buscar série de churn do ano para calcular excesso acumulado de meses anteriores
   const currentMonthKey = dataInicio ? format(parseISO(dataInicio), "yyyy-MM") : "";
@@ -628,6 +663,19 @@ export default function ChurnDetalhamento() {
       filtered = filtered.filter(c => c.possibilidade_retencao && filterPossibilidadesRetencao.includes(c.possibilidade_retencao));
     }
 
+    // Filtro de abono — só na aba Análise, onde o controle fica visível
+    if (mainTab === "analise" && filterAbono !== "todos") {
+      filtered = filtered.filter(c => {
+        const isAbonado = abonadoOverrides[c.id] ?? c.is_abonado ?? false;
+        return filterAbono === "abonados" ? isAbonado : !isAbonado;
+      });
+      if (filterAbono === "abonados") {
+        // Abonados viram a população analisada: sem o flag, todos os
+        // cálculos (taxa, squads, motivos, gráficos) os tratam como churn
+        filtered = filtered.map(c => ({ ...c, is_abonado: false }));
+      }
+    }
+
     filtered.sort((a, b) => {
       let comparison = 0;
       switch (sortBy) {
@@ -655,7 +703,7 @@ export default function ChurnDetalhamento() {
     });
     
     return filtered;
-  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, filterPlanos, filterClusters, filterEvitabilidades, filterPossibilidadesRetencao, dataInicio, dataFim, sortBy, sortOrder]);
+  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, filterPlanos, filterClusters, filterEvitabilidades, filterPossibilidadesRetencao, dataInicio, dataFim, sortBy, sortOrder, mainTab, filterAbono, abonadoOverrides]);
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
@@ -1886,7 +1934,7 @@ export default function ChurnDetalhamento() {
       </Card>
 
       {/* Tabs de nível superior */}
-      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio")}>
+      <Tabs value={mainTab} onValueChange={(v) => setMainTab(v as "analise" | "contratos" | "relatorio" | "consolidado")}>
         <TabsList>
           <TabsTrigger value="analise" className="gap-2" data-testid="main-tab-analise">
             <BarChart3 className="h-4 w-4" />
@@ -1908,25 +1956,50 @@ export default function ChurnDetalhamento() {
       ) : mainTab === "analise" ? (
       <>
 
-      {/* Sub-abas da Análise */}
-      <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40 w-fit">
-        {([
-          { key: "resumo", label: "Resumo" },
-          { key: "distribuicao", label: "Distribuição" },
-          { key: "inteligencia", label: "Inteligência" },
-        ] as const).map((tab) => (
-          <button
-            key={tab.key}
-            onClick={() => setAnalysisSubTab(tab.key)}
-            className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
-              analysisSubTab === tab.key
-                ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
-                : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50"
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      {/* Sub-abas da Análise + filtro de abono */}
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40 w-fit">
+          {([
+            { key: "resumo", label: "Resumo" },
+            { key: "distribuicao", label: "Distribuição" },
+            { key: "inteligencia", label: "Inteligência" },
+          ] as const).map((tab) => (
+            <button
+              key={tab.key}
+              onClick={() => setAnalysisSubTab(tab.key)}
+              className={`px-4 py-1.5 rounded-md text-sm font-medium transition-all ${
+                analysisSubTab === tab.key
+                  ? "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50"
+              }`}
+            >
+              {tab.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1 p-1 rounded-lg bg-muted/50 border border-border/40 w-fit">
+          {([
+            { key: "todos", label: "Todos" },
+            { key: "nao_abonados", label: "Não abonados" },
+            { key: "abonados", label: "Abonados" },
+          ] as const).map((opt) => (
+            <button
+              key={opt.key}
+              onClick={() => setFilterAbono(opt.key)}
+              data-testid={`filter-abono-${opt.key}`}
+              className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                filterAbono === opt.key
+                  ? opt.key === "abonados"
+                    ? "bg-amber-100 dark:bg-amber-900/40 shadow-sm text-amber-800 dark:text-amber-300"
+                    : "bg-white dark:bg-zinc-800 shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/50 dark:hover:bg-zinc-800/50"
+              }`}
+            >
+              {opt.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       {analysisSubTab === "resumo" && (
@@ -1943,16 +2016,23 @@ export default function ChurnDetalhamento() {
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
               {/* Coluna 1: Gauge e status */}
               <div className="flex flex-col items-center justify-center p-4 bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">Taxa de Churn</h3>
-                <ChurnGauge value={filteredTaxaChurn || 0} statusOverride={gaugeStatusOverride} />
-                {churnPlanejado.taxaPlanejada > 0 && (
+                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">{filterAbono === "abonados" ? "Taxa de Abono" : "Taxa de Churn"}</h3>
+                <ChurnGauge
+                  value={filteredTaxaChurn || 0}
+                  statusOverride={filterAbono === "abonados"
+                    ? { label: "Recorte: abonados", color: "text-amber-500", bg: "from-amber-500 to-orange-500", dotBg: "bg-amber-500" }
+                    : gaugeStatusOverride}
+                />
+                {filterAbono !== "abonados" && churnPlanejado.taxaPlanejada > 0 && (
                   <p className="text-[11px] text-muted-foreground text-center mt-1">
                     Planejado até hoje: <span className="font-semibold">{churnPlanejado.taxaPlanejada.toFixed(2)}%</span>
                   </p>
                 )}
-                <p className="text-[10px] text-muted-foreground text-center">
-                  Status baseado na media diaria
-                </p>
+                {filterAbono !== "abonados" && (
+                  <p className="text-[10px] text-muted-foreground text-center">
+                    Status baseado na media diaria
+                  </p>
+                )}
               </div>
               
               {/* Coluna 2: Métricas principais */}
@@ -1966,14 +2046,14 @@ export default function ChurnDetalhamento() {
                   <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">base de referência do período</div>
                 </div>
 
-                <div className="flex-1 p-4 bg-red-50 dark:bg-red-950/30 rounded-xl border border-red-100 dark:border-red-900/50 flex flex-col justify-center">
+                <div className={`flex-1 p-4 rounded-xl border flex flex-col justify-center ${filterAbono === "abonados" ? "bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50" : "bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50"}`}>
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-red-600 dark:text-red-400 uppercase">MRR Perdido</span>
-                    <DollarSign className="h-4 w-4 text-red-500" />
+                    <span className={`text-xs font-medium uppercase ${filterAbono === "abonados" ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>{filterAbono === "abonados" ? "MRR Abonado" : "MRR Perdido"}</span>
+                    <DollarSign className={`h-4 w-4 ${filterAbono === "abonados" ? "text-amber-500" : "text-red-500"}`} />
                   </div>
-                  <div className="text-2xl font-bold text-red-700 dark:text-red-300">{formatCurrency(filteredMetricas.mrr_perdido)}</div>
-                  <div className="text-xs text-red-600/70 dark:text-red-400/70 mt-1">{filteredMetricas.total_churned} contratos encerrados</div>
-                  {churnPlanejado.mrrPlanejado > 0 && (
+                  <div className={`text-2xl font-bold ${filterAbono === "abonados" ? "text-amber-700 dark:text-amber-300" : "text-red-700 dark:text-red-300"}`}>{formatCurrency(filteredMetricas.mrr_perdido)}</div>
+                  <div className={`text-xs mt-1 ${filterAbono === "abonados" ? "text-amber-600/70 dark:text-amber-400/70" : "text-red-600/70 dark:text-red-400/70"}`}>{filteredMetricas.total_churned} contratos {filterAbono === "abonados" ? "abonados" : "encerrados"}</div>
+                  {filterAbono !== "abonados" && churnPlanejado.mrrPlanejado > 0 && (
                     <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800/50">
                       <div className="flex items-center justify-between">
                         <span className="text-[11px] text-red-600/70 dark:text-red-400/70">Planejado até hoje</span>
@@ -1997,6 +2077,7 @@ export default function ChurnDetalhamento() {
                   )}
                 </div>
                 
+                {filterAbono === "todos" && (
                 <div className="flex-1 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase">Churn Abonado</span>
@@ -2017,7 +2098,9 @@ export default function ChurnDetalhamento() {
                     </div>
                   )}
                 </div>
-                
+                )}
+
+                {filterAbono === "todos" && (
                 <div className="flex-1 p-4 bg-purple-50 dark:bg-purple-950/30 rounded-xl border border-purple-100 dark:border-purple-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">
                     <span className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase">Churn Total</span>
@@ -2032,6 +2115,7 @@ export default function ChurnDetalhamento() {
                     <span className="text-amber-500">Abonado: {formatCurrency(filteredMetricas.mrr_abonado)}</span>
                   </div>
                 </div>
+                )}
               </div>
 
               {/* Coluna NRR & Cross-sell */}
@@ -4358,12 +4442,14 @@ export default function ChurnDetalhamento() {
                           <SortIcon column="lifetime_meses" />
                         </div>
                       </TableHead>
+                      <TableHead className="text-center w-[80px]">Abonar</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {filteredContratos.slice(0, 100).map((contrato, index) => {
                       const isExpanded = expandedRow === `${contrato.id}-${index}`;
                       const hasDetails = contrato.mensagem_cliente || contrato.contexto_operacao || contrato.contexto_cx;
+                      const isAbonado = abonadoOverrides[contrato.id] ?? contrato.is_abonado ?? false;
                       return (
                         <React.Fragment key={`${contrato.id}-${index}`}>
                           <TableRow
@@ -4380,7 +4466,7 @@ export default function ChurnDetalhamento() {
                               <div className="flex flex-col">
                                 <div className="flex items-center gap-1.5">
                                   <span className="font-medium text-sm">{contrato.cliente_nome || "-"}</span>
-                                  {contrato.is_abonado && (
+                                  {isAbonado && (
                                     <Badge variant="outline" className="text-[9px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
                                       Abonado
                                     </Badge>
@@ -4393,10 +4479,10 @@ export default function ChurnDetalhamento() {
                             </TableCell>
                             <TableCell>
                               <Badge
-                                variant={contrato.is_abonado ? 'secondary' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'secondary' : 'destructive'}
-                                className={contrato.is_abonado ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : 'text-[10px]'}
+                                variant={isAbonado ? 'secondary' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'secondary' : 'destructive'}
+                                className={isAbonado ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-400 text-[10px]' : 'text-[10px]'}
                               >
-                                {contrato.is_abonado ? 'Abonado' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'Em Cancel.' : 'Churn'}
+                                {isAbonado ? 'Abonado' : contrato.status?.toLowerCase().includes('em cancelamento') ? 'Em Cancel.' : 'Churn'}
                               </Badge>
                               {contrato.status_cancelamento && (
                                 <div className="text-[10px] text-muted-foreground mt-0.5">{contrato.status_cancelamento}</div>
@@ -4436,10 +4522,20 @@ export default function ChurnDetalhamento() {
                                 {contrato.lifetime_meses.toFixed(1)}m
                               </Badge>
                             </TableCell>
+                            <TableCell className="text-center" onClick={e => e.stopPropagation()}>
+                              <Switch
+                                checked={isAbonado}
+                                onCheckedChange={checked =>
+                                  abonarMutation.mutate({ taskId: contrato.id, abonar: checked })
+                                }
+                                disabled={pendingIds.has(contrato.id)}
+                                className="data-[state=checked]:bg-amber-500"
+                              />
+                            </TableCell>
                           </TableRow>
                           {isExpanded && hasDetails && (
                             <TableRow key={`${contrato.id}-${index}-details`} className="bg-muted/10 hover:bg-muted/10">
-                              <TableCell colSpan={11} className="p-0">
+                              <TableCell colSpan={12} className="p-0">
                                 <div className="px-6 py-4 space-y-3 border-l-4 border-primary/30">
                                   {/* Churn DNA Tags */}
                                   {getChurnDNATags(contrato).length > 0 && (

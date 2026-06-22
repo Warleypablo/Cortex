@@ -7,9 +7,29 @@ const TURBO_PARTNERS_ACCOUNT_ID = "act_1331413260627780";
 const ALLOWED_EDITOR_EMAILS = new Set([
   "ferramentas@turbopartners.com.br",
   "vinicius.ichino@turbopartners.com.br",
+  "warleyreserva4@gmail.com",
 ]);
 
-type Platform = "meta" | "google";
+// Plataformas suportadas. Adicionar um canal novo = incluir aqui + um bloco de
+// fetch no GET (e os estilos/ícone no front). Os schemas de cada plataforma:
+//   meta → meta_ads.*  |  google → google.*  |  tiktok → tiktok.*  |  linkedin → linkedin.*
+const PLATFORMS = ["meta", "google", "tiktok", "linkedin"] as const;
+type Platform = (typeof PLATFORMS)[number];
+
+// Status considerados "ativos" entre as plataformas (cada uma usa um enum diferente).
+const ACTIVE_STATUSES = new Set(["ACTIVE", "ENABLED", "ENABLE"]);
+
+// Tags/grupos (pools) válidos para classificar campanhas. Adicionar uma tag
+// nova é só incluir aqui (e no front) — não precisa de migração no banco.
+const CAMPAIGN_TAGS = ["inbound", "evento"] as const;
+type CampaignTag = (typeof CAMPAIGN_TAGS)[number];
+
+// Etapas do funil para o planejamento por etapa. Mesma regra: adicionar/renomear
+// é só editar aqui e no front.
+const CAMPAIGN_STAGES = ["descoberta", "relacionamento", "conversao", "remarketing", "institucional"] as const;
+type CampaignStage = (typeof CAMPAIGN_STAGES)[number];
+
+type PlanUnit = "pct" | "brl";
 
 interface CampanhaRow {
   platform: Platform;
@@ -22,6 +42,14 @@ interface CampanhaRow {
   orcamentoDiarioMeta: number | null;
   projecaoAsIs: number;
   isDelivering: boolean;
+  tag: CampaignTag | null;
+  stage: CampaignStage | null;
+}
+
+// Plano de um pool no mês: total + alvo por etapa (value + unit).
+interface PoolPlan {
+  total: number | null;
+  stages: Partial<Record<CampaignStage, { value: number; unit: PlanUnit }>>;
 }
 
 function parseMonthParam(param: string | undefined): { firstDay: string; lastDay: string; year: number; month1Based: number } {
@@ -96,10 +124,12 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           GROUP BY campaign_id
         ),
         recent_spend_agg AS (
+          -- Inclui HOJE: campanhas criadas/iniciadas hoje já contam como entregando,
+          -- pra projeção extrapolar o orçamento delas pra frente.
           SELECT campaign_id, SUM(spend)::float AS recent_spend
           FROM meta_ads.meta_insights_daily
           WHERE date_start >= (CURRENT_DATE - INTERVAL '3 days')
-            AND date_start < CURRENT_DATE
+            AND date_start <= CURRENT_DATE
           GROUP BY campaign_id
         ),
         metas_meta AS (
@@ -126,7 +156,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
       // Detecta coluna de data disponível em campaign_daily_metrics (histórico: report_date/metric_date/date).
       const gaColsRes = await db.execute(sql`
         SELECT column_name FROM information_schema.columns
-        WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+        WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
       `);
       const gaCols = (gaColsRes.rows || []).map((r: any) => r.column_name);
       const hasGoogleSchema = gaCols.length > 0;
@@ -140,17 +170,17 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         // Mostra apenas: ENABLED, com spend no mês, ou com meta definida.
         const googleRes = await db.execute(sql.raw(`
           WITH spend_agg AS (
-            SELECT campaign_key, SUM(cost_micros)::numeric AS cost_sum
-            FROM google_ads.campaign_daily_metrics
+            SELECT campaign_id, SUM(cost_micros)::numeric AS cost_sum
+            FROM google.campaign_daily_metrics
             WHERE ${gaDateCol} BETWEEN '${firstDay}'::date AND '${lastDay}'::date
-            GROUP BY campaign_key
+            GROUP BY campaign_id
           ),
           recent_spend_agg AS (
-            SELECT campaign_key, SUM(cost_micros)::numeric AS recent_cost_sum
-            FROM google_ads.campaign_daily_metrics
+            SELECT campaign_id, SUM(cost_micros)::numeric AS recent_cost_sum
+            FROM google.campaign_daily_metrics
             WHERE ${gaDateCol} >= (CURRENT_DATE - INTERVAL '3 days')
-              AND ${gaDateCol} < CURRENT_DATE
-            GROUP BY campaign_key
+              AND ${gaDateCol} <= CURRENT_DATE
+            GROUP BY campaign_id
           ),
           metas_google AS (
             SELECT campaign_id FROM cortex_core.campaign_monthly_budget
@@ -160,18 +190,95 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
             c.campaign_id::text AS campaign_id,
             c.name AS name,
             c.status AS status,
-            COALESCE(b.amount_micros::numeric / 1000000, 0)::float AS daily_budget_atual,
+            COALESCE(c.budget_amount_micros::numeric / 1000000, 0)::float AS daily_budget_atual,
             COALESCE(s.cost_sum / 1000000, 0)::float AS investido_total,
             COALESCE(rs.recent_cost_sum / 1000000, 0)::float AS recent_spend
-          FROM google_ads.campaigns c
-          LEFT JOIN google_ads.campaign_budgets b ON b.budget_key = c.budget_key
-          LEFT JOIN spend_agg s ON s.campaign_key = c.campaign_key
-          LEFT JOIN recent_spend_agg rs ON rs.campaign_key = c.campaign_key
+          FROM google.campaigns c
+          LEFT JOIN spend_agg s ON s.campaign_id = c.campaign_id
+          LEFT JOIN recent_spend_agg rs ON rs.campaign_id = c.campaign_id
           WHERE COALESCE(s.cost_sum, 0) > 0
              OR c.campaign_id::text IN (SELECT campaign_id FROM metas_google)
           ORDER BY c.name;
         `));
         googleRows = googleRes.rows || [];
+      }
+
+      // ===== TikTok Ads =====
+      // Schema tiktok.* pode não existir ou o role não ter permissão (degrada sem
+      // quebrar Meta/Google). budget só conta como diário quando budget_mode é DAY.
+      let tiktokRows: any[] = [];
+      try {
+        const r = await db.execute(sql`
+          WITH spend_agg AS (
+            SELECT campaign_id, SUM(spend)::float AS investido_total
+            FROM tiktok.ad_metrics_daily
+            WHERE stat_date BETWEEN ${firstDay}::date AND ${lastDay}::date
+            GROUP BY campaign_id
+          ),
+          recent_spend_agg AS (
+            SELECT campaign_id, SUM(spend)::float AS recent_spend
+            FROM tiktok.ad_metrics_daily
+            WHERE stat_date >= (CURRENT_DATE - INTERVAL '3 days') AND stat_date <= CURRENT_DATE
+            GROUP BY campaign_id
+          ),
+          tags AS (SELECT campaign_id FROM cortex_core.campaign_tags WHERE platform = 'tiktok')
+          SELECT
+            c.campaign_id::text AS campaign_id,
+            c.campaign_name AS name,
+            c.operation_status AS status,
+            CASE WHEN c.budget_mode = 'BUDGET_MODE_DAY' THEN COALESCE(c.budget, 0) ELSE 0 END::float AS daily_budget_atual,
+            COALESCE(s.investido_total, 0)::float AS investido_total,
+            COALESCE(rs.recent_spend, 0)::float AS recent_spend
+          FROM tiktok.ad_campaigns c
+          LEFT JOIN spend_agg s ON s.campaign_id = c.campaign_id
+          LEFT JOIN recent_spend_agg rs ON rs.campaign_id = c.campaign_id
+          WHERE c.operation_status = 'ENABLE'
+             OR COALESCE(s.investido_total, 0) > 0
+             OR c.campaign_id::text IN (SELECT campaign_id FROM tags)
+          ORDER BY c.campaign_name
+        `);
+        tiktokRows = r.rows || [];
+      } catch (e: any) {
+        console.warn("[orcamento] TikTok indisponível (schema/permissão):", e?.message);
+      }
+
+      // ===== LinkedIn Ads =====
+      // ad_campaigns não tem orçamento diário no schema → daily_budget_atual = 0
+      // (mostra investido/projeção pelo gasto, sem extrapolar orçamento).
+      let linkedinRows: any[] = [];
+      try {
+        const r = await db.execute(sql`
+          WITH spend_agg AS (
+            SELECT campaign_id, SUM(spend)::float AS investido_total
+            FROM linkedin.ad_metrics_daily
+            WHERE stat_date BETWEEN ${firstDay}::date AND ${lastDay}::date
+            GROUP BY campaign_id
+          ),
+          recent_spend_agg AS (
+            SELECT campaign_id, SUM(spend)::float AS recent_spend
+            FROM linkedin.ad_metrics_daily
+            WHERE stat_date >= (CURRENT_DATE - INTERVAL '3 days') AND stat_date <= CURRENT_DATE
+            GROUP BY campaign_id
+          ),
+          tags AS (SELECT campaign_id FROM cortex_core.campaign_tags WHERE platform = 'linkedin')
+          SELECT
+            c.campaign_id::text AS campaign_id,
+            c.campaign_name AS name,
+            c.status AS status,
+            0::float AS daily_budget_atual,
+            COALESCE(s.investido_total, 0)::float AS investido_total,
+            COALESCE(rs.recent_spend, 0)::float AS recent_spend
+          FROM linkedin.ad_campaigns c
+          LEFT JOIN spend_agg s ON s.campaign_id = c.campaign_id
+          LEFT JOIN recent_spend_agg rs ON rs.campaign_id = c.campaign_id
+          WHERE c.status = 'ACTIVE'
+             OR COALESCE(s.investido_total, 0) > 0
+             OR c.campaign_id::text IN (SELECT campaign_id FROM tags)
+          ORDER BY c.campaign_name
+        `);
+        linkedinRows = r.rows || [];
+      } catch (e: any) {
+        console.warn("[orcamento] LinkedIn indisponível (schema/permissão):", e?.message);
       }
 
       // ===== Metas mensais manuais =====
@@ -185,6 +292,45 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         metasMap.set(`${r.platform}:${r.campaign_id}`, Number(r.monthly_budget_target));
       }
 
+      // ===== Classificação por campanha (tag/pool + etapa), estável entre meses =====
+      const tagsRes = await db.execute(sql`
+        SELECT platform, campaign_id, tag, stage FROM cortex_core.campaign_tags
+      `);
+      const tagsMap = new Map<string, CampaignTag>();
+      const stagesMap = new Map<string, CampaignStage>();
+      for (const r of tagsRes.rows || []) {
+        const key = `${r.platform}:${r.campaign_id}`;
+        if (r.tag && (CAMPAIGN_TAGS as readonly string[]).includes(r.tag)) {
+          tagsMap.set(key, r.tag as CampaignTag);
+        }
+        if (r.stage && (CAMPAIGN_STAGES as readonly string[]).includes(r.stage)) {
+          stagesMap.set(key, r.stage as CampaignStage);
+        }
+      }
+
+      // ===== Plano de orçamento por pool/etapa do mês =====
+      const poolTotalsRes = await db.execute(sql`
+        SELECT pool, total::float AS total FROM cortex_core.budget_pool_plan
+        WHERE month = ${monthStart}::date
+      `);
+      const stagePlanRes = await db.execute(sql`
+        SELECT pool, stage, value::float AS value, unit FROM cortex_core.budget_stage_plan
+        WHERE month = ${monthStart}::date
+      `);
+      const plans: Record<string, PoolPlan> = {};
+      for (const tag of CAMPAIGN_TAGS) plans[tag] = { total: null, stages: {} };
+      for (const r of poolTotalsRes.rows || []) {
+        if (plans[r.pool]) plans[r.pool].total = Number(r.total);
+      }
+      for (const r of stagePlanRes.rows || []) {
+        if (plans[r.pool] && (CAMPAIGN_STAGES as readonly string[]).includes(r.stage)) {
+          plans[r.pool].stages[r.stage as CampaignStage] = {
+            value: Number(r.value),
+            unit: r.unit === "brl" ? "brl" : "pct",
+          };
+        }
+      }
+
       const buildRow = (platform: Platform, row: any): CampanhaRow => {
         const campaignId = String(row.campaign_id);
         const dailyBudgetAtual = Number(row.daily_budget_atual) || 0;
@@ -192,9 +338,10 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         const recentSpend = Number(row.recent_spend) || 0;
         const investimentoMensalMeta = metasMap.get(`${platform}:${campaignId}`) ?? null;
         // Só projeta gasto futuro se a campanha está ativa E houve entrega real
-        // nos últimos 3 dias (status ACTIVE/ENABLED por si só não garante delivery —
-        // ex: ABO ativa sem nenhum adset rodando, ou ativa mas sem orçamento entregando).
-        const isActiveStatus = row.status === "ACTIVE" || row.status === "ENABLED";
+        // nos últimos 3 dias INCLUINDO hoje (status ACTIVE/ENABLED por si só não
+        // garante delivery — ex: ABO ativa sem nenhum adset rodando. Incluir hoje
+        // faz campanhas recém-criadas que já gastaram hoje entrarem na projeção).
+        const isActiveStatus = ACTIVE_STATUSES.has(String(row.status || "").toUpperCase());
         const isDelivering = isActiveStatus && recentSpend > 0;
         const projecaoAsIs = isDelivering
           ? investidoTotal + dailyBudgetAtual * diasRestantes
@@ -216,12 +363,16 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           orcamentoDiarioMeta,
           projecaoAsIs,
           isDelivering,
+          tag: tagsMap.get(`${platform}:${campaignId}`) ?? null,
+          stage: stagesMap.get(`${platform}:${campaignId}`) ?? null,
         };
       };
 
       const campanhas: CampanhaRow[] = [
         ...((metaRes.rows || []) as any[]).map((r) => buildRow("meta", r)),
         ...(googleRows as any[]).map((r) => buildRow("google", r)),
+        ...(tiktokRows as any[]).map((r) => buildRow("tiktok", r)),
+        ...(linkedinRows as any[]).map((r) => buildRow("linkedin", r)),
       ];
 
       res.json({
@@ -232,6 +383,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         diasDecorridos,
         diasRestantes,
         campanhas,
+        plans,
       });
     } catch (error) {
       console.error("[api] Error fetching orcamento-campanhas:", error);
@@ -284,6 +436,186 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error upserting orcamento-campanhas meta:", error);
       res.status(500).json({ error: "Failed to save meta" });
+    }
+  });
+
+  // Upsert/remoção da tag (grupo) de uma campanha. tag = null limpa a classificação.
+  app.put("/api/growth/orcamento-campanhas/tag", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem alterar tags." });
+      }
+      const { platform, campaignId, tag } = req.body || {};
+      if (!(PLATFORMS as readonly string[]).includes(platform)) {
+        return res.status(400).json({ error: `platform must be one of: ${PLATFORMS.join(", ")}` });
+      }
+      if (!campaignId || typeof campaignId !== "string") {
+        return res.status(400).json({ error: "campaignId is required" });
+      }
+      // tag null/"" => remove; senão precisa ser uma tag válida.
+      const isClearing = tag === null || tag === undefined || tag === "";
+      if (!isClearing && !(CAMPAIGN_TAGS as readonly string[]).includes(tag)) {
+        return res.status(400).json({ error: `tag must be one of: ${CAMPAIGN_TAGS.join(", ")} (or null to clear)` });
+      }
+
+      if (isClearing) {
+        // Zera só a tag, preservando o stage; remove a linha se ficar vazia.
+        await db.execute(sql`
+          UPDATE cortex_core.campaign_tags SET tag = NULL, updated_by = ${userEmail}, updated_at = NOW()
+          WHERE platform = ${platform} AND campaign_id = ${campaignId}
+        `);
+        await db.execute(sql`
+          DELETE FROM cortex_core.campaign_tags
+          WHERE platform = ${platform} AND campaign_id = ${campaignId} AND tag IS NULL AND stage IS NULL
+        `);
+      } else {
+        await db.execute(sql`
+          INSERT INTO cortex_core.campaign_tags (platform, campaign_id, tag, updated_by)
+          VALUES (${platform}, ${campaignId}, ${tag}, ${userEmail})
+          ON CONFLICT (platform, campaign_id) DO UPDATE SET
+            tag = EXCLUDED.tag,
+            updated_by = EXCLUDED.updated_by,
+            updated_at = NOW()
+        `);
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error upserting orcamento-campanhas tag:", error);
+      res.status(500).json({ error: "Failed to save tag" });
+    }
+  });
+
+  // Upsert/remoção da etapa (stage) de uma campanha. stage = null limpa.
+  app.put("/api/growth/orcamento-campanhas/stage", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem alterar etapas." });
+      }
+      const { platform, campaignId, stage } = req.body || {};
+      if (!(PLATFORMS as readonly string[]).includes(platform)) {
+        return res.status(400).json({ error: `platform must be one of: ${PLATFORMS.join(", ")}` });
+      }
+      if (!campaignId || typeof campaignId !== "string") {
+        return res.status(400).json({ error: "campaignId is required" });
+      }
+      const isClearing = stage === null || stage === undefined || stage === "";
+      if (!isClearing && !(CAMPAIGN_STAGES as readonly string[]).includes(stage)) {
+        return res.status(400).json({ error: `stage must be one of: ${CAMPAIGN_STAGES.join(", ")} (or null to clear)` });
+      }
+
+      if (isClearing) {
+        await db.execute(sql`
+          UPDATE cortex_core.campaign_tags SET stage = NULL, updated_by = ${userEmail}, updated_at = NOW()
+          WHERE platform = ${platform} AND campaign_id = ${campaignId}
+        `);
+        await db.execute(sql`
+          DELETE FROM cortex_core.campaign_tags
+          WHERE platform = ${platform} AND campaign_id = ${campaignId} AND tag IS NULL AND stage IS NULL
+        `);
+      } else {
+        await db.execute(sql`
+          INSERT INTO cortex_core.campaign_tags (platform, campaign_id, stage, updated_by)
+          VALUES (${platform}, ${campaignId}, ${stage}, ${userEmail})
+          ON CONFLICT (platform, campaign_id) DO UPDATE SET
+            stage = EXCLUDED.stage,
+            updated_by = EXCLUDED.updated_by,
+            updated_at = NOW()
+        `);
+      }
+
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error upserting orcamento-campanhas stage:", error);
+      res.status(500).json({ error: "Failed to save stage" });
+    }
+  });
+
+  // Upsert/remoção do total mensal de um pool. total = 0/null remove.
+  app.put("/api/growth/orcamento-campanhas/plan/total", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem alterar o plano." });
+      }
+      const { pool, month, total } = req.body || {};
+      if (!(CAMPAIGN_TAGS as readonly string[]).includes(pool)) {
+        return res.status(400).json({ error: `pool must be one of: ${CAMPAIGN_TAGS.join(", ")}` });
+      }
+      if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+        return res.status(400).json({ error: "month must be 'YYYY-MM'" });
+      }
+      const value = Number(total);
+      if (!Number.isFinite(value) || value < 0) {
+        return res.status(400).json({ error: "total must be a non-negative number" });
+      }
+      const monthDate = `${month}-01`;
+
+      if (value === 0) {
+        await db.execute(sql`
+          DELETE FROM cortex_core.budget_pool_plan
+          WHERE pool = ${pool} AND month = ${monthDate}::date
+        `);
+      } else {
+        await db.execute(sql`
+          INSERT INTO cortex_core.budget_pool_plan (pool, month, total, updated_by)
+          VALUES (${pool}, ${monthDate}::date, ${value}, ${userEmail})
+          ON CONFLICT (pool, month) DO UPDATE SET
+            total = EXCLUDED.total, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+        `);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error upserting pool total:", error);
+      res.status(500).json({ error: "Failed to save pool total" });
+    }
+  });
+
+  // Upsert/remoção do alvo de uma etapa (value + unit). value = 0/null remove.
+  app.put("/api/growth/orcamento-campanhas/plan/stage", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem alterar o plano." });
+      }
+      const { pool, month, stage, value, unit } = req.body || {};
+      if (!(CAMPAIGN_TAGS as readonly string[]).includes(pool)) {
+        return res.status(400).json({ error: `pool must be one of: ${CAMPAIGN_TAGS.join(", ")}` });
+      }
+      if (!(CAMPAIGN_STAGES as readonly string[]).includes(stage)) {
+        return res.status(400).json({ error: `stage must be one of: ${CAMPAIGN_STAGES.join(", ")}` });
+      }
+      if (!month || !/^\d{4}-\d{2}$/.test(month)) {
+        return res.status(400).json({ error: "month must be 'YYYY-MM'" });
+      }
+      if (unit !== "pct" && unit !== "brl") {
+        return res.status(400).json({ error: "unit must be 'pct' or 'brl'" });
+      }
+      const v = Number(value);
+      if (!Number.isFinite(v) || v < 0) {
+        return res.status(400).json({ error: "value must be a non-negative number" });
+      }
+      const monthDate = `${month}-01`;
+
+      if (v === 0) {
+        await db.execute(sql`
+          DELETE FROM cortex_core.budget_stage_plan
+          WHERE pool = ${pool} AND month = ${monthDate}::date AND stage = ${stage}
+        `);
+      } else {
+        await db.execute(sql`
+          INSERT INTO cortex_core.budget_stage_plan (pool, month, stage, value, unit, updated_by)
+          VALUES (${pool}, ${monthDate}::date, ${stage}, ${v}, ${unit}, ${userEmail})
+          ON CONFLICT (pool, month, stage) DO UPDATE SET
+            value = EXCLUDED.value, unit = EXCLUDED.unit, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+        `);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error upserting stage plan:", error);
+      res.status(500).json({ error: "Failed to save stage plan" });
     }
   });
 }

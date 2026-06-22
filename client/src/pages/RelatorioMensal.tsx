@@ -31,29 +31,31 @@ import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
 import SlideSquadSingle from "./relatorio-mensal/SlideSquadSingle";
 import SlideTopOperadores from "./relatorio-mensal/SlideTopOperadores";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
-import SlideTopicosDiscussao from "./relatorio-mensal/SlideTopicosDiscussao";
 import SlideNPS from "./relatorio-mensal/SlideNPS";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
+import SlideTurboStore from "./relatorio-mensal/SlideTurboStore";
+import SlideTopicosFinais from "./relatorio-mensal/SlideTopicosFinais";
 import SlideCustom from "./relatorio-mensal/SlideCustom";
 
 const FIXED_SLIDE_NAMES = [
   "Capa", "Q&A", "Novos & Aniversários", "Aniv. Empresa",
-  "Faturamento YTD", "Vendas YTD", "Vendas CX & Upsell",
-  "Capa Comercial", "Ranking Closers",
+  "Faturamento YTD",
+  "Capa Comercial", "Vendas YTD", "Vendas CX & Upsell", "Ranking Closers",
   "Ranking SDRs", "Contratos", "Capa Commerce", "Ranking Squads", "Squad Details", "Top Operadores", "Turbo Commerce",
   "Pontual", "Entregas Pontuais Commerce",
   "NPS",
   "Capa Tech", "Area Tech", "Entregas Pontuais Tech",
-  "Tópicos",
+  "Turbo Store",
   "Frase", "Q&A"
 ];
 
-const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 25
+const STATIC_SLIDES = FIXED_SLIDE_NAMES.length; // 26
 
 type SlotEntry =
   | { type: "fixed"; fixedIndex: number; name: string }
   | { type: "custom"; data: CustomSlide }
-  | { type: "squad"; squadIndex: number; name: string };
+  | { type: "squad"; squadIndex: number; name: string }
+  | { type: "topico"; revealCount: number; name: string };
 
 const MESES_PT = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -96,6 +98,13 @@ function buildSlotArray(customSlides: CustomSlide[], squadDetails: SquadDetail[]
       }
     } else {
       slots.push({ type: "fixed", fixedIndex: i, name: FIXED_SLIDE_NAMES[i] });
+    }
+    // Tópicos Finais (princípios) — logo após o Turbo Store (índice 22).
+    // Começa com a lista vazia (reveal 0) e cada avanço faz o próximo tópico surgir (0→6 = 7 slides).
+    if (i === 22) {
+      for (let t = 0; t <= 6; t++) {
+        slots.push({ type: "topico", revealCount: t, name: t === 0 ? "Tópicos Finais" : `Tópico ${t}` });
+      }
     }
     // Insert custom slides that go after fixed slide i
     const customs = customSlides
@@ -175,6 +184,7 @@ export default function RelatorioMensal() {
     () => slots.map((s) =>
       s.type === "fixed"  ? s.name :
       s.type === "squad"  ? s.name :
+      s.type === "topico" ? s.name :
       (s.data.titulo || "Slide Custom")
     ),
     [slots]
@@ -287,9 +297,9 @@ export default function RelatorioMensal() {
       case 2:  return <SlideNovosAniversariantes novos={data.novosColaboradores} aniversariantes={data.aniversariantes} mesLabel={data.mesLabel} />;
       case 3:  return <SlideAniversarioEmpresa aniversarios={data.aniversariosEmpresa} />;
       case 4:  return <SlideFaturamentoYtd data={data.faturamentoYtd} mesLabel={data.mesDadosLabel} />;
-      case 5:  return <SlideVendasYtd vendasSeries={data.contratosMes.vendasSeries} mesLabel={data.mesDadosLabel} />;
-      case 6:  return <SlideVendasCxUpsell metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
-      case 7:  return <SlideCapaComercial />;
+      case 5:  return <SlideCapaComercial />;
+      case 6:  return <SlideVendasYtd vendasSeries={data.contratosMes.vendasSeries} mesLabel={data.mesDadosLabel} />;
+      case 7:  return <SlideVendasCxUpsell metrics={data.turboMetrics} mesLabel={data.mesDadosLabel} />;
       case 8:  return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
       case 9:  return <SlideRankingSDRs ranking={data.rankingSDRs} topReunioes={data.topReunioes} />;
       case 10: return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.mesDadosLabel} />;
@@ -304,7 +314,7 @@ export default function RelatorioMensal() {
       case 19: return <SlideCapaTech />;
       case 20: return <SlideAreaTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
       case 21: return <SlideEntregasPontuaisTech techData={data.techData} mesLabel={data.mesDadosLabel} />;
-      case 22: return <SlideTopicosDiscussao />;
+      case 22: return <SlideTurboStore />;
       case 23: return <SlideFraseEncerramento />;
       case 24: return <SlideQRCode />;
       default: return null;
@@ -320,6 +330,9 @@ export default function RelatorioMensal() {
     }
     if (slot.type === "squad") {
       return <SlideSquadSingle details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.mesDadosLabel} />;
+    }
+    if (slot.type === "topico") {
+      return <SlideTopicosFinais revealCount={slot.revealCount} />;
     }
     return (
       <SlideCustom

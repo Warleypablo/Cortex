@@ -4909,6 +4909,39 @@ export class DbStorage implements IStorage {
       }
     }
 
+    // ─────────────────────────────────────────────────────────────────────────
+    // ⚠️ AJUSTE DE CONCILIAÇÃO TEMPORÁRIO — REMOVER APÓS CONCILIAR CONTAS A PAGAR
+    // Existe uma divergência de R$ 10.000 a MENOR em contas a pagar cuja causa
+    // raiz ainda não foi rastreada (parcela faltante / sync incompleto / erro de
+    // competência). Enquanto a origem não é identificada, lançamos o valor como
+    // uma linha PRÓPRIA e ROTULADA sob "Despesas" — NÃO embutido em nenhuma
+    // categoria real — para que a DFC feche sem distorcer despesas legítimas e
+    // para que fique evidente que isto é um plug a investigar, não um gasto real.
+    // TODO(financeiro): remover este bloco assim que a diferença em contas a
+    //                   pagar for conciliada. Criado em 2026-06-02.
+    const AJUSTE_CONCILIACAO = {
+      ativo: true,
+      mes: '2026-05', // competência definida pelo solicitante
+      valor: 10000,
+      label: 'Ajuste de conciliação (não conciliado)',
+      categoriaId: '09', // fora do plano de contas real (05/06/07/08) → vira linha própria sob DESPESAS
+    };
+    if (AJUSTE_CONCILIACAO.ativo) {
+      console.warn(
+        `[DFC] ⚠️ Injetando AJUSTE DE CONCILIAÇÃO ARTIFICIAL de R$ ${AJUSTE_CONCILIACAO.valor.toLocaleString('pt-BR')} ` +
+        `em DESPESAS / ${AJUSTE_CONCILIACAO.mes} (linha "${AJUSTE_CONCILIACAO.label}"). ` +
+        `Este valor NÃO vem de caz_parcelas — remover após conciliar contas a pagar.`
+      );
+      mesesSet.add(AJUSTE_CONCILIACAO.mes);
+      items.push({
+        categoriaId: AJUSTE_CONCILIACAO.categoriaId,
+        categoriaNome: AJUSTE_CONCILIACAO.label,
+        mes: AJUSTE_CONCILIACAO.mes,
+        valorTotal: AJUSTE_CONCILIACAO.valor,
+      });
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     const todosOsMeses = Array.from(mesesSet).sort();
 
     console.log(`[DFC DEBUG] Parcelas únicas processadas: ${parcelaIdsProcessadas.size}`);
@@ -9851,6 +9884,67 @@ export class DbStorage implements IStorage {
       },
       porDia: diasDoMes,
     };
+  }
+
+  // Histórico de inadimplência por mês (meses já fechados do ano corrente).
+  // Usa a mesma definição de getRevenueGoals: para um mês fechado, inadimplente =
+  // tudo que ficou em aberto (nao_pago > 0). Percentual = inadimplente / previsto.
+  async getHistoricoInadimplencia(): Promise<{
+    mes: number;
+    ano: number;
+    mesNome: string;
+    inadimplente: number;
+    previsto: number;
+    percentual: number;
+  }[]> {
+    const hoje = new Date();
+    const ano = hoje.getFullYear();
+    const mesAtual = hoje.getMonth() + 1; // 1-12
+
+    // Em janeiro ainda não há meses fechados no ano corrente
+    if (mesAtual === 1) return [];
+
+    const primeiroDiaAno = `${ano}-01-01`;
+    // Limite superior exclusivo = primeiro dia do mês corrente (exclui o mês aberto)
+    const primeiroDiaMesAtual = `${ano}-${String(mesAtual).padStart(2, '0')}-01`;
+
+    const result = await db.execute(sql.raw(`
+      SELECT
+        EXTRACT(MONTH FROM data_vencimento::date)::int as mes,
+        COALESCE(SUM(CASE
+          WHEN UPPER(status) IN ('PAGO', 'ACQUITTED')
+          THEN COALESCE(total::numeric, 0) ELSE 0
+        END), 0) as recebido,
+        COALESCE(SUM(CASE
+          WHEN COALESCE(nao_pago::numeric, 0) > 0
+          THEN COALESCE(nao_pago::numeric, 0) ELSE 0
+        END), 0) as inadimplente
+      FROM "Conta Azul".caz_receber
+      WHERE data_vencimento::date >= '${primeiroDiaAno}'::date
+        AND data_vencimento::date < '${primeiroDiaMesAtual}'::date
+      GROUP BY EXTRACT(MONTH FROM data_vencimento::date)
+      ORDER BY mes
+    `));
+
+    const nomesMeses = [
+      'Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+      'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'
+    ];
+
+    return (result.rows as any[]).map(row => {
+      const mes = parseInt(row.mes);
+      const recebido = parseFloat(row.recebido || '0');
+      const inadimplente = parseFloat(row.inadimplente || '0');
+      const previsto = recebido + inadimplente;
+      return {
+        mes,
+        ano,
+        mesNome: nomesMeses[mes - 1] || String(mes),
+        inadimplente,
+        previsto,
+        percentual: previsto > 0 ? (inadimplente / previsto) * 100 : 0,
+      };
+    });
   }
 
   async getRevenueGoalsDiaDetalhes(data: string): Promise<{

@@ -208,6 +208,42 @@ export async function* ghlIterateContacts(opts: {
   }
 }
 
+/**
+ * Itera contatos via POST /contacts/search ordenado por dateUpdated DESC,
+ * paginando pelo cursor `searchAfter` que a própria API devolve em cada item.
+ *
+ * Diferença crucial pro GET /contacts/ (que devolve por dateAdded DESC): este
+ * endpoint traz à frente contatos ANTIGOS que acabaram de ser atualizados
+ * (tag adicionada, import em massa, edição) — exatamente o que um sync
+ * incremental precisa ver primeiro. Validado contra a API real em 2026-06-11.
+ */
+export async function* ghlIterateContactsByUpdated(opts: { pageLimit?: number } = {}): AsyncGenerator<GhlContactApi> {
+  const { locationId } = getConfig();
+  const pageLimit = opts.pageLimit ?? 100;
+  let searchAfter: unknown[] | undefined;
+
+  while (true) {
+    const data = await ghlFetch<{ contacts: (GhlContactApi & { searchAfter?: unknown[] })[]; total: number }>(
+      "/contacts/search",
+      {
+        method: "POST",
+        body: JSON.stringify({
+          locationId,
+          pageLimit,
+          sort: [{ field: "dateUpdated", direction: "desc" }],
+          ...(searchAfter ? { searchAfter } : {}),
+        }),
+      },
+    );
+    const contacts = data.contacts || [];
+    if (!contacts.length) return;
+    for (const c of contacts) yield c;
+    if (contacts.length < pageLimit) return;
+    searchAfter = contacts[contacts.length - 1].searchAfter;
+    if (!searchAfter) return;
+  }
+}
+
 export async function* ghlIterateConversations(opts: {
   limit?: number;
   lastMessageType?: "TYPE_EMAIL" | "TYPE_WHATSAPP" | "TYPE_SMS" | "TYPE_PHONE";
@@ -527,19 +563,28 @@ export async function runGhlHourlySync(): Promise<{
     console.error("[GHL hourly] conversations error:", err);
   }
 
-  // Contatos atualizados (cursor por dateUpdated não é suportado direto na API;
-  // pegamos uma janela small de novidades via paginação ordenada por dateAdded desc
-  // e paramos quando encontramos algo já sincronizado nos últimos 60 min).
+  // Contatos: incremental por dateUpdated DESC (/contacts/search) com marca d'água
+  // lida do próprio espelho. À prova de buracos: se o job ficar horas sem rodar, o
+  // próximo run pagina até alcançar o último date_updated conhecido — a versão
+  // antiga (janela fixa de 90min sobre lista ordenada por dateAdded) perdia
+  // contatos antigos atualizados e tudo que caísse em gaps entre execuções.
   try {
-    const sinceMs = Date.now() - 90 * 60 * 1000; // 90 min de margem
-    let pages = 0;
-    const MAX_PAGES = 50; // teto de segurança
-    for await (const ct of ghlIterateContacts({ limit: 100 })) {
+    const hwRes = await db.execute(sql`SELECT MAX(date_updated) AS hw FROM cortex_core.ghl_contacts`);
+    const hwRaw = (hwRes as any).rows?.[0]?.hw as string | Date | null;
+    // 10 min de margem pra escritas concorrentes; espelho vazio → janela de 7 dias
+    const watermarkMs = hwRaw
+      ? new Date(hwRaw).getTime() - 10 * 60 * 1000
+      : Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const MAX_CONTACTS = 20_000; // teto de segurança por run; o resto fica pro próximo
+    for await (const ct of ghlIterateContactsByUpdated({ pageLimit: 100 })) {
       const ts = Date.parse(ct.dateUpdated || ct.dateAdded || "");
-      if (ts && ts < sinceMs) break;
+      if (ts && ts < watermarkMs) break;
       await upsertContact(ct);
       contacts++;
-      if (++pages > MAX_PAGES * 100) break;
+      if (contacts >= MAX_CONTACTS) {
+        console.warn(`[GHL hourly] contacts: teto de ${MAX_CONTACTS} atingido — restante no próximo run`);
+        break;
+      }
     }
     await logSyncRun({
       resource: "hourly:contacts",

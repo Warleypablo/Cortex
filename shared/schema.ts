@@ -81,6 +81,34 @@ export const predictionsAccuracy = cortexCoreSchema.table("predictions_accuracy"
 
 export type PredictionAccuracy = typeof predictionsAccuracy.$inferSelect;
 
+// ============== META ACTIONS LOG ==============
+
+export const metaActionsLog = cortexCoreSchema.table("meta_actions_log", {
+  id: serial("id").primaryKey(),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+  actorType: varchar("actor_type", { length: 16 }).notNull(),
+  actorUserId: varchar("actor_user_id", { length: 64 }),
+  actorEmail: varchar("actor_email", { length: 255 }),
+  level: varchar("level", { length: 16 }).notNull(),
+  entityId: varchar("entity_id", { length: 64 }).notNull(),
+  entityName: text("entity_name"),
+  action: varchar("action", { length: 32 }).notNull(),
+  payloadJson: jsonb("payload_json").notNull(),
+  previousValueJson: jsonb("previous_value_json"),
+  reason: text("reason").notNull(),
+  agentRationaleText: text("agent_rationale_text"),
+  status: varchar("status", { length: 16 }).notNull().default("pending"),
+  metaErrorJson: jsonb("meta_error_json"),
+  confirmedByUserId: varchar("confirmed_by_user_id", { length: 64 }),
+  confirmedAt: timestamp("confirmed_at", { withTimezone: true }),
+}, (table) => ({
+  entityStatusIdx: index("idx_meta_actions_log_entity").on(table.entityId, table.status),
+}));
+
+export type MetaActionLog = typeof metaActionsLog.$inferSelect;
+export type InsertMetaActionLog = typeof metaActionsLog.$inferInsert;
+
 export const cazClientes = contaAzulSchema.table("caz_clientes", {
   id: integer("id").primaryKey(),
   nome: text("nome"),
@@ -1062,6 +1090,7 @@ export const crmDeal = bitrixSchema.table("crm_deal", {
   closer: text("closer"),
   sdr: text("sdr"),
   funil: varchar("funil", { length: 255 }),
+  dataReuniaoAgendada: date("data_reuniao_agendada"),
   dataReuniaoRealizada: date("data_reuniao_realizada"),
   faturamentoMensal: varchar("faturamento_mensal", { length: 255 }),
   lpDaConversao: varchar("lp_da_conversao", { length: 255 }),
@@ -1086,6 +1115,22 @@ export const crmDeal = bitrixSchema.table("crm_deal", {
   ip: varchar("ip", { length: 45 }),
   fnlNgc: text("fnl_ngc"),
 });
+
+// Contatos do Bitrix — traz o telefone que crm_deal não tem, pra casar respondedores
+// de broadcast (telefone) com o deal (via crm_deal.contact_id). Populado por
+// scripts/sync-bitrix-contacts.ts.
+export const crmContact = bitrixSchema.table("crm_contact", {
+  id: integer("id").primaryKey(),
+  name: text("name"),
+  phoneRaw: text("phone_raw"),
+  phoneNormalized: varchar("phone_normalized", { length: 20 }),
+  email: text("email"),
+  companyName: text("company_name"),
+  raw: jsonb("raw"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+}, (table) => ({
+  phoneNormIdx: index("crm_contact_phone_norm_idx").on(table.phoneNormalized),
+}));
 
 // Meta Ads + CRM types
 export type MetaAccount = typeof metaAccounts.$inferSelect;
@@ -3393,6 +3438,114 @@ export const insertInstagramPostMetricSchema = createInsertSchema(instagramPostM
 export type InstagramPostMetric = typeof instagramPostMetrics.$inferSelect;
 export type InsertInstagramPostMetric = z.infer<typeof insertInstagramPostMetricSchema>;
 
+// ── CRM Instagram (Garimpo de Engajamento → Social Selling) ─────────────────
+// Perfis que engajaram no IG da Turbo (comentário/DM), organizados em pipeline
+// comercial. Score e temperatura são COMPUTADOS na query (não viram estado).
+
+export const prospectingProfiles = cortexCoreSchema.table(
+  "prospecting_profiles",
+  {
+    id: serial("id").primaryKey(),
+    // @handle real do Instagram — só conhecido pela via de comentário (Graph API).
+    // Null pra leads de DM (GHL não entrega handle, só nome de exibição).
+    igUsername: text("ig_username"),
+    // Nome de exibição (rótulo humano). Pra DM vem do contact_name do GHL.
+    displayName: text("display_name"),
+    igUserId: text("ig_user_id"),
+    bio: text("bio"),
+    followersCount: integer("followers_count"),
+    profilePictureUrl: text("profile_picture_url"),
+    lastMediaPermalink: text("last_media_permalink"),
+    // engajador | oportunidade | negocio
+    stage: text("stage").notNull().default("engajador"),
+    // null | creator_ugc | job_candidate | competitor | poor_fit (legado)
+    subcategory: text("subcategory"),
+    // Tag de qualificação do SDR (ver shared/crmInstagramTags.ts).
+    // colaborador/desqualificado removem do Pipeline (blocklist).
+    qualification: text("qualification"),
+    // Observação livre do SDR; vai pro COMMENTS do Bitrix na criação do deal.
+    observacao: text("observacao"),
+    ownerUserId: text("owner_user_id"),
+    lockedBy: text("locked_by"),
+    lockedAt: timestamp("locked_at"),
+    bitrixDealId: integer("bitrix_deal_id"),
+    ghlContactId: text("ghl_contact_id"),
+    isExistingContact: boolean("is_existing_contact").default(false),
+    icpTags: text("icp_tags").array(),
+    firstSeen: timestamp("first_seen").defaultNow(),
+    lastInteractionAt: timestamp("last_interaction_at"),
+    createdAt: timestamp("created_at").defaultNow(),
+    updatedAt: timestamp("updated_at").defaultNow(),
+  },
+  (table) => [
+    // Postgres trata NULLs como distintos: leads de DM (ig_username NULL) coexistem;
+    // a unicidade vale entre @handles reais (via comentário).
+    uniqueIndex("uq_prospect_ig_username").on(table.igUsername),
+    // Chave de dedup estável dos leads de DM (GHL).
+    uniqueIndex("uq_prospect_ghl_contact").on(table.ghlContactId),
+    index("idx_prospect_stage").on(table.stage),
+    index("idx_prospect_owner").on(table.ownerUserId),
+    index("idx_prospect_last_interaction").on(table.lastInteractionAt),
+  ],
+);
+
+export const insertProspectingProfileSchema = createInsertSchema(prospectingProfiles)
+  .omit({ id: true, createdAt: true, updatedAt: true });
+export type ProspectingProfile = typeof prospectingProfiles.$inferSelect;
+export type InsertProspectingProfile = z.infer<typeof insertProspectingProfileSchema>;
+
+export const prospectingInteractions = cortexCoreSchema.table(
+  "prospecting_interactions",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id")
+      .notNull()
+      .references(() => prospectingProfiles.id, { onDelete: "cascade" }),
+    // comment | spontaneous_dm
+    type: text("type").notNull(),
+    igMediaId: text("ig_media_id"),
+    text: text("text"),
+    // organic | dm
+    source: text("source"),
+    // chave de dedup idempotente: id do comentário ou id da msg do GHL
+    externalRef: text("external_ref").notNull(),
+    occurredAt: timestamp("occurred_at").notNull(),
+    createdAt: timestamp("created_at").defaultNow(),
+  },
+  (table) => [
+    index("idx_prospect_int_profile").on(table.profileId),
+    uniqueIndex("uq_prospect_int_external_ref").on(table.externalRef),
+    index("idx_prospect_int_occurred").on(table.occurredAt),
+  ],
+);
+
+export const insertProspectingInteractionSchema = createInsertSchema(prospectingInteractions)
+  .omit({ id: true, createdAt: true });
+export type ProspectingInteraction = typeof prospectingInteractions.$inferSelect;
+export type InsertProspectingInteraction = z.infer<typeof insertProspectingInteractionSchema>;
+
+export const prospectingStatusLog = cortexCoreSchema.table(
+  "prospecting_status_log",
+  {
+    id: serial("id").primaryKey(),
+    profileId: integer("profile_id")
+      .notNull()
+      .references(() => prospectingProfiles.id, { onDelete: "cascade" }),
+    fromStage: text("from_stage"),
+    toStage: text("to_stage").notNull(),
+    byUser: text("by_user"),
+    at: timestamp("at").defaultNow(),
+  },
+  (table) => [
+    index("idx_prospect_log_profile").on(table.profileId),
+  ],
+);
+
+export const insertProspectingStatusLogSchema = createInsertSchema(prospectingStatusLog)
+  .omit({ id: true, at: true });
+export type ProspectingStatusLog = typeof prospectingStatusLog.$inferSelect;
+export type InsertProspectingStatusLog = z.infer<typeof insertProspectingStatusLogSchema>;
+
 // ==================== CROSSSELL ====================
 
 export const crosssellOportunidades = cortexCoreSchema.table("crosssell_oportunidades", {
@@ -3577,14 +3730,22 @@ export type InsertGeneratedUtmLink = typeof generatedUtmLinks.$inferInsert;
 
 // ============================================================
 // YouTube — sync de dados orgânicos (Data API v3 + Analytics API)
-// Padrão idêntico ao Instagram: schema cortex_core + prefixo youtube_.
+// Schema dedicado `youtube` (igual google_ads/meta_ads terem o seu).
 // access_token/refresh_token gravados encriptados (via utils/encryption).
 // ============================================================
 
-export const youtubeCredentials = cortexCoreSchema.table("youtube_credentials", {
+export const youtubeSchema = pgSchema("youtube");
+
+export const youtubeCredentials = youtubeSchema.table("credentials", {
   id: serial("id").primaryKey(),
-  googleUserId: varchar("google_user_id", { length: 100 }).notNull().unique(),
+  // NÃO é único: uma conta Google (ex.: ferramentas@) gerencia vários canais Brand
+  // Account, e cada autorização traz o MESMO google_user_id porém um refresh_token
+  // diferente, válido só para o canal selecionado no seletor de marca.
+  googleUserId: varchar("google_user_id", { length: 100 }).notNull(),
   googleEmail: varchar("google_email", { length: 255 }),
+  // Canal ao qual este refresh_token dá acesso. É a chave real da credencial
+  // (UNIQUE) — uma credencial por canal.
+  channelId: varchar("channel_id", { length: 50 }).unique(),
   refreshTokenEnc: text("refresh_token_enc").notNull(), // encriptado com encryptToken()
   scopes: text("scopes").notNull(),
   authorizedAt: timestamp("authorized_at", { withTimezone: true }).notNull().defaultNow(),
@@ -3592,7 +3753,7 @@ export const youtubeCredentials = cortexCoreSchema.table("youtube_credentials", 
   active: boolean("active").notNull().default(true),
 });
 
-export const youtubeChannels = cortexCoreSchema.table("youtube_channels", {
+export const youtubeChannels = youtubeSchema.table("channels", {
   channelId: varchar("channel_id", { length: 50 }).primaryKey(),
   title: varchar("title", { length: 255 }),
   customUrl: varchar("custom_url", { length: 255 }),
@@ -3608,7 +3769,7 @@ export const youtubeChannels = cortexCoreSchema.table("youtube_channels", {
   syncedAt: timestamp("synced_at", { withTimezone: true }).notNull().defaultNow(),
 });
 
-export const youtubeVideos = cortexCoreSchema.table("youtube_videos", {
+export const youtubeVideos = youtubeSchema.table("videos", {
   videoId: varchar("video_id", { length: 50 }).primaryKey(),
   channelId: varchar("channel_id", { length: 50 }).notNull(),
   title: varchar("title", { length: 500 }),
@@ -3630,7 +3791,7 @@ export const youtubeVideos = cortexCoreSchema.table("youtube_videos", {
   index("idx_yt_videos_published").on(table.publishedAt),
 ]);
 
-export const youtubeVideoDailyMetrics = cortexCoreSchema.table("youtube_video_daily_metrics", {
+export const youtubeVideoDailyMetrics = youtubeSchema.table("video_daily_metrics", {
   id: serial("id").primaryKey(),
   videoId: varchar("video_id", { length: 50 }).notNull(),
   channelId: varchar("channel_id", { length: 50 }).notNull(),
@@ -3654,7 +3815,7 @@ export const youtubeVideoDailyMetrics = cortexCoreSchema.table("youtube_video_da
   index("idx_yt_video_daily_channel").on(table.channelId),
 ]);
 
-export const youtubeChannelDailyMetrics = cortexCoreSchema.table("youtube_channel_daily_metrics", {
+export const youtubeChannelDailyMetrics = youtubeSchema.table("channel_daily_metrics", {
   id: serial("id").primaryKey(),
   channelId: varchar("channel_id", { length: 50 }).notNull(),
   reportDate: date("report_date").notNull(),
@@ -3672,7 +3833,7 @@ export const youtubeChannelDailyMetrics = cortexCoreSchema.table("youtube_channe
   index("idx_yt_channel_daily_date").on(table.reportDate),
 ]);
 
-export const youtubeSyncRuns = cortexCoreSchema.table("youtube_sync_runs", {
+export const youtubeSyncRuns = youtubeSchema.table("sync_runs", {
   id: serial("id").primaryKey(),
   jobType: varchar("job_type", { length: 50 }).notNull(),
   channelId: varchar("channel_id", { length: 50 }),
@@ -3815,6 +3976,57 @@ export const ghlEmailEvents = cortexCoreSchema.table("ghl_email_events", {
   messageIdx: index("ghl_email_events_message_idx").on(table.messageId),
   typeDateIdx: index("ghl_email_events_type_date_idx").on(table.eventType, table.occurredAt),
   contactIdx: index("ghl_email_events_contact_idx").on(table.contactId),
+}));
+
+// Atribuição lead-a-lead: resposta de broadcast → disparo de origem (conversationId)
+// + deal do Bitrix (telefone). Populado por server/services/broadcastAttribution.ts.
+export const broadcastLeadEvents = cortexCoreSchema.table("broadcast_lead_events", {
+  id: serial("id").primaryKey(),
+  broadcastId: text("broadcast_id").notNull(),
+  conversationId: text("conversation_id"),
+  ghlContactId: text("ghl_contact_id"),
+  leadPhone: text("lead_phone"),
+  leadPhoneNorm: varchar("lead_phone_norm", { length: 20 }),
+  replyMessageId: text("reply_message_id").notNull().unique(),
+  replyBody: text("reply_body"),
+  replyAt: timestamp("reply_at"),
+  sentiment: text("sentiment"),
+  sentimentMotivo: text("sentiment_motivo"),
+  sentimentFonte: text("sentiment_fonte"),
+  bitrixContactId: integer("bitrix_contact_id"),
+  bitrixDealId: integer("bitrix_deal_id"),
+  attributedAt: timestamp("attributed_at").defaultNow(),
+}, (table) => ({
+  broadcastIdx: index("broadcast_lead_events_broadcast_idx").on(table.broadcastId),
+  phoneIdx: index("broadcast_lead_events_phone_idx").on(table.leadPhoneNorm),
+}));
+
+// Classificação por disparo: padrão de copy (IA) + base inferida pelas tags. Cache.
+export const broadcastClassification = cortexCoreSchema.table("broadcast_classification", {
+  broadcastId: text("broadcast_id").primaryKey(),
+  padrao: text("padrao"),
+  padraoMotivo: text("padrao_motivo"),
+  base: text("base"),
+  baseMatchPct: doublePrecision("base_match_pct"),
+  classifiedAt: timestamp("classified_at").defaultNow(),
+});
+
+// Plano editorial de broadcasts (planejamento mensal). Populado pela aba Planejamento.
+export const broadcastPlan = cortexCoreSchema.table("broadcast_plan", {
+  id: serial("id").primaryKey(),
+  planDate: date("plan_date").notNull(),
+  canal: text("canal").default("WhatsApp"),
+  base: text("base"),
+  objetivo: text("objetivo"),
+  padrao: text("padrao"),
+  titulo: text("titulo"),
+  copyText: text("copy_text"),
+  status: text("status").default("backlog"),
+  createdBy: text("created_by"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  dateIdx: index("broadcast_plan_date_idx").on(table.planDate),
 }));
 
 export const ghlTagsSnapshot = cortexCoreSchema.table("ghl_tags_snapshot", {

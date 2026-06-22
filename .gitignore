@@ -17,3 +17,5 @@ contracts.db/
 attached_assets/
 .claude/worktrees/
 out/
+# dev.sh é gerado por worktree (porta dedicada) via scripts/worktree.sh
+dev.sh

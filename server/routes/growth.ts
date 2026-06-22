@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import { format } from "date-fns";
 import { getLinktreeMetrics } from "../services/linktreeGa4";
-import { getSessionsByPlatform } from "../services/ga4Sessions";
+import { getSessionsByPlatform, getGa4SourceMediumDiagnostic } from "../services/ga4Sessions";
 import { UTM_SOURCES_BY_MEDIUM, UTM_SOURCE_LABELS, type UtmMedium } from "@shared/utm-vocabulary";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
@@ -53,6 +53,7 @@ const PLATFORM_CASE_SQL_BASIC = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%ads%' THEN 'linkedin_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%' THEN 'tiktok_ads'
@@ -167,6 +168,477 @@ function expandFunilValues(values: string[]): string[] {
   return expanded;
 }
 
+// Resolve os campaign_id (Meta) cujas campanhas casam com o funil selecionado.
+// Usado para filtrar sessões do GA4 por ID — o sessionCampaignName do GA4 guarda o ID
+// numérico da campanha (utm_campaign={{campaign.id}}), não o nome com a tag [Funil].
+// Mesma lógica de match de nome usada no campaignFilter dos endpoints Meta.
+async function resolveMetaCampaignIdsForFunil(db: any, realFunilValues: string[]): Promise<string[]> {
+  if (realFunilValues.length === 0) return [];
+  try {
+    const nameConditions = realFunilValues.map(
+      v => sql`(c.campaign_name ILIKE ${'%[' + v + ']%'} OR c.campaign_name ILIKE ${'%' + v + '%'})`,
+    );
+    const nameFilter = sql.join(nameConditions, sql` OR `);
+    const result = await db.execute(sql`
+      SELECT DISTINCT c.campaign_id::text AS id
+      FROM meta_ads.meta_campaigns c
+      WHERE (${nameFilter})
+    `);
+    return (result.rows as any[]).map(r => r.id).filter(Boolean);
+  } catch (err) {
+    console.warn('[GA4] Falha ao resolver campaign_ids do funil:', (err as any)?.message || err);
+    return [];
+  }
+}
+
+// Normaliza status do Google (ENABLED/PAUSED/REMOVED) p/ o vocabulário da tela.
+function normalizeGoogleStatus(raw: string | null): string {
+  if (!raw) return 'Desconhecido';
+  const u = raw.toUpperCase();
+  if (u === 'ENABLED') return 'Ativo';
+  if (u === 'PAUSED') return 'Pausado';
+  if (['REMOVED', 'DISABLED'].includes(u)) return 'Inativo';
+  return 'Desconhecido';
+}
+
+// Acumulador de CRM (mesmos contadores das linhas de anúncio do Meta).
+type CrmAcc = {
+  leads: number; mqls: number; nmqls: number; rm: number; rmMql: number; rmNmql: number;
+  rr: number; rrMql: number; rrNmql: number; vendas: number; vendasMql: number; vendasNmql: number;
+  clientesUnicos: number; valorPontual: number; valorRecorrente: number; contratos: number;
+};
+const emptyCrm = (): CrmAcc => ({
+  leads: 0, mqls: 0, nmqls: 0, rm: 0, rmMql: 0, rmNmql: 0, rr: 0, rrMql: 0, rrNmql: 0,
+  vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0, valorPontual: 0, valorRecorrente: 0, contratos: 0,
+});
+const addCrm = (a: CrmAcc, b: CrmAcc) => {
+  a.leads += b.leads; a.mqls += b.mqls; a.nmqls += b.nmqls; a.rm += b.rm; a.rmMql += b.rmMql; a.rmNmql += b.rmNmql;
+  a.rr += b.rr; a.rrMql += b.rrMql; a.rrNmql += b.rrNmql; a.vendas += b.vendas; a.vendasMql += b.vendasMql; a.vendasNmql += b.vendasNmql;
+  a.clientesUnicos += b.clientesUnicos; a.valorPontual += b.valorPontual; a.valorRecorrente += b.valorRecorrente; a.contratos += b.contratos;
+};
+
+/**
+ * Constrói linhas de criativo do Google Ads no formato CriativoData (compatível com a tela).
+ *
+ * Métricas NATIVAS (custo/impressões/clicks/conversões) vêm no nível de ANÚNCIO, somadas no
+ * período (google.ad_daily_metrics). O CRM (leads→vendas, do Bitrix) só atribui a campanha
+ * (utm_campaign) e ad group (utm_term) — não ao anúncio. Por isso o CRM de cada ad group é
+ * anexado a uma "linha portadora" (o anúncio de maior gasto do grupo); leads de campanha sem
+ * ad group identificado vão para o anúncio de maior gasto da campanha. Assim os somatórios do
+ * frontend (anúncio → conjunto → campanha → conta) reconstroem os totais corretamente.
+ */
+export async function buildGoogleCriativos(db: any, startDate: string, endDate: string): Promise<any[]> {
+  const MQL = `(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+  const NMQL = `NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+
+  // 1. Anúncios + métricas nativas agregadas no período + nomes de ad group/campanha.
+  const adsRes = await db.execute(sql`
+    SELECT a.ad_id::text AS ad_id, a.ad_group_id::text AS ad_group_id, a.campaign_id::text AS campaign_id,
+           a.name AS ad_name, a.ad_type, a.status AS ad_status, a.final_urls, a.headlines,
+           ag.name AS adset_name, ag.status AS adset_status,
+           c.name AS campaign_name, c.status AS campaign_status, c.budget_amount_micros,
+           COALESCE(m.impressions, 0) AS impressions, COALESCE(m.clicks, 0) AS clicks,
+           COALESCE(m.cost_micros, 0) AS cost_micros, COALESCE(m.conversions, 0) AS conversions,
+           COALESCE(m.conversion_value, 0) AS conversion_value, COALESCE(m.video_views, 0) AS video_views
+    FROM google.ads a
+    LEFT JOIN google.ad_groups ag ON ag.ad_group_id = a.ad_group_id
+    LEFT JOIN google.campaigns c ON c.campaign_id = a.campaign_id
+    LEFT JOIN (
+      SELECT ad_id, SUM(impressions) AS impressions, SUM(clicks) AS clicks, SUM(cost_micros) AS cost_micros,
+             SUM(conversions) AS conversions, SUM(conversion_value) AS conversion_value, SUM(video_views) AS video_views
+      FROM google.ad_daily_metrics
+      WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+      GROUP BY ad_id
+    ) m ON m.ad_id = a.ad_id
+  `);
+
+  // 2. CRM por (utm_campaign, utm_term) — mesmas regras do funil (source canônico google).
+  const crmRes = await db.execute(sql.raw(`
+    SELECT d.utm_campaign AS campaign_key, d.utm_term AS term_key,
+      COUNT(*) AS leads,
+      SUM(CASE WHEN ${MQL} THEN 1 ELSE 0 END) AS mqls,
+      SUM(CASE WHEN ${NMQL} THEN 1 ELSE 0 END) AS nmqls,
+      SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) AS rm,
+      SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND ${MQL} THEN 1 ELSE 0 END) AS rm_mql,
+      SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND ${NMQL} THEN 1 ELSE 0 END) AS rm_nmql,
+      SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) AS rr,
+      SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND ${MQL} THEN 1 ELSE 0 END) AS rr_mql,
+      SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND ${NMQL} THEN 1 ELSE 0 END) AS rr_nmql,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) AS vendas,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' AND ${MQL} THEN 1 ELSE 0 END) AS vendas_mql,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' AND ${NMQL} THEN 1 ELSE 0 END) AS vendas_nmql,
+      COUNT(DISTINCT CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.company_name, d.contact_name, d.title) END) AS clientes_unicos,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) ELSE 0 END) AS valor_pontual,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_recorrente, 0) ELSE 0 END) AS valor_recorrente,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN
+        CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1
+        ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END
+      ELSE 0 END) AS contratos
+    FROM "Bitrix".crm_deal d
+    WHERE d.created_at >= '${startDate}'::date AND d.created_at <= '${endDate}'::date + INTERVAL '1 day'
+      AND (LOWER(COALESCE(d.utm_source, '')) LIKE '%google%' OR LOWER(COALESCE(d.utm_source, '')) LIKE '%gads%' OR LOWER(COALESCE(d.utm_source, '')) LIKE '%adwords%')
+      AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+    GROUP BY d.utm_campaign, d.utm_term
+  `));
+
+  const leadingId = (v: any): string => { const m = String(v ?? '').match(/^(\d{5,})/); return m ? m[1] : ''; };
+  const rowToCrm = (r: any): CrmAcc => ({
+    leads: parseInt(r.leads) || 0, mqls: parseInt(r.mqls) || 0, nmqls: parseInt(r.nmqls) || 0,
+    rm: parseInt(r.rm) || 0, rmMql: parseInt(r.rm_mql) || 0, rmNmql: parseInt(r.rm_nmql) || 0,
+    rr: parseInt(r.rr) || 0, rrMql: parseInt(r.rr_mql) || 0, rrNmql: parseInt(r.rr_nmql) || 0,
+    vendas: parseInt(r.vendas) || 0, vendasMql: parseInt(r.vendas_mql) || 0, vendasNmql: parseInt(r.vendas_nmql) || 0,
+    clientesUnicos: parseInt(r.clientes_unicos) || 0,
+    valorPontual: parseFloat(r.valor_pontual) || 0, valorRecorrente: parseFloat(r.valor_recorrente) || 0,
+    contratos: parseInt(r.contratos) || 0,
+  });
+
+  // Conjunto de ad groups conhecidos (que têm anúncios) p/ decidir atribuição ad group vs campanha.
+  const adRows = adsRes.rows as any[];
+  const knownAdGroups = new Set(adRows.map((a) => a.ad_group_id));
+  const adGroupCrm = new Map<string, CrmAcc>();   // ad_group_id → CRM
+  const campaignCrm = new Map<string, CrmAcc>();  // campaign_id → CRM (leads sem ad group identificado)
+  for (const r of crmRes.rows as any[]) {
+    const crm = rowToCrm(r);
+    const agId = leadingId(r.term_key);
+    const campId = leadingId(r.campaign_key);
+    if (agId && knownAdGroups.has(agId)) {
+      const cur = adGroupCrm.get(agId) || emptyCrm(); addCrm(cur, crm); adGroupCrm.set(agId, cur);
+    } else if (campId) {
+      const cur = campaignCrm.get(campId) || emptyCrm(); addCrm(cur, crm); campaignCrm.set(campId, cur);
+    }
+  }
+
+  // Linha portadora: anúncio de maior gasto dentro de um grupo de ad rows.
+  const topSpender = (rows: any[]): any | null =>
+    rows.length ? rows.reduce((best, r) => (Number(r.cost_micros) > Number(best.cost_micros) ? r : best), rows[0]) : null;
+
+  // CRM anexado por ad_id (só na linha portadora; demais ficam zerados).
+  const crmByAd = new Map<string, CrmAcc>();
+  const byAdGroup = new Map<string, any[]>();
+  const byCampaign = new Map<string, any[]>();
+  for (const a of adRows) {
+    if (a.ad_group_id) { const arr = byAdGroup.get(a.ad_group_id) || []; arr.push(a); byAdGroup.set(a.ad_group_id, arr); }
+    if (a.campaign_id) { const arr = byCampaign.get(a.campaign_id) || []; arr.push(a); byCampaign.set(a.campaign_id, arr); }
+  }
+  for (const [agId, crm] of Array.from(adGroupCrm.entries())) {
+    const carrier = topSpender(byAdGroup.get(agId) || []);
+    if (carrier) { const cur = crmByAd.get(carrier.ad_id) || emptyCrm(); addCrm(cur, crm); crmByAd.set(carrier.ad_id, cur); }
+  }
+  for (const [campId, crm] of Array.from(campaignCrm.entries())) {
+    const carrier = topSpender(byCampaign.get(campId) || []);
+    if (carrier) { const cur = crmByAd.get(carrier.ad_id) || emptyCrm(); addCrm(cur, crm); crmByAd.set(carrier.ad_id, cur); }
+  }
+
+  // 3. Montar linhas no formato CriativoData. Mantém só anúncios com gasto, CRM, ou ativos.
+  const r1 = (v: number) => parseFloat(v.toFixed(1));
+  const r2 = (v: number) => parseFloat(v.toFixed(2));
+  const out: any[] = [];
+  for (const a of adRows) {
+    const investimento = Number(a.cost_micros) / 1_000_000;
+    const impressions = parseInt(a.impressions) || 0;
+    const clicks = parseInt(a.clicks) || 0;
+    const crm = crmByAd.get(a.ad_id) || emptyCrm();
+    const adStatus = normalizeGoogleStatus(a.ad_status);
+    const isActive = adStatus === 'Ativo';
+    if (investimento <= 0 && crm.leads === 0 && crm.vendas === 0 && !isActive) continue;
+
+    const receita = crm.valorPontual + crm.valorRecorrente;
+    const ctr = impressions > 0 && clicks > 0 ? r2((clicks / impressions) * 100) : null;
+    const cpm = impressions > 0 ? Math.round((investimento / impressions) * 1000) : null;
+    // Nome de exibição: nome do anúncio → 1ª headline → tipo+id.
+    let display = a.ad_name as string | null;
+    if (!display && a.headlines) { try { const h = JSON.parse(a.headlines); if (Array.isArray(h) && h[0]) display = h[0]; } catch {} }
+    if (!display) display = `${a.ad_type || 'Anúncio'} ${a.ad_id}`;
+    let link = '';
+    if (a.final_urls) { try { const u = JSON.parse(a.final_urls); if (Array.isArray(u) && u[0]) link = u[0]; } catch {} }
+
+    out.push({
+      id: a.ad_id,
+      adName: display,
+      link,
+      dataCriacao: null,
+      status: adStatus,
+      plataforma: 'Google Ads',
+      campaignId: a.campaign_id || null,
+      campaignName: a.campaign_name || a.campaign_id || null,
+      campaignStatus: normalizeGoogleStatus(a.campaign_status),
+      adsetId: a.ad_group_id || null,
+      adsetName: a.adset_name || a.ad_group_id || null,
+      adsetStatus: normalizeGoogleStatus(a.adset_status),
+      // Google: orçamento é da campanha (diário). Conjunto não tem budget próprio aqui.
+      campaignDailyBudget: a.budget_amount_micros != null ? Number(a.budget_amount_micros) / 1_000_000 : null,
+      campaignLifetimeBudget: null,
+      adsetDailyBudget: null,
+      adsetLifetimeBudget: null,
+      investimento: Math.round(investimento),
+      // contadores nativos do Google (clicks entram como outboundClicks p/ CTR funcionar)
+      impressions,
+      outboundClicks: clicks,
+      landingPageViews: 0,
+      reach: 0,
+      video3sec: 0,
+      videoThruplay: 0,
+      videoHook: null,
+      videoHold: null,
+      ctr,
+      cpm,
+      connectRate: null,
+      taxaConversao: null,
+      // contadores nativos do Google (pixel/tag) — somáveis no frontend
+      conversions: Math.round(parseFloat(a.conversions) || 0),
+      conversionValue: Math.round(parseFloat(a.conversion_value) || 0),
+      videoViews: parseInt(a.video_views) || 0,
+      // CRM (carregado na linha portadora do ad group / campanha)
+      leads: crm.leads,
+      cpl: crm.leads > 0 ? Math.round(investimento / crm.leads) : null,
+      mql: crm.mqls,
+      cpmql: crm.mqls > 0 ? r2(investimento / crm.mqls) : null,
+      cpra: investimento > 0 && crm.rm > 0 ? Math.round(investimento / crm.rm) : null,
+      cpraMql: investimento > 0 && crm.rmMql > 0 ? Math.round(investimento / crm.rmMql) : null,
+      cpraNmql: investimento > 0 && crm.rmNmql > 0 ? Math.round(investimento / crm.rmNmql) : null,
+      cprr: investimento > 0 && crm.rr > 0 ? Math.round(investimento / crm.rr) : null,
+      cprrMql: investimento > 0 && crm.rrMql > 0 ? Math.round(investimento / crm.rrMql) : null,
+      cprrNmql: investimento > 0 && crm.rrNmql > 0 ? Math.round(investimento / crm.rrNmql) : null,
+      percMql: crm.leads > 0 ? r1((crm.mqls / crm.leads) * 100) : null,
+      descartadoPerc: null, descartadoMqlPerc: null, descartadoNmqlPerc: null,
+      percRa: crm.leads > 0 ? r1((crm.rm / crm.leads) * 100) : null,
+      percRaMql: crm.mqls > 0 ? r1((crm.rmMql / crm.mqls) * 100) : null,
+      percRaNmql: crm.nmqls > 0 ? r1((crm.rmNmql / crm.nmqls) * 100) : null,
+      percRr: crm.leads > 0 ? r1((crm.rr / crm.leads) * 100) : null,
+      percRrMql: crm.mqls > 0 ? r1((crm.rrMql / crm.mqls) * 100) : null,
+      percRrNmql: crm.nmqls > 0 ? r1((crm.rrNmql / crm.nmqls) * 100) : null,
+      percRrVendas: crm.rr > 0 ? r1((crm.vendas / crm.rr) * 100) : null,
+      percRrMqlVendas: crm.rrMql > 0 ? r1((crm.vendasMql / crm.rrMql) * 100) : null,
+      percRrNmqlVendas: crm.rrNmql > 0 ? r1((crm.vendasNmql / crm.rrNmql) * 100) : null,
+      nmqls: crm.nmqls,
+      rm: crm.rm, rmMql: crm.rmMql, rmNmql: crm.rmNmql,
+      rr: crm.rr, rrMql: crm.rrMql, rrNmql: crm.rrNmql,
+      vendas: crm.vendas, vendasMql: crm.vendasMql, vendasNmql: crm.vendasNmql,
+      contratos: crm.contratos,
+      descartados: 0, descartadosMql: 0, descartadosNmql: 0,
+      clientesUnicos: crm.clientesUnicos,
+      leadTime: null,
+      aov: crm.clientesUnicos > 0 ? Math.round(receita / crm.clientesUnicos) : null,
+      receita: receita || null,
+      receitaPontual: crm.valorPontual,
+      receitaRecorrente: crm.valorRecorrente,
+      cacGeral: crm.vendas > 0 ? Math.round(investimento / crm.vendas) : null,
+      cacUnico: crm.clientesUnicos > 0 ? Math.round(investimento / crm.clientesUnicos) : null,
+      cacContrato: crm.contratos > 0 ? Math.round(investimento / crm.contratos) : null,
+      roas: investimento > 0 ? r2(receita / investimento) : null,
+    });
+  }
+  return out;
+}
+
+/**
+ * Constrói linhas de criativo do TikTok Ads no formato CriativoData.
+ *
+ * Marketing: métricas nativas por anúncio (tiktok.ad_insights_daily) — gasto, impressões,
+ * cliques, conversões, video views. Pré-vendas/vendas: do Bitrix, casadas por anúncio via
+ * utm_content = __CID__ = ad_id (padrão de UTM pago do TikTok da Turbo: utm_source=tiktok,
+ * utm_medium=paid, utm_campaign=__CAMPAIGN_ID__, utm_term=__AID__-__PLACEMENT__,
+ * utm_content=__CID__). Casamento 1:1 por anúncio, idêntico ao Meta.
+ *
+ * Enquanto não houver tráfego pago marcado, o bloco de CRM fica zerado e as linhas
+ * mostram só as métricas de marketing. As tabelas tiktok.ads/ad_groups/ad_insights_daily
+ * são criadas por scripts/create-tiktok-ads-adlevel-tables.ts; se ainda não existirem,
+ * a query lança e o endpoint trata como "TikTok indisponível".
+ */
+export async function buildTiktokCriativos(db: any, startDate: string, endDate: string): Promise<any[]> {
+  const MQL = `(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+  const NMQL = `NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+
+  // 1. Anúncios + métricas nativas agregadas no período + nome do ad group.
+  // Só tabelas do schema controlado por esta feature (tiktok.ads/ad_groups/ad_insights_daily).
+  const adsRes = await db.execute(sql`
+    SELECT a.ad_id::text AS ad_id, a.adgroup_id::text AS adgroup_id, a.campaign_id::text AS campaign_id,
+           a.ad_name, a.operation_status AS ad_status, a.landing_page_url,
+           ag.adgroup_name, ag.operation_status AS adgroup_status,
+           COALESCE(m.spend, 0) AS spend, COALESCE(m.impressions, 0) AS impressions,
+           COALESCE(m.clicks, 0) AS clicks, COALESCE(m.conversions, 0) AS conversions,
+           COALESCE(m.video_views, 0) AS video_views
+    FROM tiktok.ads a
+    LEFT JOIN tiktok.ad_groups ag ON ag.adgroup_id = a.adgroup_id
+    LEFT JOIN (
+      SELECT ad_id, SUM(spend) AS spend, SUM(impressions) AS impressions, SUM(clicks) AS clicks,
+             SUM(conversions) AS conversions, SUM(video_views) AS video_views
+      FROM tiktok.ad_insights_daily
+      WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+      GROUP BY ad_id
+    ) m ON m.ad_id = a.ad_id
+  `);
+
+  // 1b. Metadados de campanha (nome/status/budget) vêm de tiktok.ad_campaigns, que é do
+  // PR de nível-campanha e pode ter outro owner no banco. Lemos de forma OPCIONAL: se não
+  // houver acesso/tabela, seguimos com fallback (campaign_id como nome).
+  const campMeta = new Map<string, { name: string | null; status: string | null; budget: number | null }>();
+  try {
+    const campRes = await db.execute(sql`
+      SELECT campaign_id::text AS campaign_id, campaign_name, operation_status, budget
+      FROM tiktok.ad_campaigns
+    `);
+    for (const c of campRes.rows as any[]) {
+      campMeta.set(String(c.campaign_id), {
+        name: c.campaign_name || null,
+        status: c.operation_status || null,
+        budget: c.budget != null ? Number(c.budget) : null,
+      });
+    }
+  } catch (e: any) {
+    console.log("[api] buildTiktokCriativos - ad_campaigns indisponível (fallback p/ campaign_id):", e?.message || e);
+  }
+
+  // 2. CRM por anúncio (utm_content = ad_id), só tráfego pago do TikTok.
+  const crmRes = await db.execute(sql.raw(`
+    SELECT d.utm_content AS ad_id,
+      COUNT(*) AS leads,
+      SUM(CASE WHEN ${MQL} THEN 1 ELSE 0 END) AS mqls,
+      SUM(CASE WHEN ${NMQL} THEN 1 ELSE 0 END) AS nmqls,
+      SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) AS rm,
+      SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND ${MQL} THEN 1 ELSE 0 END) AS rm_mql,
+      SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND ${NMQL} THEN 1 ELSE 0 END) AS rm_nmql,
+      SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) AS rr,
+      SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND ${MQL} THEN 1 ELSE 0 END) AS rr_mql,
+      SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND ${NMQL} THEN 1 ELSE 0 END) AS rr_nmql,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) AS vendas,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' AND ${MQL} THEN 1 ELSE 0 END) AS vendas_mql,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' AND ${NMQL} THEN 1 ELSE 0 END) AS vendas_nmql,
+      COUNT(DISTINCT CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.company_name, d.contact_name, d.title) END) AS clientes_unicos,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) ELSE 0 END) AS valor_pontual,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_recorrente, 0) ELSE 0 END) AS valor_recorrente,
+      SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN
+        CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1
+        ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END
+      ELSE 0 END) AS contratos
+    FROM "Bitrix".crm_deal d
+    WHERE d.created_at >= '${startDate}'::date AND d.created_at <= '${endDate}'::date + INTERVAL '1 day'
+      AND d.utm_content IS NOT NULL AND d.utm_content != ''
+      AND LOWER(COALESCE(d.utm_source, '')) LIKE '%tiktok%'
+      AND LOWER(COALESCE(d.utm_medium, '')) = 'paid'
+      AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+    GROUP BY d.utm_content
+  `));
+
+  const crmByAd = new Map<string, CrmAcc>();
+  for (const r of crmRes.rows as any[]) {
+    crmByAd.set(String(r.ad_id), {
+      leads: parseInt(r.leads) || 0, mqls: parseInt(r.mqls) || 0, nmqls: parseInt(r.nmqls) || 0,
+      rm: parseInt(r.rm) || 0, rmMql: parseInt(r.rm_mql) || 0, rmNmql: parseInt(r.rm_nmql) || 0,
+      rr: parseInt(r.rr) || 0, rrMql: parseInt(r.rr_mql) || 0, rrNmql: parseInt(r.rr_nmql) || 0,
+      vendas: parseInt(r.vendas) || 0, vendasMql: parseInt(r.vendas_mql) || 0, vendasNmql: parseInt(r.vendas_nmql) || 0,
+      clientesUnicos: parseInt(r.clientes_unicos) || 0,
+      valorPontual: parseFloat(r.valor_pontual) || 0, valorRecorrente: parseFloat(r.valor_recorrente) || 0,
+      contratos: parseInt(r.contratos) || 0,
+    });
+  }
+
+  const r1 = (v: number) => parseFloat(v.toFixed(1));
+  const r2 = (v: number) => parseFloat(v.toFixed(2));
+  const out: any[] = [];
+  for (const a of adsRes.rows as any[]) {
+    const investimento = parseFloat(a.spend) || 0;
+    const impressions = parseInt(a.impressions) || 0;
+    const clicks = parseInt(a.clicks) || 0;
+    const crm = crmByAd.get(String(a.ad_id)) || emptyCrm();
+    const adStatus = normalizeTiktokStatus(a.ad_status);
+    const isActive = adStatus === 'Ativo';
+    if (investimento <= 0 && crm.leads === 0 && crm.vendas === 0 && !isActive) continue;
+
+    const receita = crm.valorPontual + crm.valorRecorrente;
+    const ctr = impressions > 0 && clicks > 0 ? r2((clicks / impressions) * 100) : null;
+    const cpm = impressions > 0 ? Math.round((investimento / impressions) * 1000) : null;
+    const camp = campMeta.get(String(a.campaign_id)) || { name: null, status: null, budget: null };
+
+    out.push({
+      id: a.ad_id,
+      adName: a.ad_name || `Anúncio ${a.ad_id}`,
+      link: a.landing_page_url || '',
+      dataCriacao: null,
+      status: adStatus,
+      plataforma: 'TikTok Ads',
+      campaignId: a.campaign_id || null,
+      campaignName: camp.name || a.campaign_id || null,
+      campaignStatus: normalizeTiktokStatus(camp.status),
+      adsetId: a.adgroup_id || null,
+      adsetName: a.adgroup_name || a.adgroup_id || null,
+      adsetStatus: normalizeTiktokStatus(a.adgroup_status),
+      // TikTok: budget pode morar na campanha ou no ad group; expomos só o da campanha por ora.
+      campaignDailyBudget: camp.budget,
+      campaignLifetimeBudget: null,
+      adsetDailyBudget: null,
+      adsetLifetimeBudget: null,
+      investimento: Math.round(investimento),
+      impressions,
+      outboundClicks: clicks,
+      landingPageViews: 0,
+      reach: 0,
+      video3sec: 0,
+      videoThruplay: 0,
+      videoHook: null,
+      videoHold: null,
+      ctr,
+      cpm,
+      connectRate: null,
+      taxaConversao: null,
+      // contadores nativos do TikTok
+      conversions: Math.round(parseFloat(a.conversions) || 0),
+      conversionValue: 0,
+      videoViews: parseInt(a.video_views) || 0,
+      // CRM por anúncio (utm_content = ad_id)
+      leads: crm.leads,
+      cpl: crm.leads > 0 ? Math.round(investimento / crm.leads) : null,
+      mql: crm.mqls,
+      cpmql: crm.mqls > 0 ? r2(investimento / crm.mqls) : null,
+      cpra: investimento > 0 && crm.rm > 0 ? Math.round(investimento / crm.rm) : null,
+      cpraMql: investimento > 0 && crm.rmMql > 0 ? Math.round(investimento / crm.rmMql) : null,
+      cpraNmql: investimento > 0 && crm.rmNmql > 0 ? Math.round(investimento / crm.rmNmql) : null,
+      cprr: investimento > 0 && crm.rr > 0 ? Math.round(investimento / crm.rr) : null,
+      cprrMql: investimento > 0 && crm.rrMql > 0 ? Math.round(investimento / crm.rrMql) : null,
+      cprrNmql: investimento > 0 && crm.rrNmql > 0 ? Math.round(investimento / crm.rrNmql) : null,
+      percMql: crm.leads > 0 ? r1((crm.mqls / crm.leads) * 100) : null,
+      descartadoPerc: null, descartadoMqlPerc: null, descartadoNmqlPerc: null,
+      percRa: crm.leads > 0 ? r1((crm.rm / crm.leads) * 100) : null,
+      percRaMql: crm.mqls > 0 ? r1((crm.rmMql / crm.mqls) * 100) : null,
+      percRaNmql: crm.nmqls > 0 ? r1((crm.rmNmql / crm.nmqls) * 100) : null,
+      percRr: crm.leads > 0 ? r1((crm.rr / crm.leads) * 100) : null,
+      percRrMql: crm.mqls > 0 ? r1((crm.rrMql / crm.mqls) * 100) : null,
+      percRrNmql: crm.nmqls > 0 ? r1((crm.rrNmql / crm.nmqls) * 100) : null,
+      percRrVendas: crm.rr > 0 ? r1((crm.vendas / crm.rr) * 100) : null,
+      percRrMqlVendas: crm.rrMql > 0 ? r1((crm.vendasMql / crm.rrMql) * 100) : null,
+      percRrNmqlVendas: crm.rrNmql > 0 ? r1((crm.vendasNmql / crm.rrNmql) * 100) : null,
+      nmqls: crm.nmqls,
+      rm: crm.rm, rmMql: crm.rmMql, rmNmql: crm.rmNmql,
+      rr: crm.rr, rrMql: crm.rrMql, rrNmql: crm.rrNmql,
+      vendas: crm.vendas, vendasMql: crm.vendasMql, vendasNmql: crm.vendasNmql,
+      contratos: crm.contratos,
+      descartados: 0, descartadosMql: 0, descartadosNmql: 0,
+      clientesUnicos: crm.clientesUnicos,
+      leadTime: null,
+      aov: crm.clientesUnicos > 0 ? Math.round(receita / crm.clientesUnicos) : null,
+      receita: receita || null,
+      receitaPontual: crm.valorPontual,
+      receitaRecorrente: crm.valorRecorrente,
+      cacGeral: crm.vendas > 0 ? Math.round(investimento / crm.vendas) : null,
+      cacUnico: crm.clientesUnicos > 0 ? Math.round(investimento / crm.clientesUnicos) : null,
+      cacContrato: crm.contratos > 0 ? Math.round(investimento / crm.contratos) : null,
+      roas: investimento > 0 ? r2(receita / investimento) : null,
+    });
+  }
+  return out;
+}
+
+/** Normaliza operation_status do TikTok (ENABLE/DISABLE/...) em Ativo/Pausado/Inativo. */
+function normalizeTiktokStatus(raw: string | null): string {
+  if (!raw) return 'Desconhecido';
+  const u = raw.toUpperCase();
+  if (['ENABLE', 'ENABLED', 'CAMPAIGN_STATUS_ENABLE', 'ADGROUP_STATUS_ENABLE', 'AD_STATUS_ENABLE'].includes(u)) return 'Ativo';
+  if (u.includes('ENABLE')) return 'Ativo';
+  if (u.includes('DISABLE') || u.includes('PAUSE')) return 'Pausado';
+  if (u.includes('DELETE') || u.includes('REMOV')) return 'Inativo';
+  return 'Desconhecido';
+}
+
 export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Ensure landing_page_views column exists
   db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`)
@@ -224,13 +696,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         try {
           // Check if google_ads schema exists
           const schemaCheck = await db.execute(sql`
-            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google_ads'
+            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google'
           `);
           
           if (schemaCheck.rows.length > 0) {
             const columnsResult = await db.execute(sql`
               SELECT column_name FROM information_schema.columns 
-              WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+              WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
               ORDER BY ordinal_position
             `);
             
@@ -248,7 +720,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                   COALESCE(SUM(cost_micros) / 1000000.0, 0) as total_investimento,
                   COALESCE(SUM(impressions), 0) as total_impressions,
                   COALESCE(SUM(clicks), 0) as total_clicks
-                FROM google_ads.campaign_daily_metrics
+                FROM google.campaign_daily_metrics
                 WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
               `));
               
@@ -258,7 +730,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                   COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
                   COALESCE(SUM(impressions), 0) as impressions,
                   COALESCE(SUM(clicks), 0) as clicks
-                FROM google_ads.campaign_daily_metrics
+                FROM google.campaign_daily_metrics
                 WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
                 GROUP BY ${dateColumn}
                 ORDER BY ${dateColumn}
@@ -420,19 +892,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       if (canal === 'Todos' || canal === 'Google') {
         try {
           const schemaCheck = await db.execute(sql`
-            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google_ads'
+            SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'google'
           `);
           
           if (schemaCheck.rows.length > 0) {
             const tableCheck = await db.execute(sql`
               SELECT table_name FROM information_schema.tables 
-              WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+              WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
             `);
             
             if (tableCheck.rows.length > 0) {
               const columnsResult = await db.execute(sql`
                 SELECT column_name FROM information_schema.columns 
-                WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+                WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
                 ORDER BY ordinal_position
               `);
               
@@ -451,8 +923,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                     COALESCE(SUM(m.cost_micros::numeric) / 1000000.0, 0) as investimento,
                     COALESCE(SUM(m.impressions::numeric), 0) as impressions,
                     COALESCE(SUM(m.clicks::numeric), 0) as clicks
-                  FROM google_ads.campaign_daily_metrics m
-                  JOIN google_ads.campaigns c ON m.campaign_key = c.campaign_key
+                  FROM google.campaign_daily_metrics m
+                  JOIN google.campaigns c ON m.campaign_id = c.campaign_id
                   WHERE m.${sql.raw(dateColumn)} >= ${startDate}::date AND m.${sql.raw(dateColumn)} <= ${endDate}::date
                   GROUP BY c.campaign_id, c.name
                 `);
@@ -1002,8 +1474,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const status = req.query.status as string || 'Todos'; // Todos, Ativo, Pausado
       const plataformaParam = req.query.plataforma as string || 'Todos'; // supports comma-separated
       const campanhaId = req.query.campanhaId as string || ''; // campaign_id filter
-      const campanhaIds = req.query.campanhaIds as string || ''; // comma-separated campaign_ids (produto filter)
+      const campanhaIds = req.query.campanhaIds as string || ''; // comma-separated campaign_ids (seleção manual de campanha — Meta)
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
+      // Filtro de PRODUTO por NOME de campanha (padrão [Produto]), cross-plataforma.
+      const produtos = (req.query.produtos as string || '').split(',').map(p => p.trim()).filter(Boolean);
+      const matchProduto = (campaignName: string | null | undefined) =>
+        produtos.length === 0 || produtos.some(p => (campaignName || '').includes(`[${p}]`));
 
       // Validar formato de data
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1014,13 +1490,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Parse plataforma filter (supports comma-separated for multi-select)
       const plataformas = plataformaParam === 'Todos' ? [] : plataformaParam.split(',').map(p => p.trim());
 
-      // Por enquanto só temos dados do Meta Ads
-      // Se nenhuma plataforma selecionada incluir Meta Ads (ou "Todos"), retornar vazio
-      if (plataformas.length > 0 && !plataformas.includes('Meta Ads') && !plataformas.includes('Todos')) {
-        console.log("[api] Growth Criativos - Plataformas:", plataformas, "- sem dados disponíveis");
-        return res.json([]);
-      }
-      
+      // Plataformas com dados: Meta Ads, Google Ads e TikTok Ads. "Todos"/vazio = todas.
+      const wantsMeta = plataformas.length === 0 || plataformas.includes('Meta Ads') || plataformas.includes('Todos');
+      const wantsGoogle = plataformas.length === 0 || plataformas.includes('Google Ads') || plataformas.includes('Todos');
+      const wantsTiktok = plataformas.length === 0 || plataformas.includes('TikTok Ads') || plataformas.includes('Todos');
+
+      let criativos: any[] = [];
+
+      if (wantsMeta) {
       // Buscar dados agregados por anúncio do Meta Ads com info do anúncio e campanha (apenas conta interna Turbo Partners)
       const adsDataResult = await db.execute(sql`
         SELECT
@@ -1031,6 +1508,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           a.preview_shareable_link as link,
           a.campaign_id,
           c.campaign_name,
+          c.effective_status as campaign_status,
+          a.adset_id,
+          s.adset_name,
+          s.effective_status as adset_status,
+          c.daily_budget as campaign_daily_budget,
+          c.lifetime_budget as campaign_lifetime_budget,
+          s.daily_budget as adset_daily_budget,
+          s.lifetime_budget as adset_lifetime_budget,
           SUM(i.spend::numeric) as investimento,
           SUM(i.impressions) as impressions,
           SUM(i.clicks) as clicks,
@@ -1048,9 +1533,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM meta_ads.meta_insights_daily i
         LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
         LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
+        LEFT JOIN meta_ads.meta_adsets s ON a.adset_id = s.adset_id
         WHERE i.date_start >= ${startDate}::date AND i.date_start <= ${endDate}::date
           AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
-        GROUP BY i.ad_id, a.ad_name, a.effective_status, a.created_time, a.preview_shareable_link, a.campaign_id, c.campaign_name
+        GROUP BY i.ad_id, a.ad_name, a.effective_status, a.created_time, a.preview_shareable_link,
+                 a.campaign_id, c.campaign_name, c.effective_status, a.adset_id, s.adset_name, s.effective_status,
+                 c.daily_budget, c.lifetime_budget, s.daily_budget, s.lifetime_budget
         ORDER BY SUM(i.spend::numeric) DESC
       `);
       
@@ -1159,6 +1647,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           a.preview_shareable_link as link,
           a.campaign_id,
           c.campaign_name,
+          c.effective_status as campaign_status,
+          a.adset_id,
+          s.adset_name,
+          s.effective_status as adset_status,
+          c.daily_budget as campaign_daily_budget,
+          c.lifetime_budget as campaign_lifetime_budget,
+          s.daily_budget as adset_daily_budget,
+          s.lifetime_budget as adset_lifetime_budget,
           0 as investimento, 0 as impressions, 0 as clicks, 0 as reach,
           0 as outbound_clicks, 0 as cpm, 0 as video_plays,
           0 as video_p25, 0 as video_p50, 0 as video_p75, 0 as video_p100,
@@ -1166,6 +1662,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           0 as landing_page_views
         FROM meta_ads.meta_ads a
         LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
+        LEFT JOIN meta_ads.meta_adsets s ON a.adset_id = s.adset_id
         WHERE a.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
           AND a.effective_status IN ('ACTIVE', 'WITH_ISSUES')
           AND a.ad_id NOT IN (
@@ -1181,7 +1678,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       ];
 
       // Combinar dados de ads com deals
-      const criativos = allAdsRows
+      criativos = allAdsRows
         .map(row => {
           const adId = row.ad_id;
           const investimento = parseFloat(row.investimento) || 0;
@@ -1250,12 +1747,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const cprrMql = investimento > 0 && rrMql > 0 ? investimento / rrMql : null;
           const cprrNmql = investimento > 0 && rrNmql > 0 ? investimento / rrNmql : null;
 
-          // Determinar status baseado no effective_status (reflete estado real atual)
-          let adStatus = row.ad_status || 'Desconhecido';
-          const upperStatus = adStatus.toUpperCase();
-          if (['ACTIVE', 'WITH_ISSUES'].includes(upperStatus)) adStatus = 'Ativo';
-          else if (['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(upperStatus)) adStatus = 'Pausado';
-          else if (['ARCHIVED', 'DELETED', 'DISAPPROVED'].includes(upperStatus)) adStatus = 'Inativo';
+          // Normaliza effective_status (reflete estado real atual) em Ativo/Pausado/Inativo
+          const normalizeStatus = (raw: string | null): string => {
+            if (!raw) return 'Desconhecido';
+            const u = raw.toUpperCase();
+            if (['ACTIVE', 'WITH_ISSUES'].includes(u)) return 'Ativo';
+            if (['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(u)) return 'Pausado';
+            if (['ARCHIVED', 'DELETED', 'DISAPPROVED'].includes(u)) return 'Inativo';
+            return 'Desconhecido';
+          };
+          const adStatus = normalizeStatus(row.ad_status);
 
           return {
             id: adId,
@@ -1266,7 +1767,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             plataforma: 'Meta Ads',
             campaignId: row.campaign_id || null,
             campaignName: row.campaign_name || null,
+            campaignStatus: normalizeStatus(row.campaign_status),
+            adsetId: row.adset_id || null,
+            adsetName: row.adset_name || null,
+            adsetStatus: normalizeStatus(row.adset_status),
+            // Orçamento (já em reais no banco). CBO = budget na campanha; ABO = budget no conjunto.
+            campaignDailyBudget: row.campaign_daily_budget != null ? parseFloat(row.campaign_daily_budget) : null,
+            campaignLifetimeBudget: row.campaign_lifetime_budget != null ? parseFloat(row.campaign_lifetime_budget) : null,
+            adsetDailyBudget: row.adset_daily_budget != null ? parseFloat(row.adset_daily_budget) : null,
+            adsetLifetimeBudget: row.adset_lifetime_budget != null ? parseFloat(row.adset_lifetime_budget) : null,
             investimento: Math.round(investimento),
+            // contadores brutos do Meta (para agregação por nível no frontend)
+            impressions,
+            outboundClicks,
+            landingPageViews,
+            reach,
+            video3sec: video3Sec,
+            videoThruplay,
             videoHook: videoHook ? parseFloat(videoHook.toFixed(2)) : null,
             videoHold: videoHold ? parseFloat(videoHold.toFixed(2)) : null,
             ctr: ctr ? parseFloat(ctr.toFixed(2)) : null,
@@ -1302,6 +1819,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             receita: deal.valorPontual + deal.valorRecorrente || null,
             receitaPontual: deal.valorPontual,
             receitaRecorrente: deal.valorRecorrente,
+            // contadores brutos do CRM (para agregação por nível no frontend)
+            nmqls,
+            rm,
+            rmMql,
+            rmNmql,
+            rr,
+            rrMql,
+            rrNmql,
+            vendas,
+            vendasMql,
+            vendasNmql,
+            contratos,
+            descartados: deal.descartados,
+            descartadosMql: deal.descartadosMql,
+            descartadosNmql: deal.descartadosNmql,
             cacGeral: vendas > 0 ? Math.round(investimento / vendas) : null,
             cacUnico: cacUnico ? Math.round(cacUnico) : null,
             cacContrato: cacContrato ? Math.round(cacContrato) : null,
@@ -1314,14 +1846,54 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             if (status === 'Ativo' && c.status !== 'Ativo') return false;
             if (status === 'Pausado' && c.status !== 'Pausado') return false;
           }
-          // Filtro por campanha
+          // Filtro por campanha (manual, por ID) e por produto (nome [Produto])
           if (campanhaId && String(c.campaignId) !== String(campanhaId)) return false;
           if (campanhaIdSet && !campanhaIdSet.has(String(c.campaignId))) return false;
+          if (!matchProduto(c.campaignName)) return false;
           return true;
         });
-      
+      } // fim if (wantsMeta)
+
+      // Google Ads: mesmo formato de linha, métricas nativas + CRM por ad group/campanha.
+      if (wantsGoogle) {
+        try {
+          const googleRows = (await buildGoogleCriativos(db, startDate, endDate)).filter((c: any) => {
+            if (status !== 'Todos') {
+              if (status === 'Ativo' && c.status !== 'Ativo') return false;
+              if (status === 'Pausado' && c.status !== 'Pausado') return false;
+            }
+            if (campanhaId && String(c.campaignId) !== String(campanhaId)) return false;
+            if (campanhaIdSet && !campanhaIdSet.has(String(c.campaignId))) return false;
+            if (!matchProduto(c.campaignName)) return false;
+            return true;
+          });
+          criativos = criativos.concat(googleRows);
+        } catch (e: any) {
+          console.log("[api] Growth Criativos - Google indisponível:", e?.message || e);
+        }
+      }
+
+      // TikTok Ads: mesmo formato de linha, métricas nativas + CRM por anúncio (utm_content).
+      if (wantsTiktok) {
+        try {
+          const tiktokRows = (await buildTiktokCriativos(db, startDate, endDate)).filter((c: any) => {
+            if (status !== 'Todos') {
+              if (status === 'Ativo' && c.status !== 'Ativo') return false;
+              if (status === 'Pausado' && c.status !== 'Pausado') return false;
+            }
+            if (campanhaId && String(c.campaignId) !== String(campanhaId)) return false;
+            if (campanhaIdSet && !campanhaIdSet.has(String(c.campaignId))) return false;
+            if (!matchProduto(c.campaignName)) return false;
+            return true;
+          });
+          criativos = criativos.concat(tiktokRows);
+        } catch (e: any) {
+          console.log("[api] Growth Criativos - TikTok indisponível:", e?.message || e);
+        }
+      }
+
       console.log("[api] Growth Criativos - Total:", criativos.length, "Status:", status);
-      
+
       res.json(criativos);
     } catch (error) {
       console.error("[api] Error fetching growth criativos:", error);
@@ -1341,6 +1913,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const campanhaId = req.query.campanhaId as string || '';
       const campanhaIds = req.query.campanhaIds as string || '';
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
+      const produtos = (req.query.produtos as string || '').split(',').map(p => p.trim()).filter(Boolean);
+      const matchProduto = (campaignName: string | null | undefined) =>
+        produtos.length === 0 || produtos.some(p => (campaignName || '').includes(`[${p}]`));
 
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
@@ -1360,21 +1935,24 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SELECT
             i.ad_id,
             a.campaign_id,
+            c.campaign_name,
             a.effective_status as ad_status,
             SUM(i.spend::numeric) as investimento
           FROM meta_ads.meta_insights_daily i
           LEFT JOIN meta_ads.meta_ads a ON i.ad_id = a.ad_id
+          LEFT JOIN meta_ads.meta_campaigns c ON a.campaign_id = c.campaign_id
           WHERE i.date_start >= ${sd}::date AND i.date_start <= ${ed}::date
             AND i.account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
-          GROUP BY i.ad_id, a.campaign_id, a.effective_status
+          GROUP BY i.ad_id, a.campaign_id, c.campaign_name, a.effective_status
         `);
 
-        // Filtrar por status e campanha em JS
+        // Filtrar por status, campanha (ID) e produto (nome [Produto]) em JS
         let adRows = (adsResult.rows as any[]);
         if (status === 'Ativo') adRows = adRows.filter((r: any) => r.ad_status?.toUpperCase() === 'ACTIVE');
         if (status === 'Pausado') adRows = adRows.filter((r: any) => ['PAUSED', 'ADSET_PAUSED', 'CAMPAIGN_PAUSED'].includes(r.ad_status?.toUpperCase()));
         if (campanhaId) adRows = adRows.filter((r: any) => String(r.campaign_id) === String(campanhaId));
         if (campanhaIdSet) adRows = adRows.filter((r: any) => campanhaIdSet.has(String(r.campaign_id)));
+        if (produtos.length > 0) adRows = adRows.filter((r: any) => matchProduto(r.campaign_name));
 
         const totalInvestimento = adRows.reduce((s: number, r: any) => s + (parseFloat(r.investimento) || 0), 0);
         const adIdSet = new Set(adRows.map((r: any) => String(r.ad_id)));
@@ -1622,7 +2200,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+          WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
           ORDER BY ordinal_position
         `);
         const columns = columnsResult.rows.map((r: any) => r.column_name);
@@ -1636,7 +2214,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             SELECT
               COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
               COALESCE(SUM(clicks), 0) as sessoes
-            FROM google_ads.campaign_daily_metrics
+            FROM google.campaign_daily_metrics
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
           `));
           const gr = googleResult.rows[0] as any;
@@ -1646,6 +2224,49 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       } catch (e) {
         console.log("[api] Google Ads data not available for performance-plataformas");
       }
+
+      // ---- De-para ID→nome para mídia paga (campanha / conjunto / anúncio) ----
+      // utm_campaign/utm_term/utm_content gravam os IDs numéricos do Google e do Meta.
+      // Resolvemos para nomes legíveis sem alterar a key crua (que mantém o agrupamento).
+      //   Google: campaign=campaign_id, term=ad_group_id, content=keyword (já texto).
+      //   Meta:   campaign=campaign_id, term=adset_id (pode ter sufixo -Placement), content=ad_id.
+      const googleCampNames = new Map<string, string>();
+      const googleAdGroupNames = new Map<string, string>();
+      const metaCampNames = new Map<string, string>();
+      const metaAdsetNames = new Map<string, string>();
+      const metaAdNames = new Map<string, string>();
+      try {
+        const gc = await db.execute(sql`SELECT campaign_id::text AS id, name FROM google.campaigns`);
+        for (const r of gc.rows as any[]) if (r.name) googleCampNames.set(r.id, r.name);
+        const ga = await db.execute(sql`SELECT ad_group_id::text AS id, name FROM google.ad_groups`);
+        for (const r of ga.rows as any[]) if (r.name) googleAdGroupNames.set(r.id, r.name);
+      } catch (e) { /* schema google ausente → mantém IDs */ }
+      try {
+        const mc = await db.execute(sql`SELECT campaign_id::text AS id, campaign_name FROM meta_ads.meta_campaigns`);
+        for (const r of mc.rows as any[]) if (r.campaign_name) metaCampNames.set(r.id, r.campaign_name);
+        const ms = await db.execute(sql`SELECT adset_id::text AS id, adset_name FROM meta_ads.meta_adsets`);
+        for (const r of ms.rows as any[]) if (r.adset_name) metaAdsetNames.set(r.id, r.adset_name);
+        const ma = await db.execute(sql`SELECT ad_id::text AS id, ad_name FROM meta_ads.meta_ads`);
+        for (const r of ma.rows as any[]) if (r.ad_name) metaAdNames.set(r.id, r.ad_name);
+      } catch (e) { /* schema meta_ads ausente → mantém IDs */ }
+
+      // Extrai o ID numérico líder (Meta usa sufixos tipo "1203...450-Instagram_Feed").
+      const leadingId = (v: string): string => { const m = String(v).match(/^(\d{5,})/); return m ? m[1] : ''; };
+      const resolveLeafName = (source: string, level: 'campaign' | 'term' | 'content', raw: string): string => {
+        const id = leadingId(raw);
+        if (!id) return raw;
+        if (source === 'google') {
+          if (level === 'campaign') return googleCampNames.get(id) || raw;
+          if (level === 'term') return googleAdGroupNames.get(id) || raw;
+          return raw; // content = texto da keyword
+        }
+        if (source === 'facebook' || source === 'meta' || source === 'instagram') {
+          if (level === 'campaign') return metaCampNames.get(id) || raw;
+          if (level === 'term') return metaAdsetNames.get(id) || raw;
+          if (level === 'content') return metaAdNames.get(id) || raw;
+        }
+        return raw;
+      };
 
       // ---- Montar árvore: medium → source → campaign → term → content ----
       const MEDIUM_LABELS: Record<string, string> = {
@@ -1687,11 +2308,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         let srcNode = medNode.children.get(s);
         if (!srcNode) { srcNode = makeNode(`s${SEP}${m}${SEP}${s}`, sourceLabel(s), 'source', 997); medNode.children.set(s, srcNode); }
         let campNode = srcNode.children.get(c);
-        if (!campNode) { campNode = makeNode(`c${SEP}${m}${SEP}${s}${SEP}${c}`, c, 'campaign', 0); srcNode.children.set(c, campNode); }
+        if (!campNode) { campNode = makeNode(`c${SEP}${m}${SEP}${s}${SEP}${c}`, resolveLeafName(s, 'campaign', c), 'campaign', 0); srcNode.children.set(c, campNode); }
         let termNode = campNode.children.get(t);
-        if (!termNode) { termNode = makeNode(`t${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}`, t, 'term', 0); campNode.children.set(t, termNode); }
+        if (!termNode) { termNode = makeNode(`t${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}`, resolveLeafName(s, 'term', t), 'term', 0); campNode.children.set(t, termNode); }
         let contentNode = termNode.children.get(ct);
-        if (!contentNode) { contentNode = makeNode(`x${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}${SEP}${ct}`, ct, 'content', 0); termNode.children.set(ct, contentNode); }
+        if (!contentNode) { contentNode = makeNode(`x${SEP}${m}${SEP}${s}${SEP}${c}${SEP}${t}${SEP}${ct}`, resolveLeafName(s, 'content', ct), 'content', 0); termNode.children.set(ct, contentNode); }
         addRaw(contentNode.own, raw);
       }
 
@@ -2639,7 +3260,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       // Query Google Ads (skip when platform filter excludes Google).
-      // Funnel filter aplicado via JOIN com google_ads.campaigns parsing do c.name
+      // Funnel filter aplicado via JOIN com google.campaigns parsing do c.name
       // (mesmo padrão `[NomeFunil]` usado em Meta).
       let googleInvestimento = 0;
       let googleImpressoes = 0;
@@ -2649,7 +3270,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       } else try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+          WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
           ORDER BY ordinal_position
         `);
         const columns = columnsResult.rows.map((r: any) => r.column_name);
@@ -2670,9 +3291,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             if (hasVazio) {
               inner = `(${inner} OR c.name NOT LIKE '%[%]%')`;
             }
-            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE ${inner})`;
+            googleFunnelFilter = `AND m.campaign_id IN (SELECT campaign_id FROM google.campaigns c WHERE ${inner})`;
           } else if (hasVazio) {
-            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
+            googleFunnelFilter = `AND m.campaign_id IN (SELECT campaign_id FROM google.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
           }
 
           const googleResult = await db.execute(sql.raw(`
@@ -2680,7 +3301,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(cost_micros) / 1000000.0, 0) as investimento,
               COALESCE(SUM(impressions), 0) as impressoes,
               COALESCE(SUM(clicks), 0) as cliques
-            FROM google_ads.campaign_daily_metrics m
+            FROM google.campaign_daily_metrics m
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
               ${googleFunnelFilter}
           `));
@@ -2715,10 +3336,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // Sessões (GA4) — métrica universal de chegada na LP cobrindo Meta + Google + orgânico.
       // Filtro de funil aplicado via sessionCampaignName contains [NomeFunil].
+      const ga4CampaignIds = await resolveMetaCampaignIdsForFunil(db, realFunilValues);
       const ga4 = await getSessionsByPlatform(
         new Date(startDate),
         new Date(endDate),
-        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+        realFunilValues.length > 0
+          ? { utmCampaignContains: realFunilValues, campaignIdIn: ga4CampaignIds }
+          : undefined,
       );
       let sessoes = 0;
       if (includeMeta && includeGoogle) {
@@ -2939,7 +3563,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const investimento = parseFloat(row.investimento) || 0;
       const impressoes = parseInt(row.impressoes) || 0;
       const cliquesSaida = parseInt(row.cliques_saida) || 0;
-      const visualizacoesPagina = parseInt(row.visualizacoes_pagina) || 0;
+      const landingPageViewsPixel = parseInt(row.visualizacoes_pagina) || 0;
       const alcance = parseInt(row.alcance) || 0;
       const frequencia = parseFloat(row.frequencia) || 0;
       const video3Sec = parseInt(row.video_3sec) || 0;
@@ -2948,19 +3572,27 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = outbound_clicks / impressions
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
-      const connectRate = cliquesSaida > 0 ? visualizacoesPagina / cliquesSaida : 0;
+      // Connect Rate pelo pixel (legado, mantido só p/ comparação)
+      const connectRatePixel = cliquesSaida > 0 ? landingPageViewsPixel / cliquesSaida : 0;
       // Vídeo Hook = video_3_sec_watched_actions / impressões (actions[].video_view, 3+ seg)
       // Vídeo Hold = video_thruplay_watched_actions / impressões
       // Escala 0–100 — alinhada com o endpoint de Criativos.
       const videoHook = impressoes > 0 && video3Sec > 0 ? (video3Sec / impressoes) * 100 : null;
       const videoHold = impressoes > 0 && videoThruplay > 0 ? (videoThruplay / impressoes) * 100 : null;
 
+      const ga4CampaignIds = await resolveMetaCampaignIdsForFunil(db, realFunilValues);
       const ga4 = await getSessionsByPlatform(
         new Date(startDate),
         new Date(endDate),
-        realFunilValues.length > 0 ? { utmCampaignContains: realFunilValues } : undefined,
+        realFunilValues.length > 0
+          ? { utmCampaignContains: realFunilValues, campaignIdIn: ga4CampaignIds }
+          : undefined,
       );
       const sessoes = ga4.byPlatform.meta_ads;
+      // Padrão GA4 (igual aos outros canais): Viz Página = page views GA4,
+      // Connect Rate = Sessões ÷ cliques de saída.
+      const visualizacoesPagina = ga4.byPlatformPageViews.meta_ads;
+      const connectRate = cliquesSaida > 0 ? sessoes / cliquesSaida : 0;
 
       res.json({
         investimento,
@@ -2975,6 +3607,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         connectRate,
         sessoes,
         sessoesAvailable: ga4.available,
+        // Comparação: valores antigos pelo pixel Meta (p/ avaliar o impacto da migração)
+        visualizacoesPaginaPixel: landingPageViewsPixel,
+        connectRatePixel,
       });
     } catch (error) {
       console.error("[api] Error fetching Meta Ads metrics:", error);
@@ -3000,7 +3635,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         || utmValues.some(v => v.includes('google') || v.includes('adwords') || v === 'gads');
 
       // Funnel filter — Google Ads usa o mesmo padrão `[NomeFunil]` no `c.name`
-      // que o Meta. Parseamos via JOIN com google_ads.campaigns.
+      // que o Meta. Parseamos via JOIN com google.campaigns.
       const funilNgcRaw = req.query.funilNgc as string | undefined;
       const funilValues = funilNgcRaw
         ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
@@ -3028,7 +3663,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       try {
         const columnsResult = await db.execute(sql`
           SELECT column_name FROM information_schema.columns
-          WHERE table_schema = 'google_ads' AND table_name = 'campaign_daily_metrics'
+          WHERE table_schema = 'google' AND table_name = 'campaign_daily_metrics'
           ORDER BY ordinal_position
         `);
         const columns = columnsResult.rows.map((r: any) => r.column_name);
@@ -3052,9 +3687,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             if (hasVazio) {
               inner = `(${inner} OR c.name NOT LIKE '%[%]%')`;
             }
-            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE ${inner})`;
+            googleFunnelFilter = `AND m.campaign_id IN (SELECT campaign_id FROM google.campaigns c WHERE ${inner})`;
           } else if (hasVazio) {
-            googleFunnelFilter = `AND m.campaign_key IN (SELECT campaign_key FROM google_ads.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
+            googleFunnelFilter = `AND m.campaign_id IN (SELECT campaign_id FROM google.campaigns c WHERE c.name NOT LIKE '%[%]%')`;
           }
 
           const googleResult = await db.execute(sql.raw(`
@@ -3064,7 +3699,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
               COALESCE(SUM(clicks), 0) as cliques
               ${hasConversions ? ', COALESCE(SUM(conversions), 0) as conversoes' : ''}
               ${hasConversionsValue ? ', COALESCE(SUM(conversions_value), 0) as valor_conversoes' : ''}
-            FROM google_ads.campaign_daily_metrics m
+            FROM google.campaign_daily_metrics m
             WHERE ${dateColumn} >= '${startDate}'::date AND ${dateColumn} <= '${endDate}'::date
               ${googleFunnelFilter}
           `));
@@ -3084,9 +3719,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctr = impressoes > 0 ? (cliques / impressoes) : 0;
       const custoConversao = conversoes > 0 ? (investimento / conversoes) : 0;
 
-      // Sessões GA4 do tráfego Google (sessionSource=google + sessionMedium=cpc)
+      // Sessões + page views GA4 do tráfego Google (sessionSource=google + medium cpc)
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.google_ads;
+      // Padrão GA4 (igual aos outros canais)
+      const visualizacoesPagina = ga4.byPlatformPageViews.google_ads;
+      // Connect Rate = VdP ÷ Cliques (não exibido no Aprofundado do Google, mas
+      // mantido idêntico a TikTok/LinkedIn Ads p/ consistência).
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
         investimento,
@@ -3095,8 +3735,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cpm,
         cpc,
         ctr,
-        visualizacoesPagina: cliques, // Google Ads uses clicks as landing page proxy
-        connectRate: 0,
+        visualizacoesPagina,
+        connectRate,
         conversoes,
         valorConversoes,
         custoConversao,
@@ -3123,6 +3763,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT id FROM cortex_core.instagram_connections WHERE is_active = true
       `);
       const emptyPayload = {
+        postsPublicados: 0,
         comecaramSeguir: 0, deixaramSeguir: 0, percPerdaSeguidores: 0,
         deltaSeguidores: 0, totalSeguidores: 0, percCrescimentoSeguidores: 0,
         visualizacoesTotais: 0, percVisualizacoesOrganicas: 0, visualizacoesOrganicas: 0,
@@ -3355,7 +3996,28 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.warn('[orcado-realizado/instagram] sub-source breakdown query failed:', err?.message || err);
       }
 
+      // Posts publicados no período (conta a partir das métricas por post)
+      let postsPublicados = 0;
+      try {
+        const postsRes = await db.execute(sql`
+          SELECT COUNT(*)::int AS n
+          FROM cortex_core.instagram_post_metrics
+          WHERE connection_id IN (${sql.join(connectionIds.map((id: any) => sql`${id}`), sql`, `)})
+            AND posted_at >= ${startDate}::date
+            AND posted_at <= ${endDate}::date + INTERVAL '1 day'
+        `);
+        postsPublicados = parseInt((postsRes.rows[0] as any).n) || 0;
+      } catch (err: any) {
+        console.warn('[orcado-realizado/instagram] posts count failed:', err?.message || err);
+      }
+
+      // Chegou no site (GA4 — bucket orgânico do Instagram)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.organico_instagram;
+      const visualizacoesPagina = ga4.byPlatformPageViews.organico_instagram;
+
       res.json({
+        postsPublicados,
         comecaramSeguir, deixaramSeguir, percPerdaSeguidores,
         deltaSeguidores, totalSeguidores: lastFollowers, percCrescimentoSeguidores,
         visualizacoesTotais: visualizacoesTotaisAjustado, percVisualizacoesOrganicas, visualizacoesOrganicas,
@@ -3369,12 +4031,538 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cliquesPorDominio,
         leadsPorOrigem,
         investimentoPago,
+        // Chegou no site (GA4 orgânico do Instagram)
+        sessoes,
+        visualizacoesPagina,
+        sessoesAvailable: ga4.available,
         hasConnection: true,
         snapshotCount: snapshots.length,
       });
     } catch (error) {
       console.error("[api] Error fetching Instagram metrics:", error);
       res.status(500).json({ error: "Failed to fetch Instagram metrics" });
+    }
+  });
+
+  // ===========================================================================
+  // Métricas nativas orgânicas — YouTube / TikTok / LinkedIn
+  // ---------------------------------------------------------------------------
+  // Espelham o padrão do endpoint /instagram: leem as tabelas próprias de cada
+  // plataforma (preenchidas pelos syncs orgânicos #235/#236/#237) e devolvem JSON
+  // plano consumido pelos builders do Aprofundado (GrowthOrcadoRealizado.tsx).
+  // O funil (leads→MQL→venda) continua vindo do /funnel-by-platform — aqui é só a
+  // camada de vaidade/alcance nativa.
+  //
+  // Granularidade difere por plataforma (ver create-*-tables.ts + *Sync.ts):
+  //   - YouTube  → channel_daily_metrics é DIÁRIO real (Analytics API, dim=day) → SUM
+  //   - TikTok   → snapshots diários; account_metrics = total/dia (seguidores=último,
+  //                crescimento=último-primeiro); video_metrics = contadores CUMULATIVOS
+  //                por vídeo → ganho no período = MAX-MIN por vídeo, somado
+  //   - LinkedIn → snapshots de totais LIFETIME → tudo delta (último-primeiro / MAX-MIN);
+  //                os campos *_follower_gain não são populados (v1 só grava total_followers)
+  // ===========================================================================
+
+  // YouTube — inscritos + métricas diárias do canal (orgânico)
+  app.get("/api/growth/orcado-realizado/youtube", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      // Inscritos atuais (snapshot) + nº de canais conectados
+      const chRes = await db.execute(sql`
+        SELECT COALESCE(SUM(subscriber_count), 0)::bigint AS inscritos, COUNT(*)::int AS canais
+        FROM youtube.channels
+      `);
+      const inscritos = parseInt((chRes.rows[0] as any).inscritos) || 0;
+      const canais = parseInt((chRes.rows[0] as any).canais) || 0;
+
+      // Métricas diárias do canal — SUM no período (Analytics API entrega valor por dia)
+      const dmRes = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(views), 0)::bigint AS visualizacoes,
+          COALESCE(SUM(estimated_minutes_watched), 0)::bigint AS minutos,
+          COALESCE(SUM(subscribers_gained), 0)::int AS subs_gained,
+          COALESCE(SUM(subscribers_lost), 0)::int AS subs_lost,
+          COALESCE(SUM(likes), 0)::bigint AS curtidas,
+          COALESCE(SUM(comments), 0)::bigint AS comentarios,
+          COALESCE(SUM(shares), 0)::bigint AS compartilhamentos
+        FROM youtube.channel_daily_metrics
+        WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+      `);
+      const d = dmRes.rows[0] as any;
+      const subsGained = parseInt(d.subs_gained) || 0;
+      const subsLost = parseInt(d.subs_lost) || 0;
+      const deltaInscritos = subsGained - subsLost;
+      const visualizacoes = parseInt(d.visualizacoes) || 0;
+      const minutos = parseInt(d.minutos) || 0;
+      // Duração média por view (segundos) — média ponderada via minutos/views (evita SUM de média)
+      const avgViewDuration = visualizacoes > 0 ? Math.round((minutos / visualizacoes) * 60) : 0;
+      // Mesmas fórmulas do Instagram, trocando seguidor → inscrito
+      const percPerdaInscritos = (subsGained + subsLost) > 0 ? subsLost / (subsGained + subsLost) : 0;
+      const baseInicial = inscritos - deltaInscritos; // inscritos no início do período
+      const percCrescimentoInscritos = baseInicial > 0 ? deltaInscritos / baseInicial : 0;
+
+      // Vídeos publicados no período
+      const vRes = await db.execute(sql`
+        SELECT COUNT(*)::int AS n
+        FROM youtube.videos
+        WHERE published_at >= ${startDate}::date AND published_at <= ${endDate}::date + INTERVAL '1 day'
+      `);
+
+      // Retenção média do canal: a Analytics API não dá averageViewPercentage no nível
+      // de canal de forma agregável, mas já coletamos no nível de vídeo. Agregamos por
+      // média ponderada por views. average_view_percentage vem 0–100 → /100 p/ decimal.
+      const retRes = await db.execute(sql`
+        SELECT
+          COALESCE(SUM(average_view_percentage * views), 0)::numeric AS soma_pond,
+          COALESCE(SUM(CASE WHEN average_view_percentage IS NOT NULL THEN views ELSE 0 END), 0)::numeric AS soma_views
+        FROM youtube.video_daily_metrics
+        WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+      `);
+      const rr = retRes.rows[0] as any;
+      const somaViews = parseFloat(rr.soma_views) || 0;
+      const retencaoMedia = somaViews > 0 ? (parseFloat(rr.soma_pond) / somaViews) / 100 : 0;
+
+      // Engajamento do canal = (curtidas + comentários + compartilhamentos) ÷ views,
+      // espelhando o % Engajamento do Instagram (Interações ÷ alcance/views).
+      const ytCurtidas = parseInt(d.curtidas) || 0;
+      const ytComentarios = parseInt(d.comentarios) || 0;
+      const ytShares = parseInt(d.compartilhamentos) || 0;
+      const ytInteracoes = ytCurtidas + ytComentarios + ytShares;
+      const engajamento = visualizacoes > 0 ? ytInteracoes / visualizacoes : 0;
+
+      // Chegou no site (GA4 — bucket orgânico do YouTube)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.organico_youtube;
+      const visualizacoesPagina = ga4.byPlatformPageViews.organico_youtube;
+
+      res.json({
+        // Audiência (espelha o breakdown de seguidores do Instagram, seguidor → inscrito)
+        comecaramInscrever: subsGained,
+        deixaramInscrever: subsLost,
+        percPerdaInscritos,
+        deltaInscritos,
+        totalInscritos: inscritos,
+        percCrescimentoInscritos,
+        // compat com consumidores antigos
+        inscritos,
+        ganhoLiquidoInscritos: deltaInscritos,
+        // Conteúdo / distribuição / qualidade
+        visualizacoes,
+        horasAssistidas: Math.round(minutos / 60),
+        avgViewDuration,
+        retencaoMedia,
+        curtidas: ytCurtidas,
+        comentarios: ytComentarios,
+        compartilhamentos: ytShares,
+        interacoes: ytInteracoes,
+        engajamento,
+        videosPublicados: parseInt((vRes.rows[0] as any).n) || 0,
+        // Chegou no site (GA4 orgânico do YouTube)
+        sessoes,
+        visualizacoesPagina,
+        sessoesAvailable: ga4.available,
+        hasConnection: canais > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching YouTube metrics:", error);
+      res.status(500).json({ error: "Failed to fetch YouTube metrics" });
+    }
+  });
+
+  // TikTok — perfil orgânico (seguidores + engajamento dos vídeos)
+  app.get("/api/growth/orcado-realizado/tiktok", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const accRes = await db.execute(sql`SELECT COUNT(*)::int AS n FROM tiktok.accounts`);
+      const contas = parseInt((accRes.rows[0] as any).n) || 0;
+
+      // Seguidores: snapshot por dia → último valor no range; crescimento = último - primeiro
+      const folRes = await db.execute(sql`
+        WITH acc AS (
+          SELECT open_id,
+            (ARRAY_AGG(follower_count ORDER BY snapshot_date DESC))[1] AS last_f,
+            (ARRAY_AGG(follower_count ORDER BY snapshot_date ASC))[1] AS first_f
+          FROM tiktok.account_metrics
+          WHERE snapshot_date >= ${startDate}::date AND snapshot_date <= ${endDate}::date
+          GROUP BY open_id
+        )
+        SELECT COALESCE(SUM(last_f), 0)::bigint AS seguidores,
+               COALESCE(SUM(last_f - first_f), 0)::bigint AS crescimento
+        FROM acc
+      `);
+      const f = folRes.rows[0] as any;
+
+      // Começaram/Deixaram de seguir: inferido do delta dia-a-dia do total de seguidores
+      // (mesma aproximação do Instagram/LinkedIn). Positivo = ganho, negativo = perda.
+      const folDiffRes = await db.execute(sql`
+        WITH daily AS (
+          SELECT open_id,
+            follower_count - LAG(follower_count) OVER (PARTITION BY open_id ORDER BY snapshot_date) AS diff
+          FROM tiktok.account_metrics
+          WHERE snapshot_date >= ${startDate}::date AND snapshot_date <= ${endDate}::date
+        )
+        SELECT
+          COALESCE(SUM(CASE WHEN diff > 0 THEN diff ELSE 0 END), 0)::bigint AS gained,
+          COALESCE(SUM(CASE WHEN diff < 0 THEN -diff ELSE 0 END), 0)::bigint AS lost
+        FROM daily
+      `);
+      const fd = folDiffRes.rows[0] as any;
+
+      // Vídeos: contadores cumulativos → ganho no período = MAX - MIN por vídeo, somado
+      const vmRes = await db.execute(sql`
+        WITH vid AS (
+          SELECT video_id,
+            MAX(view_count) - MIN(view_count) AS d_views,
+            MAX(like_count) - MIN(like_count) AS d_likes,
+            MAX(comment_count) - MIN(comment_count) AS d_comments,
+            MAX(share_count) - MIN(share_count) AS d_shares
+          FROM tiktok.video_metrics
+          WHERE snapshot_date >= ${startDate}::date AND snapshot_date <= ${endDate}::date
+          GROUP BY video_id
+        )
+        SELECT COALESCE(SUM(d_views), 0)::bigint AS visualizacoes,
+               COALESCE(SUM(d_likes), 0)::bigint AS curtidas,
+               COALESCE(SUM(d_comments), 0)::bigint AS comentarios,
+               COALESCE(SUM(d_shares), 0)::bigint AS compartilhamentos
+        FROM vid
+      `);
+      const v = vmRes.rows[0] as any;
+
+      const vpubRes = await db.execute(sql`
+        SELECT COUNT(*)::int AS n FROM tiktok.videos
+        WHERE create_time >= ${startDate}::date AND create_time <= ${endDate}::date + INTERVAL '1 day'
+      `);
+
+      const totalSeguidores = parseInt(f.seguidores) || 0;
+      const deltaSeguidores = parseInt(f.crescimento) || 0;
+      const comecaramSeguir = parseInt(fd.gained) || 0;
+      const deixaramSeguir = parseInt(fd.lost) || 0;
+      const baseInicial = totalSeguidores - deltaSeguidores; // seguidores no início do período
+      const percCrescimentoSeguidores = baseInicial > 0 ? deltaSeguidores / baseInicial : 0;
+      const percPerdaSeguidores = (comecaramSeguir + deixaramSeguir) > 0
+        ? deixaramSeguir / (comecaramSeguir + deixaramSeguir) : 0;
+
+      // Engajamento do canal = (curtidas + comentários + compartilhamentos) ÷ views,
+      // espelhando o % Engajamento do Instagram (Interações ÷ Alcance). No TikTok as
+      // views são o análogo do alcance.
+      const visualizacoes = parseInt(v.visualizacoes) || 0;
+      const interacoes = (parseInt(v.curtidas) || 0) + (parseInt(v.comentarios) || 0) + (parseInt(v.compartilhamentos) || 0);
+      const engajamento = visualizacoes > 0 ? interacoes / visualizacoes : 0;
+
+      // Estágio "chegou no site" via GA4 (bucket orgânico do TikTok)
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.organico_tiktok;
+      const visualizacoesPagina = ga4.byPlatformPageViews.organico_tiktok;
+
+      res.json({
+        // Audiência (espelha o breakdown de seguidores do Instagram/YouTube/LinkedIn)
+        comecaramSeguir,
+        deixaramSeguir,
+        percPerdaSeguidores,
+        deltaSeguidores,
+        totalSeguidores,
+        percCrescimentoSeguidores,
+        // compat
+        seguidores: totalSeguidores,
+        crescimentoSeguidores: deltaSeguidores,
+        // Distribuição + engajamento
+        visualizacoes,
+        compartilhamentos: parseInt(v.compartilhamentos) || 0,
+        videosPublicados: parseInt((vpubRes.rows[0] as any).n) || 0,
+        interacoes,
+        engajamento,
+        // Chegou no site (GA4 orgânico do TikTok)
+        sessoes,
+        visualizacoesPagina,
+        sessoesAvailable: ga4.available,
+        // vaidade (não exibidos, mantidos por compat)
+        curtidas: parseInt(v.curtidas) || 0,
+        comentarios: parseInt(v.comentarios) || 0,
+        hasConnection: contas > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching TikTok metrics:", error);
+      res.status(500).json({ error: "Failed to fetch TikTok metrics" });
+    }
+  });
+
+  // TikTok Ads — mídia paga (gasto/impressões/cliques por campanha/dia).
+  // ad_metrics_daily é diário REAL (não cumulativo) → agrega por SUM no range.
+  app.get("/api/growth/orcado-realizado/tiktok-ads", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const advRes = await db.execute(sql`SELECT COUNT(*)::int AS n FROM tiktok.advertisers`);
+      const advertisers = parseInt((advRes.rows[0] as any).n) || 0;
+
+      const mRes = await db.execute(sql`
+        SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
+               COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+               COALESCE(SUM(clicks), 0)::bigint AS cliques,
+               COALESCE(SUM(conversions), 0)::numeric AS conversoes
+        FROM tiktok.ad_metrics_daily
+        WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+      `);
+      const m = mRes.rows[0] as any;
+      const investimento = parseFloat(m.investimento) || 0;
+      const impressoes = parseInt(m.impressoes) || 0;
+      const cliques = parseInt(m.cliques) || 0;
+
+      // Meio do funil via GA4: sessões + visualizações de página do tráfego tiktok_ads
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.tiktok_ads;
+      const visualizacoesPagina = ga4.byPlatformPageViews.tiktok_ads;
+      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (TikTok), alinhado à
+      // definição clássica de mídia (landing page views ÷ cliques). TikTok não expõe
+      // landing_page_views nativo, então o pageviews do GA4 é o proxy mais fiel.
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
+
+      res.json({
+        investimento,
+        impressoes,
+        cliques,
+        conversoes: parseFloat(m.conversoes) || 0,
+        cpm: impressoes > 0 ? (investimento / impressoes) * 1000 : 0,
+        ctr: impressoes > 0 ? cliques / impressoes : 0,
+        visualizacoesPagina,
+        sessoes,
+        connectRate,
+        sessoesAvailable: ga4.available,
+        hasConnection: advertisers > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching TikTok Ads metrics:", error);
+      res.status(500).json({ error: "Failed to fetch TikTok Ads metrics" });
+    }
+  });
+
+  // GA4 — diagnóstico de tagueamento: lista source/medium reais + bucket atribuído.
+  // Use em prod pra confirmar que TikTok/LinkedIn/Google Ads caem nos buckets certos
+  // antes de confiar em Connect Rate / Tx Conversão.
+  app.get("/api/growth/ga4-diagnostic", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+      const diag = await getGa4SourceMediumDiagnostic(new Date(startDate), new Date(endDate));
+      res.json(diag);
+    } catch (error) {
+      console.error("[api] Error fetching GA4 diagnostic:", error);
+      res.status(500).json({ error: "Failed to fetch GA4 diagnostic" });
+    }
+  });
+
+  // LinkedIn Ads — mídia paga (gasto/impressões/cliques por campanha/dia).
+  // ad_metrics_daily é diário REAL (adAnalytics DAILY) → agrega por SUM no range.
+  app.get("/api/growth/orcado-realizado/linkedin-ads", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const accRes = await db.execute(sql`SELECT COUNT(*)::int AS n FROM linkedin.ad_accounts`);
+      const contas = parseInt((accRes.rows[0] as any).n) || 0;
+
+      const mRes = await db.execute(sql`
+        SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
+               COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+               COALESCE(SUM(clicks), 0)::bigint AS cliques,
+               COALESCE(SUM(conversions), 0)::numeric AS conversoes
+        FROM linkedin.ad_metrics_daily
+        WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+      `);
+      const m = mRes.rows[0] as any;
+      const investimento = parseFloat(m.investimento) || 0;
+      const impressoes = parseInt(m.impressoes) || 0;
+      const cliques = parseInt(m.cliques) || 0;
+
+      // Meio do funil via GA4: sessões + visualizações de página do tráfego linkedin_ads
+      const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+      const sessoes = ga4.byPlatform.linkedin_ads;
+      const visualizacoesPagina = ga4.byPlatformPageViews.linkedin_ads;
+      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (LinkedIn), alinhado à
+      // definição clássica de mídia (landing page views ÷ cliques) e ao TikTok Ads.
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
+
+      res.json({
+        investimento,
+        impressoes,
+        cliques,
+        conversoes: parseFloat(m.conversoes) || 0,
+        cpm: impressoes > 0 ? (investimento / impressoes) * 1000 : 0,
+        ctr: impressoes > 0 ? cliques / impressoes : 0,
+        visualizacoesPagina,
+        sessoes,
+        connectRate,
+        sessoesAvailable: ga4.available,
+        hasConnection: contas > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching LinkedIn Ads metrics:", error);
+      res.status(500).json({ error: "Failed to fetch LinkedIn Ads metrics" });
+    }
+  });
+
+  // LinkedIn — Company Page orgânica (seguidores + engajamento + page views)
+  app.get("/api/growth/orcado-realizado/linkedin", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string;
+      const endDate = req.query.endDate as string;
+      if (!startDate || !endDate) {
+        return res.status(400).json({ error: "startDate and endDate are required" });
+      }
+
+      const orgRes = await db.execute(sql`SELECT COUNT(*)::int AS n FROM linkedin.organizations`);
+      const orgs = parseInt((orgRes.rows[0] as any).n) || 0;
+
+      // Seguidores: snapshot de total → último no range; novos = último - primeiro
+      const folRes = await db.execute(sql`
+        WITH foll AS (
+          SELECT org_id,
+            (ARRAY_AGG(total_followers ORDER BY stat_date DESC))[1] AS last_f,
+            (ARRAY_AGG(total_followers ORDER BY stat_date ASC))[1] AS first_f
+          FROM linkedin.follower_stats_daily
+          WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          GROUP BY org_id
+        )
+        SELECT COALESCE(SUM(last_f), 0)::bigint AS seguidores,
+               COALESCE(SUM(last_f - first_f), 0)::bigint AS novos
+        FROM foll
+      `);
+      const f = folRes.rows[0] as any;
+
+      // Começaram/Deixaram de seguir: LinkedIn não expõe unfollow → inferimos do
+      // delta dia-a-dia do total (mesma aproximação do Instagram). Positivo = ganho,
+      // negativo = perda.
+      const folDiffRes = await db.execute(sql`
+        WITH daily AS (
+          SELECT org_id,
+            total_followers - LAG(total_followers) OVER (PARTITION BY org_id ORDER BY stat_date) AS diff
+          FROM linkedin.follower_stats_daily
+          WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+        )
+        SELECT
+          COALESCE(SUM(CASE WHEN diff > 0 THEN diff ELSE 0 END), 0)::bigint AS gained,
+          COALESCE(SUM(CASE WHEN diff < 0 THEN -diff ELSE 0 END), 0)::bigint AS lost
+        FROM daily
+      `);
+      const fd = folDiffRes.rows[0] as any;
+
+      // Engajamento: impressions/clicks/likes/comments/shares são contadores lifetime →
+      // ganho no período = MAX - MIN por org. Já `engagement` é uma TAXA (decimal) do
+      // totalShareStatistics, não um contador → usa o último valor do range (média entre orgs).
+      const shRes = await db.execute(sql`
+        WITH sh AS (
+          SELECT org_id,
+            MAX(impressions) - MIN(impressions) AS d_imp,
+            MAX(clicks) - MIN(clicks) AS d_clk,
+            MAX(likes) - MIN(likes) AS d_likes,
+            MAX(comments) - MIN(comments) AS d_comments,
+            MAX(shares) - MIN(shares) AS d_shares,
+            (ARRAY_AGG(engagement ORDER BY stat_date DESC) FILTER (WHERE engagement IS NOT NULL))[1] AS last_eng
+          FROM linkedin.share_stats_daily
+          WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          GROUP BY org_id
+        )
+        SELECT COALESCE(SUM(d_imp), 0)::bigint AS impressoes,
+               COALESCE(SUM(d_clk), 0)::bigint AS cliques,
+               COALESCE(SUM(d_likes), 0)::bigint AS reacoes,
+               COALESCE(SUM(d_comments), 0)::bigint AS comentarios,
+               COALESCE(SUM(d_shares), 0)::bigint AS compartilhamentos,
+               COALESCE(AVG(last_eng), 0)::numeric AS engajamento
+        FROM sh
+      `);
+      const s = shRes.rows[0] as any;
+
+      // Page views: lifetime → ganho no período = MAX - MIN por org
+      const pgRes = await db.execute(sql`
+        WITH pg AS (
+          SELECT org_id, MAX(all_page_views) - MIN(all_page_views) AS d_pv
+          FROM linkedin.page_stats_daily
+          WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          GROUP BY org_id
+        )
+        SELECT COALESCE(SUM(d_pv), 0)::bigint AS page_views FROM pg
+      `);
+
+      const totalSeguidores = parseInt(f.seguidores) || 0;
+      const deltaSeguidores = parseInt(f.novos) || 0;
+      const comecaramSeguir = parseInt(fd.gained) || 0;
+      const deixaramSeguir = parseInt(fd.lost) || 0;
+      const baseInicial = totalSeguidores - deltaSeguidores; // seguidores no início do período
+      const percCrescimentoSeguidores = baseInicial > 0 ? deltaSeguidores / baseInicial : 0;
+      const percPerdaSeguidores = (comecaramSeguir + deixaramSeguir) > 0
+        ? deixaramSeguir / (comecaramSeguir + deixaramSeguir) : 0;
+      const impressoes = parseInt(s.impressoes) || 0;
+      const cliques = parseInt(s.cliques) || 0;
+      const ctr = impressoes > 0 ? cliques / impressoes : 0;
+
+      // Posts publicados no período (Posts API → linkedin.posts). Pode vir 0 até o
+      // sync rodar com r_organization_social concedido. Conta lifecycle PUBLISHED.
+      let postsPublicados = 0;
+      try {
+        const postsRes = await db.execute(sql`
+          SELECT COUNT(*)::int AS n FROM linkedin.posts
+          WHERE created_at >= ${startDate}::date
+            AND created_at <= ${endDate}::date + INTERVAL '1 day'
+            AND (lifecycle_state IS NULL OR lifecycle_state = 'PUBLISHED')
+        `);
+        postsPublicados = parseInt((postsRes.rows[0] as any).n) || 0;
+      } catch (err: any) {
+        console.warn('[orcado-realizado/linkedin] posts count failed:', err?.message || err);
+      }
+
+      // Chegou no site (GA4 — bucket orgânico do LinkedIn)
+      const ga4Li = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
+
+      res.json({
+        postsPublicados,
+        // Audiência (espelha o breakdown de seguidores do Instagram/YouTube)
+        comecaramSeguir,
+        deixaramSeguir,
+        percPerdaSeguidores,
+        deltaSeguidores,
+        totalSeguidores,
+        percCrescimentoSeguidores,
+        // compat
+        seguidores: totalSeguidores,
+        novosSeguidores: deltaSeguidores,
+        // Distribuição / intenção
+        impressoes,
+        cliques,
+        ctr,
+        pageViews: parseInt((pgRes.rows[0] as any).page_views) || 0,
+        engajamento: parseFloat(s.engajamento) || 0,
+        // vaidade (não exibidos no bloco, mantidos por compat)
+        reacoes: parseInt(s.reacoes) || 0,
+        comentarios: parseInt(s.comentarios) || 0,
+        compartilhamentos: parseInt(s.compartilhamentos) || 0,
+        // Chegou no site (GA4 orgânico do LinkedIn)
+        sessoes: ga4Li.byPlatform.organico_linkedin,
+        visualizacoesPagina: ga4Li.byPlatformPageViews.organico_linkedin,
+        sessoesAvailable: ga4Li.available,
+        hasConnection: orgs > 0,
+      });
+    } catch (error) {
+      console.error("[api] Error fetching LinkedIn metrics:", error);
+      res.status(500).json({ error: "Failed to fetch LinkedIn metrics" });
     }
   });
 
@@ -3389,6 +4577,41 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // Classificação de plataforma centralizada (ver constante PLATFORM_CASE_SQL_BASIC no topo do arquivo)
       const platformCaseExpr = PLATFORM_CASE_SQL_BASIC;
+
+      // Filtros de produto (funilNgc) e plataforma (utmSource), espelhando /ads (2613-2799).
+      // Necessário para o Aprofundado do Orçado x Realizado reconciliar com Evolução Temporal.
+      const funilNgcRaw = req.query.funilNgc as string | undefined;
+      const funilValues = funilNgcRaw
+        ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean)
+        : [];
+      const hasVazio = funilValues.includes('(Vazio)');
+      const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
+
+      const utmSourceParam = req.query.utmSource as string | undefined;
+      const utmValues = utmSourceParam && utmSourceParam !== 'todos'
+        ? utmSourceParam.split(',').map(v => v.trim().toLowerCase()).filter(Boolean)
+        : [];
+
+      const escapeSql = (v: string) => v.replace(/'/g, "''");
+
+      let funilFilterSql = '';
+      if (funilValues.length > 0) {
+        if (hasVazio && realFunilValues.length > 0) {
+          const conds = realFunilValues.map(v => `fnl_ngc ILIKE '${escapeSql(v)}'`).join(' OR ');
+          funilFilterSql = `AND (${conds} OR fnl_ngc IS NULL OR fnl_ngc = '')`;
+        } else if (hasVazio) {
+          funilFilterSql = `AND (fnl_ngc IS NULL OR fnl_ngc = '')`;
+        } else {
+          const conds = realFunilValues.map(v => `fnl_ngc ILIKE '${escapeSql(v)}'`).join(' OR ');
+          funilFilterSql = `AND (${conds})`;
+        }
+      }
+
+      let utmSourceFilterSql = '';
+      if (utmValues.length > 0) {
+        const conds = utmValues.map(v => `LOWER(utm_source) LIKE '${escapeSql(v)}%'`).join(' OR ');
+        utmSourceFilterSql = `AND (${conds})`;
+      }
 
       const RA_STAGES = `'reunião marcada', 'rm', 'rm - reunião marcada', 'agendado', 'reunião agendada', 'agendamento direto',
             'reunião realizada', 'rr - reunião realizada', 'rr', 'realizado',
@@ -3422,6 +4645,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM "Bitrix".crm_deal
         WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
           AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          ${funilFilterSql}
+          ${utmSourceFilterSql}
         GROUP BY platform
       `));
 
@@ -3443,6 +4668,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
           AND stage_name = 'Negócio Ganho'
           AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          ${funilFilterSql}
+          ${utmSourceFilterSql}
         GROUP BY platform
       `));
       const winsMap = new Map<string, any>();
@@ -3460,6 +4687,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             AND data_fechamento IS NOT NULL
             AND data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
             AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${funilFilterSql}
+            ${utmSourceFilterSql}
           GROUP BY platform, cliente
         ) sub
         GROUP BY platform
@@ -3600,6 +4829,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let metaImpressions = 0, metaClicks = 0, metaSpend = 0;
       let googleImpressions = 0, googleClicks = 0, googleSpend = 0;
 
+      // Campaign filter aplicado tanto na mídia quanto no Bitrix.
+      // Sem isso, leads filtravam por campanha e impressões/cliques somavam tudo — universos diferentes.
+      const metaCampaignFilter = campaign
+        ? sql`AND campaign_id IN (
+            SELECT campaign_id::text FROM meta_ads.meta_campaigns
+            WHERE campaign_name ILIKE ${'%' + campaign + '%'}
+          )`
+        : sql``;
+
       if (plataforma === 'Todos' || plataforma === 'Meta') {
         const metaResult = await db.execute(sql`
           SELECT
@@ -3609,6 +4847,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           FROM meta_ads.meta_insights_daily
           WHERE date_start >= ${startDate}::date AND date_stop <= ${endDate}::date
             AND account_id = ${TURBO_PARTNERS_ACCOUNT_ID}
+            ${metaCampaignFilter}
         `);
         const mr = metaResult.rows[0] as any;
         metaImpressions = parseInt(mr.impressions) || 0;
@@ -3618,13 +4857,20 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       if (plataforma === 'Todos' || plataforma === 'Google') {
         try {
+          const googleCampaignFilter = campaign
+            ? sql`AND campaign_id IN (
+                SELECT campaign_id FROM google.campaigns
+                WHERE name ILIKE ${'%' + campaign + '%'}
+              )`
+            : sql``;
           const googleResult = await db.execute(sql`
             SELECT
               COALESCE(SUM(impressions), 0)::bigint as impressions,
               COALESCE(SUM(clicks), 0)::bigint as clicks,
               COALESCE(SUM(cost_micros), 0)::bigint as cost_micros
-            FROM google_ads.campaign_daily_metrics
+            FROM google.campaign_daily_metrics
             WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+              ${googleCampaignFilter}
           `);
           const gr = googleResult.rows[0] as any;
           googleImpressions = parseInt(gr.impressions) || 0;
@@ -3703,30 +4949,74 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         rate: stages[i].value > 0 ? (stage.value / stages[i].value * 100) : 0,
       }));
 
-      // 4. Monthly trend
+      // 4. Monthly trend — event-time por métrica.
+      // Cada métrica é agrupada pelo mês do SEU próprio evento, não pelo mês do lead.
+      // Ex.: RA de março feita por lead criado em fevereiro entra em março.
       const trendResult = await db.execute(sql`
+        WITH leads_m AS (
+          SELECT TO_CHAR(created_at, 'YYYY-MM') as month,
+                 COUNT(*) as leads,
+                 SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls
+          FROM "Bitrix".crm_deal
+          WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${utmFilter}
+            ${campaignFilter}
+          GROUP BY 1
+        ),
+        rm_m AS (
+          SELECT TO_CHAR(data_reuniao_agendada, 'YYYY-MM') as month, COUNT(*) as rm
+          FROM "Bitrix".crm_deal
+          WHERE data_reuniao_agendada IS NOT NULL
+            AND data_reuniao_agendada::date >= ${startDate}::date
+            AND data_reuniao_agendada::date <= ${endDate}::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${utmFilter}
+            ${campaignFilter}
+          GROUP BY 1
+        ),
+        rr_m AS (
+          SELECT TO_CHAR(data_reuniao_realizada, 'YYYY-MM') as month, COUNT(*) as rr
+          FROM "Bitrix".crm_deal
+          WHERE data_reuniao_realizada IS NOT NULL
+            AND data_reuniao_realizada::date >= ${startDate}::date
+            AND data_reuniao_realizada::date <= ${endDate}::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${utmFilter}
+            ${campaignFilter}
+          GROUP BY 1
+        ),
+        vendas_m AS (
+          SELECT TO_CHAR(data_fechamento, 'YYYY-MM') as month, COUNT(*) as vendas
+          FROM "Bitrix".crm_deal
+          WHERE stage_name = 'Negócio Ganho'
+            AND data_fechamento IS NOT NULL
+            AND data_fechamento >= ${startDate}::date
+            AND data_fechamento <= ${endDate}::date
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            ${utmFilter}
+            ${campaignFilter}
+          GROUP BY 1
+        ),
+        all_months AS (
+          SELECT month FROM leads_m
+          UNION SELECT month FROM rm_m
+          UNION SELECT month FROM rr_m
+          UNION SELECT month FROM vendas_m
+        )
         SELECT
-          TO_CHAR(created_at, 'YYYY-MM') as month,
-          COUNT(*) as leads,
-          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN data_reuniao_agendada IS NOT NULL
-                   AND data_reuniao_agendada::date >= ${startDate}::date
-                   AND data_reuniao_agendada::date <= ${endDate}::date
-                   THEN 1 ELSE 0 END) as rm,
-          SUM(CASE WHEN data_reuniao_realizada IS NOT NULL
-                   AND data_reuniao_realizada::date >= ${startDate}::date
-                   AND data_reuniao_realizada::date <= ${endDate}::date
-                   THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN stage_name = 'Negócio Ganho'
-                   AND data_fechamento >= ${startDate}::date
-                   AND data_fechamento <= ${endDate}::date
-                   THEN 1 ELSE 0 END) as vendas
-        FROM "Bitrix".crm_deal
-        WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
-          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
-          ${utmFilter}
-          ${campaignFilter}
-        GROUP BY TO_CHAR(created_at, 'YYYY-MM')
+          a.month,
+          COALESCE(l.leads, 0) as leads,
+          COALESCE(l.mqls, 0) as mqls,
+          COALESCE(rm.rm, 0) as rm,
+          COALESCE(rr.rr, 0) as rr,
+          COALESCE(v.vendas, 0) as vendas
+        FROM all_months a
+        LEFT JOIN leads_m l ON a.month = l.month
+        LEFT JOIN rm_m rm ON a.month = rm.month
+        LEFT JOIN rr_m rr ON a.month = rr.month
+        LEFT JOIN vendas_m v ON a.month = v.month
+        WHERE a.month IS NOT NULL
         ORDER BY 1
       `);
 
@@ -3781,7 +5071,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const result = await db.execute(sql`
         WITH keyword_metrics AS (
           SELECT
-            k.keyword_key,
+            (k.ad_group_id || '_' || k.criterion_id) as keyword_key,
             k.text as keyword_text,
             k.match_type,
             k.status,
@@ -3796,15 +5086,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             COALESCE(SUM(m.conversions), 0)::numeric as conversions,
             COALESCE(SUM(m.conversion_value), 0)::numeric as conversion_value,
             MAX(m.quality_score) as max_quality_score
-          FROM google_ads.keywords k
-          JOIN google_ads.ad_groups ag ON k.ad_group_key = ag.ad_group_key
-          JOIN google_ads.campaigns c ON ag.campaign_key = c.campaign_key
-          LEFT JOIN google_ads.keyword_daily_metrics m
-            ON k.keyword_key = m.keyword_key
+          FROM google.keywords k
+          JOIN google.ad_groups ag ON k.ad_group_id = ag.ad_group_id
+          JOIN google.campaigns c ON ag.campaign_id = c.campaign_id
+          LEFT JOIN google.keyword_daily_metrics m
+            ON m.ad_group_id = k.ad_group_id AND m.criterion_id = k.criterion_id
             AND m.report_date >= ${startDate}::date
             AND m.report_date <= ${endDate}::date
           WHERE k.negative = false
-          GROUP BY k.keyword_key, k.text, k.match_type, k.status, k.quality_score, k.negative,
+          GROUP BY k.ad_group_id, k.criterion_id, k.text, k.match_type, k.status, k.quality_score, k.negative,
                    ag.name, c.name, c.status
         )
         SELECT

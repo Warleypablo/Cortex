@@ -95,11 +95,10 @@ export interface ContratosMes {
   vendasSeries: VendasMes[];
 }
 
-export interface CrosssellCloser {
-  nome: string;
+export interface CrosssellMes {
+  mes: string; // "YYYY-MM"
   mrr: number;
   pontual: number;
-  contratos: number;
 }
 
 export interface TurboMetrics {
@@ -118,7 +117,7 @@ export interface TurboMetrics {
   crosssellMrr: number;
   crosssellPontual: number;
   crosssellContratos: number;
-  crosssellPorCloser: CrosssellCloser[];
+  crosssellHistorico: CrosssellMes[];
   cxcsSolicitacoes: number;
   faturamentoPontual: number;
   pontualCommerceQtr: number;
@@ -139,14 +138,27 @@ export interface ReceitaChurnMes {
   churnPct: number;
 }
 
+export interface ChurnCliente {
+  nome: string;
+  valor: number;
+  abonado: boolean;
+}
+
 export interface SquadDetail {
   squad: string;
   mrr: number;
   pontual: number;
   ticketMedio: number;
   clientes: number;
-  churnPct: number;
+  churnPct: number;       // churn descontando abonados (abonar_churn != 'Sim')
   churnBrl: number;
+  churnTotalPct: number;  // churn total, sem descontar abonados
+  churnTotalBrl: number;
+  churnClientes: ChurnCliente[];
+  vendasMes: number;      // total de vendas de expansão (upsell/cross-sell) do mês
+  expansaoNrr: number;    // parcela da expansão abatida do churn p/ formar o NRR (5x → 1/5; à vista → integral)
+  nrrBrl: number;         // churn s/ abonados − abatimento (negativo = retenção líquida positiva)
+  nrrPct: number;
   mrrBase: number;
   evolucaoMrr: number;
 }
