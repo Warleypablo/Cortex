@@ -1,4 +1,5 @@
 // client/src/components/creators-modelo/EvolucaoLtLtv.tsx
+import { Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
@@ -15,6 +16,17 @@ function fmtMes(m: string): string {
 const fmtLt = (v: number | null) => (v == null ? "—" : `${v} m`);
 const fmtLtv = (v: number | null) => (v == null ? "—" : formatCurrencyNoDecimals(v));
 
+const LINHAS: Array<{ label: string; get: (x: ModMetric) => string; forte?: boolean }> = [
+  { label: "Clientes", get: (x) => String(x.clientes) },
+  { label: "LT", get: (x) => fmtLt(x.lt) },
+  { label: "LTV", get: (x) => fmtLtv(x.ltv), forte: true },
+];
+
+const GRUPOS: Array<{ key: "recorrente" | "pontual"; label: string; cor: string; barra: string }> = [
+  { key: "recorrente", label: "Recorrente", cor: "text-sky-600 dark:text-sky-400", barra: "bg-sky-500" },
+  { key: "pontual", label: "Pontual", cor: "text-indigo-600 dark:text-indigo-400", barra: "bg-indigo-500" },
+];
+
 export function EvolucaoLtLtv() {
   const { data } = useQuery({
     queryKey: ["/api/creators-modelo/evolucao"],
@@ -22,8 +34,8 @@ export function EvolucaoLtLtv() {
   });
 
   const th = "px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-zinc-500";
-  const tdNum = "px-3 py-2.5 text-right tabular-nums text-gray-900 dark:text-zinc-100";
-  const bl = "border-l border-gray-100 dark:border-zinc-800/50";
+  const td = "px-3 py-2.5 text-right tabular-nums text-gray-900 dark:text-zinc-100";
+  const meses = data?.meses ?? [];
 
   return (
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
@@ -42,34 +54,34 @@ export function EvolucaoLtLtv() {
           <table className="w-full text-sm">
             <thead>
               <tr className="border-b border-gray-200 dark:border-zinc-700/50">
-                <th className={`${th} text-left`} rowSpan={2}>Mês</th>
-                <th className={`${th} text-center ${bl}`} colSpan={3}>
-                  <span className="text-sky-600 dark:text-sky-400">Recorrente</span>
-                </th>
-                <th className={`${th} text-center ${bl}`} colSpan={3}>
-                  <span className="text-indigo-600 dark:text-indigo-400">Pontual</span>
-                </th>
-              </tr>
-              <tr className="border-b border-gray-200 dark:border-zinc-700/50">
-                <th className={`${th} text-right ${bl}`}>Clientes</th>
-                <th className={`${th} text-right`}>LT</th>
-                <th className={`${th} text-right`}>LTV</th>
-                <th className={`${th} text-right ${bl}`}>Clientes</th>
-                <th className={`${th} text-right`}>LT</th>
-                <th className={`${th} text-right`}>LTV</th>
+                <th className={`${th} text-left`}>Métrica</th>
+                {meses.map((m) => (
+                  <th key={m.mes} className={`${th} text-right`}>{fmtMes(m.mes)}</th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {data.meses.map((m) => (
-                <tr key={m.mes} className="border-b border-gray-100 last:border-0 dark:border-zinc-800/50">
-                  <td className="px-3 py-2.5 font-medium text-gray-900 dark:text-zinc-100">{fmtMes(m.mes)}</td>
-                  <td className={`${tdNum} ${bl}`}>{m.recorrente.clientes}</td>
-                  <td className={tdNum}>{fmtLt(m.recorrente.lt)}</td>
-                  <td className={`${tdNum} font-semibold`}>{fmtLtv(m.recorrente.ltv)}</td>
-                  <td className={`${tdNum} ${bl}`}>{m.pontual.clientes}</td>
-                  <td className={tdNum}>{fmtLt(m.pontual.lt)}</td>
-                  <td className={`${tdNum} font-semibold`}>{fmtLtv(m.pontual.ltv)}</td>
-                </tr>
+              {GRUPOS.map((g) => (
+                <Fragment key={g.key}>
+                  <tr className="bg-gray-50/70 dark:bg-zinc-800/30">
+                    <td colSpan={meses.length + 1} className="px-3 py-2">
+                      <span className="flex items-center gap-2">
+                        <span className={`inline-block h-3.5 w-1 rounded-full ${g.barra}`} />
+                        <span className={`text-xs font-semibold uppercase tracking-wide ${g.cor}`}>{g.label}</span>
+                      </span>
+                    </td>
+                  </tr>
+                  {LINHAS.map((l) => (
+                    <tr key={l.label} className="border-b border-gray-100 last:border-0 dark:border-zinc-800/50">
+                      <td className="px-3 py-2.5 text-gray-500 dark:text-zinc-400">{l.label}</td>
+                      {meses.map((m) => (
+                        <td key={m.mes} className={`${td}${l.forte ? " font-semibold" : ""}`}>
+                          {l.get(m[g.key])}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </Fragment>
               ))}
             </tbody>
           </table>
