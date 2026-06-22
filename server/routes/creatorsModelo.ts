@@ -115,6 +115,8 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
           SELECT m, ${grainRec} AS uid,
             GREATEST(0,(fim - MIN(di)))/30.44 AS lt,
             SUM(vr * GREATEST(0,(fim - di))/30.44) AS ltv,
+            -- MRR ativo do mês = Σ valorr da base que está faturando (ativo/onboarding/triagem)
+            SUM(vr) FILTER (WHERE status IN ('ativo','onboarding','triagem')) AS mrr,
             bool_or(status IN ('ativo','onboarding','triagem','pausado')) AS tem_ativo,
             bool_or(status IN ('cancelado/inativo','em cancelamento')) AS tem_cancel
           FROM snap WHERE vr > 0 GROUP BY m, fim, ${grainRec}
@@ -127,24 +129,38 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
             bool_or(status IN ('cancelado/inativo','não usar')) AS tem_cancel
           FROM snap WHERE vp > 0 GROUP BY m, id_task
         ),
+        -- Faturamento pontual = entregue NO mês: 1º snapshot em que cada entrega
+        -- (id_subtask) ficou 'entregue' marca o mês; soma o valorp nesse mês.
+        entregue_mes AS (
+          SELECT DISTINCT ON (id_subtask) id_subtask, id_task, m AS mes_ent, vp
+          FROM snap WHERE vp > 0 AND status = 'entregue' AND id_subtask IS NOT NULL
+          ORDER BY id_subtask, m
+        ),
         rec_agg AS (
           SELECT m, COUNT(*) AS cli, ${agg(sql`lt`)} AS lt, ${agg(sql`ltv`)} AS ltv,
-            SUM(ltv) AS fat
+            SUM(mrr) AS fat
           FROM rec_unit WHERE ${recPred} GROUP BY m
         ),
         pont_agg AS (
           SELECT m, COUNT(*) AS cli,
             ${agg(sql`CASE WHEN entregues >= 2 THEN entregues END`)} AS lt,
-            ${agg(sql`CASE WHEN entregues >= 2 THEN ltv END`)} AS ltv,
-            SUM(ltv) AS fat
+            ${agg(sql`CASE WHEN entregues >= 2 THEN ltv END`)} AS ltv
           FROM pont_unit WHERE ${pontPred} GROUP BY m
+        ),
+        pont_fat AS (
+          SELECT e.mes_ent AS m, SUM(e.vp) AS fat
+          FROM entregue_mes e
+          JOIN pont_unit pu ON pu.m = e.mes_ent AND pu.uid = e.id_task
+          WHERE ${pontPred}
+          GROUP BY e.mes_ent
         )
         SELECT mz.m AS mes,
           COALESCE(r.cli,0)::int AS rec_cli, r.lt AS rec_lt, r.ltv AS rec_ltv, r.fat AS rec_fat,
-          COALESCE(p.cli,0)::int AS pont_cli, p.lt AS pont_lt, p.ltv AS pont_ltv, p.fat AS pont_fat
+          COALESCE(p.cli,0)::int AS pont_cli, p.lt AS pont_lt, p.ltv AS pont_ltv, pf.fat AS pont_fat
         FROM (SELECT DISTINCT m FROM meses) mz
         LEFT JOIN rec_agg r ON r.m = mz.m
         LEFT JOIN pont_agg p ON p.m = mz.m
+        LEFT JOIN pont_fat pf ON pf.m = mz.m
         ORDER BY mz.m
       `);
       const r1 = (n: any) => (n == null ? null : Math.round(Number(n) * 10) / 10);
