@@ -171,19 +171,35 @@ export function buildUnitsPontual(
   rows: RawRow[], unidade: "cliente" | "contrato", hoje: string,
 ): Unit[] {
   if (unidade === "contrato") {
-    return rows.map((r) => {
-      // Lifetime (meses) = tempo de relação do contrato: início → encerramento
-      // (se houver) ou hoje (em produção / sem data_fim). Mesma régua do recorrente.
-      const emProducao = classifyEstadoPontual(r.status) === "em_producao";
-      const fim = emProducao || r.dataInconsistente || !r.dataFim ? hoje : r.dataFim;
-      return {
-        estado: classifyEstadoPontual(r.status),
-        lt: r.dataInicio ? mesesEntre(r.dataInicio, fim) : null,
-        nEntregas: 1,
-        ltv: r.valorp ?? 0,
-        idadeMeses: r.dataInicio ? mesesEntre(r.dataInicio, hoje) : 0,
-      };
-    });
+    // Pontual "por contrato": a jornada (id_task) é UM contrato, mesmo dividida
+    // em 4 entregas. Lifetime = tempo da 1ª à última entrega NÃO churnada
+    // (entregue/ativo/pausado). Entrega única → 0; jornada multi → span real.
+    const byJor = new Map<string, RawRow[]>();
+    for (const r of rows) {
+      const k = r.idTask ?? r.idSubtask ?? "";
+      (byJor.get(k) ?? byJor.set(k, []).get(k)!).push(r);
+    }
+    const units: Unit[] = [];
+    for (const [, items] of Array.from(byJor.entries())) {
+      const datasEntrega = items
+        .filter((r) => isEntregaElegivel(r.status))
+        .map((r) => r.dataInicio)
+        .filter((d): d is string => !!d)
+        .sort();
+      const lt = datasEntrega.length
+        ? mesesEntre(datasEntrega[0], datasEntrega[datasEntrega.length - 1])
+        : null;
+      const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
+      const ini = inicios[0] ?? null;
+      units.push({
+        estado: estadoClientePontual(items),
+        lt,
+        nEntregas: items.length,
+        ltv: items.reduce((s, r) => s + (r.valorp ?? 0), 0),
+        idadeMeses: ini ? mesesEntre(ini, hoje) : 0,
+      });
+    }
+    return units;
   }
   const byCli = new Map<string, RawRow[]>();
   for (const r of rows) {
