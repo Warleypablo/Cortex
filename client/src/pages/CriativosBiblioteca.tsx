@@ -469,16 +469,18 @@ export default function CriativosBiblioteca() {
                         {p ? fmtRoas(p.roas) : "—"}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground whitespace-nowrap">
-                        {formatDateBr(row.dataPostagem)}
+                        {p?.dataVeiculacao ? formatDateBr(p.dataVeiculacao) : formatDateBr(row.dataPostagem)}
                       </TableCell>
                       <TableCell>
-                        {row.adValidado ? (
+                        {!p ? (
+                          <span className="text-muted-foreground">—</span>
+                        ) : p.noAr ? (
                           <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                            Validado
+                            No ar
                           </Badge>
                         ) : (
                           <Badge variant="outline" className="text-muted-foreground">
-                            Pendente
+                            Pausado
                           </Badge>
                         )}
                       </TableCell>

@@ -56,6 +56,8 @@ export interface CreativeRawRow {
   vendas: number;
   clientesUnicos: number;
   receita: number;
+  noAr: boolean;              // algum ad vinculado ACTIVE no Meta
+  firstDelivery: string | null; // 1ª data com impressão (YYYY-MM-DD)
 }
 
 /** Agregação bruta por criativo (1 linha por TP que tenha pelo menos 1 ad vinculado). */
@@ -75,11 +77,19 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
         -- CTR de saída (outbound) — igual à aba Criativos
         SUM(COALESCE(i.outbound_clicks,0))                   AS clicks,
         SUM(COALESCE(i.video_3_sec_watched_actions,0))       AS v3s,
-        SUM(COALESCE(i.video_thruplay_watched_actions,0))    AS thruplay
+        SUM(COALESCE(i.video_thruplay_watched_actions,0))    AS thruplay,
+        MIN(i.date_start) FILTER (WHERE COALESCE(i.impressions,0) > 0) AS first_delivery
       FROM links l
       JOIN meta_ads.meta_insights_daily i
         ON i.ad_id = l.ad_id
        AND i.date_start >= $1::date AND i.date_start <= $2::date
+      GROUP BY l.creative_id
+    ),
+    -- "No ar" = algum ad vinculado está ACTIVE no Meta
+    ad_status AS (
+      SELECT l.creative_id, bool_or(a.effective_status = 'ACTIVE') AS no_ar
+      FROM links l
+      JOIN meta_ads.meta_ads a ON a.ad_id = l.ad_id
       GROUP BY l.creative_id
     ),
     crm AS (
@@ -118,10 +128,13 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
            COALESCE(crm.mqls,0)             AS mqls,
            COALESCE(crm.vendas,0)           AS vendas,
            COALESCE(crm.clientes_unicos,0)  AS clientes_unicos,
-           COALESCE(crm.receita,0)          AS receita
+           COALESCE(crm.receita,0)          AS receita,
+           ins.first_delivery::text AS first_delivery,
+           COALESCE(ad_status.no_ar, false) AS no_ar
     FROM cortex_core.creatives_library c
     JOIN ids ON ids.creative_id = c.id
     LEFT JOIN ins ON ins.creative_id = c.id
+    LEFT JOIN ad_status ON ad_status.creative_id = c.id
     LEFT JOIN crm ON crm.creative_id = c.id
     WHERE c.deleted_at IS NULL
   `;
@@ -150,6 +163,8 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
     vendas: Number(x.vendas) || 0,
     clientesUnicos: Number(x.clientes_unicos) || 0,
     receita: Number(x.receita) || 0,
+    noAr: x.no_ar === true,
+    firstDelivery: x.first_delivery ? String(x.first_delivery).slice(0, 10) : null,
   }));
 }
 
@@ -208,6 +223,8 @@ export async function getCreativePerformance(opts: { since: string; until: strin
       bodyTipo: r.bodyTipo,
       ctaTipo: r.ctaTipo,
       adCount: r.adCount,
+      noAr: r.noAr,
+      dataVeiculacao: r.firstDelivery,
       ...derive(r),
     }))
     .sort((a, b) => b.spend - a.spend);
