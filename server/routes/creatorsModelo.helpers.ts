@@ -484,6 +484,56 @@ export function avisoMaturidadePorRazao(
   return { recorrenteIdade: recIdade, pontualIdade: pontIdade, aviso: menor > 0 && maior / menor > 1.4 };
 }
 
+// ─── Task 5: novo payload do redesign ────────────────────────────────────────
+
+export interface RedesignPayload {
+  meta: { de: string | null; ate: string | null; hoje: string; nSequenciados: number; nAvulsos: number; pctSequenciados: number };
+  placar: Placar;
+  ltvMaduro: LtvMaduro;
+  mixMensal: MixMes[];
+  retencao: { funilVendido: FunilNivel[]; funilEntregue: FunilNivel[]; safra: SafraPonto[]; recompra: Recompra };
+  maturidade: { recorrenteIdade: number; pontualIdade: number; aviso: boolean };
+}
+
+export function buildRedesignPayload(
+  rows: RawRow[], opts: { de?: string; ate?: string; hoje: string },
+): RedesignPayload {
+  const { de, ate, hoje } = opts;
+  const periodo = aplicarPeriodo(rows, de, ate); // bug #2: período em TUDO
+
+  // cobertura sequenciado/avulso (reusa lógica existente)
+  const pontRows = periodo.filter((r) => classifyModelo(r) === "pontual");
+  const seqCli = new Set<string>(), avuCli = new Set<string>();
+  const byCli = new Map<string, RawRow[]>();
+  for (const r of pontRows) {
+    const k = r.idTask ?? r.idSubtask ?? "";
+    (byCli.get(k) ?? byCli.set(k, []).get(k)!).push(r);
+  }
+  for (const [k, items] of Array.from(byCli.entries())) {
+    if (items.some((r) => isSequenciado(r.servico))) seqCli.add(k); else avuCli.add(k);
+  }
+  const pontParaFunil = toPontRows(periodo.filter((r) => classifyModelo(r) === "pontual"));
+  const mat = avisoMaturidadePorRazao(periodo, hoje);
+
+  return {
+    meta: {
+      de: de ?? null, ate: ate ?? null, hoje,
+      nSequenciados: seqCli.size, nAvulsos: avuCli.size,
+      pctSequenciados: (seqCli.size + avuCli.size) ? Math.round((seqCli.size / (seqCli.size + avuCli.size)) * 1000) / 10 : 0,
+    },
+    placar: buildPlacar(periodo, hoje),
+    ltvMaduro: buildLtvMaduro(periodo, hoje),
+    mixMensal: buildMixMensal(periodo),
+    retencao: {
+      funilVendido: buildFunil(toJornadas(pontParaFunil, "vendido")),
+      funilEntregue: buildFunil(toJornadas(pontParaFunil, "entregue")),
+      safra: buildSobrevivenciaSafra(periodo),
+      recompra: buildRecompra(periodo),
+    },
+    maturidade: mat,
+  };
+}
+
 export function buildCreatorsModeloPayload(
   rows: RawRow[], opts: { de?: string; ate?: string; hoje: string },
 ): CreatorsModeloPayload {
