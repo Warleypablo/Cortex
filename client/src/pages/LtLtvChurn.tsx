@@ -11,6 +11,8 @@ import { DistLtContratos } from "@/components/lt-ltv-churn/DistLtContratos";
 import { EvolucaoProduto } from "@/components/lt-ltv-churn/EvolucaoProduto";
 import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import type { OverviewData, ProdutoBenchmark } from "@/components/lt-ltv-churn/types";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { TabelaLtLtv } from "@/components/creators-modelo/TabelaLtLtv";
 import { EvolucaoLtLtv } from "@/components/creators-modelo/EvolucaoLtLtv";
 import type { RedesignPayload, Unidade, Agregador, Situacao } from "@/components/creators-modelo/types";
@@ -23,6 +25,8 @@ export default function LtLtvChurn() {
   const [agregador, setAgregador] = useState<Agregador>("media");
   const [estado, setEstado] = useState<Situacao>("ambos");
   const [periodo, setPeriodo] = useState<string>("tudo"); // "tudo" | "2026" | "2025"
+  const [incluirUnicas, setIncluirUnicas] = useState(false); // incluir entrega única no LT/LTV
+  const incluirUnicasParam = incluirUnicas ? "1" : undefined;
 
   const anoAtual = new Date().getFullYear();
   const anos = [anoAtual, anoAtual - 1].map(String);
@@ -46,8 +50,8 @@ export default function LtLtvChurn() {
 
   // Sub-aba "Creators: Recorrente × Pontual" — serviço de Creators.
   const { data: creators } = useQuery({
-    queryKey: ["/api/creators-modelo", de, ate],
-    queryFn: () => fetchJson<RedesignPayload>(buildUrl("/api/creators-modelo", { de, ate })),
+    queryKey: ["/api/creators-modelo", de, ate, incluirUnicasParam],
+    queryFn: () => fetchJson<RedesignPayload>(buildUrl("/api/creators-modelo", { de, ate, incluirUnicas: incluirUnicasParam })),
   });
 
   const produtos = benchmark?.produtos.map((p) => p.produto).filter(Boolean) ?? [];
@@ -136,13 +140,19 @@ export default function LtLtvChurn() {
                 ))}
               </SelectContent>
             </Select>
+            <div className="flex items-center gap-2 rounded-md border border-gray-200 bg-white px-3 py-1.5 dark:border-zinc-700/50 dark:bg-zinc-900/50">
+              <Switch id="incluir-unicas" checked={incluirUnicas} onCheckedChange={setIncluirUnicas} />
+              <Label htmlFor="incluir-unicas" className="cursor-pointer text-sm text-gray-600 dark:text-zinc-300">
+                Incluir entregas únicas
+              </Label>
+            </div>
           </div>
           {!creators ? (
             <div className="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
           ) : (
-            <TabelaLtLtv data={creators} unidade={unidade} agregador={agregador} estado={estado} de={de} ate={ate} />
+            <TabelaLtLtv data={creators} unidade={unidade} agregador={agregador} estado={estado} de={de} ate={ate} incluirUnicas={incluirUnicas} />
           )}
-          <EvolucaoLtLtv unidade={unidade} agregador={agregador} estado={estado} de={de} ate={ate} />
+          <EvolucaoLtLtv unidade={unidade} agregador={agregador} estado={estado} de={de} ate={ate} incluirUnicas={incluirUnicas} />
         </TabsContent>
       </Tabs>
     </div>
