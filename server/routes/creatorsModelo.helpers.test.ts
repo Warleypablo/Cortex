@@ -115,6 +115,19 @@ describe("buildUnitsRecorrente", () => {
     expect(units[0].lt).toBeNull();   // único fim é inconsistente → sem span válido
     expect(units[0].ltv).toBe(5000);  // LTV ainda soma
   });
+  it("ignora 'fantasma' recorrente (entregue/ltv null) do balde ativo", () => {
+    const units = buildUnitsRecorrente(
+      [
+        // ativo real
+        row({ idTask: "A", tipoReceita: "recorrente", valorr: 1000, ltMeses: 3, ltvRecorrente: 3000, isAtivo: true, isChurned: false, status: "ativo", dataInicio: "2026-03-01" }),
+        // fantasma: status entregue, ltv null, não-ativo não-churned → NÃO conta
+        row({ idTask: "B", tipoReceita: "recorrente", valorr: 1000, ltMeses: null, ltvRecorrente: null, isAtivo: false, isChurned: false, status: "entregue", dataInicio: "2026-03-01" }),
+      ],
+      "contrato", "2026-06-21",
+    );
+    expect(units).toHaveLength(1);       // só o ativo real
+    expect(units[0].ltv).toBe(3000);
+  });
 });
 
 describe("buildUnitsPontual", () => {

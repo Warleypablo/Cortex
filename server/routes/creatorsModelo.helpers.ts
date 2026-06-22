@@ -33,9 +33,16 @@ export function classifyModelo(r: RawRow): Modelo | null {
   return null;
 }
 
-/** Recorrente: 2 estados. Churned = cancelado; o resto = ativo. */
-export function classifyEstadoRecorrente(r: RawRow): EstadoRec {
-  return r.isChurned ? "cancelado" : "ativo";
+/**
+ * Recorrente: ativo (assinatura viva) / cancelado / null (descartar).
+ * Bug #1: status 'entregue'/'em cancelamento' com ltv_recorrente NULL NÃO são
+ * "ativo" — a view marca como não-churned, mas não têm valor realizado. Usa
+ * is_ativo (status ativo/onboarding/triagem/pausado) para o balde ativo.
+ */
+export function classifyEstadoRecorrente(r: RawRow): "ativo" | "cancelado" | null {
+  if (r.isChurned) return "cancelado";
+  if (r.isAtivo) return "ativo";
+  return null; // fantasma (ex.: recorrente 'entregue') — fora dos baldes
 }
 
 /** Pontual: 3 estados. 'entregue'=sucesso, cancelado/inativo|não usar=churn, resto=em produção. */
@@ -89,13 +96,16 @@ export function buildUnitsRecorrente(
   rows: RawRow[], unidade: "cliente" | "contrato", hoje: string,
 ): Unit[] {
   if (unidade === "contrato") {
-    return rows.map((r) => ({
-      estado: classifyEstadoRecorrente(r),
-      lt: r.dataInconsistente || r.ltMeses == null ? null : r.ltMeses,
-      nEntregas: 0,
-      ltv: r.ltvRecorrente ?? 0,
-      idadeMeses: r.dataInicio ? mesesEntre(r.dataInicio, hoje) : 0,
-    }));
+    return rows
+      .map((r) => ({ r, estado: classifyEstadoRecorrente(r) }))
+      .filter((x): x is { r: RawRow; estado: "ativo" | "cancelado" } => x.estado !== null)
+      .map(({ r, estado }) => ({
+        estado,
+        lt: r.dataInconsistente || r.ltMeses == null ? null : r.ltMeses,
+        nEntregas: 0,
+        ltv: r.ltvRecorrente ?? 0,
+        idadeMeses: r.dataInicio ? mesesEntre(r.dataInicio, hoje) : 0,
+      }));
   }
   // por cliente: agrega por idTask
   const byCli = new Map<string, RawRow[]>();
@@ -105,7 +115,10 @@ export function buildUnitsRecorrente(
   }
   const units: Unit[] = [];
   for (const [, items] of Array.from(byCli.entries())) {
-    const ativo = items.some((r) => !r.isChurned);
+    const temAtivo = items.some((r) => classifyEstadoRecorrente(r) === "ativo");
+    const temCancelado = items.some((r) => classifyEstadoRecorrente(r) === "cancelado");
+    if (!temAtivo && !temCancelado) continue; // cliente só com fantasmas → fora
+    const ativo = temAtivo;
     const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
     // Cancelados: só data_fim de contratos consistentes (data_inconsistente =
     // data_fim < data_inicio corrompe o span). Espelha a régua de ltLtvChurn
