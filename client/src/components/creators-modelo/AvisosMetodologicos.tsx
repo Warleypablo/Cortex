@@ -18,7 +18,7 @@ export function AvisosMetodologicos({
     `Funil de 4 entregas cobre só ${meta.pctSequenciados}% dos clientes pontuais (${meta.nSequenciados} sequenciados); os outros ${meta.nAvulsos} são compra única (ver card de recompra).`,
   );
   avisos.push(
-    "LT em meses do pontual é pouco informativo (contratos datados na venda) — leia o pontual por nº de entregas.",
+    "LT em meses não se aplica ao pontual (modelo transacional — a maioria compra uma única vez), por isso aparece “—”. Leia o pontual por nº de entregas, LTV e idade média.",
   );
 
   return (
