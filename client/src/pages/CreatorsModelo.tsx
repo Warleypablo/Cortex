@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { fetchJson, buildUrl } from "@/components/creators-modelo/utils";
-import type { RedesignPayload, Unidade, Agregador } from "@/components/creators-modelo/types";
+import type { RedesignPayload } from "@/components/creators-modelo/types";
 import { PlacarDecisao } from "@/components/creators-modelo/PlacarDecisao";
 import { MixReceitaTempo } from "@/components/creators-modelo/MixReceitaTempo";
 import { LtvMaturidade } from "@/components/creators-modelo/LtvMaturidade";
@@ -25,9 +25,6 @@ export default function CreatorsModelo() {
   useSetPageInfo("Creators: Recorrente × Pontual", "Vale mais pontual ou recorrente?");
   const [de, setDe] = useState("todos");
   const [ate, setAte] = useState("todos");
-  // Controles da aba "Tabela LT/LTV"
-  const [unidade, setUnidade] = useState<Unidade>("cliente");
-  const [agregador, setAgregador] = useState<Agregador>("media");
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/creators-modelo", de, ate],
@@ -35,28 +32,32 @@ export default function CreatorsModelo() {
       de: de === "todos" ? undefined : de, ate: ate === "todos" ? undefined : ate,
     })),
   });
-  const trig = "w-[150px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50";
+  const trig = "w-[140px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50";
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        <Select value={de} onValueChange={setDe}>
-          <SelectTrigger className={trig}><SelectValue placeholder="De" /></SelectTrigger>
-          <SelectContent><SelectItem value="todos">Início: tudo</SelectItem>{MESES.map((m) => <SelectItem key={m} value={m}>De {m}</SelectItem>)}</SelectContent>
-        </Select>
-        <Select value={ate} onValueChange={setAte}>
-          <SelectTrigger className={trig}><SelectValue placeholder="Até" /></SelectTrigger>
-          <SelectContent><SelectItem value="todos">Até: tudo</SelectItem>{MESES.map((m) => <SelectItem key={m} value={m}>Até {m}</SelectItem>)}</SelectContent>
-        </Select>
-      </div>
       {isLoading || !data ? (
         <div className="h-24 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
       ) : (
         <Tabs defaultValue="decisao" className="space-y-6">
-          <TabsList>
-            <TabsTrigger value="decisao">Decisão</TabsTrigger>
-            <TabsTrigger value="tabela">Tabela LT/LTV</TabsTrigger>
-          </TabsList>
+          {/* Header único: abas à esquerda, período à direita */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <TabsList>
+              <TabsTrigger value="decisao">Decisão</TabsTrigger>
+              <TabsTrigger value="tabela">Tabela LT/LTV</TabsTrigger>
+            </TabsList>
+            <div className="flex flex-wrap items-center gap-2">
+              <Select value={de} onValueChange={setDe}>
+                <SelectTrigger className={trig}><SelectValue placeholder="De" /></SelectTrigger>
+                <SelectContent><SelectItem value="todos">Início: tudo</SelectItem>{MESES.map((m) => <SelectItem key={m} value={m}>De {m}</SelectItem>)}</SelectContent>
+              </Select>
+              <Select value={ate} onValueChange={setAte}>
+                <SelectTrigger className={trig}><SelectValue placeholder="Até" /></SelectTrigger>
+                <SelectContent><SelectItem value="todos">Até: tudo</SelectItem>{MESES.map((m) => <SelectItem key={m} value={m}>Até {m}</SelectItem>)}</SelectContent>
+              </Select>
+            </div>
+          </div>
+
           <TabsContent value="decisao" className="space-y-6">
             <PlacarDecisao data={data} />
             <MixReceitaTempo data={data} />
@@ -64,24 +65,8 @@ export default function CreatorsModelo() {
             <Retencao data={data} />
             <LeituraRecomendada data={data} />
           </TabsContent>
-          <TabsContent value="tabela" className="space-y-4">
-            <div className="flex flex-wrap items-center justify-end gap-2">
-              <Select value={unidade} onValueChange={(v) => setUnidade(v as Unidade)}>
-                <SelectTrigger className={trig}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="cliente">Por cliente</SelectItem>
-                  <SelectItem value="contrato">Por contrato</SelectItem>
-                </SelectContent>
-              </Select>
-              <Select value={agregador} onValueChange={(v) => setAgregador(v as Agregador)}>
-                <SelectTrigger className={trig}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="media">Média</SelectItem>
-                  <SelectItem value="mediana">Mediana</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <TabelaLtLtv data={data} unidade={unidade} agregador={agregador} />
+          <TabsContent value="tabela">
+            <TabelaLtLtv data={data} />
           </TabsContent>
         </Tabs>
       )}

@@ -1,5 +1,7 @@
 // client/src/components/creators-modelo/TabelaLtLtv.tsx
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import type { RedesignPayload, Grupo, Unidade, Agregador } from "./types";
 
@@ -8,11 +10,10 @@ const MODELOS: Array<{ modelo: "recorrente" | "pontual"; label: string; cor: str
   { modelo: "pontual", label: "Pontual", cor: "text-indigo-600 dark:text-indigo-400", barra: "bg-indigo-500" },
 ];
 
-export function TabelaLtLtv({
-  data, unidade, agregador,
-}: {
-  data: RedesignPayload; unidade: Unidade; agregador: Agregador;
-}) {
+export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
+  const [unidade, setUnidade] = useState<Unidade>("cliente");
+  const [agregador, setAgregador] = useState<Agregador>("media");
+
   const grupos = data.tabela?.[unidade] ?? [];
   const total = (modelo: string): Grupo | undefined =>
     grupos.find((g) => g.modelo === modelo && g.estado === "total");
@@ -25,15 +26,36 @@ export function TabelaLtLtv({
   const thNum = th + " text-right";
   const td = "px-4 py-4 text-gray-900 dark:text-zinc-100";
   const tdNum = td + " text-right tabular-nums";
+  const trig = "w-[140px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50";
 
   return (
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
       <CardHeader>
-        <CardTitle className="text-base">LT &amp; LTV — Recorrente × Pontual</CardTitle>
-        <p className="text-xs text-gray-500 dark:text-zinc-400">
-          {unidade === "cliente" ? "Por cliente" : "Por contrato"} · {agregador === "media" ? "Média" : "Mediana"}
-          {" "}· LTV recorrente = realizado até hoje · LT pontual = tempo entre entregas elegíveis
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle className="text-base">LT &amp; LTV — Recorrente × Pontual</CardTitle>
+            <p className="text-xs text-gray-500 dark:text-zinc-400">
+              {unidade === "cliente" ? "Por cliente" : "Por contrato"} · {agregador === "media" ? "Média" : "Mediana"}
+              {" "}· LTV recorrente = realizado até hoje · LT pontual = tempo entre entregas elegíveis
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            <Select value={unidade} onValueChange={(v) => setUnidade(v as Unidade)}>
+              <SelectTrigger className={trig}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cliente">Por cliente</SelectItem>
+                <SelectItem value="contrato">Por contrato</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={agregador} onValueChange={(v) => setAgregador(v as Agregador)}>
+              <SelectTrigger className={trig}><SelectValue /></SelectTrigger>
+              <SelectContent>
+                <SelectItem value="media">Média</SelectItem>
+                <SelectItem value="mediana">Mediana</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         <table className="w-full text-sm">
