@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-21 | refactor(sync-jobs): job único 12h roda todas as plataformas de ads juntas
+
+**O que foi feito:**
+- Consolidados os jobs de sync de mídia paga num **único job a cada 12h** que roda **Meta + Google + TikTok + LinkedIn juntos**, em paralelo e isolados (`Promise.allSettled` — uma plataforma falhar não derruba as outras). Antes eram 5 jobs separados (Meta 6h + 3 escalonados).
+- Novo `server/services/adsSyncAll.ts` (`syncAllAdsPlatforms`) — orquestrador reusável pelo job agendado e pelo runner manual.
+- `scripts/run-all-ads-sync.ts` passou a reusar o orquestrador (uma fonte da verdade).
+- Preserva `__metaSyncStatus` para o endpoint `/api/meta-ads/sync-status`.
+
+**Por que:**
+- A pedido: todas as plataformas no mesmo ciclo; 12h é suficiente para dado diário e mais gentil com o rate-limit das APIs. O job de keywords da agência (schema `google_ads`) fica à parte.
+
+**Arquivos alterados:**
+- `server/services/adsSyncAll.ts` (novo) · `server/index.ts` (Meta 6h → job unificado 12h; remove os 3 blocos por plataforma) · `scripts/run-all-ads-sync.ts` (reusa o serviço).
+
+**Impacto arquitetural:** Um ponto único de orquestração dos 4 canais de ads.
+
+---
+
 ## 2026-06-21 | feat(sync-jobs): syncs de Google/TikTok/LinkedIn agendados + fix Google Ads API v21
 
 **O que foi feito:**
