@@ -128,18 +128,20 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
           FROM snap WHERE vp > 0 GROUP BY m, id_task
         ),
         rec_agg AS (
-          SELECT m, COUNT(*) AS cli, ${agg(sql`lt`)} AS lt, ${agg(sql`ltv`)} AS ltv
+          SELECT m, COUNT(*) AS cli, ${agg(sql`lt`)} AS lt, ${agg(sql`ltv`)} AS ltv,
+            SUM(ltv) AS fat
           FROM rec_unit WHERE ${recPred} GROUP BY m
         ),
         pont_agg AS (
           SELECT m, COUNT(*) AS cli,
             ${agg(sql`CASE WHEN entregues >= 2 THEN entregues END`)} AS lt,
-            ${agg(sql`CASE WHEN entregues >= 2 THEN ltv END`)} AS ltv
+            ${agg(sql`CASE WHEN entregues >= 2 THEN ltv END`)} AS ltv,
+            SUM(ltv) AS fat
           FROM pont_unit WHERE ${pontPred} GROUP BY m
         )
         SELECT mz.m AS mes,
-          COALESCE(r.cli,0)::int AS rec_cli, r.lt AS rec_lt, r.ltv AS rec_ltv,
-          COALESCE(p.cli,0)::int AS pont_cli, p.lt AS pont_lt, p.ltv AS pont_ltv
+          COALESCE(r.cli,0)::int AS rec_cli, r.lt AS rec_lt, r.ltv AS rec_ltv, r.fat AS rec_fat,
+          COALESCE(p.cli,0)::int AS pont_cli, p.lt AS pont_lt, p.ltv AS pont_ltv, p.fat AS pont_fat
         FROM (SELECT DISTINCT m FROM meses) mz
         LEFT JOIN rec_agg r ON r.m = mz.m
         LEFT JOIN pont_agg p ON p.m = mz.m
@@ -149,8 +151,8 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       const r0 = (n: any) => (n == null ? null : Math.round(Number(n)));
       const meses = (result.rows as any[]).map((r) => ({
         mes: r.mes,
-        recorrente: { clientes: Number(r.rec_cli), lt: r1(r.rec_lt), ltv: r0(r.rec_ltv) },
-        pontual: { clientes: Number(r.pont_cli), lt: r1(r.pont_lt), ltv: r0(r.pont_ltv) },
+        recorrente: { clientes: Number(r.rec_cli), lt: r1(r.rec_lt), ltv: r0(r.rec_ltv), faturamento: r0(r.rec_fat) },
+        pontual: { clientes: Number(r.pont_cli), lt: r1(r.pont_lt), ltv: r0(r.pont_ltv), faturamento: r0(r.pont_fat) },
       }));
       res.json({ meses });
     } catch (error) {
