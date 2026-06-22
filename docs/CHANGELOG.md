@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-22 | feat(ads-creation): lote completo b1c1 (h1–h9) do CRM Recompra na camp FLASH CRM
+
+**O que foi feito:**
+- `subir-crm-flash.ts` generalizado de 1 ad p/ o lote **b1c1 inteiro** (TP1630–TP1638, hooks h1–h9), todos pareados 9x16+4x5 e PAUSED no mesmo conjunto pré-setado da campanha CBO FLASH CRM
+- Idempotente (pula ads que já existem pelo TP/nome) + resiliente à quota dev-tier: em rate-limit duro (80004/80014) espera 5min e tenta de novo (até 8x/ad), re-rodar continua de onde parou
+- Vídeos referenciados por `video_id` (mapa TP→{9x16,4x5} embutido, das subidas manuais do Gerenciador)
+
+**Por que:**
+- O usuário pediu pra subir TODOS os ads de CRM Recompra que já estão no Gerenciador, no mesmo padrão do h1b1c1. Hoje só o conjunto b1c1 (h1–h9) está com vídeo no Meta
+
+**Arquivos alterados:**
+- `subir-crm-flash.ts` - vira lote (loop TP1630–1638) com backoff de rate-limit
+
+**Impacto arquitetural:** Nenhum — script one-off de criação de ads via Meta API.
+
+---
+
 ## 2026-06-22 | chore(ads-creation): script one-off do ad CRM Recompra h1b1c1 na camp FLASH CRM (CBO)
 
 **O que foi feito:**
