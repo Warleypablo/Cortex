@@ -20,6 +20,12 @@ export interface Grupo { modelo: "recorrente" | "pontual"; estado: string; metri
 export type Unidade = "cliente" | "contrato";
 export type Agregador = "media" | "mediana";
 export type Situacao = "ambos" | "ativo" | "cancelado";
+export interface EntregaDetalhe { servico: string; status: string | null; dataInicio: string | null; dataFim: string | null; valor: number; }
+export interface ClienteDetalhe {
+  idTask: string; nome: string | null; estado: string;
+  nEntregas: number; ltMeses: number | null; ltv: number;
+  entregas: EntregaDetalhe[];
+}
 export interface RedesignPayload {
   meta: { de: string | null; ate: string | null; hoje: string; nSequenciados: number; nAvulsos: number; pctSequenciados: number };
   placar: Placar;
