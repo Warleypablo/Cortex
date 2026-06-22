@@ -34,7 +34,9 @@ export function EvolucaoAuditoriaDrawer({
       fetchJson<Resp>(buildUrl("/api/creators-modelo/evolucao/clientes", { modelo: modelo!, mes: mes!, estado: estadoParam, de, ate })),
   });
 
-  const clientes = data?.clientes ?? [];
+  // só quem contribui de alguma forma p/ a meta: tem receita realizada (≥1 entregue
+  // no pontual; LTV realizado no recorrente). Tira quem está na base mas não entregou nada.
+  const clientes = (data?.clientes ?? []).filter((c) => c.ltv > 0);
   const corModelo = modelo === "recorrente" ? "text-sky-600 dark:text-sky-400" : "text-indigo-600 dark:text-indigo-400";
   const isRec = modelo === "recorrente";
 
@@ -51,7 +53,7 @@ export function EvolucaoAuditoriaDrawer({
             Auditoria — <span className={corModelo}>{isRec ? "Recorrente" : "Pontual"}</span> · {fmtMes(mes)}
           </SheetTitle>
           <p className="text-xs text-gray-500 dark:text-zinc-400">
-            {isLoading ? "Carregando…" : `${clientes.length} clientes na base do snapshot · `}
+            {isLoading ? "Carregando…" : `${clientes.length} clientes contribuindo (receita realizada) · `}
             {isRec
               ? "LT = idade da base (meses) · LTV = realizado (valorr × meses)"
               : "LT = nº de entregas entregues (1 = 1 mês; entrega única fora do LT) · LTV = realizado (só entregues)"}
