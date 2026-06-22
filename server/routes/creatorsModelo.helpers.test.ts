@@ -118,6 +118,13 @@ describe("buildUnitsRecorrente", () => {
     expect(units[0].lt).toBeNull();   // único fim é inconsistente → sem span válido
     expect(units[0].ltv).toBe(5000);  // LTV ainda soma
   });
+  it("por cliente: descarta cliente que só tem contrato fantasma", () => {
+    const units = buildUnitsRecorrente(
+      [row({ idTask: "G", tipoReceita: "recorrente", isAtivo: false, isChurned: false, status: "entregue", ltvRecorrente: null, dataInicio: "2026-03-01" })],
+      "cliente", HOJE,
+    );
+    expect(units).toHaveLength(0);
+  });
   it("ignora 'fantasma' recorrente (entregue/ltv null) do balde ativo", () => {
     const units = buildUnitsRecorrente(
       [
@@ -326,6 +333,11 @@ describe("buildPlacar", () => {
     expect(p.volume.pontualClientes).toBe(2);
     expect(p.volume.recorrenteClientes).toBe(2);
   });
+  it("recorrenteClientesAtivos conta só ativos (não blended)", () => {
+    const p = buildPlacar(rows, "2026-06-21");
+    expect(p.volume.recorrenteClientesAtivos).toBe(1); // só R1 (ativo)
+    expect(p.volume.recorrenteClientes).toBe(2);       // R1 + R2 (blended)
+  });
   it("break-even = LTV recorrente / ticket pontual (faixa)", () => {
     const p = buildPlacar(rows, "2026-06-21");
     expect(p.breakEven.ticketPontual).toBe(2000);     // média valorp entregues (1000+3000)/2
@@ -371,6 +383,10 @@ describe("buildSobrevivenciaSafra", () => {
 });
 
 describe("avisoMaturidadePorRazao", () => {
+  it("aviso false quando uma coorte está vazia (guard de divisão por zero)", () => {
+    const a = avisoMaturidadePorRazao([row({ tipoReceita: "recorrente", isAtivo: true, isChurned: false, status: "ativo", dataInicio: "2025-01-01" })], "2026-06-21");
+    expect(a.aviso).toBe(false);  // pontual ausente → menor=0 → guard
+  });
   it("acende quando uma coorte é >40% mais velha (corrige limiar absoluto)", () => {
     const rows = [
       row({ tipoReceita: "recorrente", isAtivo: true, isChurned: false, status: "ativo", dataInicio: "2025-01-01" }), // ~17m

@@ -15,15 +15,13 @@ export function LtvMaturidade({ data }: { data: RedesignPayload }) {
     { nome: "Pontual (realizado)", valor: data.placar.porCliente.pontual, cor: "#6366f1" },
     { nome: "Recorrente (blended)", valor: lt.realizadoBlended, cor: "#7dd3fc" },
     { nome: "Recorrente (ativos)", valor: lt.realizadoAtivo, cor: "#0ea5e9" },
-    { nome: "Recorrente (proj. churn)", valor: lt.projetadoChurn, cor: "#0369a1" },
   ];
   return (
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
       <CardHeader>
         <CardTitle className="text-base">LTV por cliente — ajustado por maturidade</CardTitle>
         <p className="text-xs text-gray-500 dark:text-zinc-400">
-          Pontual já é realizado. Recorrente vai da faixa realizado (blended → ativos) à projeção por churn
-          (premissa: vida média de {lt.premissaChurnMeses}m dos cancelados). Comparar maçã com maçã exige olhar a faixa, não o blended.
+          Pontual já é realizado. Recorrente vai do realizado blended ao realizado entre ativos (ainda subindo). Comparar maçã com maçã exige olhar a faixa, não só o blended.
         </p>
       </CardHeader>
       <CardContent>

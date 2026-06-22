@@ -28,7 +28,7 @@ export function PlacarDecisao({ data }: { data: RedesignPayload }) {
           <div className={big}>Pontual {formatCurrencyNoDecimals(vol.pontualReceita)}</div>
           <p className={sub}>
             {vol.pontualClientes} clientes pontuais · Recorrente {formatCurrencyNoDecimals(vol.recorrenteRealizado)} realizado
-            + {formatCurrencyNoDecimals(vol.recorrenteMrrCorrente)}/mês de MRR vivo ({vol.recorrenteClientes} clientes).
+            + {formatCurrencyNoDecimals(vol.recorrenteMrrCorrente)}/mês de MRR vivo ({vol.recorrenteClientesAtivos} ativos).
           </p>
         </CardContent>
       </Card>
