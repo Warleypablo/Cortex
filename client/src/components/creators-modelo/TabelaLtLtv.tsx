@@ -3,6 +3,7 @@ import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
+import { AuditoriaClientesDrawer } from "./AuditoriaClientesDrawer";
 import type { RedesignPayload, Grupo, Unidade, Agregador } from "./types";
 
 const MODELOS: Array<{ modelo: "recorrente" | "pontual"; label: string; cor: string; barra: string }> = [
@@ -10,9 +11,10 @@ const MODELOS: Array<{ modelo: "recorrente" | "pontual"; label: string; cor: str
   { modelo: "pontual", label: "Pontual", cor: "text-indigo-600 dark:text-indigo-400", barra: "bg-indigo-500" },
 ];
 
-export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
+export function TabelaLtLtv({ data, de, ate }: { data: RedesignPayload; de?: string; ate?: string }) {
   const [unidade, setUnidade] = useState<Unidade>("cliente");
   const [agregador, setAgregador] = useState<Agregador>("media");
+  const [drawerModelo, setDrawerModelo] = useState<"recorrente" | "pontual" | null>(null);
 
   const grupos = data.tabela?.[unidade] ?? [];
   const total = (modelo: string): Grupo | undefined =>
@@ -31,6 +33,7 @@ export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
   const trig = "w-[140px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50";
 
   return (
+    <>
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
       <CardHeader>
         <div className="flex flex-wrap items-start justify-between gap-3">
@@ -83,7 +86,15 @@ export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
                       <span className={`font-semibold ${cor}`}>{label}</span>
                     </span>
                   </td>
-                  <td className={tdNum}>{g.metricas.n}</td>
+                  <td className={tdNum}>
+                    <button
+                      onClick={() => setDrawerModelo(modelo)}
+                      className="font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
+                      title="Ver clientes e auditar entregas"
+                    >
+                      {g.metricas.n}
+                    </button>
+                  </td>
                   <td className={tdNum}>{lifetime(g)}</td>
                   <td className={`${tdNum} text-base font-bold`}>{formatCurrencyNoDecimals(ltv(g))}</td>
                 </tr>
@@ -93,5 +104,7 @@ export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
         </table>
       </CardContent>
     </Card>
+    <AuditoriaClientesDrawer modelo={drawerModelo} de={de} ate={ate} onClose={() => setDrawerModelo(null)} />
+    </>
   );
 }

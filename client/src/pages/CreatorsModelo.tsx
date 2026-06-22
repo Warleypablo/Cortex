@@ -66,7 +66,7 @@ export default function CreatorsModelo() {
             <LeituraRecomendada data={data} />
           </TabsContent>
           <TabsContent value="tabela">
-            <TabelaLtLtv data={data} />
+            <TabelaLtLtv data={data} de={de === "todos" ? undefined : de} ate={ate === "todos" ? undefined : ate} />
           </TabsContent>
         </Tabs>
       )}
