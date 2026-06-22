@@ -67,7 +67,7 @@ const DIAS_MES = 30.44;
 
 export interface Unit {
   estado: EstadoRec | EstadoPont;
-  lt: number | null;     // recorrente: meses; pontual: span em meses; null = não conta na média de LT
+  lt: number | null;     // recorrente: meses; pontual: nº de entregas entregues (1=1 mês); null = não conta na média de LT
   nEntregas: number;     // 0 para recorrente
   ltv: number;
   idadeMeses: number;
@@ -160,9 +160,9 @@ function estadoClientePontual(items: RawRow[]): EstadoPont {
 
 /**
  * Entrega efetivamente realizada = status 'entregue'. É a única que gera receita
- * reconhecida no pontual: o LTV conta só o que foi entregue, e o LT mede o span
- * entre a 1ª e a última entrega entregue. Triagem/onboarding/ativo/pausado são
- * pré-entrega (ainda não realizadas); cancelado/não usar nunca serão.
+ * reconhecida no pontual: o LTV conta só o que foi entregue e o LT conta quantas
+ * entregas foram feitas. Triagem/onboarding/ativo/pausado são pré-entrega (ainda
+ * não realizadas); cancelado/não usar nunca serão.
  */
 export function isEntregue(status: string | null): boolean {
   return (status ?? "").trim().toLowerCase() === "entregue";
@@ -174,16 +174,13 @@ export function ltvPontualRealizado(items: RawRow[]): number {
 }
 
 /**
- * LT pontual = span (meses) da 1ª à última entrega efetivamente entregue.
- * <2 entregas entregues → null (entrega única não tem span; não dilui a média).
+ * LT pontual simplificado: 1 entrega entregue = 1 mês. Conta as entregas com
+ * status 'entregue' (datas do pontual têm backfill, então span é pouco confiável).
+ * 0 entregues → null (sem lifetime realizado; fora da média).
  */
-export function ltPontualEntregue(items: RawRow[]): number | null {
-  const datas = items
-    .filter((r) => isEntregue(r.status))
-    .map((r) => r.dataInicio)
-    .filter((d): d is string => !!d)
-    .sort();
-  return datas.length >= 2 ? mesesEntre(datas[0], datas[datas.length - 1]) : null;
+export function ltPontualPorEntregas(items: RawRow[]): number | null {
+  const n = items.filter((r) => isEntregue(r.status)).length;
+  return n > 0 ? n : null;
 }
 
 export function buildUnitsPontual(
@@ -191,8 +188,8 @@ export function buildUnitsPontual(
 ): Unit[] {
   if (unidade === "contrato") {
     // Pontual "por contrato": a jornada (id_task) é UM contrato, mesmo dividida
-    // em 4 entregas. LTV = receita realizada (só entregas entregues); LT = span
-    // da 1ª à última entrega entregue (entrega única → null, não dilui a média).
+    // em 4 entregas. LTV = receita realizada (só entregas entregues); LT = nº de
+    // entregas entregues (1 entrega = 1 mês; 0 entregues → null, não dilui a média).
     const byJor = new Map<string, RawRow[]>();
     for (const r of rows) {
       const k = r.idTask ?? r.idSubtask ?? "";
@@ -204,7 +201,7 @@ export function buildUnitsPontual(
       const ini = inicios[0] ?? null;
       units.push({
         estado: estadoClientePontual(items),
-        lt: ltPontualEntregue(items),
+        lt: ltPontualPorEntregas(items),
         nEntregas: items.length,
         ltv: ltvPontualRealizado(items),
         idadeMeses: ini ? mesesEntre(ini, hoje) : 0,
@@ -221,11 +218,11 @@ export function buildUnitsPontual(
   for (const [, items] of Array.from(byCli.entries())) {
     const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
     const ini = inicios[0] ?? null;
-    // LTV = receita realizada (só entregas entregues); LT = span da 1ª à última
-    // entrega entregue. Espelha a régua do drawer de auditoria.
+    // LTV = receita realizada (só entregas entregues); LT = nº de entregas
+    // entregues (1 = 1 mês). Espelha a régua do drawer de auditoria.
     units.push({
       estado: estadoClientePontual(items),
-      lt: ltPontualEntregue(items),
+      lt: ltPontualPorEntregas(items),
       nEntregas: items.length,
       ltv: ltvPontualRealizado(items),
       idadeMeses: ini ? mesesEntre(ini, hoje) : 0,
@@ -677,10 +674,10 @@ export function buildClientesDetalhe(
       }
       ltv = Math.round(items.reduce((s, r) => s + (r.ltvRecorrente ?? 0), 0));
     } else {
-      // Pontual: LTV = receita realizada (só entregas entregues); LT = span da
-      // 1ª à última entrega entregue (<2 entregues → null, sem span mensurável).
+      // Pontual: LTV = receita realizada (só entregas entregues); LT = nº de
+      // entregas entregues (1 = 1 mês; 0 entregues → null).
       estado = estadoClientePontual(items);
-      lt = ltPontualEntregue(items);
+      lt = ltPontualPorEntregas(items);
       ltv = Math.round(ltvPontualRealizado(items));
     }
 
