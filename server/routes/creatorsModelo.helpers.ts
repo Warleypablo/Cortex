@@ -144,6 +144,16 @@ function estadoClientePontual(items: RawRow[]): EstadoPont {
   return "concluido";
 }
 
+/**
+ * Entrega "real"/em curso que conta para o LT-span do pontual: entregue, ativo
+ * ou pausado. Exclui pré-entrega (triagem/onboarding) e não-entregas
+ * (cancelado/inativo, não usar). Definição do usuário p/ "tempo entre entregas".
+ */
+export function isEntregaElegivel(status: string | null): boolean {
+  const s = (status ?? "").trim().toLowerCase();
+  return s === "entregue" || s === "ativo" || s === "pausado";
+}
+
 export function buildUnitsPontual(
   rows: RawRow[], unidade: "cliente" | "contrato", hoje: string,
 ): Unit[] {
@@ -163,12 +173,23 @@ export function buildUnitsPontual(
   }
   const units: Unit[] = [];
   for (const [, items] of Array.from(byCli.entries())) {
+    // LT do pontual = tempo entre a 1ª e a última ENTREGA elegível (entregue/
+    // ativo/pausado); exclui triagem/onboarding (pré-entrega) e cancelado/não
+    // usar. ~0 quando há uma única entrega; null quando não há entrega elegível.
+    const datasEntrega = items
+      .filter((r) => isEntregaElegivel(r.status))
+      .map((r) => r.dataInicio)
+      .filter((d): d is string => !!d)
+      .sort();
+    const lt = datasEntrega.length
+      ? mesesEntre(datasEntrega[0], datasEntrega[datasEntrega.length - 1])
+      : null;
+    // Idade = 1ª compra (qualquer status) → hoje.
     const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
     const ini = inicios[0] ?? null;
-    const ult = inicios[inicios.length - 1] ?? null;
     units.push({
       estado: estadoClientePontual(items),
-      lt: ini && ult ? mesesEntre(ini, ult) : 0,
+      lt,
       nEntregas: items.length,
       ltv: items.reduce((s, r) => s + (r.valorp ?? 0), 0),
       idadeMeses: ini ? mesesEntre(ini, hoje) : 0,
