@@ -41,9 +41,8 @@ export function TabelaLtLtv({ data, de, ate }: { data: RedesignPayload; de?: str
             <CardTitle className="text-base">Creators (serviço) — LT &amp; LTV Recorrente × Pontual</CardTitle>
             <p className="text-xs text-gray-500 dark:text-zinc-400">
               {unidade === "cliente" ? "Por cliente" : "Por contrato"} · {agregador === "media" ? "Média" : "Mediana"}
-              {" "}· LTV recorrente = realizado até hoje · Lifetime do pontual = {unidade === "cliente"
-                ? "tempo de relação (1ª compra → encerramento/hoje)"
-                : "span da 1ª à última entrega não churnada (só jornadas com 2+ entregas). ⚠️ datas têm backfill — pouco confiável"}
+              {" "}· LTV recorrente = realizado até hoje · LTV pontual = realizado (só entregas com status “entregue”)
+              {" "}· Lifetime do pontual = span da 1ª à última entrega entregue (só jornadas com 2+ entregues; entrega única não tem span). ⚠️ datas do pontual têm backfill — pouco confiável
             </p>
           </div>
           <div className="flex items-center gap-2">

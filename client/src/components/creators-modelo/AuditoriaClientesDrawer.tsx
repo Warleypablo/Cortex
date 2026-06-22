@@ -93,17 +93,33 @@ export function AuditoriaClientesDrawer({
                               </tr>
                             </thead>
                             <tbody>
-                              {c.entregas.map((e, i) => (
-                                <tr key={i} className="text-sm text-gray-700 dark:text-zinc-300">
-                                  <td className="px-2 py-1">{e.servico}</td>
-                                  <td className="px-2 py-1">{e.status ?? "—"}</td>
-                                  <td className="px-2 py-1 tabular-nums">{e.dataInicio ?? "—"}</td>
-                                  <td className="px-2 py-1 tabular-nums">{e.dataFim ?? "—"}</td>
-                                  <td className="px-2 py-1 text-right tabular-nums">{formatCurrencyNoDecimals(e.valor)}</td>
-                                </tr>
-                              ))}
+                              {c.entregas.map((e, i) => {
+                                const entregue = (e.status ?? "").trim().toLowerCase() === "entregue";
+                                return (
+                                  <tr key={i} className={`text-sm ${entregue ? "text-gray-700 dark:text-zinc-300" : "text-gray-400 line-through decoration-gray-300 dark:text-zinc-600 dark:decoration-zinc-700"}`}>
+                                    <td className="px-2 py-1">{e.servico}</td>
+                                    <td className="px-2 py-1">
+                                      {entregue
+                                        ? <span className="font-medium text-emerald-600 dark:text-emerald-400">{e.status}</span>
+                                        : (e.status ?? "—")}
+                                    </td>
+                                    <td className="px-2 py-1 tabular-nums">{e.dataInicio ?? "—"}</td>
+                                    <td className="px-2 py-1 tabular-nums">{e.dataFim ?? "—"}</td>
+                                    <td className="px-2 py-1 text-right tabular-nums">{formatCurrencyNoDecimals(e.valor)}</td>
+                                  </tr>
+                                );
+                              })}
                             </tbody>
                           </table>
+                          {modelo === "pontual" && (() => {
+                            const nEntregue = c.entregas.filter((e) => (e.status ?? "").trim().toLowerCase() === "entregue").length;
+                            return (
+                              <p className="mt-2 px-2 text-xs text-gray-500 dark:text-zinc-400">
+                                LTV = {formatCurrencyNoDecimals(c.ltv)} · soma só das {nEntregue} entrega{nEntregue === 1 ? "" : "s"} entregue{nEntregue === 1 ? "" : "s"} (de {c.entregas.length}).
+                                {" "}LT = span da 1ª à última entregue{c.ltMeses == null ? " — sem span (menos de 2 entregues)" : `: ${c.ltMeses} meses`}.
+                              </p>
+                            );
+                          })()}
                         </td>
                       </tr>
                     )}
