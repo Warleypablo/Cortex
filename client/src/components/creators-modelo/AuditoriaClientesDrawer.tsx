@@ -125,7 +125,7 @@ export function AuditoriaClientesDrawer({
                             return (
                               <p className="mt-2 px-2 text-xs text-gray-500 dark:text-zinc-400">
                                 LTV = {formatCurrencyNoDecimals(c.ltv)} · soma só das {nEntregue} entrega{nEntregue === 1 ? "" : "s"} entregue{nEntregue === 1 ? "" : "s"} (de {c.entregas.length}).
-                                {" "}LT = span da 1ª à última entregue{c.ltMeses == null ? " — sem span (menos de 2 entregues)" : `: ${c.ltMeses} meses`}.
+                                {" "}LT = nº de entregas entregues (1 = 1 mês){c.ltMeses == null ? " — sem entregas" : `: ${c.ltMeses} ${c.ltMeses === 1 ? "mês" : "meses"}`}.
                               </p>
                             );
                           })()}
