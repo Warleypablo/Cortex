@@ -1,0 +1,87 @@
+sumiu_em,primeiro_snapshot,data_inicio_contrato,cliente,servico,produto,status_quando_sumiu,mrr,pontual,responsavel,cs_responsavel,vendedor,registrado_em_cup_churn,id_subtask,id_task
+2026-05-19,2026-01-31,2026-01-30,(cliente deletado),AGCT,Gestão & Atendimento ,ativo,25000.00,0.00,André Musso,,,nao,86aeyh7nm,86aeyh70y
+2026-02-28,2026-02-13,2026-02-12,Beautyin,[DOWNSELL] Beautyin - Gestão de comunidade,Gestão de Comunidade,cancelado/inativo,15000.00,0.00,Debora Mund,Aline Souza,João Guarçoni Duarte,sim,86afbddx3,86adyx7h2
+2026-06-03,2026-06-03,,Amouh,,,ativo,14997.00,,,Deborah Guimaraes,,nao,manual-amouh,86ahhkgx8
+2026-05-28,2026-05-20,2026-05-19,Foco laser,Creators Recorrente,Creators,onboarding,14997.00,0.00,Larissa Farias,Deborah Guimaraes,Fabio Richard ,nao,86ahjpk2x,86ahjpk10
+2026-04-21,2026-04-17,2026-04-15,Creamy,Creators Recorrente - Enterprise,,triagem,13000.00,0.00,,,,nao,86agxchy7,86agr5akn
+2026-03-18,2026-03-04,2026-05-12,(cliente deletado),Creators - Recorrente - Enterprise,Creators - Recorrente,triagem,11997.00,0.00,,,Aline de Carvalho de Souza,nao,cortex-ci-1,cortex-ent-40
+2026-03-18,2026-03-17,,(cliente deletado),Creators - Recorrente - Enterprise,Creators - Recorrente,triagem,11997.00,0.00,,,Allan Eduardo Machado de Araujo Alencar,nao,cortex-ci-5,cortex-ent-1
+2026-03-26,2026-03-06,2026-03-04,Pozze,Creators Recorrente - Enterprise,Creators,ativo,8500.00,0.00,Roberto Fachetti,Lucas Antunes,,nao,86afxuwbk,86aejzrgq
+2026-06-16,2026-06-16,2026-06-15,DoutorFacil,Creators (A partir de 4 entregas) - Starter,,triagem,7500.00,0.00,,,,nao,86aj1wn1k,86aj1wmzf
+2026-02-23,2026-02-20,2026-02-19,IANIS,Creators Recorrente,,triagem,6997.00,0.00,,,,nao,86afj48ct,86adbvgpu
+2026-05-26,2026-05-19,2026-05-14,Desert Wear,Creators (A paritr de 4 entregas) - Scale,Creators,onboarding,6500.00,0.00,Mariana Dalto,Iasmyn Vimercati,Matheus Scalfoni,nao,86ahff98r,86ahff98j
+2026-05-26,2026-05-26,2026-05-21,Flico,Creators (A partir de 4 entregas) - Starter,Creators,triagem,5731.00,0.00,Julia Manhães,Iasmyn Vimercati,Ramon Souza,nao,86ahmedef,86ahmedc9
+2026-06-02,2026-05-27,2026-05-24,Flico,3ª Entrega - Creators - Starter,Creators,pausado,5731.00,0.00,Victor Klein,Iasmyn Vimercati,Ramon Souza,nao,86ahnujcu,86ahmedc9
+2026-06-02,2026-05-27,2026-05-24,Flico,2ª Entrega - Creators - Starter,Creators,pausado,5731.00,0.00,Victor Klein,Iasmyn Vimercati,Ramon Souza,nao,86ahnujaw,86ahmedc9
+2026-05-26,2026-05-22,2026-05-21,Maxor,Creators Recorrente - Starter,,triagem,5500.00,0.00,Ana Clara Cordeiro,Iasmyn Vimercati,Arthur Zon,nao,86ahm7jz4,86ahm7jxz
+2026-05-04,2025-12-27,2025-12-12,Sol de Verão,Creators Recorrente,Creators,ativo,5497.00,0.00,Mariana Dalto,Lucas Antunes,Fabio Richard ,nao,86adwygjq,86adwyghm
+2026-05-26,2026-05-22,2026-05-21,Gingah,Creators (A partir de 4 entregas) - Starter,,triagem,5497.00,0.00,,,,nao,86ahm7dbh,86ae8ybj0
+2026-05-28,2026-05-19,2026-05-17,CGSA,Creators (A partir de 4 entregas) - Starter,Creators,pausado,5497.00,0.00,,Iasmyn Vimercati,Fabio Richard ,nao,86ahhekej,86ahhekec
+2026-05-28,2026-04-15,2026-04-14,Clinibud,Creators Starter,Creators,ativo,5497.00,0.00,Lara Grobério,Deborah Guimaraes,Fabio Richard ,nao,86agvwwyq,86agvwwxj
+2026-03-19,2026-03-19,2026-03-18,(cliente deletado),Creators Recorrente - Scale,,triagem,3997.00,0.00,,,,nao,86ag917gc,86ag917et
+2026-03-23,2026-03-23,,(cliente deletado),Social Media - Enterprise,Social Media,triagem,3997.00,0.00,,,Warley Pablo Santos Pereira Da Silva,nao,cortex-ci-7,cortex-ent-40
+2026-05-28,2026-04-29,2026-04-28,LAB Genesis [PADOCA CURSOS],Gestão de Performance,Performance,ativo,3997.00,0.00,Gabriel Magno,Rayane Ambrósio,Fabio Richard ,nao,86ah582xp,86afqave7
+2026-05-27,2026-05-26,2026-05-25,Único desodorante,Gestão de performance - Starter,Performance,triagem,3497.00,0.00,Glauber Pereira da Silva,Deborah Guimaraes,Fabio Richard ,nao,86ahp1a6f,86ahp1a3v
+2026-06-10,2026-05-19,2026-05-17,CGSA,Social Media - Enterprise,Social Media,onboarding,3497.00,0.00,Pedro Paulo Cortines Barretto,Deborah Guimaraes,Fabio Richard ,nao,86ahheken,86ahhekec
+2026-02-04,2026-02-04,2026-02-03,MYDOC Brasil,Gestão de performance - Starter,,triagem,2997.00,0.00,,,,nao,86af24487,86aezdmum
+2026-02-10,2026-02-04,2026-02-03,MYDOC Brasil,Gestão de performance - Starter,,triagem,2997.00,0.00,,,,nao,86af244qu,86aezdmum
+2026-02-23,2026-01-28,2026-01-05,IANIS,Gestão de Performance - Dores,Performance,pausado,2997.00,0.00,Ismael Serafim,Deborah Guimaraes,Fabio Richard ,nao,86ae8r3vg,86adbvgpu
+2026-02-23,2026-01-28,2026-01-05,IANIS,Gestão de Performance - Detox,Performance,pausado,2997.00,0.00,Ismael Serafim; Gustavo S Pires,Deborah Guimaraes,Fabio Richard ,nao,86ae8ucdm,86adbvgpu
+2026-02-23,2026-01-28,2026-01-05,IANIS,Gestão de Performance - Libido,Performance,pausado,2997.00,0.00,Ismael Serafim; Gustavo S Pires,Deborah Guimaraes,Fabio Richard ,nao,86ae8r89n,86adbvgpu
+2026-03-18,2026-03-15,2026-03-13,Camiseta Preta,Gestão de performance - Starter,,triagem,2997.00,0.00,,,,nao,86ag5vefa,86ag53312
+2026-03-23,2026-03-18,2026-03-16,Camiseta Preta,Gestão de performance - Starter,,onboarding,2997.00,0.00,,,,nao,86ag74qat,86ag53312
+2026-04-14,2026-03-26,2026-03-25,Camiseta Preta,Gestão de performance - Starter,,triagem,2997.00,0.00,,,,nao,86age6apw,86ag53312
+2026-04-14,2026-03-28,2026-03-26,Camiseta Preta,Gestão de performance - Starter,,triagem,2997.00,0.00,,,,nao,86agf90qc,86ag53312
+2026-06-10,2026-06-09,2026-06-05,Tudo na Promo,Gestão de performance - Starter,Performance,triagem,2997.00,0.00,Rodrigo Padrao,Iasmyn Vimercati,Ramon Souza,nao,86ahxe2ra,86ahwejm9
+2026-06-10,2026-05-19,2026-05-17,CGSA,Gestão de performance - Starter,Performance,onboarding,2997.00,0.00,Pedro Antonio Silva Machado,Deborah Guimaraes,Fabio Richard ,nao,86ahhekem,86ahhekec
+2026-02-05,2026-02-05,2026-02-04,Mimo Prati,Gestão de performance - Starter,,triagem,2500.00,0.00,,,,nao,86af3epf4,86af3ef74
+2026-03-18,2026-03-15,2026-03-13,Camiseta Preta,Broadcast - Starter,,triagem,1997.00,0.00,,,,nao,86ag5veeh,86ag53312
+2026-03-23,2026-03-18,2026-03-16,Camiseta Preta,Broadcast - Starter,,onboarding,1997.00,0.00,,,,nao,86ag74q9j,86ag53312
+2026-04-14,2026-03-28,2026-03-26,Camiseta Preta,Broadcast - Starter,,triagem,1997.00,0.00,,,,nao,86agf90pm,86ag53312
+2026-04-14,2026-03-26,2026-03-25,Camiseta Preta,Broadcast - Starter,,triagem,1997.00,0.00,,,,nao,86age6anu,86ag53312
+2026-02-02,2025-11-17,2025-10-09,Florest,Performance B2B,Performance,ativo,1000.00,0.00,Rayan coutinho; Bruno Da Silva,Lucas Antunes,João Guarçoni Duarte,nao,86acdqq6p,86a4f0764
+2026-02-28,2026-02-27,2026-02-26,GLPen Nutri,Social Media - Starter,Social Media,triagem,400.00,0.00,,,,nao,86afrux3d,86adbhf15
+2026-03-18,2026-03-04,,(cliente deletado),Gestão de Comunidade - Enterprise,Gestão de Comunidade,triagem,0.00,20000.00,,,Allan Eduardo Machado de Araujo Alencar,nao,cortex-ci-3,cortex-ent-40
+2026-03-18,2026-03-17,,(cliente deletado),Creators - Escopo Fechado - Enterprise,Creators - Escopo Fechado,triagem,0.00,11997.00,,,Allan Eduardo Machado de Araujo Alencar,nao,cortex-ci-6,cortex-ent-1
+2026-06-02,2026-06-02,2026-05-29,Use Asas,Creators Pontual - Enterprise,,triagem,0.00,11697.00,Debora Mund,Iasmyn Vimercati,Daniel Giestas,nao,86ahtkppm,86ahtkpnk
+2026-02-04,2026-02-04,2026-02-03,Zegui,Identidade Visual - Enterprise,,triagem,0.00,8000.00,,,,nao,86af26p1u,86aez6nt9
+2026-04-15,2026-04-09,2026-04-08,Turbo Partners,Creators Pontual - Starter,,triagem,0.00,7497.00,,,,nao,86agr4van,86a2kxyat
+2026-05-06,2026-04-01,2026-03-30,Fittform Tecnologic,3ª Entrega - Creators,Creators,triagem,0.00,6400.00,Victor Klein,,,nao,86aghy7nu,86af18a8k
+2026-05-06,2026-04-01,2026-03-30,Fittform Tecnologic,2ª Entrega - Creators,Creators,triagem,0.00,6400.00,Victor Klein,,,nao,86aghy7jj,86af18a8k
+2026-05-06,2026-04-01,2026-03-30,Fittform Tecnologic,4ª Entrega - Creators,Creators,triagem,0.00,6400.00,Victor Klein,,,nao,86aghy7tw,86af18a8k
+2026-04-16,2026-04-01,2026-03-31,Labgenix,1ª Entrega - Creators - Starter,Creators,onboarding,0.00,5497.00,Ana Clara Cordeiro,Lucas Antunes,Fabio Richard ,nao,86agjuq9n,86agjuq5j
+2026-04-23,2026-04-01,2026-03-31,Frutaê Derm,2ª Entrega - Creators,,triagem,0.00,5497.00,Victor Klein,,,nao,86agjgugu,86aezg1u6
+2026-04-23,2026-04-01,2026-03-31,Frutaê Derm,3ª Entrega - Creators,,triagem,0.00,5497.00,Victor Klein,,,nao,86agjgutt,86aezg1u6
+2026-04-23,2026-04-01,2026-03-31,Frutaê Derm,4ª Entrega - Creators,,triagem,0.00,5497.00,Victor Klein,,,nao,86agjgv5m,86aezg1u6
+2026-05-20,2026-05-20,2026-05-19,Use Zaos,Creators Pontual - Starter,,triagem,0.00,5200.00,,,,nao,86ahjw034,86ahekd75
+2026-03-25,2026-03-19,2026-03-18,Master Comfort,Creators Pontual - Starter [Zona Criativo],Creators,triagem,0.00,5000.00,,Aline Souza,Daniel Giestas,nao,86ag90xdb,86aeqh6j3
+2026-05-26,2026-05-13,2026-05-13,Basic.US,Creators (A partir de 4 entregas) - Starter,Creators,ativo,0.00,5000.00,Debora Mund,Iasmyn Vimercati,Daniel Giestas,nao,86ahet3x9,86ahet3wz
+2026-04-16,2026-03-31,2026-03-27,Bebedouros e Cia,CRM - Starter,CRM de Vendas,triagem,0.00,4000.00,Thiago Folador,Aline Souza,Arthur Zon,nao,86aggd5uw,86ad0n8j8
+2026-04-01,2026-04-01,2026-03-30,Incenso fenix,[BIMESTRAL] 3ª Entrega - Creators,Creators,ativo,0.00,3997.00,Mariana Dalto,,,nao,86aghyf8q,86acf9hyt
+2026-04-01,2026-04-01,2026-03-30,Incenso fenix,[BIMESTRAL] 2ª Entrega - Creators,Creators,entregue,0.00,3997.00,Mariana Dalto,,,nao,86aghyf6h,86acf9hyt
+2026-04-01,2026-04-01,2026-03-30,Incenso fenix,[BIMESTRAL] 4ª Entrega - Creators,Creators,triagem,0.00,3997.00,Mariana Dalto,,,nao,86aghyfaz,86acf9hyt
+2026-02-04,2026-02-04,2026-02-03,MYDOC Brasil,Fee de implantação (Performance),,triagem,0.00,2997.00,,,,nao,86af244a5,86aezdmum
+2026-02-23,2026-02-20,2026-02-19,IANIS,Social Media,,triagem,0.00,2997.00,,,,nao,86afj48ce,86adbvgpu
+2026-03-18,2026-03-04,,(cliente deletado),Fee de Implantação - Fee,Fee de Implantação,triagem,0.00,2997.00,,,Fabio Richard Salgado de Oliveira,nao,cortex-ci-4,cortex-ent-40
+2026-04-16,2026-04-16,2026-04-14,Turbo Partners,Fee de implantação (Performance),,triagem,0.00,2997.00,,,,nao,86agw3nxj,86a2kxyat
+2026-06-10,2026-04-24,2026-04-22,Labgenix,2ª Entrega - Social Media - Starter,Social Media,ativo,0.00,2500.00,Iasmim Torres,Lucas Antunes,Fabio Richard ,nao,86ah165hx,86agjuq5j
+2026-05-12,2026-05-09,2026-05-07,Fungihouse,Flash Crm,,triagem,0.00,200.00,,Lucas Antunes,Matheus Scalfoni,nao,86ahc0dqz,86ahc0dpy
+2026-02-19,2026-02-19,2026-02-18,Anahatafitwear,Gestão de Performance,,triagem,0.00,0.00,,,,nao,86afhepft,86afhepeb
+2026-02-19,2026-02-19,2026-02-18,Anahatafitwear,Creators Pontual,,triagem,0.00,0.00,,,,nao,86afhepgw,86afhepeb
+2026-02-20,2026-02-20,2026-02-19,IANIS,Gestão de Performance,,triagem,0.00,0.00,,,,nao,86afj48bt,86adbvgpu
+2026-03-18,2026-03-05,2026-03-04,Clean Whey,Solicitação de Criativos - Mês da Mulher Clean Whey,,triagem,0.00,0.00,Carlos Eduardo,,,nao,86afx4udw,86aczur0m
+2026-03-18,2026-03-11,2026-03-09,Statera Labs,Gestão de Performance,,triagem,0.00,0.00,,,,nao,86ag1uuvw,86aegw5xp
+2026-03-23,2026-03-12,2026-03-10,Basilu,UGC PRISCILA ROTEIRO 1,,triagem,0.00,0.00,Amanda Sakai,,,nao,86ag2wa2w,86af7nun0
+2026-04-01,2025-11-17,2025-09-18,Cristiane Alencar,Gestão de Performance,Performance,ativo,0.00,0.00,Gustavo S Pires; Moises Silva Fernandes; Rayanne Lengruber,Deborah Guimaraes,Daniel Giestas,nao,86abxuu7b,86abxuu3r
+2026-05-05,2025-11-17,2025-10-13,Incenso fenix,Creators - Starter,Creators,entregue,0.00,0.00,Mariana Dalto,Lucas Antunes,Fabio Richard ,nao,86acg6bnp,86acf9hyt
+2026-05-11,2026-05-09,2026-05-08,(cliente deletado),Landing Page,,triagem,0.00,0.00,,,,nao,86ahceg1w,86ahceg0w
+2026-05-19,2026-05-05,2026-04-30,Sol de Verão,4ª Entrega - Creators - Starter,Creators,triagem,0.00,0.00,Mariana Dalto,Lucas Antunes,,nao,86ah70zk4,86adwyghm
+2026-05-26,2026-05-13,2026-05-11,Blackdragonesporte,Creators (A partir de 4 entregas) - Starter,Creators,ativo,0.00,0.00,Lara Grobério,Iasmyn Vimercati,Roberto Fachetti,nao,86ahduemh,86ahduejv
+2026-05-28,2026-05-26,2026-05-21,Skyfit,Gestão de performance - Franquia,Performance,triagem,0.00,0.00,,Lucas Antunes,,nao,86ahmf8wc,86ahgera6
+2026-05-28,2026-05-28,2026-05-27,Champion,Gestão de Performance,,triagem,0.00,0.00,,,,nao,86ahqqt8p,86ahqa9a0
+2026-05-28,2026-05-28,2026-05-27,Champion,Social Media,,triagem,0.00,0.00,,,,nao,86ahqqta6,86ahqa9a0
+2026-05-28,2026-05-28,2026-05-27,Champion,Creators Recorrente,,triagem,0.00,0.00,,,,nao,86ahqqtbk,86ahqa9a0
+2026-05-28,2026-05-26,2026-05-21,Skyfit,Social Media - Starter - Franquia,Performance,triagem,0.00,0.00,,Lucas Antunes,,nao,86ahmf8wt,86ahgera6
+2026-05-28,2026-05-28,2026-05-27,Champion,E-commerce,,triagem,0.00,0.00,,,,nao,86ahqqt6n,86ahqa9a0
+2026-06-02,2026-05-27,2026-05-24,Flico,4ª Entrega - Creators - Starter,Creators,pausado,0.00,0.00,Victor Klein,Iasmyn Vimercati,Ramon Souza,nao,86ahnujdf,86ahmedc9
+2026-06-15,2026-01-29,2026-01-28,Grupo Tommasi,Account,Gestão & Atendimento ,cancelado/inativo,0.00,0.00,Pedro Paulo Cortines Barretto,Lucas Antunes,João Guarçoni Duarte,nao,86aewjrht,86adtbh39
