@@ -5,7 +5,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sh
 import { ChevronRight } from "lucide-react";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { fetchJson, buildUrl, ESTADO_LABEL } from "./utils";
-import type { ClienteDetalhe } from "./types";
+import type { ClienteDetalhe, Situacao } from "./types";
 
 type Modelo = "recorrente" | "pontual";
 
@@ -16,9 +16,9 @@ function lifetimeLabel(c: ClienteDetalhe): string {
 }
 
 export function AuditoriaClientesDrawer({
-  modelo, de, ate, onClose,
+  modelo, estado = "ambos", de, ate, onClose,
 }: {
-  modelo: Modelo | null; de?: string; ate?: string; onClose: () => void;
+  modelo: Modelo | null; estado?: Situacao; de?: string; ate?: string; onClose: () => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
 
@@ -28,7 +28,12 @@ export function AuditoriaClientesDrawer({
     queryFn: () => fetchJson<Resp>(buildUrl("/api/creators-modelo/clientes", { modelo: modelo!, de, ate })),
   });
 
-  const clientes = data?.clientes ?? [];
+  // espelha o filtro global de estado (cancelado = estado 'cancelado'; ativo = o resto).
+  const clientes = (data?.clientes ?? []).filter((c) =>
+    estado === "ativo" ? c.estado !== "cancelado"
+    : estado === "cancelado" ? c.estado === "cancelado"
+    : true,
+  );
   const corModelo = modelo === "recorrente" ? "text-sky-600 dark:text-sky-400" : "text-indigo-600 dark:text-indigo-400";
 
   const th = "px-3 py-2 text-left text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-zinc-500";

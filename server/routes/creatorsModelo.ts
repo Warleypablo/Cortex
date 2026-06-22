@@ -60,15 +60,40 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
   //    então lê mais alto que o total blended da tabela do topo.
   //  - pontual: LT = nº médio de entregas entregues até o mês (1 entrega = 1 mês,
   //    só ≥1); LTV = média do valorp entregue (realizado).
-  app.get("/api/creators-modelo/evolucao", async (_req, res) => {
+  app.get("/api/creators-modelo/evolucao", async (req, res) => {
     try {
+      const unidade = req.query.unidade === "contrato" ? "contrato" : "cliente";
+      const agregador = req.query.agregador === "mediana" ? "mediana" : "media";
+      const estadoQ = String(req.query.estado ?? "todos");
+      const estado = estadoQ === "ativo" || estadoQ === "cancelado" ? estadoQ : "todos";
+
+      // grão do recorrente: contrato = por subtask; cliente = por task. Pontual
+      // é sempre por task (a jornada é o contrato), espelhando a tabela do topo.
+      const grainRec = unidade === "contrato" ? sql`id_subtask` : sql`id_task`;
+      // agregador (média/mediana) aplicado por coluna
+      const agg = (col: any) =>
+        agregador === "mediana"
+          ? sql`PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ${col})`
+          : sql`AVG(${col})`;
+      // filtro de estado (classificação client-level, espelha a tabela):
+      // recorrente ativo = tem linha ativa; cancelado = só cancelada (sem ativa).
+      // pontual cancelado = sem em-produção e com cancelada; ativo = o resto.
+      const recPred =
+        estado === "ativo" ? sql`tem_ativo`
+        : estado === "cancelado" ? sql`(NOT tem_ativo AND tem_cancel)`
+        : sql`(tem_ativo OR tem_cancel)`;
+      const pontPred =
+        estado === "ativo" ? sql`(tem_emprod OR NOT tem_cancel)`
+        : estado === "cancelado" ? sql`(NOT tem_emprod AND tem_cancel)`
+        : sql`TRUE`;
+
       const result = await db.execute(sql`
         WITH meses AS (
           SELECT to_char(data_snapshot::date,'YYYY-MM') AS m, MAX(data_snapshot::date) AS fim
           FROM "Clickup".cup_data_hist GROUP BY 1
         ),
         snap AS (
-          SELECT mz.m, mz.fim, h.id_task,
+          SELECT mz.m, mz.fim, h.id_task, h.id_subtask,
             LOWER(TRIM(COALESCE(h.status,''))) AS status,
             COALESCE(h.valorr::numeric,0) AS vr,
             COALESCE(h.valorp::numeric,0) AS vp,
@@ -77,23 +102,29 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
           JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = mz.fim
           WHERE h.servico ILIKE '%creator%'
         ),
-        rec AS (
-          SELECT m, id_task,
-            GREATEST(0,(MAX(fim) - MIN(di)))/30.44 AS lt,
-            SUM(vr * GREATEST(0,(fim - di))/30.44) AS ltv
-          FROM snap WHERE vr > 0 GROUP BY m, id_task
+        rec_unit AS (
+          SELECT m, ${grainRec} AS uid,
+            GREATEST(0,(fim - MIN(di)))/30.44 AS lt,
+            SUM(vr * GREATEST(0,(fim - di))/30.44) AS ltv,
+            bool_or(status IN ('ativo','onboarding','triagem','pausado')) AS tem_ativo,
+            bool_or(status IN ('cancelado/inativo','em cancelamento')) AS tem_cancel
+          FROM snap WHERE vr > 0 GROUP BY m, fim, ${grainRec}
         ),
-        pont AS (
-          SELECT m, id_task,
-            COUNT(*) FILTER (WHERE status='entregue') AS entregues,
-            COALESCE(SUM(vp) FILTER (WHERE status='entregue'),0) AS ltv
+        pont_unit AS (
+          SELECT m, id_task AS uid,
+            COUNT(*) FILTER (WHERE status='entregue')::numeric AS entregues,
+            COALESCE(SUM(vp) FILTER (WHERE status='entregue'),0) AS ltv,
+            bool_or(status NOT IN ('entregue','cancelado/inativo','não usar')) AS tem_emprod,
+            bool_or(status IN ('cancelado/inativo','não usar')) AS tem_cancel
           FROM snap WHERE vp > 0 GROUP BY m, id_task
         ),
         rec_agg AS (
-          SELECT m, COUNT(*) AS cli, AVG(lt) AS lt, AVG(ltv) AS ltv FROM rec GROUP BY m
+          SELECT m, COUNT(*) AS cli, ${agg(sql`lt`)} AS lt, ${agg(sql`ltv`)} AS ltv
+          FROM rec_unit WHERE ${recPred} GROUP BY m
         ),
         pont_agg AS (
-          SELECT m, COUNT(*) AS cli, AVG(NULLIF(entregues,0)) AS lt, AVG(ltv) AS ltv FROM pont GROUP BY m
+          SELECT m, COUNT(*) AS cli, ${agg(sql`NULLIF(entregues,0)`)} AS lt, ${agg(sql`ltv`)} AS ltv
+          FROM pont_unit WHERE ${pontPred} GROUP BY m
         )
         SELECT mz.m AS mes,
           COALESCE(r.cli,0)::int AS rec_cli, r.lt AS rec_lt, r.ltv AS rec_ltv,

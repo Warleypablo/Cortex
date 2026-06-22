@@ -13,11 +13,15 @@ import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import type { OverviewData, ProdutoBenchmark } from "@/components/lt-ltv-churn/types";
 import { TabelaLtLtv } from "@/components/creators-modelo/TabelaLtLtv";
 import { EvolucaoLtLtv } from "@/components/creators-modelo/EvolucaoLtLtv";
-import type { RedesignPayload } from "@/components/creators-modelo/types";
+import type { RedesignPayload, Unidade, Agregador, Situacao } from "@/components/creators-modelo/types";
 
 export default function LtLtvChurn() {
   useSetPageInfo("LTV por Contrato", "Lifetime e valor por contrato");
   const [produto, setProduto] = useState<string>("todos");
+  // Filtros globais da sub-aba Creators (controlam a tabela e a evolução).
+  const [unidade, setUnidade] = useState<Unidade>("cliente");
+  const [agregador, setAgregador] = useState<Agregador>("media");
+  const [estado, setEstado] = useState<Situacao>("ambos");
 
   const produtoParam = produto === "todos" ? undefined : produto;
 
@@ -85,12 +89,42 @@ export default function LtLtvChurn() {
         </TabsContent>
 
         <TabsContent value="creators" className="space-y-6">
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            <Select value={unidade} onValueChange={(v) => setUnidade(v as Unidade)}>
+              <SelectTrigger className="w-[150px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="cliente">Por cliente</SelectItem>
+                <SelectItem value="contrato">Por contrato</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={agregador} onValueChange={(v) => setAgregador(v as Agregador)}>
+              <SelectTrigger className="w-[130px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="media">Média</SelectItem>
+                <SelectItem value="mediana">Mediana</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={estado} onValueChange={(v) => setEstado(v as Situacao)}>
+              <SelectTrigger className="w-[150px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="ambos">Todos</SelectItem>
+                <SelectItem value="ativo">Ativos</SelectItem>
+                <SelectItem value="cancelado">Cancelados</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
           {!creators ? (
             <div className="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
           ) : (
-            <TabelaLtLtv data={creators} />
+            <TabelaLtLtv data={creators} unidade={unidade} agregador={agregador} estado={estado} />
           )}
-          <EvolucaoLtLtv />
+          <EvolucaoLtLtv unidade={unidade} agregador={agregador} estado={estado} />
         </TabsContent>
       </Tabs>
     </div>
