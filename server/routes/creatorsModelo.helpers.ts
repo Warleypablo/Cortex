@@ -179,13 +179,13 @@ export function ltvPontualRealizado(items: RawRow[]): number {
  * Entrega única (n<2) → null: compra de 1 entrega não é "lifetime" e puxava a
  * média pra baixo mesmo com serviço bem entregue — fora do cálculo de LT.
  */
-export function ltPontualPorEntregas(items: RawRow[]): number | null {
+export function ltPontualPorEntregas(items: RawRow[], minLt = 2): number | null {
   const n = items.filter((r) => isEntregue(r.status)).length;
-  return n >= 2 ? n : null;
+  return n >= minLt ? n : null;
 }
 
 export function buildUnitsPontual(
-  rows: RawRow[], unidade: "cliente" | "contrato", hoje: string,
+  rows: RawRow[], unidade: "cliente" | "contrato", hoje: string, minLt = 2,
 ): Unit[] {
   if (unidade === "contrato") {
     // Pontual "por contrato": a jornada (id_task) é UM contrato, mesmo dividida
@@ -200,7 +200,7 @@ export function buildUnitsPontual(
     for (const [, items] of Array.from(byJor.entries())) {
       const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
       const ini = inicios[0] ?? null;
-      const lt = ltPontualPorEntregas(items);
+      const lt = ltPontualPorEntregas(items, minLt);
       units.push({
         estado: estadoClientePontual(items),
         lt,
@@ -223,7 +223,7 @@ export function buildUnitsPontual(
     const ini = inicios[0] ?? null;
     // LT = nº de entregas entregues (só 2+); LTV = realizado, mas entrega única
     // (lt null) também sai da média de LTV p/ casar com o LT. Conta em n.
-    const lt = ltPontualPorEntregas(items);
+    const lt = ltPontualPorEntregas(items, minLt);
     units.push({
       estado: estadoClientePontual(items),
       lt,
@@ -330,11 +330,11 @@ export function aplicarPeriodo(rows: RawRow[], de?: string, ate?: string): RawRo
 const ESTADOS_REC = ["ativo", "cancelado"] as const;
 const ESTADOS_PONT = ["em_producao", "concluido", "cancelado"] as const;
 
-function gruposDeUnidade(rows: RawRow[], unidade: "cliente" | "contrato", hoje: string): Grupo[] {
+function gruposDeUnidade(rows: RawRow[], unidade: "cliente" | "contrato", hoje: string, minLt = 2): Grupo[] {
   const recRows = rows.filter((r) => classifyModelo(r) === "recorrente");
   const pontRows = rows.filter((r) => classifyModelo(r) === "pontual");
   const recUnits = buildUnitsRecorrente(recRows, unidade, hoje);
-  const pontUnits = buildUnitsPontual(pontRows, unidade, hoje);
+  const pontUnits = buildUnitsPontual(pontRows, unidade, hoje, minLt);
 
   const grupos: Grupo[] = [];
   for (const e of ESTADOS_REC) {
@@ -527,9 +527,9 @@ export interface RedesignPayload {
 }
 
 export function buildRedesignPayload(
-  rows: RawRow[], opts: { de?: string; ate?: string; hoje: string },
+  rows: RawRow[], opts: { de?: string; ate?: string; hoje: string; minLt?: number },
 ): RedesignPayload {
-  const { de, ate, hoje } = opts;
+  const { de, ate, hoje, minLt = 2 } = opts;
   const periodo = aplicarPeriodo(rows, de, ate); // bug #2: período em TUDO
 
   // cobertura sequenciado/avulso (reusa lógica existente)
@@ -563,8 +563,8 @@ export function buildRedesignPayload(
     },
     maturidade: mat,
     tabela: {
-      cliente: gruposDeUnidade(periodo, "cliente", hoje),
-      contrato: gruposDeUnidade(periodo, "contrato", hoje),
+      cliente: gruposDeUnidade(periodo, "cliente", hoje, minLt),
+      contrato: gruposDeUnidade(periodo, "contrato", hoje, minLt),
     },
   };
 }
@@ -645,9 +645,9 @@ export interface ClienteDetalhe {
  * "Por cliente" da tabela. Ordenado por LTV desc.
  */
 export function buildClientesDetalhe(
-  rows: RawRow[], modelo: Modelo, opts: { de?: string; ate?: string; hoje: string },
+  rows: RawRow[], modelo: Modelo, opts: { de?: string; ate?: string; hoje: string; minLt?: number },
 ): ClienteDetalhe[] {
-  const { de, ate, hoje } = opts;
+  const { de, ate, hoje, minLt = 2 } = opts;
   const periodo = aplicarPeriodo(rows, de, ate).filter((r) => classifyModelo(r) === modelo);
   const byCli = new Map<string, RawRow[]>();
   for (const r of periodo) {
@@ -685,7 +685,7 @@ export function buildClientesDetalhe(
       // Pontual: LTV = receita realizada (só entregas entregues); LT = nº de
       // entregas entregues (1 = 1 mês; 0 entregues → null).
       estado = estadoClientePontual(items);
-      lt = ltPontualPorEntregas(items);
+      lt = ltPontualPorEntregas(items, minLt);
       ltv = Math.round(ltvPontualRealizado(items));
     }
 
@@ -745,7 +745,7 @@ const STATUS_REC_CANCEL = ["cancelado/inativo", "em cancelamento"];
  * `fim` = data do snapshot ('YYYY-MM-DD'). Filtra por estado e ordena por LTV.
  */
 export function buildEvolucaoClientes(
-  rows: EvoSnapRow[], modelo: Modelo, estado: EstadoFiltro, fim: string,
+  rows: EvoSnapRow[], modelo: Modelo, estado: EstadoFiltro, fim: string, minLt = 2,
 ): ClienteDetalhe[] {
   const byCli = new Map<string, EvoSnapRow[]>();
   for (const r of rows) {
@@ -790,7 +790,7 @@ export function buildEvolucaoClientes(
       estadoCli = estados.includes("em_producao") ? "em_producao"
         : estados.includes("cancelado") ? "cancelado" : "concluido";
       const nEntregue = modeloRows.filter((r) => isEntregue(r.status)).length;
-      lt = nEntregue >= 2 ? nEntregue : null; // entrega única → fora do LT
+      lt = nEntregue >= minLt ? nEntregue : null; // entrega única → fora do LT (salvo "incluir únicas")
       ltv = modeloRows.filter((r) => isEntregue(r.status)).reduce((s, r) => s + (r.valorp ?? 0), 0);
     }
 

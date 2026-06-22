@@ -13,9 +13,9 @@ const MODELOS: Array<{ modelo: "recorrente" | "pontual"; label: string; cor: str
 const ESTADO_LABEL: Record<Situacao, string> = { ambos: "Todos", ativo: "Ativos", cancelado: "Cancelados" };
 
 export function TabelaLtLtv({
-  data, unidade, agregador, estado, de, ate,
+  data, unidade, agregador, estado, de, ate, incluirUnicas = false,
 }: {
-  data: RedesignPayload; unidade: Unidade; agregador: Agregador; estado: Situacao; de?: string; ate?: string;
+  data: RedesignPayload; unidade: Unidade; agregador: Agregador; estado: Situacao; de?: string; ate?: string; incluirUnicas?: boolean;
 }) {
   const [drawerModelo, setDrawerModelo] = useState<"recorrente" | "pontual" | null>(null);
 
@@ -42,7 +42,7 @@ export function TabelaLtLtv({
         <p className="text-xs text-gray-500 dark:text-zinc-400">
           {unidade === "cliente" ? "Por cliente" : "Por contrato"} · {agregador === "media" ? "Média" : "Mediana"} · {ESTADO_LABEL[estado]}
           {" "}· LTV recorrente = realizado até hoje · LTV pontual = realizado (só entregas com status “entregue”)
-          {" "}· Lifetime do pontual = nº de entregas entregues (1 entrega = 1 mês; entrega única fora do LT)
+          {" "}· Lifetime do pontual = nº de entregas entregues (1 entrega = 1 mês; {incluirUnicas ? "entrega única incluída" : "entrega única fora do LT"})
         </p>
       </CardHeader>
       <CardContent className="overflow-x-auto">
@@ -85,7 +85,7 @@ export function TabelaLtLtv({
         </table>
       </CardContent>
     </Card>
-    <AuditoriaClientesDrawer modelo={drawerModelo} estado={estado} de={de} ate={ate} onClose={() => setDrawerModelo(null)} />
+    <AuditoriaClientesDrawer modelo={drawerModelo} estado={estado} de={de} ate={ate} incluirUnicas={incluirUnicas} onClose={() => setDrawerModelo(null)} />
     </>
   );
 }
