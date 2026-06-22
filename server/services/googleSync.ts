@@ -6,14 +6,16 @@
  * agência (`google_ads.*`).
  *
  * Reusa as credenciais OAuth de getGoogleAdsCredentials() (env GOOGLE_ADS_*).
- * API v20 (v18/v19 foram descontinuadas pelo Google).
+ * API v21 (v20 e anteriores descontinuadas — sondado 2026-06-21: v21..v24 ativas).
+ * Usamos a mais antiga ainda ativa (v21) p/ minimizar breaking changes nas GAQL
+ * escritas p/ v20; v24 acusou UNRECOGNIZED_FIELD por mudança de schema.
  */
 
 import { google } from 'googleapis';
 import { getGoogleAdsCredentials } from '../autoreport/credentials';
 import type { Pool } from 'pg';
 
-const API_VERSION = 'v20';
+const API_VERSION = 'v21';
 const API_BASE = `https://googleads.googleapis.com/${API_VERSION}`;
 
 // Conta própria da Turbo (cliente sob a MCC). A MCC não retorna métricas.

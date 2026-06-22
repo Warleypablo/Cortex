@@ -757,6 +757,52 @@ export async function initializeSysSchema(): Promise<void> {
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_campaign_monthly_budget_month ON cortex_core.campaign_monthly_budget(month)`);
 
+    // Campaign Tags — classificação por campanha: tag (pool, ex: inbound/evento)
+    // e stage (etapa do funil, ex: descoberta/conversao). Ambos opcionais e
+    // estáveis entre meses (sem coluna month). Alimenta as abas e o agrupamento
+    // por etapa da tela /growth/orcamento-campanhas.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.campaign_tags (
+        platform TEXT NOT NULL,
+        campaign_id TEXT NOT NULL,
+        tag TEXT,
+        stage TEXT,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT,
+        PRIMARY KEY (platform, campaign_id)
+      )
+    `);
+    // Migração de tabelas pré-existentes (tag era NOT NULL, sem stage, e o CHECK
+    // de platform só aceitava meta/google — agora qualquer canal: tiktok, linkedin...).
+    await db.execute(sql`ALTER TABLE cortex_core.campaign_tags ADD COLUMN IF NOT EXISTS stage TEXT`);
+    await db.execute(sql`ALTER TABLE cortex_core.campaign_tags ALTER COLUMN tag DROP NOT NULL`);
+    await db.execute(sql`ALTER TABLE cortex_core.campaign_tags DROP CONSTRAINT IF EXISTS campaign_tags_platform_check`);
+
+    // Plano de orçamento por pool/mês (total) e por etapa (alvo em % ou R$).
+    // pool = valor de tag (inbound/evento). Alimenta o planejamento por etapa.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.budget_pool_plan (
+        pool TEXT NOT NULL,
+        month DATE NOT NULL,
+        total NUMERIC(12, 2) NOT NULL,
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT,
+        PRIMARY KEY (pool, month)
+      )
+    `);
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.budget_stage_plan (
+        pool TEXT NOT NULL,
+        month DATE NOT NULL,
+        stage TEXT NOT NULL,
+        value NUMERIC(12, 2) NOT NULL,
+        unit TEXT NOT NULL CHECK (unit IN ('pct', 'brl')),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT,
+        PRIMARY KEY (pool, month, stage)
+      )
+    `);
+
     console.log('[database] cortex_core schema tables created');
 
     // Apply spec - UPSERT catalogs
