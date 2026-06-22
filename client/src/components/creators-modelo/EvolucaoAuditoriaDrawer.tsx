@@ -54,7 +54,7 @@ export function EvolucaoAuditoriaDrawer({
             {isLoading ? "Carregando…" : `${clientes.length} clientes na base do snapshot · `}
             {isRec
               ? "LT = idade da base (meses) · LTV = realizado (valorr × meses)"
-              : "LT = nº de entregas entregues (1 = 1 mês) · LTV = realizado (só entregues)"}
+              : "LT = nº de entregas entregues (1 = 1 mês; entrega única fora do LT) · LTV = realizado (só entregues)"}
           </p>
         </SheetHeader>
 

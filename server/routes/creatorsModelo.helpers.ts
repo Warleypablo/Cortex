@@ -176,11 +176,12 @@ export function ltvPontualRealizado(items: RawRow[]): number {
 /**
  * LT pontual simplificado: 1 entrega entregue = 1 mês. Conta as entregas com
  * status 'entregue' (datas do pontual têm backfill, então span é pouco confiável).
- * 0 entregues → null (sem lifetime realizado; fora da média).
+ * Entrega única (n<2) → null: compra de 1 entrega não é "lifetime" e puxava a
+ * média pra baixo mesmo com serviço bem entregue — fora do cálculo de LT.
  */
 export function ltPontualPorEntregas(items: RawRow[]): number | null {
   const n = items.filter((r) => isEntregue(r.status)).length;
-  return n > 0 ? n : null;
+  return n >= 2 ? n : null;
 }
 
 export function buildUnitsPontual(
@@ -766,7 +767,7 @@ export function buildEvolucaoClientes(
       estadoCli = estados.includes("em_producao") ? "em_producao"
         : estados.includes("cancelado") ? "cancelado" : "concluido";
       const nEntregue = modeloRows.filter((r) => isEntregue(r.status)).length;
-      lt = nEntregue > 0 ? nEntregue : null;
+      lt = nEntregue >= 2 ? nEntregue : null; // entrega única → fora do LT
       ltv = modeloRows.filter((r) => isEntregue(r.status)).reduce((s, r) => s + (r.valorp ?? 0), 0);
     }
 
