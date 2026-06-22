@@ -219,6 +219,8 @@ export async function getCreativePerformance(opts: { since: string; until: strin
       angulo: r.angulo,
       personagem: r.personagem,
       tipoAd: r.tipoAd,
+      formatoAd: r.formatoAd,
+      proporcao: r.proporcao,
       produto: r.produto,
       bodyTipo: r.bodyTipo,
       ctaTipo: r.ctaTipo,

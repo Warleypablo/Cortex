@@ -187,6 +187,8 @@ export interface CreativePerfRow extends CreativeMetrics {
   angulo: string | null;
   personagem: string | null;
   tipoAd: string | null;
+  formatoAd: string | null;
+  proporcao: string | null;
   produto: string | null;
   bodyTipo: string | null;
   ctaTipo: string | null;
