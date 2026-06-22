@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-06-21 | feat(sync-jobs): syncs de Google/TikTok/LinkedIn agendados + fix Google Ads API v21
+
+**O que foi feito:**
+- **Fix Google Ads API:** `googleSync.ts` usava a API v20, que o Google descontinuou → o sync da Turbo falhava com `UNSUPPORTED_VERSION` e os dados pararam em 11/jun. Subido para **v21** (sondado: v21..v24 ativas; v21 é a mais antiga ativa, minimiza breaking changes nas GAQL). Validado: voltou a puxar (dado fresco, gasto de junho saltou de R$1.291 → R$2.413).
+- **Agendadores em produção** (no `server/index.ts`, espelhando o job do Meta de 6h): Google Turbo, TikTok Ads e LinkedIn Ads passam a rodar no boot (escalonados 75s/105s/135s) e a cada **12h**. Antes só o Meta era agendado; os outros tinham serviço pronto mas ninguém disparava.
+- `scripts/run-tiktok-ads-sync.ts`: runner manual do sync de TikTok Ads.
+
+**Por que:**
+- Sem isso, Google/TikTok/LinkedIn nunca ficavam frescos (Google parou em 11/jun por causa da API morta; TikTok estava zerado por nunca ter rodado). Agora os 4 canais atualizam sozinhos como o Meta.
+
+**Descobertas de diagnóstico (não-código):**
+- A credencial `advertiser` do TikTok já está conectada (3 contas desde 05/jun); a `INSTAGRAM_ENCRYPTION_KEY` correta é hex de 64 chars (a local estava corrompida — corrigida no .env local, que é gitignored).
+- Em produção o app conecta como `postgres` (superuser) → não há barreira de permissão; o `permission denied` em tiktok/linkedin é só do role local `growth_dev`.
+
+**Arquivos alterados:**
+- `server/services/googleSync.ts` - API_VERSION v20 → v21.
+- `server/index.ts` - 3 novos jobs de sync agendados (12h).
+- `scripts/run-tiktok-ads-sync.ts` - runner manual (novo).
+
+**Impacto arquitetural:** Paridade de automação entre as 4 plataformas de mídia paga. Cada job isola erros (try/catch + status em globalThis) — uma plataforma falhando não derruba as outras nem o boot.
+
+---
+
 ## 2026-06-21 | feat(orcamento-campanhas): multi-plataforma (TikTok/LinkedIn) + projeção conta hoje
 
 **O que foi feito:**
