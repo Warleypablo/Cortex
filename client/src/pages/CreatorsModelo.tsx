@@ -4,7 +4,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { fetchJson, buildUrl } from "@/components/creators-modelo/utils";
-import type { RedesignPayload, Unidade, Agregador, Situacao } from "@/components/creators-modelo/types";
+import type { RedesignPayload, Unidade, Agregador } from "@/components/creators-modelo/types";
 import { PlacarDecisao } from "@/components/creators-modelo/PlacarDecisao";
 import { MixReceitaTempo } from "@/components/creators-modelo/MixReceitaTempo";
 import { LtvMaturidade } from "@/components/creators-modelo/LtvMaturidade";
@@ -28,7 +28,6 @@ export default function CreatorsModelo() {
   // Controles da aba "Tabela LT/LTV"
   const [unidade, setUnidade] = useState<Unidade>("cliente");
   const [agregador, setAgregador] = useState<Agregador>("media");
-  const [situacao, setSituacao] = useState<Situacao>("ambos");
 
   const { data, isLoading } = useQuery({
     queryKey: ["/api/creators-modelo", de, ate],
@@ -81,16 +80,8 @@ export default function CreatorsModelo() {
                   <SelectItem value="mediana">Mediana</SelectItem>
                 </SelectContent>
               </Select>
-              <Select value={situacao} onValueChange={(v) => setSituacao(v as Situacao)}>
-                <SelectTrigger className={trig}><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ambos">Todas situações</SelectItem>
-                  <SelectItem value="ativo">Ativos</SelectItem>
-                  <SelectItem value="cancelado">Cancelados</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
-            <TabelaLtLtv data={data} unidade={unidade} agregador={agregador} situacao={situacao} />
+            <TabelaLtLtv data={data} unidade={unidade} agregador={agregador} />
           </TabsContent>
         </Tabs>
       )}
