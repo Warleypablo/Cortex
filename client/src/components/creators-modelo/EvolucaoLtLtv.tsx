@@ -7,7 +7,7 @@ import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import { EvolucaoAuditoriaDrawer } from "./EvolucaoAuditoriaDrawer";
 import type { Unidade, Agregador, Situacao } from "./types";
 
-interface ModMetric { clientes: number; lt: number | null; ltv: number | null; }
+interface ModMetric { clientes: number; lt: number | null; ltv: number | null; faturamento: number | null; }
 interface EvolucaoMes { mes: string; recorrente: ModMetric; pontual: ModMetric; }
 
 const MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -22,6 +22,7 @@ const LINHAS: Array<{ label: string; get: (x: ModMetric) => string; forte?: bool
   { label: "Clientes", get: (x) => String(x.clientes) },
   { label: "LT", get: (x) => fmtLt(x.lt) },
   { label: "LTV", get: (x) => fmtLtv(x.ltv), forte: true },
+  { label: "Faturamento", get: (x) => fmtLtv(x.faturamento), forte: true },
 ];
 
 const GRUPOS: Array<{ key: "recorrente" | "pontual"; label: string; cor: string; barra: string }> = [
@@ -57,6 +58,7 @@ export function EvolucaoLtLtv({
           Base presente em cada snapshot de fim de mês (cup_data_hist). Recorrente = base ativa do mês
           (exclui churnados que já saíram → lê mais alto que o total acima, que é blended com cancelados).
           {" "}Pontual: 1 entrega entregue = 1 mês (entrega única fora do LT); LTV = realizado (só entregues).
+          {" "}Faturamento = total realizado da base no mês (tudo que foi entregue, inclui entrega única; recorrente = Σ valorr × meses).
         </p>
       </CardHeader>
       <CardContent className="overflow-x-auto">
