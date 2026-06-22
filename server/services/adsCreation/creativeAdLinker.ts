@@ -18,6 +18,11 @@ import {
   creativeAdLinks,
   type InsertCreativeAdLink,
 } from "@shared/schema";
+import {
+  parseConventionFromAdName,
+  extractConventionString,
+  upsertCreativesFromConvention,
+} from "./creativesRepo";
 
 const TP_PREFIX = /^(TP\d+)/i;
 
@@ -96,4 +101,54 @@ export async function linkAdsByName(
     skipped: ads.length - inserted.length,
     unmatchedTpIds: Array.from(unmatched),
   };
+}
+
+/**
+ * Ingestão universal pelo NOME do anúncio (cobre Cortex E manual): para cada ad cujo nome
+ * carrega a convenção (`vv-...-v#`), parseia, GARANTE a linha na Biblioteca (cria se não existir,
+ * preenche dimensões faltantes) e vincula o ad_id. É o que fecha o caso de ads subidos fora do Cortex.
+ *
+ * Roda no sync. Idempotente. Ads sem convenção no nome caem fora (o linkAdsByName por TP cobre o legado).
+ */
+export async function ingestAndLinkAds(
+  ads: LinkableAd[],
+): Promise<{ linked: number; creatives: number; ads: number }> {
+  const parsed = ads
+    .map((a) => ({
+      adId: a.adId ? String(a.adId) : "",
+      conv: extractConventionString(a.adName),
+      p: parseConventionFromAdName(a.adName),
+    }))
+    .filter((x): x is { adId: string; conv: string; p: NonNullable<typeof x.p> } =>
+      Boolean(x.adId && x.conv && x.p),
+    );
+
+  if (parsed.length === 0) return { linked: 0, creatives: 0, ads: 0 };
+
+  const nameToCreative = await upsertCreativesFromConvention(
+    parsed.map((x) => ({ nomeDrive: x.conv, parsed: x.p })),
+  );
+
+  const values: InsertCreativeAdLink[] = [];
+  const seen = new Set<string>();
+  for (const x of parsed) {
+    const c = nameToCreative.get(x.conv);
+    if (!c) continue;
+    const key = `${c.id}|${x.adId}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    values.push({ creativeId: c.id, tpId: c.tpId, adId: x.adId, source: "name_match" });
+  }
+
+  let linked = 0;
+  if (values.length > 0) {
+    const inserted = await db
+      .insert(creativeAdLinks)
+      .values(values)
+      .onConflictDoNothing({ target: [creativeAdLinks.creativeId, creativeAdLinks.adId] })
+      .returning({ id: creativeAdLinks.id });
+    linked = inserted.length;
+  }
+
+  return { linked, creatives: nameToCreative.size, ads: parsed.length };
 }

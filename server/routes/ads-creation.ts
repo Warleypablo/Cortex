@@ -382,8 +382,8 @@ export function registerAdsCreationRoutes(app: Express) {
               // ângulo do HOOK vem direto do nome; h# via batch é backup. body/cta (b#/c#) são só
               // identificadores (ficam no nome, não viram campo semântico).
               angulo: parsed.angulo ?? mod.angulo ?? null,
-              // campos comuns: batch (se houver) tem prioridade; senão, puxado do Drive
-              produto: batch?.produto ?? driveCtx.produto ?? null,
+              // produto vem do nome (convenção); batch/Drive são fallback
+              produto: parsed.produto ?? batch?.produto ?? driveCtx.produto ?? null,
               roteiroUrl: batch?.roteiroUrl ?? driveCtx.roteiroUrl ?? null,
               clickupTaskId: batch?.clickupTaskId ?? null,
               driveFolderId: batchFolderId ?? null,

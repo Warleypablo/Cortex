@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Loop de Inteligência de Criativos — fluxo & revisão</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --line:#2a2f3a; --txt:#e6e9ef; --mut:#9aa3b2;
+    --roteiro:#8b5cf6; --editor:#f59e0b; --cortex:#22d3ee; --meta:#3b82f6; --dados:#34d399;
+    --ok:#22c55e; --pend:#eab308; --risk:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:32px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px} h2{font-size:19px;margin:38px 0 14px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  .sub{color:var(--mut);margin:0 0 8px}
+  code{background:#0b0d11;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#c7d2fe}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 4px;font-size:13px;color:var(--mut)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  /* flow */
+  .flow{display:flex;flex-direction:column;gap:0}
+  .step{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:stretch}
+  .who{display:flex;align-items:center;justify-content:flex-end;text-align:right;font-weight:600;font-size:13px;padding-right:4px}
+  .card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:12px 16px;margin:8px 0;position:relative}
+  .card .t{font-weight:700;margin-bottom:3px}
+  .card .d{color:var(--mut);font-size:13.5px}
+  .card .tag{display:inline-block;font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:20px;padding:1px 9px;margin-top:8px;margin-right:6px}
+  .arrow{grid-column:2;color:var(--mut);text-align:center;font-size:18px;margin:-2px 0}
+  .bRoteiro{border-left-color:var(--roteiro)} .bEditor{border-left-color:var(--editor)}
+  .bCortex{border-left-color:var(--cortex)} .bMeta{border-left-color:var(--meta)} .bDados{border-left-color:var(--dados)}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#10131a;color:var(--mut);font-weight:600}
+  .pill{font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap}
+  .auto{background:rgba(34,197,94,.15);color:#86efac} .manual{background:rgba(234,179,8,.15);color:#fde68a}
+  .b-ok{background:rgba(34,197,94,.15);color:#86efac} .b-pend{background:rgba(234,179,8,.15);color:#fde68a} .b-risk{background:rgba(239,68,68,.15);color:#fca5a5}
+  .name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;background:#0b0d11;border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;white-space:nowrap}
+  .name b{padding:2px 4px;border-radius:4px}
+  .risk{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--risk);border-radius:10px;padding:12px 16px;margin:12px 0}
+  .risk.warn{border-left-color:var(--pend)}
+  .risk .t{font-weight:700;margin-bottom:3px}
+  .risk .d{color:var(--mut);font-size:14px}
+  ul{margin:6px 0 6px 18px;padding:0} li{margin:3px 0}
+  .foot{color:var(--mut);font-size:12.5px;margin-top:30px;border-top:1px solid var(--line);padding-top:10px}
+</style>
+</head>
+<body><div class="wrap">
+
+  <h1>Loop de Inteligência de Criativos</h1>
+  <p class="sub">Como o fluxo funciona na prática, de onde vem cada dado, e o que ainda precisa de decisão. — atualizado 21/06/2026</p>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--roteiro)"></span>Roteiro (skill/IA)</span>
+    <span><span class="dot" style="background:var(--editor)"></span>Editor (humano)</span>
+    <span><span class="dot" style="background:var(--cortex)"></span>Cortex (automático)</span>
+    <span><span class="dot" style="background:var(--meta)"></span>Meta Ads</span>
+    <span><span class="dot" style="background:var(--dados)"></span>Dados (CRM/insights)</span>
+  </div>
+
+  <h2>1. O fluxo ponta a ponta</h2>
+  <div class="flow">
+    <div class="step"><div class="who" style="color:var(--roteiro)">Roteiro</div>
+      <div class="card bRoteiro"><div class="t">1. Escreve o roteiro</div>
+        <div class="d">A skill <code>turbo-ads-workflow</code> gera o roteiro (ângulo por hook), cria a pasta no Drive, o Doc do roteiro e a task no ClickUp.</div>
+        <span class="tag">decide o ÂNGULO de cada hook</span><span class="tag">gera a lista de nomes de arquivo</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--editor)">Editor</div>
+      <div class="card bEditor"><div class="t">2. Edita e nomeia os arquivos</div>
+        <div class="d">O editor exporta os criativos e usa <b>exatamente</b> os nomes que a skill prescreveu (não inventa nada — só copia). Sobe pra pasta no Drive.</div>
+        <span class="tag">única disciplina manual</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--cortex)">Cortex</div>
+      <div class="card bCortex"><div class="t">3. Ingestão (fluxo "Criar Campanhas")</div>
+        <div class="d">Ao subir a campanha pelo Cortex, ele lê a pasta: <b>parseia o nome</b> de cada arquivo (ângulo/formato/persona/proporção) e <b>puxa da pasta</b> o link do roteiro (Doc) e o produto (pasta-raiz). Cadastra cada criativo na Biblioteca com um <code>TP##</code>.</div>
+        <span class="tag">cria a linha na Biblioteca</span><span class="tag">sem POST/token</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--meta)">Meta</div>
+      <div class="card bMeta"><div class="t">4. Cria o anúncio no Meta</div>
+        <div class="d">O ad é criado já batizado com o <b>Nome Final</b> (<code>TP## - ...</code>) e com <code>utm_content={{ad.id}}</code> no link.</div>
+        <span class="tag">nome carrega o TP</span><span class="tag">utm = ad_id</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--cortex)">Cortex</div>
+      <div class="card bCortex"><div class="t">5. Sync liga TP ↔ ad_id</div>
+        <div class="d">No sync do Meta, o Cortex casa o <code>TP##</code> do nome do anúncio com a linha da Biblioteca. (Cobre ads criados pelo Cortex e manuais.)</div>
+        <span class="tag">ponte criativo ↔ anúncio</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--dados)">Dados</div>
+      <div class="card bDados"><div class="t">6. Junta performance</div>
+        <div class="d">Por <code>ad_id</code>: spend, hook%, hold%, CTR (Meta) + leads, MQL, vendas, CAC, ROAS (Bitrix via <code>utm_content</code>).</div>
+        <span class="tag">métricas pagas batem c/ aba Criativos</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--cortex)">Cortex</div>
+      <div class="card bCortex"><div class="t">7. Biblioteca + Ranking de Inteligência</div>
+        <div class="d">Cada criativo mostra sua performance. O Ranking agrega por <b>ângulo / formato / persona / proporção / produto</b> → "qual tipo converte melhor".</div>
+        <span class="tag">vira briefing</span></div></div>
+    <div class="arrow">↺</div>
+    <div class="step"><div class="who" style="color:var(--roteiro)">Roteiro</div>
+      <div class="card bRoteiro"><div class="t">8. Próximo roteiro melhor</div>
+        <div class="d">O ranking informa o próximo roteiro — o loop se retroalimenta.</div></div></div>
+  </div>
+
+  <h2>2. De onde vem cada dado (e o que é automático)</h2>
+  <table>
+    <tr><th>Campo</th><th>Fonte</th><th>Automático?</th></tr>
+    <tr><td>Ângulo do hook · Formato de ad · Persona · Proporção</td><td>Nome do arquivo (convenção)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Link do roteiro</td><td>Doc dentro da pasta do Drive</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Produto</td><td>Pasta-raiz no Drive</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Spend · Hook% · Hold% · CTR</td><td>Meta (insights por ad_id)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Leads · MQL · Vendas · CAC · ROAS</td><td>Bitrix (utm_content = ad_id)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Task do ClickUp</td><td>—</td><td><span class="pill manual">não puxado (opcional)</span></td></tr>
+  </table>
+
+  <h2>3. A convenção de nome (o contrato)</h2>
+  <div class="name">vv-<b style="background:rgba(245,158,11,.2)">nome_do_ad</b>-<b style="background:rgba(139,92,246,.25)">react</b>-<b style="background:rgba(139,92,246,.25)">prova_social</b>-<b style="background:rgba(245,158,11,.2)">ana</b>-<b style="background:rgba(59,130,246,.2)">9x16</b>-<b style="background:rgba(34,211,153,.2)">h1_b1_c1</b>-<b style="background:rgba(59,130,246,.2)">v1</b>.mp4</div>
+  <p class="sub" style="margin-top:8px"><code>-</code> separa campo · <code>_</code> dentro de valor composto · ângulo/formato saem da <b>lista controlada</b> · h/b/c = identificadores (hook/body/cta) · a skill gera o nome pronto, o editor só copia.</p>
+
+  <h2>4. Pontos de atenção — o que revisar antes de ir ao ar</h2>
+
+  <div class="risk"><div class="t">⚠️ #1 — Todo ad passa pelo "Criar Campanhas" do Cortex? (o mais importante)</div>
+    <div class="d">A captura das dimensões ricas (ângulo/formato/persona/proporção) e do roteiro/produto só acontece quando o criativo é <b>ingerido pelo fluxo do Cortex</b> (que lê a pasta). Se o ad for subido <b>direto no Gerenciador do Meta</b>, só o <b>spend</b> linka (pelo TP no nome) — as dimensões e o roteiro <b>não</b> são capturados. <br><b>Decisão:</b> padronizar que todo ad sobe pelo Cortex; OU criar um passo que ingira a pasta de qualquer jeito.</div></div>
+
+  <div class="risk warn"><div class="t">Disciplina de nomenclatura</div>
+    <div class="d">A skill gera os nomes, mas o editor precisa aplicar exatamente. Mitigação: o <code>h#</code> é backup do ângulo e os slugs vêm da lista controlada. Ainda assim, vale uma conferência ("o nome bateu?") na subtarefa de subir ad.</div></div>
+
+  <div class="risk warn"><div class="t">Slugs ↔ lista controlada</div>
+    <div class="d">Ângulo/formato no nome precisam existir na lista (<code>prova_social</code> ↔ "Prova social"). Um valor novo fora da lista vira "(sem)" no ranking. → manter a lista (tela ⚙️) alinhada com o roteiro.</div></div>
+
+  <div class="risk warn"><div class="t">Histórico tem atribuição parcial</div>
+    <div class="d">Dos criativos antigos com gasto, ~33% têm leads/vendas (ads antigos nem sempre tinham <code>utm_content=ad_id</code>). Métricas pagas (hook/CTR) são confiáveis; CAC/ROAS histórico é mais fino. <b>Daqui pra frente fica completo.</b></div></div>
+
+  <div class="risk warn"><div class="t">Maioria dos ads está pausada</div>
+    <div class="d">123 de 2.901 ads ativos → em janela recente a maioria mostra zero. Use a janela <b>"Todos"</b> + filtro <b>"Só com investimento"</b>.</div></div>
+
+  <h2>5. Status & o que falta</h2>
+  <table>
+    <tr><th>Parte</th><th>Status</th></tr>
+    <tr><td>Cortex — parser, dimensões, read-back (MQL/CAC alinhados), ranking, UI, linker, puxar do Drive</td><td><span class="pill b-ok">PRONTO + TESTADO</span></td></tr>
+    <tr><td>Skill — convenção de nome (PASSO 4) documentada</td><td><span class="pill b-ok">EDITADO</span> <span class="pill b-pend">revisar/commitar no chief-of-staff</span></td></tr>
+    <tr><td>Time de edição adotar a convenção</td><td><span class="pill b-pend">PENDENTE</span></td></tr>
+    <tr><td>Definir: todo ad passa pelo Cortex? (ponto #1)</td><td><span class="pill b-risk">DECIDIR</span></td></tr>
+    <tr><td>Release — #277 mergear → re-apontar PR pra main + re-verificar read-back</td><td><span class="pill b-pend">DEPENDE DO #277</span></td></tr>
+    <tr><td>clickupTaskId (puxar do ClickUp)</td><td><span class="pill b-pend">OPCIONAL</span></td></tr>
+  </table>
+
+  <p class="foot">Branch <code>feature/criativos-intelligence-loop</code> (porta 3004) · 12 commits · stacked no PR #277. Gerado pra revisão — me aponta o que quiser ajustar.</p>
+
+</div></body></html>

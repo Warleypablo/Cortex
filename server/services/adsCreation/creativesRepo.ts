@@ -117,6 +117,7 @@ function normalizeName(name: string): string {
 export interface ParsedConvention {
   tipo: "vv" | "img" | "car";
   nomeAd: string;
+  produto: string | null;   // creators, ecommerce, estruturacao
   formato: string | null;   // formato de ad (react, caixinha-de-perguntas)
   angulo: string | null;    // ângulo do hook (prova-social)
   personagem: string;
@@ -130,17 +131,16 @@ export interface ParsedConvention {
 const VALID_EXT = /\.(mp4|mov|jpg|jpeg|png)$/i;
 const PROPORCOES = ["9x16", "4x5", "1x1", "16x9"];
 const toSpace = (s: string) => s.replace(/_/g, " ").trim();   // nomeAd, persona
-const toSlug = (s: string) => s.replace(/_/g, "-").trim();    // vocab (formato, angulo)
+const toSlug = (s: string) => s.replace(/_/g, "-").trim();    // vocab (produto, formato, angulo)
 
-export function parseFileNameConvention(filename: string): ParsedConvention | null {
-  if (!filename || !VALID_EXT.test(filename)) return null;
-  const parts = filename.replace(VALID_EXT, "").toLowerCase().split("-");
-  if (parts.length < 7) return null;
+// Núcleo: parseia a string da convenção já sem extensão e minúscula.
+// Ordem: {tipo}-{nomead}-{produto}-{formato}-{angulo}-{persona}-{proporção}-{h#_b#_c#}-v{N}
+function parseConventionParts(base: string): ParsedConvention | null {
+  const parts = base.split("-");
 
   const tipo = parts[0];
   if (tipo !== "vv" && tipo !== "img" && tipo !== "car") return null;
 
-  // Âncoras a partir do fim: variação (v#), bloco h_b_c, proporção.
   const mVar = parts[parts.length - 1].match(/^v(\d{1,2})$/);
   if (!mVar) return null;
   const variacao = `v${mVar[1]}`;
@@ -157,18 +157,20 @@ export function parseFileNameConvention(filename: string): ParsedConvention | nu
   const proporcao = parts[parts.length - 3];
   if (!PROPORCOES.includes(proporcao)) return null;
 
-  // Campos da frente: [nomeAd, formato, angulo, persona] — persona/angulo/formato pela cauda;
+  // Campos da frente: [nomeAd, produto, formato, angulo, persona] — pela cauda;
   // o resto (inclui hífen acidental no nomeAd) vira nomeAd.
   const front = parts.slice(1, parts.length - 3);
-  if (front.length < 4) return null;
+  if (front.length < 5) return null;
   const personagem = front[front.length - 1];
   const angulo = front[front.length - 2];
   const formato = front[front.length - 3];
-  const nomeAd = front.slice(0, front.length - 3).join("-");
+  const produto = front[front.length - 4];
+  const nomeAd = front.slice(0, front.length - 4).join("-");
 
   return {
     tipo,
     nomeAd: toSpace(nomeAd),
+    produto: produto ? toSlug(produto) : null,
     formato: formato ? toSlug(formato) : null,
     angulo: angulo ? toSlug(angulo) : null,
     personagem: toSpace(personagem),
@@ -176,6 +178,30 @@ export function parseFileNameConvention(filename: string): ParsedConvention | nu
     hookCode, bodyCode, ctaCode,
     variacao,
   };
+}
+
+/** Parseia o nome de um ARQUIVO (com extensão). */
+export function parseFileNameConvention(filename: string): ParsedConvention | null {
+  if (!filename || !VALID_EXT.test(filename)) return null;
+  return parseConventionParts(filename.replace(VALID_EXT, "").toLowerCase());
+}
+
+/**
+ * Extrai a convenção de DENTRO do nome do anúncio do Meta e parseia.
+ * O Nome Final é `TP## - {convenção} - {data}`; ads manuais podem ter só a convenção.
+ * Cobre os dois caminhos (Cortex e manual) → o sync usa isto pra popular a Biblioteca.
+ */
+export function parseConventionFromAdName(adName: string): ParsedConvention | null {
+  if (!adName) return null;
+  const m = adName.toLowerCase().match(/(?:vv|img|car)(?:-[a-z0-9_]+)+-v\d{1,2}/);
+  return m ? parseConventionParts(m[0]) : null;
+}
+
+/** A string canônica da convenção (= nomeDrive), extraída do nome do ad. */
+export function extractConventionString(adName: string): string | null {
+  if (!adName) return null;
+  const m = adName.toLowerCase().match(/(?:vv|img|car)(?:-[a-z0-9_]+)+-v\d{1,2}/);
+  return m ? m[0] : null;
 }
 
 // ============== Listagem / busca ==============
@@ -525,6 +551,79 @@ export async function bulkInsertStubs(
     .values(values)
     .onConflictDoNothing({ target: creativesLibrary.tpId })
     .returning();
+}
+
+const TIPO_LABEL: Record<string, string> = { vv: "vídeo", img: "estático", car: "carrossel" };
+
+/**
+ * Garante uma linha na Biblioteca pra cada convenção parseada (chave = nomeDrive = a string da
+ * convenção). Cria as faltantes (gera TP) e PREENCHE dimensões faltantes nas existentes
+ * (sem sobrescrever edições manuais). Idempotente. Usado pelo sync pra cobrir ads manuais.
+ * Retorna mapa nomeDrive → { id, tpId }.
+ */
+export async function upsertCreativesFromConvention(
+  items: { nomeDrive: string; parsed: ParsedConvention }[],
+  createdBy: string | null = null,
+): Promise<Map<string, { id: number; tpId: string }>> {
+  const out = new Map<string, { id: number; tpId: string }>();
+  const byName = new Map<string, ParsedConvention>();
+  for (const it of items) if (it.nomeDrive && !byName.has(it.nomeDrive)) byName.set(it.nomeDrive, it.parsed);
+  const names = Array.from(byName.keys());
+  if (names.length === 0) return out;
+
+  const existing = await db
+    .select({
+      id: creativesLibrary.id, tpId: creativesLibrary.tpId, nomeDrive: creativesLibrary.nomeDrive,
+      angulo: creativesLibrary.angulo, produto: creativesLibrary.produto, personagem: creativesLibrary.personagem,
+      tipoAd: creativesLibrary.tipoAd, formatoAd: creativesLibrary.formatoAd, proporcao: creativesLibrary.proporcao,
+    })
+    .from(creativesLibrary)
+    .where(and(isNull(creativesLibrary.deletedAt), inArray(creativesLibrary.nomeDrive, names)));
+  const existingByName = new Map(existing.map((r) => [r.nomeDrive, r]));
+
+  // 1) Criar as que faltam (gera TPs em lote)
+  const toCreate = names.filter((n) => !existingByName.has(n));
+  if (toCreate.length > 0) {
+    const usedRows = await db.select({ tpId: creativesLibrary.tpId }).from(creativesLibrary);
+    const usedSeqs = new Set<number>();
+    for (const r of usedRows) { const m = r.tpId?.match(/^TP(\d+)$/); if (m) usedSeqs.add(parseInt(m[1], 10)); }
+    const allocate = () => { let s = 1; while (usedSeqs.has(s)) s++; usedSeqs.add(s); return s; };
+
+    const values: InsertCreativeLibraryItem[] = toCreate.map((name) => {
+      const p = byName.get(name)!;
+      const tpId = makeTpId(allocate());
+      return {
+        tpId, nomeDrive: name, nomeFinal: buildNomeFinal({ tpId, nomeDrive: name }),
+        angulo: p.angulo ?? null, produto: p.produto ?? null, personagem: p.personagem || null,
+        tipoAd: TIPO_LABEL[p.tipo] ?? null, formatoAd: p.formato ?? null, proporcao: p.proporcao ?? null,
+        adValidado: false, createdBy,
+      };
+    });
+    const inserted = await db
+      .insert(creativesLibrary).values(values)
+      .onConflictDoNothing({ target: creativesLibrary.tpId })
+      .returning({ id: creativesLibrary.id, tpId: creativesLibrary.tpId, nomeDrive: creativesLibrary.nomeDrive });
+    for (const r of inserted) out.set(r.nomeDrive, { id: r.id, tpId: r.tpId });
+  }
+
+  // 2) Existentes: mapeia e preenche só as dimensões faltantes (não sobrescreve)
+  for (const [name, r] of existingByName) {
+    out.set(name, { id: r.id, tpId: r.tpId });
+    const p = byName.get(name)!;
+    const patch: Record<string, any> = {};
+    if (!r.angulo && p.angulo) patch.angulo = p.angulo;
+    if (!r.produto && p.produto) patch.produto = p.produto;
+    if (!r.personagem && p.personagem) patch.personagem = p.personagem;
+    if (!r.tipoAd && TIPO_LABEL[p.tipo]) patch.tipoAd = TIPO_LABEL[p.tipo];
+    if (!r.formatoAd && p.formato) patch.formatoAd = p.formato;
+    if (!r.proporcao && p.proporcao) patch.proporcao = p.proporcao;
+    if (Object.keys(patch).length > 0) {
+      patch.updatedAt = new Date();
+      await db.update(creativesLibrary).set(patch).where(eq(creativesLibrary.id, r.id));
+    }
+  }
+
+  return out;
 }
 
 export type UpdateCreativeInput = Partial<CreateCreativeInput>;

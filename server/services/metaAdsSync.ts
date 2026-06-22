@@ -6,7 +6,7 @@
  */
 
 import { Pool } from 'pg';
-import { linkAdsByName } from './adsCreation/creativeAdLinker';
+import { linkAdsByName, ingestAndLinkAds } from './adsCreation/creativeAdLinker';
 
 const META_API_VERSION = 'v18.0';
 const META_API_BASE = `https://graph.facebook.com/${META_API_VERSION}`;
@@ -560,15 +560,27 @@ export async function syncMetaAds(pool: Pool, options?: { since?: string; until?
     console.error('[MetaSync] Insights by-platform sync failed:', e.message);
   }
 
-  // 7. Vincula ad_id ↔ tpId da Biblioteca pelos ads batizados com prefixo TP## (nome_match).
-  //    Cobre tanto ads criados via Cortex quanto subidos manualmente no Gerenciador.
+  // 7a. Ingestão UNIVERSAL pelo nome do anúncio (convenção `vv-...-v#`): cria/preenche a linha
+  //     na Biblioteca a partir do nome e vincula o ad_id. Cobre ads do Cortex E manuais.
+  try {
+    const r = await pool.query(`SELECT ad_id, ad_name FROM meta_ads.meta_ads WHERE ad_name IS NOT NULL`);
+    const ing = await ingestAndLinkAds(
+      r.rows.map((x: any) => ({ adId: String(x.ad_id), adName: x.ad_name })),
+    );
+    console.log(`[MetaSync] Ingest por nome: ${ing.linked} vínculos, ${ing.creatives} criativos (de ${ing.ads} ads c/ convenção)`);
+  } catch (e: any) {
+    errors.push(`IngestByName: ${e.message}`);
+    console.error('[MetaSync] Ingest by name failed:', e.message);
+  }
+
+  // 7b. Fallback legado: ads com TP no nome (naming antigo, sem a convenção nova) → liga por TP.
   try {
     const r = await pool.query(`SELECT ad_id, ad_name FROM meta_ads.meta_ads WHERE ad_name ILIKE 'TP%'`);
     const link = await linkAdsByName(
       r.rows.map((x: any) => ({ adId: String(x.ad_id), adName: x.ad_name })),
       { source: 'name_match' },
     );
-    console.log(`[MetaSync] Creative links: ${link.linked} novos vínculos (de ${r.rows.length} ads TP##)`);
+    console.log(`[MetaSync] Creative links (TP legado): ${link.linked} novos (de ${r.rows.length} ads TP##)`);
   } catch (e: any) {
     errors.push(`CreativeLinks: ${e.message}`);
     console.error('[MetaSync] Creative linking failed:', e.message);
