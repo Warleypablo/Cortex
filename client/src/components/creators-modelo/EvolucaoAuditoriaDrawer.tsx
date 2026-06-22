@@ -18,9 +18,9 @@ function fmtMes(m: string | null): string {
 }
 
 export function EvolucaoAuditoriaDrawer({
-  alvo, estado = "ambos", onClose,
+  alvo, estado = "ambos", de, ate, onClose,
 }: {
-  alvo: { modelo: Modelo; mes: string } | null; estado?: Situacao; onClose: () => void;
+  alvo: { modelo: Modelo; mes: string } | null; estado?: Situacao; de?: string; ate?: string; onClose: () => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
   const modelo = alvo?.modelo ?? null;
@@ -28,10 +28,10 @@ export function EvolucaoAuditoriaDrawer({
   const estadoParam = estado === "ambos" ? "todos" : estado;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/creators-modelo/evolucao/clientes", modelo, mes, estadoParam],
+    queryKey: ["/api/creators-modelo/evolucao/clientes", modelo, mes, estadoParam, de, ate],
     enabled: !!alvo,
     queryFn: () =>
-      fetchJson<Resp>(buildUrl("/api/creators-modelo/evolucao/clientes", { modelo: modelo!, mes: mes!, estado: estadoParam })),
+      fetchJson<Resp>(buildUrl("/api/creators-modelo/evolucao/clientes", { modelo: modelo!, mes: mes!, estado: estadoParam, de, ate })),
   });
 
   const clientes = data?.clientes ?? [];
