@@ -94,9 +94,18 @@ export function AuditoriaClientesDrawer({
                             </thead>
                             <tbody>
                               {c.entregas.map((e, i) => {
-                                const entregue = (e.status ?? "").trim().toLowerCase() === "entregue";
+                                const status = (e.status ?? "").trim().toLowerCase();
+                                const entregue = status === "entregue";
+                                const cancelado = status === "cancelado/inativo" || status === "não usar";
+                                // Risco só p/ cancelado (morto). Em progresso (triagem/ativo/
+                                // onboarding/pausado) fica esmaecido — vivo, mas ainda não conta.
+                                const rowCls = entregue
+                                  ? "text-gray-700 dark:text-zinc-300"
+                                  : cancelado
+                                    ? "text-gray-400 line-through decoration-gray-300 dark:text-zinc-600 dark:decoration-zinc-700"
+                                    : "text-gray-400 dark:text-zinc-500";
                                 return (
-                                  <tr key={i} className={`text-sm ${entregue ? "text-gray-700 dark:text-zinc-300" : "text-gray-400 line-through decoration-gray-300 dark:text-zinc-600 dark:decoration-zinc-700"}`}>
+                                  <tr key={i} className={`text-sm ${rowCls}`}>
                                     <td className="px-2 py-1">{e.servico}</td>
                                     <td className="px-2 py-1">
                                       {entregue
