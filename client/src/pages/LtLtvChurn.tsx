@@ -22,6 +22,13 @@ export default function LtLtvChurn() {
   const [unidade, setUnidade] = useState<Unidade>("cliente");
   const [agregador, setAgregador] = useState<Agregador>("media");
   const [estado, setEstado] = useState<Situacao>("ambos");
+  const [periodo, setPeriodo] = useState<string>("tudo"); // "tudo" | "2026" | "2025"
+
+  const anoAtual = new Date().getFullYear();
+  const anos = [anoAtual, anoAtual - 1].map(String);
+  // Período = coorte por data de início do contrato (de/ate em 'YYYY-MM').
+  const de = periodo === "tudo" ? undefined : `${periodo}-01`;
+  const ate = periodo === "tudo" ? undefined : `${periodo}-12`;
 
   const produtoParam = produto === "todos" ? undefined : produto;
 
@@ -39,8 +46,8 @@ export default function LtLtvChurn() {
 
   // Sub-aba "Creators: Recorrente × Pontual" — serviço de Creators.
   const { data: creators } = useQuery({
-    queryKey: ["/api/creators-modelo"],
-    queryFn: () => fetchJson<RedesignPayload>("/api/creators-modelo"),
+    queryKey: ["/api/creators-modelo", de, ate],
+    queryFn: () => fetchJson<RedesignPayload>(buildUrl("/api/creators-modelo", { de, ate })),
   });
 
   const produtos = benchmark?.produtos.map((p) => p.produto).filter(Boolean) ?? [];
@@ -118,13 +125,24 @@ export default function LtLtvChurn() {
                 <SelectItem value="cancelado">Cancelados</SelectItem>
               </SelectContent>
             </Select>
+            <Select value={periodo} onValueChange={setPeriodo}>
+              <SelectTrigger className="w-[160px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="tudo">Todo o período</SelectItem>
+                {anos.map((a) => (
+                  <SelectItem key={a} value={a}>{a === String(anoAtual) ? `${a} (ano atual)` : a}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
           </div>
           {!creators ? (
             <div className="h-64 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800/50" />
           ) : (
-            <TabelaLtLtv data={creators} unidade={unidade} agregador={agregador} estado={estado} />
+            <TabelaLtLtv data={creators} unidade={unidade} agregador={agregador} estado={estado} de={de} ate={ate} />
           )}
-          <EvolucaoLtLtv unidade={unidade} agregador={agregador} estado={estado} />
+          <EvolucaoLtLtv unidade={unidade} agregador={agregador} estado={estado} de={de} ate={ate} />
         </TabsContent>
       </Tabs>
     </div>

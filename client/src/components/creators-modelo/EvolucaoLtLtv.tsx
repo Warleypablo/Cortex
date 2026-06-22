@@ -30,17 +30,17 @@ const GRUPOS: Array<{ key: "recorrente" | "pontual"; label: string; cor: string;
 ];
 
 export function EvolucaoLtLtv({
-  unidade, agregador, estado,
+  unidade, agregador, estado, de, ate,
 }: {
-  unidade: Unidade; agregador: Agregador; estado: Situacao;
+  unidade: Unidade; agregador: Agregador; estado: Situacao; de?: string; ate?: string;
 }) {
   const [audit, setAudit] = useState<{ modelo: "recorrente" | "pontual"; mes: string } | null>(null);
   const estadoParam = estado === "ambos" ? "todos" : estado;
   const { data } = useQuery({
-    queryKey: ["/api/creators-modelo/evolucao", unidade, agregador, estadoParam],
+    queryKey: ["/api/creators-modelo/evolucao", unidade, agregador, estadoParam, de, ate],
     queryFn: () =>
       fetchJson<{ meses: EvolucaoMes[] }>(
-        buildUrl("/api/creators-modelo/evolucao", { unidade, agregador, estado: estadoParam }),
+        buildUrl("/api/creators-modelo/evolucao", { unidade, agregador, estado: estadoParam, de, ate }),
       ),
   });
 
@@ -110,7 +110,7 @@ export function EvolucaoLtLtv({
         )}
       </CardContent>
     </Card>
-    <EvolucaoAuditoriaDrawer alvo={audit} estado={estado} onClose={() => setAudit(null)} />
+    <EvolucaoAuditoriaDrawer alvo={audit} estado={estado} de={de} ate={ate} onClose={() => setAudit(null)} />
     </>
   );
 }
