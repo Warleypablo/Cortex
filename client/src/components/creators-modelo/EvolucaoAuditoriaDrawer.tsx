@@ -34,9 +34,10 @@ export function EvolucaoAuditoriaDrawer({
       fetchJson<Resp>(buildUrl("/api/creators-modelo/evolucao/clientes", { modelo: modelo!, mes: mes!, estado: estadoParam, de, ate })),
   });
 
-  // só quem contribui de alguma forma p/ a meta: tem receita realizada (≥1 entregue
-  // no pontual; LTV realizado no recorrente). Tira quem está na base mas não entregou nada.
-  const clientes = (data?.clientes ?? []).filter((c) => c.ltv > 0);
+  // só quem CONTA na meta (LT): pontual com 2+ entregas; recorrente com LT válido.
+  // Combinado: entrega única do pontual NÃO contabiliza (ltMeses null) → fora.
+  const todos = data?.clientes ?? [];
+  const clientes = todos.filter((c) => c.ltMeses != null);
   const corModelo = modelo === "recorrente" ? "text-sky-600 dark:text-sky-400" : "text-indigo-600 dark:text-indigo-400";
   const isRec = modelo === "recorrente";
 
@@ -53,7 +54,7 @@ export function EvolucaoAuditoriaDrawer({
             Auditoria — <span className={corModelo}>{isRec ? "Recorrente" : "Pontual"}</span> · {fmtMes(mes)}
           </SheetTitle>
           <p className="text-xs text-gray-500 dark:text-zinc-400">
-            {isLoading ? "Carregando…" : `${clientes.length} clientes contribuindo (receita realizada) · `}
+            {isLoading ? "Carregando…" : `${clientes.length} de ${todos.length} clientes contam no LT${isRec ? "" : " (2+ entregas)"} · `}
             {isRec
               ? "LT = idade da base (meses) · LTV = realizado (valorr × meses)"
               : "LT = nº de entregas entregues (1 = 1 mês; entrega única fora do LT) · LTV = realizado (só entregues)"}
