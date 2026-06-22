@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BPDreTable, type BPLinha } from "@/components/bp2026/BPDreTable";
 import { BPCellDetail } from "@/components/bp2026/BPCellDetail";
+import { BPReconciliacao } from "@/components/bp2026/BPReconciliacao";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 
@@ -28,6 +29,8 @@ export default function BP2026() {
     queryKey: ["/api/bp2026/receitas"],
   });
   const [detalhe, setDetalhe] = useState<{ metrica: string; mes: number } | null>(null);
+  const [recon, setRecon] = useState<{ produto: string; mes: number; titulo: string } | null>(null);
+  const PRODUTOS_REVENUE = ["performance", "creators", "social", "gc", "others"];
 
   if (isLoading) {
     return (
@@ -90,7 +93,15 @@ export default function BP2026() {
             linhas={data.revenue}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
-            onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
+            onCellClick={(metrica, mes) => {
+              const prod = metrica.startsWith("mrr_") ? metrica.slice(4) : "";
+              if (PRODUTOS_REVENUE.includes(prod)) {
+                const titulo = data.revenue.find((l) => l.metrica === metrica)?.titulo ?? prod;
+                setRecon({ produto: prod, mes, titulo });
+              } else {
+                setDetalhe({ metrica, mes });
+              }
+            }}
           />
         </TabsContent>
         <TabsContent value="funil" className="mt-4">
@@ -163,6 +174,12 @@ export default function BP2026() {
           ...data.cacDetalhe, ...data.outrasDetalhe,
         ]}
         onClose={() => setDetalhe(null)}
+      />
+      <BPReconciliacao
+        produto={recon?.produto ?? null}
+        mes={recon?.mes ?? null}
+        titulo={recon?.titulo ?? ""}
+        onClose={() => setRecon(null)}
       />
       <p className="text-xs text-gray-500 dark:text-zinc-500">
         MRR: ClickUp (snapshot fim do mês) · Pontual: Bitrix (vendas ganhas — proxy de

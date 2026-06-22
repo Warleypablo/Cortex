@@ -1,5 +1,111 @@
 # Changelog
 
+## 2026-06-21 | refactor(sync-jobs): job único 12h roda todas as plataformas de ads juntas
+
+**O que foi feito:**
+- Consolidados os jobs de sync de mídia paga num **único job a cada 12h** que roda **Meta + Google + TikTok + LinkedIn juntos**, em paralelo e isolados (`Promise.allSettled` — uma plataforma falhar não derruba as outras). Antes eram 5 jobs separados (Meta 6h + 3 escalonados).
+- Novo `server/services/adsSyncAll.ts` (`syncAllAdsPlatforms`) — orquestrador reusável pelo job agendado e pelo runner manual.
+- `scripts/run-all-ads-sync.ts` passou a reusar o orquestrador (uma fonte da verdade).
+- Preserva `__metaSyncStatus` para o endpoint `/api/meta-ads/sync-status`.
+
+**Por que:**
+- A pedido: todas as plataformas no mesmo ciclo; 12h é suficiente para dado diário e mais gentil com o rate-limit das APIs. O job de keywords da agência (schema `google_ads`) fica à parte.
+
+**Arquivos alterados:**
+- `server/services/adsSyncAll.ts` (novo) · `server/index.ts` (Meta 6h → job unificado 12h; remove os 3 blocos por plataforma) · `scripts/run-all-ads-sync.ts` (reusa o serviço).
+
+**Impacto arquitetural:** Um ponto único de orquestração dos 4 canais de ads.
+
+---
+
+## 2026-06-21 | feat(sync-jobs): syncs de Google/TikTok/LinkedIn agendados + fix Google Ads API v21
+
+**O que foi feito:**
+- **Fix Google Ads API:** `googleSync.ts` usava a API v20, que o Google descontinuou → o sync da Turbo falhava com `UNSUPPORTED_VERSION` e os dados pararam em 11/jun. Subido para **v21** (sondado: v21..v24 ativas; v21 é a mais antiga ativa, minimiza breaking changes nas GAQL). Validado: voltou a puxar (dado fresco, gasto de junho saltou de R$1.291 → R$2.413).
+- **Agendadores em produção** (no `server/index.ts`, espelhando o job do Meta de 6h): Google Turbo, TikTok Ads e LinkedIn Ads passam a rodar no boot (escalonados 75s/105s/135s) e a cada **12h**. Antes só o Meta era agendado; os outros tinham serviço pronto mas ninguém disparava.
+- `scripts/run-tiktok-ads-sync.ts`: runner manual do sync de TikTok Ads.
+
+**Por que:**
+- Sem isso, Google/TikTok/LinkedIn nunca ficavam frescos (Google parou em 11/jun por causa da API morta; TikTok estava zerado por nunca ter rodado). Agora os 4 canais atualizam sozinhos como o Meta.
+
+**Descobertas de diagnóstico (não-código):**
+- A credencial `advertiser` do TikTok já está conectada (3 contas desde 05/jun); a `INSTAGRAM_ENCRYPTION_KEY` correta é hex de 64 chars (a local estava corrompida — corrigida no .env local, que é gitignored).
+- Em produção o app conecta como `postgres` (superuser) → não há barreira de permissão; o `permission denied` em tiktok/linkedin é só do role local `growth_dev`.
+
+**Arquivos alterados:**
+- `server/services/googleSync.ts` - API_VERSION v20 → v21.
+- `server/index.ts` - 3 novos jobs de sync agendados (12h).
+- `scripts/run-tiktok-ads-sync.ts` - runner manual (novo).
+
+**Impacto arquitetural:** Paridade de automação entre as 4 plataformas de mídia paga. Cada job isola erros (try/catch + status em globalThis) — uma plataforma falhando não derruba as outras nem o boot.
+
+---
+
+## 2026-06-21 | feat(orcamento-campanhas): multi-plataforma (TikTok/LinkedIn) + projeção conta hoje
+
+**O que foi feito:**
+- **Projeção (As Is)** passou a considerar o gasto de **hoje** ao decidir se uma campanha "está entregando". Antes a janela era os 3 dias *anteriores* (excluindo hoje), então campanhas criadas/iniciadas hoje não tinham o orçamento extrapolado na projeção — só o gasto já realizado. Agora `date <= CURRENT_DATE`.
+- **Suporte multi-plataforma** na aba: além de Meta e Google, agora há blocos de fetch para **TikTok** (`tiktok.ad_campaigns` / `ad_metrics_daily`) e **LinkedIn** (`linkedin.*`). Cada plataforma tem `try/catch`: se o schema não existir ou faltar permissão, é ignorada sem quebrar as demais.
+- Constante `PLATFORMS` (meta|google|tiktok|linkedin) com type derivado; `ACTIVE_STATUSES` cobre os enums de status de cada canal. Endpoints `/tag` e `/stage` validam contra `PLATFORMS`; removido o CHECK de `platform` em `campaign_tags`.
+- Front: rótulos/ordem/cores/ícones para as 4 plataformas (Meta azul, Google âmbar, TikTok rosa, LinkedIn ciano) e sub-agrupamento por plataforma já genérico.
+
+**Por que:**
+- A aba será usada com todos os canais de mídia paga. Deixar a estrutura pronta faz adicionar um canal ser "só plugar" (constante + bloco de fetch). A correção da projeção evita subestimar o investimento ao subir campanhas novas no meio do mês.
+
+**Arquivos alterados:**
+- `server/routes/orcamentoCampanhas.ts` - janela de entrega inclui hoje; PLATFORMS/ACTIVE_STATUSES; blocos TikTok/LinkedIn; validação de plataforma nos endpoints.
+- `server/db.ts` + `scripts/create_campaign_tags.sql` - remove CHECK de platform em campaign_tags.
+- `client/src/pages/GrowthOrcamentoCampanhas.tsx` - 4 plataformas (type/labels/cores/ícones); remove flag SHOW_GOOGLE.
+
+**Impacto arquitetural:** Adiciona plataformas como dimensão extensível. Em prod, TikTok/LinkedIn só aparecem se o role do app tiver SELECT nos schemas `tiktok`/`linkedin` (localmente o `growth_dev` não tem — queries validadas por sintaxe, mas permission denied).
+
+---
+
+## 2026-06-20 | feat(orcamento-campanhas): planejamento top-down por etapa do funil
+
+**O que foi feito:**
+- O planejamento de investimento deixou de ser por campanha individual e passou a ser por **etapa do funil**. Define-se o total mensal do pool e distribui-se entre as etapas (Descoberta, Relacionamento, Conversão, Remarketing, Institucional).
+- Alvo de cada etapa em modo **híbrido**: % do total do pool ou valor R$ travado, com **barra de fechamento** ao vivo (mostra distribuído vs total: "fecha 100%", "faltam X" ou "passou X").
+- Tabela reagrupada por etapa dentro da aba (pool). O cabeçalho de cada etapa mostra alvo, orç. diário atual, projeção, investido, % atingido e o ritmo R$/dia necessário para bater o alvo.
+- Campanhas viram execução: só somam o gasto real ao balde da etapa, sem alvo individual. Select de etapa por campanha (manual).
+- DB: `campaign_tags` ganhou coluna `stage` (e `tag` virou nullable); novas tabelas `budget_pool_plan` (total por pool/mês) e `budget_stage_plan` (alvo por etapa, value+unit).
+- Backend: GET retorna `stage` por campanha e `plans` por pool; novos endpoints `PUT /stage`, `/plan/total` e `/plan/stage`.
+
+**Por que:**
+- Calcular meta R$ campanha a campanha era inviável e impreciso. Planejar por etapa (com % do total) deixa o replanejamento instantâneo — mudou o total, todas as etapas em % reescalam sozinhas.
+
+**Arquivos alterados:**
+- `server/db.ts` - coluna stage + tabelas de plano no bootstrap.
+- `server/routes/orcamentoCampanhas.ts` - constante CAMPAIGN_STAGES, stage/plans no GET, endpoints de stage e plano.
+- `client/src/pages/GrowthOrcamentoCampanhas.tsx` - reestruturação por etapa, editores de plano (total + alvo híbrido), barra de fechamento, select de etapa.
+- `scripts/create_campaign_tags.sql` - stage + migração de tag nullable.
+- `scripts/create_budget_plan.sql` - tabelas de plano (referência).
+
+**Impacto arquitetural:** Muda a unidade de planejamento (campanha → etapa). A `campaign_monthly_budget` e o endpoint `/meta` ficam órfãos (não usados na UI nova), preservados por ora; podem ser removidos depois.
+
+---
+
+## 2026-06-20 | feat(orcamento-campanhas): tags/grupos por campanha com abas de filtro
+
+**O que foi feito:**
+- Nova tabela `cortex_core.campaign_tags` (tag única por campanha, sem coluna `month` — a classificação persiste entre meses).
+- Coluna "Grupo" editável inline na tela /growth/orcamento-campanhas (dropdown Inbound/Evento/Sem tag), restrita aos editores autorizados.
+- Abas de filtro no topo (Todas / Inbound / Evento / Sem tag) com contagem por aba; cards de resumo, subtotais e tabela passam a refletir a aba ativa.
+- Endpoint `PUT /api/growth/orcamento-campanhas/tag` para salvar/limpar a tag, validando contra a constante `CAMPAIGN_TAGS`.
+
+**Por que:**
+- A conta de Meta Ads é compartilhada por times com produtos/orçamentos distintos (ex: funis principais vs. campanhas de evento de outro time), o que polui a visão de orçamento. As abas permitem isolar e somar o orçamento de cada grupo separadamente.
+
+**Arquivos alterados:**
+- `server/db.ts` - criação da tabela `campaign_tags` no bootstrap.
+- `server/routes/orcamentoCampanhas.ts` - constante `CAMPAIGN_TAGS`, anexa `tag` em cada campanha no GET, novo endpoint PUT de tag.
+- `client/src/pages/GrowthOrcamentoCampanhas.tsx` - abas de filtro, coluna Grupo com `TagSelect` inline, filtro/contagem por aba.
+- `scripts/create_campaign_tags.sql` - script de referência da tabela.
+
+**Impacto arquitetural:** Nenhum — segue o mesmo padrão da tabela `campaign_monthly_budget` e dos endpoints existentes da mesma tela.
+
+---
+
 ## 2026-06-19 | feat(tiktok): agendar sync orgânico + script de disparo manual
 
 **O que foi feito:**
@@ -7,7 +113,7 @@
 - Criado `scripts/sync-tiktok-organic.ts` para disparo manual do sync (`npx tsx scripts/sync-tiktok-organic.ts`).
 
 **Por que:**
-- O pipeline de métricas orgânicas do TikTok já existia ponta a ponta (OAuth → tabelas `tiktok.*` → `tiktokOrganicSync` → endpoint `/api/growth/orcado-realizado/tiktok` → tela Orçado x Realizado), mas o sync **nunca rodava sozinho** (não estava no scheduler) — por isso a tela exibia tudo zerado. Agendar o sync + ter um disparo manual destrava o abastecimento assim que as credenciais forem confirmadas no ambiente (Replit).
+- O pipeline de métricas orgânicas do TikTok já existia ponta a ponta (OAuth → tabelas `tiktok.*` → `tiktokOrganicSync` → endpoint `/api/growth/orcado-realizado/tiktok` → tela Orçado x Realizado), mas o sync **nunca rodava sozinho** (não estava no scheduler) — por isso a tela exibia tudo zerado. Agendar o sync + ter um disparo manual destrava o abastecimento assim que as credenciais forem confirmadas no ambiente (prod/Render).
 
 **Arquivos alterados:**
 - `server/index.ts` - novo bloco do job `runTiktokOrganicSync` (setTimeout inicial + setInterval 12h) com gate de env.

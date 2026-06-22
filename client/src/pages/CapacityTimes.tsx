@@ -420,22 +420,31 @@ function Overview({ teams }: { teams: TeamSummary[] }) {
     .filter((t) => t.util_mrr_pct !== null || t.util_contas_pct !== null)
     .map((t) => ({ time: t.time, mrr: t.util_mrr_pct, contas: t.util_contas_pct }));
 
-  const cards: { label: string; value: string; tone?: string; sub?: string }[] = [
+  // Faturamento por cabeça — mesmo número exibido no Investors Report
+  // (faturamento mensal médio em regime caixa ÷ headcount total da empresa).
+  const { data: investors } = useQuery<{ equipe: { faturamentoPorCabeca: number } }>({
+    queryKey: ["/api/investors-report"],
+  });
+  const fatPorCabeca = investors?.equipe.faturamentoPorCabeca ?? 0;
+
+  const cards: { label: string; value: string; tone?: string; sub?: string; note?: string }[] = [
     { label: "MRR Operando (total)", value: formatCurrency(totalOperando) },
     { label: "Capacity MRR (total)", value: formatCurrency(totalCap), sub: capParcial ? `cobre ${totalComCap} de ${totalPessoas} pessoas` : undefined },
     { label: "Espaço de crescimento", value: formatCurrency(totalGap), tone: totalGap < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400", sub: capParcial ? "só de quem tem cap de MRR" : undefined },
     { label: "MRR em cancelamento (risco)", value: formatCurrency(totalCancel), tone: totalCancel > 0 ? "text-red-600 dark:text-red-400" : "text-gray-900 dark:text-white" },
+    { label: "Fat. / Cabeça", value: formatCurrency(fatPorCabeca), note: "realizado / mês (média)" },
   ];
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
         {cards.map((c) => (
           <Card key={c.label} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
             <CardContent className="pt-4 pb-4">
               <p className="text-xs text-gray-500 dark:text-zinc-400">{c.label}</p>
               <p className={cn("text-xl font-bold", c.tone ?? "text-gray-900 dark:text-white")}>{c.value}</p>
               {c.sub && <p className="text-[10px] text-amber-600 dark:text-amber-400">{c.sub}</p>}
+              {c.note && <p className="text-[10px] text-gray-400 dark:text-zinc-500">{c.note}</p>}
             </CardContent>
           </Card>
         ))}

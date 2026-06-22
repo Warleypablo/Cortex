@@ -29,6 +29,17 @@ const PONTUAL_OPERADOR_OVERRIDE: Record<string, Record<string, number>> = {
   "2026-05": { "Davi Ferraz": 95500 },
 };
 
+// Reclassificação manual de churn por squad — afeta APENAS o slide "Detalhes por Squad" do
+// Reporte Mensal (não altera vw_cup_churn_ajustado nem qualquer outro dashboard de churn).
+// Move um contrato de churn (identificado pelo task_id da subtask do ClickUp — único por
+// contrato, NÃO usar parent_id que é o cliente e agrupa vários contratos) de uma squad para
+// outra, somente no mês indicado. O nome, valor e flag de abonado do contrato são preservados.
+// mai/2026: PharmaPack — contrato Performance (task_id 86a78223q, R$ 1.997) sai da Selva e
+// entra na Black. O contrato Sustentação (Tech, R$ 997) do mesmo cliente NÃO é tocado.
+const CHURN_SQUAD_OVERRIDE: Record<string, { taskId: string; squadDestino: string }[]> = {
+  "2026-05": [{ taskId: "86a78223q", squadDestino: "🐑 Black" }],
+};
+
 async function initCustomSlidesTable(db: any) {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS cortex_core.relatorio_slides_custom (
@@ -147,6 +158,20 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
       const overrideNomeAlvo = daviPontualOverride !== null ? "Davi Ferraz" : null;
       const overrideValorPontual = daviPontualOverride ?? 0;
 
+      // Reclassificação de squad no churn por squad (query 16). Aplica os overrides do mês via
+      // CASE sobre v.task_id; sem overrides para o mês, usa v.squad puro. Valor, contagem e
+      // lista de clientes migram para a squad de destino automaticamente pela agregação.
+      // OBS: a query 16 agrupa por `GROUP BY 1` (posição), não pela expressão — repetir o CASE
+      // parametrizado no GROUP BY gera placeholders distintos ($n) e o Postgres não o reconhece
+      // como a mesma expressão do SELECT ("must appear in the GROUP BY clause").
+      const churnSquadOverrides = CHURN_SQUAD_OVERRIDE[mesParam] || [];
+      const churnSquadExpr = churnSquadOverrides.length > 0
+        ? sql`CASE ${sql.join(
+            churnSquadOverrides.map((o) => sql`WHEN v.task_id = ${o.taskId} THEN ${o.squadDestino}`),
+            sql` `,
+          )} ELSE v.squad END`
+        : sql`v.squad`;
+
       // Run all queries in parallel
       const [
         novosResult,
@@ -164,7 +189,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         turboClientesResult,
         turboChurnResult,
         turboCxcsResult,
-        crosssellPorCloserResult,
+        crosssellHistoricoResult,
         turboFaturamentoResult,
         turboRetencoesResult,
         indicacoesResult,
@@ -433,22 +458,29 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND d.data_fechamento < ${dataEnd}
         `),
 
-        // 12b. Cross-sell por closer (source PARTNER, mês de dados)
+        // 12b. Histórico mensal de Cross-sell/Upsell (source PARTNER) — YTD do ano de dados.
+        // Série de jan/{ano} até o mês de referência; generate_series + LEFT JOIN garantem que
+        // meses sem deal apareçam zerados. Total = mrr + pontual (calculado no frontend).
         db.execute(sql`
+          WITH meses AS (
+            SELECT generate_series(
+              DATE_TRUNC('year', ${dataStart}::date),
+              ${dataStart}::date,
+              INTERVAL '1 month'
+            )::date AS mes_inicio
+          )
           SELECT
-            COALESCE(c.nome, 'Sem Responsável') as nome,
-            COALESCE(SUM(d.valor_recorrente), 0)::numeric as mrr,
-            COALESCE(SUM(d.valor_pontual), 0)::numeric as pontual,
-            COUNT(*)::int as contratos
-          FROM "Bitrix".crm_deal d
-          LEFT JOIN "Bitrix".crm_closers c
-            ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
-          WHERE d.stage_name = 'Negócio Ganho'
+            TO_CHAR(m.mes_inicio, 'YYYY-MM') AS mes,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric AS mrr,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric AS pontual
+          FROM meses m
+          LEFT JOIN "Bitrix".crm_deal d
+            ON d.stage_name = 'Negócio Ganho'
             AND d.source = 'PARTNER'
-            AND d.data_fechamento >= ${dataStart}
-            AND d.data_fechamento < ${dataEnd}
-          GROUP BY COALESCE(c.nome, 'Sem Responsável')
-          ORDER BY (COALESCE(SUM(d.valor_recorrente), 0) + COALESCE(SUM(d.valor_pontual), 0)) DESC
+            AND d.data_fechamento >= m.mes_inicio
+            AND d.data_fechamento < (m.mes_inicio + INTERVAL '1 month')
+          GROUP BY m.mes_inicio
+          ORDER BY m.mes_inicio
         `),
 
         // 13. Faturamento pontual do mês (cup_contratos — data_entrega no mês)
@@ -608,7 +640,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         // clientes: lista p/ tooltip (nome do cliente via cup_clientes; só contratos com valor_r > 0)
         db.execute(sql`
           SELECT
-            v.squad,
+            ${churnSquadExpr} as squad,
             COALESCE(SUM(v.valor_r), 0)::numeric as churn_total_brl,
             COUNT(*)::int as churn_total_count,
             COALESCE(SUM(v.valor_r) FILTER (WHERE COALESCE(v.abonar_churn, '') != 'Sim'), 0)::numeric as churn_brl,
@@ -631,7 +663,7 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             AND v.data_solicitacao_encerramento < ${dataEnd}
             AND v.squad IS NOT NULL
             AND TRIM(v.squad) != ''
-          GROUP BY v.squad
+          GROUP BY 1
         `),
 
         // 16b. Pontual entregue no mês por squad (cup_contratos com data_entrega no mês)
@@ -1360,11 +1392,10 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         crosssellPontual: parseFloat(turboCxcs.crosssell_pontual) || 0,
         cxcsSolicitacoes: parseInt(turboCxcs.solicitacoes) || 0,
         crosssellContratos: parseInt(turboCxcs.solicitacoes) || 0,
-        crosssellPorCloser: (crosssellPorCloserResult.rows as any[]).map((row: any) => ({
-          nome: row.nome,
+        crosssellHistorico: (crosssellHistoricoResult.rows as any[]).map((row: any) => ({
+          mes: row.mes,
           mrr: parseFloat(row.mrr) || 0,
           pontual: parseFloat(row.pontual) || 0,
-          contratos: parseInt(row.contratos) || 0,
         })),
         faturamentoPontual: parseFloat(turboFat.faturamento_pontual) || 0,
         pontualCommerceQtr: parseFloat((pontualCommerceQtrResult.rows as any[])[0]?.pontual_commerce_qtr) || 0,
