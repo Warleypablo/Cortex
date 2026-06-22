@@ -1,6 +1,6 @@
 export interface Placar {
   porCliente: { recorrente: number; pontual: number; recorrenteAtivo: number; razao: number };
-  volume: { pontualReceita: number; pontualClientes: number; recorrenteRealizado: number; recorrenteMrrCorrente: number; recorrenteClientes: number };
+  volume: { pontualReceita: number; pontualClientes: number; recorrenteRealizado: number; recorrenteMrrCorrente: number; recorrenteClientes: number; recorrenteClientesAtivos: number };
   breakEven: { ticketPontual: number; minRecompras: number; maxRecompras: number; recompraRealPct: number };
 }
 export interface LtvMaduro { realizadoBlended: number; realizadoAtivo: number; projetadoChurn: number; premissaChurnMeses: number; }

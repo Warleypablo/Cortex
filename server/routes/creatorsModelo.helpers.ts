@@ -406,7 +406,6 @@ export function buildPlacar(rows: RawRow[], hoje: string): Placar {
     : 0;
   const recompra = buildRecompra(rows);
 
-  const round1 = (n: number) => Math.round(n * 10) / 10;
   return {
     porCliente: {
       recorrente: recAgg.ltvMedia,
@@ -422,6 +421,7 @@ export function buildPlacar(rows: RawRow[], hoje: string): Placar {
         rec.filter((r) => classifyEstadoRecorrente(r) === "ativo").reduce((s, r) => s + (r.valorr ?? 0), 0),
       ),
       recorrenteClientes: recCli.length,
+      recorrenteClientesAtivos: recAtivoAgg.n,
     },
     breakEven: {
       ticketPontual,
@@ -443,8 +443,9 @@ export function buildMixMensal(rows: RawRow[]): MixMes[] {
   for (const r of rows) {
     if (!r.dataInicio) continue;
     const mes = r.dataInicio.slice(0, 7);
-    const m = map.get(mes) ?? { mes, pontualN: 0, pontualValor: 0, recorrenteN: 0, recorrenteMrrNovo: 0 };
     const modelo = classifyModelo(r);
+    if (modelo !== "pontual" && modelo !== "recorrente") continue;
+    const m = map.get(mes) ?? { mes, pontualN: 0, pontualValor: 0, recorrenteN: 0, recorrenteMrrNovo: 0 };
     if (modelo === "pontual") { m.pontualN += 1; m.pontualValor += r.valorp ?? 0; }
     else if (modelo === "recorrente") { m.recorrenteN += 1; m.recorrenteMrrNovo += r.valorr ?? 0; }
     map.set(mes, m);
