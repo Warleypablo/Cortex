@@ -130,7 +130,11 @@ export function AuditoriaClientesDrawer({
                             return (
                               <p className="mt-2 px-2 text-xs text-gray-500 dark:text-zinc-400">
                                 LTV = {formatCurrencyNoDecimals(c.ltv)} · soma só das {nEntregue} entrega{nEntregue === 1 ? "" : "s"} entregue{nEntregue === 1 ? "" : "s"} (de {c.entregas.length}).
-                                {" "}LT = nº de entregas entregues (1 = 1 mês){c.ltMeses == null ? " — sem entregas" : `: ${c.ltMeses} ${c.ltMeses === 1 ? "mês" : "meses"}`}.
+                                {" "}LT = {nEntregue >= 2
+                                  ? `${c.ltMeses} meses (nº de entregas entregues)`
+                                  : nEntregue === 1
+                                    ? "— entrega única não conta no LT"
+                                    : "— sem entregas"}.
                               </p>
                             );
                           })()}
