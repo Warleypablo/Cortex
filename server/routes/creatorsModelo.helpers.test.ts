@@ -467,19 +467,22 @@ describe("buildClientesDetalhe", () => {
 
 describe("buildEvolucaoClientes", () => {
   const rows: EvoSnapRow[] = [
-    { idTask: "A", nome: "Cli A", status: "ativo", valorr: 1000, valorp: 0, servico: "Gestão", dataInicio: "2026-01-01" },
-    { idTask: "B", nome: "Cli B", status: "cancelado/inativo", valorr: 2000, valorp: 0, servico: "Gestão", dataInicio: "2026-01-01" },
-    { idTask: "P", nome: "Pont", status: "entregue", valorr: 0, valorp: 5000, servico: "1ª Entrega", dataInicio: "2026-02-01" },
-    { idTask: "Q", nome: "Q2", status: "entregue", valorr: 0, valorp: 3000, servico: "1ª Entrega", dataInicio: "2026-01-01" },
-    { idTask: "Q", nome: "Q2", status: "entregue", valorr: 0, valorp: 3000, servico: "2ª Entrega", dataInicio: "2026-03-01" },
+    { idTask: "A", nome: "Cli A", status: "ativo", valorr: 1000, valorp: 0, servico: "Gestão", dataInicio: "2026-01-01", dataFim: null },
+    { idTask: "B", nome: "Cli B", status: "cancelado/inativo", valorr: 2000, valorp: 0, servico: "Gestão", dataInicio: "2026-01-01", dataFim: "2026-02-01" },
+    { idTask: "P", nome: "Pont", status: "entregue", valorr: 0, valorp: 5000, servico: "1ª Entrega", dataInicio: "2026-02-01", dataFim: null },
+    { idTask: "Q", nome: "Q2", status: "entregue", valorr: 0, valorp: 3000, servico: "1ª Entrega", dataInicio: "2026-01-01", dataFim: null },
+    { idTask: "Q", nome: "Q2", status: "entregue", valorr: 0, valorp: 3000, servico: "2ª Entrega", dataInicio: "2026-03-01", dataFim: null },
   ];
-  it("recorrente: LT = idade da base; LTV = valorr × idade; filtra por estado", () => {
+  it("recorrente: ativo conta idade; cancelado conta LT realizado (→ data_fim); filtra estado", () => {
     const todos = buildEvolucaoClientes(rows, "recorrente", "ambos", "2026-04-01");
     expect(todos).toHaveLength(2);          // A e B (P/Q são pontuais)
     const a = todos.find((c) => c.idTask === "A")!;
     expect(a.estado).toBe("ativo");
-    expect(a.ltMeses).toBeCloseTo(2.96, 1); // jan→abr
+    expect(a.ltMeses).toBeCloseTo(2.96, 1); // ativo → idade jan→abr
     expect(a.ltv).toBeGreaterThan(0);       // 1000 × idade
+    const b = todos.find((c) => c.idTask === "B")!;
+    expect(b.estado).toBe("cancelado");
+    expect(b.ltMeses).toBeCloseTo(1.0, 1);  // cancelado → realizado jan→fev (não idade jan→abr)
     const ativos = buildEvolucaoClientes(rows, "recorrente", "ativo", "2026-04-01");
     expect(ativos.map((c) => c.idTask)).toEqual(["A"]); // B (cancelado) fora
   });
