@@ -106,15 +106,25 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
             LOWER(TRIM(COALESCE(h.status,''))) AS status,
             COALESCE(h.valorr::numeric,0) AS vr,
             COALESCE(h.valorp::numeric,0) AS vp,
-            h.data_inicio::date AS di
+            h.data_inicio::date AS di,
+            v.data_fim::date AS df   -- data de churn (NULL se ativo) p/ LT realizado do cancelado
           FROM meses mz
           JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = mz.fim
+          LEFT JOIN cortex_core.vw_lt_contratos v
+            ON v.id_subtask = h.id_subtask AND NOT v.data_inconsistente
           WHERE h.servico ILIKE '%creator%' ${cohortDe} ${cohortAte}
         ),
         rec_unit AS (
           SELECT m, ${grainRec} AS uid,
-            GREATEST(0,(fim - MIN(di)))/30.44 AS lt,
-            SUM(vr * GREATEST(0,(fim - di))/30.44) AS ltv,
+            -- LT: unidade com contrato ativo → idade (1ª compra → snapshot);
+            -- só cancelada → LT realizado (1ª compra → data_fim), igual à tabela do topo.
+            CASE WHEN bool_or(status IN ('ativo','onboarding','triagem','pausado'))
+              THEN GREATEST(0,(fim - MIN(di)))/30.44
+              ELSE GREATEST(0,(MAX(LEAST(fim, COALESCE(df, fim))) - MIN(di)))/30.44 END AS lt,
+            -- LTV: por contrato — ativo → valorr × idade; cancelado → valorr × realizado.
+            SUM(CASE WHEN status IN ('ativo','onboarding','triagem','pausado')
+              THEN vr * GREATEST(0,(fim - di))/30.44
+              ELSE vr * GREATEST(0,(LEAST(fim, COALESCE(df, fim)) - di))/30.44 END) AS ltv,
             -- MRR ativo do mês = Σ valorr da base que está faturando (ativo/onboarding/triagem)
             SUM(vr) FILTER (WHERE status IN ('ativo','onboarding','triagem')) AS mrr,
             bool_or(status IN ('ativo','onboarding','triagem','pausado')) AS tem_ativo,
@@ -204,10 +214,13 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
           COALESCE(h.valorp::numeric,0) AS valorp,
           h.servico,
           to_char(h.data_inicio::date,'YYYY-MM-DD') AS data_inicio,
+          to_char(v.data_fim::date,'YYYY-MM-DD') AS data_fim,
           to_char((SELECT d FROM alvo),'YYYY-MM-DD') AS fim
         FROM "Clickup".cup_data_hist h
         JOIN alvo ON h.data_snapshot::date = alvo.d
         LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+        LEFT JOIN cortex_core.vw_lt_contratos v
+          ON v.id_subtask = h.id_subtask AND NOT v.data_inconsistente
         WHERE h.servico ILIKE '%creator%' ${cohortDe} ${cohortAte}
       `);
       const rows = result.rows as any[];
@@ -216,7 +229,7 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       const snap: EvoSnapRow[] = rows.map((r) => ({
         idTask: r.id_task, nome: r.nome ?? null, status: r.status ?? null,
         valorr: Number(r.valorr) || 0, valorp: Number(r.valorp) || 0,
-        servico: r.servico ?? "", dataInicio: r.data_inicio ?? null,
+        servico: r.servico ?? "", dataInicio: r.data_inicio ?? null, dataFim: r.data_fim ?? null,
       }));
       res.json({ mes, modelo, clientes: buildEvolucaoClientes(snap, modelo, estado, fim) });
     } catch (error) {
