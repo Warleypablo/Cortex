@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { Link } from "wouter";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { OverviewCards } from "@/components/lt-ltv-churn/OverviewCards";
@@ -33,7 +34,10 @@ export default function LtLtvChurn() {
 
   return (
     <div className="space-y-6 p-4 md:p-6">
-      <div className="flex items-center justify-end">
+      <div className="flex items-center justify-end gap-4">
+        <Link href="/creators-modelo" className="text-xs text-sky-600 dark:text-sky-400 hover:underline">
+          → Creators: Recorrente × Pontual
+        </Link>
         <Select value={produto} onValueChange={setProduto}>
           <SelectTrigger className="w-[200px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
             <SelectValue placeholder="Produto" />
