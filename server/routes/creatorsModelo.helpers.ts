@@ -341,6 +341,97 @@ function toPontRows(rows: RawRow[]): PontRawRow[] {
     }));
 }
 
+// ─── Task 2 (redesign): LTV maduro e Placar ──────────────────────────────────
+
+export interface LtvMaduro {
+  realizadoBlended: number;
+  realizadoAtivo: number;
+  projetadoChurn: number;
+  premissaChurnMeses: number;
+}
+
+export function buildLtvMaduro(rows: RawRow[], hoje: string): LtvMaduro {
+  const rec = rows.filter((r) => classifyModelo(r) === "recorrente");
+  const cli = buildUnitsRecorrente(rec, "cliente", hoje);
+  const blended = aggregateMetricas(cli);
+  const ativos = cli.filter((u) => u.estado === "ativo");
+  const realizadoAtivo = aggregateMetricas(ativos).ltvMedia;
+  const mrrAtivo = (() => {
+    const v = rec.filter((r) => classifyEstadoRecorrente(r) === "ativo" && r.valorr > 0).map((r) => r.valorr);
+    return v.length ? Math.round(v.reduce((s, x) => s + x, 0) / v.length) : 0;
+  })();
+  const ltCancelados = rec
+    .filter((r) => classifyEstadoRecorrente(r) === "cancelado" && !r.dataInconsistente && r.ltMeses != null)
+    .map((r) => r.ltMeses!);
+  const premissaChurnMeses = ltCancelados.length
+    ? Math.round((ltCancelados.reduce((s, x) => s + x, 0) / ltCancelados.length) * 10) / 10
+    : 0;
+  return {
+    realizadoBlended: blended.ltvMedia,
+    realizadoAtivo,
+    projetadoChurn: Math.round(mrrAtivo * premissaChurnMeses),
+    premissaChurnMeses,
+  };
+}
+
+export interface BreakEven {
+  ticketPontual: number;
+  minRecompras: number;
+  maxRecompras: number;
+  recompraRealPct: number;
+}
+
+export interface Placar {
+  porCliente: { recorrente: number; pontual: number; recorrenteAtivo: number; razao: number };
+  volume: {
+    pontualReceita: number; pontualClientes: number;
+    recorrenteRealizado: number; recorrenteMrrCorrente: number; recorrenteClientes: number;
+  };
+  breakEven: BreakEven;
+}
+
+export function buildPlacar(rows: RawRow[], hoje: string): Placar {
+  const rec = rows.filter((r) => classifyModelo(r) === "recorrente");
+  const pont = rows.filter((r) => classifyModelo(r) === "pontual");
+  const recCli = buildUnitsRecorrente(rec, "cliente", hoje);
+  const pontCli = buildUnitsPontual(pont, "cliente", hoje);
+  const recAgg = aggregateMetricas(recCli);
+  const pontAgg = aggregateMetricas(pontCli);
+  const recAtivoAgg = aggregateMetricas(recCli.filter((u) => u.estado === "ativo"));
+
+  const ltv = buildLtvMaduro(rows, hoje);
+  const ticketsEntregue = pont.filter((r) => r.status?.trim().toLowerCase() === "entregue").map((r) => r.valorp ?? 0);
+  const ticketPontual = ticketsEntregue.length
+    ? Math.round(ticketsEntregue.reduce((s, x) => s + x, 0) / ticketsEntregue.length)
+    : 0;
+  const recompra = buildRecompra(rows);
+
+  const round1 = (n: number) => Math.round(n * 10) / 10;
+  return {
+    porCliente: {
+      recorrente: recAgg.ltvMedia,
+      pontual: pontAgg.ltvMedia,
+      recorrenteAtivo: recAtivoAgg.ltvMedia,
+      razao: pontAgg.ltvMedia ? round1(recAgg.ltvMedia / pontAgg.ltvMedia) : 0,
+    },
+    volume: {
+      pontualReceita: Math.round(pont.reduce((s, r) => s + (r.valorp ?? 0), 0)),
+      pontualClientes: pontCli.length,
+      recorrenteRealizado: Math.round(rec.reduce((s, r) => s + (r.ltvRecorrente ?? 0), 0)),
+      recorrenteMrrCorrente: Math.round(
+        rec.filter((r) => classifyEstadoRecorrente(r) === "ativo").reduce((s, r) => s + (r.valorr ?? 0), 0),
+      ),
+      recorrenteClientes: recCli.length,
+    },
+    breakEven: {
+      ticketPontual,
+      minRecompras: ticketPontual ? round1(ltv.realizadoBlended / ticketPontual) : 0,
+      maxRecompras: ticketPontual ? round1(ltv.realizadoAtivo / ticketPontual) : 0,
+      recompraRealPct: recompra.pctRecompra,
+    },
+  };
+}
+
 export function buildCreatorsModeloPayload(
   rows: RawRow[], opts: { de?: string; ate?: string; hoje: string },
 ): CreatorsModeloPayload {
