@@ -109,6 +109,64 @@ async function listFolderContents(folderId: string): Promise<FolderContents> {
   return { files, subfolders };
 }
 
+// ============== Contexto da pasta: roteiro (Doc) + produto (pela linhagem) ==============
+// Em vez de a skill empurrar esses dados, o Cortex puxa do próprio Drive na ingestão:
+// - roteiro = o Google Doc que mora na pasta do ad (criado pela skill no PASSO 3)
+// - produto = inferido pela pasta-pai do ad (raízes por produto, do turbo-ads-workflow)
+
+const DOC_MIME = "application/vnd.google-apps.document";
+
+// IDs das pastas-raiz por produto (turbo-ads-workflow → PASSO 1). vídeo e imagem mapeiam pro mesmo produto.
+const PRODUTO_BY_ROOT: Record<string, string> = {
+  "1uYCpqUUk_kUhiGLqxeG-T489xIK_4yXQ": "creators",       // Creators vídeo
+  "1xEV4TUWE_mmnDOlT4S2-glPrRpigJVP-": "creators",       // Creators imagem
+  "1-YyoW8UNo6MaTdy_lhxYqlw_gDfk18cH": "ecommerce",      // E-Commerce vídeo
+  "1GSnXmN5ZV6UY5zD590M9GaFdA05t-U7I": "ecommerce",      // E-Commerce imagem
+  "1d3JjYzwMFSXtPACUXNtJfRLnB1Ect0p2": "estruturacao",  // Estruturação vídeo
+  "1--jZ5VkBRZ2drH2Lhpy3NWk1ljUZlOFX": "estruturacao",  // Estruturação imagem
+};
+
+async function getParentId(folderId: string): Promise<string | null> {
+  const drive = getDriveClient();
+  const r = await drive.files.get({ fileId: folderId, fields: "parents", supportsAllDrives: true });
+  return r.data.parents?.[0] ?? null;
+}
+
+async function findRoteiroDoc(folderId: string): Promise<string | null> {
+  const drive = getDriveClient();
+  const r = await drive.files.list({
+    q: `'${folderId}' in parents and mimeType = '${DOC_MIME}' and trashed = false`,
+    fields: "files(id, name)",
+    pageSize: 5,
+    supportsAllDrives: true,
+    includeItemsFromAllDrives: true,
+  });
+  const doc = r.data.files?.[0];
+  return doc?.id ? `https://docs.google.com/document/d/${doc.id}/edit` : null;
+}
+
+/**
+ * Resolve roteiroUrl + produto a partir da pasta colada — subindo a linhagem (pasta, pai, avô)
+ * pra cobrir o caso de colarem a subpasta "01 - Editados".
+ */
+export async function resolveFolderContext(
+  folderUrl: string,
+): Promise<{ roteiroUrl: string | null; produto: string | null }> {
+  const folderId = extractFolderId(folderUrl);
+  const parent = await getParentId(folderId).catch(() => null);
+  const grandparent = parent ? await getParentId(parent).catch(() => null) : null;
+
+  let produto: string | null = null;
+  for (const id of [folderId, parent, grandparent]) {
+    if (id && PRODUTO_BY_ROOT[id]) { produto = PRODUTO_BY_ROOT[id]; break; }
+  }
+
+  let roteiroUrl = await findRoteiroDoc(folderId).catch(() => null);
+  if (!roteiroUrl && parent) roteiroUrl = await findRoteiroDoc(parent).catch(() => null);
+
+  return { roteiroUrl, produto };
+}
+
 /**
  * Lista arquivos de mídia (imagem/vídeo) na pasta. Não baixa o conteúdo.
  * Compat: continua existindo pra fluxo single mode antigo.

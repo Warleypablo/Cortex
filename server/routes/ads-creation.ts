@@ -22,7 +22,7 @@ import {
   listAudiences,
   type CreationBookmark,
 } from "../services/adsCreation";
-import { listDriveFolder, listDriveFolderTree } from "../services/adsCreation/driveLoader";
+import { listDriveFolder, listDriveFolderTree, resolveFolderContext } from "../services/adsCreation/driveLoader";
 import {
   listAllForMatching,
   parseFileNameConvention,
@@ -336,10 +336,12 @@ export function registerAdsCreationRoutes(app: Express) {
         }
         const tree = await listDriveFolderTree(driveFolderUrl);
 
-        // Cabeçalho de batch (se a skill já gravou): stubs herdam os campos comuns e
-        // resolvem angulo/bodyTipo/ctaTipo via os códigos hNN/bNN/cNN do nome do arquivo.
+        // Cabeçalho de batch (se a skill já gravou): stubs herdam os campos comuns.
         const batchFolderId = extractDriveFolderId(driveFolderUrl);
         const batch = await getBatchByFolderId(batchFolderId);
+        // Contexto puxado do próprio Drive (sem POST/token): link do roteiro (Doc na pasta) + produto
+        // (pela pasta-raiz). É a fonte primária; o batch é fallback caso exista.
+        const driveCtx = await resolveFolderContext(driveFolderUrl).catch(() => ({ roteiroUrl: null, produto: null }));
 
         // Match contra a Biblioteca pra sinalizar arquivos sem cadastro
         const libraryRows = await listAllForMatching();
@@ -380,9 +382,9 @@ export function registerAdsCreationRoutes(app: Express) {
               // ângulo do HOOK vem direto do nome; h# via batch é backup. body/cta (b#/c#) são só
               // identificadores (ficam no nome, não viram campo semântico).
               angulo: parsed.angulo ?? mod.angulo ?? null,
-              // campos comuns herdados do cabeçalho do batch
-              produto: batch?.produto ?? null,
-              roteiroUrl: batch?.roteiroUrl ?? null,
+              // campos comuns: batch (se houver) tem prioridade; senão, puxado do Drive
+              produto: batch?.produto ?? driveCtx.produto ?? null,
+              roteiroUrl: batch?.roteiroUrl ?? driveCtx.roteiroUrl ?? null,
               clickupTaskId: batch?.clickupTaskId ?? null,
               driveFolderId: batchFolderId ?? null,
             });
@@ -392,8 +394,8 @@ export function registerAdsCreationRoutes(app: Express) {
             nomeDrive,
             linkDrive,
             driveFileId: f.id,
-            produto: batch?.produto ?? null,
-            roteiroUrl: batch?.roteiroUrl ?? null,
+            produto: batch?.produto ?? driveCtx.produto ?? null,
+            roteiroUrl: batch?.roteiroUrl ?? driveCtx.roteiroUrl ?? null,
             clickupTaskId: batch?.clickupTaskId ?? null,
             driveFolderId: batchFolderId ?? null,
           });
