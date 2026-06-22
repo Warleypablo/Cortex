@@ -725,6 +725,12 @@ export interface EvoSnapRow {
   valorp: number;
   servico: string;
   dataInicio: string | null;
+  dataFim: string | null; // data de churn (vw_lt_contratos) p/ LT realizado do cancelado
+}
+
+/** Menor data ('YYYY-MM-DD') entre `a` e `b` (b pode ser null). */
+function minData(a: string, b: string | null): string {
+  return b && b < a ? b : a;
 }
 
 const STATUS_REC_ATIVO = ["ativo", "onboarding", "triagem", "pausado"];
@@ -758,14 +764,27 @@ export function buildEvolucaoClientes(
 
     if (modelo === "recorrente") {
       const st = (r: EvoSnapRow) => (r.status ?? "").trim().toLowerCase();
-      const temAtivo = modeloRows.some((r) => STATUS_REC_ATIVO.includes(st(r)));
+      const ativoRow = (r: EvoSnapRow) => STATUS_REC_ATIVO.includes(st(r));
+      const temAtivo = modeloRows.some(ativoRow);
       const temCancel = modeloRows.some((r) => STATUS_REC_CANCEL.includes(st(r)));
       if (!temAtivo && !temCancel) continue; // fantasma (ex.: entregue) — fora
       estadoCli = temAtivo ? "ativo" : "cancelado";
       const inicios = modeloRows.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
       const ini = inicios[0] ?? null;
-      lt = ini ? mesesEntre(ini, fim) : null;
-      ltv = modeloRows.reduce((s, r) => s + (r.dataInicio ? r.valorr * mesesEntre(r.dataInicio, fim) : 0), 0);
+      // LT: ativo → idade (1ª compra → mês); cancelado → realizado (→ data_fim, capado no mês).
+      if (temAtivo) {
+        lt = ini ? mesesEntre(ini, fim) : null;
+      } else {
+        const ends = modeloRows.map((r) => minData(fim, r.dataFim)).sort();
+        const end = ends[ends.length - 1] ?? null;
+        lt = ini && end ? mesesEntre(ini, end) : null;
+      }
+      // LTV: por contrato — ativo → valorr × idade; cancelado → valorr × realizado.
+      ltv = modeloRows.reduce((s, r) => {
+        if (!r.dataInicio) return s;
+        const end = ativoRow(r) ? fim : minData(fim, r.dataFim);
+        return s + r.valorr * mesesEntre(r.dataInicio, end);
+      }, 0);
     } else {
       const estados = modeloRows.map((r) => classifyEstadoPontual(r.status));
       estadoCli = estados.includes("em_producao") ? "em_producao"
