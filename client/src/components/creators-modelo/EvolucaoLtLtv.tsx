@@ -56,7 +56,7 @@ export function EvolucaoLtLtv({
         <p className="text-xs text-gray-500 dark:text-zinc-400">
           Base presente em cada snapshot de fim de mês (cup_data_hist). Recorrente = base ativa do mês
           (exclui churnados que já saíram → lê mais alto que o total acima, que é blended com cancelados).
-          {" "}Pontual: 1 entrega entregue = 1 mês; LTV = realizado (só entregues).
+          {" "}Pontual: 1 entrega entregue = 1 mês (entrega única fora do LT); LTV = realizado (só entregues).
         </p>
       </CardHeader>
       <CardContent className="overflow-x-auto">
