@@ -42,7 +42,7 @@ export function TabelaLtLtv({
         <p className="text-xs text-gray-500 dark:text-zinc-400">
           {unidade === "cliente" ? "Por cliente" : "Por contrato"} · {agregador === "media" ? "Média" : "Mediana"} · {ESTADO_LABEL[estado]}
           {" "}· LTV recorrente = realizado até hoje · LTV pontual = realizado (só entregas com status “entregue”)
-          {" "}· Lifetime do pontual = nº de entregas entregues (1 entrega = 1 mês)
+          {" "}· Lifetime do pontual = nº de entregas entregues (1 entrega = 1 mês; entrega única fora do LT)
         </p>
       </CardHeader>
       <CardContent className="overflow-x-auto">

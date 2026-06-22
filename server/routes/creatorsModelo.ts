@@ -132,7 +132,7 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
           FROM rec_unit WHERE ${recPred} GROUP BY m
         ),
         pont_agg AS (
-          SELECT m, COUNT(*) AS cli, ${agg(sql`NULLIF(entregues,0)`)} AS lt, ${agg(sql`ltv`)} AS ltv
+          SELECT m, COUNT(*) AS cli, ${agg(sql`CASE WHEN entregues >= 2 THEN entregues END`)} AS lt, ${agg(sql`ltv`)} AS ltv
           FROM pont_unit WHERE ${pontPred} GROUP BY m
         )
         SELECT mz.m AS mes,
