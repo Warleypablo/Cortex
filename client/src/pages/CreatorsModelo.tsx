@@ -89,7 +89,7 @@ export default function CreatorsModelo() {
       ) : (
         <>
           <AvisosMetodologicos meta={data.meta} coorte={data.coorte} />
-          <HeadlineCards data={data} unidade={unidade} agregador={agregador} />
+          <HeadlineCards data={data} agregador={agregador} />
           <TabelaLtLtv data={data} unidade={unidade} agregador={agregador} situacao={situacao} />
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2"><FunilSobrevivencia data={data} /></div>
