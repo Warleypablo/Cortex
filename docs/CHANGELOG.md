@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-22 | chore(biblioteca): cadastro + reordenação CRM Recompra (body→cta→hook)
+
+**O que foi feito:**
+- Cadastro dos 36 criativos 9x16 do lote CRM Recompra (Lucas) na Biblioteca como TP1630–TP1665, via `createCreative` (TP sequencial, sem gap-fill)
+- Reordenação de TP1630–TP1665 pra ordem **body → cta → hook**: todos os hooks de b1c1 (h1..h9), depois b1c2, b2c1, b2c2 — UPDATE in-place em 2 fases (tp_id temporário → final, casado por `driveFileId`) pra não colidir no unique constraint
+- `subir-crm-planilha.ts` atualizado pra usar a ordenação body→cta→hook como padrão das próximas subidas
+- `verificar-utm.ts`: utilitário só-leitura que confere o `url_tags` dos ads criados na sessão contra a UTM padrão da Turbo
+
+**Por que:**
+- O usuário definiu a ordem de preenchimento da planilha como body→cta→hook (preencher todos os h1..h10 de b1c1, depois b1c2, etc.), substituindo a ordem hook→body→cta usada na primeira subida
+- Manter os TPs sequenciais e agrupados por body/cta facilita a leitura da Biblioteca e o pareamento na criação dos ads
+
+**Arquivos novos:**
+- `subir-crm-planilha.ts` - cadastra o lote CRM 9x16 na Biblioteca
+- `reordenar-crm.ts` - reordena TP1630–1665 pra body→cta→hook
+- `verificar-utm.ts` - confere UTM dos ads criados (só leitura)
+
+**Impacto arquitetural:** Nenhum — scripts one-off + reordenação de dados na Biblioteca, sem mudança de schema.
+
+---
+
 ## 2026-06-17 | chore(ads-creation): script one-off de upload de criativos Ana (Bastidores)
 
 **O que foi feito:**
