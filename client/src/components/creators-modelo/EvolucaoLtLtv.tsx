@@ -3,7 +3,8 @@ import { Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
-import { fetchJson } from "@/components/lt-ltv-churn/utils";
+import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
+import type { Unidade, Agregador, Situacao } from "./types";
 
 interface ModMetric { clientes: number; lt: number | null; ltv: number | null; }
 interface EvolucaoMes { mes: string; recorrente: ModMetric; pontual: ModMetric; }
@@ -27,10 +28,18 @@ const GRUPOS: Array<{ key: "recorrente" | "pontual"; label: string; cor: string;
   { key: "pontual", label: "Pontual", cor: "text-indigo-600 dark:text-indigo-400", barra: "bg-indigo-500" },
 ];
 
-export function EvolucaoLtLtv() {
+export function EvolucaoLtLtv({
+  unidade, agregador, estado,
+}: {
+  unidade: Unidade; agregador: Agregador; estado: Situacao;
+}) {
+  const estadoParam = estado === "ambos" ? "todos" : estado;
   const { data } = useQuery({
-    queryKey: ["/api/creators-modelo/evolucao"],
-    queryFn: () => fetchJson<{ meses: EvolucaoMes[] }>("/api/creators-modelo/evolucao"),
+    queryKey: ["/api/creators-modelo/evolucao", unidade, agregador, estadoParam],
+    queryFn: () =>
+      fetchJson<{ meses: EvolucaoMes[] }>(
+        buildUrl("/api/creators-modelo/evolucao", { unidade, agregador, estado: estadoParam }),
+      ),
   });
 
   const th = "px-3 py-2 text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-zinc-500";

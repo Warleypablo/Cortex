@@ -339,6 +339,9 @@ function gruposDeUnidade(rows: RawRow[], unidade: "cliente" | "contrato", hoje: 
   for (const e of ESTADOS_PONT) {
     grupos.push({ modelo: "pontual", estado: e, metricas: aggregateMetricas(pontUnits.filter((u) => u.estado === e)) });
   }
+  // 'ativo' do pontual = não-cancelado (em produção + concluído) — espelha o
+  // 'ativo' do recorrente p/ o filtro global de estado (Ativos × Cancelados).
+  grupos.push({ modelo: "pontual", estado: "ativo", metricas: aggregateMetricas(pontUnits.filter((u) => u.estado !== "cancelado")) });
   grupos.push({ modelo: "pontual", estado: "total", metricas: aggregateMetricas(pontUnits) });
   return grupos;
 }
