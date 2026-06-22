@@ -153,6 +153,7 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
         ),
         pont_agg AS (
           SELECT m, COUNT(*) AS cli,
+            COUNT(*) FILTER (WHERE entregues >= 2) AS cli_lt,
             ${agg(sql`CASE WHEN entregues >= 2 THEN entregues END`)} AS lt,
             ${agg(sql`CASE WHEN entregues >= 2 THEN ltv END`)} AS ltv
           FROM pont_unit WHERE ${pontPred} GROUP BY m
@@ -166,7 +167,8 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
         )
         SELECT mz.m AS mes,
           COALESCE(r.cli,0)::int AS rec_cli, r.lt AS rec_lt, r.ltv AS rec_ltv, r.fat AS rec_fat,
-          COALESCE(p.cli,0)::int AS pont_cli, p.lt AS pont_lt, p.ltv AS pont_ltv, pf.fat AS pont_fat
+          COALESCE(p.cli,0)::int AS pont_cli, COALESCE(p.cli_lt,0)::int AS pont_cli_lt,
+          p.lt AS pont_lt, p.ltv AS pont_ltv, pf.fat AS pont_fat
         FROM (SELECT DISTINCT m FROM meses) mz
         LEFT JOIN rec_agg r ON r.m = mz.m
         LEFT JOIN pont_agg p ON p.m = mz.m
@@ -177,8 +179,8 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       const r0 = (n: any) => (n == null ? null : Math.round(Number(n)));
       const meses = (result.rows as any[]).map((r) => ({
         mes: r.mes,
-        recorrente: { clientes: Number(r.rec_cli), lt: r1(r.rec_lt), ltv: r0(r.rec_ltv), faturamento: r0(r.rec_fat) },
-        pontual: { clientes: Number(r.pont_cli), lt: r1(r.pont_lt), ltv: r0(r.pont_ltv), faturamento: r0(r.pont_fat) },
+        recorrente: { clientes: Number(r.rec_cli), clientesLt: Number(r.rec_cli), lt: r1(r.rec_lt), ltv: r0(r.rec_ltv), faturamento: r0(r.rec_fat) },
+        pontual: { clientes: Number(r.pont_cli), clientesLt: Number(r.pont_cli_lt), lt: r1(r.pont_lt), ltv: r0(r.pont_ltv), faturamento: r0(r.pont_fat) },
       }));
       res.json({ meses });
     } catch (error) {

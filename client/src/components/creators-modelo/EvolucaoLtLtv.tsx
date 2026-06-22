@@ -7,7 +7,7 @@ import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import { EvolucaoAuditoriaDrawer } from "./EvolucaoAuditoriaDrawer";
 import type { Unidade, Agregador, Situacao } from "./types";
 
-interface ModMetric { clientes: number; lt: number | null; ltv: number | null; faturamento: number | null; }
+interface ModMetric { clientes: number; clientesLt: number; lt: number | null; ltv: number | null; faturamento: number | null; }
 interface EvolucaoMes { mes: string; recorrente: ModMetric; pontual: ModMetric; }
 
 const MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -94,9 +94,14 @@ export function EvolucaoLtLtv({
                             <button
                               onClick={() => setAudit({ modelo: g.key, mes: m.mes })}
                               className="font-medium text-sky-600 underline-offset-2 hover:underline dark:text-sky-400"
-                              title="Ver clientes e auditar entregas deste mês"
+                              title="Ver clientes que contam no LT deste mês"
                             >
-                              {l.get(m[g.key])}
+                              {m[g.key].clientes}
+                              {m[g.key].clientesLt < m[g.key].clientes && (
+                                <span className="ml-1 text-xs font-normal text-gray-400 dark:text-zinc-500">
+                                  ({m[g.key].clientesLt} no LT)
+                                </span>
+                              )}
                             </button>
                           ) : (
                             l.get(m[g.key])
