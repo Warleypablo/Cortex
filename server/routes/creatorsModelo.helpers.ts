@@ -171,13 +171,19 @@ export function buildUnitsPontual(
   rows: RawRow[], unidade: "cliente" | "contrato", hoje: string,
 ): Unit[] {
   if (unidade === "contrato") {
-    return rows.map((r) => ({
-      estado: classifyEstadoPontual(r.status),
-      lt: 0,            // 1 contrato pontual não tem span
-      nEntregas: 1,
-      ltv: r.valorp ?? 0,
-      idadeMeses: r.dataInicio ? mesesEntre(r.dataInicio, hoje) : 0,
-    }));
+    return rows.map((r) => {
+      // Lifetime (meses) = tempo de relação do contrato: início → encerramento
+      // (se houver) ou hoje (em produção / sem data_fim). Mesma régua do recorrente.
+      const emProducao = classifyEstadoPontual(r.status) === "em_producao";
+      const fim = emProducao || r.dataInconsistente || !r.dataFim ? hoje : r.dataFim;
+      return {
+        estado: classifyEstadoPontual(r.status),
+        lt: r.dataInicio ? mesesEntre(r.dataInicio, fim) : null,
+        nEntregas: 1,
+        ltv: r.valorp ?? 0,
+        idadeMeses: r.dataInicio ? mesesEntre(r.dataInicio, hoje) : 0,
+      };
+    });
   }
   const byCli = new Map<string, RawRow[]>();
   for (const r of rows) {
@@ -186,20 +192,19 @@ export function buildUnitsPontual(
   }
   const units: Unit[] = [];
   for (const [, items] of Array.from(byCli.entries())) {
-    // LT do pontual = tempo entre a 1ª e a última ENTREGA elegível (entregue/
-    // ativo/pausado); exclui triagem/onboarding (pré-entrega) e cancelado/não
-    // usar. ~0 quando há uma única entrega; null quando não há entrega elegível.
-    const datasEntrega = items
-      .filter((r) => isEntregaElegivel(r.status))
-      .map((r) => r.dataInicio)
-      .filter((d): d is string => !!d)
-      .sort();
-    const lt = datasEntrega.length
-      ? mesesEntre(datasEntrega[0], datasEntrega[datasEntrega.length - 1])
-      : null;
-    // Idade = 1ª compra (qualquer status) → hoje.
     const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
     const ini = inicios[0] ?? null;
+    // Lifetime (meses) = tempo de relação: 1ª compra → encerramento (se já encerrou)
+    // ou hoje (em produção / sem data_fim). Mesma régua do recorrente. O pontual
+    // raramente registra data_fim, então tende a contar até hoje (tempo de relação).
+    const emProducao = items.some((r) => classifyEstadoPontual(r.status) === "em_producao");
+    const finsValidos = items
+      .filter((r) => !r.dataInconsistente)
+      .map((r) => r.dataFim)
+      .filter((d): d is string => !!d)
+      .sort();
+    const fim = emProducao || finsValidos.length === 0 ? hoje : finsValidos[finsValidos.length - 1];
+    const lt = ini ? mesesEntre(ini, fim) : null;
     units.push({
       estado: estadoClientePontual(items),
       lt,

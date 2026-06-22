@@ -19,12 +19,10 @@ export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
     grupos.find((g) => g.modelo === modelo && g.estado === "total");
 
   const ltMeses = (g: Grupo) => (agregador === "media" ? g.metricas.ltMesesMedia : g.metricas.ltMesesMediana);
-  const ent = (g: Grupo) => (agregador === "media" ? g.metricas.nEntregasMedia : g.metricas.nEntregasMediana);
   const ltv = (g: Grupo) => (agregador === "media" ? g.metricas.ltvMedia : g.metricas.ltvMediana);
 
-  // Lifetime na unidade nativa: recorrente em meses, pontual em nº de entregas.
-  const lifetime = (modelo: string, g: Grupo): string =>
-    modelo === "recorrente" ? `${ltMeses(g)} meses` : `${ent(g)} entregas`;
+  // Lifetime = tempo de relação em meses (1ª compra → encerramento ou hoje), para os dois modelos.
+  const lifetime = (g: Grupo): string => `${ltMeses(g)} meses`;
 
   const th = "px-4 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-gray-400 dark:text-zinc-500";
   const thNum = th + " text-right";
@@ -40,7 +38,7 @@ export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
             <CardTitle className="text-base">LT &amp; LTV — Recorrente × Pontual</CardTitle>
             <p className="text-xs text-gray-500 dark:text-zinc-400">
               {unidade === "cliente" ? "Por cliente" : "Por contrato"} · {agregador === "media" ? "Média" : "Mediana"}
-              {" "}· LTV recorrente = realizado até hoje · Lifetime: recorrente em meses, pontual em nº de entregas
+              {" "}· LTV recorrente = realizado até hoje · Lifetime = tempo de relação (1ª compra → encerramento/hoje)
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -84,7 +82,7 @@ export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
                     </span>
                   </td>
                   <td className={tdNum}>{g.metricas.n}</td>
-                  <td className={tdNum}>{lifetime(modelo, g)}</td>
+                  <td className={tdNum}>{lifetime(g)}</td>
                   <td className={`${tdNum} text-base font-bold`}>{formatCurrencyNoDecimals(ltv(g))}</td>
                 </tr>
               );
