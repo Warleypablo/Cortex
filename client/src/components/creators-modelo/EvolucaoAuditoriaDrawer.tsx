@@ -18,20 +18,21 @@ function fmtMes(m: string | null): string {
 }
 
 export function EvolucaoAuditoriaDrawer({
-  alvo, estado = "ambos", de, ate, onClose,
+  alvo, estado = "ambos", de, ate, incluirUnicas = false, onClose,
 }: {
-  alvo: { modelo: Modelo; mes: string } | null; estado?: Situacao; de?: string; ate?: string; onClose: () => void;
+  alvo: { modelo: Modelo; mes: string } | null; estado?: Situacao; de?: string; ate?: string; incluirUnicas?: boolean; onClose: () => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
   const modelo = alvo?.modelo ?? null;
   const mes = alvo?.mes ?? null;
   const estadoParam = estado === "ambos" ? "todos" : estado;
+  const incluirUnicasParam = incluirUnicas ? "1" : undefined;
 
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/creators-modelo/evolucao/clientes", modelo, mes, estadoParam, de, ate],
+    queryKey: ["/api/creators-modelo/evolucao/clientes", modelo, mes, estadoParam, de, ate, incluirUnicasParam],
     enabled: !!alvo,
     queryFn: () =>
-      fetchJson<Resp>(buildUrl("/api/creators-modelo/evolucao/clientes", { modelo: modelo!, mes: mes!, estado: estadoParam, de, ate })),
+      fetchJson<Resp>(buildUrl("/api/creators-modelo/evolucao/clientes", { modelo: modelo!, mes: mes!, estado: estadoParam, de, ate, incluirUnicas: incluirUnicasParam })),
   });
 
   // só quem CONTA na meta (LT): pontual com 2+ entregas; recorrente com LT válido.
@@ -54,7 +55,7 @@ export function EvolucaoAuditoriaDrawer({
             Auditoria — <span className={corModelo}>{isRec ? "Recorrente" : "Pontual"}</span> · {fmtMes(mes)}
           </SheetTitle>
           <p className="text-xs text-gray-500 dark:text-zinc-400">
-            {isLoading ? "Carregando…" : `${clientes.length} de ${todos.length} clientes contam no LT${isRec ? "" : " (2+ entregas)"} · `}
+            {isLoading ? "Carregando…" : `${clientes.length} de ${todos.length} clientes contam no LT${isRec ? "" : incluirUnicas ? " (1+ entrega)" : " (2+ entregas)"} · `}
             {isRec
               ? "LT = idade da base (meses) · LTV = realizado (valorr × meses)"
               : "LT = nº de entregas entregues (1 = 1 mês; entrega única fora do LT) · LTV = realizado (só entregues)"}

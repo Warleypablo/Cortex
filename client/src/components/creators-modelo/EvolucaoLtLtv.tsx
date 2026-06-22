@@ -31,17 +31,18 @@ const GRUPOS: Array<{ key: "recorrente" | "pontual"; label: string; cor: string;
 ];
 
 export function EvolucaoLtLtv({
-  unidade, agregador, estado, de, ate,
+  unidade, agregador, estado, de, ate, incluirUnicas = false,
 }: {
-  unidade: Unidade; agregador: Agregador; estado: Situacao; de?: string; ate?: string;
+  unidade: Unidade; agregador: Agregador; estado: Situacao; de?: string; ate?: string; incluirUnicas?: boolean;
 }) {
   const [audit, setAudit] = useState<{ modelo: "recorrente" | "pontual"; mes: string } | null>(null);
   const estadoParam = estado === "ambos" ? "todos" : estado;
+  const incluirUnicasParam = incluirUnicas ? "1" : undefined;
   const { data } = useQuery({
-    queryKey: ["/api/creators-modelo/evolucao", unidade, agregador, estadoParam, de, ate],
+    queryKey: ["/api/creators-modelo/evolucao", unidade, agregador, estadoParam, de, ate, incluirUnicasParam],
     queryFn: () =>
       fetchJson<{ meses: EvolucaoMes[] }>(
-        buildUrl("/api/creators-modelo/evolucao", { unidade, agregador, estado: estadoParam, de, ate }),
+        buildUrl("/api/creators-modelo/evolucao", { unidade, agregador, estado: estadoParam, de, ate, incluirUnicas: incluirUnicasParam }),
       ),
   });
 
@@ -57,7 +58,7 @@ export function EvolucaoLtLtv({
         <p className="text-xs text-gray-500 dark:text-zinc-400">
           Base presente em cada snapshot de fim de mês (cup_data_hist). Recorrente: ativos contam idade
           (1ª compra → mês); cancelados contam LT realizado (até o churn) — alinhado ao total acima.
-          {" "}Pontual: 1 entrega entregue = 1 mês (entrega única fora do LT); LTV = realizado (só entregues).
+          {" "}Pontual: 1 entrega entregue = 1 mês ({incluirUnicas ? "entrega única incluída" : "entrega única fora do LT"}); LTV = realizado (só entregues).
           {" "}Faturamento: pontual = valor entregue no mês (1ª vez que a entrega vira “entregue”); recorrente = MRR ativo do mês (Σ valorr da base ativa).
         </p>
       </CardHeader>
@@ -117,7 +118,7 @@ export function EvolucaoLtLtv({
         )}
       </CardContent>
     </Card>
-    <EvolucaoAuditoriaDrawer alvo={audit} estado={estado} de={de} ate={ate} onClose={() => setAudit(null)} />
+    <EvolucaoAuditoriaDrawer alvo={audit} estado={estado} de={de} ate={ate} incluirUnicas={incluirUnicas} onClose={() => setAudit(null)} />
     </>
   );
 }
