@@ -494,6 +494,8 @@ export interface RedesignPayload {
   mixMensal: MixMes[];
   retencao: { funilVendido: FunilNivel[]; funilEntregue: FunilNivel[]; safra: SafraPonto[]; recompra: Recompra };
   maturidade: { recorrenteIdade: number; pontualIdade: number; aviso: boolean };
+  // Tabela detalhada (aba "Tabela LT/LTV"): grupos por modelo/estado nas duas unidades.
+  tabela: { cliente: Grupo[]; contrato: Grupo[] };
 }
 
 export function buildRedesignPayload(
@@ -532,6 +534,10 @@ export function buildRedesignPayload(
       recompra: buildRecompra(periodo),
     },
     maturidade: mat,
+    tabela: {
+      cliente: gruposDeUnidade(periodo, "cliente", hoje),
+      contrato: gruposDeUnidade(periodo, "contrato", hoje),
+    },
   };
 }
 

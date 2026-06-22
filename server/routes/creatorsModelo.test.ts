@@ -35,6 +35,9 @@ describe("GET /api/creators-modelo (redesign)", () => {
     expect(res.body.retencao).toHaveProperty("safra");
     expect(res.body.retencao).toHaveProperty("funilEntregue");
     expect(typeof res.body.maturidade.aviso).toBe("boolean");
+    expect(Array.isArray(res.body.tabela.cliente)).toBe(true);
+    expect(res.body.tabela.cliente.some((g: any) => g.modelo === "pontual" && g.estado === "total")).toBe(true);
+    expect(Array.isArray(res.body.tabela.contrato)).toBe(true);
   });
   it("período filtra todos os blocos", async () => {
     mockExecute.mockResolvedValueOnce({ rows: dbRows });
