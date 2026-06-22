@@ -8,8 +8,8 @@ import {
   buildLtvMaduro, buildPlacar,
   buildMixMensal,
   buildSobrevivenciaSafra, avisoMaturidadePorRazao,
-  buildClientesDetalhe,
-  type RawRow,
+  buildClientesDetalhe, buildEvolucaoClientes,
+  type RawRow, type EvoSnapRow,
 } from "./creatorsModelo.helpers";
 
 const HOJE = "2026-06-21";
@@ -461,5 +461,30 @@ describe("buildClientesDetalhe", () => {
     expect(cli[0].nome).toBe("Loja Byr");
     expect(cli[0].ltv).toBe(4000);          // ltv_recorrente
     expect(cli[0].estado).toBe("cancelado");
+  });
+});
+
+describe("buildEvolucaoClientes", () => {
+  const rows: EvoSnapRow[] = [
+    { idTask: "A", nome: "Cli A", status: "ativo", valorr: 1000, valorp: 0, servico: "Gestão", dataInicio: "2026-01-01" },
+    { idTask: "B", nome: "Cli B", status: "cancelado/inativo", valorr: 2000, valorp: 0, servico: "Gestão", dataInicio: "2026-01-01" },
+    { idTask: "P", nome: "Pont", status: "entregue", valorr: 0, valorp: 5000, servico: "1ª Entrega", dataInicio: "2026-02-01" },
+  ];
+  it("recorrente: LT = idade da base; LTV = valorr × idade; filtra por estado", () => {
+    const todos = buildEvolucaoClientes(rows, "recorrente", "ambos", "2026-04-01");
+    expect(todos).toHaveLength(2);          // A e B (P é pontual)
+    const a = todos.find((c) => c.idTask === "A")!;
+    expect(a.estado).toBe("ativo");
+    expect(a.ltMeses).toBeCloseTo(2.96, 1); // jan→abr
+    expect(a.ltv).toBeGreaterThan(0);       // 1000 × idade
+    const ativos = buildEvolucaoClientes(rows, "recorrente", "ativo", "2026-04-01");
+    expect(ativos.map((c) => c.idTask)).toEqual(["A"]); // B (cancelado) fora
+  });
+  it("pontual: LT = nº de entregas entregues; LTV realizado", () => {
+    const cli = buildEvolucaoClientes(rows, "pontual", "ambos", "2026-04-01");
+    expect(cli).toHaveLength(1);
+    expect(cli[0].idTask).toBe("P");
+    expect(cli[0].ltMeses).toBe(1);  // 1 entregue = 1 mês
+    expect(cli[0].ltv).toBe(5000);
   });
 });
