@@ -1,7 +1,7 @@
 // client/src/components/creators-modelo/HeadlineCards.tsx
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
-import type { CreatorsModeloPayload, Grupo, Unidade, Agregador } from "./types";
+import type { CreatorsModeloPayload, Grupo, Agregador } from "./types";
 
 function pick(g: Grupo | undefined, campo: "ltv" | "lt" | "ent", agg: Agregador): number {
   if (!g) return 0;
@@ -16,11 +16,14 @@ function find(grupos: Grupo[], modelo: string, estado: string) {
 }
 
 export function HeadlineCards({
-  data, unidade, agregador,
+  data, agregador,
 }: {
-  data: CreatorsModeloPayload; unidade: Unidade; agregador: Agregador;
+  data: CreatorsModeloPayload; agregador: Agregador;
 }) {
-  const grupos = data.tabela[unidade];
+  // O header é sempre um resumo POR CLIENTE (unidade de negócio): "Clientes" e
+  // "Nº entregas média" só fazem sentido por cliente. O toggle cliente/contrato
+  // afeta apenas a tabela detalhada, não este resumo.
+  const grupos = data.tabela.cliente;
   const recTotal = find(grupos, "recorrente", "total");
   const pontTotal = find(grupos, "pontual", "total");
   const recCanc = find(grupos, "recorrente", "cancelado");

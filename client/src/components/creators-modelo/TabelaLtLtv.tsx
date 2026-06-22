@@ -82,8 +82,8 @@ export function TabelaLtLtv({
                     {!isTotal && <span className="text-gray-500 dark:text-zinc-400"> · {ESTADO_LABEL[estado] ?? estado}</span>}
                   </td>
                   <td className={td}>{g.metricas.n}</td>
-                  <td className={td}>{lt(g)}</td>
-                  <td className={td}>{isPont ? ent(g) : "—"}</td>
+                  <td className={td}>{isPont && unidade === "contrato" ? "—" : lt(g)}</td>
+                  <td className={td}>{isPont && unidade === "cliente" ? ent(g) : "—"}</td>
                   <td className={td}>{formatCurrencyNoDecimals(ltv(g))}</td>
                   <td className={td}>{formatCurrencyNoDecimals(g.metricas.ltvTotal)}</td>
                   <td className={td}>{g.metricas.idadeMediaMeses}</td>
