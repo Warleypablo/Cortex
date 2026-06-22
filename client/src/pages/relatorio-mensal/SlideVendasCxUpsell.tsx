@@ -1,7 +1,7 @@
 import { Handshake } from "lucide-react";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
-  ResponsiveContainer,
+  ResponsiveContainer, LabelList,
 } from "recharts";
 import type { TurboMetrics } from "./types";
 import SlideLayout from "./SlideLayout";
@@ -22,6 +22,13 @@ function fmtK(v: number): string {
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(1)}M`;
   if (v >= 1_000) return `${Math.round(v / 1_000)}k`;
   return `${Math.round(v)}`;
+}
+
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+// "YYYY-MM" → abreviação do mês (YTD do mesmo ano dispensa mostrar o ano no eixo)
+function mesAbrev(ym: string): string {
+  const m = parseInt(ym.slice(5, 7), 10);
+  return MESES_ABREV[m - 1] ?? ym;
 }
 
 function ChartTooltip({ active, payload, label }: any) {
@@ -50,14 +57,16 @@ function ChartTooltip({ active, payload, label }: any) {
 }
 
 export default function SlideVendasCxUpsell({ metrics, mesLabel }: Props) {
-  const { crosssellMrr, crosssellPontual, crosssellContratos, crosssellPorCloser } = metrics;
+  const { crosssellMrr, crosssellPontual, crosssellContratos, crosssellHistorico } = metrics;
   const crosssellTotal = crosssellMrr + crosssellPontual;
 
-  const chartData = crosssellPorCloser.map(c => ({
-    nome: c.nome,
-    mrr: c.mrr,
-    pontual: c.pontual,
+  const chartData = crosssellHistorico.map((m) => ({
+    mes: mesAbrev(m.mes),
+    mrr: m.mrr,
+    pontual: m.pontual,
+    total: m.mrr + m.pontual,
   }));
+  const ano = crosssellHistorico[0]?.mes.slice(0, 4) ?? "";
 
   return (
     <SlideLayout section="comercial" padding="24px 32px">
@@ -92,7 +101,7 @@ export default function SlideVendasCxUpsell({ metrics, mesLabel }: Props) {
 
       <ChartCard className="flex-1">
         <div className="flex items-center justify-between mb-2">
-          <p className="text-sm font-bold text-zinc-300">Ranking Closers — CX & Upsell</p>
+          <p className="text-sm font-bold text-zinc-300">Histórico CX & Upsell{ano ? ` — ${ano}` : ""}</p>
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1.5">
               <div className="w-2.5 h-2.5 rounded-sm bg-emerald-400" />
@@ -107,34 +116,33 @@ export default function SlideVendasCxUpsell({ metrics, mesLabel }: Props) {
         <div className="flex-1 min-h-0">
           {chartData.length === 0 ? (
             <div className="flex items-center justify-center h-full text-zinc-600 text-sm">
-              Sem vendas CX/Upsell no mês
+              Sem histórico de CX/Upsell
             </div>
           ) : (
             <ResponsiveContainer width="100%" height="100%">
               <BarChart
-                layout="vertical"
                 data={chartData}
-                margin={{ top: 4, right: 60, left: 8, bottom: 4 }}
+                margin={{ top: 24, right: 12, left: 8, bottom: 4 }}
               >
-                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" horizontal={false} />
-                <YAxis
-                  type="category"
-                  dataKey="nome"
+                <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+                <XAxis
+                  dataKey="mes"
                   tick={{ fill: "#a1a1aa", fontSize: 11 }}
                   axisLine={{ stroke: "#3f3f46" }}
                   tickLine={false}
-                  width={120}
                 />
-                <XAxis
-                  type="number"
+                <YAxis
                   tick={{ fill: "#a1a1aa", fontSize: 10 }}
                   axisLine={{ stroke: "#3f3f46" }}
                   tickLine={false}
                   tickFormatter={fmtK}
+                  width={44}
                 />
                 <Tooltip content={<ChartTooltip />} cursor={{ fill: "rgba(255,255,255,0.03)" }} />
                 <Bar dataKey="mrr" name="MRR" stackId="cx" fill="#34d399" fillOpacity={0.85} />
-                <Bar dataKey="pontual" name="Pontual" stackId="cx" fill="#c084fc" fillOpacity={0.8} radius={[0, 4, 4, 0]} />
+                <Bar dataKey="pontual" name="Pontual" stackId="cx" fill="#c084fc" fillOpacity={0.8} radius={[4, 4, 0, 0]}>
+                  <LabelList dataKey="total" position="top" formatter={(v: any) => fmtK(Number(v))} fill="#f59e0b" fontSize={11} fontWeight={700} />
+                </Bar>
               </BarChart>
             </ResponsiveContainer>
           )}

@@ -81,8 +81,10 @@ import { registerChurnProdutoMotivoRoutes } from "./routes/churnProdutoMotivo";
 import { registerEstoquePontualRoutes } from "./routes/estoquePontual";
 import { registerBp2026Routes } from "./routes/bp2026";
 import { registerBp2026DetalheRoutes } from "./routes/bp2026.detalhe";
+import { registerBp2026ReconciliacaoRoutes } from "./routes/bp2026.reconciliacao";
 import { registerCreatorsPontualRoutes } from "./routes/creatorsPontual";
 import { registerChurnPontorrenteRoutes } from "./routes/churnPontorrente";
+import { registerCreatorsModeloRoutes } from "./routes/creatorsModelo";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
@@ -8379,8 +8381,10 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   registerEstoquePontualRoutes(app, db);
   registerBp2026Routes(app, db);
   registerBp2026DetalheRoutes(app, db);
+  registerBp2026ReconciliacaoRoutes(app, db);
   registerCreatorsPontualRoutes(app, db);
   registerChurnPontorrenteRoutes(app, db);
+  registerCreatorsModeloRoutes(app, db);
 
   // ============================================
   // Sugestões API
