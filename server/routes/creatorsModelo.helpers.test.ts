@@ -141,7 +141,7 @@ describe("buildUnitsRecorrente", () => {
 });
 
 describe("buildUnitsPontual", () => {
-  it("por contrato: nEntregas=1, ltv=valorp, lt=0", () => {
+  it("por contrato: entrega única não tem span (lt null, não dilui a média)", () => {
     const units = buildUnitsPontual(
       [row({ tipoReceita: "pontual", valorp: 5000, status: "entregue" })],
       "contrato", HOJE,
@@ -149,6 +149,7 @@ describe("buildUnitsPontual", () => {
     expect(units[0].nEntregas).toBe(1);
     expect(units[0].ltv).toBe(5000);
     expect(units[0].estado).toBe("concluido");
+    expect(units[0].lt).toBeNull(); // 1 entrega → sem span → fora da média
   });
   it("por contrato: jornada de várias entregas = 1 contrato; lt = 1ª à última entrega não churnada", () => {
     const rows = [
