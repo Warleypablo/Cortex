@@ -234,56 +234,35 @@ app.use((req, res, next) => {
   // Executar snapshot na inicialização
   setTimeout(() => createDailySnapshot(), 5000);
 
-  // Meta Ads auto-sync a cada 6 horas
-  const META_SYNC_INTERVAL = 6 * 60 * 60 * 1000; // 6h
-  const runMetaSync = async () => {
+  // Sync unificado de mídia paga: Meta + Google Turbo + TikTok Ads + LinkedIn Ads.
+  // Roda as 4 plataformas JUNTAS, em paralelo e isoladas, a cada 12h (uma falhar
+  // não derruba as outras). Substitui os jobs separados por plataforma.
+  const ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
+  const runAllAdsSync = async () => {
     try {
-      console.log("[meta-sync-job] Starting scheduled Meta Ads sync...");
-      const { syncMetaAds, backfillMetaInsightsGaps } = await import("./services/metaAdsSync");
-      const { Pool } = await import("pg");
-      const pool = new Pool({
-        host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
-        port: parseInt(process.env.DB_PORT || '5432', 10),
-        database: process.env.DB_NAME || 'dados_turbo',
-        user: process.env.DB_USER || 'postgres',
-        password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
-        ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
-      });
-      const result = await syncMetaAds(pool, { since: undefined, until: undefined });
-      // Backfill any gaps detected in the last 14 days after the regular sync
-      try {
-        const backfill = await backfillMetaInsightsGaps(pool);
-        if (backfill.filled.length > 0) {
-          console.log(`[meta-sync-job] Backfill filled ${backfill.filled.length} missing dates: ${backfill.filled.join(', ')}`);
-        }
-        if (backfill.errors.length > 0) {
-          result.errors.push(...backfill.errors.map(e => `backfill: ${e}`));
-        }
-      } catch (backfillErr: any) {
-        console.error("[meta-sync-job] Backfill failed:", backfillErr.message);
+      console.log("[ads-sync-job] Starting unified ads sync (Meta + Google + TikTok + LinkedIn)...");
+      const { syncAllAdsPlatforms } = await import("./services/adsSyncAll");
+      const summary = await syncAllAdsPlatforms();
+      (globalThis as any).__adsSyncStatus = { lastSync: new Date().toISOString(), summary };
+      // Compat: mantém __metaSyncStatus p/ o endpoint /api/meta-ads/sync-status
+      const meta = summary.find((s) => s.label === "meta");
+      if (meta) {
+        (globalThis as any).__metaSyncStatus = {
+          lastSync: new Date().toISOString(),
+          result: meta.result || null,
+          status: meta.status,
+          error: meta.error,
+        };
       }
-      await pool.end();
-      // Store last sync result globally
-      (globalThis as any).__metaSyncStatus = {
-        lastSync: new Date().toISOString(),
-        result,
-        status: result.errors.length === 0 ? "success" : "partial",
-      };
-      console.log(`[meta-sync-job] Sync complete: ${result.campaigns} campaigns, ${result.ads} ads, ${result.insights} insights`);
+      console.log("[ads-sync-job] Done: " + summary.map((s) => `${s.label}=${s.status}`).join(" "));
     } catch (err: any) {
-      console.error("[meta-sync-job] Sync failed:", err.message);
-      (globalThis as any).__metaSyncStatus = {
-        lastSync: new Date().toISOString(),
-        result: null,
-        status: "error",
-        error: err.message,
-      };
+      console.error("[ads-sync-job] Unified sync failed:", err.message);
     }
   };
-  // First sync 30s after startup, then every 6 hours
-  setTimeout(() => runMetaSync(), 30000);
-  setInterval(() => runMetaSync(), META_SYNC_INTERVAL);
-  console.log(`[meta-sync-job] Scheduled every ${META_SYNC_INTERVAL / 3600000}h`);
+  // First run 30s after startup, then every 12 hours
+  setTimeout(() => runAllAdsSync(), 30000);
+  setInterval(() => runAllAdsSync(), ADS_SYNC_INTERVAL);
+  console.log(`[ads-sync-job] Scheduled every ${ADS_SYNC_INTERVAL / 3600000}h (all platforms together)`);
 
   // Instagram auto-sync a cada 6 horas
   const IG_SYNC_INTERVAL = 6 * 60 * 60 * 1000; // 6h
@@ -658,88 +637,6 @@ app.use((req, res, next) => {
   setTimeout(() => runGoogleAdsSync(), 60000);
   setInterval(() => runGoogleAdsSync(), GOOGLE_ADS_SYNC_INTERVAL);
   console.log(`[google-ads-sync-job] Scheduled every ${GOOGLE_ADS_SYNC_INTERVAL / 3600000}h`);
-
-  // Pool helper p/ os jobs de mídia paga (Google Turbo / TikTok / LinkedIn).
-  const makeAdsPool = async () => {
-    const { Pool } = await import("pg");
-    return new Pool({
-      host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
-      port: parseInt(process.env.DB_PORT || '5432', 10),
-      database: process.env.DB_NAME || 'dados_turbo',
-      user: process.env.DB_USER || 'postgres',
-      password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
-      ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
-    });
-  };
-
-  // Google Ads (conta própria da Turbo, schema google.*) auto-sync a cada 12h
-  const GOOGLE_TURBO_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
-  const runGoogleTurboSync = async () => {
-    try {
-      console.log("[google-turbo-sync-job] Starting scheduled Google Turbo sync...");
-      const { syncGoogleTurbo } = await import("./services/googleSync");
-      const pool = await makeAdsPool();
-      const result = await syncGoogleTurbo(pool);
-      await pool.end();
-      (globalThis as any).__googleTurboSyncStatus = {
-        lastSync: new Date().toISOString(), result,
-        status: result.errors.length === 0 ? "success" : "partial",
-      };
-      console.log(`[google-turbo-sync-job] Sync complete: ${result.campaigns} campanhas, ${result.metrics} métricas, ${result.errors.length} erros`);
-    } catch (err: any) {
-      console.error("[google-turbo-sync-job] Sync failed:", err.message);
-      (globalThis as any).__googleTurboSyncStatus = { lastSync: new Date().toISOString(), result: null, status: "error", error: err.message };
-    }
-  };
-  setTimeout(() => runGoogleTurboSync(), 75000);
-  setInterval(() => runGoogleTurboSync(), GOOGLE_TURBO_SYNC_INTERVAL);
-  console.log(`[google-turbo-sync-job] Scheduled every ${GOOGLE_TURBO_SYNC_INTERVAL / 3600000}h`);
-
-  // TikTok Ads (schema tiktok.*) auto-sync a cada 12h
-  const TIKTOK_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
-  const runTiktokAdsSync = async () => {
-    try {
-      console.log("[tiktok-ads-sync-job] Starting scheduled TikTok Ads sync...");
-      const { syncTiktokAds } = await import("./services/tiktokAdsSync");
-      const pool = await makeAdsPool();
-      const result = await syncTiktokAds(pool, 30);
-      await pool.end();
-      (globalThis as any).__tiktokAdsSyncStatus = {
-        lastSync: new Date().toISOString(), result,
-        status: result.errors.length === 0 ? "success" : "partial",
-      };
-      console.log(`[tiktok-ads-sync-job] Sync complete: ${result.campaigns} campanhas, ${result.adMetricRows} métricas anúncio, ${result.errors.length} erros`);
-    } catch (err: any) {
-      console.error("[tiktok-ads-sync-job] Sync failed:", err.message);
-      (globalThis as any).__tiktokAdsSyncStatus = { lastSync: new Date().toISOString(), result: null, status: "error", error: err.message };
-    }
-  };
-  setTimeout(() => runTiktokAdsSync(), 105000);
-  setInterval(() => runTiktokAdsSync(), TIKTOK_ADS_SYNC_INTERVAL);
-  console.log(`[tiktok-ads-sync-job] Scheduled every ${TIKTOK_ADS_SYNC_INTERVAL / 3600000}h`);
-
-  // LinkedIn Ads (schema linkedin.*) auto-sync a cada 12h
-  const LINKEDIN_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
-  const runLinkedinAdsSync = async () => {
-    try {
-      console.log("[linkedin-ads-sync-job] Starting scheduled LinkedIn Ads sync...");
-      const { syncLinkedinAds } = await import("./services/linkedinAdsSync");
-      const pool = await makeAdsPool();
-      const result = await syncLinkedinAds(pool, 30);
-      await pool.end();
-      (globalThis as any).__linkedinAdsSyncStatus = {
-        lastSync: new Date().toISOString(), result,
-        status: result.errors.length === 0 ? "success" : "partial",
-      };
-      console.log(`[linkedin-ads-sync-job] Sync complete: ${result.campaigns} campanhas, ${result.metricRows} métricas, ${result.errors.length} erros`);
-    } catch (err: any) {
-      console.error("[linkedin-ads-sync-job] Sync failed:", err.message);
-      (globalThis as any).__linkedinAdsSyncStatus = { lastSync: new Date().toISOString(), result: null, status: "error", error: err.message };
-    }
-  };
-  setTimeout(() => runLinkedinAdsSync(), 135000);
-  setInterval(() => runLinkedinAdsSync(), LINKEDIN_ADS_SYNC_INTERVAL);
-  console.log(`[linkedin-ads-sync-job] Scheduled every ${LINKEDIN_ADS_SYNC_INTERVAL / 3600000}h`);
 
   // Internal Trainings auto-sync a cada 1 hora
   const INTERNAL_TRAININGS_SYNC_INTERVAL = 60 * 60 * 1000; // 1h
