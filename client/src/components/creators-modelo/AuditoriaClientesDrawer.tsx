@@ -16,16 +16,16 @@ function lifetimeLabel(c: ClienteDetalhe): string {
 }
 
 export function AuditoriaClientesDrawer({
-  modelo, estado = "ambos", de, ate, onClose,
+  modelo, estado = "ambos", de, ate, incluirUnicas = false, onClose,
 }: {
-  modelo: Modelo | null; estado?: Situacao; de?: string; ate?: string; onClose: () => void;
+  modelo: Modelo | null; estado?: Situacao; de?: string; ate?: string; incluirUnicas?: boolean; onClose: () => void;
 }) {
   const [aberto, setAberto] = useState<string | null>(null);
 
   const { data, isLoading } = useQuery({
-    queryKey: ["/api/creators-modelo/clientes", modelo, de, ate],
+    queryKey: ["/api/creators-modelo/clientes", modelo, de, ate, incluirUnicas],
     enabled: !!modelo,
-    queryFn: () => fetchJson<Resp>(buildUrl("/api/creators-modelo/clientes", { modelo: modelo!, de, ate })),
+    queryFn: () => fetchJson<Resp>(buildUrl("/api/creators-modelo/clientes", { modelo: modelo!, de, ate, incluirUnicas: incluirUnicas ? "1" : undefined })),
   });
 
   // espelha o filtro global de estado (cancelado = estado 'cancelado'; ativo = o resto).

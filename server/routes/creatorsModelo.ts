@@ -44,9 +44,10 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
     try {
       const de = (req.query.de as string) || undefined;
       const ate = (req.query.ate as string) || undefined;
+      const minLt = req.query.incluirUnicas === "1" ? 1 : 2; // incluir entregas únicas no LT?
       const rows = await fetchCreatorsRows(db);
       const hoje = new Date().toISOString().slice(0, 10);
-      res.json(buildRedesignPayload(rows, { de, ate, hoje }));
+      res.json(buildRedesignPayload(rows, { de, ate, hoje, minLt }));
     } catch (error) {
       console.error("[api] Error fetching creators-modelo:", error);
       res.status(500).json({ error: "Failed to fetch creators-modelo" });
@@ -66,6 +67,7 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       const agregador = req.query.agregador === "mediana" ? "mediana" : "media";
       const estadoQ = String(req.query.estado ?? "todos");
       const estado = estadoQ === "ativo" || estadoQ === "cancelado" ? estadoQ : "todos";
+      const minLt = req.query.incluirUnicas === "1" ? 1 : 2; // limiar de entregas p/ contar no LT
       // período = coorte por data_inicio + recorta os meses do snapshot ('YYYY-MM').
       const de = typeof req.query.de === "string" && /^\d{4}-\d{2}$/.test(req.query.de) ? req.query.de : null;
       const ate = typeof req.query.ate === "string" && /^\d{4}-\d{2}$/.test(req.query.ate) ? req.query.ate : null;
@@ -153,9 +155,9 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
         ),
         pont_agg AS (
           SELECT m, COUNT(*) AS cli,
-            COUNT(*) FILTER (WHERE entregues >= 2) AS cli_lt,
-            ${agg(sql`CASE WHEN entregues >= 2 THEN entregues END`)} AS lt,
-            ${agg(sql`CASE WHEN entregues >= 2 THEN ltv END`)} AS ltv
+            COUNT(*) FILTER (WHERE entregues >= ${minLt}) AS cli_lt,
+            ${agg(sql`CASE WHEN entregues >= ${minLt} THEN entregues END`)} AS lt,
+            ${agg(sql`CASE WHEN entregues >= ${minLt} THEN ltv END`)} AS ltv
           FROM pont_unit WHERE ${pontPred} GROUP BY m
         ),
         pont_fat AS (
@@ -197,6 +199,7 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       const modelo: Modelo = req.query.modelo === "recorrente" ? "recorrente" : "pontual";
       const estadoQ = String(req.query.estado ?? "ambos");
       const estado: EstadoFiltro = estadoQ === "ativo" || estadoQ === "cancelado" ? estadoQ : "ambos";
+      const minLt = req.query.incluirUnicas === "1" ? 1 : 2;
       if (!/^\d{4}-\d{2}$/.test(mes)) return res.status(400).json({ error: "mes inválido" });
       // mesma coorte por data_inicio do resto da sub-aba
       const de = typeof req.query.de === "string" && /^\d{4}-\d{2}$/.test(req.query.de) ? req.query.de : null;
@@ -233,7 +236,7 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
         valorr: Number(r.valorr) || 0, valorp: Number(r.valorp) || 0,
         servico: r.servico ?? "", dataInicio: r.data_inicio ?? null, dataFim: r.data_fim ?? null,
       }));
-      res.json({ mes, modelo, clientes: buildEvolucaoClientes(snap, modelo, estado, fim) });
+      res.json({ mes, modelo, clientes: buildEvolucaoClientes(snap, modelo, estado, fim, minLt) });
     } catch (error) {
       console.error("[api] Error fetching creators-modelo evolucao/clientes:", error);
       res.status(500).json({ error: "Failed to fetch creators-modelo evolucao clientes" });
@@ -246,9 +249,10 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       const modelo: Modelo = req.query.modelo === "recorrente" ? "recorrente" : "pontual";
       const de = (req.query.de as string) || undefined;
       const ate = (req.query.ate as string) || undefined;
+      const minLt = req.query.incluirUnicas === "1" ? 1 : 2;
       const rows = await fetchCreatorsRows(db);
       const hoje = new Date().toISOString().slice(0, 10);
-      res.json({ modelo, clientes: buildClientesDetalhe(rows, modelo, { de, ate, hoje }) });
+      res.json({ modelo, clientes: buildClientesDetalhe(rows, modelo, { de, ate, hoje, minLt }) });
     } catch (error) {
       console.error("[api] Error fetching creators-modelo clientes:", error);
       res.status(500).json({ error: "Failed to fetch creators-modelo clientes" });

@@ -152,6 +152,14 @@ describe("buildUnitsPontual", () => {
     expect(units[0].estado).toBe("concluido");
     expect(units[0].lt).toBeNull();   // entrega única → fora da média de LT
   });
+  it("minLt=1 (incluir únicas): entrega única volta a contar no LT e LTV", () => {
+    const units = buildUnitsPontual(
+      [row({ tipoReceita: "pontual", valorp: 5000, status: "entregue" })],
+      "contrato", HOJE, 1,
+    );
+    expect(units[0].lt).toBe(1);     // 1 entrega = 1 mês, agora conta
+    expect(units[0].ltv).toBe(5000); // LTV realizado também entra na média
+  });
   it("por contrato: LTV e LT contam só entregas entregues (1 = 1 mês)", () => {
     const rows = [
       row({ idTask: "J", tipoReceita: "pontual", valorp: 5000, status: "entregue", servico: "1ª Entrega - Creators", dataInicio: "2026-01-01" }),
