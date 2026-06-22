@@ -69,7 +69,7 @@ export interface Unit {
   estado: EstadoRec | EstadoPont;
   lt: number | null;     // recorrente: meses; pontual: nº de entregas entregues (1=1 mês); null = não conta na média de LT
   nEntregas: number;     // 0 para recorrente
-  ltv: number;
+  ltv: number | null;    // null = fora da média de LTV (pontual de entrega única). Conta em n, não na média.
   idadeMeses: number;
 }
 
@@ -200,11 +200,13 @@ export function buildUnitsPontual(
     for (const [, items] of Array.from(byJor.entries())) {
       const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
       const ini = inicios[0] ?? null;
+      const lt = ltPontualPorEntregas(items);
       units.push({
         estado: estadoClientePontual(items),
-        lt: ltPontualPorEntregas(items),
+        lt,
         nEntregas: items.length,
-        ltv: ltvPontualRealizado(items),
+        // entrega única (lt null) sai da média de LTV também, p/ casar com o LT.
+        ltv: lt == null ? null : ltvPontualRealizado(items),
         idadeMeses: ini ? mesesEntre(ini, hoje) : 0,
       });
     }
@@ -219,13 +221,14 @@ export function buildUnitsPontual(
   for (const [, items] of Array.from(byCli.entries())) {
     const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
     const ini = inicios[0] ?? null;
-    // LTV = receita realizada (só entregas entregues); LT = nº de entregas
-    // entregues (1 = 1 mês). Espelha a régua do drawer de auditoria.
+    // LT = nº de entregas entregues (só 2+); LTV = realizado, mas entrega única
+    // (lt null) também sai da média de LTV p/ casar com o LT. Conta em n.
+    const lt = ltPontualPorEntregas(items);
     units.push({
       estado: estadoClientePontual(items),
-      lt: ltPontualPorEntregas(items),
+      lt,
       nEntregas: items.length,
-      ltv: ltvPontualRealizado(items),
+      ltv: lt == null ? null : ltvPontualRealizado(items),
       idadeMeses: ini ? mesesEntre(ini, hoje) : 0,
     });
   }
@@ -283,7 +286,8 @@ export function buildRecompra(rows: RawRow[]): Recompra {
 
 export function aggregateMetricas(units: Unit[]): Metricas {
   const lts = units.map((u) => u.lt).filter((x): x is number => x != null);
-  const ltvs = units.map((u) => u.ltv);
+  // ltv null (pontual de entrega única) sai da média/total, mas o cliente conta em n.
+  const ltvs = units.map((u) => u.ltv).filter((x): x is number => x != null);
   const ents = units.map((u) => u.nEntregas);
   const idades = units.map((u) => u.idadeMeses);
   return {
