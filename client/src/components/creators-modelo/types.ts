@@ -1,30 +1,18 @@
-// client/src/components/creators-modelo/types.ts
-export interface Metricas {
-  n: number;
-  ltMesesMedia: number; ltMesesMediana: number;
-  nEntregasMedia: number; nEntregasMediana: number;
-  ltvMedia: number; ltvMediana: number;
-  ltvTotal: number;
-  idadeMediaMeses: number;
+export interface Placar {
+  porCliente: { recorrente: number; pontual: number; recorrenteAtivo: number; razao: number };
+  volume: { pontualReceita: number; pontualClientes: number; recorrenteRealizado: number; recorrenteMrrCorrente: number; recorrenteClientes: number };
+  breakEven: { ticketPontual: number; minRecompras: number; maxRecompras: number; recompraRealPct: number };
 }
-export interface Grupo { modelo: "recorrente" | "pontual"; estado: string; metricas: Metricas; }
-export interface FunilNivel {
-  nivel: number; atingiram: number; pararamAqui: number; churn: number;
-  emAndamento: number; concluido: number; valorpChurn: number; dropPct: number;
-}
-export interface CurvaPonto { meses: number; pctSobrevivencia: number; n: number; }
+export interface LtvMaduro { realizadoBlended: number; realizadoAtivo: number; projetadoChurn: number; premissaChurnMeses: number; }
+export interface MixMes { mes: string; pontualN: number; pontualValor: number; recorrenteN: number; recorrenteMrrNovo: number; }
+export interface FunilNivel { nivel: number; atingiram: number; pararamAqui: number; churn: number; emAndamento: number; concluido: number; valorpChurn: number; dropPct: number; }
+export interface SafraPonto { safra: string; n: number; pctAtivo: number; }
 export interface Recompra { totalAvulsos: number; comRecompra: number; pctRecompra: number; }
-
-export interface CreatorsModeloPayload {
-  meta: { de: string | null; ate: string | null; hoje: string; nSequenciados: number; nAvulsos: number; pctSequenciados: number; };
-  tabela: { cliente: Grupo[]; contrato: Grupo[]; };
-  funilVendido: FunilNivel[];
-  funilEntregue: FunilNivel[];
-  curvaRecorrente: CurvaPonto[];
-  recompra: Recompra;
-  coorte: { recorrenteIdadeMedia: number; pontualIdadeMedia: number; avisoMaturidade: boolean; };
+export interface RedesignPayload {
+  meta: { de: string | null; ate: string | null; hoje: string; nSequenciados: number; nAvulsos: number; pctSequenciados: number };
+  placar: Placar;
+  ltvMaduro: LtvMaduro;
+  mixMensal: MixMes[];
+  retencao: { funilVendido: FunilNivel[]; funilEntregue: FunilNivel[]; safra: SafraPonto[]; recompra: Recompra };
+  maturidade: { recorrenteIdade: number; pontualIdade: number; aviso: boolean };
 }
-
-export type Unidade = "cliente" | "contrato";
-export type Agregador = "media" | "mediana";
-export type Situacao = "ambos" | "ativo" | "cancelado";
