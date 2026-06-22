@@ -103,22 +103,21 @@
   <h2>2. De onde vem cada dado (e o que é automático)</h2>
   <table>
     <tr><th>Campo</th><th>Fonte</th><th>Automático?</th></tr>
-    <tr><td>Ângulo do hook · Formato de ad · Persona · Proporção</td><td>Nome do arquivo (convenção)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
-    <tr><td>Link do roteiro</td><td>Doc dentro da pasta do Drive</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
-    <tr><td>Produto</td><td>Pasta-raiz no Drive</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Produto · Ângulo · Formato · Persona · Proporção · Tipo</td><td>Nome do anúncio (convenção, parseado no sync — Cortex <b>e manual</b>)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Link do roteiro</td><td>Doc dentro da pasta do Drive (só fluxo Cortex)</td><td><span class="pill auto">AUTOMÁTICO*</span></td></tr>
     <tr><td>Spend · Hook% · Hold% · CTR</td><td>Meta (insights por ad_id)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
     <tr><td>Leads · MQL · Vendas · CAC · ROAS</td><td>Bitrix (utm_content = ad_id)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
     <tr><td>Task do ClickUp</td><td>—</td><td><span class="pill manual">não puxado (opcional)</span></td></tr>
   </table>
 
   <h2>3. A convenção de nome (o contrato)</h2>
-  <div class="name">vv-<b style="background:rgba(245,158,11,.2)">nome_do_ad</b>-<b style="background:rgba(139,92,246,.25)">react</b>-<b style="background:rgba(139,92,246,.25)">prova_social</b>-<b style="background:rgba(245,158,11,.2)">ana</b>-<b style="background:rgba(59,130,246,.2)">9x16</b>-<b style="background:rgba(34,211,153,.2)">h1_b1_c1</b>-<b style="background:rgba(59,130,246,.2)">v1</b>.mp4</div>
+  <div class="name">vv-<b style="background:rgba(245,158,11,.2)">nome_do_ad</b>-<b style="background:rgba(52,211,153,.2)">creators</b>-<b style="background:rgba(139,92,246,.25)">react</b>-<b style="background:rgba(139,92,246,.25)">prova_social</b>-<b style="background:rgba(245,158,11,.2)">ana</b>-<b style="background:rgba(59,130,246,.2)">9x16</b>-<b style="background:rgba(34,211,153,.2)">h1_b1_c1</b>-<b style="background:rgba(59,130,246,.2)">v1</b>.mp4</div>
   <p class="sub" style="margin-top:8px"><code>-</code> separa campo · <code>_</code> dentro de valor composto · ângulo/formato saem da <b>lista controlada</b> · h/b/c = identificadores (hook/body/cta) · a skill gera o nome pronto, o editor só copia.</p>
 
   <h2>4. Pontos de atenção — o que revisar antes de ir ao ar</h2>
 
-  <div class="risk"><div class="t">⚠️ #1 — Todo ad passa pelo "Criar Campanhas" do Cortex? (o mais importante)</div>
-    <div class="d">A captura das dimensões ricas (ângulo/formato/persona/proporção) e do roteiro/produto só acontece quando o criativo é <b>ingerido pelo fluxo do Cortex</b> (que lê a pasta). Se o ad for subido <b>direto no Gerenciador do Meta</b>, só o <b>spend</b> linka (pelo TP no nome) — as dimensões e o roteiro <b>não</b> são capturados. <br><b>Decisão:</b> padronizar que todo ad sobe pelo Cortex; OU criar um passo que ingira a pasta de qualquer jeito.</div></div>
+  <div class="risk" style="border-left-color:var(--ok)"><div class="t">✅ #1 — RESOLVIDO: ads manuais também são cobertos</div>
+    <div class="d">As dimensões ricas (produto/ângulo/formato/persona/proporção) e o tipo agora são <b>parseados do nome do anúncio no sync</b> — funciona pra <b>100% dos ads</b>, criados pelo Cortex ou subidos manualmente no Meta. Se a linha ainda não existe na Biblioteca, o Cortex <b>cria a partir do nome</b>. <br><b>Única exigência:</b> o ad manual precisa estar nomeado com a convenção (= mesmo nome do arquivo). <b>Só o link do roteiro</b> fica exclusivo do fluxo Cortex (campo de referência, não afeta o ranking).</div></div>
 
   <div class="risk warn"><div class="t">Disciplina de nomenclatura</div>
     <div class="d">A skill gera os nomes, mas o editor precisa aplicar exatamente. Mitigação: o <code>h#</code> é backup do ângulo e os slugs vêm da lista controlada. Ainda assim, vale uma conferência ("o nome bateu?") na subtarefa de subir ad.</div></div>
@@ -138,7 +137,7 @@
     <tr><td>Cortex — parser, dimensões, read-back (MQL/CAC alinhados), ranking, UI, linker, puxar do Drive</td><td><span class="pill b-ok">PRONTO + TESTADO</span></td></tr>
     <tr><td>Skill — convenção de nome (PASSO 4) documentada</td><td><span class="pill b-ok">EDITADO</span> <span class="pill b-pend">revisar/commitar no chief-of-staff</span></td></tr>
     <tr><td>Time de edição adotar a convenção</td><td><span class="pill b-pend">PENDENTE</span></td></tr>
-    <tr><td>Definir: todo ad passa pelo Cortex? (ponto #1)</td><td><span class="pill b-risk">DECIDIR</span></td></tr>
+    <tr><td>Ads manuais cobertos (ingestão pelo nome no sync)</td><td><span class="pill b-ok">RESOLVIDO + TESTADO</span></td></tr>
     <tr><td>Release — #277 mergear → re-apontar PR pra main + re-verificar read-back</td><td><span class="pill b-pend">DEPENDE DO #277</span></td></tr>
     <tr><td>clickupTaskId (puxar do ClickUp)</td><td><span class="pill b-pend">OPCIONAL</span></td></tr>
   </table>
