@@ -159,13 +159,31 @@ function estadoClientePontual(items: RawRow[]): EstadoPont {
 }
 
 /**
- * Entrega "real"/em curso que conta para o LT-span do pontual: entregue, ativo
- * ou pausado. Exclui pré-entrega (triagem/onboarding) e não-entregas
- * (cancelado/inativo, não usar). Definição do usuário p/ "tempo entre entregas".
+ * Entrega efetivamente realizada = status 'entregue'. É a única que gera receita
+ * reconhecida no pontual: o LTV conta só o que foi entregue, e o LT mede o span
+ * entre a 1ª e a última entrega entregue. Triagem/onboarding/ativo/pausado são
+ * pré-entrega (ainda não realizadas); cancelado/não usar nunca serão.
  */
-export function isEntregaElegivel(status: string | null): boolean {
-  const s = (status ?? "").trim().toLowerCase();
-  return s === "entregue" || s === "ativo" || s === "pausado";
+export function isEntregue(status: string | null): boolean {
+  return (status ?? "").trim().toLowerCase() === "entregue";
+}
+
+/** LTV pontual = receita realizada = soma do valorp das entregas entregues. */
+export function ltvPontualRealizado(items: RawRow[]): number {
+  return items.filter((r) => isEntregue(r.status)).reduce((s, r) => s + (r.valorp ?? 0), 0);
+}
+
+/**
+ * LT pontual = span (meses) da 1ª à última entrega efetivamente entregue.
+ * <2 entregas entregues → null (entrega única não tem span; não dilui a média).
+ */
+export function ltPontualEntregue(items: RawRow[]): number | null {
+  const datas = items
+    .filter((r) => isEntregue(r.status))
+    .map((r) => r.dataInicio)
+    .filter((d): d is string => !!d)
+    .sort();
+  return datas.length >= 2 ? mesesEntre(datas[0], datas[datas.length - 1]) : null;
 }
 
 export function buildUnitsPontual(
@@ -173,8 +191,8 @@ export function buildUnitsPontual(
 ): Unit[] {
   if (unidade === "contrato") {
     // Pontual "por contrato": a jornada (id_task) é UM contrato, mesmo dividida
-    // em 4 entregas. Lifetime = tempo da 1ª à última entrega NÃO churnada
-    // (entregue/ativo/pausado). Entrega única → 0; jornada multi → span real.
+    // em 4 entregas. LTV = receita realizada (só entregas entregues); LT = span
+    // da 1ª à última entrega entregue (entrega única → null, não dilui a média).
     const byJor = new Map<string, RawRow[]>();
     for (const r of rows) {
       const k = r.idTask ?? r.idSubtask ?? "";
@@ -182,23 +200,13 @@ export function buildUnitsPontual(
     }
     const units: Unit[] = [];
     for (const [, items] of Array.from(byJor.entries())) {
-      const datasEntrega = items
-        .filter((r) => isEntregaElegivel(r.status))
-        .map((r) => r.dataInicio)
-        .filter((d): d is string => !!d)
-        .sort();
-      // Span só faz sentido com 2+ entregas; compra única → null (fora da média,
-      // não dilui com zeros). aggregateMetricas ignora lt null.
-      const lt = datasEntrega.length >= 2
-        ? mesesEntre(datasEntrega[0], datasEntrega[datasEntrega.length - 1])
-        : null;
       const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
       const ini = inicios[0] ?? null;
       units.push({
         estado: estadoClientePontual(items),
-        lt,
+        lt: ltPontualEntregue(items),
         nEntregas: items.length,
-        ltv: items.reduce((s, r) => s + (r.valorp ?? 0), 0),
+        ltv: ltvPontualRealizado(items),
         idadeMeses: ini ? mesesEntre(ini, hoje) : 0,
       });
     }
@@ -213,22 +221,13 @@ export function buildUnitsPontual(
   for (const [, items] of Array.from(byCli.entries())) {
     const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
     const ini = inicios[0] ?? null;
-    // Lifetime (meses) = tempo de relação: 1ª compra → encerramento (se já encerrou)
-    // ou hoje (em produção / sem data_fim). Mesma régua do recorrente. O pontual
-    // raramente registra data_fim, então tende a contar até hoje (tempo de relação).
-    const emProducao = items.some((r) => classifyEstadoPontual(r.status) === "em_producao");
-    const finsValidos = items
-      .filter((r) => !r.dataInconsistente)
-      .map((r) => r.dataFim)
-      .filter((d): d is string => !!d)
-      .sort();
-    const fim = emProducao || finsValidos.length === 0 ? hoje : finsValidos[finsValidos.length - 1];
-    const lt = ini ? mesesEntre(ini, fim) : null;
+    // LTV = receita realizada (só entregas entregues); LT = span da 1ª à última
+    // entrega entregue. Espelha a régua do drawer de auditoria.
     units.push({
       estado: estadoClientePontual(items),
-      lt,
+      lt: ltPontualEntregue(items),
       nEntregas: items.length,
-      ltv: items.reduce((s, r) => s + (r.valorp ?? 0), 0),
+      ltv: ltvPontualRealizado(items),
       idadeMeses: ini ? mesesEntre(ini, hoje) : 0,
     });
   }
@@ -678,16 +677,11 @@ export function buildClientesDetalhe(
       }
       ltv = Math.round(items.reduce((s, r) => s + (r.ltvRecorrente ?? 0), 0));
     } else {
+      // Pontual: LTV = receita realizada (só entregas entregues); LT = span da
+      // 1ª à última entrega entregue (<2 entregues → null, sem span mensurável).
       estado = estadoClientePontual(items);
-      const emProducao = items.some((r) => classifyEstadoPontual(r.status) === "em_producao");
-      const finsValidos = items
-        .filter((r) => !r.dataInconsistente)
-        .map((r) => r.dataFim)
-        .filter((d): d is string => !!d)
-        .sort();
-      const fim = emProducao || finsValidos.length === 0 ? hoje : finsValidos[finsValidos.length - 1];
-      lt = ini ? mesesEntre(ini, fim) : null;
-      ltv = Math.round(items.reduce((s, r) => s + (r.valorp ?? 0), 0));
+      lt = ltPontualEntregue(items);
+      ltv = Math.round(ltvPontualRealizado(items));
     }
 
     const entregas: EntregaDetalhe[] = items
