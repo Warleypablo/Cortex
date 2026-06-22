@@ -106,6 +106,23 @@
 
 ---
 
+## 2026-06-19 | feat(tiktok): agendar sync orgânico + script de disparo manual
+
+**O que foi feito:**
+- Adicionado o job `runTiktokOrganicSync` ao scheduler em `server/index.ts` (12h em 12h, primeiro disparo ~105s após o boot), espelhando o padrão de Meta/Instagram. O job é gated em `TIKTOK_APP_ID`/`TIKTOK_APP_SECRET`: sem as credenciais do app ele apenas loga "pulando", sem poluir `tiktok.sync_runs`.
+- Criado `scripts/sync-tiktok-organic.ts` para disparo manual do sync (`npx tsx scripts/sync-tiktok-organic.ts`).
+
+**Por que:**
+- O pipeline de métricas orgânicas do TikTok já existia ponta a ponta (OAuth → tabelas `tiktok.*` → `tiktokOrganicSync` → endpoint `/api/growth/orcado-realizado/tiktok` → tela Orçado x Realizado), mas o sync **nunca rodava sozinho** (não estava no scheduler) — por isso a tela exibia tudo zerado. Agendar o sync + ter um disparo manual destrava o abastecimento assim que as credenciais forem confirmadas no ambiente (prod/Render).
+
+**Arquivos alterados:**
+- `server/index.ts` - novo bloco do job `runTiktokOrganicSync` (setTimeout inicial + setInterval 12h) com gate de env.
+- `scripts/sync-tiktok-organic.ts` - runner manual do sync orgânico (reusa o `pool` de `server/db`).
+
+**Impacto arquitetural:** Nenhum — reusa o serviço `syncTiktokOrganic` e o padrão de scheduler já existentes; nenhuma tabela nem contrato de API novo.
+
+---
+
 ## 2026-06-18 | style(relatorio-mensal): slide Pontual preenche o espaço após remoção do bloco
 
 **O que foi feito:**
