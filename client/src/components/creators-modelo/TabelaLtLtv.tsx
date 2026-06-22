@@ -38,7 +38,9 @@ export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
             <CardTitle className="text-base">LT &amp; LTV — Recorrente × Pontual</CardTitle>
             <p className="text-xs text-gray-500 dark:text-zinc-400">
               {unidade === "cliente" ? "Por cliente" : "Por contrato"} · {agregador === "media" ? "Média" : "Mediana"}
-              {" "}· LTV recorrente = realizado até hoje · Lifetime = tempo de relação (1ª compra → encerramento/hoje)
+              {" "}· LTV recorrente = realizado até hoje · Lifetime do pontual = {unidade === "cliente"
+                ? "tempo de relação (1ª compra → encerramento/hoje)"
+                : "tempo de entrega ativa (1ª à última entrega não churnada; jornada = 1 contrato)"}
             </p>
           </div>
           <div className="flex items-center gap-2">
