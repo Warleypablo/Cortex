@@ -218,7 +218,9 @@ export interface RegPontualItem extends RegPontual {
   squad?: string;
 }
 
-export type CategoriaPonte = "venda" | "entrega" | "churn" | "deletados" | "saida_atipica" | "reajuste";
+export type CategoriaPonte =
+  | "venda_mes" | "entrada_defasada" | "reativacao" | "sem_origem"
+  | "entrega" | "churn" | "deletados" | "saida_atipica" | "reajuste";
 
 export interface ItemPonte {
   idSubtask: string;
@@ -235,11 +237,13 @@ const brl = (v: number) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 export function classificarPonteItens(
   ant: RegPontualItem[],
   atual: RegPontualItem[],
+  ymAlvo: string,
 ): Record<CategoriaPonte, ItemPonte[]> {
   const antMap = new Map(ant.map((r) => [r.idSubtask, r]));
   const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
   const out: Record<CategoriaPonte, ItemPonte[]> = {
-    venda: [], entrega: [], churn: [], deletados: [], saida_atipica: [], reajuste: [],
+    venda_mes: [], entrada_defasada: [], reativacao: [], sem_origem: [],
+    entrega: [], churn: [], deletados: [], saida_atipica: [], reajuste: [],
   };
   for (const r of ant) {
     if (!ehEstoquePontual(r)) continue;
@@ -257,7 +261,12 @@ export function classificarPonteItens(
   for (const r of atual) {
     if (!ehEstoquePontual(r)) continue;
     const prev = antMap.get(r.idSubtask);
-    if (!prev || !ehEstoquePontual(prev)) out.venda.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: r.status, valor: r.valorp, detalhe: "" });
+    if (prev && ehEstoquePontual(prev)) continue;
+    const base = { idSubtask: r.idSubtask, cliente: r.cliente, status: r.status, valor: r.valorp };
+    if (prev) out.reativacao.push({ ...base, detalhe: `voltou de ${prev.status}` });
+    else if (!r.criadoYm) out.sem_origem.push({ ...base, detalhe: "sem registro em cup_contratos" });
+    else if (r.criadoYm === ymAlvo) out.venda_mes.push({ ...base, detalhe: "" });
+    else out.entrada_defasada.push({ ...base, detalhe: `criado em ${r.criadoYm}` });
   }
   return out;
 }
