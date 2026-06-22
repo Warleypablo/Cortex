@@ -7,10 +7,13 @@ export interface RegPontual {
   idSubtask: string;
   valorp: number;
   status: string;
+  criadoYm?: string | null; // 'YYYY-MM' de data_criado (cup_contratos); ausente => sem origem
 }
 
 const ESTOQUE_STATUS_EXCLUDE = new Set(["entregue", "cancelado/inativo", "não usar"]);
 const CHURN_STATUS = new Set(["cancelado/inativo", "não usar"]);
+
+const ANO = 2026;
 
 export function ehEstoquePontual(r: RegPontual): boolean {
   return r.valorp > 0 && !ESTOQUE_STATUS_EXCLUDE.has(r.status);
@@ -18,7 +21,11 @@ export function ehEstoquePontual(r: RegPontual): boolean {
 
 export interface PonteMes {
   estoqueIni: number;
-  venda: number;
+  venda: number;          // total das 4 sub-categorias abaixo
+  vendaMes: number;       // criadoYm == mês-alvo
+  entradaDefasada: number;// criadoYm de mês anterior/futuro
+  reativacao: number;     // estava na foto anterior fora do estoque
+  semOrigem: number;      // sem registro em cup_contratos
   entrega: number;
   churn: number;
   deletados: number;
@@ -30,13 +37,13 @@ export interface PonteMes {
 // IMPORTANTE: manter a árvore de classificação em sincronia com classificarPonteItens (mesma lógica; uma soma, a outra lista). Desync quebra a reconciliação drill×célula — coberto pelo teste de soma por categoria.
 // Classifica a transição de cada contrato (id_subtask) entre o estoque do snapshot
 // anterior e o do atual. Venda inclui contratos que (re)entraram no estoque.
-export function classificarPonte(ant: RegPontual[], atual: RegPontual[]): PonteMes {
+export function classificarPonte(ant: RegPontual[], atual: RegPontual[], ymAlvo: string): PonteMes {
   const antMap = new Map(ant.map((r) => [r.idSubtask, r]));
-  const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
   const p: PonteMes = {
-    estoqueIni: 0, venda: 0, entrega: 0, churn: 0,
-    deletados: 0, saidaAtipica: 0, reajuste: 0, estoqueFim: 0,
+    estoqueIni: 0, venda: 0, vendaMes: 0, entradaDefasada: 0, reativacao: 0, semOrigem: 0,
+    entrega: 0, churn: 0, deletados: 0, saidaAtipica: 0, reajuste: 0, estoqueFim: 0,
   };
+  const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
   for (const r of ant) {
     if (!ehEstoquePontual(r)) continue;
     p.estoqueIni += r.valorp;
@@ -51,7 +58,13 @@ export function classificarPonte(ant: RegPontual[], atual: RegPontual[]): PonteM
     if (!ehEstoquePontual(r)) continue;
     p.estoqueFim += r.valorp;
     const prev = antMap.get(r.idSubtask);
-    if (!prev || !ehEstoquePontual(prev)) p.venda += r.valorp;
+    if (prev && ehEstoquePontual(prev)) continue; // permaneceu (reajuste já tratado)
+    // entrada no estoque: subdividir
+    if (prev) p.reativacao += r.valorp;                 // estava na foto anterior, fora do estoque
+    else if (!r.criadoYm) p.semOrigem += r.valorp;      // sem registro em cup_contratos
+    else if (r.criadoYm === ymAlvo) p.vendaMes += r.valorp;
+    else p.entradaDefasada += r.valorp;
+    p.venda += r.valorp;
   }
   return p;
 }
@@ -86,8 +99,16 @@ export interface LinhaPontual {
 }
 
 const NOTA_VENDA =
-  "Venda = entrada no estoque (contratos pontuais que passaram a constar no snapshot do " +
-  "ClickUp), medida por diferença de snapshots — não é o 'Vendas Pontual' do Bitrix de outras abas.";
+  "Venda = entrada no estoque (snapshot do ClickUp), medida por diferença de snapshots — " +
+  "não é a venda comercial da Visão Geral. Decomposta abaixo pelo motivo da entrada.";
+const NOTA_VENDA_MES =
+  "Contratos com data de criação (cup_contratos) no próprio mês — a venda real do período.";
+const NOTA_DEFASADA =
+  "Contratos criados em meses anteriores que só agora apareceram no snapshot (a foto do estoque atrasa ~1 mês).";
+const NOTA_REATIVACAO =
+  "Contratos que estavam como entregue/cancelado e voltaram ao estoque.";
+const NOTA_SEM_ORIGEM =
+  "Contratos presentes no snapshot mas sem registro atual em cup_contratos (órfãos).";
 
 // porMes[m] = registros (valorp>0) do último snapshot do mês m; m=0 é dez/2025.
 export function montarLinhasPontual(
@@ -99,7 +120,8 @@ export function montarLinhasPontual(
   const decomp: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
   for (let m = 1; m <= 12; m++) {
     if (m > mesCorrente) continue;
-    ponte[m] = classificarPonte(porMes[m - 1] ?? [], porMes[m] ?? []);
+    const ym = `${ANO}-${String(m).padStart(2, "0")}`;
+    ponte[m] = classificarPonte(porMes[m - 1] ?? [], porMes[m] ?? [], ym);
     decomp[m] = decomporStatus(porMes[m] ?? []);
   }
 
@@ -141,16 +163,30 @@ export function montarLinhasPontual(
     return m <= mesCorrente && p ? p.estoqueFim : null;
   });
 
+  const serieVenda = serieFluxo((p) => p.venda, 1);
+  const serieVendaMes = serieFluxo((p) => p.vendaMes, 1);
+  const serieDefasada = serieFluxo((p) => p.entradaDefasada, 1);
+  const serieReativacao = serieFluxo((p) => p.reativacao, 1);
+  const serieSemOrigem = serieFluxo((p) => p.semOrigem, 1);
+
   const linhas: LinhaPontual[] = [
     mk("pontual_estoque_ini", "(=) Estoque inicial", "estoque", serieEstoqueIni, ponte[1]?.estoqueIni ?? null),
-    mk("pontual_venda", "(+) Venda", "fluxo", serieFluxo((p) => p.venda, 1), sumYtd(serieFluxo((p) => p.venda, 1)), { nota: NOTA_VENDA }),
+    mk("pontual_venda", "(+) Venda", "fluxo", serieVenda, sumYtd(serieVenda), { nota: NOTA_VENDA }),
+    mk("pontual_venda_mes", "· Venda do mês", "fluxo", serieVendaMes, sumYtd(serieVendaMes), { nota: NOTA_VENDA_MES }),
+    mk("pontual_entrada_defasada", "· Entrada defasada", "fluxo", serieDefasada, sumYtd(serieDefasada), { nota: NOTA_DEFASADA }),
+    mk("pontual_reativacao", "· Reativação", "fluxo", serieReativacao, sumYtd(serieReativacao), { nota: NOTA_REATIVACAO }),
+  ];
+  if (serieSemOrigem.some((v) => v !== null && Math.abs(v) > 0.5)) {
+    linhas.push(mk("pontual_sem_origem", "· Sem origem", "fluxo", serieSemOrigem, sumYtd(serieSemOrigem), { nota: NOTA_SEM_ORIGEM }));
+  }
+  linhas.push(
     mk("pontual_entrega", "(−) Entrega", "fluxo", serieFluxo((p) => p.entrega, -1), sumYtd(serieFluxo((p) => p.entrega, -1))),
     mk("pontual_churn", "(−) Churn", "fluxo", serieFluxo((p) => p.churn, -1), sumYtd(serieFluxo((p) => p.churn, -1))),
     mk("pontual_deletados", "(−) Deletados", "fluxo", serieFluxo((p) => p.deletados, -1), sumYtd(serieFluxo((p) => p.deletados, -1))),
     mk("pontual_saida_atipica", "(−) Saída atípica", "fluxo", serieFluxo((p) => p.saidaAtipica, -1), sumYtd(serieFluxo((p) => p.saidaAtipica, -1))),
     mk("pontual_reajuste", "(±) Reajuste de valor", "fluxo", serieFluxo((p) => p.reajuste, 1), sumYtd(serieFluxo((p) => p.reajuste, 1))),
     mk("pontual_estoque_fim", "(=) Estoque final", "estoque", serieEstoqueFim, mesFechado === 0 ? null : ponte[mesFechado]?.estoqueFim ?? null, { destaque: true }),
-  ];
+  );
 
   for (const { chave, titulo } of STATUS_DECOMP) {
     const serie = Array.from({ length: 12 }, (_, i) => {
