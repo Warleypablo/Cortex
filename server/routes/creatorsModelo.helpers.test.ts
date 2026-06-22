@@ -142,7 +142,7 @@ describe("buildUnitsRecorrente", () => {
 });
 
 describe("buildUnitsPontual", () => {
-  it("por contrato: entrega única entregue → ltv realizado, sem span (lt null)", () => {
+  it("por contrato: entrega única entregue → ltv realizado, LT = 1 mês (1 entrega = 1 mês)", () => {
     const units = buildUnitsPontual(
       [row({ tipoReceita: "pontual", valorp: 5000, status: "entregue" })],
       "contrato", HOJE,
@@ -150,9 +150,9 @@ describe("buildUnitsPontual", () => {
     expect(units[0].nEntregas).toBe(1);
     expect(units[0].ltv).toBe(5000);  // a única entrega foi entregue → conta
     expect(units[0].estado).toBe("concluido");
-    expect(units[0].lt).toBeNull();   // 1 entregue → sem span → fora da média
+    expect(units[0].lt).toBe(1);      // 1 entrega entregue = 1 mês
   });
-  it("por contrato: LTV conta só entregas entregues; LT = span entre as entregues", () => {
+  it("por contrato: LTV e LT contam só entregas entregues (1 = 1 mês)", () => {
     const rows = [
       row({ idTask: "J", tipoReceita: "pontual", valorp: 5000, status: "entregue", servico: "1ª Entrega - Creators", dataInicio: "2026-01-01" }),
       row({ idTask: "J", tipoReceita: "pontual", valorp: 5000, status: "entregue", servico: "2ª Entrega - Creators", dataInicio: "2026-04-01" }),
@@ -160,11 +160,11 @@ describe("buildUnitsPontual", () => {
     ];
     const units = buildUnitsPontual(rows, "contrato", HOJE);
     expect(units).toHaveLength(1);             // jornada vira 1 contrato (não 3)
-    expect(units[0].lt).toBeCloseTo(2.96, 1);  // span jan→abr; a 3ª (não entregue) não entra
+    expect(units[0].lt).toBe(2);               // 2 entregues = 2 meses; a 3ª (cancelada) não entra
     expect(units[0].ltv).toBe(10000);          // só as 2 entregues; a cancelada não gera receita
     expect(units[0].nEntregas).toBe(3);        // contagem total de entregas (vendidas) preservada
   });
-  it("por contrato: caso Dily — 1 de 4 entregue → ltv = 1 entrega, lt null", () => {
+  it("por contrato: caso Dily — 1 de 4 entregue → ltv = 1 entrega, LT = 1 mês", () => {
     const rows = [
       row({ idTask: "D", tipoReceita: "pontual", valorp: 14000, status: "entregue", servico: "1ª Entrega - Creators", dataInicio: "2026-03-16" }),
       row({ idTask: "D", tipoReceita: "pontual", valorp: 14000, status: "triagem", servico: "2ª Entrega - Creators", dataInicio: "2026-03-30" }),
@@ -173,10 +173,10 @@ describe("buildUnitsPontual", () => {
     ];
     const units = buildUnitsPontual(rows, "contrato", HOJE);
     expect(units[0].ltv).toBe(14000); // só a 1ª (entregue); as 3 em triagem não contam
-    expect(units[0].lt).toBeNull();   // 1 entregue → sem span
+    expect(units[0].lt).toBe(1);      // 1 entregue = 1 mês
     expect(units[0].nEntregas).toBe(4);
   });
-  it("por cliente: LTV conta só entregue (exclui ativo/triagem); 1 entregue → lt null", () => {
+  it("por cliente: LTV/LT contam só entregue (exclui ativo/triagem); 1 entregue → LT 1 mês", () => {
     const rows = [
       row({ idTask: "A", tipoReceita: "pontual", valorp: 5000, status: "entregue", dataInicio: "2026-01-01" }),
       row({ idTask: "A", tipoReceita: "pontual", valorp: 6000, status: "ativo", dataInicio: "2026-03-01" }),
@@ -185,18 +185,27 @@ describe("buildUnitsPontual", () => {
     expect(units).toHaveLength(1);
     expect(units[0].nEntregas).toBe(2);
     expect(units[0].ltv).toBe(5000);   // só a entregue; a 'ativo' ainda não foi realizada
-    expect(units[0].lt).toBeNull();    // só 1 entregue → sem span
+    expect(units[0].lt).toBe(1);       // 1 entregue = 1 mês
     expect(units[0].estado).toBe("em_producao"); // em produção tem prioridade
   });
-  it("por cliente: 2+ entregues → LT = span entre 1ª e última entregue", () => {
+  it("por cliente: sem nenhuma entrega entregue → LT null (fora da média)", () => {
+    const units = buildUnitsPontual(
+      [row({ idTask: "A", tipoReceita: "pontual", valorp: 5000, status: "triagem", dataInicio: "2026-01-01" })],
+      "cliente", HOJE,
+    );
+    expect(units[0].ltv).toBe(0);    // nada entregue → LTV realizado 0
+    expect(units[0].lt).toBeNull();  // 0 entregues → sem lifetime → fora da média
+  });
+  it("por cliente: 3 entregues → LT = 3 meses", () => {
     const rows = [
       row({ idTask: "A", tipoReceita: "pontual", valorp: 5000, status: "entregue", dataInicio: "2026-01-01" }),
       row({ idTask: "A", tipoReceita: "pontual", valorp: 6000, status: "entregue", dataInicio: "2026-04-01" }),
-      row({ idTask: "A", tipoReceita: "pontual", valorp: 7000, status: "triagem", dataInicio: "2026-06-01" }),
+      row({ idTask: "A", tipoReceita: "pontual", valorp: 7000, status: "entregue", dataInicio: "2026-05-01" }),
+      row({ idTask: "A", tipoReceita: "pontual", valorp: 8000, status: "triagem", dataInicio: "2026-06-01" }),
     ];
     const units = buildUnitsPontual(rows, "cliente", HOJE);
-    expect(units[0].ltv).toBe(11000);          // 2 entregues; a triagem não conta
-    expect(units[0].lt).toBeCloseTo(2.96, 1);  // span jan→abr entre as entregues
+    expect(units[0].ltv).toBe(18000);  // 3 entregues; a triagem não conta
+    expect(units[0].lt).toBe(3);       // 3 entregues = 3 meses
   });
 });
 
@@ -421,7 +430,7 @@ describe("buildClientesDetalhe", () => {
     row({ idTask: "P1", nome: "Cacow", tipoReceita: "pontual", valorp: 5000, status: "entregue", servico: "1ª Entrega - Creators", dataInicio: "2026-01-01" }),
     row({ idTask: "P1", nome: "Cacow", tipoReceita: "pontual", valorp: 6000, status: "entregue", servico: "2ª Entrega - Creators", dataInicio: "2026-04-01" }),
     row({ idTask: "P2", nome: "Life's", tipoReceita: "pontual", valorp: 1000, status: "entregue", servico: "Creators Pontual", dataInicio: "2026-03-01" }),
-    // Dily: 1 entregue + 3 em triagem → LTV só a entregue, LT null (1 entregue só)
+    // Dily: 1 entregue + 3 em triagem → LTV só a entregue, LT = 1 mês (1 entregue)
     row({ idTask: "P3", nome: "Dily", tipoReceita: "pontual", valorp: 14000, status: "entregue", servico: "1ª Entrega - Creators", dataInicio: "2026-03-16" }),
     row({ idTask: "P3", nome: "Dily", tipoReceita: "pontual", valorp: 14000, status: "triagem", servico: "2ª Entrega - Creators", dataInicio: "2026-03-30" }),
     row({ idTask: "P3", nome: "Dily", tipoReceita: "pontual", valorp: 14000, status: "triagem", servico: "3ª Entrega - Creators", dataInicio: "2026-03-30" }),
@@ -433,16 +442,16 @@ describe("buildClientesDetalhe", () => {
     expect(cli).toHaveLength(3);
     const cacow = cli.find((c) => c.idTask === "P1")!;
     expect(cacow.nome).toBe("Cacow");
-    expect(cacow.ltv).toBe(11000);             // 2 entregues
-    expect(cacow.ltMeses).toBeCloseTo(2.96, 1); // span jan→abr entre as entregues
+    expect(cacow.ltv).toBe(11000);   // 2 entregues
+    expect(cacow.ltMeses).toBe(2);   // 2 entregues = 2 meses
     expect(cacow.nEntregas).toBe(2);
     expect(cacow.entregas[0].servico).toBe("1ª Entrega - Creators"); // ordenado por data
   });
-  it("caso Dily: 1 de 4 entregue → LTV = R$14.000 (não R$56.000), LT null", () => {
+  it("caso Dily: 1 de 4 entregue → LTV = R$14.000 (não R$56.000), LT = 1 mês", () => {
     const cli = buildClientesDetalhe(rows, "pontual", { hoje: "2026-06-21" });
     const dily = cli.find((c) => c.idTask === "P3")!;
     expect(dily.ltv).toBe(14000);   // só a 1ª entrega (entregue); as 3 em triagem não contam
-    expect(dily.ltMeses).toBeNull(); // só 1 entregue → sem span
+    expect(dily.ltMeses).toBe(1);   // 1 entregue = 1 mês
     expect(dily.nEntregas).toBe(4); // todas as entregas aparecem na auditoria
     expect(dily.entregas).toHaveLength(4);
   });
