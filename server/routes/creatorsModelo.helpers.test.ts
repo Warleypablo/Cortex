@@ -6,6 +6,7 @@ import {
   buildCurvaRecorrente, buildRecompra,
   buildCreatorsModeloPayload, aplicarPeriodo,
   buildLtvMaduro, buildPlacar,
+  buildMixMensal,
   type RawRow,
 } from "./creatorsModelo.helpers";
 
@@ -329,5 +330,27 @@ describe("buildPlacar", () => {
     expect(p.breakEven.ticketPontual).toBe(2000);     // média valorp entregues (1000+3000)/2
     expect(p.breakEven.minRecompras).toBe(2);         // blended 4000/2000
     expect(p.breakEven.maxRecompras).toBe(3);         // ativo 6000/2000
+  });
+});
+
+describe("buildMixMensal", () => {
+  it("agrupa vendas novas por mês de data_inicio e modelo", () => {
+    const rows = [
+      row({ tipoReceita: "pontual", valorp: 5000, dataInicio: "2026-03-10" }),
+      row({ tipoReceita: "pontual", valorp: 6000, dataInicio: "2026-03-20" }),
+      row({ tipoReceita: "recorrente", valorr: 1000, valorp: 0, dataInicio: "2026-03-05" }),
+      row({ tipoReceita: "pontual", valorp: 4000, dataInicio: "2026-04-01" }),
+    ];
+    const mix = buildMixMensal(rows);
+    expect(mix).toHaveLength(2);
+    const mar = mix.find((m) => m.mes === "2026-03")!;
+    expect(mar.pontualN).toBe(2);
+    expect(mar.pontualValor).toBe(11000);
+    expect(mar.recorrenteN).toBe(1);
+    expect(mar.recorrenteMrrNovo).toBe(1000);
+    expect(mix.find((m) => m.mes === "2026-04")!.pontualN).toBe(1);
+  });
+  it("ignora linhas sem data_inicio", () => {
+    expect(buildMixMensal([row({ tipoReceita: "pontual", dataInicio: null })])).toHaveLength(0);
   });
 });

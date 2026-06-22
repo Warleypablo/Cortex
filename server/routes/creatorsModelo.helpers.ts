@@ -432,6 +432,28 @@ export function buildPlacar(rows: RawRow[], hoje: string): Placar {
   };
 }
 
+// ─── Task 3 (redesign): Mix de receita mensal por modelo ─────────────────────
+
+export interface MixMes {
+  mes: string; pontualN: number; pontualValor: number; recorrenteN: number; recorrenteMrrNovo: number;
+}
+
+export function buildMixMensal(rows: RawRow[]): MixMes[] {
+  const map = new Map<string, MixMes>();
+  for (const r of rows) {
+    if (!r.dataInicio) continue;
+    const mes = r.dataInicio.slice(0, 7);
+    const m = map.get(mes) ?? { mes, pontualN: 0, pontualValor: 0, recorrenteN: 0, recorrenteMrrNovo: 0 };
+    const modelo = classifyModelo(r);
+    if (modelo === "pontual") { m.pontualN += 1; m.pontualValor += r.valorp ?? 0; }
+    else if (modelo === "recorrente") { m.recorrenteN += 1; m.recorrenteMrrNovo += r.valorr ?? 0; }
+    map.set(mes, m);
+  }
+  return Array.from(map.values())
+    .map((m) => ({ ...m, pontualValor: Math.round(m.pontualValor), recorrenteMrrNovo: Math.round(m.recorrenteMrrNovo) }))
+    .sort((a, b) => a.mes.localeCompare(b.mes));
+}
+
 export function buildCreatorsModeloPayload(
   rows: RawRow[], opts: { de?: string; ate?: string; hoje: string },
 ): CreatorsModeloPayload {
