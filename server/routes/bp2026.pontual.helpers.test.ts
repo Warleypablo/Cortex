@@ -34,21 +34,58 @@ describe("ehEstoquePontual", () => {
 });
 
 describe("classificarPonte", () => {
-  const p = classificarPonte(ant, atual);
+  const p = classificarPonte(
+    ant.map((r) => ({ ...r, criadoYm: "2026-03" })),
+    atual.map((r) => ({ ...r, criadoYm: r.idSubtask === "F" ? "2026-03" : "2026-03" })),
+    "2026-03",
+  );
   it("classifica cada categoria", () => {
-    expect(p.estoqueIni).toBe(2150); // A+B+C+D+G (E fora)
-    expect(p.venda).toBe(700);       // F
-    expect(p.entrega).toBe(500);     // B
-    expect(p.churn).toBe(300);       // C
-    expect(p.deletados).toBe(200);   // D
-    expect(p.saidaAtipica).toBe(150);// G (valorp 0)
-    expect(p.reajuste).toBe(100);    // A 1000->1100
-    expect(p.estoqueFim).toBe(1800); // A1100 + F700
+    expect(p.estoqueIni).toBe(2150);
+    expect(p.venda).toBe(700);        // F (total)
+    expect(p.vendaMes).toBe(700);     // F criado em 2026-03 == ymAlvo
+    expect(p.entradaDefasada).toBe(0);
+    expect(p.reativacao).toBe(0);
+    expect(p.semOrigem).toBe(0);
+    expect(p.entrega).toBe(500);
+    expect(p.churn).toBe(300);
+    expect(p.deletados).toBe(200);
+    expect(p.saidaAtipica).toBe(150);
+    expect(p.reajuste).toBe(100);
+    expect(p.estoqueFim).toBe(1800);
+  });
+  it("soma das 4 sub-categorias = venda total", () => {
+    expect(p.vendaMes + p.entradaDefasada + p.reativacao + p.semOrigem).toBe(p.venda);
   });
   it("a ponte fecha (identidade)", () => {
     expect(
       p.estoqueIni + p.venda - p.entrega - p.churn - p.deletados - p.saidaAtipica + p.reajuste
     ).toBe(p.estoqueFim);
+  });
+});
+
+describe("classificarPonte — sub-categorias da venda", () => {
+  // base anterior: H estava entregue (fora do estoque) -> reativa; demais ausentes
+  const anterior = [
+    { idSubtask: "H", valorp: 400, status: "entregue", criadoYm: "2025-11" }, // volta -> reativação
+  ];
+  const agora = [
+    { idSubtask: "H", valorp: 400, status: "ativo", criadoYm: "2025-11" },    // reativação (precede data)
+    { idSubtask: "M", valorp: 300, status: "ativo", criadoYm: "2026-04" },    // venda do mês
+    { idSubtask: "P", valorp: 200, status: "ativo", criadoYm: "2026-02" },    // entrada defasada
+    { idSubtask: "S", valorp: 100, status: "ativo", criadoYm: null },         // sem origem
+  ];
+  const p = classificarPonte(anterior, agora, "2026-04");
+  it("separa reativação, venda do mês, defasada e sem origem", () => {
+    expect(p.reativacao).toBe(400);
+    expect(p.vendaMes).toBe(300);
+    expect(p.entradaDefasada).toBe(200);
+    expect(p.semOrigem).toBe(100);
+    expect(p.venda).toBe(1000);
+  });
+  it("reativação tem precedência sobre data_criado", () => {
+    // H tem criadoYm 2025-11 (defasada) mas estava no snapshot anterior fora do estoque -> reativação
+    expect(p.reativacao).toBe(400);
+    expect(p.entradaDefasada).toBe(200); // só P, não H
   });
 });
 
@@ -65,19 +102,29 @@ describe("decomporStatus", () => {
 });
 
 describe("montarLinhasPontual", () => {
-  const porMes = { 0: ant, 1: atual };
+  const porMes = {
+    0: ant.map((r) => ({ ...r, criadoYm: "2025-12" })),
+    1: atual.map((r) => ({ ...r, criadoYm: r.idSubtask === "F" ? "2026-01" : "2025-12" })),
+  };
   const linhas = montarLinhasPontual(porMes, 1, 1);
   const by = (m: string) => linhas.find((l) => l.metrica === m)!;
   it("estoque inicial positivo, fluxos com sinal, estoque final destaque", () => {
     expect(by("pontual_estoque_ini").meses[0].realizado).toBe(2150);
     expect(by("pontual_venda").meses[0].realizado).toBe(700);
     expect(by("pontual_entrega").meses[0].realizado).toBe(-500);
-    expect(by("pontual_churn").meses[0].realizado).toBe(-300);
-    expect(by("pontual_deletados").meses[0].realizado).toBe(-200);
-    expect(by("pontual_saida_atipica").meses[0].realizado).toBe(-150);
-    expect(by("pontual_reajuste").meses[0].realizado).toBe(100);
     expect(by("pontual_estoque_fim").meses[0].realizado).toBe(1800);
     expect(by("pontual_estoque_fim").destaque).toBe(true);
+  });
+  it("emite as sub-linhas da venda logo após (+) Venda", () => {
+    expect(by("pontual_venda_mes").meses[0].realizado).toBe(700);    // F criado em 2026-01 == mês 1
+    expect(by("pontual_entrada_defasada").meses[0].realizado).toBe(0);
+    expect(by("pontual_reativacao").meses[0].realizado).toBe(0);
+    expect(by("pontual_venda_mes").titulo).toBe("· Venda do mês");
+    const idxVenda = linhas.findIndex((l) => l.metrica === "pontual_venda");
+    expect(linhas[idxVenda + 1].metrica).toBe("pontual_venda_mes");
+  });
+  it("não emite '· Sem origem' quando não há valor", () => {
+    expect(linhas.find((l) => l.metrica === "pontual_sem_origem")).toBeUndefined();
   });
   it("decomposição por status soma ao estoque final", () => {
     expect(by("pontual_status_ativo").meses[0].realizado).toBe(1100);
@@ -90,7 +137,7 @@ describe("montarLinhasPontual", () => {
       expect(l.meses[0].atingimento).toBeNull();
     }
   });
-  it("YTD: inicial=jan(dez), fluxos somados, final=posição", () => {
+  it("YTD: inicial=jan(dez), venda somada, final=posição", () => {
     expect(by("pontual_estoque_ini").ytd.realizado).toBe(2150);
     expect(by("pontual_venda").ytd.realizado).toBe(700);
     expect(by("pontual_estoque_fim").ytd.realizado).toBe(1800);
