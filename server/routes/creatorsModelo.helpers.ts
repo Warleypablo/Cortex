@@ -186,7 +186,9 @@ export function buildUnitsPontual(
         .map((r) => r.dataInicio)
         .filter((d): d is string => !!d)
         .sort();
-      const lt = datasEntrega.length
+      // Span só faz sentido com 2+ entregas; compra única → null (fora da média,
+      // não dilui com zeros). aggregateMetricas ignora lt null.
+      const lt = datasEntrega.length >= 2
         ? mesesEntre(datasEntrega[0], datasEntrega[datasEntrega.length - 1])
         : null;
       const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();

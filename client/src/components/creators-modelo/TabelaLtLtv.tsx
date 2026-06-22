@@ -40,7 +40,7 @@ export function TabelaLtLtv({ data }: { data: RedesignPayload }) {
               {unidade === "cliente" ? "Por cliente" : "Por contrato"} · {agregador === "media" ? "Média" : "Mediana"}
               {" "}· LTV recorrente = realizado até hoje · Lifetime do pontual = {unidade === "cliente"
                 ? "tempo de relação (1ª compra → encerramento/hoje)"
-                : "tempo de entrega ativa (1ª à última entrega não churnada; jornada = 1 contrato)"}
+                : "span da 1ª à última entrega não churnada (só jornadas com 2+ entregas). ⚠️ datas têm backfill — pouco confiável"}
             </p>
           </div>
           <div className="flex items-center gap-2">
