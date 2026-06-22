@@ -7,6 +7,7 @@ import {
   buildCreatorsModeloPayload, aplicarPeriodo,
   buildLtvMaduro, buildPlacar,
   buildMixMensal,
+  buildSobrevivenciaSafra, avisoMaturidadePorRazao,
   type RawRow,
 } from "./creatorsModelo.helpers";
 
@@ -352,5 +353,31 @@ describe("buildMixMensal", () => {
   });
   it("ignora linhas sem data_inicio", () => {
     expect(buildMixMensal([row({ tipoReceita: "pontual", dataInicio: null })])).toHaveLength(0);
+  });
+});
+
+describe("buildSobrevivenciaSafra", () => {
+  it("agrupa recorrente por mês de entrada e calcula % ainda ativo (não mistura coortes)", () => {
+    const rows = [
+      row({ tipoReceita: "recorrente", isAtivo: true, isChurned: false, status: "ativo", dataInicio: "2026-01-05" }),
+      row({ tipoReceita: "recorrente", isAtivo: false, isChurned: true, status: "cancelado/inativo", dataInicio: "2026-01-20" }),
+      row({ tipoReceita: "recorrente", isAtivo: true, isChurned: false, status: "ativo", dataInicio: "2026-02-10" }),
+    ];
+    const s = buildSobrevivenciaSafra(rows);
+    expect(s).toHaveLength(2);
+    expect(s.find((x) => x.safra === "2026-01")).toMatchObject({ n: 2, pctAtivo: 50 });
+    expect(s.find((x) => x.safra === "2026-02")).toMatchObject({ n: 1, pctAtivo: 100 });
+  });
+});
+
+describe("avisoMaturidadePorRazao", () => {
+  it("acende quando uma coorte é >40% mais velha (corrige limiar absoluto)", () => {
+    const rows = [
+      row({ tipoReceita: "recorrente", isAtivo: true, isChurned: false, status: "ativo", dataInicio: "2025-01-01" }), // ~17m
+      row({ tipoReceita: "pontual", status: "entregue", dataInicio: "2026-04-01" }), // ~2.6m
+    ];
+    const a = avisoMaturidadePorRazao(rows, "2026-06-21");
+    expect(a.aviso).toBe(true);
+    expect(a.recorrenteIdade).toBeGreaterThan(a.pontualIdade);
   });
 });

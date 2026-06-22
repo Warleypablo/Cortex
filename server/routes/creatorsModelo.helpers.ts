@@ -454,6 +454,36 @@ export function buildMixMensal(rows: RawRow[]): MixMes[] {
     .sort((a, b) => a.mes.localeCompare(b.mes));
 }
 
+// ─── Task 4 (redesign): Sobrevivência por safra + aviso maturidade por razão ──
+
+export interface SafraPonto { safra: string; n: number; pctAtivo: number; }
+
+export function buildSobrevivenciaSafra(rows: RawRow[]): SafraPonto[] {
+  const rec = rows.filter((r) => classifyModelo(r) === "recorrente" && r.dataInicio);
+  const map = new Map<string, { n: number; ativos: number }>();
+  for (const r of rec) {
+    const safra = r.dataInicio!.slice(0, 7);
+    const cur = map.get(safra) ?? { n: 0, ativos: 0 };
+    cur.n += 1;
+    if (classifyEstadoRecorrente(r) === "ativo") cur.ativos += 1;
+    map.set(safra, cur);
+  }
+  return Array.from(map.entries())
+    .map(([safra, v]) => ({ safra, n: v.n, pctAtivo: v.n ? Math.round((v.ativos / v.n) * 1000) / 10 : 0 }))
+    .sort((a, b) => a.safra.localeCompare(b.safra));
+}
+
+export function avisoMaturidadePorRazao(
+  rows: RawRow[], hoje: string,
+): { recorrenteIdade: number; pontualIdade: number; aviso: boolean } {
+  const rec = rows.filter((r) => classifyModelo(r) === "recorrente");
+  const pont = rows.filter((r) => classifyModelo(r) === "pontual");
+  const recIdade = aggregateMetricas(buildUnitsRecorrente(rec, "cliente", hoje)).idadeMediaMeses;
+  const pontIdade = aggregateMetricas(buildUnitsPontual(pont, "cliente", hoje)).idadeMediaMeses;
+  const maior = Math.max(recIdade, pontIdade), menor = Math.min(recIdade, pontIdade);
+  return { recorrenteIdade: recIdade, pontualIdade: pontIdade, aviso: menor > 0 && maior / menor > 1.4 };
+}
+
 export function buildCreatorsModeloPayload(
   rows: RawRow[], opts: { de?: string; ate?: string; hoje: string },
 ): CreatorsModeloPayload {
