@@ -150,6 +150,17 @@ describe("buildUnitsPontual", () => {
     expect(units[0].ltv).toBe(5000);
     expect(units[0].estado).toBe("concluido");
   });
+  it("por contrato: jornada de várias entregas = 1 contrato; lt = 1ª à última entrega não churnada", () => {
+    const rows = [
+      row({ idTask: "J", tipoReceita: "pontual", valorp: 5000, status: "entregue", servico: "1ª Entrega - Creators", dataInicio: "2026-01-01" }),
+      row({ idTask: "J", tipoReceita: "pontual", valorp: 5000, status: "entregue", servico: "2ª Entrega - Creators", dataInicio: "2026-04-01" }),
+      row({ idTask: "J", tipoReceita: "pontual", valorp: 5000, status: "cancelado/inativo", servico: "3ª Entrega - Creators", dataInicio: "2026-06-01" }),
+    ];
+    const units = buildUnitsPontual(rows, "contrato", HOJE);
+    expect(units).toHaveLength(1);             // jornada vira 1 contrato (não 3)
+    expect(units[0].lt).toBeCloseTo(2.96, 1);  // jan→abr; a 3ª (churnada) não conta
+    expect(units[0].ltv).toBe(15000);          // soma de todas as entregas
+  });
   it("por cliente: nEntregas=nº contratos, ltv=soma, lt=tempo de relação, estado por prioridade", () => {
     const rows = [
       row({ idTask: "A", tipoReceita: "pontual", valorp: 5000, status: "entregue", dataInicio: "2026-01-01" }),
