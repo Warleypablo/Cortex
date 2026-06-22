@@ -136,8 +136,26 @@ describe("buildUnitsPontual", () => {
     expect(units).toHaveLength(1);
     expect(units[0].nEntregas).toBe(2);
     expect(units[0].ltv).toBe(11000);
-    expect(units[0].lt).toBeCloseTo(1.97, 1); // jan→mar span
+    expect(units[0].lt).toBeCloseTo(1.97, 1); // jan→mar span (entregue + ativo, ambos elegíveis)
     expect(units[0].estado).toBe("em_producao"); // em produção tem prioridade
+  });
+  it("por cliente: LT-span ignora triagem/onboarding/cancelado (só entregas elegíveis)", () => {
+    const units = buildUnitsPontual(
+      [
+        row({ idTask: "A", tipoReceita: "pontual", valorp: 5000, status: "entregue", dataInicio: "2026-01-01" }),
+        row({ idTask: "A", tipoReceita: "pontual", valorp: 5000, status: "triagem", dataInicio: "2026-06-01" }),
+      ],
+      "cliente", HOJE,
+    );
+    expect(units[0].lt).toBe(0);      // só a entrega (jan) conta → span 0; triagem (jun) ignorada
+    expect(units[0].nEntregas).toBe(2); // nº de compras continua contando todas
+  });
+  it("por cliente: LT null quando não há entrega elegível", () => {
+    const units = buildUnitsPontual(
+      [row({ idTask: "B", tipoReceita: "pontual", valorp: 5000, status: "triagem", dataInicio: "2026-01-01" })],
+      "cliente", HOJE,
+    );
+    expect(units[0].lt).toBeNull();
   });
 });
 
