@@ -8,6 +8,7 @@ import { mediana } from "./ltLtvChurn.helpers";
 export interface RawRow {
   idTask: string | null;
   idSubtask: string | null;
+  nome: string | null;
   produto: string | null;
   servico: string;
   status: string | null;
@@ -612,4 +613,102 @@ export function buildCreatorsModeloPayload(
       avisoMaturidade: Math.abs(recIdade - pontIdade) > 6,
     },
   };
+}
+
+// ─── Auditoria: detalhe por cliente (drill-down) ──────────────────────────────
+
+export interface EntregaDetalhe {
+  servico: string;
+  status: string | null;
+  dataInicio: string | null;
+  dataFim: string | null;
+  valor: number; // valorr (recorrente) ou valorp (pontual)
+}
+
+export interface ClienteDetalhe {
+  idTask: string;
+  nome: string | null;
+  estado: string;
+  nEntregas: number;
+  ltMeses: number | null;
+  ltv: number;
+  entregas: EntregaDetalhe[];
+}
+
+/**
+ * Lista de clientes (1 linha = 1 id_task) de um modelo, com LT, LTV e o
+ * detalhamento das entregas. LT/LTV/estado seguem exatamente a régua da aba
+ * "Por cliente" da tabela. Ordenado por LTV desc.
+ */
+export function buildClientesDetalhe(
+  rows: RawRow[], modelo: Modelo, opts: { de?: string; ate?: string; hoje: string },
+): ClienteDetalhe[] {
+  const { de, ate, hoje } = opts;
+  const periodo = aplicarPeriodo(rows, de, ate).filter((r) => classifyModelo(r) === modelo);
+  const byCli = new Map<string, RawRow[]>();
+  for (const r of periodo) {
+    const k = r.idTask ?? r.idSubtask ?? "";
+    (byCli.get(k) ?? byCli.set(k, []).get(k)!).push(r);
+  }
+
+  const out: ClienteDetalhe[] = [];
+  for (const [idTask, items] of Array.from(byCli.entries())) {
+    const inicios = items.map((r) => r.dataInicio).filter((d): d is string => !!d).sort();
+    const ini = inicios[0] ?? null;
+    let estado: string;
+    let lt: number | null = null;
+    let ltv: number;
+
+    if (modelo === "recorrente") {
+      const temAtivo = items.some((r) => classifyEstadoRecorrente(r) === "ativo");
+      const temCancelado = items.some((r) => classifyEstadoRecorrente(r) === "cancelado");
+      if (!temAtivo && !temCancelado) continue; // só fantasmas → fora
+      estado = temAtivo ? "ativo" : "cancelado";
+      const finsValidos = items
+        .filter((r) => !r.dataInconsistente)
+        .map((r) => r.dataFim)
+        .filter((d): d is string => !!d)
+        .sort();
+      if (ini) {
+        if (temAtivo) lt = mesesEntre(ini, hoje);
+        else {
+          const fim = finsValidos[finsValidos.length - 1] ?? null;
+          lt = fim && fim >= ini ? mesesEntre(ini, fim) : null;
+        }
+      }
+      ltv = Math.round(items.reduce((s, r) => s + (r.ltvRecorrente ?? 0), 0));
+    } else {
+      estado = estadoClientePontual(items);
+      const emProducao = items.some((r) => classifyEstadoPontual(r.status) === "em_producao");
+      const finsValidos = items
+        .filter((r) => !r.dataInconsistente)
+        .map((r) => r.dataFim)
+        .filter((d): d is string => !!d)
+        .sort();
+      const fim = emProducao || finsValidos.length === 0 ? hoje : finsValidos[finsValidos.length - 1];
+      lt = ini ? mesesEntre(ini, fim) : null;
+      ltv = Math.round(items.reduce((s, r) => s + (r.valorp ?? 0), 0));
+    }
+
+    const entregas: EntregaDetalhe[] = items
+      .map((r) => ({
+        servico: r.servico,
+        status: r.status,
+        dataInicio: r.dataInicio,
+        dataFim: r.dataFim,
+        valor: modelo === "recorrente" ? r.valorr : r.valorp,
+      }))
+      .sort((a, b) => (a.dataInicio ?? "").localeCompare(b.dataInicio ?? ""));
+
+    out.push({
+      idTask,
+      nome: items.find((r) => r.nome != null)?.nome ?? null,
+      estado,
+      nEntregas: items.length,
+      ltMeses: lt != null ? Math.round(lt * 10) / 10 : null,
+      ltv,
+      entregas,
+    });
+  }
+  return out.sort((a, b) => b.ltv - a.ltv);
 }

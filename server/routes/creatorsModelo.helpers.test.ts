@@ -8,6 +8,7 @@ import {
   buildLtvMaduro, buildPlacar,
   buildMixMensal,
   buildSobrevivenciaSafra, avisoMaturidadePorRazao,
+  buildClientesDetalhe,
   type RawRow,
 } from "./creatorsModelo.helpers";
 
@@ -15,7 +16,7 @@ const HOJE = "2026-06-21";
 
 function row(p: Partial<RawRow>): RawRow {
   return {
-    idTask: "T1", idSubtask: "S1", produto: "Creators", servico: "Creators Pontual",
+    idTask: "T1", idSubtask: "S1", nome: "Cliente T1", produto: "Creators", servico: "Creators Pontual",
     status: "ativo", tipoReceita: "pontual", valorr: 0, valorp: 5000,
     ltMeses: null, ltvRecorrente: null, isAtivo: true, isChurned: false,
     dataInconsistente: false, dataInicio: "2026-03-01", dataFim: null, ...p,
@@ -407,5 +408,31 @@ describe("avisoMaturidadePorRazao", () => {
     const a = avisoMaturidadePorRazao(rows, "2026-06-21");
     expect(a.aviso).toBe(true);
     expect(a.recorrenteIdade).toBeGreaterThan(a.pontualIdade);
+  });
+});
+
+describe("buildClientesDetalhe", () => {
+  const rows = [
+    row({ idTask: "P1", nome: "Cacow", tipoReceita: "pontual", valorp: 5000, status: "entregue", servico: "1ª Entrega - Creators", dataInicio: "2026-01-01" }),
+    row({ idTask: "P1", nome: "Cacow", tipoReceita: "pontual", valorp: 6000, status: "entregue", servico: "2ª Entrega - Creators", dataInicio: "2026-04-01" }),
+    row({ idTask: "P2", nome: "Life's", tipoReceita: "pontual", valorp: 1000, status: "entregue", servico: "Creators Pontual", dataInicio: "2026-03-01" }),
+    row({ idTask: "R1", nome: "Loja Byr", tipoReceita: "recorrente", valorr: 1000, ltMeses: 4, ltvRecorrente: 4000, isChurned: true, status: "cancelado/inativo", dataInicio: "2026-01-01", dataFim: "2026-05-01" }),
+  ];
+  it("lista clientes pontuais com nome, LTV (soma), nEntregas e entregas detalhadas", () => {
+    const cli = buildClientesDetalhe(rows, "pontual", { hoje: "2026-06-21" });
+    expect(cli).toHaveLength(2);
+    const cacow = cli.find((c) => c.idTask === "P1")!;
+    expect(cacow.nome).toBe("Cacow");
+    expect(cacow.ltv).toBe(11000);          // soma valorp
+    expect(cacow.nEntregas).toBe(2);
+    expect(cacow.entregas).toHaveLength(2);
+    expect(cacow.entregas[0].servico).toBe("1ª Entrega - Creators"); // ordenado por data
+  });
+  it("ordena por LTV desc e calcula LTV recorrente realizado", () => {
+    const cli = buildClientesDetalhe(rows, "recorrente", { hoje: "2026-06-21" });
+    expect(cli).toHaveLength(1);
+    expect(cli[0].nome).toBe("Loja Byr");
+    expect(cli[0].ltv).toBe(4000);          // ltv_recorrente
+    expect(cli[0].estado).toBe("cancelado");
   });
 });
