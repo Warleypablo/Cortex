@@ -58,7 +58,7 @@ export function EvolucaoLtLtv({
           Base presente em cada snapshot de fim de mês (cup_data_hist). Recorrente = base ativa do mês
           (exclui churnados que já saíram → lê mais alto que o total acima, que é blended com cancelados).
           {" "}Pontual: 1 entrega entregue = 1 mês (entrega única fora do LT); LTV = realizado (só entregues).
-          {" "}Faturamento = total realizado da base no mês (tudo que foi entregue, inclui entrega única; recorrente = Σ valorr × meses).
+          {" "}Faturamento: pontual = valor entregue no mês (1ª vez que a entrega vira “entregue”); recorrente = MRR ativo do mês (Σ valorr da base ativa).
         </p>
       </CardHeader>
       <CardContent className="overflow-x-auto">
