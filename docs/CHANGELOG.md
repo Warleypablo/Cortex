@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-06-22 | chore(ads-creation): script one-off do ad CRM Recompra h1b1c1 na camp FLASH CRM (CBO)
+
+**O que foi feito:**
+- `subir-crm-flash.ts`: cria o ad **TP1630** (`Crm_Recompra_Lucas_h1b1c1`) pareado 9x16+4x5, **PAUSED**, dentro do conjunto pré-setado (`120252008223980450`) da campanha CBO `[TP] [LEADS] [CBO] [FLASH CRM]` (`120252008224000450`)
+- Vídeos já no Meta (referência por `video_id`: 9x16 `1373715248001174`, 4x5 `1509680107621231`); pareamento via `asset_feed_spec` (9x16 → story/reels, 4x5 → feed)
+- Copy do CRM Recompra + CTA "Saiba mais" (LEARN_MORE) + UTM dinâmica padrão da Turbo
+- Como é CBO, o ad entra no conjunto existente sem budget no nível do conjunto (verba na campanha)
+
+**Por que:**
+- Subir o primeiro criativo do lote CRM na campanha de teste recém-criada pelo usuário, deixando pausado pra revisão antes de publicar
+
+**Pendências registradas (antes de publicar):**
+- Link real da página de destino (hoje placeholder `turbopartners.com.br`) — recriar criativo ou editar no Gerenciador
+- UTMs específicas da landing (se houver, além da dinâmica padrão)
+- Posicionamentos do conjunto + `destination_type` (hoje UNDEFINED) + nome do conjunto + resto da config
+
+**Arquivos novos:**
+- `subir-crm-flash.ts` - cria o ad h1b1c1 pareado PAUSED na camp FLASH CRM (idempotente por nome do ad)
+
+**Impacto arquitetural:** Nenhum — script one-off de criação de ad via Meta API, sem mudança de schema.
+
+---
+
 ## 2026-06-22 | chore(biblioteca): cadastro + reordenação CRM Recompra (body→cta→hook)
 
 **O que foi feito:**
