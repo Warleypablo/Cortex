@@ -72,7 +72,8 @@ async function fetchCreativeRawRows(since: string, until: string): Promise<Creat
         COUNT(DISTINCT l.ad_id)                              AS ad_count,
         SUM(COALESCE(i.spend,0))                             AS spend,
         SUM(COALESCE(i.impressions,0))                       AS impressions,
-        SUM(COALESCE(i.clicks,0))                            AS clicks,
+        -- CTR de saída (outbound) — igual à aba Criativos
+        SUM(COALESCE(i.outbound_clicks,0))                   AS clicks,
         SUM(COALESCE(i.video_3_sec_watched_actions,0))       AS v3s,
         SUM(COALESCE(i.video_thruplay_watched_actions,0))    AS thruplay
       FROM links l
