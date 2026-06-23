@@ -15,7 +15,7 @@ import {
   somaDespesaCaixaPorMes, type DefLinha,
 } from "./bp2026";
 import {
-  classificarPonteItens, ehEstoquePontual, STATUS_DECOMP,
+  classificarPonteItens, ehEstoquePontual, STATUS_DECOMP, normalizarSquad,
   type RegPontualItem, type CategoriaPonte,
 } from "./bp2026.pontual.helpers";
 
@@ -726,7 +726,7 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         realizado = itens.reduce((s, i) => s + i.valor, 0);
       } else if (squadAlvo) {
         const sq = squadAlvo;
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => (r.squad ?? "(sem squad)") === sq));
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => normalizarSquad(r.squad) === sq));
       } else if (metrica === "pontual_estoque_ini") {
         ({ grupos, realizado } = await detPontualSnapshot(db, mes, true));
       } else if (metrica === "pontual_estoque_fim") {
