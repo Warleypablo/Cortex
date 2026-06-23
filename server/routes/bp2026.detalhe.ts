@@ -259,9 +259,8 @@ const TITULOS_SUBABAS: Record<string, string> = {
   cac_eventos: "Eventos", cac_brindes: "Brindes", cac_viagens: "Viagens",
   cac_outras_sub: "Outras comerciais (não orçadas)",
   pontual_venda_comercial: "(+) Venda Pontual",
-  pontual_estoque_ini: "(=) Estoque inicial",
-  pontual_entrada_defasada: "· Entrada defasada",
-  pontual_reativacao: "· Reativação", pontual_sem_origem: "· Sem origem",
+  pontual_venda_no_estoque: "· Entrou no estoque", pontual_venda_fora_estoque: "· Fora do estoque",
+  pontual_estoque_ini: "(=) Estoque inicial", pontual_entrada: "(+) Entrada na foto",
   pontual_entrega: "(−) Entrega", pontual_churn: "(−) Churn",
   pontual_deletados: "(−) Deletados", pontual_saida_atipica: "(−) Saída atípica",
   pontual_reajuste: "(±) Reajuste de valor", pontual_estoque_fim: "(=) Estoque final",
@@ -373,6 +372,44 @@ async function detVendaPontualComercial(db: any, mes: number): Promise<Resultado
   }));
   return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
 }
+
+// Venda do mês decomposta por estar (dentro=true) ou não (dentro=false) na foto do estoque
+// do fim do mês. Mesma régua de valor da venda comercial (cup_contratos) → soma exata.
+async function detVendaPorEstoque(db: any, mes: number, dentro: boolean): Promise<ResultadoDet> {
+  const result = await db.execute(sql`
+    WITH alvo AS (
+      SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+      WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
+        AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
+    ),
+    est AS (
+      SELECT h.id_subtask FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+      WHERE h.valorp::numeric > 0 AND h.status NOT IN ('entregue','cancelado/inativo','não usar')
+    )
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+           COALESCE(c.servico, '') AS servico,
+           COALESCE(c.status, '') AS status,
+           c.valorp::numeric AS valor,
+           c.data_criado::date::text AS data
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+    WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+      AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+      AND LOWER(TRIM(c.status)) <> 'não usar' AND c.valorp::numeric > 0
+      AND (c.id_subtask IN (SELECT id_subtask FROM est)) = ${dentro}
+    ORDER BY valor DESC
+  `);
+  const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+    grupo: r.produto, nome: r.cliente,
+    detalhe: [r.servico, `status ${r.status}`].filter(Boolean).join(" · "),
+    data: r.data ?? null, valor: parseFloat(r.valor),
+  }));
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
+// categorias que compõem a "Entrada na foto" (tudo que entrou no estoque no mês)
+const CATS_ENTRADA: CategoriaPonte[] = ["venda_mes", "entrada_defasada", "reativacao", "sem_origem"];
 
 // contratos que se moveram numa ou várias categorias do mês (snapshot anterior × atual)
 async function detPontualMovimento(
@@ -699,8 +736,13 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false));
       } else if (metrica === "pontual_venda_comercial") {
         ({ grupos, realizado } = await detVendaPontualComercial(db, mes));
+      } else if (metrica === "pontual_venda_no_estoque") {
+        ({ grupos, realizado } = await detVendaPorEstoque(db, mes, true));
+      } else if (metrica === "pontual_venda_fora_estoque") {
+        ({ grupos, realizado } = await detVendaPorEstoque(db, mes, false));
+      } else if (metrica === "pontual_entrada") {
+        ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA));
       } else if ([
-        "pontual_entrada_defasada", "pontual_reativacao", "pontual_sem_origem",
         "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste",
       ].includes(metrica)) {
         ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte));

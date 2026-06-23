@@ -154,12 +154,13 @@ export default function BP2026() {
         </TabsContent>
         <TabsContent value="pontual" className="mt-4 space-y-2">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300">
-            Movimento do estoque de contratos pontuais (só realizado)
+            Pontual — venda comercial e movimento de estoque (só realizado)
           </h3>
           <p className="text-xs text-gray-500 dark:text-zinc-400 max-w-4xl">
-            <strong>Venda Pontual</strong> = quanto foi vendido no mês (data de criação do contrato),
-            igual a Vendas por Produto. O <strong>Ajuste estoque × venda</strong> reconcilia a venda com o
-            que efetivamente entrou na foto do estoque (defasagem do snapshot), para fechar no estoque final.
+            <strong>Venda Pontual</strong> = quanto foi vendido no mês (data de criação), igual a Vendas
+            por Produto; decomposta em <em>entrou no estoque</em> e <em>fora do estoque</em> (entregue/cancelada
+            ou criada no fim do mês). O <strong>Movimento do estoque</strong> é a foto do ClickUp (snapshot) e
+            fecha no estoque final — é outra régua de valor, por isso a Entrada na foto não é igual à Venda.
           </p>
           <BPDreTable
             linhas={data.pontual}
