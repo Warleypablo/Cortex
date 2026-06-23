@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-23 | feat(ads-creation): sobe lote CRM Recompra b1c2 (h1–h9) com auto-discovery
+
+**O que foi feito:**
+- `subir-crm-b1c2.ts`: cria os ads do lote **b1c2** (TP1639–TP1647) na camp CBO FLASH CRM, no padrão Turbo
+  - **auto-descobre** os video_id b1c2 no Gerenciador (por título), cruza com a Biblioteca (hook→TP) e calcula o NN sozinho (max dos conjuntos + 1)
+  - conjunto **155** = `… - CRM Recompra - h01 a h05 | b1 | c2` (TP1639–1643)
+  - conjunto **156** = `… - CRM Recompra - h06 a h09 | b1 | c2` (TP1644–1647)
+  - ads pareados 9x16+4x5, PAUSED; config clonada do 151; idempotente + backoff de rate-limit
+- Validado via DRY (descobre e imprime o plano sem escrever) antes do `--go`
+
+**Por que:**
+- Continuação do lote CRM (b1c2 entrou no Gerenciador); auto-discovery reduz hardcode de IDs e erro de digitação
+
+**Arquivos novos:**
+- `subir-crm-b1c2.ts` - cria os 2 conjuntos + 9 ads do b1c2 (com auto-discovery)
+
+**Impacto arquitetural:** Nenhum — script one-off de criação de ads via Meta API.
+
+---
+
 ## 2026-06-23 | feat(ads-creation): sobe lote CRM Recompra b2c1 (h1–h9) em 2 conjuntos
 
 **O que foi feito:**
