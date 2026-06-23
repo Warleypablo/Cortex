@@ -591,4 +591,18 @@ export function registerBp2026Routes(app: Express, db: any) {
       res.status(500).json({ error: "Erro ao calcular orçado x realizado" });
     }
   });
+
+  app.get("/api/bp2026/pontual-creators", async (_req, res) => {
+    try {
+      const agora = new Date();
+      const anoAtual = agora.getFullYear();
+      const mesCorrente = anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;
+      const mesFechado = anoAtual > ANO ? 12 : mesCorrente <= 1 ? 0 : mesCorrente - 1;
+      const linhas = await montarPontual({ db, mesCorrente, mesFechado, produtoLike: "%creators%" });
+      res.json({ linhas, mesCorrente, mesFechado });
+    } catch (error) {
+      console.error("[bp2026] Erro em /api/bp2026/pontual-creators:", error);
+      res.status(500).json({ error: "Failed to fetch pontual creators" });
+    }
+  });
 }

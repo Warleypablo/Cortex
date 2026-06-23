@@ -8,9 +8,16 @@ interface Deps {
   db: any;
   mesCorrente: number;
   mesFechado: number;
+  produtoLike?: string;
 }
 
-export async function montarPontual({ db, mesCorrente, mesFechado }: Deps): Promise<LinhaPontual[]> {
+export async function montarPontual({ db, mesCorrente, mesFechado, produtoLike }: Deps): Promise<LinhaPontual[]> {
+  const filtroSnap = produtoLike
+    ? sql`AND LOWER(COALESCE(h.produto, '')) LIKE ${produtoLike}`
+    : sql``;
+  const filtroVenda = produtoLike
+    ? sql`AND LOWER(COALESCE(produto, '')) LIKE ${produtoLike}`
+    : sql``;
   // Último snapshot de cada mês; mês 0 = dez/2025 (base da ponte de janeiro).
   const result = await db.execute(sql`
     WITH alvo AS (
@@ -28,7 +35,7 @@ export async function montarPontual({ db, mesCorrente, mesFechado }: Deps): Prom
     FROM alvo a
     JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = a.d
     LEFT JOIN "Clickup".cup_contratos c ON c.id_subtask = h.id_subtask
-    WHERE h.valorp::numeric > 0
+    WHERE h.valorp::numeric > 0 ${filtroSnap}
     ORDER BY a.mes
   `);
 
@@ -54,6 +61,7 @@ export async function montarPontual({ db, mesCorrente, mesFechado }: Deps): Prom
     FROM "Clickup".cup_contratos
     WHERE data_criado >= '2026-01-01' AND data_criado < '2027-01-01'
       AND LOWER(TRIM(status)) <> 'não usar' AND valorp::numeric > 0
+      ${filtroVenda}
   `);
   // Estoque de cada mês = contratos da foto que contam como estoque pontual (por id_subtask).
   const estoqueIds: Record<number, Set<string>> = {};
