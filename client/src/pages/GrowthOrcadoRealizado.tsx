@@ -1718,7 +1718,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
       { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRate ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRate), format: 'percent' },
-      { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : 0), format: 'percent' },
+      { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : 0), format: 'percent' },
       { id: 'taxa_conversao_pagina_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: (data.sessoes ?? 0) > 0 ? (data.mqls ?? 0) / (data.sessoes ?? 1) : 0, percentual: null, format: 'percent' },
       { id: 'taxa_conversao_pagina_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: (data.sessoes ?? 0) > 0 ? ((data.leads ?? 0) - (data.mqls ?? 0)) / (data.sessoes ?? 1) : 0, percentual: null, format: 'percent' },
       { id: 'leads', name: 'Leads', type: 'formula', orcado: ORCADO_ADS.leads, realizado: data.leads ?? 0, percentual: calcPercentual(ORCADO_ADS.leads, data.leads), format: 'number' },
@@ -1830,7 +1830,7 @@ export default function GrowthOrcadoRealizado() {
       // Connect Rate segue removido do Aprofundado do Google (despriorizado). A Tx
       // Conversão da Página usa Visualizações de Página (Leads ÷ VdP), coerente com
       // o Connect Rate do TikTok/LinkedIn e com o funil do Meta (que usa LPV do pixel).
-      { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
+      { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('gads', funnel, O, d.investimento ?? null)];
   };
@@ -1873,7 +1873,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ig_cliquesLinkBio', name: 'Cliques no Link', type: 'formula', orcado: O.cliquesLinkBio, realizado: d.cliquesLinkBio ?? 0, percentual: calcPercentual(O.cliquesLinkBio, d.cliquesLinkBio), format: 'number' },
       { id: 'ig_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: (O as any).visualizacoesPaginaSite ?? null, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual((O as any).visualizacoesPaginaSite ?? null, d.visualizacoesPagina ?? null), format: 'number' },
       { id: 'ig_sessoes', name: 'Sessões', type: 'formula', orcado: (O as any).sessoes ?? null, realizado: d.sessoes ?? 0, percentual: calcPercentual((O as any).sessoes ?? null, d.sessoes ?? null), format: 'number' },
-      { id: 'ig_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
+      { id: 'ig_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('ig', funnel, O, d.investimentoPago ?? null)];
   };
@@ -1917,7 +1917,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'yt_cliquesLink', name: 'Cliques no Link', type: 'formula', orcado: (O as any).cliquesLink ?? null, realizado: null, percentual: null, format: 'number' },
       { id: 'yt_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: (O as any).visualizacoesPagina ?? null, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual((O as any).visualizacoesPagina ?? null, d.visualizacoesPagina ?? null), format: 'number' },
       { id: 'yt_sessoes', name: 'Sessões', type: 'formula', orcado: (O as any).sessoes ?? null, realizado: d.sessoes ?? 0, percentual: calcPercentual((O as any).sessoes ?? null, d.sessoes ?? null), format: 'number' },
-      { id: 'yt_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
+      { id: 'yt_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('yt', funnel, O, null)];
   };
@@ -1951,7 +1951,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'li_cliques', name: 'Cliques no Link', type: 'formula', orcado: (O as any).cliques ?? null, realizado: d.cliques ?? 0, percentual: calcPercentual((O as any).cliques ?? null, d.cliques), format: 'number' },
       { id: 'li_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina ?? null), format: 'number' },
       { id: 'li_sessoes', name: 'Sessões', type: 'formula', orcado: (O as any).sessoes ?? null, realizado: d.sessoes ?? 0, percentual: calcPercentual((O as any).sessoes ?? null, d.sessoes ?? null), format: 'number' },
-      { id: 'li_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
+      { id: 'li_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('li', funnel, O, null)];
   };
@@ -1989,7 +1989,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'tt_cliquesLink', name: 'Cliques no Link', type: 'formula', orcado: (O as any).cliquesLink ?? null, realizado: null, percentual: null, format: 'number' },
       { id: 'tt_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: (O as any).visualizacoesPagina ?? null, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual((O as any).visualizacoesPagina ?? null, d.visualizacoesPagina ?? null), format: 'number' },
       { id: 'tt_sessoes', name: 'Sessões', type: 'formula', orcado: (O as any).sessoes ?? null, realizado: d.sessoes ?? 0, percentual: calcPercentual((O as any).sessoes ?? null, d.sessoes ?? null), format: 'number' },
-      { id: 'tt_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
+      { id: 'tt_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: (O as any).taxaConversaoPagina ?? null, realizado: taxaConversaoPagina, percentual: calcPercentual((O as any).taxaConversaoPagina ?? null, taxaConversaoPagina), format: 'percent' },
     ];
     // includeInvestimento=false: a linha de Investimento já está no topo (acima).
     return [...topMetrics, ...buildFunnelMetrics('tt', funnel, O, null)];
@@ -2013,7 +2013,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'tta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'tta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
       { id: 'tta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
-      { id: 'tta_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
+      { id: 'tta_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('tta', funnel, O, d.investimento ?? null)];
   };
@@ -2036,7 +2036,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'lia_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'lia_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
       { id: 'lia_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate), format: 'percent' },
-      { id: 'lia_taxaConversaoPagina', name: 'Tx Conversão da Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
+      { id: 'lia_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('lia', funnel, O, d.investimento ?? null)];
   };
