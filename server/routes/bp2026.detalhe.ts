@@ -258,9 +258,9 @@ const TITULOS_SUBABAS: Record<string, string> = {
   cac_comissoes: "Comissões", cac_growth: "Growth", cac_ads: "ADs",
   cac_eventos: "Eventos", cac_brindes: "Brindes", cac_viagens: "Viagens",
   cac_outras_sub: "Outras comerciais (não orçadas)",
-  pontual_venda_comercial: "(+) Venda Pontual", pontual_entrada: "(+) Entrada no estoque",
+  pontual_venda_comercial: "(+) Venda Pontual",
   pontual_estoque_ini: "(=) Estoque inicial",
-  pontual_venda_mes: "· Venda do mês", pontual_entrada_defasada: "· Entrada defasada",
+  pontual_entrada_defasada: "· Entrada defasada",
   pontual_reativacao: "· Reativação", pontual_sem_origem: "· Sem origem",
   pontual_entrega: "(−) Entrega", pontual_churn: "(−) Churn",
   pontual_deletados: "(−) Deletados", pontual_saida_atipica: "(−) Saída atípica",
@@ -348,8 +348,6 @@ const TITULO_CATEGORIA: Record<CategoriaPonte, string> = {
   entrega: "Saídas por entrega", churn: "Saídas por churn",
   deletados: "Deletados do ClickUp", saida_atipica: "Saídas atípicas", reajuste: "Reajustes de valor",
 };
-
-const SUBCATS_VENDA: CategoriaPonte[] = ["venda_mes", "entrada_defasada", "reativacao", "sem_origem"];
 
 // Venda Pontual (comercial): contratos pontuais criados no mês (data_criado) — mesma régua da
 // Receita Pontual de Vendas por Produto. Agrupados por produto.
@@ -701,10 +699,8 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false));
       } else if (metrica === "pontual_venda_comercial") {
         ({ grupos, realizado } = await detVendaPontualComercial(db, mes));
-      } else if (metrica === "pontual_entrada") {
-        ({ grupos, realizado } = await detPontualMovimento(db, mes, SUBCATS_VENDA));
       } else if ([
-        "pontual_venda_mes", "pontual_entrada_defasada", "pontual_reativacao", "pontual_sem_origem",
+        "pontual_entrada_defasada", "pontual_reativacao", "pontual_sem_origem",
         "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste",
       ].includes(metrica)) {
         ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte));

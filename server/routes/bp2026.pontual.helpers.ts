@@ -94,24 +94,22 @@ export interface LinhaPontual {
   unidade: "brl" | "int" | "pct";
   nota?: string;
   destaque?: boolean;
-  grupo?: string;
+  semDetalhe?: boolean;
   meses: { mes: number; orcado: number; realizado: number | null; atingimento: number | null }[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
 
-// Dois blocos distintos na aba: a venda comercial (data_criado, bate com Vendas por Produto)
-// e o movimento de estoque (foto/snapshot). A "venda" comercial nunca é igual à "entrada na foto".
-export const GRUPO_VENDA = "Venda Pontual (comercial)";
-export const GRUPO_ESTOQUE = "Movimento do estoque (foto do ClickUp)";
-
+// Uma única ponte: a Venda é a venda comercial (data_criado, = Vendas por Produto) e o
+// "Ajuste estoque × venda" reconcilia a defasagem do snapshot para fechar no estoque final.
 const NOTA_VENDA_COMERCIAL =
   "Quanto foi vendido no mês (data de criação do contrato em cup_contratos). " +
   "Igual à Receita Pontual de Vendas por Produto — venda bate com venda, independente do estoque.";
-const NOTA_ENTRADA =
-  "Entrada na foto do estoque (snapshot do ClickUp). Difere da venda comercial pela defasagem do " +
-  "snapshot: venda criada no fim do mês ou já entregue não aparece aqui no mesmo mês. Decomposta abaixo.";
-const NOTA_VENDA_MES =
-  "Contratos com data de criação (cup_contratos) no próprio mês — a venda real do período.";
+const NOTA_AJUSTE =
+  "Reconcilia a venda comercial com o que efetivamente entrou na foto do estoque (defasagem do " +
+  "snapshot). = entrada na foto − venda do mês. Decomposto abaixo.";
+const NOTA_VENDA_FORA =
+  "Parte da venda do mês que ainda não entrou na foto do estoque (criada no fim do mês ou já " +
+  "entregue/cancelada). Negativa: é venda comercial que não aparece como entrada no snapshot.";
 const NOTA_DEFASADA =
   "Contratos criados em meses anteriores que só agora apareceram no snapshot (a foto do estoque atrasa ~1 mês).";
 const NOTA_REATIVACAO =
@@ -174,33 +172,39 @@ export function montarLinhasPontual(
     return m <= mesCorrente && p ? p.estoqueFim : null;
   });
 
-  const serieVenda = serieFluxo((p) => p.venda, 1);
-  const serieVendaMes = serieFluxo((p) => p.vendaMes, 1);
   const serieDefasada = serieFluxo((p) => p.entradaDefasada, 1);
   const serieReativacao = serieFluxo((p) => p.reativacao, 1);
   const serieSemOrigem = serieFluxo((p) => p.semOrigem, 1);
 
-  // Bloco 1 — Venda Pontual (comercial): mesma fonte da Visão Geral (data_criado), bate sempre.
+  // Venda comercial (A) por mês = mesma régua da Receita Pontual (Vendas por Produto).
+  const vc = (m: number) => vendaComercialPorMes[m] ?? 0;
   const serieVendaComercial = Array.from({ length: 12 }, (_, i) => {
     const m = i + 1;
-    return m <= mesCorrente ? (vendaComercialPorMes[m] ?? 0) : null;
+    return m <= mesCorrente ? vc(m) : null;
   });
-  const linhaVendaComercial = mk(
-    "pontual_venda_comercial", "(+) Venda Pontual", "fluxo", serieVendaComercial,
-    sumYtd(serieVendaComercial), { nota: NOTA_VENDA_COMERCIAL, grupo: GRUPO_VENDA, destaque: true },
-  );
+  // Venda do mês que ainda não entrou na foto = vendaMes − A (≤ 0). Reconcilia A → entrada na foto.
+  const serieVendaForaFoto = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1; const p = ponte[m];
+    return m <= mesCorrente && p ? p.vendaMes - vc(m) : null;
+  });
+  // Ajuste estoque × venda = entrada na foto (B) − venda comercial (A)
+  //                        = entradaDefasada + reativacao + semOrigem + (vendaMes − A).
+  const serieAjuste = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1; const p = ponte[m];
+    return m <= mesCorrente && p ? p.entradaDefasada + p.reativacao + p.semOrigem + (p.vendaMes - vc(m)) : null;
+  });
 
-  // Bloco 2 — Movimento do estoque (foto/snapshot): a entrada na foto, decomposta.
   const linhas: LinhaPontual[] = [
     mk("pontual_estoque_ini", "(=) Estoque inicial", "estoque", serieEstoqueIni, ponte[1]?.estoqueIni ?? null),
-    mk("pontual_entrada", "(+) Entrada no estoque", "fluxo", serieVenda, sumYtd(serieVenda), { nota: NOTA_ENTRADA }),
-    mk("pontual_venda_mes", "· Venda do mês", "fluxo", serieVendaMes, sumYtd(serieVendaMes), { nota: NOTA_VENDA_MES }),
+    mk("pontual_venda_comercial", "(+) Venda Pontual", "fluxo", serieVendaComercial, sumYtd(serieVendaComercial), { nota: NOTA_VENDA_COMERCIAL, destaque: true }),
+    mk("pontual_ajuste", "(±) Ajuste estoque × venda", "fluxo", serieAjuste, sumYtd(serieAjuste), { nota: NOTA_AJUSTE, semDetalhe: true }),
     mk("pontual_entrada_defasada", "· Entrada defasada", "fluxo", serieDefasada, sumYtd(serieDefasada), { nota: NOTA_DEFASADA }),
     mk("pontual_reativacao", "· Reativação", "fluxo", serieReativacao, sumYtd(serieReativacao), { nota: NOTA_REATIVACAO }),
   ];
   if (serieSemOrigem.some((v) => v !== null && Math.abs(v) > 0.5)) {
     linhas.push(mk("pontual_sem_origem", "· Sem origem", "fluxo", serieSemOrigem, sumYtd(serieSemOrigem), { nota: NOTA_SEM_ORIGEM }));
   }
+  linhas.push(mk("pontual_venda_fora_foto", "· Venda do mês fora da foto", "fluxo", serieVendaForaFoto, sumYtd(serieVendaForaFoto), { nota: NOTA_VENDA_FORA, semDetalhe: true }));
   linhas.push(
     mk("pontual_entrega", "(−) Entrega", "fluxo", serieFluxo((p) => p.entrega, -1), sumYtd(serieFluxo((p) => p.entrega, -1))),
     mk("pontual_churn", "(−) Churn", "fluxo", serieFluxo((p) => p.churn, -1), sumYtd(serieFluxo((p) => p.churn, -1))),
@@ -232,8 +236,7 @@ export function montarLinhasPontual(
     linhas.push(mk("pontual_status_outros", "· Outros status", "estoque", serieOutros, ytdOutros));
   }
 
-  for (const l of linhas) l.grupo = GRUPO_ESTOQUE;
-  return [linhaVendaComercial, ...linhas];
+  return linhas;
 }
 
 export interface RegPontualItem extends RegPontual {
