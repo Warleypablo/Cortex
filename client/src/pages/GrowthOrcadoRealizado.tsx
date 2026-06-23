@@ -2462,7 +2462,7 @@ export default function GrowthOrcadoRealizado() {
 
   // Métricas amarelas para a aba Consolidado (filtradas por seção)
   const YELLOW_METRIC_IDS = new Set([
-    'investimento', 'leads', 'mqls', 'cpl', 'cpmql', 'perc_mqls',
+    'investimento', 'sessoes', 'taxa_conversao_pagina', 'leads', 'mqls', 'cpl', 'cpmql', 'perc_mqls',
     // MQL
     'mql_ra_perc', 'mql_noshow', 'mql_rr_perc', 'mql_taxa_vendas', 'mql_novos_clientes', 'mql_contratos_ganhos', 'mql_ticket_acel', 'mql_ticket_impl', 'mql_fat_total',
     // Não-MQL
@@ -2472,12 +2472,14 @@ export default function GrowthOrcadoRealizado() {
     'total_contratos_ganhos',
     'total_faturamento', 'total_cac_ads', 'total_cac_contrato',
     'total_ticket_acel', 'total_ticket_impl',
-    // Consolidado por plataforma — SEMPRE as 6 métricas-padrão de Marketing em
-    // toda plataforma (paga ou orgânica), na mesma ordem da referência:
-    // Investimento · Leads · MQLs · CPL · CPMQL · % MQLs. Orgânicos sem verba
-    // mostram R$ 0 (a linha de Investimento é injetada via buildFunnelMetrics).
+    // Consolidado por plataforma — métricas-padrão de Marketing em toda plataforma
+    // (paga ou orgânica), na mesma ordem dos builders:
+    // Investimento · Sessões · Tx Conversão da Página · Leads · MQLs · CPL · CPMQL · % MQLs.
+    // Sessões e Tx Conversão vêm antes de Leads em todos os builders, então a ordem
+    // é preservada automaticamente pelo filtro. Orgânicos sem verba mostram R$ 0
+    // (a linha de Investimento é injetada via buildFunnelMetrics).
     ...['meta', 'gads', 'tta', 'lia', 'ig', 'yt', 'li', 'tt'].flatMap(p => [
-      `${p}_investimento`, `${p}_leads`, `${p}_mqls`, `${p}_cpl`, `${p}_cpmql`, `${p}_percMqls`,
+      `${p}_investimento`, `${p}_sessoes`, `${p}_taxaConversaoPagina`, `${p}_leads`, `${p}_mqls`, `${p}_cpl`, `${p}_cpmql`, `${p}_percMqls`,
     ]),
   ]);
 
