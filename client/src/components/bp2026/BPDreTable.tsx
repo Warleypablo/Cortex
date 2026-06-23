@@ -216,6 +216,7 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                   <span className="flex items-center gap-1.5">
                     {linha.filhos && linha.filhos.length > 0 && (
                       <button
+                        type="button"
                         onClick={() => toggleExpand(linha.metrica)}
                         className="shrink-0 text-gray-400 hover:text-gray-600 dark:text-zinc-500 dark:hover:text-zinc-300"
                         aria-label={expanded.has(linha.metrica) ? "Colapsar" : "Expandir"}
