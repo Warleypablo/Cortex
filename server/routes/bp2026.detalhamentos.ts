@@ -243,7 +243,6 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
         },
       ),
       subItem: true,
-      semDetalhe: true,
     };
   });
 
