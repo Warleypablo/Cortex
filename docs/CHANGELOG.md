@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-23 | chore(ads-creation): cadastra lote Victor "Bready" na Biblioteca (TP1666–1692)
+
+**O que foi feito:**
+- `subir-victor-planilha.ts`: cadastra na Biblioteca os 27 criativos 9x16 do lote "Bready" do Victor (Body1/2/3 × h1–h9), da pasta 9x16 do Drive
+- TP1666–TP1692, ordem body→hook, TP sequencial (max+1), persona Victor, tema Bready, sem cta no naming
+- Só 9x16 entra na planilha (padrão de sempre)
+
+**Por que:**
+- Próximo lote (Victor) — preparar a Biblioteca antes de criar os ads no Meta (que dependem dos vídeos no Gerenciador + campanha alvo)
+
+**Arquivos novos:**
+- `subir-victor-planilha.ts` - cadastro do lote Victor na Biblioteca
+
+**Impacto arquitetural:** Nenhum — script one-off de cadastro na Biblioteca (sem Meta API).
+
+---
+
 ## 2026-06-23 | feat(ads-creation): sobe lote CRM Recompra b2c2 (h1–h9) — fecha o lote CRM
 
 **O que foi feito:**
