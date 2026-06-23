@@ -4354,10 +4354,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.tiktok_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.tiktok_ads;
-      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (TikTok), alinhado à
-      // definição clássica de mídia (landing page views ÷ cliques). TikTok não expõe
-      // landing_page_views nativo, então o pageviews do GA4 é o proxy mais fiel.
-      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
+      // Connect Rate - GA4 = Sessões (GA4) ÷ Cliques (TikTok). Padronizado com o
+      // Consolidado e o Meta: numerador = chegadas na LP medidas por sessões GA4
+      // (mesmo universo do clique), em vez de page views.
+      const connectRate = cliques > 0 ? sessoes / cliques : 0;
 
       res.json({
         investimento,
@@ -4426,9 +4426,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.linkedin_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.linkedin_ads;
-      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (LinkedIn), alinhado à
-      // definição clássica de mídia (landing page views ÷ cliques) e ao TikTok Ads.
-      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
+      // Connect Rate - GA4 = Sessões (GA4) ÷ Cliques (LinkedIn). Padronizado com o
+      // Consolidado, Meta e TikTok Ads: numerador = sessões GA4 (mesmo universo do
+      // clique), em vez de page views.
+      const connectRate = cliques > 0 ? sessoes / cliques : 0;
 
       res.json({
         investimento,
