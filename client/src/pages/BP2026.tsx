@@ -2,6 +2,24 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { BPDreTable, type BPLinha } from "@/components/bp2026/BPDreTable";
+
+// Converte lista plana com paiMetrica → árvore com filhos para BPDreTable.
+function nestFilhos(linhas: BPLinha[]): BPLinha[] {
+  const filhosPorPai = new Map<string, BPLinha[]>();
+  for (const l of linhas) {
+    const pm = (l as any).paiMetrica as string | undefined;
+    if (pm) {
+      if (!filhosPorPai.has(pm)) filhosPorPai.set(pm, []);
+      filhosPorPai.get(pm)!.push(l);
+    }
+  }
+  return linhas
+    .filter((l) => !(l as any).paiMetrica)
+    .map((pai) => {
+      const filhos = filhosPorPai.get(pai.metrica);
+      return filhos ? { ...pai, filhos } : pai;
+    });
+}
 import { BPCellDetail } from "@/components/bp2026/BPCellDetail";
 import { BPReconciliacao } from "@/components/bp2026/BPReconciliacao";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -174,7 +192,7 @@ export default function BP2026() {
             fecha no estoque final — é outra régua de valor, por isso a Entrada na foto não é igual à Venda.
           </p>
           <BPDreTable
-            linhas={data.pontual}
+            linhas={nestFilhos(data.pontual)}
             mesCorrente={data.mesCorrente}
             mesFechado={data.mesFechado}
             mostrarOrcado={false}
@@ -195,7 +213,7 @@ export default function BP2026() {
             <Skeleton className="h-64 w-full" />
           ) : (
             <BPDreTable
-              linhas={creatorsData.linhas}
+              linhas={nestFilhos(creatorsData.linhas)}
               mesCorrente={creatorsData.mesCorrente}
               mesFechado={creatorsData.mesFechado}
               mostrarOrcado={false}
