@@ -1,9 +1,9 @@
 // client/src/components/bp2026/BPDreTable.tsx
-import { useState } from "react";
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Info, ChevronRight, ChevronDown } from "lucide-react";
+import { ChevronDown, ChevronRight, Info } from "lucide-react";
+import { useState } from "react";
 
 export interface BPMes {
   mes: number;
@@ -26,8 +26,7 @@ export interface BPLinha {
   segmento?: string;   // produto (ex.: Performance / Creators) — sub-cabeçalho por produto
   subItem?: boolean;    // linha-filha (ex.: "% do CAC total") — indentada e atenuada
   semDetalhe?: boolean; // célula não abre drill-down
-  expansivel?: boolean; // linha-pai com toggle ▶/▼ (mostra/esconde as filhas por produto)
-  paiMetrica?: string;  // linha-filha: só aparece quando o pai (metrica) está expandido
+  filhos?: BPLinha[];
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -122,9 +121,9 @@ interface Props {
 
 export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostrarOrcado = true }: Props) {
   const ytdLabel = mesFechado >= 1 ? `YTD ${MESES_CURTOS[mesFechado - 1]}` : "YTD";
-  const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
-  const toggleExpandir = (metrica: string) =>
-    setExpandidas((prev) => {
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = (metrica: string) =>
+    setExpanded((prev) => {
       const next = new Set(prev);
       next.has(metrica) ? next.delete(metrica) : next.add(metrica);
       return next;
@@ -165,8 +164,6 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
             let grupoAnterior: string | undefined;
             let segAnterior: string | undefined;
             linhas.forEach((linha) => {
-              // linha-filha (por produto): só renderiza se o pai estiver expandido
-              if (linha.paiMetrica && !expandidas.has(linha.paiMetrica)) return;
               // cabeçalho de bloco (ex.: Recorrente / Pontual)
               if (linha.grupo && linha.grupo !== grupoAnterior) {
                 render.push(
@@ -214,17 +211,17 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                 <td
                   className={`sticky left-0 z-10 px-4 py-3 whitespace-nowrap align-top ${
                     ehTotal ? "bg-gray-100 dark:bg-zinc-800" : "bg-white dark:bg-zinc-900"
-                  } ${linha.segmento ? "pl-8" : ""} ${linha.subItem ? "pl-8 text-xs text-gray-500 dark:text-zinc-500" : ""} ${linha.paiMetrica ? "pl-10 text-gray-600 dark:text-zinc-400" : ""}`}
+                  } ${linha.segmento ? "pl-8" : ""} ${linha.subItem ? "pl-8 text-xs text-gray-500 dark:text-zinc-500" : ""}`}
                 >
                   <span className="flex items-center gap-1.5">
-                    {linha.expansivel && (
+                    {linha.filhos && linha.filhos.length > 0 && (
                       <button
                         type="button"
-                        onClick={() => toggleExpandir(linha.metrica)}
-                        className="-ml-1 shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
-                        aria-label={expandidas.has(linha.metrica) ? "Recolher por produto" : "Expandir por produto"}
+                        onClick={() => toggleExpand(linha.metrica)}
+                        className="shrink-0 text-gray-400 hover:text-gray-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                        aria-label={expanded.has(linha.metrica) ? "Colapsar" : "Expandir"}
                       >
-                        {expandidas.has(linha.metrica)
+                        {expanded.has(linha.metrica)
                           ? <ChevronDown className="h-3.5 w-3.5" />
                           : <ChevronRight className="h-3.5 w-3.5" />}
                       </button>
@@ -298,6 +295,47 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                 </td>
               </tr>
               );
+              // sub-linhas de filhos (toggle)
+              if (expanded.has(linha.metrica) && linha.filhos) {
+                linha.filhos.forEach((filho) => {
+                  render.push(
+                    <tr
+                      key={filho.metrica}
+                      className="border-t border-gray-100 dark:border-zinc-800 text-gray-700 dark:text-zinc-300"
+                      data-testid={`bp-linha-${filho.metrica}`}
+                    >
+                      <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 pl-12 pr-4 py-2 text-xs text-gray-500 dark:text-zinc-500 whitespace-nowrap align-top">
+                        {filho.titulo}
+                      </td>
+                      {filho.meses.map((m) => (
+                        <td key={m.mes} className="px-2 py-2 text-right align-top">
+                          <Celula
+                            orcado={m.orcado}
+                            realizado={m.realizado}
+                            atingimento={m.atingimento}
+                            direcao={filho.direcao}
+                            unidade={filho.unidade ?? "brl"}
+                            parcial={m.mes === mesCorrente && mesCorrente > mesFechado}
+                            semMeta
+                            mostrarOrcado={mostrarOrcado}
+                          />
+                        </td>
+                      ))}
+                      <td className="px-3 py-2 text-right align-top border-l border-gray-200 dark:border-zinc-700 bg-gray-50/50 dark:bg-zinc-800/50">
+                        <Celula
+                          orcado={filho.ytd.orcado}
+                          realizado={filho.ytd.realizado}
+                          atingimento={filho.ytd.atingimento}
+                          direcao={filho.direcao}
+                          unidade={filho.unidade ?? "brl"}
+                          semMeta
+                          mostrarOrcado={mostrarOrcado}
+                        />
+                      </td>
+                    </tr>
+                  );
+                });
+              }
             });
             return render;
           })()}

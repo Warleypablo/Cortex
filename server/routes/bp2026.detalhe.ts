@@ -661,6 +661,43 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         grupos = ganhos.grupos;
         realizado = ganhos.realizado ? despesa / ganhos.realizado : 0;
         notaDinamica = `despesa CAC R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${ganhos.realizado} deals ganhos no mês`;
+      } else if (metrica.startsWith("cac_contrato_produto_")) {
+        const slug = metrica.slice("cac_contrato_produto_".length);
+        const predicadoSlug =
+          slug === "performance" ? sql`(TRIM(COALESCE(c.produto,''))='Performance' OR c.servico ILIKE '%performance%')`
+          : slug === "creators"  ? sql`(TRIM(COALESCE(c.produto,''))='Creators' OR c.servico ILIKE '%creator%')`
+          : slug === "social"    ? sql`(TRIM(COALESCE(c.produto,''))='Social Media' OR c.servico ILIKE '%social%')`
+          : slug === "gc"        ? sql`(TRIM(COALESCE(c.produto,''))='Gestão de Comunidade' OR c.servico ILIKE '%comunidade%')`
+          : sql`(TRIM(COALESCE(c.produto,'')) NOT IN ('Performance','Creators','Social Media','Gestão de Comunidade'))`;
+        const result = await db.execute(sql`
+          SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+                 COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+                 COALESCE(c.servico, '') AS servico,
+                 COALESCE(c.squad, '') AS squad,
+                 c.valorr::numeric AS valor,
+                 c.data_criado::date::text AS data
+          FROM "Clickup".cup_contratos c
+          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+          WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+            AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+            AND LOWER(TRIM(c.status)) <> 'não usar'
+            AND COALESCE(c.valorr::numeric, 0) > 0
+            AND (${predicadoSlug})
+          ORDER BY cl.nome
+        `);
+        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+          grupo: r.squad || r.produto || "(sem squad)",
+          nome: r.cliente,
+          detalhe: r.servico,
+          data: r.data ?? null,
+          valor: parseFloat(r.valor),
+        }));
+        const cacPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac);
+        const despesa = cacPorMes[mes] ?? 0;
+        const nContratos = itens.length;
+        grupos = agruparItens(itens, LIMITE_ITENS);
+        realizado = nContratos > 0 ? despesa / nContratos : 0;
+        notaDinamica = `CAC total R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${nContratos} contrato${nContratos !== 1 ? "s" : ""} = R$ ${Math.round(realizado).toLocaleString("pt-BR")}/contrato`;
       } else if (metrica === "taxa_conversao") {
         const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (numerador)");
         const reun = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas");
