@@ -30,6 +30,7 @@ export async function montarPontual({ db, mesCorrente, mesFechado, produtoLike }
     )
     SELECT a.mes, h.id_subtask, h.valorp::numeric AS valorp, h.status,
            to_char(c.data_criado, 'YYYY-MM') AS criado_ym,
+           c.data_criado::date::text AS data_criado_iso,
            COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
            COALESCE(NULLIF(TRIM(h.produto), ''), '(sem produto)') AS produto
     FROM alvo a
@@ -47,6 +48,7 @@ export async function montarPontual({ db, mesCorrente, mesFechado, produtoLike }
       valorp: parseFloat(row.valorp),
       status: row.status,
       criadoYm: row.criado_ym ?? null,
+      dataCriadoIso: row.data_criado_iso ?? null,
       squad: row.squad,
       produto: row.produto,
     });
