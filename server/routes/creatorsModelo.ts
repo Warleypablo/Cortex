@@ -149,7 +149,9 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
           ORDER BY id_subtask, m
         ),
         rec_agg AS (
-          SELECT m, COUNT(*) AS cli, ${agg(sql`lt`)} AS lt, ${agg(sql`ltv`)} AS ltv,
+          SELECT m, COUNT(*) AS cli,
+            COUNT(*) FILTER (WHERE mrr > 0) AS cli_fat, -- clientes faturando (denominador do ticket médio)
+            ${agg(sql`lt`)} AS lt, ${agg(sql`ltv`)} AS ltv,
             SUM(mrr) AS fat
           FROM rec_unit WHERE ${recPred} GROUP BY m
         ),
@@ -161,16 +163,16 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
           FROM pont_unit WHERE ${pontPred} GROUP BY m
         ),
         pont_fat AS (
-          SELECT e.mes_ent AS m, SUM(e.vp) AS fat
+          SELECT e.mes_ent AS m, SUM(e.vp) AS fat, COUNT(*) AS ent -- nº de entregas do mês (denominador do ticket médio)
           FROM entregue_mes e
           JOIN pont_unit pu ON pu.m = e.mes_ent AND pu.uid = e.id_task
           WHERE ${pontPred}
           GROUP BY e.mes_ent
         )
         SELECT mz.m AS mes,
-          COALESCE(r.cli,0)::int AS rec_cli, r.lt AS rec_lt, r.ltv AS rec_ltv, r.fat AS rec_fat,
+          COALESCE(r.cli,0)::int AS rec_cli, COALESCE(r.cli_fat,0)::int AS rec_cli_fat, r.lt AS rec_lt, r.ltv AS rec_ltv, r.fat AS rec_fat,
           COALESCE(p.cli,0)::int AS pont_cli, COALESCE(p.cli_lt,0)::int AS pont_cli_lt,
-          p.lt AS pont_lt, p.ltv AS pont_ltv, pf.fat AS pont_fat
+          p.lt AS pont_lt, p.ltv AS pont_ltv, pf.fat AS pont_fat, COALESCE(pf.ent,0)::int AS pont_ent
         FROM (SELECT DISTINCT m FROM meses) mz
         LEFT JOIN rec_agg r ON r.m = mz.m
         LEFT JOIN pont_agg p ON p.m = mz.m
@@ -179,11 +181,19 @@ export function registerCreatorsModeloRoutes(app: Express, db: any) {
       `);
       const r1 = (n: any) => (n == null ? null : Math.round(Number(n) * 10) / 10);
       const r0 = (n: any) => (n == null ? null : Math.round(Number(n)));
-      const meses = (result.rows as any[]).map((r) => ({
-        mes: r.mes,
-        recorrente: { clientes: Number(r.rec_cli), clientesLt: Number(r.rec_cli), lt: r1(r.rec_lt), ltv: r0(r.rec_ltv), faturamento: r0(r.rec_fat) },
-        pontual: { clientes: Number(r.pont_cli), clientesLt: Number(r.pont_cli_lt), lt: r1(r.pont_lt), ltv: r0(r.pont_ltv), faturamento: r0(r.pont_fat) },
-      }));
+      const meses = (result.rows as any[]).map((r) => {
+        // Ticket médio: recorrente = MRR ÷ clientes ativos (mensalidade média);
+        // pontual = valor entregue no mês ÷ nº de entregas do mês (preço médio por entrega).
+        const recCliFat = Number(r.rec_cli_fat);
+        const pontEnt = Number(r.pont_ent);
+        const recTicket = recCliFat > 0 && r.rec_fat != null ? Math.round(Number(r.rec_fat) / recCliFat) : null;
+        const pontTicket = pontEnt > 0 && r.pont_fat != null ? Math.round(Number(r.pont_fat) / pontEnt) : null;
+        return {
+          mes: r.mes,
+          recorrente: { clientes: Number(r.rec_cli), clientesLt: Number(r.rec_cli), lt: r1(r.rec_lt), ltv: r0(r.rec_ltv), faturamento: r0(r.rec_fat), ticket: recTicket },
+          pontual: { clientes: Number(r.pont_cli), clientesLt: Number(r.pont_cli_lt), lt: r1(r.pont_lt), ltv: r0(r.pont_ltv), faturamento: r0(r.pont_fat), ticket: pontTicket },
+        };
+      });
       res.json({ meses });
     } catch (error) {
       console.error("[api] Error fetching creators-modelo evolucao:", error);
