@@ -2,7 +2,8 @@
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { ChevronDown, ChevronRight, Info } from "lucide-react";
+import { useState } from "react";
 
 export interface BPMes {
   mes: number;
@@ -25,6 +26,7 @@ export interface BPLinha {
   segmento?: string;   // produto (ex.: Performance / Creators) — sub-cabeçalho por produto
   subItem?: boolean;    // linha-filha (ex.: "% do CAC total") — indentada e atenuada
   semDetalhe?: boolean; // célula não abre drill-down
+  filhos?: BPLinha[];
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -119,6 +121,13 @@ interface Props {
 
 export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostrarOrcado = true }: Props) {
   const ytdLabel = mesFechado >= 1 ? `YTD ${MESES_CURTOS[mesFechado - 1]}` : "YTD";
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const toggleExpand = (metrica: string) =>
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      next.has(metrica) ? next.delete(metrica) : next.add(metrica);
+      return next;
+    });
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-zinc-700">
       <table className="w-full text-sm" data-testid="bp-dre-table">
@@ -205,6 +214,17 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                   } ${linha.segmento ? "pl-8" : ""} ${linha.subItem ? "pl-8 text-xs text-gray-500 dark:text-zinc-500" : ""}`}
                 >
                   <span className="flex items-center gap-1.5">
+                    {linha.filhos && linha.filhos.length > 0 && (
+                      <button
+                        onClick={() => toggleExpand(linha.metrica)}
+                        className="shrink-0 text-gray-400 hover:text-gray-600 dark:text-zinc-500 dark:hover:text-zinc-300"
+                        aria-label={expanded.has(linha.metrica) ? "Colapsar" : "Expandir"}
+                      >
+                        {expanded.has(linha.metrica)
+                          ? <ChevronDown className="h-3.5 w-3.5" />
+                          : <ChevronRight className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
                     {tituloLinha}
                     {(linha.info || linha.nota || ehEstoque) && (
                       <Tooltip>
@@ -274,6 +294,47 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                 </td>
               </tr>
               );
+              // sub-linhas de filhos (toggle)
+              if (expanded.has(linha.metrica) && linha.filhos) {
+                linha.filhos.forEach((filho) => {
+                  render.push(
+                    <tr
+                      key={filho.metrica}
+                      className="border-t border-gray-100 dark:border-zinc-800 text-gray-700 dark:text-zinc-300"
+                      data-testid={`bp-linha-${filho.metrica}`}
+                    >
+                      <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 pl-12 pr-4 py-2 text-xs text-gray-500 dark:text-zinc-500 whitespace-nowrap align-top">
+                        {filho.titulo}
+                      </td>
+                      {filho.meses.map((m) => (
+                        <td key={m.mes} className="px-2 py-2 text-right align-top">
+                          <Celula
+                            orcado={m.orcado}
+                            realizado={m.realizado}
+                            atingimento={m.atingimento}
+                            direcao={filho.direcao}
+                            unidade={filho.unidade ?? "brl"}
+                            parcial={m.mes === mesCorrente && mesCorrente > mesFechado}
+                            semMeta
+                            mostrarOrcado={mostrarOrcado}
+                          />
+                        </td>
+                      ))}
+                      <td className="px-3 py-2 text-right align-top border-l border-gray-200 dark:border-zinc-700 bg-gray-50/50 dark:bg-zinc-800/50">
+                        <Celula
+                          orcado={filho.ytd.orcado}
+                          realizado={filho.ytd.realizado}
+                          atingimento={filho.ytd.atingimento}
+                          direcao={filho.direcao}
+                          unidade={filho.unidade ?? "brl"}
+                          semMeta
+                          mostrarOrcado={mostrarOrcado}
+                        />
+                      </td>
+                    </tr>
+                  );
+                });
+              }
             });
             return render;
           })()}
