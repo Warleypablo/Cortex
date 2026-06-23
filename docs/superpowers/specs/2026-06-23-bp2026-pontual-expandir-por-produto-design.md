@@ -76,3 +76,17 @@ de cada mês = valor da linha-pai naquele mês.
 - Demais linhas (Churn, Deletados, Saída atípica, Reajuste, Estoque inicial, status, squad) NÃO ganham
   toggle por produto agora.
 - Não alterar a lógica/valores das linhas-pai — só adicionar a decomposição expansível.
+
+---
+
+## ADENDO (2026-06-23) — estender o toggle às linhas de status do Estoque final
+
+As 5 linhas de decomposição do Estoque final por status (· Em execução, · Triagem, · Pausado,
+· Onboarding, · Em cancelamento) também ganham o toggle ▶ para expandir por produto.
+
+- `montarLinhasPontual`: para cada `STATUS_DECOMP.chave`, adiciona ao `subPorPai` as sub-linhas por
+  produto = `decomporProduto(porMes[m].filter(status === chave))` (régua estoque). Soma das sub-linhas
+  = a linha do status.
+- `bp2026.detalhe.ts`: no drill `pontual_prod:<pai>:<produto>`, se `pai` começa com `pontual_status_`,
+  resolve o status (via `STATUS_DECOMP`) e filtra `detPontualSnapshot` por status + produto.
+- Frontend: sem mudança (o `BPDreTable` já renderiza o toggle para qualquer linha `expansivel`).

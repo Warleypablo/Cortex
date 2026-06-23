@@ -384,6 +384,16 @@ export function montarLinhasPontual(
     pontual_entrega: subLinhasProduto("pontual_entrega", (m) => prodEntrega[m] ?? {}, "fluxo", -1),
     pontual_estoque_fim: subLinhasProduto("pontual_estoque_fim", (m) => prodFim[m] ?? {}, "estoque", 1),
   };
+  // Cada status do estoque final (Em execução, Triagem, Pausado, Onboarding, Em cancelamento)
+  // também é expandível por produto (estoque daquele status decomposto por produto).
+  for (const { chave } of STATUS_DECOMP) {
+    const metricaStatus = `pontual_status_${chave.replace(/\s+/g, "_")}`;
+    subPorPai[metricaStatus] = subLinhasProduto(
+      metricaStatus,
+      (m) => decomporProduto((porMes[m] ?? []).filter((r) => r.status === chave)),
+      "estoque", 1,
+    );
+  }
 
   // Insere as sub-linhas logo após cada linha-pai e marca o pai como expansível.
   const out: LinhaPontual[] = [];

@@ -84,6 +84,15 @@ describe("montarLinhasPontual — expandir por produto", () => {
     const iPai = linhas.findIndex((l) => l.metrica === "pontual_estoque_fim");
     expect(linhas[iPai + 1].paiMetrica).toBe("pontual_estoque_fim");
   });
+  it("linhas de status também são expansíveis por produto e somam o status", () => {
+    // todos a/b/c são status 'ativo' (50K Creators + 30K Ecommerce + 4K Site = 84K)
+    expect(by("pontual_status_ativo").expansivel).toBe(true);
+    const subs = linhas.filter((l) => l.paiMetrica === "pontual_status_ativo");
+    const somaSubs = subs.reduce((s, l) => s + (l.meses[0].realizado ?? 0), 0);
+    expect(somaSubs).toBe(by("pontual_status_ativo").meses[0].realizado);
+    expect(somaSubs).toBe(84000);
+    expect(subs.find((l) => l.titulo === "· Creators")!.meses[0].realizado).toBe(50000);
+  });
 });
 
 const ant = [
