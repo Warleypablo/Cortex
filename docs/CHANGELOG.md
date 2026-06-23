@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-23 | feat(ads-creation): reestrutura CRM Recompra b1c1 p/ 5 ads/conjunto (padrão ABO Creators)
+
+**O que foi feito:**
+- `inspecionar-abo-creators.ts` (read-only): mapeou a estrutura/nomenclatura da camp ABO Creators teste — split por hook (h01–h05 / h06–h09), `[IG] [Aberto] [Stories & Feed & Reels] [Personagem] - Tema - hooks | bN | cN`, NN como contador corrido (último = 150)
+- `reestruturar-crm-flash.ts`: corrige a estrutura na camp CBO FLASH CRM (antes tudo num conjunto só) p/ **5 ads por conjunto**:
+  - conjunto **151** = reaproveita o pré-setado renomeado, mantém TP1630–1634 (h1–h5)
+  - conjunto **152** = novo (clona a config do pré-setado), recebe TP1635–1638 (h6–h9)
+  - como a API da Meta não move ad entre conjuntos, recria no destino e deleta da origem (cria-antes-de-deletar); idempotente + backoff de rate-limit
+
+**Por que:**
+- A primeira subida pôs os 9 ads num conjunto único, fora do padrão Turbo. O padrão é 5 ads/conjunto com a nomenclatura da ABO Creators teste
+
+**Arquivos novos:**
+- `inspecionar-abo-creators.ts` - read-only da estrutura da ABO Creators teste
+- `reestruturar-crm-flash.ts` - split do lote b1c1 em 2 conjuntos no padrão
+
+**Impacto arquitetural:** Nenhum — scripts one-off de leitura/criação via Meta API.
+
+---
+
 ## 2026-06-22 | feat(ads-creation): lote completo b1c1 (h1–h9) do CRM Recompra na camp FLASH CRM
 
 **O que foi feito:**
