@@ -212,3 +212,38 @@ numa categoria de ajuste. Estrutura final (ponte única, sem grupos):
   no estoque`, `· Venda do mês`, os grupos `GRUPO_VENDA/GRUPO_ESTOQUE` e `SUBCATS_VENDA`.
 - Métricas novas: `pontual_ajuste`, `pontual_venda_fora_foto` (ambas `semDetalhe`). `pontual_venda_comercial`
   permanece como a linha de venda (drill por produto).
+
+---
+
+## ADENDO 3 (2026-06-22) — decompor a própria Venda (auditável), sem cruzar réguas
+
+A linha "Venda do mês fora da foto" (Adendo 2) não era auditável: era `A(valor atual) −
+vendaMes(valor do snapshot)`, subtração de duas réguas de valor → não corresponde a lista de
+contratos (ex.: jan a lista real soma 71k, mas a linha mostrava −19k pela mudança de valor).
+
+**Decisão final (aprovada):** não cruzar réguas. Dois blocos:
+
+### Bloco "Venda Pontual (comercial)" — tudo na régua de cup_contratos (valor atual)
+```
+(+) Venda Pontual        = A (= Vendas por Produto)      [drill por produto]
+   · Entrou no estoque    = A ∩ estoque do snapshot fim do mês   [drill]
+   · Fora do estoque      = A − (A ∩ estoque)                    [drill]
+```
+`Entrou + Fora = Venda Pontual` exato (mesma régua) → auditável. Validado em prod (mar:
+280.823 + 673.521 = 954.344; drill Fora=673.521 por produto).
+
+### Bloco "Movimento do estoque (foto do ClickUp)" — régua do snapshot, fecha sozinho
+```
+(=) Estoque inicial
+(+) Entrada na foto       = B (drill: novos do mês + defasada + reativação + sem origem)
+(−) Entrega / Churn / Deletados / Saída atípica / (±) Reajuste
+(=) Estoque final  (· status…)
+```
+
+### Implementação
+- `montarLinhasPontual(porMes, mesCorrente, mesFechado, vendaComercialPorMes, vendaNoEstoquePorMes)`.
+- `bp2026.pontual.ts`: query da venda traz `id_subtask`; cruza com o estoque do snapshot (Set por mês)
+  para `vendaNoEstoquePorMes`.
+- `bp2026.detalhe.ts`: `detVendaPorEstoque(db, mes, dentro)` (drill entrou/fora); `pontual_entrada`
+  drilla `CATS_ENTRADA` (novos+defasada+reativação+sem origem).
+- Removidos: `pontual_ajuste`, `pontual_venda_fora_foto`, `GRUPO_*` antigos não usados.
