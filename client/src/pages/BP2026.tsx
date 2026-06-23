@@ -200,15 +200,6 @@ export default function BP2026() {
           />
         </TabsContent>
         <TabsContent value="pontual-creators" className="mt-4 space-y-2">
-          <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300">
-            Pontual Creators — venda comercial e movimento de estoque (só realizado)
-          </h3>
-          <p className="text-xs text-gray-500 dark:text-zinc-400 max-w-4xl">
-            <strong>Venda Pontual</strong> = quanto foi vendido no mês (data de criação), filtrado por produto
-            Creators; decomposta em <em>entrou no estoque</em> e <em>fora do estoque</em>. O{" "}
-            <strong>Movimento do estoque</strong> é a foto do ClickUp (snapshot) filtrada por Creators e fecha
-            no estoque final — régua de snapshot, independente da Venda.
-          </p>
           {!creatorsData ? (
             <Skeleton className="h-64 w-full" />
           ) : (
