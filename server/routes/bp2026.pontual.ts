@@ -85,5 +85,6 @@ export async function montarPontual({ db, mesCorrente, mesFechado, produtoLike }
   return montarLinhasPontual(
     porMes, mesCorrente, mesFechado,
     vendaComercialPorMes, vendaNoEstoquePorMes, vendaPorProdutoPorMes,
+    produtoLike ? "squad" : "produto",
   );
 }
