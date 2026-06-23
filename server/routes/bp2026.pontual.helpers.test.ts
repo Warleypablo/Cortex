@@ -36,7 +36,7 @@ describe("ehEstoquePontual", () => {
 describe("classificarPonte", () => {
   const p = classificarPonte(
     ant.map((r) => ({ ...r, criadoYm: "2026-03" })),
-    atual.map((r) => ({ ...r, criadoYm: r.idSubtask === "F" ? "2026-03" : "2026-03" })),
+    atual.map((r) => ({ ...r, criadoYm: "2026-03" })),
     "2026-03",
   );
   it("classifica cada categoria", () => {
