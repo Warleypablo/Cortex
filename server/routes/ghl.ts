@@ -1106,6 +1106,35 @@ async function listBroadcasts(req: Request, res: Response) {
       for (const row of ((sRes as any).rows ?? [])) salesMap.set(row.broadcast_id, { ganhos: row.ganhos ?? 0, receita: row.receita ?? 0 });
     }
 
+    // Oportunidades por disparo = respondentes com intenção: 1ª resposta POSITIVA OU que marcaram
+    // reunião (em qualquer evento). A reunião é o sinal de intenção mais forte; o classificador de
+    // sentimento rotula "neutra" a maioria de quem agendou (87% das reuniões — investigação jun/2026),
+    // então sentimento sozinho subcontava. BOOL_OR(reunião) garante oportunidades >= reuniões da lista.
+    const oppMap = new Map<string, number>();
+    if (waIds.length) {
+      const oRes = await db.execute(sql`
+        WITH ev AS (
+          SELECT e.broadcast_id,
+            COALESCE(e.ghl_contact_id, e.lead_phone, e.reply_message_id) AS lead_key,
+            e.sentiment, e.reply_at,
+            (d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date) AS tem_reuniao
+          FROM cortex_core.broadcast_lead_events e
+          LEFT JOIN "Bitrix".crm_deal d ON d.id = e.bitrix_deal_id
+          WHERE e.broadcast_id IN (${sql.join(waIds.map((id) => sql`${id}`), sql`,`)})
+        ),
+        per_lead AS (
+          SELECT broadcast_id, lead_key,
+            (ARRAY_AGG(sentiment ORDER BY reply_at ASC))[1] AS first_sentiment,
+            BOOL_OR(tem_reuniao) AS tem_reuniao
+          FROM ev GROUP BY broadcast_id, lead_key
+        )
+        SELECT broadcast_id,
+          COUNT(*) FILTER (WHERE first_sentiment = 'positiva' OR tem_reuniao)::int AS oportunidades
+        FROM per_lead GROUP BY broadcast_id
+      `);
+      for (const row of ((oRes as any).rows ?? [])) oppMap.set(row.broadcast_id, row.oportunidades ?? 0);
+    }
+
     // Monta o response final
     const broadcasts = rows.map((r) => {
       const isEmail = r.channel === "Email";
@@ -1142,6 +1171,7 @@ async function listBroadcasts(req: Request, res: Response) {
         delivery_pct,
         open_pct,
         conversations_generated: conversationsMap.get(r.id) ?? 0,
+        oportunidades: isEmail ? null : (oppMap.get(r.id) ?? 0), // respondentes positivos (oportunidades)
         meetings_scheduled: isEmail ? null : (meetingsMap.get(r.id) ?? 0), // reuniões atribuídas (pós-resposta)
         ganhos: isEmail ? null : (salesMap.get(r.id)?.ganhos ?? 0), // negócios ganhos atribuídos
         receita: isEmail ? null : (salesMap.get(r.id)?.receita ?? 0), // receita atribuída (R$)
@@ -1617,6 +1647,13 @@ async function getBroadcastsSummary(req: Request, res: Response) {
         count(*) FILTER (WHERE fr.sentiment = 'negativa')::int AS negativas,
         count(*) FILTER (WHERE fr.sentiment = 'neutra')::int AS neutras,
         count(*) FILTER (WHERE fr.sentiment = 'opt_out')::int AS opt_out,
+        -- Oportunidade = respondente com intenção: 1ª resposta positiva OU que marcou reunião
+        -- (a reunião é o sinal de intenção mais forte; o classificador de sentimento erra "neutra"
+        -- pra quem agendou — ver investigação jun/2026). Garante oportunidades >= reuniao_marcada.
+        count(*) FILTER (
+          WHERE fr.sentiment = 'positiva'
+             OR (d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)
+        )::int AS oportunidades,
         -- causalidade (>=): inclui etapas no mesmo dia da resposta (ver nota no topo)
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)::int AS reuniao_marcada,
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,

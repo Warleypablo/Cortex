@@ -866,6 +866,7 @@ interface BroadcastRow {
   delivery_pct: number | null;
   open_pct: number | null;
   conversations_generated: number;
+  oportunidades: number | null;
   meetings_scheduled: number | null;
   ganhos: number | null;
   receita: number | null;
@@ -883,7 +884,30 @@ type SortKey =
   | "delivered"
   | "delivery_pct"
   | "open_pct"
-  | "conversations_generated";
+  | "conversations_generated"
+  | "oportunidades"
+  | "meetings_scheduled"
+  | "ganhos"
+  | "receita"
+  | "aov"
+  | "spend_brl"
+  | "cac";
+
+// Opções do seletor "Ordenar por" — toda métrica da tabela, com maior/menor via o toggle de direção.
+const SORT_OPTIONS: { key: SortKey; label: string }[] = [
+  { key: "date", label: "Data" },
+  { key: "list_size", label: "Base (lista)" },
+  { key: "delivery_pct", label: "Taxa de entrega" },
+  { key: "open_pct", label: "Taxa de abertura" },
+  { key: "conversations_generated", label: "Conversas" },
+  { key: "oportunidades", label: "Oportunidades" },
+  { key: "meetings_scheduled", label: "Reuniões" },
+  { key: "ganhos", label: "Ganhos" },
+  { key: "receita", label: "Receita" },
+  { key: "aov", label: "Ticket médio (AOV)" },
+  { key: "spend_brl", label: "Gasto" },
+  { key: "cac", label: "CAC" },
+];
 
 function BibliotecaTab({ from, to }: { from: string; to: string }) {
   const [channel, setChannel] = useState<string>("all");
@@ -930,12 +954,20 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
   const totalPages = data ? Math.ceil(data.total / limit) : 0;
 
   // Ordenação local (em cima da página atual, já que a paginação é no servidor por data desc)
+  // AOV e CAC são derivados (não são campos da linha) — resolvidos aqui pra serem ordenáveis.
+  const sortValueOf = (b: BroadcastRow, k: SortKey): number | string | null => {
+    if (k === "aov") return b.ganhos && b.receita ? b.receita / b.ganhos : null;
+    if (k === "cac") return b.ganhos && b.spend_brl != null ? b.spend_brl / b.ganhos : null;
+    return (b as any)[k];
+  };
+
   const sorted = useMemo(() => {
     if (!data?.broadcasts) return [];
     const rows = [...data.broadcasts];
     rows.sort((a, b) => {
-      const av = (a as any)[sortKey];
-      const bv = (b as any)[sortKey];
+      const av = sortValueOf(a, sortKey);
+      const bv = sortValueOf(b, sortKey);
+      // Nulos (— na tabela) sempre por último, independente da direção.
       if (av == null && bv == null) return 0;
       if (av == null) return 1;
       if (bv == null) return -1;
@@ -960,7 +992,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
   // Resumo executivo: entrega WhatsApp por status + funil atribuído (causalidade pós-resposta).
   const summary = useQuery<{
     whatsapp: { total: number; enviado: number; entregue: number; lida: number; erro: number; entrega_pct: number | null; leitura_pct: number | null; erro_pct: number | null };
-    funil: { responderam: number; positivas: number; reuniao_marcada: number; compareceu: number; venda: number };
+    funil: { responderam: number; positivas: number; oportunidades: number; reuniao_marcada: number; compareceu: number; venda: number };
     custos: { gasto_total: number; gasto_por_disparo: number | null; custo_reuniao: number | null; cac: number | null; estimado: boolean; unit_cost: number; n_manual: number };
   }>({
     queryKey: ["/api/ghl/broadcasts/summary", from, to],
@@ -982,12 +1014,14 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
 
   return (
     <div className="space-y-4">
-      {/* KPI cards: Investimento · Disparos · Respostas · Reuniões · Vendas · CAC */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      {/* KPI cards: Investimento · Disparos · Respostas · Oportunidades · Reuniões · Custo/reunião · Vendas · CAC */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
         <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"} />
         <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp" />
-        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint={fnl ? `${fmtInt(fnl.positivas)} positivas` : undefined} />
+        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint="responderam ao disparo" />
+        <StatCard label="Oportunidades" value={fnl ? fmtInt(fnl.oportunidades) : "—"} hint="responderam positivo ou marcaram reunião" />
         <StatCard label="Reuniões" value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"} hint="atribuídas (pós-resposta)" />
+        <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="investimento ÷ reuniões" />
         <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
         <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas" />
       </div>
@@ -1037,7 +1071,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
               <div key={row.label} className="space-y-1">
                 <div className="flex justify-between text-sm">
                   <span>{row.label}</span>
-                  <span className="text-muted-foreground"><strong className="text-foreground">{fmtInt(row.value)}</strong> · {pct.toFixed(1)}%</span>
+                  <span className="text-muted-foreground" title="% sobre o total de mensagens"><strong className="text-foreground">{fmtInt(row.value)}</strong> · {pct.toFixed(1)}%</span>
                 </div>
                 <div className="h-2 w-full rounded bg-muted/40 overflow-hidden">
                   <div className={`h-full ${row.color}`} style={{ width: `${Math.max(pct, 1)}%` }} />
@@ -1045,96 +1079,146 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
               </div>
             );
           })}
-          <div className="flex gap-4 pt-2 text-sm border-t border-border">
-            <div><span className="text-muted-foreground">Taxa de entrega: </span><strong>{wa?.entrega_pct != null ? `${wa.entrega_pct}%` : "—"}</strong></div>
-            <div><span className="text-muted-foreground">Taxa de leitura: </span><strong>{wa?.leitura_pct != null ? `${wa.leitura_pct}%` : "—"}</strong></div>
-            <div><span className="text-muted-foreground">Taxa de erro: </span><strong>{wa?.erro_pct != null ? `${wa.erro_pct}%` : "—"}</strong></div>
-          </div>
+          {(() => {
+            // Oportunidades é métrica de pessoa (respondentes positivos OU que marcaram reunião),
+            // não de mensagem — por isso fica separada das barras de entrega, com taxa sobre as entregues.
+            const opp = fnl?.oportunidades ?? 0;
+            const entregue = wa?.entregue ?? 0;
+            const pct = entregue > 0 ? (100 * opp) / entregue : 0;
+            return (
+              <div className="space-y-1 pt-2 border-t border-border">
+                <div className="flex justify-between text-sm">
+                  <span className="font-medium">Oportunidades</span>
+                  <span className="text-muted-foreground" title="oportunidades ÷ entregues"><strong className="text-emerald-600 dark:text-emerald-400">{fmtInt(opp)}</strong> · {pct.toFixed(1)}%</span>
+                </div>
+                <div className="h-2 w-full rounded bg-muted/40 overflow-hidden">
+                  <div className="h-full bg-amber-500" style={{ width: `${Math.max(pct, 1)}%` }} />
+                </div>
+                <p className="text-[11px] text-muted-foreground">Respondentes positivos ou que marcaram reunião (taxa sobre entregues)</p>
+              </div>
+            );
+          })()}
+          {(() => {
+            // Taxas com denominador padrão de mercado (não sobre o total): entrega sobre o que saiu,
+            // leitura sobre o que foi entregue (abertura real). Erro segue sobre o total enviado.
+            const enviado = wa?.enviado ?? 0, entregue = wa?.entregue ?? 0, lida = wa?.lida ?? 0, erro = wa?.erro ?? 0, total = wa?.total ?? 0;
+            const opp = fnl?.oportunidades ?? 0;
+            const taxa = (num: number, den: number) => (den > 0 ? `${((100 * num) / den).toFixed(1)}%` : "—");
+            return (
+              <div className="flex flex-wrap gap-4 pt-2 text-sm border-t border-border">
+                <div title="entregues ÷ enviadas"><span className="text-muted-foreground">Taxa de entrega: </span><strong>{taxa(entregue, enviado)}</strong></div>
+                <div title="lidas ÷ entregues (abertura real)"><span className="text-muted-foreground">Taxa de leitura: </span><strong>{taxa(lida, entregue)}</strong></div>
+                <div title="falhas ÷ total enviado"><span className="text-muted-foreground">Taxa de erro: </span><strong>{taxa(erro, total)}</strong></div>
+                <div title="oportunidades ÷ entregues"><span className="text-muted-foreground">Taxa de oportunidade: </span><strong>{taxa(opp, entregue)}</strong></div>
+              </div>
+            );
+          })()}
         </CardContent>
       </Card>
 
-      {/* Filtros */}
+      {/* Lista de broadcasts — filtros (canal/busca) e ordenação integrados no header */}
       <Card>
-        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-          <div>
-            <Label className="text-xs">Canal</Label>
-            <Select value={channel} onValueChange={setChannel}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="Email">Email</SelectItem>
-                <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="md:col-span-2">
-            <Label className="text-xs">Busca (nome, assunto ou corpo)</Label>
-            <div className="flex gap-1">
-              <Input
-                value={searchInput}
-                onChange={(e) => setSearchInput(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") setSearch(searchInput); }}
-                placeholder="Ex.: convite, workshop, black friday..."
-                className="text-sm"
-              />
-              <button
-                onClick={() => setSearch(searchInput)}
-                className="px-2 hover:bg-muted rounded"
-                title="Buscar"
-                aria-label="Buscar"
-              >
-                <Search className="w-4 h-4" />
-              </button>
-              {search && (
+        <CardHeader className="space-y-3">
+          <CardTitle className="text-base flex justify-between items-baseline">
+            <span>Broadcasts ({data ? fmtInt(data.total) : "—"})</span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2 text-sm font-normal">
                 <button
-                  onClick={() => { setSearch(""); setSearchInput(""); }}
-                  className="px-2 hover:bg-muted rounded"
-                  title="Limpar busca"
+                  onClick={() => setPage((p) => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
+                  aria-label="Página anterior"
                 >
-                  <X className="w-4 h-4" />
+                  <ChevronLeft className="w-4 h-4" />
                 </button>
-              )}
+                <span className="text-muted-foreground">Página {page + 1} de {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
+                  aria-label="Próxima página"
+                >
+                  <ChevronRight className="w-4 h-4" />
+                </button>
+              </div>
+            )}
+          </CardTitle>
+
+          {/* Filtros + ordenação */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
+            <div className="lg:col-span-2">
+              <Label className="text-xs">Canal</Label>
+              <Select value={channel} onValueChange={setChannel}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos</SelectItem>
+                  <SelectItem value="Email">Email</SelectItem>
+                  <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="sm:col-span-2 lg:col-span-5">
+              <Label className="text-xs">Busca (nome, assunto ou corpo)</Label>
+              <div className="flex gap-1">
+                <Input
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === "Enter") setSearch(searchInput); }}
+                  placeholder="Ex.: convite, workshop, black friday..."
+                  className="text-sm"
+                />
+                <button
+                  onClick={() => setSearch(searchInput)}
+                  className="px-2 hover:bg-muted rounded"
+                  title="Buscar"
+                  aria-label="Buscar"
+                >
+                  <Search className="w-4 h-4" />
+                </button>
+                {search && (
+                  <button
+                    onClick={() => { setSearch(""); setSearchInput(""); }}
+                    className="px-2 hover:bg-muted rounded"
+                    title="Limpar busca"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <div className="lg:col-span-3">
+              <Label className="text-xs">Ordenar por</Label>
+              <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SORT_OPTIONS.map((o) => (
+                    <SelectItem key={o.key} value={o.key}>{o.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="lg:col-span-2">
+              <Label className="text-xs">Ordem</Label>
+              <button
+                onClick={() => setSortDir((d) => (d === "asc" ? "desc" : "asc"))}
+                className="flex h-10 w-full items-center justify-between rounded-md border border-input bg-background px-3 text-sm hover:bg-muted"
+                title="Inverter ordem"
+                aria-label="Inverter ordem"
+              >
+                <span>{sortDir === "desc" ? "Maior → menor" : "Menor → maior"}</span>
+                <span className="text-muted-foreground">{sortDir === "desc" ? "▼" : "▲"}</span>
+              </button>
             </div>
           </div>
-        </CardContent>
-      </Card>
-
-      {isLoading && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
-        </div>
-      )}
-      {error && <div className="text-destructive">Erro: {(error as Error).message}</div>}
-
-      {data && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base flex justify-between items-baseline">
-              <span>Broadcasts ({fmtInt(data.total)})</span>
-              {totalPages > 1 && (
-                <div className="flex items-center gap-2 text-sm font-normal">
-                  <button
-                    onClick={() => setPage((p) => Math.max(0, p - 1))}
-                    disabled={page === 0}
-                    className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
-                    aria-label="Página anterior"
-                  >
-                    <ChevronLeft className="w-4 h-4" />
-                  </button>
-                  <span className="text-muted-foreground">Página {page + 1} de {totalPages}</span>
-                  <button
-                    onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
-                    disabled={page >= totalPages - 1}
-                    className="px-2 py-1 hover:bg-muted rounded disabled:opacity-30"
-                    aria-label="Próxima página"
-                  >
-                    <ChevronRight className="w-4 h-4" />
-                  </button>
-                </div>
-              )}
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
+        </CardHeader>
+        <CardContent>
+          {isLoading ? (
+            <div className="flex items-center gap-2 text-muted-foreground py-6">
+              <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
+            </div>
+          ) : error ? (
+            <div className="text-destructive py-6">Erro: {(error as Error).message}</div>
+          ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
@@ -1145,12 +1229,13 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                     <SortableTh label="Entrega" k="delivery_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <SortableTh label="Abertura" k="open_pct" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
                     <SortableTh label="Conversas" k="conversations_generated" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-                    <TableHead className="text-right" title="Reuniões atribuídas ao disparo (agendadas após a resposta)">Reuniões</TableHead>
-                    <TableHead className="text-right" title="Negócios ganhos atribuídos (venda após resposta)">Ganhos</TableHead>
-                    <TableHead className="text-right" title="Receita dos negócios ganhos atribuídos">Receita</TableHead>
-                    <TableHead className="text-right" title="Ticket médio = receita ÷ negócios ganhos">AOV</TableHead>
-                    <TableHead className="text-right">Gasto</TableHead>
-                    <TableHead className="text-right" title="Custo de aquisição = gasto ÷ negócios ganhos">CAC</TableHead>
+                    <SortableTh label="Oportunidades" k="oportunidades" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Oportunidades = respondentes com 1ª resposta positiva OU que marcaram reunião (intenção qualificada)" />
+                    <SortableTh label="Reuniões" k="meetings_scheduled" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Reuniões atribuídas ao disparo (agendadas após a resposta)" />
+                    <SortableTh label="Ganhos" k="ganhos" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Negócios ganhos atribuídos (venda após resposta)" />
+                    <SortableTh label="Receita" k="receita" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Receita dos negócios ganhos atribuídos" />
+                    <SortableTh label="AOV" k="aov" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Ticket médio = receita ÷ negócios ganhos" />
+                    <SortableTh label="Gasto" k="spend_brl" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
+                    <SortableTh label="CAC" k="cac" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" title="Custo de aquisição = gasto ÷ negócios ganhos" />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -1197,6 +1282,9 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                       </TableCell>
                       <TableCell className="text-right tabular-nums align-top py-3">{fmtInt(b.conversations_generated)}</TableCell>
                       <TableCell className="text-right tabular-nums align-top py-3">
+                        {b.oportunidades != null && b.oportunidades > 0 ? <span className="font-medium text-emerald-600 dark:text-emerald-400">{fmtInt(b.oportunidades)}</span> : (b.oportunidades != null ? "0" : "—")}
+                      </TableCell>
+                      <TableCell className="text-right tabular-nums align-top py-3">
                         {b.meetings_scheduled != null ? <span className="font-medium">{fmtInt(b.meetings_scheduled)}</span> : "—"}
                       </TableCell>
                       <TableCell className="text-right tabular-nums align-top py-3">
@@ -1223,7 +1311,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                   ))}
                   {sorted.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={12} className="text-center text-muted-foreground py-6">
+                      <TableCell colSpan={13} className="text-center text-muted-foreground py-6">
                         Nenhum broadcast encontrado com esses filtros
                       </TableCell>
                     </TableRow>
@@ -1231,9 +1319,9 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
                 </TableBody>
               </Table>
             </div>
-          </CardContent>
-        </Card>
-      )}
+          )}
+        </CardContent>
+      </Card>
 
       {/* Modal de detalhes */}
       {detail && (
@@ -1253,6 +1341,7 @@ function SortableTh({
   onClick,
   align,
   className,
+  title,
 }: {
   label: string;
   k: SortKey;
@@ -1261,10 +1350,12 @@ function SortableTh({
   onClick: (k: SortKey) => void;
   align?: "right" | "left";
   className?: string;
+  title?: string;
 }) {
   const active = sortKey === k;
   return (
     <TableHead
+      title={title}
       className={cn(
         "cursor-pointer select-none hover:bg-muted/50 whitespace-nowrap",
         align === "right" && "text-right",
