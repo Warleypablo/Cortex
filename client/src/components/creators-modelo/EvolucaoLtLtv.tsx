@@ -7,7 +7,7 @@ import { fetchJson, buildUrl } from "@/components/lt-ltv-churn/utils";
 import { EvolucaoAuditoriaDrawer } from "./EvolucaoAuditoriaDrawer";
 import type { Unidade, Agregador, Situacao } from "./types";
 
-interface ModMetric { clientes: number; clientesLt: number; lt: number | null; ltv: number | null; faturamento: number | null; }
+interface ModMetric { clientes: number; clientesLt: number; lt: number | null; ltv: number | null; faturamento: number | null; ticket: number | null; }
 interface EvolucaoMes { mes: string; recorrente: ModMetric; pontual: ModMetric; }
 
 const MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
@@ -23,6 +23,7 @@ const LINHAS: Array<{ label: string; get: (x: ModMetric) => string; forte?: bool
   { label: "LT", get: (x) => fmtLt(x.lt) },
   { label: "LTV", get: (x) => fmtLtv(x.ltv), forte: true },
   { label: "Faturamento", get: (x) => fmtLtv(x.faturamento), forte: true },
+  { label: "Ticket médio", get: (x) => fmtLtv(x.ticket) },
 ];
 
 const GRUPOS: Array<{ key: "recorrente" | "pontual"; label: string; cor: string; barra: string }> = [
@@ -60,6 +61,7 @@ export function EvolucaoLtLtv({
           (1ª compra → mês); cancelados contam LT realizado (até o churn) — alinhado ao total acima.
           {" "}Pontual: 1 entrega entregue = 1 mês ({incluirUnicas ? "entrega única incluída" : "entrega única fora do LT"}); LTV = realizado (só entregues).
           {" "}Faturamento: pontual = valor entregue no mês (1ª vez que a entrega vira “entregue”); recorrente = MRR ativo do mês (Σ valorr da base ativa).
+          {" "}Ticket médio: recorrente = MRR ÷ clientes ativos (mensalidade média); pontual = valor entregue ÷ nº de entregas do mês (preço médio por entrega).
         </p>
       </CardHeader>
       <CardContent className="overflow-x-auto">
