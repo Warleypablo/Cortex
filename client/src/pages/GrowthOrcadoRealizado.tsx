@@ -93,6 +93,7 @@ interface AdsMetrics {
   videoHook: number;
   videoHold: number;
   connectRate: number;
+  connectRateGa4: number;
   visualizacoesPagina: number;
   sessoes: number;
   leads: number;
@@ -1717,7 +1718,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ctr', name: 'CTR', type: 'manual', orcado: ORCADO_ADS.ctr, realizado: data.ctr ?? null, percentual: calcPercentual(ORCADO_ADS.ctr, data.ctr), format: 'percent' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
-      { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRate ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRate), format: 'percent' },
+      { id: 'connect_rate', name: 'Connect Rate - GA4', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRateGa4 ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRateGa4), format: 'percent' },
       { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : 0), format: 'percent' },
       { id: 'taxa_conversao_pagina_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: (data.sessoes ?? 0) > 0 ? (data.mqls ?? 0) / (data.sessoes ?? 1) : 0, percentual: null, format: 'percent' },
       { id: 'taxa_conversao_pagina_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: (data.sessoes ?? 0) > 0 ? ((data.leads ?? 0) - (data.mqls ?? 0)) / (data.sessoes ?? 1) : 0, percentual: null, format: 'percent' },
@@ -1792,7 +1793,8 @@ export default function GrowthOrcadoRealizado() {
       { id: 'meta_ctr', name: 'CTR', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: lpvPixel, percentual: calcPercentual(O.visualizacoesPagina, lpvPixel), format: 'number' },
       { id: 'meta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent' },
+      { id: 'meta_connectRate', name: 'Connect Rate - Visualização de Página', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent' },
+      { id: 'meta_connectRateGa4', name: 'Connect Rate - GA4', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate ?? null), format: 'percent' },
       { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página - Visualização de Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
       { id: 'meta_taxaConversaoPagina_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? (funnel?.mqls ?? 0) / lpvPixel : 0, percentual: null, format: 'percent' },
       { id: 'meta_taxaConversaoPagina_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? ((funnel?.leads ?? 0) - (funnel?.mqls ?? 0)) / lpvPixel : 0, percentual: null, format: 'percent' },

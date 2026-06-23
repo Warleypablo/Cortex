@@ -3369,6 +3369,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         visualizacoesPaginaGa4 = ga4.byPlatformPageViews.google_ads;
       }
 
+      // Connect Rate consolidado pelo GA4: sessões PAGAS (Meta + Google) ÷ cliques de
+      // saída pagos (Meta outbound + Google clicks). Numerador e denominador no MESMO
+      // universo (pago multi-plataforma). O connectRate legado usa o pixel Meta-only
+      // no numerador sobre cliques Meta+Google, o que subestima a taxa.
+      const sessoesPagas =
+        (includeMeta ? ga4.byPlatform.meta_ads : 0) +
+        (includeGoogle ? ga4.byPlatform.google_ads : 0);
+      const connectRateGa4 = cliquesSaida > 0 ? sessoesPagas / cliquesSaida : 0;
+
       // Query Leads e MQLs do Bitrix (tráfego pago)
       const contagem = (req.query.contagem as string) || 'contrato';
       let funilFilter = sql``;
@@ -3462,6 +3471,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctrExposto = onlyInstagram ? 0 : ctr;
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
+      const connectRateGa4Exposto = onlyInstagram ? 0 : connectRateGa4;
       const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPaginaGa4;
       const visualizacoesPaginaPixelExposto = onlyInstagram ? 0 : visualizacoesPagina;
       const sessoesExposto = onlyInstagram ? 0 : sessoes;
@@ -3485,6 +3495,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ctr: ctrExposto,
         cps: cpsExposto,
         connectRate: connectRateExposto,
+        connectRateGa4: connectRateGa4Exposto,
         visualizacoesPagina: visualizacoesPaginaExposto,
         visualizacoesPaginaPixel: visualizacoesPaginaPixelExposto,
         sessoes: sessoesExposto,
