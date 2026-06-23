@@ -88,14 +88,15 @@ interface Props {
   mes: number | null;
   linhas: BPLinha[];
   onClose: () => void;
+  segmento?: string;
 }
 
-export function BPCellDetail({ metrica, mes, linhas, onClose }: Props) {
+export function BPCellDetail({ metrica, mes, linhas, onClose, segmento }: Props) {
   const aberto = metrica !== null && mes !== null;
   const ehDerivada = metrica !== null && metrica in DERIVADAS;
 
   const { data, isLoading, error } = useQuery<DetalheResponse>({
-    queryKey: ["/api/bp2026/detalhe", { metrica: metrica ?? "", mes: String(mes ?? "") }],
+    queryKey: ["/api/bp2026/detalhe", { metrica: metrica ?? "", mes: String(mes ?? ""), ...(segmento ? { segmento } : {}) }],
     enabled: aberto && !ehDerivada,
   });
 
