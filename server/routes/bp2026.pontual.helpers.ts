@@ -9,6 +9,7 @@ export interface RegPontual {
   status: string;
   criadoYm?: string | null; // 'YYYY-MM' de data_criado (cup_contratos); ausente => sem origem
   squad?: string;           // squad do contrato no snapshot (p/ decomposição do estoque por squad)
+  produto?: string;         // produto do contrato no snapshot (p/ expandir linhas por produto)
 }
 
 const ESTOQUE_STATUS_EXCLUDE = new Set(["entregue", "cancelado/inativo", "não usar"]);
@@ -100,6 +101,43 @@ export function decomporSquad(atual: RegPontual[]): Record<string, number> {
   return out;
 }
 
+const produtoDe = (r: RegPontual) => (r.produto && r.produto.trim() ? r.produto : "(sem produto)");
+
+// Soma valorp por produto, só do estoque (ehEstoquePontual). Soma total = estoque final.
+export function decomporProduto(atual: RegPontual[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of atual) {
+    if (!ehEstoquePontual(r)) continue;
+    const p = produtoDe(r);
+    out[p] = (out[p] ?? 0) + r.valorp;
+  }
+  return out;
+}
+
+// Entrada na foto e Entrega por produto (mesma classificação de classificarPonte, agregada por produto).
+// entrada = contratos que (re)entraram no estoque; entrega = contratos que viraram "entregue".
+export function classificarPontePorProduto(
+  ant: RegPontual[], atual: RegPontual[],
+): { entrada: Record<string, number>; entrega: Record<string, number> } {
+  const antMap = new Map(ant.map((r) => [r.idSubtask, r]));
+  const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
+  const entrada: Record<string, number> = {};
+  const entrega: Record<string, number> = {};
+  for (const r of ant) {
+    if (!ehEstoquePontual(r)) continue;
+    const a = atualMap.get(r.idSubtask);
+    if (!a || ehEstoquePontual(a)) continue; // deletado ou permaneceu
+    if (a.status === "entregue") entrega[produtoDe(r)] = (entrega[produtoDe(r)] ?? 0) + r.valorp;
+  }
+  for (const r of atual) {
+    if (!ehEstoquePontual(r)) continue;
+    const prev = antMap.get(r.idSubtask);
+    if (prev && ehEstoquePontual(prev)) continue; // permaneceu
+    entrada[produtoDe(r)] = (entrada[produtoDe(r)] ?? 0) + r.valorp; // entrada na foto
+  }
+  return { entrada, entrega };
+}
+
 // Limiar para esconder squads pequenos: < R$ 10K no mês corrente vão para "· Outros".
 export const SQUAD_MIN_EXIBIR = 10000;
 
@@ -121,6 +159,8 @@ export interface LinhaPontual {
   destaque?: boolean;
   semDetalhe?: boolean;
   grupo?: string;
+  expansivel?: boolean;   // linha-pai com toggle ▶/▼ (decomposição por produto)
+  paiMetrica?: string;    // sub-linha (por produto): só aparece se o pai estiver expandido
   meses: { mes: number; orcado: number; realizado: number | null; atingimento: number | null }[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -154,16 +194,24 @@ export function montarLinhasPontual(
   mesFechado: number,
   vendaComercialPorMes: Record<number, number> = {},
   vendaNoEstoquePorMes: Record<number, number> = {},
+  vendaPorProdutoPorMes: Record<number, Record<string, number>> = {},
 ): LinhaPontual[] {
   const ponte: (PonteMes | null)[] = Array.from({ length: 13 }, () => null);
   const decomp: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
   const decompSquad: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
+  const prodFim: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
+  const prodEntrada: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
+  const prodEntrega: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
   for (let m = 1; m <= 12; m++) {
     if (m > mesCorrente) continue;
     const ym = `${ANO}-${String(m).padStart(2, "0")}`;
     ponte[m] = classificarPonte(porMes[m - 1] ?? [], porMes[m] ?? [], ym);
     decomp[m] = decomporStatus(porMes[m] ?? []);
     decompSquad[m] = decomporSquad(porMes[m] ?? []);
+    prodFim[m] = decomporProduto(porMes[m] ?? []);
+    const pp = classificarPontePorProduto(porMes[m - 1] ?? [], porMes[m] ?? []);
+    prodEntrada[m] = pp.entrada;
+    prodEntrega[m] = pp.entrega;
   }
 
   const serieFluxo = (pick: (p: PonteMes) => number, signo: 1 | -1) =>
@@ -294,7 +342,57 @@ export function montarLinhasPontual(
     linhasSquad.push(mk("pontual_squad_outros", "· Outros (< R$ 10K)", "estoque", serieOutrosSquad, ytdOutros, { grupo: GRUPO_SQUAD, semDetalhe: true }));
   }
 
-  return [...bloco1, ...linhas, ...linhasSquad];
+  // ---- Sub-linhas por produto (expandíveis) das 4 linhas principais. ----
+  const subLinhasProduto = (
+    paiMetrica: string,
+    pickMes: (m: number) => Record<string, number>,
+    tipoAgregacao: "fluxo" | "estoque",
+    signo: 1 | -1,
+  ): LinhaPontual[] => {
+    const produtos = Array.from(new Set(
+      Array.from({ length: mesCorrente }, (_, i) => pickMes(i + 1)).flatMap((d) => Object.keys(d)),
+    ));
+    const valMesCorrente = (p: string) => pickMes(mesCorrente)[p] ?? 0;
+    const grandesP = produtos
+      .filter((p) => Math.abs(valMesCorrente(p)) >= SQUAD_MIN_EXIBIR)
+      .sort((a, b) => Math.abs(valMesCorrente(b)) - Math.abs(valMesCorrente(a)));
+    const pequenosP = produtos.filter((p) => Math.abs(valMesCorrente(p)) < SQUAD_MIN_EXIBIR);
+    const serieDe = (pick: (d: Record<string, number>) => number) =>
+      Array.from({ length: 12 }, (_, i) => {
+        const m = i + 1;
+        return m <= mesCorrente ? signo * pick(pickMes(m)) : null;
+      });
+    const ytdDe = (serie: (number | null)[], pickFechado: () => number): number | null =>
+      tipoAgregacao === "estoque"
+        ? (mesFechado === 0 ? null : signo * pickFechado())
+        : sumYtd(serie);
+    const subs: LinhaPontual[] = grandesP.map((p) => {
+      const serie = serieDe((d) => d[p] ?? 0);
+      return mk(`pontual_prod:${paiMetrica}:${p}`, `· ${p}`, tipoAgregacao, serie, ytdDe(serie, () => pickMes(mesFechado)[p] ?? 0), { paiMetrica });
+    });
+    const somaPeq = (d: Record<string, number>) => pequenosP.reduce((s, p) => s + (d[p] ?? 0), 0);
+    const serieOutrosP = serieDe(somaPeq);
+    if (serieOutrosP.some((v) => v !== null && Math.abs(v) > 0.5)) {
+      subs.push(mk(`pontual_prod:${paiMetrica}:__outros__`, "· Outros (< R$ 10K)", tipoAgregacao, serieOutrosP, ytdDe(serieOutrosP, () => somaPeq(pickMes(mesFechado))), { paiMetrica, semDetalhe: true }));
+    }
+    return subs;
+  };
+
+  const subPorPai: Record<string, LinhaPontual[]> = {
+    pontual_venda_comercial: subLinhasProduto("pontual_venda_comercial", (m) => vendaPorProdutoPorMes[m] ?? {}, "fluxo", 1),
+    pontual_entrada: subLinhasProduto("pontual_entrada", (m) => prodEntrada[m] ?? {}, "fluxo", 1),
+    pontual_entrega: subLinhasProduto("pontual_entrega", (m) => prodEntrega[m] ?? {}, "fluxo", -1),
+    pontual_estoque_fim: subLinhasProduto("pontual_estoque_fim", (m) => prodFim[m] ?? {}, "estoque", 1),
+  };
+
+  // Insere as sub-linhas logo após cada linha-pai e marca o pai como expansível.
+  const out: LinhaPontual[] = [];
+  for (const l of [...bloco1, ...linhas, ...linhasSquad]) {
+    const subs = subPorPai[l.metrica];
+    if (subs && subs.length) { l.expansivel = true; out.push(l, ...subs); }
+    else out.push(l);
+  }
+  return out;
 }
 
 export interface RegPontualItem extends RegPontual {

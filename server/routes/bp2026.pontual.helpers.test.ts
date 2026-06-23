@@ -4,10 +4,87 @@ import {
   classificarPonte,
   decomporStatus,
   decomporSquad,
+  decomporProduto,
+  classificarPontePorProduto,
   normalizarSquad,
   montarLinhasPontual,
 } from "./bp2026.pontual.helpers";
 import { classificarPonteItens } from "./bp2026.pontual.helpers";
+
+describe("decomporProduto", () => {
+  it("soma valorp por produto, só do estoque; vazio → '(sem produto)'", () => {
+    const d = decomporProduto([
+      { idSubtask: "A", valorp: 1000, status: "ativo", produto: "Creators" },
+      { idSubtask: "B", valorp: 500, status: "ativo", produto: "Ecommerce" },
+      { idSubtask: "C", valorp: 200, status: "ativo" },              // sem produto
+      { idSubtask: "D", valorp: 999, status: "entregue", produto: "Creators" }, // fora do estoque
+    ]);
+    expect(d["Creators"]).toBe(1000);
+    expect(d["Ecommerce"]).toBe(500);
+    expect(d["(sem produto)"]).toBe(200);
+    expect(Object.values(d).reduce((s, v) => s + v, 0)).toBe(1700);
+  });
+});
+
+describe("classificarPontePorProduto", () => {
+  const ant = [
+    { idSubtask: "P", valorp: 400, status: "ativo", produto: "Creators" },   // vira entregue
+    { idSubtask: "Q", valorp: 300, status: "ativo", produto: "Ecommerce" },  // permanece
+  ];
+  const atual = [
+    { idSubtask: "P", valorp: 400, status: "entregue", produto: "Creators" }, // entrega
+    { idSubtask: "Q", valorp: 300, status: "ativo", produto: "Ecommerce" },   // permanece
+    { idSubtask: "R", valorp: 250, status: "ativo", produto: "Creators" },    // entrada
+    { idSubtask: "S", valorp: 100, status: "ativo" },                          // entrada (sem produto)
+  ];
+  it("entrada e entrega por produto batem com classificarPonte (soma)", () => {
+    const { entrada, entrega } = classificarPontePorProduto(ant, atual);
+    expect(entrada["Creators"]).toBe(250); // R
+    expect(entrada["(sem produto)"]).toBe(100); // S
+    expect(entrega["Creators"]).toBe(400); // P
+    const p = classificarPonte(ant, atual, "2026-04");
+    expect(Object.values(entrada).reduce((s, v) => s + v, 0)).toBe(p.venda);
+    expect(Object.values(entrega).reduce((s, v) => s + v, 0)).toBe(p.entrega);
+  });
+});
+
+describe("montarLinhasPontual — expandir por produto", () => {
+  const porMes = {
+    0: [
+      { idSubtask: "e", valorp: 12000, status: "ativo", produto: "Performance", criadoYm: "2025-12" }, // vira entregue
+    ] as any[],
+    1: [
+      { idSubtask: "a", valorp: 50000, status: "ativo", produto: "Creators", criadoYm: "2026-01" },
+      { idSubtask: "b", valorp: 30000, status: "ativo", produto: "Ecommerce", criadoYm: "2026-01" },
+      { idSubtask: "c", valorp: 4000, status: "ativo", produto: "Site", criadoYm: "2026-01" }, // < 10K → Outros
+      { idSubtask: "e", valorp: 12000, status: "entregue", produto: "Performance", criadoYm: "2025-12" }, // entrega
+    ],
+  };
+  const vendaProd = { 1: { Creators: 60000, Ecommerce: 20000, Site: 4000 } };
+  const linhas = montarLinhasPontual(porMes, 1, 1, { 1: 84000 }, {}, vendaProd);
+  const by = (m: string) => linhas.find((l) => l.metrica === m)!;
+  it("marca as 4 linhas-pai como expansíveis", () => {
+    for (const pai of ["pontual_venda_comercial", "pontual_entrada", "pontual_entrega", "pontual_estoque_fim"]) {
+      expect(by(pai).expansivel).toBe(true);
+    }
+  });
+  it("sub-linhas por produto: paiMetrica, soma = pai, filtro < 10K em '· Outros'", () => {
+    // Estoque final por produto: Creators 50K, Ecommerce 30K, Site 4K → Outros
+    const subs = linhas.filter((l) => l.paiMetrica === "pontual_estoque_fim");
+    expect(subs.find((l) => l.titulo === "· Creators")!.meses[0].realizado).toBe(50000);
+    expect(subs.find((l) => l.titulo === "· Ecommerce")!.meses[0].realizado).toBe(30000);
+    expect(subs.find((l) => l.titulo === "· Outros (< R$ 10K)")!.meses[0].realizado).toBe(4000);
+    const somaSubs = subs.reduce((s, l) => s + (l.meses[0].realizado ?? 0), 0);
+    expect(somaSubs).toBe(by("pontual_estoque_fim").meses[0].realizado); // = 84000
+    // Venda Pontual por produto vem da query (vendaProd): Creators 60K + Ecommerce 20K + Site 4K = 84K
+    const subsVenda = linhas.filter((l) => l.paiMetrica === "pontual_venda_comercial");
+    expect(subsVenda.reduce((s, l) => s + (l.meses[0].realizado ?? 0), 0)).toBe(84000);
+  });
+  it("sub-linha aparece logo após o pai", () => {
+    const iPai = linhas.findIndex((l) => l.metrica === "pontual_estoque_fim");
+    expect(linhas[iPai + 1].paiMetrica).toBe("pontual_estoque_fim");
+  });
+});
 
 const ant = [
   { idSubtask: "A", valorp: 1000, status: "ativo" },        // permanece (reajuste +100)
