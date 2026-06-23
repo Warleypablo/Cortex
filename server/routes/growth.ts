@@ -3369,15 +3369,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         visualizacoesPaginaGa4 = ga4.byPlatformPageViews.google_ads;
       }
 
-      // Connect Rate consolidado pelo GA4: sessões PAGAS (Meta + Google) ÷ cliques de
-      // saída pagos (Meta outbound + Google clicks). Numerador e denominador no MESMO
-      // universo (pago multi-plataforma). O connectRate legado usa o pixel Meta-only
-      // no numerador sobre cliques Meta+Google, o que subestima a taxa.
-      const sessoesPagas =
-        (includeMeta ? ga4.byPlatform.meta_ads : 0) +
-        (includeGoogle ? ga4.byPlatform.google_ads : 0);
-      const connectRateGa4 = cliquesSaida > 0 ? sessoesPagas / cliquesSaida : 0;
-
       // Query Leads e MQLs do Bitrix (tráfego pago)
       const contagem = (req.query.contagem as string) || 'contrato';
       let funilFilter = sql``;
@@ -3471,7 +3462,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctrExposto = onlyInstagram ? 0 : ctr;
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
-      const connectRateGa4Exposto = onlyInstagram ? 0 : connectRateGa4;
       const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPaginaGa4;
       const visualizacoesPaginaPixelExposto = onlyInstagram ? 0 : visualizacoesPagina;
       const sessoesExposto = onlyInstagram ? 0 : sessoes;
@@ -3495,7 +3485,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ctr: ctrExposto,
         cps: cpsExposto,
         connectRate: connectRateExposto,
-        connectRateGa4: connectRateGa4Exposto,
         visualizacoesPagina: visualizacoesPaginaExposto,
         visualizacoesPaginaPixel: visualizacoesPaginaPixelExposto,
         sessoes: sessoesExposto,
@@ -4354,10 +4343,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.tiktok_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.tiktok_ads;
-      // Connect Rate - GA4 = Sessões (GA4) ÷ Cliques (TikTok). Padronizado com o
-      // Consolidado e o Meta: numerador = chegadas na LP medidas por sessões GA4
-      // (mesmo universo do clique), em vez de page views.
-      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+      // Connect Rate (proxy GA4): page views GA4 ÷ cliques. TikTok não expõe
+      // landing_page_views nativo, então não há Connect Rate fiel ≤100% — esta métrica
+      // fica calculada mas NÃO é exibida na UI (ver decisão de manter Connect Rate só
+      // no pixel). Mantida no payload para diagnóstico.
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
         investimento,
@@ -4426,10 +4416,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.linkedin_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.linkedin_ads;
-      // Connect Rate - GA4 = Sessões (GA4) ÷ Cliques (LinkedIn). Padronizado com o
-      // Consolidado, Meta e TikTok Ads: numerador = sessões GA4 (mesmo universo do
-      // clique), em vez de page views.
-      const connectRate = cliques > 0 ? sessoes / cliques : 0;
+      // Connect Rate (proxy GA4): page views GA4 ÷ cliques. LinkedIn não expõe
+      // landing_page_views nativo, então não há Connect Rate fiel ≤100% — esta métrica
+      // fica calculada mas NÃO é exibida na UI (Connect Rate só no pixel). Mantida no
+      // payload para diagnóstico.
+      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
         investimento,
