@@ -106,45 +106,37 @@ describe("montarLinhasPontual", () => {
     0: ant.map((r) => ({ ...r, criadoYm: "2025-12" })),
     1: atual.map((r) => ({ ...r, criadoYm: r.idSubtask === "F" ? "2026-01" : "2025-12" })),
   };
-  // venda comercial (data_criado) é independente do snapshot — aqui 900, vs 700 de entrada na foto
+  // venda comercial (A=900) ≠ entrada na foto (B=700, só F). A diferença vai p/ o ajuste.
   const vendaComercial = { 1: 900 };
   const linhas = montarLinhasPontual(porMes, 1, 1, vendaComercial);
   const by = (m: string) => linhas.find((l) => l.metrica === m)!;
-  const GRUPO_ESTOQUE = "Movimento do estoque (foto do ClickUp)";
-  it("bloco 1: Venda Pontual (comercial) no topo, da fonte data_criado", () => {
-    expect(linhas[0].metrica).toBe("pontual_venda_comercial");
+  it("uma única linha de venda = venda comercial (bate com Vendas por Produto)", () => {
     expect(by("pontual_venda_comercial").titulo).toBe("(+) Venda Pontual");
     expect(by("pontual_venda_comercial").meses[0].realizado).toBe(900);
-    expect(by("pontual_venda_comercial").grupo).toBe("Venda Pontual (comercial)");
     expect(by("pontual_venda_comercial").ytd.realizado).toBe(900);
+    // não há segunda linha de venda
+    expect(linhas.find((l) => l.metrica === "pontual_venda")).toBeUndefined();
+    expect(linhas.find((l) => l.metrica === "pontual_entrada")).toBeUndefined();
+    expect(linhas.find((l) => l.metrica === "pontual_venda_mes")).toBeUndefined();
   });
-  it("bloco 2: linha-mãe do estoque renomeada para Entrada no estoque", () => {
-    expect(by("pontual_entrada").titulo).toBe("(+) Entrada no estoque");
-    expect(by("pontual_entrada").meses[0].realizado).toBe(700); // entrada na foto (snapshot), ≠ venda comercial
-    expect(by("pontual_entrada").grupo).toBe(GRUPO_ESTOQUE);
-    expect(linhas.find((l) => l.metrica === "pontual_venda")).toBeUndefined(); // renomeada
+  it("ajuste estoque × venda reconcilia (B − A) e decompõe", () => {
+    expect(by("pontual_ajuste").meses[0].realizado).toBe(-200);          // 700 − 900
+    expect(by("pontual_venda_fora_foto").meses[0].realizado).toBe(-200); // vendaMes 700 − A 900
+    expect(by("pontual_entrada_defasada").meses[0].realizado).toBe(0);
+    expect(by("pontual_reativacao").meses[0].realizado).toBe(0);
   });
-  it("estoque inicial positivo, fluxos com sinal, estoque final destaque", () => {
+  it("a ponte fecha com venda comercial + ajuste", () => {
+    const v = (m: string) => by(m).meses[0].realizado ?? 0;
+    const total = v("pontual_estoque_ini") + v("pontual_venda_comercial") + v("pontual_ajuste")
+      + v("pontual_entrega") + v("pontual_churn") + v("pontual_deletados")
+      + v("pontual_saida_atipica") + v("pontual_reajuste");
+    expect(total).toBe(by("pontual_estoque_fim").meses[0].realizado);
+  });
+  it("estoque inicial/final e sinais", () => {
     expect(by("pontual_estoque_ini").meses[0].realizado).toBe(2150);
     expect(by("pontual_entrega").meses[0].realizado).toBe(-500);
     expect(by("pontual_estoque_fim").meses[0].realizado).toBe(1800);
     expect(by("pontual_estoque_fim").destaque).toBe(true);
-  });
-  it("emite as sub-linhas logo após (+) Entrada no estoque", () => {
-    expect(by("pontual_venda_mes").meses[0].realizado).toBe(700);    // F criado em 2026-01 == mês 1
-    expect(by("pontual_entrada_defasada").meses[0].realizado).toBe(0);
-    expect(by("pontual_reativacao").meses[0].realizado).toBe(0);
-    expect(by("pontual_venda_mes").titulo).toBe("· Venda do mês");
-    const idxEntrada = linhas.findIndex((l) => l.metrica === "pontual_entrada");
-    expect(linhas[idxEntrada + 1].metrica).toBe("pontual_venda_mes");
-  });
-  it("linhas do estoque ficam no grupo do movimento de estoque", () => {
-    expect(by("pontual_estoque_ini").grupo).toBe(GRUPO_ESTOQUE);
-    expect(by("pontual_estoque_fim").grupo).toBe(GRUPO_ESTOQUE);
-    expect(by("pontual_venda_mes").grupo).toBe(GRUPO_ESTOQUE);
-  });
-  it("não emite '· Sem origem' quando não há valor", () => {
-    expect(linhas.find((l) => l.metrica === "pontual_sem_origem")).toBeUndefined();
   });
   it("decomposição por status soma ao estoque final", () => {
     expect(by("pontual_status_ativo").meses[0].realizado).toBe(1100);
@@ -157,9 +149,9 @@ describe("montarLinhasPontual", () => {
       expect(l.meses[0].atingimento).toBeNull();
     }
   });
-  it("YTD: inicial=jan(dez), entrada somada, final=posição", () => {
+  it("YTD: inicial=jan(dez), venda=A, final=posição", () => {
     expect(by("pontual_estoque_ini").ytd.realizado).toBe(2150);
-    expect(by("pontual_entrada").ytd.realizado).toBe(700);
+    expect(by("pontual_venda_comercial").ytd.realizado).toBe(900);
     expect(by("pontual_estoque_fim").ytd.realizado).toBe(1800);
   });
 });
