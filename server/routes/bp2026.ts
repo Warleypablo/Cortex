@@ -528,6 +528,15 @@ export function registerBp2026Routes(app: Express, db: any) {
         contratosVendidosRec[SLUG[seg]] = Array.from({ length: 12 }, (_, i) =>
           i + 1 <= mesCorrente ? (agg.get(i + 1)?.get(seg)?.contratosRec ?? 0) : null);
       }
+      // total de contratos vendidos no mês (recorrentes + pontuais, todos os segmentos) —
+      // denominador do "CAC por contrato": cada deal conta 1 contrato por produto/natureza,
+      // então é ≥ deals ganhos (base do "por cliente"). Mesma fonte (agg) do CAC por produto.
+      const contratosVendidosTotalPorMes: (number | null)[] = Array.from({ length: 12 }, (_, i) => {
+        if (i + 1 > mesCorrente) return null;
+        const porMes = agg.get(i + 1);
+        if (!porMes) return 0;
+        return Array.from(porMes.values()).reduce((t, cell) => t + cell.contratosRec + cell.contratosPont, 0);
+      });
       const { agg: aggVendas, totais: totaisVendas } = await carregarVendasProdutoClickup(db);
       const vendasProduto = montarVendasProduto({ agg: aggVendas, totais: totaisVendas, orcado, mesCorrente, mesFechado });
 
@@ -541,7 +550,8 @@ export function registerBp2026Routes(app: Express, db: any) {
 
       // 12. Detalhamentos: SG&A e CAC por sub-linha, Outras Receitas por categoria
       const { sga: sgaDetalhe, cac: cacDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
-        db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec, mesCorrente, mesFechado,
+        db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec,
+        contratosVendidosTotalPorMes, mesCorrente, mesFechado,
       });
 
       // documentação por linha (o que é / fonte / cálculo) — dicionário único
