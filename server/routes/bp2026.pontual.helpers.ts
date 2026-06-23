@@ -7,10 +7,13 @@ export interface RegPontual {
   idSubtask: string;
   valorp: number;
   status: string;
+  criadoYm?: string | null; // 'YYYY-MM' de data_criado (cup_contratos); ausente => sem origem
 }
 
 const ESTOQUE_STATUS_EXCLUDE = new Set(["entregue", "cancelado/inativo", "não usar"]);
 const CHURN_STATUS = new Set(["cancelado/inativo", "não usar"]);
+
+const ANO = 2026;
 
 export function ehEstoquePontual(r: RegPontual): boolean {
   return r.valorp > 0 && !ESTOQUE_STATUS_EXCLUDE.has(r.status);
@@ -18,7 +21,11 @@ export function ehEstoquePontual(r: RegPontual): boolean {
 
 export interface PonteMes {
   estoqueIni: number;
-  venda: number;
+  venda: number;          // total das 4 sub-categorias abaixo
+  vendaMes: number;       // criadoYm == mês-alvo
+  entradaDefasada: number;// criadoYm de mês anterior/futuro
+  reativacao: number;     // estava na foto anterior fora do estoque
+  semOrigem: number;      // sem registro em cup_contratos
   entrega: number;
   churn: number;
   deletados: number;
@@ -30,13 +37,13 @@ export interface PonteMes {
 // IMPORTANTE: manter a árvore de classificação em sincronia com classificarPonteItens (mesma lógica; uma soma, a outra lista). Desync quebra a reconciliação drill×célula — coberto pelo teste de soma por categoria.
 // Classifica a transição de cada contrato (id_subtask) entre o estoque do snapshot
 // anterior e o do atual. Venda inclui contratos que (re)entraram no estoque.
-export function classificarPonte(ant: RegPontual[], atual: RegPontual[]): PonteMes {
+export function classificarPonte(ant: RegPontual[], atual: RegPontual[], ymAlvo: string): PonteMes {
   const antMap = new Map(ant.map((r) => [r.idSubtask, r]));
-  const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
   const p: PonteMes = {
-    estoqueIni: 0, venda: 0, entrega: 0, churn: 0,
-    deletados: 0, saidaAtipica: 0, reajuste: 0, estoqueFim: 0,
+    estoqueIni: 0, venda: 0, vendaMes: 0, entradaDefasada: 0, reativacao: 0, semOrigem: 0,
+    entrega: 0, churn: 0, deletados: 0, saidaAtipica: 0, reajuste: 0, estoqueFim: 0,
   };
+  const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
   for (const r of ant) {
     if (!ehEstoquePontual(r)) continue;
     p.estoqueIni += r.valorp;
@@ -51,7 +58,13 @@ export function classificarPonte(ant: RegPontual[], atual: RegPontual[]): PonteM
     if (!ehEstoquePontual(r)) continue;
     p.estoqueFim += r.valorp;
     const prev = antMap.get(r.idSubtask);
-    if (!prev || !ehEstoquePontual(prev)) p.venda += r.valorp;
+    if (prev && ehEstoquePontual(prev)) continue; // permaneceu (reajuste já tratado)
+    // entrada no estoque: subdividir
+    if (prev) p.reativacao += r.valorp;                 // estava na foto anterior, fora do estoque
+    else if (!r.criadoYm) p.semOrigem += r.valorp;      // sem registro em cup_contratos
+    else if (r.criadoYm === ymAlvo) p.vendaMes += r.valorp;
+    else p.entradaDefasada += r.valorp;
+    p.venda += r.valorp;
   }
   return p;
 }
@@ -81,25 +94,47 @@ export interface LinhaPontual {
   unidade: "brl" | "int" | "pct";
   nota?: string;
   destaque?: boolean;
+  semDetalhe?: boolean;
+  grupo?: string;
   meses: { mes: number; orcado: number; realizado: number | null; atingimento: number | null }[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
 
-const NOTA_VENDA =
-  "Venda = entrada no estoque (contratos pontuais que passaram a constar no snapshot do " +
-  "ClickUp), medida por diferença de snapshots — não é o 'Vendas Pontual' do Bitrix de outras abas.";
+// Dois blocos, sem misturar réguas de valor:
+// 1) Venda Pontual (comercial, data_criado, valor atual) = Vendas por Produto, decomposta em
+//    entrou/fora do estoque (mesma régua → soma exata, auditável).
+// 2) Movimento do estoque (foto/snapshot, valor do snapshot) — fecha sozinho.
+export const GRUPO_VENDA = "Venda Pontual (comercial)";
+export const GRUPO_ESTOQUE = "Movimento do estoque (foto do ClickUp)";
+
+const NOTA_VENDA_COMERCIAL =
+  "Quanto foi vendido no mês (data de criação do contrato em cup_contratos). " +
+  "Igual à Receita Pontual de Vendas por Produto — venda bate com venda, independente do estoque.";
+const NOTA_VENDA_NO_ESTOQUE =
+  "Parte da venda do mês que está na foto do estoque no fim do mês.";
+const NOTA_VENDA_FORA_ESTOQUE =
+  "Parte da venda do mês que não está na foto do estoque no fim do mês: já entregue/cancelada, " +
+  "ou criada perto do fim do mês.";
+const NOTA_ENTRADA =
+  "Tudo que entrou na foto do estoque no mês (novos do mês + vendas de meses anteriores + " +
+  "reativações + órfãos). Clique para ver a composição. Régua do snapshot, fecha no estoque final.";
 
 // porMes[m] = registros (valorp>0) do último snapshot do mês m; m=0 é dez/2025.
+// vendaComercialPorMes[m] = SUM(valorp) de cup_contratos por data_criado no mês m (= Receita Pontual).
+// vendaNoEstoquePorMes[m] = parte dessa venda cujo contrato está na foto do estoque no fim do mês.
 export function montarLinhasPontual(
   porMes: Record<number, RegPontual[]>,
   mesCorrente: number,
   mesFechado: number,
+  vendaComercialPorMes: Record<number, number> = {},
+  vendaNoEstoquePorMes: Record<number, number> = {},
 ): LinhaPontual[] {
   const ponte: (PonteMes | null)[] = Array.from({ length: 13 }, () => null);
   const decomp: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
   for (let m = 1; m <= 12; m++) {
     if (m > mesCorrente) continue;
-    ponte[m] = classificarPonte(porMes[m - 1] ?? [], porMes[m] ?? []);
+    const ym = `${ANO}-${String(m).padStart(2, "0")}`;
+    ponte[m] = classificarPonte(porMes[m - 1] ?? [], porMes[m] ?? [], ym);
     decomp[m] = decomporStatus(porMes[m] ?? []);
   }
 
@@ -141,9 +176,29 @@ export function montarLinhasPontual(
     return m <= mesCorrente && p ? p.estoqueFim : null;
   });
 
+  // ---- Bloco 1: Venda Pontual (comercial). Tudo na mesma régua (valor atual) → soma exata. ----
+  const vc = (m: number) => vendaComercialPorMes[m] ?? 0;
+  const vne = (m: number) => vendaNoEstoquePorMes[m] ?? 0;
+  const serieVendaComercial = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1; return m <= mesCorrente ? vc(m) : null;
+  });
+  const serieVendaNoEstoque = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1; return m <= mesCorrente ? vne(m) : null;
+  });
+  const serieVendaForaEstoque = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1; return m <= mesCorrente ? vc(m) - vne(m) : null;
+  });
+  const bloco1: LinhaPontual[] = [
+    mk("pontual_venda_comercial", "(+) Venda Pontual", "fluxo", serieVendaComercial, sumYtd(serieVendaComercial), { nota: NOTA_VENDA_COMERCIAL, destaque: true, grupo: GRUPO_VENDA }),
+    mk("pontual_venda_no_estoque", "· Entrou no estoque", "fluxo", serieVendaNoEstoque, sumYtd(serieVendaNoEstoque), { nota: NOTA_VENDA_NO_ESTOQUE, grupo: GRUPO_VENDA }),
+    mk("pontual_venda_fora_estoque", "· Fora do estoque", "fluxo", serieVendaForaEstoque, sumYtd(serieVendaForaEstoque), { nota: NOTA_VENDA_FORA_ESTOQUE, grupo: GRUPO_VENDA }),
+  ];
+
+  // ---- Bloco 2: Movimento do estoque (foto/snapshot). Fecha sozinho. ----
+  const serieEntrada = serieFluxo((p) => p.venda, 1); // B = tudo que entrou na foto no mês
   const linhas: LinhaPontual[] = [
     mk("pontual_estoque_ini", "(=) Estoque inicial", "estoque", serieEstoqueIni, ponte[1]?.estoqueIni ?? null),
-    mk("pontual_venda", "(+) Venda", "fluxo", serieFluxo((p) => p.venda, 1), sumYtd(serieFluxo((p) => p.venda, 1)), { nota: NOTA_VENDA }),
+    mk("pontual_entrada", "(+) Entrada na foto", "fluxo", serieEntrada, sumYtd(serieEntrada), { nota: NOTA_ENTRADA }),
     mk("pontual_entrega", "(−) Entrega", "fluxo", serieFluxo((p) => p.entrega, -1), sumYtd(serieFluxo((p) => p.entrega, -1))),
     mk("pontual_churn", "(−) Churn", "fluxo", serieFluxo((p) => p.churn, -1), sumYtd(serieFluxo((p) => p.churn, -1))),
     mk("pontual_deletados", "(−) Deletados", "fluxo", serieFluxo((p) => p.deletados, -1), sumYtd(serieFluxo((p) => p.deletados, -1))),
@@ -174,7 +229,8 @@ export function montarLinhasPontual(
     linhas.push(mk("pontual_status_outros", "· Outros status", "estoque", serieOutros, ytdOutros));
   }
 
-  return linhas;
+  for (const l of linhas) l.grupo = GRUPO_ESTOQUE;
+  return [...bloco1, ...linhas];
 }
 
 export interface RegPontualItem extends RegPontual {
@@ -182,7 +238,9 @@ export interface RegPontualItem extends RegPontual {
   squad?: string;
 }
 
-export type CategoriaPonte = "venda" | "entrega" | "churn" | "deletados" | "saida_atipica" | "reajuste";
+export type CategoriaPonte =
+  | "venda_mes" | "entrada_defasada" | "reativacao" | "sem_origem"
+  | "entrega" | "churn" | "deletados" | "saida_atipica" | "reajuste";
 
 export interface ItemPonte {
   idSubtask: string;
@@ -199,11 +257,13 @@ const brl = (v: number) => `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
 export function classificarPonteItens(
   ant: RegPontualItem[],
   atual: RegPontualItem[],
+  ymAlvo: string,
 ): Record<CategoriaPonte, ItemPonte[]> {
   const antMap = new Map(ant.map((r) => [r.idSubtask, r]));
   const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
   const out: Record<CategoriaPonte, ItemPonte[]> = {
-    venda: [], entrega: [], churn: [], deletados: [], saida_atipica: [], reajuste: [],
+    venda_mes: [], entrada_defasada: [], reativacao: [], sem_origem: [],
+    entrega: [], churn: [], deletados: [], saida_atipica: [], reajuste: [],
   };
   for (const r of ant) {
     if (!ehEstoquePontual(r)) continue;
@@ -221,7 +281,12 @@ export function classificarPonteItens(
   for (const r of atual) {
     if (!ehEstoquePontual(r)) continue;
     const prev = antMap.get(r.idSubtask);
-    if (!prev || !ehEstoquePontual(prev)) out.venda.push({ idSubtask: r.idSubtask, cliente: r.cliente, status: r.status, valor: r.valorp, detalhe: "" });
+    if (prev && ehEstoquePontual(prev)) continue;
+    const base = { idSubtask: r.idSubtask, cliente: r.cliente, status: r.status, valor: r.valorp };
+    if (prev) out.reativacao.push({ ...base, detalhe: `voltou de ${prev.status}` });
+    else if (!r.criadoYm) out.sem_origem.push({ ...base, detalhe: "sem registro em cup_contratos" });
+    else if (r.criadoYm === ymAlvo) out.venda_mes.push({ ...base, detalhe: "" });
+    else out.entrada_defasada.push({ ...base, detalhe: `criado em ${r.criadoYm}` });
   }
   return out;
 }

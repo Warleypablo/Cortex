@@ -34,21 +34,58 @@ describe("ehEstoquePontual", () => {
 });
 
 describe("classificarPonte", () => {
-  const p = classificarPonte(ant, atual);
+  const p = classificarPonte(
+    ant.map((r) => ({ ...r, criadoYm: "2026-03" })),
+    atual.map((r) => ({ ...r, criadoYm: "2026-03" })),
+    "2026-03",
+  );
   it("classifica cada categoria", () => {
-    expect(p.estoqueIni).toBe(2150); // A+B+C+D+G (E fora)
-    expect(p.venda).toBe(700);       // F
-    expect(p.entrega).toBe(500);     // B
-    expect(p.churn).toBe(300);       // C
-    expect(p.deletados).toBe(200);   // D
-    expect(p.saidaAtipica).toBe(150);// G (valorp 0)
-    expect(p.reajuste).toBe(100);    // A 1000->1100
-    expect(p.estoqueFim).toBe(1800); // A1100 + F700
+    expect(p.estoqueIni).toBe(2150);
+    expect(p.venda).toBe(700);        // F (total)
+    expect(p.vendaMes).toBe(700);     // F criado em 2026-03 == ymAlvo
+    expect(p.entradaDefasada).toBe(0);
+    expect(p.reativacao).toBe(0);
+    expect(p.semOrigem).toBe(0);
+    expect(p.entrega).toBe(500);
+    expect(p.churn).toBe(300);
+    expect(p.deletados).toBe(200);
+    expect(p.saidaAtipica).toBe(150);
+    expect(p.reajuste).toBe(100);
+    expect(p.estoqueFim).toBe(1800);
+  });
+  it("soma das 4 sub-categorias = venda total", () => {
+    expect(p.vendaMes + p.entradaDefasada + p.reativacao + p.semOrigem).toBe(p.venda);
   });
   it("a ponte fecha (identidade)", () => {
     expect(
       p.estoqueIni + p.venda - p.entrega - p.churn - p.deletados - p.saidaAtipica + p.reajuste
     ).toBe(p.estoqueFim);
+  });
+});
+
+describe("classificarPonte — sub-categorias da venda", () => {
+  // base anterior: H estava entregue (fora do estoque) -> reativa; demais ausentes
+  const anterior = [
+    { idSubtask: "H", valorp: 400, status: "entregue", criadoYm: "2025-11" }, // volta -> reativação
+  ];
+  const agora = [
+    { idSubtask: "H", valorp: 400, status: "ativo", criadoYm: "2025-11" },    // reativação (precede data)
+    { idSubtask: "M", valorp: 300, status: "ativo", criadoYm: "2026-04" },    // venda do mês
+    { idSubtask: "P", valorp: 200, status: "ativo", criadoYm: "2026-02" },    // entrada defasada
+    { idSubtask: "S", valorp: 100, status: "ativo", criadoYm: null },         // sem origem
+  ];
+  const p = classificarPonte(anterior, agora, "2026-04");
+  it("separa reativação, venda do mês, defasada e sem origem", () => {
+    expect(p.reativacao).toBe(400);
+    expect(p.vendaMes).toBe(300);
+    expect(p.entradaDefasada).toBe(200);
+    expect(p.semOrigem).toBe(100);
+    expect(p.venda).toBe(1000);
+  });
+  it("reativação tem precedência sobre data_criado", () => {
+    // H tem criadoYm 2025-11 (defasada) mas estava no snapshot anterior fora do estoque -> reativação
+    expect(p.reativacao).toBe(400);
+    expect(p.entradaDefasada).toBe(200); // só P, não H
   });
 });
 
@@ -65,17 +102,45 @@ describe("decomporStatus", () => {
 });
 
 describe("montarLinhasPontual", () => {
-  const porMes = { 0: ant, 1: atual };
-  const linhas = montarLinhasPontual(porMes, 1, 1);
+  const porMes = {
+    0: ant.map((r) => ({ ...r, criadoYm: "2025-12" })),
+    1: atual.map((r) => ({ ...r, criadoYm: r.idSubtask === "F" ? "2026-01" : "2025-12" })),
+  };
+  // venda comercial A=900 (valor atual); destes 650 estão no estoque, 250 fora. B (foto) = 700.
+  const vendaComercial = { 1: 900 };
+  const vendaNoEstoque = { 1: 650 };
+  const linhas = montarLinhasPontual(porMes, 1, 1, vendaComercial, vendaNoEstoque);
   const by = (m: string) => linhas.find((l) => l.metrica === m)!;
-  it("estoque inicial positivo, fluxos com sinal, estoque final destaque", () => {
+  const GRUPO_VENDA = "Venda Pontual (comercial)";
+  const GRUPO_ESTOQUE = "Movimento do estoque (foto do ClickUp)";
+  it("Venda Pontual = A, decomposta em entrou/fora (mesma régua, soma exata)", () => {
+    expect(by("pontual_venda_comercial").titulo).toBe("(+) Venda Pontual");
+    expect(by("pontual_venda_comercial").meses[0].realizado).toBe(900);
+    expect(by("pontual_venda_comercial").grupo).toBe(GRUPO_VENDA);
+    expect(by("pontual_venda_no_estoque").meses[0].realizado).toBe(650);
+    expect(by("pontual_venda_fora_estoque").meses[0].realizado).toBe(250); // 900 − 650
+    // soma das sub = total (auditável, mesma régua de valor)
+    expect(by("pontual_venda_no_estoque").meses[0].realizado! + by("pontual_venda_fora_estoque").meses[0].realizado!)
+      .toBe(by("pontual_venda_comercial").meses[0].realizado);
+  });
+  it("não há linha que misture réguas (sem ajuste/venda fora da foto/venda do mês)", () => {
+    expect(linhas.find((l) => l.metrica === "pontual_ajuste")).toBeUndefined();
+    expect(linhas.find((l) => l.metrica === "pontual_venda_fora_foto")).toBeUndefined();
+    expect(linhas.find((l) => l.metrica === "pontual_venda_mes")).toBeUndefined();
+    expect(linhas.find((l) => l.metrica === "pontual_entrada_defasada")).toBeUndefined();
+  });
+  it("movimento de estoque: entrada na foto (B) e ponte fecha (régua snapshot)", () => {
+    expect(by("pontual_entrada").titulo).toBe("(+) Entrada na foto");
+    expect(by("pontual_entrada").meses[0].realizado).toBe(700); // B (snapshot)
+    expect(by("pontual_entrada").grupo).toBe(GRUPO_ESTOQUE);
+    const v = (m: string) => by(m).meses[0].realizado ?? 0;
+    const total = v("pontual_estoque_ini") + v("pontual_entrada") + v("pontual_entrega")
+      + v("pontual_churn") + v("pontual_deletados") + v("pontual_saida_atipica") + v("pontual_reajuste");
+    expect(total).toBe(by("pontual_estoque_fim").meses[0].realizado);
+  });
+  it("estoque inicial/final e sinais", () => {
     expect(by("pontual_estoque_ini").meses[0].realizado).toBe(2150);
-    expect(by("pontual_venda").meses[0].realizado).toBe(700);
     expect(by("pontual_entrega").meses[0].realizado).toBe(-500);
-    expect(by("pontual_churn").meses[0].realizado).toBe(-300);
-    expect(by("pontual_deletados").meses[0].realizado).toBe(-200);
-    expect(by("pontual_saida_atipica").meses[0].realizado).toBe(-150);
-    expect(by("pontual_reajuste").meses[0].realizado).toBe(100);
     expect(by("pontual_estoque_fim").meses[0].realizado).toBe(1800);
     expect(by("pontual_estoque_fim").destaque).toBe(true);
   });
@@ -90,48 +155,51 @@ describe("montarLinhasPontual", () => {
       expect(l.meses[0].atingimento).toBeNull();
     }
   });
-  it("YTD: inicial=jan(dez), fluxos somados, final=posição", () => {
+  it("YTD: inicial=jan(dez), venda=A, final=posição", () => {
     expect(by("pontual_estoque_ini").ytd.realizado).toBe(2150);
-    expect(by("pontual_venda").ytd.realizado).toBe(700);
+    expect(by("pontual_venda_comercial").ytd.realizado).toBe(900);
     expect(by("pontual_estoque_fim").ytd.realizado).toBe(1800);
   });
 });
 
 describe("classificarPonteItens", () => {
   const antI = [
-    { idSubtask: "A", valorp: 1000, status: "ativo", cliente: "Cli A" },
-    { idSubtask: "B", valorp: 500, status: "triagem", cliente: "Cli B" },
-    { idSubtask: "C", valorp: 300, status: "pausado", cliente: "Cli C" },
-    { idSubtask: "D", valorp: 200, status: "ativo", cliente: "Cli D" },
-    { idSubtask: "E", valorp: 100, status: "entregue", cliente: "Cli E" },
-    { idSubtask: "G", valorp: 150, status: "ativo", cliente: "Cli G" },
+    { idSubtask: "A", valorp: 1000, status: "ativo", cliente: "Cli A", criadoYm: "2025-12" },
+    { idSubtask: "B", valorp: 500, status: "triagem", cliente: "Cli B", criadoYm: "2025-12" },
+    { idSubtask: "C", valorp: 300, status: "pausado", cliente: "Cli C", criadoYm: "2025-12" },
+    { idSubtask: "D", valorp: 200, status: "ativo", cliente: "Cli D", criadoYm: "2025-12" },
+    { idSubtask: "E", valorp: 100, status: "entregue", cliente: "Cli E", criadoYm: "2025-12" },
+    { idSubtask: "G", valorp: 150, status: "ativo", cliente: "Cli G", criadoYm: "2025-12" },
+    { idSubtask: "R", valorp: 250, status: "entregue", cliente: "Cli R", criadoYm: "2025-10" }, // reativa
   ];
   const atualI = [
-    { idSubtask: "A", valorp: 1100, status: "ativo", cliente: "Cli A" },
-    { idSubtask: "B", valorp: 500, status: "entregue", cliente: "Cli B" },
-    { idSubtask: "C", valorp: 300, status: "cancelado/inativo", cliente: "Cli C" },
-    { idSubtask: "G", valorp: 0, status: "ativo", cliente: "Cli G" },
-    { idSubtask: "F", valorp: 700, status: "triagem", cliente: "Cli F" },
+    { idSubtask: "A", valorp: 1100, status: "ativo", cliente: "Cli A", criadoYm: "2025-12" },
+    { idSubtask: "B", valorp: 500, status: "entregue", cliente: "Cli B", criadoYm: "2025-12" },
+    { idSubtask: "C", valorp: 300, status: "cancelado/inativo", cliente: "Cli C", criadoYm: "2025-12" },
+    { idSubtask: "G", valorp: 0, status: "ativo", cliente: "Cli G", criadoYm: "2025-12" },
+    { idSubtask: "F", valorp: 700, status: "triagem", cliente: "Cli F", criadoYm: "2026-03" }, // venda do mês
+    { idSubtask: "X", valorp: 400, status: "ativo", cliente: "Cli X", criadoYm: "2026-01" },   // defasada
+    { idSubtask: "Y", valorp: 120, status: "ativo", cliente: "Cli Y", criadoYm: null },        // sem origem
+    { idSubtask: "R", valorp: 250, status: "ativo", cliente: "Cli R", criadoYm: "2025-10" },   // reativação
   ];
-  const out = classificarPonteItens(antI, atualI);
-  it("lista os contratos de cada categoria", () => {
-    expect(out.venda.map((i) => i.idSubtask)).toEqual(["F"]);
+  const out = classificarPonteItens(antI, atualI, "2026-03");
+  it("lista os contratos de cada sub-categoria da venda", () => {
+    expect(out.venda_mes.map((i) => i.idSubtask)).toEqual(["F"]);
+    expect(out.entrada_defasada.map((i) => i.idSubtask)).toEqual(["X"]);
+    expect(out.sem_origem.map((i) => i.idSubtask)).toEqual(["Y"]);
+    expect(out.reativacao.map((i) => i.idSubtask)).toEqual(["R"]);
     expect(out.entrega.map((i) => i.idSubtask)).toEqual(["B"]);
     expect(out.churn.map((i) => i.idSubtask)).toEqual(["C"]);
     expect(out.deletados.map((i) => i.idSubtask)).toEqual(["D"]);
     expect(out.saida_atipica.map((i) => i.idSubtask)).toEqual(["G"]);
     expect(out.reajuste.map((i) => i.idSubtask)).toEqual(["A"]);
-    expect(out.reajuste[0].valor).toBe(100);
-    expect(out.venda[0].valor).toBe(700);
-    expect(out.entrega[0].valor).toBe(500);
   });
-  it("soma dos itens por categoria casa com classificarPonte", () => {
+  it("soma dos itens por sub-categoria casa com a classificação", () => {
     const sum = (a: { valor: number }[]) => a.reduce((s, i) => s + i.valor, 0);
-    expect(sum(out.venda)).toBe(700);
-    expect(sum(out.entrega)).toBe(500);
-    expect(sum(out.churn)).toBe(300);
-    expect(sum(out.deletados)).toBe(200);
-    expect(sum(out.saida_atipica)).toBe(150);
+    expect(sum(out.venda_mes)).toBe(700);
+    expect(sum(out.entrada_defasada)).toBe(400);
+    expect(sum(out.sem_origem)).toBe(120);
+    expect(sum(out.reativacao)).toBe(250);
     expect(sum(out.reajuste)).toBe(100);
   });
 });
