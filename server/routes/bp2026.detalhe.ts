@@ -441,11 +441,12 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       const mes = Number(req.query.mes);
       const def = TODAS_DEFS.find((d) => d.metrica === metrica);
       const prod = parseMetricaProduto(metrica);
-      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod;
+      const squadAlvo = metrica.startsWith("pontual_squad:") ? metrica.slice("pontual_squad:".length) : null;
+      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod || !!squadAlvo;
       if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }
-      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo ?? metrica;
+      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo ?? (squadAlvo ? `Estoque pontual — ${squadAlvo}` : metrica);
 
       let orcado: number | null = null;
       const orcRes = await db.execute(sql`
@@ -723,6 +724,9 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
+      } else if (squadAlvo) {
+        const sq = squadAlvo;
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => (r.squad ?? "(sem squad)") === sq));
       } else if (metrica === "pontual_estoque_ini") {
         ({ grupos, realizado } = await detPontualSnapshot(db, mes, true));
       } else if (metrica === "pontual_estoque_fim") {
