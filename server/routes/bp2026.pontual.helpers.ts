@@ -8,6 +8,7 @@ export interface RegPontual {
   valorp: number;
   status: string;
   criadoYm?: string | null; // 'YYYY-MM' de data_criado (cup_contratos); ausente => sem origem
+  squad?: string;           // squad do contrato no snapshot (p/ decomposição do estoque por squad)
 }
 
 const ESTOQUE_STATUS_EXCLUDE = new Set(["entregue", "cancelado/inativo", "não usar"]);
@@ -78,6 +79,17 @@ export function decomporStatus(atual: RegPontual[]): Record<string, number> {
   return out;
 }
 
+// Soma valorp por squad, só do estoque (ehEstoquePontual). Soma total = estoque final.
+export function decomporSquad(atual: RegPontual[]): Record<string, number> {
+  const out: Record<string, number> = {};
+  for (const r of atual) {
+    if (!ehEstoquePontual(r)) continue;
+    const sq = r.squad && r.squad.trim() ? r.squad : "(sem squad)";
+    out[sq] = (out[sq] ?? 0) + r.valorp;
+  }
+  return out;
+}
+
 export const STATUS_DECOMP = [
   { chave: "ativo", titulo: "· Em execução (ativo)" },
   { chave: "triagem", titulo: "· Triagem" },
@@ -106,6 +118,7 @@ export interface LinhaPontual {
 // 2) Movimento do estoque (foto/snapshot, valor do snapshot) — fecha sozinho.
 export const GRUPO_VENDA = "Venda Pontual (comercial)";
 export const GRUPO_ESTOQUE = "Movimento do estoque (foto do ClickUp)";
+export const GRUPO_SQUAD = "Estoque pontual por squad";
 
 const NOTA_VENDA_COMERCIAL =
   "Quanto foi vendido no mês (data de criação do contrato em cup_contratos). " +
@@ -131,11 +144,13 @@ export function montarLinhasPontual(
 ): LinhaPontual[] {
   const ponte: (PonteMes | null)[] = Array.from({ length: 13 }, () => null);
   const decomp: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
+  const decompSquad: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
   for (let m = 1; m <= 12; m++) {
     if (m > mesCorrente) continue;
     const ym = `${ANO}-${String(m).padStart(2, "0")}`;
     ponte[m] = classificarPonte(porMes[m - 1] ?? [], porMes[m] ?? [], ym);
     decomp[m] = decomporStatus(porMes[m] ?? []);
+    decompSquad[m] = decomporSquad(porMes[m] ?? []);
   }
 
   const serieFluxo = (pick: (p: PonteMes) => number, signo: 1 | -1) =>
@@ -230,7 +245,24 @@ export function montarLinhasPontual(
   }
 
   for (const l of linhas) l.grupo = GRUPO_ESTOQUE;
-  return [...bloco1, ...linhas];
+
+  // ---- Bloco 3: Estoque pontual por squad (decomposição do estoque final por squad). ----
+  // Saldo (estoque) por squad ao fim de cada mês; soma das linhas = (=) Estoque final.
+  const squads = Array.from(
+    new Set(decompSquad.flatMap((d) => (d ? Object.keys(d) : []))),
+  );
+  const valorSquadMesCorrente = (sq: string) => decompSquad[mesCorrente]?.[sq] ?? 0;
+  squads.sort((a, b) => valorSquadMesCorrente(b) - valorSquadMesCorrente(a));
+  const linhasSquad: LinhaPontual[] = squads.map((sq) => {
+    const serie = Array.from({ length: 12 }, (_, i) => {
+      const m = i + 1; const d = decompSquad[m];
+      return m <= mesCorrente && d ? d[sq] ?? 0 : null;
+    });
+    const ytdReal = mesFechado === 0 ? null : decompSquad[mesFechado]?.[sq] ?? 0;
+    return mk(`pontual_squad:${sq}`, sq, "estoque", serie, ytdReal, { grupo: GRUPO_SQUAD });
+  });
+
+  return [...bloco1, ...linhas, ...linhasSquad];
 }
 
 export interface RegPontualItem extends RegPontual {

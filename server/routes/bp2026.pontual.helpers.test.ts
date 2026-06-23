@@ -3,6 +3,7 @@ import {
   ehEstoquePontual,
   classificarPonte,
   decomporStatus,
+  decomporSquad,
   montarLinhasPontual,
 } from "./bp2026.pontual.helpers";
 import { classificarPonteItens } from "./bp2026.pontual.helpers";
@@ -16,11 +17,11 @@ const ant = [
   { idSubtask: "G", valorp: 150, status: "ativo" },         // valorp some (saída atípica)
 ];
 const atual = [
-  { idSubtask: "A", valorp: 1100, status: "ativo" },        // reajuste
-  { idSubtask: "B", valorp: 500, status: "entregue" },      // entrega
-  { idSubtask: "C", valorp: 300, status: "cancelado/inativo" }, // churn
-  { idSubtask: "G", valorp: 0, status: "ativo" },           // saída atípica (valorp 0)
-  { idSubtask: "F", valorp: 700, status: "triagem" },       // venda nova
+  { idSubtask: "A", valorp: 1100, status: "ativo", squad: "Olimpo" },        // reajuste
+  { idSubtask: "B", valorp: 500, status: "entregue", squad: "Olimpo" },      // entrega
+  { idSubtask: "C", valorp: 300, status: "cancelado/inativo", squad: "Pulse" }, // churn
+  { idSubtask: "G", valorp: 0, status: "ativo", squad: "Pulse" },           // saída atípica (valorp 0)
+  { idSubtask: "F", valorp: 700, status: "triagem", squad: "Pulse" },       // venda nova
 ];
 
 describe("ehEstoquePontual", () => {
@@ -101,6 +102,23 @@ describe("decomporStatus", () => {
   });
 });
 
+describe("decomporSquad", () => {
+  it("soma valorp por squad, só do estoque, fechando no estoque final", () => {
+    const d = decomporSquad(atual);
+    expect(d["Olimpo"]).toBe(1100); // A
+    expect(d["Pulse"]).toBe(700);   // F (C/G não são estoque)
+    const soma = Object.values(d).reduce((s, v) => s + v, 0);
+    expect(soma).toBe(1800);
+  });
+  it("squad vazio/ausente vira '(sem squad)'", () => {
+    const d = decomporSquad([
+      { idSubtask: "X", valorp: 50, status: "ativo" },
+      { idSubtask: "Y", valorp: 30, status: "ativo", squad: "  " },
+    ]);
+    expect(d["(sem squad)"]).toBe(80);
+  });
+});
+
 describe("montarLinhasPontual", () => {
   const porMes = {
     0: ant.map((r) => ({ ...r, criadoYm: "2025-12" })),
@@ -159,6 +177,25 @@ describe("montarLinhasPontual", () => {
     expect(by("pontual_estoque_ini").ytd.realizado).toBe(2150);
     expect(by("pontual_venda_comercial").ytd.realizado).toBe(900);
     expect(by("pontual_estoque_fim").ytd.realizado).toBe(1800);
+  });
+  it("bloco por squad: linhas no grupo certo, somam o estoque final, ordenadas desc", () => {
+    const olimpo = by("pontual_squad:Olimpo");
+    const pulse = by("pontual_squad:Pulse");
+    expect(olimpo.meses[0].realizado).toBe(1100);
+    expect(pulse.meses[0].realizado).toBe(700);
+    expect(olimpo.grupo).toBe("Estoque pontual por squad");
+    expect(olimpo.tipoAgregacao).toBe("estoque");
+    // soma das linhas de squad no mês = estoque final
+    const somaSquad = linhas
+      .filter((l) => l.metrica.startsWith("pontual_squad:"))
+      .reduce((s, l) => s + (l.meses[0].realizado ?? 0), 0);
+    expect(somaSquad).toBe(by("pontual_estoque_fim").meses[0].realizado);
+    // ordenação desc por valor do mês corrente: Olimpo (1100) antes de Pulse (700)
+    const idxOlimpo = linhas.findIndex((l) => l.metrica === "pontual_squad:Olimpo");
+    const idxPulse = linhas.findIndex((l) => l.metrica === "pontual_squad:Pulse");
+    expect(idxOlimpo).toBeLessThan(idxPulse);
+    // YTD = posição (saldo) do mês fechado, não soma
+    expect(olimpo.ytd.realizado).toBe(1100);
   });
 });
 
