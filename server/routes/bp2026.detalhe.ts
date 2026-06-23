@@ -314,7 +314,8 @@ async function carregaPontualSnapshot(db: any, mes: number, anterior: boolean): 
     SELECT h.id_subtask, h.valorp::numeric AS valorp, h.status,
            to_char(c.data_criado, 'YYYY-MM') AS criado_ym,
            COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
-           COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad
+           COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
+           COALESCE(NULLIF(TRIM(h.produto), ''), '(sem produto)') AS produto
     FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
     LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
     LEFT JOIN "Clickup".cup_contratos c ON c.id_subtask = h.id_subtask
@@ -323,7 +324,7 @@ async function carregaPontualSnapshot(db: any, mes: number, anterior: boolean): 
   return (result.rows as any[]).map((r) => ({
     idSubtask: String(r.id_subtask), valorp: parseFloat(r.valorp), status: r.status,
     criadoYm: r.criado_ym ?? null,
-    cliente: r.cliente, squad: r.squad,
+    cliente: r.cliente, squad: r.squad, produto: r.produto,
   }));
 }
 
@@ -350,7 +351,7 @@ const TITULO_CATEGORIA: Record<CategoriaPonte, string> = {
 
 // Venda Pontual (comercial): contratos pontuais criados no mês (data_criado) — mesma régua da
 // Receita Pontual de Vendas por Produto. Agrupados por produto.
-async function detVendaPontualComercial(db: any, mes: number): Promise<ResultadoDet> {
+async function detVendaPontualComercial(db: any, mes: number, produtoFiltro?: string): Promise<ResultadoDet> {
   const result = await db.execute(sql`
     SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
            COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
@@ -365,11 +366,13 @@ async function detVendaPontualComercial(db: any, mes: number): Promise<Resultado
       AND LOWER(TRIM(c.status)) <> 'não usar' AND c.valorp::numeric > 0
     ORDER BY valor DESC
   `);
-  const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-    grupo: r.produto, nome: r.cliente,
-    detalhe: [r.servico, `status ${r.status}`].filter(Boolean).join(" · "),
-    data: r.data ?? null, valor: parseFloat(r.valor),
-  }));
+  const itens: ItemDetalhe[] = (result.rows as any[])
+    .filter((r) => !produtoFiltro || r.produto === produtoFiltro)
+    .map((r) => ({
+      grupo: r.produto, nome: r.cliente,
+      detalhe: [r.servico, `status ${r.status}`].filter(Boolean).join(" · "),
+      data: r.data ?? null, valor: parseFloat(r.valor),
+    }));
   return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
 }
 
@@ -413,13 +416,17 @@ const CATS_ENTRADA: CategoriaPonte[] = ["venda_mes", "entrada_defasada", "reativ
 
 // contratos que se moveram numa ou várias categorias do mês (snapshot anterior × atual)
 async function detPontualMovimento(
-  db: any, mes: number, categorias: CategoriaPonte | CategoriaPonte[],
+  db: any, mes: number, categorias: CategoriaPonte | CategoriaPonte[], produtoFiltro?: string,
 ): Promise<ResultadoDet> {
   const cats = Array.isArray(categorias) ? categorias : [categorias];
   const ymAlvo = `${ANO}-${String(mes).padStart(2, "0")}`;
-  const [ant, atual] = await Promise.all([
+  let [ant, atual] = await Promise.all([
     carregaPontualSnapshot(db, mes, true), carregaPontualSnapshot(db, mes, false),
   ]);
+  if (produtoFiltro) {
+    const ehProduto = (r: RegPontualItem) => (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produtoFiltro;
+    ant = ant.filter(ehProduto); atual = atual.filter(ehProduto);
+  }
   const rec = classificarPonteItens(ant, atual, ymAlvo);
   const itens: ItemDetalhe[] = [];
   for (const cat of cats) {
@@ -442,11 +449,20 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       const def = TODAS_DEFS.find((d) => d.metrica === metrica);
       const prod = parseMetricaProduto(metrica);
       const squadAlvo = metrica.startsWith("pontual_squad:") ? metrica.slice("pontual_squad:".length) : null;
-      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod || !!squadAlvo;
+      // pontual_prod:<pai>:<produto> — drill de uma sub-linha por produto
+      const prodAlvo = (() => {
+        if (!metrica.startsWith("pontual_prod:")) return null;
+        const rest = metrica.slice("pontual_prod:".length);
+        const idx = rest.indexOf(":");
+        return idx < 0 ? null : { pai: rest.slice(0, idx), produto: rest.slice(idx + 1) };
+      })();
+      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod || !!squadAlvo || !!prodAlvo;
       if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }
-      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo ?? (squadAlvo ? `Estoque pontual — ${squadAlvo}` : metrica);
+      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo
+        ?? (squadAlvo ? `Estoque pontual — ${squadAlvo}` : null)
+        ?? (prodAlvo ? `${TITULOS_SUBABAS[prodAlvo.pai] ?? prodAlvo.pai} — ${prodAlvo.produto}` : metrica);
 
       let orcado: number | null = null;
       const orcRes = await db.execute(sql`
@@ -724,6 +740,22 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
+      } else if (prodAlvo) {
+        const { pai, produto } = prodAlvo;
+        if (pai === "pontual_venda_comercial") {
+          ({ grupos, realizado } = await detVendaPontualComercial(db, mes, produto));
+        } else if (pai === "pontual_entrada") {
+          ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA, produto));
+        } else if (pai === "pontual_entrega") {
+          ({ grupos, realizado } = await detPontualMovimento(db, mes, "entrega", produto));
+        } else if (pai === "pontual_estoque_fim") {
+          ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto));
+        } else if (pai.startsWith("pontual_status_")) {
+          const chaveMetrica = pai.slice("pontual_status_".length);
+          const statusAlvo = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica)?.chave;
+          ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) =>
+            r.status === statusAlvo && (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto));
+        }
       } else if (squadAlvo) {
         const sq = squadAlvo;
         ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => normalizarSquad(r.squad) === sq));
