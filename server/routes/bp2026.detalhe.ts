@@ -750,6 +750,11 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
           ({ grupos, realizado } = await detPontualMovimento(db, mes, "entrega", produto));
         } else if (pai === "pontual_estoque_fim") {
           ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto));
+        } else if (pai.startsWith("pontual_status_")) {
+          const chaveMetrica = pai.slice("pontual_status_".length);
+          const statusAlvo = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica)?.chave;
+          ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) =>
+            r.status === statusAlvo && (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto));
         }
       } else if (squadAlvo) {
         const sq = squadAlvo;
