@@ -79,16 +79,29 @@ export function decomporStatus(atual: RegPontual[]): Record<string, number> {
   return out;
 }
 
-// Soma valorp por squad, só do estoque (ehEstoquePontual). Soma total = estoque final.
+// Renames/consolidações de squad (regra de negócio): "Aura" (qualquer variante) vira "Pulse".
+const SQUAD_RENAME: Array<[RegExp, string]> = [
+  [/aura/i, "💠 Pulse"],
+];
+export function normalizarSquad(squad: string | undefined | null): string {
+  const s = squad && squad.trim() ? squad : "(sem squad)";
+  for (const [re, alvo] of SQUAD_RENAME) if (re.test(s)) return alvo;
+  return s;
+}
+
+// Soma valorp por squad (normalizado), só do estoque (ehEstoquePontual). Soma total = estoque final.
 export function decomporSquad(atual: RegPontual[]): Record<string, number> {
   const out: Record<string, number> = {};
   for (const r of atual) {
     if (!ehEstoquePontual(r)) continue;
-    const sq = r.squad && r.squad.trim() ? r.squad : "(sem squad)";
+    const sq = normalizarSquad(r.squad);
     out[sq] = (out[sq] ?? 0) + r.valorp;
   }
   return out;
 }
+
+// Limiar para esconder squads pequenos: < R$ 10K no mês corrente vão para "· Outros".
+export const SQUAD_MIN_EXIBIR = 10000;
 
 export const STATUS_DECOMP = [
   { chave: "ativo", titulo: "· Em execução (ativo)" },
@@ -247,20 +260,39 @@ export function montarLinhasPontual(
   for (const l of linhas) l.grupo = GRUPO_ESTOQUE;
 
   // ---- Bloco 3: Estoque pontual por squad (decomposição do estoque final por squad). ----
-  // Saldo (estoque) por squad ao fim de cada mês; soma das linhas = (=) Estoque final.
+  // Saldo por squad ao fim de cada mês; soma das linhas = (=) Estoque final. Squads com
+  // < SQUAD_MIN_EXIBIR no mês corrente são agregados em "· Outros" (mantém a soma fechando).
   const squads = Array.from(
     new Set(decompSquad.flatMap((d) => (d ? Object.keys(d) : []))),
   );
   const valorSquadMesCorrente = (sq: string) => decompSquad[mesCorrente]?.[sq] ?? 0;
-  squads.sort((a, b) => valorSquadMesCorrente(b) - valorSquadMesCorrente(a));
-  const linhasSquad: LinhaPontual[] = squads.map((sq) => {
-    const serie = Array.from({ length: 12 }, (_, i) => {
+  const grandes = squads
+    .filter((sq) => valorSquadMesCorrente(sq) >= SQUAD_MIN_EXIBIR)
+    .sort((a, b) => valorSquadMesCorrente(b) - valorSquadMesCorrente(a));
+  const pequenos = squads.filter((sq) => valorSquadMesCorrente(sq) < SQUAD_MIN_EXIBIR);
+
+  const serieSquad = (pick: (d: Record<string, number>) => number) =>
+    Array.from({ length: 12 }, (_, i) => {
       const m = i + 1; const d = decompSquad[m];
-      return m <= mesCorrente && d ? d[sq] ?? 0 : null;
+      return m <= mesCorrente && d ? pick(d) : null;
     });
+
+  const linhasSquad: LinhaPontual[] = grandes.map((sq) => {
+    const serie = serieSquad((d) => d[sq] ?? 0);
     const ytdReal = mesFechado === 0 ? null : decompSquad[mesFechado]?.[sq] ?? 0;
     return mk(`pontual_squad:${sq}`, sq, "estoque", serie, ytdReal, { grupo: GRUPO_SQUAD });
   });
+
+  // "· Outros" = soma dos squads pequenos (< R$ 10K no mês corrente). Só entra se houver valor.
+  const somaPequenos = (d: Record<string, number>) =>
+    pequenos.reduce((s, sq) => s + (d[sq] ?? 0), 0);
+  const serieOutrosSquad = serieSquad(somaPequenos);
+  if (serieOutrosSquad.some((v) => v !== null && Math.abs(v) > 0.5)) {
+    const ytdOutros = mesFechado === 0
+      ? null
+      : (decompSquad[mesFechado] ? somaPequenos(decompSquad[mesFechado]!) : 0);
+    linhasSquad.push(mk("pontual_squad_outros", "· Outros (< R$ 10K)", "estoque", serieOutrosSquad, ytdOutros, { grupo: GRUPO_SQUAD, semDetalhe: true }));
+  }
 
   return [...bloco1, ...linhas, ...linhasSquad];
 }

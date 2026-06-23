@@ -4,6 +4,7 @@ import {
   classificarPonte,
   decomporStatus,
   decomporSquad,
+  normalizarSquad,
   montarLinhasPontual,
 } from "./bp2026.pontual.helpers";
 import { classificarPonteItens } from "./bp2026.pontual.helpers";
@@ -117,6 +118,25 @@ describe("decomporSquad", () => {
     ]);
     expect(d["(sem squad)"]).toBe(80);
   });
+  it("Aura (qualquer variante) é consolidada em Pulse", () => {
+    const d = decomporSquad([
+      { idSubtask: "X", valorp: 100, status: "ativo", squad: "💠 Pulse" },
+      { idSubtask: "Y", valorp: 40, status: "ativo", squad: "✨ Aura" },
+      { idSubtask: "Z", valorp: 20, status: "ativo", squad: "✨ Aura (OFF)" },
+    ]);
+    expect(d["💠 Pulse"]).toBe(160); // 100 + 40 + 20
+    expect(d["✨ Aura"]).toBeUndefined();
+  });
+});
+
+describe("normalizarSquad", () => {
+  it("mapeia Aura -> Pulse e preserva os demais", () => {
+    expect(normalizarSquad("✨ Aura")).toBe("💠 Pulse");
+    expect(normalizarSquad("✨ Aura (OFF)")).toBe("💠 Pulse");
+    expect(normalizarSquad("🏛️ Olimpo")).toBe("🏛️ Olimpo");
+    expect(normalizarSquad("")).toBe("(sem squad)");
+    expect(normalizarSquad(null)).toBe("(sem squad)");
+  });
 });
 
 describe("montarLinhasPontual", () => {
@@ -178,24 +198,43 @@ describe("montarLinhasPontual", () => {
     expect(by("pontual_venda_comercial").ytd.realizado).toBe(900);
     expect(by("pontual_estoque_fim").ytd.realizado).toBe(1800);
   });
-  it("bloco por squad: linhas no grupo certo, somam o estoque final, ordenadas desc", () => {
-    const olimpo = by("pontual_squad:Olimpo");
-    const pulse = by("pontual_squad:Pulse");
-    expect(olimpo.meses[0].realizado).toBe(1100);
-    expect(pulse.meses[0].realizado).toBe(700);
-    expect(olimpo.grupo).toBe("Estoque pontual por squad");
-    expect(olimpo.tipoAgregacao).toBe("estoque");
-    // soma das linhas de squad no mês = estoque final
+  it("bloco por squad: squads < 10K no mês corrente agregam em '· Outros', soma = estoque final", () => {
+    // Olimpo (1100) e Pulse (700) são < 10K → vão para "· Outros"
+    expect(linhas.find((l) => l.metrica === "pontual_squad:Olimpo")).toBeUndefined();
+    expect(by("pontual_squad_outros").meses[0].realizado).toBe(1800);
+    expect(by("pontual_squad_outros").grupo).toBe("Estoque pontual por squad");
     const somaSquad = linhas
-      .filter((l) => l.metrica.startsWith("pontual_squad:"))
+      .filter((l) => l.grupo === "Estoque pontual por squad")
       .reduce((s, l) => s + (l.meses[0].realizado ?? 0), 0);
     expect(somaSquad).toBe(by("pontual_estoque_fim").meses[0].realizado);
-    // ordenação desc por valor do mês corrente: Olimpo (1100) antes de Pulse (700)
-    const idxOlimpo = linhas.findIndex((l) => l.metrica === "pontual_squad:Olimpo");
-    const idxPulse = linhas.findIndex((l) => l.metrica === "pontual_squad:Pulse");
-    expect(idxOlimpo).toBeLessThan(idxPulse);
-    // YTD = posição (saldo) do mês fechado, não soma
-    expect(olimpo.ytd.realizado).toBe(1100);
+  });
+});
+
+describe("montarLinhasPontual — filtro < 10K + Aura→Pulse no bloco squad", () => {
+  const porMes = {
+    0: [] as any[],
+    1: [
+      { idSubtask: "a", valorp: 50000, status: "ativo", squad: "🏛️ Olimpo", criadoYm: "2026-01" },
+      { idSubtask: "b", valorp: 30000, status: "ativo", squad: "💠 Pulse", criadoYm: "2026-01" },
+      { idSubtask: "c", valorp: 5000, status: "ativo", squad: "✨ Aura", criadoYm: "2026-01" }, // vira Pulse
+      { idSubtask: "d", valorp: 3000, status: "ativo", squad: "🐑 Black", criadoYm: "2026-01" }, // < 10K → Outros
+    ],
+  };
+  const linhas = montarLinhasPontual(porMes, 1, 1);
+  const by = (m: string) => linhas.find((l) => l.metrica === m)!;
+  it("Aura consolidada em Pulse; squad < 10K em '· Outros'; soma = estoque final; ordenado desc", () => {
+    expect(by("pontual_squad:🏛️ Olimpo").meses[0].realizado).toBe(50000);
+    expect(by("pontual_squad:💠 Pulse").meses[0].realizado).toBe(35000); // 30K + Aura 5K
+    expect(linhas.find((l) => l.metrica === "pontual_squad:✨ Aura")).toBeUndefined();
+    expect(by("pontual_squad_outros").meses[0].realizado).toBe(3000); // Black < 10K
+    const iOl = linhas.findIndex((l) => l.metrica === "pontual_squad:🏛️ Olimpo");
+    const iPu = linhas.findIndex((l) => l.metrica === "pontual_squad:💠 Pulse");
+    expect(iOl).toBeLessThan(iPu); // 50K antes de 35K
+    const somaSquad = linhas
+      .filter((l) => l.grupo === "Estoque pontual por squad")
+      .reduce((s, l) => s + (l.meses[0].realizado ?? 0), 0);
+    expect(somaSquad).toBe(by("pontual_estoque_fim").meses[0].realizado);
+    expect(by("pontual_estoque_fim").meses[0].realizado).toBe(88000);
   });
 });
 
