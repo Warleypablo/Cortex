@@ -183,3 +183,32 @@ nome e nota próprios, e a **Venda batendo com a Venda sempre**:
   `pontual_venda_comercial` (novo handler que lista contratos por `data_criado`).
 - `BP2026.tsx`: nota explicando os dois blocos. `BPDreTable` já renderiza headers por `grupo`.
 - O `BPDreTable` renderiza um header de bloco quando `grupo` muda (não é mudança no componente).
+
+---
+
+## ADENDO 2 (2026-06-22) — uma única linha de Venda + Ajuste (sem dois blocos)
+
+O usuário pediu **uma só linha de venda** (não a comercial + "venda do mês" do estoque) e o restante
+numa categoria de ajuste. Estrutura final (ponte única, sem grupos):
+
+```
+(=) Estoque inicial
+(+) Venda Pontual              = venda comercial (data_criado) = Vendas por Produto  [única venda]
+(±) Ajuste estoque × venda     = entrada na foto (B) − venda comercial (A)            [reconciliação]
+    · Entrada defasada         (+)
+    · Reativação               (+)
+    · Sem origem               (+)  (condicional)
+    · Venda do mês fora da foto (−) = vendaMes − A  (venda do mês que ainda não entrou na foto)
+(−) Entrega / Churn / Deletados / Saída atípica / (±) Reajuste de valor
+(=) Estoque final  (· status…)
+```
+
+- Identidade: `Estoque inicial + Venda + Ajuste − Entrega − Churn − Deletados − Saída atípica
+  + Reajuste = Estoque final` (pois `Venda(A) + Ajuste(B−A) = B`, a entrada real na foto).
+- `· Ajuste` e `· Venda do mês fora da foto` são derivadas → `semDetalhe` (sem drill). As demais
+  sub-linhas (defasada/reativação/sem origem) mantêm drill no snapshot; a Venda Pontual abre os
+  contratos por produto (data_criado).
+- Removidos: linha separada `pontual_venda_comercial` em bloco próprio, `pontual_entrada`/`(+) Entrada
+  no estoque`, `· Venda do mês`, os grupos `GRUPO_VENDA/GRUPO_ESTOQUE` e `SUBCATS_VENDA`.
+- Métricas novas: `pontual_ajuste`, `pontual_venda_fora_foto` (ambas `semDetalhe`). `pontual_venda_comercial`
+  permanece como a linha de venda (drill por produto).
