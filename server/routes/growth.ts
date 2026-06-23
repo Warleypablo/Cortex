@@ -3353,6 +3353,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         sessoes = ga4.byPlatform.google_ads;
       }
 
+      // Visualizações de Página consolidadas via GA4 (screenPageViews), cobrindo
+      // Meta + Google + orgânico — mesma cobertura das Sessões. Substitui o
+      // landing_page_views do pixel (Meta-only) como denominador da Tx Conversão
+      // da Página: o numerador (Leads do Bitrix) abrange TODAS as plataformas, então
+      // o denominador também precisa. O pixel segue exposto como referência.
+      const sumPageViews = (b: Record<string, number>) =>
+        Object.values(b).reduce((acc, v) => acc + (Number(v) || 0), 0);
+      let visualizacoesPaginaGa4 = 0;
+      if (includeMeta && includeGoogle) {
+        visualizacoesPaginaGa4 = sumPageViews(ga4.byPlatformPageViews);
+      } else if (includeMeta) {
+        visualizacoesPaginaGa4 = ga4.byPlatformPageViews.meta_ads;
+      } else if (includeGoogle) {
+        visualizacoesPaginaGa4 = ga4.byPlatformPageViews.google_ads;
+      }
+
       // Query Leads e MQLs do Bitrix (tráfego pago)
       const contagem = (req.query.contagem as string) || 'contrato';
       let funilFilter = sql``;
@@ -3446,7 +3462,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctrExposto = onlyInstagram ? 0 : ctr;
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
-      const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPagina;
+      const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPaginaGa4;
+      const visualizacoesPaginaPixelExposto = onlyInstagram ? 0 : visualizacoesPagina;
       const sessoesExposto = onlyInstagram ? 0 : sessoes;
       const cpl = onlyInstagram ? 0 : (leads > 0 ? investimento / leads : 0);
       const cpmql = onlyInstagram ? 0 : (mqls > 0 ? investimento / mqls : 0);
@@ -3469,6 +3486,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cps: cpsExposto,
         connectRate: connectRateExposto,
         visualizacoesPagina: visualizacoesPaginaExposto,
+        visualizacoesPaginaPixel: visualizacoesPaginaPixelExposto,
         sessoes: sessoesExposto,
         sessoesAvailable: ga4.available,
         leads,
