@@ -258,7 +258,8 @@ const TITULOS_SUBABAS: Record<string, string> = {
   cac_comissoes: "Comissões", cac_growth: "Growth", cac_ads: "ADs",
   cac_eventos: "Eventos", cac_brindes: "Brindes", cac_viagens: "Viagens",
   cac_outras_sub: "Outras comerciais (não orçadas)",
-  pontual_estoque_ini: "(=) Estoque inicial", pontual_venda: "(+) Venda",
+  pontual_venda_comercial: "(+) Venda Pontual", pontual_entrada: "(+) Entrada no estoque",
+  pontual_estoque_ini: "(=) Estoque inicial",
   pontual_venda_mes: "· Venda do mês", pontual_entrada_defasada: "· Entrada defasada",
   pontual_reativacao: "· Reativação", pontual_sem_origem: "· Sem origem",
   pontual_entrega: "(−) Entrega", pontual_churn: "(−) Churn",
@@ -349,6 +350,31 @@ const TITULO_CATEGORIA: Record<CategoriaPonte, string> = {
 };
 
 const SUBCATS_VENDA: CategoriaPonte[] = ["venda_mes", "entrada_defasada", "reativacao", "sem_origem"];
+
+// Venda Pontual (comercial): contratos pontuais criados no mês (data_criado) — mesma régua da
+// Receita Pontual de Vendas por Produto. Agrupados por produto.
+async function detVendaPontualComercial(db: any, mes: number): Promise<ResultadoDet> {
+  const result = await db.execute(sql`
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+           COALESCE(c.servico, '') AS servico,
+           COALESCE(c.status, '') AS status,
+           c.valorp::numeric AS valor,
+           c.data_criado::date::text AS data
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+    WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+      AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+      AND LOWER(TRIM(c.status)) <> 'não usar' AND c.valorp::numeric > 0
+    ORDER BY valor DESC
+  `);
+  const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+    grupo: r.produto, nome: r.cliente,
+    detalhe: [r.servico, `status ${r.status}`].filter(Boolean).join(" · "),
+    data: r.data ?? null, valor: parseFloat(r.valor),
+  }));
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
 
 // contratos que se moveram numa ou várias categorias do mês (snapshot anterior × atual)
 async function detPontualMovimento(
@@ -673,7 +699,9 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const chaveMetrica = metrica.slice("pontual_status_".length);
         const def2 = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica);
         ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false));
-      } else if (metrica === "pontual_venda") {
+      } else if (metrica === "pontual_venda_comercial") {
+        ({ grupos, realizado } = await detVendaPontualComercial(db, mes));
+      } else if (metrica === "pontual_entrada") {
         ({ grupos, realizado } = await detPontualMovimento(db, mes, SUBCATS_VENDA));
       } else if ([
         "pontual_venda_mes", "pontual_entrada_defasada", "pontual_reativacao", "pontual_sem_origem",
