@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-23 | feat(ads-creation): sobe lote CRM Recompra b2c1 (h1–h9) em 2 conjuntos
+
+**O que foi feito:**
+- `subir-crm-b2c1.ts`: cria os ads do lote **b2c1** (TP1648–TP1656, h1–h9) na camp CBO FLASH CRM, no padrão Turbo (5 ads/conjunto)
+  - conjunto **153** = `… - CRM Recompra - h01 a h05 | b2 | c1` (TP1648–1652)
+  - conjunto **154** = `… - CRM Recompra - h06 a h09 | b2 | c1` (TP1653–1656)
+  - ads pareados 9x16+4x5, PAUSED; config clonada do conjunto 151; vídeos b2c1 já no Meta (subidos 23/06)
+- Idempotente (reusa conjunto pelo nome, pula ad existente) + backoff de rate-limit (quota dev-tier saturada, ~300%)
+
+**Por que:**
+- O usuário pediu pra subir o b2c1 (já estava na Biblioteca; só faltava criar os ads no padrão de conjuntos)
+
+**Arquivos novos:**
+- `subir-crm-b2c1.ts` - cria os 2 conjuntos + 9 ads do b2c1
+
+**Impacto arquitetural:** Nenhum — script one-off de criação de ads via Meta API.
+
+---
+
 ## 2026-06-23 | feat(ads-creation): reestrutura CRM Recompra b1c1 p/ 5 ads/conjunto (padrão ABO Creators)
 
 **O que foi feito:**
