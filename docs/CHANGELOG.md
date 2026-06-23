@@ -19,6 +19,27 @@
 
 ---
 
+## 2026-06-23 | feat(bp2026): linha "CAC por contrato" na aba CAC
+
+**O que foi feito:**
+- Nova métrica `cac_por_contrato` na aba CAC do BP 2026, logo abaixo de "CAC por cliente adquirido".
+- Denominador = total de contratos vendidos no mês (recorrentes + pontuais, todos os segmentos), derivado do mesmo `agg` do Bitrix que alimenta o bloco "CAC por Produto". Um deal com N produtos/naturezas conta N contratos.
+- Orçado = CAC orçado ÷ contratos vendidos orçados (`contratos_vendidos_mrr_*` + `contratos_vendidos_pontual_*`); YTD = Σ numerador ÷ Σ denominador.
+- Linha marcada como `semDetalhe` (sem drill-down).
+- Verificado contra o banco real: CAC/contrato fica ≤ CAC/cliente em todos os meses (jan–jun), pois contratos ≥ deals ganhos.
+
+**Por que:**
+- "CAC por cliente" usa CAC total ÷ deals ganhos; faltava a visão por contrato. Como um cliente pode fechar mais de um contrato, o custo por contrato é menor e mais granular. Usar rec+pontual no denominador deixa a métrica apples-to-apples com a de "por cliente" (mesmo numerador, denominador análogo).
+
+**Arquivos alterados:**
+- `server/routes/bp2026.detalhamentos.ts` - cálculo da linha `cac_por_contrato` (série, orçado, YTD, `semDetalhe`) e import de `SEGMENTOS_PONTUAIS`.
+- `server/routes/bp2026.ts` - série `contratosVendidosTotalPorMes` (Σ contratosRec + contratosPont do `agg`) passada ao `montarDetalhamentos`.
+- `server/routes/bp2026.info.ts` - documentação (definição/fonte/cálculo) da nova métrica.
+
+**Impacto arquitetural:** Nenhum — nova linha derivada reusa fontes existentes; frontend (`BPDreTable`) renderiza automaticamente.
+
+---
+
 ## 2026-06-21 | refactor(sync-jobs): job único 12h roda todas as plataformas de ads juntas
 
 **O que foi feito:**

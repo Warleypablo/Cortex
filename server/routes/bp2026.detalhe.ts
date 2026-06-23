@@ -15,7 +15,7 @@ import {
   somaDespesaCaixaPorMes, type DefLinha,
 } from "./bp2026";
 import {
-  classificarPonteItens, ehEstoquePontual, STATUS_DECOMP,
+  classificarPonteItens, ehEstoquePontual, STATUS_DECOMP, normalizarSquad,
   type RegPontualItem, type CategoriaPonte,
 } from "./bp2026.pontual.helpers";
 
@@ -258,7 +258,9 @@ const TITULOS_SUBABAS: Record<string, string> = {
   cac_comissoes: "Comissões", cac_growth: "Growth", cac_ads: "ADs",
   cac_eventos: "Eventos", cac_brindes: "Brindes", cac_viagens: "Viagens",
   cac_outras_sub: "Outras comerciais (não orçadas)",
-  pontual_estoque_ini: "(=) Estoque inicial", pontual_venda: "(+) Venda",
+  pontual_venda_comercial: "(+) Venda Pontual",
+  pontual_venda_no_estoque: "· Entrou no estoque", pontual_venda_fora_estoque: "· Fora do estoque",
+  pontual_estoque_ini: "(=) Estoque inicial", pontual_entrada: "(+) Entrada na foto",
   pontual_entrega: "(−) Entrega", pontual_churn: "(−) Churn",
   pontual_deletados: "(−) Deletados", pontual_saida_atipica: "(−) Saída atípica",
   pontual_reajuste: "(±) Reajuste de valor", pontual_estoque_fim: "(=) Estoque final",
@@ -310,14 +312,17 @@ async function carregaPontualSnapshot(db: any, mes: number, anterior: boolean): 
       WHERE data_snapshot::date >= ${ini}::date AND data_snapshot::date < ${fim}::date
     )
     SELECT h.id_subtask, h.valorp::numeric AS valorp, h.status,
+           to_char(c.data_criado, 'YYYY-MM') AS criado_ym,
            COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
            COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad
     FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
     LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+    LEFT JOIN "Clickup".cup_contratos c ON c.id_subtask = h.id_subtask
     WHERE h.valorp::numeric > 0
   `);
   return (result.rows as any[]).map((r) => ({
     idSubtask: String(r.id_subtask), valorp: parseFloat(r.valorp), status: r.status,
+    criadoYm: r.criado_ym ?? null,
     cliente: r.cliente, squad: r.squad,
   }));
 }
@@ -335,21 +340,97 @@ async function detPontualSnapshot(
 }
 
 const TITULO_CATEGORIA: Record<CategoriaPonte, string> = {
-  venda: "Entradas no estoque (vendas)", entrega: "Saídas por entrega", churn: "Saídas por churn",
+  venda_mes: "Venda do mês (data de criação)",
+  entrada_defasada: "Entrada defasada (vendas anteriores)",
+  reativacao: "Reativações (voltaram ao estoque)",
+  sem_origem: "Sem origem (órfãos do snapshot)",
+  entrega: "Saídas por entrega", churn: "Saídas por churn",
   deletados: "Deletados do ClickUp", saida_atipica: "Saídas atípicas", reajuste: "Reajustes de valor",
 };
 
-// contratos que se moveram numa categoria do mês (snapshot anterior × atual)
-async function detPontualMovimento(db: any, mes: number, categoria: CategoriaPonte): Promise<ResultadoDet> {
+// Venda Pontual (comercial): contratos pontuais criados no mês (data_criado) — mesma régua da
+// Receita Pontual de Vendas por Produto. Agrupados por produto.
+async function detVendaPontualComercial(db: any, mes: number): Promise<ResultadoDet> {
+  const result = await db.execute(sql`
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+           COALESCE(c.servico, '') AS servico,
+           COALESCE(c.status, '') AS status,
+           c.valorp::numeric AS valor,
+           c.data_criado::date::text AS data
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+    WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+      AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+      AND LOWER(TRIM(c.status)) <> 'não usar' AND c.valorp::numeric > 0
+    ORDER BY valor DESC
+  `);
+  const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+    grupo: r.produto, nome: r.cliente,
+    detalhe: [r.servico, `status ${r.status}`].filter(Boolean).join(" · "),
+    data: r.data ?? null, valor: parseFloat(r.valor),
+  }));
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
+// Venda do mês decomposta por estar (dentro=true) ou não (dentro=false) na foto do estoque
+// do fim do mês. Mesma régua de valor da venda comercial (cup_contratos) → soma exata.
+async function detVendaPorEstoque(db: any, mes: number, dentro: boolean): Promise<ResultadoDet> {
+  const result = await db.execute(sql`
+    WITH alvo AS (
+      SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+      WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
+        AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
+    ),
+    est AS (
+      SELECT h.id_subtask FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+      WHERE h.valorp::numeric > 0 AND h.status NOT IN ('entregue','cancelado/inativo','não usar')
+    )
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+           COALESCE(c.servico, '') AS servico,
+           COALESCE(c.status, '') AS status,
+           c.valorp::numeric AS valor,
+           c.data_criado::date::text AS data
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+    WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+      AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+      AND LOWER(TRIM(c.status)) <> 'não usar' AND c.valorp::numeric > 0
+      AND (c.id_subtask IN (SELECT id_subtask FROM est)) = ${dentro}
+    ORDER BY valor DESC
+  `);
+  const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+    grupo: r.produto, nome: r.cliente,
+    detalhe: [r.servico, `status ${r.status}`].filter(Boolean).join(" · "),
+    data: r.data ?? null, valor: parseFloat(r.valor),
+  }));
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
+// categorias que compõem a "Entrada na foto" (tudo que entrou no estoque no mês)
+const CATS_ENTRADA: CategoriaPonte[] = ["venda_mes", "entrada_defasada", "reativacao", "sem_origem"];
+
+// contratos que se moveram numa ou várias categorias do mês (snapshot anterior × atual)
+async function detPontualMovimento(
+  db: any, mes: number, categorias: CategoriaPonte | CategoriaPonte[],
+): Promise<ResultadoDet> {
+  const cats = Array.isArray(categorias) ? categorias : [categorias];
+  const ymAlvo = `${ANO}-${String(mes).padStart(2, "0")}`;
   const [ant, atual] = await Promise.all([
     carregaPontualSnapshot(db, mes, true), carregaPontualSnapshot(db, mes, false),
   ]);
-  const itensCat = classificarPonteItens(ant, atual)[categoria];
-  const itens: ItemDetalhe[] = itensCat.map((it) => ({
-    grupo: TITULO_CATEGORIA[categoria], nome: it.cliente,
-    detalhe: [it.detalhe, `status ${it.status}`].filter(Boolean).join(" · "),
-    data: null, valor: it.valor,
-  }));
+  const rec = classificarPonteItens(ant, atual, ymAlvo);
+  const itens: ItemDetalhe[] = [];
+  for (const cat of cats) {
+    for (const it of rec[cat]) {
+      itens.push({
+        grupo: TITULO_CATEGORIA[cat], nome: it.cliente,
+        detalhe: [it.detalhe, `status ${it.status}`].filter(Boolean).join(" · "),
+        data: null, valor: it.valor,
+      });
+    }
+  }
   return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
 }
 
@@ -360,11 +441,12 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       const mes = Number(req.query.mes);
       const def = TODAS_DEFS.find((d) => d.metrica === metrica);
       const prod = parseMetricaProduto(metrica);
-      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod;
+      const squadAlvo = metrica.startsWith("pontual_squad:") ? metrica.slice("pontual_squad:".length) : null;
+      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod || !!squadAlvo;
       if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }
-      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo ?? metrica;
+      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo ?? (squadAlvo ? `Estoque pontual — ${squadAlvo}` : metrica);
 
       let orcado: number | null = null;
       const orcRes = await db.execute(sql`
@@ -642,6 +724,9 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
+      } else if (squadAlvo) {
+        const sq = squadAlvo;
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => normalizarSquad(r.squad) === sq));
       } else if (metrica === "pontual_estoque_ini") {
         ({ grupos, realizado } = await detPontualSnapshot(db, mes, true));
       } else if (metrica === "pontual_estoque_fim") {
@@ -653,7 +738,17 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const chaveMetrica = metrica.slice("pontual_status_".length);
         const def2 = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica);
         ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false));
-      } else if (["pontual_venda", "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste"].includes(metrica)) {
+      } else if (metrica === "pontual_venda_comercial") {
+        ({ grupos, realizado } = await detVendaPontualComercial(db, mes));
+      } else if (metrica === "pontual_venda_no_estoque") {
+        ({ grupos, realizado } = await detVendaPorEstoque(db, mes, true));
+      } else if (metrica === "pontual_venda_fora_estoque") {
+        ({ grupos, realizado } = await detVendaPorEstoque(db, mes, false));
+      } else if (metrica === "pontual_entrada") {
+        ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA));
+      } else if ([
+        "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste",
+      ].includes(metrica)) {
         ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte));
       } else if (metrica === "or_receita_variavel" || metrica === "or_stack_digital" || metrica === "or_demais") {
         const pred = metrica === "or_receita_variavel" ? PREDICADOS_OUTRAS_SUB.or_variavel
