@@ -22,8 +22,8 @@ const LINHAS: Array<{ label: string; get: (x: ModMetric) => string; forte?: bool
   { label: "Clientes", get: (x) => String(x.clientes) },
   { label: "LT", get: (x) => fmtLt(x.lt) },
   { label: "LTV", get: (x) => fmtLtv(x.ltv), forte: true },
-  { label: "Faturamento", get: (x) => fmtLtv(x.faturamento), forte: true },
   { label: "Vendas", get: (x) => fmtLtv(x.vendas) },
+  { label: "Faturamento", get: (x) => fmtLtv(x.faturamento), forte: true },
   { label: "Ticket médio", get: (x) => fmtLtv(x.ticket) },
 ];
 
