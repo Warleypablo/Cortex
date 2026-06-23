@@ -24,12 +24,22 @@ interface ReceitasResponse {
   atualizadoEm: string;
 }
 
+interface CreatorsPontualResponse {
+  linhas: BPLinha[];
+  mesCorrente: number;
+  mesFechado: number;
+}
+
 export default function BP2026() {
   const { data, isLoading, error } = useQuery<ReceitasResponse>({
     queryKey: ["/api/bp2026/receitas"],
   });
+  const { data: creatorsData } = useQuery<CreatorsPontualResponse>({
+    queryKey: ["/api/bp2026/pontual-creators"],
+  });
   const [detalhe, setDetalhe] = useState<{ metrica: string; mes: number } | null>(null);
   const [recon, setRecon] = useState<{ produto: string; mes: number; titulo: string } | null>(null);
+  const [detalheCreators, setDetalheCreators] = useState<{ metrica: string; mes: number } | null>(null);
   const PRODUTOS_REVENUE = ["performance", "creators", "social", "gc", "others"];
 
   if (isLoading) {
@@ -71,6 +81,7 @@ export default function BP2026() {
           <TabsTrigger value="cac">CAC</TabsTrigger>
           <TabsTrigger value="outras">Outras Receitas</TabsTrigger>
           <TabsTrigger value="pontual">Pontual</TabsTrigger>
+          <TabsTrigger value="pontual-creators">Pontual · Creators</TabsTrigger>
         </TabsList>
         <TabsContent value="dre" className="mt-4">
           <BPDreTable
@@ -170,6 +181,28 @@ export default function BP2026() {
             onCellClick={(metrica, mes) => setDetalhe({ metrica, mes })}
           />
         </TabsContent>
+        <TabsContent value="pontual-creators" className="mt-4 space-y-2">
+          <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300">
+            Pontual Creators — venda comercial e movimento de estoque (só realizado)
+          </h3>
+          <p className="text-xs text-gray-500 dark:text-zinc-400 max-w-4xl">
+            <strong>Venda Pontual</strong> = quanto foi vendido no mês (data de criação), filtrado por produto
+            Creators; decomposta em <em>entrou no estoque</em> e <em>fora do estoque</em>. O{" "}
+            <strong>Movimento do estoque</strong> é a foto do ClickUp (snapshot) filtrada por Creators e fecha
+            no estoque final — régua de snapshot, independente da Venda.
+          </p>
+          {!creatorsData ? (
+            <Skeleton className="h-64 w-full" />
+          ) : (
+            <BPDreTable
+              linhas={creatorsData.linhas}
+              mesCorrente={creatorsData.mesCorrente}
+              mesFechado={creatorsData.mesFechado}
+              mostrarOrcado={false}
+              onCellClick={(metrica, mes) => setDetalheCreators({ metrica, mes })}
+            />
+          )}
+        </TabsContent>
       </Tabs>
       <BPCellDetail
         metrica={detalhe?.metrica ?? null}
@@ -180,6 +213,13 @@ export default function BP2026() {
           ...data.cacDetalhe, ...data.outrasDetalhe,
         ]}
         onClose={() => setDetalhe(null)}
+      />
+      <BPCellDetail
+        metrica={detalheCreators?.metrica ?? null}
+        mes={detalheCreators?.mes ?? null}
+        linhas={creatorsData?.linhas ?? []}
+        onClose={() => setDetalheCreators(null)}
+        segmento="creators"
       />
       <BPReconciliacao
         produto={recon?.produto ?? null}
