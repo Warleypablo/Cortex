@@ -1,8 +1,9 @@
 // client/src/components/bp2026/BPDreTable.tsx
+import { useState } from "react";
 import {
   Tooltip, TooltipContent, TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { Info } from "lucide-react";
+import { Info, ChevronRight, ChevronDown } from "lucide-react";
 
 export interface BPMes {
   mes: number;
@@ -25,6 +26,8 @@ export interface BPLinha {
   segmento?: string;   // produto (ex.: Performance / Creators) — sub-cabeçalho por produto
   subItem?: boolean;    // linha-filha (ex.: "% do CAC total") — indentada e atenuada
   semDetalhe?: boolean; // célula não abre drill-down
+  expansivel?: boolean; // linha-pai com toggle ▶/▼ (mostra/esconde as filhas por produto)
+  paiMetrica?: string;  // linha-filha: só aparece quando o pai (metrica) está expandido
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -119,6 +122,13 @@ interface Props {
 
 export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostrarOrcado = true }: Props) {
   const ytdLabel = mesFechado >= 1 ? `YTD ${MESES_CURTOS[mesFechado - 1]}` : "YTD";
+  const [expandidas, setExpandidas] = useState<Set<string>>(new Set());
+  const toggleExpandir = (metrica: string) =>
+    setExpandidas((prev) => {
+      const next = new Set(prev);
+      next.has(metrica) ? next.delete(metrica) : next.add(metrica);
+      return next;
+    });
   return (
     <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-zinc-700">
       <table className="w-full text-sm" data-testid="bp-dre-table">
@@ -155,6 +165,8 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
             let grupoAnterior: string | undefined;
             let segAnterior: string | undefined;
             linhas.forEach((linha) => {
+              // linha-filha (por produto): só renderiza se o pai estiver expandido
+              if (linha.paiMetrica && !expandidas.has(linha.paiMetrica)) return;
               // cabeçalho de bloco (ex.: Recorrente / Pontual)
               if (linha.grupo && linha.grupo !== grupoAnterior) {
                 render.push(
@@ -202,9 +214,21 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                 <td
                   className={`sticky left-0 z-10 px-4 py-3 whitespace-nowrap align-top ${
                     ehTotal ? "bg-gray-100 dark:bg-zinc-800" : "bg-white dark:bg-zinc-900"
-                  } ${linha.segmento ? "pl-8" : ""} ${linha.subItem ? "pl-8 text-xs text-gray-500 dark:text-zinc-500" : ""}`}
+                  } ${linha.segmento ? "pl-8" : ""} ${linha.subItem ? "pl-8 text-xs text-gray-500 dark:text-zinc-500" : ""} ${linha.paiMetrica ? "pl-10 text-gray-600 dark:text-zinc-400" : ""}`}
                 >
                   <span className="flex items-center gap-1.5">
+                    {linha.expansivel && (
+                      <button
+                        type="button"
+                        onClick={() => toggleExpandir(linha.metrica)}
+                        className="-ml-1 shrink-0 rounded p-0.5 text-gray-400 hover:bg-gray-100 hover:text-gray-700 dark:text-zinc-500 dark:hover:bg-zinc-800 dark:hover:text-zinc-200"
+                        aria-label={expandidas.has(linha.metrica) ? "Recolher por produto" : "Expandir por produto"}
+                      >
+                        {expandidas.has(linha.metrica)
+                          ? <ChevronDown className="h-3.5 w-3.5" />
+                          : <ChevronRight className="h-3.5 w-3.5" />}
+                      </button>
+                    )}
                     {tituloLinha}
                     {(linha.info || linha.nota || ehEstoque) && (
                       <Tooltip>
