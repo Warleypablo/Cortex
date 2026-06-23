@@ -22,7 +22,8 @@ export async function montarPontual({ db, mesCorrente, mesFechado }: Deps): Prom
       GROUP BY gs.mes
     )
     SELECT a.mes, h.id_subtask, h.valorp::numeric AS valorp, h.status,
-           to_char(c.data_criado, 'YYYY-MM') AS criado_ym
+           to_char(c.data_criado, 'YYYY-MM') AS criado_ym,
+           COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad
     FROM alvo a
     JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = a.d
     LEFT JOIN "Clickup".cup_contratos c ON c.id_subtask = h.id_subtask
@@ -38,6 +39,7 @@ export async function montarPontual({ db, mesCorrente, mesFechado }: Deps): Prom
       valorp: parseFloat(row.valorp),
       status: row.status,
       criadoYm: row.criado_ym ?? null,
+      squad: row.squad,
     });
   }
 
