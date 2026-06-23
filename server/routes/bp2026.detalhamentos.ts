@@ -15,6 +15,7 @@ interface Linha {
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
   unidade?: "brl" | "int" | "pct" | "dec"; nota?: string; destaque?: boolean;
   grupo?: string; subItem?: boolean; semDetalhe?: boolean;
+  filhos?: Linha[];
   meses: MesLinha[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -224,6 +225,28 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
   const porContratoSerie = Array.from({ length: 12 }, (_, i) =>
     i + 1 <= mesCorrente ? razao(cacTotalSerie[i], contratosVendidosTotalPorMes[i]) : null
   );
+  // sub-linhas por produto: CAC total ÷ contratos do produto (mesma premissa de CAC)
+  const cacPorContratoFilhos: Linha[] = PRODUTOS_CAC.map((p) => {
+    const serie = Array.from({ length: 12 }, (_, i) => {
+      if (i + 1 > mesCorrente) return null;
+      const cont = contratosVendidosRec[p.slug]?.[i] ?? 0;
+      return cont > 0 ? razao(cacTotalSerie[i], cont) : null;
+    });
+    return {
+      ...fazLinha(
+        { metrica: `cac_contrato_produto_${p.slug}`, titulo: p.titulo,
+          direcao: "menor_melhor", unidade: "brl" },
+        serie,
+        (m) => {
+          const cont = orcado[`contratos_vendidos_mrr_${p.slug}`]?.[m] ?? 0;
+          return cont > 0 ? razao(cacOrcMes(m), cont) ?? 0 : 0;
+        },
+      ),
+      subItem: true,
+      semDetalhe: true,
+    };
+  });
+
   const cacPorContrato: Linha = {
     ...fazLinha(
       { metrica: "cac_por_contrato", titulo: "CAC por contrato", direcao: "menor_melhor", unidade: "brl",
@@ -235,9 +258,8 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
         realizado: razao(cacYtdReal, somaAte((m) => contratosVendidosTotalPorMes[m - 1] ?? 0)),
       }
     ),
-    // sem drill: reproduzir a contagem de contratos por produto exigiria refazer toda a
-    // distribuição de deals (distribuirDeal) no endpoint de detalhe — não compensa.
     semDetalhe: true,
+    filhos: cacPorContratoFilhos,
   };
 
   const cacPayback = fazLinha(
