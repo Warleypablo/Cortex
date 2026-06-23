@@ -138,6 +138,33 @@ export function classificarPontePorProduto(
   return { entrada, entrega };
 }
 
+// Entrada na foto e Entrega por squad (mesma lógica de classificarPontePorProduto, agregada por squad).
+export function classificarPontePorSquad(
+  ant: RegPontual[], atual: RegPontual[],
+): { entrada: Record<string, number>; entrega: Record<string, number> } {
+  const antMap = new Map(ant.map((r) => [r.idSubtask, r]));
+  const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
+  const entrada: Record<string, number> = {};
+  const entrega: Record<string, number> = {};
+  for (const r of ant) {
+    if (!ehEstoquePontual(r)) continue;
+    const a = atualMap.get(r.idSubtask);
+    if (!a || ehEstoquePontual(a)) continue;
+    if (a.status === "entregue") {
+      const sq = normalizarSquad(r.squad);
+      entrega[sq] = (entrega[sq] ?? 0) + r.valorp;
+    }
+  }
+  for (const r of atual) {
+    if (!ehEstoquePontual(r)) continue;
+    const prev = antMap.get(r.idSubtask);
+    if (prev && ehEstoquePontual(prev)) continue;
+    const sq = normalizarSquad(r.squad);
+    entrada[sq] = (entrada[sq] ?? 0) + r.valorp;
+  }
+  return { entrada, entrega };
+}
+
 // Limiar para esconder squads pequenos: < R$ 10K no mês corrente vão para "· Outros".
 export const SQUAD_MIN_EXIBIR = 10000;
 
@@ -195,6 +222,7 @@ export function montarLinhasPontual(
   vendaComercialPorMes: Record<number, number> = {},
   vendaNoEstoquePorMes: Record<number, number> = {},
   vendaPorProdutoPorMes: Record<number, Record<string, number>> = {},
+  sublinhasPor: "produto" | "squad" = "produto",
 ): LinhaPontual[] {
   const ponte: (PonteMes | null)[] = Array.from({ length: 13 }, () => null);
   const decomp: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
@@ -202,6 +230,8 @@ export function montarLinhasPontual(
   const prodFim: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
   const prodEntrada: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
   const prodEntrega: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
+  const squadEntrada: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
+  const squadEntrega: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
   for (let m = 1; m <= 12; m++) {
     if (m > mesCorrente) continue;
     const ym = `${ANO}-${String(m).padStart(2, "0")}`;
@@ -212,6 +242,11 @@ export function montarLinhasPontual(
     const pp = classificarPontePorProduto(porMes[m - 1] ?? [], porMes[m] ?? []);
     prodEntrada[m] = pp.entrada;
     prodEntrega[m] = pp.entrega;
+    if (sublinhasPor === "squad") {
+      const ps = classificarPontePorSquad(porMes[m - 1] ?? [], porMes[m] ?? []);
+      squadEntrada[m] = ps.entrada;
+      squadEntrega[m] = ps.entrega;
+    }
   }
 
   const serieFluxo = (pick: (p: PonteMes) => number, signo: 1 | -1) =>
@@ -378,22 +413,71 @@ export function montarLinhasPontual(
     return subs;
   };
 
-  const subPorPai: Record<string, LinhaPontual[]> = {
-    pontual_venda_comercial: subLinhasProduto("pontual_venda_comercial", (m) => vendaPorProdutoPorMes[m] ?? {}, "fluxo", 1),
-    pontual_entrada: subLinhasProduto("pontual_entrada", (m) => prodEntrada[m] ?? {}, "fluxo", 1),
-    pontual_entrega: subLinhasProduto("pontual_entrega", (m) => prodEntrega[m] ?? {}, "fluxo", -1),
-    pontual_estoque_fim: subLinhasProduto("pontual_estoque_fim", (m) => prodFim[m] ?? {}, "estoque", 1),
+  // Sub-linhas por squad (usadas na aba Creators, onde produto é redundante).
+  const subLinhasSquad = (
+    paiMetrica: string,
+    pickMes: (m: number) => Record<string, number>,
+    tipoAgregacao: "fluxo" | "estoque",
+    signo: 1 | -1,
+  ): LinhaPontual[] => {
+    const sqs = Array.from(new Set(
+      Array.from({ length: mesCorrente }, (_, i) => pickMes(i + 1)).flatMap((d) => Object.keys(d)),
+    ));
+    const valMesCorrente = (sq: string) => pickMes(mesCorrente)[sq] ?? 0;
+    const grandesS = sqs
+      .filter((sq) => Math.abs(valMesCorrente(sq)) >= SQUAD_MIN_EXIBIR)
+      .sort((a, b) => Math.abs(valMesCorrente(b)) - Math.abs(valMesCorrente(a)));
+    const pequenosS = sqs.filter((sq) => Math.abs(valMesCorrente(sq)) < SQUAD_MIN_EXIBIR);
+    const serieDe = (pick: (d: Record<string, number>) => number) =>
+      Array.from({ length: 12 }, (_, i) => {
+        const m = i + 1;
+        return m <= mesCorrente ? signo * pick(pickMes(m)) : null;
+      });
+    const ytdDe = (serie: (number | null)[], pickFechado: () => number): number | null =>
+      tipoAgregacao === "estoque"
+        ? (mesFechado === 0 ? null : signo * pickFechado())
+        : sumYtd(serie);
+    const subs: LinhaPontual[] = grandesS.map((sq) => {
+      const serie = serieDe((d) => d[sq] ?? 0);
+      return mk(`pontual_sq:${paiMetrica}:${sq}`, `· ${sq}`, tipoAgregacao, serie, ytdDe(serie, () => pickMes(mesFechado)[sq] ?? 0), { paiMetrica });
+    });
+    const somaPeq = (d: Record<string, number>) => pequenosS.reduce((s, sq) => s + (d[sq] ?? 0), 0);
+    const serieOutrosS = serieDe(somaPeq);
+    if (serieOutrosS.some((v) => v !== null && Math.abs(v) > 0.5)) {
+      subs.push(mk(`pontual_sq:${paiMetrica}:__outros__`, "· Outros (< R$ 10K)", tipoAgregacao, serieOutrosS, ytdDe(serieOutrosS, () => somaPeq(pickMes(mesFechado))), { paiMetrica, semDetalhe: true }));
+    }
+    return subs;
   };
-  // Cada status do estoque final (Em execução, Triagem, Pausado, Onboarding, Em cancelamento)
-  // também é expandível por produto (estoque daquele status decomposto por produto).
-  for (const { chave } of STATUS_DECOMP) {
-    const metricaStatus = `pontual_status_${chave.replace(/\s+/g, "_")}`;
-    subPorPai[metricaStatus] = subLinhasProduto(
-      metricaStatus,
-      (m) => decomporProduto((porMes[m] ?? []).filter((r) => r.status === chave)),
-      "estoque", 1,
-    );
-  }
+
+  const subPorPai: Record<string, LinhaPontual[]> = sublinhasPor === "squad"
+    ? {
+        // Venda Pontual não tem squad na query — sem sub-linhas expansíveis
+        pontual_entrada: subLinhasSquad("pontual_entrada", (m) => squadEntrada[m] ?? {}, "fluxo", 1),
+        pontual_entrega: subLinhasSquad("pontual_entrega", (m) => squadEntrega[m] ?? {}, "fluxo", -1),
+        pontual_estoque_fim: subLinhasSquad("pontual_estoque_fim", (m) => decompSquad[m] ?? {}, "estoque", 1),
+        ...Object.fromEntries(STATUS_DECOMP.map(({ chave }) => {
+          const metricaStatus = `pontual_status_${chave.replace(/\s+/g, "_")}`;
+          return [metricaStatus, subLinhasSquad(
+            metricaStatus,
+            (m) => decomporSquad((porMes[m] ?? []).filter((r) => r.status === chave)),
+            "estoque", 1,
+          )];
+        })),
+      }
+    : {
+        pontual_venda_comercial: subLinhasProduto("pontual_venda_comercial", (m) => vendaPorProdutoPorMes[m] ?? {}, "fluxo", 1),
+        pontual_entrada: subLinhasProduto("pontual_entrada", (m) => prodEntrada[m] ?? {}, "fluxo", 1),
+        pontual_entrega: subLinhasProduto("pontual_entrega", (m) => prodEntrega[m] ?? {}, "fluxo", -1),
+        pontual_estoque_fim: subLinhasProduto("pontual_estoque_fim", (m) => prodFim[m] ?? {}, "estoque", 1),
+        ...Object.fromEntries(STATUS_DECOMP.map(({ chave }) => {
+          const metricaStatus = `pontual_status_${chave.replace(/\s+/g, "_")}`;
+          return [metricaStatus, subLinhasProduto(
+            metricaStatus,
+            (m) => decomporProduto((porMes[m] ?? []).filter((r) => r.status === chave)),
+            "estoque", 1,
+          )];
+        })),
+      };
 
   // Insere as sub-linhas logo após cada linha-pai e marca o pai como expansível.
   const out: LinhaPontual[] = [];
