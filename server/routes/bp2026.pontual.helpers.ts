@@ -108,7 +108,7 @@ const NOTA_DEFASADA =
 const NOTA_REATIVACAO =
   "Contratos que estavam como entregue/cancelado e voltaram ao estoque.";
 const NOTA_SEM_ORIGEM =
-  "Contratos presentes no snapshot mas sem registro atual em cup_contratos (órfãos).";
+  "Contratos no snapshot sem data de criação em cup_contratos (órfãos do ClickUp ou data_criado vazia).";
 
 // porMes[m] = registros (valorp>0) do último snapshot do mês m; m=0 é dez/2025.
 export function montarLinhasPontual(
