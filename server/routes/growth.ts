@@ -3561,6 +3561,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(SUM(mid.impressions), 0) as impressoes,
           COALESCE(SUM(mid.clicks), 0) as cliques,
           COALESCE(SUM(mid.outbound_clicks), 0) as cliques_saida,
+          COALESCE(SUM(mid.unique_outbound_clicks), 0) as cliques_saida_unicos,
           COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina,
           COALESCE(SUM(mid.reach), 0) as alcance,
           COALESCE(AVG(mid.frequency), 0) as frequencia,
@@ -3581,6 +3582,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const investimento = parseFloat(row.investimento) || 0;
       const impressoes = parseInt(row.impressoes) || 0;
       const cliquesSaida = parseInt(row.cliques_saida) || 0;
+      const cliquesSaidaUnicos = parseInt(row.cliques_saida_unicos) || 0;
       const landingPageViewsPixel = parseInt(row.visualizacoes_pagina) || 0;
       const alcance = parseInt(row.alcance) || 0;
       const frequencia = parseFloat(row.frequencia) || 0;
@@ -3590,6 +3592,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = outbound_clicks / impressions
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
+      // CTR de saída único = unique_outbound_clicks / reach (definição "unique" do Meta:
+      // % de PESSOAS alcançadas que clicaram pra sair, cada pessoa conta 1×).
+      const ctrUnico = alcance > 0 ? (cliquesSaidaUnicos / alcance) : 0;
       // Connect Rate pelo pixel (legado, mantido só p/ comparação)
       const connectRatePixel = cliquesSaida > 0 ? landingPageViewsPixel / cliquesSaida : 0;
       // Vídeo Hook = video_3_sec_watched_actions / impressões (actions[].video_view, 3+ seg)
@@ -3619,6 +3624,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         frequencia,
         cpm,
         ctr,
+        ctrUnico,
         videoHook,
         videoHold,
         visualizacoesPagina,

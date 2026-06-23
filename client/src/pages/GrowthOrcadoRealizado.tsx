@@ -1213,7 +1213,7 @@ export default function GrowthOrcadoRealizado() {
   // ===== Platform-specific queries (only in aprofundado view) =====
   interface MetaAdsDetailMetrics {
     investimento: number; impressoes: number; alcance: number; frequencia: number;
-    cpm: number; ctr: number; videoHook: number; videoHold: number;
+    cpm: number; ctr: number; ctrUnico?: number; videoHook: number; videoHold: number;
     videoP75: number; videoP100: number; visualizacoesPagina: number; connectRate: number;
     sessoes: number;
     // Base pixel Meta (landing_page_views) — usada em Connect Rate e Tx Conversão da Página,
@@ -1789,7 +1789,8 @@ export default function GrowthOrcadoRealizado() {
     const topMetrics: Metric[] = [
       { id: 'meta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'meta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
-      { id: 'meta_ctr', name: 'CTR', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
+      { id: 'meta_ctr', name: 'CTR de saída', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
+      { id: 'meta_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: d.ctrUnico ?? null, percentual: null, format: 'percent' },
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: lpvPixel, percentual: calcPercentual(O.visualizacoesPagina, lpvPixel), format: 'number' },
       { id: 'meta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
       { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent' },
