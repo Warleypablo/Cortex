@@ -599,7 +599,8 @@ export function registerBp2026Routes(app: Express, db: any) {
       const mesCorrente = anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;
       const mesFechado = anoAtual > ANO ? 12 : mesCorrente <= 1 ? 0 : mesCorrente - 1;
       const linhas = await montarPontual({ db, mesCorrente, mesFechado, produtoLike: "%creators%" });
-      res.json({ linhas, mesCorrente, mesFechado });
+      const comInfo = linhas.map((l) => ({ ...l, info: INFO_METRICAS[l.metrica] }));
+      res.json({ linhas: comInfo, mesCorrente, mesFechado });
     } catch (error) {
       console.error("[bp2026] Erro em /api/bp2026/pontual-creators:", error);
       res.status(500).json({ error: "Failed to fetch pontual creators" });
