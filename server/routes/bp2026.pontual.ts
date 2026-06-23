@@ -41,5 +41,20 @@ export async function montarPontual({ db, mesCorrente, mesFechado }: Deps): Prom
     });
   }
 
-  return montarLinhasPontual(porMes, mesCorrente, mesFechado);
+  // Venda Pontual (comercial): mesma fonte/régua da Receita Pontual de Vendas por Produto
+  // (cup_contratos por data_criado) — garante que "venda bate com venda".
+  const vendaRes = await db.execute(sql`
+    SELECT EXTRACT(MONTH FROM data_criado)::int AS mes,
+           COALESCE(SUM(valorp::numeric), 0)::float AS valor
+    FROM "Clickup".cup_contratos
+    WHERE data_criado >= '2026-01-01' AND data_criado < '2027-01-01'
+      AND LOWER(TRIM(status)) <> 'não usar' AND valorp::numeric > 0
+    GROUP BY 1
+  `);
+  const vendaComercialPorMes: Record<number, number> = {};
+  for (const row of vendaRes.rows as any[]) {
+    vendaComercialPorMes[Number(row.mes)] = Number(row.valor);
+  }
+
+  return montarLinhasPontual(porMes, mesCorrente, mesFechado, vendaComercialPorMes);
 }

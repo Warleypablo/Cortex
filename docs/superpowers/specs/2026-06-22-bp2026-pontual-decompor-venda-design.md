@@ -146,3 +146,40 @@ Regras:
 ## Fora de escopo
 - Não alterar a "Receita Pontual" da Visão Geral nem a aba "Vendas por Produto".
 - Não criar reconciliação/plug entre as duas réguas (decisão explícita de NÃO trocar a fonte).
+
+---
+
+## ADENDO (2026-06-22, pós-validação visual) — "venda tem que bater com venda"
+
+Após ver a feature pronta, o usuário apontou que a decomposição **não resolveu** o pedido original:
+nenhuma linha da aba de estoque bate com a "Receita Pontual" de Vendas por Produto — nem `· Venda do
+mês`, porque o snapshot exclui contratos criados no mês que já saíram da foto (entregues no mês) ou que
+ainda não entraram (lag). Ex. confirmado em prod: março — Receita Pontual = 954.344, mas só 282.017 é
+"venda do mês na foto"; os 672.327 restantes não estão no estoque de 31/03.
+
+**Nova decisão (aprovada):** separar os dois conceitos em **dois blocos** na aba Pontual, cada um com
+nome e nota próprios, e a **Venda batendo com a Venda sempre**:
+
+### Bloco 1 — "Venda Pontual (comercial)"
+- Linha `(+) Venda Pontual` (metrica `pontual_venda_comercial`), grupo `"Venda Pontual (comercial)"`.
+- Fonte: `cup_contratos` por `data_criado`, `SUM(valorp)`, `status <> 'não usar'`, `valorp > 0` —
+  **idêntica** à Receita Pontual da Visão Geral → bate 100%, independente da situação.
+- Drill: lista os contratos pontuais criados no mês (por produto/cliente).
+- Nota: "Quanto foi vendido no mês (data de criação do contrato). Igual a Vendas por Produto."
+
+### Bloco 2 — "Movimento do estoque (foto do ClickUp)"
+- As linhas de estoque já existentes ganham grupo `"Movimento do estoque (foto do ClickUp)"`.
+- A linha-mãe `(+) Venda` é **renomeada** para `(+) Entrada no estoque` (metrica passa a
+  `pontual_entrada`; drill continua concatenando as 4 sub-linhas via `SUBCATS_VENDA`).
+- Sub-linhas (`· Venda do mês / · Entrada defasada / · Reativação / · Sem origem`) e o resto da ponte
+  permanecem como implementado nas Tasks 1–3 (régua de snapshot, ponte fecha).
+- Nota: "O que entrou/saiu da foto do estoque. Difere da venda pela defasagem do snapshot."
+
+### Implementação do adendo
+- `LinhaPontual` ganha `grupo?: string`; `montarLinhasPontual` recebe `vendaComercialPorMes:
+  Record<number, number>` e emite o bloco 1 + aplica `grupo` aos dois blocos + renomeia a linha-mãe.
+- `bp2026.pontual.ts`: nova query da venda comercial por mês (mesmas regras da Receita Pontual).
+- `bp2026.detalhe.ts`: rótulos/roteamento — `pontual_entrada` (era `pontual_venda`) e
+  `pontual_venda_comercial` (novo handler que lista contratos por `data_criado`).
+- `BP2026.tsx`: nota explicando os dois blocos. `BPDreTable` já renderiza headers por `grupo`.
+- O `BPDreTable` renderiza um header de bloco quando `grupo` muda (não é mudança no componente).

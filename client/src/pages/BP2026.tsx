@@ -154,8 +154,14 @@ export default function BP2026() {
         </TabsContent>
         <TabsContent value="pontual" className="mt-4 space-y-2">
           <h3 className="text-sm font-semibold text-gray-700 dark:text-zinc-300">
-            Movimento do estoque de contratos pontuais (só realizado)
+            Pontual — venda comercial × movimento de estoque (só realizado)
           </h3>
+          <p className="text-xs text-gray-500 dark:text-zinc-400 max-w-4xl">
+            <strong>Venda Pontual</strong> = quanto foi vendido no mês (data de criação do contrato) —
+            igual a Vendas por Produto. O <strong>Movimento do estoque</strong> mostra o que entrou e saiu
+            da foto do ClickUp (snapshot); difere da venda pela defasagem da foto (venda criada no fim do
+            mês ou já entregue não aparece como entrada no mesmo mês). São medidas diferentes.
+          </p>
           <BPDreTable
             linhas={data.pontual}
             mesCorrente={data.mesCorrente}
