@@ -115,7 +115,7 @@ export interface AggVendasClickup {
   totais: Map<number, TotalMes>;
 }
 export interface ContratoRow {
-  idSubtask: string; cliente: string; produto: string; servico: string; status: string;
+  idSubtask: string; idTask: string; cliente: string; produto: string; servico: string; status: string;
   valorr: number; valorp: number; data: string | null;
 }
 
