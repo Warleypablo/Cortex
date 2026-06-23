@@ -57,14 +57,6 @@ export function EvolucaoLtLtv({
     <Card className="bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
       <CardHeader>
         <CardTitle className="text-base">Evolução mensal — LT &amp; LTV Recorrente × Pontual</CardTitle>
-        <p className="text-xs text-gray-500 dark:text-zinc-400">
-          Base presente em cada snapshot de fim de mês (cup_data_hist). Recorrente: ativos contam idade
-          (1ª compra → mês); cancelados contam LT realizado (até o churn) — alinhado ao total acima.
-          {" "}Pontual: 1 entrega entregue = 1 mês ({incluirUnicas ? "entrega única incluída" : "entrega única fora do LT"}); LTV = realizado (só entregues).
-          {" "}Faturamento: pontual = valor entregue no mês (1ª vez que a entrega vira entregue); recorrente = MRR ativo do mês (Σ valorr da base ativa).
-          {" "}Vendas (pontual): Σ valorp dos contratos cujo data_inicio cai naquele mês (new bookings); recorrente mostra —.
-          {" "}Ticket médio: recorrente = MRR ÷ clientes ativos (mensalidade média); pontual = valor entregue ÷ nº de entregas do mês (preço médio por entrega).
-        </p>
       </CardHeader>
       <CardContent className="overflow-x-auto">
         {!data ? (
