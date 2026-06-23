@@ -262,7 +262,12 @@ const TITULOS_SUBABAS: Record<string, string> = {
   pontual_venda_no_estoque: "· Entrou no estoque", pontual_venda_fora_estoque: "· Fora do estoque",
   pontual_estoque_ini: "(=) Estoque inicial", pontual_entrada: "(+) Entrada na foto",
   pontual_entrega: "(−) Entrega", pontual_churn: "(−) Churn",
+  pontual_taxa_entrega: "· Taxa de entrega",
   pontual_deletados: "(−) Deletados", pontual_saida_atipica: "(−) Saída atípica",
+  pontual_aging: "Aging do estoque",
+  pontual_aging_lt30: "Aging < 30 dias", pontual_aging_30_60: "Aging 30–60 dias",
+  pontual_aging_60_90: "Aging 60–90 dias", pontual_aging_gt90: "Aging > 90 dias",
+  pontual_tempo_medio: "Tempo médio p/ entrega",
   pontual_reajuste: "(±) Reajuste de valor", pontual_estoque_fim: "(=) Estoque final",
   pontual_status_ativo: "Em execução (ativo)", pontual_status_triagem: "Triagem",
   pontual_status_pausado: "Pausado", pontual_status_onboarding: "Onboarding",
@@ -833,6 +838,41 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste",
       ].includes(metrica)) {
         ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte, undefined, filtroCreators));
+      } else if (metrica.startsWith("pontual_aging_")) {
+        const bucket = metrica.slice("pontual_aging_".length);
+        const ageCond =
+          bucket === "lt30"  ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) < 30`
+          : bucket === "30_60" ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) BETWEEN 30 AND 59`
+          : bucket === "60_90" ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) BETWEEN 60 AND 89`
+          : sql`(a.d - COALESCE(c.data_criado::date, a.d)) >= 90`;
+        const filtroAging = filtroCreators ? sql`AND LOWER(COALESCE(h.produto, '')) LIKE '%creators%'` : sql``;
+        const resAging = await db.execute(sql`
+          WITH alvo AS (
+            SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+            WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
+              AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
+          )
+          SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+                 h.status, h.valorp::numeric AS valor,
+                 c.data_criado::date::text AS data_criado,
+                 COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
+                 (a.d - COALESCE(c.data_criado::date, a.d)) AS idade_dias
+          FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+          LEFT JOIN "Clickup".cup_contratos c ON c.id_subtask = h.id_subtask
+          WHERE h.valorp::numeric > 0
+            AND h.status NOT IN ('entregue','cancelado/inativo','não usar')
+            AND (${ageCond})
+            ${filtroAging}
+          ORDER BY cl.nome
+        `);
+        const itensAging: ItemDetalhe[] = (resAging.rows as any[]).map((r) => ({
+          grupo: r.squad, nome: r.cliente,
+          detalhe: `${r.idade_dias ?? 0} dias · status ${r.status}`,
+          data: r.data_criado ?? null, valor: parseFloat(r.valor),
+        }));
+        grupos = agruparItens(itensAging, LIMITE_ITENS);
+        realizado = itensAging.reduce((s, i) => s + i.valor, 0);
       } else if (metrica === "or_receita_variavel" || metrica === "or_stack_digital" || metrica === "or_demais") {
         const pred = metrica === "or_receita_variavel" ? PREDICADOS_OUTRAS_SUB.or_variavel
           : metrica === "or_stack_digital" ? PREDICADOS_OUTRAS_SUB.or_stack : PREDICADOS_OUTRAS_SUB.or_demais;

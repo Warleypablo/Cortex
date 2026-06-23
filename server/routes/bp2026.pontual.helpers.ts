@@ -7,9 +7,10 @@ export interface RegPontual {
   idSubtask: string;
   valorp: number;
   status: string;
-  criadoYm?: string | null; // 'YYYY-MM' de data_criado (cup_contratos); ausente => sem origem
-  squad?: string;           // squad do contrato no snapshot (p/ decomposição do estoque por squad)
-  produto?: string;         // produto do contrato no snapshot (p/ expandir linhas por produto)
+  criadoYm?: string | null;     // 'YYYY-MM' de data_criado (cup_contratos); ausente => sem origem
+  dataCriadoIso?: string | null; // 'YYYY-MM-DD' de data_criado; usado para aging e tempo médio
+  squad?: string;               // squad do contrato no snapshot (p/ decomposição do estoque por squad)
+  produto?: string;             // produto do contrato no snapshot (p/ expandir linhas por produto)
 }
 
 const ESTOQUE_STATUS_EXCLUDE = new Set(["entregue", "cancelado/inativo", "não usar"]);
@@ -199,6 +200,7 @@ export interface LinhaPontual {
 export const GRUPO_VENDA = "Venda Pontual (comercial)";
 export const GRUPO_ESTOQUE = "Movimento do estoque (foto do ClickUp)";
 export const GRUPO_SQUAD = "Estoque pontual por squad";
+export const GRUPO_ANALISE = "Análise de desempenho";
 
 const NOTA_VENDA_COMERCIAL =
   "Quanto foi vendido no mês (data de criação do contrato em cup_contratos). " +
@@ -211,6 +213,42 @@ const NOTA_VENDA_FORA_ESTOQUE =
 const NOTA_ENTRADA =
   "Tudo que entrou na foto do estoque no mês (novos do mês + vendas de meses anteriores + " +
   "reativações + órfãos). Clique para ver a composição. Régua do snapshot, fecha no estoque final.";
+
+// last day of month m (1-indexed, year=2026)
+const ultimoDiaMes = (m: number) => new Date(2026, m, 0);
+
+export interface AgingBuckets { lt30: number; d30_60: number; d60_90: number; gt90: number }
+
+// Decomposição do estoque por faixa de idade (snapshot_date - data_criado).
+// Contratos sem dataCriadoIso são ignorados (não infla o bucket incorreto).
+export function agingEstoque(atual: RegPontual[], snapshotDate: Date): AgingBuckets {
+  const out: AgingBuckets = { lt30: 0, d30_60: 0, d60_90: 0, gt90: 0 };
+  for (const r of atual) {
+    if (!ehEstoquePontual(r) || !r.dataCriadoIso) continue;
+    const dias = Math.floor((snapshotDate.getTime() - new Date(r.dataCriadoIso).getTime()) / 86400000);
+    if (dias < 0) continue;
+    if (dias < 30) out.lt30 += r.valorp;
+    else if (dias < 60) out.d30_60 += r.valorp;
+    else if (dias < 90) out.d60_90 += r.valorp;
+    else out.gt90 += r.valorp;
+  }
+  return out;
+}
+
+// Tempo médio (dias) da criação até a entrega para contratos entregues no mês.
+// Usa o snapshot anterior (ant = estoque do mês m-1) e o snapshot atual (atual = mês m).
+export function tempoMedioEntrega(ant: RegPontual[], atual: RegPontual[], snapshotDate: Date): number | null {
+  const atualMap = new Map(atual.map((r) => [r.idSubtask, r]));
+  const dias: number[] = [];
+  for (const r of ant) {
+    if (!ehEstoquePontual(r)) continue;
+    const a = atualMap.get(r.idSubtask);
+    if (!a || a.status !== "entregue" || !r.dataCriadoIso) continue;
+    const d = Math.floor((snapshotDate.getTime() - new Date(r.dataCriadoIso).getTime()) / 86400000);
+    if (d >= 0) dias.push(d);
+  }
+  return dias.length ? Math.round(dias.reduce((s, d) => s + d, 0) / dias.length) : null;
+}
 
 // porMes[m] = registros (valorp>0) do último snapshot do mês m; m=0 é dez/2025.
 // vendaComercialPorMes[m] = SUM(valorp) de cup_contratos por data_criado no mês m (= Receita Pontual).
@@ -307,10 +345,28 @@ export function montarLinhasPontual(
 
   // ---- Bloco 2: Movimento do estoque (foto/snapshot). Fecha sozinho. ----
   const serieEntrada = serieFluxo((p) => p.venda, 1); // B = tudo que entrou na foto no mês
+  // Taxa de entrega: fração (0-1) para display pct
+  const serieTaxaEntrega = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1; const p = ponte[m];
+    if (!(m <= mesCorrente && p && p.estoqueIni > 0)) return null;
+    return p.entrega / p.estoqueIni;
+  });
+  const ytdTaxaEntrega = (() => {
+    if (mesFechado === 0) return null;
+    let totalE = 0, totalI = 0;
+    for (let m = 1; m <= mesFechado; m++) {
+      const p = ponte[m];
+      if (!p || p.estoqueIni === 0) continue;
+      totalE += p.entrega; totalI += p.estoqueIni;
+    }
+    return totalI > 0 ? totalE / totalI : null;
+  })();
+
   const linhas: LinhaPontual[] = [
     mk("pontual_estoque_ini", "(=) Estoque inicial", "estoque", serieEstoqueIni, ponte[1]?.estoqueIni ?? null),
     mk("pontual_entrada", "(+) Entrada na foto", "fluxo", serieEntrada, sumYtd(serieEntrada), { nota: NOTA_ENTRADA }),
     mk("pontual_entrega", "(−) Entrega", "fluxo", serieFluxo((p) => p.entrega, -1), sumYtd(serieFluxo((p) => p.entrega, -1))),
+    mk("pontual_taxa_entrega", "· Taxa de entrega", "fluxo", serieTaxaEntrega, ytdTaxaEntrega, { unidade: "pct", semDetalhe: true }),
     mk("pontual_churn", "(−) Churn", "fluxo", serieFluxo((p) => p.churn, -1), sumYtd(serieFluxo((p) => p.churn, -1))),
     mk("pontual_deletados", "(−) Deletados", "fluxo", serieFluxo((p) => p.deletados, -1), sumYtd(serieFluxo((p) => p.deletados, -1))),
     mk("pontual_saida_atipica", "(−) Saída atípica", "fluxo", serieFluxo((p) => p.saidaAtipica, -1), sumYtd(serieFluxo((p) => p.saidaAtipica, -1))),
@@ -479,6 +535,43 @@ export function montarLinhasPontual(
         })),
       };
 
+  // ---- Bloco análise: aging + tempo médio ----
+  const agingPorMes = Array.from({ length: 13 }, (_, m) =>
+    m >= 1 && m <= mesCorrente ? agingEstoque(porMes[m] ?? [], ultimoDiaMes(m)) : null,
+  );
+  const serieAging = (pick: (a: AgingBuckets) => number) =>
+    Array.from({ length: 12 }, (_, i) => { const m = i + 1; const a = agingPorMes[m]; return a ? pick(a) : null; });
+  const ytdAgingPick = (pick: (a: AgingBuckets) => number) =>
+    mesFechado === 0 ? null : (agingPorMes[mesFechado] ? pick(agingPorMes[mesFechado]!) : null);
+
+  const serieTempoMedio = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1;
+    return m <= mesCorrente ? tempoMedioEntrega(porMes[m - 1] ?? [], porMes[m] ?? [], ultimoDiaMes(m)) : null;
+  });
+  const ytdTempoMedio = (() => {
+    if (mesFechado === 0) return null;
+    const vals = serieTempoMedio.slice(0, mesFechado).filter((v): v is number => v !== null);
+    return vals.length ? Math.round(vals.reduce((s, v) => s + v, 0) / vals.length) : null;
+  })();
+
+  const mkA = (metrica: string, titulo: string, serie: (number | null)[], ytd: number | null, extra: Partial<LinhaPontual> = {}) =>
+    mk(metrica, titulo, "estoque", serie, ytd, { grupo: GRUPO_ANALISE, ...extra });
+
+  const linhasAnalise: LinhaPontual[] = [
+    mkA("pontual_aging", "Aging do estoque", serieEstoqueFim, mesFechado === 0 ? null : ponte[mesFechado]?.estoqueFim ?? null,
+      { expansivel: true, semDetalhe: true }),
+    mkA("pontual_aging_lt30", "· < 30 dias", serieAging((a) => a.lt30), ytdAgingPick((a) => a.lt30),
+      { paiMetrica: "pontual_aging" }),
+    mkA("pontual_aging_30_60", "· 30–60 dias", serieAging((a) => a.d30_60), ytdAgingPick((a) => a.d30_60),
+      { paiMetrica: "pontual_aging" }),
+    mkA("pontual_aging_60_90", "· 60–90 dias", serieAging((a) => a.d60_90), ytdAgingPick((a) => a.d60_90),
+      { paiMetrica: "pontual_aging" }),
+    mkA("pontual_aging_gt90", "· > 90 dias", serieAging((a) => a.gt90), ytdAgingPick((a) => a.gt90),
+      { paiMetrica: "pontual_aging" }),
+    mk("pontual_tempo_medio", "Tempo médio p/ entrega", "fluxo", serieTempoMedio, ytdTempoMedio,
+      { unidade: "int", semDetalhe: true, grupo: GRUPO_ANALISE }),
+  ];
+
   // Insere as sub-linhas logo após cada linha-pai e marca o pai como expansível.
   const out: LinhaPontual[] = [];
   for (const l of [...bloco1, ...linhas, ...linhasSquad]) {
@@ -486,6 +579,7 @@ export function montarLinhasPontual(
     if (subs && subs.length) { l.expansivel = true; out.push(l, ...subs); }
     else out.push(l);
   }
+  for (const l of linhasAnalise) out.push(l);
   return out;
 }
 
