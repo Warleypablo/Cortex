@@ -41,7 +41,15 @@ export async function carregarVendasProdutoClickup(db: any): Promise<AggVendasCl
            COALESCE(SUM(valorr::numeric), 0)::float AS mrr,
            COALESCE(SUM(valorp::numeric), 0)::float AS pont,
            COUNT(*) FILTER (WHERE COALESCE(valorr,0) > 0)::int AS contratos_mrr,
-           COUNT(*) FILTER (WHERE COALESCE(valorp,0) > 0)::int AS contratos_pont
+           -- Creators pontual: contar jornadas (id_task distinto) — entregas 1ª/2ª/3ª/4ª
+           -- do mesmo cliente no mesmo mês são uma única decisão de compra.
+           -- Demais produtos: contar contratos individuais (comportamento padrão).
+           COUNT(DISTINCT
+             CASE WHEN TRIM(COALESCE(produto,'')) = 'Creators' AND COALESCE(valorp::numeric,0) > 0
+                  THEN 'task:' || id_task
+                  ELSE 'sub:'  || id_subtask
+             END
+           ) FILTER (WHERE COALESCE(valorp::numeric,0) > 0)::int AS contratos_pont
     FROM "Clickup".cup_contratos
     WHERE data_criado >= ${ini} AND data_criado < ${fim}
       AND LOWER(TRIM(status)) <> 'não usar'
