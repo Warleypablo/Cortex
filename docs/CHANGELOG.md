@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-23 | feat(creators): adicionar ticket médio na evolução LT/LTV Recorrente × Pontual
+
+**O que foi feito:**
+- Nova linha **"Ticket médio"** na tabela "Evolução mensal — LT & LTV Recorrente × Pontual" (aba Creators da tela `/lt-ltv-churn`).
+- **Recorrente** = MRR do mês ÷ clientes ativos faturando (mensalidade média). Backend: novo `COUNT(*) FILTER (WHERE mrr > 0)` em `rec_agg`.
+- **Pontual** = valor entregue no mês ÷ nº de entregas do mês (preço médio por entrega). Backend: novo `COUNT(*)` em `pont_fat`.
+- Ticket calculado no map do endpoint (`null` quando o denominador é 0); nota do card atualizada explicando a definição por modelo.
+
+**Por que:**
+- A pedido: comparar o ticket médio entre os modelos de receita de Creators. O denominador "limpo" (só quem fatura/entrega) evita diluição — usar o total de clientes (com cancelados) subestimaria a mensalidade recorrente.
+
+**Arquivos alterados:**
+- `server/routes/creatorsModelo.ts` - expõe `rec_cli_fat`/`pont_ent` na query do endpoint `/api/creators-modelo/evolucao` e calcula `ticket` por modelo.
+- `client/src/components/creators-modelo/EvolucaoLtLtv.tsx` - campo `ticket` no tipo `ModMetric`, linha na tabela e nota explicativa.
+
+**Impacto arquitetural:** Nenhum — reaproveita o pipeline e o padrão de renderização já existentes.
+
+---
+
 ## 2026-06-23 | feat(bp2026): linha "CAC por contrato" na aba CAC
 
 **O que foi feito:**
