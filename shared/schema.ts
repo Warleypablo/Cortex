@@ -1056,6 +1056,106 @@ export const creativeVocab = cortexCoreSchema.table("creative_vocab", {
   kindIdx: index("idx_creative_vocab_kind").on(table.kind),
 }));
 
+// ============== CONTENT PUBLISH (painel "Orgânico" — automacoes/instagram-turbo) ==============
+// Contrato Postgres entre o worker de publicação (Python, automacoes/instagram-turbo) e o
+// painel "Orgânico" no Cortex. Platform-agnóstico de propósito: a coluna `platform`
+// ('instagram' | 'tiktok' | 'youtube' | 'linkedin') faz o MESMO painel/worker servir todas as
+// redes. O worker ESCREVE runs/posts (+heartbeat) e CONSOME commands; o backend Express só lê/
+// escreve estas tabelas — nunca chama o Python. Ver memory/instagram-turbo-painel-operador e a
+// skill subir-conteudo-organico.
+
+// Um registro por ciclo do agente — alimenta a "saúde do agente" (heartbeat + contagens).
+export const contentPublishRuns = cortexCoreSchema.table("content_publish_runs", {
+  id: serial("id").primaryKey(),
+  runId: varchar("run_id", { length: 16 }).notNull(),          // run_id do agente (uuid hex[:8])
+  platform: varchar("platform", { length: 16 }).notNull(),     // instagram | tiktok | youtube | linkedin
+  dryRun: boolean("dry_run").notNull().default(true),
+  status: varchar("status", { length: 16 }).notNull().default("running"), // running | ok | error
+  counts: jsonb("counts").default({}),                         // { approved_seen, ready, published, failed, skipped, errors }
+  errorText: text("error_text"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (table) => ({
+  platformStartedIdx: index("idx_content_publish_runs_platform_started").on(table.platform, table.startedAt),
+  runIdIdx: index("idx_content_publish_runs_run_id").on(table.runId),
+}));
+
+export type ContentPublishRun = typeof contentPublishRuns.$inferSelect;
+export type InsertContentPublishRun = typeof contentPublishRuns.$inferInsert;
+
+// Um registro por task/dia (upsert a cada ciclo) — é a FILA/STATUS que o painel mostra.
+export const contentPosts = cortexCoreSchema.table("content_posts", {
+  id: serial("id").primaryKey(),
+  platform: varchar("platform", { length: 16 }).notNull(),
+  clickupTaskId: varchar("clickup_task_id", { length: 64 }).notNull(),
+  clickupListId: varchar("clickup_list_id", { length: 64 }),
+  taskName: text("task_name"),
+  parentName: text("parent_name"),                             // "Social Media - ABRIL"
+  mes: varchar("mes", { length: 24 }),
+  turboSlug: varchar("turbo_slug", { length: 128 }),
+  postingDate: date("posting_date"),
+  slot: varchar("slot", { length: 8 }),                        // '12h' | '18h'
+  tipoPost: varchar("tipo_post", { length: 16 }),              // single | reels | carousel
+  assetCount: integer("asset_count").default(0),
+  legendaSource: varchar("legenda_source", { length: 24 }),    // doc | claude-precisa | ia | none
+  legendaLen: integer("legenda_len").default(0),
+  legendaEmpty: boolean("legenda_empty").default(false),
+  legendaPreview: text("legenda_preview"),                     // preview da legenda (p/ aprovação de IA)
+  state: varchar("state", { length: 24 }).notNull().default("agendado"),
+    // agendado | aguardando_ia | publicado | falhou | pulado
+  skipReason: text("skip_reason"),
+  errorText: text("error_text"),
+  publishedMediaId: varchar("published_media_id", { length: 64 }), // ig media_id / tiktok publish_id
+  permalink: text("permalink"),                                // URL do post na rede
+  clickupUrl: text("clickup_url"),
+  lastRunId: varchar("last_run_id", { length: 16 }),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  uniqTaskDate: uniqueIndex("idx_content_posts_platform_task_date").on(table.platform, table.clickupTaskId, table.postingDate),
+  platformDateIdx: index("idx_content_posts_platform_date").on(table.platform, table.postingDate),
+  stateIdx: index("idx_content_posts_state").on(table.state),
+}));
+
+export type ContentPost = typeof contentPosts.$inferSelect;
+export type InsertContentPost = typeof contentPosts.$inferInsert;
+
+// Fila de comandos painel→worker. O worker lê status='pending', executa e marca done/failed.
+export const contentPublishCommands = cortexCoreSchema.table("content_publish_commands", {
+  id: serial("id").primaryKey(),
+  platform: varchar("platform", { length: 16 }).notNull(),
+  clickupTaskId: varchar("clickup_task_id", { length: 64 }),   // null em comandos globais (pause/resume)
+  action: varchar("action", { length: 32 }).notNull(),
+    // publish_now | retry | skip | approve_caption | edit_caption | pause_agent | resume_agent
+  payload: jsonb("payload").default({}),                       // ex.: { caption: "..." } no edit_caption
+  status: varchar("status", { length: 16 }).notNull().default("pending"), // pending | running | done | failed | canceled
+  result: jsonb("result"),
+  errorText: text("error_text"),
+  requestedBy: varchar("requested_by", { length: 255 }),       // email do usuário do painel
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (table) => ({
+  statusIdx: index("idx_content_publish_commands_status").on(table.status),
+  platformTaskIdx: index("idx_content_publish_commands_platform_task").on(table.platform, table.clickupTaskId),
+}));
+
+export type ContentPublishCommand = typeof contentPublishCommands.$inferSelect;
+export type InsertContentPublishCommand = typeof contentPublishCommands.$inferInsert;
+
+// Estado/config por plataforma (1 linha por rede): pausar agente + dry-run.
+export const contentPublishSettings = cortexCoreSchema.table("content_publish_settings", {
+  platform: varchar("platform", { length: 16 }).primaryKey(),  // instagram | tiktok | ...
+  agentEnabled: boolean("agent_enabled").notNull().default(true),
+  dryRun: boolean("dry_run").notNull().default(true),          // default seguro = não publica
+  slotsConfig: jsonb("slots_config"),                          // override opcional dos slots 12h/18h
+  updatedBy: varchar("updated_by", { length: 255 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ContentPublishSetting = typeof contentPublishSettings.$inferSelect;
+export type InsertContentPublishSetting = typeof contentPublishSettings.$inferInsert;
+
 // CRM Deal table
 export const crmDeal = bitrixSchema.table("crm_deal", {
   id: integer("id").primaryKey(),
