@@ -23,8 +23,10 @@ export function registerComercialRoutes(app: Express) {
       if (hasEmail) selectColumns.push(sql`email`);
       if (hasActive) selectColumns.push(sql`active`);
 
+      // Whitelist de closers ativos: só os marcados active=true aparecem nos dropdowns.
+      const whereActive = hasActive ? sql`WHERE active = true` : sql``;
       const result = await db.execute(sql`
-        SELECT ${sql.join(selectColumns, sql`, `)} FROM "Bitrix".crm_closers ORDER BY nome
+        SELECT ${sql.join(selectColumns, sql`, `)} FROM "Bitrix".crm_closers ${whereActive} ORDER BY nome
       `);
 
       // Ensure all rows have email and active fields
@@ -234,14 +236,14 @@ export function registerComercialRoutes(app: Express) {
 
       const resultReunioes = await db.execute(sql`
         SELECT
-          c.id as closer_id,
-          c.nome as closer_name,
+          CASE WHEN c.active THEN c.id ELSE 0 END as closer_id,
+          CASE WHEN c.active THEN c.nome ELSE 'Outros' END as closer_name,
           COUNT(*) as reunioes
         FROM "Bitrix".crm_deal d
-        INNER JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseReunioes}
-        GROUP BY c.id, c.nome
-        ORDER BY c.nome
+        GROUP BY 1, 2
+        ORDER BY 2
       `);
 
       // Query 2: Negócios ganhos por closer - filtered ONLY by closing dates
@@ -257,14 +259,14 @@ export function registerComercialRoutes(app: Express) {
 
       const resultNegocios = await db.execute(sql`
         SELECT
-          c.id as closer_id,
-          c.nome as closer_name,
+          CASE WHEN c.active THEN c.id ELSE 0 END as closer_id,
+          CASE WHEN c.active THEN c.nome ELSE 'Outros' END as closer_name,
           COUNT(*) as negocios_ganhos
         FROM "Bitrix".crm_deal d
-        INNER JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseNegocios}
-        GROUP BY c.id, c.nome
-        ORDER BY c.nome
+        GROUP BY 1, 2
+        ORDER BY 2
       `);
 
       // Merge results by closer
@@ -331,18 +333,20 @@ export function registerComercialRoutes(app: Express) {
       // Query principal: negócios ganhos, MRR, pontual, contadores
       const result = await db.execute(sql`
         SELECT
-          c.id as closer_id,
-          c.nome as closer_name,
+          CASE WHEN c.active THEN c.id ELSE 0 END as closer_id,
+          CASE WHEN c.active THEN c.nome ELSE 'Outros' END as closer_name,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual,
           COUNT(*) as negocios_ganhos,
           COUNT(CASE WHEN COALESCE(d.valor_recorrente, 0) > 0 THEN 1 END) as negocios_com_recorrente,
           COUNT(CASE WHEN COALESCE(d.valor_pontual, 0) > 0 THEN 1 END) as negocios_com_pontual
         FROM "Bitrix".crm_deal d
-        INNER JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        -- LEFT JOIN + bucket "Outros": só os 7 closers ativos aparecem nominalmente;
+        -- o resto (closers inativos e deals sem closer) é agregado em "Outros" p/ o total fechar.
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
-        GROUP BY c.id, c.nome
-        ORDER BY c.nome
+        GROUP BY 1, 2
+        ORDER BY 2
       `);
 
       // Query separada para reuniões (usa datas de reunião)
@@ -363,12 +367,12 @@ export function registerComercialRoutes(app: Express) {
 
       const reunioesResult = await db.execute(sql`
         SELECT
-          c.id as closer_id,
+          CASE WHEN c.active THEN c.id ELSE 0 END as closer_id,
           COUNT(*) as reunioes
         FROM "Bitrix".crm_deal d
-        INNER JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+        LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClauseReunioes}
-        GROUP BY c.id
+        GROUP BY 1
       `);
 
       // Mapa de reuniões por closer
@@ -1577,14 +1581,14 @@ export function registerComercialRoutes(app: Express) {
 
       const result = await db.execute(sql`
         SELECT
-          COALESCE(c.nome, 'Não Atribuído') as closer_name,
+          CASE WHEN c.active THEN c.nome ELSE 'Outros' END as closer_name,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual,
           COUNT(*) as contratos
         FROM "Bitrix".crm_deal d
         LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
-        GROUP BY c.id, c.nome
+        GROUP BY 1
         ORDER BY mrr DESC
       `);
 
@@ -1974,7 +1978,7 @@ export function registerComercialRoutes(app: Express) {
 
       const result = await db.execute(sql`
         SELECT
-          c.nome as closer,
+          CASE WHEN c.active THEN c.nome ELSE 'Outros' END as closer,
           COUNT(*) as quantidade,
           COALESCE(SUM(d.valor_recorrente), 0) as mrr,
           COALESCE(SUM(d.valor_pontual), 0) as pontual,
@@ -1984,7 +1988,7 @@ export function registerComercialRoutes(app: Express) {
         FROM "Bitrix".crm_deal d
         LEFT JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
         ${whereClause}
-        GROUP BY c.nome
+        GROUP BY 1
         ORDER BY total DESC
       `);
 
@@ -2380,7 +2384,7 @@ export function registerComercialRoutes(app: Express) {
   app.get("/api/comercial/funil/filtros", isAuthenticated, async (req, res) => {
     try {
       const [closersResult, sdrsResult, sourcesResult] = await Promise.all([
-        db.execute(sql`SELECT id, nome as name FROM "Bitrix".crm_closers ORDER BY nome`),
+        db.execute(sql`SELECT id, nome as name FROM "Bitrix".crm_closers WHERE active = true ORDER BY nome`),
         db.execute(sql`
           SELECT DISTINCT u.id, u.nome as name
           FROM "Bitrix".crm_users u

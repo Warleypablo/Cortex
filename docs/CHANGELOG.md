@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-24 | feat(comercial): exibir só os 7 closers ativos nas telas de comercial
+
+**O que foi feito:**
+- A coluna `"Bitrix".crm_closers.active` passou a ser a whitelist de closers ativos. Marcados `active=true` apenas os 7: Arthur Zon, Fabio Richard, Daniel Basilio, Matheus Scalfoni, Ramon Reis, Roberto Fachetti, Rodrigo Pimenta.
+- Inserido **Rodrigo Pimenta** (id 1154) na `crm_closers` — não existia, por isso era excluído dos rankings com `INNER JOIN`.
+- **Dropdowns/filtros** (`/api/closers/list`, `/api/comercial/funil/filtros`) passam a retornar só `active=true`.
+- **Rankings** (`chart-receita`, `chart-reunioes-negocios`, `mrr-por-closer`, `detalhamento/por-closer`) trocaram `INNER`→`LEFT JOIN` e agregam os não-ativos (e deals sem closer) sob **"Outros"**, preservando os totais.
+- **Ranking de slides do Reporte Mensal** mostra só os 7 (sem "Outros", por ser ranking com fotos).
+
+**Por que:**
+- As telas de comercial mostravam ~30 nomes (ex-funcionários, SDRs, closers antigos). A pedido, restringir a exibição de closers aos 7 atuais, sem alterar os totais de vendas.
+
+**Arquivos alterados:**
+- `server/routes/comercial.ts` - filtro `active` nos dropdowns; `LEFT JOIN` + bucket "Outros" nos 4 endpoints de ranking.
+- `server/routes/relatorioMensalSlides.ts` - ranking de closers do mês filtra `c.active = true`.
+- Dados (fora do git): `INSERT` Rodrigo Pimenta + `UPDATE active` aplicados em **local + produção**.
+
+**Impacto arquitetural:** Nenhum estrutural. Validado no banco: soma das linhas (7 + "Outros") = total geral (R$ 1.639.418 / 441 deals em 2026), totais preservados.
+
+---
+
 ## 2026-06-24 | fix(bp2026): AOV/Contratos por produto contam só contratos com MRR>0
 
 **O que foi feito:**
