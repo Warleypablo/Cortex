@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-24 | chore(ads-creation): cadastra clipes Natural tech na Biblioteca (TP1693–1704)
+
+**O que foi feito:**
+- `subir-naturaltech-planilha.ts`: cadastra os 12 clipes "Natural tech" das 2 pastas de editados
+  - Esther (TP1693–1695) + Ichino (TP1696–1698) — pasta "56 - Estratégia peculiar natural tech"
+  - Musso (TP1699–1704) — pasta "57 - Natural tech"
+- São clipes soltos **sem h/b/c e sem formato 9x16/4x5** — cadastrados como estão (1 linha/clipe), persona do nome do arquivo, tema da pasta
+- TP sequencial (max+1), dedup por driveFileId
+
+**Por que:**
+- O usuário confirmou que os links estavam certos e pediu pra cadastrar o Natural tech mesmo sem a estrutura padrão (h/b/c)
+
+**Arquivos novos:**
+- `subir-naturaltech-planilha.ts` - cadastro dos clipes Natural tech na Biblioteca
+
+**Impacto arquitetural:** Nenhum — cadastro na Biblioteca (sem Meta API); primeiro lote sem h/b/c/formato.
+
+---
+
 ## 2026-06-24 | feat(ads-creation): sobe lote Victor "Bready" na camp CBO Creators (159–164)
 
 **O que foi feito:**
