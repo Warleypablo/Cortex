@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-24 | fix(bp2026): AOV/Contratos por produto contam só contratos com MRR>0
+
+**O que foi feito:**
+- Na aba **Revenue** do BP 2026 (`bp2026.revenue.ts`), o `COUNT(DISTINCT id_subtask)` por produto passou a aplicar `FILTER (WHERE COALESCE(valorr,0) > 0)`.
+- Afeta as linhas **"Contratos — <produto>"** e **"AOV — <produto>"** (AOV = MRR ÷ contratos).
+- Validado em produção (abril): Creators AOV 1.408 → 5.951 (contratos 186 → 44); Others 895 → 2.229; Performance/Social/GC praticamente inalterados.
+
+**Por que:**
+- Contratos pontuais (têm `valorp`, `valorr = 0`) em status ativo/onboarding/triagem entravam no denominador do AOV sem somar nada no numerador, diluindo o indicador — gritante em Creators, que virou majoritariamente pontual a partir de abril.
+- Alinha o tratamento à aba **Vendas por Produto**, que já filtrava `valorr > 0`.
+
+**Arquivos alterados:**
+- `server/routes/bp2026.revenue.ts` - filtro `valorr > 0` no COUNT de contratos do snapshot por produto.
+
+**Impacto arquitetural:** Nenhum — mudança isolada na query do snapshot; numerador (MRR), churn% e MRR Ativo permanecem idênticos.
+
+---
+
 ## 2026-06-23 | feat(creators): adicionar ticket médio na evolução LT/LTV Recorrente × Pontual
 
 **O que foi feito:**
