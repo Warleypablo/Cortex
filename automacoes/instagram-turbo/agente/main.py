@@ -39,30 +39,62 @@ from agente.idempotency import Lock, LockHeld, inspect_comments, should_process
 _mes_cache: dict[str, dict] = {}
 
 
-# ── Slots fixos (modo atual) ───────────────────────────────────────────────
-SLOT_HOURS = (12, 18)
-SLOT_TOLERANCE_HOURS = 1
+# ── Slots fixos (hora, minuto) ─────────────────────────────────────────────
+# O agente só publica dentro de uma destas janelas. Cada slot abre no horário
+# indicado e fica aberto por SLOT_TOLERANCE_MINUTES (margem pra pegar a rodada
+# do cron, que não cai no segundo exato do slot).
+#   12:00 → janela 12:00–12:59   ·   17:30 → janela 17:30–18:29
+SLOTS = ((12, 0), (17, 30))
+SLOT_TOLERANCE_MINUTES = 60
+
+
+def _slot_label(h: int, m: int) -> str:
+    """Rótulo curto do slot: '12h' em ponto, '17h30' quando tem minutos."""
+    return f"{h}h" if m == 0 else f"{h}h{m:02d}"
+
+
+def _mins(h: int, m: int = 0) -> int:
+    """Minutos desde a meia-noite."""
+    return h * 60 + m
+
+
+def _hhmm(total_min: int) -> str:
+    return f"{total_min // 60:02d}:{total_min % 60:02d}"
 
 
 def current_slot(now: datetime | None = None) -> str | None:
     now = now or datetime.now()
-    for h in SLOT_HOURS:
-        if h <= now.hour < h + SLOT_TOLERANCE_HOURS:
-            return f"{h}h"
+    now_min = _mins(now.hour, now.minute)
+    for h, m in SLOTS:
+        start = _mins(h, m)
+        if start <= now_min < start + SLOT_TOLERANCE_MINUTES:
+            return _slot_label(h, m)
     return None
 
 
 def slot_status_human(now: datetime | None = None) -> str:
     now = now or datetime.now()
-    h = now.hour
+    now_min = _mins(now.hour, now.minute)
     slot = current_slot(now)
     if slot:
-        return f"no slot {slot} (até {SLOT_HOURS[0] + SLOT_TOLERANCE_HOURS if slot=='12h' else SLOT_HOURS[1] + SLOT_TOLERANCE_HOURS}h)"
-    if h < SLOT_HOURS[0]:
-        return f"antes do 1º slot — abre {SLOT_HOURS[0]}h"
-    if SLOT_HOURS[0] + SLOT_TOLERANCE_HOURS <= h < SLOT_HOURS[1]:
-        return f"entre slots — slot {SLOT_HOURS[0]}h fechou, {SLOT_HOURS[1]}h abre depois"
-    return f"depois do último slot — slot {SLOT_HOURS[1]}h fechou às {SLOT_HOURS[1] + SLOT_TOLERANCE_HOURS}h"
+        for h, m in SLOTS:
+            if _slot_label(h, m) == slot:
+                return f"no slot {slot} (até {_hhmm(_mins(h, m) + SLOT_TOLERANCE_MINUTES)})"
+    ordered = sorted(SLOTS, key=lambda s: _mins(*s))
+    first, last = ordered[0], ordered[-1]
+    if now_min < _mins(*first):
+        return f"antes do 1º slot — abre {_slot_label(*first)}"
+    if now_min >= _mins(*last) + SLOT_TOLERANCE_MINUTES:
+        return (f"depois do último slot — slot {_slot_label(*last)} "
+                f"fechou às {_hhmm(_mins(*last) + SLOT_TOLERANCE_MINUTES)}")
+    # entre dois slots: qual fechou e qual abre em seguida
+    prev_label = next_label = None
+    for h, m in ordered:
+        if _mins(h, m) + SLOT_TOLERANCE_MINUTES <= now_min:
+            prev_label = _slot_label(h, m)
+        elif next_label is None and now_min < _mins(h, m):
+            next_label = _slot_label(h, m)
+    return f"entre slots — slot {prev_label} fechou, {next_label} abre depois"
 
 
 @dataclass
@@ -406,7 +438,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--task-id", help="processa só essa task (debug / teste)")
     ap.add_argument(
         "--force-now", action="store_true",
-        help="bypassa filtro de Data=hoje e de slot 12h/18h. Use em testes em "
+        help="bypassa filtro de Data=hoje e de slot 12h/17h30. Use em testes em "
              "conta IG de teste. NÃO use em produção.",
     )
     ap.add_argument(
