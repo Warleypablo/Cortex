@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Loop de Inteligência de Criativos — fluxo & pendências</title>
+<style>
+  :root{
+    --bg:#0f1115; --card:#171a21; --line:#2a2f3a; --txt:#e6e9ef; --mut:#9aa3b2;
+    --roteiro:#8b5cf6; --editor:#f59e0b; --cortex:#22d3ee; --meta:#3b82f6; --dados:#34d399;
+    --ok:#22c55e; --pend:#eab308; --risk:#ef4444;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--txt);font:15px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;padding:32px}
+  .wrap{max-width:1080px;margin:0 auto}
+  h1{font-size:26px;margin:0 0 4px} h2{font-size:19px;margin:38px 0 14px;border-bottom:1px solid var(--line);padding-bottom:6px}
+  .sub{color:var(--mut);margin:0 0 8px}
+  code{background:#0b0d11;border:1px solid var(--line);border-radius:5px;padding:1px 6px;font-size:13px;color:#c7d2fe}
+  .legend{display:flex;gap:14px;flex-wrap:wrap;margin:14px 0 4px;font-size:13px;color:var(--mut)}
+  .dot{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px;vertical-align:middle}
+  .flow{display:flex;flex-direction:column}
+  .step{display:grid;grid-template-columns:120px 1fr;gap:16px;align-items:stretch}
+  .who{display:flex;align-items:center;justify-content:flex-end;text-align:right;font-weight:600;font-size:13px;padding-right:4px}
+  .card{background:var(--card);border:1px solid var(--line);border-left:4px solid var(--line);border-radius:10px;padding:12px 16px;margin:8px 0}
+  .card .t{font-weight:700;margin-bottom:3px}
+  .card .d{color:var(--mut);font-size:13.5px}
+  .card .tag{display:inline-block;font-size:11px;color:var(--mut);border:1px solid var(--line);border-radius:20px;padding:1px 9px;margin-top:8px;margin-right:6px}
+  .arrow{grid-column:2;color:var(--mut);text-align:center;font-size:18px;margin:-2px 0}
+  .bRoteiro{border-left-color:var(--roteiro)} .bEditor{border-left-color:var(--editor)}
+  .bCortex{border-left-color:var(--cortex)} .bMeta{border-left-color:var(--meta)} .bDados{border-left-color:var(--dados)}
+  table{width:100%;border-collapse:collapse;margin:8px 0;font-size:14px}
+  th,td{border:1px solid var(--line);padding:8px 10px;text-align:left;vertical-align:top}
+  th{background:#10131a;color:var(--mut);font-weight:600}
+  .pill{font-size:11px;font-weight:700;border-radius:20px;padding:2px 9px;white-space:nowrap}
+  .auto{background:rgba(34,197,94,.15);color:#86efac} .manual{background:rgba(234,179,8,.15);color:#fde68a}
+  .b-ok{background:rgba(34,197,94,.15);color:#86efac} .b-pend{background:rgba(234,179,8,.15);color:#fde68a} .b-risk{background:rgba(239,68,68,.15);color:#fca5a5}
+  .name{font-family:ui-monospace,SFMono-Regular,Menlo,monospace;font-size:15px;background:#0b0d11;border:1px solid var(--line);border-radius:8px;padding:14px;overflow-x:auto;white-space:nowrap}
+  .name b{padding:2px 4px;border-radius:4px}
+  .box{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;margin:12px 0}
+  .box.ok{border-left:4px solid var(--ok)} .box.pend{border-left:4px solid var(--pend)} .box.risk{border-left:4px solid var(--risk)} .box.info{border-left:4px solid var(--cortex)}
+  .box .t{font-weight:700;margin-bottom:3px}
+  .box .d{color:var(--mut);font-size:14px}
+  ul{margin:6px 0 6px 18px;padding:0} li{margin:4px 0}
+  .foot{color:var(--mut);font-size:12.5px;margin-top:30px;border-top:1px solid var(--line);padding-top:10px}
+</style>
+</head>
+<body><div class="wrap">
+
+  <h1>Loop de Inteligência de Criativos</h1>
+  <p class="sub">Fluxo na prática, integração com a IA de criar campanhas, e o que falta pra ir ao ar. — 22/06/2026</p>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--roteiro)"></span>Roteiro (skill/IA)</span>
+    <span><span class="dot" style="background:var(--editor)"></span>Editor (humano)</span>
+    <span><span class="dot" style="background:var(--cortex)"></span>Cortex (automático)</span>
+    <span><span class="dot" style="background:var(--meta)"></span>Meta Ads</span>
+    <span><span class="dot" style="background:var(--dados)"></span>Dados (CRM/insights)</span>
+  </div>
+
+  <h2>1. O fluxo ponta a ponta</h2>
+  <div class="flow">
+    <div class="step"><div class="who" style="color:var(--roteiro)">Roteiro</div>
+      <div class="card bRoteiro"><div class="t">1. Escreve o roteiro (skill turbo-ads-workflow)</div>
+        <div class="d">Gera o roteiro (ângulo por hook), a pasta no Drive, o Doc e a task no ClickUp — e a <b>lista de nomes de arquivo prontos</b> na convenção.</div>
+        <span class="tag">decide o ÂNGULO</span><span class="tag">gera os nomes prescritos</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--editor)">Editor</div>
+      <div class="card bEditor"><div class="t">2. Edita e nomeia os arquivos</div>
+        <div class="d">Exporta os criativos usando <b>exatamente</b> os nomes prescritos e sobe na pasta do Drive. Única disciplina manual.</div></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--cortex)">Cortex / Meta</div>
+      <div class="card bMeta"><div class="t">3. O ad sobe no Meta — pelos 2 caminhos</div>
+        <div class="d"><b>(a) IA "Criar Campanhas" do Cortex:</b> registra o criativo na Biblioteca e nomeia o ad com o Nome Final (<code>TP## - {convenção} - data</code>). <br><b>(b) Manual no Gerenciador:</b> a pessoa nomeia o ad com a convenção. <br>Em ambos, <b>o nome do ad carrega a convenção</b> + <code>utm_content={{ad.id}}</code>.</div></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--cortex)">Cortex</div>
+      <div class="card bCortex"><div class="t">4. ⏰ O sync roda sozinho (de 6 em 6h)</div>
+        <div class="d">Não precisa apertar nada — o Cortex <b>já tinha</b> esse sync agendado em produção. A cada ciclo ele: lê os ads do Meta → <b>parseia o nome</b> → cria/preenche a linha na Biblioteca (produto/ângulo/formato/persona/proporção) → marca Status (No ar/Pausado) → puxa a performance.</div>
+        <span class="tag">100% dos ads (Cortex e manual)</span><span class="tag">o nome do ad é a ponte</span></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--dados)">Dados</div>
+      <div class="card bDados"><div class="t">5. Performance acumula</div>
+        <div class="d">Por <code>ad_id</code>: spend, hook%, hold%, CTR de saída (Meta) + leads, MQL, vendas, CAC, ROAS (Bitrix via <code>utm_content</code>). Enche a cada sync, conforme veicula.</div></div></div>
+    <div class="arrow">↓</div>
+    <div class="step"><div class="who" style="color:var(--cortex)">Cortex</div>
+      <div class="card bCortex"><div class="t">6. Biblioteca + Ranking de Inteligência</div>
+        <div class="d">Cada criativo mostra sua performance. O Ranking agrega por ângulo / formato / persona / proporção / produto → "qual tipo converte melhor".</div></div></div>
+    <div class="arrow">↺</div>
+    <div class="step"><div class="who" style="color:var(--roteiro)">Roteiro</div>
+      <div class="card bRoteiro"><div class="t">7. Vira briefing do próximo roteiro</div>
+        <div class="d">Hoje: um humano lê o ranking e escreve o próximo. Futuro (Fase 3): o ranking alimenta a própria IA de criar campanhas.</div></div></div>
+  </div>
+
+  <h2>2. De onde vem cada dado</h2>
+  <table>
+    <tr><th>Campo</th><th>Fonte</th><th>Automático?</th></tr>
+    <tr><td>Produto · Ângulo · Formato · Persona · Proporção · Tipo</td><td>Nome do anúncio (convenção, parseado no sync — Cortex <b>e manual</b>)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Spend · Hook% · Hold% · CTR de saída</td><td>Meta (insights por ad_id)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Leads · MQL · %MQL · Vendas · CAC · ROAS</td><td>Bitrix (utm_content = ad_id)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Status (No ar / Pausado) · Data (1ª veiculação)</td><td>Meta (effective_status / 1º dia com impressão)</td><td><span class="pill auto">AUTOMÁTICO</span></td></tr>
+    <tr><td>Link do roteiro</td><td>Doc na pasta do Drive — <b>só pelo fluxo Cortex</b></td><td><span class="pill manual">só Cortex / manual no form</span></td></tr>
+  </table>
+
+  <h2>3. A convenção de nome (o contrato)</h2>
+  <div class="name">vv-<b style="background:rgba(245,158,11,.2)">nome_do_ad</b>-<b style="background:rgba(52,211,153,.2)">creators</b>-<b style="background:rgba(139,92,246,.25)">react</b>-<b style="background:rgba(139,92,246,.25)">prova_social</b>-<b style="background:rgba(245,158,11,.2)">ana</b>-<b style="background:rgba(59,130,246,.2)">9x16</b>-<b style="background:rgba(34,211,153,.2)">h1_b1_c1</b>-<b style="background:rgba(59,130,246,.2)">v1</b>.mp4</div>
+  <p class="sub" style="margin-top:8px"><code>-</code> separa campo · <code>_</code> dentro de valor composto · ângulo/formato/produto saem da <b>lista controlada</b> · a skill gera o nome, o editor só copia.</p>
+
+  <h2>4. Integração com a IA de criar campanhas (Cortex)</h2>
+  <div class="box ok"><div class="t">✅ Input — já integrado</div>
+    <div class="d">Quando a IA "Criar Campanhas" sobe um ad, ela: (1) lê os arquivos da pasta e <b>registra o criativo na Biblioteca</b> (com produto/ângulo/formato/persona/proporção parseados do nome + link do roteiro puxado da pasta); (2) nomeia o anúncio no Meta com o <b>Nome Final</b> (<code>TP## - convenção - data</code>). O sync depois linka e enche a performance. <b>Não precisa de nada novo entre os dois sistemas — eles já conversam pelo nome.</b></div></div>
+  <div class="box pend"><div class="t">⚠️ Duas dependências pra essa ponte funcionar</div>
+    <div class="d"><ul>
+      <li><b>Os arquivos da pasta precisam seguir a convenção</b> — a IA usa o nome do arquivo como base do nome do ad. (Mesma disciplina do editor.)</li>
+      <li><b>Não usar override de nome do ad</b> (<code>adNameOverridePrefix</code>) na IA — se sobrescrever, a convenção some do nome e o sync não parseia. Por padrão a IA usa o Nome Final, então é só não ativar o override.</li>
+    </ul></div></div>
+  <div class="box info"><div class="t">⏳ Output — fechar o loop com a IA (Fase 3, futuro)</div>
+    <div class="d">Hoje o ranking informa um humano, que escreve o próximo roteiro. Pra fechar 100% com a IA, o <b>ranking viraria input do briefing</b> da IA de criar campanhas (um gerador que propõe os próximos ângulos com base no que converte). Não está construído — é a evolução natural.</div></div>
+
+  <h2>5. Status &amp; validação</h2>
+  <table>
+    <tr><th>Parte</th><th>Status</th></tr>
+    <tr><td>Cortex — parser, dimensões, read-back (paridade c/ aba Criativos), ranking, UI, ingestão universal pelo nome, Status/Data reais</td><td><span class="pill b-ok">PRONTO + TESTADO</span></td></tr>
+    <tr><td>Validação Etapa 1 (paridade dos números) — fórmulas idênticas ao growth.ts</td><td><span class="pill b-ok">VALIDADO</span></td></tr>
+    <tr><td>Validação Etapa 2 (ad real → sync de produção → Biblioteca)</td><td><span class="pill b-ok">VALIDADO</span></td></tr>
+    <tr><td>Skill — convenção (PASSO 4) documentada no SKILL.md</td><td><span class="pill b-ok">EDITADO</span> <span class="pill b-pend">revisar/commitar no chief-of-staff</span></td></tr>
+  </table>
+
+  <h2>6. O que falta pra ir ao ar</h2>
+  <div class="box risk"><div class="t">1 — Reconciliar o PR #277 com a main (gargalo do release)</div>
+    <div class="d">Esta branch está <b>365 commits atrás da main</b> porque está empilhada no PR #277 (que não foi reconciliado). A Biblioteca só existe no #277. Então o loop só vai pra main <b>depois do #277 mergear</b> → aí re-aponto o PR pra main + re-verifico o read-back contra o growth.ts novo.</div></div>
+  <div class="box pend"><div class="t">2 — Time de edição adotar a convenção de nome</div>
+    <div class="d">A skill gera os nomes prontos; o editor só precisa aplicar. É a única disciplina manual de todo o fluxo.</div></div>
+  <div class="box pend"><div class="t">3 — Validação Etapa 3 (rodar a skill e ver os nomes saírem certos)</div>
+    <div class="d">Rodar a turbo-ads-workflow num ad de teste e conferir que a lista de nomes sai na convenção (com produto).</div></div>
+  <div class="box pend"><div class="t">4 — (opcional) Fechar o loop com a IA — Fase 3</div>
+    <div class="d">O ranking alimentando o briefing da IA de criar campanhas. Evolução, não bloqueio.</div></div>
+
+  <h2>7. Os ads antigos (legado) — ainda dá pra usar</h2>
+  <p class="sub">Os criativos antigos não seguem a convenção, mas <b>a performance deles está toda lá</b>. O que falta são as tags. Três níveis de uso:</p>
+  <ul>
+    <li><b>Nível A (já dá):</b> análises por persona/proporção/produto/campanha/tempo e "top por ROAS/CAC" — sem precisar de tag nova.</li>
+    <li><b>Nível B (backfill heurístico):</b> puxar do nome antigo o que está lá (proporção, persona, tipo, códigos h/b/c) → o histórico entra nesses rankings. Falta só ângulo/formato.</li>
+    <li><b>Nível C (IA):</b> um LLM infere ângulo/formato do ad antigo → entra no ranking completo, retroativo. Impreciso, bom pra tendência. (Cortex já faz isso pra broadcasts.)</li>
+    <li><b>Marcação:</b> flag <code>padronizado: sim/não</code> (pelo parse do nome, não por data) pra separar legado de novo num clique — sem sujar as dimensões.</li>
+  </ul>
+
+  <p class="foot">Branch <code>feature/criativos-intelligence-loop</code> (porta 3004) · 16 commits · stacked no PR #277 · 365 atrás da main. Gerado pra revisão.</p>
+
+</div></body></html>

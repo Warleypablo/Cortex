@@ -91,7 +91,6 @@ export function CapacityMetasConfig() {
               <TableHead>Categoria</TableHead>
               <TableHead>Vínculo</TableHead>
               <TableHead className="text-right">Cap. MRR</TableHead>
-              <TableHead className="text-right">Cap. Rec.</TableHead>
               <TableHead className="text-right">Cap. Pont.</TableHead>
               <TableHead className="text-right">Cap. Contas</TableHead>
               <TableHead className="text-center">Ativo</TableHead>
@@ -108,7 +107,6 @@ export function CapacityMetasConfig() {
                 </TableCell>
                 <TableCell className="text-gray-600 dark:text-zinc-400">{m.match_responsavel}</TableCell>
                 <TableCell className="text-right">{fmtCap(m.cap_mrr)}</TableCell>
-                <TableCell className="text-right">{fmtCap(m.cap_recorrente)}</TableCell>
                 <TableCell className="text-right">{fmtCap(m.cap_pontual)}</TableCell>
                 <TableCell className="text-right">{fmtCap(m.cap_contas)}</TableCell>
                 <TableCell className="text-center">

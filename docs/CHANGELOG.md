@@ -1,5 +1,45 @@
 # Changelog
 
+## 2026-06-23 | feat(creators): adicionar ticket médio na evolução LT/LTV Recorrente × Pontual
+
+**O que foi feito:**
+- Nova linha **"Ticket médio"** na tabela "Evolução mensal — LT & LTV Recorrente × Pontual" (aba Creators da tela `/lt-ltv-churn`).
+- **Recorrente** = MRR do mês ÷ clientes ativos faturando (mensalidade média). Backend: novo `COUNT(*) FILTER (WHERE mrr > 0)` em `rec_agg`.
+- **Pontual** = valor entregue no mês ÷ nº de entregas do mês (preço médio por entrega). Backend: novo `COUNT(*)` em `pont_fat`.
+- Ticket calculado no map do endpoint (`null` quando o denominador é 0); nota do card atualizada explicando a definição por modelo.
+
+**Por que:**
+- A pedido: comparar o ticket médio entre os modelos de receita de Creators. O denominador "limpo" (só quem fatura/entrega) evita diluição — usar o total de clientes (com cancelados) subestimaria a mensalidade recorrente.
+
+**Arquivos alterados:**
+- `server/routes/creatorsModelo.ts` - expõe `rec_cli_fat`/`pont_ent` na query do endpoint `/api/creators-modelo/evolucao` e calcula `ticket` por modelo.
+- `client/src/components/creators-modelo/EvolucaoLtLtv.tsx` - campo `ticket` no tipo `ModMetric`, linha na tabela e nota explicativa.
+
+**Impacto arquitetural:** Nenhum — reaproveita o pipeline e o padrão de renderização já existentes.
+
+---
+
+## 2026-06-23 | feat(bp2026): linha "CAC por contrato" na aba CAC
+
+**O que foi feito:**
+- Nova métrica `cac_por_contrato` na aba CAC do BP 2026, logo abaixo de "CAC por cliente adquirido".
+- Denominador = total de contratos vendidos no mês (recorrentes + pontuais, todos os segmentos), derivado do mesmo `agg` do Bitrix que alimenta o bloco "CAC por Produto". Um deal com N produtos/naturezas conta N contratos.
+- Orçado = CAC orçado ÷ contratos vendidos orçados (`contratos_vendidos_mrr_*` + `contratos_vendidos_pontual_*`); YTD = Σ numerador ÷ Σ denominador.
+- Linha marcada como `semDetalhe` (sem drill-down).
+- Verificado contra o banco real: CAC/contrato fica ≤ CAC/cliente em todos os meses (jan–jun), pois contratos ≥ deals ganhos.
+
+**Por que:**
+- "CAC por cliente" usa CAC total ÷ deals ganhos; faltava a visão por contrato. Como um cliente pode fechar mais de um contrato, o custo por contrato é menor e mais granular. Usar rec+pontual no denominador deixa a métrica apples-to-apples com a de "por cliente" (mesmo numerador, denominador análogo).
+
+**Arquivos alterados:**
+- `server/routes/bp2026.detalhamentos.ts` - cálculo da linha `cac_por_contrato` (série, orçado, YTD, `semDetalhe`) e import de `SEGMENTOS_PONTUAIS`.
+- `server/routes/bp2026.ts` - série `contratosVendidosTotalPorMes` (Σ contratosRec + contratosPont do `agg`) passada ao `montarDetalhamentos`.
+- `server/routes/bp2026.info.ts` - documentação (definição/fonte/cálculo) da nova métrica.
+
+**Impacto arquitetural:** Nenhum — nova linha derivada reusa fontes existentes; frontend (`BPDreTable`) renderiza automaticamente.
+
+---
+
 ## 2026-06-21 | refactor(sync-jobs): job único 12h roda todas as plataformas de ads juntas
 
 **O que foi feito:**
@@ -103,6 +143,23 @@
 - `scripts/create_campaign_tags.sql` - script de referência da tabela.
 
 **Impacto arquitetural:** Nenhum — segue o mesmo padrão da tabela `campaign_monthly_budget` e dos endpoints existentes da mesma tela.
+
+---
+
+## 2026-06-19 | feat(tiktok): agendar sync orgânico + script de disparo manual
+
+**O que foi feito:**
+- Adicionado o job `runTiktokOrganicSync` ao scheduler em `server/index.ts` (12h em 12h, primeiro disparo ~105s após o boot), espelhando o padrão de Meta/Instagram. O job é gated em `TIKTOK_APP_ID`/`TIKTOK_APP_SECRET`: sem as credenciais do app ele apenas loga "pulando", sem poluir `tiktok.sync_runs`.
+- Criado `scripts/sync-tiktok-organic.ts` para disparo manual do sync (`npx tsx scripts/sync-tiktok-organic.ts`).
+
+**Por que:**
+- O pipeline de métricas orgânicas do TikTok já existia ponta a ponta (OAuth → tabelas `tiktok.*` → `tiktokOrganicSync` → endpoint `/api/growth/orcado-realizado/tiktok` → tela Orçado x Realizado), mas o sync **nunca rodava sozinho** (não estava no scheduler) — por isso a tela exibia tudo zerado. Agendar o sync + ter um disparo manual destrava o abastecimento assim que as credenciais forem confirmadas no ambiente (prod/Render).
+
+**Arquivos alterados:**
+- `server/index.ts` - novo bloco do job `runTiktokOrganicSync` (setTimeout inicial + setInterval 12h) com gate de env.
+- `scripts/sync-tiktok-organic.ts` - runner manual do sync orgânico (reusa o `pool` de `server/db`).
+
+**Impacto arquitetural:** Nenhum — reusa o serviço `syncTiktokOrganic` e o padrão de scheduler já existentes; nenhuma tabela nem contrato de API novo.
 
 ---
 

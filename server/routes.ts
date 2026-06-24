@@ -62,6 +62,8 @@ import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
 import { registerGrowthAiRoutes } from "./routes/growth-ai";
 import { registerSdrAssistantRoutes } from "./routes/sdr-assistant";
+import { registerAdsCreationRoutes } from "./routes/ads-creation";
+import { registerCreativesRoutes } from "./routes/creatives";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
@@ -84,6 +86,7 @@ import { registerBp2026DetalheRoutes } from "./routes/bp2026.detalhe";
 import { registerBp2026ReconciliacaoRoutes } from "./routes/bp2026.reconciliacao";
 import { registerCreatorsPontualRoutes } from "./routes/creatorsPontual";
 import { registerChurnPontorrenteRoutes } from "./routes/churnPontorrente";
+import { registerCreatorsModeloRoutes } from "./routes/creatorsModelo";
 import * as autoreport from "./autoreport/index";
 import OpenAI from "openai";
 import { getReceitaPorItens, type ReceitaItemLinha, SEM_SQUAD_LABEL } from "./contribuicaoSquad/receitaPorItens";
@@ -8267,6 +8270,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   registerGrowthAiRoutes(app, db);
   registerGrowthDfcCacRoutes(app, db);
 
+  // Growth — Criação de Campanhas (briefing → Meta API → PAUSED)
+  registerAdsCreationRoutes(app);
+
+  // Growth — Biblioteca de Criativos (cortex_core.creatives_library)
+  registerCreativesRoutes(app);
+
   // SDR Assistant Module - registered from separate file
   registerSdrAssistantRoutes(app, db);
 
@@ -8383,6 +8392,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   registerBp2026ReconciliacaoRoutes(app, db);
   registerCreatorsPontualRoutes(app, db);
   registerChurnPontorrenteRoutes(app, db);
+  registerCreatorsModeloRoutes(app, db);
 
   // ============================================
   // Sugestões API

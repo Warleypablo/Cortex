@@ -1,0 +1,237 @@
+nome,cargo,setor,squad,nivel,admissao,demissao,status
+André Musso,C-Level,Sócios,Turbo Interno,Diretor,2022-01-15,,Ativo
+Rodrigo Queiroz,C-Level,Sócios,Turbo Interno,Diretor,2022-01-15,,Ativo
+Breno Carmo,Desenvolvedor,Tech Sites,🖥️ Tech,VI,2022-01-16,,Ativo
+Gabriel Milagres,Gestor de Performance,Commerce,️ A Forja (OFF),X V,2022-04-27,2025-02-05,Dispensado
+Daniel Vivas,Designer,Commerce,️ A Forja (OFF),X IV,2022-05-22,2025-06-27,Dispensado
+Roberto Fachetti,Inside Sales,Commerce,Makers,Gerente/Supervisor,2022-08-12,,Ativo
+Rafael Vilela,Líder de Squad,Commerce,Turbo Interno,Gerente/Supervisor,2022-08-15,2026-05-08,Dispensado
+Caio Massaroni,Líder de Squad,Commerce,Squad I.A,V,2022-08-18,,Ativo
+Igor Costa,Desenvolvedor,Tech Proprietária,️ Tech,X III,2022-09-15,2024-11-14,Dispensado
+Pamela Alves,Financeiro,Backoffice,,X III,2022-11-04,2025-03-31,Dispensado
+Bruna Cristina Costa Oliveira,Designer,Commerce,️ Squadra,X IV,2022-11-07,2025-10-03,Dispensado
+Rodrigo Padrão,Líder de Squad,Commerce,️ Squadra,X V,2022-11-08,,Ativo
+Vinicius Ichinoseki,Gestor de Performance,Growth Interno,Turbo Interno,IV,2023-02-06,,Ativo
+João Guarçoni,Inside Sales,Commerce,Vendas,Gerente/Supervisor,2023-02-07,,Ativo
+Gabriel Silva Machado,PO,Tech Sites,️ Tech,X IV,2023-02-24,2025-11-28,Dispensado
+Matheus Souza,Designer,Comunicação,Comunicação (OFF),X III,2023-02-28,2024-08-08,Dispensado
+Arthur Freitas Barbosa Gama Zon,Inside Sales,Commerce,Vendas,X III,2023-03-13,,Ativo
+Victor Anderson Arpini Vianna,Gestor de Performance,Commerce,️ Squadra,VI,2023-03-13,,Ativo
+Thiago Moura,Gestor de Performance,Commerce,Tribo (OFF),X III,2023-04-03,2024-12-20,Dispensado
+Leticia Felix,UIUX,Tech Sites,️ Tech,X II,2023-04-25,2024-11-14,Dispensado
+Pedro Margon,Gestor de Performance,Commerce,Hunters (OFF),X III,2023-04-25,2025-02-28,Dispensado
+Estevam Santiago,Desenvolvedor,Tech Sites,️ Tech,X II,2023-05-08,2024-08-05,Dispensado
+João Pedro Pauletti Coutinho,Gestor de Performance,Commerce,️ A Forja (OFF),X III,2023-06-26,2025-05-15,Dispensado
+João Pedro Ferreira Vivaldi,Gestor de Performance,Commerce,,X II,2023-07-31,2025-02-25,Dispensado
+Alexandre Costa Rocha Junior,Analista de Comunicação,Commerce,Supreme (OFF),X III,2023-08-02,2025-11-28,Dispensado
+Heitor Domingos Guimarães,Analista de Dados,Growth Interno,,X III,2023-08-07,2025-03-31,Dispensado
+Daiani Silva Vieira,UIUX,Tech Sites,🖥️ Tech,X IV,2023-09-25,,Ativo
+Thaisa Monteiro Pereira,Designer,Commerce,Chama (OFF),X III,2023-09-25,2025-04-22,Dispensado
+Daniel Correa Nunes,Designer,Comunicação,Comunicação (OFF),X I,2023-10-03,2024-11-18,Dispensado
+Camilly Laube Siqueira de Deus,G&G,Backoffice,,X I,2023-10-25,2024-07-24,Dispensado
+Wendel Martins de Azevedo,Designer,Commerce,Selva,IV,2023-10-25,,Ativo
+Lucas de Oliveira Pereira,Pré-Vendas,Commerce,Vendas,Gerente/Supervisor,2023-11-06,,Ativo
+Thiago Kenzo Takahashi,Desenvolvedor,Tech Sites,🖥️ Tech,Estágio,2023-11-27,,Ativo
+Esther Fiorio de Oliveira,Analista de Comunicação,Growth Interno,🚀 Turbo Interno,X IV,2023-12-05,,Ativo
+Elen Gabrielly dos Santos Segadilha,Pré-Vendas,Growth Interno,,X I,2024-01-03,2024-07-25,Dispensado
+Lara Grobério Miranda Carlos,Analista de Comunicação,Commerce,Aura,X III,2024-01-03,,Ativo
+Luiz Henrique Gomes Ribeiro,Desenvolvedor,Tech Proprietária,,X I,2024-01-03,2024-11-14,Dispensado
+Giselle de Souza Pereira,Desenvolvedor,Tech Proprietária,️ Tech,X III,2024-01-29,2024-11-14,Dispensado
+Maria Alice da Silva Costa,Analista de Comunicação,Commerce,Pulse,IV,2024-03-25,2026-03-03,Dispensado
+Yasmin Buery de Melo Moreira,Designer,Commerce,️ Bloomfield,X I,2024-03-25,2025-04-08,Dispensado
+Mayra Lazarone Barros,Designer,Commerce,️ Bloomfield (OFF),X II,2024-04-10,2025-05-23,Dispensado
+Luise Cristine nascimento Duarte,Gestor de Performance,Commerce,,X I,2024-04-25,2024-07-06,Dispensado
+João Vitor Correa Nunes,Gestor de Performance,Commerce,,X II,2024-04-29,2024-07-25,Dispensado
+Júlia Cypreste Ciciliotti Ferreira,Pré-Vendas,Growth Interno,,X I,2024-04-29,2025-03-12,Dispensado
+Leonardo Silva Claudino Cruz,Designer,Commerce,,X I,2024-04-29,2024-07-11,Dispensado
+Thúlio Kuster Siqueira,Desenvolvedor,Tech Sites,️ Tech,Estágio,2024-04-29,2024-08-08,Dispensado
+Paulo Henrique de Abreu,PO,Commerce,CX&CS,X IV,2024-05-10,2025-03-25,Dispensado
+Guilherme Cassemiro Pacheco Monteiro,Pré-Vendas,Commerce,Vendas,X II,2024-05-13,,Ativo
+Raquel Bezerra de Oliveira,Copy,Growth Interno,,X I,2024-05-13,2025-01-25,Dispensado
+Vitória de Abreu Santos,Pré-Vendas,Growth Interno,,X I,2024-05-13,2024-12-08,Dispensado
+Erick Pereira Ramos Ferreira Silva,CXCS,Commerce,CX&CS,X II,2024-06-10,2025-08-15,Dispensado
+João Pedro Testa Fiereck Afonso,Gestor de Performance,Ventures,️ Ventures,X IV,2024-06-10,2025-07-11,Dispensado
+Priscilla Britto da Silva,Designer,Commerce,️ Bloomfield,X III,2024-06-24,2025-05-23,Dispensado
+Gustavo Amorim de Souza Meireles,Gestor de Performance,Commerce,️ A Forja (OFF),X I,2024-07-01,2024-09-02,Dispensado
+Letícia Rodrigues Andrade Dayrel,Pré-Vendas,Growth Interno,,X I,2024-07-15,2025-03-14,Dispensado
+Arthur Fagundes de Oliveira Siqueira,Gestor de Performance,Commerce,️ Squadra,X III,2024-07-22,2025-12-23,Dispensado
+Daniel Alves Santana,Gestor de Performance,Commerce,️ A Forja (OFF),X II,2024-07-22,2024-07-25,Dispensado
+Júlia Acosta Ferreira,Inside Sales,Growth Interno,,X I,2024-07-22,2024-11-15,Dispensado
+Amanda Scalzer Lima Mota,Pré-Vendas,Growth Interno,,X I,2024-07-25,2024-12-13,Dispensado
+Bruno Prata Ferreira Luz,Gestor de Performance,Commerce,️ Solar+ (OFF),X III,2024-07-25,2024-10-25,Dispensado
+Ceres Naci,,Backoffice,,X II,2024-07-25,,Dispensado
+Daniel Fazolo Pimentel Torres Oliveira,CXCS,Commerce,,X II,2024-07-25,2024-10-25,Dispensado
+Karolayne Vieira Calis Pereira,Designer,Commerce,️ Squadra,X II,2024-07-25,2025-09-25,Dispensado
+Karoline Nobre Fraga Tognere,G&G,Backoffice,Turbo Interno,Gerente/Supervisor,2024-07-25,,Ativo
+Mariana Mischiatti Cavaleiro,Inside Sales,Growth Interno,Turbo Interno,X III,2024-07-25,2025-06-02,Dispensado
+Matheus Jann Scalfoni,Inside Sales,Commerce,Vendas,IV,2024-07-25,,Ativo
+Thiago Folador de Abreu,Desenvolvedor,Commerce,Squad I.A,X V,2024-07-25,,Ativo
+Victor de Souza Peixoto,C-Level,Sócios,Turbo Interno,Diretor,2024-07-25,,Ativo
+Kadu Fafa Borges Vidal,Gestor de Performance,Commerce,,X II,2024-07-29,2025-01-17,Dispensado
+Henrique Orlando Canani Vettorello,Gestor de Performance,Commerce,️ Squadra,X III,2024-08-01,2025-05-25,Dispensado
+Cynthya Schultz Musa,CXCS,Commerce,,Estágio,2024-08-13,2024-10-25,Dispensado
+Vinicius Klein Andrade,Gestor de Performance,Commerce,Selva,X VI,2024-08-20,2025-12-25,Dispensado
+Caio Cunha Ewald,PO,Tech Sites,️ Tech,X II,2024-08-29,2025-02-21,Dispensado
+Leonardo Soares Ferreira,Designer,Commerce,⚓️ Squadra,III,2024-08-29,,Ativo
+Bárbara Souza Silva,Analista de Comunicação,Comunicação,Comunicação (OFF),Estágio,2024-09-03,2024-11-18,Dispensado
+Gabriel Vieira Plozner,Designer,Comunicação,Comunicação (OFF),X II,2024-09-03,2024-09-04,Dispensado
+Maria Midyan De Sousa Sequeira Dias,CXCS,Commerce,📊 CX&CS,Gerente/Supervisor,2024-09-12,,Ativo
+Stéfano Calabrez Zuliani,Pré-Vendas,Growth Interno,Turbo Interno,X II,2024-09-17,2025-05-26,Dispensado
+Victoria Marlene Stefanelli,Inside Sales,Growth Interno,,X I,2024-09-17,2024-12-13,Dispensado
+Aline Ribeiro Moreira,Analista de Comunicação,Commerce,Fragmentados  (OFF),X III,2024-09-24,2025-05-23,Dispensado
+Bruno Matheus Traba de Souza,Pré-Vendas,Growth Interno,-,X II,2024-09-24,2025-03-25,Dispensado
+Pedro Santiago Nascimento,Designer,Growth Interno,Turbo Interno,X III,2024-09-24,2025-06-18,Dispensado
+Caio Rodrigues Rabello,Gestor de Performance,Commerce,️ A Forja (OFF),X I,2024-10-01,2024-10-25,Dispensado
+Diego Cassaro Vereza de Oliveira,Pré-Vendas,Growth Interno,,X I,2024-10-01,2024-11-14,Dispensado
+Millena Rossi Fernandes,Pré-Vendas,Growth Interno,,X I,2024-10-01,2025-02-19,Dispensado
+Renato Azevedo Ramos Neto,Gestor de Performance,Commerce,Hunters (OFF),X II,2024-10-01,2025-05-23,Dispensado
+Arthur Araujo Iglesias,Gestor de Performance,Commerce,️ Squadra,X I,2024-10-16,2024-11-11,Dispensado
+Henrique Cerqueira Gonzalez Martinez,Pré-Vendas,Growth Interno,,Gerente/Supervisor,2024-10-16,2024-11-25,Dispensado
+Lucas Emanoel de Jesus Antunes,CXCS,Commerce,CX&CS,X II,2024-10-16,,Ativo
+Lucas Rosetti Miranda,Gestor de Performance,Commerce,️ Squadra,IV,2024-10-16,2026-03-09,Dispensado
+Ricardo Henrique Gusman Celestino,Gestor de Performance,Commerce,️ A Forja (OFF),X II,2024-10-16,2025-02-28,Dispensado
+Marco Antonio Dias Marchetto,Gestor de Performance,Commerce,️ A Forja (OFF),X III,2024-10-29,2025-09-30,Dispensado
+Iago Franklin de Lima Góis,Inside Sales,Growth Interno,,X I,2024-11-04,2025-04-22,Dispensado
+Bibiana Chaves Paz,PO,Tech Sites,️ Tech,X II,2024-11-05,,Ativo
+Daniel Basilio Giestas,Inside Sales,Commerce,💰 Vendas,II,2024-11-12,,Ativo
+Luan de Oliveira Vita,Gestor de Performance,Commerce,️ A Forja (OFF),X II,2024-11-13,2025-02-28,Dispensado
+Julia Manhães Silva,Analista de Comunicação,Commerce,Aura,X IV,2024-11-18,,Ativo
+Mateus Luiz de Oliveira,Gestor de Performance,Commerce,️ A Forja (OFF),X I,2024-11-25,2025-01-26,Dispensado
+Pedro Henrique Lopes Espíndola,Gestor de Performance,Commerce,️ A Forja (OFF),X II,2024-11-25,2025-03-31,Dispensado
+Ana Luiza Lello Maria,Analista de Comunicação,Commerce,✨ Makers,IV,2024-12-04,2026-02-18,Dispensado
+Marcelo Augusto Silva Messias,Designer,Commerce,Hunters (OFF),X I,2024-12-04,2025-07-11,Dispensado
+Luís Filipe Medeiros Barbosa,Gestor de Performance,Commerce,️ Squadra,X II,2024-12-10,2025-03-21,Dispensado
+Luis Guilherme Borborema Rocha,Pré-Vendas,Growth Interno,,X II,2024-12-10,2025-03-27,Dispensado
+Ramon Souza dos Reis,Inside Sales,Commerce,Vendas,X II,2024-12-10,,Ativo
+Rafael Bodart Avila,Gestor de Performance,Commerce,🪖 Selva,V,2025-01-06,2026-04-22,Dispensado
+Renan Marques Pastori,Gestor de Performance,Commerce,️ A Forja (OFF),X IV,2025-01-06,2025-09-26,Dispensado
+Debora Mund,Analista de Comunicação,Commerce,Olimpo,IV,2025-01-13,,Ativo
+Denys Alves dos Santos,Designer,Growth Interno,,X III,2025-01-13,2025-04-25,Dispensado
+João Henryque Rodrigues,Gestor de Performance,Commerce,️ A Forja (OFF),X I,2025-01-13,2025-04-04,Dispensado
+Bruno Vinicius Miranda Moreira,Gestor de Performance,Commerce,️ A Forja (OFF),X III,2025-01-21,2025-01-28,Dispensado
+Mariano Libério de Lacerda Batista,Gestor de Performance,Commerce,Hunters (OFF),X III,2025-01-21,2025-02-10,Dispensado
+Yury Henrique Esteves lopes,Gestor de Performance,Commerce,️ Squadra,X III,2025-01-21,2025-06-06,Dispensado
+Jacqueline Henrique Soares da Silva,Analista de Comunicação,Commerce,️ Bloomfield (OFF),X II,2025-01-28,2025-03-28,Dispensado
+Matheus Braconi Grilo,PO,Tech Sites,️ Tech,X I,2025-01-28,2025-07-25,Dispensado
+Matheus Glendel de Azevedo,Designer,Commerce,Olimpo,III,2025-01-29,,Ativo
+Robert da Silva Bragança,Designer,Commerce,Supreme (OFF),X III,2025-01-30,2025-07-25,Dispensado
+Alana Anselmo Giglio Becherer,Analista de Comunicação,Commerce,Fragmentados  (OFF),X II,2025-02-04,2025-05-23,Dispensado
+Guilherme Destefane Biló,Designer,Commerce,Hunters (OFF),X III,2025-02-04,2025-07-18,Dispensado
+Marlon de Melo Santos,Gestor de Performance,Commerce,Hunters (OFF),X IV,2025-02-05,2025-03-14,Dispensado
+Amanda Lovise Lopes Comitre,Designer,Growth Interno,🚀 Turbo Interno,IV,2025-02-11,,Ativo
+Lenize Pretti,Pré-Vendas,Commerce,Vendas,X I,2025-02-11,,Ativo
+Rodrigo de Moura Coelho,Gestor de Performance,Commerce,Chama (OFF),X III,2025-02-11,2025-04-17,Dispensado
+Thiago Lopes Wolfgrann,Gestor de Performance,Commerce,Hunters (OFF),X III,2025-02-11,2025-03-07,Dispensado
+Bruno Eduardo Romera,Gestor de Performance,Commerce,️ A Forja (OFF),X II,2025-02-18,2025-06-27,Dispensado
+George Lucas Costa Dos Santos,Designer,Commerce,Selva,IV,2025-02-18,,Ativo
+Julia Rangel Ronchi,Analista de Comunicação,Commerce,️ Bloomfield (OFF),X II,2025-02-18,2025-05-23,Dispensado
+Luíza Sessa Tavares Dias,Analista de Comunicação,Commerce,Fragmentados  (OFF),X II,2025-02-18,2025-05-23,Dispensado
+Nestor Squiba Neto,Designer,Commerce,️ A Forja (OFF),X I,2025-02-18,2025-05-23,Dispensado
+Rayan Coutinho Cavessana,Gestor de Performance,Commerce,🪖 Selva,X III,2025-02-18,2026-02-10,Dispensado
+Thiago Henrique Martins,Gestor de Performance,Commerce,️ Squadra,V,2025-02-18,,Ativo
+Vitor de Mira Honorato,Gestor de Performance,Commerce,Hunters (OFF),X III,2025-02-18,2025-05-09,Dispensado
+Aliny de Souza e Frisso,Analista de Comunicação,Commerce,Supreme (OFF),X III,2025-02-26,2025-10-08,Dispensado
+Marlon Carneiro Oliveira,Financeiro,Backoffice,Turbo Interno,X IV,2025-03-05,,Ativo
+Gabriel Farias da Silva,Gestor de Performance,Commerce,Chama (OFF),X II,2025-03-06,2025-06-06,Dispensado
+Ives Thomaz Padua Farias de Oliveira,Designer,Growth Interno,Conteúdo,X I,2025-03-06,2025-03-28,Dispensado
+Matheus Henrique De Oliveira Costa,Videomaker,Growth Interno,Turbo Interno,III,2025-03-06,,Ativo
+Nickson Domingos Nascimento,Gestor de Performance,Commerce,Hunters (OFF),X II,2025-03-06,2025-06-20,Dispensado
+Bruno Branco Camarin,Gestor de Performance,Growth Interno,Turbo Interno,Estágio,2025-03-10,2025-11-25,Dispensado
+Kaike Matos dos Santos Pereira,Pré-Vendas,Commerce,Vendas,X I,2025-03-12,,Ativo
+Caio Benevenuto dos Santos,Gestor de Performance,Commerce,Hunters (OFF),Estágio,2025-03-20,2025-07-11,Dispensado
+Anderson Pereira da Silva,Gestor de Performance,Commerce,️ A Forja (OFF),X III,2025-03-27,2025-06-06,Dispensado
+Arthur Leandro dos Anjos Nunes,PO,Tech Sites,️ Tech,X II,2025-03-27,2025-04-07,Dispensado
+Caio Gomes Uhlig,Gestor de Performance,Commerce,Chama (OFF),X IV,2025-03-27,2025-08-29,Dispensado
+Caio Gomes Santillo,Gestor de Performance,Commerce,Chama (OFF),X I,2025-04-04,2025-07-25,Dispensado
+Victor Klein Machado,Analista de Comunicação,Commerce,Pulse,X III,2025-04-04,,Ativo
+Maria Clara Alves Pires,CXCS,Commerce,CX&CS,X I,2025-04-08,2025-08-29,Dispensado
+João Vitor Nossa Carvalho,Financeiro,Backoffice,-,X II,2025-04-15,2025-04-25,Dispensado
+Bruno Passador Parreira,Gestor de Performance,Commerce,Selva,IV,2025-04-17,2026-02-26,Dispensado
+Hiuri Carriço Liberato,PO,Tech Sites,️ Tech,III,2025-04-23,2026-03-10,Dispensado
+Fernando Clarindo Cristóvão,Gestor de Performance,Commerce,Squad I.A,Estágio,2025-04-25,,Dispensado
+Isabella Novaes de Souza,Pré-Vendas,Commerce,Vendas,II,2025-04-25,2026-02-27,Dispensado
+Lucas Gabrielli de Carvalho Santos,Gestor de Performance,Commerce,Hunters (OFF),Estágio,2025-04-25,2025-07-11,Dispensado
+Bernardo Soroldani Vital Campos,Designer,Commerce,⚓️ Squadra,III,2025-05-06,,Ativo
+Fabiely Laurett Gums,Pré-Vendas,Commerce,Vendas,II,2025-05-06,2026-05-08,Dispensado
+Fabio Richard Salgado de Oliveira,Inside Sales,Commerce,Vendas,II,2025-05-06,,Ativo
+Lucas Ferreira Pinto,Gestor de Performance,Commerce,Hunters (OFF),X II,2025-05-06,2025-07-25,Dispensado
+Thiago Andrey da Silva Marinho,Gestor de Performance,Commerce,⚓️ Squadra,VI,2025-05-06,,Ativo
+Daniel Pim Nunes,Designer,Growth Interno,Turbo Interno,X II,2025-05-13,2025-07-07,Dispensado
+Joao Vitor Domiciano,Pré-Vendas,Growth Interno,Turbo Interno,X III,2025-05-13,2025-05-28,Dispensado
+Leonardo Rodrigues da Silva Júnior,Gestor de Performance,Growth Interno,Turbo Interno,Estágio,2025-05-13,2025-08-15,Dispensado
+Warley Pablo Santos Pereira Da Silva,Analista de Dados,Backoffice,Turbo Interno,X III,2025-05-13,,Ativo
+André Luís Freitas Moraes Séder,Desenvolvedor,Tech Sites,️ Tech,Estágio,2025-05-19,2026-01-30,Dispensado
+Francisco Eduardo Lopes Lemes,Designer,Commerce,Pulse,X III,2025-05-19,,Ativo
+Gabriel Martins Storer,Gestor de Performance,Commerce,Chama (OFF),X II,2025-05-19,2025-08-25,Dispensado
+Alexander Haubrichs de Abreu Santos Brandão,Gestor de Performance,Commerce,️ Squadra,X III,2025-05-26,2025-11-28,Dispensado
+André Lucas da Silva Laurindo,Gestor de Performance,Commerce,️ A Forja (OFF),Gerente/Supervisor,2025-05-26,2025-08-12,Dispensado
+Pedro Paulo Cortines Barretto,Líder de Squad,Commerce,💠 Pulse,Gerente/Supervisor,2025-05-26,,Ativo
+Enéas dos Santos Barbosa Junior,Gestor de Performance,Commerce,Chama (OFF),X III,2025-05-29,2025-10-10,Dispensado
+Anna Gabriela Rauta Machado,Designer,Commerce,️ Squadra,X III,2025-06-02,2025-10-31,Dispensado
+Lianca Lopes Costa Leite,G&G,Backoffice,Turbo Interno,X III,2025-06-10,,Ativo
+Yan Roldi de Albuquerque,Inside Sales,Commerce,💰 Vendas,X II,2025-06-17,2026-03-12,Dispensado
+Anna Laís Fagundes Duus,Pré-Vendas,Commerce,Vendas,X II,2025-06-18,2025-09-15,Dispensado
+Guilherme Paulo Miranda,Desenvolvedor,Commerce,Squad I.A,Estágio,2025-06-18,2025-11-06,Dispensado
+Mariah Eduarda Grippa de Sousa,Pré-Vendas,Commerce,Vendas,II,2025-06-18,,Ativo
+Arthur de Pádua Machado,Inside Sales,Commerce,Vendas,X II,2025-06-24,2025-11-11,Dispensado
+Matheus Inácio Pin,UIUX,Tech Sites,️ Tech,Estágio,2025-07-08,,Ativo
+Guilherme Araujo dos Santtos,CXCS,Commerce,CX&CS,X II,2025-07-15,2025-07-30,Dispensado
+Guilherme Martins Ribeiro Gualtieri,Líder de Squad,Tech Sites,️ Tech,Gerente/Supervisor,2025-07-15,2025-10-25,Dispensado
+Gustavo de Souza Pires,Gestor de Performance,Commerce,Black Sheep,IV,2025-07-15,2026-05-22,Dispensado
+Caio Vitor Da Silva de Santana,Designer,Commerce,Supreme (OFF),X II,2025-07-22,2025-08-08,Dispensado
+Erick Henrique Sales da Silva,Designer,Commerce,Supreme (OFF),X III,2025-07-22,2025-08-13,Dispensado
+Eduardo Tonane Portes,Pré-Vendas,Growth Interno,💰 Vendas,I,2025-07-29,2026-05-22,Dispensado
+Aline de Carvalho de Souza,CXCS,Commerce,📊 CX&CS,II,2025-08-12,,Ativo
+Gabriela Maia Sena,CXCS,Commerce,CX&CS,X III,2025-08-12,2025-10-24,Dispensado
+Jhonnathan Correa,Videomaker,Growth Interno,Turbo Interno,X II,2025-08-12,2025-08-25,Dispensado
+Pietro Rutigliano Júnior,Designer,Commerce,Pulse,X III,2025-08-12,,Ativo
+Abner Junior de Souza,Gestor de Performance,Commerce,Selva,X III,2025-08-19,2025-10-24,Dispensado
+Victor dos Santos Matsushita,Gestor de Performance,Commerce,️ Squadra,X III,2025-08-19,,Ativo
+Davi de Souza Ferraz Matos,PO,Tech Sites,🖥️ Tech,III,2025-08-28,,Ativo
+Gabriel Pereira Taufner,Gestor de Performance,Commerce,Selva,III,2025-08-28,,Ativo
+João Victor Moulin Cateim,Designer,Commerce,Supreme (OFF),X I,2025-08-28,2025-09-10,Dispensado
+Ezequiel de Sousa Barbosa,Gestor de Performance,Commerce,Selva,X IV,2025-09-03,2025-10-24,Dispensado
+Rayanne Vieira Lengruber de Azevedo,Designer,Commerce,Black Sheep,III,2025-09-03,,Ativo
+Gabriela Teixeira Menezes de Souza Toledo,Designer,Commerce,Pulse,X III,2025-09-09,,Ativo
+Amanda Vitória Pereira Teixeira,Designer,Commerce,Supreme (OFF),Estágio,2025-09-16,2025-10-03,Dispensado
+Wendeson Eduardo Diniz Barros,UIUX,Tech Sites,🖥️ Tech,III,2025-09-16,,Ativo
+Alanna Oliveira de Souza,Pré-Vendas,Commerce,Vendas,X II,2025-09-23,2025-12-01,Dispensado
+Allan Eduardo Machado de Araujo Alencar,Gestor de Performance,Commerce,⚓️ Squadra,X III,2025-09-23,,Ativo
+Helamã Peres Janes,Desenvolvedor,Tech Sites,️ Tech,Estágio,2025-09-23,2026-01-16,Dispensado
+Isabelle Oliveira do Carmo,Analista de Comunicação,Commerce,Supreme (OFF),X III,2025-09-23,,Dispensado
+Talisson Targino Mesquita,Videomaker,Commerce,Turbo Interno,X II,2025-09-23,2025-10-24,Dispensado
+Glauber Pereira da Silva,Líder de Squad,Commerce,Selva,Gerente/Supervisor,2025-09-30,,Ativo
+Bruno Marcelo Díaz Franco,Designer,Commerce,Supreme (OFF),X III,2025-10-07,2025-11-12,Dispensado
+Livia de Oliveira Scalon,Analista de Comunicação,Commerce,💠 Pulse,IV,2025-10-07,2026-04-02,Dispensado
+Milena Gomes Vieira,Analista de Comunicação,Commerce,Pulse,X III,2025-10-07,,Ativo
+Raquel Soares Santos Fernandes,Analista de Comunicação,Commerce,Makers,III,2025-10-07,2026-02-13,Dispensado
+Edigar Scodeler Silva,Gestor de Performance,Commerce,Selva,X IV,2025-10-21,2025-11-19,Dispensado
+Kamila Martins Hernandes Ribeiro,CXCS,Commerce,CX&CS,II,2025-10-21,2026-03-03,Dispensado
+Pedro Vitor Boeloni Baier,Gestor de Performance,Commerce,Selva,Estágio,2025-10-21,2025-12-01,Dispensado
+Rodrigo Cunha Amorim,Gestor de Performance,Commerce,Selva,X V,2025-10-21,,Dispensado
+Carlos Eduardo Ferreira Lopes,Designer,Commerce,🪖 Selva,III,2025-10-28,,Ativo
+Geiziele Izidorio Oliveira,Analista de Comunicação,Commerce,Olimpo,Estágio,2025-10-28,,Ativo
+Jônatas Cavalcante da Silva,Gestor de Performance,Commerce,️ Squadra,X IV,2025-10-28,,Ativo
+Elizio José da Silva Filho,Designer,Commerce,️ Squadra,X III,2025-11-04,,Ativo
+Mariana Domingos Thomé Leite Souza,CXCS,Commerce,CX&CS,X II,2025-11-04,2025-11-07,Dispensado
+Samantha Pedroso Campos,Videomaker,Commerce,Turbo Interno,III,2025-11-10,2026-01-23,Dispensado
+Gabriela Viana Vasconcelos de Sousa,Designer,Commerce,Aura,III,2025-11-11,2026-06-05,Dispensado
+João Lucas Negromonte Marques Mendes,Designer,Commerce,️ Squadra,X IV,2025-11-11,,Ativo
+Pedro Henrique Teodoro do Amaral,Pré-Vendas,Commerce,Vendas,X II,2025-11-11,,Ativo
+Fernanda de Almeida Tobias,Analista de Comunicação,Commerce,Pulse,X III,2025-11-19,,Ativo
+Gabriel Nogueira Gomes,Gestor de Performance,Commerce,Selva,X V,2025-11-19,2025-12-25,Dispensado
+Jordnei Gadelha da Silva,Gestor de Performance,Commerce,⚓️ Squadra,IV,2025-11-19,2026-04-28,Dispensado
+Laura Falcão,Analista de Comunicação,Commerce,💠 Pulse,Estágio,2025-11-19,2026-01-05,Dispensado
+Anderson Matheus Silva de Moura,Desenvolvedor,Tech Sites,🖥️ Tech,V,2025-11-25,,Ativo
+Caio Pedro Malini,Copy,Growth Interno,🚀 Turbo Interno,Estágio,2025-11-25,,Ativo
+Laura Gonzaga da Silva,Designer,Commerce,Aura,X III,2025-11-25,,Ativo
+Vinicius Tineli Paiva,PO,Commerce,🖥️ Tech,VI,2025-11-25,,Ativo
+Weverton Silva Assis,Gestor de Performance,Commerce,Olimpo,I,2025-11-25,,Ativo
+Ismael Ataide Serafim,Líder de Squad,Commerce,Black Sheep,Gerente/Supervisor,2025-12-02,,Ativo
+Julia Viana Ribeiro,Jurídico,Backoffice,Turbo Interno,X VI,2025-12-02,,Ativo
+Renan Fortunato Silveira,Gestor de Performance,Commerce,⚓️ Squadra,III,2025-12-02,,Ativo
+Amanda Sakai dos Santos,Designer,Commerce,💠 Pulse,III,2025-12-10,,Ativo
+Emerson Henrique Gama da Silva,Videomaker,Growth Interno,🚀 Turbo Interno,X II,2025-12-10,,Ativo
+João Pedro Lopes,Pré-Vendas,Commerce,Vendas,X II,2025-12-11,,Ativo
+Brenda Federici Vieira,Analista de Comunicação,Commerce,Pulse,IV,2025-12-16,,Ativo
+Mariana Amaral Dalto,Analista de Comunicação,Commerce,Aura,X IV,2025-12-16,,Ativo
