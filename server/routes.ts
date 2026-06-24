@@ -71,6 +71,7 @@ import { registerUtmRoutes } from "./routes/utm";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerOrganicoRoutes } from "./routes/organico";
 import { registerCrmInstagramRoutes } from "./routes/crmInstagram";
 import { registerGrowthDfcCacRoutes } from "./routes/growthDfcCac";
 import { registerGhlPublicRoutes, registerGhlApiRoutes } from "./routes/ghl";
@@ -8235,6 +8236,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
+
+  // Painel Orgânico (publicação de conteúdo orgânico) — leitura das tabelas content_* (pós-auth)
+  registerOrganicoRoutes(app, db, storage);
 
   // Growth — Orçamento por Campanha
   registerOrcamentoCampanhasRoutes(app, db);
