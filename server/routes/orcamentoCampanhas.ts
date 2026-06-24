@@ -2,6 +2,10 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 
 const TURBO_PARTNERS_ACCOUNT_ID = "act_1331413260627780";
+// Conta de anúncios da própria Turbo no TikTok ("Turbo Partners LTDA - CA Oficial").
+// O schema tiktok.* guarda também contas de clientes (Hevo, Suburb, etc.) que a
+// agência opera — aqui só queremos a conta da Turbo, espelhando o filtro do Meta.
+const TURBO_PARTNERS_TIKTOK_ADVERTISER_ID = "7065303755092131842";
 
 // Usuários autorizados a editar as metas mensais de investimento.
 const ALLOWED_EDITOR_EMAILS = new Set([
@@ -232,6 +236,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
                 )
               END::float AS daily_budget_atual
             FROM tiktok.ad_campaigns c
+            WHERE c.advertiser_id = ${TURBO_PARTNERS_TIKTOK_ADVERTISER_ID}
           ),
           spend_agg AS (
             SELECT campaign_id, SUM(spend)::float AS investido_total
