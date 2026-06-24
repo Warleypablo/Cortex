@@ -46,38 +46,47 @@ function bpCopilotGuard(req: Request, res: Response, next: NextFunction) {
 
 export function registerBpCopilotRoutes(app: Express, db: any) {
   // ── Tabelas (idempotente) ──
-  db.execute(sql`
-    CREATE TABLE IF NOT EXISTS cortex_core.bp_copilot_conversas (
-      id SERIAL PRIMARY KEY,
-      usuario_id VARCHAR(255) NOT NULL,
-      titulo VARCHAR(500) DEFAULT 'Nova conversa',
-      criado_em TIMESTAMP DEFAULT NOW(),
-      atualizado_em TIMESTAMP DEFAULT NOW()
-    )
-  `).catch((e: any) => console.log("[bp-copilot] tabela conversas:", e.message));
-  db.execute(sql`
-    CREATE TABLE IF NOT EXISTS cortex_core.bp_copilot_mensagens (
-      id SERIAL PRIMARY KEY,
-      conversa_id INTEGER NOT NULL REFERENCES cortex_core.bp_copilot_conversas(id) ON DELETE CASCADE,
-      role VARCHAR(20) NOT NULL,
-      conteudo TEXT NOT NULL,
-      tool_calls JSONB,
-      criado_em TIMESTAMP DEFAULT NOW()
-    )
-  `).catch((e: any) => console.log("[bp-copilot] tabela mensagens:", e.message));
-  db.execute(sql`
-    CREATE TABLE IF NOT EXISTS cortex_core.bp_copilot_usage (
-      id SERIAL PRIMARY KEY,
-      usuario_id VARCHAR(255),
-      conversa_id INTEGER,
-      tokens_in INTEGER DEFAULT 0,
-      tokens_out INTEGER DEFAULT 0,
-      tokens_cache INTEGER DEFAULT 0,
-      tool_calls INTEGER DEFAULT 0,
-      duration_ms INTEGER DEFAULT 0,
-      criado_em TIMESTAMP DEFAULT NOW()
-    )
-  `).catch((e: any) => console.log("[bp-copilot] tabela usage:", e.message));
+  // Criadas EM ORDEM: bp_copilot_mensagens tem FK p/ bp_copilot_conversas, então a
+  // conversas precisa existir antes. Encadear com await evita a race (criações
+  // paralelas faziam mensagens perder a corrida e falhar na FK).
+  (async () => {
+    try {
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS cortex_core.bp_copilot_conversas (
+          id SERIAL PRIMARY KEY,
+          usuario_id VARCHAR(255) NOT NULL,
+          titulo VARCHAR(500) DEFAULT 'Nova conversa',
+          criado_em TIMESTAMP DEFAULT NOW(),
+          atualizado_em TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS cortex_core.bp_copilot_mensagens (
+          id SERIAL PRIMARY KEY,
+          conversa_id INTEGER NOT NULL REFERENCES cortex_core.bp_copilot_conversas(id) ON DELETE CASCADE,
+          role VARCHAR(20) NOT NULL,
+          conteudo TEXT NOT NULL,
+          tool_calls JSONB,
+          criado_em TIMESTAMP DEFAULT NOW()
+        )
+      `);
+      await db.execute(sql`
+        CREATE TABLE IF NOT EXISTS cortex_core.bp_copilot_usage (
+          id SERIAL PRIMARY KEY,
+          usuario_id VARCHAR(255),
+          conversa_id INTEGER,
+          tokens_in INTEGER DEFAULT 0,
+          tokens_out INTEGER DEFAULT 0,
+          tokens_cache INTEGER DEFAULT 0,
+          tool_calls INTEGER DEFAULT 0,
+          duration_ms INTEGER DEFAULT 0,
+          criado_em TIMESTAMP DEFAULT NOW()
+        )
+      `);
+    } catch (e: any) {
+      console.log("[bp-copilot] erro ao criar tabelas:", e.message);
+    }
+  })();
 
   // ── Listar conversas ──
   app.get("/api/bp-copilot/conversas", isAuthenticated, bpCopilotGuard, async (req, res) => {
