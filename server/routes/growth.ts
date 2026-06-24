@@ -644,6 +644,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`)
     .catch(() => { /* column may already exist */ });
 
+  // Ensure unique_outbound_clicks column exists (CTR de saída único). Garante que o
+  // endpoint /meta-ads não quebre antes do backfill do sync preencher a coluna.
+  db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS unique_outbound_clicks INTEGER DEFAULT 0`)
+    .catch(() => { /* column may already exist */ });
+
   // Ensure Instagram snapshot columns exist
   db.execute(sql`ALTER TABLE cortex_core.instagram_metrics_snapshots ADD COLUMN IF NOT EXISTS profile_views INTEGER DEFAULT 0`)
     .catch(() => { /* column may already exist */ });
