@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-24 | feat(publicacao): fundação do painel "Orgânico" — skill + schema content_*
+
+**O que foi feito:**
+- Nova skill `.claude/skills/subir-conteudo-organico/SKILL.md`: blueprint do publicador multiplataforma (núcleo agnóstico `plan_task` + adaptador por plataforma) com checklist de "adicionar plataforma" para replicar IG → TikTok/YouTube/LinkedIn.
+- Schema `content_*` no `cortex_core` (fonte da verdade do painel operador, platform-aware): `content_publish_runs` (saúde/heartbeat), `content_posts` (fila/status por task/dia), `content_publish_commands` (fila painel→worker) e `content_publish_settings` (toggle pausar/dry-run por plataforma). Definido em `shared/schema.ts` + migration SQL idempotente, com seed em dry-run ligado.
+
+**Por que:**
+- Início da Fase 1 do painel **Orgânico** (Growth): dar ao time de conteúdo (Esther + editores) visão de fila/status/saúde e operação da automação `instagram-turbo` sem terminal/Claude. Tabelas genéricas (`content_*`, não `instagram_*`) porque o mesmo painel/worker servirá IG, TikTok, YouTube e LinkedIn.
+
+**Arquivos alterados:**
+- `shared/schema.ts` - 4 tabelas `content_*` + tipos `$inferSelect/$inferInsert`.
+- `migrations/2026-06-24-content-publish.sql` - DDL idempotente espelhando o schema + seed das settings (instagram, tiktok).
+- `.claude/skills/subir-conteudo-organico/SKILL.md` - skill nova (blueprint + checklist por plataforma).
+
+**Impacto arquitetural:** Estabelece o Postgres do Cortex como fonte da verdade entre o worker Python e o painel (o backend Express só lê/escreve as tabelas, nunca chama o Python). Aditivo — nenhuma tabela existente alterada. Migration ainda **não aplicada** no banco (pendente `drizzle-kit push` ou rodar o SQL).
+
+---
+
 ## 2026-06-24 | feat(comercial): exibir só os 7 closers ativos nas telas de comercial
 
 **O que foi feito:**
