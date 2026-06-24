@@ -931,6 +931,131 @@ export const metaInsightsDaily = pgTable("meta_insights_daily", {
   hashDados: varchar("hash_dados", { length: 64 }),
 });
 
+// ============== META ADS CREATION DRAFTS ==============
+// Briefings de campanhas que serão criadas no Meta Ads via API.
+// Workflow: usuário cria draft → executa → backend cria Campaign+AdSet+Ads em PAUSED → usuário ativa no Gerenciador.
+export const metaCreationDrafts = pgTable("meta_creation_drafts", {
+  id: serial("id").primaryKey(),
+  userEmail: varchar("user_email", { length: 255 }).notNull(),
+  adAccountId: varchar("ad_account_id", { length: 50 }).notNull(),
+
+  status: varchar("status", { length: 20 }).notNull().default("draft"),
+  // 'draft' | 'executing' | 'created' | 'failed'
+
+  briefing: jsonb("briefing").notNull(),
+  driveFolderUrl: text("drive_folder_url"),
+
+  // Result após execução: { campaign_id, adset_id, ad_ids[], errors[] }
+  result: jsonb("result"),
+  errorMessage: text("error_message"),
+
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  executedAt: timestamp("executed_at"),
+}, (table) => ({
+  userIdx: index("idx_meta_creation_drafts_user").on(table.userEmail),
+  statusIdx: index("idx_meta_creation_drafts_status").on(table.status),
+}));
+
+// ============== CREATIVES LIBRARY (Turbo) ==============
+// Biblioteca interna de criativos da Turbo (substitui o Sheet manual de "Criativos").
+// Cada linha representa 1 arquivo do Drive com seu briefing (hook, corpo, cta, etc.) e o Nome Final
+// usado pra batizar ads no Meta (formato: {tpId} - {nomeDrive} - {idCopy} - {DD/MM/AA}).
+// Distinto de `metaCreatives` (esse é mirror de creatives já existentes no Meta).
+export const creativesLibrary = cortexCoreSchema.table("creatives_library", {
+  id: serial("id").primaryKey(),
+  tpId: varchar("tp_id", { length: 16 }).notNull().unique(), // TP01, TP02...
+  nomeDrive: text("nome_drive").notNull(),                    // sem extensão
+  linkDrive: text("link_drive"),
+  driveFileId: varchar("drive_file_id", { length: 64 }),
+
+  angulo: text("angulo"),
+  etapaFunil: varchar("etapa_funil", { length: 32 }),
+  dataPostagem: date("data_postagem"),
+  produto: varchar("produto", { length: 64 }),
+  plataforma: varchar("plataforma", { length: 32 }),
+  personagem: varchar("personagem", { length: 64 }),
+  tipoAd: varchar("tipo_ad", { length: 32 }),
+  observacao: text("observacao"),
+
+  // Dimensões da convenção de nome (parseadas do arquivo)
+  formatoAd: varchar("formato_ad", { length: 64 }),   // formato de ad: react, caixinha-de-perguntas
+  proporcao: varchar("proporcao", { length: 16 }),    // 9x16, 4x5, 1x1, 16x9
+  // (legado — body/cta viraram só identificadores na coluna Variação, não campo semântico)
+  bodyTipo: varchar("body_tipo", { length: 32 }),
+  ctaTipo: varchar("cta_tipo", { length: 32 }),
+
+  // Elo com o roteiro/produção e o lote (herdados de creative_batches)
+  roteiroUrl: text("roteiro_url"),
+  clickupTaskId: varchar("clickup_task_id", { length: 64 }),
+  driveFolderId: varchar("drive_folder_id", { length: 64 }),
+
+  nomeFinal: text("nome_final").notNull(),
+  adValidado: boolean("ad_validado").default(false),
+
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+  deletedAt: timestamp("deleted_at"), // soft delete
+}, (table) => ({
+  tpIdIdx: uniqueIndex("idx_creatives_library_tp_id").on(table.tpId),
+  driveFileIdIdx: index("idx_creatives_library_drive_file_id").on(table.driveFileId),
+  nomeDriveIdx: index("idx_creatives_library_nome_drive").on(table.nomeDrive),
+  deletedAtIdx: index("idx_creatives_library_deleted_at").on(table.deletedAt),
+}));
+
+// ============== CREATIVE BATCHES (cabeçalho do lote/roteiro) ==============
+// Escrito pela skill turbo-ads-workflow no DIA do roteiro (keyed por pasta do Drive).
+// Os stubs criados depois (bulkInsertStubs) HERDAM os campos comuns e resolvem
+// angulo/bodyTipo/ctaTipo a partir do mapa `modules` via os códigos hNN/bNN/cNN do nome do arquivo.
+export const creativeBatches = cortexCoreSchema.table("creative_batches", {
+  id: serial("id").primaryKey(),
+  driveFolderId: varchar("drive_folder_id", { length: 64 }).notNull().unique(),
+  nomeAd: text("nome_ad"),                                  // = Big Idea (tese central do batch)
+  produto: varchar("produto", { length: 64 }),
+  roteiroUrl: text("roteiro_url"),                          // link do Google Doc do roteiro
+  clickupTaskId: varchar("clickup_task_id", { length: 64 }),
+  // { hooks: { h01: { angulo } }, bodies: { b01: { tipo } }, ctas: { c01: { tipo } } }
+  modules: jsonb("modules"),
+  createdBy: varchar("created_by", { length: 255 }),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+}, (table) => ({
+  driveFolderIdx: uniqueIndex("idx_creative_batches_drive_folder_id").on(table.driveFolderId),
+}));
+
+// ============== CREATIVE ↔ AD LINKS ==============
+// Ponte tpId ↔ ad_id do Meta. Populada pelo prefixo TP## do nome do anúncio, tanto na
+// criação (source=creation) quanto no sync de métricas (source=name_match, cobre ads manuais).
+export const creativeAdLinks = cortexCoreSchema.table("creative_ad_links", {
+  id: serial("id").primaryKey(),
+  creativeId: integer("creative_id").notNull(),             // FK -> creatives_library.id
+  tpId: varchar("tp_id", { length: 16 }).notNull(),
+  adId: varchar("ad_id", { length: 64 }).notNull(),         // meta_ads.ad_id
+  source: varchar("source", { length: 16 }).notNull().default("name_match"), // 'creation' | 'name_match'
+  linkedAt: timestamp("linked_at").defaultNow(),
+}, (table) => ({
+  creativeAdIdx: uniqueIndex("idx_creative_ad_links_creative_ad").on(table.creativeId, table.adId),
+  adIdIdx: index("idx_creative_ad_links_ad_id").on(table.adId),
+  tpIdIdx: index("idx_creative_ad_links_tp_id").on(table.tpId),
+}));
+
+// ============== CREATIVE VOCAB (listas controladas editáveis) ==============
+// Vocabulário controlado dos dropdowns da Biblioteca, mantido via UI de config.
+// kind ∈ angulo | persona | bodyTipo | ctaTipo | produto | proporcao | tipo
+export const creativeVocab = cortexCoreSchema.table("creative_vocab", {
+  id: serial("id").primaryKey(),
+  kind: varchar("kind", { length: 32 }).notNull(),
+  value: varchar("value", { length: 64 }).notNull(),
+  label: text("label").notNull(),
+  sortOrder: integer("sort_order").default(0),
+  active: boolean("active").default(true),
+  createdAt: timestamp("created_at").defaultNow(),
+}, (table) => ({
+  kindValueIdx: uniqueIndex("idx_creative_vocab_kind_value").on(table.kind, table.value),
+  kindIdx: index("idx_creative_vocab_kind").on(table.kind),
+}));
+
 // CRM Deal table
 export const crmDeal = bitrixSchema.table("crm_deal", {
   id: integer("id").primaryKey(),
@@ -1014,6 +1139,16 @@ export type MetaAdset = typeof metaAdsets.$inferSelect;
 export type MetaAd = typeof metaAds.$inferSelect;
 export type MetaCreative = typeof metaCreatives.$inferSelect;
 export type MetaInsight = typeof metaInsightsDaily.$inferSelect;
+export type MetaCreationDraft = typeof metaCreationDrafts.$inferSelect;
+export type InsertMetaCreationDraft = typeof metaCreationDrafts.$inferInsert;
+export type CreativeLibraryItem = typeof creativesLibrary.$inferSelect;
+export type InsertCreativeLibraryItem = typeof creativesLibrary.$inferInsert;
+export type CreativeBatch = typeof creativeBatches.$inferSelect;
+export type InsertCreativeBatch = typeof creativeBatches.$inferInsert;
+export type CreativeAdLink = typeof creativeAdLinks.$inferSelect;
+export type InsertCreativeAdLink = typeof creativeAdLinks.$inferInsert;
+export type CreativeVocabItem = typeof creativeVocab.$inferSelect;
+export type InsertCreativeVocabItem = typeof creativeVocab.$inferInsert;
 export type CrmDeal = typeof crmDeal.$inferSelect;
 
 // Meta Ads Analytics types
