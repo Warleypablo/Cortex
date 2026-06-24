@@ -24,6 +24,9 @@ import { BPCellDetail } from "@/components/bp2026/BPCellDetail";
 import { BPReconciliacao } from "@/components/bp2026/BPReconciliacao";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
+import { Link } from "wouter";
+import { Button } from "@/components/ui/button";
+import { Bot } from "lucide-react";
 
 interface ReceitasResponse {
   ano: number;
@@ -79,13 +82,21 @@ export default function BP2026() {
 
   return (
     <div className="p-6 space-y-6">
-      <div>
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
-          BP 2026 — Orçado × Realizado
-        </h1>
-        <p className="text-sm text-gray-600 dark:text-zinc-400">
-          Bloco de receitas · orçado fechado em dezembro/2025 · realizado ao vivo
-        </p>
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">
+            BP 2026 — Orçado × Realizado
+          </h1>
+          <p className="text-sm text-gray-600 dark:text-zinc-400">
+            Bloco de receitas · orçado fechado em dezembro/2025 · realizado ao vivo
+          </p>
+        </div>
+        <Link href="/bp-2026/copilot">
+          <Button className="gap-2 bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0">
+            <Bot className="w-4 h-4" />
+            BP Copilot
+          </Button>
+        </Link>
       </div>
       <Tabs defaultValue="dre">
         <TabsList>
