@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-24 | feat(publicacao): slot da tarde às 17h30 (granularidade de minutos)
+
+**O que foi feito:**
+- Move o slot vespertino do publicador de **18h para 17h30 cravado**: `SLOTS = ((12, 0), (17, 30))` em `agente/main.py`.
+- Refatora `current_slot` / `slot_status_human` pra operar em **minutos do dia** (antes era hora cheia, não conseguia representar `:30`). Agora é genérico pra N slots e o rótulo vira `"17h30"` quando há minutos.
+- Tolerância passa a ser `SLOT_TOLERANCE_MINUTES = 60` → janela efetiva 17:30–18:29 (garante que a rodada do cron pegue o slot mesmo sem cair no segundo exato).
+- Teste `agente/tests/test_slots.py` trava o comportamento: 17:29 não abre, 17:30 abre, 18:29 ainda abre, 18:30 fecha.
+
+**Por que:**
+- O conteúdo programado pras 17h30 não saía porque o agente só tinha slots fixos de 12h e 18h — 17h30 caía na zona morta "entre slots" e o `execute_plan` se recusava a publicar. A correção alinha o horário de publicação ao que o time planejou.
+
+**Arquivos alterados:**
+- `automacoes/instagram-turbo/agente/main.py` - novo modelo de slot (hora, minuto) + helpers `_slot_label`/`_mins`/`_hhmm`; texto do `--force-now` atualizado p/ "12h/17h30".
+- `automacoes/instagram-turbo/agente/tests/test_slots.py` - cobertura nova do slot 17h30 e das mensagens de fora-de-slot.
+
+**Impacto arquitetural:** Nenhum. Mudança confinada ao adaptador/orquestrador do Instagram; núcleo agnóstico (`plan_task`, drive, docs) intocado. `slot` continua cabendo em `VARCHAR(8)` no schema `content_posts`.
+
+---
+
 ## 2026-06-24 | feat(publicacao): fundação do painel "Orgânico" — skill + schema content_*
 
 **O que foi feito:**
