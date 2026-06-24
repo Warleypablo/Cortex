@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-24 | feat(bp-copilot): UI do chat (Fase 2)
+
+**O que foi feito:**
+- `client/src/pages/BpCopilot.tsx` — página de chat no padrão Growth AI (sidebar de conversas + chat com ReactMarkdown + cards de sugestão + input), tema azul, dark/light, modelo "Claude Opus 4.8".
+- Cards de sugestão específicos do BP: fechamento do ano, maior gargalo, what-if de churn (+2pp), queima de caixa, atingimento por produto, linhas fora da meta.
+- Rota `/bp-2026/copilot` registrada em `App.tsx` (lazy + ProtectedRoute).
+- Botão **"BP Copilot"** no header do BP 2026; botão "Voltar ao BP 2026" na sidebar do chat.
+
+**Por que:**
+- Fase 2 do BP Copilot (spec em `docs/superpowers/specs/2026-06-24-bp-copilot-design.md`): a interface sobre o backend da Fase 1.
+
+**Arquivos alterados:**
+- `client/src/pages/BpCopilot.tsx` (novo) - página do chat.
+- `client/src/App.tsx` - lazy import + rota `/bp-2026/copilot`.
+- `client/src/pages/BP2026.tsx` - botão de acesso ao Copilot no header.
+
+**Impacto arquitetural:** Nenhum estrutural. Validado: `vite build` passa e a página é bundleada (chunk `BpCopilot-*.js`); typecheck não introduz erros novos (delta 0). Fluxo real depende da chave Anthropic válida (Fase 1).
+
+---
+
 ## 2026-06-24 | feat(bp-copilot): backend núcleo (Fase 1) — tools, agentic loop, histórico
 
 **O que foi feito:**
