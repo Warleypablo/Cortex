@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-24 | feat(publicacao): página Orgânico (Growth) + endpoint read-only
+
+**O que foi feito:**
+- Nova página **Orgânico** em Growth (`/growth/organico`, permissão `growth.organico`): painel **somente leitura** com Saúde do agente (por plataforma), Fila de publicação e Histórico, filtro por rede (IG/TikTok/…) e refetch a cada 20s. Lê das tabelas `content_*`.
+- Endpoint `GET /api/growth/organico/overview` (`server/routes/organico.ts`): retorna settings + último ciclo por plataforma + fila (hoje/futuro não publicado) + histórico (publicados).
+- Fiação: `nav-config` (permission key + rota + item "Orgânico" + label), `App.tsx` (rota lazy), `app-sidebar` (ícone `Sprout` no mapa).
+
+**Por que:**
+- Fatia visível da Fase 1: o time enxerga fila/status/saúde da automação sem terminal. Read-only de propósito (botões de ação = Fase 3). Platform-aware desde já.
+
+**Arquivos alterados:**
+- `client/src/pages/GrowthOrganico.tsx` (novo) — a página.
+- `server/routes/organico.ts` (novo) — endpoint de leitura.
+- `server/routes.ts` — import + registro **pós-auth**.
+- `shared/nav-config.ts` — permissão/rota/nav/label de `growth.organico`.
+- `client/src/App.tsx` — rota `/growth/organico`.
+- `client/src/components/app-sidebar.tsx` — ícone `Sprout` no mapa.
+
+**Impacto arquitetural:** Endpoint registrado intencionalmente DEPOIS de `app.use("/api", isAuthenticated)` (linha 479) — registrar junto do Instagram (pré-auth por causa do OAuth) deixaria a rota sem autenticação. Sem dado real até a migration `content_*` ser aplicada e o worker popular as tabelas (painel mostra estados vazios). Não typechecado localmente (worktree sem node_modules) — validar no build/CI.
+
+---
+
 ## 2026-06-24 | feat(publicacao): slot da tarde às 17h30 (granularidade de minutos)
 
 **O que foi feito:**
