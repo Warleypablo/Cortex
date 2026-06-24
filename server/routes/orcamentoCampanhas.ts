@@ -205,11 +205,35 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
 
       // ===== TikTok Ads =====
       // Schema tiktok.* pode não existir ou o role não ter permissão (degrada sem
-      // quebrar Meta/Google). budget só conta como diário quando budget_mode é DAY.
+      // quebrar Meta/Google). Orçamento diário (espelha CBO/ABO do Meta):
+      // - CBO: budget no nível campanha quando budget_mode é diário.
+      // - ABO: soma o budget dos ad groups ATIVOS com budget_mode diário.
+      // Modos diários do TikTok: BUDGET_MODE_DAY e BUDGET_MODE_DYNAMIC_DAILY_BUDGET
+      // (este último é o usado pela maioria dos conjuntos ativos). BUDGET_MODE_TOTAL
+      // (lifetime) e BUDGET_MODE_INFINITE (sem teto) não contam como diário.
       let tiktokRows: any[] = [];
       try {
         const r = await db.execute(sql`
-          WITH spend_agg AS (
+          WITH campaign_budget AS (
+            SELECT
+              c.campaign_id,
+              c.campaign_name,
+              c.operation_status,
+              CASE
+                WHEN c.budget_mode IN ('BUDGET_MODE_DAY', 'BUDGET_MODE_DYNAMIC_DAILY_BUDGET')
+                     AND COALESCE(c.budget, 0) > 0
+                  THEN c.budget
+                ELSE (
+                  SELECT COALESCE(SUM(g.budget), 0)
+                  FROM tiktok.ad_groups g
+                  WHERE g.campaign_id = c.campaign_id
+                    AND g.operation_status = 'ENABLE'
+                    AND g.budget_mode IN ('BUDGET_MODE_DAY', 'BUDGET_MODE_DYNAMIC_DAILY_BUDGET')
+                )
+              END::float AS daily_budget_atual
+            FROM tiktok.ad_campaigns c
+          ),
+          spend_agg AS (
             SELECT campaign_id, SUM(spend)::float AS investido_total
             FROM tiktok.ad_metrics_daily
             WHERE stat_date BETWEEN ${firstDay}::date AND ${lastDay}::date
@@ -223,19 +247,19 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           ),
           tags AS (SELECT campaign_id FROM cortex_core.campaign_tags WHERE platform = 'tiktok')
           SELECT
-            c.campaign_id::text AS campaign_id,
-            c.campaign_name AS name,
-            c.operation_status AS status,
-            CASE WHEN c.budget_mode = 'BUDGET_MODE_DAY' THEN COALESCE(c.budget, 0) ELSE 0 END::float AS daily_budget_atual,
+            cb.campaign_id::text AS campaign_id,
+            cb.campaign_name AS name,
+            cb.operation_status AS status,
+            COALESCE(cb.daily_budget_atual, 0)::float AS daily_budget_atual,
             COALESCE(s.investido_total, 0)::float AS investido_total,
             COALESCE(rs.recent_spend, 0)::float AS recent_spend
-          FROM tiktok.ad_campaigns c
-          LEFT JOIN spend_agg s ON s.campaign_id = c.campaign_id
-          LEFT JOIN recent_spend_agg rs ON rs.campaign_id = c.campaign_id
-          WHERE c.operation_status = 'ENABLE'
+          FROM campaign_budget cb
+          LEFT JOIN spend_agg s ON s.campaign_id = cb.campaign_id
+          LEFT JOIN recent_spend_agg rs ON rs.campaign_id = cb.campaign_id
+          WHERE cb.operation_status = 'ENABLE'
              OR COALESCE(s.investido_total, 0) > 0
-             OR c.campaign_id::text IN (SELECT campaign_id FROM tags)
-          ORDER BY c.campaign_name
+             OR cb.campaign_id::text IN (SELECT campaign_id FROM tags)
+          ORDER BY cb.campaign_name
         `);
         tiktokRows = r.rows || [];
       } catch (e: any) {

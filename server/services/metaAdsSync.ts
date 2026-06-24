@@ -42,6 +42,7 @@ interface ParsedInsightRow {
   ctr: number;
   inlineLinkClicks: number;
   outboundClicks: number;
+  uniqueOutboundClicks: number;
   videoPlay: number;
   videoP25: number;
   videoP50: number;
@@ -86,6 +87,12 @@ function parseInsightRow(row: any): ParsedInsightRow {
     ? row.outbound_clicks.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0)
     : parseInt(row.outbound_clicks || '0');
 
+  // unique_outbound_clicks: pessoas únicas que clicaram pra sair (não cliques totais).
+  // A API retorna como array [{action_type, value}], igual ao outbound_clicks.
+  const uniqueOutboundClicks = Array.isArray(row.unique_outbound_clicks)
+    ? row.unique_outbound_clicks.reduce((sum: number, v: any) => sum + parseInt(v.value || '0'), 0)
+    : parseInt(row.unique_outbound_clicks || '0');
+
   return {
     impressions: parseInt(row.impressions || '0'),
     clicks: parseInt(row.clicks || '0'),
@@ -97,6 +104,7 @@ function parseInsightRow(row: any): ParsedInsightRow {
     ctr: parseFloat(row.ctr || '0'),
     inlineLinkClicks: parseInt(row.inline_link_clicks || '0'),
     outboundClicks,
+    uniqueOutboundClicks,
     videoPlay: getVideoMetric(row.video_play_actions),
     videoP25: getVideoMetric(row.video_p25_watched_actions),
     videoP50: getVideoMetric(row.video_p50_watched_actions),
@@ -367,9 +375,12 @@ async function syncAdsAndCreatives(pool: Pool): Promise<{ ads: number; creatives
 async function syncInsightsDaily(pool: Pool, since: string, until: string): Promise<number> {
   console.log(`[MetaSync] Syncing daily insights ${since} → ${until}...`);
 
+  // Coluna de cliques de saída únicos (pessoas, não cliques). Idempotente.
+  await pool.query(`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS unique_outbound_clicks INTEGER DEFAULT 0`);
+
   const timeRange = JSON.stringify({ since, until });
   const insights = await fetchAllPages(`${TURBO_ACCOUNT_ID}/insights`, {
-    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,actions,action_values,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_thruplay_watched_actions',
+    fields: 'campaign_id,adset_id,ad_id,impressions,clicks,spend,reach,frequency,cpm,cpc,ctr,inline_link_clicks,outbound_clicks,unique_outbound_clicks,actions,action_values,video_play_actions,video_p25_watched_actions,video_p50_watched_actions,video_p75_watched_actions,video_p100_watched_actions,video_thruplay_watched_actions',
     time_range: timeRange,
     level: 'ad',
     time_increment: '1',
@@ -386,14 +397,15 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         video_play_actions, video_p25_watched_actions, video_p50_watched_actions,
         video_p75_watched_actions, video_p100_watched_actions,
         video_3_sec_watched_actions, video_thruplay_watched_actions,
-        conversions, landing_page_views, data_importacao
-      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,NOW())
+        conversions, landing_page_views, unique_outbound_clicks, data_importacao
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,NOW())
       ON CONFLICT ON CONSTRAINT meta_insights_daily_account_id_campaign_id_adset_id_ad_id_d_key
       DO UPDATE SET
         impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
         reach=EXCLUDED.reach, frequency=EXCLUDED.frequency, cpm=EXCLUDED.cpm,
         cpc=EXCLUDED.cpc, ctr=EXCLUDED.ctr,
         inline_link_clicks=EXCLUDED.inline_link_clicks, outbound_clicks=EXCLUDED.outbound_clicks,
+        unique_outbound_clicks=EXCLUDED.unique_outbound_clicks,
         video_play_actions=EXCLUDED.video_play_actions,
         video_p25_watched_actions=EXCLUDED.video_p25_watched_actions,
         video_p50_watched_actions=EXCLUDED.video_p50_watched_actions,
@@ -412,7 +424,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
       p.videoPlay,
       p.videoP25, p.videoP50, p.videoP75, p.videoP100,
       p.video3Sec, p.videoThruplay,
-      p.conversions, p.landingPageViews,
+      p.conversions, p.landingPageViews, p.uniqueOutboundClicks,
     ]);
     count++;
   }
