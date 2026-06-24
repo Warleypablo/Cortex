@@ -41,7 +41,15 @@ export async function carregarVendasProdutoClickup(db: any): Promise<AggVendasCl
            COALESCE(SUM(valorr::numeric), 0)::float AS mrr,
            COALESCE(SUM(valorp::numeric), 0)::float AS pont,
            COUNT(*) FILTER (WHERE COALESCE(valorr,0) > 0)::int AS contratos_mrr,
-           COUNT(*) FILTER (WHERE COALESCE(valorp,0) > 0)::int AS contratos_pont
+           -- Creators pontual: contar jornadas (id_task distinto) — entregas 1ª/2ª/3ª/4ª
+           -- do mesmo cliente no mesmo mês são uma única decisão de compra.
+           -- Demais produtos: contar contratos individuais (comportamento padrão).
+           COUNT(DISTINCT
+             CASE WHEN TRIM(COALESCE(produto,'')) = 'Creators' AND COALESCE(valorp::numeric,0) > 0
+                  THEN 'task:' || id_task
+                  ELSE 'sub:'  || id_subtask
+             END
+           ) FILTER (WHERE COALESCE(valorp::numeric,0) > 0)::int AS contratos_pont
     FROM "Clickup".cup_contratos
     WHERE data_criado >= ${ini} AND data_criado < ${fim}
       AND LOWER(TRIM(status)) <> 'não usar'
@@ -285,6 +293,36 @@ export function montarItensVendaProduto(
 ): { itens: ItemVendaDet[]; total: number } {
   const doSeg = contratosDoSegmento(rows, natureza, segmento);
   const valorDe = (c: ContratoRow) => (natureza === "recorrente" ? c.valorr : c.valorp);
+
+  // Creators pontual — modo contrato: agrupar por id_task (jornada), não id_subtask (entrega)
+  if (natureza === "pontual" && segmento === "Creators" && modo === "contrato") {
+    const byTask = new Map<string, ContratoRow[]>();
+    for (const c of doSeg) {
+      const key = c.idTask || c.idSubtask;
+      const arr = byTask.get(key) ?? [];
+      arr.push(c);
+      byTask.set(key, arr);
+    }
+    const itens: ItemVendaDet[] = Array.from(byTask.entries()).map(([taskId, entregas]) => {
+      const first = entregas[0];
+      const nE = entregas.length;
+      const totalPont = entregas.reduce((s, c) => s + c.valorp, 0);
+      const detalheEntregas = nE === 1
+        ? (first.servico || first.produto)
+        : `${nE} entregas · R$ ${Math.round(totalPont).toLocaleString("pt-BR")}`;
+      return {
+        grupo: "Contratos",
+        nome: first.cliente,
+        detalhe: detalheEntregas,
+        data: first.data,
+        valor: 0,
+        url: `${CLICKUP_TASK_BASE}/${taskId}`,
+      };
+    });
+    itens.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    return { itens, total: byTask.size };
+  }
+
   const itens: ItemVendaDet[] = doSeg.map((c) => ({
     grupo: "Contratos",
     nome: c.cliente,
@@ -303,6 +341,7 @@ export async function detalheVendaProdutoMes(
 ): Promise<{ itens: ItemVendaDet[]; total: number }> {
   const rows = (await db.execute(sql`
     SELECT c.id_subtask AS id_subtask,
+           COALESCE(c.id_task::text, '') AS id_task,
            COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
            COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
            COALESCE(c.servico, '') AS servico,
@@ -317,7 +356,7 @@ export async function detalheVendaProdutoMes(
       AND LOWER(TRIM(c.status)) <> 'não usar'
   `)).rows as any[];
   const contratos: ContratoRow[] = rows.map((r) => ({
-    idSubtask: String(r.id_subtask),
+    idSubtask: String(r.id_subtask), idTask: String(r.id_task),
     cliente: String(r.cliente), produto: String(r.produto), servico: String(r.servico),
     status: String(r.status), valorr: Number(r.valorr), valorp: Number(r.valorp), data: r.data ?? null,
   }));

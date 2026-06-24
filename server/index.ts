@@ -516,6 +516,54 @@ app.use((req, res, next) => {
   setInterval(() => runCrmIgCollectorJob(), CRM_IG_COLLECTOR_INTERVAL);
   console.log(`[crm-instagram-collector] Scheduled every ${CRM_IG_COLLECTOR_INTERVAL / 3600000}h`);
 
+  // TikTok orgânico — perfil + vídeos + snapshot diário de métricas (a cada 12h).
+  // Gated em TIKTOK_APP_ID/SECRET: sem as credenciais do app o refresh de token
+  // falha, então pulamos o job em vez de poluir tiktok.sync_runs com erros.
+  const TIKTOK_ORGANIC_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
+  const runTiktokOrganicSync = async () => {
+    if (!process.env.TIKTOK_APP_ID || !process.env.TIKTOK_APP_SECRET) {
+      console.log("[tiktok-organic-job] TIKTOK_APP_ID/SECRET ausentes, pulando");
+      (globalThis as any).__tiktokOrganicSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "skipped",
+      };
+      return;
+    }
+    try {
+      console.log("[tiktok-organic-job] Starting scheduled TikTok organic sync...");
+      const { syncTiktokOrganic } = await import("./services/tiktokOrganicSync");
+      const { Pool } = await import("pg");
+      const pool = new Pool({
+        host: process.env.DB_HOST || process.env.DATABASE_HOST || '',
+        port: parseInt(process.env.DB_PORT || '5432', 10),
+        database: process.env.DB_NAME || 'dados_turbo',
+        user: process.env.DB_USER || 'postgres',
+        password: process.env.DB_PASSWORD || process.env.DATABASE_PASSWORD || '',
+        ssl: process.env.DB_SSL === 'false' ? false : { rejectUnauthorized: false },
+      });
+      const result = await syncTiktokOrganic(pool);
+      await pool.end();
+      (globalThis as any).__tiktokOrganicSyncStatus = {
+        lastSync: new Date().toISOString(),
+        result,
+        status: result.errors.length === 0 ? "success" : "partial",
+      };
+      console.log(`[tiktok-organic-job] Sync complete: ${result.videos} vídeos, ${result.videoMetrics} métricas, ${result.errors.length} erros`);
+    } catch (err: any) {
+      console.error("[tiktok-organic-job] Sync failed:", err.message);
+      (globalThis as any).__tiktokOrganicSyncStatus = {
+        lastSync: new Date().toISOString(),
+        result: null,
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  // Primeiro sync 105s após boot, depois a cada 12h
+  setTimeout(() => runTiktokOrganicSync(), 105000);
+  setInterval(() => runTiktokOrganicSync(), TIKTOK_ORGANIC_SYNC_INTERVAL);
+  console.log(`[tiktok-organic-job] Scheduled every ${TIKTOK_ORGANIC_SYNC_INTERVAL / 3600000}h`);
+
   // Bitrix motivo de perda sync a cada 6 horas
   const MOTIVO_PERDA_SYNC_INTERVAL = 6 * 60 * 60 * 1000; // 6h
   const runMotivoPerdaSync = async () => {

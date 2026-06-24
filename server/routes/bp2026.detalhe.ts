@@ -15,7 +15,7 @@ import {
   somaDespesaCaixaPorMes, type DefLinha,
 } from "./bp2026";
 import {
-  classificarPonteItens, ehEstoquePontual, STATUS_DECOMP,
+  classificarPonteItens, ehEstoquePontual, STATUS_DECOMP, normalizarSquad,
   type RegPontualItem, type CategoriaPonte,
 } from "./bp2026.pontual.helpers";
 
@@ -258,9 +258,16 @@ const TITULOS_SUBABAS: Record<string, string> = {
   cac_comissoes: "Comissões", cac_growth: "Growth", cac_ads: "ADs",
   cac_eventos: "Eventos", cac_brindes: "Brindes", cac_viagens: "Viagens",
   cac_outras_sub: "Outras comerciais (não orçadas)",
-  pontual_estoque_ini: "(=) Estoque inicial", pontual_venda: "(+) Venda",
+  pontual_venda_comercial: "(+) Venda Pontual",
+  pontual_venda_no_estoque: "· Entrou no estoque", pontual_venda_fora_estoque: "· Fora do estoque",
+  pontual_estoque_ini: "(=) Estoque inicial", pontual_entrada: "(+) Entrada na foto",
   pontual_entrega: "(−) Entrega", pontual_churn: "(−) Churn",
+  pontual_taxa_entrega: "· Taxa de entrega",
   pontual_deletados: "(−) Deletados", pontual_saida_atipica: "(−) Saída atípica",
+  pontual_aging: "Aging do estoque",
+  pontual_aging_lt30: "Aging < 30 dias", pontual_aging_30_60: "Aging 30–60 dias",
+  pontual_aging_60_90: "Aging 60–90 dias", pontual_aging_gt90: "Aging > 90 dias",
+  pontual_tempo_medio: "Tempo médio p/ entrega",
   pontual_reajuste: "(±) Reajuste de valor", pontual_estoque_fim: "(=) Estoque final",
   pontual_status_ativo: "Em execução (ativo)", pontual_status_triagem: "Triagem",
   pontual_status_pausado: "Pausado", pontual_status_onboarding: "Onboarding",
@@ -301,32 +308,39 @@ async function detMrrSnapshot(db: any, mes: number, anterior: boolean): Promise<
 }
 
 // contratos pontuais (valorp>0) do último snapshot do mês (anterior=false) ou do mês anterior (anterior=true)
-async function carregaPontualSnapshot(db: any, mes: number, anterior: boolean): Promise<RegPontualItem[]> {
+async function carregaPontualSnapshot(db: any, mes: number, anterior: boolean, filtroCreators?: boolean): Promise<RegPontualItem[]> {
   const ini = anterior ? sql`(make_date(${ANO}, ${mes}, 1) - INTERVAL '1 month')` : sql`make_date(${ANO}, ${mes}, 1)`;
   const fim = anterior ? sql`make_date(${ANO}, ${mes}, 1)` : sql`(make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')`;
+  const filtro = filtroCreators
+    ? sql`AND LOWER(COALESCE(h.produto, '')) LIKE '%creators%'`
+    : sql``;
   const result = await db.execute(sql`
     WITH alvo AS (
       SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
       WHERE data_snapshot::date >= ${ini}::date AND data_snapshot::date < ${fim}::date
     )
     SELECT h.id_subtask, h.valorp::numeric AS valorp, h.status,
+           to_char(c.data_criado, 'YYYY-MM') AS criado_ym,
            COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
-           COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad
+           COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
+           COALESCE(NULLIF(TRIM(h.produto), ''), '(sem produto)') AS produto
     FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
     LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
-    WHERE h.valorp::numeric > 0
+    LEFT JOIN "Clickup".cup_contratos c ON c.id_subtask = h.id_subtask
+    WHERE h.valorp::numeric > 0 ${filtro}
   `);
   return (result.rows as any[]).map((r) => ({
     idSubtask: String(r.id_subtask), valorp: parseFloat(r.valorp), status: r.status,
-    cliente: r.cliente, squad: r.squad,
+    criadoYm: r.criado_ym ?? null,
+    cliente: r.cliente, squad: r.squad, produto: r.produto,
   }));
 }
 
 // estoque pontual de um snapshot (opcional filtro de status); grupos por squad
 async function detPontualSnapshot(
-  db: any, mes: number, anterior: boolean, pred?: (r: RegPontualItem) => boolean
+  db: any, mes: number, anterior: boolean, pred?: (r: RegPontualItem) => boolean, filtroCreators?: boolean
 ): Promise<ResultadoDet> {
-  const regs = (await carregaPontualSnapshot(db, mes, anterior)).filter(ehEstoquePontual);
+  const regs = (await carregaPontualSnapshot(db, mes, anterior, filtroCreators)).filter(ehEstoquePontual);
   const filtrados = pred ? regs.filter(pred) : regs;
   const itens: ItemDetalhe[] = filtrados.map((r) => ({
     grupo: r.squad ?? "(sem squad)", nome: r.cliente, detalhe: `status ${r.status}`, data: null, valor: r.valorp,
@@ -335,21 +349,112 @@ async function detPontualSnapshot(
 }
 
 const TITULO_CATEGORIA: Record<CategoriaPonte, string> = {
-  venda: "Entradas no estoque (vendas)", entrega: "Saídas por entrega", churn: "Saídas por churn",
+  venda_mes: "Venda do mês (data de criação)",
+  entrada_defasada: "Entrada defasada (vendas anteriores)",
+  reativacao: "Reativações (voltaram ao estoque)",
+  sem_origem: "Sem origem (órfãos do snapshot)",
+  entrega: "Saídas por entrega", churn: "Saídas por churn",
   deletados: "Deletados do ClickUp", saida_atipica: "Saídas atípicas", reajuste: "Reajustes de valor",
 };
 
-// contratos que se moveram numa categoria do mês (snapshot anterior × atual)
-async function detPontualMovimento(db: any, mes: number, categoria: CategoriaPonte): Promise<ResultadoDet> {
-  const [ant, atual] = await Promise.all([
-    carregaPontualSnapshot(db, mes, true), carregaPontualSnapshot(db, mes, false),
-  ]);
-  const itensCat = classificarPonteItens(ant, atual)[categoria];
-  const itens: ItemDetalhe[] = itensCat.map((it) => ({
-    grupo: TITULO_CATEGORIA[categoria], nome: it.cliente,
-    detalhe: [it.detalhe, `status ${it.status}`].filter(Boolean).join(" · "),
-    data: null, valor: it.valor,
+// Venda Pontual (comercial): contratos pontuais criados no mês (data_criado) — mesma régua da
+// Receita Pontual de Vendas por Produto. Agrupados por produto.
+async function detVendaPontualComercial(db: any, mes: number, produtoFiltro?: string, filtroCreators?: boolean): Promise<ResultadoDet> {
+  const result = await db.execute(sql`
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+           COALESCE(c.servico, '') AS servico,
+           COALESCE(c.status, '') AS status,
+           c.valorp::numeric AS valor,
+           c.data_criado::date::text AS data
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+    WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+      AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+      AND LOWER(TRIM(c.status)) <> 'não usar' AND c.valorp::numeric > 0
+    ORDER BY valor DESC
+  `);
+  const itens: ItemDetalhe[] = (result.rows as any[])
+    .filter((r) => {
+      if (filtroCreators && !r.produto.toLowerCase().includes("creators")) return false;
+      if (produtoFiltro && r.produto !== produtoFiltro) return false;
+      return true;
+    })
+    .map((r) => ({
+      grupo: r.produto, nome: r.cliente,
+      detalhe: [r.servico, `status ${r.status}`].filter(Boolean).join(" · "),
+      data: r.data ?? null, valor: parseFloat(r.valor),
+    }));
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
+// Venda do mês decomposta por estar (dentro=true) ou não (dentro=false) na foto do estoque
+// do fim do mês. Mesma régua de valor da venda comercial (cup_contratos) → soma exata.
+async function detVendaPorEstoque(db: any, mes: number, dentro: boolean, filtroCreators?: boolean): Promise<ResultadoDet> {
+  const filtroC = filtroCreators
+    ? sql`AND LOWER(COALESCE(c.produto, '')) LIKE '%creators%'`
+    : sql``;
+  const result = await db.execute(sql`
+    WITH alvo AS (
+      SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+      WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
+        AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
+    ),
+    est AS (
+      SELECT h.id_subtask FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+      WHERE h.valorp::numeric > 0 AND h.status NOT IN ('entregue','cancelado/inativo','não usar')
+    )
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+           COALESCE(c.servico, '') AS servico,
+           COALESCE(c.status, '') AS status,
+           c.valorp::numeric AS valor,
+           c.data_criado::date::text AS data
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+    WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+      AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+      AND LOWER(TRIM(c.status)) <> 'não usar' AND c.valorp::numeric > 0
+      AND (c.id_subtask IN (SELECT id_subtask FROM est)) = ${dentro}
+      ${filtroC}
+    ORDER BY valor DESC
+  `);
+  const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+    grupo: r.produto, nome: r.cliente,
+    detalhe: [r.servico, `status ${r.status}`].filter(Boolean).join(" · "),
+    data: r.data ?? null, valor: parseFloat(r.valor),
   }));
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
+// categorias que compõem a "Entrada na foto" (tudo que entrou no estoque no mês)
+const CATS_ENTRADA: CategoriaPonte[] = ["venda_mes", "entrada_defasada", "reativacao", "sem_origem"];
+
+// contratos que se moveram numa ou várias categorias do mês (snapshot anterior × atual)
+async function detPontualMovimento(
+  db: any, mes: number, categorias: CategoriaPonte | CategoriaPonte[], produtoFiltro?: string, filtroCreators?: boolean,
+): Promise<ResultadoDet> {
+  const cats = Array.isArray(categorias) ? categorias : [categorias];
+  const ymAlvo = `${ANO}-${String(mes).padStart(2, "0")}`;
+  let [ant, atual] = await Promise.all([
+    carregaPontualSnapshot(db, mes, true, filtroCreators),
+    carregaPontualSnapshot(db, mes, false, filtroCreators),
+  ]);
+  if (produtoFiltro) {
+    const ehProduto = (r: RegPontualItem) => (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produtoFiltro;
+    ant = ant.filter(ehProduto); atual = atual.filter(ehProduto);
+  }
+  const rec = classificarPonteItens(ant, atual, ymAlvo);
+  const itens: ItemDetalhe[] = [];
+  for (const cat of cats) {
+    for (const it of rec[cat]) {
+      itens.push({
+        grupo: TITULO_CATEGORIA[cat], nome: it.cliente,
+        detalhe: [it.detalhe, `status ${it.status}`].filter(Boolean).join(" · "),
+        data: null, valor: it.valor,
+      });
+    }
+  }
   return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
 }
 
@@ -360,11 +465,23 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       const mes = Number(req.query.mes);
       const def = TODAS_DEFS.find((d) => d.metrica === metrica);
       const prod = parseMetricaProduto(metrica);
-      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod;
+      const squadAlvo = metrica.startsWith("pontual_squad:") ? metrica.slice("pontual_squad:".length) : null;
+      // pontual_prod:<pai>:<produto> — drill de uma sub-linha por produto
+      const prodAlvo = (() => {
+        if (!metrica.startsWith("pontual_prod:")) return null;
+        const rest = metrica.slice("pontual_prod:".length);
+        const idx = rest.indexOf(":");
+        return idx < 0 ? null : { pai: rest.slice(0, idx), produto: rest.slice(idx + 1) };
+      })();
+      const segmento = String(req.query.segmento ?? "");
+      const filtroCreators = segmento === "creators";
+      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod || !!squadAlvo || !!prodAlvo;
       if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }
-      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo ?? metrica;
+      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo
+        ?? (squadAlvo ? `Estoque pontual — ${squadAlvo}` : null)
+        ?? (prodAlvo ? `${TITULOS_SUBABAS[prodAlvo.pai] ?? prodAlvo.pai} — ${prodAlvo.produto}` : metrica);
 
       let orcado: number | null = null;
       const orcRes = await db.execute(sql`
@@ -549,6 +666,43 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         grupos = ganhos.grupos;
         realizado = ganhos.realizado ? despesa / ganhos.realizado : 0;
         notaDinamica = `despesa CAC R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${ganhos.realizado} deals ganhos no mês`;
+      } else if (metrica.startsWith("cac_contrato_produto_")) {
+        const slug = metrica.slice("cac_contrato_produto_".length);
+        const predicadoSlug =
+          slug === "performance" ? sql`(TRIM(COALESCE(c.produto,''))='Performance' OR c.servico ILIKE '%performance%')`
+          : slug === "creators"  ? sql`(TRIM(COALESCE(c.produto,''))='Creators' OR c.servico ILIKE '%creator%')`
+          : slug === "social"    ? sql`(TRIM(COALESCE(c.produto,''))='Social Media' OR c.servico ILIKE '%social%')`
+          : slug === "gc"        ? sql`(TRIM(COALESCE(c.produto,''))='Gestão de Comunidade' OR c.servico ILIKE '%comunidade%')`
+          : sql`(TRIM(COALESCE(c.produto,'')) NOT IN ('Performance','Creators','Social Media','Gestão de Comunidade'))`;
+        const result = await db.execute(sql`
+          SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+                 COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+                 COALESCE(c.servico, '') AS servico,
+                 COALESCE(c.squad, '') AS squad,
+                 c.valorr::numeric AS valor,
+                 c.data_criado::date::text AS data
+          FROM "Clickup".cup_contratos c
+          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+          WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+            AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+            AND LOWER(TRIM(c.status)) <> 'não usar'
+            AND COALESCE(c.valorr::numeric, 0) > 0
+            AND (${predicadoSlug})
+          ORDER BY cl.nome
+        `);
+        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+          grupo: r.squad || r.produto || "(sem squad)",
+          nome: r.cliente,
+          detalhe: r.servico,
+          data: r.data ?? null,
+          valor: parseFloat(r.valor),
+        }));
+        const cacPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac);
+        const despesa = cacPorMes[mes] ?? 0;
+        const nContratos = itens.length;
+        grupos = agruparItens(itens, LIMITE_ITENS);
+        realizado = nContratos > 0 ? despesa / nContratos : 0;
+        notaDinamica = `CAC total R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${nContratos} contrato${nContratos !== 1 ? "s" : ""} = R$ ${Math.round(realizado).toLocaleString("pt-BR")}/contrato`;
       } else if (metrica === "taxa_conversao") {
         const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (numerador)");
         const reun = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas");
@@ -642,19 +796,83 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
+      } else if (prodAlvo) {
+        const { pai, produto } = prodAlvo;
+        if (pai === "pontual_venda_comercial") {
+          ({ grupos, realizado } = await detVendaPontualComercial(db, mes, produto, filtroCreators));
+        } else if (pai === "pontual_entrada") {
+          ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA, produto, filtroCreators));
+        } else if (pai === "pontual_entrega") {
+          ({ grupos, realizado } = await detPontualMovimento(db, mes, "entrega", produto, filtroCreators));
+        } else if (pai === "pontual_estoque_fim") {
+          ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto, filtroCreators));
+        } else if (pai.startsWith("pontual_status_")) {
+          const chaveMetrica = pai.slice("pontual_status_".length);
+          const statusAlvo = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica)?.chave;
+          ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) =>
+            r.status === statusAlvo && (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto, filtroCreators));
+        }
+      } else if (squadAlvo) {
+        const sq = squadAlvo;
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => normalizarSquad(r.squad) === sq, filtroCreators));
       } else if (metrica === "pontual_estoque_ini") {
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, true));
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, true, undefined, filtroCreators));
       } else if (metrica === "pontual_estoque_fim") {
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false));
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, undefined, filtroCreators));
       } else if (metrica === "pontual_status_outros") {
         const conhecidos: Set<string> = new Set(STATUS_DECOMP.map((s) => s.chave));
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => !conhecidos.has(r.status)));
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => !conhecidos.has(r.status), filtroCreators));
       } else if (metrica.startsWith("pontual_status_")) {
         const chaveMetrica = metrica.slice("pontual_status_".length);
         const def2 = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica);
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false));
-      } else if (["pontual_venda", "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste"].includes(metrica)) {
-        ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte));
+        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false, filtroCreators));
+      } else if (metrica === "pontual_venda_comercial") {
+        ({ grupos, realizado } = await detVendaPontualComercial(db, mes, undefined, filtroCreators));
+      } else if (metrica === "pontual_venda_no_estoque") {
+        ({ grupos, realizado } = await detVendaPorEstoque(db, mes, true, filtroCreators));
+      } else if (metrica === "pontual_venda_fora_estoque") {
+        ({ grupos, realizado } = await detVendaPorEstoque(db, mes, false, filtroCreators));
+      } else if (metrica === "pontual_entrada") {
+        ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA, undefined, filtroCreators));
+      } else if ([
+        "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste",
+      ].includes(metrica)) {
+        ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte, undefined, filtroCreators));
+      } else if (metrica.startsWith("pontual_aging_")) {
+        const bucket = metrica.slice("pontual_aging_".length);
+        const ageCond =
+          bucket === "lt30"  ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) < 30`
+          : bucket === "30_60" ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) BETWEEN 30 AND 59`
+          : bucket === "60_90" ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) BETWEEN 60 AND 89`
+          : sql`(a.d - COALESCE(c.data_criado::date, a.d)) >= 90`;
+        const filtroAging = filtroCreators ? sql`AND LOWER(COALESCE(h.produto, '')) LIKE '%creators%'` : sql``;
+        const resAging = await db.execute(sql`
+          WITH alvo AS (
+            SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+            WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
+              AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
+          )
+          SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+                 h.status, h.valorp::numeric AS valor,
+                 c.data_criado::date::text AS data_criado,
+                 COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
+                 (a.d - COALESCE(c.data_criado::date, a.d)) AS idade_dias
+          FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+          LEFT JOIN "Clickup".cup_contratos c ON c.id_subtask = h.id_subtask
+          WHERE h.valorp::numeric > 0
+            AND h.status NOT IN ('entregue','cancelado/inativo','não usar')
+            AND (${ageCond})
+            ${filtroAging}
+          ORDER BY cl.nome
+        `);
+        const itensAging: ItemDetalhe[] = (resAging.rows as any[]).map((r) => ({
+          grupo: r.squad, nome: r.cliente,
+          detalhe: `${r.idade_dias ?? 0} dias · status ${r.status}`,
+          data: r.data_criado ?? null, valor: parseFloat(r.valor),
+        }));
+        grupos = agruparItens(itensAging, LIMITE_ITENS);
+        realizado = itensAging.reduce((s, i) => s + i.valor, 0);
       } else if (metrica === "or_receita_variavel" || metrica === "or_stack_digital" || metrica === "or_demais") {
         const pred = metrica === "or_receita_variavel" ? PREDICADOS_OUTRAS_SUB.or_variavel
           : metrica === "or_stack_digital" ? PREDICADOS_OUTRAS_SUB.or_stack : PREDICADOS_OUTRAS_SUB.or_demais;

@@ -428,25 +428,32 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
             FROM generate_series(${minMesDate}::date, ${maxMesDate}::date, interval '1 month') d
           ),
           snap_ref AS (
-            SELECT meses.mes, COALESCE(
-              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = meses.m LIMIT 1),
-              (SELECT MIN(data_snapshot) FROM "Clickup".cup_data_hist WHERE date_trunc('month',data_snapshot)=meses.m)
-            ) snap FROM meses
+            SELECT meses.mes,
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist
+               WHERE date_trunc('month',data_snapshot)=meses.m) snap
+            FROM meses
           ),
           base AS (
-            SELECT sr.mes, h.produto, h.valorr,
+            SELECT sr.mes,
+              -- classifica por produto e, quando ausente/instável, cai p/ servico
+              -- (alinha com a aba Creators e estabiliza meses de produto corrompido)
+              CASE
+                WHEN TRIM(COALESCE(h.produto,'')) = 'Performance' THEN 'Performance'
+                WHEN TRIM(COALESCE(h.produto,'')) = 'Creators' THEN 'Creators'
+                WHEN TRIM(COALESCE(h.produto,'')) = 'Social Media' THEN 'Social Media'
+                WHEN TRIM(COALESCE(h.produto,'')) <> '' THEN 'Outros'
+                WHEN h.servico ILIKE '%creator%' THEN 'Creators'
+                WHEN h.servico ILIKE '%performance%' THEN 'Performance'
+                WHEN h.servico ILIKE '%social%' THEN 'Social Media'
+                ELSE 'Outros' END AS produto,
+              h.valorr,
               (h.data_snapshot - h.data_inicio)::numeric/30.44 AS lt
             FROM snap_ref sr
             JOIN "Clickup".cup_data_hist h ON h.data_snapshot = sr.snap
-            WHERE h.status IN ('ativo','onboarding','triagem') AND h.valorr>0 AND h.data_snapshot >= h.data_inicio
-          ),
-          cobertura AS (
-            SELECT mes, COUNT(*) FILTER (WHERE produto IS NOT NULL)::numeric / NULLIF(COUNT(*),0) cob
-            FROM base GROUP BY mes
+            WHERE h.status IN ('ativo','onboarding','triagem','pausado') AND h.valorr>0 AND h.data_snapshot >= h.data_inicio
           )
           SELECT b.mes, b.produto, b.lt::float8 AS lt, b.valorr::float8 AS valorr
-          FROM base b JOIN cobertura c ON c.mes=b.mes AND c.cob>=0.5
-          WHERE b.produto IS NOT NULL
+          FROM base b
         `)).rows as any[];
         rows.push(...ativos.map((x) => ({
           mes: x.mes as string, produto: x.produto as string | null,
@@ -457,10 +464,19 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       if (status === "cancelados" || status === "todos") {
         const cancelados = (await db.execute(sql`
           SELECT to_char(date_trunc('month', data_fim),'YYYY-MM') AS mes,
-            produto, lt_meses::float8 AS lt, valorr::float8 AS valorr
+            CASE
+              WHEN TRIM(COALESCE(produto,'')) = 'Performance' THEN 'Performance'
+              WHEN TRIM(COALESCE(produto,'')) = 'Creators' THEN 'Creators'
+              WHEN TRIM(COALESCE(produto,'')) = 'Social Media' THEN 'Social Media'
+              WHEN TRIM(COALESCE(produto,'')) <> '' THEN 'Outros'
+              WHEN servico ILIKE '%creator%' THEN 'Creators'
+              WHEN servico ILIKE '%performance%' THEN 'Performance'
+              WHEN servico ILIKE '%social%' THEN 'Social Media'
+              ELSE 'Outros' END AS produto,
+            lt_meses::float8 AS lt, valorr::float8 AS valorr
           FROM cortex_core.vw_lt_contratos
           WHERE tipo_receita='recorrente' AND is_churned AND NOT data_inconsistente
-            AND data_fim IS NOT NULL AND produto IS NOT NULL
+            AND data_fim IS NOT NULL
             AND to_char(date_trunc('month', data_fim),'YYYY-MM') BETWEEN ${minMes} AND ${maxMes}
         `)).rows as any[];
         rows.push(...cancelados.map((x) => ({
