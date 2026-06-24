@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, Fragment } from "react";
+import { useMemo, useState, useEffect, useRef, Fragment, type CSSProperties } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -6,7 +6,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { DollarSign, TrendingUp, Target, Calendar, Facebook, Search as SearchIcon, Loader2, ChevronRight, ChevronDown, Linkedin, Music2 } from "lucide-react";
+import { DollarSign, TrendingUp, Target, Calendar, Facebook, Search as SearchIcon, Loader2, ChevronRight, ChevronDown, Linkedin, Music2, Settings, Plus, ArrowUp, ArrowDown, Archive, RotateCcw } from "lucide-react";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { formatCurrency } from "@/lib/utils";
@@ -39,15 +39,28 @@ const PLATFORM_STYLES: Record<Platform, { row: string; icon: string }> = {
   linkedin: { row: "bg-cyan-500/5 dark:bg-cyan-400/[0.07]", icon: "text-cyan-600 dark:text-cyan-400" },
 };
 
-// Tags/grupos (pools). Manter em sincronia com CAMPAIGN_TAGS no backend.
-type CampaignTag = "inbound" | "evento";
-const TAG_OPTIONS: { value: CampaignTag; label: string }[] = [
-  { value: "inbound", label: "Inbound" },
-  { value: "evento", label: "Evento" },
-];
-const TAG_LABELS: Record<CampaignTag, string> = { inbound: "Inbound", evento: "Evento" };
-const POOLS: CampaignTag[] = ["inbound", "evento"];
-const NO_TAG = "__none__"; // sentinela p/ "Sem tag" no Select (Radix não aceita value vazio)
+// Tags/grupos (pools) — agora configuráveis pela aba "Configuração"
+// (tabela cortex_core.budget_tags), carregadas do backend a cada request.
+type CampaignTag = string;
+interface TagDef {
+  key: string;
+  label: string;
+  color: string | null;
+  sortOrder: number;
+  active: boolean;
+}
+const NO_TAG = "__none__"; // sentinela p/ "Sem grupo" no Select (Radix não aceita value vazio)
+
+// Abas especiais (não são tags).
+const TAB_TODAS = "__todas__";
+const TAB_SEM_TAG = "__sem_tag__";
+const TAB_CONFIG = "__config__";
+
+// Tinge um badge/realce com a cor da tag (hex #rrggbb). Acrescenta alpha em hex.
+function tagTint(color: string | null | undefined): CSSProperties | undefined {
+  if (!color) return undefined;
+  return { backgroundColor: `${color}1f`, color, borderColor: `${color}55` };
+}
 
 // Etapas do funil. Manter em sincronia com CAMPAIGN_STAGES no backend.
 type CampaignStage = "descoberta" | "relacionamento" | "conversao" | "remarketing" | "institucional";
@@ -67,15 +80,6 @@ const STAGE_LABELS: Record<CampaignStage, string> = {
 };
 const STAGE_ORDER: CampaignStage[] = STAGE_OPTIONS.map((o) => o.value);
 const NO_STAGE = "__none__";
-
-// Abas de filtro no topo. "sem-tag" lista campanhas ainda não classificadas.
-type TabValue = "todas" | CampaignTag | "sem-tag";
-const TABS: { value: TabValue; label: string }[] = [
-  { value: "todas", label: "Todas" },
-  { value: "inbound", label: "Inbound" },
-  { value: "evento", label: "Evento" },
-  { value: "sem-tag", label: "Sem tag" },
-];
 
 type PlanUnit = "pct" | "brl";
 interface StagePlan {
@@ -109,6 +113,7 @@ interface ApiResponse {
   diasRestantes: number;
   campanhas: Campanha[];
   plans: Record<string, PoolPlan>;
+  tags: TagDef[];
 }
 
 function getMonthOptions(): { value: string; label: string }[] {
@@ -176,13 +181,14 @@ function projecaoColor(projecao: number, meta: number | null): string {
 }
 
 // ---- Select de pool (grupo) por campanha ----
-function TagSelect({ platform, campaignId, value, onSaved, canEdit }: {
-  platform: Platform; campaignId: string; value: CampaignTag | null; onSaved: () => void; canEdit: boolean;
+function TagSelect({ platform, campaignId, value, onSaved, canEdit, tags }: {
+  platform: Platform; campaignId: string; value: CampaignTag | null; onSaved: () => void; canEdit: boolean; tags: TagDef[];
 }) {
   const { toast } = useToast();
+  const current = value ? tags.find((t) => t.key === value) : undefined;
   if (!canEdit) {
     return value
-      ? <Badge variant="secondary" className="text-xs">{TAG_LABELS[value]}</Badge>
+      ? <Badge variant="secondary" className="text-xs" style={tagTint(current?.color)}>{current?.label ?? value}</Badge>
       : <span className="text-muted-foreground text-xs">—</span>;
   }
   const handleChange = async (next: string) => {
@@ -194,14 +200,20 @@ function TagSelect({ platform, campaignId, value, onSaved, canEdit }: {
       toast({ title: "Erro ao salvar grupo", description: String(err), variant: "destructive" });
     }
   };
+  // Tag arquivada ainda atribuída: mostra como opção para não "sumir" o valor atual.
+  const options = tags.filter((t) => t.active || t.key === value);
   return (
     <Select value={value ?? NO_TAG} onValueChange={handleChange}>
-      <SelectTrigger className="h-7 w-[120px] text-xs" data-testid={`select-tag-${platform}-${campaignId}`}>
+      <SelectTrigger className="h-7 w-[140px] text-xs" data-testid={`select-tag-${platform}-${campaignId}`}>
         <SelectValue />
       </SelectTrigger>
       <SelectContent>
         <SelectItem value={NO_TAG}><span className="text-muted-foreground">Sem grupo</span></SelectItem>
-        {TAG_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+        {options.map((t) => (
+          <SelectItem key={t.key} value={t.key}>
+            {t.label}{!t.active && <span className="text-muted-foreground"> (arquivada)</span>}
+          </SelectItem>
+        ))}
       </SelectContent>
     </Select>
   );
@@ -388,6 +400,151 @@ function sumStage(rows: Campanha[]): StageSums {
 
 const COLSPAN = 9;
 
+// ---- Aba de Configuração: gerencia o catálogo de tags/grupos ----
+function TagsConfig({ tags, onChanged, canEdit }: { tags: TagDef[]; onChanged: () => void; canEdit: boolean }) {
+  const { toast } = useToast();
+  const [newLabel, setNewLabel] = useState("");
+  const [newColor, setNewColor] = useState("#6366f1");
+  const [busy, setBusy] = useState(false);
+
+  const activeSorted = tags.filter((t) => t.active).sort((a, b) => a.sortOrder - b.sortOrder);
+  const archived = tags.filter((t) => !t.active).sort((a, b) => a.label.localeCompare(b.label));
+  const activeKeys = activeSorted.map((t) => t.key);
+
+  const run = async (fn: () => Promise<any>, errTitle: string) => {
+    setBusy(true);
+    try { await fn(); onChanged(); }
+    catch (err) { toast({ title: errTitle, description: String(err), variant: "destructive" }); }
+    finally { setBusy(false); }
+  };
+
+  const create = () => {
+    const label = newLabel.trim();
+    if (!label) return;
+    run(async () => {
+      await apiRequest("POST", "/api/growth/orcamento-campanhas/tags", { label, color: newColor });
+      setNewLabel("");
+    }, "Erro ao criar tag");
+  };
+  const rename = (key: string, label: string, prev: string) => {
+    if (!label.trim() || label.trim() === prev) return;
+    run(() => apiRequest("PUT", "/api/growth/orcamento-campanhas/tags", { key, label: label.trim() }), "Erro ao renomear");
+  };
+  const recolor = (key: string, color: string) =>
+    run(() => apiRequest("PUT", "/api/growth/orcamento-campanhas/tags", { key, color }), "Erro ao alterar cor");
+  const setActive = (key: string, active: boolean) =>
+    run(() => apiRequest("PUT", "/api/growth/orcamento-campanhas/tags", { key, active }), active ? "Erro ao reativar" : "Erro ao arquivar");
+  const move = (key: string, dir: -1 | 1) => {
+    const idx = activeKeys.indexOf(key);
+    const swap = idx + dir;
+    if (idx < 0 || swap < 0 || swap >= activeKeys.length) return;
+    const next = [...activeKeys];
+    [next[idx], next[swap]] = [next[swap], next[idx]];
+    run(() => apiRequest("PUT", "/api/growth/orcamento-campanhas/tags/reorder", { keys: next }), "Erro ao reordenar");
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2"><Settings className="w-4 h-4" /> Configuração de grupos</CardTitle>
+        <p className="text-sm text-muted-foreground">
+          Cada grupo vira uma aba e um pool de orçamento. Renomear preserva os dados; arquivar esconde a aba sem apagar nada.
+        </p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Criar nova tag */}
+        {canEdit && (
+          <div className="flex flex-wrap items-center gap-2 border-b pb-4">
+            <input
+              type="color" value={newColor} onChange={(e) => setNewColor(e.target.value)}
+              className="h-9 w-9 rounded cursor-pointer bg-transparent border" title="Cor do grupo"
+              data-testid="input-new-tag-color"
+            />
+            <Input
+              value={newLabel} onChange={(e) => setNewLabel(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Enter") create(); }}
+              placeholder="Nome do grupo (ex: Creators Summit)"
+              className="h-9 w-[260px]" data-testid="input-new-tag-label"
+            />
+            <button
+              type="button" onClick={create} disabled={busy || !newLabel.trim()}
+              className="h-9 px-3 inline-flex items-center gap-1.5 rounded-md bg-primary text-primary-foreground text-sm font-medium hover:bg-primary/90 disabled:opacity-50"
+              data-testid="button-create-tag"
+            >
+              <Plus className="w-4 h-4" /> Criar
+            </button>
+          </div>
+        )}
+
+        {/* Tags ativas */}
+        <div className="space-y-1.5">
+          {activeSorted.length === 0 && <p className="text-sm text-muted-foreground">Nenhum grupo ativo.</p>}
+          {activeSorted.map((t, i) => (
+            <div key={t.key} className="flex items-center gap-2 py-1.5 px-2 rounded-md hover:bg-accent/50" data-testid={`tag-row-${t.key}`}>
+              {canEdit && (
+                <div className="flex flex-col">
+                  <button type="button" onClick={() => move(t.key, -1)} disabled={i === 0 || busy}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Subir">
+                    <ArrowUp className="w-3.5 h-3.5" />
+                  </button>
+                  <button type="button" onClick={() => move(t.key, 1)} disabled={i === activeSorted.length - 1 || busy}
+                    className="text-muted-foreground hover:text-foreground disabled:opacity-30" title="Descer">
+                    <ArrowDown className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              <input
+                type="color" value={t.color ?? "#888888"} disabled={!canEdit}
+                onChange={(e) => recolor(t.key, e.target.value)}
+                className="h-7 w-7 rounded cursor-pointer bg-transparent border disabled:cursor-default" title="Cor"
+              />
+              {canEdit ? (
+                <Input
+                  defaultValue={t.label}
+                  onBlur={(e) => rename(t.key, e.target.value, t.label)}
+                  onKeyDown={(e) => { if (e.key === "Enter") (e.target as HTMLInputElement).blur(); }}
+                  className="h-8 w-[240px]" data-testid={`input-tag-label-${t.key}`}
+                />
+              ) : (
+                <Badge variant="secondary" style={tagTint(t.color)}>{t.label}</Badge>
+              )}
+              <span className="text-xs text-muted-foreground font-mono">{t.key}</span>
+              {canEdit && (
+                <button type="button" onClick={() => setActive(t.key, false)} disabled={busy}
+                  className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                  data-testid={`button-archive-${t.key}`}>
+                  <Archive className="w-3.5 h-3.5" /> Arquivar
+                </button>
+              )}
+            </div>
+          ))}
+        </div>
+
+        {/* Tags arquivadas */}
+        {archived.length > 0 && (
+          <div className="space-y-1.5 border-t pt-3">
+            <p className="text-xs uppercase tracking-wide text-muted-foreground">Arquivadas</p>
+            {archived.map((t) => (
+              <div key={t.key} className="flex items-center gap-2 py-1 px-2 opacity-70" data-testid={`tag-row-archived-${t.key}`}>
+                <span className="h-3 w-3 rounded-full border" style={{ backgroundColor: t.color ?? "#888" }} />
+                <span className="text-sm">{t.label}</span>
+                <span className="text-xs text-muted-foreground font-mono">{t.key}</span>
+                {canEdit && (
+                  <button type="button" onClick={() => setActive(t.key, true)} disabled={busy}
+                    className="ml-auto inline-flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+                    data-testid={`button-restore-${t.key}`}>
+                    <RotateCcw className="w-3.5 h-3.5" /> Reativar
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function GrowthOrcamentoCampanhas() {
   useSetPageInfo(
     "Orçamento por Campanha",
@@ -404,7 +561,7 @@ export default function GrowthOrcamentoCampanhas() {
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
   }, []);
   const [month, setMonth] = useState<string>(defaultMonth);
-  const [activeTab, setActiveTab] = useState<TabValue>("todas");
+  const [activeTab, setActiveTab] = useState<string>(TAB_TODAS);
   // Plataformas expandidas (chave `${etapa}:${plataforma}`). Padrão: fechado.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const togglePlatform = (key: string) =>
@@ -428,24 +585,49 @@ export default function GrowthOrcamentoCampanhas() {
 
   const plans: Record<string, PoolPlan> = data?.plans ?? {};
   const diasRestantes = data?.diasRestantes ?? 0;
+
+  // Catálogo de tags dinâmico. Abas só mostram as ativas; o mapa cobre todas
+  // (inclusive arquivadas) p/ rotular badges de campanhas já classificadas.
+  const allTags: TagDef[] = data?.tags ?? [];
+  const activeTags = useMemo(
+    () => allTags.filter((t) => t.active).sort((a, b) => a.sortOrder - b.sortOrder),
+    [allTags],
+  );
+  const tagMap = useMemo(() => new Map(allTags.map((t) => [t.key, t])), [allTags]);
+  const tagLabel = (key: string) => tagMap.get(key)?.label ?? key;
+  const POOLS: CampaignTag[] = useMemo(() => activeTags.map((t) => t.key), [activeTags]);
+
+  const isConfig = activeTab === TAB_CONFIG;
   const poolForTab: CampaignTag | null =
-    activeTab === "inbound" || activeTab === "evento" ? activeTab : null;
+    activeTab !== TAB_TODAS && activeTab !== TAB_SEM_TAG && activeTab !== TAB_CONFIG && tagMap.has(activeTab)
+      ? activeTab
+      : null;
+
+  // Abas: Todas + cada tag ativa + Sem tag (+ Configuração à parte).
+  const TABS = useMemo(
+    () => [
+      { value: TAB_TODAS, label: "Todas", color: null as string | null },
+      ...activeTags.map((t) => ({ value: t.key, label: t.label, color: t.color })),
+      { value: TAB_SEM_TAG, label: "Sem tag", color: null as string | null },
+    ],
+    [activeTags],
+  );
 
   // Contagem por aba sobre TODAS as campanhas (independe da aba ativa).
   const tabCounts = useMemo(() => {
     const all = data?.campanhas ?? [];
-    return {
-      todas: all.length,
-      inbound: all.filter((c) => c.tag === "inbound").length,
-      evento: all.filter((c) => c.tag === "evento").length,
-      "sem-tag": all.filter((c) => !c.tag).length,
-    } as Record<TabValue, number>;
-  }, [data]);
+    const counts: Record<string, number> = {
+      [TAB_TODAS]: all.length,
+      [TAB_SEM_TAG]: all.filter((c) => !c.tag).length,
+    };
+    for (const t of activeTags) counts[t.key] = all.filter((c) => c.tag === t.key).length;
+    return counts;
+  }, [data, activeTags]);
 
   const filteredCampanhas = useMemo(() => {
     const all = data?.campanhas ?? [];
-    if (activeTab === "todas") return all;
-    if (activeTab === "sem-tag") return all.filter((c) => !c.tag);
+    if (activeTab === TAB_TODAS) return all;
+    if (activeTab === TAB_SEM_TAG) return all.filter((c) => !c.tag);
     return all.filter((c) => c.tag === activeTab);
   }, [data, activeTab]);
 
@@ -455,7 +637,7 @@ export default function GrowthOrcamentoCampanhas() {
       const p = plans[poolForTab];
       return p ? deriveStageTarget(p.stages[stage], p.total) : null;
     }
-    if (activeTab === "todas") {
+    if (activeTab === TAB_TODAS) {
       let sum = 0, any = false;
       for (const pool of POOLS) {
         const p = plans[pool];
@@ -469,7 +651,7 @@ export default function GrowthOrcamentoCampanhas() {
 
   const poolTotalForTab: number | null = (() => {
     if (poolForTab) return plans[poolForTab]?.total ?? null;
-    if (activeTab === "todas") {
+    if (activeTab === TAB_TODAS) {
       let sum = 0, any = false;
       for (const pool of POOLS) {
         const t = plans[pool]?.total;
@@ -549,7 +731,7 @@ export default function GrowthOrcamentoCampanhas() {
             )}
           </div>
         </TableCell>
-        <TableCell><TagSelect platform={c.platform} campaignId={c.campaignId} value={c.tag} onSaved={invalidate} canEdit={canEdit} /></TableCell>
+        <TableCell><TagSelect platform={c.platform} campaignId={c.campaignId} value={c.tag} onSaved={invalidate} canEdit={canEdit} tags={allTags} /></TableCell>
         <TableCell><StageSelect platform={c.platform} campaignId={c.campaignId} value={c.stage} onSaved={invalidate} canEdit={canEdit} /></TableCell>
         <TableCell className="text-right text-muted-foreground">—</TableCell>
         <TableCell className="text-right font-mono">
@@ -671,19 +853,40 @@ export default function GrowthOrcamentoCampanhas() {
 
       {/* Abas por pool. Cards, planejamento e tabela refletem a aba ativa. */}
       <div className="flex items-center gap-1 border-b">
-        {TABS.map((t) => (
-          <button
-            key={t.value} type="button" onClick={() => setActiveTab(t.value)} data-testid={`tab-${t.value}`}
-            className={cn(
-              "px-3 py-1.5 text-sm font-medium -mb-px border-b-2 transition-colors",
-              activeTab === t.value ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
-          >
-            {t.label}<span className="ml-1.5 text-xs opacity-60">{tabCounts[t.value]}</span>
-          </button>
-        ))}
+        {TABS.map((t) => {
+          const isActive = activeTab === t.value;
+          return (
+            <button
+              key={t.value} type="button" onClick={() => setActiveTab(t.value)} data-testid={`tab-${t.value}`}
+              className={cn(
+                "px-3 py-1.5 text-sm font-medium -mb-px border-b-2 transition-colors flex items-center gap-1.5",
+                isActive ? "text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+                isActive && !t.color && "border-primary",
+              )}
+              style={isActive && t.color ? { borderBottomColor: t.color, color: t.color } : undefined}
+            >
+              {t.color && <span className="h-2 w-2 rounded-full" style={{ backgroundColor: t.color }} />}
+              {t.label}<span className="text-xs opacity-60">{tabCounts[t.value] ?? 0}</span>
+            </button>
+          );
+        })}
+        {/* Aba de configuração das tags (separada, à direita) */}
+        <button
+          type="button" onClick={() => setActiveTab(TAB_CONFIG)} data-testid="tab-config"
+          className={cn(
+            "ml-auto px-3 py-1.5 text-sm font-medium -mb-px border-b-2 transition-colors flex items-center gap-1.5",
+            isConfig ? "border-primary text-foreground" : "border-transparent text-muted-foreground hover:text-foreground",
+          )}
+          title="Configurar grupos"
+        >
+          <Settings className="w-3.5 h-3.5" /> Configuração
+        </button>
       </div>
 
+      {isConfig ? (
+        <TagsConfig tags={allTags} onChanged={invalidate} canEdit={canEdit} />
+      ) : (
+      <>
       <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
         <Card>
           <CardHeader className="pb-2"><CardTitle className="text-xs font-medium text-muted-foreground uppercase tracking-wide flex items-center gap-2"><Target className="w-3.5 h-3.5" /> Planejado (Total)</CardTitle></CardHeader>
@@ -708,7 +911,7 @@ export default function GrowthOrcamentoCampanhas() {
         <Card>
           <CardContent className="py-3 flex flex-wrap items-center gap-x-6 gap-y-2">
             <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Total do mês ({TAG_LABELS[poolForTab]}):</span>
+              <span className="text-sm text-muted-foreground">Total do mês ({tagLabel(poolForTab)}):</span>
               <PoolTotalInput pool={poolForTab} month={month} value={plans[poolForTab]?.total ?? null} onSaved={invalidate} canEdit={canEdit} />
             </div>
             {closing && closing.total != null && (
@@ -801,6 +1004,8 @@ export default function GrowthOrcamentoCampanhas() {
           )}
         </CardContent>
       </Card>
+      </>
+      )}
     </div>
   );
 }

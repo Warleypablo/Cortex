@@ -778,6 +778,29 @@ export async function initializeSysSchema(): Promise<void> {
     await db.execute(sql`ALTER TABLE cortex_core.campaign_tags ALTER COLUMN tag DROP NOT NULL`);
     await db.execute(sql`ALTER TABLE cortex_core.campaign_tags DROP CONSTRAINT IF EXISTS campaign_tags_platform_check`);
 
+    // Catálogo de tags/grupos (pools) configurável pela aba "Configuração".
+    // key = slug estável referenciado por campaign_tags.tag e *_plan.pool;
+    // label = nome exibido (renomear não quebra dados); active=false arquiva.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.budget_tags (
+        key TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        color TEXT,
+        sort_order INTEGER NOT NULL DEFAULT 0,
+        active BOOLEAN NOT NULL DEFAULT TRUE,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT
+      )
+    `);
+    // Seed das tags antes hardcoded (preserva dados/planos já salvos).
+    await db.execute(sql`
+      INSERT INTO cortex_core.budget_tags (key, label, color, sort_order) VALUES
+        ('inbound', 'Inbound', '#3b82f6', 1),
+        ('evento',  'Evento',  '#f59e0b', 2)
+      ON CONFLICT (key) DO NOTHING
+    `);
+
     // Plano de orçamento por pool/mês (total) e por etapa (alvo em % ou R$).
     // pool = valor de tag (inbound/evento). Alimenta o planejamento por etapa.
     await db.execute(sql`

@@ -23,10 +23,47 @@ type Platform = (typeof PLATFORMS)[number];
 // Status considerados "ativos" entre as plataformas (cada uma usa um enum diferente).
 const ACTIVE_STATUSES = new Set(["ACTIVE", "ENABLED", "ENABLE"]);
 
-// Tags/grupos (pools) válidos para classificar campanhas. Adicionar uma tag
-// nova é só incluir aqui (e no front) — não precisa de migração no banco.
-const CAMPAIGN_TAGS = ["inbound", "evento"] as const;
-type CampaignTag = (typeof CAMPAIGN_TAGS)[number];
+// Tags/grupos (pools) agora são configuráveis pela aba "Configuração"
+// (tabela cortex_core.budget_tags). Não há mais lista fixa — as keys válidas
+// são carregadas do banco a cada request via loadBudgetTags().
+type CampaignTag = string;
+
+interface BudgetTag {
+  key: string;
+  label: string;
+  color: string | null;
+  sortOrder: number;
+  active: boolean;
+}
+
+// Carrega o catálogo de tags. includeArchived=false só as ativas (uso geral);
+// true traz arquivadas também (config + validação de planos antigos).
+async function loadBudgetTags(db: any, includeArchived = true): Promise<BudgetTag[]> {
+  const r = await db.execute(sql`
+    SELECT key, label, color, sort_order, active
+    FROM cortex_core.budget_tags
+    ${includeArchived ? sql`` : sql`WHERE active = true`}
+    ORDER BY active DESC, sort_order ASC, label ASC
+  `);
+  return ((r.rows || []) as any[]).map((x) => ({
+    key: String(x.key),
+    label: String(x.label),
+    color: x.color ?? null,
+    sortOrder: Number(x.sort_order) || 0,
+    active: x.active !== false,
+  }));
+}
+
+// Gera um slug estável a partir do nome (sem acentos, minúsculo, _ entre palavras).
+function slugifyTag(label: string): string {
+  const base = String(label)
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().trim()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "")
+    .slice(0, 40);
+  return base || "tag";
+}
 
 // Etapas do funil para o planejamento por etapa. Mesma regra: adicionar/renomear
 // é só editar aqui e no front.
@@ -97,6 +134,11 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
       const { firstDay, lastDay, year, month1Based } = parseMonthParam(monthParam);
       const { diasTotal, diasDecorridos, diasRestantes } = computeDias(firstDay, lastDay);
       const monthStart = firstDay; // DATE, primeiro dia do mês
+
+      // Catálogo de tags (configurável). Inclui arquivadas para validar/exibir
+      // planos antigos; o front filtra as ativas para as abas.
+      const budgetTags = await loadBudgetTags(db, true);
+      const validTagKeys = new Set(budgetTags.map((t) => t.key));
 
       // ===== Meta Ads =====
       // Mostra campanhas relevantes: ACTIVE, ou com spend no mês, ou com meta definida.
@@ -329,7 +371,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
       const stagesMap = new Map<string, CampaignStage>();
       for (const r of tagsRes.rows || []) {
         const key = `${r.platform}:${r.campaign_id}`;
-        if (r.tag && (CAMPAIGN_TAGS as readonly string[]).includes(r.tag)) {
+        if (r.tag && validTagKeys.has(r.tag)) {
           tagsMap.set(key, r.tag as CampaignTag);
         }
         if (r.stage && (CAMPAIGN_STAGES as readonly string[]).includes(r.stage)) {
@@ -347,12 +389,15 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         WHERE month = ${monthStart}::date
       `);
       const plans: Record<string, PoolPlan> = {};
-      for (const tag of CAMPAIGN_TAGS) plans[tag] = { total: null, stages: {} };
+      for (const t of budgetTags) plans[t.key] = { total: null, stages: {} };
       for (const r of poolTotalsRes.rows || []) {
-        if (plans[r.pool]) plans[r.pool].total = Number(r.total);
+        // Plano de uma tag que não está mais no catálogo ainda é exibido (não some).
+        if (!plans[r.pool]) plans[r.pool] = { total: null, stages: {} };
+        plans[r.pool].total = Number(r.total);
       }
       for (const r of stagePlanRes.rows || []) {
-        if (plans[r.pool] && (CAMPAIGN_STAGES as readonly string[]).includes(r.stage)) {
+        if (!plans[r.pool]) plans[r.pool] = { total: null, stages: {} };
+        if ((CAMPAIGN_STAGES as readonly string[]).includes(r.stage)) {
           plans[r.pool].stages[r.stage as CampaignStage] = {
             value: Number(r.value),
             unit: r.unit === "brl" ? "brl" : "pct",
@@ -413,6 +458,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         diasRestantes,
         campanhas,
         plans,
+        tags: budgetTags,
       });
     } catch (error) {
       console.error("[api] Error fetching orcamento-campanhas:", error);
@@ -482,10 +528,13 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
       if (!campaignId || typeof campaignId !== "string") {
         return res.status(400).json({ error: "campaignId is required" });
       }
-      // tag null/"" => remove; senão precisa ser uma tag válida.
+      // tag null/"" => remove; senão precisa ser uma tag ativa do catálogo.
       const isClearing = tag === null || tag === undefined || tag === "";
-      if (!isClearing && !(CAMPAIGN_TAGS as readonly string[]).includes(tag)) {
-        return res.status(400).json({ error: `tag must be one of: ${CAMPAIGN_TAGS.join(", ")} (or null to clear)` });
+      if (!isClearing) {
+        const activeKeys = new Set((await loadBudgetTags(db, false)).map((t) => t.key));
+        if (!activeKeys.has(tag)) {
+          return res.status(400).json({ error: `tag must be an active tag key (or null to clear)` });
+        }
       }
 
       if (isClearing) {
@@ -570,8 +619,9 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         return res.status(403).json({ error: "Apenas editores autorizados podem alterar o plano." });
       }
       const { pool, month, total } = req.body || {};
-      if (!(CAMPAIGN_TAGS as readonly string[]).includes(pool)) {
-        return res.status(400).json({ error: `pool must be one of: ${CAMPAIGN_TAGS.join(", ")}` });
+      const poolKeysTotal = new Set((await loadBudgetTags(db, true)).map((t) => t.key));
+      if (!poolKeysTotal.has(pool)) {
+        return res.status(400).json({ error: "pool must be an existing tag key" });
       }
       if (!month || !/^\d{4}-\d{2}$/.test(month)) {
         return res.status(400).json({ error: "month must be 'YYYY-MM'" });
@@ -610,8 +660,9 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         return res.status(403).json({ error: "Apenas editores autorizados podem alterar o plano." });
       }
       const { pool, month, stage, value, unit } = req.body || {};
-      if (!(CAMPAIGN_TAGS as readonly string[]).includes(pool)) {
-        return res.status(400).json({ error: `pool must be one of: ${CAMPAIGN_TAGS.join(", ")}` });
+      const poolKeysStage = new Set((await loadBudgetTags(db, true)).map((t) => t.key));
+      if (!poolKeysStage.has(pool)) {
+        return res.status(400).json({ error: "pool must be an existing tag key" });
       }
       if (!(CAMPAIGN_STAGES as readonly string[]).includes(stage)) {
         return res.status(400).json({ error: `stage must be one of: ${CAMPAIGN_STAGES.join(", ")}` });
@@ -645,6 +696,113 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error upserting stage plan:", error);
       res.status(500).json({ error: "Failed to save stage plan" });
+    }
+  });
+
+  // ===== Catálogo de tags (aba Configuração) =====
+
+  // Cria uma tag nova. key (slug) é gerada do label, garantindo unicidade.
+  app.post("/api/growth/orcamento-campanhas/tags", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem criar tags." });
+      }
+      const { label, color } = req.body || {};
+      if (!label || typeof label !== "string" || !label.trim()) {
+        return res.status(400).json({ error: "label is required" });
+      }
+      if (color != null && (typeof color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(color))) {
+        return res.status(400).json({ error: "color must be a hex like #3b82f6" });
+      }
+
+      // Gera key única a partir do label (slug, slug_2, slug_3...).
+      const existing = new Set((await loadBudgetTags(db, true)).map((t) => t.key));
+      const base = slugifyTag(label);
+      let key = base;
+      let i = 2;
+      while (existing.has(key)) key = `${base}_${i++}`;
+
+      const orderRes = await db.execute(sql`
+        SELECT COALESCE(MAX(sort_order), 0) + 1 AS next FROM cortex_core.budget_tags
+      `);
+      const nextOrder = Number((orderRes.rows?.[0] as any)?.next) || 1;
+
+      await db.execute(sql`
+        INSERT INTO cortex_core.budget_tags (key, label, color, sort_order, updated_by)
+        VALUES (${key}, ${label.trim()}, ${color ?? null}, ${nextOrder}, ${userEmail})
+      `);
+      res.json({ success: true, key });
+    } catch (error) {
+      console.error("[api] Error creating tag:", error);
+      res.status(500).json({ error: "Failed to create tag" });
+    }
+  });
+
+  // Atualiza uma tag existente: label, color e/ou active (arquivar/reativar).
+  // key é estável e nunca muda (preserva os dados referenciados).
+  app.put("/api/growth/orcamento-campanhas/tags", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem editar tags." });
+      }
+      const { key, label, color, active } = req.body || {};
+      if (!key || typeof key !== "string") {
+        return res.status(400).json({ error: "key is required" });
+      }
+      const existing = new Set((await loadBudgetTags(db, true)).map((t) => t.key));
+      if (!existing.has(key)) {
+        return res.status(404).json({ error: "tag not found" });
+      }
+      if (label != null && (typeof label !== "string" || !label.trim())) {
+        return res.status(400).json({ error: "label must be a non-empty string" });
+      }
+      if (color != null && color !== "" && (typeof color !== "string" || !/^#[0-9a-fA-F]{6}$/.test(color))) {
+        return res.status(400).json({ error: "color must be a hex like #3b82f6" });
+      }
+      if (active != null && typeof active !== "boolean") {
+        return res.status(400).json({ error: "active must be a boolean" });
+      }
+
+      await db.execute(sql`
+        UPDATE cortex_core.budget_tags SET
+          label = ${label != null ? label.trim() : sql`label`},
+          color = ${color != null ? (color === "" ? null : color) : sql`color`},
+          active = ${active != null ? active : sql`active`},
+          updated_by = ${userEmail},
+          updated_at = NOW()
+        WHERE key = ${key}
+      `);
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error updating tag:", error);
+      res.status(500).json({ error: "Failed to update tag" });
+    }
+  });
+
+  // Reordena as abas: recebe a lista de keys na ordem desejada.
+  app.put("/api/growth/orcamento-campanhas/tags/reorder", async (req, res) => {
+    try {
+      const userEmail = (req.user as any)?.email as string | undefined;
+      if (!userEmail || !ALLOWED_EDITOR_EMAILS.has(userEmail)) {
+        return res.status(403).json({ error: "Apenas editores autorizados podem reordenar tags." });
+      }
+      const { keys } = req.body || {};
+      if (!Array.isArray(keys) || keys.some((k) => typeof k !== "string")) {
+        return res.status(400).json({ error: "keys must be an array of strings" });
+      }
+      for (let i = 0; i < keys.length; i++) {
+        await db.execute(sql`
+          UPDATE cortex_core.budget_tags
+          SET sort_order = ${i + 1}, updated_by = ${userEmail}, updated_at = NOW()
+          WHERE key = ${keys[i]}
+        `);
+      }
+      res.json({ success: true });
+    } catch (error) {
+      console.error("[api] Error reordering tags:", error);
+      res.status(500).json({ error: "Failed to reorder tags" });
     }
   });
 }
