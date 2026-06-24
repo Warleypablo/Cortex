@@ -644,6 +644,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS landing_page_views INTEGER DEFAULT 0`)
     .catch(() => { /* column may already exist */ });
 
+  // Ensure unique_outbound_clicks column exists (CTR de saída único). Garante que o
+  // endpoint /meta-ads não quebre antes do backfill do sync preencher a coluna.
+  db.execute(sql`ALTER TABLE meta_ads.meta_insights_daily ADD COLUMN IF NOT EXISTS unique_outbound_clicks INTEGER DEFAULT 0`)
+    .catch(() => { /* column may already exist */ });
+
   // Ensure Instagram snapshot columns exist
   db.execute(sql`ALTER TABLE cortex_core.instagram_metrics_snapshots ADD COLUMN IF NOT EXISTS profile_views INTEGER DEFAULT 0`)
     .catch(() => { /* column may already exist */ });
@@ -3353,6 +3358,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         sessoes = ga4.byPlatform.google_ads;
       }
 
+      // Visualizações de Página consolidadas via GA4 (screenPageViews), cobrindo
+      // Meta + Google + orgânico — mesma cobertura das Sessões. Substitui o
+      // landing_page_views do pixel (Meta-only) como denominador da Tx Conversão
+      // da Página: o numerador (Leads do Bitrix) abrange TODAS as plataformas, então
+      // o denominador também precisa. O pixel segue exposto como referência.
+      const sumPageViews = (b: Record<string, number>) =>
+        Object.values(b).reduce((acc, v) => acc + (Number(v) || 0), 0);
+      let visualizacoesPaginaGa4 = 0;
+      if (includeMeta && includeGoogle) {
+        visualizacoesPaginaGa4 = sumPageViews(ga4.byPlatformPageViews);
+      } else if (includeMeta) {
+        visualizacoesPaginaGa4 = ga4.byPlatformPageViews.meta_ads;
+      } else if (includeGoogle) {
+        visualizacoesPaginaGa4 = ga4.byPlatformPageViews.google_ads;
+      }
+
       // Query Leads e MQLs do Bitrix (tráfego pago)
       const contagem = (req.query.contagem as string) || 'contrato';
       let funilFilter = sql``;
@@ -3446,7 +3467,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctrExposto = onlyInstagram ? 0 : ctr;
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
-      const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPagina;
+      const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPaginaGa4;
+      const visualizacoesPaginaPixelExposto = onlyInstagram ? 0 : visualizacoesPagina;
       const sessoesExposto = onlyInstagram ? 0 : sessoes;
       const cpl = onlyInstagram ? 0 : (leads > 0 ? investimento / leads : 0);
       const cpmql = onlyInstagram ? 0 : (mqls > 0 ? investimento / mqls : 0);
@@ -3469,6 +3491,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cps: cpsExposto,
         connectRate: connectRateExposto,
         visualizacoesPagina: visualizacoesPaginaExposto,
+        visualizacoesPaginaPixel: visualizacoesPaginaPixelExposto,
         sessoes: sessoesExposto,
         sessoesAvailable: ga4.available,
         leads,
@@ -3543,6 +3566,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COALESCE(SUM(mid.impressions), 0) as impressoes,
           COALESCE(SUM(mid.clicks), 0) as cliques,
           COALESCE(SUM(mid.outbound_clicks), 0) as cliques_saida,
+          COALESCE(SUM(mid.unique_outbound_clicks), 0) as cliques_saida_unicos,
           COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina,
           COALESCE(SUM(mid.reach), 0) as alcance,
           COALESCE(AVG(mid.frequency), 0) as frequencia,
@@ -3563,6 +3587,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const investimento = parseFloat(row.investimento) || 0;
       const impressoes = parseInt(row.impressoes) || 0;
       const cliquesSaida = parseInt(row.cliques_saida) || 0;
+      const cliquesSaidaUnicos = parseInt(row.cliques_saida_unicos) || 0;
       const landingPageViewsPixel = parseInt(row.visualizacoes_pagina) || 0;
       const alcance = parseInt(row.alcance) || 0;
       const frequencia = parseFloat(row.frequencia) || 0;
@@ -3572,6 +3597,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = outbound_clicks / impressions
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
+      // CTR de saída único = unique_outbound_clicks / reach (definição "unique" do Meta:
+      // % de PESSOAS alcançadas que clicaram pra sair, cada pessoa conta 1×).
+      const ctrUnico = alcance > 0 ? (cliquesSaidaUnicos / alcance) : 0;
       // Connect Rate pelo pixel (legado, mantido só p/ comparação)
       const connectRatePixel = cliquesSaida > 0 ? landingPageViewsPixel / cliquesSaida : 0;
       // Vídeo Hook = video_3_sec_watched_actions / impressões (actions[].video_view, 3+ seg)
@@ -3601,6 +3629,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         frequencia,
         cpm,
         ctr,
+        ctrUnico,
         videoHook,
         videoHold,
         visualizacoesPagina,
@@ -4325,9 +4354,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.tiktok_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.tiktok_ads;
-      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (TikTok), alinhado à
-      // definição clássica de mídia (landing page views ÷ cliques). TikTok não expõe
-      // landing_page_views nativo, então o pageviews do GA4 é o proxy mais fiel.
+      // Connect Rate (proxy GA4): page views GA4 ÷ cliques. TikTok não expõe
+      // landing_page_views nativo, então não há Connect Rate fiel ≤100% — esta métrica
+      // fica calculada mas NÃO é exibida na UI (ver decisão de manter Connect Rate só
+      // no pixel). Mantida no payload para diagnóstico.
       const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
@@ -4397,8 +4427,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.linkedin_ads;
       const visualizacoesPagina = ga4.byPlatformPageViews.linkedin_ads;
-      // Connect Rate = Visualizações de Página (GA4) ÷ Cliques (LinkedIn), alinhado à
-      // definição clássica de mídia (landing page views ÷ cliques) e ao TikTok Ads.
+      // Connect Rate (proxy GA4): page views GA4 ÷ cliques. LinkedIn não expõe
+      // landing_page_views nativo, então não há Connect Rate fiel ≤100% — esta métrica
+      // fica calculada mas NÃO é exibida na UI (Connect Rate só no pixel). Mantida no
+      // payload para diagnóstico.
       const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
 
       res.json({
