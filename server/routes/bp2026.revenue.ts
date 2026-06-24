@@ -82,7 +82,10 @@ export async function montarRevenue({ db, orcado, vendasMrrPorMes, mesCorrente, 
     )
     SELECT a.mes, ${CASE_PRODUTO} AS linha,
            SUM(h.valorr::numeric) AS mrr,
-           COUNT(DISTINCT h.id_subtask) AS contratos
+           -- contratos = só os que geram MRR (valorr>0). Contratos pontuais de Creators
+           -- (valorp>0, valorr=0) em status ativo/onboarding/triagem inflavam o denominador
+           -- do AOV (e a própria contagem), derrubando o AOV. Alinha à aba Vendas por Produto.
+           COUNT(DISTINCT h.id_subtask) FILTER (WHERE COALESCE(h.valorr::numeric, 0) > 0) AS contratos
     FROM alvo a
     JOIN "Clickup".cup_data_hist h ON h.data_snapshot::date = a.d
     WHERE h.status IN ('ativo', 'onboarding', 'triagem')
