@@ -45,7 +45,9 @@ _TOKEN_URL = "https://open.tiktokapis.com/v2/oauth/token/"
 _API_BASE = "https://open.tiktokapis.com/v2"
 
 # Scopes: video.upload = rascunho/inbox; video.publish = direct post.
-SCOPES = "user.info.basic,video.upload,video.publish"
+# video.publish CONFIRMADO indisponível no app (sandbox) em 2026-06-16 — OAuth
+# dava erro 'scope'. Re-adicionar só depois de habilitar/auditar no painel.
+SCOPES = "user.info.basic,video.upload"
 
 _TOKEN_STORE = PROJECT_ROOT / ".cache" / "tiktok_tokens.json"
 
@@ -209,12 +211,19 @@ class TikTokResult:
 
 
 def _plan_chunks(size: int) -> tuple[int, int]:
-    """Define (chunk_size, total_chunk_count). Vídeo <=64MB vai em 1 chunk."""
+    """
+    Define (chunk_size, total_chunk_count). Vídeo <=64MB vai em 1 chunk.
+
+    Acima de 64MB fatia em chunks de 32MB; o último absorve o resto (fica entre
+    32MB e <64MB, dentro do limite de 128MB do chunk final). NÃO usar 64MB de
+    chunk aqui: vídeo entre 64–128MB daria `size // 64MB == 1`, ou seja 1 chunk
+    de 64MB pra um arquivo >64MB → TikTok recusa com 'chunk size invalid'.
+    """
     if size <= _SINGLE_CHUNK_MAX:
         return size, 1
-    chunk = _CHUNK_MAX
-    total = size // chunk  # último chunk leva o resto (pode ser maior que chunk)
-    return chunk, max(total, 1)
+    chunk = 32 * 1024 * 1024
+    total = size // chunk  # >=2 quando size>64MB; último chunk leva o resto
+    return chunk, total
 
 
 def _upload_chunks(upload_url: str, data: bytes, chunk_size: int, total: int) -> None:
