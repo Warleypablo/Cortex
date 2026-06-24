@@ -162,7 +162,8 @@ export default function BpCopilot() {
   }, [allMessages.length, scrollToBottom]);
 
   useEffect(() => {
-    if (activeConversaId && inputRef.current) inputRef.current.focus();
+    // Foca o input ao abrir uma conversa E ao voltar p/ nova conversa (estado vazio).
+    inputRef.current?.focus();
   }, [activeConversaId]);
 
   // Mutations
@@ -418,30 +419,6 @@ export default function BpCopilot() {
                 )}
               </div>
             </ScrollArea>
-
-            {/* Input */}
-            <div className="border-t border-gray-200 dark:border-zinc-800 p-4">
-              <div className="max-w-3xl mx-auto flex gap-3 items-end">
-                <Textarea
-                  ref={inputRef}
-                  value={inputMessage}
-                  onChange={(e) => setInputMessage(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder="Pergunte sobre o BP — orçado, churn, caixa, projeções..."
-                  disabled={isLoading}
-                  className="flex-1 min-h-[44px] max-h-[160px] resize-none bg-gray-50 dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-zinc-500"
-                  rows={1}
-                />
-                <Button
-                  onClick={() => handleSend()}
-                  disabled={!inputMessage.trim() || isLoading}
-                  size="icon"
-                  className="h-11 w-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0"
-                >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
-                </Button>
-              </div>
-            </div>
           </>
         ) : (
           /* Empty state with suggestion cards */
@@ -480,6 +457,30 @@ export default function BpCopilot() {
             </div>
           </div>
         )}
+
+        {/* Input — sempre visível (inclusive em nova conversa / estado vazio) */}
+        <div className="border-t border-gray-200 dark:border-zinc-800 p-4">
+          <div className="max-w-3xl mx-auto flex gap-3 items-end">
+            <Textarea
+              ref={inputRef}
+              value={inputMessage}
+              onChange={(e) => setInputMessage(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder="Pergunte sobre o BP — orçado, churn, caixa, projeções..."
+              disabled={isLoading}
+              className="flex-1 min-h-[44px] max-h-[160px] resize-none bg-gray-50 dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-white placeholder:text-gray-400 dark:placeholder:text-zinc-500"
+              rows={1}
+            />
+            <Button
+              onClick={() => handleSend()}
+              disabled={!inputMessage.trim() || isLoading}
+              size="icon"
+              className="h-11 w-11 rounded-xl bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0"
+            >
+              {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+            </Button>
+          </div>
+        </div>
       </div>
     </div>
   );
