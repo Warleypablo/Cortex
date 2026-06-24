@@ -29,3 +29,8 @@ ON CONFLICT (key) DO NOTHING;
 
 COMMENT ON TABLE cortex_core.budget_tags IS
     'Catálogo de tags/grupos (pools) do Orçamento por Campanha. key: slug estável (referência), label: nome exibido, color: cor da aba/badge, active: false = arquivada.';
+
+-- Acesso do role local/preview (growth_dev). Em PROD o app conecta como
+-- postgres (owner) e já tem tudo; este GRANT é só para o preview enxergar a
+-- tabela criada pelo owner. Idempotente.
+GRANT SELECT, INSERT, UPDATE, DELETE ON cortex_core.budget_tags TO growth_dev;
