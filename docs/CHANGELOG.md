@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-24 | feat(ads-creation): sobe lote Victor "Bready" na camp CBO Creators (159–164)
+
+**O que foi feito:**
+- `subir-victor-ads.ts`: cria os ads do lote Victor "Bready" (TP1666–1692, b1/b2/b3 × h1–h9) na camp CBO Creators teste, padrão Turbo
+  - 6 conjuntos (**159–164**), 5 ads/conjunto, split h01–h05 / h06–h09, pareados 9x16+4x5, PAUSED, cta no nome = c1
+  - auto-discovery dos video_id no Gerenciador + cruzamento com a Biblioteca (hook/body → TP)
+  - clona config do conjunto irmão 142 (Processo Bready) e reaproveita copy/link/UTM do criativo irmão (fallback `object_story_spec.video_data.message` p/ criativos antigos que não usam asset_feed_spec)
+  - NN corrido com piso 158 (não colide com 151–158 do CRM); idempotente + backoff
+- Validado via DRY (pegou copy vazia na 1ª tentativa → corrigido o fallback antes de escrever)
+
+**Por que:**
+- Novo lote (Victor), reaproveitando a copy/link dos Bready que já estão no ar (escolha do usuário)
+
+**Arquivos novos:**
+- `subir-victor-ads.ts` - cria os 6 conjuntos + 27 ads do Victor
+
+**Impacto arquitetural:** Nenhum — script one-off de criação de ads via Meta API.
+
+---
+
 ## 2026-06-23 | chore(ads-creation): cadastra lote Victor "Bready" na Biblioteca (TP1666–1692)
 
 **O que foi feito:**
