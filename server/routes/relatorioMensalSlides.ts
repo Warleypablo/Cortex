@@ -305,7 +305,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             COUNT(*)::int as negocios_ganhos
           FROM "Bitrix".crm_deal d
           JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
-          WHERE d.stage_name = 'Negócio Ganho'
+          -- só os 7 closers ativos (ranking com fotos; sem bucket "Outros")
+          WHERE d.stage_name = 'Negócio Ganho' AND c.active = true
             AND d.data_fechamento >= ${`${anoDados}-${String(mesDados).padStart(2, '0')}-01`}
             AND d.data_fechamento < ${dataEnd}
           GROUP BY c.nome
