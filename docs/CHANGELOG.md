@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-24 | feat(bp-copilot): skill/persona do BP Copilot (system prompt)
+
+**O que foi feito:**
+- Criado `agents/bp-copilot-SKILL.md` — system prompt do **BP Copilot**, o copiloto de decisão do BP (Anthropic `claude-opus-4-8`).
+- 7 blocos: identidade/postura (copiloto consultivo híbrido, C-level), princípios de comportamento (BLUF, número real ou nada, faixa não ponto), domínio do negócio com **os gotchas críticos do BP embutidos** (churn bruto, produto×servico jan corrompido, AOV só valorr>0, venda-estoque×receita-pontual com lag, regime caixa×competência), estrutura do BP (abas + YTD fluxo/estoque), ferramentas (drill bp2026.* + code execution + ações registráveis), capacidades (diagnóstico/gargalo/predição), formato executivo.
+
+**Por que:**
+- Primeira etapa da feature "chat especialista de tomada de decisão no BP". A persona é o que impede o agente de confundir artefato de dados com tendência e garante recomendações ancoradas em número real.
+
+**Arquivos alterados:**
+- `agents/bp-copilot-SKILL.md` (novo) - persona e habilidades do agente.
+
+**Impacto arquitetural:** Nenhum ainda — artefato de prompt; backend/UI/tools virão nas próximas etapas. Design em `docs/superpowers/specs/` (a seguir).
+
+---
+
 ## 2026-06-24 | feat(comercial): exibir só os 7 closers ativos nas telas de comercial
 
 **O que foi feito:**
