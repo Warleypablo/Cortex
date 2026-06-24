@@ -162,11 +162,12 @@ function buildLinhas(
   }));
 }
 
-export function registerBp2026Routes(app: Express, db: any) {
-  app.get("/api/bp2026/receitas", async (_req, res) => {
-    try {
+// Cálculo completo do BP (orçado×realizado + todas as sub-abas). Extraído da rota
+// /api/bp2026/receitas para ser reutilizado pelas ferramentas do BP Copilot.
+// Reusa o mesmo cache de 10min do handler.
+export async function computarBpReceitas(db: any): Promise<any> {
       if (cache && Date.now() < cache.expiraEm) {
-        return res.json(cache.payload);
+        return cache.payload;
       }
 
       // 1. Orçado
@@ -585,7 +586,13 @@ export function registerBp2026Routes(app: Express, db: any) {
       };
 
       cache = { payload, expiraEm: Date.now() + CACHE_TTL_MS };
-      res.json(payload);
+      return payload;
+}
+
+export function registerBp2026Routes(app: Express, db: any) {
+  app.get("/api/bp2026/receitas", async (_req, res) => {
+    try {
+      res.json(await computarBpReceitas(db));
     } catch (error) {
       console.error("[bp2026] Erro em /api/bp2026/receitas:", error);
       res.status(500).json({ error: "Erro ao calcular orçado x realizado" });

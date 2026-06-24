@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-24 | feat(bp-copilot): backend núcleo (Fase 1) — tools, agentic loop, histórico
+
+**O que foi feito:**
+- `computarBpReceitas(db)` extraída da rota `/api/bp2026/receitas` em `bp2026.ts` (handler virou wrapper) — mesmo cálculo e cache de 10min, agora reutilizável.
+- `bp-copilot.tools.ts`: 7 ferramentas read-only que fatiam o payload do BP (overview, revenue, vendas-produto, funil, capacity, detalhamentos, pontual) + `montarResumoBp()` (snapshot textual do estado do BP p/ o contexto).
+- `bp-copilot.ts`: endpoint do chat (Anthropic `claude-opus-4-8`, adaptive thinking, prompt caching na skill) com agentic loop (tools + code execution server-side p/ projeções), histórico em `bp_copilot_conversas`/`mensagens`, logging em `bp_copilot_usage`, auth restrita a admin/sócios. Registrado em `routes.ts`.
+
+**Por que:**
+- Fase 1 do BP Copilot (spec em `docs/superpowers/specs/2026-06-24-bp-copilot-design.md`): o "corpo" do agente. UI, streaming e ações registráveis vêm nas fases 2-4.
+
+**Arquivos alterados:**
+- `server/routes/bp2026.ts` - extraída `computarBpReceitas`; rota vira wrapper (comportamento idêntico).
+- `server/routes/bp-copilot.tools.ts` (novo) - ferramentas read-only + resumo do BP.
+- `server/routes/bp-copilot.ts` (novo) - endpoint, agentic loop, histórico, auth.
+- `server/routes.ts` - registro de `registerBpCopilotRoutes`.
+
+**Impacto arquitetural:** Reaproveita os módulos `bp2026.*` (agente vê os mesmos números da tela). Validado: camada de dados roda contra dados reais (smoke local OK); typecheck não introduz erros novos (delta 0). End-to-end com Anthropic não validado localmente — chave `ANTHROPIC_API_KEY` do .env local retorna 401 (expirada); em produção usa a mesma var do SDR Assistant.
+
+---
+
 ## 2026-06-24 | feat(bp-copilot): skill/persona do BP Copilot (system prompt)
 
 **O que foi feito:**
