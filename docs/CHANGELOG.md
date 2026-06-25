@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-06-25 | chore(publicacao): script p/ aplicar a migration content_*
+
+Script `scripts/apply-content-migration.ts`: aplica `migrations/2026-06-24-content-publish.sql` reusando a conexão do app (DATABASE_URL ou DB_*). Idempotente — caminho de 1 comando pra criar as tabelas `content_*` sem psql/GUI. **Impacto arquitetural:** Nenhum (helper).
+
+---
+
 ## 2026-06-24 | feat(publicacao): página Orgânico (Growth) + endpoint read-only
 
 **O que foi feito:**
