@@ -67,3 +67,96 @@ export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage
     }
   });
 }
+
+/**
+ * Endpoint de MÁQUINA (o worker instagram-turbo reporta o estado de cada ciclo).
+ * Autenticado por token compartilhado (ORGANICO_INGEST_TOKEN), NÃO por sessão —
+ * por isso é registrado ANTES do `app.use("/api", isAuthenticated)` global.
+ * Body: { platform, run: {...}, posts: [...] }. Insere 1 run + faz upsert dos posts.
+ */
+export function registerOrganicoIngestRoutes(app: Express, db: any) {
+  app.post("/api/growth/organico/ingest", async (req, res) => {
+    const token = process.env.ORGANICO_INGEST_TOKEN;
+    if (!token) {
+      return res.status(503).json({ error: "ingest não configurado (defina ORGANICO_INGEST_TOKEN)" });
+    }
+    if ((req.headers.authorization || "") !== `Bearer ${token}`) {
+      return res.status(401).json({ error: "token inválido" });
+    }
+
+    try {
+      const { platform, run, posts } = req.body || {};
+      if (!platform) return res.status(400).json({ error: "platform obrigatório" });
+
+      // 1) registra o ciclo (heartbeat / saúde do agente)
+      if (run) {
+        await db.insert(contentPublishRuns).values({
+          runId: String(run.run_id || "—").slice(0, 16),
+          platform,
+          dryRun: run.dry_run !== false,
+          status: run.status || "ok",
+          counts: run.counts || {},
+          startedAt: run.started_at ? new Date(run.started_at) : new Date(),
+          finishedAt: new Date(),
+        });
+      }
+
+      // 2) upsert dos posts (chave: platform + task + data). Sem data → ignora.
+      let upserted = 0;
+      for (const p of Array.isArray(posts) ? posts : []) {
+        if (!p?.clickup_task_id || !p?.posting_date) continue;
+        const row = {
+          platform,
+          clickupTaskId: String(p.clickup_task_id),
+          taskName: p.task_name ?? null,
+          parentName: p.parent_name ?? null,
+          mes: p.mes ?? null,
+          turboSlug: p.turbo_slug ?? null,
+          postingDate: p.posting_date,
+          slot: p.slot ?? null,
+          tipoPost: p.tipo_post ?? null,
+          assetCount: p.asset_count ?? 0,
+          legendaSource: p.legenda_source ?? null,
+          legendaLen: p.legenda_len ?? 0,
+          legendaEmpty: p.legenda_empty ?? false,
+          state: p.state || "agendado",
+          skipReason: p.skip_reason ?? null,
+          errorText: p.error_text ?? null,
+          publishedMediaId: p.published_media_id ?? null,
+          permalink: p.permalink ?? null,
+          updatedAt: new Date(),
+        };
+        await db
+          .insert(contentPosts)
+          .values(row)
+          .onConflictDoUpdate({
+            target: [contentPosts.platform, contentPosts.clickupTaskId, contentPosts.postingDate],
+            set: {
+              taskName: row.taskName,
+              parentName: row.parentName,
+              mes: row.mes,
+              turboSlug: row.turboSlug,
+              slot: row.slot,
+              tipoPost: row.tipoPost,
+              assetCount: row.assetCount,
+              legendaSource: row.legendaSource,
+              legendaLen: row.legendaLen,
+              legendaEmpty: row.legendaEmpty,
+              state: row.state,
+              skipReason: row.skipReason,
+              errorText: row.errorText,
+              publishedMediaId: row.publishedMediaId,
+              permalink: row.permalink,
+              updatedAt: row.updatedAt,
+            },
+          });
+        upserted++;
+      }
+
+      res.json({ ok: true, run: !!run, posts: upserted });
+    } catch (err: any) {
+      console.error("[organico] ingest error:", err);
+      res.status(500).json({ error: "falha no ingest" });
+    }
+  });
+}
