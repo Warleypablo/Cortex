@@ -4696,7 +4696,24 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       let utmSourceFilterSql = '';
       if (utmValues.length > 0) {
-        const conds = utmValues.map(v => `LOWER(utm_source) LIKE '${escapeSql(v)}%'`).join(' OR ');
+        // Mesma lógica do buildPlatformFilterSql (usado em /mql, /nao-mql, /ads):
+        // 'instagram' captura também DM/social selling (source WEB/UC_4VCKGM) e
+        // linktree. Sem isso, filtrar por Instagram dropa esses leads — que o GROUP BY
+        // já classifica como instagram (ver PLATFORM_CASE_SQL_BASIC) —, fazendo o funil
+        // por plataforma não bater com o card de Ads. Versão raw (sem alias d.) porque
+        // esta query usa sql.raw com colunas sem prefixo.
+        const conds = utmValues.map(v => {
+          if (v === 'instagram') {
+            return `(
+              LOWER(utm_source) LIKE 'instagram%'
+              OR LOWER(utm_source) = 'ig'
+              OR source IN ('WEB', 'UC_4VCKGM')
+              OR LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree'
+              OR (LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree')
+            )`;
+          }
+          return `LOWER(utm_source) LIKE '${escapeSql(v)}%'`;
+        }).join(' OR ');
         utmSourceFilterSql = `AND (${conds})`;
       }
 
