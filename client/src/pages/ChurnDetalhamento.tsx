@@ -50,6 +50,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import ChurnConsolidadoTrimestral from "@/components/ChurnConsolidadoTrimestral";
 import { type ChurnContract, type ChurnDetalhamentoData, type ChurnPorSquad, type ChurnPorMotivo, type ChurnBreakdownItem, type RetentionPoint, CHART_COLORS } from "@/components/churn/types";
 import { ChurnControls } from "@/components/churn/ChurnControls";
+import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { CustomTooltip } from "@/components/churn/ui/CustomTooltip";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { StatPill } from "@/components/churn/ui/StatPill";
@@ -1631,7 +1632,21 @@ export default function ChurnDetalhamento() {
 
       <>
 
-      {/* Painel Executivo Hero - Taxa de Churn */}
+      {/* Painel Executivo Hero - KPIs de Diagnóstico */}
+      {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
+        <ChurnKpisHero
+          contratos={filteredContratos}
+          mrrPerdido={filteredMetricas.mrr_perdido}
+          taxaChurn={filteredTaxaChurn}
+          gaugeStatus={gaugeStatusOverride?.label ?? ""}
+          gaugeStatusOverride={gaugeStatusOverride}
+          churnPlanejado={churnPlanejado.mrrPlanejado}
+          ltMedio={filteredMetricas.lt_medio}
+          ticketMedio={filteredMetricas.ticket_medio}
+        />
+      )}
+
+      {/* Painel Executivo Detalhado (MRR Base, Abonado, NRR, Squad) */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
         <Card className="relative overflow-hidden border-2 border-red-200/50 dark:border-red-900/30 bg-gradient-to-br from-slate-50 via-white to-red-50/30 dark:from-zinc-900 dark:via-zinc-900 dark:to-red-950/20">
           {/* Background pattern */}
