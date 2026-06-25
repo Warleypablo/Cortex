@@ -118,7 +118,7 @@ export function ChurnDrillDrawer({
                       </td>
                       <td className="py-2 pr-3 text-right whitespace-nowrap">
                         <Badge variant="outline" className="text-xs">
-                          {c.lifetime_meses.toFixed(1)}m
+                          {(c.lifetime_meses ?? 0).toFixed(1)}m
                         </Badge>
                       </td>
                       <td className="py-2 pr-3 text-right text-gray-500 dark:text-zinc-400 whitespace-nowrap">
