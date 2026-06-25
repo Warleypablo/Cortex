@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-25 | feat(organico): painel operador (3 visões + Soltar agora/Agendar) + engine do worker
+
+**O que foi feito:**
+- **Redesenho do painel Orgânico** pro fluxo do operador: 3 visões do dia (**Aprovados / Agendados / Publicados**) e, por post aprovado, ações **"Soltar agora"** (confirmação) e **"Agendar"** (date-picker). Substitui o read-only "Saúde/Fila/Histórico".
+- **Modelo de dados** (migration aditiva `2026-06-25-content-publish-operador.sql`, aplicada): `state` += `aprovado`; coluna `content_posts.scheduled_at`; unique `(platform, clickup_task_id)` (tolera aprovado sem data); `command.action` += `schedule|cancel_schedule`.
+- **Backend** (`server/routes/organico.ts`): `/overview` em 3 visões; `POST /commands` + `POST /settings` (operador, pós-auth); `GET /commands/pending` + `POST /commands/:id/ack` + `GET /posts/due` (máquina, token); ingest com upsert por task e `scheduled_at` chave-presente.
+- **Engine do worker** (monorepo `automacoes/instagram-turbo/agente/`): `main_poller.py` (reporta aprovados + consome fila + publica vencidos; `--once` p/ cron), `commands.py` (consumidor; DRY_RUN não publica), `panel_client.py` (HTTP de máquina fail-soft), `state_sink` (emite `aprovado` + `report_posts`).
+
+**Por que:**
+- O painel só observava; o time precisa **operar** (soltar/agendar) sem terminal. Os cards aprovados costumam estar sem "Data de Postagem" e não saíam sozinhos — o operador passa a comandar a publicação pela fila `content_publish_commands`.
+
+**Arquivos alterados:**
+- `shared/schema.ts`, `migrations/2026-06-25-content-publish-operador.sql` - modelo de dados.
+- `server/routes/organico.ts` - 3 visões + comandos + endpoints de máquina.
+- `client/src/pages/GrowthOrganico.tsx` - UI operador (botões + date-picker).
+- `automacoes/instagram-turbo/agente/{main_poller,commands,panel_client,state_sink}.py` + `tests/test_commands.py` - engine + 12 testes.
+
+**Impacto arquitetural:** Backend continua só lendo/escrevendo Postgres; o worker fala HTTP (pull/ack/ingest/due), nunca toca o banco direto. Engine vive só no monorepo (cópia de referência); ativar exige portar pro repo de prod `automacao-insta` + tokens + launchd recorrente + merge→main. Tudo dry-run + integração testado; nada publicado.
+
+---
+
 ## 2026-06-25 | feat(publicacao): telemetria do worker → painel Orgânico (ingest + hooks)
 
 **O que foi feito:**
