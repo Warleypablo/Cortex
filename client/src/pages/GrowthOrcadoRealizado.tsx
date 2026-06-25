@@ -9,7 +9,29 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, Music, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS } from "@/lib/metasBudgetConfig";
+import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS, UNIVERSAL, PAID_ONLY, META_ONLY, isMetricVisibleForSelection } from "@/lib/metasBudgetConfig";
+
+// Disponibilidade por plataforma das métricas da seção genérica de Marketing
+// (Aprofundado sem filtro). Métricas só-pagas (CPM/CTR/VdP/Connect Rate) não
+// existem em todo canal e não devem aparecer no blend consolidado. As demais
+// seções vêm do CRM e independem de plataforma. IDs não listados → UNIVERSAL.
+const GENERIC_MARKETING_PLATFORMS: Record<string, readonly string[]> = {
+  investimento: UNIVERSAL,
+  cpm: PAID_ONLY,
+  ctr: PAID_ONLY,                       // CTR de saída
+  ctrUnico: META_ONLY,                  // CTR de saída único — só Meta
+  visualizacoes_pagina: PAID_ONLY,
+  sessoes: UNIVERSAL,
+  connect_rate: PAID_ONLY,
+  taxa_conversao_pagina: UNIVERSAL,     // aqui é por Sessões (Leads ÷ Sessões)
+  taxa_conversao_pagina_mql: UNIVERSAL,
+  taxa_conversao_pagina_nmql: UNIVERSAL,
+  leads: UNIVERSAL,
+  mqls: UNIVERSAL,
+  cpl: UNIVERSAL,
+  cpmql: UNIVERSAL,
+  perc_mqls: UNIVERSAL,
+};
 import { MultiSelect } from "@/components/ui/multi-select";
 import { cn } from "@/lib/utils";
 import { startOfMonth, endOfMonth, format, parse, differenceInCalendarDays, subDays } from "date-fns";
@@ -1739,11 +1761,21 @@ export default function GrowthOrcadoRealizado() {
     return mergePrevRealizado(cur, buildAdsMetrics(prevAdsData));
   }, [adsData, prevAdsData, ORCADO_ADS]);
 
+  // Seção genérica de Marketing (consolidado de todos os canais). Filtra métricas
+  // que não existem em todas as plataformas selecionadas (interseção). Sem filtro =
+  // todas → só as universais (some CPM/CTR/VdP/Connect Rate, que são só de pago).
+  const marketingMetricsFiltered = useMemo(
+    () => adsMetrics.filter((m) =>
+      isMetricVisibleForSelection(GENERIC_MARKETING_PLATFORMS[m.id] ?? UNIVERSAL, selectedPlataformas),
+    ),
+    [adsMetrics, selectedPlataformas],
+  );
+
   const marketingSections: MetricSection[] = [
     {
       title: 'Métricas de Marketing',
       icon: <Megaphone className="w-5 h-5" />,
-      metrics: adsMetrics,
+      metrics: marketingMetricsFiltered,
     },
   ];
 

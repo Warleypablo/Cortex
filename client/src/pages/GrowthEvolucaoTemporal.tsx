@@ -13,7 +13,14 @@ const EXPORT_ALLOWED_EMAILS = new Set([
   "vinicius.ichino@turbopartners.com.br",
   "ferramentas@turbopartners.com.br",
 ]);
-import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM } from "@/lib/metasBudgetConfig";
+import {
+  PLATFORM_MULTISELECT_OPTIONS,
+  PLATFORM_TO_UTM,
+  UNIVERSAL,
+  PAID_ONLY,
+  META_ONLY,
+  isMetricVisibleForSelection,
+} from "@/lib/metasBudgetConfig";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { cn } from "@/lib/utils";
 
@@ -512,6 +519,31 @@ const METRIC_DEFS: MetricDef[] = [
     orcado: (b) => b.total?.ticketMedioImplantacao ?? null },
 ];
 
+// Disponibilidade por plataforma das métricas da seção "Marketing". As demais
+// seções (MQL / Não-MQL / Total) vêm do CRM e independem de plataforma — sempre
+// aparecem. Métricas de marketing não listadas aqui assumem UNIVERSAL (sempre).
+const MARKETING_METRIC_PLATFORMS: Record<string, readonly string[]> = {
+  ads_investimento: UNIVERSAL,
+  ads_cpm: PAID_ONLY,
+  ads_ctr: PAID_ONLY,                         // CTR de saída
+  ads_ctr_unico: META_ONLY,                   // CTR de saída único — só Meta
+  ads_impressoes: PAID_ONLY,
+  ads_visualizacoes_pagina: PAID_ONLY,
+  ads_taxa_conversao_pagina: PAID_ONLY,       // Tx Conversão por Visualização de Página (pixel)
+  ads_taxa_conversao_pagina_mql: PAID_ONLY,
+  ads_taxa_conversao_pagina_nmql: PAID_ONLY,
+  ads_sessoes: UNIVERSAL,
+  ads_taxa_conversao_sessoes: UNIVERSAL,      // Tx Conversão por Sessões (GA4) — padrão da casa
+  ads_taxa_conversao_sessoes_mql: UNIVERSAL,
+  ads_taxa_conversao_sessoes_nmql: UNIVERSAL,
+  ads_connect_rate: PAID_ONLY,
+  ads_leads: UNIVERSAL,
+  ads_mqls: UNIVERSAL,
+  ads_cpl: UNIVERSAL,
+  ads_cpmql: UNIVERSAL,
+  ads_perc_mqls: UNIVERSAL,
+};
+
 export default function GrowthEvolucaoTemporal() {
   usePageTitle("Evolução Temporal");
   useSetPageInfo("Evolução Temporal", "Matriz de métricas por mês ao longo do ano");
@@ -718,9 +750,18 @@ export default function GrowthEvolucaoTemporal() {
     const grouped: Record<SectionKey, MetricDef[]> = {
       marketing: [], mql: [], "nao-mql": [], total: [],
     };
-    for (const m of METRIC_DEFS) grouped[m.section].push(m);
+    for (const m of METRIC_DEFS) {
+      // Só a seção de Marketing depende de plataforma. Uma métrica de marketing
+      // só entra se existir em todas as plataformas selecionadas (sem filtro =
+      // todas → restam só as universais). Demais seções entram sempre.
+      if (m.section === "marketing") {
+        const avail = MARKETING_METRIC_PLATFORMS[m.id] ?? UNIVERSAL;
+        if (!isMetricVisibleForSelection(avail, selectedPlataformas)) continue;
+      }
+      grouped[m.section].push(m);
+    }
     return grouped;
-  }, []);
+  }, [selectedPlataformas]);
 
   const renderCell = (m: MetricDef, col: Column) => {
     const bKey = col.kind === "month" ? col.bucket.key : col.week.key;
