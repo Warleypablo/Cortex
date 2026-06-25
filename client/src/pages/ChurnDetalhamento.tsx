@@ -54,7 +54,7 @@ import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { CustomTooltip } from "@/components/churn/ui/CustomTooltip";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { StatPill } from "@/components/churn/ui/StatPill";
-import { ChurnGauge } from "@/components/churn/ui/ChurnGauge";
+
 import { TechChartCard } from "@/components/churn/ui/TechChartCard";
 import { SectionBlock } from "@/components/churn/ui/SectionBlock";
 import { format, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
@@ -1638,7 +1638,6 @@ export default function ChurnDetalhamento() {
           contratos={filteredContratos}
           mrrPerdido={filteredMetricas.mrr_perdido}
           taxaChurn={filteredTaxaChurn}
-          gaugeStatus={gaugeStatusOverride?.label ?? ""}
           gaugeStatusOverride={gaugeStatusOverride}
           churnPlanejado={churnPlanejado.mrrPlanejado}
           ltMedio={filteredMetricas.lt_medio}
@@ -1655,29 +1654,8 @@ export default function ChurnDetalhamento() {
           </div>
           
           <CardContent className="relative p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-              {/* Coluna 1: Gauge e status */}
-              <div className="flex flex-col items-center justify-center p-4 bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50">
-                <h3 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">{filterAbono === "abonados" ? "Taxa de Abono" : "Taxa de Churn"}</h3>
-                <ChurnGauge
-                  value={filteredTaxaChurn || 0}
-                  statusOverride={filterAbono === "abonados"
-                    ? { label: "Recorte: abonados", color: "text-amber-500", bg: "from-amber-500 to-orange-500", dotBg: "bg-amber-500" }
-                    : gaugeStatusOverride}
-                />
-                {filterAbono !== "abonados" && churnPlanejado.taxaPlanejada > 0 && (
-                  <p className="text-[11px] text-muted-foreground text-center mt-1">
-                    Planejado até hoje: <span className="font-semibold">{churnPlanejado.taxaPlanejada.toFixed(2)}%</span>
-                  </p>
-                )}
-                {filterAbono !== "abonados" && (
-                  <p className="text-[10px] text-muted-foreground text-center">
-                    Status baseado na media diaria
-                  </p>
-                )}
-              </div>
-              
-              {/* Coluna 2: Métricas principais */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+              {/* Coluna 1: Métricas principais */}
               <div className="flex flex-col gap-3">
                 <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 flex flex-col justify-center">
                   <div className="flex items-center justify-between mb-1">

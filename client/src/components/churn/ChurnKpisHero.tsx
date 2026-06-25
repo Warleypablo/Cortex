@@ -5,7 +5,7 @@ import { type ChurnContract } from "@/components/churn/types";
 import { ChurnGauge } from "@/components/churn/ui/ChurnGauge";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { StatPill } from "@/components/churn/ui/StatPill";
-import { formatCurrency } from "@/lib/utils";
+
 
 // ── Pure helper ─────────────────────────────────────────────────────────────
 /**
@@ -36,7 +36,6 @@ export interface ChurnKpisHeroProps {
   contratos: ChurnContract[];        // filteredContratos
   mrrPerdido: number;                // de filteredMetricas
   taxaChurn: number;                 // de filteredTaxaChurn
-  gaugeStatus: string;               // de gaugeStatusOverride (ignorado aqui; usamos statusOverride abaixo)
   churnPlanejado?: number;           // de churnPlanejado (opcional)
   // Full gaugeStatusOverride object for ChurnGauge
   gaugeStatusOverride?: { label: string; color: string; bg: string; dotBg: string };
