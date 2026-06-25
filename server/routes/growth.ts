@@ -3210,6 +3210,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         || utmValues.some(v => v.includes('facebook') || v === 'meta' || v.includes('instagram') || v === 'ig' || v === 'fb');
       const includeGoogle = utmValues.length === 0
         || utmValues.some(v => v.includes('google') || v.includes('adwords') || v === 'gads');
+      // TikTok/LinkedIn Ads: somados ao consolidado SOMENTE quando não há filtro de
+      // produto. As tabelas *.ad_metrics_daily não atribuem gasto por funil (não seguem
+      // a convenção [Funil] no nome como Meta/Google), então sob filtro de produto ficam
+      // de fora pra não superatribuir. As mesmas queries dos endpoints dedicados
+      // (tiktok-ads / linkedin-ads) — garante reconciliação com o Aprofundado.
+      const noFunnelFilter = funilValues.length === 0;
+      const includeTikTokAds = noFunnelFilter
+        && (utmValues.length === 0 || utmValues.some(v => v.includes('tiktok')));
+      const includeLinkedInAds = noFunnelFilter
+        && (utmValues.length === 0 || utmValues.some(v => v.includes('linkedin')));
 
       // Build campaign filter: match campaign names containing [funil] pattern
       // Campaign naming convention: [TP] [Leads] [ABO] [Odonto] - ...
@@ -3319,16 +3329,57 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.log("[api] Google Ads query error in orcado-realizado/ads (may not have data):", googleError);
       }
 
-      // Cliques de saída consolidados: Meta outbound_clicks + Google clicks
-      // (Google clicks são cliques no anúncio que levam à LP — equivalente a outbound).
+      // Query TikTok Ads (mesma query do endpoint /tiktok-ads). Só quando incluído.
+      let tiktokInvestimento = 0, tiktokImpressoes = 0, tiktokCliques = 0;
+      if (includeTikTokAds) {
+        try {
+          const r = await db.execute(sql`
+            SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
+                   COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+                   COALESCE(SUM(clicks), 0)::bigint AS cliques
+            FROM tiktok.ad_metrics_daily
+            WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          `);
+          const row = r.rows[0] as any;
+          tiktokInvestimento = parseFloat(row.investimento) || 0;
+          tiktokImpressoes = parseInt(row.impressoes) || 0;
+          tiktokCliques = parseInt(row.cliques) || 0;
+        } catch (e: any) {
+          console.warn("[orcado-realizado/ads] TikTok Ads indisponível (schema/permissão):", e?.message);
+        }
+      }
+
+      // Query LinkedIn Ads (mesma query do endpoint /linkedin-ads). Só quando incluído.
+      let linkedinInvestimento = 0, linkedinImpressoes = 0, linkedinCliques = 0;
+      if (includeLinkedInAds) {
+        try {
+          const r = await db.execute(sql`
+            SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
+                   COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+                   COALESCE(SUM(clicks), 0)::bigint AS cliques
+            FROM linkedin.ad_metrics_daily
+            WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          `);
+          const row = r.rows[0] as any;
+          linkedinInvestimento = parseFloat(row.investimento) || 0;
+          linkedinImpressoes = parseInt(row.impressoes) || 0;
+          linkedinCliques = parseInt(row.cliques) || 0;
+        } catch (e: any) {
+          console.warn("[orcado-realizado/ads] LinkedIn Ads indisponível (schema/permissão):", e?.message);
+        }
+      }
+
+      // Cliques de saída consolidados: Meta outbound_clicks + cliques de anúncio das
+      // demais plataformas (Google/TikTok/LinkedIn) — todos levam à LP (equiv. outbound).
       if (includeGoogle) {
         cliquesSaida += googleCliques;
       }
+      cliquesSaida += tiktokCliques + linkedinCliques;
 
-      // Combine Meta + Google
-      const investimento = metaInvestimento + googleInvestimento;
-      const impressoes = metaImpressoes + googleImpressoes;
-      const cliques = metaCliques + googleCliques;
+      // Combine Meta + Google + TikTok + LinkedIn
+      const investimento = metaInvestimento + googleInvestimento + tiktokInvestimento + linkedinInvestimento;
+      const impressoes = metaImpressoes + googleImpressoes + tiktokImpressoes + linkedinImpressoes;
+      const cliques = metaCliques + googleCliques + tiktokCliques + linkedinCliques;
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = cliques_saida / impressões (Meta outbound_clicks + Google clicks).
       // Padrão da casa — alinhado com Criativos e Aprofundado por plataforma.
@@ -3350,12 +3401,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           : undefined,
       );
       let sessoes = 0;
-      if (includeMeta && includeGoogle) {
+      if (utmValues.length === 0) {
+        // "Todas as plataformas": ga4.total cobre Meta+Google+TikTok+LinkedIn+orgânico
+        // (e já é funnel-scoped quando há filtro de produto, via utmCampaignContains).
         sessoes = ga4.total;
-      } else if (includeMeta) {
-        sessoes = ga4.byPlatform.meta_ads;
-      } else if (includeGoogle) {
-        sessoes = ga4.byPlatform.google_ads;
+      } else {
+        if (includeMeta) sessoes += ga4.byPlatform.meta_ads;
+        if (includeGoogle) sessoes += ga4.byPlatform.google_ads;
+        if (includeTikTokAds) sessoes += ga4.byPlatform.tiktok_ads;
+        if (includeLinkedInAds) sessoes += ga4.byPlatform.linkedin_ads;
       }
 
       // Visualizações de Página consolidadas via GA4 (screenPageViews), cobrindo
@@ -3366,12 +3420,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const sumPageViews = (b: Record<string, number>) =>
         Object.values(b).reduce((acc, v) => acc + (Number(v) || 0), 0);
       let visualizacoesPaginaGa4 = 0;
-      if (includeMeta && includeGoogle) {
+      if (utmValues.length === 0) {
         visualizacoesPaginaGa4 = sumPageViews(ga4.byPlatformPageViews);
-      } else if (includeMeta) {
-        visualizacoesPaginaGa4 = ga4.byPlatformPageViews.meta_ads;
-      } else if (includeGoogle) {
-        visualizacoesPaginaGa4 = ga4.byPlatformPageViews.google_ads;
+      } else {
+        if (includeMeta) visualizacoesPaginaGa4 += ga4.byPlatformPageViews.meta_ads;
+        if (includeGoogle) visualizacoesPaginaGa4 += ga4.byPlatformPageViews.google_ads;
+        if (includeTikTokAds) visualizacoesPaginaGa4 += ga4.byPlatformPageViews.tiktok_ads;
+        if (includeLinkedInAds) visualizacoesPaginaGa4 += ga4.byPlatformPageViews.linkedin_ads;
       }
 
       // Query Leads e MQLs do Bitrix (tráfego pago)
