@@ -222,7 +222,6 @@ export default function ChurnDetalhamento() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [drill, setDrill] = useState<{ titulo: string; contratos: ChurnContract[] } | null>(null);
   const onDrill = (titulo: string, contratos: ChurnContract[]) => setDrill({ titulo, contratos });
-  const onToggleAbono = (taskId: string, abonar: boolean) => abonarMutation.mutate({ taskId, abonar });
   const queryClient = useQueryClient();
 
   const abonarMutation = useMutation({
@@ -253,6 +252,8 @@ export default function ChurnDetalhamento() {
       queryClient.invalidateQueries({ queryKey: ["/api/analytics/churn-detalhamento"] });
     },
   });
+
+  const onToggleAbono = (taskId: string, abonar: boolean) => abonarMutation.mutate({ taskId, abonar });
 
   // Buscar série de churn do ano para calcular excesso acumulado de meses anteriores
   const currentMonthKey = dataInicio ? format(parseISO(dataInicio), "yyyy-MM") : "";
@@ -2167,8 +2168,5 @@ export default function ChurnDetalhamento() {
     </div>
   );
 }
-
-
-
 
 
