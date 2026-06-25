@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-25 | feat(ads-creation): sobe lote Natural tech (Esther/Ichino/Musso) na camp CBO Creators
+
+**O que foi feito:**
+- `subir-naturaltech-ads.ts`: sobe os 12 clipes Natural tech (TP1693–1704) como ads de **vídeo único**, PAUSED, na camp CBO Creators teste (`120249141209100450`)
+- 3 conjuntos por persona: **165 Esther**, **166 Ichino** (tema "Estratégia peculiar natural tech") e **167 Musso** (tema "Natural tech")
+- Cruza Biblioteca × `video_id` no Gerenciador por nome normalizado (12/12 casaram); clona config (otimização OFFSITE_CONVERSIONS, pixel MQL, atribuição 7d/1d, targeting) e copy/link/CTA do conjunto `109 - Roberto - Natural Tech`
+- UTMs `hsa_grp`/`hsa_ad` trocados por macros dinâmicos (`{{adset.id}}`/`{{ad.id}}`) em vez de herdar os IDs fixos do Roberto
+- `limpa-naturaltech.ts`: deleta o adset órfão vazio gerado na 1ª tentativa e renomeia 166/167/168 → 165/166/167
+
+**Por que:**
+- Lote Natural tech estava só na Biblioteca; o usuário pediu pra subir todos os clipes na camp CBO Creators, pausados
+- Clipes soltos (sem h/b/c, sem 9x16+4x5) exigem creative clássico `object_story_spec.video_data` — `asset_feed_spec` sem `asset_customization_rules` viraria Dynamic Creative e exigiria adset DCO (erro `code=100`)
+
+**Arquivos novos:**
+- `subir-naturaltech-ads.ts` - script de upload dos ads (DRY por padrão, `--go` pra criar, idempotente, backoff de rate-limit)
+- `limpa-naturaltech.ts` - cleanup do órfão + renomeação dos conjuntos
+
+**Impacto arquitetural:** Nenhum — scripts standalone na raiz, mesmo padrão dos `subir-*-ads.ts`/`reordenar-crm.ts` existentes.
+
+---
+
 ## 2026-06-24 | chore(ads-creation): cadastra clipes Natural tech na Biblioteca (TP1693–1704)
 
 **O que foi feito:**
