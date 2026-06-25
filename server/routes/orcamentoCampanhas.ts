@@ -40,6 +40,10 @@ interface CampanhaRow {
   campaignId: string;
   name: string;
   status: string | null;
+  // Normalizado no backend via ACTIVE_STATUSES — cada plataforma usa um enum
+  // diferente (Meta=ACTIVE, Google=ENABLED, TikTok=ENABLE). O front consome este
+  // booleano em vez de re-checar a string, pra não esquecer nenhum vocabulário.
+  isActive: boolean;
   dailyBudgetAtual: number;
   investidoTotal: number;
   investimentoMensalMeta: number | null;
@@ -200,7 +204,8 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           FROM google.campaigns c
           LEFT JOIN spend_agg s ON s.campaign_id = c.campaign_id
           LEFT JOIN recent_spend_agg rs ON rs.campaign_id = c.campaign_id
-          WHERE COALESCE(s.cost_sum, 0) > 0
+          WHERE c.status = 'ENABLED'
+             OR COALESCE(s.cost_sum, 0) > 0
              OR c.campaign_id::text IN (SELECT campaign_id FROM metas_google)
           ORDER BY c.name;
         `));
@@ -386,6 +391,7 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
           campaignId,
           name: row.name,
           status: row.status,
+          isActive: isActiveStatus,
           dailyBudgetAtual,
           investidoTotal,
           investimentoMensalMeta,
