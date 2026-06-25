@@ -56,6 +56,8 @@ interface AdsData {
   cliquesSaida: number;
   cpm: number;
   ctr: number;
+  ctrUnico: number | null;
+  ctrUnicoAvailable?: boolean;
   connectRate: number;
   visualizacoesPagina: number;
   sessoes: number;
@@ -241,9 +243,14 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "ads_cpm", name: "CPM", format: "currency", section: "marketing", inverted: true,
     realizado: ({ ads }) => ads?.cpm ?? null,
     orcado: (b) => b.marketing?.cpm ?? null },
-  { id: "ads_ctr", name: "CTR", format: "percent", section: "marketing",
+  { id: "ads_ctr", name: "CTR de saída", format: "percent", section: "marketing",
     realizado: ({ ads }) => ads?.ctr ?? null,
     orcado: (b) => b.marketing?.ctr ?? null },
+  // CTR de saída único (cliques de saída únicos / alcance) — só o Meta expõe; no
+  // consolidado só é definível quando Meta é a única fonte paga (senão "—"). Sem orçado.
+  { id: "ads_ctr_unico", name: "CTR de saída único", format: "percent", section: "marketing",
+    realizado: ({ ads }) => ads?.ctrUnico ?? null,
+    orcado: () => null },
   { id: "ads_impressoes", name: "Impressões", format: "number", section: "marketing",
     realizado: ({ ads }) => ads?.impressoes ?? null,
     orcado: (b) => b.marketing?.impressoes ?? null },
@@ -264,6 +271,18 @@ const METRIC_DEFS: MetricDef[] = [
     orcado: () => null },
   { id: "ads_taxa_conversao_pagina_nmql", name: "Não-MQL", format: "percent", section: "marketing", sub: true,
     realizado: ({ ads }) => (ads && ads.visualizacoesPagina > 0 ? (ads.leads - ads.mqls) / ads.visualizacoesPagina : null),
+    orcado: () => null },
+  // Conversão por Sessões (GA4): denominador = sessões em vez de visualizações de
+  // página. Sem alvo orçado (não há taxaConversaoSessoes no budget). null quando não
+  // há sessões (GA4 indisponível) — evita exibir 0% falso.
+  { id: "ads_taxa_conversao_sessoes", name: "Tx Conversão de Sessões", format: "percent", section: "marketing",
+    realizado: ({ ads }) => (ads && ads.sessoes > 0 ? ads.leads / ads.sessoes : null),
+    orcado: () => null },
+  { id: "ads_taxa_conversao_sessoes_mql", name: "MQL", format: "percent", section: "marketing", sub: true,
+    realizado: ({ ads }) => (ads && ads.sessoes > 0 ? ads.mqls / ads.sessoes : null),
+    orcado: () => null },
+  { id: "ads_taxa_conversao_sessoes_nmql", name: "Não-MQL", format: "percent", section: "marketing", sub: true,
+    realizado: ({ ads }) => (ads && ads.sessoes > 0 ? (ads.leads - ads.mqls) / ads.sessoes : null),
     orcado: () => null },
   { id: "ads_connect_rate", name: "Connect Rate", format: "percent", section: "marketing",
     realizado: ({ ads }) => ads?.connectRate ?? null,
