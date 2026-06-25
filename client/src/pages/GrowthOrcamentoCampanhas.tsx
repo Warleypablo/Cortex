@@ -94,6 +94,7 @@ interface Campanha {
   campaignId: string;
   name: string;
   status: string | null;
+  isActive: boolean;
   dailyBudgetAtual: number;
   investidoTotal: number;
   projecaoAsIs: number;
@@ -380,8 +381,7 @@ interface StageSums {
 function sumStage(rows: Campanha[]): StageSums {
   let daily = 0, projecao = 0, investido = 0;
   for (const c of rows) {
-    const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
-    daily += isActive ? c.dailyBudgetAtual : 0;
+    daily += c.isActive ? c.dailyBudgetAtual : 0;
     projecao += c.projecaoAsIs;
     investido += c.investidoTotal;
   }
@@ -393,7 +393,7 @@ const COLSPAN = 9;
 export default function GrowthOrcamentoCampanhas() {
   useSetPageInfo(
     "Orçamento por Campanha",
-    "Planejamento por etapa do funil — Meta + Google",
+    "Planejamento por etapa do funil — Meta, Google, TikTok e LinkedIn",
   );
 
   const { user } = useAuth();
@@ -538,14 +538,14 @@ export default function GrowthOrcamentoCampanhas() {
   };
 
   const renderCampaignRow = (c: Campanha) => {
-    const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
+    const isActive = c.isActive;
     return (
       <TableRow key={`${c.platform}-${c.campaignId}`} className={PLATFORM_STYLES[c.platform].row} data-testid={`row-${c.platform}-${c.campaignId}`}>
         <TableCell className="font-medium pl-12">
           <div className="flex items-center gap-2">
             <span className="truncate max-w-[300px]" title={c.name}>{c.name}</span>
-            {c.status === "PAUSED" && <Badge variant="outline" className="text-xs">Pausada</Badge>}
-            {c.status !== "PAUSED" && !c.isDelivering && (
+            {!isActive && <Badge variant="outline" className="text-xs">Pausada</Badge>}
+            {isActive && !c.isDelivering && (
               <Badge variant="outline" className="text-xs" title="Sem gasto nos últimos 3 dias — projeção não extrapola.">
                 Sem entrega
               </Badge>
