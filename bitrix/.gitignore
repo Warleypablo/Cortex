@@ -1,0 +1,4 @@
+# Variaveis de ambiente (NUNCA subir pro repositorio)
+.env
+.env.local
+.env.*.local
