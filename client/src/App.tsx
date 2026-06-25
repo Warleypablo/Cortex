@@ -134,6 +134,7 @@ const Creators = lazyWithRetry(() => import("@/pages/Creators"));
 const PagamentoFreelancers = lazyWithRetry(() => import("@/pages/PagamentoFreelancers"));
 const InvestorsReport = lazyWithRetry(() => import("@/pages/InvestorsReport"));
 const RelatorioMensal = lazyWithRetry(() => import("@/pages/RelatorioMensal"));
+const RelatorioSemanal = lazyWithRetry(() => import("@/pages/RelatorioSemanal"));
 const Acessos = lazyWithRetry(() => import("@/pages/Acessos"));
 const Conhecimentos = lazyWithRetry(() => import("@/pages/Conhecimentos"));
 const TreinamentoInternoVideo = lazyWithRetry(() => import("@/pages/TreinamentoInternoVideo"));
@@ -430,6 +431,7 @@ function ProtectedRouter() {
       {/* Investidores */}
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
       <Route path="/reports/mensal">{() => <ProtectedRoute path="/reports/mensal" component={RelatorioMensal} />}</Route>
+      <Route path="/reports/semanal">{() => <ProtectedRoute path="/reports/semanal" component={RelatorioSemanal} />}</Route>
       
       {/* OKR 2026 */}
       <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>
