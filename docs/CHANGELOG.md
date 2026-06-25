@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-25 | feat(ads-creation): sobe 17 estaticos pareados Creator Summit (TP1705-1721) no conjunto 10
+
+**O que foi feito:**
+- `subir-summit-estaticos.ts`: sobe os 33 estáticos do Creator Summit (já no Gerenciador) como **17 ads pareados** feed 4x5 + stories 9x16, PAUSED, no conjunto `10` (`120252239374870450`) da camp `[TP] [Vendas] [Quente] [ES] [CBO] [Summit]`
+- Pareamento: **palestrantes 1–7** (a #2 sobe só com stories, falta o feed "4_5 2") + **lote numérico A** (arquivos sem "(1)") + **lote numérico B** (arquivos com "(1)") — variantes `(1)` têm hash distinto, são imagens diferentes
+- Copy/link/CTA = **padrão da campanha** (body "O maior evento da creator economy do ES", link `pages.turbopartners.com.br/creators-summit-es/`, CTA `LEARN_MORE`, descrição e url_tags herdados dos ads existentes)
+- Cada ad registrado na Biblioteca com **TP sequencial** (TP1705–1721); nome do ad no Gerenciador = `nome_final` (`TPxxxx - <base>`)
+
+**Por que:**
+- Usuário pediu pra subir os 33 estáticos no conjunto '10' já criado, pareando feed+stories, com TP correto no nome, tudo pausado
+- Imagem única (stories órfã) precisou ir como `object_story_spec.link_data` — `asset_feed_spec` de 1 asset sem `asset_customization_rules` é tratado como Dynamic Creative e quebra em conjunto normal (erro `code=100`, mesmo gotcha do lote Natural tech)
+
+**Arquivos novos:**
+- `subir-summit-estaticos.ts` - upload dos estáticos pareados (DRY por padrão, `--go` pra criar, idempotente via tag de hashes na observacao + nome TP no conjunto, backoff de rate-limit)
+
+**Impacto arquitetural:** Nenhum — script standalone na raiz, mesmo padrão dos `subir-*-ads.ts` existentes.
+
+---
+
 ## 2026-06-25 | feat(ads-creation): sobe lote Natural tech (Esther/Ichino/Musso) na camp CBO Creators
 
 **O que foi feito:**
