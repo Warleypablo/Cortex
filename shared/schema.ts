@@ -1093,8 +1093,9 @@ export const contentPosts = cortexCoreSchema.table("content_posts", {
   parentName: text("parent_name"),                             // "Social Media - ABRIL"
   mes: varchar("mes", { length: 24 }),
   turboSlug: varchar("turbo_slug", { length: 128 }),
-  postingDate: date("posting_date"),
-  slot: varchar("slot", { length: 8 }),                        // '12h' | '18h'
+  postingDate: date("posting_date"),                           // data planejada no ClickUp (sem hora)
+  slot: varchar("slot", { length: 8 }),                        // '12h' | '17h30' (slot fixo do agente)
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }), // horário escolhido pelo operador ("Agendar"); NULL = não agendado
   tipoPost: varchar("tipo_post", { length: 16 }),              // single | reels | carousel
   assetCount: integer("asset_count").default(0),
   legendaSource: varchar("legenda_source", { length: 24 }),    // doc | claude-precisa | ia | none
@@ -1102,7 +1103,7 @@ export const contentPosts = cortexCoreSchema.table("content_posts", {
   legendaEmpty: boolean("legenda_empty").default(false),
   legendaPreview: text("legenda_preview"),                     // preview da legenda (p/ aprovação de IA)
   state: varchar("state", { length: 24 }).notNull().default("agendado"),
-    // agendado | aguardando_ia | publicado | falhou | pulado
+    // aprovado | agendado | aguardando_ia | publicado | falhou | pulado
   skipReason: text("skip_reason"),
   errorText: text("error_text"),
   publishedMediaId: varchar("published_media_id", { length: 64 }), // ig media_id / tiktok publish_id
@@ -1112,8 +1113,11 @@ export const contentPosts = cortexCoreSchema.table("content_posts", {
   firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
 }, (table) => ({
+  // upsert estável por task (cada card = 1 post; tolera posts sem data agendada)
+  uniqTask: uniqueIndex("idx_content_posts_platform_task").on(table.platform, table.clickupTaskId),
   uniqTaskDate: uniqueIndex("idx_content_posts_platform_task_date").on(table.platform, table.clickupTaskId, table.postingDate),
   platformDateIdx: index("idx_content_posts_platform_date").on(table.platform, table.postingDate),
+  scheduledIdx: index("idx_content_posts_scheduled").on(table.platform, table.scheduledAt),
   stateIdx: index("idx_content_posts_state").on(table.state),
 }));
 
@@ -1126,8 +1130,8 @@ export const contentPublishCommands = cortexCoreSchema.table("content_publish_co
   platform: varchar("platform", { length: 16 }).notNull(),
   clickupTaskId: varchar("clickup_task_id", { length: 64 }),   // null em comandos globais (pause/resume)
   action: varchar("action", { length: 32 }).notNull(),
-    // publish_now | retry | skip | approve_caption | edit_caption | pause_agent | resume_agent
-  payload: jsonb("payload").default({}),                       // ex.: { caption: "..." } no edit_caption
+    // publish_now | schedule | cancel_schedule | retry | skip | approve_caption | edit_caption | pause_agent | resume_agent
+  payload: jsonb("payload").default({}),                       // ex.: { caption } no edit_caption; { scheduled_at } no schedule
   status: varchar("status", { length: 16 }).notNull().default("pending"), // pending | running | done | failed | canceled
   result: jsonb("result"),
   errorText: text("error_text"),
