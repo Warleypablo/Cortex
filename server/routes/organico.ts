@@ -1,38 +1,54 @@
 import type { Express } from "express";
-import { desc } from "drizzle-orm";
+import { desc, eq, and } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import {
   contentPosts,
   contentPublishRuns,
   contentPublishSettings,
+  contentPublishCommands,
 } from "../../shared/schema";
 
+// Ações aceitas na fila content_publish_commands (espelha o vocabulário do schema).
+const ALLOWED_ACTIONS = new Set([
+  "publish_now",      // Soltar post agora
+  "schedule",         // Agendar post (payload.scheduled_at)
+  "cancel_schedule",  // Cancelar agendamento
+  "retry",
+  "skip",
+  "approve_caption",
+  "edit_caption",
+  "pause_agent",
+  "resume_agent",
+]);
+// Ações globais (sem task): pausar/retomar o agente da plataforma inteira.
+const GLOBAL_ACTIONS = new Set(["pause_agent", "resume_agent"]);
+
 /**
- * Painel "Orgânico" (Growth) — Fase 1, SOMENTE LEITURA.
+ * Painel "Orgânico" (Growth) — leitura + ações do operador.
  *
- * Lê o estado que o worker de publicação (automacoes/instagram-turbo) escreve nas
- * tabelas content_* (platform-agnósticas). Nenhuma escrita aqui ainda — os botões
- * (publicar agora / retry / aprovar legenda / pausar) entram na Fase 3 via a fila
- * content_publish_commands. Rotas /api/* já são protegidas pelo isAuthenticated global.
+ * Lê o estado que o worker de publicação (automacoes/instagram-turbo) escreve nas tabelas
+ * content_* (platform-agnósticas) e ENFILEIRA comandos do operador em content_publish_commands.
+ * O backend NUNCA chama o Python: as ações viram linhas `pending` que o worker-poller consome
+ * e reflete de volta via /ingest. Rotas /api/* já são protegidas pelo isAuthenticated global.
  */
 export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage) {
   // GET /api/growth/organico/overview
-  // Snapshot único pro painel: settings + saúde (último ciclo por plataforma) + fila + histórico.
+  // Snapshot pro painel: settings + saúde + as 3 visões do dia (aprovados / agendados / publicados).
   app.get("/api/growth/organico/overview", async (_req, res) => {
     try {
       const settings = await db.select().from(contentPublishSettings);
 
-      // runs recentes → saúde = o último ciclo de cada plataforma (já vem desc por started_at)
+      // saúde = o último ciclo de cada plataforma (runs já vêm desc por started_at)
       const recentRuns = await db
         .select()
         .from(contentPublishRuns)
         .orderBy(desc(contentPublishRuns.startedAt))
         .limit(50);
       const health: any[] = [];
-      const seen = new Set<string>();
+      const seenPlat = new Set<string>();
       for (const r of recentRuns) {
-        if (!seen.has(r.platform)) {
-          seen.add(r.platform);
+        if (!seenPlat.has(r.platform)) {
+          seenPlat.add(r.platform);
           health.push(r);
         }
       }
@@ -41,29 +57,147 @@ export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage
         .select()
         .from(contentPosts)
         .orderBy(desc(contentPosts.postingDate))
-        .limit(300);
+        .limit(500);
 
       const today = new Date().toISOString().slice(0, 10);
-      // Fila: hoje em diante e ainda não publicado (inclui falhou/aguardando p/ ação futura).
-      const queue = posts
+      const day = (d: any) => (d ? String(d).slice(0, 10) : "");
+      const byDateAsc = (a: any, b: any) =>
+        day(a.postingDate).localeCompare(day(b.postingDate));
+      const bySchedAsc = (a: any, b: any) =>
+        String(a.scheduledAt ?? a.postingDate ?? "").localeCompare(
+          String(b.scheduledAt ?? b.postingDate ?? ""),
+        );
+
+      // (A) APROVADOS — prontos/esperando legenda, ainda sem agendamento nem publicação.
+      const aprovados = posts
         .filter(
           (p: any) =>
-            p.postingDate &&
-            String(p.postingDate).slice(0, 10) >= today &&
-            p.state !== "publicado",
+            (p.state === "aprovado" || p.state === "aguardando_ia") &&
+            !p.scheduledAt,
         )
-        .sort((a: any, b: any) =>
-          String(a.postingDate).localeCompare(String(b.postingDate)),
-        );
-      // Histórico: o que já foi publicado (mais recente primeiro).
-      const history = posts.filter((p: any) => p.state === "publicado").slice(0, 50);
+        .sort(byDateAsc);
+
+      // (B) AGENDADOS — agendados pelo operador (scheduled_at) ou pelo slot automático do agente.
+      const agendados = posts
+        .filter(
+          (p: any) =>
+            p.state !== "publicado" &&
+            (p.scheduledAt || p.state === "agendado"),
+        )
+        .sort(bySchedAsc);
+
+      // (C) PUBLICADOS DO DIA — publicados hoje (updatedAt = carimbo da publicação).
+      const publicados = posts
+        .filter((p: any) => p.state === "publicado" && day(p.updatedAt) === today)
+        .sort((a: any, b: any) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
 
       const platforms = settings.map((s: any) => s.platform);
 
-      res.json({ today, platforms, settings, health, queue, history });
+      res.json({
+        today,
+        platforms,
+        settings,
+        health,
+        aprovados,
+        agendados,
+        publicados,
+        // compat: visões antigas (fila/histórico) — até o frontend novo assumir.
+        queue: [...aprovados, ...agendados],
+        history: posts.filter((p: any) => p.state === "publicado").slice(0, 50),
+      });
     } catch (err: any) {
       console.error("[organico] overview error:", err);
       res.status(500).json({ error: "Falha ao carregar o painel Orgânico" });
+    }
+  });
+
+  // POST /api/growth/organico/commands — enfileira uma ação do operador (Soltar agora / Agendar / ...).
+  app.post("/api/growth/organico/commands", async (req, res) => {
+    try {
+      const { platform, clickupTaskId, action } = req.body || {};
+      let payload = req.body?.payload;
+      if (!platform) return res.status(400).json({ error: "platform obrigatório" });
+      if (!action || !ALLOWED_ACTIONS.has(action))
+        return res.status(400).json({ error: "ação inválida" });
+      if (!GLOBAL_ACTIONS.has(action) && !clickupTaskId)
+        return res.status(400).json({ error: "clickupTaskId obrigatório para esta ação" });
+
+      payload = payload && typeof payload === "object" ? payload : {};
+
+      // "Agendar" exige um horário futuro válido.
+      if (action === "schedule") {
+        const when = new Date(payload.scheduled_at);
+        if (!payload.scheduled_at || isNaN(when.getTime()))
+          return res.status(400).json({ error: "scheduled_at inválido" });
+        if (when.getTime() < Date.now() - 60_000)
+          return res.status(400).json({ error: "scheduled_at precisa ser no futuro" });
+        payload = { ...payload, scheduled_at: when.toISOString() };
+      }
+
+      // Idempotência leve: não duplica comando pending igual (mesma task + ação).
+      if (clickupTaskId && (action === "publish_now" || action === "schedule")) {
+        const existing = await db
+          .select()
+          .from(contentPublishCommands)
+          .where(
+            and(
+              eq(contentPublishCommands.platform, platform),
+              eq(contentPublishCommands.clickupTaskId, String(clickupTaskId)),
+              eq(contentPublishCommands.action, action),
+              eq(contentPublishCommands.status, "pending"),
+            ),
+          )
+          .limit(1);
+        if (existing.length) {
+          return res.json({ ok: true, command: existing[0], deduped: true });
+        }
+      }
+
+      const requestedBy =
+        (req.user as any)?.email || (req.user as any)?.name || null;
+      const [cmd] = await db
+        .insert(contentPublishCommands)
+        .values({
+          platform,
+          clickupTaskId: clickupTaskId ? String(clickupTaskId) : null,
+          action,
+          payload,
+          status: "pending",
+          requestedBy,
+        })
+        .returning();
+
+      res.json({ ok: true, command: cmd });
+    } catch (err: any) {
+      console.error("[organico] command error:", err);
+      res.status(500).json({ error: "falha ao enfileirar comando" });
+    }
+  });
+
+  // POST /api/growth/organico/settings — pausa/retoma o agente e alterna dry-run por plataforma.
+  app.post("/api/growth/organico/settings", async (req, res) => {
+    try {
+      const { platform, agentEnabled, dryRun } = req.body || {};
+      if (!platform) return res.status(400).json({ error: "platform obrigatório" });
+
+      const set: any = {
+        updatedAt: new Date(),
+        updatedBy: (req.user as any)?.email || null,
+      };
+      if (typeof agentEnabled === "boolean") set.agentEnabled = agentEnabled;
+      if (typeof dryRun === "boolean") set.dryRun = dryRun;
+
+      const [row] = await db
+        .update(contentPublishSettings)
+        .set(set)
+        .where(eq(contentPublishSettings.platform, platform))
+        .returning();
+      if (!row) return res.status(404).json({ error: "plataforma não encontrada" });
+
+      res.json({ ok: true, settings: row });
+    } catch (err: any) {
+      console.error("[organico] settings error:", err);
+      res.status(500).json({ error: "falha ao salvar settings" });
     }
   });
 }
@@ -101,54 +235,69 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
         });
       }
 
-      // 2) upsert dos posts (chave: platform + task + data). Sem data → ignora.
+      // 2) upsert dos posts. Chave estável = (platform, task) — tolera posts SEM data
+      //    (aprovados ainda sem agendamento). scheduled_at só é tocado se o worker mandar.
       let upserted = 0;
       for (const p of Array.isArray(posts) ? posts : []) {
-        if (!p?.clickup_task_id || !p?.posting_date) continue;
-        const row = {
+        if (!p?.clickup_task_id) continue;
+        const hasSched = p.scheduled_at != null;
+        const insert: any = {
           platform,
           clickupTaskId: String(p.clickup_task_id),
           taskName: p.task_name ?? null,
           parentName: p.parent_name ?? null,
           mes: p.mes ?? null,
           turboSlug: p.turbo_slug ?? null,
-          postingDate: p.posting_date,
+          postingDate: p.posting_date ?? null,
           slot: p.slot ?? null,
           tipoPost: p.tipo_post ?? null,
           assetCount: p.asset_count ?? 0,
           legendaSource: p.legenda_source ?? null,
           legendaLen: p.legenda_len ?? 0,
           legendaEmpty: p.legenda_empty ?? false,
+          legendaPreview: p.legenda_preview ?? null,
           state: p.state || "agendado",
           skipReason: p.skip_reason ?? null,
           errorText: p.error_text ?? null,
           publishedMediaId: p.published_media_id ?? null,
           permalink: p.permalink ?? null,
+          clickupUrl: p.clickup_url ?? null,
+          lastRunId: run?.run_id ? String(run.run_id).slice(0, 16) : null,
           updatedAt: new Date(),
         };
+        if (hasSched) insert.scheduledAt = new Date(p.scheduled_at);
+
+        const set: any = {
+          taskName: insert.taskName,
+          parentName: insert.parentName,
+          mes: insert.mes,
+          turboSlug: insert.turboSlug,
+          postingDate: insert.postingDate,
+          slot: insert.slot,
+          tipoPost: insert.tipoPost,
+          assetCount: insert.assetCount,
+          legendaSource: insert.legendaSource,
+          legendaLen: insert.legendaLen,
+          legendaEmpty: insert.legendaEmpty,
+          legendaPreview: insert.legendaPreview,
+          state: insert.state,
+          skipReason: insert.skipReason,
+          errorText: insert.errorText,
+          publishedMediaId: insert.publishedMediaId,
+          permalink: insert.permalink,
+          clickupUrl: insert.clickupUrl,
+          lastRunId: insert.lastRunId,
+          updatedAt: insert.updatedAt,
+        };
+        // só sobrescreve scheduled_at quando o worker reporta (evita zerar agendamento do operador)
+        if (hasSched) set.scheduledAt = insert.scheduledAt;
+
         await db
           .insert(contentPosts)
-          .values(row)
+          .values(insert)
           .onConflictDoUpdate({
-            target: [contentPosts.platform, contentPosts.clickupTaskId, contentPosts.postingDate],
-            set: {
-              taskName: row.taskName,
-              parentName: row.parentName,
-              mes: row.mes,
-              turboSlug: row.turboSlug,
-              slot: row.slot,
-              tipoPost: row.tipoPost,
-              assetCount: row.assetCount,
-              legendaSource: row.legendaSource,
-              legendaLen: row.legendaLen,
-              legendaEmpty: row.legendaEmpty,
-              state: row.state,
-              skipReason: row.skipReason,
-              errorText: row.errorText,
-              publishedMediaId: row.publishedMediaId,
-              permalink: row.permalink,
-              updatedAt: row.updatedAt,
-            },
+            target: [contentPosts.platform, contentPosts.clickupTaskId],
+            set,
           });
         upserted++;
       }
