@@ -51,6 +51,7 @@ import ChurnConsolidadoTrimestral from "@/components/ChurnConsolidadoTrimestral"
 import { type ChurnContract, type ChurnDetalhamentoData, type ChurnPorSquad, type ChurnPorMotivo, type ChurnBreakdownItem, type RetentionPoint, CHART_COLORS } from "@/components/churn/types";
 import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
+import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { CustomTooltip } from "@/components/churn/ui/CustomTooltip";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { StatPill } from "@/components/churn/ui/StatPill";
@@ -219,6 +220,9 @@ export default function ChurnDetalhamento() {
   const [expandedCxTheme, setExpandedCxTheme] = useState<string | null>(null);
   const [abonadoOverrides, setAbonadoOverrides] = useState<Record<string, boolean>>({});
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
+  const [drill, setDrill] = useState<{ titulo: string; contratos: ChurnContract[] } | null>(null);
+  const onDrill = (titulo: string, contratos: ChurnContract[]) => setDrill({ titulo, contratos });
+  const onToggleAbono = (taskId: string, abonar: boolean) => abonarMutation.mutate({ taskId, abonar });
   const queryClient = useQueryClient();
 
   const abonarMutation = useMutation({
@@ -2150,6 +2154,15 @@ export default function ChurnDetalhamento() {
       )}
 
 
+      <ChurnDrillDrawer
+        open={!!drill}
+        titulo={drill?.titulo ?? ""}
+        contratos={drill?.contratos ?? []}
+        onClose={() => setDrill(null)}
+        onToggleAbono={onToggleAbono}
+        pendingIds={pendingIds}
+        abonadoOverrides={abonadoOverrides}
+      />
       </>
     </div>
   );
