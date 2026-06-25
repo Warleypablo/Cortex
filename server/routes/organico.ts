@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { desc, asc, eq, and } from "drizzle-orm";
+import { desc, asc, eq, ne, and, lte, isNotNull } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import {
   contentPosts,
@@ -278,6 +278,34 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
     }
   });
 
+  // GET /api/growth/organico/posts/due?platform=instagram
+  // Posts agendados pelo operador cujo horário já venceu e ainda não publicaram.
+  // O worker-poller publica cada um e reporta de volta via /ingest.
+  app.get("/api/growth/organico/posts/due", async (req, res) => {
+    if (!requireToken(req, res)) return;
+    try {
+      const platform = String(req.query.platform || "");
+      if (!platform) return res.status(400).json({ error: "platform obrigatório" });
+      const due = await db
+        .select()
+        .from(contentPosts)
+        .where(
+          and(
+            eq(contentPosts.platform, platform),
+            isNotNull(contentPosts.scheduledAt),
+            lte(contentPosts.scheduledAt, new Date()),
+            ne(contentPosts.state, "publicado"),
+          ),
+        )
+        .orderBy(asc(contentPosts.scheduledAt))
+        .limit(20);
+      res.json({ posts: due });
+    } catch (err: any) {
+      console.error("[organico] due error:", err);
+      res.status(500).json({ error: "falha ao listar vencidos" });
+    }
+  });
+
   app.post("/api/growth/organico/ingest", async (req, res) => {
     if (!requireToken(req, res)) return;
 
@@ -303,7 +331,9 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
       let upserted = 0;
       for (const p of Array.isArray(posts) ? posts : []) {
         if (!p?.clickup_task_id) continue;
-        const hasSched = p.scheduled_at != null;
+        // scheduled_at: chave ausente = mantém; null = limpa (cancelar); valor = grava (agendar)
+        const schedKey = Object.prototype.hasOwnProperty.call(p, "scheduled_at");
+        const schedVal = schedKey ? (p.scheduled_at ? new Date(p.scheduled_at) : null) : undefined;
         const insert: any = {
           platform,
           clickupTaskId: String(p.clickup_task_id),
@@ -328,7 +358,7 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
           lastRunId: run?.run_id ? String(run.run_id).slice(0, 16) : null,
           updatedAt: new Date(),
         };
-        if (hasSched) insert.scheduledAt = new Date(p.scheduled_at);
+        if (schedKey) insert.scheduledAt = schedVal;
 
         const set: any = {
           taskName: insert.taskName,
@@ -352,8 +382,8 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
           lastRunId: insert.lastRunId,
           updatedAt: insert.updatedAt,
         };
-        // só sobrescreve scheduled_at quando o worker reporta (evita zerar agendamento do operador)
-        if (hasSched) set.scheduledAt = insert.scheduledAt;
+        // só toca scheduled_at quando o worker manda a chave (evita zerar agendamento do operador)
+        if (schedKey) set.scheduledAt = schedVal;
 
         await db
           .insert(contentPosts)

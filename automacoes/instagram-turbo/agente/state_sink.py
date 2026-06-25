@@ -28,15 +28,22 @@ def _today() -> str:
 
 
 def panel_state(plan: Any) -> str:
-    """Mapeia um PlannedAction pro estado que o painel mostra."""
-    if plan.legenda_empty:
+    """Mapeia um PlannedAction pro estado que o painel mostra.
+
+    Para o painel do operador, uma task aprovada e PRONTA (assets + legenda),
+    com ou sem data de hoje, vira 'aprovado' — é o que o operador pode soltar/
+    agendar. Data futura = 'agendado' (slot automático do agente). Legenda
+    pendente = 'aguardando_ia'. Sem assets/placeholder = 'pulado'.
+    Planejar com force_now=True faz os skips de data não mascararem a prontidão.
+    """
+    src = getattr(plan, "legenda_source", None)
+    if plan.legenda_empty or src in ("claude-precisa", "ia"):
         return "aguardando_ia"
-    if plan.skip_reason:
-        # task com data futura ainda está "na fila" (agendada), não "pulada"
-        if plan.posting_date and plan.posting_date > _today():
-            return "agendado"
-        return "pulado"
-    return "agendado"
+    if plan.posting_date and plan.posting_date > _today():
+        return "agendado"
+    if getattr(plan, "is_ready_to_publish", False):
+        return "aprovado"
+    return "pulado"
 
 
 def panel_post(plan: Any, platform: str = "instagram") -> dict:
@@ -62,6 +69,31 @@ def panel_post(plan: Any, platform: str = "instagram") -> dict:
     }
 
 
+def _send_ingest(payload: dict) -> bool:
+    """POST fail-soft pro /ingest do Cortex. Nunca levanta exceção. True se 2xx."""
+    url = (CONFIG.cortex_ingest_url or "").strip()
+    token = (CONFIG.organico_ingest_token or "").strip()
+    if not url or not token:
+        print("   ℹ️  painel: CORTEX_INGEST_URL/ORGANICO_INGEST_TOKEN não setados — não reporto")
+        return False
+    data = json.dumps(payload).encode("utf-8")
+    req = urllib.request.Request(
+        url, data=data, method="POST",
+        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            n = len(payload.get("posts") or [])
+            print(f"   📡 painel atualizado: {n} post(s) reportado(s) (HTTP {r.status})")
+            return True
+    except urllib.error.HTTPError as e:
+        body = e.read()[:200] if hasattr(e, "read") else b""
+        print(f"   ⚠️  painel: ingest retornou {e.code} (segue normal) — {body!r}")
+    except Exception as e:  # noqa: BLE001
+        print(f"   ⚠️  painel: falha ao reportar (segue normal) — {type(e).__name__}: {e}")
+    return False
+
+
 def report_cycle(
     platform: str,
     *,
@@ -73,13 +105,7 @@ def report_cycle(
     status: str = "ok",
 ) -> None:
     """POST fail-soft do ciclo (run + posts) pro Cortex. Nunca levanta exceção."""
-    url = (CONFIG.cortex_ingest_url or "").strip()
-    token = (CONFIG.organico_ingest_token or "").strip()
-    if not url or not token:
-        print("   ℹ️  painel: CORTEX_INGEST_URL/ORGANICO_INGEST_TOKEN não setados — não reporto")
-        return
-
-    payload = {
+    _send_ingest({
         "platform": platform,
         "run": {
             "run_id": run_id,
@@ -90,17 +116,9 @@ def report_cycle(
             "counts": counts,
         },
         "posts": posts,
-    }
-    data = json.dumps(payload).encode("utf-8")
-    req = urllib.request.Request(
-        url, data=data, method="POST",
-        headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            print(f"   📡 painel atualizado: {len(posts)} post(s) reportado(s) (HTTP {r.status})")
-    except urllib.error.HTTPError as e:
-        body = e.read()[:200] if hasattr(e, "read") else b""
-        print(f"   ⚠️  painel: ingest retornou {e.code} (segue normal) — {body!r}")
-    except Exception as e:  # noqa: BLE001
-        print(f"   ⚠️  painel: falha ao reportar (segue normal) — {type(e).__name__}: {e}")
+    })
+
+
+def report_posts(platform: str, posts: list[dict]) -> None:
+    """Reporta só posts (sem run/heartbeat) — usado pelo consumidor de comandos."""
+    _send_ingest({"platform": platform, "run": None, "posts": posts})
