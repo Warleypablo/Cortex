@@ -52,6 +52,7 @@ import { type ChurnContract, type ChurnDetalhamentoData, type ChurnPorSquad, typ
 import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
+import { SecaoMotivos } from "@/components/churn/SecaoMotivos";
 import { CustomTooltip } from "@/components/churn/ui/CustomTooltip";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { StatPill } from "@/components/churn/ui/StatPill";
@@ -206,8 +207,6 @@ export default function ChurnDetalhamento() {
   const [sortBy, setSortBy] = useState<string>("data_encerramento");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [mainTab, setMainTab] = useState<"analise" | "contratos" | "relatorio" | "consolidado">("analise");
-  const [crossAnalysisView, setCrossAnalysisView] = useState<"motivo" | "cluster" | "plano">("motivo");
-  const [expandedMotivo, setExpandedMotivo] = useState<string | null>(null);
   const [filterAbono, setFilterAbono] = useState<"todos" | "abonados" | "nao_abonados">("todos");
 
   // Voz do Cliente states
@@ -760,151 +759,6 @@ export default function ChurnDetalhamento() {
       .slice(0, 6);
   }, [filteredContratos]);
 
-  // Análise de Churn por Tipo de Erro (Erro Operacional, Erro Operacional Indireto, Falta de Resultado)
-  type ChurnTipoErro = {
-    tipo: string;
-    count: number;
-    mrr: number;
-    porSquad: Record<string, { count: number; mrr: number }>;
-    porResponsavel: Record<string, { count: number; mrr: number }>;
-    porVendedor: Record<string, { count: number; mrr: number }>;
-    porCsResponsavel: Record<string, { count: number; mrr: number }>;
-  };
-
-  const churnPorTipoErro = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
-    if (churnContratos.length === 0) return [];
-    
-    const tiposErro: Record<string, ChurnTipoErro> = {};
-    
-    // Categorias de motivo que representam erro operacional
-    const erroOperacionalMotivos = [
-      'erro operacional',
-      'erro interno',
-      'falha operacional',
-      'problema interno',
-      'erro de operação'
-    ];
-    
-    const erroOperacionalIndiretoMotivos = [
-      'erro operacional indireto',
-      'erro indireto',
-      'falha indireta'
-    ];
-    
-    const faltaResultadoMotivos = [
-      'falta de resultado',
-      'sem resultado',
-      'resultado insatisfatório',
-      'não atingiu meta',
-      'baixa performance',
-      'performance'
-    ];
-    
-    churnContratos.forEach(c => {
-      const motivo = (c.motivo_cancelamento || '').toLowerCase().trim();
-      
-      let categoria = 'Outros';
-      if (erroOperacionalMotivos.some(m => motivo.includes(m))) {
-        categoria = 'Erro Operacional';
-      } else if (erroOperacionalIndiretoMotivos.some(m => motivo.includes(m))) {
-        categoria = 'Erro Operacional Indireto';
-      } else if (faltaResultadoMotivos.some(m => motivo.includes(m))) {
-        categoria = 'Falta de Resultado';
-      }
-      
-      if (!tiposErro[categoria]) {
-        tiposErro[categoria] = {
-          tipo: categoria,
-          count: 0,
-          mrr: 0,
-          porSquad: {},
-          porResponsavel: {},
-          porVendedor: {},
-          porCsResponsavel: {}
-        };
-      }
-      
-      tiposErro[categoria].count++;
-      tiposErro[categoria].mrr += c.valorr || 0;
-      
-      // Agregar por Squad
-      const squad = c.squad || 'Não especificado';
-      if (!tiposErro[categoria].porSquad[squad]) {
-        tiposErro[categoria].porSquad[squad] = { count: 0, mrr: 0 };
-      }
-      tiposErro[categoria].porSquad[squad].count++;
-      tiposErro[categoria].porSquad[squad].mrr += c.valorr || 0;
-      
-      // Agregar por Responsável
-      const resp = c.responsavel || 'Não especificado';
-      if (!tiposErro[categoria].porResponsavel[resp]) {
-        tiposErro[categoria].porResponsavel[resp] = { count: 0, mrr: 0 };
-      }
-      tiposErro[categoria].porResponsavel[resp].count++;
-      tiposErro[categoria].porResponsavel[resp].mrr += c.valorr || 0;
-      
-      // Agregar por Vendedor
-      const vendedor = c.vendedor || 'Não especificado';
-      if (!tiposErro[categoria].porVendedor[vendedor]) {
-        tiposErro[categoria].porVendedor[vendedor] = { count: 0, mrr: 0 };
-      }
-      tiposErro[categoria].porVendedor[vendedor].count++;
-      tiposErro[categoria].porVendedor[vendedor].mrr += c.valorr || 0;
-      
-      // Agregar por CS Responsável
-      const csResp = c.cs_responsavel || 'Não especificado';
-      if (!tiposErro[categoria].porCsResponsavel[csResp]) {
-        tiposErro[categoria].porCsResponsavel[csResp] = { count: 0, mrr: 0 };
-      }
-      tiposErro[categoria].porCsResponsavel[csResp].count++;
-      tiposErro[categoria].porCsResponsavel[csResp].mrr += c.valorr || 0;
-    });
-    
-    return Object.values(tiposErro)
-      .filter(t => t.tipo !== 'Outros')
-      .sort((a, b) => b.mrr - a.mrr);
-  }, [filteredContratos]);
-
-  const [tipoErroTab, setTipoErroTab] = useState<'squad' | 'responsavel' | 'vendedor' | 'cs_responsavel'>('squad');
-  const [tipoErroSelecionado, setTipoErroSelecionado] = useState<string>('');
-
-  const dadosTipoErroAtual = useMemo(() => {
-    if (churnPorTipoErro.length === 0) return [];
-    
-    const tipoSelecionado = tipoErroSelecionado || churnPorTipoErro[0]?.tipo || '';
-    const tipoData = churnPorTipoErro.find(t => t.tipo === tipoSelecionado);
-    if (!tipoData) return [];
-    
-    let dados: Record<string, { count: number; mrr: number }> = {};
-    
-    switch (tipoErroTab) {
-      case 'squad':
-        dados = tipoData.porSquad;
-        break;
-      case 'responsavel':
-        dados = tipoData.porResponsavel;
-        break;
-      case 'vendedor':
-        dados = tipoData.porVendedor;
-        break;
-      case 'cs_responsavel':
-        dados = tipoData.porCsResponsavel;
-        break;
-    }
-    
-    return Object.entries(dados)
-      .map(([name, info]) => ({
-        name: name.length > 20 ? name.substring(0, 20) + '...' : name,
-        fullName: name,
-        count: info.count,
-        mrr: info.mrr
-      }))
-      .sort((a, b) => b.mrr - a.mrr)
-      .slice(0, 10);
-  }, [churnPorTipoErro, tipoErroTab, tipoErroSelecionado]);
 
   const churnPorMes = useMemo(() => {
     if (filteredContratos.length === 0) return [];
@@ -1010,168 +864,7 @@ export default function ChurnDetalhamento() {
     return results.sort((a, b) => b.count - a.count);
   }, [filteredContratos]);
 
-  // Feature 3: Drill-down Motivo → Submotivo
-  const motivoSubmotivoTree = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
 
-    const tree: Record<string, { count: number; mrr: number; submotivos: Record<string, { count: number; mrr: number }> }> = {};
-
-    filteredContratos.forEach(c => {
-      const motivo = c.motivo_cancelamento || 'Não especificado';
-      if (!tree[motivo]) tree[motivo] = { count: 0, mrr: 0, submotivos: {} };
-      tree[motivo].count++;
-      tree[motivo].mrr += c.valorr || 0;
-
-      const sub = c.submotivo || 'Sem submotivo';
-      if (!tree[motivo].submotivos[sub]) tree[motivo].submotivos[sub] = { count: 0, mrr: 0 };
-      tree[motivo].submotivos[sub].count++;
-      tree[motivo].submotivos[sub].mrr += c.valorr || 0;
-    });
-
-    return Object.entries(tree)
-      .map(([motivo, data]) => ({
-        motivo,
-        count: data.count,
-        mrr: data.mrr,
-        submotivos: Object.entries(data.submotivos)
-          .map(([sub, info]) => ({ submotivo: sub, count: info.count, mrr: info.mrr }))
-          .sort((a, b) => b.mrr - a.mrr),
-      }))
-      .sort((a, b) => b.mrr - a.mrr);
-  }, [filteredContratos]);
-
-  // Feature 4: Matriz Cruzada (Evitabilidade × Motivo/Cluster/Plano)
-  const crossAnalysisData = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-
-    const getDimension = (c: ChurnContract) => {
-      switch (crossAnalysisView) {
-        case 'motivo': return c.motivo_cancelamento || 'Não especificado';
-        case 'cluster': return c.cluster || 'Não especificado';
-        case 'plano': return c.plano || 'Não especificado';
-      }
-    };
-
-    const groups: Record<string, { evitavel: number; inevitavel: number; mrrEvitavel: number; mrrInevitavel: number }> = {};
-
-    filteredContratos.forEach(c => {
-      const dim = getDimension(c);
-      if (!groups[dim]) groups[dim] = { evitavel: 0, inevitavel: 0, mrrEvitavel: 0, mrrInevitavel: 0 };
-      if (c.evitabilidade_churn === 'Evitável') {
-        groups[dim].evitavel++;
-        groups[dim].mrrEvitavel += c.valorr || 0;
-      } else {
-        groups[dim].inevitavel++;
-        groups[dim].mrrInevitavel += c.valorr || 0;
-      }
-    });
-
-    return Object.entries(groups)
-      .map(([name, data]) => ({
-        name: name.length > 20 ? name.substring(0, 20) + '...' : name,
-        fullName: name,
-        evitavel: data.evitavel,
-        inevitavel: data.inevitavel,
-        mrrEvitavel: data.mrrEvitavel,
-        mrrInevitavel: data.mrrInevitavel,
-        total: data.evitavel + data.inevitavel,
-      }))
-      .sort((a, b) => b.total - a.total)
-      .slice(0, 10);
-  }, [filteredContratos, crossAnalysisView]);
-
-  // Feature 5: Cards de Contexto (Operação + CX)
-  const contextThemes = useMemo(() => {
-    if (filteredContratos.length === 0) return { operacao: [], cx: [] };
-
-    const opThemes: Record<string, string[]> = {
-      'Falha de Comunicação': ['comunicação', 'contato', 'resposta', 'alinhamento', 'informação'],
-      'Erro Operacional': ['erro', 'falha', 'bug', 'problema técnico', 'incorreto'],
-      'Atraso': ['atraso', 'demora', 'prazo', 'lento', 'demorou'],
-      'Falta de Acompanhamento': ['acompanhamento', 'follow', 'proativo', 'abandonado', 'negligência'],
-      'Turnover': ['turnover', 'troca', 'saiu', 'mudança de equipe', 'rotatividade'],
-      'Qualidade': ['qualidade', 'entrega', 'padrão', 'expectativa', 'insatisf'],
-    };
-
-    const cxThemes: Record<string, string[]> = {
-      'Insatisfação Geral': ['insatisf', 'frustrad', 'descontente', 'chateado', 'decepcion'],
-      'Falta de Resultado': ['resultado', 'retorno', 'meta', 'roi', 'performance'],
-      'Problema de Comunicação': ['comunicação', 'contato', 'resposta', 'demora', 'suporte'],
-      'Questão Financeira': ['preço', 'custo', 'valor', 'caro', 'investimento', 'orçamento'],
-      'Mudança de Estratégia': ['estratégia', 'mudança', 'reestrutur', 'direcionamento', 'interno'],
-      'Concorrência': ['concorrência', 'concorrente', 'agência', 'inhouse', 'proposta'],
-    };
-
-    const analyzeContext = (field: 'contexto_operacao' | 'contexto_cx', themes: Record<string, string[]>) => {
-      const results: { theme: string; count: number; mrr: number; examples: string[]; matchedContratos: ChurnContract[] }[] = [];
-
-      Object.entries(themes).forEach(([theme, terms]) => {
-        const matched = filteredContratos.filter(c => {
-          const text = (c[field] || '').toLowerCase();
-          return text.length > 0 && terms.some(t => text.includes(t));
-        });
-        if (matched.length > 0) {
-          results.push({
-            theme,
-            count: matched.length,
-            mrr: matched.reduce((sum, c) => sum + (c.valorr || 0), 0),
-            examples: matched.map(c => (c[field] || '').substring(0, 80)).slice(0, 3),
-            matchedContratos: matched,
-          });
-        }
-      });
-
-      return results.sort((a, b) => b.count - a.count);
-    };
-
-    return {
-      operacao: analyzeContext('contexto_operacao', opThemes),
-      cx: analyzeContext('contexto_cx', cxThemes),
-    };
-  }, [filteredContratos]);
-
-  // Feature 6: Score de Oportunidade de Retenção
-  const retentionOpportunities = useMemo(() => {
-    if (filteredContratos.length === 0) return { scored: [], totalMissed: 0, mrrMissed: 0, avgScore: 0 };
-
-    const scored = filteredContratos.map(c => {
-      let score = 0;
-
-      // Possibilidade de retenção (0-30 pts)
-      if (c.possibilidade_retencao === 'Alta') score += 30;
-      else if (c.possibilidade_retencao === 'Média') score += 20;
-      else if (c.possibilidade_retencao === 'Baixa') score += 5;
-
-      // Evitabilidade (0-25 pts)
-      if (c.evitabilidade_churn === 'Evitável') score += 25;
-
-      // Lifetime (0-15 pts)
-      if (c.lifetime_meses >= 12) score += 15;
-      else if (c.lifetime_meses >= 6) score += 10;
-
-      // MRR alto (0-20 pts) - escala relativa
-      const maxMrr = Math.max(...filteredContratos.map(x => x.valorr || 0), 1);
-      score += Math.round(((c.valorr || 0) / maxMrr) * 20);
-
-      // Tem mensagem_cliente (10 pts)
-      if (c.mensagem_cliente && c.mensagem_cliente.trim().length > 0) score += 10;
-
-      const isMissedOpportunity = c.evitabilidade_churn === 'Evitável' &&
-        (c.possibilidade_retencao === 'Alta' || c.possibilidade_retencao === 'Média');
-
-      return { ...c, score: Math.min(score, 100), isMissedOpportunity };
-    }).sort((a, b) => b.score - a.score);
-
-    const missed = scored.filter(c => c.isMissedOpportunity);
-    const avgScore = scored.length > 0 ? scored.reduce((sum, c) => sum + c.score, 0) / scored.length : 0;
-
-    return {
-      scored,
-      totalMissed: missed.length,
-      mrrMissed: missed.reduce((sum, c) => sum + (c.valorr || 0), 0),
-      avgScore,
-    };
-  }, [filteredContratos]);
 
   // === Voz do Cliente: Análise IA ===
 
@@ -1649,6 +1342,9 @@ export default function ChurnDetalhamento() {
           ticketMedio={filteredMetricas.ticket_medio}
         />
       )}
+
+      {/* Seção Motivos & Evitabilidade */}
+      <SecaoMotivos contratos={filteredContratos} onDrill={onDrill} />
 
       {/* Painel Executivo Detalhado (MRR Base, Abonado, NRR, Squad) */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
