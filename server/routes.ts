@@ -54,6 +54,7 @@ import { registerSaldoDiarioRoutes } from "./routes/saldoDiario";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
 import { registerFechamentoSemanalRoutes } from "./routes/fechamentoSemanal";
+import { registerReportsSemanalRoutes } from "./routes/reportsSemanal";
 import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
@@ -8341,6 +8342,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Fechamento Semanal - novos contratos e saúde de squads
   registerFechamentoSemanalRoutes(app);
+
+  // Reporte Semanal - 4 KPIs de desempenho semanal
+  registerReportsSemanalRoutes(app);
 
   // Cross-Sell Management - registered from separate file
   registerCrossSellRoutes(app);
