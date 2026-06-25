@@ -7,9 +7,7 @@ import {
   AlertTriangle,
   Brain,
   GitBranch,
-  MessageSquare,
   Target,
-  Shield,
   Users,
   BarChart3,
   PieChart,
@@ -49,28 +47,6 @@ const REFINED_COLORS = [
   "#ec4899", "#6366f1", "#14b8a6", "#f97316", "#84cc16",
 ];
 
-const PALETTE = [
-  "#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b",
-  "#ec4899", "#6366f1", "#14b8a6", "#f97316", "#84cc16",
-];
-
-const EXPANDED_KEYWORDS: Record<string, string[]> = {
-  Resultado: ["resultado", "performance", "meta", "retorno", "roi", "entrega"],
-  Preço: ["preco", "valor", "custo", "caro", "investimento", "orcamento", "budget"],
-  Atendimento: ["atendimento", "suporte", "resposta", "demora", "comunicacao", "contato"],
-  Operação: ["operacao", "operacional", "execucao", "qualidade", "erro", "falha"],
-  Estratégia: ["estrategia", "estrategico", "planejamento", "direcionamento", "alinhamento"],
-  Interno: ["interno", "reestruturacao", "mudanca interna", "corte", "reducao"],
-  Concorrência: ["concorrencia", "concorrente", "agencia", "inhouse", "in-house"],
-  Prazo: ["prazo", "tempo", "urgencia", "deadline", "atraso", "lento"],
-  Produto: ["produto", "ferramenta", "plataforma", "funcionalidade", "feature", "sistema"],
-  Confiança: ["confianca", "credibilidade", "transparencia", "honestidade", "seguranca"],
-  Onboarding: ["onboarding", "implantacao", "inicio", "setup", "treinamento", "integracao"],
-  Relacionamento: ["relacionamento", "parceria", "proximidade", "dedicacao", "empatia", "cuidado"],
-};
-
-const normalizeText = (text: string): string =>
-  text.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "");
 
 // ── types ────────────────────────────────────────────────────────────────────
 
@@ -97,10 +73,6 @@ export function SecaoMotivos({ contratos, onDrill }: SecaoMotivosProps): JSX.Ele
   const [expandedMotivo, setExpandedMotivo] = useState<string | null>(null);
   const [tipoErroTab, setTipoErroTab] = useState<"squad" | "responsavel" | "vendedor" | "cs_responsavel">("squad");
   const [tipoErroSelecionado, setTipoErroSelecionado] = useState<string>("");
-  const [selectedThemeKeyword, setSelectedThemeKeyword] = useState<string | null>(null);
-  const [expandedOpTheme, setExpandedOpTheme] = useState<string | null>(null);
-  const [expandedCxTheme, setExpandedCxTheme] = useState<string | null>(null);
-
   // ── memos moved from orchestrator ────────────────────────────────────────
 
   // Evitabilidade breakdown (computed from contracts, replacing data.metricas.churn_por_evitabilidade)
@@ -303,59 +275,6 @@ export function SecaoMotivos({ contratos, onDrill }: SecaoMotivosProps): JSX.Ele
       .slice(0, 10);
   }, [churnPorTipoErro, tipoErroTab, tipoErroSelecionado]);
 
-  // Feature 5: Cards de Contexto (Operação + CX)
-  const contextThemes = useMemo(() => {
-    if (contratos.length === 0) return { operacao: [] as any[], cx: [] as any[] };
-
-    const opThemes: Record<string, string[]> = {
-      "Falha de Comunicação": ["comunicação", "contato", "resposta", "alinhamento", "informação"],
-      "Erro Operacional": ["erro", "falha", "bug", "problema técnico", "incorreto"],
-      Atraso: ["atraso", "demora", "prazo", "lento", "demorou"],
-      "Falta de Acompanhamento": ["acompanhamento", "follow", "proativo", "abandonado", "negligência"],
-      Turnover: ["turnover", "troca", "saiu", "mudança de equipe", "rotatividade"],
-      Qualidade: ["qualidade", "entrega", "padrão", "expectativa", "insatisf"],
-    };
-
-    const cxThemes: Record<string, string[]> = {
-      "Insatisfação Geral": ["insatisf", "frustrad", "descontente", "chateado", "decepcion"],
-      "Falta de Resultado": ["resultado", "retorno", "meta", "roi", "performance"],
-      "Problema de Comunicação": ["comunicação", "contato", "resposta", "demora", "suporte"],
-      "Questão Financeira": ["preço", "custo", "valor", "caro", "investimento", "orçamento"],
-      "Mudança de Estratégia": ["estratégia", "mudança", "reestrutur", "direcionamento", "interno"],
-      Concorrência: ["concorrência", "concorrente", "agência", "inhouse", "proposta"],
-    };
-
-    const analyzeContext = (
-      field: "contexto_operacao" | "contexto_cx",
-      themes: Record<string, string[]>
-    ) => {
-      const results: { theme: string; count: number; mrr: number; examples: string[]; matchedContratos: ChurnContract[] }[] = [];
-
-      Object.entries(themes).forEach(([theme, terms]) => {
-        const matched = contratos.filter((c) => {
-          const text = (c[field] || "").toLowerCase();
-          return text.length > 0 && terms.some((t) => text.includes(t));
-        });
-        if (matched.length > 0) {
-          results.push({
-            theme,
-            count: matched.length,
-            mrr: matched.reduce((sum, c) => sum + (c.valorr || 0), 0),
-            examples: matched.map((c) => (c[field] || "").substring(0, 80)).slice(0, 3),
-            matchedContratos: matched,
-          });
-        }
-      });
-
-      return results.sort((a, b) => b.count - a.count);
-    };
-
-    return {
-      operacao: analyzeContext("contexto_operacao", opThemes),
-      cx: analyzeContext("contexto_cx", cxThemes),
-    };
-  }, [contratos]);
-
   // Feature 6: Score de Oportunidade de Retenção
   const retentionOpportunities = useMemo(() => {
     if (contratos.length === 0) return { scored: [] as any[], totalMissed: 0, mrrMissed: 0, avgScore: 0 };
@@ -393,33 +312,6 @@ export function SecaoMotivos({ contratos, onDrill }: SecaoMotivosProps): JSX.Ele
       mrrMissed: missed.reduce((sum, c) => sum + (c.valorr || 0), 0),
       avgScore,
     };
-  }, [contratos]);
-
-  // Text pattern analysis (needed for Padrões nas Mensagens chart)
-  const textPatternAnalysis = useMemo(() => {
-    if (contratos.length === 0) return [] as { keyword: string; count: number; mrr: number; evitavelPct: number; contratos: string[]; matchedContratos: ChurnContract[] }[];
-
-    const results: { keyword: string; count: number; mrr: number; evitavelPct: number; contratos: string[]; matchedContratos: ChurnContract[] }[] = [];
-
-    Object.entries(EXPANDED_KEYWORDS).forEach(([keyword, terms]) => {
-      const matched = contratos.filter((c) => {
-        const msg = normalizeText(c.mensagem_cliente || "");
-        return terms.some((t) => msg.includes(t));
-      });
-      if (matched.length > 0) {
-        const evitavel = matched.filter((c) => c.evitabilidade_churn === "Evitável").length;
-        results.push({
-          keyword,
-          count: matched.length,
-          mrr: matched.reduce((sum, c) => sum + (c.valorr || 0), 0),
-          evitavelPct: matched.length > 0 ? (evitavel / matched.length) * 100 : 0,
-          contratos: matched.map((c) => c.cliente_nome).slice(0, 5),
-          matchedContratos: matched,
-        });
-      }
-    });
-
-    return results.sort((a, b) => b.count - a.count);
   }, [contratos]);
 
   // ── render ───────────────────────────────────────────────────────────────
@@ -824,155 +716,8 @@ export function SecaoMotivos({ contratos, onDrill }: SecaoMotivosProps): JSX.Ele
         icon={Brain}
         accent="bg-gradient-to-r from-indigo-500 to-purple-600"
       >
-        {/* Feature 2 + Feature 3: Text Patterns + Motivo → Submotivo */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Padrões nas Mensagens */}
-          <TechChartCard
-            title="Padrões nas Mensagens"
-            subtitle="Keywords identificadas na mensagem do cliente"
-            icon={MessageSquare}
-            iconBg="bg-gradient-to-r from-indigo-500 to-purple-500"
-            meta={
-              <StatPill
-                label="Com mensagem"
-                value={`${contratos.filter((c) => c.mensagem_cliente).length}`}
-                tone="info"
-              />
-            }
-          >
-            <div className="lg:col-span-2">
-              {textPatternAnalysis.length === 0 ? (
-                <div className="h-[220px] flex items-center justify-center text-muted-foreground text-sm">
-                  Sem mensagens para analisar
-                </div>
-              ) : (
-                <ResponsiveContainer width="100%" height={Math.max(220, textPatternAnalysis.length * 40)}>
-                  <BarChart
-                    data={textPatternAnalysis}
-                    layout="vertical"
-                    margin={{ left: 0, right: 10, top: 5, bottom: 5 }}
-                  >
-                    <defs>
-                      <linearGradient id="secMotivosDeepBarGradient" x1="0" y1="0" x2="1" y2="0">
-                        <stop offset="0%" stopColor="#6366f1" />
-                        <stop offset="100%" stopColor="#8b5cf6" />
-                      </linearGradient>
-                    </defs>
-                    <XAxis type="number" tick={{ fontSize: 11 }} stroke="hsl(var(--muted-foreground))" />
-                    <YAxis
-                      type="category"
-                      dataKey="keyword"
-                      width={80}
-                      tick={{ fontSize: 11 }}
-                      stroke="hsl(var(--muted-foreground))"
-                    />
-                    <Tooltip
-                      content={({ active, payload, label }: any) => {
-                        if (!active || !payload?.length) return null;
-                        const d = textPatternAnalysis.find((t) => t.keyword === label);
-                        return (
-                          <div className="bg-white/95 dark:bg-zinc-900/95 backdrop-blur-xl border border-gray-200 dark:border-zinc-700/50 rounded-lg shadow-xl p-3 min-w-[200px]">
-                            <p className="text-xs font-semibold text-foreground mb-2">{label}</p>
-                            <div className="space-y-1 text-xs">
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">Contratos</span>
-                                <span className="font-bold text-foreground">{d?.count}</span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">MRR Impactado</span>
-                                <span className="font-bold text-red-500">
-                                  {formatCurrencyNoDecimals(d?.mrr || 0)}
-                                </span>
-                              </div>
-                              <div className="flex justify-between">
-                                <span className="text-muted-foreground">% Evitável</span>
-                                <span className="font-bold text-foreground">
-                                  {(d?.evitavelPct || 0).toFixed(0)}%
-                                </span>
-                              </div>
-                            </div>
-                            {d?.contratos && d.contratos.length > 0 && (
-                              <div className="mt-2 pt-2 border-t border-border/50">
-                                <p className="text-[10px] text-muted-foreground mb-1">Clientes:</p>
-                                {d.contratos.map((n, i) => (
-                                  <p key={i} className="text-[10px] text-foreground truncate">
-                                    {n}
-                                  </p>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        );
-                      }}
-                    />
-                    <Bar
-                      dataKey="count"
-                      fill="url(#secMotivosDeepBarGradient)"
-                      radius={[0, 4, 4, 0]}
-                      name="Contratos"
-                      cursor="pointer"
-                      onClick={(data: any) => {
-                        if (data?.keyword) {
-                          const themeData = textPatternAnalysis.find((t) => t.keyword === data.keyword);
-                          if (themeData) {
-                            onDrill(`Tema: ${data.keyword}`, themeData.matchedContratos);
-                          }
-                          setSelectedThemeKeyword(
-                            selectedThemeKeyword === data.keyword ? null : data.keyword
-                          );
-                        }
-                      }}
-                    />
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
-              {/* Drill-down: mensagens matchadas */}
-              {selectedThemeKeyword &&
-                (() => {
-                  const themeData = textPatternAnalysis.find((t) => t.keyword === selectedThemeKeyword);
-                  if (!themeData || themeData.matchedContratos.length === 0) return null;
-                  return (
-                    <div className="mt-3 border-t border-border/50 pt-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <p className="text-xs font-semibold text-foreground">
-                          Mensagens com "{selectedThemeKeyword}" ({themeData.matchedContratos.length})
-                        </p>
-                        <button
-                          onClick={() => setSelectedThemeKeyword(null)}
-                          className="text-[10px] text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          Fechar
-                        </button>
-                      </div>
-                      <div className="space-y-2 max-h-[300px] overflow-y-auto pr-1">
-                        {themeData.matchedContratos.slice(0, 15).map((c, i) => (
-                          <div
-                            key={`drill-${c.id}-${i}`}
-                            className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 p-2"
-                          >
-                            <div className="flex items-center justify-between mb-1">
-                              <span className="text-xs font-medium text-foreground">{c.cliente_nome}</span>
-                              <span className="text-[10px] text-red-500 font-semibold">
-                                {formatCurrencyNoDecimals(c.valorr)}
-                              </span>
-                            </div>
-                            <p className="text-[11px] text-muted-foreground leading-relaxed">
-                              {c.mensagem_cliente}
-                            </p>
-                          </div>
-                        ))}
-                        {themeData.matchedContratos.length > 15 && (
-                          <p className="text-[10px] text-muted-foreground text-center pt-1">
-                            Mostrando 15 de {themeData.matchedContratos.length}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })()}
-            </div>
-          </TechChartCard>
-
+        {/* Feature 3: Motivo → Submotivo */}
+        <div className="grid grid-cols-1 gap-4">
           {/* Feature 3: Drill-down Motivo → Submotivo */}
           <TechChartCard
             title="Motivo → Submotivo"
@@ -1222,207 +967,6 @@ export function SecaoMotivos({ contratos, onDrill }: SecaoMotivosProps): JSX.Ele
             </ResponsiveContainer>
           )}
         </TechChartCard>
-
-        {/* Feature 5: Cards de Contexto (Operação + CX) */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <TechChartCard
-            title="Temas Operacionais"
-            subtitle="Padrões no contexto de operação"
-            icon={Shield}
-            iconBg="bg-gradient-to-r from-slate-500 to-zinc-600"
-          >
-            {contextThemes.operacao.length === 0 ? (
-              <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
-                Sem dados de operação
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                {contextThemes.operacao.map((item: any, i: number) => {
-                  const maxMrr = Math.max(
-                    ...contextThemes.operacao.map((d: any) => d.mrr),
-                    1
-                  );
-                  const barWidth = Math.max((item.mrr / maxMrr) * 100, 5);
-                  const isExpanded = expandedOpTheme === item.theme;
-                  return (
-                    <div
-                      key={item.theme}
-                      className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 overflow-hidden"
-                    >
-                      <button
-                        onClick={() => {
-                          setExpandedOpTheme(isExpanded ? null : item.theme);
-                          onDrill(`Operação: ${item.theme}`, item.matchedContratos);
-                        }}
-                        className="w-full px-2.5 py-2 space-y-1 text-left hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: PALETTE[i % PALETTE.length] }}
-                            />
-                            <span className="text-xs font-medium text-foreground">{item.theme}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Badge variant="secondary" className="text-[10px] h-5">
-                              {item.count}
-                            </Badge>
-                            {isExpanded ? (
-                              <ChevronUp className="h-3 w-3 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${barWidth}%`,
-                                backgroundColor: PALETTE[i % PALETTE.length],
-                              }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-red-500 dark:text-red-400 tabular-nums whitespace-nowrap">
-                            {formatCurrencyNoDecimals(item.mrr)}
-                          </span>
-                        </div>
-                      </button>
-                      {isExpanded && (
-                        <div className="border-t border-border/30 bg-gray-50/50 dark:bg-zinc-950/30 px-2.5 py-2 space-y-1.5 max-h-[200px] overflow-y-auto">
-                          {item.matchedContratos.slice(0, 20).map((c: ChurnContract) => (
-                            <div key={c.id} className="flex items-start gap-2 text-[11px]">
-                              <div className="w-1.5 h-1.5 rounded-full bg-slate-400 dark:bg-zinc-500 flex-shrink-0 mt-1.5" />
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-medium text-foreground truncate max-w-[140px]">
-                                    {c.cliente_nome}
-                                  </span>
-                                  <span className="text-red-500 dark:text-red-400 tabular-nums">
-                                    {formatCurrencyNoDecimals(c.valorr)}
-                                  </span>
-                                </div>
-                                <p className="text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">
-                                  {c.contexto_operacao}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                          {item.matchedContratos.length > 20 && (
-                            <p className="text-[10px] text-muted-foreground text-center pt-1">
-                              +{item.matchedContratos.length - 20} contratos
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </TechChartCard>
-
-          <TechChartCard
-            title="Temas CX"
-            subtitle="Padrões no contexto de experiência do cliente"
-            icon={Users}
-            iconBg="bg-gradient-to-r from-teal-500 to-cyan-500"
-          >
-            {contextThemes.cx.length === 0 ? (
-              <div className="h-[180px] flex items-center justify-center text-muted-foreground text-sm">
-                Sem dados de CX
-              </div>
-            ) : (
-              <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1">
-                {contextThemes.cx.map((item: any, i: number) => {
-                  const maxMrr = Math.max(
-                    ...contextThemes.cx.map((d: any) => d.mrr),
-                    1
-                  );
-                  const barWidth = Math.max((item.mrr / maxMrr) * 100, 5);
-                  const isExpanded = expandedCxTheme === item.theme;
-                  return (
-                    <div
-                      key={item.theme}
-                      className="rounded-md border border-border/40 bg-white/70 dark:bg-zinc-900/50 overflow-hidden"
-                    >
-                      <button
-                        onClick={() => {
-                          setExpandedCxTheme(isExpanded ? null : item.theme);
-                          onDrill(`CX: ${item.theme}`, item.matchedContratos);
-                        }}
-                        className="w-full px-2.5 py-2 space-y-1 text-left hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <div className="flex items-center gap-2">
-                            <div
-                              className="w-2 h-2 rounded-full flex-shrink-0"
-                              style={{ backgroundColor: PALETTE[(i + 5) % PALETTE.length] }}
-                            />
-                            <span className="text-xs font-medium text-foreground">{item.theme}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5">
-                            <Badge variant="secondary" className="text-[10px] h-5">
-                              {item.count}
-                            </Badge>
-                            {isExpanded ? (
-                              <ChevronUp className="h-3 w-3 text-muted-foreground" />
-                            ) : (
-                              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                            )}
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full transition-all"
-                              style={{
-                                width: `${barWidth}%`,
-                                backgroundColor: PALETTE[(i + 5) % PALETTE.length],
-                              }}
-                            />
-                          </div>
-                          <span className="text-[10px] text-red-500 dark:text-red-400 tabular-nums whitespace-nowrap">
-                            {formatCurrencyNoDecimals(item.mrr)}
-                          </span>
-                        </div>
-                      </button>
-                      {isExpanded && (
-                        <div className="border-t border-border/30 bg-gray-50/50 dark:bg-zinc-950/30 px-2.5 py-2 space-y-1.5 max-h-[200px] overflow-y-auto">
-                          {item.matchedContratos.slice(0, 20).map((c: ChurnContract) => (
-                            <div key={c.id} className="flex items-start gap-2 text-[11px]">
-                              <div className="w-1.5 h-1.5 rounded-full bg-teal-400 dark:bg-teal-600 flex-shrink-0 mt-1.5" />
-                              <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-1.5 flex-wrap">
-                                  <span className="font-medium text-foreground truncate max-w-[140px]">
-                                    {c.cliente_nome}
-                                  </span>
-                                  <span className="text-red-500 dark:text-red-400 tabular-nums">
-                                    {formatCurrencyNoDecimals(c.valorr)}
-                                  </span>
-                                </div>
-                                <p className="text-muted-foreground leading-relaxed mt-0.5 line-clamp-2">
-                                  {c.contexto_cx}
-                                </p>
-                              </div>
-                            </div>
-                          ))}
-                          {item.matchedContratos.length > 20 && (
-                            <p className="text-[10px] text-muted-foreground text-center pt-1">
-                              +{item.matchedContratos.length - 20} contratos
-                            </p>
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </TechChartCard>
-        </div>
 
         {/* Feature 6: Score de Oportunidade de Retenção */}
         {retentionOpportunities.scored.length > 0 && (
