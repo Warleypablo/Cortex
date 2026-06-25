@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { desc, eq, and } from "drizzle-orm";
+import { desc, asc, eq, and } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import {
   contentPosts,
@@ -209,14 +209,77 @@ export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage
  * Body: { platform, run: {...}, posts: [...] }. Insere 1 run + faz upsert dos posts.
  */
 export function registerOrganicoIngestRoutes(app: Express, db: any) {
-  app.post("/api/growth/organico/ingest", async (req, res) => {
+  // Guard de token compartilhado (worker↔Cortex). Retorna true se ok; senão responde e retorna false.
+  const requireToken = (req: any, res: any): boolean => {
     const token = process.env.ORGANICO_INGEST_TOKEN;
     if (!token) {
-      return res.status(503).json({ error: "ingest não configurado (defina ORGANICO_INGEST_TOKEN)" });
+      res.status(503).json({ error: "ingest não configurado (defina ORGANICO_INGEST_TOKEN)" });
+      return false;
     }
     if ((req.headers.authorization || "") !== `Bearer ${token}`) {
-      return res.status(401).json({ error: "token inválido" });
+      res.status(401).json({ error: "token inválido" });
+      return false;
     }
+    return true;
+  };
+
+  // GET /api/growth/organico/commands/pending?platform=instagram
+  // O worker-poller puxa os comandos pending da sua plataforma (mais antigos primeiro).
+  app.get("/api/growth/organico/commands/pending", async (req, res) => {
+    if (!requireToken(req, res)) return;
+    try {
+      const platform = String(req.query.platform || "");
+      if (!platform) return res.status(400).json({ error: "platform obrigatório" });
+      const cmds = await db
+        .select()
+        .from(contentPublishCommands)
+        .where(
+          and(
+            eq(contentPublishCommands.platform, platform),
+            eq(contentPublishCommands.status, "pending"),
+          ),
+        )
+        .orderBy(asc(contentPublishCommands.createdAt))
+        .limit(50);
+      res.json({ commands: cmds });
+    } catch (err: any) {
+      console.error("[organico] pending error:", err);
+      res.status(500).json({ error: "falha ao listar comandos" });
+    }
+  });
+
+  // POST /api/growth/organico/commands/:id/ack  body: { status, result?, error? }
+  // O worker marca running → done|failed conforme executa.
+  app.post("/api/growth/organico/commands/:id/ack", async (req, res) => {
+    if (!requireToken(req, res)) return;
+    try {
+      const id = parseInt(String(req.params.id), 10);
+      if (!Number.isFinite(id)) return res.status(400).json({ error: "id inválido" });
+      const { status, result, error } = req.body || {};
+      if (!["running", "done", "failed", "canceled"].includes(status))
+        return res.status(400).json({ error: "status inválido" });
+
+      const set: any = { status };
+      if (status === "running") set.consumedAt = new Date();
+      if (status === "done" || status === "failed" || status === "canceled") set.finishedAt = new Date();
+      if (result !== undefined) set.result = result;
+      if (error !== undefined) set.errorText = String(error).slice(0, 2000);
+
+      const [row] = await db
+        .update(contentPublishCommands)
+        .set(set)
+        .where(eq(contentPublishCommands.id, id))
+        .returning();
+      if (!row) return res.status(404).json({ error: "comando não encontrado" });
+      res.json({ ok: true, command: row });
+    } catch (err: any) {
+      console.error("[organico] ack error:", err);
+      res.status(500).json({ error: "falha no ack" });
+    }
+  });
+
+  app.post("/api/growth/organico/ingest", async (req, res) => {
+    if (!requireToken(req, res)) return;
 
     try {
       const { platform, run, posts } = req.body || {};
