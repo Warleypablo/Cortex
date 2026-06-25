@@ -265,6 +265,18 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "ads_taxa_conversao_pagina_nmql", name: "Não-MQL", format: "percent", section: "marketing", sub: true,
     realizado: ({ ads }) => (ads && ads.visualizacoesPagina > 0 ? (ads.leads - ads.mqls) / ads.visualizacoesPagina : null),
     orcado: () => null },
+  // Conversão por Sessões (GA4): denominador = sessões em vez de visualizações de
+  // página. Sem alvo orçado (não há taxaConversaoSessoes no budget). null quando não
+  // há sessões (GA4 indisponível) — evita exibir 0% falso.
+  { id: "ads_taxa_conversao_sessoes", name: "Tx Conversão de Sessões", format: "percent", section: "marketing",
+    realizado: ({ ads }) => (ads && ads.sessoes > 0 ? ads.leads / ads.sessoes : null),
+    orcado: () => null },
+  { id: "ads_taxa_conversao_sessoes_mql", name: "MQL", format: "percent", section: "marketing", sub: true,
+    realizado: ({ ads }) => (ads && ads.sessoes > 0 ? ads.mqls / ads.sessoes : null),
+    orcado: () => null },
+  { id: "ads_taxa_conversao_sessoes_nmql", name: "Não-MQL", format: "percent", section: "marketing", sub: true,
+    realizado: ({ ads }) => (ads && ads.sessoes > 0 ? (ads.leads - ads.mqls) / ads.sessoes : null),
+    orcado: () => null },
   { id: "ads_connect_rate", name: "Connect Rate", format: "percent", section: "marketing",
     realizado: ({ ads }) => ads?.connectRate ?? null,
     orcado: (b) => b.marketing?.connectRate ?? null },
