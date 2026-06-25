@@ -381,6 +381,7 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
       videoHook: null,
       videoHold: null,
       ctr,
+      ctrUnico: null,
       cpm,
       connectRate: null,
       taxaConversao: null,
@@ -578,6 +579,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       videoHook: null,
       videoHold: null,
       ctr,
+      ctrUnico: null,
       cpm,
       connectRate: null,
       taxaConversao: null,
@@ -1526,6 +1528,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(i.clicks) as clicks,
           SUM(i.reach) as reach,
           COALESCE(SUM(i.outbound_clicks), 0) as outbound_clicks,
+          COALESCE(SUM(i.unique_outbound_clicks), 0) as unique_outbound_clicks,
           AVG(i.cpm::numeric) as cpm,
           SUM(i.video_play_actions) as video_plays,
           SUM(i.video_p25_watched_actions) as video_p25,
@@ -1693,8 +1696,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const landingPageViews = parseInt(row.landing_page_views) || 0;
 
           const outboundClicks = parseInt(row.outbound_clicks) || 0;
+          const uniqueOutboundClicks = parseInt(row.unique_outbound_clicks) || 0;
           // CTR de saída = outbound_clicks / impressions
           const ctr = impressions > 0 && outboundClicks > 0 ? (outboundClicks / impressions) * 100 : null;
+          // CTR de saída único = unique_outbound_clicks / reach (Meta-only)
+          const ctrUnico = reach > 0 && uniqueOutboundClicks > 0 ? (uniqueOutboundClicks / reach) * 100 : null;
           const cpm = parseFloat(row.cpm) || (impressions > 0 ? (investimento / impressions) * 1000 : null);
 
           // Vídeo Hook = video_3_sec_watched_actions (actions[].video_view) / impressões
@@ -1785,6 +1791,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             // contadores brutos do Meta (para agregação por nível no frontend)
             impressions,
             outboundClicks,
+            uniqueOutboundClicks,
             landingPageViews,
             reach,
             video3sec: video3Sec,
@@ -1792,6 +1799,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             videoHook: videoHook ? parseFloat(videoHook.toFixed(2)) : null,
             videoHold: videoHold ? parseFloat(videoHold.toFixed(2)) : null,
             ctr: ctr ? parseFloat(ctr.toFixed(2)) : null,
+            ctrUnico: ctrUnico ? parseFloat(ctrUnico.toFixed(2)) : null,
             cpm: cpm ? Math.round(cpm) : null,
             connectRate: connectRate ? parseFloat(connectRate.toFixed(2)) : null,
             taxaConversao: taxaConversao ? parseFloat(taxaConversao.toFixed(2)) : null,
@@ -3251,6 +3259,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let metaImpressoes = 0;
       let metaCliques = 0;
       let cliquesSaida = 0;
+      let metaCliquesSaidaUnicos = 0;
+      let metaAlcance = 0;
       let visualizacoesPagina = 0;
       if (includeMeta) {
         const metaResult = await db.execute(sql`
@@ -3259,6 +3269,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             COALESCE(SUM(mid.impressions), 0) as impressoes,
             COALESCE(SUM(mid.clicks), 0) as cliques,
             COALESCE(SUM(mid.outbound_clicks), 0) as cliques_saida,
+            COALESCE(SUM(mid.unique_outbound_clicks), 0) as cliques_saida_unicos,
+            COALESCE(SUM(mid.reach), 0) as alcance,
             COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina
           FROM meta_ads.meta_insights_daily mid
           WHERE mid.date_start >= ${startDate}::date
@@ -3271,6 +3283,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         metaImpressoes = parseInt(metaRow.impressoes) || 0;
         metaCliques = parseInt(metaRow.cliques) || 0;
         cliquesSaida = parseInt(metaRow.cliques_saida) || 0;
+        metaCliquesSaidaUnicos = parseInt(metaRow.cliques_saida_unicos) || 0;
+        metaAlcance = parseInt(metaRow.alcance) || 0;
         visualizacoesPagina = parseInt(metaRow.visualizacoes_pagina) || 0;
       }
 
@@ -3384,6 +3398,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // CTR de saída = cliques_saida / impressões (Meta outbound_clicks + Google clicks).
       // Padrão da casa — alinhado com Criativos e Aprofundado por plataforma.
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
+      // CTR de saída ÚNICO = unique_outbound_clicks / reach. Só o Meta expõe cliques
+      // de saída únicos — Google/TikTok/LinkedIn não têm. No consolidado, portanto, só
+      // é definível quando o Meta é a única fonte paga incluída (senão misturaria
+      // numerador Meta com denominador de outras plataformas). Caso contrário → null
+      // (front mostra "—"). ctrUnicoAvailable comunica essa disponibilidade.
+      const ctrUnicoAvailable = includeMeta && !includeGoogle && !includeTikTokAds
+        && !includeLinkedInAds && metaAlcance > 0;
+      const ctrUnico = ctrUnicoAvailable ? metaCliquesSaidaUnicos / metaAlcance : null;
 
       // CPS = Custo por Sessão (Investimento / Visualizações de Página)
       const cps = visualizacoesPagina > 0 ? investimento / visualizacoesPagina : 0;
@@ -3520,6 +3542,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cliquesSaidaExposto = onlyInstagram ? 0 : cliquesSaida;
       const cpmExposto = onlyInstagram ? 0 : cpm;
       const ctrExposto = onlyInstagram ? 0 : ctr;
+      const ctrUnicoExposto = onlyInstagram ? null : ctrUnico;
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
       const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPaginaGa4;
@@ -3543,6 +3566,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cliquesSaida: cliquesSaidaExposto,
         cpm: cpmExposto,
         ctr: ctrExposto,
+        ctrUnico: ctrUnicoExposto,
+        ctrUnicoAvailable: onlyInstagram ? false : ctrUnicoAvailable,
         cps: cpsExposto,
         connectRate: connectRateExposto,
         visualizacoesPagina: visualizacoesPaginaExposto,
@@ -3586,7 +3611,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       if (!includeMeta) {
         return res.json({
           investimento: 0, impressoes: 0, alcance: 0, frequencia: 0,
-          cpm: 0, ctr: 0, videoHook: null, videoHold: null,
+          cpm: 0, ctr: 0, ctrUnico: 0, videoHook: null, videoHold: null,
           visualizacoesPagina: 0, connectRate: 0,
           sessoes: 0, sessoesAvailable: false,
         });
