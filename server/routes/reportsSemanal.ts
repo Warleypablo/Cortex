@@ -24,7 +24,7 @@ async function mrrAtivoNaData(fim: string): Promise<number> {
       SELECT DISTINCT ON (h.id_subtask) h.id_subtask, h.valorr, h.status
       FROM "Clickup".cup_data_hist h, snap
       WHERE h.data_snapshot = snap.d
-      ORDER BY h.id_subtask
+      ORDER BY h.id_subtask, h.valorr DESC NULLS LAST
     )
     SELECT COALESCE(SUM(valorr::numeric), 0) AS mrr
     FROM linhas
@@ -43,21 +43,39 @@ async function churnNaJanela(j: Janela): Promise<{ valor: number; qtd: number }>
     WHERE data_solicitacao_encerramento IS NOT NULL
       AND data_solicitacao_encerramento >= ${j.inicio}::date
       AND data_solicitacao_encerramento <= ${j.fim}::date
+      AND valor_r > 0
   `);
   const row = r.rows[0] as any;
   return { valor: num(row?.valor), qtd: num(row?.qtd) };
 }
 
-// --- Entregas pontuais: itens com valorp>0 entregues na janela (data_entrega) ---
+// --- Entregas pontuais: itens que flipparam para 'entregue' na janela (delta de snapshots) ---
 async function entregasPontuaisNaJanela(j: Janela): Promise<{ valor: number; qtd: number }> {
   const r = await db.execute(sql`
+    WITH snap_fim AS (
+      SELECT MAX(data_snapshot) AS d FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${j.fim}::date
+    ),
+    snap_ini AS (
+      SELECT MAX(data_snapshot) AS d FROM "Clickup".cup_data_hist WHERE data_snapshot < ${j.inicio}::date
+    ),
+    entregue_fim AS (
+      SELECT DISTINCT ON (h.id_subtask) h.id_subtask, h.valorp
+      FROM "Clickup".cup_data_hist h, snap_fim
+      WHERE h.data_snapshot = snap_fim.d AND h.status = 'entregue' AND h.valorp > 0
+      ORDER BY h.id_subtask
+    ),
+    estado_ini AS (
+      SELECT DISTINCT ON (h.id_subtask) h.id_subtask, h.status
+      FROM "Clickup".cup_data_hist h, snap_ini
+      WHERE h.data_snapshot = snap_ini.d
+      ORDER BY h.id_subtask
+    )
     SELECT
       COUNT(*) AS qtd,
-      COALESCE(SUM(valorp::numeric), 0) AS valor
-    FROM "Clickup".cup_contratos
-    WHERE valorp > 0
-      AND data_entrega >= ${j.inicio}::date
-      AND data_entrega <= ${j.fim}::date
+      COALESCE(SUM(e.valorp::numeric), 0) AS valor
+    FROM entregue_fim e
+    LEFT JOIN estado_ini i ON i.id_subtask = e.id_subtask
+    WHERE i.status IS DISTINCT FROM 'entregue'
   `);
   const row = r.rows[0] as any;
   return { valor: num(row?.valor), qtd: num(row?.qtd) };
