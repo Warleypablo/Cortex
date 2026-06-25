@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-25 | feat(publicacao): telemetria do worker → painel Orgânico (ingest + hooks)
+
+**O que foi feito:**
+- **Cortex:** endpoint `POST /api/growth/organico/ingest` (token-auth via `ORGANICO_INGEST_TOKEN`, registrado PRÉ-`isAuthenticated`): insere 1 `content_publish_runs` + faz upsert dos `content_posts` (chave platform+task+data). Upsert validado contra a prod (transação com rollback).
+- **Worker (instagram-turbo, stdlib):** `agente/state_sink.py` — POST fail-soft (urllib) do estado de cada ciclo; `panel_post`/`panel_state` mapeiam `PlannedAction` → estado do painel (agendado/aguardando_ia/publicado/falhou/pulado). Hooks em `main.py` (IG) e `main_tiktok.py` coletam o estado por task e chamam `report_cycle` no fim. Config nova: `CORTEX_INGEST_URL` + `ORGANICO_INGEST_TOKEN` (opcionais — sem elas o agente roda igual e só não atualiza o painel).
+
+**Por que:**
+- Fecha a Fase 1: o painel sai do vazio. Worker continua **zero-dependência** (só urllib) e **sem credencial de banco** — POSTa pro Cortex, que escreve. Reusa o padrão de endpoint-com-token (FCA).
+
+**Arquivos alterados:**
+- `server/routes/organico.ts` (+ `registerOrganicoIngestRoutes`), `server/routes.ts` (registro pré-auth).
+- `automacoes/instagram-turbo/agente/state_sink.py` (novo) + `config.py` + `.env.example` + `main.py` + `main_tiktok.py`.
+
+**Impacto arquitetural:** Refinamento do plano — em vez de o worker escrever direto no Postgres, ele reporta via HTTP pro Cortex (preserva zero-dep do worker, não espalha creds do banco). Pra ficar LIVE: setar `ORGANICO_INGEST_TOKEN` no Cortex (Render) + `CORTEX_INGEST_URL`/token no `.env` do worker. PROD do worker roda do repo separado `automacao-insta` → essa cópia precisa ser sincronizada lá.
+
+---
+
 ## 2026-06-25 | chore(publicacao): script p/ aplicar a migration content_*
 
 Script `scripts/apply-content-migration.ts`: aplica `migrations/2026-06-24-content-publish.sql` reusando a conexão do app (DATABASE_URL ou DB_*). Idempotente — caminho de 1 comando pra criar as tabelas `content_*` sem psql/GUI. **Impacto arquitetural:** Nenhum (helper).
