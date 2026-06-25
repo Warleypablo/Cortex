@@ -25,7 +25,7 @@ const ACTIVE_STATUSES = new Set(["ACTIVE", "ENABLED", "ENABLE"]);
 
 // Tags/grupos (pools) válidos para classificar campanhas. Adicionar uma tag
 // nova é só incluir aqui (e no front) — não precisa de migração no banco.
-const CAMPAIGN_TAGS = ["inbound", "evento"] as const;
+const CAMPAIGN_TAGS = ["inbound", "evento", "creators_summit"] as const;
 type CampaignTag = (typeof CAMPAIGN_TAGS)[number];
 
 // Etapas do funil para o planejamento por etapa. Mesma regra: adicionar/renomear
