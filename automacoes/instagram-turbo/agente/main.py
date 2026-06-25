@@ -28,9 +28,9 @@ import sys
 import traceback
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
-from agente import clickup, docs_parser
+from agente import clickup, docs_parser, state_sink
 from agente.config import CONFIG
 from agente.idempotency import Lock, LockHeld, inspect_comments, should_process
 
@@ -452,6 +452,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     run_id = uuid.uuid4().hex[:8]
+    posts: list[dict] = []
+    started_at = datetime.now(timezone.utc).isoformat()
 
     print("═══════════════════════════════════════════════════════════")
     print(f"  Agente Instagram — DRY_RUN={CONFIG.dry_run}   run_id={run_id}")
@@ -527,6 +529,8 @@ def main(argv: list[str] | None = None) -> int:
                     traceback.print_exc()
                     errors += 1
                     continue
+                post = state_sink.panel_post(plan)
+                posts.append(post)
                 if plan.skip_reason:
                     skipped_lines.append(render_skip_compact(plan))
                     if "já passou" in plan.skip_reason:
@@ -564,8 +568,13 @@ def main(argv: list[str] | None = None) -> int:
                 if exec_res.error:
                     print(f"   ❌ {exec_res.error}")
                     publish_failed += 1
+                    post["state"] = "falhou"
+                    post["error_text"] = exec_res.error
                 else:
                     published += 1
+                    post["state"] = "publicado"
+                    post["permalink"] = exec_res.permalink
+                    post["published_media_id"] = exec_res.ig_media_id
                     print(f"   ✅ publicado: media_id={exec_res.ig_media_id}")
                     if exec_res.permalink:
                         print(f"      {exec_res.permalink}")
@@ -589,6 +598,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  puladas (idempotência/outros):  {skipped}")
             print(f"  erros / info incompleta:        {errors}")
             print("──────────────────────────────────")
+
+            counts = {
+                "ready": ok, "published": published, "publish_failed": publish_failed,
+                "legenda_vazia": empty_docs, "sem_pasta_drive": missing_drive,
+                "oauth_pending": oauth_pending, "data_passou": skip_past,
+                "data_futura": skip_future, "sem_data": skip_no_date,
+                "pulados": skipped, "errors": errors,
+            }
+            state_sink.report_cycle(
+                "instagram", run_id=run_id, dry_run=CONFIG.dry_run,
+                started_at=started_at, counts=counts, posts=posts,
+                status="error" if (errors or publish_failed) else "ok",
+            )
             return 0
     except LockHeld as e:
         print(f"⛔ {e}")

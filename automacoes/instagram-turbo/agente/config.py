@@ -38,6 +38,8 @@ class Config:
     anthropic_model: str
     dry_run: bool
     poll_interval_seconds: int
+    cortex_ingest_url: str
+    organico_ingest_token: str
 
     @classmethod
     def load(cls) -> "Config":
@@ -61,6 +63,8 @@ class Config:
             anthropic_model=env.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
             dry_run=env.get("DRY_RUN", "1") not in ("0", "false", "False", ""),
             poll_interval_seconds=int(env.get("POLL_INTERVAL_SECONDS", "300")),
+            cortex_ingest_url=env.get("CORTEX_INGEST_URL", ""),
+            organico_ingest_token=env.get("ORGANICO_INGEST_TOKEN", ""),
         )
 
     def require_clickup(self) -> None:
