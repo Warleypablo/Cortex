@@ -4,7 +4,7 @@ import {
   Eye, UserCheck, UserPlus, Target, ShieldAlert, Shield, DollarSign, Briefcase,
   Monitor, Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
-  CalendarDays, CalendarCheck, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut, Lock, Bell, Moon, Sun,
+  CalendarDays, CalendarCheck, CalendarRange, ClipboardList, Settings, LayoutDashboard, Zap, Tv, LogOut, Lock, Bell, Moon, Sun,
   ChevronRight, ChevronDown, Presentation, Activity, Palette, Sliders, Lightbulb, Megaphone, Ticket,
   Star, Gauge, Bot, Link2, Package, Clapperboard
 } from "lucide-react";
@@ -45,7 +45,7 @@ const ICONS: Record<string, any> = {
   Eye, UserCheck, UserPlus, Target, ShieldAlert, Shield, DollarSign, Briefcase, Monitor,
   Rocket, Wallet, AlertTriangle, Handshake, UserRound, Headphones, UserSearch,
   LineChart, Sparkles, Image, Trophy, Layers, Scale, Gavel, Key, Gift, BookOpen,
-  CalendarDays, ClipboardList, Settings, LayoutDashboard, Zap, Activity, Palette,
+  CalendarDays, CalendarRange, ClipboardList, Settings, LayoutDashboard, Zap, Activity, Palette,
   Sliders, Bell, Lightbulb, Megaphone, Ticket, Gauge, Bot, Link2, Package, Clapperboard,
 };
 
