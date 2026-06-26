@@ -71,8 +71,8 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
       {evitabilidadeData.length > 0 && (
         <div className="flex flex-wrap gap-2">
           {evitabilidadeData.map((item) => {
-            const isEvitavel = item.label === "Evitável";
-            const dotColor = isEvitavel ? "#ef4444" : "#10b981";
+            const lbl = item.label.toLowerCase();
+            const dotColor = (lbl.includes("evit") && !lbl.includes("inevit")) ? "#ef4444" : "#10b981";
             return (
               <div
                 key={item.label}

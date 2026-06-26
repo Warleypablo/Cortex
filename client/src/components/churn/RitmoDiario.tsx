@@ -22,9 +22,7 @@ function isBlacklisted(squad: string): boolean {
 }
 
 function getDateKey(c: ChurnContract): string | null {
-  if (c.tipo === "churn") return c.data_encerramento;
-  if (c.tipo === "pausado") return c.data_pausa;
-  return null;
+  return c.tipo === "churn" ? c.data_encerramento : null;
 }
 
 type MetricKey = "mrr" | "count";

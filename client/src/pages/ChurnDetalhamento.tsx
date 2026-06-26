@@ -14,7 +14,7 @@ import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { RitmoDiario } from "@/components/churn/RitmoDiario";
 import { ChurnPorDimensao } from "@/components/churn/ChurnPorDimensao";
 
-import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
 
@@ -319,38 +319,6 @@ export default function ChurnDetalhamento() {
     return mrrBase > 0 ? (mrrPerdido / mrrBase) * 100 : 0;
   }, [filteredMetricas.mrr_perdido, somaMrrBases, mrrBaseReal]);
 
-  // Meta planejada pro-rateada até hoje (BP 2026) — DINÂMICA baseada no MRR real
-  const churnPlanejado = useMemo(() => {
-    const today = new Date();
-    const periodStart = dataInicio ? parseISO(dataInicio) : null;
-    const periodEnd = dataFim ? parseISO(dataFim) : null;
-    if (!periodStart || !periodEnd) return { mrrPlanejado: 0, taxaPlanejada: 0 };
-
-    // Pegar o mês de referência do filtro
-    const monthKey = format(periodStart, "yyyy-MM");
-    const churnRate = getChurnRateBP(monthKey);
-    // Meta dinâmica: taxa do BP × MRR real, descontando excesso acumulado de meses anteriores
-    const targetBase = mrrBaseReal > 0 ? mrrBaseReal * churnRate : (BP_CHURN_MRR_TARGETS[monthKey] || 0);
-    const targetMensal = Math.max(0, targetBase - churnExcessFromPreviousMonths);
-    if (targetBase === 0) return { mrrPlanejado: 0, taxaPlanejada: 0 };
-
-    // Total de dias no mês
-    const totalDaysInMonth = getDaysInMonth(periodStart);
-
-    // Dias decorridos até hoje (ou até o fim do período se já passou)
-    const effectiveEnd = today < periodStart ? periodStart : today > periodEnd ? periodEnd : today;
-    const elapsedDays = differenceInCalendarDays(effectiveEnd, periodStart) + 1;
-    const safeDays = Math.max(0, Math.min(elapsedDays, totalDaysInMonth));
-
-    // Meta pro-rateada até hoje, capped at 8% (meta máxima de churn)
-    const MAX_CHURN_RATE = 0.08;
-    const cappedTargetMensal = mrrBaseReal > 0 ? Math.min(targetMensal, mrrBaseReal * MAX_CHURN_RATE) : targetMensal;
-    const mrrPlanejado = (cappedTargetMensal / totalDaysInMonth) * safeDays;
-    const taxaPlanejada = mrrBaseReal > 0 ? (mrrPlanejado / mrrBaseReal) * 100 : 0;
-
-    return { mrrPlanejado, taxaPlanejada, targetMensal: cappedTargetMensal };
-  }, [dataInicio, dataFim, mrrBaseReal, churnExcessFromPreviousMonths]);
-
   const churnDailyInsights = useMemo(() => {
     const mrrBase = mrrBaseReal;
     const monthKey = dataInicio ? format(parseISO(dataInicio), "yyyy-MM") : "";
@@ -412,23 +380,6 @@ export default function ChurnDetalhamento() {
       status,
     };
   }, [filteredMetricas.mrr_perdido, dataInicio, dataFim, mrrBaseReal, churnExcessFromPreviousMonths]);
-
-  const gaugeStatusOverride = useMemo(() => {
-    switch (churnDailyInsights.status) {
-      case "on_track":
-        return { label: "No alvo", color: "text-emerald-500", bg: "from-emerald-500 to-green-500", dotBg: "bg-emerald-500" };
-      case "warning":
-        return { label: "Atenção", color: "text-amber-500", bg: "from-amber-500 to-orange-500", dotBg: "bg-amber-500" };
-      case "critical":
-        return { label: "Crítico", color: "text-orange-500", bg: "from-orange-500 to-red-500", dotBg: "bg-orange-500" };
-      case "over_budget":
-        return { label: "Fora da meta", color: "text-red-600", bg: "from-red-600 to-rose-700", dotBg: "bg-red-600" };
-      case "future":
-        return { label: "Período futuro", color: "text-slate-500", bg: "from-slate-500 to-slate-700", dotBg: "bg-slate-500" };
-      default:
-        return undefined;
-    }
-  }, [churnDailyInsights.status]);
 
   // Severity color for compact Observatório strip: over 100% pace = worse
   const paceColor = churnDailyInsights.status === "on_track"
@@ -492,8 +443,6 @@ export default function ChurnDetalhamento() {
           mrrPerdido={filteredMetricas.mrr_perdido}
           taxaChurn={filteredTaxaChurn}
           nrrPct={nrrData?.nrr_pct}
-          gaugeStatusOverride={gaugeStatusOverride}
-          churnPlanejado={churnPlanejado.mrrPlanejado}
           ltMedio={filteredMetricas.lt_medio}
           ticketMedio={filteredMetricas.ticket_medio}
         />
