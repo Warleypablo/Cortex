@@ -31,6 +31,26 @@ except Exception:  # noqa: BLE001 — fallback pro fuso local da máquina
 API_BASE = "https://api.clickup.com/api/v2"
 
 
+# Aceita os formatos que a cardista digita num campo de TEXTO: "14:00", "14h",
+# "14h30", "14", "9:5" (→09:05), "14h00", "18:30 às ..." (pega o primeiro).
+# O separador é OBRIGATÓRIO pra ter minutos, senão "830" viraria (8,30) por engano.
+_HHMM_RE = re.compile(r"(\d{1,2})(?:\s*[:hH.]\s*(\d{1,2}))?")
+
+
+def parse_hhmm(s: str) -> tuple[int, int] | None:
+    """'14h30' → (14, 30). None se não der pra ler uma hora válida (0–23h, 0–59m)."""
+    if not s:
+        return None
+    m = _HHMM_RE.search(s.strip())
+    if not m:
+        return None
+    h = int(m.group(1))
+    mm = int(m.group(2)) if m.group(2) else 0
+    if 0 <= h <= 23 and 0 <= mm <= 59:
+        return h, mm
+    return None
+
+
 def _get(path: str, params: dict | None = None) -> dict:
     CONFIG.require_clickup()
     url = f"{API_BASE}{path}"
@@ -80,18 +100,32 @@ class Task:
             raw=t,
         )
 
+    def _cf(self, name: str) -> Any:
+        """Lê um custom field por nome, tolerando diferença de caixa/espaços.
+
+        O dict do ClickUp é keyed pelo nome EXATO do campo, e o nome real diverge
+        do esperado (ex.: "Data de postagem" com p minúsculo). Match exato primeiro,
+        depois case-insensitive.
+        """
+        if name in self.custom_fields:
+            return self.custom_fields[name]
+        low = name.strip().lower()
+        for k, v in self.custom_fields.items():
+            if k.strip().lower() == low:
+                return v
+        return None
+
     def posting_date(self) -> date | None:
         """
-        Lê o custom field 'Data de Postagem' (epoch ms) e retorna a data-calendário
-        no fuso de São Paulo (o fuso em que a pessoa marca a data no ClickUp).
-        None se ausente/inválido. Comparar com `date.today()` pra decidir se a
-        task é do dia atual em diante.
+        Lê o custom field de data (CONFIG.posting_date_field, default 'Data de
+        postagem') — epoch ms — e retorna a data-calendário no fuso de São Paulo
+        (o fuso em que a pessoa marca a data no ClickUp). None se ausente/inválido.
 
         ATENÇÃO: usar UTC aqui empurra posts agendados à noite (>21h BRT) pro dia
         seguinte — bug corrigido em 2026-06-08. Usa America/Sao_Paulo (ou fuso
         local da máquina como fallback).
         """
-        val = self.custom_fields.get("Data de Postagem")
+        val = self._cf(CONFIG.posting_date_field)
         if val in (None, ""):
             return None
         try:
@@ -101,6 +135,34 @@ class Task:
         if _TZ_POSTAGEM is not None:
             return datetime.fromtimestamp(ms / 1000, tz=_TZ_POSTAGEM).date()
         return datetime.fromtimestamp(ms / 1000).date()  # fallback: fuso local
+
+    def posting_time(self) -> str | None:
+        """Horário EXPLÍCITO do card (campo de texto 'Horário'), normalizado 'HH:MM'.
+
+        None se o campo está vazio ou ilegível — nesse caso o agente cai no
+        horário padrão (CONFIG.horario_padrao). Saber se foi explícito ou padrão
+        deixa o painel mostrar "(padrão)".
+        """
+        val = self._cf(CONFIG.horario_field)
+        if val in (None, ""):
+            return None
+        hm = parse_hhmm(str(val))
+        return f"{hm[0]:02d}:{hm[1]:02d}" if hm else None
+
+    def scheduled_datetime(self) -> datetime | None:
+        """Data + horário do card combinados, tz-aware (America/Sao_Paulo).
+
+        É o horário em que o agente deve publicar. Usa o Horário explícito do card;
+        se ausente, o horário padrão. None quando não há Data de postagem (sem data
+        não há agendamento — o post fica em 'aprovado' aguardando data/ação).
+        """
+        d = self.posting_date()
+        if d is None:
+            return None
+        hm = parse_hhmm(self.posting_time() or CONFIG.horario_padrao) or (12, 0)
+        if _TZ_POSTAGEM is not None:
+            return datetime(d.year, d.month, d.day, hm[0], hm[1], tzinfo=_TZ_POSTAGEM)
+        return datetime(d.year, d.month, d.day, hm[0], hm[1])  # naive: fuso local
 
 
 @dataclass

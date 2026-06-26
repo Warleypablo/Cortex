@@ -108,6 +108,8 @@ class PlannedAction:
     criativo: str | None
     is_placeholder: bool
     posting_date: str | None = None
+    posting_time: str | None = None      # 'HH:MM' explícito do card, ou None (→ padrão)
+    scheduled_at: str | None = None      # data+hora do card, ISO tz-aware (horário-alvo)
     slot_now: str | None = None
     slot_status: str = ""
     already_posted: bool = False
@@ -195,6 +197,9 @@ def plan_task(t: clickup.Task, *, force_now: bool = False) -> PlannedAction:
     )
     pdate = t.posting_date()
     plan.posting_date = pdate.isoformat() if pdate else None
+    plan.posting_time = t.posting_time()
+    sdt = t.scheduled_datetime()
+    plan.scheduled_at = sdt.isoformat() if sdt else None
     plan.slot_now = current_slot()
     plan.slot_status = slot_status_human()
 

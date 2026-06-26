@@ -55,6 +55,8 @@ def panel_post(plan: Any, platform: str = "instagram") -> dict:
         "mes": plan.mes,
         "turbo_slug": plan.turbo_slug,
         "posting_date": plan.posting_date,        # ISO 'YYYY-MM-DD' ou None
+        "posting_time": getattr(plan, "posting_time", None),   # 'HH:MM' explícito ou None
+        "card_scheduled_at": getattr(plan, "scheduled_at", None),  # data+hora do card (ISO)
         "slot": plan.slot_now,
         "tipo_post": plan.tipo_post,
         "asset_count": plan.asset_count,
