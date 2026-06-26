@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { toast } from "sonner";
@@ -11,32 +11,16 @@ import {
   TrendingDown,
   DollarSign,
   AlertTriangle,
-  Percent,
   Clock,
   BarChart3,
   Target,
-  CalendarDays,
-  Pause,
 } from "lucide-react";
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table";
-import { Progress } from "@/components/ui/progress";
 import { type ChurnContract, type ChurnDetalhamentoData } from "@/components/churn/types";
 import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { RitmoDiario } from "@/components/churn/RitmoDiario";
 import { ChurnPorDimensao } from "@/components/churn/ChurnPorDimensao";
-import { SecaoMotivos } from "@/components/churn/SecaoMotivos";
-import { SecaoVozCliente } from "@/components/churn/SecaoVozCliente";
-import { SecaoSegmentacao } from "@/components/churn/SecaoSegmentacao";
-import { SecaoTiming } from "@/components/churn/SecaoTiming";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -70,7 +54,7 @@ export default function ChurnDetalhamento() {
     if (!mrrBP || !churnBP) return 0;
     return churnBP / mrrBP;
   };
-  
+
   const [searchTerm, setSearchTerm] = useState("");
   const [filterSquads, setFilterSquads] = useState<string[]>([]);
   const [filterProdutos, setFilterProdutos] = useState<string[]>([]);
@@ -181,9 +165,9 @@ export default function ChurnDetalhamento() {
 
   const filteredContratos = useMemo(() => {
     if (!data?.contratos) return [];
-    
+
     let filtered = [...data.contratos];
-    
+
     // Filter by date using the correct date column for each type:
     // - Churn: uses data_encerramento
     // - Pausado: uses data_pausa
@@ -194,7 +178,7 @@ export default function ChurnDetalhamento() {
         return refDate && new Date(refDate) >= inicio;
       });
     }
-    
+
     if (dataFim) {
       const fim = new Date(dataFim);
       fim.setHours(23, 59, 59, 999);
@@ -203,29 +187,29 @@ export default function ChurnDetalhamento() {
         return refDate && new Date(refDate) <= fim;
       });
     }
-    
+
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(c => 
+      filtered = filtered.filter(c =>
         c.cliente_nome?.toLowerCase().includes(term) ||
         c.cnpj?.includes(term) ||
         c.produto?.toLowerCase().includes(term) ||
         c.responsavel?.toLowerCase().includes(term)
       );
     }
-    
+
     if (filterSquads.length > 0) {
       filtered = filtered.filter(c => filterSquads.includes(c.squad));
     }
-    
+
     if (filterProdutos.length > 0) {
       filtered = filtered.filter(c => filterProdutos.includes(c.produto));
     }
-    
+
     if (filterResponsaveis.length > 0) {
       filtered = filtered.filter(c => filterResponsaveis.includes(c.responsavel));
     }
-    
+
     if (filterServicos.length > 0) {
       filtered = filtered.filter(c => c.servico && filterServicos.includes(c.servico));
     }
@@ -284,7 +268,7 @@ export default function ChurnDetalhamento() {
       }
       return sortOrder === "desc" ? -comparison : comparison;
     });
-    
+
     return filtered;
   }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, filterPlanos, filterClusters, filterEvitabilidades, filterPossibilidadesRetencao, dataInicio, dataFim, sortBy, sortOrder, filterAbono, abonadoOverrides]);
 
@@ -330,41 +314,6 @@ export default function ChurnDetalhamento() {
       abonado_por_motivo: abonadoPorMotivo,
     };
   }, [filteredContratos]);
-
-  const filteredChurnPorSquad = useMemo(() => {
-    if (filteredContratos.length === 0 || !data?.metricas?.churn_por_squad) return [];
-
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
-    if (churnContratos.length === 0) return [];
-    
-    const squadData: Record<string, { mrr_perdido: number; mrr_base: number }> = {};
-    
-    churnContratos.forEach(c => {
-      const squad = c.squad || "Não especificado";
-      if (!squadData[squad]) {
-        const originalSquadData = data.metricas.churn_por_squad?.find(s => s.squad === squad);
-        squadData[squad] = { 
-          mrr_perdido: 0, 
-          mrr_base: originalSquadData?.mrr_ativo || 0 
-        };
-      }
-      squadData[squad].mrr_perdido += c.valorr || 0;
-    });
-    
-    // Lista de squads irrelevantes a serem excluídos
-    const squadsIrrelevantes = ['turbo interno', 'squad x', 'interno', 'x'];
-    
-    return Object.entries(squadData)
-      .map(([squad, info]) => ({
-        squad,
-        mrr_perdido: info.mrr_perdido,
-        mrr_ativo: info.mrr_base,
-        percentual: info.mrr_base > 0 ? (info.mrr_perdido / info.mrr_base) * 100 : 0
-      }))
-      .filter(s => s.mrr_perdido > 0) // Remover squads com valor zerado
-      .filter(s => !squadsIrrelevantes.includes(s.squad.toLowerCase().trim())) // Remover squads irrelevantes
-      .sort((a, b) => b.mrr_perdido - a.mrr_perdido); // Ordenar por valor (R$) ao invés de percentual
-  }, [filteredContratos, data?.metricas?.churn_por_squad]);
 
   // MRR base dinâmico: usa MRR real do período quando disponível
   const mrrBaseReal = data?.metricas?.mrr_ativo_ref ?? 0;
@@ -438,7 +387,6 @@ export default function ChurnDetalhamento() {
 
     const remainingDays = Math.max(totalDays - elapsedDays, 0);
     const remainingBudget = churnTarget - churnSpent;
-    const dailyCap = remainingDays > 0 ? remainingBudget / remainingDays : remainingBudget;
     const dailyIdeal = totalDays > 0 ? churnTarget / totalDays : 0;
     const dailyActual = elapsedDays > 0 ? churnSpent / elapsedDays : 0;
     const progressPct = churnTarget > 0 ? (churnSpent / churnTarget) * 100 : 0;
@@ -465,7 +413,6 @@ export default function ChurnDetalhamento() {
       totalDays,
       elapsedDays,
       remainingDays,
-      dailyCap,
       dailyIdeal,
       dailyActual,
       progressPct,
@@ -473,41 +420,6 @@ export default function ChurnDetalhamento() {
       status,
     };
   }, [filteredMetricas.mrr_perdido, dataInicio, dataFim, mrrBaseReal, churnExcessFromPreviousMonths]);
-
-  const dailyStatusConfig = {
-    on_track: {
-      label: "No alvo",
-      badgeClass: "bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
-      barClass: "bg-emerald-500",
-      textClass: "text-emerald-600 dark:text-emerald-400",
-    },
-    warning: {
-      label: "Atenção",
-      badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
-      barClass: "bg-amber-500",
-      textClass: "text-amber-600 dark:text-amber-400",
-    },
-    critical: {
-      label: "Crítico",
-      badgeClass: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30",
-      barClass: "bg-orange-500",
-      textClass: "text-orange-600 dark:text-orange-400",
-    },
-    over_budget: {
-      label: "Meta estourada",
-      badgeClass: "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/30",
-      barClass: "bg-red-500",
-      textClass: "text-red-600 dark:text-red-400",
-    },
-    future: {
-      label: "Período futuro",
-      badgeClass: "bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/30",
-      barClass: "bg-slate-400",
-      textClass: "text-slate-600 dark:text-slate-300",
-    },
-  } as const;
-
-  const dailyStatus = dailyStatusConfig[churnDailyInsights.status as keyof typeof dailyStatusConfig];
 
   const gaugeStatusOverride = useMemo(() => {
     switch (churnDailyInsights.status) {
@@ -526,23 +438,14 @@ export default function ChurnDetalhamento() {
     }
   }, [churnDailyInsights.status]);
 
-  // Clientes perdidos (maior impacto financeiro) — todos, sem limite
-  const topClientesPerdidos = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
-    return churnContratos
-      .sort((a, b) => b.valorr - a.valorr);
-  }, [filteredContratos]);
-
-  const formatDate = (dateStr: string | null) => {
-    if (!dateStr) return "-";
-    try {
-      return format(parseISO(dateStr), "dd/MM/yyyy", { locale: ptBR });
-    } catch {
-      return dateStr;
-    }
-  };
+  // Severity color for compact Observatório strip: over 100% pace = worse
+  const paceColor = churnDailyInsights.status === "on_track"
+    ? "text-emerald-600 dark:text-emerald-400"
+    : churnDailyInsights.status === "warning"
+    ? "text-amber-600 dark:text-amber-400"
+    : churnDailyInsights.status === "future"
+    ? "text-slate-500 dark:text-slate-400"
+    : "text-red-600 dark:text-red-400";
 
   if (error) {
     return (
@@ -609,362 +512,44 @@ export default function ChurnDetalhamento() {
         <RitmoDiario contratos={filteredContratos} onDrill={onDrill} />
       )}
 
+      {/* Observatório compacto: meta/gasto/saldo/ritmo em uma linha */}
+      {!isLoading && churnDailyInsights.churnTarget > 0 && (
+        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2 rounded-lg border border-border/50 bg-muted/30 text-xs text-muted-foreground">
+          <span>
+            Meta do período:{" "}
+            <span className="font-semibold text-foreground">
+              {formatCurrencyNoDecimals(churnDailyInsights.churnTarget)}
+            </span>
+          </span>
+          <span className="text-border/60">·</span>
+          <span>
+            Gasto:{" "}
+            <span className="font-semibold text-foreground">
+              {formatCurrencyNoDecimals(churnDailyInsights.churnSpent)}
+            </span>
+          </span>
+          <span className="text-border/60">·</span>
+          <span>
+            Saldo:{" "}
+            <span className={`font-semibold ${churnDailyInsights.remainingBudget >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}`}>
+              {formatCurrencyNoDecimals(churnDailyInsights.remainingBudget)}
+            </span>
+          </span>
+          <span className="text-border/60">·</span>
+          <span>
+            Ritmo:{" "}
+            <span className={`font-semibold ${paceColor}`}>
+              {churnDailyInsights.pacePct.toFixed(0)}% do ideal
+            </span>
+          </span>
+        </div>
+      )}
+
       {/* Churn por Dimensão — seletor único com ranking */}
       {!isLoading && (
         <ChurnPorDimensao contratos={filteredContratos} onDrill={onDrill} />
       )}
 
-      {/* Seções analíticas — skeleton enquanto carrega */}
-      {isLoading ? (
-        <div className="space-y-4">
-          {Array.from({ length: 4 }).map((_, i) => (
-            <Card key={i} className="border-border/50">
-              <CardContent className="p-6 space-y-3">
-                <Skeleton className="h-5 w-40" />
-                <Skeleton className="h-3 w-64" />
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
-                  {Array.from({ length: 3 }).map((_, j) => (
-                    <Skeleton key={j} className="h-40 rounded-xl" />
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <>
-          {/* Seção Motivos & Evitabilidade */}
-          <SecaoMotivos contratos={filteredContratos} onDrill={onDrill} />
-
-          {/* Seção Voz do Cliente (IA) */}
-          <SecaoVozCliente contratos={filteredContratos} onDrill={onDrill} />
-
-          {/* Seção Segmentação: squad, produto/serviço, ticket, responsável */}
-          <SecaoSegmentacao contratos={filteredContratos} onDrill={onDrill} />
-
-          {/* Seção Timing: distribuição por lifetime, evolução mensal, cohort, curva de sobrevivência, MRR perdido */}
-          <SecaoTiming contratos={filteredContratos} onDrill={onDrill} />
-        </>
-      )}
-
-      {/* Painel Executivo Detalhado (MRR Base, Abonado, NRR, Squad) */}
-      {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
-        <Card className="relative overflow-hidden border-2 border-red-200/50 dark:border-red-900/30 bg-gradient-to-br from-slate-50 via-white to-red-50/30 dark:from-zinc-900 dark:via-zinc-900 dark:to-red-950/20">
-          {/* Background pattern */}
-          <div className="absolute inset-0 opacity-5">
-            <div className="absolute inset-0" style={{ backgroundImage: 'radial-gradient(circle at 1px 1px, currentColor 1px, transparent 0)', backgroundSize: '24px 24px' }} />
-          </div>
-          
-          <CardContent className="relative p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              {/* Coluna 1: Métricas principais */}
-              <div className="flex flex-col gap-3">
-                <div className="p-4 bg-blue-50 dark:bg-blue-950/30 rounded-xl border border-blue-100 dark:border-blue-900/50 flex flex-col justify-center">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-blue-600 dark:text-blue-400 uppercase">MRR Base</span>
-                    <DollarSign className="h-4 w-4 text-blue-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-blue-700 dark:text-blue-300">{formatCurrency(mrrBaseReal)}</div>
-                  <div className="text-xs text-blue-600/70 dark:text-blue-400/70 mt-1">base de referência do período</div>
-                </div>
-
-                <div className={`flex-1 p-4 rounded-xl border flex flex-col justify-center ${filterAbono === "abonados" ? "bg-amber-50 dark:bg-amber-950/30 border-amber-100 dark:border-amber-900/50" : "bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50"}`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-medium uppercase ${filterAbono === "abonados" ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400"}`}>{filterAbono === "abonados" ? "MRR Abonado" : "MRR Perdido"}</span>
-                    <DollarSign className={`h-4 w-4 ${filterAbono === "abonados" ? "text-amber-500" : "text-red-500"}`} />
-                  </div>
-                  <div className={`text-2xl font-bold ${filterAbono === "abonados" ? "text-amber-700 dark:text-amber-300" : "text-red-700 dark:text-red-300"}`}>{formatCurrency(filteredMetricas.mrr_perdido)}</div>
-                  <div className={`text-xs mt-1 ${filterAbono === "abonados" ? "text-amber-600/70 dark:text-amber-400/70" : "text-red-600/70 dark:text-red-400/70"}`}>{filteredMetricas.total_churned} contratos {filterAbono === "abonados" ? "abonados" : "encerrados"}</div>
-                  {filterAbono !== "abonados" && churnPlanejado.mrrPlanejado > 0 && (
-                    <div className="mt-2 pt-2 border-t border-red-200 dark:border-red-800/50">
-                      <div className="flex items-center justify-between">
-                        <span className="text-[11px] text-red-600/70 dark:text-red-400/70">Planejado até hoje</span>
-                        <span className="text-[11px] font-semibold text-red-600 dark:text-red-400 tabular-nums">{formatCurrencyNoDecimals(churnPlanejado.mrrPlanejado)}</span>
-                      </div>
-                      <div className="flex items-center justify-between mt-0.5">
-                        <span className="text-[11px] text-red-600/70 dark:text-red-400/70">Meta do mês</span>
-                        <span className="text-[11px] font-semibold text-red-600 dark:text-red-400 tabular-nums">{formatCurrencyNoDecimals(churnPlanejado.targetMensal || 0)}</span>
-                      </div>
-                      {(() => {
-                        const diff = filteredMetricas.mrr_perdido - churnPlanejado.mrrPlanejado;
-                        const isOver = diff > 0;
-                        return (
-                          <div className={`flex items-center gap-1 mt-1 text-[11px] font-medium ${isOver ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}`}>
-                            {isOver ? <TrendingDown className="h-3 w-3" /> : <TrendingDown className="h-3 w-3 rotate-180" />}
-                            <span>{isOver ? '+' : ''}{formatCurrencyNoDecimals(diff)} {isOver ? 'acima' : 'abaixo'} do planejado</span>
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-                
-                {filterAbono === "todos" && (
-                <div className="flex-1 p-4 bg-amber-50 dark:bg-amber-950/30 rounded-xl border border-amber-100 dark:border-amber-900/50 flex flex-col justify-center">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-amber-600 dark:text-amber-400 uppercase">Churn Abonado</span>
-                    <Pause className="h-4 w-4 text-amber-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-amber-700 dark:text-amber-300">{formatCurrency(filteredMetricas.mrr_abonado || 0)}</div>
-                  <div className="text-xs text-amber-600/70 dark:text-amber-400/70 mt-1">{filteredMetricas.total_abonado || 0} contratos abonados</div>
-                  {filteredMetricas.abonado_por_motivo && Object.keys(filteredMetricas.abonado_por_motivo).length > 0 && (
-                    <div className="mt-2 pt-2 border-t border-amber-200 dark:border-amber-800/50 space-y-1">
-                      {Object.entries(filteredMetricas.abonado_por_motivo)
-                        .sort(([,a], [,b]) => b.mrr - a.mrr)
-                        .map(([motivo, info]) => (
-                          <div key={motivo} className="flex items-center justify-between text-[11px]">
-                            <span className="text-amber-700 dark:text-amber-400 truncate max-w-[140px]">{motivo}</span>
-                            <span className="text-amber-800 dark:text-amber-300 font-semibold tabular-nums ml-2">{info.count}x · {formatCurrencyNoDecimals(info.mrr)}</span>
-                          </div>
-                        ))}
-                    </div>
-                  )}
-                </div>
-                )}
-
-                {filterAbono === "todos" && (
-                <div className="flex-1 p-4 bg-purple-50 dark:bg-purple-950/30 rounded-xl border border-purple-100 dark:border-purple-900/50 flex flex-col justify-center">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-purple-600 dark:text-purple-400 uppercase">Churn Total</span>
-                    <Target className="h-4 w-4 text-purple-500" />
-                  </div>
-                  <div className="text-2xl font-bold text-purple-700 dark:text-purple-300">{formatCurrency(filteredMetricas.mrr_perdido + filteredMetricas.mrr_abonado)}</div>
-                  <div className="text-xs text-purple-600/70 dark:text-purple-400/70 mt-1">
-                    {filteredMetricas.total_churned + filteredMetricas.total_abonado} contratos (MRR Perdido + Abonado)
-                  </div>
-                  <div className="flex items-center gap-3 text-xs mt-2">
-                    <span className="text-red-500">Perdido: {formatCurrency(filteredMetricas.mrr_perdido)}</span>
-                    <span className="text-amber-500">Abonado: {formatCurrency(filteredMetricas.mrr_abonado)}</span>
-                  </div>
-                </div>
-                )}
-              </div>
-
-              {/* Coluna NRR & Cross-sell */}
-              <div className="flex flex-col gap-3">
-                <div className={`flex-1 p-4 rounded-xl border flex flex-col justify-center ${
-                  (nrrData?.nrr_pct ?? 0) <= 0
-                    ? 'bg-green-50 dark:bg-green-950/30 border-green-100 dark:border-green-900/50'
-                    : 'bg-red-50 dark:bg-red-950/30 border-red-100 dark:border-red-900/50'
-                }`}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className={`text-xs font-medium uppercase ${
-                      (nrrData?.nrr_pct ?? 0) <= 0
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
-                    }`}>NRR (Net Revenue Retention)</span>
-                    <Percent className={`h-4 w-4 ${
-                      (nrrData?.nrr_pct ?? 0) <= 0
-                        ? 'text-green-500'
-                        : 'text-red-500'
-                    }`} />
-                  </div>
-                  <div className={`text-2xl font-bold ${
-                    (nrrData?.nrr_pct ?? 0) <= 0
-                      ? 'text-green-700 dark:text-green-300'
-                      : 'text-red-700 dark:text-red-300'
-                  }`}>{(nrrData?.nrr_pct ?? 0).toFixed(1)}%</div>
-                  <div className="text-xs text-muted-foreground mt-1">(Churn - Vendas) / MRR Base</div>
-                </div>
-
-                <div className="flex-1 p-4 bg-emerald-50 dark:bg-emerald-950/30 rounded-xl border border-emerald-100 dark:border-emerald-900/50 flex flex-col justify-center">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase">Cross-sell MRR</span>
-                    <TrendingDown className="h-4 w-4 text-emerald-500 rotate-180" />
-                  </div>
-                  <div className="text-2xl font-bold text-emerald-700 dark:text-emerald-300">{formatCurrency(nrrData?.crosssell_mrr ?? 0)}</div>
-                  <div className="text-xs text-emerald-600/70 dark:text-emerald-400/70 mt-1">vendas para clientes existentes</div>
-                  {(nrrData?.crosssell_pontual ?? 0) > 0 && (
-                    <div className="text-xs text-emerald-600/50 dark:text-emerald-400/50 mt-0.5">Pontual: {formatCurrency(nrrData?.crosssell_pontual ?? 0)}</div>
-                  )}
-                </div>
-
-                <div className="flex-1 p-4 bg-gray-50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50 flex flex-col justify-center">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs font-medium text-muted-foreground uppercase">Vendas MRR (Novo)</span>
-                    <DollarSign className="h-4 w-4 text-muted-foreground" />
-                  </div>
-                  <div className="text-2xl font-bold text-foreground">{formatCurrency(nrrData?.vendas_mrr_novo ?? 0)}</div>
-                  <div className="text-xs text-muted-foreground mt-1">vendas para clientes novos</div>
-                </div>
-              </div>
-              
-              {/* Coluna 3: Ranking de Churn por Squad */}
-              <div className="bg-white/50 dark:bg-zinc-800/30 rounded-xl border border-gray-100 dark:border-zinc-700/50 p-4 flex flex-col">
-                <div className="flex items-center justify-between gap-2 mb-3">
-                  <h3 className="text-sm font-semibold text-foreground">Churn por Squad</h3>
-                  <Badge variant="outline" className="text-xs">Top {filteredChurnPorSquad.length}</Badge>
-                </div>
-                <div className="space-y-2 flex-1 overflow-y-auto pr-1">
-                  {filteredChurnPorSquad.map((squad, index) => {
-                    const isTop3 = index < 3;
-                    const medalColors = ['bg-amber-500', 'bg-gray-400', 'bg-amber-700'];
-                    
-                    return (
-                      <div 
-                        key={squad.squad} 
-                        data-testid={`squad-ranking-${index}`}
-                        className={`flex items-center gap-2 p-2.5 rounded-lg transition-all ${
-                          isTop3 
-                            ? 'bg-red-50/80 dark:bg-red-950/40 border border-red-100 dark:border-red-900/50' 
-                            : 'bg-gray-50/50 dark:bg-zinc-900/30 border border-gray-100/50 dark:border-zinc-800/50'
-                        }`}
-                      >
-                        <div className="w-6 text-center flex-shrink-0">
-                          {isTop3 ? (
-                            <div className={`w-5 h-5 rounded-full ${medalColors[index]} flex items-center justify-center`}>
-                              <span className="text-[10px] font-bold text-white">{index + 1}</span>
-                            </div>
-                          ) : (
-                            <span className="text-xs font-medium text-muted-foreground">{index + 1}º</span>
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-medium truncate">{squad.squad}</span>
-                            <span className={`text-sm font-bold tabular-nums ${
-                              squad.percentual >= 5 ? 'text-red-600 dark:text-red-400' : 
-                              squad.percentual >= 2 ? 'text-orange-600 dark:text-orange-400' : 
-                              'text-emerald-600 dark:text-emerald-400'
-                            }`}>
-                              {squad.percentual.toFixed(1)}%
-                            </span>
-                          </div>
-                          <div className="flex items-center gap-2 mt-1">
-                            <div className="flex-1 h-1.5 bg-gray-200 dark:bg-zinc-700 rounded-full overflow-hidden">
-                              <div 
-                                className={`h-full rounded-full transition-all duration-500 ${
-                                  squad.percentual >= 5 ? 'bg-red-500' : 
-                                  squad.percentual >= 2 ? 'bg-orange-500' : 
-                                  'bg-emerald-500'
-                                }`}
-                                style={{ width: `${Math.min(squad.percentual * 10, 100)}%` }}
-                              />
-                            </div>
-                            <span className="text-[10px] text-muted-foreground whitespace-nowrap">{formatCurrencyNoDecimals(squad.mrr_perdido)}</span>
-                          </div>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Observação de Churn Máximo Diário */}
-      {isLoading ? (
-        <Card className="border-border/50">
-          <CardContent className="p-6">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {Array.from({ length: 3 }).map((_, i) => (
-                <div key={i} className="rounded-xl border border-gray-100 dark:border-zinc-800/60 p-4 bg-white/70 dark:bg-zinc-900/40">
-                  <Skeleton className="h-4 w-32 mb-3" />
-                  <Skeleton className="h-7 w-40 mb-2" />
-                  <Skeleton className="h-3 w-24" />
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      ) : (
-        <Card className="border-border/50 bg-gradient-to-br from-emerald-50 via-white to-amber-50/40 dark:from-zinc-900 dark:via-zinc-900 dark:to-emerald-950/30">
-          <CardHeader className="pb-3">
-            <div className="flex items-center justify-between gap-3 flex-wrap">
-              <div className="flex items-center gap-3">
-                <div className="p-2 rounded-lg bg-gradient-to-r from-emerald-500 to-teal-600 shadow-lg">
-                  <Target className="h-4 w-4 text-white" />
-                </div>
-                <div>
-                  <CardTitle className="text-base">Observatório de Churn Diário</CardTitle>
-                  <p className="text-xs text-muted-foreground">
-                    Meta referência: {churnDailyInsights.churnTargetPct}% do MRR base no período selecionado
-                  </p>
-                </div>
-              </div>
-              <Badge variant="outline" className={`text-xs ${dailyStatus.badgeClass}`}>
-                {dailyStatus.label}
-              </Badge>
-            </div>
-          </CardHeader>
-          <CardContent className="p-6 pt-2">
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              <div className="rounded-xl border border-emerald-100 dark:border-emerald-900/40 bg-white/70 dark:bg-zinc-900/40 p-4">
-                <div className="flex items-center justify-between text-xs font-semibold text-emerald-700 dark:text-emerald-300 uppercase">
-                  <span>Meta de churn do período</span>
-                  <Badge variant="outline" className="text-[10px]">MRR base</Badge>
-                </div>
-                <div className="mt-2 text-2xl font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
-                  {formatCurrencyNoDecimals(churnDailyInsights.churnTarget)}
-                </div>
-                <div className="mt-3 flex items-center justify-between text-xs">
-                  <span className="text-muted-foreground">Churn acumulado</span>
-                  <span className="font-semibold text-rose-600 dark:text-rose-400 tabular-nums">
-                    {formatCurrencyNoDecimals(churnDailyInsights.churnSpent)}
-                  </span>
-                </div>
-                <Progress value={Math.min(Math.max(churnDailyInsights.progressPct, 0), 100)} className="h-2 mt-2" />
-                <div className="mt-2 flex items-center justify-between text-[10px] text-muted-foreground">
-                  <span>{churnDailyInsights.progressPct.toFixed(1)}% da meta</span>
-                  <span className={churnDailyInsights.remainingBudget >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400"}>
-                    Saldo: {formatCurrencyNoDecimals(churnDailyInsights.remainingBudget)}
-                  </span>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-amber-100 dark:border-amber-900/40 bg-white/70 dark:bg-zinc-900/40 p-4">
-                <div className="flex items-center justify-between text-xs font-semibold text-amber-700 dark:text-amber-300 uppercase">
-                  <span>Churn máximo diário</span>
-                  <CalendarDays className="h-3.5 w-3.5" />
-                </div>
-                <div className="mt-2 text-3xl font-bold text-amber-700 dark:text-amber-300 tabular-nums">
-                  {churnDailyInsights.remainingDays > 0 
-                    ? formatCurrencyNoDecimals(Math.max(churnDailyInsights.dailyCap, 0)) 
-                    : "R$ 0"}
-                </div>
-                <div className="mt-1 text-xs text-muted-foreground">
-                  {churnDailyInsights.remainingDays > 0 
-                    ? `restam ${churnDailyInsights.remainingDays} dias` 
-                    : "período encerrado"}
-                </div>
-                <div className="mt-3 p-2 rounded-lg bg-amber-50/80 dark:bg-amber-950/40 border border-amber-100 dark:border-amber-900/40 text-[11px] text-amber-700 dark:text-amber-300">
-                  Limite diário sugerido para fechar no alvo sem estourar a meta.
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-blue-100 dark:border-blue-900/40 bg-white/70 dark:bg-zinc-900/40 p-4">
-                <div className="flex items-center justify-between text-xs font-semibold text-blue-700 dark:text-blue-300 uppercase">
-                  <span>Ritmo diário</span>
-                  <BarChart3 className="h-3.5 w-3.5" />
-                </div>
-                <div className="mt-3 space-y-2">
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Ideal</span>
-                    <span className="font-semibold tabular-nums">{formatCurrencyNoDecimals(churnDailyInsights.dailyIdeal)}/dia</span>
-                  </div>
-                  <div className="flex items-center justify-between text-xs">
-                    <span className="text-muted-foreground">Atual</span>
-                    <span className={`font-semibold tabular-nums ${dailyStatus.textClass}`}>
-                      {formatCurrencyNoDecimals(churnDailyInsights.dailyActual)}/dia
-                    </span>
-                  </div>
-                  <div className="h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full ${dailyStatus.barClass}`}
-                      style={{ width: `${Math.min(churnDailyInsights.pacePct, 100)}%` }}
-                    />
-                  </div>
-                  <div className="text-[10px] text-muted-foreground">
-                    Ritmo atual em {churnDailyInsights.pacePct.toFixed(0)}% do ideal
-                  </div>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
       {/* Métricas Secundárias */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {isLoading ? (
@@ -1002,7 +587,7 @@ export default function ChurnDetalhamento() {
             />
             <TechKpiCard
               title="LTV Médio"
-              value={filteredMetricas.total_churned > 0 
+              value={filteredMetricas.total_churned > 0
                 ? formatCurrencyNoDecimals(filteredMetricas.ltv_total / filteredMetricas.total_churned)
                 : "R$ 0"}
               subtitle="por contrato churned"
@@ -1034,14 +619,14 @@ export default function ChurnDetalhamento() {
                 const maxMrr = data.metricas.churn_por_motivo?.[0]?.mrr_perdido || 1;
                 const barWidth = (item.mrr_perdido / maxMrr) * 100;
                 const ticketMedioMotivo = item.quantidade > 0 ? item.mrr_perdido / item.quantidade : 0;
-                
+
                 return (
                   <div key={item.motivo} className="group" data-testid={`motivo-ranking-${index}`}>
                     <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
                       <div className="flex items-center gap-2 flex-1 min-w-0">
                         <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          index < 3 
-                            ? 'bg-rose-500 text-white' 
+                          index < 3
+                            ? 'bg-rose-500 text-white'
                             : 'bg-gray-100 dark:bg-zinc-800 text-muted-foreground'
                         }`}>
                           <span className="text-[10px] font-bold">{index + 1}</span>
@@ -1063,7 +648,7 @@ export default function ChurnDetalhamento() {
                       </div>
                     </div>
                     <div className="ml-8 h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden" data-testid={`bar-motivo-${index}`}>
-                      <div 
+                      <div
                         className="h-full rounded-full bg-gradient-to-r from-rose-500 to-pink-500 transition-all duration-500"
                         style={{ width: `${barWidth}%` }}
                       />
@@ -1079,79 +664,6 @@ export default function ChurnDetalhamento() {
         </Card>
       )}
 
-      {/* Top Clientes Perdidos - movido para sub-aba Resumo */}
-      {!isLoading && topClientesPerdidos.length > 0 && (
-        <Card className="border-red-200 dark:border-red-900/40">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-r from-red-500 to-rose-600 shadow-lg">
-                <TrendingDown className="h-5 w-5 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-base">Clientes Perdidos ({topClientesPerdidos.length})</CardTitle>
-                <CardDescription>Maior impacto financeiro no período</CardDescription>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="overflow-x-auto max-h-[500px] overflow-y-auto">
-              <Table>
-                <TableHeader className="sticky top-0 bg-card z-10">
-                  <TableRow>
-                    <TableHead className="w-[50px]">#</TableHead>
-                    <TableHead>Cliente</TableHead>
-                    <TableHead>Contrato</TableHead>
-                    <TableHead>Produto</TableHead>
-                    <TableHead>Squad</TableHead>
-                    <TableHead className="text-right">MRR</TableHead>
-                    <TableHead className="text-right">LTV</TableHead>
-                    <TableHead className="text-center">Lifetime</TableHead>
-                    <TableHead>Data Saída</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {topClientesPerdidos.map((c, idx) => (
-                    <TableRow key={c.id} data-testid={`row-top-cliente-${idx}`}>
-                      <TableCell>
-                        <Badge variant={idx < 3 ? "destructive" : "secondary"} className="font-bold">
-                          {idx + 1}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1.5">
-                          <span className="font-medium">{c.cliente_nome}</span>
-                          {c.is_abonado && (
-                            <Badge variant="outline" className="text-[9px] bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-900/20 dark:text-amber-400 dark:border-amber-800">
-                              Abonado
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-sm">{c.contrato_nome || c.cliente_nome}</TableCell>
-                      <TableCell className="text-sm">{c.produto}</TableCell>
-                      <TableCell className="text-sm">{c.squad}</TableCell>
-                      <TableCell className="text-right font-semibold text-red-600 dark:text-red-400">
-                        {formatCurrency(c.valorr)}
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">
-                        {formatCurrencyNoDecimals(c.ltv)}
-                      </TableCell>
-                      <TableCell className="text-center">
-                        <Badge variant="outline">{c.lifetime_meses.toFixed(1)}m</Badge>
-                      </TableCell>
-                      <TableCell className="text-sm text-muted-foreground">
-                        {formatDate(c.data_encerramento)}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-
       <ChurnDrillDrawer
         open={!!drill}
         titulo={drill?.titulo ?? ""}
@@ -1164,5 +676,3 @@ export default function ChurnDetalhamento() {
     </div>
   );
 }
-
-
