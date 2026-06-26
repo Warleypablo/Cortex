@@ -3671,10 +3671,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           : undefined,
       );
       const sessoes = ga4.byPlatform.meta_ads;
-      // Padrão GA4 (igual aos outros canais): Viz Página = page views GA4,
-      // Connect Rate = Sessões ÷ cliques de saída.
+      // Viz Página (GA4) = page views GA4. O Connect Rate do Meta é calculado no
+      // cliente a partir do pixel (connectRatePixel = landing_page_views ÷ cliques de
+      // saída) — same-source. A versão GA4 (sessões ÷ cliques) foi removida por não
+      // ser usada na UI e misturar fontes.
       const visualizacoesPagina = ga4.byPlatformPageViews.meta_ads;
-      const connectRate = cliquesSaida > 0 ? sessoes / cliquesSaida : 0;
 
       res.json({
         investimento,
@@ -3687,10 +3688,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         videoHook,
         videoHold,
         visualizacoesPagina,
-        connectRate,
         sessoes,
         sessoesAvailable: ga4.available,
-        // Comparação: valores antigos pelo pixel Meta (p/ avaliar o impacto da migração)
+        // Connect Rate e Viz Página do recorte Meta usam o pixel (same-source):
+        // connectRatePixel = landing_page_views ÷ cliques de saída.
         visualizacoesPaginaPixel: landingPageViewsPixel,
         connectRatePixel,
       });
