@@ -1,33 +1,22 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatCurrencyNoDecimals } from "@/lib/utils";
-import { 
-  TrendingDown, 
-  DollarSign, 
-  Calendar, 
+import {
+  TrendingDown,
+  DollarSign,
   AlertTriangle,
-  FileText,
-  ChevronDown,
-  ChevronUp,
   Percent,
   Clock,
   BarChart3,
   Target,
   CalendarDays,
-  Building2,
-  Users,
   Pause,
-  CalendarRange,
 } from "lucide-react";
 import {
   Table,
@@ -38,9 +27,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Progress } from "@/components/ui/progress";
-import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import ChurnConsolidadoTrimestral from "@/components/ChurnConsolidadoTrimestral";
-import { type ChurnContract, type ChurnDetalhamentoData, type ChurnPorSquad, type ChurnPorMotivo, type ChurnBreakdownItem, type RetentionPoint, CHART_COLORS } from "@/components/churn/types";
+import { type ChurnContract, type ChurnDetalhamentoData } from "@/components/churn/types";
 import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
@@ -48,12 +35,7 @@ import { SecaoMotivos } from "@/components/churn/SecaoMotivos";
 import { SecaoVozCliente } from "@/components/churn/SecaoVozCliente";
 import { SecaoSegmentacao } from "@/components/churn/SecaoSegmentacao";
 import { SecaoTiming } from "@/components/churn/SecaoTiming";
-import { CustomTooltip } from "@/components/churn/ui/CustomTooltip";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
-import { StatPill } from "@/components/churn/ui/StatPill";
-
-import { TechChartCard } from "@/components/churn/ui/TechChartCard";
-import { SectionBlock } from "@/components/churn/ui/SectionBlock";
 import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -96,12 +78,10 @@ export default function ChurnDetalhamento() {
   const [filterClusters, setFilterClusters] = useState<string[]>([]);
   const [filterEvitabilidades, setFilterEvitabilidades] = useState<string[]>([]);
   const [filterPossibilidadesRetencao, setFilterPossibilidadesRetencao] = useState<string[]>([]);
-  const [expandedRow, setExpandedRow] = useState<string | null>(null);
   const [dataInicio, setDataInicio] = useState<string>(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [dataFim, setDataFim] = useState<string>(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [sortBy, setSortBy] = useState<string>("data_encerramento");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
-  const [mainTab, setMainTab] = useState<"analise" | "contratos" | "relatorio" | "consolidado">("analise");
   const [filterAbono, setFilterAbono] = useState<"todos" | "abonados" | "nao_abonados">("todos");
 
   const [abonadoOverrides, setAbonadoOverrides] = useState<Record<string, boolean>>({});
@@ -264,8 +244,8 @@ export default function ChurnDetalhamento() {
       filtered = filtered.filter(c => c.possibilidade_retencao && filterPossibilidadesRetencao.includes(c.possibilidade_retencao));
     }
 
-    // Filtro de abono — só na aba Análise, onde o controle fica visível
-    if (mainTab === "analise" && filterAbono !== "todos") {
+    // Filtro de abono
+    if (filterAbono !== "todos") {
       filtered = filtered.filter(c => {
         const isAbonado = abonadoOverrides[c.id] ?? c.is_abonado ?? false;
         return filterAbono === "abonados" ? isAbonado : !isAbonado;
@@ -304,7 +284,7 @@ export default function ChurnDetalhamento() {
     });
     
     return filtered;
-  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, filterPlanos, filterClusters, filterEvitabilidades, filterPossibilidadesRetencao, dataInicio, dataFim, sortBy, sortOrder, mainTab, filterAbono, abonadoOverrides]);
+  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, filterPlanos, filterClusters, filterEvitabilidades, filterPossibilidadesRetencao, dataInicio, dataFim, sortBy, sortOrder, filterAbono, abonadoOverrides]);
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
@@ -544,11 +524,6 @@ export default function ChurnDetalhamento() {
     }
   }, [churnDailyInsights.status]);
 
-  // distribuicaoPorSquad, distribuicaoPorProduto, distribuicaoPorResponsavel, distribuicaoPorTicket
-  // moved to SecaoSegmentacao.tsx
-  // churnPorMes, comparativoMensal, cohortAnalysis, lifetimeCurve, mrrPerdidoPorMes
-  // moved to SecaoTiming.tsx
-
   // Clientes perdidos (maior impacto financeiro) — todos, sem limite
   const topClientesPerdidos = useMemo(() => {
     if (filteredContratos.length === 0) return [];
@@ -558,137 +533,6 @@ export default function ChurnDetalhamento() {
       .sort((a, b) => b.valorr - a.valorr);
   }, [filteredContratos]);
 
-  // Feature 1: Churn DNA Tags helper
-  const getChurnDNATags = (contrato: ChurnContract) => {
-    const tags: { label: string; value: string; color: string }[] = [];
-    if (contrato.evitabilidade_churn) {
-      tags.push({
-        label: "Evitabilidade",
-        value: contrato.evitabilidade_churn,
-        color: contrato.evitabilidade_churn === 'Evitável'
-          ? 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800'
-          : 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
-      });
-    }
-    if (contrato.possibilidade_retencao) {
-      const retColor = contrato.possibilidade_retencao === 'Alta'
-        ? 'bg-emerald-100 text-emerald-700 border-emerald-200 dark:bg-emerald-900/30 dark:text-emerald-400 dark:border-emerald-800'
-        : contrato.possibilidade_retencao === 'Média'
-        ? 'bg-amber-100 text-amber-700 border-amber-200 dark:bg-amber-900/30 dark:text-amber-400 dark:border-amber-800'
-        : 'bg-red-100 text-red-700 border-red-200 dark:bg-red-900/30 dark:text-red-400 dark:border-red-800';
-      tags.push({ label: "Retenção", value: contrato.possibilidade_retencao, color: retColor });
-    }
-    if (contrato.cluster) {
-      tags.push({ label: "Cluster", value: contrato.cluster, color: 'bg-blue-100 text-blue-700 border-blue-200 dark:bg-blue-900/30 dark:text-blue-400 dark:border-blue-800' });
-    }
-    if (contrato.plano) {
-      tags.push({ label: "Plano", value: contrato.plano, color: 'bg-violet-100 text-violet-700 border-violet-200 dark:bg-violet-900/30 dark:text-violet-400 dark:border-violet-800' });
-    }
-    if (contrato.motivo_cancelamento && contrato.motivo_cancelamento !== 'Não especificado') {
-      tags.push({ label: "Motivo", value: contrato.motivo_cancelamento, color: 'bg-orange-100 text-orange-700 border-orange-200 dark:bg-orange-900/30 dark:text-orange-400 dark:border-orange-800' });
-    }
-    if (contrato.submotivo) {
-      tags.push({ label: "Submotivo", value: contrato.submotivo, color: 'bg-pink-100 text-pink-700 border-pink-200 dark:bg-pink-900/30 dark:text-pink-400 dark:border-pink-800' });
-    }
-    return tags;
-  };
-
-  // comparativoMensal, cohortAnalysis, lifetimeCurve, mrrPerdidoPorMes moved to SecaoTiming.tsx
-  // distribuicaoPorTicket moved to SecaoSegmentacao.tsx
-
-  interface ClienteAgrupado {
-    cnpj: string;
-    cliente_nome: string;
-    contratos_count: number;
-    mrr_total: number;
-    ltv_total: number;
-    lifetime_medio: number;
-    ultima_data_encerramento: string;
-    produtos: string[];
-    squads: string[];
-  }
-
-  const clientesAgrupados = useMemo((): ClienteAgrupado[] => {
-    if (filteredContratos.length === 0) return [];
-    
-    const clientesMap: Record<string, {
-      cnpj: string;
-      cliente_nome: string;
-      contratos: ChurnContract[];
-    }> = {};
-    
-    filteredContratos.forEach(c => {
-      const key = c.cnpj || c.cliente_nome || "unknown";
-      if (!clientesMap[key]) {
-        clientesMap[key] = {
-          cnpj: c.cnpj,
-          cliente_nome: c.cliente_nome,
-          contratos: []
-        };
-      }
-      clientesMap[key].contratos.push(c);
-    });
-    
-    return Object.values(clientesMap)
-      .map(cliente => {
-        const contratos = cliente.contratos;
-        const mrrTotal = contratos.reduce((sum, c) => sum + (c.valorr || 0), 0);
-        const ltvTotal = contratos.reduce((sum, c) => sum + (c.ltv || 0), 0);
-        const ltMedio = contratos.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / contratos.length;
-        const ultimaData = contratos.reduce((max, c) => {
-          if (!c.data_encerramento) return max;
-          return !max || new Date(c.data_encerramento) > new Date(max) ? c.data_encerramento : max;
-        }, "" as string);
-        const produtos = Array.from(new Set(contratos.map(c => c.produto).filter(Boolean)));
-        const squads = Array.from(new Set(contratos.map(c => c.squad).filter(Boolean)));
-        
-        return {
-          cnpj: cliente.cnpj,
-          cliente_nome: cliente.cliente_nome,
-          contratos_count: contratos.length,
-          mrr_total: mrrTotal,
-          ltv_total: ltvTotal,
-          lifetime_medio: ltMedio,
-          ultima_data_encerramento: ultimaData,
-          produtos,
-          squads
-        };
-      })
-      .sort((a, b) => {
-        if (sortBy === "mrr_total" || sortBy === "valorr") {
-          return sortOrder === "desc" ? b.mrr_total - a.mrr_total : a.mrr_total - b.mrr_total;
-        }
-        if (sortBy === "ltv" || sortBy === "ltv_total") {
-          return sortOrder === "desc" ? b.ltv_total - a.ltv_total : a.ltv_total - b.ltv_total;
-        }
-        if (sortBy === "lifetime_meses") {
-          return sortOrder === "desc" ? b.lifetime_medio - a.lifetime_medio : a.lifetime_medio - b.lifetime_medio;
-        }
-        if (sortBy === "data_encerramento") {
-          const dateA = a.ultima_data_encerramento ? new Date(a.ultima_data_encerramento).getTime() : 0;
-          const dateB = b.ultima_data_encerramento ? new Date(b.ultima_data_encerramento).getTime() : 0;
-          return sortOrder === "desc" ? dateB - dateA : dateA - dateB;
-        }
-        return sortOrder === "desc" 
-          ? (b.cliente_nome || "").localeCompare(a.cliente_nome || "")
-          : (a.cliente_nome || "").localeCompare(b.cliente_nome || "");
-      });
-  }, [filteredContratos, sortBy, sortOrder]);
-
-  const handleSort = (column: string) => {
-    if (sortBy === column) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortBy(column);
-      setSortOrder("desc");
-    }
-  };
-
-  const SortIcon = ({ column }: { column: string }) => {
-    if (sortBy !== column) return null;
-    return sortOrder === "asc" ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />;
-  };
-
   const formatDate = (dateStr: string | null) => {
     if (!dateStr) return "-";
     try {
@@ -696,13 +540,6 @@ export default function ChurnDetalhamento() {
     } catch {
       return dateStr;
     }
-  };
-
-  const colors = {
-    danger: "text-red-500",
-    warning: "text-amber-500",
-    success: "text-emerald-500",
-    info: "text-blue-500",
   };
 
   if (error) {
@@ -751,8 +588,6 @@ export default function ChurnDetalhamento() {
         setSortOrder={setSortOrder}
       />
 
-      <>
-
       {/* Painel Executivo Hero - KPIs de Diagnóstico */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
         <ChurnKpisHero
@@ -766,17 +601,38 @@ export default function ChurnDetalhamento() {
         />
       )}
 
-      {/* Seção Motivos & Evitabilidade */}
-      <SecaoMotivos contratos={filteredContratos} onDrill={onDrill} />
+      {/* Seções analíticas — skeleton enquanto carrega */}
+      {isLoading ? (
+        <div className="space-y-4">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <Card key={i} className="border-border/50">
+              <CardContent className="p-6 space-y-3">
+                <Skeleton className="h-5 w-40" />
+                <Skeleton className="h-3 w-64" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2">
+                  {Array.from({ length: 3 }).map((_, j) => (
+                    <Skeleton key={j} className="h-40 rounded-xl" />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      ) : (
+        <>
+          {/* Seção Motivos & Evitabilidade */}
+          <SecaoMotivos contratos={filteredContratos} onDrill={onDrill} />
 
-      {/* Seção Voz do Cliente (IA) */}
-      <SecaoVozCliente contratos={filteredContratos} onDrill={onDrill} />
+          {/* Seção Voz do Cliente (IA) */}
+          <SecaoVozCliente contratos={filteredContratos} onDrill={onDrill} />
 
-      {/* Seção Segmentação: squad, produto/serviço, ticket, responsável */}
-      <SecaoSegmentacao contratos={filteredContratos} onDrill={onDrill} />
+          {/* Seção Segmentação: squad, produto/serviço, ticket, responsável */}
+          <SecaoSegmentacao contratos={filteredContratos} onDrill={onDrill} />
 
-      {/* Seção Timing: distribuição por lifetime, evolução mensal, cohort, curva de sobrevivência, MRR perdido */}
-      <SecaoTiming contratos={filteredContratos} onDrill={onDrill} />
+          {/* Seção Timing: distribuição por lifetime, evolução mensal, cohort, curva de sobrevivência, MRR perdido */}
+          <SecaoTiming contratos={filteredContratos} onDrill={onDrill} />
+        </>
+      )}
 
       {/* Painel Executivo Detalhado (MRR Base, Abonado, NRR, Squad) */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
@@ -1292,7 +1148,6 @@ export default function ChurnDetalhamento() {
         pendingIds={pendingIds}
         abonadoOverrides={abonadoOverrides}
       />
-      </>
     </div>
   );
 }

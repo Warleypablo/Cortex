@@ -31,16 +31,7 @@ import { TechChartCard } from "@/components/churn/ui/TechChartCard";
 import { SectionBlock } from "@/components/churn/ui/SectionBlock";
 import { CustomTooltip } from "@/components/churn/ui/CustomTooltip";
 import { StatPill } from "@/components/churn/ui/StatPill";
-
-// ── helpers duplicated/moved from orchestrator ──────────────────────────────
-
-const formatCurrencyNoDecimals = (value: number) =>
-  new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
+import { formatCurrencyNoDecimals } from "@/lib/utils";
 
 const REFINED_COLORS = [
   "#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b",
