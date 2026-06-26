@@ -207,6 +207,23 @@ export default function GrowthOrganico() {
   // posts que passaram do horário e NÃO vão sair sozinhos → alimentam o banner de alerta
   const perdidos = agendados.filter((p) => tsOf(p) === "perdeu");
 
+  // conflito de horário: 2+ posts da MESMA rede no MESMO horário efetivo (minuto).
+  // Regra: nunca deve sair mais de um post no mesmo horário.
+  const horarioKey = (p: Post) => {
+    const eff = effectiveWhen(p);
+    return eff ? `${p.platform}|${new Date(eff).toISOString().slice(0, 16)}` : null;
+  };
+  const horarioCount = new Map<string, number>();
+  agendados.forEach((p) => {
+    const k = horarioKey(p);
+    if (k) horarioCount.set(k, (horarioCount.get(k) ?? 0) + 1);
+  });
+  const emConflito = (p: Post) => {
+    const k = horarioKey(p);
+    return !!k && (horarioCount.get(k) ?? 0) > 1;
+  };
+  const temConflito = agendados.some(emConflito);
+
   const runNow = (p: Post) =>
     commandMut.mutate({ platform: p.platform, clickupTaskId: p.clickupTaskId, action: "publish_now" });
   const doSchedule = (p: Post, whenIso: string) =>
@@ -249,6 +266,22 @@ export default function GrowthOrganico() {
                   ))}
                   {perdidos.length > 3 && <span>+{perdidos.length - 3}</span>}
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* ALERTA — dois ou mais posts marcados pro mesmo horário (não pode sair junto) */}
+        {temConflito && (
+          <Card className="border-amber-300 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/40">
+            <CardContent className="p-3 flex items-start gap-2 text-sm">
+              <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400 mt-0.5 shrink-0" />
+              <div>
+                <span className="font-semibold text-amber-700 dark:text-amber-300">Conflito de horário</span>
+                <span className="text-amber-700/80 dark:text-amber-300/80">
+                  {" "}— há posts marcados pro mesmo horário. Nunca deve sair mais de um post na mesma hora;
+                  ajuste o campo <strong>Horário</strong> no card pra dar um horário diferente a cada um.
+                </span>
               </div>
             </CardContent>
           </Card>
@@ -313,7 +346,12 @@ export default function GrowthOrganico() {
                       <TableCell>{p.tipoPost ?? "—"}</TableCell>
                       <TableCell className="text-center">{p.assetCount ?? 0}</TableCell>
                       <TableCell><LegendaCell post={p} /></TableCell>
-                      <TableCell className="whitespace-nowrap">{fmtData(p.postingDate)}</TableCell>
+                      <TableCell className="whitespace-nowrap">
+                        {fmtData(p.postingDate)}
+                        {p.postingDate && (
+                          <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">· sem horário</span>
+                        )}
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="inline-flex items-center gap-1.5 justify-end">
                           <ClickUpButton post={p} />
@@ -380,9 +418,14 @@ export default function GrowthOrganico() {
                       <TableCell className="max-w-[260px] truncate" title={p.taskName ?? ""}>{p.taskName ?? "—"}</TableCell>
                       <TableCell>{p.tipoPost ?? "—"}</TableCell>
                       <TableCell>
-                        <div className="inline-flex items-center gap-1.5">
+                        <div className="inline-flex items-center gap-1.5 flex-wrap">
                           <StateBadge state={p.state} />
                           <TimeBadge ts={tsOf(p)} />
+                          {emConflito(p) && (
+                            <Badge variant="outline" className="border-0 bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
+                              Mesmo horário
+                            </Badge>
+                          )}
                         </div>
                       </TableCell>
                       <TableCell className="text-right">
@@ -391,11 +434,6 @@ export default function GrowthOrganico() {
                           <Button size="sm" variant="default" className="h-7 px-2"
                             disabled={commandMut.isPending} onClick={() => setConfirmPost(p)}>
                             <Send className="h-3.5 w-3.5" /><span className="ml-1">Soltar agora</span>
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 px-2"
-                            disabled={commandMut.isPending} onClick={() => setSchedulePost(p)}>
-                            <CalendarClock className="h-3.5 w-3.5" />
-                            <span className="ml-1">{p.scheduledAt ? "Reagendar" : "Agendar"}</span>
                           </Button>
                           {p.scheduledAt && (
                             <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground"
