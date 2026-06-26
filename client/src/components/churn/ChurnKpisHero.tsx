@@ -36,6 +36,7 @@ export interface ChurnKpisHeroProps {
   nrrPct?: number;
   ltMedio?: number;
   ticketMedio?: number;
+  onDrill?: (titulo: string, contratos: ChurnContract[]) => void;
 }
 
 // TETO de taxa de churn: 10% = severidade máxima.
@@ -53,15 +54,26 @@ function KpiCard({
   valueClass,
   sub,
   severityNorm,
+  onClick,
 }: {
   label: string;
   value: string;
   valueClass?: string;
   sub?: string;
   severityNorm?: number; // 0–1, para barra
+  onClick?: () => void;
 }): JSX.Element {
   return (
-    <div className="flex flex-col gap-1 p-4 rounded-lg bg-white dark:bg-zinc-900/50 border border-border/50 min-w-0">
+    <div
+      className={[
+        "flex flex-col gap-1 p-4 rounded-lg bg-white dark:bg-zinc-900/50 border border-border/50 min-w-0",
+        onClick ? "cursor-pointer hover:bg-muted/40 transition-colors" : "",
+      ].join(" ")}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+    >
       <span className="text-xs text-muted-foreground uppercase tracking-wider truncate">{label}</span>
       <span className={`text-3xl font-bold tabular-nums leading-none ${valueClass ?? "text-foreground"}`}>
         {value}
@@ -99,8 +111,10 @@ export function ChurnKpisHero({
   nrrPct,
   ltMedio,
   ticketMedio,
+  onDrill,
 }: ChurnKpisHeroProps): JSX.Element {
-  const logosCount = contratos.filter(c => c.tipo === "churn" && !c.is_abonado).length;
+  const churns = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
+  const logosCount = churns.length;
   const evitavelPct = pctEvitavel(contratos);
 
   // Taxa: 0% = verde, TAXA_CHURN_TETO% = vermelho
@@ -116,6 +130,15 @@ export function ChurnKpisHero({
 
   const hasSecondary = (ltMedio !== undefined && ltMedio > 0) || (ticketMedio !== undefined && ticketMedio > 0);
 
+  // Subsets for drill
+  const evitaveis = churns.filter(c => {
+    const val = (c.evitabilidade_churn ?? "").toLowerCase();
+    return val.includes("evit") && !val.includes("inevit");
+  });
+
+  const makeDrill = (titulo: string, subset: ChurnContract[]) =>
+    onDrill && subset.length > 0 ? () => onDrill(titulo, subset) : undefined;
+
   return (
     <div className="space-y-2">
       <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
@@ -125,16 +148,19 @@ export function ChurnKpisHero({
           valueClass={severityTextClass(taxaNorm)}
           sub="do MRR base no período"
           severityNorm={taxaNorm}
+          onClick={makeDrill("Churn do período", churns)}
         />
         <KpiCard
           label="MRR Perdido"
           value={formatCurrencyNoDecimals(mrrPerdido)}
           sub="receita recorrente encerrada"
+          onClick={makeDrill("Churn do período — MRR perdido", churns)}
         />
         <KpiCard
           label="Logos Perdidos"
           value={String(logosCount)}
           sub="contratos encerrados"
+          onClick={makeDrill("Logos perdidos", churns)}
         />
         <KpiCard
           label="% Evitável"
@@ -142,6 +168,7 @@ export function ChurnKpisHero({
           valueClass={severityTextClass(evitavelNorm)}
           sub="dos classificados"
           severityNorm={evitavelNorm}
+          onClick={makeDrill("Churn evitável", evitaveis)}
         />
         <KpiCard
           label="NRR"
@@ -149,6 +176,7 @@ export function ChurnKpisHero({
           valueClass={nrrNorm !== undefined ? severityTextClass(nrrNorm) : "text-muted-foreground"}
           sub="net revenue retention"
           severityNorm={nrrNorm}
+          onClick={makeDrill("Churn do período", churns)}
         />
       </div>
       {hasSecondary && (
