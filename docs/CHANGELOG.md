@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-26 | feat(bp2026): tornar células de CAC por contrato auditáveis
+
+**O que foi feito:**
+- A célula **CAC por contrato** (linha-pai total) e as 5 sub-linhas por área (Performance, Creators, Social, Gestão de Comunidade, Others) viraram clicáveis: abrem o drawer de detalhe.
+- Novo handler `detCacPorContrato` em `bp2026.detalhe.ts`: mostra a fórmula (CAC total ÷ contratos = razão) via `notaDinamica` e lista os deals do Bitrix que compõem o denominador, estourados por segmento × natureza.
+- A contagem do drawer reusa `carregarAtribuicaoVendas` + `distribuirDeal` (a MESMA fonte da célula), garantindo paridade exata com o denominador. Pai = rec + pontual de todos os segmentos; filho = só recorrente do segmento.
+- Front: novo campo `auditavel` em `BPLinha` libera o clique nas sub-linhas (que o bloqueio de `subItem` impediria); células dos filhos ganham `onClick`.
+- Teste `bp2026.cacContrato.test.ts` trava a invariante "contagem do drawer == denominador da célula".
+
+**Por que:**
+- O "CAC por contrato" tinha `semDetalhe: true` (o denominador exigia reconstruir a distribuição de deals). Tornar a célula auditável dá transparência ao número — clicar e ver de onde vem, sem depender do dev.
+
+**Arquivos alterados:**
+- `server/routes/bp2026.detalhe.ts` - handler `detCacPorContrato` + roteamento das métricas `cac_por_contrato` e `cac_contrato_produto_<slug>`.
+- `server/routes/bp2026.detalhamentos.ts` - `semDetalhe → auditavel` na linha-pai e nas sub-linhas; campo `auditavel` no tipo `Linha`.
+- `client/src/components/bp2026/BPDreTable.tsx` - campo `auditavel` em `BPLinha`; condição de clique cobre sub-linhas auditáveis (linhas de topo e bloco de filhos).
+- `server/routes/bp2026.cacContrato.test.ts` (novo) - teste de paridade.
+
+**Impacto arquitetural:** Nenhum estrutural. Paridade validada contra o banco real (jan–jun: contagem do handler == denominador da célula em todos os meses e segmentos); `tsc` sem erros novos nos arquivos tocados; teste passa. Smoke visual no browser ficou pendente (Chrome MCP em página de erro p/ localhost, apesar do server responder 200).
+
+---
+
 ## 2026-06-24 | feat(bp-copilot): UI do chat (Fase 2)
 
 **O que foi feito:**
