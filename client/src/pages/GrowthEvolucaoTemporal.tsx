@@ -213,16 +213,10 @@ function formatValue(value: number | null, format: MetricFormat): string {
   }
 }
 
-function percColor(pct: number | null, inverted = false): string {
-  if (pct === null) return "";
-  if (inverted) {
-    if (pct <= 100) return "text-emerald-600 dark:text-emerald-400";
-    if (pct <= 120) return "text-amber-600 dark:text-amber-400";
-    return "text-red-600 dark:text-red-400";
-  }
-  if (pct >= 100) return "text-emerald-600 dark:text-emerald-400";
-  if (pct >= 80) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
+// Coloração por performance (verde/laranja/vermelho) removida — não usamos.
+// Mantém o número de % atingido vs. orçado, mas em cinza neutro.
+function percColor(_pct: number | null, _inverted = false): string {
+  return "text-muted-foreground";
 }
 
 interface MetricDef {
