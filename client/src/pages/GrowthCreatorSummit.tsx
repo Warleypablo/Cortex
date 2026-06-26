@@ -14,11 +14,12 @@ interface PorTipo {
   leads: number; ingressos: number; receitaBruta: number; receitaLiquida: number;
 }
 interface MetaBlock {
-  investimento: number; impressoes: number; alcance: number; frequencia: number;
-  cpm: number; cliquesTotais: number; cliques: number; ctr: number; ctrUnico: number;
-  visualizacoesPagina: number; connectRate: number; sessoes: number; pageViewsGa4: number;
-  leads: number; cpl: number; txConversaoVdP: number; txConversaoSessoes: number;
-  compras: number | null; receita: number | null; roas: number | null;
+  investimento: number; cpm: number; ctr: number; ctrUnico: number;
+  connectRate: number; sessoes: number;
+  txConversaoVdP: number; txConversaoSessoes: number;
+  leads: number; cpl: number;
+  carrinhoAbandonado: number | null; vendas: number | null;
+  receita: number | null; roas: number | null;
 }
 interface Consolidado {
   investimento: number; leads: number; carrinhoAbandonado: number | null; ingressos: number;
@@ -102,50 +103,45 @@ export default function GrowthCreatorSummit() {
   const m = data?.meta;
   const cons = data?.consolidado;
 
+  const pend = "pendente: integração pixel";
+  const custoVenda = m && m.vendas ? m.investimento / m.vendas : null;
+  const custoCarrinho = m && m.carrinhoAbandonado ? m.investimento / m.carrinhoAbandonado : null;
+
   const metaSections: Section[] = m
     ? [
         {
           title: "Mídia",
           rows: [
             { label: "Investimento", value: formatCurrencyNoDecimals(m.investimento) },
-            { label: "Impressões", value: fmtInt(m.impressoes) },
-            { label: "Alcance", value: fmtInt(m.alcance) },
-            { label: "Frequência", value: formatDecimal(m.frequencia) },
             { label: "CPM", value: formatCurrency(m.cpm) },
-            { label: "Cliques de saída", value: fmtInt(m.cliques) },
             { label: "CTR de saída", value: formatPercent(m.ctr) },
             { label: "CTR de saída único", value: formatPercent(m.ctrUnico) },
-            { label: "Visualizações de página", value: fmtInt(m.visualizacoesPagina) },
             { label: "Connect Rate", value: formatPercent(m.connectRate), hint: "VdP ÷ cliques de saída" },
             { label: "Sessões", value: fmtInt(m.sessoes), hint: "GA4" },
+            { label: "Tx conversão de página (por VdP)", value: formatPercent(m.txConversaoVdP), hint: "leads ÷ VdP" },
+            { label: "Tx conversão de página (por sessões)", value: formatPercent(m.txConversaoSessoes), hint: "leads ÷ sessões" },
           ],
         },
         {
-          title: "Conversão de página",
-          rows: [
-            { label: "Tx conversão por visualização de página", value: formatPercent(m.txConversaoVdP), hint: "leads ÷ VdP" },
-            { label: "Tx conversão por sessões", value: formatPercent(m.txConversaoSessoes), hint: "leads ÷ sessões" },
-          ],
-        },
-        {
-          title: "Leads",
+          title: "Conversão",
           rows: [
             { label: "Leads (atribuídos ao Meta)", value: fmtInt(m.leads) },
-            { label: "CPL", value: formatCurrency(m.cpl) },
-          ],
-        },
-        {
-          title: "Vendas",
-          rows: [
-            m.compras === null
-              ? { label: "Ingressos vendidos (Meta)", pending: "pendente: sync conversão" }
-              : { label: "Ingressos vendidos (Meta)", value: fmtInt(m.compras) },
-            m.receita === null
-              ? { label: "Receita (Meta)", pending: "pendente: sync conversão" }
-              : { label: "Receita (Meta)", value: formatCurrencyNoDecimals(m.receita) },
+            { label: "Custo por lead", value: formatCurrency(m.cpl) },
+            m.carrinhoAbandonado === null
+              ? { label: "Carrinho abandonado", pending: pend }
+              : { label: "Carrinho abandonado", value: fmtInt(m.carrinhoAbandonado) },
+            custoCarrinho === null
+              ? { label: "Custo por carrinho abandonado", pending: pend }
+              : { label: "Custo por carrinho abandonado", value: formatCurrency(custoCarrinho) },
+            m.vendas === null
+              ? { label: "Vendas", pending: pend }
+              : { label: "Vendas", value: fmtInt(m.vendas) },
+            custoVenda === null
+              ? { label: "Custo por venda", pending: pend }
+              : { label: "Custo por venda", value: formatCurrency(custoVenda) },
             m.roas === null
-              ? { label: "ROAS (Meta)", pending: "pendente: sync conversão" }
-              : { label: "ROAS (Meta)", value: `${formatDecimal(m.roas)}x` },
+              ? { label: "ROAS", pending: pend }
+              : { label: "ROAS", value: `${formatDecimal(m.roas)}x` },
           ],
         },
       ]
@@ -312,9 +308,9 @@ export default function GrowthCreatorSummit() {
               <div className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400 px-1">
                 <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                 <span>
-                  Mídia e leads são do Meta (campanhas com "summit" no nome; sessões via GA4). Ingressos/receita/ROAS do
-                  Meta dependem de sincronizar a conversão de compra do pixel (Sympla) — a maioria das compras perde o
-                  UTM no checkout, então a atribuição por venda fica pendente. Veja o total real na aba Consolidado.
+                  Mídia, sessões e leads são do Meta (campanhas com "summit" no nome; sessões via GA4). Carrinho
+                  abandonado, vendas e ROAS dependem de capturar os eventos do pixel (InitiateCheckout / Purchase) no
+                  sync do Meta — ainda não disponível. O total real de vendas está na aba Consolidado.
                 </span>
               </div>
             </TabsContent>

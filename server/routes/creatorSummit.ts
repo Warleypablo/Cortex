@@ -134,34 +134,29 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
       const mInvest = num(mm.investimento);
       const mImpr = num(mm.impressoes);
       const mAlcance = num(mm.alcance);
-      const mCliquesTotais = num(mm.cliques_totais);
       const mCliques = num(mm.cliques); // outbound
       const mCliquesUnicos = num(mm.cliques_unicos);
       const mVdP = num(mm.visualizacoes_pagina);
       const mLeads = num((metaLeadsRow.rows[0] || {}).leads);
 
+      // Espelha o conjunto do Orçado×Realizado (Meta), enxuto: sem alcance,
+      // frequência e cliques de saída (números brutos pedidos pra remover).
       const meta = {
         investimento: mInvest,
-        impressoes: mImpr,
-        alcance: mAlcance,
-        frequencia: mAlcance > 0 ? mImpr / mAlcance : 0,
         cpm: mImpr > 0 ? (mInvest / mImpr) * 1000 : 0,
-        cliquesTotais: mCliquesTotais,
-        cliques: mCliques,
         ctr: mImpr > 0 ? (mCliques / mImpr) * 100 : 0,
         ctrUnico: mAlcance > 0 ? (mCliquesUnicos / mAlcance) * 100 : 0,
-        visualizacoesPagina: mVdP,
         connectRate: mCliques > 0 ? (mVdP / mCliques) * 100 : 0,
         sessoes: ga4Sessoes,
-        pageViewsGa4: ga4PageViews,
-        leads: mLeads,
-        cpl: mLeads > 0 ? mInvest / mLeads : 0,
         // Conversão de página: por visualização de página (pixel) e por sessões (GA4)
         txConversaoVdP: mVdP > 0 ? (mLeads / mVdP) * 100 : 0,
         txConversaoSessoes: ga4Sessoes > 0 ? (mLeads / ga4Sessoes) * 100 : 0,
-        // Compras/receita/ROAS dependem de sincronizar a conversão de compra do
-        // pixel (Sympla) — não disponível no pipeline hoje.
-        compras: null as number | null,
+        leads: mLeads,
+        cpl: mLeads > 0 ? mInvest / mLeads : 0,
+        // Carrinho abandonado e vendas dependem de capturar os eventos do pixel
+        // (InitiateCheckout / Purchase) no sync do Meta — não disponível hoje.
+        carrinhoAbandonado: null as number | null,
+        vendas: null as number | null,
         receita: null as number | null,
         roas: null as number | null,
       };
