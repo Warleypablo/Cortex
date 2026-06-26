@@ -305,12 +305,13 @@ export default function GrowthCreatorSummit() {
                 <CardContent><MetricsTable sections={metaSections} /></CardContent>
               </Card>
 
-              <div className="flex items-start gap-2 text-xs text-amber-600 dark:text-amber-400 px-1">
+              <div className="flex items-start gap-2 text-xs text-gray-500 dark:text-zinc-500 px-1">
                 <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
                 <span>
-                  Mídia, sessões e leads são do Meta (campanhas com "summit" no nome; sessões via GA4). Carrinho
-                  abandonado, vendas e ROAS dependem de capturar os eventos do pixel (InitiateCheckout / Purchase) no
-                  sync do Meta — ainda não disponível. O total real de vendas está na aba Consolidado.
+                  Tudo aqui é atribuição do Meta: mídia/sessões das campanhas com "summit" no nome (sessões via GA4),
+                  carrinho = evento InitiateCheckout e vendas = conversão personalizada do pixel ("Compra - Creators
+                  Summit ES"). Por isso difere da aba Consolidado, que conta todas as {data.consolidado.ingressos} vendas
+                  (incl. as sem rastro de canal, via Bitrix).
                 </span>
               </div>
             </TabsContent>
