@@ -31,8 +31,12 @@ const REFINED_COLORS = [
 
 export function SecaoSegmentacao({ contratos, onDrill }: SecaoSegmentacaoProps): JSX.Element {
   // MRR Perdido por Squad (churn only, excluding irrelevant squads)
+  const squadsIrrelevantes = ['turbo interno', 'squad x', 'interno', 'x'];
   const distribuicaoPorSquad = useMemo(() => {
-    const churnOnly = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
+    const churnOnly = contratos.filter(
+      c => c.tipo === "churn" && !c.is_abonado &&
+           !squadsIrrelevantes.includes((c.squad || "").toLowerCase().trim())
+    );
     if (churnOnly.length === 0) return [];
 
     const squadCounts: Record<string, { count: number; mrr: number }> = {};
@@ -148,7 +152,7 @@ export function SecaoSegmentacao({ contratos, onDrill }: SecaoSegmentacaoProps):
 
   return (
     <SectionBlock
-      title="Segmentacao"
+      title="Segmentação"
       subtitle="Onde o churn se concentra"
       icon={Users}
       accent="bg-gradient-to-r from-cyan-500 to-blue-500"
@@ -163,7 +167,7 @@ export function SecaoSegmentacao({ contratos, onDrill }: SecaoSegmentacaoProps):
           iconBg="bg-gradient-to-r from-blue-500 to-indigo-500"
           meta={
             <StatPill
-              label="Top servico"
+              label="Top serviço"
               value={topServico ? `${topServico.name} (${topServico.percentual.toFixed(0)}%)` : "-"}
               tone="info"
             />
@@ -276,6 +280,7 @@ export function SecaoSegmentacao({ contratos, onDrill }: SecaoSegmentacaoProps):
                         c =>
                           c.tipo === "churn" &&
                           !c.is_abonado &&
+                          !squadsIrrelevantes.includes((c.squad || "").toLowerCase().trim()) &&
                           (c.squad || "Não especificado") === data.fullName
                       )
                     )
@@ -370,7 +375,7 @@ export function SecaoSegmentacao({ contratos, onDrill }: SecaoSegmentacaoProps):
           iconBg="bg-gradient-to-r from-indigo-500 to-purple-500"
           meta={
             <StatPill
-              label="Faixa lider"
+              label="Faixa líder"
               value={topTicket ? `${topTicket.name} (${topTicket.count})` : "-"}
               tone="info"
             />
@@ -399,9 +404,7 @@ export function SecaoSegmentacao({ contratos, onDrill }: SecaoSegmentacaoProps):
                         `Ticket: ${data.name}`,
                         contratos.filter(c => {
                           const valor = c.valorr || 0;
-                          const range = distribuicaoPorTicket.find(r => r.name === data.name);
-                          if (!range) return false;
-                          return valor >= range.min && valor < range.max;
+                          return valor >= data.min && valor < data.max;
                         })
                       )
                     }
