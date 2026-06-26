@@ -11,6 +11,7 @@ export interface User {
   createdAt: string;
   role: 'admin' | 'user';
   allowedRoutes: string[];
+  allowedBpTabs: string[];
   department: 'admin' | 'comercial' | 'financeiro' | 'operacao' | null;
 }
 
