@@ -101,24 +101,28 @@ export function expandFunilValues(values: string[]): string[] {
 export const SUMMIT_CATEGORY_ID = 10;
 export const SUMMIT_CAMPAIGN_KEYWORD = "summit";
 
-// Tipos de ingresso. `match` casa (ILIKE) contra o fnl_ngc do deal; `preco` é o
-// valor do comprador (com taxa Sympla embutida). Ordem = exibição.
+// Tipos de ingresso. `match` casa (ILIKE) contra o fnl_ngc do deal.
+//  - preco        = valor do comprador (bruto, com taxa Sympla embutida)
+//  - precoLiquido = valor a receber (o que cai no bolso, após ~10% da Sympla)
+// Ordem = exibição.
 export interface SummitTicketType {
   key: string;
   label: string;
   match: string[]; // substrings case-insensitive no fnl_ngc
-  preco: number; // valor do comprador (R$)
+  preco: number; // valor do comprador (R$, bruto)
+  precoLiquido: number; // valor a receber (R$, líquido)
 }
 
 export const SUMMIT_TICKET_TYPES: SummitTicketType[] = [
-  { key: "criador", label: "Criador", match: ["criador"], preco: 297 },
-  { key: "empresario", label: "Empresário", match: ["empres"], preco: 297 },
-  { key: "vip", label: "VIP", match: ["vip"], preco: 2997 },
+  { key: "criador", label: "Criador", match: ["criador"], preco: 297, precoLiquido: 267.3 },
+  { key: "empresario", label: "Empresário", match: ["empres"], preco: 297, precoLiquido: 267.3 },
+  { key: "vip", label: "VIP", match: ["vip"], preco: 2997, precoLiquido: 2697.3 },
 ];
 
-// Preço default p/ ingressos sem tipo identificável (ex: "Compra Sympla",
-// fnl_ngc nulo). Maioria é PASS (R$ 297); VIP só conta quando o tipo casa.
+// Preços default p/ ingressos sem tipo identificável (ex: "Compra Sympla",
+// fnl_ngc nulo). Maioria é PASS; VIP só conta quando o tipo casa.
 export const SUMMIT_DEFAULT_PRECO = 297;
+export const SUMMIT_DEFAULT_PRECO_LIQUIDO = 267.3;
 
 /** Classifica o fnl_ngc de um deal de evento num tipo de ingresso (ou null). */
 export function summitTicketType(fnlNgc: string | null | undefined): SummitTicketType | null {
@@ -130,7 +134,12 @@ export function summitTicketType(fnlNgc: string | null | undefined): SummitTicke
   return null;
 }
 
-/** Preço do ingresso de um deal pelo seu tipo (default PASS quando indefinido). */
+/** Preço bruto do ingresso de um deal pelo tipo (default PASS quando indefinido). */
 export function summitPrecoIngresso(fnlNgc: string | null | undefined): number {
   return summitTicketType(fnlNgc)?.preco ?? SUMMIT_DEFAULT_PRECO;
+}
+
+/** Preço líquido (valor a receber) do ingresso pelo tipo (default PASS). */
+export function summitPrecoLiquidoIngresso(fnlNgc: string | null | undefined): number {
+  return summitTicketType(fnlNgc)?.precoLiquido ?? SUMMIT_DEFAULT_PRECO_LIQUIDO;
 }

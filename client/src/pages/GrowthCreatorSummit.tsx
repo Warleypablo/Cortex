@@ -1,84 +1,61 @@
-import { useState } from "react";
+import { useState, Fragment } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import {
-  Loader2, PartyPopper, Megaphone, Users, Ticket, DollarSign, TrendingUp, Info,
-} from "lucide-react";
-import {
-  ResponsiveContainer, ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
-} from "recharts";
+import { Loader2, PartyPopper, Info } from "lucide-react";
 import { formatCurrency, formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
 
 interface PorTipo {
   key: string;
   label: string;
   preco: number;
-  cadastros: number;
+  precoLiquido: number;
+  leads: number;
   ingressos: number;
-  receita: number;
+  receitaBruta: number;
+  receitaLiquida: number;
 }
-interface SerieMes {
-  mes: string;
-  label: string;
-  investimento: number;
-  cadastros: number;
-  ingressos: number;
-  receita: number;
-  roas: number;
-}
-interface Campanha {
-  nome: string;
+interface Totais {
   investimento: number;
   impressoes: number;
   cliques: number;
+  leads: number;
+  carrinhoAbandonado: number | null;
+  ingressos: number;
+  receitaBruta: number;
+  receitaLiquida: number;
+  cpl: number;
+  cacIngresso: number;
+  ticketMedioBruto: number;
+  ticketMedioLiquido: number;
+  roasBruto: number;
+  roasLiquido: number;
+  taxaConversao: number;
 }
 interface SummitData {
   year: number;
-  totais: {
-    investimento: number;
-    impressoes: number;
-    cliques: number;
-    cadastros: number;
-    ingressos: number;
-    receita: number;
-    cpl: number;
-    cacIngresso: number;
-    ticketMedio: number;
-    roas: number;
-    taxaConversao: number;
-  };
+  totais: Totais;
   porTipo: PorTipo[];
-  series: SerieMes[];
-  campanhas: Campanha[];
-  premissaPreco: { label: string; preco: number }[];
+  premissaPreco: { label: string; preco: number; precoLiquido: number }[];
 }
 
 const fmtInt = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
 
-function Kpi({
-  icon, label, value, sub,
-}: { icon: React.ReactNode; label: string; value: string; sub?: string }) {
-  return (
-    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-gray-600 dark:text-zinc-400 text-xs font-medium">
-          {icon}
-          <span className="truncate">{label}</span>
-        </div>
-        <div className="mt-2 text-2xl font-bold text-gray-900 dark:text-white tabular-nums">{value}</div>
-        {sub && <div className="mt-0.5 text-xs text-gray-500 dark:text-zinc-500">{sub}</div>}
-      </CardContent>
-    </Card>
-  );
+type Row =
+  | { label: string; value: string; muted?: boolean; hint?: string }
+  | { label: string; pending: string };
+
+interface Section {
+  title: string;
+  rows: Row[];
 }
 
 export default function GrowthCreatorSummit() {
   usePageTitle("Creator Summit");
-  useSetPageInfo("Creator Summit", "Funil do evento (pipeline de Eventos) — investimento, inscrições e ingressos");
+  useSetPageInfo("Creator Summit", "Funil do evento (pipeline de Eventos) — investimento, leads e ingressos");
 
   const [year, setYear] = useState(new Date().getFullYear());
 
@@ -93,8 +70,44 @@ export default function GrowthCreatorSummit() {
 
   const years = [year - 1, year, year + 1].filter((y, i, a) => a.indexOf(y) === i);
 
+  const sections: Section[] = data
+    ? [
+        {
+          title: "Marketing",
+          rows: [
+            { label: "Investimento", value: formatCurrencyNoDecimals(data.totais.investimento) },
+            { label: "Impressões", value: fmtInt(data.totais.impressoes) },
+            { label: "Cliques", value: fmtInt(data.totais.cliques) },
+            { label: "Leads", value: fmtInt(data.totais.leads) },
+            { label: "CPL", value: formatCurrency(data.totais.cpl) },
+            data.totais.carrinhoAbandonado === null
+              ? { label: "Carrinho abandonado", pending: "a integrar (Sympla)" }
+              : { label: "Carrinho abandonado", value: fmtInt(data.totais.carrinhoAbandonado) },
+          ],
+        },
+        {
+          title: "Conversão",
+          rows: [
+            { label: "Ingressos vendidos", value: fmtInt(data.totais.ingressos) },
+            { label: "Taxa de conversão (Lead → Ingresso)", value: formatPercent(data.totais.taxaConversao * 100) },
+            { label: "CAC por ingresso", value: formatCurrency(data.totais.cacIngresso) },
+          ],
+        },
+        {
+          title: "Receita",
+          rows: [
+            { label: "Receita bruta", value: formatCurrencyNoDecimals(data.totais.receitaBruta), hint: "valor do comprador" },
+            { label: "Receita líquida", value: formatCurrencyNoDecimals(data.totais.receitaLiquida), hint: "valor a receber (após taxa Sympla)" },
+            { label: "Ticket médio líquido", value: formatCurrency(data.totais.ticketMedioLiquido) },
+            { label: "ROAS bruto", value: `${formatDecimal(data.totais.roasBruto)}x` },
+            { label: "ROAS líquido", value: `${formatDecimal(data.totais.roasLiquido)}x` },
+          ],
+        },
+      ]
+    : [];
+
   return (
-    <div className="p-4 md:p-6 space-y-6 max-w-[1400px] mx-auto">
+    <div className="p-4 md:p-6 space-y-6 max-w-[1100px] mx-auto">
       <div className="flex items-center justify-between gap-4 flex-wrap">
         <div className="flex items-center gap-2">
           <PartyPopper className="h-5 w-5 text-fuchsia-500" />
@@ -127,16 +140,6 @@ export default function GrowthCreatorSummit() {
 
       {data && (
         <>
-          {/* KPIs principais */}
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Kpi icon={<Megaphone className="h-3.5 w-3.5" />} label="Investimento" value={formatCurrencyNoDecimals(data.totais.investimento)} />
-            <Kpi icon={<Users className="h-3.5 w-3.5" />} label="Cadastros" value={fmtInt(data.totais.cadastros)} sub={`CPL ${formatCurrency(data.totais.cpl)}`} />
-            <Kpi icon={<Ticket className="h-3.5 w-3.5" />} label="Ingressos" value={fmtInt(data.totais.ingressos)} sub={`Conv. ${formatPercent(data.totais.taxaConversao * 100)}`} />
-            <Kpi icon={<DollarSign className="h-3.5 w-3.5" />} label="CAC / Ingresso" value={formatCurrency(data.totais.cacIngresso)} />
-            <Kpi icon={<DollarSign className="h-3.5 w-3.5" />} label="Receita" value={formatCurrencyNoDecimals(data.totais.receita)} sub={`Ticket ${formatCurrency(data.totais.ticketMedio)}`} />
-            <Kpi icon={<TrendingUp className="h-3.5 w-3.5" />} label="ROAS" value={`${formatDecimal(data.totais.roas)}x`} />
-          </div>
-
           {/* Funil simples */}
           <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
             <CardHeader className="pb-2">
@@ -144,8 +147,8 @@ export default function GrowthCreatorSummit() {
             </CardHeader>
             <CardContent className="flex items-center gap-3 flex-wrap">
               <div className="flex-1 min-w-[140px] rounded-lg bg-blue-50 dark:bg-blue-950/40 p-3">
-                <div className="text-xs text-blue-700 dark:text-blue-300">Cadastros</div>
-                <div className="text-2xl font-bold text-blue-900 dark:text-blue-200">{fmtInt(data.totais.cadastros)}</div>
+                <div className="text-xs text-blue-700 dark:text-blue-300">Leads</div>
+                <div className="text-2xl font-bold text-blue-900 dark:text-blue-200">{fmtInt(data.totais.leads)}</div>
               </div>
               <div className="text-gray-400 dark:text-zinc-600 text-sm font-medium">
                 → {formatPercent(data.totais.taxaConversao * 100)} →
@@ -155,10 +158,56 @@ export default function GrowthCreatorSummit() {
                 <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-200">{fmtInt(data.totais.ingressos)}</div>
               </div>
               <div className="text-gray-400 dark:text-zinc-600 text-sm font-medium">=</div>
-              <div className="flex-1 min-w-[140px] rounded-lg bg-fuchsia-50 dark:bg-fuchsia-950/40 p-3">
-                <div className="text-xs text-fuchsia-700 dark:text-fuchsia-300">Receita</div>
-                <div className="text-2xl font-bold text-fuchsia-900 dark:text-fuchsia-200">{formatCurrencyNoDecimals(data.totais.receita)}</div>
+              <div className="flex-1 min-w-[160px] rounded-lg bg-fuchsia-50 dark:bg-fuchsia-950/40 p-3">
+                <div className="text-xs text-fuchsia-700 dark:text-fuchsia-300">Receita líquida</div>
+                <div className="text-2xl font-bold text-fuchsia-900 dark:text-fuchsia-200">{formatCurrencyNoDecimals(data.totais.receitaLiquida)}</div>
+                <div className="text-[11px] text-fuchsia-600/70 dark:text-fuchsia-400/70">bruta {formatCurrencyNoDecimals(data.totais.receitaBruta)}</div>
               </div>
+            </CardContent>
+          </Card>
+
+          {/* Tabela de métricas (estilo Orçado × Realizado) */}
+          <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Métricas — {data.year}</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Métrica</TableHead>
+                    <TableHead className="text-right">Realizado</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {sections.map((section) => (
+                    <Fragment key={section.title}>
+                      <TableRow className="bg-muted/50 border-l-4 border-l-primary/40">
+                        <TableCell colSpan={2} className="text-xs font-semibold uppercase tracking-wide py-2.5 text-muted-foreground">
+                          {section.title}
+                        </TableCell>
+                      </TableRow>
+                      {section.rows.map((row) => (
+                        <TableRow key={row.label}>
+                          <TableCell className="text-gray-900 dark:text-white">
+                            {row.label}
+                            {"hint" in row && row.hint && (
+                              <span className="ml-2 text-xs text-gray-400 dark:text-zinc-500">({row.hint})</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-right tabular-nums font-medium">
+                            {"pending" in row ? (
+                              <span className="text-xs text-amber-600 dark:text-amber-400">{row.pending}</span>
+                            ) : (
+                              row.value
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </Fragment>
+                  ))}
+                </TableBody>
+              </Table>
             </CardContent>
           </Card>
 
@@ -172,107 +221,45 @@ export default function GrowthCreatorSummit() {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Tipo</TableHead>
-                    <TableHead className="text-right">Preço</TableHead>
-                    <TableHead className="text-right">Cadastros</TableHead>
+                    <TableHead className="text-right">Preço líq.</TableHead>
+                    <TableHead className="text-right">Leads</TableHead>
                     <TableHead className="text-right">Ingressos</TableHead>
                     <TableHead className="text-right">Conversão</TableHead>
-                    <TableHead className="text-right">Receita</TableHead>
+                    <TableHead className="text-right">Receita líq.</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {data.porTipo.map((t) => (
                     <TableRow key={t.key}>
                       <TableCell className="font-medium text-gray-900 dark:text-white">{t.label}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrency(t.preco)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{fmtInt(t.cadastros)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrency(t.precoLiquido)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{fmtInt(t.leads)}</TableCell>
                       <TableCell className="text-right tabular-nums">{fmtInt(t.ingressos)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{t.cadastros > 0 ? formatPercent((t.ingressos / t.cadastros) * 100) : "—"}</TableCell>
-                      <TableCell className="text-right tabular-nums">{formatCurrencyNoDecimals(t.receita)}</TableCell>
+                      <TableCell className="text-right tabular-nums">{t.leads > 0 ? formatPercent((t.ingressos / t.leads) * 100) : "—"}</TableCell>
+                      <TableCell className="text-right tabular-nums">{formatCurrencyNoDecimals(t.receitaLiquida)}</TableCell>
                     </TableRow>
                   ))}
                   <TableRow className="border-t-2 border-gray-300 dark:border-zinc-600 font-semibold">
                     <TableCell className="text-gray-900 dark:text-white">Total</TableCell>
                     <TableCell />
-                    <TableCell className="text-right tabular-nums">{fmtInt(data.totais.cadastros)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{fmtInt(data.totais.leads)}</TableCell>
                     <TableCell className="text-right tabular-nums">{fmtInt(data.totais.ingressos)}</TableCell>
                     <TableCell className="text-right tabular-nums">{formatPercent(data.totais.taxaConversao * 100)}</TableCell>
-                    <TableCell className="text-right tabular-nums">{formatCurrencyNoDecimals(data.totais.receita)}</TableCell>
+                    <TableCell className="text-right tabular-nums">{formatCurrencyNoDecimals(data.totais.receitaLiquida)}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
             </CardContent>
           </Card>
 
-          {/* Evolução temporal */}
-          {data.series.length > 0 && (
-            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Evolução mensal</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <ResponsiveContainer width="100%" height={300}>
-                  <ComposedChart data={data.series} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-zinc-700" />
-                    <XAxis dataKey="label" tick={{ fontSize: 12 }} />
-                    <YAxis yAxisId="money" tick={{ fontSize: 11 }} tickFormatter={(v) => formatCurrencyNoDecimals(v)} />
-                    <YAxis yAxisId="count" orientation="right" tick={{ fontSize: 11 }} />
-                    <Tooltip
-                      formatter={(value: any, name: any) => {
-                        if (name === "Investimento" || name === "Receita") return formatCurrency(Number(value));
-                        return fmtInt(Number(value));
-                      }}
-                      contentStyle={{ fontSize: 12 }}
-                    />
-                    <Legend wrapperStyle={{ fontSize: 12 }} />
-                    <Bar yAxisId="money" dataKey="investimento" name="Investimento" fill="#a855f7" radius={[4, 4, 0, 0]} />
-                    <Bar yAxisId="money" dataKey="receita" name="Receita" fill="#10b981" radius={[4, 4, 0, 0]} />
-                    <Line yAxisId="count" dataKey="cadastros" name="Cadastros" stroke="#3b82f6" strokeWidth={2} dot={{ r: 3 }} />
-                    <Line yAxisId="count" dataKey="ingressos" name="Ingressos" stroke="#f59e0b" strokeWidth={2} dot={{ r: 3 }} />
-                  </ComposedChart>
-                </ResponsiveContainer>
-              </CardContent>
-            </Card>
-          )}
-
-          {/* Campanhas */}
-          {data.campanhas.length > 0 && (
-            <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Campanhas (Meta) — identificadas por "summit" no nome</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>Campanha</TableHead>
-                      <TableHead className="text-right">Investimento</TableHead>
-                      <TableHead className="text-right">Impressões</TableHead>
-                      <TableHead className="text-right">Cliques</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {data.campanhas.map((c) => (
-                      <TableRow key={c.nome}>
-                        <TableCell className="text-gray-900 dark:text-white max-w-[420px] truncate">{c.nome}</TableCell>
-                        <TableCell className="text-right tabular-nums">{formatCurrency(c.investimento)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{fmtInt(c.impressoes)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{fmtInt(c.cliques)}</TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          )}
-
           {/* Premissa de receita */}
           <div className="flex items-start gap-2 text-xs text-gray-500 dark:text-zinc-500 px-1">
             <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />
             <span>
-              Receita estimada por preço tabelado do ingresso (valor do comprador):{" "}
+              Receita por preço tabelado do ingresso —{" "}
               {data.premissaPreco.map((p, i) => (
                 <span key={p.label}>
-                  {i > 0 && " · "}{p.label} {formatCurrency(p.preco)}
+                  {i > 0 && " · "}{p.label} {formatCurrency(p.preco)} bruto / {formatCurrency(p.precoLiquido)} líq.
                 </span>
               ))}
               . Ingressos sem tipo identificado usam o preço PASS. Gasto = campanhas Meta com "summit" no nome.
