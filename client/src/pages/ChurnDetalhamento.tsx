@@ -47,6 +47,7 @@ import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { SecaoMotivos } from "@/components/churn/SecaoMotivos";
 import { SecaoVozCliente } from "@/components/churn/SecaoVozCliente";
 import { SecaoSegmentacao } from "@/components/churn/SecaoSegmentacao";
+import { SecaoTiming } from "@/components/churn/SecaoTiming";
 import { CustomTooltip } from "@/components/churn/ui/CustomTooltip";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { StatPill } from "@/components/churn/ui/StatPill";
@@ -545,39 +546,8 @@ export default function ChurnDetalhamento() {
 
   // distribuicaoPorSquad, distribuicaoPorProduto, distribuicaoPorResponsavel, distribuicaoPorTicket
   // moved to SecaoSegmentacao.tsx
-
-  const churnPorMes = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-
-    const meses: Record<string, { count: number; countAbonado: number; mrr: number; mrrAbonado: number; sortKey: string }> = {};
-    filteredContratos.forEach(c => {
-      const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
-      if (!refDate) return;
-      const parsedDate = parseISO(refDate);
-      const mes = format(parsedDate, "MMM/yy", { locale: ptBR });
-      const sortKey = format(parsedDate, "yyyy-MM");
-      if (!meses[mes]) meses[mes] = { count: 0, countAbonado: 0, mrr: 0, mrrAbonado: 0, sortKey };
-      if (c.is_abonado) {
-        meses[mes].countAbonado++;
-        meses[mes].mrrAbonado += c.valorr || 0;
-      } else {
-        meses[mes].count++;
-        meses[mes].mrr += c.valorr || 0;
-      }
-    });
-
-    return Object.entries(meses)
-      .map(([mes, data]) => ({
-        mes,
-        count: data.count,
-        countAbonado: data.countAbonado,
-        mrr: data.mrr,
-        mrrAbonado: data.mrrAbonado,
-        sortKey: data.sortKey
-      }))
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-      .slice(-12);
-  }, [filteredContratos]);
+  // churnPorMes, comparativoMensal, cohortAnalysis, lifetimeCurve, mrrPerdidoPorMes
+  // moved to SecaoTiming.tsx
 
   // Clientes perdidos (maior impacto financeiro) — todos, sem limite
   const topClientesPerdidos = useMemo(() => {
@@ -623,139 +593,8 @@ export default function ChurnDetalhamento() {
     return tags;
   };
 
-  // distribuicaoPorTicket moved to SecaoSegmentacao.tsx
-
-  // Comparativo Churn vs Pausado por mês
-  const comparativoMensal = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-
-    const meses: Record<string, { churn: number; pausado: number; abonado: number; mrrChurn: number; mrrPausado: number; mrrAbonado: number; sortKey: string }> = {};
-
-    filteredContratos.forEach(c => {
-      const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
-      if (!refDate) return;
-      const parsedDate = parseISO(refDate);
-      const mes = format(parsedDate, "MMM/yy", { locale: ptBR });
-      const sortKey = format(parsedDate, "yyyy-MM");
-
-      if (!meses[mes]) meses[mes] = { churn: 0, pausado: 0, abonado: 0, mrrChurn: 0, mrrPausado: 0, mrrAbonado: 0, sortKey };
-
-      if (c.is_abonado) {
-        meses[mes].abonado++;
-        meses[mes].mrrAbonado += c.valorr || 0;
-      } else if (c.tipo === 'churn') {
-        meses[mes].churn++;
-        meses[mes].mrrChurn += c.valorr || 0;
-      } else if (c.tipo === 'pausado') {
-        meses[mes].pausado++;
-        meses[mes].mrrPausado += c.valorr || 0;
-      }
-    });
-
-    return Object.entries(meses)
-      .map(([mes, data]) => ({ mes, ...data }))
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-      .slice(-12);
-  }, [filteredContratos]);
-
-  // Análise de cohort: tempo médio até churn por mês de início
-  const cohortAnalysis = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-    
-    const churnContratos = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado && c.data_inicio);
-    if (churnContratos.length === 0) return [];
-    
-    const cohorts: Record<string, { count: number; totalLifetime: number; totalMrr: number }> = {};
-    
-    churnContratos.forEach(c => {
-      if (!c.data_inicio) return;
-      const startDate = parseISO(c.data_inicio);
-      const cohort = format(startDate, "MMM/yy", { locale: ptBR });
-      const sortKey = format(startDate, "yyyy-MM");
-      
-      if (!cohorts[cohort]) {
-        cohorts[cohort] = { count: 0, totalLifetime: 0, totalMrr: 0 };
-        (cohorts[cohort] as any).sortKey = sortKey;
-      }
-      cohorts[cohort].count++;
-      cohorts[cohort].totalLifetime += c.lifetime_meses || 0;
-      cohorts[cohort].totalMrr += c.valorr || 0;
-    });
-    
-    return Object.entries(cohorts)
-      .map(([cohort, data]) => ({
-        cohort,
-        count: data.count,
-        avgLifetime: data.count > 0 ? data.totalLifetime / data.count : 0,
-        avgMrr: data.count > 0 ? data.totalMrr / data.count : 0,
-        sortKey: (data as any).sortKey
-      }))
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-      .slice(-12);
-  }, [filteredContratos]);
-
-  // Curva de distribuição de lifetime (calculada no frontend com filtros)
-  const lifetimeCurve = useMemo(() => {
-    const contratosComLifetime = filteredContratos.filter(c => 
-      c.lifetime_meses !== undefined && c.lifetime_meses !== null && c.lifetime_meses >= 0
-    );
-    
-    if (contratosComLifetime.length === 0) return [];
-    
-    const totalBase = contratosComLifetime.length;
-    const totalMrrBase = contratosComLifetime.reduce((sum, c) => sum + (c.valorr || 0), 0);
-    
-    const curve: { monthIndex: number; retainedPct: number; mrrRetainedPct: number; retainedCount: number; totalStarted: number; churnedCount: number }[] = [];
-    
-    for (let month = 0; month <= 12; month++) {
-      const sobreviventes = contratosComLifetime.filter(c => c.lifetime_meses >= month);
-      const sobrevivMrr = sobreviventes.reduce((sum, c) => sum + (c.valorr || 0), 0);
-      const churnedNoPeriodo = contratosComLifetime.filter(c => 
-        c.lifetime_meses >= month && c.lifetime_meses < month + 1
-      );
-      
-      const retainedPct = totalBase > 0 ? (sobreviventes.length / totalBase) * 100 : 0;
-      const mrrRetainedPct = totalMrrBase > 0 ? (sobrevivMrr / totalMrrBase) * 100 : 0;
-      
-      curve.push({
-        monthIndex: month,
-        retainedPct: Math.round(retainedPct * 10) / 10,
-        mrrRetainedPct: Math.round(mrrRetainedPct * 10) / 10,
-        retainedCount: sobreviventes.length,
-        totalStarted: totalBase,
-        churnedCount: churnedNoPeriodo.length,
-      });
-    }
-    
-    return curve;
-  }, [filteredContratos]);
-
-  // MRR perdido por mês (evolução)
-  const mrrPerdidoPorMes = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-
-    const meses: Record<string, { mrr: number; mrrAbonado: number; sortKey: string }> = {};
-
-    filteredContratos.forEach(c => {
-      if (c.tipo !== 'churn') return;
-      if (!c.data_encerramento) return;
-      const parsedDate = parseISO(c.data_encerramento);
-      const mes = format(parsedDate, "MMM/yy", { locale: ptBR });
-      const sortKey = format(parsedDate, "yyyy-MM");
-
-      if (!meses[mes]) meses[mes] = { mrr: 0, mrrAbonado: 0, sortKey };
-      if (c.is_abonado) {
-        meses[mes].mrrAbonado += c.valorr || 0;
-      } else {
-        meses[mes].mrr += c.valorr || 0;
-      }
-    });
-
-    return Object.entries(meses)
-      .map(([mes, data]) => ({ mes, mrr: data.mrr, mrrAbonado: data.mrrAbonado, sortKey: data.sortKey }))
-      .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
-      .slice(-12);
-  }, [filteredContratos]);
+  // distribuicaoPorTicket, comparativoMensal, cohortAnalysis, lifetimeCurve, mrrPerdidoPorMes
+  // all moved to SecaoTiming.tsx
 
   interface ClienteAgrupado {
     cnpj: string;
@@ -866,17 +705,6 @@ export default function ChurnDetalhamento() {
     info: "text-blue-500",
   };
 
-  const churnPorMesTotal = churnPorMes.reduce((sum, item) => sum + item.count, 0);
-  const churnPorMesMedia = churnPorMes.length > 0 ? churnPorMesTotal / churnPorMes.length : 0;
-  const mrrPerdidoTotal = mrrPerdidoPorMes.reduce((sum, item) => sum + item.mrr, 0);
-  const mrrAbonadoTotal = mrrPerdidoPorMes.reduce((sum, item) => sum + item.mrrAbonado, 0);
-  const comparativoChurnTotal = comparativoMensal.reduce((sum, item) => sum + item.mrrChurn, 0);
-  const comparativoAbonadoTotal = comparativoMensal.reduce((sum, item) => sum + item.mrrAbonado, 0);
-  const comparativoPausadoTotal = comparativoMensal.reduce((sum, item) => sum + item.mrrPausado, 0);
-  const cohortMediaGeral = cohortAnalysis.length > 0
-    ? cohortAnalysis.reduce((sum, item) => sum + item.avgLifetime, 0) / cohortAnalysis.length
-    : 0;
-
   if (error) {
     return (
       <div className="p-6">
@@ -946,6 +774,9 @@ export default function ChurnDetalhamento() {
 
       {/* Seção Segmentação: squad, produto/serviço, ticket, responsável */}
       <SecaoSegmentacao contratos={filteredContratos} onDrill={onDrill} />
+
+      {/* Seção Timing: distribuição por lifetime, evolução mensal, cohort, curva de sobrevivência, MRR perdido */}
+      <SecaoTiming contratos={filteredContratos} onDrill={onDrill} />
 
       {/* Painel Executivo Detalhado (MRR Base, Abonado, NRR, Squad) */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
