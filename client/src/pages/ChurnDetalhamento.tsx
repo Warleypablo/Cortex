@@ -31,6 +31,7 @@ import { type ChurnContract, type ChurnDetalhamentoData } from "@/components/chu
 import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
+import { RitmoDiario } from "@/components/churn/RitmoDiario";
 import { SecaoMotivos } from "@/components/churn/SecaoMotivos";
 import { SecaoVozCliente } from "@/components/churn/SecaoVozCliente";
 import { SecaoSegmentacao } from "@/components/churn/SecaoSegmentacao";
@@ -600,6 +601,11 @@ export default function ChurnDetalhamento() {
           ltMedio={filteredMetricas.lt_medio}
           ticketMedio={filteredMetricas.ticket_medio}
         />
+      )}
+
+      {/* Ritmo Diário — série por dia do período */}
+      {!isLoading && (
+        <RitmoDiario contratos={filteredContratos} onDrill={onDrill} />
       )}
 
       {/* Seções analíticas — skeleton enquanto carrega */}
