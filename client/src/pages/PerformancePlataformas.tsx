@@ -9,8 +9,6 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Search, ChevronRight, ChevronDown } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
-import { getMetricColor, getColorClasses } from "@/lib/metricFormatting";
-import type { MetricRulesetWithThresholds } from "@shared/schema";
 import type { DateRange } from "react-day-picker";
 import { formatCurrency as formatCurrencyUtil, formatDecimal as formatDecimalUtil, formatPercent as formatPercentUtil } from "@/lib/utils";
 import { cn } from "@/lib/utils";
@@ -170,16 +168,8 @@ export default function PerformancePlataformas() {
 
   const isCompareActive = compareEnabled && !!compareData?.rows?.length;
 
-  const { data: metricRules = [] } = useQuery<MetricRulesetWithThresholds[]>({
-    queryKey: ["/api/metric-rules"],
-  });
-
-  const getCellClassName = (metricKey: string, value: number | null): string => {
-    if (value === null || value === undefined) return "";
-    const color = getMetricColor(value, metricRules, metricKey);
-    if (!color || color === 'default') return "";
-    return getColorClasses(color);
-  };
+  // Coloração por faixas de meta removida — não usamos esse recurso nesta aba.
+  const getCellClassName = (_metricKey: string, _value: number | null): string => "";
 
   const toggleRow = (id: string) => {
     setExpandedRows(prev => {
