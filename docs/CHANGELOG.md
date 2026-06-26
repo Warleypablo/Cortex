@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-26 | test(ads-creation): valida metaUploadVideo (Drive → Gerenciador) com smoke test real
+
+**O que foi feito:**
+- Auditoria adversarial (workflow multi-agente) do `metaUploadVideo` e cadeia de deps em `server/services/adsCreation/metaApi.ts` antes de qualquer chamada real — veredito **GO**, zero blockers em 5 dimensões (chunked, direto/imagem, retry/rate-limit, config/env, pós-upload)
+- `smoke-upload.ts`: smoke test ponta-a-ponta — baixou `vv-naturaltech-esther-1.mp4` (34MB) do Drive, subiu via `metaUploadVideo` (caminho direto, <100MB), `pollVideoUntilReady` confirmou `ready` em ~7s, thumbnail OK (`video_id=27205498122478229`)
+
+**Por que:**
+- Provar o passo de upload da pipeline de automação (Drive → Gerenciador) antes de codificar o fluxo completo; até então os vídeos sempre chegavam já no Gerenciador
+
+**Achado não-bloqueante (pra produção):** o caminho **chunked** (vídeos >100MB) só faz retry em `TRANSIENT_HTTP` e não embrulha rate-limit em `MetaRateLimitError` — um 429/code 17 no meio dos chunks não é retriado. Resolver antes de confiar em uploads grandes. Smoke test não afetado (caminho direto).
+
+**Arquivos novos:**
+- `smoke-upload.ts` - smoke test de upload de vídeo (DRY por padrão, `--go`, `--cleanup`)
+
+**Impacto arquitetural:** Nenhum — script de teste standalone; reusa helpers existentes (`metaUploadVideo`/`pollVideoUntilReady`/`getVideoThumbnail`) e o Drive client.
+
+---
+
 ## 2026-06-25 | feat(ads-creation): sobe 17 estaticos pareados Creator Summit (TP1705-1721) no conjunto 10
 
 **O que foi feito:**
