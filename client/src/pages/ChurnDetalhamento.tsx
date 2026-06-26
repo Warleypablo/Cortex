@@ -480,13 +480,13 @@ export default function ChurnDetalhamento() {
       textClass: "text-emerald-600 dark:text-emerald-400",
     },
     warning: {
-      label: "AtenÃ§Ã£o",
+      label: "Atenção",
       badgeClass: "bg-amber-500/10 text-amber-600 dark:text-amber-400 border-amber-500/30",
       barClass: "bg-amber-500",
       textClass: "text-amber-600 dark:text-amber-400",
     },
     critical: {
-      label: "CrÃ­tico",
+      label: "Crítico",
       badgeClass: "bg-orange-500/10 text-orange-600 dark:text-orange-400 border-orange-500/30",
       barClass: "bg-orange-500",
       textClass: "text-orange-600 dark:text-orange-400",
@@ -498,7 +498,7 @@ export default function ChurnDetalhamento() {
       textClass: "text-red-600 dark:text-red-400",
     },
     future: {
-      label: "PerÃ­odo futuro",
+      label: "Período futuro",
       badgeClass: "bg-slate-500/10 text-slate-600 dark:text-slate-300 border-slate-500/30",
       barClass: "bg-slate-400",
       textClass: "text-slate-600 dark:text-slate-300",
@@ -512,13 +512,13 @@ export default function ChurnDetalhamento() {
       case "on_track":
         return { label: "No alvo", color: "text-emerald-500", bg: "from-emerald-500 to-green-500", dotBg: "bg-emerald-500" };
       case "warning":
-        return { label: "Atencao", color: "text-amber-500", bg: "from-amber-500 to-orange-500", dotBg: "bg-amber-500" };
+        return { label: "Atenção", color: "text-amber-500", bg: "from-amber-500 to-orange-500", dotBg: "bg-amber-500" };
       case "critical":
-        return { label: "Critico", color: "text-orange-500", bg: "from-orange-500 to-red-500", dotBg: "bg-orange-500" };
+        return { label: "Crítico", color: "text-orange-500", bg: "from-orange-500 to-red-500", dotBg: "bg-orange-500" };
       case "over_budget":
         return { label: "Fora da meta", color: "text-red-600", bg: "from-red-600 to-rose-700", dotBg: "bg-red-600" };
       case "future":
-        return { label: "Periodo futuro", color: "text-slate-500", bg: "from-slate-500 to-slate-700", dotBg: "bg-slate-500" };
+        return { label: "Período futuro", color: "text-slate-500", bg: "from-slate-500 to-slate-700", dotBg: "bg-slate-500" };
       default:
         return undefined;
     }
