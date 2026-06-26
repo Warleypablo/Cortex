@@ -5,6 +5,7 @@ import { type ChurnContract } from "@/components/churn/types";
 import { ChurnGauge } from "@/components/churn/ui/ChurnGauge";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { StatPill } from "@/components/churn/ui/StatPill";
+import { formatCurrencyNoDecimals } from "@/lib/utils";
 
 
 // ── Pure helper ─────────────────────────────────────────────────────────────
@@ -43,14 +44,6 @@ export interface ChurnKpisHeroProps {
   ltMedio?: number;
   ticketMedio?: number;
 }
-
-const formatCurrencyNoDecimals = (value: number) =>
-  new Intl.NumberFormat("pt-BR", {
-    style: "currency",
-    currency: "BRL",
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
 
 // ── Component ────────────────────────────────────────────────────────────────
 export function ChurnKpisHero({

@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { formatCurrencyNoDecimals } from "@/lib/utils";
 import {
   Brain,
   MessageSquare,
@@ -54,7 +55,7 @@ const EXPANDED_KEYWORDS: Record<string, string[]> = {
 };
 
 const normalizeText = (text: string): string =>
-  text.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '');
+  text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
 
 /** Highlights matched keywords inside a string with yellow mark tags */
 const highlightKeywords = (text: string, keywords: string[]): React.ReactNode => {
@@ -99,14 +100,6 @@ const highlightKeywords = (text: string, keywords: string[]): React.ReactNode =>
   if (lastEnd < text.length) parts.push(text.slice(lastEnd));
   return <>{parts}</>;
 };
-
-const formatCurrencyNoDecimals = (value: number) =>
-  new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0,
-  }).format(value);
 
 // ===== Component props =====
 
@@ -433,11 +426,6 @@ export function SecaoVozCliente({ contratos, onDrill }: SecaoVozClienteProps): J
                       cursor="pointer"
                       onClick={(entry: any) => {
                         if (entry?.sentiment) {
-                          const sentiment = entry.sentiment === 'Negativo'
-                            ? 'negativo'
-                            : entry.sentiment === 'Positivo'
-                            ? 'positivo'
-                            : 'neutro';
                           const matched = entry.matchedContratos ?? [];
                           if (matched.length > 0) {
                             onDrill(`Sentimento: ${entry.sentiment}`, matched);

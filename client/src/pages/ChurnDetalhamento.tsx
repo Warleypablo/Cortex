@@ -10,7 +10,7 @@ import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatCurrencyNoDecimals } from "@/lib/utils";
 import { 
   TrendingDown, 
   DollarSign, 
@@ -56,14 +56,6 @@ import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays, g
 import { ptBR } from "date-fns/locale";
 
 
-const formatCurrencyNoDecimals = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 0
-  }).format(value);
-};
 
 export default function ChurnDetalhamento() {
   usePageTitle("Detalhamento de Churn");
