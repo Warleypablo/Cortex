@@ -109,11 +109,14 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
                       name,
                     ]}
                     contentStyle={{
-                      backgroundColor: "var(--background, #fff)",
-                      border: "1px solid #e5e7eb",
+                      backgroundColor: "hsl(var(--popover))",
+                      color: "hsl(var(--popover-foreground))",
+                      border: "1px solid hsl(var(--border))",
                       borderRadius: 6,
                       fontSize: 11,
                     }}
+                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
                   />
                 </PieChart>
               </ResponsiveContainer>
