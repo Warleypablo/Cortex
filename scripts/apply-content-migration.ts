@@ -16,7 +16,13 @@ import { readFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { Pool } from "pg";
 
-const SQL_PATH = resolve(process.cwd(), "migrations/2026-06-24-content-publish.sql");
+// Todas as migrations do painel Orgânico, em ordem cronológica. Todas são
+// aditivas/idempotentes (CREATE/ALTER ... IF NOT EXISTS), então rodar de novo é seguro.
+const SQL_FILES = [
+  "migrations/2026-06-24-content-publish.sql",
+  "migrations/2026-06-25-content-publish-operador.sql",
+  "migrations/2026-06-25-content-publish-horario.sql",
+];
 
 function makePool(): Pool {
   const ssl = process.env.DB_SSL === "false" ? false : { rejectUnauthorized: false };
@@ -40,10 +46,14 @@ function makePool(): Pool {
 }
 
 async function main() {
-  const sql = readFileSync(SQL_PATH, "utf8");
   const pool = makePool();
-  console.log("→ aplicando migration content_* no banco…");
-  await pool.query(sql);
+  console.log("→ aplicando migrations content_* no banco…");
+  for (const rel of SQL_FILES) {
+    const sql = readFileSync(resolve(process.cwd(), rel), "utf8");
+    process.stdout.write(`   • ${rel} … `);
+    await pool.query(sql);
+    console.log("ok");
+  }
   const { rows } = await pool.query(
     "SELECT platform, agent_enabled AS ativo, dry_run FROM cortex_core.content_publish_settings ORDER BY platform",
   );

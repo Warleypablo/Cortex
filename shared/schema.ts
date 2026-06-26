@@ -1094,8 +1094,10 @@ export const contentPosts = cortexCoreSchema.table("content_posts", {
   mes: varchar("mes", { length: 24 }),
   turboSlug: varchar("turbo_slug", { length: 128 }),
   postingDate: date("posting_date"),                           // data planejada no ClickUp (sem hora)
-  slot: varchar("slot", { length: 8 }),                        // '12h' | '17h30' (slot fixo do agente)
+  postingTime: varchar("posting_time", { length: 8 }),         // 'HH:MM' explícito do card (campo Horário); NULL = usou padrão
+  slot: varchar("slot", { length: 8 }),                        // '12h' | '17h30' (slot fixo legado do agente)
   scheduledAt: timestamp("scheduled_at", { withTimezone: true }), // horário escolhido pelo operador ("Agendar"); NULL = não agendado
+  cardScheduledAt: timestamp("card_scheduled_at", { withTimezone: true }), // horário-alvo vindo do card (Data+Horário); o worker escreve a cada ciclo
   tipoPost: varchar("tipo_post", { length: 16 }),              // single | reels | carousel
   assetCount: integer("asset_count").default(0),
   legendaSource: varchar("legenda_source", { length: 24 }),    // doc | claude-precisa | ia | none
@@ -1118,6 +1120,7 @@ export const contentPosts = cortexCoreSchema.table("content_posts", {
   uniqTaskDate: uniqueIndex("idx_content_posts_platform_task_date").on(table.platform, table.clickupTaskId, table.postingDate),
   platformDateIdx: index("idx_content_posts_platform_date").on(table.platform, table.postingDate),
   scheduledIdx: index("idx_content_posts_scheduled").on(table.platform, table.scheduledAt),
+  cardScheduledIdx: index("idx_content_posts_card_scheduled").on(table.platform, table.cardScheduledAt),
   stateIdx: index("idx_content_posts_state").on(table.state),
 }));
 

@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { desc, asc, eq, ne, and, lte, isNotNull } from "drizzle-orm";
+import { desc, asc, eq, ne, and } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import {
   contentPosts,
@@ -64,25 +64,27 @@ export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage
       const byDateAsc = (a: any, b: any) =>
         day(a.postingDate).localeCompare(day(b.postingDate));
       const bySchedAsc = (a: any, b: any) =>
-        String(a.scheduledAt ?? a.postingDate ?? "").localeCompare(
-          String(b.scheduledAt ?? b.postingDate ?? ""),
+        String(a.scheduledAt ?? a.cardScheduledAt ?? a.postingDate ?? "").localeCompare(
+          String(b.scheduledAt ?? b.cardScheduledAt ?? b.postingDate ?? ""),
         );
 
-      // (A) APROVADOS — prontos/esperando legenda, ainda sem agendamento nem publicação.
+      // (A) APROVADOS — prontos/esperando legenda, SEM horário (operador nem card) nem publicação.
+      // Com horário-por-card, um card com data+hora já tem card_scheduled_at → cai em AGENDADOS.
+      // Aqui sobram os que precisam de atenção: sem data/hora definidos.
       const aprovados = posts
         .filter(
           (p: any) =>
             (p.state === "aprovado" || p.state === "aguardando_ia") &&
-            !p.scheduledAt,
+            !p.scheduledAt && !p.cardScheduledAt,
         )
         .sort(byDateAsc);
 
-      // (B) AGENDADOS — agendados pelo operador (scheduled_at) ou pelo slot automático do agente.
+      // (B) AGENDADOS — têm horário-alvo: operador (scheduled_at) OU card (card_scheduled_at).
       const agendados = posts
         .filter(
           (p: any) =>
             p.state !== "publicado" &&
-            (p.scheduledAt || p.state === "agendado"),
+            (p.scheduledAt || p.cardScheduledAt || p.state === "agendado"),
         )
         .sort(bySchedAsc);
 
@@ -279,26 +281,36 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
   });
 
   // GET /api/growth/organico/posts/due?platform=instagram
-  // Posts agendados pelo operador cujo horário já venceu e ainda não publicaram.
+  // Posts cujo horário EFETIVO já venceu DENTRO DE HOJE e ainda não publicaram.
+  // Efetivo = COALESCE(scheduled_at do operador, card_scheduled_at do card). A janela
+  // é [início do dia em SP, agora]: um horário que caiu num dia ANTERIOR não entra aqui
+  // (= "perdeu o horário" — não dispara sozinho, fica pro operador resolver no painel).
   // O worker-poller publica cada um e reporta de volta via /ingest.
   app.get("/api/growth/organico/posts/due", async (req, res) => {
     if (!requireToken(req, res)) return;
     try {
       const platform = String(req.query.platform || "");
       if (!platform) return res.status(400).json({ error: "platform obrigatório" });
-      const due = await db
+      const now = new Date();
+      // início do dia em São Paulo (UTC-3, sem horário de verão desde 2019).
+      const ymdSP = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(now);
+      const startOfDaySP = new Date(`${ymdSP}T00:00:00-03:00`);
+      const eff = (p: any): Date | null => {
+        const v = p.scheduledAt ?? p.cardScheduledAt;
+        return v ? new Date(v) : null;
+      };
+      const candidates = await db
         .select()
         .from(contentPosts)
-        .where(
-          and(
-            eq(contentPosts.platform, platform),
-            isNotNull(contentPosts.scheduledAt),
-            lte(contentPosts.scheduledAt, new Date()),
-            ne(contentPosts.state, "publicado"),
-          ),
-        )
-        .orderBy(asc(contentPosts.scheduledAt))
-        .limit(20);
+        .where(and(eq(contentPosts.platform, platform), ne(contentPosts.state, "publicado")))
+        .limit(500);
+      const due = candidates
+        .filter((p: any) => {
+          const t = eff(p);
+          return t !== null && t >= startOfDaySP && t <= now;
+        })
+        .sort((a: any, b: any) => (eff(a)!.getTime() - eff(b)!.getTime()))
+        .slice(0, 20);
       res.json({ posts: due });
     } catch (err: any) {
       console.error("[organico] due error:", err);
@@ -334,6 +346,10 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
         // scheduled_at: chave ausente = mantém; null = limpa (cancelar); valor = grava (agendar)
         const schedKey = Object.prototype.hasOwnProperty.call(p, "scheduled_at");
         const schedVal = schedKey ? (p.scheduled_at ? new Date(p.scheduled_at) : null) : undefined;
+        // card_scheduled_at: horário-alvo derivado do card (domínio do worker). Mesma
+        // semântica de chave: ausente = mantém; null = limpa; valor = grava.
+        const cardSchedKey = Object.prototype.hasOwnProperty.call(p, "card_scheduled_at");
+        const cardSchedVal = cardSchedKey ? (p.card_scheduled_at ? new Date(p.card_scheduled_at) : null) : undefined;
         const insert: any = {
           platform,
           clickupTaskId: String(p.clickup_task_id),
@@ -342,6 +358,7 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
           mes: p.mes ?? null,
           turboSlug: p.turbo_slug ?? null,
           postingDate: p.posting_date ?? null,
+          postingTime: p.posting_time ?? null,
           slot: p.slot ?? null,
           tipoPost: p.tipo_post ?? null,
           assetCount: p.asset_count ?? 0,
@@ -359,6 +376,7 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
           updatedAt: new Date(),
         };
         if (schedKey) insert.scheduledAt = schedVal;
+        if (cardSchedKey) insert.cardScheduledAt = cardSchedVal;
 
         const set: any = {
           taskName: insert.taskName,
@@ -366,6 +384,7 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
           mes: insert.mes,
           turboSlug: insert.turboSlug,
           postingDate: insert.postingDate,
+          postingTime: insert.postingTime,
           slot: insert.slot,
           tipoPost: insert.tipoPost,
           assetCount: insert.assetCount,
@@ -384,6 +403,7 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
         };
         // só toca scheduled_at quando o worker manda a chave (evita zerar agendamento do operador)
         if (schedKey) set.scheduledAt = schedVal;
+        if (cardSchedKey) set.cardScheduledAt = cardSchedVal;
 
         await db
           .insert(contentPosts)
