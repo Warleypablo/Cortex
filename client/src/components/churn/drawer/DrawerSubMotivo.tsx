@@ -1,7 +1,15 @@
 import React, { useState, useMemo } from "react";
 import { ChevronDown, ChevronUp } from "lucide-react";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { type ChurnContract } from "@/components/churn/types";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
+
+function evitabilidadeColor(label: string): string {
+  const l = label.toLowerCase();
+  if (l.includes("evit") && !l.includes("inevit")) return "#ef4444";
+  if (l.includes("inevit")) return "#10b981";
+  return "#94a3b8";
+}
 
 export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): JSX.Element {
   const [expandedMotivo, setExpandedMotivo] = useState<string | null>(null);
@@ -67,31 +75,86 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
 
   return (
     <div className="space-y-4">
-      {/* ── Evitabilidade pills ──────────────────────────────────────────────── */}
+      {/* ── Evitabilidade donut ──────────────────────────────────────────────── */}
       {evitabilidadeData.length > 0 && (
-        <div className="flex flex-wrap gap-2">
-          {evitabilidadeData.map((item) => {
-            const lbl = item.label.toLowerCase();
-            const dotColor = (lbl.includes("evit") && !lbl.includes("inevit")) ? "#ef4444" : "#10b981";
-            return (
-              <div
-                key={item.label}
-                className="flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2.5 py-1 text-xs"
-              >
-                <span
-                  className="w-2 h-2 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: dotColor }}
-                />
-                <span className="text-gray-600 dark:text-zinc-400">{item.label}</span>
-                <span className="font-semibold text-gray-900 dark:text-white tabular-nums">
-                  {item.count}
-                </span>
-                <span className="text-[10px] text-red-500 dark:text-red-400 tabular-nums">
-                  {formatCurrencyNoDecimals(item.mrr)}
-                </span>
-              </div>
-            );
-          })}
+        <div>
+          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+            Evitabilidade
+          </p>
+          <div className="flex items-center gap-3">
+            {/* Donut */}
+            <div className="flex-shrink-0" style={{ width: 130, height: 130 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={evitabilidadeData}
+                    dataKey="mrr"
+                    nameKey="label"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={38}
+                    outerRadius={58}
+                    startAngle={90}
+                    endAngle={-270}
+                    strokeWidth={2}
+                    stroke="transparent"
+                  >
+                    {evitabilidadeData.map((item) => (
+                      <Cell key={item.label} fill={evitabilidadeColor(item.label)} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number, name: string) => [
+                      formatCurrencyNoDecimals(value),
+                      name,
+                    ]}
+                    contentStyle={{
+                      backgroundColor: "var(--background, #fff)",
+                      border: "1px solid #e5e7eb",
+                      borderRadius: 6,
+                      fontSize: 11,
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+
+            {/* Legend */}
+            {(() => {
+              const totalMrr = evitabilidadeData.reduce((s, d) => s + d.mrr, 0);
+              return (
+                <div className="flex-1 space-y-1.5 min-w-0">
+                  {evitabilidadeData.map((item) => {
+                    const pct = totalMrr > 0 ? Math.round((item.mrr / totalMrr) * 100) : 0;
+                    return (
+                      <div key={item.label} className="flex flex-col gap-0.5">
+                        <div className="flex items-center gap-1.5">
+                          <span
+                            className="w-2 h-2 rounded-full flex-shrink-0"
+                            style={{ backgroundColor: evitabilidadeColor(item.label) }}
+                          />
+                          <span className="text-xs text-gray-700 dark:text-zinc-300 truncate">
+                            {item.label}
+                          </span>
+                        </div>
+                        <div className="pl-3.5 flex items-center gap-1.5">
+                          <span className="text-xs font-semibold text-gray-900 dark:text-white tabular-nums">
+                            {item.count}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground tabular-nums">
+                            {formatCurrencyNoDecimals(item.mrr)}
+                          </span>
+                          <span className="text-[10px] font-medium tabular-nums" style={{ color: evitabilidadeColor(item.label) }}>
+                            {pct}%
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })()}
+          </div>
         </div>
       )}
 
