@@ -593,8 +593,8 @@ export default function ChurnDetalhamento() {
     return tags;
   };
 
-  // distribuicaoPorTicket, comparativoMensal, cohortAnalysis, lifetimeCurve, mrrPerdidoPorMes
-  // all moved to SecaoTiming.tsx
+  // comparativoMensal, cohortAnalysis, lifetimeCurve, mrrPerdidoPorMes moved to SecaoTiming.tsx
+  // distribuicaoPorTicket moved to SecaoSegmentacao.tsx
 
   interface ClienteAgrupado {
     cnpj: string;
