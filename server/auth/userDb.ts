@@ -372,6 +372,25 @@ export async function updateUserPermissions(userId: string, allowedRoutes: strin
   }
 }
 
+export async function updateUserBpTabs(userId: string, allowedBpTabs: string[]): Promise<User | null> {
+  try {
+    const result = await db
+      .update(authUsers)
+      .set({ allowedBpTabs })
+      .where(eq(authUsers.id, userId))
+      .returning();
+
+    if (result.length === 0) return null;
+
+    const user = dbUserToUser(result[0]);
+    setCachedUser(user);
+    return user;
+  } catch (error) {
+    console.error("Erro ao atualizar abas do BP:", error);
+    return null;
+  }
+}
+
 export async function updateUserRole(userId: string, role: 'admin' | 'user'): Promise<User | null> {
   try {
     const newRoutes = role === 'admin' ? ALL_ROUTES : DEFAULT_USER_ROUTES;

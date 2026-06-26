@@ -5,8 +5,9 @@ import { insertPatrimonioSchema, updateContratoSchema, pageViews } from "@shared
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
 import { validateBody } from "./middleware/validate";
-import { createUserSchema, updatePermissionsSchema, updateRoleSchema } from "./middleware/schemas";
-import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser } from "./auth/userDb";
+import { createUserSchema, updatePermissionsSchema, updateRoleSchema, updateBpTabsSchema } from "./middleware/schemas";
+import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser, updateUserBpTabs } from "./auth/userDb";
+import { BP2026_TAB_IDS } from "../shared/bp2026-tabs";
 import { db } from "./db";
 import { sql, type SQL } from "drizzle-orm";
 import { computeEvolucaoChurn } from "./investorsReport/churn";
@@ -541,6 +542,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error updating permissions:", error);
       res.status(500).json({ error: "Failed to update permissions" });
+    }
+  });
+
+  app.post("/api/users/:userId/bp-tabs", isAuthenticated, isAdmin, validateBody(updateBpTabsSchema), async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { allowedBpTabs } = req.body;
+      const validos = allowedBpTabs.filter((t: string) => (BP2026_TAB_IDS as string[]).includes(t));
+      const updatedUser = await updateUserBpTabs(userId, validos);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("[api] Error updating bp-tabs:", error);
+      res.status(500).json({ error: "Failed to update bp-tabs" });
     }
   });
 
