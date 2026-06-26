@@ -89,7 +89,7 @@ export function ChurnPorDimensao({
       <div className="flex items-center justify-between gap-3 flex-wrap">
         <h3 className="text-sm font-semibold text-foreground">
           Churn por{" "}
-          <span className="text-muted-foreground font-normal">[dimensão]</span>
+          <span className="text-muted-foreground font-normal">{DIMENSAO_LABELS[dimensao]}</span>
         </h3>
 
         {/* Dimension selector */}
