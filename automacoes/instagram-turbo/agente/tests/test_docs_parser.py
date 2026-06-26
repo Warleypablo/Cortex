@@ -140,6 +140,17 @@ def run():
     _assert(_normalize("Não Basta Empreender!") == "NAO BASTA EMPREENDER", "normalize remove acentos + pontuação")
     _assert(_normalize("DIA DO FRETE GRÁTIS/BEIJO/CAFÉ") == "DIA DO FRETE GRATISBEIJOCAFE", "normalize com barras")
 
+    # Tolerância a espaçamento: título "ES TÁ" casa com header "ESTÁ" (caso real do Creator Summit)
+    _mini = (
+        "**O MAIOR EVENTO DO ESTÁ CHEGANDO**\n"
+        "**LEGENDA**\n"
+        "Vem aí o Creator Summit! 🚀\n"
+        "**PRÓXIMO POST**\n"
+    )
+    leg, hdr = find_legenda_for_task(_mini, "O MAIOR EVENTO DO ES TÁ CHEGANDO")
+    _assert(hdr == "O MAIOR EVENTO DO ESTÁ CHEGANDO", "match tolera diferença de espaço (ES TÁ vs ESTÁ)")
+    _assert("Creator Summit" in leg, "legenda do header com typo de espaço veio certa")
+
     print("\n🎉 Todos os testes passaram.")
 
 

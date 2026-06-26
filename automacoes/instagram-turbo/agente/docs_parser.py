@@ -206,4 +206,17 @@ def find_legenda_for_task(doc_content: str, task_name: str) -> tuple[str, str | 
     if candidates:
         best = max(candidates, key=lambda s: len(s.header_normalized))
         return best.legenda, best.header
+    # Última tolerância: diferença SÓ de espaçamento entre título e header
+    # (ex.: card "...DO ES TÁ CHEGANDO" vs Doc "...DO ESTÁ CHEGANDO"). Compara sem
+    # espaços — pega quebra de palavra/typo de espaço sem afrouxar pra letras diferentes.
+    target_ns = target.replace(" ", "")
+    if target_ns:
+        def ns(s: ParsedSection) -> str:
+            return s.header_normalized.replace(" ", "")
+        loose = [s for s in sections if ns(s) == target_ns]
+        if not loose:
+            loose = [s for s in sections if ns(s) and (target_ns in ns(s) or ns(s) in target_ns)]
+        if loose:
+            best = max(loose, key=lambda s: len(s.header_normalized))
+            return best.legenda, best.header
     return "", None
