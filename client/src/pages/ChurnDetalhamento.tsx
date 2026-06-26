@@ -22,20 +22,12 @@ import {
   Percent,
   Clock,
   BarChart3,
-  PieChart,
   Target,
   CalendarDays,
   Building2,
   Users,
   Pause,
   CalendarRange,
-  Brain,
-  MessageSquare,
-  GitBranch,
-  Lightbulb,
-  Shield,
-  Hash,
-  Megaphone
 } from "lucide-react";
 import {
   Table,
@@ -53,41 +45,16 @@ import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { SecaoMotivos } from "@/components/churn/SecaoMotivos";
+import { SecaoVozCliente } from "@/components/churn/SecaoVozCliente";
 import { CustomTooltip } from "@/components/churn/ui/CustomTooltip";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { StatPill } from "@/components/churn/ui/StatPill";
 
 import { TechChartCard } from "@/components/churn/ui/TechChartCard";
 import { SectionBlock } from "@/components/churn/ui/SectionBlock";
-import { format, parseISO, subMonths, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
+import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { 
-  ResponsiveContainer, 
-  BarChart, 
-  Bar, 
-  XAxis, 
-  YAxis, 
-  Tooltip, 
-  Cell,
-  PieChart as RechartsPie,
-  Pie,
-  Legend,
-  LineChart,
-  Line,
-  Area,
-  AreaChart
-} from "recharts";
 
-
-const PALETTE = [
-  "#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b",
-  "#ec4899", "#6366f1", "#14b8a6", "#f97316", "#84cc16"
-];
-
-const REFINED_COLORS = [
-  "#3b82f6", "#8b5cf6", "#06b6d4", "#10b981", "#f59e0b",
-  "#ec4899", "#6366f1", "#14b8a6", "#f97316", "#84cc16"
-];
 
 const formatCurrencyNoDecimals = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -98,75 +65,9 @@ const formatCurrencyNoDecimals = (value: number) => {
   }).format(value);
 };
 
-// === Voz do Cliente: Constants & Helpers ===
-
-const EXPANDED_KEYWORDS: Record<string, string[]> = {
-  'Resultado': ['resultado', 'performance', 'meta', 'retorno', 'roi', 'entrega'],
-  'Preço': ['preco', 'valor', 'custo', 'caro', 'investimento', 'orcamento', 'budget'],
-  'Atendimento': ['atendimento', 'suporte', 'resposta', 'demora', 'comunicacao', 'contato'],
-  'Operação': ['operacao', 'operacional', 'execucao', 'qualidade', 'erro', 'falha'],
-  'Estratégia': ['estrategia', 'estrategico', 'planejamento', 'direcionamento', 'alinhamento'],
-  'Interno': ['interno', 'reestruturacao', 'mudanca interna', 'corte', 'reducao'],
-  'Concorrência': ['concorrencia', 'concorrente', 'agencia', 'inhouse', 'in-house'],
-  'Prazo': ['prazo', 'tempo', 'urgencia', 'deadline', 'atraso', 'lento'],
-  'Produto': ['produto', 'ferramenta', 'plataforma', 'funcionalidade', 'feature', 'sistema'],
-  'Confiança': ['confianca', 'credibilidade', 'transparencia', 'honestidade', 'seguranca'],
-  'Onboarding': ['onboarding', 'implantacao', 'inicio', 'setup', 'treinamento', 'integracao'],
-  'Relacionamento': ['relacionamento', 'parceria', 'proximidade', 'dedicacao', 'empatia', 'cuidado'],
-};
-
-const normalizeText = (text: string): string =>
-  text.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-
-const highlightKeywords = (text: string, keywords: string[]): React.ReactNode => {
-  if (!text || keywords.length === 0) return text;
-  const normalizedText = normalizeText(text);
-  const segments: { start: number; end: number }[] = [];
-
-  keywords.forEach(kw => {
-    const normalizedKw = normalizeText(kw);
-    let idx = normalizedText.indexOf(normalizedKw);
-    while (idx !== -1) {
-      segments.push({ start: idx, end: idx + normalizedKw.length });
-      idx = normalizedText.indexOf(normalizedKw, idx + 1);
-    }
-  });
-
-  if (segments.length === 0) return text;
-
-  // Merge overlapping segments
-  segments.sort((a, b) => a.start - b.start);
-  const merged: { start: number; end: number }[] = [segments[0]];
-  for (let i = 1; i < segments.length; i++) {
-    const last = merged[merged.length - 1];
-    if (segments[i].start <= last.end) {
-      last.end = Math.max(last.end, segments[i].end);
-    } else {
-      merged.push(segments[i]);
-    }
-  }
-
-  const parts: React.ReactNode[] = [];
-  let lastEnd = 0;
-  merged.forEach((seg, i) => {
-    if (seg.start > lastEnd) parts.push(text.slice(lastEnd, seg.start));
-    parts.push(
-      <mark key={i} className="bg-yellow-200 dark:bg-yellow-900/60 rounded px-0.5">
-        {text.slice(seg.start, seg.end)}
-      </mark>
-    );
-    lastEnd = seg.end;
-  });
-  if (lastEnd < text.length) parts.push(text.slice(lastEnd));
-  return <>{parts}</>;
-};
-
-
 export default function ChurnDetalhamento() {
   usePageTitle("Detalhamento de Churn");
   useSetPageInfo("Detalhamento de Churn", "Análise detalhada de contratos encerrados");
-
-  const BASE_REFERENCE_DATE = new Date(2026, 0, 1);
 
   // BP 2026 - MRR planejado por mês (para calcular taxa de churn)
   const BP_MRR_TARGETS: Record<string, number> = {
@@ -209,14 +110,6 @@ export default function ChurnDetalhamento() {
   const [mainTab, setMainTab] = useState<"analise" | "contratos" | "relatorio" | "consolidado">("analise");
   const [filterAbono, setFilterAbono] = useState<"todos" | "abonados" | "nao_abonados">("todos");
 
-  // Voz do Cliente states
-  const [muralSortBy, setMuralSortBy] = useState<"mrr" | "date">("mrr");
-  const [muralFilterSentiment, setMuralFilterSentiment] = useState<string | null>(null);
-  const [muralFilterTheme, setMuralFilterTheme] = useState<string | null>(null);
-  const [muralExpandedId, setMuralExpandedId] = useState<string | null>(null);
-  const [selectedThemeKeyword, setSelectedThemeKeyword] = useState<string | null>(null);
-  const [expandedOpTheme, setExpandedOpTheme] = useState<string | null>(null);
-  const [expandedCxTheme, setExpandedCxTheme] = useState<string | null>(null);
   const [abonadoOverrides, setAbonadoOverrides] = useState<Record<string, boolean>>({});
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [drill, setDrill] = useState<{ titulo: string; contratos: ChurnContract[] } | null>(null);
@@ -837,160 +730,6 @@ export default function ChurnDetalhamento() {
     return tags;
   };
 
-  // Feature 2: Análise de Padrões de Texto (mensagem_cliente)
-  const textPatternAnalysis = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-
-    const results: { keyword: string; count: number; mrr: number; evitavelPct: number; contratos: string[]; matchedContratos: ChurnContract[] }[] = [];
-
-    Object.entries(EXPANDED_KEYWORDS).forEach(([keyword, terms]) => {
-      const matched = filteredContratos.filter(c => {
-        const msg = normalizeText(c.mensagem_cliente || '');
-        return terms.some(t => msg.includes(t));
-      });
-      if (matched.length > 0) {
-        const evitavel = matched.filter(c => c.evitabilidade_churn === 'Evitável').length;
-        results.push({
-          keyword,
-          count: matched.length,
-          mrr: matched.reduce((sum, c) => sum + (c.valorr || 0), 0),
-          evitavelPct: matched.length > 0 ? (evitavel / matched.length) * 100 : 0,
-          contratos: matched.map(c => c.cliente_nome).slice(0, 5),
-          matchedContratos: matched,
-        });
-      }
-    });
-
-    return results.sort((a, b) => b.count - a.count);
-  }, [filteredContratos]);
-
-
-
-  // === Voz do Cliente: Análise IA ===
-
-  // Mensagens que têm texto real
-  const contratosComMensagem = useMemo(() =>
-    filteredContratos.filter(c => c.mensagem_cliente && c.mensagem_cliente.trim().length > 0),
-    [filteredContratos]
-  );
-
-  // Payload para a IA — só monta quando tem mensagens
-  const aiPayload = useMemo(() => {
-    if (contratosComMensagem.length === 0) return null;
-    return contratosComMensagem.map(c => ({
-      id: c.id,
-      cliente: c.cliente_nome,
-      mensagem: c.mensagem_cliente!,
-      motivo: c.motivo_cancelamento || undefined,
-      mrr: c.valorr || 0,
-    }));
-  }, [contratosComMensagem]);
-
-  // Chamada à IA
-  const { data: aiAnalysis, isLoading: aiLoading, error: aiError, refetch: refetchAI } = useQuery<{
-    analises: { id: string; sentimento: string; temas: string[]; resumo: string }[];
-    sintese: { principal_motivo: string; padrao_critico: string; recomendacao: string };
-  }>({
-    queryKey: ["/api/analytics/churn-mensagens-ai", aiPayload?.map(m => m.id).sort().join(',')],
-    queryFn: async () => {
-      const res = await fetch("/api/analytics/churn-mensagens-ai", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ mensagens: aiPayload }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        throw new Error(body.error || `Erro ${res.status}`);
-      }
-      return res.json();
-    },
-    enabled: !!aiPayload && aiPayload.length > 0,
-    staleTime: 1000 * 60 * 30, // 30 min cache
-    retry: 1,
-  });
-
-  // Mapas derivados da análise IA
-  const aiByContract = useMemo(() => {
-    const map = new Map<string, { sentimento: string; temas: string[]; resumo: string }>();
-    if (!aiAnalysis?.analises) return map;
-    aiAnalysis.analises.forEach(a => map.set(a.id, a));
-    return map;
-  }, [aiAnalysis]);
-
-  // Distribuição de sentimento a partir da IA
-  const sentimentDistribution = useMemo(() => {
-    if (!aiAnalysis?.analises) return [];
-    let neg = 0, neu = 0, pos = 0;
-    let mrrNeg = 0, mrrNeu = 0, mrrPos = 0;
-
-    aiAnalysis.analises.forEach(a => {
-      const c = contratosComMensagem.find(x => x.id === a.id);
-      const mrr = c?.valorr || 0;
-      if (a.sentimento === 'negativo') { neg++; mrrNeg += mrr; }
-      else if (a.sentimento === 'positivo') { pos++; mrrPos += mrr; }
-      else { neu++; mrrNeu += mrr; }
-    });
-
-    const result: { sentiment: string; count: number; mrr: number; color: string }[] = [];
-    if (neg > 0) result.push({ sentiment: 'Negativo', count: neg, mrr: mrrNeg, color: '#ef4444' });
-    if (neu > 0) result.push({ sentiment: 'Neutro', count: neu, mrr: mrrNeu, color: '#94a3b8' });
-    if (pos > 0) result.push({ sentiment: 'Positivo', count: pos, mrr: mrrPos, color: '#22c55e' });
-    return result;
-  }, [aiAnalysis, contratosComMensagem]);
-
-  // Distribuição de temas a partir da IA
-  const themeDistribution = useMemo(() => {
-    if (!aiAnalysis?.analises) return [];
-    const themes: Record<string, { count: number; mrr: number }> = {};
-
-    aiAnalysis.analises.forEach(a => {
-      const c = contratosComMensagem.find(x => x.id === a.id);
-      const mrr = c?.valorr || 0;
-      (a.temas || []).forEach(t => {
-        if (!themes[t]) themes[t] = { count: 0, mrr: 0 };
-        themes[t].count++;
-        themes[t].mrr += mrr;
-      });
-    });
-
-    return Object.entries(themes)
-      .map(([theme, data]) => ({ theme, ...data }))
-      .sort((a, b) => b.count - a.count);
-  }, [aiAnalysis, contratosComMensagem]);
-
-  // Mural filtrado
-  const muralMessages = useMemo(() => {
-    let msgs = contratosComMensagem.map(c => {
-      const ai = aiByContract.get(c.id);
-      return {
-        ...c,
-        sentiment: ai?.sentimento || 'neutro',
-        temas: ai?.temas || [],
-        resumo: ai?.resumo || '',
-      };
-    });
-
-    if (muralFilterSentiment) {
-      msgs = msgs.filter(m => m.sentiment === muralFilterSentiment);
-    }
-
-    if (muralFilterTheme) {
-      msgs = msgs.filter(m => m.temas.includes(muralFilterTheme));
-    }
-
-    if (muralSortBy === 'mrr') {
-      msgs.sort((a, b) => (b.valorr || 0) - (a.valorr || 0));
-    } else {
-      msgs.sort((a, b) => {
-        const da = a.data_encerramento || a.data_pausa || '';
-        const db = b.data_encerramento || b.data_pausa || '';
-        return db.localeCompare(da);
-      });
-    }
-
-    return msgs;
-  }, [contratosComMensagem, aiByContract, muralFilterSentiment, muralFilterTheme, muralSortBy]);
-
   // Distribuição por faixa de ticket (MRR)
   const distribuicaoPorTicket = useMemo(() => {
     if (filteredContratos.length === 0) return [];
@@ -1345,6 +1084,9 @@ export default function ChurnDetalhamento() {
 
       {/* Seção Motivos & Evitabilidade */}
       <SecaoMotivos contratos={filteredContratos} onDrill={onDrill} />
+
+      {/* Seção Voz do Cliente (IA) */}
+      <SecaoVozCliente contratos={filteredContratos} onDrill={onDrill} />
 
       {/* Painel Executivo Detalhado (MRR Base, Abonado, NRR, Squad) */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
