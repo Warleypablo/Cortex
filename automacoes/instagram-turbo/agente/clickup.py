@@ -150,16 +150,22 @@ class Task:
         return f"{hm[0]:02d}:{hm[1]:02d}" if hm else None
 
     def scheduled_datetime(self) -> datetime | None:
-        """Data + horário do card combinados, tz-aware (America/Sao_Paulo).
+        """Data + horário do card combinados, tz-aware (America/Sao_Paulo), ou None.
 
-        É o horário em que o agente deve publicar. Usa o Horário explícito do card;
-        se ausente, o horário padrão. None quando não há Data de postagem (sem data
-        não há agendamento — o post fica em 'aprovado' aguardando data/ação).
+        EXIGE Horário explícito no card. Sem Horário (ou sem Data) NÃO agenda
+        (retorna None) — de propósito: um horário padrão faria todo post sem hora
+        cair no mesmo minuto e colidir. Posts sem horário ficam em 'aprovado'
+        esperando alguém definir a hora (no card ou via "Agendar").
         """
         d = self.posting_date()
         if d is None:
             return None
-        hm = parse_hhmm(self.posting_time() or CONFIG.horario_padrao) or (12, 0)
+        t = self.posting_time()
+        if not t:
+            return None
+        hm = parse_hhmm(t)
+        if not hm:
+            return None
         if _TZ_POSTAGEM is not None:
             return datetime(d.year, d.month, d.day, hm[0], hm[1], tzinfo=_TZ_POSTAGEM)
         return datetime(d.year, d.month, d.day, hm[0], hm[1])  # naive: fuso local

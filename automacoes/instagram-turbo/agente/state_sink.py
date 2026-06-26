@@ -31,15 +31,15 @@ def panel_state(plan: Any) -> str:
     """Mapeia um PlannedAction pro estado que o painel mostra.
 
     Para o painel do operador, uma task aprovada e PRONTA (assets + legenda),
-    com ou sem data de hoje, vira 'aprovado' — é o que o operador pode soltar/
-    agendar. Data futura = 'agendado' (slot automático do agente). Legenda
-    pendente = 'aguardando_ia'. Sem assets/placeholder = 'pulado'.
+    SEM Horário definido, vira 'aprovado' — é o que o operador pode soltar/agendar.
+    Com Horário definido (card ou operador) = 'agendado'. Legenda pendente =
+    'aguardando_ia'. Sem assets/placeholder = 'pulado'.
     Planejar com force_now=True faz os skips de data não mascararem a prontidão.
     """
     src = getattr(plan, "legenda_source", None)
     if plan.legenda_empty or src in ("claude-precisa", "ia"):
         return "aguardando_ia"
-    if plan.posting_date and plan.posting_date > _today():
+    if getattr(plan, "scheduled_at", None):  # tem Horário definido (card ou operador) → agendado
         return "agendado"
     if getattr(plan, "is_ready_to_publish", False):
         return "aprovado"

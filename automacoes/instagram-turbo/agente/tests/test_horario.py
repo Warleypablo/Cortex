@@ -64,10 +64,10 @@ def test_scheduled_datetime_combina_data_e_hora():
     assert dt == datetime(2026, 6, 25, 15, 30, tzinfo=_SP)
 
 
-def test_scheduled_datetime_usa_padrao_quando_sem_hora():
-    # sem Horário → horário padrão (CONFIG.horario_padrao, default 12:00)
+def test_scheduled_datetime_none_sem_horario():
+    # sem Horário no card → NÃO agenda (None) — evita um padrão que colidiria entre posts
     t = _mk({"Data de postagem": _MS_25JUN})
-    assert t.scheduled_datetime() == datetime(2026, 6, 25, 12, 0, tzinfo=_SP)
+    assert t.scheduled_datetime() is None
 
 
 def test_scheduled_datetime_none_sem_data():

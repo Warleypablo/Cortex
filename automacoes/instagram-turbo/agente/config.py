@@ -45,9 +45,6 @@ class Config:
     # (p minúsculo), não "Data de Postagem". O horário é um campo de TEXTO novo.
     posting_date_field: str
     horario_field: str
-    # Horário usado quando o card tem data mas NÃO preencheu o campo Horário.
-    # Evita que o post fique preso sem nunca sair. Formato "HH:MM".
-    horario_padrao: str
 
     @classmethod
     def load(cls) -> "Config":
@@ -75,7 +72,6 @@ class Config:
             organico_ingest_token=env.get("ORGANICO_INGEST_TOKEN", ""),
             posting_date_field=env.get("CLICKUP_POSTING_DATE_FIELD", "Data de postagem"),
             horario_field=env.get("CLICKUP_HORARIO_FIELD", "Horário"),
-            horario_padrao=env.get("HORARIO_PADRAO", "12:00"),
         )
 
     def require_clickup(self) -> None:
