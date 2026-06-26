@@ -102,9 +102,13 @@ export const SUMMIT_CATEGORY_ID = 10;
 export const SUMMIT_CAMPAIGN_KEYWORD = "summit";
 
 // Eventos do pixel (Meta) usados na aba Meta Ads do Summit. Vêm no jsonb
-// meta_insights_daily.actions / action_values após o sync.
+// meta_insights_daily.actions / action_values após o sync. Funil 100% Meta
+// (mesma régua de atribuição em todas as etapas → números consistentes):
+//   Lead (pixel) → Carrinho (InitiateCheckout) → Venda (conversão personalizada)
+//  - Lead      = conversão personalizada "Lead - Summit ES"
 //  - Carrinho  = evento padrão InitiateCheckout
 //  - Venda     = conversão personalizada "Compra - Creators Summit ES"
+export const SUMMIT_LEAD_ACTION = "offsite_conversion.custom.2444269669378621";
 export const SUMMIT_CART_ACTION = "initiate_checkout";
 export const SUMMIT_PURCHASE_ACTION = "offsite_conversion.custom.1345738370839003";
 

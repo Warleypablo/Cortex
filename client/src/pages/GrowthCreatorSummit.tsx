@@ -16,10 +16,11 @@ interface PorTipo {
 interface MetaBlock {
   investimento: number; cpm: number; ctr: number; ctrUnico: number;
   connectRate: number; sessoes: number;
-  txConversaoVdP: number; txConversaoSessoes: number;
-  leads: number; cpl: number;
+  txConversaoVdP: number | null; txConversaoSessoes: number | null;
+  leads: number | null; cpl: number | null;
   carrinhoAbandonado: number | null; vendas: number | null;
   receita: number | null; roas: number | null;
+  pctLeadCarrinho: number | null; pctCarrinhoVenda: number | null; taxaConversao: number | null;
 }
 interface Consolidado {
   investimento: number; leads: number; carrinhoAbandonado: number | null; ingressos: number;
@@ -104,6 +105,9 @@ export default function GrowthCreatorSummit() {
   const cons = data?.consolidado;
 
   const pend = "pendente: integração pixel";
+  // Linha que vira "pendente" quando o valor é null (não sincronizado).
+  const row = (label: string, v: number | null, fmt: (n: number) => string, hint?: string): Row =>
+    v === null ? { label, pending: pend } : { label, value: fmt(v), ...(hint ? { hint } : {}) };
   const custoVenda = m && m.vendas ? m.investimento / m.vendas : null;
   const custoCarrinho = m && m.carrinhoAbandonado ? m.investimento / m.carrinhoAbandonado : null;
 
@@ -118,30 +122,24 @@ export default function GrowthCreatorSummit() {
             { label: "CTR de saída único", value: formatPercent(m.ctrUnico) },
             { label: "Connect Rate", value: formatPercent(m.connectRate), hint: "VdP ÷ cliques de saída" },
             { label: "Sessões", value: fmtInt(m.sessoes), hint: "GA4" },
-            { label: "Tx conversão de página (por VdP)", value: formatPercent(m.txConversaoVdP), hint: "leads ÷ VdP" },
-            { label: "Tx conversão de página (por sessões)", value: formatPercent(m.txConversaoSessoes), hint: "leads ÷ sessões" },
+            row("Tx conversão de página (por VdP)", m.txConversaoVdP, formatPercent, "leads ÷ VdP"),
+            row("Tx conversão de página (por sessões)", m.txConversaoSessoes, formatPercent, "leads ÷ sessões"),
           ],
         },
         {
-          title: "Conversão",
+          title: "Funil (atribuição do pixel)",
           rows: [
-            { label: "Leads (atribuídos ao Meta)", value: fmtInt(m.leads) },
-            { label: "Custo por lead", value: formatCurrency(m.cpl) },
-            m.carrinhoAbandonado === null
-              ? { label: "Carrinho abandonado", pending: pend }
-              : { label: "Carrinho abandonado", value: fmtInt(m.carrinhoAbandonado) },
-            custoCarrinho === null
-              ? { label: "Custo por carrinho abandonado", pending: pend }
-              : { label: "Custo por carrinho abandonado", value: formatCurrency(custoCarrinho) },
-            m.vendas === null
-              ? { label: "Vendas", pending: pend }
-              : { label: "Vendas", value: fmtInt(m.vendas) },
-            custoVenda === null
-              ? { label: "Custo por venda", pending: pend }
-              : { label: "Custo por venda", value: formatCurrency(custoVenda) },
-            m.roas === null
-              ? { label: "ROAS", pending: pend }
-              : { label: "ROAS", value: `${formatDecimal(m.roas)}x` },
+            row("Leads", m.leads, fmtInt, "evento Lead - Summit ES"),
+            row("Custo por lead", m.cpl, formatCurrency),
+            row("% Lead → Carrinho", m.pctLeadCarrinho, formatPercent),
+            row("Carrinho abandonado", m.carrinhoAbandonado, fmtInt, "InitiateCheckout"),
+            row("Custo por carrinho abandonado", custoCarrinho, formatCurrency),
+            row("% Carrinho → Venda", m.pctCarrinhoVenda, formatPercent),
+            row("Vendas", m.vendas, fmtInt, "Compra - Creators Summit ES"),
+            row("Custo por venda", custoVenda, formatCurrency),
+            row("Taxa de conversão (Lead → Venda)", m.taxaConversao, formatPercent),
+            row("Receita", m.receita, formatCurrencyNoDecimals),
+            row("ROAS", m.roas, (n) => `${formatDecimal(n)}x`),
           ],
         },
       ]

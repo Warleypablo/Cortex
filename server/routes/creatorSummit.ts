@@ -6,6 +6,7 @@ import {
   SUMMIT_TICKET_TYPES,
   SUMMIT_DEFAULT_PRECO,
   SUMMIT_DEFAULT_PRECO_LIQUIDO,
+  SUMMIT_LEAD_ACTION,
   SUMMIT_CART_ACTION,
   SUMMIT_PURCHASE_ACTION,
 } from "@shared/produtos";
@@ -14,16 +15,6 @@ import { getSessionsByPlatform } from "../services/ga4Sessions";
 // Stage de "ingresso vendido" no pipeline de Eventos (cat 10).
 // stage_semantic vem nulo nesse pipeline, então casamos pelo nome.
 const SUMMIT_WON_STAGE = "Negócios Ganhos";
-
-// Atribuição de um deal ao Meta Ads: veio de um anúncio do Summit (utm_content =
-// ad_id) ou tem utm de tráfego pago do Meta. (Maioria das COMPRAS perde o UTM na
-// Sympla — por isso compras/receita do Meta dependem de sincronizar a conversão
-// de compra do pixel; ver bloco `meta` abaixo.)
-const metaAttribCond = (adIdsSubquery: any) => sql`(
-  d.utm_content IN ${adIdsSubquery}
-  OR (lower(d.utm_source) IN ('facebook','instagram','fb','ig')
-      AND lower(coalesce(d.utm_medium,'')) IN ('paid','cpc','ads','paid_social'))
-)`;
 
 function tipoCaseSql(col = sql`d.fnl_ngc`) {
   const whens = SUMMIT_TICKET_TYPES.map((t) => {
@@ -58,14 +49,7 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
         FROM meta_ads.meta_campaigns c
         WHERE c.campaign_name ILIKE ${campKeyword}
       )`;
-      const summitAdIds = sql`(
-        SELECT a.ad_id::text
-        FROM meta_ads.meta_ads a
-        JOIN meta_ads.meta_campaigns c ON c.campaign_id = a.campaign_id
-        WHERE c.campaign_name ILIKE ${campKeyword}
-      )`;
-
-      const [metaMedia, metaLeadsRow, metaConv, funilByType] = await Promise.all([
+      const [metaMedia, metaConv, funilByType] = await Promise.all([
         // 1. Mídia Meta (campanhas com "summit" no nome)
         db.execute(sql`
           SELECT
@@ -82,19 +66,10 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
             AND i.campaign_id IN ${summitCampaignIds}
         `),
 
-        // 2. Leads atribuídos ao Meta (cat 10)
-        db.execute(sql`
-          SELECT COUNT(*) AS leads
-          FROM "Bitrix".crm_deal d
-          WHERE ${catCond}
-            AND d.date_create >= ${yearStart}::date
-            AND d.date_create < (${yearEnd}::date + INTERVAL '1 day')
-            AND ${metaAttribCond(summitAdIds)}
-        `),
-
-        // 3. Conversões do pixel (carrinho + venda) extraídas do jsonb actions/
-        // action_values gravado pelo sync. rows_com_actions distingue "ainda não
-        // sincronizado" (→ pendente na UI) de "genuinamente zero".
+        // 2. Funil do pixel (lead + carrinho + venda) extraído do jsonb actions/
+        // action_values gravado pelo sync — funil 100% Meta, mesma régua de
+        // atribuição em todas as etapas (evita misturar com leads do Bitrix).
+        // rows_com_actions distingue "ainda não sincronizado" de "genuinamente zero".
         db.execute(sql`
           WITH base AS (
             SELECT i.actions, i.action_values
@@ -106,6 +81,8 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
           SELECT
             (SELECT COUNT(*) FROM base WHERE jsonb_typeof(actions) = 'array' AND jsonb_array_length(actions) > 0) AS rows_com_actions,
             COALESCE((SELECT SUM((a->>'value')::numeric) FROM base, jsonb_array_elements(base.actions) a
+              WHERE jsonb_typeof(base.actions) = 'array' AND a->>'action_type' = ${SUMMIT_LEAD_ACTION}), 0) AS leads,
+            COALESCE((SELECT SUM((a->>'value')::numeric) FROM base, jsonb_array_elements(base.actions) a
               WHERE jsonb_typeof(base.actions) = 'array' AND a->>'action_type' = ${SUMMIT_CART_ACTION}), 0) AS carrinho,
             COALESCE((SELECT SUM((a->>'value')::numeric) FROM base, jsonb_array_elements(base.actions) a
               WHERE jsonb_typeof(base.actions) = 'array' AND a->>'action_type' = ${SUMMIT_PURCHASE_ACTION}), 0) AS vendas,
@@ -113,7 +90,7 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
               WHERE jsonb_typeof(base.action_values) = 'array' AND v->>'action_type' = ${SUMMIT_PURCHASE_ACTION}), 0) AS receita
         `),
 
-        // 4. Funil consolidado por tipo de ingresso (todos os canais)
+        // 3. Funil consolidado por tipo de ingresso (todos os canais)
         db.execute(sql`
           SELECT
             ${tipoCaseSql()} AS tipo,
@@ -160,7 +137,17 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
       const mCliques = num(mm.cliques); // outbound
       const mCliquesUnicos = num(mm.cliques_unicos);
       const mVdP = num(mm.visualizacoes_pagina);
-      const mLeads = num((metaLeadsRow.rows[0] || {}).leads);
+
+      // Funil 100% Meta (pixel): leads, carrinho e vendas na mesma régua de
+      // atribuição. null enquanto o jsonb não foi sincronizado (→ "pendente").
+      const cv = metaConv.rows[0] || {};
+      const synced = num(cv.rows_com_actions) > 0;
+      const mLeads = synced ? num(cv.leads) : null;
+      const carrinho = synced ? num(cv.carrinho) : null;
+      const vendas = synced ? num(cv.vendas) : null;
+      const mReceita = synced ? num(cv.receita) : null;
+      const pct = (n: number | null, d: number | null) =>
+        n !== null && d !== null && d > 0 ? (n / d) * 100 : null;
 
       // Espelha o conjunto do Orçado×Realizado (Meta), enxuto: sem alcance,
       // frequência e cliques de saída (números brutos pedidos pra remover).
@@ -171,26 +158,19 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
         ctrUnico: mAlcance > 0 ? (mCliquesUnicos / mAlcance) * 100 : 0,
         connectRate: mCliques > 0 ? (mVdP / mCliques) * 100 : 0,
         sessoes: ga4Sessoes,
-        // Conversão de página: por visualização de página (pixel) e por sessões (GA4)
-        txConversaoVdP: mVdP > 0 ? (mLeads / mVdP) * 100 : 0,
-        txConversaoSessoes: ga4Sessoes > 0 ? (mLeads / ga4Sessoes) * 100 : 0,
+        // Conversão de página: leads (pixel) ÷ VdP (pixel) e ÷ sessões (GA4)
+        txConversaoVdP: pct(mLeads, mVdP),
+        txConversaoSessoes: pct(mLeads, ga4Sessoes),
         leads: mLeads,
-        cpl: mLeads > 0 ? mInvest / mLeads : 0,
-        // Carrinho/vendas vêm dos eventos do pixel (jsonb actions). Enquanto o sync
-        // não gravou o jsonb (rows_com_actions = 0), retornamos null → "pendente".
-        ...(() => {
-          const cv = metaConv.rows[0] || {};
-          const synced = num(cv.rows_com_actions) > 0;
-          const carrinho = num(cv.carrinho);
-          const vendas = num(cv.vendas);
-          const receita = num(cv.receita);
-          return {
-            carrinhoAbandonado: synced ? carrinho : null,
-            vendas: synced ? vendas : null,
-            receita: synced ? receita : null,
-            roas: synced && mInvest > 0 ? receita / mInvest : null,
-          };
-        })(),
+        cpl: mLeads && mLeads > 0 ? mInvest / mLeads : null,
+        carrinhoAbandonado: carrinho,
+        vendas,
+        receita: mReceita,
+        roas: synced && mInvest > 0 && mReceita !== null ? mReceita / mInvest : null,
+        // Taxas do funil (estilo Orçado×Realizado)
+        pctLeadCarrinho: pct(carrinho, mLeads),
+        pctCarrinhoVenda: pct(vendas, carrinho),
+        taxaConversao: pct(vendas, mLeads),
       };
 
       // ---- Bloco CONSOLIDADO (todos os canais) ----
