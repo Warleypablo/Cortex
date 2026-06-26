@@ -47,19 +47,8 @@ export default function ChurnDetalhamento() {
     return churnBP / mrrBP;
   };
 
-  const [searchTerm, setSearchTerm] = useState("");
-  const [filterSquads, setFilterSquads] = useState<string[]>([]);
-  const [filterProdutos, setFilterProdutos] = useState<string[]>([]);
-  const [filterResponsaveis, setFilterResponsaveis] = useState<string[]>([]);
-  const [filterServicos, setFilterServicos] = useState<string[]>([]);
-  const [filterPlanos, setFilterPlanos] = useState<string[]>([]);
-  const [filterClusters, setFilterClusters] = useState<string[]>([]);
-  const [filterEvitabilidades, setFilterEvitabilidades] = useState<string[]>([]);
-  const [filterPossibilidadesRetencao, setFilterPossibilidadesRetencao] = useState<string[]>([]);
   const [dataInicio, setDataInicio] = useState<string>(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [dataFim, setDataFim] = useState<string>(format(endOfMonth(new Date()), "yyyy-MM-dd"));
-  const [sortBy, setSortBy] = useState<string>("data_encerramento");
-  const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
   const [filterAbono, setFilterAbono] = useState<"todos" | "abonados" | "nao_abonados">("todos");
 
   const [abonadoOverrides, setAbonadoOverrides] = useState<Record<string, boolean>>({});
@@ -180,48 +169,6 @@ export default function ChurnDetalhamento() {
       });
     }
 
-    if (searchTerm) {
-      const term = searchTerm.toLowerCase();
-      filtered = filtered.filter(c =>
-        c.cliente_nome?.toLowerCase().includes(term) ||
-        c.cnpj?.includes(term) ||
-        c.produto?.toLowerCase().includes(term) ||
-        c.responsavel?.toLowerCase().includes(term)
-      );
-    }
-
-    if (filterSquads.length > 0) {
-      filtered = filtered.filter(c => filterSquads.includes(c.squad));
-    }
-
-    if (filterProdutos.length > 0) {
-      filtered = filtered.filter(c => filterProdutos.includes(c.produto));
-    }
-
-    if (filterResponsaveis.length > 0) {
-      filtered = filtered.filter(c => filterResponsaveis.includes(c.responsavel));
-    }
-
-    if (filterServicos.length > 0) {
-      filtered = filtered.filter(c => c.servico && filterServicos.includes(c.servico));
-    }
-
-    if (filterPlanos.length > 0) {
-      filtered = filtered.filter(c => c.plano && filterPlanos.includes(c.plano));
-    }
-
-    if (filterClusters.length > 0) {
-      filtered = filtered.filter(c => c.cluster && filterClusters.includes(c.cluster));
-    }
-
-    if (filterEvitabilidades.length > 0) {
-      filtered = filtered.filter(c => c.evitabilidade_churn && filterEvitabilidades.includes(c.evitabilidade_churn));
-    }
-
-    if (filterPossibilidadesRetencao.length > 0) {
-      filtered = filtered.filter(c => c.possibilidade_retencao && filterPossibilidadesRetencao.includes(c.possibilidade_retencao));
-    }
-
     // Filtro de abono
     if (filterAbono !== "todos") {
       filtered = filtered.filter(c => {
@@ -235,34 +182,15 @@ export default function ChurnDetalhamento() {
       }
     }
 
+    // Default stable sort: most recent encerramento first
     filtered.sort((a, b) => {
-      let comparison = 0;
-      switch (sortBy) {
-        case "data_encerramento":
-          const dateA = a.data_encerramento || a.data_pausa || '';
-          const dateB = b.data_encerramento || b.data_pausa || '';
-          comparison = new Date(dateA).getTime() - new Date(dateB).getTime();
-          break;
-        case "valorr":
-          comparison = a.valorr - b.valorr;
-          break;
-        case "lifetime_meses":
-          comparison = a.lifetime_meses - b.lifetime_meses;
-          break;
-        case "ltv":
-          comparison = a.ltv - b.ltv;
-          break;
-        case "cliente_nome":
-          comparison = (a.cliente_nome || "").localeCompare(b.cliente_nome || "");
-          break;
-        default:
-          comparison = 0;
-      }
-      return sortOrder === "desc" ? -comparison : comparison;
+      const dateA = a.data_encerramento || a.data_pausa || '';
+      const dateB = b.data_encerramento || b.data_pausa || '';
+      return new Date(dateB).getTime() - new Date(dateA).getTime();
     });
 
     return filtered;
-  }, [data?.contratos, searchTerm, filterSquads, filterProdutos, filterResponsaveis, filterServicos, filterPlanos, filterClusters, filterEvitabilidades, filterPossibilidadesRetencao, dataInicio, dataFim, sortBy, sortOrder, filterAbono, abonadoOverrides]);
+  }, [data?.contratos, dataInicio, dataFim, filterAbono, abonadoOverrides]);
 
   const filteredMetricas = useMemo(() => {
     if (filteredContratos.length === 0) {
@@ -411,29 +339,6 @@ export default function ChurnDetalhamento() {
         onChangePeriodo={(inicio, fim) => { setDataInicio(inicio); setDataFim(fim); }}
         filterAbono={filterAbono}
         onChangeAbono={setFilterAbono}
-        filtros={data?.filtros}
-        filterSquads={filterSquads}
-        setFilterSquads={setFilterSquads}
-        filterProdutos={filterProdutos}
-        setFilterProdutos={setFilterProdutos}
-        filterResponsaveis={filterResponsaveis}
-        setFilterResponsaveis={setFilterResponsaveis}
-        filterServicos={filterServicos}
-        setFilterServicos={setFilterServicos}
-        filterPlanos={filterPlanos}
-        setFilterPlanos={setFilterPlanos}
-        filterClusters={filterClusters}
-        setFilterClusters={setFilterClusters}
-        filterEvitabilidades={filterEvitabilidades}
-        setFilterEvitabilidades={setFilterEvitabilidades}
-        filterPossibilidadesRetencao={filterPossibilidadesRetencao}
-        setFilterPossibilidadesRetencao={setFilterPossibilidadesRetencao}
-        searchTerm={searchTerm}
-        setSearchTerm={setSearchTerm}
-        sortBy={sortBy}
-        setSortBy={setSortBy}
-        sortOrder={sortOrder}
-        setSortOrder={setSortOrder}
       />
 
       {/* Painel Executivo Hero - KPIs de Diagnóstico */}
