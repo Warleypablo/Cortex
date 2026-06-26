@@ -316,6 +316,7 @@ export default function GrowthOrganico() {
                       <TableCell className="whitespace-nowrap">{fmtData(p.postingDate)}</TableCell>
                       <TableCell className="text-right">
                         <div className="inline-flex items-center gap-1.5 justify-end">
+                          <ClickUpButton post={p} />
                           <Button size="sm" variant="default" className="h-7 px-2"
                             disabled={commandMut.isPending}
                             onClick={() => setConfirmPost(p)}>
@@ -386,6 +387,7 @@ export default function GrowthOrganico() {
                       </TableCell>
                       <TableCell className="text-right">
                         <div className="inline-flex items-center gap-1.5 justify-end">
+                          <ClickUpButton post={p} />
                           <Button size="sm" variant="default" className="h-7 px-2"
                             disabled={commandMut.isPending} onClick={() => setConfirmPost(p)}>
                             <Send className="h-3.5 w-3.5" /><span className="ml-1">Soltar agora</span>
@@ -440,12 +442,15 @@ export default function GrowthOrganico() {
                       <TableCell>{p.tipoPost ?? "—"}</TableCell>
                       <TableCell><StateBadge state={p.state} /></TableCell>
                       <TableCell>
-                        {p.permalink ? (
-                          <a href={p.permalink} target="_blank" rel="noreferrer"
-                            className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline">
-                            abrir <ExternalLink className="h-3 w-3" />
-                          </a>
-                        ) : "—"}
+                        <div className="inline-flex items-center gap-1.5">
+                          <ClickUpButton post={p} />
+                          {p.permalink && (
+                            <a href={p.permalink} target="_blank" rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline">
+                              abrir post <ExternalLink className="h-3 w-3" />
+                            </a>
+                          )}
+                        </div>
                       </TableCell>
                     </TableRow>
                   ))}
@@ -557,6 +562,23 @@ function LegendaCell({ post }: { post: Post }) {
   if (post.legendaSource === "ia" || post.legendaSource === "claude-precisa")
     return <Badge variant="outline" className="border-0 bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">IA</Badge>;
   return <span className="text-xs text-muted-foreground">—</span>;
+}
+
+// Botão que abre o card correspondente no ClickUp. Usa a URL salva (clickupUrl)
+// quando existe; senão monta a partir do task id (formato curto que redireciona).
+function ClickUpButton({ post }: { post: Post }) {
+  const url = post.clickupUrl ?? `https://app.clickup.com/t/${post.clickupTaskId}`;
+  return (
+    <Button
+      size="sm"
+      variant="ghost"
+      className="h-7 px-2 text-muted-foreground"
+      title="Abrir card no ClickUp"
+      onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+    >
+      <ExternalLink className="h-3.5 w-3.5" /><span className="ml-1">ClickUp</span>
+    </Button>
+  );
 }
 
 function EmptyRow({ span, children }: { span: number; children: ReactNode }) {
