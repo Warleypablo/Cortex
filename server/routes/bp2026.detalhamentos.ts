@@ -15,7 +15,7 @@ interface Linha {
   direcao: "maior_melhor" | "menor_melhor" | "neutro";
   unidade?: "brl" | "int" | "pct" | "dec"; nota?: string; destaque?: boolean;
   grupo?: string; subItem?: boolean; semDetalhe?: boolean;
-  expansivel?: boolean; paiMetrica?: string;
+  expansivel?: boolean; paiMetrica?: string; auditavel?: boolean;
   meses: MesLinha[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
 }
@@ -244,6 +244,7 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
       ),
       subItem: true,
       paiMetrica: "cac_por_contrato",
+      auditavel: true,
     };
   });
 
@@ -258,7 +259,7 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
         realizado: razao(cacYtdReal, somaAte((m) => contratosVendidosTotalPorMes[m - 1] ?? 0)),
       }
     ),
-    semDetalhe: true,
+    auditavel: true,
     expansivel: true,
   };
 
