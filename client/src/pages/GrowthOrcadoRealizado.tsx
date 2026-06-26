@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, Music, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft } from "lucide-react";
+import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, Music, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS, UNIVERSAL, PAID_ONLY, META_ONLY, isMetricVisibleForSelection } from "@/lib/metasBudgetConfig";
@@ -22,7 +22,7 @@ const GENERIC_MARKETING_PLATFORMS: Record<string, readonly string[]> = {
   ctrUnico: META_ONLY,                  // CTR de saída único — só Meta
   visualizacoes_pagina: PAID_ONLY,
   sessoes: UNIVERSAL,
-  connect_rate: PAID_ONLY,
+  // connect_rate removido do blend: só existe por plataforma (same-source) — ver buildAdsMetrics.
   taxa_conversao_pagina: UNIVERSAL,     // aqui é por Sessões (Leads ÷ Sessões)
   taxa_conversao_pagina_mql: UNIVERSAL,
   taxa_conversao_pagina_nmql: UNIVERSAL,
@@ -53,6 +53,9 @@ interface Metric {
   isHeader?: boolean;
   indent?: number;
   emoji?: string;
+  // Aviso de qualidade do dado (ex: pixel do Meta sub-capturando). Quando presente,
+  // a linha mostra um ⚠️ com este texto em tooltip.
+  warning?: string;
 }
 
 interface MetricSection {
@@ -1001,6 +1004,11 @@ export default function GrowthOrcadoRealizado() {
                     {igOrigemExpanded ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />}
                     <span>{m.name}</span>
                   </button>
+                ) : m.warning ? (
+                  <span className="inline-flex items-center gap-1.5 cursor-help" title={m.warning}>
+                    <span>{m.name}</span>
+                    <AlertTriangle className="w-3.5 h-3.5 text-amber-500 shrink-0" aria-label={m.warning} />
+                  </span>
                 ) : (
                   m.name
                 )}
@@ -1238,7 +1246,7 @@ export default function GrowthOrcadoRealizado() {
   interface MetaAdsDetailMetrics {
     investimento: number; impressoes: number; alcance: number; frequencia: number;
     cpm: number; ctr: number; ctrUnico?: number; videoHook: number; videoHold: number;
-    videoP75: number; videoP100: number; visualizacoesPagina: number; connectRate: number;
+    videoP75: number; videoP100: number; visualizacoesPagina: number;
     sessoes: number;
     // Base pixel Meta (landing_page_views) — usada em Connect Rate e Tx Conversão da Página,
     // que devem ser calculadas a partir do Meta Ads, não do GA4.
@@ -1742,7 +1750,12 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: data.ctrUnico ?? null, percentual: null, format: 'percent' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
-      { id: 'connect_rate', name: 'Connect Rate', type: 'formula', orcado: ORCADO_ADS.connectRate, realizado: data.connectRate ?? 0, percentual: calcPercentual(ORCADO_ADS.connectRate, data.connectRate), format: 'percent' },
+      // Connect Rate NÃO entra no consolidado de Marketing (blend): ele só faz sentido
+      // por plataforma, com numerador e denominador da MESMA fonte. No blend, o
+      // numerador (landing_page_views do pixel Meta) e o denominador (cliques de saída
+      // de todas as plataformas) vêm de fontes diferentes e produzem um número
+      // sem significado. A linha aparece apenas no recorte por plataforma (Aprofundado),
+      // onde é calculada same-source — ver buildMetaAdsMetrics (pixel Meta).
       { id: 'taxa_conversao_pagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: ORCADO_ADS.taxaConversaoPagina, realizado: (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : 0, percentual: calcPercentual(ORCADO_ADS.taxaConversaoPagina, (data.sessoes ?? 0) > 0 ? (data.leads ?? 0) / (data.sessoes ?? 1) : 0), format: 'percent' },
       { id: 'taxa_conversao_pagina_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: (data.sessoes ?? 0) > 0 ? (data.mqls ?? 0) / (data.sessoes ?? 1) : 0, percentual: null, format: 'percent' },
       { id: 'taxa_conversao_pagina_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: (data.sessoes ?? 0) > 0 ? ((data.leads ?? 0) - (data.mqls ?? 0)) / (data.sessoes ?? 1) : 0, percentual: null, format: 'percent' },
@@ -1821,15 +1834,24 @@ export default function GrowthOrcadoRealizado() {
     const taxaConversaoPagina = lpvPixel > 0 ? ((funnel?.leads ?? 0) / lpvPixel) : 0;
     const sessoes = d.sessoes ?? 0;
     const taxaConversaoPaginaSessoes = sessoes > 0 ? ((funnel?.leads ?? 0) / sessoes) : 0;
+    // Saúde do pixel: o landing_page_views do Meta deveria acompanhar as Sessões do
+    // GA4 (na conta toda fica ~67%). Quando cai muito abaixo disso com volume relevante,
+    // o pixel está sub-capturando (provável bug de instalação/tagueamento) e tanto o
+    // Connect Rate quanto a Tx Conversão por Visualização de Página ficam subestimados.
+    const pixelHealthRatio = sessoes > 0 ? lpvPixel / sessoes : null;
+    const pixelSubcaptura = sessoes >= 30 && pixelHealthRatio !== null && pixelHealthRatio < 0.4;
+    const pixelWarning = pixelSubcaptura
+      ? `Pixel do Meta sub-capturando: registrou ${lpvPixel} visualizações de página, mas o GA4 viu ${sessoes} sessões (${Math.round((pixelHealthRatio ?? 0) * 100)}% — o normal na conta é ~67%). Connect Rate e Tx Conversão por Visualização de Página estão subestimados; provável problema de instalação/tagueamento do pixel nessas campanhas.`
+      : undefined;
     const topMetrics: Metric[] = [
       { id: 'meta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
       { id: 'meta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
       { id: 'meta_ctr', name: 'CTR de saída', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
       { id: 'meta_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: d.ctrUnico ?? null, percentual: null, format: 'percent' },
-      { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: lpvPixel, percentual: calcPercentual(O.visualizacoesPagina, lpvPixel), format: 'number' },
+      { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: lpvPixel, percentual: calcPercentual(O.visualizacoesPagina, lpvPixel), format: 'number', warning: pixelWarning },
       { id: 'meta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent' },
-      { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página - Visualização de Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
+      { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent', warning: pixelWarning },
+      { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página - Visualização de Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent', warning: pixelWarning },
       { id: 'meta_taxaConversaoPagina_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? (funnel?.mqls ?? 0) / lpvPixel : 0, percentual: null, format: 'percent' },
       { id: 'meta_taxaConversaoPagina_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? ((funnel?.leads ?? 0) - (funnel?.mqls ?? 0)) / lpvPixel : 0, percentual: null, format: 'percent' },
       { id: 'meta_taxaConversaoPaginaSessoes', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: null, realizado: taxaConversaoPaginaSessoes, percentual: null, format: 'percent' },
