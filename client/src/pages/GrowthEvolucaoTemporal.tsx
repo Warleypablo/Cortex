@@ -314,9 +314,23 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "mql_ra_num", name: "Nº RA MQL", format: "number", section: "mql",
     realizado: ({ mql }) => mql?.reunioesAgendadas ?? null,
     orcado: (b) => b.mql?.reunioesAgendadas ?? null },
+  { id: "mql_cpra", name: "CPRA MQL", format: "currency", section: "mql", inverted: true,
+    realizado: ({ ads, mql }) => {
+      const invest = ads?.investimento ?? 0;
+      const ra = mql?.reunioesAgendadas ?? 0;
+      return invest > 0 && ra > 0 ? invest / ra : null;
+    },
+    orcado: (b) => b.mql?.cpraMql ?? null },
   { id: "mql_rr_num", name: "Nº RR MQL", format: "number", section: "mql",
     realizado: ({ mql }) => mql?.reunioesRealizadas ?? null,
     orcado: (b) => b.mql?.reunioesRealizadas ?? null },
+  { id: "mql_cprr", name: "CPRR MQL", format: "currency", section: "mql", inverted: true,
+    realizado: ({ ads, mql }) => {
+      const invest = ads?.investimento ?? 0;
+      const rr = mql?.reunioesRealizadas ?? 0;
+      return invest > 0 && rr > 0 ? invest / rr : null;
+    },
+    orcado: (b) => b.mql?.cprrMql ?? null },
   { id: "mql_noshow", name: "% No-Show MQL", format: "percent", section: "mql", inverted: true,
     realizado: ({ mql }) => mql?.percNoShow ?? null,
     orcado: (b) => b.mql?.percNoShow ?? null },
@@ -326,8 +340,8 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "mql_taxa_vendas", name: "Taxa Vendas MQL", format: "percent", section: "mql",
     realizado: ({ mql }) => mql?.taxaVendas ?? null,
     orcado: (b) => b.mql?.taxaVendas ?? null },
-  { id: "mql_novos_clientes", name: "Novos Clientes MQL", format: "number", section: "mql",
-    realizado: ({ mql }) => mql?.novosClientes ?? null,
+  { id: "mql_novos_clientes", name: "Negócios Ganhos MQL", format: "number", section: "mql",
+    realizado: ({ mql }) => mql?.dealsGanhos ?? null,
     orcado: (b) => b.mql?.novosClientes ?? null },
   { id: "mql_tx_recorrente", name: "Tx Recorrente MQL", format: "percent", section: "mql",
     realizado: ({ mql }) => mql?.txContratosRecorrentes ?? null,
@@ -364,9 +378,23 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "nmql_ra_num", name: "Nº RA Não-MQL", format: "number", section: "nao-mql",
     realizado: ({ naoMql }) => naoMql?.reunioesAgendadas ?? null,
     orcado: (b) => b["nao-mql"]?.reunioesAgendadas ?? null },
+  { id: "nmql_cpra", name: "CPRA Não-MQL", format: "currency", section: "nao-mql", inverted: true,
+    realizado: ({ ads, naoMql }) => {
+      const invest = ads?.investimento ?? 0;
+      const ra = naoMql?.reunioesAgendadas ?? 0;
+      return invest > 0 && ra > 0 ? invest / ra : null;
+    },
+    orcado: (b) => b["nao-mql"]?.cpraNmql ?? null },
   { id: "nmql_rr_num", name: "Nº RR Não-MQL", format: "number", section: "nao-mql",
     realizado: ({ naoMql }) => naoMql?.reunioesRealizadas ?? null,
     orcado: (b) => b["nao-mql"]?.reunioesRealizadas ?? null },
+  { id: "nmql_cprr", name: "CPRR Não-MQL", format: "currency", section: "nao-mql", inverted: true,
+    realizado: ({ ads, naoMql }) => {
+      const invest = ads?.investimento ?? 0;
+      const rr = naoMql?.reunioesRealizadas ?? 0;
+      return invest > 0 && rr > 0 ? invest / rr : null;
+    },
+    orcado: (b) => b["nao-mql"]?.cprrNmql ?? null },
   { id: "nmql_noshow", name: "% No-Show Não-MQL", format: "percent", section: "nao-mql", inverted: true,
     realizado: ({ naoMql }) => naoMql?.percNoShow ?? null,
     orcado: (b) => b["nao-mql"]?.percNoShow ?? null },
@@ -376,8 +404,8 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "nmql_taxa_vendas", name: "Taxa Vendas Não-MQL", format: "percent", section: "nao-mql",
     realizado: ({ naoMql }) => naoMql?.taxaVendas ?? null,
     orcado: (b) => b["nao-mql"]?.taxaVendas ?? null },
-  { id: "nmql_novos_clientes", name: "Novos Clientes Não-MQL", format: "number", section: "nao-mql",
-    realizado: ({ naoMql }) => naoMql?.novosClientes ?? null,
+  { id: "nmql_novos_clientes", name: "Negócios Ganhos Não-MQL", format: "number", section: "nao-mql",
+    realizado: ({ naoMql }) => naoMql?.dealsGanhos ?? null,
     orcado: (b) => b["nao-mql"]?.novosClientes ?? null },
   { id: "nmql_tx_recorrente", name: "Tx Recorrente Não-MQL", format: "percent", section: "nao-mql",
     realizado: ({ naoMql }) => naoMql?.txContratosRecorrentes ?? null,
