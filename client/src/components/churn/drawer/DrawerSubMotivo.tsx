@@ -3,6 +3,7 @@ import { ChevronDown, ChevronUp } from "lucide-react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { type ChurnContract } from "@/components/churn/types";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
+import { severityHex } from "@/components/churn/severity";
 
 function evitabilidadeColor(label: string): string {
   const l = label.toLowerCase();
@@ -71,7 +72,8 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
     );
   }
 
-  const maxMotivoCount = Math.max(...motivoSubmotivoTree.map((d) => d.count), 1);
+  const maxMotivoMrr = motivoSubmotivoTree.length > 0 ? motivoSubmotivoTree[0].mrr : 1;
+  const totalMotivoMrr = motivoSubmotivoTree.reduce((s, d) => s + d.mrr, 0);
 
   return (
     <div className="space-y-4">
@@ -161,91 +163,129 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
         </div>
       )}
 
-      {/* ── Motivo → Submotivo tree ──────────────────────────────────────────── */}
-      <div className="space-y-1.5">
+      {/* ── Motivo → Submotivo donut ─────────────────────────────────────────── */}
+      <div>
         <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
           Motivo → Submotivo
         </p>
-        {motivoSubmotivoTree.map((item) => {
-          const barWidth = Math.max((item.count / maxMotivoCount) * 100, 5);
-          const isOpen = expandedMotivo === item.motivo;
 
-          return (
-            <div key={item.motivo}>
-              {/* Motivo row */}
-              <div
-                className="rounded-md border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 px-2 py-1.5 cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors"
-                onClick={() => setExpandedMotivo(isOpen ? null : item.motivo)}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-1.5 min-w-0">
-                    {isOpen ? (
-                      <ChevronUp className="h-3 w-3 flex-shrink-0 text-gray-400 dark:text-zinc-500" />
-                    ) : (
-                      <ChevronDown className="h-3 w-3 flex-shrink-0 text-gray-400 dark:text-zinc-500" />
-                    )}
-                    <span className="truncate text-xs font-medium text-gray-900 dark:text-white">
-                      {item.motivo}
-                    </span>
-                  </div>
-                  <span className="text-xs font-semibold text-gray-900 dark:text-white tabular-nums flex-shrink-0">
-                    {item.count}
-                  </span>
-                </div>
-                {/* MRR bar */}
-                <div className="flex items-center gap-2 mt-1 pl-5">
-                  <div className="flex-1 h-1.5 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-orange-400 to-red-500 transition-all"
-                      style={{ width: `${barWidth}%` }}
-                    />
-                  </div>
-                  <span className="text-[10px] text-red-500 dark:text-red-400 tabular-nums whitespace-nowrap">
-                    {formatCurrencyNoDecimals(item.mrr)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Submotivos (expanded) */}
-              {isOpen && item.submotivos.length > 0 && (
-                <div className="ml-5 mt-1 space-y-1 border-l-2 border-orange-200 dark:border-orange-800 pl-2">
-                  {(() => {
-                    const subMaxCount = Math.max(...item.submotivos.map((s) => s.count), 1);
-                    return item.submotivos.map((sub) => {
-                    const subBarWidth = Math.max((sub.count / subMaxCount) * 100, 5);
-                    return (
-                      <div
-                        key={sub.submotivo}
-                        className="rounded-md border border-gray-100 dark:border-zinc-800 bg-white/50 dark:bg-zinc-900/50 px-2 py-1"
-                      >
-                        <div className="flex items-center justify-between gap-2">
-                          <span className="truncate text-[11px] text-gray-500 dark:text-zinc-400">
-                            {sub.submotivo}
-                          </span>
-                          <span className="text-[11px] font-semibold text-gray-900 dark:text-white tabular-nums flex-shrink-0">
-                            {sub.count}
-                          </span>
-                        </div>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <div className="flex-1 h-1 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden">
-                            <div
-                              className="h-full rounded-full bg-orange-300 dark:bg-orange-600 transition-all"
-                              style={{ width: `${subBarWidth}%` }}
-                            />
-                          </div>
-                          <span className="text-[9px] text-red-500 dark:text-red-400 tabular-nums whitespace-nowrap">
-                            {formatCurrencyNoDecimals(sub.mrr)}
-                          </span>
-                        </div>
-                      </div>
-                    );
-                  });
-                  })()}
-                </div>
-              )}
+        {motivoSubmotivoTree.length === 0 ? (
+          <p className="text-xs text-muted-foreground text-center py-3">
+            Nenhum motivo registrado.
+          </p>
+        ) : (
+          <div className="flex items-start gap-3">
+            {/* Donut */}
+            <div className="flex-shrink-0" style={{ width: 130, height: 130 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={motivoSubmotivoTree}
+                    dataKey="mrr"
+                    nameKey="motivo"
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={38}
+                    outerRadius={58}
+                    startAngle={90}
+                    endAngle={-270}
+                    strokeWidth={2}
+                    stroke="transparent"
+                  >
+                    {motivoSubmotivoTree.map((item) => (
+                      <Cell
+                        key={item.motivo}
+                        fill={severityHex(maxMotivoMrr > 0 ? item.mrr / maxMotivoMrr : 0)}
+                      />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number, name: string) => [
+                      formatCurrencyNoDecimals(value),
+                      name,
+                    ]}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--popover))",
+                      color: "hsl(var(--popover-foreground))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: 6,
+                      fontSize: 11,
+                    }}
+                    labelStyle={{ color: "hsl(var(--popover-foreground))" }}
+                    itemStyle={{ color: "hsl(var(--popover-foreground))" }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
             </div>
-          );
-        })}
+
+            {/* Legend with clickable submotivo drill-down */}
+            <div className="flex-1 space-y-1.5 min-w-0">
+              {motivoSubmotivoTree.map((item) => {
+                const pct = totalMotivoMrr > 0 ? Math.round((item.mrr / totalMotivoMrr) * 100) : 0;
+                const color = severityHex(maxMotivoMrr > 0 ? item.mrr / maxMotivoMrr : 0);
+                const isOpen = expandedMotivo === item.motivo;
+
+                return (
+                  <div key={item.motivo}>
+                    {/* Motivo legend row — clickable */}
+                    <div
+                      className="cursor-pointer rounded-sm hover:bg-gray-50 dark:hover:bg-zinc-800 transition-colors px-0.5"
+                      onClick={() => setExpandedMotivo(isOpen ? null : item.motivo)}
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: color }}
+                        />
+                        <span className="text-xs text-gray-700 dark:text-zinc-300 truncate flex-1">
+                          {item.motivo}
+                        </span>
+                        {isOpen ? (
+                          <ChevronUp className="h-3 w-3 flex-shrink-0 text-gray-400 dark:text-zinc-500" />
+                        ) : (
+                          <ChevronDown className="h-3 w-3 flex-shrink-0 text-gray-400 dark:text-zinc-500" />
+                        )}
+                      </div>
+                      <div className="pl-3.5 flex items-center gap-1.5">
+                        <span className="text-xs font-semibold text-gray-900 dark:text-white tabular-nums">
+                          {item.count}
+                        </span>
+                        <span className="text-[10px] text-muted-foreground tabular-nums">
+                          {formatCurrencyNoDecimals(item.mrr)}
+                        </span>
+                        <span className="text-[10px] font-medium tabular-nums" style={{ color }}>
+                          {pct}%
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Submotivos (expanded) */}
+                    {isOpen && item.submotivos.length > 0 && (
+                      <div className="ml-3.5 mt-1 mb-1 space-y-0.5 border-l-2 pl-2" style={{ borderColor: color + "66" }}>
+                        {item.submotivos.map((sub) => (
+                          <div
+                            key={sub.submotivo}
+                            className="flex items-center justify-between gap-1 py-0.5"
+                          >
+                            <span className="truncate text-[11px] text-gray-500 dark:text-zinc-400 flex-1">
+                              {sub.submotivo}
+                            </span>
+                            <span className="text-[10px] font-semibold text-gray-700 dark:text-zinc-300 tabular-nums flex-shrink-0">
+                              {sub.count}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground tabular-nums flex-shrink-0 ml-1">
+                              {formatCurrencyNoDecimals(sub.mrr)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
