@@ -18,6 +18,9 @@ import {
   classificarPonteItens, ehEstoquePontual, STATUS_DECOMP, normalizarSquad,
   type RegPontualItem, type CategoriaPonte,
 } from "./bp2026.pontual.helpers";
+import { abasPermitidas } from "../../shared/bp2026-tabs";
+import { metricaPertenceAAba } from "./bp2026.catalogo";
+import type { User } from "../auth/userDb";
 
 const ANO = 2026;
 const LIMITE_ITENS = 50;
@@ -462,6 +465,15 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
   app.get("/api/bp2026/detalhe", async (req, res) => {
     try {
       const metrica = String(req.query.metrica ?? "");
+      const aba = String(req.query.aba ?? "");
+      const user = req.user as User;
+      const minhasAbas = abasPermitidas(user?.role, user?.allowedBpTabs);
+      if (!minhasAbas.includes(aba as any)) {
+        return res.status(403).json({ error: "Sem acesso a esta aba" });
+      }
+      if (!metricaPertenceAAba(metrica, aba)) {
+        return res.status(400).json({ error: "métrica não pertence à aba" });
+      }
       const mes = Number(req.query.mes);
       const def = TODAS_DEFS.find((d) => d.metrica === metrica);
       const prod = parseMetricaProduto(metrica);
