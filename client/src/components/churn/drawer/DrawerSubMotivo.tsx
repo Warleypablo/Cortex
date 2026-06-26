@@ -97,7 +97,7 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
 
       {/* ── Motivo → Submotivo tree ──────────────────────────────────────────── */}
       <div className="space-y-1.5">
-        <p className="text-[11px] font-medium text-gray-500 dark:text-zinc-400 uppercase tracking-wide mb-2">
+        <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
           Motivo → Submotivo
         </p>
         {motivoSubmotivoTree.map((item) => {
@@ -143,8 +143,9 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
               {/* Submotivos (expanded) */}
               {isOpen && item.submotivos.length > 0 && (
                 <div className="ml-5 mt-1 space-y-1 border-l-2 border-orange-200 dark:border-orange-800 pl-2">
-                  {item.submotivos.map((sub) => {
+                  {(() => {
                     const subMaxCount = Math.max(...item.submotivos.map((s) => s.count), 1);
+                    return item.submotivos.map((sub) => {
                     const subBarWidth = Math.max((sub.count / subMaxCount) * 100, 5);
                     return (
                       <div
@@ -172,7 +173,8 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
                         </div>
                       </div>
                     );
-                  })}
+                  });
+                  })()}
                 </div>
               )}
             </div>

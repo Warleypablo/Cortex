@@ -161,7 +161,8 @@ export function DrawerVozCliente({
     return msgs;
   }, [contratosComMensagem, aiByContract, muralFilterSentiment]);
 
-  // ---- Guard: don't render when tab is not active ----
+  // ---- Guard: safety fallback (component is only mounted when tab is active,
+  //             so this branch is unreachable in practice) ----
 
   if (!enabled) return <div />;
 
@@ -259,7 +260,7 @@ export function DrawerVozCliente({
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         {/* Sentimento */}
         <div className="rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3">
-          <p className="text-xs font-semibold text-gray-700 dark:text-zinc-300 mb-2">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
             Sentimento
           </p>
           {sentimentDistribution.length === 0 ? (
@@ -302,7 +303,7 @@ export function DrawerVozCliente({
 
         {/* Temas */}
         <div className="rounded-lg border border-gray-200 dark:border-zinc-700 bg-white dark:bg-zinc-900 p-3">
-          <p className="text-xs font-semibold text-gray-700 dark:text-zinc-300 mb-2">
+          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
             Temas Identificados
           </p>
           {themeDistribution.length === 0 ? (
@@ -344,7 +345,7 @@ export function DrawerVozCliente({
         <div className="flex items-center justify-between gap-2 px-4 py-3 border-b border-gray-200 dark:border-zinc-700">
           <div className="flex items-center gap-2">
             <MessageSquare className="h-4 w-4 text-gray-400 dark:text-zinc-500" />
-            <span className="text-xs font-semibold text-gray-700 dark:text-zinc-300">
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">
               Mensagens dos Clientes
             </span>
             <span className="text-[11px] text-gray-400 dark:text-zinc-500">
@@ -392,11 +393,11 @@ export function DrawerVozCliente({
             </div>
           ) : (
             <>
-              {muralMessages.slice(0, 20).map((msg, i) => {
+              {muralMessages.slice(0, 20).map((msg) => {
                 const cfg = SENTIMENT_CONFIG[msg.sentiment] ?? SENTIMENT_CONFIG.neutro;
                 return (
                   <div
-                    key={`mural-${msg.id}-${i}`}
+                    key={msg.id}
                     className={`px-4 py-3 border-l-4 ${cfg.border} transition-colors`}
                   >
                     {/* Row: name + mrr + sentiment badge */}
@@ -417,9 +418,9 @@ export function DrawerVozCliente({
                         )}
                       </div>
                       <div className="flex flex-wrap gap-1 flex-shrink-0 items-start">
-                        {msg.temas.slice(0, 3).map((t, ti) => (
+                        {msg.temas.slice(0, 3).map((t) => (
                           <Badge
-                            key={ti}
+                            key={t}
                             variant="outline"
                             className="text-[9px] px-1.5 py-0 h-4 bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-900/20 dark:text-violet-400 dark:border-violet-800"
                           >
