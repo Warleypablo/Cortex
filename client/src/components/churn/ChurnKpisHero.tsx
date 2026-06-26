@@ -34,10 +34,8 @@ export interface ChurnKpisHeroProps {
   mrrPerdido: number;
   taxaChurn: number;
   nrrPct?: number;
-  churnPlanejado?: number;
   ltMedio?: number;
   ticketMedio?: number;
-  gaugeStatusOverride?: { label: string; color: string; bg: string; dotBg: string };
 }
 
 // TETO de taxa de churn: 10% = severidade máxima.
