@@ -32,6 +32,7 @@ import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { RitmoDiario } from "@/components/churn/RitmoDiario";
+import { ChurnPorDimensao } from "@/components/churn/ChurnPorDimensao";
 import { SecaoMotivos } from "@/components/churn/SecaoMotivos";
 import { SecaoVozCliente } from "@/components/churn/SecaoVozCliente";
 import { SecaoSegmentacao } from "@/components/churn/SecaoSegmentacao";
@@ -606,6 +607,11 @@ export default function ChurnDetalhamento() {
       {/* Ritmo Diário — série por dia do período */}
       {!isLoading && (
         <RitmoDiario contratos={filteredContratos} onDrill={onDrill} />
+      )}
+
+      {/* Churn por Dimensão — seletor único com ranking */}
+      {!isLoading && (
+        <ChurnPorDimensao contratos={filteredContratos} onDrill={onDrill} />
       )}
 
       {/* Seções analíticas — skeleton enquanto carrega */}
