@@ -5,6 +5,7 @@ import { format } from "date-fns";
 import { getLinktreeMetrics } from "../services/linktreeGa4";
 import { getSessionsByPlatform, getGa4SourceMediumDiagnostic } from "../services/ga4Sessions";
 import { UTM_SOURCES_BY_MEDIUM, UTM_SOURCE_LABELS, type UtmMedium } from "@shared/utm-vocabulary";
+import { classificarProdutoCampanha, bucketForFnlNgc, expandFunilValues, FNL_NGC_BUCKET_ORDER } from "@shared/produtos";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
@@ -119,11 +120,6 @@ const SOURCE_CANON_SQL = `CASE
   ELSE COALESCE(NULLIF(LOWER(TRIM(utm_source)), ''), 'outros')
 END`;
 
-// Funnel name aliases: normalized name → all DB variations
-const FUNNEL_ALIASES: Record<string, string[]> = {
-  'ecommerce': ['Ecommerce', 'E-commerce', 'ecommerce'],
-};
-
 /**
  * Constrói um filtro SQL pra utm_source/plataforma consistente com PLATFORM_CASE_SQL_BASIC.
  *
@@ -152,20 +148,6 @@ function buildPlatformFilterSql(utmValues: string[]) {
     return sql`LOWER(d.utm_source) LIKE ${v + '%'}`;
   });
   return sql`AND (${sql.join(expressions, sql` OR `)})`;
-}
-
-// Expand funnel values: if a normalized name has aliases, expand to all variants
-function expandFunilValues(values: string[]): string[] {
-  const expanded: string[] = [];
-  for (const v of values) {
-    const aliases = FUNNEL_ALIASES[v.toLowerCase()];
-    if (aliases) {
-      expanded.push(...aliases);
-    } else {
-      expanded.push(v);
-    }
-  }
-  return expanded;
 }
 
 // Resolve os campaign_id (Meta) cujas campanhas casam com o funil selecionado.
@@ -1483,10 +1465,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const campanhaId = req.query.campanhaId as string || ''; // campaign_id filter
       const campanhaIds = req.query.campanhaIds as string || ''; // comma-separated campaign_ids (seleção manual de campanha — Meta)
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
-      // Filtro de PRODUTO por NOME de campanha (padrão [Produto]), cross-plataforma.
+      // Filtro de PRODUTO por NOME de campanha (produto canônico classificado), cross-plataforma.
       const produtos = (req.query.produtos as string || '').split(',').map(p => p.trim()).filter(Boolean);
       const matchProduto = (campaignName: string | null | undefined) =>
-        produtos.length === 0 || produtos.some(p => (campaignName || '').includes(`[${p}]`));
+        produtos.length === 0 || produtos.includes(classificarProdutoCampanha(campaignName));
 
       // Validar formato de data
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1928,7 +1910,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
       const produtos = (req.query.produtos as string || '').split(',').map(p => p.trim()).filter(Boolean);
       const matchProduto = (campaignName: string | null | undefined) =>
-        produtos.length === 0 || produtos.some(p => (campaignName || '').includes(`[${p}]`));
+        produtos.length === 0 || produtos.includes(classificarProdutoCampanha(campaignName));
 
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
@@ -2720,28 +2702,20 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Growth - Orçado x Realizado - Valores distintos de fnl_ngc (funil) com atividade
   app.get("/api/growth/orcado-realizado/funis", async (req, res) => {
     try {
+      // Allowlist por bucket canônico (ver FNL_NGC_BUCKETS / bucketForFnlNgc).
+      // Classifica cada valor real de fnl_ngc no seu bucket e devolve só os buckets
+      // que existem, em ordem fixa. Creator Summit é escondido (outra iniciativa).
       const result = await db.execute(sql`
         SELECT DISTINCT fnl_ngc
         FROM "Bitrix".crm_deal
         WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
-          AND LOWER(fnl_ngc) NOT IN (
-            'cross sell', 'commerce', 'indicação', 'lead',
-            'ifv', 'odonto', 'bootcamp vendas', 'bootcamp performance'
-          )
-        ORDER BY fnl_ngc
       `);
-      // Normalize: merge ecommerce/E-commerce/Ecommerce into single "Ecommerce"
-      const ECOMMERCE_VARIANTS = ['ecommerce', 'e-commerce'];
-      const rawFunis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
-      const normalizedSet = new Set<string>();
-      for (const f of rawFunis) {
-        if (ECOMMERCE_VARIANTS.includes(f.toLowerCase())) {
-          normalizedSet.add('Ecommerce');
-        } else {
-          normalizedSet.add(f);
-        }
+      const present = new Set<string>();
+      for (const row of result.rows as any[]) {
+        const bucket = bucketForFnlNgc(row.fnl_ngc as string);
+        if (bucket) present.add(bucket);
       }
-      const funis = Array.from(normalizedSet).sort();
+      const funis = FNL_NGC_BUCKET_ORDER.filter((b) => present.has(b));
       funis.unshift("(Vazio)");
       res.json(funis);
     } catch (error) {
