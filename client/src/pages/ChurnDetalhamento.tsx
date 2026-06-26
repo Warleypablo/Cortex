@@ -594,6 +594,7 @@ export default function ChurnDetalhamento() {
           contratos={filteredContratos}
           mrrPerdido={filteredMetricas.mrr_perdido}
           taxaChurn={filteredTaxaChurn}
+          nrrPct={nrrData?.nrr_pct}
           gaugeStatusOverride={gaugeStatusOverride}
           churnPlanejado={churnPlanejado.mrrPlanejado}
           ltMedio={filteredMetricas.lt_medio}
