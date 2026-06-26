@@ -3,6 +3,8 @@ import {
   ResponsiveContainer,
   BarChart,
   Bar,
+  AreaChart,
+  Area,
   XAxis,
   YAxis,
   Tooltip,
@@ -33,6 +35,10 @@ export function DrawerTiming({ contratos }: { contratos: ChurnContract[] }): JSX
 
     contratos.forEach((c) => {
       const lt = c.lifetime_meses;
+      // Guard: skip contracts with null/undefined/negative lifetime
+      // (null >= 0 is true in JS, so without this check they'd silently
+      // inflate the "< 3m" bucket — same filter lifetimeCurve already uses)
+      if (lt === null || lt === undefined || lt < 0) return;
       for (const range of ranges) {
         if (lt >= range.min && lt < range.max) {
           range.count++;
@@ -276,14 +282,14 @@ export function DrawerTiming({ contratos }: { contratos: ChurnContract[] }): JSX
             % de contratos retidos por mês de vida
           </p>
           <ResponsiveContainer width="100%" height={120}>
-            <BarChart
+            <AreaChart
               data={lifetimeCurve}
               margin={{ top: 4, right: 4, left: -18, bottom: 4 }}
             >
               <defs>
                 <linearGradient id="drawerSurvivalGradient" x1="0" y1="0" x2="0" y2="1">
                   <stop offset="0%" stopColor="#6366f1" stopOpacity={0.9} />
-                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.7} />
+                  <stop offset="100%" stopColor="#8b5cf6" stopOpacity={0.15} />
                 </linearGradient>
               </defs>
               <XAxis
@@ -312,13 +318,17 @@ export function DrawerTiming({ contratos }: { contratos: ChurnContract[] }): JSX
                   color: "hsl(var(--popover-foreground))",
                 }}
               />
-              <Bar
+              <Area
+                type="monotone"
                 dataKey="retainedPct"
+                stroke="#6366f1"
+                strokeWidth={2}
                 fill="url(#drawerSurvivalGradient)"
-                radius={[3, 3, 0, 0]}
                 name="% Retido"
+                dot={false}
+                activeDot={{ r: 3, fill: "#6366f1" }}
               />
-            </BarChart>
+            </AreaChart>
           </ResponsiveContainer>
         </div>
       )}
