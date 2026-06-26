@@ -46,6 +46,7 @@ import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { SecaoMotivos } from "@/components/churn/SecaoMotivos";
 import { SecaoVozCliente } from "@/components/churn/SecaoVozCliente";
+import { SecaoSegmentacao } from "@/components/churn/SecaoSegmentacao";
 import { CustomTooltip } from "@/components/churn/ui/CustomTooltip";
 import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
 import { StatPill } from "@/components/churn/ui/StatPill";
@@ -542,108 +543,8 @@ export default function ChurnDetalhamento() {
     }
   }, [churnDailyInsights.status]);
 
-  const distribuicaoPorSquad = useMemo(() => {
-    const churnOnly = filteredContratos.filter(c => c.tipo === 'churn' && !c.is_abonado);
-    if (churnOnly.length === 0) return [];
-
-    const squadCounts: Record<string, { count: number; mrr: number }> = {};
-    churnOnly.forEach(c => {
-      const squad = c.squad || "Não especificado";
-      if (!squadCounts[squad]) squadCounts[squad] = { count: 0, mrr: 0 };
-      squadCounts[squad].count++;
-      squadCounts[squad].mrr += c.valorr || 0;
-    });
-
-    const total = churnOnly.length;
-    return Object.entries(squadCounts)
-      .map(([name, data]) => ({
-        name: name.length > 15 ? name.substring(0, 15) + "..." : name,
-        fullName: name,
-        count: data.count,
-        mrr: data.mrr,
-        percentual: (data.count / total) * 100
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  }, [filteredContratos]);
-
-  const distribuicaoPorProduto = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-    
-    const prodCounts: Record<string, { count: number; mrr: number }> = {};
-    filteredContratos.forEach(c => {
-      const servico = c.servico || "Não especificado";
-      if (!prodCounts[servico]) prodCounts[servico] = { count: 0, mrr: 0 };
-      prodCounts[servico].count++;
-      prodCounts[servico].mrr += c.valorr || 0;
-    });
-    
-    const total = filteredContratos.length;
-    return Object.entries(prodCounts)
-      .map(([name, data]) => ({
-        name: name.length > 15 ? name.substring(0, 15) + "..." : name,
-        fullName: name,
-        count: data.count,
-        mrr: data.mrr,
-        percentual: (data.count / total) * 100
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8);
-  }, [filteredContratos]);
-
-  const distribuicaoPorLifetime = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-    
-    const ranges = [
-      { name: "< 3m", min: 0, max: 3, count: 0, mrr: 0 },
-      { name: "3-6m", min: 3, max: 6, count: 0, mrr: 0 },
-      { name: "6-12m", min: 6, max: 12, count: 0, mrr: 0 },
-      { name: "12-24m", min: 12, max: 24, count: 0, mrr: 0 },
-      { name: "> 24m", min: 24, max: Infinity, count: 0, mrr: 0 },
-    ];
-    
-    filteredContratos.forEach(c => {
-      const lt = c.lifetime_meses;
-      for (const range of ranges) {
-        if (lt >= range.min && lt < range.max) {
-          range.count++;
-          range.mrr += c.valorr || 0;
-          break;
-        }
-      }
-    });
-    
-    const total = filteredContratos.length;
-    return ranges.map(r => ({
-      ...r,
-      percentual: (r.count / total) * 100
-    }));
-  }, [filteredContratos]);
-
-  const distribuicaoPorResponsavel = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-    
-    const respCounts: Record<string, { count: number; mrr: number }> = {};
-    filteredContratos.forEach(c => {
-      const resp = c.responsavel || "Não especificado";
-      if (!respCounts[resp]) respCounts[resp] = { count: 0, mrr: 0 };
-      respCounts[resp].count++;
-      respCounts[resp].mrr += c.valorr || 0;
-    });
-    
-    const total = filteredContratos.length;
-    return Object.entries(respCounts)
-      .map(([name, data]) => ({
-        name: name.length > 12 ? name.substring(0, 12) + "..." : name,
-        fullName: name,
-        count: data.count,
-        mrr: data.mrr,
-        percentual: (data.count / total) * 100
-      }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 6);
-  }, [filteredContratos]);
-
+  // distribuicaoPorSquad, distribuicaoPorProduto, distribuicaoPorResponsavel, distribuicaoPorTicket
+  // moved to SecaoSegmentacao.tsx
 
   const churnPorMes = useMemo(() => {
     if (filteredContratos.length === 0) return [];
@@ -722,35 +623,7 @@ export default function ChurnDetalhamento() {
     return tags;
   };
 
-  // Distribuição por faixa de ticket (MRR)
-  const distribuicaoPorTicket = useMemo(() => {
-    if (filteredContratos.length === 0) return [];
-    
-    const ranges = [
-      { name: "< R$1k", min: 0, max: 1000, count: 0, mrr: 0 },
-      { name: "R$1k-3k", min: 1000, max: 3000, count: 0, mrr: 0 },
-      { name: "R$3k-5k", min: 3000, max: 5000, count: 0, mrr: 0 },
-      { name: "R$5k-10k", min: 5000, max: 10000, count: 0, mrr: 0 },
-      { name: "> R$10k", min: 10000, max: Infinity, count: 0, mrr: 0 },
-    ];
-    
-    filteredContratos.forEach(c => {
-      const valor = c.valorr || 0;
-      for (const range of ranges) {
-        if (valor >= range.min && valor < range.max) {
-          range.count++;
-          range.mrr += valor;
-          break;
-        }
-      }
-    });
-    
-    const total = filteredContratos.length;
-    return ranges.map(r => ({
-      ...r,
-      percentual: total > 0 ? (r.count / total) * 100 : 0
-    })).filter(r => r.count > 0);
-  }, [filteredContratos]);
+  // distribuicaoPorTicket moved to SecaoSegmentacao.tsx
 
   // Comparativo Churn vs Pausado por mês
   const comparativoMensal = useMemo(() => {
@@ -995,15 +868,6 @@ export default function ChurnDetalhamento() {
 
   const churnPorMesTotal = churnPorMes.reduce((sum, item) => sum + item.count, 0);
   const churnPorMesMedia = churnPorMes.length > 0 ? churnPorMesTotal / churnPorMes.length : 0;
-  const topServico = distribuicaoPorProduto[0];
-  const topLifetime = distribuicaoPorLifetime.length > 0
-    ? distribuicaoPorLifetime.reduce((best, item) => (item.count > best.count ? item : best))
-    : undefined;
-  const topTicket = distribuicaoPorTicket.length > 0
-    ? distribuicaoPorTicket.reduce((best, item) => (item.count > best.count ? item : best))
-    : undefined;
-  const mrrSquadTotal = distribuicaoPorSquad.reduce((sum, item) => sum + item.mrr, 0);
-  const mrrResponsavelTotal = distribuicaoPorResponsavel.reduce((sum, item) => sum + item.mrr, 0);
   const mrrPerdidoTotal = mrrPerdidoPorMes.reduce((sum, item) => sum + item.mrr, 0);
   const mrrAbonadoTotal = mrrPerdidoPorMes.reduce((sum, item) => sum + item.mrrAbonado, 0);
   const comparativoChurnTotal = comparativoMensal.reduce((sum, item) => sum + item.mrrChurn, 0);
@@ -1079,6 +943,9 @@ export default function ChurnDetalhamento() {
 
       {/* Seção Voz do Cliente (IA) */}
       <SecaoVozCliente contratos={filteredContratos} onDrill={onDrill} />
+
+      {/* Seção Segmentação: squad, produto/serviço, ticket, responsável */}
+      <SecaoSegmentacao contratos={filteredContratos} onDrill={onDrill} />
 
       {/* Painel Executivo Detalhado (MRR Base, Abonado, NRR, Squad) */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
