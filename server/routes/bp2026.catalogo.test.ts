@@ -19,7 +19,7 @@ describe("abasDaMetrica", () => {
   it("agregados de resumo ficam no DRE/Métricas, não na aba detalhada", () => {
     expect(abasDaMetrica("cac")).toEqual(["dre"]);
     expect(abasDaMetrica("sga")).toEqual(["dre"]);
-    expect(abasDaMetrica("mrr_ativo")).toEqual(["dre"]);
+    expect(abasDaMetrica("mrr_ativo")).toEqual(["dre", "revenue"]);
     expect(abasDaMetrica("churn_mes")).toEqual(["metricas"]);
   });
   it("desconhecida → vazio", () => {
@@ -34,5 +34,9 @@ describe("metricaPertenceAAba (anti-spoof)", () => {
   it("aceita métrica na sua aba", () => {
     expect(metricaPertenceAAba("cac_vendas", "cac")).toBe(true);
     expect(metricaPertenceAAba("pontual_entrega", "pontual-creators")).toBe(true);
+  });
+  it("mrr_ativo pertence a dre E revenue", () => {
+    expect(metricaPertenceAAba("mrr_ativo", "dre")).toBe(true);
+    expect(metricaPertenceAAba("mrr_ativo", "revenue")).toBe(true);
   });
 });

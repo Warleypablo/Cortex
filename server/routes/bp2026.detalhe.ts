@@ -486,7 +486,7 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         return idx < 0 ? null : { pai: rest.slice(0, idx), produto: rest.slice(idx + 1) };
       })();
       const segmento = String(req.query.segmento ?? "");
-      const filtroCreators = segmento === "creators";
+      const filtroCreators = segmento === "creators" || aba === "pontual-creators";
       const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod || !!squadAlvo || !!prodAlvo;
       if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "metrica/mes inválidos" });

@@ -256,9 +256,9 @@ export default function BP2026() {
         mes={detalhe?.mes ?? null}
         aba={detalhe?.aba}
         linhas={[
-          ...data.linhas, ...data.metricasGerais, ...data.revenue,
-          ...data.pontual, ...data.funil, ...data.vendasProduto, ...data.capacity, ...data.sgaDetalhe,
-          ...data.cacDetalhe, ...data.outrasDetalhe,
+          ...(data.linhas ?? []), ...(data.metricasGerais ?? []), ...(data.revenue ?? []),
+          ...(data.pontual ?? []), ...(data.funil ?? []), ...(data.vendasProduto ?? []), ...(data.capacity ?? []), ...(data.sgaDetalhe ?? []),
+          ...(data.cacDetalhe ?? []), ...(data.outrasDetalhe ?? []),
         ]}
         onClose={() => setDetalhe(null)}
       />

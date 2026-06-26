@@ -41,7 +41,13 @@ function classificarPorPrefixo(m: string): Bp2026TabId | null {
   return null;
 }
 
+// Métricas que aparecem em múltiplas abas (verificado antes dos sets/prefixos).
+const METRICAS_MULTI: Record<string, Bp2026TabId[]> = {
+  mrr_ativo: ["dre", "revenue"],
+};
+
 export function abasDaMetrica(metrica: string): Bp2026TabId[] {
+  if (METRICAS_MULTI[metrica]) return METRICAS_MULTI[metrica];
   if (metrica.startsWith("pontual_")) return ["pontual", "pontual-creators"];
   if (METRICAS_DRE.has(metrica)) return ["dre"];
   if (METRICAS_GERAIS.has(metrica)) return ["metricas"];
