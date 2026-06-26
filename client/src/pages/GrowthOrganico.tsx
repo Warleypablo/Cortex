@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import {
   Sprout, Instagram, Music2, Youtube, Linkedin, Loader2, PauseCircle, PlayCircle,
-  ExternalLink, Send, CalendarClock, CalendarX,
+  ExternalLink, Send, CalendarClock, CalendarX, AlertTriangle,
 } from "lucide-react";
 
 // ── tipos do payload de /api/growth/organico/overview ──────────────────────
@@ -26,7 +26,8 @@ interface Setting { platform: string; agentEnabled: boolean; dryRun: boolean; up
 interface Run { platform: string; runId: string; status: string; dryRun: boolean; startedAt: string; finishedAt: string | null; counts: any }
 interface Post {
   id: number; platform: string; clickupTaskId: string; taskName: string | null;
-  postingDate: string | null; slot: string | null; scheduledAt: string | null;
+  postingDate: string | null; postingTime: string | null; slot: string | null;
+  scheduledAt: string | null; cardScheduledAt: string | null;
   tipoPost: string | null; assetCount: number | null; legendaSource: string | null;
   legendaLen: number | null; state: string; permalink: string | null; clickupUrl: string | null;
 }
@@ -93,6 +94,57 @@ function toLocalInput(d: Date): string {
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
 
+// ── horário-por-card: tempo efetivo + estado de atraso ─────────────────────
+// Horário em que o post DEVE sair: override do operador (scheduledAt) tem prioridade;
+// senão o horário-alvo vindo do card (cardScheduledAt = Data de postagem + Horário).
+function effectiveWhen(p: Post): string | null {
+  return p.scheduledAt ?? p.cardScheduledAt ?? null;
+}
+
+// Início do dia em São Paulo (UTC-3, sem horário de verão) em ms — separa
+// "atrasado hoje (ainda sai)" de "perdeu (caiu num dia anterior)".
+function startOfTodaySPms(): number {
+  const ymd = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  return new Date(`${ymd}T00:00:00-03:00`).getTime();
+}
+
+type TimeState = "futuro" | "atrasado" | "perdeu" | "none";
+
+// Estado de TEMPO, sobreposto ao state do post:
+//  futuro   = horário ainda não chegou
+//  atrasado = passou da hora HOJE e vai sair (agente ativo, legenda ok)
+//  perdeu   = passou e NÃO vai sair sozinho (agente pausado / legenda pendente /
+//             erro / o dia já virou) → precisa de ação
+function timeState(p: Post, agentActive: boolean): TimeState {
+  const eff = effectiveWhen(p);
+  if (!eff || p.state === "publicado" || p.state === "pulado") return "none";
+  const t = new Date(eff).getTime();
+  if (isNaN(t)) return "none";
+  if (t > Date.now()) return "futuro";
+  const legendaPendente =
+    p.state === "aguardando_ia" || p.legendaSource === "ia" || p.legendaSource === "claude-precisa";
+  if (t < startOfTodaySPms() || !agentActive || legendaPendente || p.state === "falhou") return "perdeu";
+  return "atrasado";
+}
+
+function motivoPerdeu(p: Post, agentActive: boolean): string {
+  if (!agentActive) return "agente pausado";
+  if (p.state === "falhou") return "erro ao publicar";
+  if (p.state === "aguardando_ia" || p.legendaSource === "ia" || p.legendaSource === "claude-precisa")
+    return "legenda pendente";
+  const eff = effectiveWhen(p);
+  if (eff && new Date(eff).getTime() < startOfTodaySPms()) return "passou do dia";
+  return "travado";
+}
+
+function TimeBadge({ ts }: { ts: TimeState }) {
+  if (ts === "atrasado")
+    return <Badge variant="outline" className="border-0 bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300">Atrasado</Badge>;
+  if (ts === "perdeu")
+    return <Badge variant="outline" className="border-0 bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">Perdeu o horário</Badge>;
+  return null;
+}
+
 export default function GrowthOrganico() {
   useSetPageInfo("Orgânico", "Publicação de conteúdo orgânico — IG, TikTok e além");
   const [plat, setPlat] = useState<string>("all");
@@ -149,6 +201,12 @@ export default function GrowthOrganico() {
   const agendados = onlyPlat(data?.agendados ?? []);
   const publicados = onlyPlat(data?.publicados ?? []);
 
+  const agentActiveFor = (platform: string) =>
+    settings.find((s) => s.platform === platform)?.agentEnabled ?? true;
+  const tsOf = (p: Post) => timeState(p, agentActiveFor(p.platform));
+  // posts que passaram do horário e NÃO vão sair sozinhos → alimentam o banner de alerta
+  const perdidos = agendados.filter((p) => tsOf(p) === "perdeu");
+
   const runNow = (p: Post) =>
     commandMut.mutate({ platform: p.platform, clickupTaskId: p.clickupTaskId, action: "publish_now" });
   const doSchedule = (p: Post, whenIso: string) =>
@@ -171,6 +229,30 @@ export default function GrowthOrganico() {
             </Chip>
           ))}
         </div>
+
+        {/* ALERTA — posts que passaram do horário e não saíram (precisam de ação) */}
+        {perdidos.length > 0 && (
+          <Card className="border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40">
+            <CardContent className="p-3 flex items-start gap-2 text-sm">
+              <AlertTriangle className="h-4 w-4 text-red-600 dark:text-red-400 mt-0.5 shrink-0" />
+              <div className="flex-1 min-w-0">
+                <span className="font-semibold text-red-700 dark:text-red-300">
+                  {perdidos.length} post{perdidos.length > 1 ? "s passaram" : " passou"} do horário e não{" "}
+                  {perdidos.length > 1 ? "saíram" : "saiu"}
+                </span>
+                <div className="text-red-700/80 dark:text-red-300/80 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
+                  {perdidos.slice(0, 3).map((p) => (
+                    <span key={`${p.platform}-${p.id}`} className="truncate">
+                      "{p.taskName ?? "—"}" · {fmtDataHora(effectiveWhen(p))} ·{" "}
+                      {motivoPerdeu(p, agentActiveFor(p.platform))}
+                    </span>
+                  ))}
+                  {perdidos.length > 3 && <span>+{perdidos.length - 3}</span>}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {isError && (
           <Card>
@@ -279,20 +361,39 @@ export default function GrowthOrganico() {
                   {!isLoading && agendados.length === 0 && (
                     <EmptyRow span={6}>Nada agendado.</EmptyRow>
                   )}
-                  {agendados.map((p) => (
+                  {agendados.map((p) => {
+                    const eff = effectiveWhen(p);
+                    return (
                     <TableRow key={`${p.platform}-${p.id}`}>
                       <TableCell className="whitespace-nowrap font-medium">
-                        {p.scheduledAt ? fmtDataHora(p.scheduledAt) : `${fmtData(p.postingDate)}${p.slot ? ` · ${p.slot}` : ""}`}
+                        {eff ? (
+                          <>
+                            {fmtDataHora(eff)}
+                            {!p.scheduledAt && !p.postingTime && p.cardScheduledAt && (
+                              <span className="text-xs font-normal text-muted-foreground ml-1">(padrão)</span>
+                            )}
+                          </>
+                        ) : `${fmtData(p.postingDate)}${p.slot ? ` · ${p.slot}` : ""}`}
                       </TableCell>
                       <TableCell><PlatformCell platform={p.platform} /></TableCell>
                       <TableCell className="max-w-[260px] truncate" title={p.taskName ?? ""}>{p.taskName ?? "—"}</TableCell>
                       <TableCell>{p.tipoPost ?? "—"}</TableCell>
-                      <TableCell><StateBadge state={p.state} /></TableCell>
+                      <TableCell>
+                        <div className="inline-flex items-center gap-1.5">
+                          <StateBadge state={p.state} />
+                          <TimeBadge ts={tsOf(p)} />
+                        </div>
+                      </TableCell>
                       <TableCell className="text-right">
                         <div className="inline-flex items-center gap-1.5 justify-end">
                           <Button size="sm" variant="default" className="h-7 px-2"
                             disabled={commandMut.isPending} onClick={() => setConfirmPost(p)}>
                             <Send className="h-3.5 w-3.5" /><span className="ml-1">Soltar agora</span>
+                          </Button>
+                          <Button size="sm" variant="outline" className="h-7 px-2"
+                            disabled={commandMut.isPending} onClick={() => setSchedulePost(p)}>
+                            <CalendarClock className="h-3.5 w-3.5" />
+                            <span className="ml-1">{p.scheduledAt ? "Reagendar" : "Agendar"}</span>
                           </Button>
                           {p.scheduledAt && (
                             <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground"
@@ -303,7 +404,8 @@ export default function GrowthOrganico() {
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
+                    );
+                  })}
                 </TableBody>
               </Table>
             </CardContent>
@@ -354,8 +456,10 @@ export default function GrowthOrganico() {
         </section>
 
         <p className="text-xs text-muted-foreground">
-          "Soltar agora" enfileira a publicação imediata; "Agendar" escolhe data/hora. A produção do conteúdo
-          segue no Google Doc + Drive + ClickUp — este painel mostra e opera a fila.
+          O horário de cada post vem do próprio card (campo <strong>Horário</strong> + <strong>Data de postagem</strong>);
+          "Reagendar" sobrescreve pontualmente e "Soltar agora" publica no próximo ciclo. <span className="text-orange-600 dark:text-orange-400">Atrasado</span> = passou
+          da hora mas ainda sai; <span className="text-red-600 dark:text-red-400">Perdeu o horário</span> = não sai sozinho, precisa de você.
+          A produção do conteúdo segue no Google Doc + Drive + ClickUp.
         </p>
       </div>
 
