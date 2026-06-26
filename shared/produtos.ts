@@ -101,6 +101,13 @@ export function expandFunilValues(values: string[]): string[] {
 export const SUMMIT_CATEGORY_ID = 10;
 export const SUMMIT_CAMPAIGN_KEYWORD = "summit";
 
+// Eventos do pixel (Meta) usados na aba Meta Ads do Summit. Vêm no jsonb
+// meta_insights_daily.actions / action_values após o sync.
+//  - Carrinho  = evento padrão InitiateCheckout
+//  - Venda     = conversão personalizada "Compra - Creators Summit ES"
+export const SUMMIT_CART_ACTION = "initiate_checkout";
+export const SUMMIT_PURCHASE_ACTION = "offsite_conversion.custom.1345738370839003";
+
 // Tipos de ingresso. `match` casa (ILIKE) contra o fnl_ngc do deal.
 //  - preco        = valor do comprador (bruto, com taxa Sympla embutida)
 //  - precoLiquido = valor a receber (o que cai no bolso, após ~10% da Sympla)

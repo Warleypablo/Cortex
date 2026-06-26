@@ -6,6 +6,8 @@ import {
   SUMMIT_TICKET_TYPES,
   SUMMIT_DEFAULT_PRECO,
   SUMMIT_DEFAULT_PRECO_LIQUIDO,
+  SUMMIT_CART_ACTION,
+  SUMMIT_PURCHASE_ACTION,
 } from "@shared/produtos";
 import { getSessionsByPlatform } from "../services/ga4Sessions";
 
@@ -63,7 +65,7 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
         WHERE c.campaign_name ILIKE ${campKeyword}
       )`;
 
-      const [metaMedia, metaLeadsRow, funilByType] = await Promise.all([
+      const [metaMedia, metaLeadsRow, metaConv, funilByType] = await Promise.all([
         // 1. Mídia Meta (campanhas com "summit" no nome)
         db.execute(sql`
           SELECT
@@ -90,7 +92,28 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
             AND ${metaAttribCond(summitAdIds)}
         `),
 
-        // 3. Funil consolidado por tipo de ingresso (todos os canais)
+        // 3. Conversões do pixel (carrinho + venda) extraídas do jsonb actions/
+        // action_values gravado pelo sync. rows_com_actions distingue "ainda não
+        // sincronizado" (→ pendente na UI) de "genuinamente zero".
+        db.execute(sql`
+          WITH base AS (
+            SELECT i.actions, i.action_values
+            FROM meta_ads.meta_insights_daily i
+            WHERE i.date_start >= ${yearStart}::date
+              AND i.date_start <= ${yearEnd}::date
+              AND i.campaign_id IN ${summitCampaignIds}
+          )
+          SELECT
+            (SELECT COUNT(*) FROM base WHERE jsonb_typeof(actions) = 'array' AND jsonb_array_length(actions) > 0) AS rows_com_actions,
+            COALESCE((SELECT SUM((a->>'value')::numeric) FROM base, jsonb_array_elements(base.actions) a
+              WHERE jsonb_typeof(base.actions) = 'array' AND a->>'action_type' = ${SUMMIT_CART_ACTION}), 0) AS carrinho,
+            COALESCE((SELECT SUM((a->>'value')::numeric) FROM base, jsonb_array_elements(base.actions) a
+              WHERE jsonb_typeof(base.actions) = 'array' AND a->>'action_type' = ${SUMMIT_PURCHASE_ACTION}), 0) AS vendas,
+            COALESCE((SELECT SUM((v->>'value')::numeric) FROM base, jsonb_array_elements(base.action_values) v
+              WHERE jsonb_typeof(base.action_values) = 'array' AND v->>'action_type' = ${SUMMIT_PURCHASE_ACTION}), 0) AS receita
+        `),
+
+        // 4. Funil consolidado por tipo de ingresso (todos os canais)
         db.execute(sql`
           SELECT
             ${tipoCaseSql()} AS tipo,
@@ -153,12 +176,21 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
         txConversaoSessoes: ga4Sessoes > 0 ? (mLeads / ga4Sessoes) * 100 : 0,
         leads: mLeads,
         cpl: mLeads > 0 ? mInvest / mLeads : 0,
-        // Carrinho abandonado e vendas dependem de capturar os eventos do pixel
-        // (InitiateCheckout / Purchase) no sync do Meta — não disponível hoje.
-        carrinhoAbandonado: null as number | null,
-        vendas: null as number | null,
-        receita: null as number | null,
-        roas: null as number | null,
+        // Carrinho/vendas vêm dos eventos do pixel (jsonb actions). Enquanto o sync
+        // não gravou o jsonb (rows_com_actions = 0), retornamos null → "pendente".
+        ...(() => {
+          const cv = metaConv.rows[0] || {};
+          const synced = num(cv.rows_com_actions) > 0;
+          const carrinho = num(cv.carrinho);
+          const vendas = num(cv.vendas);
+          const receita = num(cv.receita);
+          return {
+            carrinhoAbandonado: synced ? carrinho : null,
+            vendas: synced ? vendas : null,
+            receita: synced ? receita : null,
+            roas: synced && mInvest > 0 ? receita / mInvest : null,
+          };
+        })(),
       };
 
       // ---- Bloco CONSOLIDADO (todos os canais) ----
