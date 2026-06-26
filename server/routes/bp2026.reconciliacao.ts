@@ -4,6 +4,8 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { computeReconciliacao, type SnapRow } from "./bp2026.reconciliacao.helpers";
 import { CASE_PRODUTO } from "./bp2026.revenue";
+import { abasPermitidas } from "../../shared/bp2026-tabs";
+import type { User } from "../auth/userDb";
 
 const ANO = 2026;
 const PRODUTOS = ["performance", "creators", "social", "gc", "others"];
@@ -41,6 +43,10 @@ export function registerBp2026ReconciliacaoRoutes(app: Express, db: any) {
     try {
       const produto = String(req.query.produto ?? "");
       const mes = Number(req.query.mes);
+      const user = req.user as User;
+      if (!abasPermitidas(user?.role, user?.allowedBpTabs).includes("revenue")) {
+        return res.status(403).json({ error: "Sem acesso a esta aba" });
+      }
       if (!PRODUTOS.includes(produto) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "produto/mes inválidos" });
       }
