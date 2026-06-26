@@ -5017,7 +5017,7 @@ Estruture sua resposta em:
       }
 
       // Para cada mês no range, buscar MRR base: primeiro snapshot do mês atual, fallback último do mês anterior
-      const mrrBasePorMes: Record<string, { total: number; por_squad: Record<string, number> }> = {};
+      const mrrBasePorMes: Record<string, { total: number; por_squad: Record<string, number>; por_responsavel: Record<string, number> }> = {};
 
       for (const mesKey of mesesNoRange) {
         const [ano, mes] = mesKey.split('-').map(Number);
@@ -5068,7 +5068,44 @@ Estruture sua resposta em:
           porSquad[squadName] = mrr;
           totalMes += mrr;
         }
-        mrrBasePorMes[mesKey] = { total: totalMes, por_squad: porSquad };
+
+        // Base por responsavel — mesmo snapshot, agrupado por h.responsavel
+        const mrrResultResp = await db.execute(sql`
+          WITH snapshot_atual AS (
+            SELECT MIN(data_snapshot) as data_snapshot
+            FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioMesAtual}::timestamp
+              AND data_snapshot <= ${fimMesAtual}::timestamp
+          ),
+          snapshot_anterior AS (
+            SELECT MAX(data_snapshot) as data_snapshot
+            FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioRef}::timestamp
+              AND data_snapshot <= ${fimRef}::timestamp
+          ),
+          snapshot_ref AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM snapshot_atual WHERE data_snapshot IS NOT NULL),
+              (SELECT data_snapshot FROM snapshot_anterior)
+            ) as data_ultimo_snapshot
+          )
+          SELECT
+            COALESCE(NULLIF(TRIM(h.responsavel), ''), 'Não especificado') as responsavel,
+            COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
+          FROM snapshot_ref us
+          JOIN "Clickup".cup_data_hist h
+            ON h.data_snapshot = us.data_ultimo_snapshot
+            AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
+          GROUP BY 1
+        `);
+
+        const porResponsavel: Record<string, number> = {};
+        for (const row of mrrResultResp.rows as any[]) {
+          const pessoa = row.responsavel || 'Não especificado';
+          porResponsavel[pessoa] = (porResponsavel[pessoa] || 0) + (Number(row.mrr_ativo) || 0);
+        }
+
+        mrrBasePorMes[mesKey] = { total: totalMes, por_squad: porSquad, por_responsavel: porResponsavel };
       }
 
       // MRR base agregado = soma dos MRR base de cada mês (para média ponderada)
@@ -5118,6 +5155,37 @@ Estruture sua resposta em:
         mrr_ativo: mrrAtivoPorSquad[squadName] || 0,
         mrr_perdido: mrrPerdidoPorSquad[squadName] || 0,
         percentual: (somaMrrBasesPorSquad[squadName] || 0) > 0 ? ((mrrPerdidoPorSquad[squadName] || 0) / (somaMrrBasesPorSquad[squadName] || 1)) * 100 : 0,
+      })).sort((a, b) => b.percentual - a.percentual);
+
+      // Churn por pessoa (responsavel)
+      const somaMrrBasesPorPessoa: Record<string, number> = {};
+      for (const mesData of Object.values(mrrBasePorMes)) {
+        for (const [pessoa, mrr] of Object.entries(mesData.por_responsavel)) {
+          somaMrrBasesPorPessoa[pessoa] = (somaMrrBasesPorPessoa[pessoa] || 0) + mrr;
+        }
+      }
+
+      const mrrBasesPrimeiroPorPessoa = mrrBasePrimeiro.por_responsavel || {};
+
+      const mrrPerdidoPorPessoa: Record<string, number> = {};
+      for (const contrato of allContratos) {
+        const rawResp = (contrato as any).responsavel;
+        const pessoa = (rawResp && rawResp.trim()) ? rawResp.trim() : 'Não especificado';
+        mrrPerdidoPorPessoa[pessoa] = (mrrPerdidoPorPessoa[pessoa] || 0) + (contrato as any).valorr;
+      }
+
+      const allPessoaNames = Array.from(new Set([
+        ...Object.keys(mrrBasesPrimeiroPorPessoa),
+        ...Object.keys(mrrPerdidoPorPessoa),
+        ...Object.keys(somaMrrBasesPorPessoa),
+      ]));
+      const churnPorPessoa = allPessoaNames.map(pessoa => ({
+        pessoa,
+        mrr_ativo: mrrBasesPrimeiroPorPessoa[pessoa] || 0,
+        mrr_perdido: mrrPerdidoPorPessoa[pessoa] || 0,
+        percentual: (somaMrrBasesPorPessoa[pessoa] || 0) > 0
+          ? ((mrrPerdidoPorPessoa[pessoa] || 0) / somaMrrBasesPorPessoa[pessoa]) * 100
+          : 0,
       })).sort((a, b) => b.percentual - a.percentual);
 
       // Retention curve
@@ -5209,6 +5277,7 @@ Estruture sua resposta em:
           mrr_ativo_ref: mrrAtivoTotal,
           churn_percentual: churnPercentualGeral,
           churn_por_squad: churnPercentualPorSquad,
+          churn_por_pessoa: churnPorPessoa,
           churn_por_motivo: churnPorMotivo,
           churn_por_evitabilidade: churnPorEvitabilidade,
           churn_por_cluster: churnPorCluster,
