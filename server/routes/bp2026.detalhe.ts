@@ -9,7 +9,9 @@ import {
   PREDICADOS_CAC_SUB,
 } from "./bp2026.predicados";
 import { CASE_PRODUTO, CASE_PRODUTO_CHURN } from "./bp2026.revenue";
-import { parseMetricaProduto, detalheVendaProdutoMes } from "./bp2026.vendasProduto";
+import { parseMetricaProduto, detalheVendaProdutoMes, carregarAtribuicaoVendas } from "./bp2026.vendasProduto";
+import { distribuirDeal } from "./bp2026.vendasProduto.helpers";
+import { SLUG, SEGMENTOS_RECORRENTES, type SegmentoBP } from "../okr2026/servicosBitrix";
 import {
   LINHAS, LINHAS_DEDUCOES, LINHAS_CSV, LINHAS_OPEX, LINHAS_POS_EBITDA,
   somaDespesaCaixaPorMes, type DefLinha,
@@ -128,6 +130,53 @@ async function detDealsBitrix(
     grupos: agruparItens(itens, LIMITE_ITENS),
     realizado: modo === "contagem" ? itens.length : itens.reduce((s, i) => s + i.valor, 0),
   };
+}
+
+// slug (chave de orçado/métrica) -> segmento BP. Usado pelo drill do CAC por contrato.
+const SEG_POR_SLUG: Record<string, SegmentoBP> = Object.fromEntries(
+  (Object.entries(SLUG) as [SegmentoBP, string][]).map(([seg, slug]) => [slug, seg])
+) as Record<string, SegmentoBP>;
+
+// Drill do "CAC por contrato": audita os DOIS lados da razão usando a MESMA fonte da célula
+// (carregarAtribuicaoVendas + distribuirDeal), para que a contagem nunca divirja do denominador.
+// Pai (segSlug=null): todas as partes (rec + pontual, todos os segmentos) — denom. do total.
+// Filho (segSlug): só as partes RECORRENTES daquele segmento — espelha contratosVendidosRec.
+async function detCacPorContrato(
+  db: any, mes: number, segSlug: string | null
+): Promise<{ grupos: GrupoDetalhe[]; realizado: number; notaDinamica: string }> {
+  // numerador = CAC total do mês, somado sub-a-sub igual à célula (cacTotalSerie)
+  let cacTotal = 0;
+  for (const pred of Object.values(PREDICADOS_CAC_SUB)) {
+    const porMes = await somaDespesaCaixaPorMes(db, pred);
+    cacTotal += porMes[mes] ?? 0;
+  }
+  // denominador = contratos do mês, estourados por segmento × natureza (1 contrato por parte)
+  const atrib = await carregarAtribuicaoVendas(db);
+  const segAlvo = segSlug ? SEG_POR_SLUG[segSlug] : null;
+  const itens: ItemDetalhe[] = [];
+  for (const d of atrib.deals) {
+    if (d.mes !== mes) continue;
+    const m = atrib.meta.get(d.id);
+    const partes = distribuirDeal(d, atrib.prMix, atrib.mixRec, atrib.mixPont, atrib.aovRec, atrib.aovPont);
+    for (const p of partes) {
+      if (segAlvo && (p.segmento !== segAlvo || p.natureza !== "recorrente")) continue;
+      itens.push({
+        grupo: p.segmento,
+        nome: m?.titulo ?? "(sem título)",
+        detalhe: `${p.natureza} · R$ ${Math.round(p.valor).toLocaleString("pt-BR")}`,
+        data: m?.data ?? null,
+        valor: 0, // modo contagem: a célula conta contratos, não soma R$
+      });
+    }
+  }
+  const n = itens.length;
+  const razao = n > 0 ? cacTotal / n : 0;
+  const escopo = segAlvo ? `${n} contratos recorrentes de ${segAlvo}` : `${n} contratos (recorrentes + pontuais)`;
+  const notaDinamica =
+    `CAC total R$ ${Math.round(cacTotal).toLocaleString("pt-BR")} ÷ ${escopo} = ` +
+    `R$ ${Math.round(razao).toLocaleString("pt-BR")} por contrato.` +
+    (segAlvo ? " O CAC total não é rateado por área — o numerador é o mesmo em todas as áreas." : "");
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: n, notaDinamica };
 }
 
 // pessoas Inhire ativas no fim do mês, filtro opcional por SQL (cargo/setor); grupos por campo
@@ -475,13 +524,21 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       })();
       const segmento = String(req.query.segmento ?? "");
       const filtroCreators = segmento === "creators";
-      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod || !!squadAlvo || !!prodAlvo;
+      // CAC por contrato: pai (total) e sub-linhas por área cac_contrato_produto_<slug>
+      const cacContratoSlug = metrica.startsWith("cac_contrato_produto_")
+        ? metrica.slice("cac_contrato_produto_".length) : null;
+      const cacContratoSeg = cacContratoSlug && SEGMENTOS_RECORRENTES.includes(SEG_POR_SLUG[cacContratoSlug])
+        ? SEG_POR_SLUG[cacContratoSlug] : null;
+      const ehCacContrato = metrica === "cac_por_contrato" || !!cacContratoSeg;
+      const conhecida = def || Object.hasOwn(HANDLERS_SUBABAS, metrica) || !!prod || !!squadAlvo || !!prodAlvo || ehCacContrato;
       if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }
       const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo
         ?? (squadAlvo ? `Estoque pontual — ${squadAlvo}` : null)
-        ?? (prodAlvo ? `${TITULOS_SUBABAS[prodAlvo.pai] ?? prodAlvo.pai} — ${prodAlvo.produto}` : metrica);
+        ?? (prodAlvo ? `${TITULOS_SUBABAS[prodAlvo.pai] ?? prodAlvo.pai} — ${prodAlvo.produto}` : null)
+        ?? (metrica === "cac_por_contrato" ? "CAC por contrato"
+          : cacContratoSeg ? `CAC por contrato — ${cacContratoSeg}` : metrica);
 
       let orcado: number | null = null;
       const orcRes = await db.execute(sql`
@@ -895,6 +952,8 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
         }));
         grupos = agruparItens(itens, LIMITE_ITENS);
         realizado = itens.reduce((s, i) => s + i.valor, 0);
+      } else if (ehCacContrato) {
+        ({ grupos, realizado, notaDinamica } = await detCacPorContrato(db, mes, cacContratoSlug));
       } else {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }

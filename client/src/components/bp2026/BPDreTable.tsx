@@ -26,6 +26,7 @@ export interface BPLinha {
   segmento?: string;   // produto (ex.: Performance / Creators) — sub-cabeçalho por produto
   subItem?: boolean;    // linha-filha (ex.: "% do CAC total") — indentada e atenuada
   semDetalhe?: boolean; // célula não abre drill-down
+  auditavel?: boolean;  // força drill-down mesmo em sub-linha (ex.: CAC por contrato por área)
   filhos?: BPLinha[];
   meses: BPMes[];
   ytd: { orcado: number; realizado: number | null; atingimento: number | null };
@@ -258,7 +259,8 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                   </span>
                 </td>
                 {linha.meses.map((m) => {
-                    const clicavel = !!onCellClick && m.realizado !== null && !linha.subItem && !linha.semDetalhe;
+                    const clicavel = !!onCellClick && m.realizado !== null &&
+                      (linha.auditavel || (!linha.subItem && !linha.semDetalhe));
                     return (
                       <td
                         key={m.mes}
@@ -307,8 +309,14 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                       <td className="sticky left-0 z-10 bg-white dark:bg-zinc-900 pl-12 pr-4 py-2 text-xs text-gray-500 dark:text-zinc-500 whitespace-nowrap align-top">
                         {filho.titulo}
                       </td>
-                      {filho.meses.map((m) => (
-                        <td key={m.mes} className="px-2 py-2 text-right align-top">
+                      {filho.meses.map((m) => {
+                        const clicavelFilho = !!onCellClick && m.realizado !== null && !!filho.auditavel;
+                        return (
+                        <td
+                          key={m.mes}
+                          className={`px-2 py-2 text-right align-top${clicavelFilho ? " cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/70" : ""}`}
+                          onClick={clicavelFilho ? () => onCellClick!(filho.metrica, m.mes) : undefined}
+                        >
                           <Celula
                             orcado={m.orcado}
                             realizado={m.realizado}
@@ -320,7 +328,8 @@ export function BPDreTable({ linhas, mesCorrente, mesFechado, onCellClick, mostr
                             mostrarOrcado={mostrarOrcado}
                           />
                         </td>
-                      ))}
+                        );
+                      })}
                       <td className="px-3 py-2 text-right align-top border-l border-gray-200 dark:border-zinc-700 bg-gray-50/50 dark:bg-zinc-800/50">
                         <Celula
                           orcado={filho.ytd.orcado}
