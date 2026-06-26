@@ -228,6 +228,13 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/debug/users'] });
     },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar abas BP",
+        description: error.message || "Ocorreu um erro ao atualizar as abas do BP.",
+        variant: "destructive",
+      });
+    },
   });
   const toggleBpTab = (id: string) =>
     setSelectedBpTabs((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);

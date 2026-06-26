@@ -151,7 +151,8 @@ router.post("/auth/dev-login", (req, res) => {
     createdAt: new Date().toISOString(),
     role: "admin",
     allowedRoutes: [],
-    department: "admin"
+    department: "admin",
+    allowedBpTabs: [],
   };
   
   req.login(devUser, (err) => {

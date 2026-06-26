@@ -63,6 +63,7 @@ export function configurePassport() {
             '/dashboard/comercial/sdr-assistant',
           ],
           department: 'admin',
+          allowedBpTabs: [],
         };
         return done(null, devUser);
       }
