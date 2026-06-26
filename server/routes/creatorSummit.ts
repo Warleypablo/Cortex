@@ -7,15 +7,22 @@ import {
   SUMMIT_DEFAULT_PRECO,
   SUMMIT_DEFAULT_PRECO_LIQUIDO,
 } from "@shared/produtos";
+import { getSessionsByPlatform } from "../services/ga4Sessions";
 
 // Stage de "ingresso vendido" no pipeline de Eventos (cat 10).
 // stage_semantic vem nulo nesse pipeline, então casamos pelo nome.
 const SUMMIT_WON_STAGE = "Negócios Ganhos";
 
-/**
- * Expressão SQL do label do tipo de ingresso (ou 'sem_tipo'), derivada de
- * SUMMIT_TICKET_TYPES (fonte única de verdade).
- */
+// Atribuição de um deal ao Meta Ads: veio de um anúncio do Summit (utm_content =
+// ad_id) ou tem utm de tráfego pago do Meta. (Maioria das COMPRAS perde o UTM na
+// Sympla — por isso compras/receita do Meta dependem de sincronizar a conversão
+// de compra do pixel; ver bloco `meta` abaixo.)
+const metaAttribCond = (adIdsSubquery: any) => sql`(
+  d.utm_content IN ${adIdsSubquery}
+  OR (lower(d.utm_source) IN ('facebook','instagram','fb','ig')
+      AND lower(coalesce(d.utm_medium,'')) IN ('paid','cpc','ads','paid_social'))
+)`;
+
 function tipoCaseSql(col = sql`d.fnl_ngc`) {
   const whens = SUMMIT_TICKET_TYPES.map((t) => {
     const conds = t.match.map((m) => sql`lower(coalesce(${col}, '')) LIKE ${"%" + m + "%"}`);
@@ -24,11 +31,6 @@ function tipoCaseSql(col = sql`d.fnl_ngc`) {
   return sql`CASE ${sql.join(whens, sql` `)} ELSE ${"sem_tipo"} END`;
 }
 
-/**
- * Expressão SQL do preço do ingresso. `field` escolhe bruto (preco) ou líquido
- * (precoLiquido). Emitido como literal numérico (sql.raw) — são constantes
- * confiáveis; como parâmetro ($n) o Postgres não casa o tipo com o ELSE 0.
- */
 function precoCaseSql(field: "preco" | "precoLiquido", col = sql`d.fnl_ngc`) {
   const def = field === "preco" ? SUMMIT_DEFAULT_PRECO : SUMMIT_DEFAULT_PRECO_LIQUIDO;
   const whens = SUMMIT_TICKET_TYPES.map((t) => {
@@ -54,21 +56,41 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
         FROM meta_ads.meta_campaigns c
         WHERE c.campaign_name ILIKE ${campKeyword}
       )`;
+      const summitAdIds = sql`(
+        SELECT a.ad_id::text
+        FROM meta_ads.meta_ads a
+        JOIN meta_ads.meta_campaigns c ON c.campaign_id = a.campaign_id
+        WHERE c.campaign_name ILIKE ${campKeyword}
+      )`;
 
-      const [spendTotal, funilByType] = await Promise.all([
-        // Gasto/impressões/cliques total do ano (campanhas Meta com "summit" no nome)
+      const [metaMedia, metaLeadsRow, funilByType] = await Promise.all([
+        // 1. Mídia Meta (campanhas com "summit" no nome)
         db.execute(sql`
           SELECT
             COALESCE(SUM(i.spend), 0) AS investimento,
             COALESCE(SUM(i.impressions), 0) AS impressoes,
-            COALESCE(SUM(i.outbound_clicks), 0) AS cliques
+            COALESCE(SUM(i.reach), 0) AS alcance,
+            COALESCE(SUM(i.clicks), 0) AS cliques_totais,
+            COALESCE(SUM(i.outbound_clicks), 0) AS cliques,
+            COALESCE(SUM(i.unique_outbound_clicks), 0) AS cliques_unicos,
+            COALESCE(SUM(i.landing_page_views), 0) AS visualizacoes_pagina
           FROM meta_ads.meta_insights_daily i
           WHERE i.date_start >= ${yearStart}::date
             AND i.date_start <= ${yearEnd}::date
             AND i.campaign_id IN ${summitCampaignIds}
         `),
 
-        // Funil por tipo de ingresso (leads, ingressos, receita bruta + líquida)
+        // 2. Leads atribuídos ao Meta (cat 10)
+        db.execute(sql`
+          SELECT COUNT(*) AS leads
+          FROM "Bitrix".crm_deal d
+          WHERE ${catCond}
+            AND d.date_create >= ${yearStart}::date
+            AND d.date_create < (${yearEnd}::date + INTERVAL '1 day')
+            AND ${metaAttribCond(summitAdIds)}
+        `),
+
+        // 3. Funil consolidado por tipo de ingresso (todos os canais)
         db.execute(sql`
           SELECT
             ${tipoCaseSql()} AS tipo,
@@ -84,13 +106,67 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
         `),
       ]);
 
+      // GA4 — sessões/page views do tráfego Meta do Summit (resiliente a falha)
+      let ga4Sessoes = 0;
+      let ga4PageViews = 0;
+      try {
+        const ids = (
+          await db.execute(sql`
+            SELECT DISTINCT campaign_id::text AS id
+            FROM meta_ads.meta_campaigns
+            WHERE campaign_name ILIKE ${campKeyword}
+          `)
+        ).rows.map((r: any) => r.id);
+        const ga4 = await getSessionsByPlatform(new Date(yearStart), new Date(yearEnd), {
+          utmCampaignContains: [SUMMIT_CAMPAIGN_KEYWORD],
+          campaignIdIn: ids,
+        });
+        ga4Sessoes = ga4.byPlatform?.meta_ads || 0;
+        ga4PageViews = ga4.byPlatformPageViews?.meta_ads || 0;
+      } catch (err) {
+        console.log("[creator-summit] GA4 sessions skipped:", (err as any)?.message || err);
+      }
+
       const num = (v: any) => parseFloat(v) || 0;
 
-      const sRow = spendTotal.rows[0] || {};
-      const investimento = num(sRow.investimento);
-      const impressoes = num(sRow.impressoes);
-      const cliques = num(sRow.cliques);
+      // ---- Bloco META (mídia) ----
+      const mm = metaMedia.rows[0] || {};
+      const mInvest = num(mm.investimento);
+      const mImpr = num(mm.impressoes);
+      const mAlcance = num(mm.alcance);
+      const mCliquesTotais = num(mm.cliques_totais);
+      const mCliques = num(mm.cliques); // outbound
+      const mCliquesUnicos = num(mm.cliques_unicos);
+      const mVdP = num(mm.visualizacoes_pagina);
+      const mLeads = num((metaLeadsRow.rows[0] || {}).leads);
 
+      const meta = {
+        investimento: mInvest,
+        impressoes: mImpr,
+        alcance: mAlcance,
+        frequencia: mAlcance > 0 ? mImpr / mAlcance : 0,
+        cpm: mImpr > 0 ? (mInvest / mImpr) * 1000 : 0,
+        cliquesTotais: mCliquesTotais,
+        cliques: mCliques,
+        ctr: mImpr > 0 ? (mCliques / mImpr) * 100 : 0,
+        ctrUnico: mAlcance > 0 ? (mCliquesUnicos / mAlcance) * 100 : 0,
+        visualizacoesPagina: mVdP,
+        connectRate: mCliques > 0 ? (mVdP / mCliques) * 100 : 0,
+        sessoes: ga4Sessoes,
+        pageViewsGa4: ga4PageViews,
+        leads: mLeads,
+        cpl: mLeads > 0 ? mInvest / mLeads : 0,
+        // Conversão de página: por visualização de página (pixel) e por sessões (GA4)
+        txConversaoVdP: mVdP > 0 ? (mLeads / mVdP) * 100 : 0,
+        txConversaoSessoes: ga4Sessoes > 0 ? (mLeads / ga4Sessoes) * 100 : 0,
+        // Compras/receita/ROAS dependem de sincronizar a conversão de compra do
+        // pixel (Sympla) — não disponível no pipeline hoje.
+        compras: null as number | null,
+        receita: null as number | null,
+        roas: null as number | null,
+      };
+
+      // ---- Bloco CONSOLIDADO (todos os canais) ----
       const tipoMap = new Map(SUMMIT_TICKET_TYPES.map((t) => [t.key, t]));
       const porTipo = (funilByType.rows as any[]).map((r) => {
         const t = tipoMap.get(r.tipo);
@@ -113,30 +189,28 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
       const receitaBruta = porTipo.reduce((s, t) => s + t.receitaBruta, 0);
       const receitaLiquida = porTipo.reduce((s, t) => s + t.receitaLiquida, 0);
 
-      const totais = {
-        investimento,
-        impressoes,
-        cliques,
+      const consolidado = {
+        // Investimento total = mídia paga do Summit (hoje só Meta rodou)
+        investimento: mInvest,
         leads,
-        // Carrinho abandonado vive na Sympla (externo) — sem fonte no banco hoje.
         carrinhoAbandonado: null as number | null,
         ingressos,
         receitaBruta,
         receitaLiquida,
-        cpl: leads > 0 ? investimento / leads : 0,
-        cacIngresso: ingressos > 0 ? investimento / ingressos : 0,
+        cpl: leads > 0 ? mInvest / leads : 0,
+        cacIngresso: ingressos > 0 ? mInvest / ingressos : 0,
         ticketMedioBruto: ingressos > 0 ? receitaBruta / ingressos : 0,
         ticketMedioLiquido: ingressos > 0 ? receitaLiquida / ingressos : 0,
-        roasBruto: investimento > 0 ? receitaBruta / investimento : 0,
-        roasLiquido: investimento > 0 ? receitaLiquida / investimento : 0,
+        roasBruto: mInvest > 0 ? receitaBruta / mInvest : 0,
+        roasLiquido: mInvest > 0 ? receitaLiquida / mInvest : 0,
         taxaConversao: leads > 0 ? ingressos / leads : 0,
       };
 
       res.json({
         year,
-        totais,
+        meta,
+        consolidado,
         porTipo,
-        // Premissa exposta na UI: receita = nº ingressos × preço tabelado por tipo.
         premissaPreco: SUMMIT_TICKET_TYPES.map((t) => ({
           label: t.label,
           preco: t.preco,
