@@ -40,6 +40,13 @@ export interface ChurnPorSquad {
   percentual: number;
 }
 
+export interface ChurnPorPessoa {
+  pessoa: string;
+  mrr_ativo: number;
+  mrr_perdido: number;
+  percentual: number;
+}
+
 export interface RetentionPoint {
   monthIndex: number;
   retainedPct: number;
@@ -75,6 +82,7 @@ export interface ChurnDetalhamentoData {
     mrr_ativo_ref?: number;
     churn_percentual?: number;
     churn_por_squad?: ChurnPorSquad[];
+    churn_por_pessoa?: ChurnPorPessoa[];
     churn_por_motivo?: ChurnPorMotivo[];
     churn_por_evitabilidade?: ChurnBreakdownItem[];
     churn_por_cluster?: ChurnBreakdownItem[];

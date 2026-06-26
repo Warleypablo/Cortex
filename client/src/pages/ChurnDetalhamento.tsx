@@ -488,7 +488,12 @@ export default function ChurnDetalhamento() {
 
       {/* Churn por Dimensão — seletor único com ranking */}
       {!isLoading && (
-        <ChurnPorDimensao contratos={filteredContratos} onDrill={onDrill} />
+        <ChurnPorDimensao
+          contratos={filteredContratos}
+          onDrill={onDrill}
+          churnPorSquad={data?.metricas?.churn_por_squad}
+          churnPorPessoa={data?.metricas?.churn_por_pessoa}
+        />
       )}
 
       <ChurnDrillDrawer
