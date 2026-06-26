@@ -137,7 +137,7 @@ export function SecaoTiming({ contratos, onDrill }: SecaoTimingProps): JSX.Eleme
     const churnContratos = contratos.filter(c => c.tipo === "churn" && !c.is_abonado && c.data_inicio);
     if (churnContratos.length === 0) return [];
 
-    const cohorts: Record<string, { count: number; totalLifetime: number; totalMrr: number }> = {};
+    const cohorts: Record<string, { count: number; totalLifetime: number; totalMrr: number; sortKey: string }> = {};
 
     churnContratos.forEach(c => {
       if (!c.data_inicio) return;
@@ -146,8 +146,7 @@ export function SecaoTiming({ contratos, onDrill }: SecaoTimingProps): JSX.Eleme
       const sortKey = format(startDate, "yyyy-MM");
 
       if (!cohorts[cohort]) {
-        cohorts[cohort] = { count: 0, totalLifetime: 0, totalMrr: 0 };
-        (cohorts[cohort] as any).sortKey = sortKey;
+        cohorts[cohort] = { count: 0, totalLifetime: 0, totalMrr: 0, sortKey };
       }
       cohorts[cohort].count++;
       cohorts[cohort].totalLifetime += c.lifetime_meses || 0;
@@ -160,7 +159,7 @@ export function SecaoTiming({ contratos, onDrill }: SecaoTimingProps): JSX.Eleme
         count: data.count,
         avgLifetime: data.count > 0 ? data.totalLifetime / data.count : 0,
         avgMrr: data.count > 0 ? data.totalMrr / data.count : 0,
-        sortKey: (data as any).sortKey,
+        sortKey: data.sortKey,
       }))
       .sort((a, b) => a.sortKey.localeCompare(b.sortKey))
       .slice(-12);
@@ -260,8 +259,6 @@ export function SecaoTiming({ contratos, onDrill }: SecaoTimingProps): JSX.Eleme
   };
 
   const handleMesDrill = (mes: string) => {
-    const item = churnPorMes.find(m => m.mes === mes);
-    if (!item) return;
     const filtered = contratos.filter(c => {
       const refDate = c.tipo === "pausado" ? c.data_pausa : c.data_encerramento;
       if (!refDate) return false;
@@ -309,11 +306,7 @@ export function SecaoTiming({ contratos, onDrill }: SecaoTimingProps): JSX.Eleme
               </div>
             }
           >
-            {contratos.length === 0 ? (
-              <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
-                Nenhum dado disponível
-              </div>
-            ) : churnPorMes.length === 0 ? (
+            {churnPorMes.length === 0 ? (
               <div className="h-[200px] flex items-center justify-center text-muted-foreground text-sm">
                 Nenhum dado disponível
               </div>
