@@ -21,6 +21,9 @@ import { montarCapacity } from "./bp2026.capacity";
 import { montarDetalhamentos } from "./bp2026.detalhamentos";
 import { montarPontual } from "./bp2026.pontual";
 import { INFO_METRICAS } from "./bp2026.info";
+import { abasPermitidas } from "../../shared/bp2026-tabs";
+import { filtrarPayloadPorAbas } from "./bp2026.enforcement";
+import type { User } from "../auth/userDb";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -593,17 +596,24 @@ export async function computarBpReceitas(db: any): Promise<any> {
 }
 
 export function registerBp2026Routes(app: Express, db: any) {
-  app.get("/api/bp2026/receitas", async (_req, res) => {
+  app.get("/api/bp2026/receitas", async (req, res) => {
     try {
-      res.json(await computarBpReceitas(db));
+      const user = req.user as User;
+      const abas = abasPermitidas(user?.role, user?.allowedBpTabs);
+      const payload = await computarBpReceitas(db);
+      res.json(filtrarPayloadPorAbas(payload, abas));
     } catch (error) {
       console.error("[bp2026] Erro em /api/bp2026/receitas:", error);
       res.status(500).json({ error: "Erro ao calcular orçado x realizado" });
     }
   });
 
-  app.get("/api/bp2026/pontual-creators", async (_req, res) => {
+  app.get("/api/bp2026/pontual-creators", async (req, res) => {
     try {
+      const user = req.user as User;
+      if (!abasPermitidas(user?.role, user?.allowedBpTabs).includes("pontual-creators")) {
+        return res.status(403).json({ error: "Sem acesso a esta aba" });
+      }
       const agora = new Date();
       const anoAtual = agora.getFullYear();
       const mesCorrente = anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;
