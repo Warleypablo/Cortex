@@ -6,7 +6,7 @@ import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd, type MesValor } from "./bp2026.helpers";
 import { PREDICADOS_DESPESA, PREDICADOS_SGA_SUB, PREDICADOS_OUTRAS_SUB, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { somaDespesaCaixaPorMes } from "./bp2026";
-import { ratearSeriePorPeso, participacaoPct, razaoYtd } from "./bp2026.cac.helpers";
+import { participacaoPct, razaoYtd } from "./bp2026.cac.helpers";
 import { SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SLUG } from "../okr2026/servicosBitrix";
 
 interface MesLinha extends MesValor { atingimento: number | null }
@@ -61,12 +61,7 @@ const NOTA_CAC_OUTRAS =
   "Categorias que entram no CAC do DRE mas não têm linha no BP " +
   "(Outras Despesas Comerciais, Patrocínios).";
 
-const NOTA_CAC_PRODUTO =
-  "CAC total do mês rateado pela participação do produto nos contratos recorrentes " +
-  "vendidos (Bitrix). Soma dos produtos = CAC total. Pontual não recebe bucket próprio.";
-
-// derivado da fonte única (servicosBitrix): garante que CAC por produto cubra
-// exatamente os mesmos produtos da aba Vendas por Produto (invariante soma = CAC total)
+// derivado da fonte única (servicosBitrix): produtos das sub-linhas de CAC por contrato
 const PRODUTOS_CAC: { slug: string; titulo: string }[] =
   SEGMENTOS_RECORRENTES.map((seg) => ({ slug: SLUG[seg], titulo: seg }));
 
@@ -335,26 +330,9 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     cacLinhasComPct.push(pctChild);
   });
 
-  // ---- bloco "CAC por Produto": rateio do CAC pelos contratos vendidos ----
-  const orcContratos: Record<string, (number | null)[]> = {};
-  for (const p of PRODUTOS_CAC) {
-    orcContratos[p.slug] = Array.from({ length: 12 }, (_, i) => orcado[`contratos_vendidos_mrr_${p.slug}`]?.[i + 1] ?? 0);
-  }
-  const allocReal = ratearSeriePorPeso(cacTotalSerie, contratosVendidosRec);
-  const allocOrc = ratearSeriePorPeso(cacOrcSerie, orcContratos);
-  const cacPorProduto: Linha[] = PRODUTOS_CAC.map((p) => ({
-    ...fazLinha(
-      { metrica: `cac_produto_${p.slug}`, titulo: p.titulo, direcao: "menor_melhor", nota: NOTA_CAC_PRODUTO },
-      allocReal[p.slug],
-      (m) => allocOrc[p.slug][m - 1] ?? 0,
-    ),
-    grupo: "CAC por Produto",
-    semDetalhe: true,
-  }));
-
   return {
     sga: [sgaTotal, ...sgaLinhas],
-    cac: [cacTotal, ...cacLinhasComPct, cacPorCliente, cacPorContrato, ...cacPorContratoFilhos, cacPctReceita, cacPayback, ...cacPorProduto],
+    cac: [cacTotal, ...cacLinhasComPct, cacPorCliente, cacPorContrato, ...cacPorContratoFilhos, cacPctReceita, cacPayback],
     outrasReceitas: [orTotal, variavelL, stackL, demaisL],
   };
 }
