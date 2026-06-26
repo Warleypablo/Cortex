@@ -153,9 +153,6 @@ export default function GrowthCreatorSummit() {
             { label: "Investimento", value: formatCurrencyNoDecimals(cons.investimento) },
             { label: "Leads", value: fmtInt(cons.leads) },
             { label: "CPL", value: formatCurrency(cons.cpl) },
-            cons.carrinhoAbandonado === null
-              ? { label: "Carrinho abandonado", pending: "a integrar (Sympla)" }
-              : { label: "Carrinho abandonado", value: fmtInt(cons.carrinhoAbandonado) },
           ],
         },
         {
@@ -221,31 +218,6 @@ export default function GrowthCreatorSummit() {
 
             {/* ---- Consolidado ---- */}
             <TabsContent value="consolidado" className="space-y-6 mt-4">
-              <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Funil do Evento</CardTitle>
-                </CardHeader>
-                <CardContent className="flex items-center gap-3 flex-wrap">
-                  <div className="flex-1 min-w-[140px] rounded-lg bg-blue-50 dark:bg-blue-950/40 p-3">
-                    <div className="text-xs text-blue-700 dark:text-blue-300">Leads</div>
-                    <div className="text-2xl font-bold text-blue-900 dark:text-blue-200">{fmtInt(cons.leads)}</div>
-                  </div>
-                  <div className="text-gray-400 dark:text-zinc-600 text-sm font-medium">
-                    → {formatPercent(cons.taxaConversao * 100)} →
-                  </div>
-                  <div className="flex-1 min-w-[140px] rounded-lg bg-emerald-50 dark:bg-emerald-950/40 p-3">
-                    <div className="text-xs text-emerald-700 dark:text-emerald-300">Ingressos vendidos</div>
-                    <div className="text-2xl font-bold text-emerald-900 dark:text-emerald-200">{fmtInt(cons.ingressos)}</div>
-                  </div>
-                  <div className="text-gray-400 dark:text-zinc-600 text-sm font-medium">=</div>
-                  <div className="flex-1 min-w-[160px] rounded-lg bg-fuchsia-50 dark:bg-fuchsia-950/40 p-3">
-                    <div className="text-xs text-fuchsia-700 dark:text-fuchsia-300">Receita líquida</div>
-                    <div className="text-2xl font-bold text-fuchsia-900 dark:text-fuchsia-200">{formatCurrencyNoDecimals(cons.receitaLiquida)}</div>
-                    <div className="text-[11px] text-fuchsia-600/70 dark:text-fuchsia-400/70">bruta {formatCurrencyNoDecimals(cons.receitaBruta)}</div>
-                  </div>
-                </CardContent>
-              </Card>
-
               <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
                 <CardHeader className="pb-2">
                   <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Métricas — {data.year} (todos os canais)</CardTitle>
