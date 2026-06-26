@@ -30,12 +30,11 @@ export function pctEvitavel(contratos: ChurnContract[]): number {
 
 // ── Props ────────────────────────────────────────────────────────────────────
 export interface ChurnKpisHeroProps {
-  contratos: ChurnContract[];        // filteredContratos
-  mrrPerdido: number;                // de filteredMetricas
-  taxaChurn: number;                 // de filteredTaxaChurn
-  nrrPct?: number;                   // de nrrData.nrr_pct
-  churnPlanejado?: number;           // de churnPlanejado (opcional, não mais exibido)
-  // Secondary stats — mantidas por compatibilidade mas não exibidas no estilo minimalista
+  contratos: ChurnContract[];
+  mrrPerdido: number;
+  taxaChurn: number;
+  nrrPct?: number;
+  churnPlanejado?: number;
   ltMedio?: number;
   ticketMedio?: number;
   gaugeStatusOverride?: { label: string; color: string; bg: string; dotBg: string };
@@ -84,12 +83,24 @@ function KpiCard({
   );
 }
 
+// ── StatPill: compact secondary metric ───────────────────────────────────────
+function StatPill({ label, value }: { label: string; value: string }): JSX.Element {
+  return (
+    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      <span className="text-xs font-semibold tabular-nums text-foreground">{value}</span>
+    </div>
+  );
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 export function ChurnKpisHero({
   contratos,
   mrrPerdido,
   taxaChurn,
   nrrPct,
+  ltMedio,
+  ticketMedio,
 }: ChurnKpisHeroProps): JSX.Element {
   const logosCount = contratos.filter(c => c.tipo === "churn" && !c.is_abonado).length;
   const evitavelPct = pctEvitavel(contratos);
@@ -105,39 +116,53 @@ export function ChurnKpisHero({
     ? Math.min(Math.max(100 - nrrPct, 0) / NRR_TETO_QUEDA, 1)
     : undefined;
 
+  const hasSecondary = (ltMedio !== undefined && ltMedio > 0) || (ticketMedio !== undefined && ticketMedio > 0);
+
   return (
-    <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
-      <KpiCard
-        label="Taxa de Churn %"
-        value={`${taxaChurn.toFixed(2)}%`}
-        valueClass={severityTextClass(taxaNorm)}
-        sub="do MRR base no período"
-        severityNorm={taxaNorm}
-      />
-      <KpiCard
-        label="MRR Perdido"
-        value={formatCurrencyNoDecimals(mrrPerdido)}
-        sub="receita recorrente encerrada"
-      />
-      <KpiCard
-        label="Logos Perdidos"
-        value={String(logosCount)}
-        sub="contratos encerrados"
-      />
-      <KpiCard
-        label="% Evitável"
-        value={`${evitavelPct.toFixed(1)}%`}
-        valueClass={severityTextClass(evitavelNorm)}
-        sub="dos classificados"
-        severityNorm={evitavelNorm}
-      />
-      <KpiCard
-        label="NRR"
-        value={nrrPct !== undefined ? `${nrrPct.toFixed(1)}%` : "—"}
-        valueClass={nrrNorm !== undefined ? severityTextClass(nrrNorm) : "text-muted-foreground"}
-        sub="net revenue retention"
-        severityNorm={nrrNorm}
-      />
+    <div className="space-y-2">
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <KpiCard
+          label="Taxa de Churn %"
+          value={`${taxaChurn.toFixed(2)}%`}
+          valueClass={severityTextClass(taxaNorm)}
+          sub="do MRR base no período"
+          severityNorm={taxaNorm}
+        />
+        <KpiCard
+          label="MRR Perdido"
+          value={formatCurrencyNoDecimals(mrrPerdido)}
+          sub="receita recorrente encerrada"
+        />
+        <KpiCard
+          label="Logos Perdidos"
+          value={String(logosCount)}
+          sub="contratos encerrados"
+        />
+        <KpiCard
+          label="% Evitável"
+          value={`${evitavelPct.toFixed(1)}%`}
+          valueClass={severityTextClass(evitavelNorm)}
+          sub="dos classificados"
+          severityNorm={evitavelNorm}
+        />
+        <KpiCard
+          label="NRR"
+          value={nrrPct !== undefined ? `${nrrPct.toFixed(1)}%` : "—"}
+          valueClass={nrrNorm !== undefined ? severityTextClass(nrrNorm) : "text-muted-foreground"}
+          sub="net revenue retention"
+          severityNorm={nrrNorm}
+        />
+      </div>
+      {hasSecondary && (
+        <div className="flex flex-wrap gap-2">
+          {ltMedio !== undefined && ltMedio > 0 && (
+            <StatPill label="Lifetime médio" value={`${ltMedio.toFixed(1)} meses`} />
+          )}
+          {ticketMedio !== undefined && ticketMedio > 0 && (
+            <StatPill label="Ticket médio" value={formatCurrencyNoDecimals(ticketMedio)} />
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -1,27 +1,19 @@
 import React, { useState, useMemo } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
-import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
+
 import { toast } from "sonner";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { formatCurrency, formatCurrencyNoDecimals } from "@/lib/utils";
-import {
-  TrendingDown,
-  DollarSign,
-  AlertTriangle,
-  Clock,
-  BarChart3,
-  Target,
-} from "lucide-react";
+import { AlertTriangle } from "lucide-react";
 import { type ChurnContract, type ChurnDetalhamentoData } from "@/components/churn/types";
 import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { RitmoDiario } from "@/components/churn/RitmoDiario";
 import { ChurnPorDimensao } from "@/components/churn/ChurnPorDimensao";
-import { TechKpiCard } from "@/components/churn/ui/TechKpiCard";
+
 import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays, getDaysInMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -548,120 +540,6 @@ export default function ChurnDetalhamento() {
       {/* Churn por Dimensão — seletor único com ranking */}
       {!isLoading && (
         <ChurnPorDimensao contratos={filteredContratos} onDrill={onDrill} />
-      )}
-
-      {/* Métricas Secundárias */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {isLoading ? (
-          Array.from({ length: 4 }).map((_, i) => (
-            <div key={i} className="rounded-xl bg-white dark:bg-zinc-900/50 border border-gray-100 dark:border-zinc-800/50 p-4 shadow">
-              <Skeleton className="h-4 w-20 mb-3" />
-              <Skeleton className="h-7 w-24" />
-            </div>
-          ))
-        ) : (
-          <>
-            <TechKpiCard
-              title="LTV Total"
-              value={formatCurrencyNoDecimals(filteredMetricas.ltv_total)}
-              subtitle="valor gerado antes do churn"
-              icon={Target}
-              gradient="bg-gradient-to-r from-emerald-500 to-teal-600"
-              shadowColor="rgba(16,185,129,0.25)"
-            />
-            <TechKpiCard
-              title="Lifetime Médio"
-              value={`${filteredMetricas.lt_medio.toFixed(1)} meses`}
-              subtitle="tempo médio de permanência"
-              icon={Clock}
-              gradient="bg-gradient-to-r from-blue-500 to-cyan-600"
-              shadowColor="rgba(59,130,246,0.25)"
-            />
-            <TechKpiCard
-              title="Ticket Médio"
-              value={formatCurrencyNoDecimals(filteredMetricas.ticket_medio)}
-              subtitle="MRR médio por contrato"
-              icon={BarChart3}
-              gradient="bg-gradient-to-r from-violet-500 to-purple-600"
-              shadowColor="rgba(139,92,246,0.25)"
-            />
-            <TechKpiCard
-              title="LTV Médio"
-              value={filteredMetricas.total_churned > 0
-                ? formatCurrencyNoDecimals(filteredMetricas.ltv_total / filteredMetricas.total_churned)
-                : "R$ 0"}
-              subtitle="por contrato churned"
-              icon={DollarSign}
-              gradient="bg-gradient-to-r from-indigo-500 to-purple-600"
-              shadowColor="rgba(99,102,241,0.25)"
-            />
-          </>
-        )}
-      </div>
-
-      {/* MRR Perdido por Motivo de Cancelamento */}
-      {data?.metricas?.churn_por_motivo && data.metricas.churn_por_motivo.length > 0 && (
-        <Card className="border-border/50" data-testid="card-mrr-por-motivo">
-          <CardHeader className="pb-3">
-            <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-r from-rose-500 to-pink-600 shadow-lg">
-                <AlertTriangle className="h-4 w-4 text-white" />
-              </div>
-              <div>
-                <CardTitle className="text-base" data-testid="title-mrr-por-motivo">MRR Perdido por Motivo de Cancelamento</CardTitle>
-                <p className="text-xs text-muted-foreground">Análise dos principais motivos de churn</p>
-              </div>
-            </div>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {data.metricas.churn_por_motivo.slice(0, 10).map((item, index) => {
-                const maxMrr = data.metricas.churn_por_motivo?.[0]?.mrr_perdido || 1;
-                const barWidth = (item.mrr_perdido / maxMrr) * 100;
-                const ticketMedioMotivo = item.quantidade > 0 ? item.mrr_perdido / item.quantidade : 0;
-
-                return (
-                  <div key={item.motivo} className="group" data-testid={`motivo-ranking-${index}`}>
-                    <div className="flex items-center justify-between gap-2 mb-1.5 flex-wrap">
-                      <div className="flex items-center gap-2 flex-1 min-w-0">
-                        <div className={`w-6 h-6 rounded-full flex items-center justify-center flex-shrink-0 ${
-                          index < 3
-                            ? 'bg-rose-500 text-white'
-                            : 'bg-gray-100 dark:bg-zinc-800 text-muted-foreground'
-                        }`}>
-                          <span className="text-[10px] font-bold">{index + 1}</span>
-                        </div>
-                        <span className="text-sm font-medium truncate" data-testid={`text-motivo-${index}`}>{item.motivo}</span>
-                      </div>
-                      <div className="flex items-center gap-3 flex-shrink-0">
-                        <Badge variant="outline" className="text-xs" data-testid={`badge-qtd-motivo-${index}`}>
-                          {item.quantidade} {item.quantidade === 1 ? 'contrato' : 'contratos'}
-                        </Badge>
-                        <div className="flex flex-col items-end leading-tight">
-                          <span className="text-sm font-bold text-rose-600 dark:text-rose-400 tabular-nums" data-testid={`text-mrr-motivo-${index}`}>
-                            {formatCurrencyNoDecimals(item.mrr_perdido)}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground tabular-nums" data-testid={`text-ticket-medio-motivo-${index}`}>
-                            Ticket médio: {formatCurrencyNoDecimals(ticketMedioMotivo)}
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                    <div className="ml-8 h-2 bg-gray-100 dark:bg-zinc-800 rounded-full overflow-hidden" data-testid={`bar-motivo-${index}`}>
-                      <div
-                        className="h-full rounded-full bg-gradient-to-r from-rose-500 to-pink-500 transition-all duration-500"
-                        style={{ width: `${barWidth}%` }}
-                      />
-                    </div>
-                    <div className="ml-8 mt-0.5 text-[10px] text-muted-foreground" data-testid={`text-percent-motivo-${index}`}>
-                      {item.percentual.toFixed(1)}% do total perdido
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </CardContent>
-        </Card>
       )}
 
       <ChurnDrillDrawer
