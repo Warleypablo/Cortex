@@ -8,6 +8,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Loader2, PartyPopper, Info } from "lucide-react";
 import { formatCurrency, formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
+import { SUMMIT_CAPACITY, SUMMIT_ROAS_ALVO } from "@shared/produtos";
 
 interface PorTipo {
   key: string; label: string; preco: number; precoLiquido: number;
@@ -38,25 +39,34 @@ interface SummitData {
 
 const fmtInt = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
 
-type Row =
-  | { label: string; value: string; hint?: string }
-  | { label: string; pending: string };
+interface Row {
+  label: string;
+  value?: string;        // realizado (formatado)
+  pending?: string;      // se realizado indisponível
+  hint?: string;
+  orcado?: string;       // orçado/projeção (formatado)
+  atingimento?: number;  // % = realizado ÷ orçado × 100
+}
 interface Section { title: string; rows: Row[] }
 
 function MetricsTable({ sections }: { sections: Section[] }) {
+  const hasOrcado = sections.some((s) => s.rows.some((r) => r.orcado !== undefined));
+  const colSpan = hasOrcado ? 4 : 2;
   return (
     <Table>
       <TableHeader>
         <TableRow>
           <TableHead>Métrica</TableHead>
           <TableHead className="text-right">Realizado</TableHead>
+          {hasOrcado && <TableHead className="text-right">Orçado</TableHead>}
+          {hasOrcado && <TableHead className="text-right">% Ating.</TableHead>}
         </TableRow>
       </TableHeader>
       <TableBody>
         {sections.map((section) => (
           <Fragment key={section.title}>
             <TableRow className="bg-muted/50 border-l-4 border-l-primary/40">
-              <TableCell colSpan={2} className="text-xs font-semibold uppercase tracking-wide py-2.5 text-muted-foreground">
+              <TableCell colSpan={colSpan} className="text-xs font-semibold uppercase tracking-wide py-2.5 text-muted-foreground">
                 {section.title}
               </TableCell>
             </TableRow>
@@ -64,17 +74,27 @@ function MetricsTable({ sections }: { sections: Section[] }) {
               <TableRow key={row.label}>
                 <TableCell className="text-gray-900 dark:text-white">
                   {row.label}
-                  {"hint" in row && row.hint && (
+                  {row.hint && (
                     <span className="ml-2 text-xs text-gray-400 dark:text-zinc-500">({row.hint})</span>
                   )}
                 </TableCell>
                 <TableCell className="text-right tabular-nums font-medium">
-                  {"pending" in row ? (
+                  {row.pending !== undefined ? (
                     <span className="text-xs text-amber-600 dark:text-amber-400">{row.pending}</span>
                   ) : (
                     row.value
                   )}
                 </TableCell>
+                {hasOrcado && (
+                  <TableCell className="text-right tabular-nums text-gray-600 dark:text-zinc-400">
+                    {row.orcado ?? "—"}
+                  </TableCell>
+                )}
+                {hasOrcado && (
+                  <TableCell className="text-right tabular-nums text-xs text-gray-500 dark:text-zinc-500">
+                    {row.atingimento !== undefined ? formatPercent(row.atingimento) : ""}
+                  </TableCell>
+                )}
               </TableRow>
             ))}
           </Fragment>
@@ -105,41 +125,73 @@ export default function GrowthCreatorSummit() {
   const cons = data?.consolidado;
 
   const pend = "pendente: integração pixel";
-  // Linha que vira "pendente" quando o valor é null (não sincronizado).
-  const row = (label: string, v: number | null, fmt: (n: number) => string, hint?: string): Row =>
-    v === null ? { label, pending: pend } : { label, value: fmt(v), ...(hint ? { hint } : {}) };
+  // Cria a linha. opts.orcado adiciona a projeção + % de atingimento (real ÷ orçado).
+  const row = (
+    label: string,
+    v: number | null,
+    fmt: (n: number) => string,
+    opts?: { hint?: string; orcado?: number },
+  ): Row => {
+    const r: Row = v === null ? { label, pending: pend } : { label, value: fmt(v) };
+    if (opts?.hint) r.hint = opts.hint;
+    if (opts?.orcado !== undefined) {
+      r.orcado = fmt(opts.orcado);
+      if (v !== null && opts.orcado > 0) r.atingimento = (v / opts.orcado) * 100;
+    }
+    return r;
+  };
   const custoVenda = m && m.vendas ? m.investimento / m.vendas : null;
   const custoCarrinho = m && m.carrinhoAbandonado ? m.investimento / m.carrinhoAbandonado : null;
+
+  // Projeção "esgotar o evento (330 ingressos) a ROAS 1": de trás pra frente,
+  // o funil e o investimento necessários, usando as taxas de conversão atuais.
+  const proj =
+    m && m.taxaConversao && m.pctCarrinhoVenda
+      ? (() => {
+          const ingressos = SUMMIT_CAPACITY.reduce((s, c) => s + c.total, 0);
+          const receita = SUMMIT_CAPACITY.reduce((s, c) => s + c.total * c.precoLiquido, 0);
+          const invest = receita / SUMMIT_ROAS_ALVO; // ROAS 1 → investimento = receita
+          const leads = ingressos / (m.taxaConversao! / 100);
+          const carrinho = ingressos / (m.pctCarrinhoVenda! / 100);
+          return {
+            ingressos, receita, invest, leads, carrinho,
+            cac: invest / ingressos,
+            cpl: invest / leads,
+            custoCarrinho: invest / carrinho,
+            roas: SUMMIT_ROAS_ALVO,
+          };
+        })()
+      : null;
 
   const metaSections: Section[] = m
     ? [
         {
           title: "Mídia",
           rows: [
-            { label: "Investimento", value: formatCurrencyNoDecimals(m.investimento) },
+            row("Investimento", m.investimento, formatCurrencyNoDecimals, { orcado: proj?.invest }),
             { label: "CPM", value: formatCurrency(m.cpm) },
             { label: "CTR de saída", value: formatPercent(m.ctr) },
             { label: "CTR de saída único", value: formatPercent(m.ctrUnico) },
             { label: "Connect Rate", value: formatPercent(m.connectRate), hint: "VdP ÷ cliques de saída" },
             { label: "Sessões", value: fmtInt(m.sessoes), hint: "GA4" },
-            row("Tx conversão de página (por VdP)", m.txConversaoVdP, formatPercent, "leads ÷ VdP"),
-            row("Tx conversão de página (por sessões)", m.txConversaoSessoes, formatPercent, "leads ÷ sessões"),
+            row("Tx conversão de página (por VdP)", m.txConversaoVdP, formatPercent, { hint: "leads ÷ VdP" }),
+            row("Tx conversão de página (por sessões)", m.txConversaoSessoes, formatPercent, { hint: "leads ÷ sessões" }),
           ],
         },
         {
           title: "Funil (atribuição do pixel)",
           rows: [
-            row("Leads", m.leads, fmtInt, "evento Lead - Summit ES"),
-            row("Custo por lead", m.cpl, formatCurrency),
+            row("Leads", m.leads, fmtInt, { hint: "evento Lead - Summit ES", orcado: proj?.leads }),
+            row("Custo por lead", m.cpl, formatCurrency, { orcado: proj?.cpl }),
             row("% Lead → Carrinho", m.pctLeadCarrinho, formatPercent),
-            row("Carrinho abandonado", m.carrinhoAbandonado, fmtInt, "InitiateCheckout"),
-            row("Custo por carrinho abandonado", custoCarrinho, formatCurrency),
+            row("Carrinho abandonado", m.carrinhoAbandonado, fmtInt, { hint: "InitiateCheckout", orcado: proj?.carrinho }),
+            row("Custo por carrinho abandonado", custoCarrinho, formatCurrency, { orcado: proj?.custoCarrinho }),
             row("% Carrinho → Venda", m.pctCarrinhoVenda, formatPercent),
-            row("Vendas", m.vendas, fmtInt, "Compra - Creators Summit ES"),
-            row("Custo por venda", custoVenda, formatCurrency),
+            row("Vendas", m.vendas, fmtInt, { hint: "Compra - Creators Summit ES", orcado: proj?.ingressos }),
+            row("Custo por venda", custoVenda, formatCurrency, { orcado: proj?.cac }),
             row("Taxa de conversão (Lead → Venda)", m.taxaConversao, formatPercent),
-            row("Receita", m.receita, formatCurrencyNoDecimals),
-            row("ROAS", m.roas, (n) => `${formatDecimal(n)}x`),
+            row("Receita", m.receita, formatCurrencyNoDecimals, { orcado: proj?.receita }),
+            row("ROAS", m.roas, (n) => `${formatDecimal(n)}x`, { orcado: proj?.roas }),
           ],
         },
       ]
@@ -274,6 +326,17 @@ export default function GrowthCreatorSummit() {
                 </CardHeader>
                 <CardContent><MetricsTable sections={metaSections} /></CardContent>
               </Card>
+
+              <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-zinc-400 px-1 rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-amber-500" />
+                <span>
+                  <strong>Orçado = esgotar o evento a ROAS 1.</strong> Projeta o funil pra vender os 330 ingressos
+                  (300 PASS + 30 VIP = R$ 161.109 líquidos), com investimento = receita (ROAS 1) e as taxas de conversão
+                  atuais. Como cada VIP rende R$ 2.697 líquido, o custo por venda que ainda dá break-even é alto
+                  (~R$ 488) — acima do seu CAC atual. Ou seja: <strong>no ritmo de eficiência de hoje, o gargalo pra
+                  estourar o ROAS é volume de vendas, não custo.</strong>
+                </span>
+              </div>
 
               <div className="flex items-start gap-2 text-xs text-gray-500 dark:text-zinc-500 px-1">
                 <Info className="h-3.5 w-3.5 mt-0.5 shrink-0" />

@@ -112,6 +112,20 @@ export const SUMMIT_LEAD_ACTION = "offsite_conversion.custom.2444269669378621";
 export const SUMMIT_CART_ACTION = "initiate_checkout";
 export const SUMMIT_PURCHASE_ACTION = "offsite_conversion.custom.1345738370839003";
 
+// Capacidade do evento (Sympla) por faixa de ingresso — base da projeção
+// "esgotar o evento" na aba Meta Ads. precoLiquido = valor a receber.
+export interface SummitCapacity {
+  label: string;
+  total: number;
+  precoLiquido: number;
+}
+export const SUMMIT_CAPACITY: SummitCapacity[] = [
+  { label: "PASS", total: 300, precoLiquido: 267.3 },
+  { label: "VIP", total: 30, precoLiquido: 2697.3 },
+];
+// ROAS-alvo da projeção (1 = break-even: investimento = receita líquida).
+export const SUMMIT_ROAS_ALVO = 1;
+
 // Tipos de ingresso. `match` casa (ILIKE) contra o fnl_ngc do deal.
 //  - preco        = valor do comprador (bruto, com taxa Sympla embutida)
 //  - precoLiquido = valor a receber (o que cai no bolso, após ~10% da Sympla)
