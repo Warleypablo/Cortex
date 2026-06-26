@@ -25,6 +25,7 @@ import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
+import { registerCreatorSummitRoutes } from "./routes/creatorSummit";
 import { registerYoutubeOAuthPublicRoutes, registerYoutubeOAuthStatusRoute } from "./routes/youtubeOAuth";
 import { registerYoutubeAdminRoutes } from "./routes/youtubeAdmin";
 import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
@@ -8285,6 +8286,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth — Evolução Temporal (matriz métricas × meses/semanas)
   registerGrowthTimeseriesRoutes(app, db);
+
+  // Growth — Creator Summit (dashboard do funil de eventos, cat 10)
+  registerCreatorSummitRoutes(app, db);
 
   // YouTube OAuth — /status (protegido; start/callback são públicos, registrados acima)
   registerYoutubeOAuthStatusRoute(app, db);

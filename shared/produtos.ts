@@ -90,3 +90,47 @@ export function expandFunilValues(values: string[]): string[] {
   }
   return expanded;
 }
+
+// ---- Creator Summit (pipeline de EVENTOS, categoria 10 do Bitrix) ----
+// Funil próprio (Cadastro → Negócio Ganho), separado do inbound de propósito —
+// por isso bucketForFnlNgc() devolve null pra "creator summit". O dashboard
+// dedicado (/growth/creator-summit) consome estas constantes.
+//
+// Identificação do GASTO: campanhas Meta cujo nome contém "summit".
+// Identificação do FUNIL: deals da categoria 10 do Bitrix, tipados via fnl_ngc.
+export const SUMMIT_CATEGORY_ID = 10;
+export const SUMMIT_CAMPAIGN_KEYWORD = "summit";
+
+// Tipos de ingresso. `match` casa (ILIKE) contra o fnl_ngc do deal; `preco` é o
+// valor do comprador (com taxa Sympla embutida). Ordem = exibição.
+export interface SummitTicketType {
+  key: string;
+  label: string;
+  match: string[]; // substrings case-insensitive no fnl_ngc
+  preco: number; // valor do comprador (R$)
+}
+
+export const SUMMIT_TICKET_TYPES: SummitTicketType[] = [
+  { key: "criador", label: "Criador", match: ["criador"], preco: 297 },
+  { key: "empresario", label: "Empresário", match: ["empres"], preco: 297 },
+  { key: "vip", label: "VIP", match: ["vip"], preco: 2997 },
+];
+
+// Preço default p/ ingressos sem tipo identificável (ex: "Compra Sympla",
+// fnl_ngc nulo). Maioria é PASS (R$ 297); VIP só conta quando o tipo casa.
+export const SUMMIT_DEFAULT_PRECO = 297;
+
+/** Classifica o fnl_ngc de um deal de evento num tipo de ingresso (ou null). */
+export function summitTicketType(fnlNgc: string | null | undefined): SummitTicketType | null {
+  if (!fnlNgc) return null;
+  const lower = fnlNgc.toLowerCase();
+  for (const t of SUMMIT_TICKET_TYPES) {
+    if (t.match.some((m) => lower.includes(m))) return t;
+  }
+  return null;
+}
+
+/** Preço do ingresso de um deal pelo seu tipo (default PASS quando indefinido). */
+export function summitPrecoIngresso(fnlNgc: string | null | undefined): number {
+  return summitTicketType(fnlNgc)?.preco ?? SUMMIT_DEFAULT_PRECO;
+}
