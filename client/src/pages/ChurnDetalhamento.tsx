@@ -350,6 +350,7 @@ export default function ChurnDetalhamento() {
           nrrPct={nrrData?.nrr_pct}
           ltMedio={filteredMetricas.lt_medio}
           ticketMedio={filteredMetricas.ticket_medio}
+          onDrill={onDrill}
         />
       )}
 
