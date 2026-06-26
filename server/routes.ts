@@ -5030,6 +5030,8 @@ Estruture sua resposta em:
         const inicioRef = new Date(refYear, refMonth - 1, 1);
         const fimRef = new Date(refYear, refMonth, 0, 23, 59, 59);
 
+        // Single query: fetch squad + responsavel + valorr per row, aggregate in JS
+        // Squad aggregation excludes irrelevant squads; pessoa does NOT
         const mrrResult = await db.execute(sql`
           WITH snapshot_atual AS (
             SELECT MIN(data_snapshot) as data_snapshot
@@ -5050,59 +5052,30 @@ Estruture sua resposta em:
             ) as data_ultimo_snapshot
           )
           SELECT
-            COALESCE(h.squad, 'Não especificado') as squad,
-            COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
+            COALESCE(NULLIF(TRIM(h.squad), ''), 'Não especificado') as squad,
+            COALESCE(NULLIF(TRIM(h.responsavel), ''), 'Não especificado') as responsavel,
+            COALESCE(h.valorr::numeric, 0) as valorr
           FROM snapshot_ref us
           JOIN "Clickup".cup_data_hist h
             ON h.data_snapshot = us.data_ultimo_snapshot
             AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
-            AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
-          GROUP BY COALESCE(h.squad, 'Não especificado')
         `);
 
         const porSquad: Record<string, number> = {};
-        let totalMes = 0;
-        for (const row of mrrResult.rows as any[]) {
-          const squadName = row.squad || 'Não especificado';
-          const mrr = Number(row.mrr_ativo) || 0;
-          porSquad[squadName] = mrr;
-          totalMes += mrr;
-        }
-
-        // Base por responsavel — mesmo snapshot, agrupado por h.responsavel
-        const mrrResultResp = await db.execute(sql`
-          WITH snapshot_atual AS (
-            SELECT MIN(data_snapshot) as data_snapshot
-            FROM "Clickup".cup_data_hist
-            WHERE data_snapshot >= ${inicioMesAtual}::timestamp
-              AND data_snapshot <= ${fimMesAtual}::timestamp
-          ),
-          snapshot_anterior AS (
-            SELECT MAX(data_snapshot) as data_snapshot
-            FROM "Clickup".cup_data_hist
-            WHERE data_snapshot >= ${inicioRef}::timestamp
-              AND data_snapshot <= ${fimRef}::timestamp
-          ),
-          snapshot_ref AS (
-            SELECT COALESCE(
-              (SELECT data_snapshot FROM snapshot_atual WHERE data_snapshot IS NOT NULL),
-              (SELECT data_snapshot FROM snapshot_anterior)
-            ) as data_ultimo_snapshot
-          )
-          SELECT
-            COALESCE(NULLIF(TRIM(h.responsavel), ''), 'Não especificado') as responsavel,
-            COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
-          FROM snapshot_ref us
-          JOIN "Clickup".cup_data_hist h
-            ON h.data_snapshot = us.data_ultimo_snapshot
-            AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
-          GROUP BY 1
-        `);
-
         const porResponsavel: Record<string, number> = {};
-        for (const row of mrrResultResp.rows as any[]) {
-          const pessoa = row.responsavel || 'Não especificado';
-          porResponsavel[pessoa] = (porResponsavel[pessoa] || 0) + (Number(row.mrr_ativo) || 0);
+        let totalMes = 0;
+        const SQUADS_IRRELEVANTES_LOWER = ['turbo interno', 'squad x', 'interno', 'x'];
+        for (const row of mrrResult.rows as any[]) {
+          const squadRaw: string = row.squad || 'Não especificado';
+          const pessoa: string = row.responsavel || 'Não especificado';
+          const mrr = Number(row.valorr) || 0;
+          // squad: exclude irrelevant squads (matches original query filter)
+          if (!SQUADS_IRRELEVANTES_LOWER.includes(squadRaw.trim().toLowerCase())) {
+            porSquad[squadRaw] = (porSquad[squadRaw] || 0) + mrr;
+            totalMes += mrr;
+          }
+          // pessoa: all rows (no squad filter)
+          porResponsavel[pessoa] = (porResponsavel[pessoa] || 0) + mrr;
         }
 
         mrrBasePorMes[mesKey] = { total: totalMes, por_squad: porSquad, por_responsavel: porResponsavel };
@@ -5114,7 +5087,7 @@ Estruture sua resposta em:
 
       // Para exibição e cálculo de churn por squad, usar o MRR base do primeiro mês (referência principal)
       const primeiroMes = mesesNoRange[0];
-      const mrrBasePrimeiro = mrrBasePorMes[primeiroMes] || { total: 0, por_squad: {} };
+      const mrrBasePrimeiro = mrrBasePorMes[primeiroMes] || { total: 0, por_squad: {}, por_responsavel: {} };
       for (const [squad, mrr] of Object.entries(mrrBasePrimeiro.por_squad)) {
         mrrAtivoPorSquad[squad] = mrr;
       }

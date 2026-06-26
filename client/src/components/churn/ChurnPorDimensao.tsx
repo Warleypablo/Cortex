@@ -100,11 +100,22 @@ export function ChurnPorDimensao({
 
     const churnOnly = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
 
-    // build contract subsets for drill (keyed by label)
+    // Normalize exactly like the backend: trim + blank/null → "Não especificado"
+    const normKey = (v: string | null | undefined): string =>
+      v && v.trim() ? v.trim() : "Não especificado";
+
+    // build contract subsets for drill (keyed by normalized label)
     const drillMap: Record<string, ChurnContract[]> = {};
     churnOnly.forEach(c => {
-      const key = getFieldValue(c, dimensao);
-      if (key === null) return;
+      let key: string;
+      if (dimensao === "squad") {
+        const s = (c.squad || "").trim();
+        if (!s || SQUADS_IRRELEVANTES.includes(s.toLowerCase())) return;
+        key = s; // squad is already trimmed; backend uses COALESCE(NULLIF(TRIM(...)),'Não especificado')
+      } else {
+        // pessoa
+        key = normKey(c.responsavel);
+      }
       if (!drillMap[key]) drillMap[key] = [];
       drillMap[key].push(c);
     });
