@@ -90,3 +90,81 @@ export function expandFunilValues(values: string[]): string[] {
   }
   return expanded;
 }
+
+// ---- Creator Summit (pipeline de EVENTOS, categoria 10 do Bitrix) ----
+// Funil próprio (Cadastro → Negócio Ganho), separado do inbound de propósito —
+// por isso bucketForFnlNgc() devolve null pra "creator summit". O dashboard
+// dedicado (/growth/creator-summit) consome estas constantes.
+//
+// Identificação do GASTO: campanhas Meta cujo nome contém "summit".
+// Identificação do FUNIL: deals da categoria 10 do Bitrix, tipados via fnl_ngc.
+export const SUMMIT_CATEGORY_ID = 10;
+export const SUMMIT_CAMPAIGN_KEYWORD = "summit";
+
+// Eventos do pixel (Meta) usados na aba Meta Ads do Summit. Vêm no jsonb
+// meta_insights_daily.actions / action_values após o sync. Funil 100% Meta
+// (mesma régua de atribuição em todas as etapas → números consistentes):
+//   Lead (pixel) → Carrinho (InitiateCheckout) → Venda (conversão personalizada)
+//  - Lead      = conversão personalizada "Lead - Summit ES"
+//  - Carrinho  = evento padrão InitiateCheckout
+//  - Venda     = conversão personalizada "Compra - Creators Summit ES"
+export const SUMMIT_LEAD_ACTION = "offsite_conversion.custom.2444269669378621";
+export const SUMMIT_CART_ACTION = "initiate_checkout";
+export const SUMMIT_PURCHASE_ACTION = "offsite_conversion.custom.1345738370839003";
+
+// Capacidade do evento (Sympla) por faixa de ingresso — base da projeção
+// "esgotar o evento" na aba Meta Ads. precoLiquido = valor a receber.
+export interface SummitCapacity {
+  label: string;
+  total: number;
+  precoLiquido: number;
+}
+export const SUMMIT_CAPACITY: SummitCapacity[] = [
+  { label: "PASS", total: 300, precoLiquido: 267.3 },
+  { label: "VIP", total: 30, precoLiquido: 2697.3 },
+];
+// ROAS-alvo da projeção (1 = break-even: investimento = receita líquida).
+export const SUMMIT_ROAS_ALVO = 1;
+
+// Tipos de ingresso. `match` casa (ILIKE) contra o fnl_ngc do deal.
+//  - preco        = valor do comprador (bruto, com taxa Sympla embutida)
+//  - precoLiquido = valor a receber (o que cai no bolso, após ~10% da Sympla)
+// Ordem = exibição.
+export interface SummitTicketType {
+  key: string;
+  label: string;
+  match: string[]; // substrings case-insensitive no fnl_ngc
+  preco: number; // valor do comprador (R$, bruto)
+  precoLiquido: number; // valor a receber (R$, líquido)
+}
+
+export const SUMMIT_TICKET_TYPES: SummitTicketType[] = [
+  { key: "criador", label: "Criador", match: ["criador"], preco: 297, precoLiquido: 267.3 },
+  { key: "empresario", label: "Empresário", match: ["empres"], preco: 297, precoLiquido: 267.3 },
+  { key: "vip", label: "VIP", match: ["vip"], preco: 2997, precoLiquido: 2697.3 },
+];
+
+// Preços default p/ ingressos sem tipo identificável (ex: "Compra Sympla",
+// fnl_ngc nulo). Maioria é PASS; VIP só conta quando o tipo casa.
+export const SUMMIT_DEFAULT_PRECO = 297;
+export const SUMMIT_DEFAULT_PRECO_LIQUIDO = 267.3;
+
+/** Classifica o fnl_ngc de um deal de evento num tipo de ingresso (ou null). */
+export function summitTicketType(fnlNgc: string | null | undefined): SummitTicketType | null {
+  if (!fnlNgc) return null;
+  const lower = fnlNgc.toLowerCase();
+  for (const t of SUMMIT_TICKET_TYPES) {
+    if (t.match.some((m) => lower.includes(m))) return t;
+  }
+  return null;
+}
+
+/** Preço bruto do ingresso de um deal pelo tipo (default PASS quando indefinido). */
+export function summitPrecoIngresso(fnlNgc: string | null | undefined): number {
+  return summitTicketType(fnlNgc)?.preco ?? SUMMIT_DEFAULT_PRECO;
+}
+
+/** Preço líquido (valor a receber) do ingresso pelo tipo (default PASS). */
+export function summitPrecoLiquidoIngresso(fnlNgc: string | null | undefined): number {
+  return summitTicketType(fnlNgc)?.precoLiquido ?? SUMMIT_DEFAULT_PRECO_LIQUIDO;
+}
