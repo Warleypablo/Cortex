@@ -52,6 +52,10 @@ interface ParsedInsightRow {
   videoThruplay: number;
   conversions: number;
   landingPageViews: number;
+  // Arrays brutos do Meta — guardados como jsonb pra extrair qualquer action_type
+  // depois (ex: initiate_checkout, conversões personalizadas) sem novo sync.
+  actions: any[];
+  actionValues: any[];
 }
 
 function parseInsightRow(row: any): ParsedInsightRow {
@@ -114,6 +118,8 @@ function parseInsightRow(row: any): ParsedInsightRow {
     videoThruplay: getVideoMetric(row.video_thruplay_watched_actions),
     conversions: actionsLead + actionsPurchase,
     landingPageViews,
+    actions: Array.isArray(row.actions) ? row.actions : [],
+    actionValues: Array.isArray(row.action_values) ? row.action_values : [],
   };
 }
 
@@ -397,8 +403,9 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         video_play_actions, video_p25_watched_actions, video_p50_watched_actions,
         video_p75_watched_actions, video_p100_watched_actions,
         video_3_sec_watched_actions, video_thruplay_watched_actions,
-        conversions, landing_page_views, unique_outbound_clicks, data_importacao
-      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,NOW())
+        conversions, landing_page_views, unique_outbound_clicks,
+        actions, action_values, data_importacao
+      ) VALUES ($1,$2,$3,$4,$5,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25,$26::jsonb,$27::jsonb,NOW())
       ON CONFLICT ON CONSTRAINT meta_insights_daily_account_id_campaign_id_adset_id_ad_id_d_key
       DO UPDATE SET
         impressions=EXCLUDED.impressions, clicks=EXCLUDED.clicks, spend=EXCLUDED.spend,
@@ -414,6 +421,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
         video_3_sec_watched_actions=EXCLUDED.video_3_sec_watched_actions,
         video_thruplay_watched_actions=EXCLUDED.video_thruplay_watched_actions,
         conversions=EXCLUDED.conversions, landing_page_views=EXCLUDED.landing_page_views,
+        actions=EXCLUDED.actions, action_values=EXCLUDED.action_values,
         data_importacao=NOW()
     `, [
       TURBO_ACCOUNT_ID, row.campaign_id || null, row.adset_id || null, row.ad_id || null,
@@ -425,6 +433,7 @@ async function syncInsightsDaily(pool: Pool, since: string, until: string): Prom
       p.videoP25, p.videoP50, p.videoP75, p.videoP100,
       p.video3Sec, p.videoThruplay,
       p.conversions, p.landingPageViews, p.uniqueOutboundClicks,
+      JSON.stringify(p.actions), JSON.stringify(p.actionValues),
     ]);
     count++;
   }
