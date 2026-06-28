@@ -8,7 +8,11 @@
 
 - **FIXO** (link da bio): cola **uma vez** no perfil e esquece. `utm_content=site-home`.
 - **POST** (link na publicação): troca o `utm_content` por `{tema}-{aaaa-mm-dd}` a cada post (ex: `creators-2026-06-28`). O `{tema}` é o assunto (`creators`, `ecommerce`, `comercial`, `flash`).
-- **Nunca edite** `utm_source`, `utm_medium` e `utm_term` — são o padrão. Só o `utm_content` muda nos posts.
+- **`utm_campaign`** = a iniciativa. Padrão `always-on` (conteúdo contínuo, sem campanha nomeada). **Troque** quando o post fizer parte de algo:
+  - Lançamento → `lancamento-{produto}-{aaaa-mm}` (ex: `lancamento-creators-2026-06`)
+  - Evento → `{evento}-{aaaa-mm}` (ex: `creator-summit-2026-06`)
+  - SDR conversando em DM → `social-selling` · ManyChat → `automacoes`
+- **Nunca edite** `utm_source`, `utm_medium` e `utm_term` — são o padrão. Nos posts mudam o `utm_content` (sempre) e o `utm_campaign` (quando for campanha).
 
 | Entidade | `utm_medium` |
 |---|---|
