@@ -112,7 +112,7 @@ function deriveCols(mt: OrcRealMetric, p: Pacing) {
   return { perc, desvio, previsao, recalculo };
 }
 
-function OrcRealTable({ sections, pacing }: { sections: OrcRealSection[]; pacing: Pacing }) {
+function OrcRealTable({ sections, pacing, plan = true }: { sections: OrcRealSection[]; pacing: Pacing; plan?: boolean }) {
   return (
     <Table>
       <TableHeader>
@@ -136,7 +136,11 @@ function OrcRealTable({ sections, pacing }: { sections: OrcRealSection[]; pacing
             </TableRow>
             {section.metrics.map((mt) => {
               const inv = !!mt.inverted;
-              const { perc, desvio, previsao, recalculo } = deriveCols(mt, pacing);
+              // plan=false (ex.: Consolidado sem planejamento): zera toda a parte
+              // de orçado/projeção, deixando só o Realizado.
+              const { perc, desvio, previsao, recalculo } = plan
+                ? deriveCols(mt, pacing)
+                : { perc: null, desvio: null, previsao: null, recalculo: null };
               const percColor = perc === null ? "" : inv
                 ? (perc <= 100 ? "text-emerald-600 dark:text-emerald-400" : perc <= 120 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400")
                 : (perc >= 100 ? "text-emerald-600 dark:text-emerald-400" : perc >= 80 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400");
@@ -154,7 +158,7 @@ function OrcRealTable({ sections, pacing }: { sections: OrcRealSection[]; pacing
                     {mt.name}
                     {mt.hint && <span className="ml-2 text-xs text-gray-400 dark:text-zinc-500">({mt.hint})</span>}
                   </TableCell>
-                  <TableCell className="text-right tabular-nums text-gray-600 dark:text-zinc-400">{orcRealFmt(mt.orcado, mt.format)}</TableCell>
+                  <TableCell className="text-right tabular-nums text-gray-600 dark:text-zinc-400">{plan ? orcRealFmt(mt.orcado, mt.format) : "—"}</TableCell>
                   <TableCell className="text-right tabular-nums font-medium text-gray-900 dark:text-white">{orcRealFmt(mt.realizado, mt.format)}</TableCell>
                   <TableCell className={cn("text-right text-sm font-semibold", percColor)}>
                     <div className="flex flex-col items-end gap-0.5">
@@ -186,7 +190,7 @@ function OrcRealTable({ sections, pacing }: { sections: OrcRealSection[]; pacing
 }
 
 // Export CSV/XLSX com as 7 colunas (mesmo layout da aba geral).
-function buildExportRows(sections: OrcRealSection[], pacing: Pacing, mode: "csv" | "xlsx") {
+function buildExportRows(sections: OrcRealSection[], pacing: Pacing, mode: "csv" | "xlsx", plan: boolean) {
   const header = ["Métrica", "Orçado", "Realizado", "% Atingido", "Desvio Meta", "Previsão As Is", "Recálculo Meta"];
   const rows: (string | number | null)[][] = [];
   const dash = mode === "csv" ? "-" : null;
@@ -199,15 +203,17 @@ function buildExportRows(sections: OrcRealSection[], pacing: Pacing, mode: "csv"
   for (const s of sections) {
     rows.push([s.title, "", "", "", "", "", ""]);
     for (const mt of s.metrics) {
-      const { perc, desvio, previsao, recalculo } = deriveCols(mt, pacing);
-      rows.push([mt.name, num(mt.orcado, mt.format), num(mt.realizado, mt.format), plain(perc), sig(desvio), num(previsao, mt.format), sig(recalculo)]);
+      const { perc, desvio, previsao, recalculo } = plan
+        ? deriveCols(mt, pacing)
+        : { perc: null, desvio: null, previsao: null, recalculo: null };
+      rows.push([mt.name, plan ? num(mt.orcado, mt.format) : dash, num(mt.realizado, mt.format), plain(perc), sig(desvio), num(previsao, mt.format), sig(recalculo)]);
     }
     rows.push([]);
   }
   return { header, rows };
 }
-function exportCSV(sections: OrcRealSection[], pacing: Pacing, label: string) {
-  const { header, rows } = buildExportRows(sections, pacing, "csv");
+function exportCSV(sections: OrcRealSection[], pacing: Pacing, label: string, plan = true) {
+  const { header, rows } = buildExportRows(sections, pacing, "csv", plan);
   const csv = [header, ...rows].map((r) => r.map((c) => `"${c ?? ""}"`).join(";")).join("\n");
   const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
   const url = URL.createObjectURL(blob);
@@ -217,9 +223,9 @@ function exportCSV(sections: OrcRealSection[], pacing: Pacing, label: string) {
   a.click();
   URL.revokeObjectURL(url);
 }
-async function exportXLSX(sections: OrcRealSection[], pacing: Pacing, label: string) {
+async function exportXLSX(sections: OrcRealSection[], pacing: Pacing, label: string, plan = true) {
   const XLSX = await import("xlsx");
-  const { header, rows } = buildExportRows(sections, pacing, "xlsx");
+  const { header, rows } = buildExportRows(sections, pacing, "xlsx", plan);
   const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
   ws["!cols"] = [{ wch: 40 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 18 }];
   const wb = XLSX.utils.book_new();
@@ -319,14 +325,13 @@ export default function GrowthCreatorSummit() {
     return { propDias: totalDias > 0 ? elapsed / totalDias : 0, diasRestantes: Math.max(totalDias - elapsed, 0), totalDias };
   })();
 
-  // KPIs do topo (sempre o consolidado). % = realizado ÷ orçado (projeção).
-  const pctOf = (real: number, orc?: number) => (orc && orc > 0 ? (real / orc) * 100 : undefined);
+  // KPIs do topo (sempre o consolidado) — só o valor realizado.
   const kpiCards = cons
     ? [
-        { label: "Investimento", icon: DollarSign, value: formatCurrencyNoDecimals(cons.investimento), ating: pctOf(cons.investimento, co?.investimento) },
-        { label: "Ingressos", icon: Ticket, value: fmtInt(cons.ingressos), ating: pctOf(cons.ingressos, co?.ingressos) },
-        { label: "CPA", icon: Target, value: formatCurrency(cons.cacIngresso), ating: pctOf(cons.cacIngresso, co?.cacIngresso) },
-        { label: "Faturamento", icon: Banknote, value: formatCurrencyNoDecimals(cons.receitaBruta), ating: pctOf(cons.receitaBruta, co?.receitaBruta) },
+        { label: "Investimento", icon: DollarSign, value: formatCurrencyNoDecimals(cons.investimento) },
+        { label: "Ingressos", icon: Ticket, value: fmtInt(cons.ingressos) },
+        { label: "CPA", icon: Target, value: formatCurrency(cons.cacIngresso) },
+        { label: "Faturamento", icon: Banknote, value: formatCurrencyNoDecimals(cons.receitaBruta) },
       ]
     : [];
   // Tabela Orçado x Realizado do consolidado (7 colunas, igual à aba geral).
@@ -409,9 +414,6 @@ export default function GrowthCreatorSummit() {
                       <Icon className="h-4 w-4 text-fuchsia-500" />
                     </div>
                     <div className="mt-2 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{k.value}</div>
-                    <div className="mt-0.5 text-xs text-gray-400 dark:text-zinc-500">
-                      {k.ating !== undefined ? `${formatPercent(k.ating)} do orçado` : " "}
-                    </div>
                   </CardContent>
                 </Card>
               );
@@ -436,27 +438,17 @@ export default function GrowthCreatorSummit() {
                       </Button>
                     </DropdownMenuTrigger>
                     <DropdownMenuContent align="end">
-                      <DropdownMenuItem onClick={() => exportCSV(orcRealSections, pacing, String(data.year))} className="gap-2 cursor-pointer">
+                      <DropdownMenuItem onClick={() => exportCSV(orcRealSections, pacing, String(data.year), false)} className="gap-2 cursor-pointer">
                         <FileText className="w-4 h-4" /> Exportar CSV
                       </DropdownMenuItem>
-                      <DropdownMenuItem onClick={() => exportXLSX(orcRealSections, pacing, String(data.year))} className="gap-2 cursor-pointer">
+                      <DropdownMenuItem onClick={() => exportXLSX(orcRealSections, pacing, String(data.year), false)} className="gap-2 cursor-pointer">
                         <FileSpreadsheet className="w-4 h-4" /> Exportar Excel (.xlsx)
                       </DropdownMenuItem>
                     </DropdownMenuContent>
                   </DropdownMenu>
                 </CardHeader>
-                <CardContent className="overflow-x-auto"><OrcRealTable sections={orcRealSections} pacing={pacing} /></CardContent>
+                <CardContent className="overflow-x-auto"><OrcRealTable sections={orcRealSections} pacing={pacing} plan={false} /></CardContent>
               </Card>
-
-              <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-zinc-400 px-1 rounded-lg bg-fuchsia-50 dark:bg-fuchsia-950/20 p-3">
-                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-fuchsia-500" />
-                <span>
-                  <strong>Orçado = esgotar o evento a ROAS 1</strong> (330 ingressos — 300 PASS + 30 VIP = R$ 161.109 líq. / R$ 179.010 bruto;
-                  investimento = receita líquida; leads pela taxa de conversão atual do consolidado).{" "}
-                  <strong>Desvio Meta / Previsão As Is / Recálculo Meta</strong> usam <em>pacing linear do ano</em> ({pacing.totalDias - pacing.diasRestantes}/{pacing.totalDias} dias)
-                  — só nas métricas de fluxo (investimento, leads, ingressos, receita); em métricas por unidade (CPL, CPA, ticket, ROAS) a previsão não se aplica.
-                </span>
-              </div>
 
               <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
                 <CardHeader className="pb-2">
