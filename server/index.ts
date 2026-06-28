@@ -506,6 +506,83 @@ app.use((req, res, next) => {
   setInterval(() => runInstagramSync(), IG_SYNC_INTERVAL);
   console.log(`[instagram-sync-job] Scheduled every ${IG_SYNC_INTERVAL / 3600000}h`);
 
+  // Instagram — renovação automática de tokens long-lived + alerta de expiração (1x/dia).
+  // Tokens long-lived duram ~60 dias; renovamos proativamente quando faltam <=15 dias.
+  // Token já expirado NÃO é renovável pela Graph API (exige reconexão manual via OAuth) →
+  // geramos notificação in-app de alta prioridade. Sem isso, um token vencido derruba o
+  // sync silenciosamente (só registra em errors[]) e ninguém percebe por semanas.
+  const IG_TOKEN_REFRESH_INTERVAL = 24 * 60 * 60 * 1000; // 24h
+  const runInstagramTokenRefresh = async () => {
+    try {
+      console.log("[instagram-token-refresh] Checking Instagram token expiry...");
+      const { db } = await import("./db");
+      const { eq } = await import("drizzle-orm");
+      const { instagramConnections } = await import("../shared/schema");
+      const { decryptToken, encryptToken } = await import("./utils/encryption");
+      const { refreshLongLivedToken } = await import("./services/instagramSync");
+      const { refreshExpiringTokens, buildExpiryAlert } = await import("./services/instagramTokenRefresh");
+      const { storage } = await import("./storage");
+
+      const rows = await db
+        .select()
+        .from(instagramConnections)
+        .where(eq(instagramConnections.isActive, true));
+
+      const report = await refreshExpiringTokens({
+        now: new Date(),
+        connections: rows.map((c) => ({
+          id: c.id,
+          username: c.username,
+          clienteCnpj: c.clienteCnpj,
+          accessTokenEnc: c.accessToken,
+          tokenExpiresAt: c.tokenExpiresAt ? new Date(c.tokenExpiresAt) : null,
+        })),
+        decrypt: decryptToken,
+        encrypt: encryptToken,
+        refresh: refreshLongLivedToken,
+        persist: async (id, newEnc, newExpiresAt) => {
+          await db
+            .update(instagramConnections)
+            .set({ accessToken: newEnc, tokenExpiresAt: newExpiresAt, updatedAt: new Date() })
+            .where(eq(instagramConnections.id, id));
+        },
+      });
+
+      // Emite alertas in-app (dedup por uniqueKey diária — 1 notificação/conexão/dia)
+      let alertsCreated = 0;
+      for (const alert of report.alerts) {
+        const notif = buildExpiryAlert(alert);
+        if (notif.uniqueKey && (await storage.notificationExists(notif.uniqueKey))) continue;
+        await storage.createNotification(notif);
+        alertsCreated++;
+      }
+
+      (globalThis as any).__instagramTokenRefreshStatus = {
+        lastRun: new Date().toISOString(),
+        status: "ok",
+        refreshed: report.refreshed.length,
+        alerts: report.alerts.length,
+        alertsCreated,
+        healthy: report.healthy,
+      };
+      console.log(
+        `[instagram-token-refresh] Done: ${report.refreshed.length} renovado(s), ` +
+          `${report.alerts.length} alerta(s) (${alertsCreated} novo(s)), ${report.healthy} saudável(is)`,
+      );
+    } catch (err: any) {
+      console.error("[instagram-token-refresh] Failed:", err.message);
+      (globalThis as any).__instagramTokenRefreshStatus = {
+        lastRun: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  // First run 3min após boot (depois do primeiro sync), depois diariamente
+  setTimeout(() => runInstagramTokenRefresh(), 180000);
+  setInterval(() => runInstagramTokenRefresh(), IG_TOKEN_REFRESH_INTERVAL);
+  console.log(`[instagram-token-refresh] Scheduled every ${IG_TOKEN_REFRESH_INTERVAL / 3600000}h`);
+
   // CRM Instagram — coletor de comentários (prospecção/social selling) a cada 6h
   const CRM_IG_COLLECTOR_INTERVAL = 6 * 60 * 60 * 1000; // 6h
   const runCrmIgCollectorJob = async () => {
