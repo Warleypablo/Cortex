@@ -23,11 +23,17 @@ interface MetaBlock {
   receita: number | null; roas: number | null;
   pctLeadCarrinho: number | null; pctCarrinhoVenda: number | null; taxaConversao: number | null;
 }
+interface ConsolidadoOrcado {
+  investimento: number; leads: number; cpl: number; ingressos: number; cacIngresso: number;
+  receitaBruta: number; receitaLiquida: number; ticketMedioLiquido: number;
+  roasBruto: number; roasLiquido: number;
+}
 interface Consolidado {
   investimento: number; leads: number; carrinhoAbandonado: number | null; ingressos: number;
   receitaBruta: number; receitaLiquida: number; cpl: number; cacIngresso: number;
   ticketMedioBruto: number; ticketMedioLiquido: number; roasBruto: number; roasLiquido: number;
   taxaConversao: number;
+  orcado?: ConsolidadoOrcado;
 }
 interface SummitData {
   year: number;
@@ -197,32 +203,34 @@ export default function GrowthCreatorSummit() {
       ]
     : [];
 
+  const co = cons?.orcado;
+  const roasFmt = (n: number) => `${formatDecimal(n)}x`;
   const consSections: Section[] = cons
     ? [
         {
           title: "Marketing",
           rows: [
-            { label: "Investimento", value: formatCurrencyNoDecimals(cons.investimento) },
-            { label: "Leads", value: fmtInt(cons.leads) },
-            { label: "CPL", value: formatCurrency(cons.cpl) },
+            row("Investimento", cons.investimento, formatCurrencyNoDecimals, { orcado: co?.investimento }),
+            row("Leads", cons.leads, fmtInt, { orcado: co?.leads }),
+            row("CPL", cons.cpl, formatCurrency, { orcado: co?.cpl }),
           ],
         },
         {
           title: "Conversão",
           rows: [
-            { label: "Ingressos vendidos", value: fmtInt(cons.ingressos) },
-            { label: "Taxa de conversão (Lead → Ingresso)", value: formatPercent(cons.taxaConversao * 100) },
-            { label: "CAC por ingresso", value: formatCurrency(cons.cacIngresso) },
+            row("Ingressos vendidos", cons.ingressos, fmtInt, { orcado: co?.ingressos }),
+            row("Taxa de conversão (Lead → Ingresso)", cons.taxaConversao * 100, formatPercent),
+            row("CAC por ingresso", cons.cacIngresso, formatCurrency, { orcado: co?.cacIngresso }),
           ],
         },
         {
           title: "Receita",
           rows: [
-            { label: "Receita bruta", value: formatCurrencyNoDecimals(cons.receitaBruta), hint: "valor do comprador" },
-            { label: "Receita líquida", value: formatCurrencyNoDecimals(cons.receitaLiquida), hint: "valor a receber (após taxa Sympla)" },
-            { label: "Ticket médio líquido", value: formatCurrency(cons.ticketMedioLiquido) },
-            { label: "ROAS bruto", value: `${formatDecimal(cons.roasBruto)}x` },
-            { label: "ROAS líquido", value: `${formatDecimal(cons.roasLiquido)}x` },
+            row("Receita bruta", cons.receitaBruta, formatCurrencyNoDecimals, { hint: "valor do comprador", orcado: co?.receitaBruta }),
+            row("Receita líquida", cons.receitaLiquida, formatCurrencyNoDecimals, { hint: "valor a receber (após taxa Sympla)", orcado: co?.receitaLiquida }),
+            row("Ticket médio líquido", cons.ticketMedioLiquido, formatCurrency, { orcado: co?.ticketMedioLiquido }),
+            row("ROAS bruto", cons.roasBruto, roasFmt, { orcado: co?.roasBruto }),
+            row("ROAS líquido", cons.roasLiquido, roasFmt, { orcado: co?.roasLiquido }),
           ],
         },
       ]
@@ -276,6 +284,15 @@ export default function GrowthCreatorSummit() {
                 </CardHeader>
                 <CardContent><MetricsTable sections={consSections} /></CardContent>
               </Card>
+
+              <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-zinc-400 px-1 rounded-lg bg-fuchsia-50 dark:bg-fuchsia-950/20 p-3">
+                <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-fuchsia-500" />
+                <span>
+                  <strong>Orçado = esgotar o evento a ROAS 1.</strong> Meta de vender os 330 ingressos
+                  (300 PASS + 30 VIP = R$ 161.109 líquidos / R$ 179.010 brutos), com investimento = receita líquida
+                  (ROAS 1) e os leads projetados pela taxa de conversão atual do consolidado. <strong>% Ating. = realizado ÷ orçado.</strong>
+                </span>
+              </div>
 
               <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
                 <CardHeader className="pb-2">

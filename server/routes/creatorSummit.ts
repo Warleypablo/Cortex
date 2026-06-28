@@ -9,6 +9,8 @@ import {
   SUMMIT_LEAD_ACTION,
   SUMMIT_CART_ACTION,
   SUMMIT_PURCHASE_ACTION,
+  SUMMIT_CAPACITY,
+  SUMMIT_ROAS_ALVO,
 } from "@shared/produtos";
 import { getSessionsByPlatform } from "../services/ga4Sessions";
 
@@ -213,10 +215,32 @@ export function registerCreatorSummitRoutes(app: Express, db: any) {
         taxaConversao: leads > 0 ? ingressos / leads : 0,
       };
 
+      // ---- Projeção "Orçado" do consolidado: esgotar o evento a ROAS-alvo ----
+      // Mesma régua da aba Meta Ads, mas projetando o funil pela taxa de conversão
+      // do CONSOLIDADO (todos os canais). Orçado = vender os 330 ingressos com
+      // investimento = receita líquida (ROAS 1) e as taxas de conversão atuais.
+      const capIngressos = SUMMIT_CAPACITY.reduce((s, c) => s + c.total, 0);
+      const capReceitaBruta = SUMMIT_CAPACITY.reduce((s, c) => s + c.total * c.preco, 0);
+      const capReceitaLiquida = SUMMIT_CAPACITY.reduce((s, c) => s + c.total * c.precoLiquido, 0);
+      const orcInvest = capReceitaLiquida / SUMMIT_ROAS_ALVO;
+      const orcLeads = consolidado.taxaConversao > 0 ? capIngressos / consolidado.taxaConversao : 0;
+      const orcado = {
+        investimento: orcInvest,
+        leads: orcLeads,
+        cpl: orcLeads > 0 ? orcInvest / orcLeads : 0,
+        ingressos: capIngressos,
+        cacIngresso: capIngressos > 0 ? orcInvest / capIngressos : 0,
+        receitaBruta: capReceitaBruta,
+        receitaLiquida: capReceitaLiquida,
+        ticketMedioLiquido: capIngressos > 0 ? capReceitaLiquida / capIngressos : 0,
+        roasBruto: orcInvest > 0 ? capReceitaBruta / orcInvest : 0,
+        roasLiquido: SUMMIT_ROAS_ALVO,
+      };
+
       res.json({
         year,
         meta,
-        consolidado,
+        consolidado: { ...consolidado, orcado },
         porTipo,
         premissaPreco: SUMMIT_TICKET_TYPES.map((t) => ({
           label: t.label,
