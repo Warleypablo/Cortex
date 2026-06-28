@@ -117,7 +117,11 @@ END`;
  * source (ex: linkedin_ads e linkedin → 'linkedin'); o medium é quem distingue.
  */
 const SOURCE_CANON_SQL = `CASE
-  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound')
+  -- Referral com source fora do vocabulário canônico (ex: 'noway' = nome do cliente que indicou)
+  -- vira 'cliente'; o nome cru do indicador fica no nível de campanha.
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('cliente','colaborador','afiliado','influencer','marketplace') THEN LOWER(TRIM(utm_source))
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) = 'referral' THEN 'cliente'
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','outbound')
        AND NULLIF(LOWER(TRIM(COALESCE(utm_source, ''))), '') IS NOT NULL THEN LOWER(TRIM(utm_source))
   WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
