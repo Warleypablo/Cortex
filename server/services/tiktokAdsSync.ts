@@ -269,8 +269,9 @@ export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsRes
     }
 
     await pool.query(
-      `UPDATE tiktok.sync_runs SET status=$2, rows_upserted=$3, finished_at=NOW() WHERE id=$1`,
-      [runId, result.errors.length ? 'partial' : 'ok', result.metricRows],
+      `UPDATE tiktok.sync_runs SET status=$2, rows_upserted=$3, error=$4, finished_at=NOW() WHERE id=$1`,
+      [runId, result.errors.length ? 'partial' : 'ok', result.metricRows,
+       result.errors.length ? result.errors.join(' | ').slice(0, 2000) : null],
     );
   } catch (err: any) {
     result.errors.push(err.message);
