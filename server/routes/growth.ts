@@ -2266,6 +2266,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const ma = await db.execute(sql`SELECT ad_id::text AS id, ad_name FROM meta_ads.meta_ads`);
         for (const r of ma.rows as any[]) if (r.ad_name) metaAdNames.set(r.id, r.ad_name);
       } catch (e) { /* schema meta_ads ausente → mantém IDs */ }
+      // TikTok: term=adgroup_id (sufixo "-TikTok"), content=ad_id. Campanha NÃO tem nome no banco
+      // (sync não traz tabela de campanhas), então campaign continua como ID.
+      const tiktokAdsetNames = new Map<string, string>();
+      const tiktokAdNames = new Map<string, string>();
+      try {
+        const ts = await db.execute(sql`SELECT adgroup_id::text AS id, adgroup_name FROM tiktok.ad_groups`);
+        for (const r of ts.rows as any[]) if (r.adgroup_name) tiktokAdsetNames.set(r.id, r.adgroup_name);
+        const ta = await db.execute(sql`SELECT ad_id::text AS id, ad_name FROM tiktok.ads`);
+        for (const r of ta.rows as any[]) if (r.ad_name) tiktokAdNames.set(r.id, r.ad_name);
+      } catch (e) { /* schema tiktok ausente → mantém IDs */ }
 
       // Extrai o ID numérico líder (Meta usa sufixos tipo "1203...450-Instagram_Feed").
       const leadingId = (v: string): string => { const m = String(v).match(/^(\d{5,})/); return m ? m[1] : ''; };
@@ -2281,6 +2291,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           if (level === 'campaign') return metaCampNames.get(id) || raw;
           if (level === 'term') return metaAdsetNames.get(id) || raw;
           if (level === 'content') return metaAdNames.get(id) || raw;
+        }
+        if (source === 'tiktok') {
+          if (level === 'term') return tiktokAdsetNames.get(id) || raw; // conjunto
+          if (level === 'content') return tiktokAdNames.get(id) || raw; // anúncio
+          return raw; // campaign: TikTok não sincroniza nome de campanha → fica o ID
         }
         return raw;
       };
