@@ -6,8 +6,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
-import { Loader2, PartyPopper, Info } from "lucide-react";
-import { formatCurrency, formatCurrencyNoDecimals, formatDecimal, formatPercent } from "@/lib/utils";
+import { Button } from "@/components/ui/button";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { Loader2, PartyPopper, Info, DollarSign, Ticket, Target, Banknote, Download, FileText, FileSpreadsheet } from "lucide-react";
+import { differenceInCalendarDays } from "date-fns";
+import { formatCurrency, formatCurrencyNoDecimals, formatDecimal, formatPercent, cn } from "@/lib/utils";
 import { SUMMIT_CAPACITY, SUMMIT_ROAS_ALVO } from "@shared/produtos";
 
 interface PorTipo {
@@ -110,6 +113,185 @@ function MetricsTable({ sections }: { sections: Section[] }) {
   );
 }
 
+// ===== Tabela "Orçado x Realizado" (replica a aba geral) =====
+type MetricKind = "flow" | "ratio" | "percent";
+type MetricFormat = "currency" | "number" | "percent" | "ratio";
+interface OrcRealMetric {
+  name: string;
+  realizado: number | null;
+  orcado: number | null;
+  format: MetricFormat;
+  kind: MetricKind; // flow = acumula no tempo (pacing); ratio/percent = valor por unidade
+  inverted?: boolean; // menor é melhor (CPL, CPA)
+  hint?: string;
+}
+interface OrcRealSection { title: string; metrics: OrcRealMetric[] }
+interface Pacing { propDias: number; diasRestantes: number; totalDias: number }
+
+function orcRealFmt(v: number | null, f: MetricFormat): string {
+  if (v === null || !isFinite(v)) return "-";
+  switch (f) {
+    case "currency": return formatCurrency(v);
+    case "percent": return `${(v * 100).toFixed(2)}%`;
+    case "ratio": return `${formatDecimal(v)}x`;
+    case "number": return new Intl.NumberFormat("pt-BR").format(Math.round(v));
+    default: return "-";
+  }
+}
+
+// Fórmulas idênticas à aba Orçado x Realizado.
+function calcPercentual(orcado: number | null, realizado: number | null): number | null {
+  if (orcado === null || realizado === null || orcado === 0) return null;
+  return (realizado / orcado) * 100;
+}
+function calcDesvioMeta(orcado: number | null, realizado: number | null, propDias: number): number | null {
+  if (orcado === null || realizado === null || orcado === 0 || propDias === 0) return null;
+  const esperado = orcado * propDias;
+  return ((realizado - esperado) / esperado) * 100;
+}
+function calcPrevisaoAsIs(realizado: number | null, propDias: number): number | null {
+  if (realizado === null || propDias === 0) return null;
+  return realizado / propDias;
+}
+function calcRecalculoMeta(orcado: number | null, realizado: number | null, diasRestantes: number, totalDias: number): number | null {
+  if (orcado === null || realizado === null || orcado === 0 || totalDias === 0 || diasRestantes <= 0) return null;
+  const falta = orcado - realizado;
+  if (falta <= 0) return 0;
+  const esperadoNoRestante = orcado * (diasRestantes / totalDias);
+  if (esperadoNoRestante === 0) return null;
+  return (falta / esperadoNoRestante - 1) * 100;
+}
+
+// Calcula as 4 colunas derivadas de uma métrica. flow usa pacing no tempo;
+// ratio/percent usam comparação simples (não faz sentido projetar run-rate).
+function deriveCols(mt: OrcRealMetric, p: Pacing) {
+  const isFlow = mt.kind === "flow";
+  const perc = calcPercentual(mt.orcado, mt.realizado);
+  const desvio = isFlow
+    ? calcDesvioMeta(mt.orcado, mt.realizado, p.propDias)
+    : (mt.orcado !== null && mt.realizado !== null && mt.orcado !== 0
+        ? ((mt.realizado - mt.orcado) / mt.orcado) * 100
+        : null);
+  const previsao = isFlow ? calcPrevisaoAsIs(mt.realizado, p.propDias) : null;
+  const recalculo = isFlow ? calcRecalculoMeta(mt.orcado, mt.realizado, p.diasRestantes, p.totalDias) : null;
+  return { perc, desvio, previsao, recalculo };
+}
+
+function OrcRealTable({ sections, pacing }: { sections: OrcRealSection[]; pacing: Pacing }) {
+  return (
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Métrica</TableHead>
+          <TableHead className="text-right">Orçado</TableHead>
+          <TableHead className="text-right">Realizado</TableHead>
+          <TableHead className="text-right">% Atingido</TableHead>
+          <TableHead className="text-right">Desvio Meta</TableHead>
+          <TableHead className="text-right">Previsão As Is</TableHead>
+          <TableHead className="text-right">Recálculo Meta</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {sections.map((section) => (
+          <Fragment key={section.title}>
+            <TableRow className="bg-muted/50 border-l-4 border-l-primary/40">
+              <TableCell colSpan={7} className="text-xs font-semibold uppercase tracking-wide py-2.5 text-muted-foreground">
+                {section.title}
+              </TableCell>
+            </TableRow>
+            {section.metrics.map((mt) => {
+              const inv = !!mt.inverted;
+              const { perc, desvio, previsao, recalculo } = deriveCols(mt, pacing);
+              const percColor = perc === null ? "" : inv
+                ? (perc <= 100 ? "text-emerald-600 dark:text-emerald-400" : perc <= 120 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400")
+                : (perc >= 100 ? "text-emerald-600 dark:text-emerald-400" : perc >= 80 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400");
+              const barColor = perc === null ? "bg-muted" : inv
+                ? (perc <= 100 ? "bg-emerald-500" : perc <= 120 ? "bg-amber-500" : "bg-red-500")
+                : (perc >= 100 ? "bg-emerald-500" : perc >= 80 ? "bg-amber-500" : "bg-red-500");
+              const desvioColor = desvio === null ? "" : inv
+                ? (desvio <= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400")
+                : (desvio >= 0 ? "text-emerald-600 dark:text-emerald-400" : "text-red-600 dark:text-red-400");
+              const recalcColor = recalculo === null ? "" : recalculo <= 0
+                ? "text-emerald-600 dark:text-emerald-400" : recalculo <= 30 ? "text-amber-600 dark:text-amber-400" : "text-red-600 dark:text-red-400";
+              return (
+                <TableRow key={mt.name}>
+                  <TableCell className="text-gray-900 dark:text-white">
+                    {mt.name}
+                    {mt.hint && <span className="ml-2 text-xs text-gray-400 dark:text-zinc-500">({mt.hint})</span>}
+                  </TableCell>
+                  <TableCell className="text-right tabular-nums text-gray-600 dark:text-zinc-400">{orcRealFmt(mt.orcado, mt.format)}</TableCell>
+                  <TableCell className="text-right tabular-nums font-medium text-gray-900 dark:text-white">{orcRealFmt(mt.realizado, mt.format)}</TableCell>
+                  <TableCell className={cn("text-right text-sm font-semibold", percColor)}>
+                    <div className="flex flex-col items-end gap-0.5">
+                      <span>{perc !== null ? `${perc.toFixed(1)}%` : "-"}</span>
+                      {perc !== null && (
+                        <div className="w-12 h-1 bg-muted rounded-full overflow-hidden">
+                          <div className={cn("h-full rounded-full", barColor)} style={{ width: `${Math.min(inv ? 200 - perc : perc, 100)}%` }} />
+                        </div>
+                      )}
+                    </div>
+                  </TableCell>
+                  <TableCell className={cn("text-right text-sm font-semibold", desvioColor)}>
+                    {desvio !== null ? `${desvio >= 0 ? "+" : ""}${desvio.toFixed(1)}%` : "-"}
+                  </TableCell>
+                  <TableCell className="text-right text-sm font-medium tabular-nums">
+                    {previsao !== null ? orcRealFmt(previsao, mt.format) : "-"}
+                  </TableCell>
+                  <TableCell className={cn("text-right text-sm font-semibold", recalcColor)}>
+                    {recalculo !== null ? `${recalculo >= 0 ? "+" : ""}${recalculo.toFixed(1)}%` : "-"}
+                  </TableCell>
+                </TableRow>
+              );
+            })}
+          </Fragment>
+        ))}
+      </TableBody>
+    </Table>
+  );
+}
+
+// Export CSV/XLSX com as 7 colunas (mesmo layout da aba geral).
+function buildExportRows(sections: OrcRealSection[], pacing: Pacing, mode: "csv" | "xlsx") {
+  const header = ["Métrica", "Orçado", "Realizado", "% Atingido", "Desvio Meta", "Previsão As Is", "Recálculo Meta"];
+  const rows: (string | number | null)[][] = [];
+  const dash = mode === "csv" ? "-" : null;
+  const num = (v: number | null, f: MetricFormat) =>
+    v === null || !isFinite(v) ? dash : mode === "xlsx" ? v : orcRealFmt(v, f);
+  const sig = (v: number | null) =>
+    v === null ? dash : mode === "xlsx" ? v / 100 : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
+  const plain = (v: number | null) =>
+    v === null ? dash : mode === "xlsx" ? v / 100 : `${v.toFixed(1)}%`;
+  for (const s of sections) {
+    rows.push([s.title, "", "", "", "", "", ""]);
+    for (const mt of s.metrics) {
+      const { perc, desvio, previsao, recalculo } = deriveCols(mt, pacing);
+      rows.push([mt.name, num(mt.orcado, mt.format), num(mt.realizado, mt.format), plain(perc), sig(desvio), num(previsao, mt.format), sig(recalculo)]);
+    }
+    rows.push([]);
+  }
+  return { header, rows };
+}
+function exportCSV(sections: OrcRealSection[], pacing: Pacing, label: string) {
+  const { header, rows } = buildExportRows(sections, pacing, "csv");
+  const csv = [header, ...rows].map((r) => r.map((c) => `"${c ?? ""}"`).join(";")).join("\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = `CreatorSummit_OrcadoRealizado_${label}.csv`;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+async function exportXLSX(sections: OrcRealSection[], pacing: Pacing, label: string) {
+  const XLSX = await import("xlsx");
+  const { header, rows } = buildExportRows(sections, pacing, "xlsx");
+  const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+  ws["!cols"] = [{ wch: 40 }, { wch: 16 }, { wch: 16 }, { wch: 14 }, { wch: 14 }, { wch: 18 }, { wch: 18 }];
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, "Consolidado");
+  XLSX.writeFile(wb, `CreatorSummit_OrcadoRealizado_${label}.xlsx`);
+}
+
 export default function GrowthCreatorSummit() {
   usePageTitle("Creator Summit");
   useSetPageInfo("Creator Summit", "Funil do evento (pipeline de Eventos) — Meta Ads e consolidado");
@@ -204,33 +386,56 @@ export default function GrowthCreatorSummit() {
     : [];
 
   const co = cons?.orcado;
-  const roasFmt = (n: number) => `${formatDecimal(n)}x`;
-  const consSections: Section[] = cons
+
+  // Pacing no tempo (fração do ANO decorrida) — base das colunas Desvio/Previsão/Recálculo.
+  const pacing: Pacing = (() => {
+    const today = new Date();
+    const start = new Date(year, 0, 1);
+    const end = new Date(year, 11, 31);
+    const totalDias = differenceInCalendarDays(end, start) + 1;
+    const elapsed = Math.min(Math.max(differenceInCalendarDays(today, start) + 1, 0), totalDias);
+    return { propDias: totalDias > 0 ? elapsed / totalDias : 0, diasRestantes: Math.max(totalDias - elapsed, 0), totalDias };
+  })();
+
+  // KPIs do topo (sempre o consolidado). % = realizado ÷ orçado (projeção).
+  const pctOf = (real: number, orc?: number) => (orc && orc > 0 ? (real / orc) * 100 : undefined);
+  const kpiCards = cons
+    ? [
+        { label: "Investimento", icon: DollarSign, value: formatCurrencyNoDecimals(cons.investimento), ating: pctOf(cons.investimento, co?.investimento) },
+        { label: "Ingressos", icon: Ticket, value: fmtInt(cons.ingressos), ating: pctOf(cons.ingressos, co?.ingressos) },
+        { label: "CPA", icon: Target, value: formatCurrency(cons.cacIngresso), ating: pctOf(cons.cacIngresso, co?.cacIngresso) },
+        { label: "Faturamento", icon: Banknote, value: formatCurrencyNoDecimals(cons.receitaBruta), ating: pctOf(cons.receitaBruta, co?.receitaBruta) },
+      ]
+    : [];
+  // Tabela Orçado x Realizado do consolidado (7 colunas, igual à aba geral).
+  // kind: flow = acumula no tempo (pacing aplicável); ratio/percent = valor por
+  // unidade (Previsão/Recálculo não se aplicam → "-").
+  const orcRealSections: OrcRealSection[] = cons
     ? [
         {
           title: "Marketing",
-          rows: [
-            row("Investimento", cons.investimento, formatCurrencyNoDecimals, { orcado: co?.investimento }),
-            row("Leads", cons.leads, fmtInt, { orcado: co?.leads }),
-            row("CPL", cons.cpl, formatCurrency, { orcado: co?.cpl }),
+          metrics: [
+            { name: "Investimento", realizado: cons.investimento, orcado: co?.investimento ?? null, format: "currency", kind: "flow" },
+            { name: "Leads", realizado: cons.leads, orcado: co?.leads ?? null, format: "number", kind: "flow" },
+            { name: "CPL", realizado: cons.cpl, orcado: co?.cpl ?? null, format: "currency", kind: "ratio", inverted: true },
           ],
         },
         {
           title: "Conversão",
-          rows: [
-            row("Ingressos vendidos", cons.ingressos, fmtInt, { orcado: co?.ingressos }),
-            row("Taxa de conversão (Lead → Ingresso)", cons.taxaConversao * 100, formatPercent),
-            row("CAC por ingresso", cons.cacIngresso, formatCurrency, { orcado: co?.cacIngresso }),
+          metrics: [
+            { name: "Ingressos vendidos", realizado: cons.ingressos, orcado: co?.ingressos ?? null, format: "number", kind: "flow" },
+            { name: "Taxa de conversão (Lead → Ingresso)", realizado: cons.taxaConversao, orcado: null, format: "percent", kind: "percent" },
+            { name: "CPA", realizado: cons.cacIngresso, orcado: co?.cacIngresso ?? null, format: "currency", kind: "ratio", inverted: true, hint: "custo por ingresso" },
           ],
         },
         {
           title: "Receita",
-          rows: [
-            row("Receita bruta", cons.receitaBruta, formatCurrencyNoDecimals, { hint: "valor do comprador", orcado: co?.receitaBruta }),
-            row("Receita líquida", cons.receitaLiquida, formatCurrencyNoDecimals, { hint: "valor a receber (após taxa Sympla)", orcado: co?.receitaLiquida }),
-            row("Ticket médio líquido", cons.ticketMedioLiquido, formatCurrency, { orcado: co?.ticketMedioLiquido }),
-            row("ROAS bruto", cons.roasBruto, roasFmt, { orcado: co?.roasBruto }),
-            row("ROAS líquido", cons.roasLiquido, roasFmt, { orcado: co?.roasLiquido }),
+          metrics: [
+            { name: "Receita bruta", realizado: cons.receitaBruta, orcado: co?.receitaBruta ?? null, format: "currency", kind: "flow", hint: "valor do comprador" },
+            { name: "Receita líquida", realizado: cons.receitaLiquida, orcado: co?.receitaLiquida ?? null, format: "currency", kind: "flow", hint: "após taxa Sympla" },
+            { name: "Ticket médio líquido", realizado: cons.ticketMedioLiquido, orcado: co?.ticketMedioLiquido ?? null, format: "currency", kind: "ratio" },
+            { name: "ROAS bruto", realizado: cons.roasBruto, orcado: co?.roasBruto ?? null, format: "ratio", kind: "ratio" },
+            { name: "ROAS líquido", realizado: cons.roasLiquido, orcado: co?.roasLiquido ?? null, format: "ratio", kind: "ratio" },
           ],
         },
       ]
@@ -270,6 +475,27 @@ export default function GrowthCreatorSummit() {
 
       {data && m && cons && (
         <>
+          {/* KPIs do topo (consolidado) */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            {kpiCards.map((k) => {
+              const Icon = k.icon;
+              return (
+                <Card key={k.label} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+                  <CardContent className="p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-medium uppercase tracking-wide text-gray-500 dark:text-zinc-400">{k.label}</span>
+                      <Icon className="h-4 w-4 text-fuchsia-500" />
+                    </div>
+                    <div className="mt-2 text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{k.value}</div>
+                    <div className="mt-0.5 text-xs text-gray-400 dark:text-zinc-500">
+                      {k.ating !== undefined ? `${formatPercent(k.ating)} do orçado` : " "}
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
+          </div>
+
           <Tabs defaultValue="consolidado">
             <TabsList>
               <TabsTrigger value="consolidado">Consolidado</TabsTrigger>
@@ -279,18 +505,34 @@ export default function GrowthCreatorSummit() {
             {/* ---- Consolidado ---- */}
             <TabsContent value="consolidado" className="space-y-6 mt-4">
               <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 space-y-0">
                   <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Métricas — {data.year} (todos os canais)</CardTitle>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Download className="w-4 h-4" /> Exportar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => exportCSV(orcRealSections, pacing, String(data.year))} className="gap-2 cursor-pointer">
+                        <FileText className="w-4 h-4" /> Exportar CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => exportXLSX(orcRealSections, pacing, String(data.year))} className="gap-2 cursor-pointer">
+                        <FileSpreadsheet className="w-4 h-4" /> Exportar Excel (.xlsx)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </CardHeader>
-                <CardContent><MetricsTable sections={consSections} /></CardContent>
+                <CardContent className="overflow-x-auto"><OrcRealTable sections={orcRealSections} pacing={pacing} /></CardContent>
               </Card>
 
               <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-zinc-400 px-1 rounded-lg bg-fuchsia-50 dark:bg-fuchsia-950/20 p-3">
                 <Info className="h-3.5 w-3.5 mt-0.5 shrink-0 text-fuchsia-500" />
                 <span>
-                  <strong>Orçado = esgotar o evento a ROAS 1.</strong> Meta de vender os 330 ingressos
-                  (300 PASS + 30 VIP = R$ 161.109 líquidos / R$ 179.010 brutos), com investimento = receita líquida
-                  (ROAS 1) e os leads projetados pela taxa de conversão atual do consolidado. <strong>% Ating. = realizado ÷ orçado.</strong>
+                  <strong>Orçado = esgotar o evento a ROAS 1</strong> (330 ingressos — 300 PASS + 30 VIP = R$ 161.109 líq. / R$ 179.010 bruto;
+                  investimento = receita líquida; leads pela taxa de conversão atual do consolidado).{" "}
+                  <strong>Desvio Meta / Previsão As Is / Recálculo Meta</strong> usam <em>pacing linear do ano</em> ({pacing.totalDias - pacing.diasRestantes}/{pacing.totalDias} dias)
+                  — só nas métricas de fluxo (investimento, leads, ingressos, receita); em métricas por unidade (CPL, CPA, ticket, ROAS) a previsão não se aplica.
                 </span>
               </div>
 
