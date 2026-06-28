@@ -89,7 +89,7 @@ END`;
 const MEDIUM_CASE_SQL = `CASE
   -- Sources de indicação são sempre referral, mesmo com utm_medium errado (ex: cliente tagueado como 'organic').
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('cliente','colaborador','afiliado','influencer','marketplace') THEN 'referral'
-  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound') THEN LOWER(TRIM(utm_medium))
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound','victor','andre','rodrigo') THEN LOWER(TRIM(utm_medium))
   WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'organic'
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'organic'
   WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'organic'
@@ -121,7 +121,7 @@ const SOURCE_CANON_SQL = `CASE
   -- vira 'cliente'; o nome cru do indicador fica no nível de campanha.
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('cliente','colaborador','afiliado','influencer','marketplace') THEN LOWER(TRIM(utm_source))
   WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) = 'referral' THEN 'cliente'
-  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','outbound')
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','outbound','victor','andre','rodrigo')
        AND NULLIF(LOWER(TRIM(COALESCE(utm_source, ''))), '') IS NOT NULL THEN LOWER(TRIM(utm_source))
   WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
@@ -2307,10 +2307,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // ---- Montar árvore: medium → source → campaign → term → content ----
       const MEDIUM_LABELS: Record<string, string> = {
-        paid: 'Mídia Paga', organic: 'Orgânico', crm: 'CRM',
-        eventos: 'Eventos', referral: 'Referral', outbound: 'Outbound', outros: 'Outros',
+        paid: 'Mídia Paga', organic: 'Orgânico',
+        victor: 'Victor (canal próprio)', andre: 'André (canal próprio)', rodrigo: 'Rodrigo (canal próprio)',
+        crm: 'CRM', eventos: 'Eventos', referral: 'Referral', outbound: 'Outbound', outros: 'Outros',
       };
-      const MEDIUM_ORDER = ['paid', 'organic', 'crm', 'eventos', 'referral', 'outbound', 'outros'];
+      // Sócios (figuras-exceção) entram logo após Orgânico — dimensão de 1ª ordem (Constituição UTM §3.7).
+      const MEDIUM_ORDER = ['paid', 'organic', 'victor', 'andre', 'rodrigo', 'crm', 'eventos', 'referral', 'outbound', 'outros'];
       const mediumOrderOf = (m: string) => { const i = MEDIUM_ORDER.indexOf(m); return i >= 0 ? i : 998; };
       const sourceLabel = (s: string): string =>
         UTM_SOURCE_LABELS[s]
