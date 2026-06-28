@@ -48,71 +48,6 @@ interface SummitData {
 
 const fmtInt = (n: number) => new Intl.NumberFormat("pt-BR").format(Math.round(n));
 
-interface Row {
-  label: string;
-  value?: string;        // realizado (formatado)
-  pending?: string;      // se realizado indisponível
-  hint?: string;
-  orcado?: string;       // orçado/projeção (formatado)
-  atingimento?: number;  // % = realizado ÷ orçado × 100
-}
-interface Section { title: string; rows: Row[] }
-
-function MetricsTable({ sections }: { sections: Section[] }) {
-  const hasOrcado = sections.some((s) => s.rows.some((r) => r.orcado !== undefined));
-  const colSpan = hasOrcado ? 4 : 2;
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Métrica</TableHead>
-          <TableHead className="text-right">Realizado</TableHead>
-          {hasOrcado && <TableHead className="text-right">Orçado</TableHead>}
-          {hasOrcado && <TableHead className="text-right">% Ating.</TableHead>}
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {sections.map((section) => (
-          <Fragment key={section.title}>
-            <TableRow className="bg-muted/50 border-l-4 border-l-primary/40">
-              <TableCell colSpan={colSpan} className="text-xs font-semibold uppercase tracking-wide py-2.5 text-muted-foreground">
-                {section.title}
-              </TableCell>
-            </TableRow>
-            {section.rows.map((row) => (
-              <TableRow key={row.label}>
-                <TableCell className="text-gray-900 dark:text-white">
-                  {row.label}
-                  {row.hint && (
-                    <span className="ml-2 text-xs text-gray-400 dark:text-zinc-500">({row.hint})</span>
-                  )}
-                </TableCell>
-                <TableCell className="text-right tabular-nums font-medium">
-                  {row.pending !== undefined ? (
-                    <span className="text-xs text-amber-600 dark:text-amber-400">{row.pending}</span>
-                  ) : (
-                    row.value
-                  )}
-                </TableCell>
-                {hasOrcado && (
-                  <TableCell className="text-right tabular-nums text-gray-600 dark:text-zinc-400">
-                    {row.orcado ?? "—"}
-                  </TableCell>
-                )}
-                {hasOrcado && (
-                  <TableCell className="text-right tabular-nums text-xs text-gray-500 dark:text-zinc-500">
-                    {row.atingimento !== undefined ? formatPercent(row.atingimento) : ""}
-                  </TableCell>
-                )}
-              </TableRow>
-            ))}
-          </Fragment>
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
-
 // ===== Tabela "Orçado x Realizado" (replica a aba geral) =====
 type MetricKind = "flow" | "ratio" | "percent";
 type MetricFormat = "currency" | "number" | "percent" | "ratio";
@@ -312,22 +247,6 @@ export default function GrowthCreatorSummit() {
   const m = data?.meta;
   const cons = data?.consolidado;
 
-  const pend = "pendente: integração pixel";
-  // Cria a linha. opts.orcado adiciona a projeção + % de atingimento (real ÷ orçado).
-  const row = (
-    label: string,
-    v: number | null,
-    fmt: (n: number) => string,
-    opts?: { hint?: string; orcado?: number },
-  ): Row => {
-    const r: Row = v === null ? { label, pending: pend } : { label, value: fmt(v) };
-    if (opts?.hint) r.hint = opts.hint;
-    if (opts?.orcado !== undefined) {
-      r.orcado = fmt(opts.orcado);
-      if (v !== null && opts.orcado > 0) r.atingimento = (v / opts.orcado) * 100;
-    }
-    return r;
-  };
   const custoVenda = m && m.vendas ? m.investimento / m.vendas : null;
   const custoCarrinho = m && m.carrinhoAbandonado ? m.investimento / m.carrinhoAbandonado : null;
 
@@ -351,35 +270,38 @@ export default function GrowthCreatorSummit() {
         })()
       : null;
 
-  const metaSections: Section[] = m
+  // percent-fração: o bloco Meta guarda % já multiplicado (1,08 = 1,08%);
+  // a OrcRealTable espera fração (0,0108). Converte (preserva null = pendente).
+  const pf = (v: number | null) => (v == null ? null : v / 100);
+  const metaOrcRealSections: OrcRealSection[] = m
     ? [
         {
           title: "Mídia",
-          rows: [
-            row("Investimento", m.investimento, formatCurrencyNoDecimals, { orcado: proj?.invest }),
-            { label: "CPM", value: formatCurrency(m.cpm) },
-            { label: "CTR de saída", value: formatPercent(m.ctr) },
-            { label: "CTR de saída único", value: formatPercent(m.ctrUnico) },
-            { label: "Connect Rate", value: formatPercent(m.connectRate), hint: "VdP ÷ cliques de saída" },
-            { label: "Sessões", value: fmtInt(m.sessoes), hint: "GA4" },
-            row("Tx conversão de página (por VdP)", m.txConversaoVdP, formatPercent, { hint: "leads ÷ VdP" }),
-            row("Tx conversão de página (por sessões)", m.txConversaoSessoes, formatPercent, { hint: "leads ÷ sessões" }),
+          metrics: [
+            { name: "Investimento", realizado: m.investimento, orcado: proj?.invest ?? null, format: "currency", kind: "flow" },
+            { name: "CPM", realizado: m.cpm, orcado: null, format: "currency", kind: "ratio" },
+            { name: "CTR de saída", realizado: pf(m.ctr), orcado: null, format: "percent", kind: "percent" },
+            { name: "CTR de saída único", realizado: pf(m.ctrUnico), orcado: null, format: "percent", kind: "percent" },
+            { name: "Connect Rate", realizado: pf(m.connectRate), orcado: null, format: "percent", kind: "percent", hint: "VdP ÷ cliques de saída" },
+            { name: "Sessões", realizado: m.sessoes, orcado: null, format: "number", kind: "flow", hint: "GA4" },
+            { name: "Tx conversão de página (por VdP)", realizado: pf(m.txConversaoVdP), orcado: null, format: "percent", kind: "percent", hint: "leads ÷ VdP" },
+            { name: "Tx conversão de página (por sessões)", realizado: pf(m.txConversaoSessoes), orcado: null, format: "percent", kind: "percent", hint: "leads ÷ sessões" },
           ],
         },
         {
           title: "Funil (atribuição do pixel)",
-          rows: [
-            row("Leads", m.leads, fmtInt, { hint: "evento Lead - Summit ES", orcado: proj?.leads }),
-            row("Custo por lead", m.cpl, formatCurrency, { orcado: proj?.cpl }),
-            row("% Lead → Carrinho", m.pctLeadCarrinho, formatPercent),
-            row("Carrinho abandonado", m.carrinhoAbandonado, fmtInt, { hint: "InitiateCheckout", orcado: proj?.carrinho }),
-            row("Custo por carrinho abandonado", custoCarrinho, formatCurrency, { orcado: proj?.custoCarrinho }),
-            row("% Carrinho → Venda", m.pctCarrinhoVenda, formatPercent),
-            row("Vendas", m.vendas, fmtInt, { hint: "Compra - Creators Summit ES", orcado: proj?.ingressos }),
-            row("Custo por venda", custoVenda, formatCurrency, { orcado: proj?.cac }),
-            row("Taxa de conversão (Lead → Venda)", m.taxaConversao, formatPercent),
-            row("Receita", m.receita, formatCurrencyNoDecimals, { orcado: proj?.receita }),
-            row("ROAS", m.roas, (n) => `${formatDecimal(n)}x`, { orcado: proj?.roas }),
+          metrics: [
+            { name: "Leads", realizado: m.leads, orcado: proj?.leads ?? null, format: "number", kind: "flow", hint: "evento Lead - Summit ES" },
+            { name: "Custo por lead", realizado: m.cpl, orcado: proj?.cpl ?? null, format: "currency", kind: "ratio", inverted: true },
+            { name: "% Lead → Carrinho", realizado: pf(m.pctLeadCarrinho), orcado: null, format: "percent", kind: "percent" },
+            { name: "Carrinho abandonado", realizado: m.carrinhoAbandonado, orcado: proj?.carrinho ?? null, format: "number", kind: "flow", hint: "InitiateCheckout" },
+            { name: "Custo por carrinho abandonado", realizado: custoCarrinho, orcado: proj?.custoCarrinho ?? null, format: "currency", kind: "ratio", inverted: true },
+            { name: "% Carrinho → Venda", realizado: pf(m.pctCarrinhoVenda), orcado: null, format: "percent", kind: "percent" },
+            { name: "Vendas", realizado: m.vendas, orcado: proj?.ingressos ?? null, format: "number", kind: "flow", hint: "Compra - Creators Summit ES" },
+            { name: "Custo por venda", realizado: custoVenda, orcado: proj?.cac ?? null, format: "currency", kind: "ratio", inverted: true },
+            { name: "Taxa de conversão (Lead → Venda)", realizado: pf(m.taxaConversao), orcado: null, format: "percent", kind: "percent" },
+            { name: "Receita", realizado: m.receita, orcado: proj?.receita ?? null, format: "currency", kind: "flow" },
+            { name: "ROAS", realizado: m.roas, orcado: proj?.roas ?? null, format: "ratio", kind: "ratio" },
           ],
         },
       ]
@@ -580,10 +502,25 @@ export default function GrowthCreatorSummit() {
             {/* ---- Meta Ads ---- */}
             <TabsContent value="meta" className="space-y-6 mt-4">
               <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-                <CardHeader className="pb-2">
+                <CardHeader className="pb-2 flex flex-row items-center justify-between gap-2 space-y-0">
                   <CardTitle className="text-sm font-semibold text-gray-900 dark:text-white">Métricas Meta Ads — {data.year}</CardTitle>
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button variant="outline" size="sm" className="gap-2">
+                        <Download className="w-4 h-4" /> Exportar
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="end">
+                      <DropdownMenuItem onClick={() => exportCSV(metaOrcRealSections, pacing, `${data.year}_MetaAds`)} className="gap-2 cursor-pointer">
+                        <FileText className="w-4 h-4" /> Exportar CSV
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onClick={() => exportXLSX(metaOrcRealSections, pacing, `${data.year}_MetaAds`)} className="gap-2 cursor-pointer">
+                        <FileSpreadsheet className="w-4 h-4" /> Exportar Excel (.xlsx)
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 </CardHeader>
-                <CardContent><MetricsTable sections={metaSections} /></CardContent>
+                <CardContent className="overflow-x-auto"><OrcRealTable sections={metaOrcRealSections} pacing={pacing} /></CardContent>
               </Card>
 
               <div className="flex items-start gap-2 text-xs text-gray-600 dark:text-zinc-400 px-1 rounded-lg bg-amber-50 dark:bg-amber-950/20 p-3">
