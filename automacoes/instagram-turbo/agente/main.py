@@ -563,6 +563,12 @@ def main(argv: list[str] | None = None) -> int:
                 if not plan.is_ready_to_publish:
                     errors += 1
                     continue
+                # horário-por-card: o slot-cron NÃO auto-publica post sem Horário (alinha
+                # com o poller e com o readiness — sem horário, não há auto-publish).
+                if not plan.scheduled_at and not args.force_now:
+                    skipped += 1
+                    skipped_lines.append(f"⏭  {t.id} «{t.name}» — sem horário (não auto-publica)")
+                    continue
 
                 # Tudo certo. Em dry-run, apenas conta. Em produção, executa.
                 ok += 1
@@ -574,10 +580,12 @@ def main(argv: list[str] | None = None) -> int:
                     print(f"   ❌ {exec_res.error}")
                     publish_failed += 1
                     post["state"] = "falhou"
+                    post["readiness"] = "failed"
                     post["error_text"] = exec_res.error
                 else:
                     published += 1
                     post["state"] = "publicado"
+                    post["readiness"] = "published"
                     post["permalink"] = exec_res.permalink
                     post["published_media_id"] = exec_res.ig_media_id
                     print(f"   ✅ publicado: media_id={exec_res.ig_media_id}")

@@ -43,7 +43,7 @@ def _publish(platform: str, task_id: str, *, run_id: str, dry_run: bool) -> tupl
     if res.error:
         return False, res.error
     post = state_sink.panel_post(plan, platform)
-    post.update(state="publicado", published_media_id=res.ig_media_id, permalink=res.permalink)
+    post.update(state="publicado", readiness="published", published_media_id=res.ig_media_id, permalink=res.permalink)
     state_sink.report_posts(platform, [post])
     return True, {"media_id": res.ig_media_id, "permalink": res.permalink}
 

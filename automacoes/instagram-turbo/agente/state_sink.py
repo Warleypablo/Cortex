@@ -46,8 +46,40 @@ def panel_state(plan: Any) -> str:
     return "pulado"
 
 
+# Códigos de bloqueio POR CARD (o front mapeia pra rótulo humano):
+#   legenda = sem legenda no Doc · midia = sem mídia/tipo · horario = sem Horário no card
+#   google = OAuth pendente · erro = erro no plano · pulado = skip (placeholder/idempotência)
+def panel_readiness(plan: Any) -> tuple[str, list[str]]:
+    """Prontidão POR CARD: o conteúdo está pronto e tem horário pra sair? Calculada do MESMO
+    dado que o worker usa pra publicar (as condições do is_ready_to_publish, destrinchadas)
+    + horário do card. O painel só PINTA isto — nunca infere de snapshot. Retorna
+    (readiness, reasons): 'published' já postado · 'ready' pronto · 'blocked' (reasons = o quê falta).
+
+    NB: dry-run e "agente pausado" são estados GLOBAIS (vêm no run/settings, não no card). O
+    painel COMBINA este readiness com esses globais — por isso não entram aqui como bloqueio.
+    """
+    if getattr(plan, "already_posted", False):
+        return "published", []
+    reasons: list[str] = []
+    src = getattr(plan, "legenda_source", None)
+    if plan.legenda_empty or src != "doc":
+        reasons.append("legenda")
+    if not getattr(plan, "asset_count", 0) or plan.tipo_post not in ("reels", "carousel", "single"):
+        reasons.append("midia")
+    if getattr(plan, "oauth_pending", False):
+        reasons.append("google")
+    if getattr(plan, "error", None):
+        reasons.append("erro")
+    if getattr(plan, "skip_reason", None):
+        reasons.append("pulado")
+    if not getattr(plan, "scheduled_at", None):
+        reasons.append("horario")
+    return ("ready" if not reasons else "blocked"), reasons
+
+
 def panel_post(plan: Any, platform: str = "instagram") -> dict:
     """Dict de um post a partir do PlannedAction (estado pré-publicação)."""
+    readiness, block_reasons = panel_readiness(plan)
     return {
         "clickup_task_id": plan.task_id,
         "task_name": plan.task_name,
@@ -64,6 +96,8 @@ def panel_post(plan: Any, platform: str = "instagram") -> dict:
         "legenda_len": plan.legenda_len,
         "legenda_empty": plan.legenda_empty,
         "state": panel_state(plan),
+        "readiness": readiness,           # prontidão autoritativa: vai sair? (ready/blocked/published)
+        "block_reasons": block_reasons,   # códigos do que falta quando blocked (front mapeia)
         "skip_reason": plan.skip_reason,
         "error_text": plan.error,
         "permalink": None,
