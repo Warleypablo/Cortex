@@ -2340,6 +2340,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       injectSpend('facebook', metaInvestimento, metaSessoes);
       injectSpend('google', googleInvestimento, googleSessoes);
 
+      // Um nó tem "sinal" se ele (ou qualquer descendente) teve atividade real no período.
+      // Inclui investimento/sessões → mídia paga com gasto e ZERO leads continua visível
+      // (sinal de problema de atribuição). Só some quando TUDO está zerado.
+      const hasSignal = (r: Raw): boolean =>
+        r.leads > 0 || r.mqls > 0 || r.ra > 0 || r.rr > 0 ||
+        r.vendas > 0 || r.clientesUnicos > 0 || r.contratos > 0 ||
+        r.receitaPontual > 0 || r.receitaRecorrente > 0 ||
+        (r.investimento ?? 0) > 0 || (r.sessoes ?? 0) > 0 ||
+        r.leadTimeCount > 0;
+
       // Agregar bottom-up (soma os contadores brutos) e derivar métricas em cada nível.
       const buildNode = (node: TNode): { out: any; agg: Raw } => {
         const agg = emptyRaw();
@@ -2347,13 +2357,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const built = Array.from(node.children.values()).map((child) => {
           const r = buildNode(child);
           addRaw(agg, r.agg);
-          return { child, out: r.out, leads: r.agg.leads };
+          return { child, out: r.out, agg: r.agg, leads: r.agg.leads };
         });
         built.sort((a, b) => (a.child.order - b.child.order) || (b.leads - a.leads) || a.child.name.localeCompare(b.child.name));
+        // Poda recursiva: descarta filhos cuja subárvore inteira está zerada (esqueleto canônico sem dados).
+        const kept = built.filter((b) => hasSignal(b.agg));
         const out = {
           id: node.key, name: node.name, level: node.level,
           ...deriveMetrics(agg),
-          children: built.length ? built.map((b) => b.out) : undefined,
+          children: kept.length ? kept.map((b) => b.out) : undefined,
         };
         return { out, agg };
       };
@@ -2363,7 +2375,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const totalRaw = emptyRaw();
       for (const m of mediums) addRaw(totalRaw, m.built.agg);
 
-      const rows = mediums.map((m) => m.built.out);
+      const rows = mediums.filter((m) => hasSignal(m.built.agg)).map((m) => m.built.out);
       const total = { id: 'total', name: 'TOTAL GERAL', level: 'total', ...deriveMetrics(totalRaw) };
 
       console.log(`[api] Performance Plataformas: ${rows.length} mediums, ${leafMap.size} folhas`);
