@@ -87,6 +87,8 @@ END`;
  * esperar utm_medium acumular.
  */
 const MEDIUM_CASE_SQL = `CASE
+  -- Sources de indicação são sempre referral, mesmo com utm_medium errado (ex: cliente tagueado como 'organic').
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('cliente','colaborador','afiliado','influencer','marketplace') THEN 'referral'
   WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound') THEN LOWER(TRIM(utm_medium))
   WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'organic'
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'organic'
