@@ -22,6 +22,7 @@ const SQL_FILES = [
   "migrations/2026-06-24-content-publish.sql",
   "migrations/2026-06-25-content-publish-operador.sql",
   "migrations/2026-06-25-content-publish-horario.sql",
+  "migrations/2026-06-28-content-readiness.sql",
 ];
 
 function makePool(): Pool {

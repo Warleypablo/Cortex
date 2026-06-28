@@ -1106,6 +1106,8 @@ export const contentPosts = cortexCoreSchema.table("content_posts", {
   legendaPreview: text("legenda_preview"),                     // preview da legenda (p/ aprovação de IA)
   state: varchar("state", { length: 24 }).notNull().default("agendado"),
     // aprovado | agendado | aguardando_ia | publicado | falhou | pulado
+  readiness: varchar("readiness", { length: 16 }),            // ready | blocked | published | failed — prontidão AUTORITATIVA calculada pelo worker
+  blockReasons: jsonb("block_reasons").$type<string[]>(),     // quando blocked: códigos do que falta (legenda/midia/horario/google/erro/pulado/dry_run)
   skipReason: text("skip_reason"),
   errorText: text("error_text"),
   publishedMediaId: varchar("published_media_id", { length: 64 }), // ig media_id / tiktok publish_id
