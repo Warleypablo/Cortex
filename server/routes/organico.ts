@@ -31,11 +31,15 @@ const GLOBAL_ACTIONS = new Set(["pause_agent", "resume_agent"]);
  * O backend NUNCA chama o Python: as ações viram linhas `pending` que o worker-poller consome
  * e reflete de volta via /ingest. Rotas /api/* já são protegidas pelo isAuthenticated global.
  */
-export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage) {
+export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage, isAdmin: any) {
   // GET /api/growth/organico/overview
   // Snapshot pro painel: settings + saúde + as 3 visões do dia (aprovados / agendados / publicados).
   app.get("/api/growth/organico/overview", async (_req, res) => {
     try {
+      // NOTA (Fase 3): hoje qualquer usuário autenticado lê TODOS os cards aqui.
+      // O "acesso mínimo" de leitura (cardista vê só os dela) precisa de coluna `owner`
+      // em content_posts + redação de campos no front — feito junto na Fase 3. Mascarar
+      // só a prévia da legenda seria ilusório (o clickupUrl leva à legenda completa).
       const settings = await db.select().from(contentPublishSettings);
 
       // saúde = o último ciclo de cada plataforma (runs já vêm desc por started_at)
@@ -114,7 +118,7 @@ export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage
   });
 
   // POST /api/growth/organico/commands — enfileira uma ação do operador (Soltar agora / Agendar / ...).
-  app.post("/api/growth/organico/commands", async (req, res) => {
+  app.post("/api/growth/organico/commands", isAdmin, async (req, res) => {
     try {
       const { platform, clickupTaskId, action } = req.body || {};
       let payload = req.body?.payload;
@@ -177,7 +181,7 @@ export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage
   });
 
   // POST /api/growth/organico/settings — pausa/retoma o agente e alterna dry-run por plataforma.
-  app.post("/api/growth/organico/settings", async (req, res) => {
+  app.post("/api/growth/organico/settings", isAdmin, async (req, res) => {
     try {
       const { platform, agentEnabled, dryRun } = req.body || {};
       if (!platform) return res.status(400).json({ error: "platform obrigatório" });

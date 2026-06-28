@@ -8241,7 +8241,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   registerGrowthRoutes(app, db, storage);
 
   // Painel Orgânico (publicação de conteúdo orgânico) — leitura das tabelas content_* (pós-auth)
-  registerOrganicoRoutes(app, db, storage);
+  registerOrganicoRoutes(app, db, storage, isAdmin);
 
   // Growth — Orçamento por Campanha
   registerOrcamentoCampanhasRoutes(app, db);
