@@ -35,12 +35,14 @@
 
 É como você atribui um **post de feed/reels** (IG/TikTok) que não tem link clicável: o post pede "comenta X", o bot responde na DM com o link **tagueado e clicável**.
 
-**Padrão:** `utm_campaign=automacoes` · `utm_term=dm` · `utm_content=manychat-{fluxo}`
+**Padrão:** `utm_campaign=automacoes` · `utm_term=dm` · `utm_content={nome-do-post}-{aaaa-mm-dd}`
+
+Como `automacoes` + `dm` já dizem "veio de ManyChat", o `utm_content` identifica **qual post/reel** a pessoa comentou — assim você sabe qual conteúdo gerou o lead. Troca o `utm_content` a cada post.
 
 ```
-https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=organic&utm_campaign=automacoes&utm_term=dm&utm_content=manychat-quero-creators
+https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=organic&utm_campaign=automacoes&utm_term=dm&utm_content=creators-ugc-2026-06-28
 ```
-(troca `organic` por `victor`/`andre`/`rodrigo` no canal do sócio; `{fluxo}` = nome da automação, ex: `quero-creators`, `ebook-ecommerce`.)
+(troca `organic` por `victor`/`andre`/`rodrigo` no canal do sócio.)
 
 ---
 
@@ -58,7 +60,7 @@ LinkedIn   https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=orga
 LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-28
 YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-2026-06-28
 Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=stories&utm_content=creators-2026-06-28
-ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=organic&utm_campaign=automacoes&utm_term=dm&utm_content=manychat-quero-creators
+ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=organic&utm_campaign=automacoes&utm_term=dm&utm_content=creators-2026-06-28
 ```
 > TikTok e feed/reels do Instagram não têm post com link clicável → usam o **link fixo da bio** ou **ManyChat**.
 
@@ -78,7 +80,7 @@ LinkedIn   https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=vict
 LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=victor&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-28
 YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-2026-06-28
 Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=victor&utm_campaign=always-on&utm_term=stories&utm_content=creators-2026-06-28
-ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=victor&utm_campaign=automacoes&utm_term=dm&utm_content=manychat-quero-creators
+ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=victor&utm_campaign=automacoes&utm_term=dm&utm_content=creators-2026-06-28
 ```
 
 ---
@@ -97,7 +99,7 @@ LinkedIn   https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=andr
 LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=andre&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-28
 YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=andre&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-2026-06-28
 Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=andre&utm_campaign=always-on&utm_term=stories&utm_content=creators-2026-06-28
-ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=andre&utm_campaign=automacoes&utm_term=dm&utm_content=manychat-quero-creators
+ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=andre&utm_campaign=automacoes&utm_term=dm&utm_content=creators-2026-06-28
 ```
 
 ---
@@ -116,7 +118,7 @@ LinkedIn   https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=rodr
 LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-28
 YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=rodrigo&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-2026-06-28
 Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=always-on&utm_term=stories&utm_content=creators-2026-06-28
-ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=automacoes&utm_term=dm&utm_content=manychat-quero-creators
+ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=automacoes&utm_term=dm&utm_content=creators-2026-06-28
 ```
 
 ---
@@ -125,7 +127,7 @@ ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&ut
 
 1. **Destino dos fixos = home** (`site-home`). Se o link apontar pra uma **landing page** (`pages.turbopartners.com.br/...`), troque `utm_content` por `lp-{slug}` (`lp-creators`, `lp-ecommerce`). Outra página do site institucional → `site-{pagina}`. Slugs de produto: `creators`, `ecommerce`, `comercial`, `flash`.
 2. **`utm_content` dos posts = nome do post + data:** o `creators-2026-06-28` é só exemplo. Troque por `{nome-do-post}-{data-da-publicação}`.
-3. **`utm_content` do ManyChat = nome do fluxo:** `manychat-{fluxo}` (ex: `manychat-quero-creators`). Fixo por automação, sem data.
+3. **`utm_content` do ManyChat = nome do post + data** (igual aos posts) — `automacoes`+`dm` já marcam que veio de ManyChat, então o `utm_content` diz **qual post** disparou o fluxo.
 4. **Feed/Reels (IG) e vídeos (TikTok) não têm link clicável** → a atribuição vem do **link da bio** ou de **ManyChat**. Não adianta colar UTM numa legenda que ninguém clica.
 5. **WhatsApp:** UTM em `wa.me` direto **não rastreia**. Use uma página de redirect tracked (`pages.turbopartners.com.br/wpp?...`).
 6. **Mídia paga** (Meta/Google/TikTok Ads) **não usa estes links** — lá os UTMs são injetados por token automático da plataforma (ver §5 da Constituição).
