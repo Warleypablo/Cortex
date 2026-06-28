@@ -117,11 +117,12 @@ export const SUMMIT_PURCHASE_ACTION = "offsite_conversion.custom.134573837083900
 export interface SummitCapacity {
   label: string;
   total: number;
-  precoLiquido: number;
+  preco: number; // valor do comprador (bruto, com taxa Sympla)
+  precoLiquido: number; // valor a receber (após ~10% da Sympla)
 }
 export const SUMMIT_CAPACITY: SummitCapacity[] = [
-  { label: "PASS", total: 300, precoLiquido: 267.3 },
-  { label: "VIP", total: 30, precoLiquido: 2697.3 },
+  { label: "PASS", total: 300, preco: 297, precoLiquido: 267.3 },
+  { label: "VIP", total: 30, preco: 2997, precoLiquido: 2697.3 },
 ];
 // ROAS-alvo da projeção (1 = break-even: investimento = receita líquida).
 export const SUMMIT_ROAS_ALVO = 1;
