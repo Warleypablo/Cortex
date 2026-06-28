@@ -107,6 +107,7 @@ export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage
         aprovados,
         agendados,
         publicados,
+        posts,   // conjunto completo (até 500) — alimenta a visão de Calendário
         // compat: visões antigas (fila/histórico) — até o frontend novo assumir.
         queue: [...aprovados, ...agendados],
         history: posts.filter((p: any) => p.state === "publicado").slice(0, 50),

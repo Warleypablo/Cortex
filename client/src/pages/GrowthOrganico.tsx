@@ -19,6 +19,7 @@ import {
 import {
   Sprout, Instagram, Music2, Youtube, Linkedin, Loader2, PauseCircle, PlayCircle,
   ExternalLink, Send, CalendarClock, CalendarX, AlertTriangle,
+  CalendarDays, List, ChevronLeft, ChevronRight,
 } from "lucide-react";
 
 // ── tipos do payload de /api/growth/organico/overview ──────────────────────
@@ -30,10 +31,11 @@ interface Post {
   scheduledAt: string | null; cardScheduledAt: string | null;
   tipoPost: string | null; assetCount: number | null; legendaSource: string | null;
   legendaLen: number | null; state: string; permalink: string | null; clickupUrl: string | null;
+  readiness: string | null; blockReasons: string[] | null;
 }
 interface Overview {
   today: string; platforms: string[]; settings: Setting[]; health: Run[];
-  aprovados: Post[]; agendados: Post[]; publicados: Post[];
+  aprovados: Post[]; agendados: Post[]; publicados: Post[]; posts: Post[];
 }
 
 const PLATFORM_LABEL: Record<string, string> = {
@@ -145,11 +147,99 @@ function TimeBadge({ ts }: { ts: TimeState }) {
   return null;
 }
 
+// ── Fase 2: prontidão por card → pílula do calendário ───────────────────────
+// O `readiness` vem do WORKER (autoritativo). Aqui só PINTAMOS + reconciliamos o que o
+// front conhece e o worker não: override do operador (scheduledAt) e o estado GLOBAL
+// (o agente está publicando? = ativo E não dry-run).
+function readinessOf(p: Post): string {
+  if (p.readiness) return p.readiness;
+  // posts antigos/leftover sem readiness do worker: aproxima pelo state (legado)
+  if (p.state === "publicado") return "published";
+  if (p.state === "falhou") return "failed";
+  if (p.state === "aguardando_ia" || p.state === "pulado") return "blocked";
+  return "ready";
+}
+// 'horario' deixa de ser bloqueio quando o operador agendou (ele deu o horário)
+function effectiveReasons(p: Post): string[] {
+  return (p.blockReasons ?? []).filter((r) => !(r === "horario" && !!p.scheduledAt));
+}
+
+type PillKind =
+  | "publicado" | "vai_sair" | "pronto_pausado" | "atrasado"
+  | "perdeu" | "falta_algo" | "producao" | "falhou";
+
+const REASON_LABEL: Record<string, string> = {
+  legenda: "legenda", midia: "mídia", horario: "horário",
+  google: "Google", erro: "erro", pulado: "incompleto",
+};
+
+function pillKind(p: Post, publishing: boolean): PillKind {
+  const rd = readinessOf(p);
+  if (rd === "published") return "publicado";
+  if (rd === "failed") return "falhou";
+  // sem veredito do worker (post legado/leftover) → NEUTRO; nunca inventamos "vai sair"
+  if (p.readiness == null) return "producao";
+  const reasons = effectiveReasons(p);
+  const ready = rd === "ready" || (rd === "blocked" && p.readiness != null && reasons.length === 0);
+  const eff = effectiveWhen(p);
+  const now = Date.now();
+  if (ready) {
+    if (!eff) return "producao";
+    const t = new Date(eff).getTime();
+    if (t > now) return publishing ? "vai_sair" : "pronto_pausado";
+    if (t >= startOfTodaySPms() && publishing) return "atrasado";
+    return "perdeu";
+  }
+  // bloqueado por motivo real
+  if (eff) {
+    const t = new Date(eff).getTime();
+    if (t < now) return "perdeu";
+    if (t <= now + 48 * 3600_000) return "falta_algo";
+  }
+  return "producao";
+}
+
+// glyph = sinal de FORMA além da cor (acessibilidade: daltônico distingue sem hover)
+const PILL_STYLES: Record<PillKind, { dot: string; chip: string; label: string; glyph: string }> = {
+  vai_sair:       { glyph: "→", dot: "bg-emerald-500", chip: "bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border border-emerald-300/60 dark:border-emerald-800/70", label: "vai sair" },
+  publicado:      { glyph: "✓", dot: "bg-blue-500",    chip: "bg-blue-100 text-blue-800 dark:bg-blue-950 dark:text-blue-300 border border-blue-300/60 dark:border-blue-800/70", label: "publicado" },
+  atrasado:       { glyph: "!", dot: "bg-orange-500",  chip: "bg-orange-100 text-orange-800 dark:bg-orange-950 dark:text-orange-300 border border-orange-300/60 dark:border-orange-800/70", label: "atrasado" },
+  perdeu:         { glyph: "✕", dot: "bg-red-500",     chip: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 border border-red-300/60 dark:border-red-800/70", label: "perdeu o horário" },
+  falta_algo:     { glyph: "!", dot: "bg-amber-500",   chip: "bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border border-amber-300/60 dark:border-amber-800/70", label: "falta algo" },
+  falhou:         { glyph: "✕", dot: "bg-red-600",     chip: "bg-red-100 text-red-800 dark:bg-red-950 dark:text-red-300 border border-red-400/60 dark:border-red-800/70", label: "falhou" },
+  pronto_pausado: { glyph: "⏸", dot: "bg-zinc-400",    chip: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-300 border border-zinc-300/50 dark:border-zinc-700", label: "pronto (pausado)" },
+  producao:       { glyph: "·", dot: "bg-zinc-300 dark:bg-zinc-600", chip: "bg-zinc-50 text-zinc-500 dark:bg-zinc-900/60 dark:text-zinc-400 border border-dashed border-zinc-300 dark:border-zinc-700", label: "em produção" },
+};
+
+// dia-calendário (YYYY-MM-DD) de um ISO, no fuso de São Paulo
+function spDayKey(iso: string | null): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return null;
+  return new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(d);
+}
+function postDayKey(p: Post): string | null {
+  return spDayKey(effectiveWhen(p)) ?? (p.postingDate ? String(p.postingDate).slice(0, 10) : null);
+}
+function fmtHora(iso: string | null): string {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return "";
+  const parts = new Intl.DateTimeFormat("pt-BR", {
+    timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit", hour12: false,
+  }).formatToParts(d);
+  const h = parts.find((x) => x.type === "hour")?.value ?? "00";
+  const m = parts.find((x) => x.type === "minute")?.value ?? "00";
+  return `${h}:${m}`;
+}
+
 export default function GrowthOrganico() {
   useSetPageInfo("Orgânico", "Publicação de conteúdo orgânico — IG, TikTok e além");
   const [plat, setPlat] = useState<string>("all");
   const [confirmPost, setConfirmPost] = useState<Post | null>(null);
   const [schedulePost, setSchedulePost] = useState<Post | null>(null);
+  const [view, setView] = useState<"calendario" | "listas">("calendario");
+  const [monthDate, setMonthDate] = useState<Date>(() => new Date());
 
   const qc = useQueryClient();
   const { toast } = useToast();
@@ -200,6 +290,7 @@ export default function GrowthOrganico() {
   const aprovados = onlyPlat(data?.aprovados ?? []);
   const agendados = onlyPlat(data?.agendados ?? []);
   const publicados = onlyPlat(data?.publicados ?? []);
+  const allPosts = onlyPlat(data?.posts ?? []);  // conjunto completo p/ o calendário
 
   const agentActiveFor = (platform: string) =>
     settings.find((s) => s.platform === platform)?.agentEnabled ?? true;
@@ -245,6 +336,14 @@ export default function GrowthOrganico() {
               {PLATFORM_LABEL[p] ?? p}
             </Chip>
           ))}
+          <div className="ml-auto inline-flex items-center gap-1.5">
+            <Chip active={view === "calendario"} onClick={() => setView("calendario")}>
+              <CalendarDays className="h-3.5 w-3.5" />Calendário
+            </Chip>
+            <Chip active={view === "listas"} onClick={() => setView("listas")}>
+              <List className="h-3.5 w-3.5" />Listas
+            </Chip>
+          </div>
         </div>
 
         {/* ALERTA — posts que passaram do horário e não saíram (precisam de ação) */}
@@ -315,6 +414,21 @@ export default function GrowthOrganico() {
           </div>
         </section>
 
+        {/* CALENDÁRIO DE PRONTIDÃO (Fase 2) — a cor de cada card vem do readiness do worker */}
+        {view === "calendario" && (
+          <CalendarSection
+            posts={allPosts}
+            monthDate={monthDate}
+            settings={settings}
+            loading={isLoading}
+            onPrev={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+            onNext={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+            onToday={() => setMonthDate(new Date())}
+          />
+        )}
+
+        {view === "listas" && (
+          <>
         {/* (A) APROVADOS — com ações */}
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground">
@@ -504,6 +618,8 @@ export default function GrowthOrganico() {
           da hora mas ainda sai; <span className="text-red-600 dark:text-red-400">Perdeu o horário</span> = não sai sozinho, precisa de você.
           A produção do conteúdo segue no Google Doc + Drive + ClickUp.
         </p>
+          </>
+        )}
       </div>
 
       {/* CONFIRMAÇÃO — Soltar agora (ação irreversível: publica na conta real) */}
@@ -673,5 +789,139 @@ function HealthCard({ platform, setting, run, loading, onToggleAgent, toggling }
         )}
       </CardContent>
     </Card>
+  );
+}
+
+// ── Fase 2: Calendário de Prontidão (grade do mês + resumo/legenda) ─────────
+function CalendarSection({ posts, monthDate, settings, loading, onPrev, onNext, onToday }: {
+  posts: Post[]; monthDate: Date; settings: Setting[]; loading: boolean;
+  onPrev: () => void; onNext: () => void; onToday: () => void;
+}) {
+  const publishingFor = (platform: string) => {
+    const s = settings.find((x) => x.platform === platform);
+    return (s?.agentEnabled ?? true) && !(s?.dryRun ?? true);
+  };
+  const year = monthDate.getFullYear();
+  const month = monthDate.getMonth();
+  const pad = (n: number) => String(n).padStart(2, "0");
+  const monthPrefix = `${year}-${pad(month + 1)}`;
+
+  // bucket de posts por dia-calendário
+  const byDay = new Map<string, Post[]>();
+  for (const p of posts) {
+    const k = postDayKey(p);
+    if (!k) continue;
+    const arr = byDay.get(k);
+    if (arr) arr.push(p); else byDay.set(k, [p]);
+  }
+  byDay.forEach((arr) =>
+    arr.sort((a, b) => String(effectiveWhen(a) ?? "").localeCompare(String(effectiveWhen(b) ?? ""))));
+  const semData = posts.filter((p) => !postDayKey(p)).length;  // somem do calendário → avisar
+
+  // resumo do mês visível (conta por tipo de pílula)
+  const summary: Partial<Record<PillKind, number>> = {};
+  for (const p of posts) {
+    const k = postDayKey(p);
+    if (!k || !k.startsWith(monthPrefix)) continue;
+    const kind = pillKind(p, publishingFor(p.platform));
+    summary[kind] = (summary[kind] ?? 0) + 1;
+  }
+
+  const daysInMonth = new Date(year, month + 1, 0).getDate();
+  const leading = new Date(year, month, 1).getDay();
+  const cells: (number | null)[] = [];
+  for (let i = 0; i < leading; i++) cells.push(null);
+  for (let d = 1; d <= daysInMonth; d++) cells.push(d);
+  while (cells.length % 7 !== 0) cells.push(null);
+
+  const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const monthName = new Date(year, month, 1).toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const summaryOrder: PillKind[] = ["vai_sair", "falta_algo", "producao", "perdeu", "atrasado", "publicado"];
+
+  return (
+    <section className="space-y-2">
+      {/* resumo + legenda de cores (a cor nunca é o único sinal — sempre tem rótulo) */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs">
+        {summaryOrder.map((k) => (
+          <span key={k} className="inline-flex items-center gap-1.5 text-muted-foreground">
+            <span className={`h-2 w-2 rounded-full ${PILL_STYLES[k].dot}`} />
+            {PILL_STYLES[k].label}
+            <span className="font-semibold text-foreground">{summary[k] ?? 0}</span>
+          </span>
+        ))}
+        {semData > 0 && (
+          <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400" title="Posts sem Data de postagem não aparecem no calendário">
+            <AlertTriangle className="h-3 w-3" />
+            {semData} sem data — veja em "Listas"
+          </span>
+        )}
+      </div>
+
+      <Card>
+        <CardHeader className="pb-2 flex flex-row items-center justify-between space-y-0">
+          <CardTitle className="text-sm capitalize">
+            {monthName}
+            {loading && <Loader2 className="h-3.5 w-3.5 animate-spin inline ml-2 text-muted-foreground" />}
+          </CardTitle>
+          <div className="inline-flex items-center gap-1">
+            <Button size="sm" variant="ghost" className="h-7 px-2 text-xs" onClick={onToday}>Hoje</Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onPrev}><ChevronLeft className="h-4 w-4" /></Button>
+            <Button size="icon" variant="ghost" className="h-7 w-7" onClick={onNext}><ChevronRight className="h-4 w-4" /></Button>
+          </div>
+        </CardHeader>
+        <CardContent className="p-2">
+          <div className="grid grid-cols-7 gap-1">
+            {weekdays.map((w) => (
+              <div key={w} className="text-[11px] font-medium text-muted-foreground text-center pb-1">{w}</div>
+            ))}
+            {cells.map((d, i) => {
+              if (d === null) return <div key={`b${i}`} className="min-h-[92px] rounded-md bg-muted/20" />;
+              const key = `${monthPrefix}-${pad(d)}`;
+              const dayPosts = byDay.get(key) ?? [];
+              const isToday = key === todayKey;
+              return (
+                <div key={key} className={`min-h-[92px] rounded-md border p-1 flex flex-col gap-1 overflow-hidden ${isToday ? "border-primary bg-primary/5" : "border-border bg-card"}`}>
+                  <div className={`text-[11px] font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{d}</div>
+                  {dayPosts.slice(0, 4).map((p) => (
+                    <CalPill key={`${p.platform}-${p.id}`} post={p} publishing={publishingFor(p.platform)} />
+                  ))}
+                  {dayPosts.length > 4 && (
+                    <span className="text-[10px] text-muted-foreground pl-0.5">+{dayPosts.length - 4} mais</span>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+    </section>
+  );
+}
+
+function CalPill({ post, publishing }: { post: Post; publishing: boolean }) {
+  const kind = pillKind(post, publishing);
+  const s = PILL_STYLES[kind];
+  const eff = effectiveWhen(post);
+  const hora = fmtHora(eff);
+  const reasons = effectiveReasons(post).map((r) => REASON_LABEL[r] ?? r);
+  const tip = [
+    post.taskName ?? "—",
+    s.label + (hora ? ` · ${hora}` : ""),
+    reasons.length ? `falta: ${reasons.join(", ")}` : "",
+  ].filter(Boolean).join(" · ");
+  const url = post.clickupUrl ?? `https://app.clickup.com/t/${post.clickupTaskId}`;
+  const showHora = !!hora && (kind === "vai_sair" || kind === "atrasado" || kind === "perdeu" || kind === "publicado");
+  return (
+    <button
+      type="button"
+      title={tip}
+      onClick={() => window.open(url, "_blank", "noopener,noreferrer")}
+      className={`w-full text-left rounded px-1 py-0.5 text-[10px] leading-tight flex items-center gap-1 ${s.chip} hover:opacity-80 transition-opacity`}
+    >
+      <span className="font-bold shrink-0 w-2.5 text-center leading-none" aria-hidden="true">{s.glyph}</span>
+      {showHora && <span className="font-semibold tabular-nums shrink-0">{hora}</span>}
+      <span className="truncate">{post.taskName ?? "—"}</span>
+    </button>
   );
 }
