@@ -10,6 +10,19 @@ import { classificarProdutoCampanha, bucketForFnlNgc, expandFunilValues, FNL_NGC
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
 
+// Advertiser ID da Turbo no TikTok ("Turbo Partners LTDA - CA Oficial").
+// O login do TikTok Business Center enxerga também contas de clientes geridos
+// (ex.: Brady / "Target CPA Manual Maquina de Waffle"), que entram no banco pelo
+// OAuth/sync sem distinção. Na LEITURA filtramos só o(s) advertiser(s) da Turbo
+// para não vazar campanhas de cliente na aba Criativos. Se a Turbo abrir outra
+// conta própria no TikTok, adicionar o advertiser_id aqui.
+const TURBO_TIKTOK_ADVERTISER_IDS = ['7065303755092131842'];
+
+// Customer ID da conta de anúncios própria da Turbo no Google Ads (mesmo valor
+// de googleSync.TURBO_CUSTOMER_ID). O sync já é travado nessa conta, mas filtramos
+// também na leitura como blindagem caso outra conta entre no schema google.*.
+const TURBO_GOOGLE_CUSTOMER_ID = '3795436039';
+
 /**
  * Expressão SQL que classifica um deal do Bitrix em plataforma de marketing.
  *
@@ -232,6 +245,7 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
       WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
       GROUP BY ad_id
     ) m ON m.ad_id = a.ad_id
+    WHERE c.customer_id = ${TURBO_GOOGLE_CUSTOMER_ID}
   `);
 
   // 2. CRM por (utm_campaign, utm_term) — mesmas regras do funil (source canônico google).
@@ -450,6 +464,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
       GROUP BY ad_id
     ) m ON m.ad_id = a.ad_id
+    WHERE a.advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
   `);
 
   // 1b. Metadados de campanha (nome/status/budget) vêm de tiktok.ad_campaigns, que é do
@@ -460,6 +475,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
     const campRes = await db.execute(sql`
       SELECT campaign_id::text AS campaign_id, campaign_name, operation_status, budget
       FROM tiktok.ad_campaigns
+      WHERE advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
     `);
     for (const c of campRes.rows as any[]) {
       campMeta.set(String(c.campaign_id), {
@@ -3327,6 +3343,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                    COALESCE(SUM(clicks), 0)::bigint AS cliques
             FROM tiktok.ad_metrics_daily
             WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+              AND advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
           `);
           const row = r.rows[0] as any;
           tiktokInvestimento = parseFloat(row.investimento) || 0;
@@ -4399,6 +4416,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                COALESCE(SUM(conversions), 0)::numeric AS conversoes
         FROM tiktok.ad_metrics_daily
         WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          AND advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
       `);
       const m = mRes.rows[0] as any;
       const investimento = parseFloat(m.investimento) || 0;
