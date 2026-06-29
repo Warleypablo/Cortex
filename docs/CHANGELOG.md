@@ -1,5 +1,129 @@
 # Changelog
 
+## 2026-06-29 | fix(encurtador): UTM única (dedup) — não cria link duplicado
+
+**O que foi feito:**
+- `server/routes/utm.ts` — `POST /api/utm/generate` agora é **idempotente**: se a `full_url` exata já existe, reusa a linha existente (não cria duplicata). Clicar "Copiar e salvar" 2-3x na mesma UTM devolve sempre o mesmo registro.
+- `server/routes/shortener.ts` — `POST /api/links/shorten` dedup por `target_url`: se o destino já tem um link curto, reusa o mesmo slug (e garante o KV) em vez de criar outro.
+- `client/src/pages/UtmBuilder.tsx` — toast avisa "Essa UTM já existia — reutilizada" quando bate na dedup.
+
+**Por que:**
+- Ichino criou 3 UTMs idênticas sem querer (3 cliques no botão). A UTM tem que ser única e centralizadora — todos os cliques/MQL/venda de um destino ficam num link só, não espalhados em cópias.
+
+**Arquivos alterados:**
+- `server/routes/utm.ts` - dedup por full_url no generate.
+- `server/routes/shortener.ts` - dedup por target_url no shorten.
+- `client/src/pages/UtmBuilder.tsx` - toast de reutilização.
+
+**Impacto arquitetural:** Nenhum. Dedup é só leitura-antes-de-inserir. Linhas duplicadas já existentes (criadas antes do fix) não são removidas automaticamente — limpeza é opcional/manual.
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 3 — Cloudflare Worker (redirect na borda + ingestão de clique)
+
+**O que foi feito:**
+- `cloudflare/shortener-worker/` (nova pasta, deploy separado via wrangler — fora do build do Cortex):
+  - `src/index.ts` — Worker que responde em `marketing.turbopartners.com.br/<slug>`: lê o slug no KV (`LINKS`), faz 302 pro destino com UTM intacta, e via `ctx.waitUntil` dispara `POST /api/clicks` pro Cortex (header `x-click-secret`, com country/ipHash SHA-256/userAgent/referrer) sem atrasar o redirect. Slug inexistente ou raiz → `FALLBACK_URL` (o site), nunca 404.
+  - `wrangler.toml` — rota `marketing.turbopartners.com.br/*`, binding KV `LINKS`, vars `CORTEX_CLICKS_URL`/`FALLBACK_URL` (secret fica via `wrangler secret put`).
+  - `package.json` (wrangler + @cloudflare/workers-types), `tsconfig.json` (isolado, types do Cloudflare — não entra no tsconfig do app, que só inclui client/shared/server).
+  - `README.md` — passo a passo da infra (KV namespace, secret, DNS AAAA `marketing`→`100::` proxied, `wrangler deploy`) + vars do Render no Cortex.
+- `.gitignore` — `.wrangler`.
+
+**Por que:**
+- Fase 3 do encurtador: a peça que faz o link **de fato redirecionar e contar o clique**. Fecha o ciclo criar (Cortex) → redirecionar (Worker) → clique no Postgres → cruzar com Bitrix.
+
+**Arquivos alterados:**
+- `cloudflare/shortener-worker/{src/index.ts,wrangler.toml,package.json,tsconfig.json,README.md}` (novos).
+- `.gitignore` - `.wrangler`.
+
+**Impacto arquitetural:** Nenhum no app (pasta isolada, deploy separado). Código validado por `esbuild` (sintaxe OK). **Ativação depende da infra do Ichino** (login Cloudflare, criar KV, secret, DNS, `wrangler deploy`, vars no Render) — passo a passo no README. Sem isso, o Cortex segue criando/listando links com `kvSynced:false`.
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 4 revisão + Fase 5 — auto-encurtar + atribuição no Histórico
+
+**O que foi feito:**
+- **Auto-encurtar (decisão Ichino):** todo link gerado no UTM Builder já nasce com um link curto. `server/routes/shortener.ts` — `POST /api/links/shorten` aceita slug vazio e gera um aleatório (8 hex, com retry até achar livre); slug digitado mantém a guarda de unicidade (409 se ocupado).
+- **Frontend (`client/src/pages/UtmBuilder.tsx`):** campo opcional "Nome do link curto" **antes** do botão; ao clicar "Copiar e salvar", gera a UTM **e** o link curto num passo só (auto-chama o shorten). Mostra o link curto resultante com copiar. Botão de retry "Encurtar" só aparece se o nome custom estava em uso.
+- **Atribuição no Histórico (Fase 5, Caminho A — por UTM):** `GET /api/utm/history` ganhou CTEs `click_agg` (cliques por slug) e `deal_agg` (cruza `"Bitrix".crm_deal` por tupla UTM source+medium+campaign+content) com as **mesmas regras do Orçado x Realizado** (`growth.ts:232-269`): MQL = `mql '1'/'true'`, Reunião marcada = `data_reuniao_agendada`, realizada = `data_reuniao_realizada`, Venda = `stage_name 'Negócio Ganho'`. A tabela do Histórico ganhou colunas: Link curto, Cliques, MQL, Reun. marc., Reun. real., Vendas.
+- **Removida a página `/links` separada** (decisão Ichino: tudo no Histórico): deletado `client/src/pages/LinkShortener.tsx`, rota + lazy import em `App.tsx`, botão "Links curtos" no UTM Builder.
+
+**Por que:**
+- Ichino pediu: (1) todo link já encurtado por padrão; (2) MQL/reunião/venda por link junto do histórico, "igual ao Orçado x Realizado", em vez de aba separada. Atribuição por UTM (Caminho A) — granularidade = unicidade da UTM.
+
+**Arquivos alterados:**
+- `server/routes/shortener.ts` - slug aleatório quando vazio (retry).
+- `server/routes/utm.ts` - history com cliques + funil cruzando crm_deal por UTM.
+- `client/src/pages/UtmBuilder.tsx` - fluxo gera+encurta; colunas de funil no Histórico; remove botão/import de /links.
+- `client/src/App.tsx` - remove rota /links.
+- `client/src/pages/LinkShortener.tsx` - **deletado**.
+
+**Impacto arquitetural:** Nenhum estrutural. Validado: `esbuild` (server) e `vite build` passam; a query nova do Histórico foi executada direto no banco local (roda sem erro de permissão na `"Bitrix".crm_deal`; local tem 19.509 deals / 3.645 MQLs / 793 vendas, confirmando que a atribuição produz números reais). Atribuição por UTM: links de UTM idêntica compartilham os mesmos números (limitação aceita do Caminho A). Redirect real ainda depende da Fase 3 (Cloudflare).
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 4 — frontend (botão "Encurtar" no UTM Builder + página /links)
+
+**O que foi feito:**
+- `client/src/pages/UtmBuilder.tsx` — depois de gerar a UTM, aparece um bloco **"Encurtar este link"**: input de slug (prefixo `marketing.turbopartners.com.br/`, sanitizado ao digitar, Enter envia) + botão que chama `POST /api/links/shorten` (passa `targetUrl` = URL gerada e `generatedUtmLinkId`). Mostra o link curto resultante com botão copiar. Toast informa se já redireciona (`kvSynced`) ou se está só no banco. Botão **"Links curtos"** no topo (ao lado das tabs) leva pra `/links`.
+- `client/src/pages/LinkShortener.tsx` (novo) — página `/links`: tabela dos links curtos (slug, destino, campanha/UTM, **cliques**, criador, data) via `GET /api/links`, com copiar e estado vazio. Dark/light mode (tokens `muted`/`foreground`).
+- `client/src/App.tsx` — lazy import + rota `/links` (ProtectedRoute, mesmo padrão do UTM Builder).
+- `.env.example` — documentadas as vars do encurtador (`SHORTENER_BASE_URL`, `CF_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`, `CF_API_TOKEN`, `CLICK_INGEST_SECRET`) com nota de que em local roda sem elas.
+
+**Por que:**
+- Fase 4 do encurtador (plano em `docs/encurtador-links-plano.md`): a UI que fecha o fluxo de criar e gerir links curtos a partir do UTM Builder, testável no preview mesmo sem o Cloudflare (Fase 3) configurado.
+
+**Arquivos alterados:**
+- `client/src/pages/UtmBuilder.tsx` - bloco "Encurtar" na aba Gerar + botão "Links curtos" + import do `Link` (wouter).
+- `client/src/pages/LinkShortener.tsx` (novo) - página de gestão.
+- `client/src/App.tsx` - lazy import + rota `/links`.
+- `.env.example` - vars do encurtador.
+
+**Impacto arquitetural:** Nenhum estrutural. Validado: `vite build` passa (chunk `LinkShortener-*.js` gerado, `UtmBuilder-*.js` rebuildado), sem erro de import/sintaxe. Fluxo end-to-end de redirect depende da Fase 3 (Cloudflare Worker + KV) e das env vars de prod; em local o link é criado e listado, e o clique pode ser simulado via `POST /api/clicks`.
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 2 — backend (rotas + criação das tabelas no boot)
+
+**O que foi feito:**
+- `server/db.ts` — função `initializeShortLinksTables()` cria `cortex_core.short_links` e `short_link_clicks` (CREATE TABLE IF NOT EXISTS + índices), seguindo o padrão das demais `initialize*Table()` do repo. Idempotente; roda no boot (local e prod), sem precisar de `db:push`.
+- `server/index.ts` — `initializeShortLinksTables()` adicionada ao `Promise.all` de inicialização + import.
+- `server/routes/shortener.ts` (novo) — três rotas:
+  - `POST /api/links/shorten` (Growth + admins): valida/sanitiza o slug (estrito `[a-z0-9-]`, reservados bloqueados), extrai a UTM do `targetUrl`, grava em `short_links` com guarda de unicidade (`ON CONFLICT (slug)` → 409) e escreve `slug→targetUrl` no KV do Cloudflare (best-effort: sem `CF_*` em local, pula o KV e retorna `kvSynced:false`).
+  - `GET /api/links` (Growth + admins): lista links + contagem de cliques (LEFT JOIN agregado) + nome do criador.
+  - `POST /api/clicks`: ingestão de clique do Worker, protegida por header secreto `x-click-secret` (`CLICK_INGEST_SECRET`); grava em `short_link_clicks`.
+- `server/routes.ts` — registro de `registerShortenerRoutes(app)` + import.
+
+**Por que:**
+- Fase 2 do encurtador (plano em `docs/encurtador-links-plano.md`): a camada de servidor pra criar/gerir links e receber cliques, pronta pra ser consumida pelo frontend (Fase 4) e pelo Worker (Fase 3).
+
+**Arquivos alterados:**
+- `server/db.ts` - função de init das duas tabelas.
+- `server/index.ts` - wiring no boot.
+- `server/routes/shortener.ts` (novo) - rotas shorten/links/clicks.
+- `server/routes.ts` - import + registro.
+
+**Impacto arquitetural:** Nenhum estrutural. Tabelas criadas pela convenção `initialize*Table()` existente (não usa `db:push`, evitando diff do schema inteiro). Validado: `tsc` não acusa erro novo nos arquivos tocados (erros restantes são pré-existentes no `routes.ts`); `esbuild` bundla o server limpo (exit 0). KV e auth de clique são best-effort sem `CF_*`/`CLICK_INGEST_SECRET`, então o backend roda no preview local. Falta env de prod: `SHORTENER_BASE_URL`, `CF_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`, `CF_API_TOKEN`, `CLICK_INGEST_SECRET`.
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 1 — tabelas short_links e short_link_clicks
+
+**O que foi feito:**
+- `shared/schema.ts` — duas tabelas novas no schema `cortex_core` para o encurtador de links da Turbo (`marketing.turbopartners.com.br/<slug>`):
+  - `short_links`: cadastro do link curto (slug único personalizado, target_url com UTM, UTM desmembrada, FK lógica p/ generated_utm_links, created_by, expires_at). Índices em created_by e utm_campaign.
+  - `short_link_clicks`: um registro por clique (slug, clicked_at, country ISO-2, ip_hash, user_agent, referrer) para cruzar clique → lead (Bitrix) → venda por UTM. Índices em slug e clicked_at.
+- Tipos `ShortLink`/`InsertShortLink`/`ShortLinkClick`/`InsertShortLinkClick` exportados.
+- Plano completo do encurtador documentado em `docs/encurtador-links-plano.md`.
+
+**Por que:**
+- Base (Fase 1) do encurtador próprio: redirect via Cloudflare Worker na borda, mas cadastro + cliques no Postgres do Cortex para atribuição cruzada com Bitrix/Meta (nível "contar + cruzar"). Arquitetura e decisões em `docs/encurtador-links-plano.md`.
+
+**Arquivos alterados:**
+- `shared/schema.ts` - tabelas `short_links` e `short_link_clicks` + tipos (schema `cortex_core`).
+- `docs/encurtador-links-plano.md` (novo) - plano de implementação (5 fases) e decisões travadas.
+
+**Impacto arquitetural:** Nenhum estrutural. Só definição de schema (Drizzle); `tsc --noEmit` não acusa erros no schema. Criação física das tabelas (`npm run db:push`) é passo separado, ainda não executado.
 ## 2026-06-29 | feat(churn): histórico mensal de churn por motivo na tela Detalhamento
 
 **O que foi feito:**

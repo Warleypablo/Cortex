@@ -2743,3 +2743,49 @@ export async function initializeCrmInstagramTables(): Promise<void> {
     console.error('[database] erro ao inicializar CRM Instagram tables:', error);
   }
 }
+
+// Encurtador de links da Turbo (marketing.turbopartners.com.br).
+// short_links = cadastro (fonte de verdade; o KV do Cloudflare é só cache de redirect).
+// short_link_clicks = 1 registro por clique, enviado pelo Worker via POST /api/clicks.
+// Schema espelha shared/schema.ts (shortLinks / shortLinkClicks).
+export async function initializeShortLinksTables(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.short_links (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        slug VARCHAR(80) NOT NULL UNIQUE,
+        target_url TEXT NOT NULL,
+        utm_source VARCHAR(40),
+        utm_medium VARCHAR(20),
+        utm_campaign VARCHAR(120),
+        utm_term VARCHAR(120),
+        utm_content VARCHAR(200),
+        generated_utm_link_id VARCHAR,
+        created_by VARCHAR NOT NULL,
+        is_active BOOLEAN NOT NULL DEFAULT TRUE,
+        expires_at TIMESTAMP,
+        created_at TIMESTAMP NOT NULL DEFAULT NOW()
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_short_links_created_by ON cortex_core.short_links (created_by)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_short_links_utm_campaign ON cortex_core.short_links (utm_campaign)`);
+
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.short_link_clicks (
+        id VARCHAR PRIMARY KEY DEFAULT gen_random_uuid()::text,
+        slug VARCHAR(80) NOT NULL,
+        clicked_at TIMESTAMP NOT NULL DEFAULT NOW(),
+        country VARCHAR(2),
+        ip_hash VARCHAR(64),
+        user_agent TEXT,
+        referrer TEXT
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_short_link_clicks_slug ON cortex_core.short_link_clicks (slug)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_short_link_clicks_clicked_at ON cortex_core.short_link_clicks (clicked_at)`);
+
+    console.log('[database] short links tables initialized');
+  } catch (error) {
+    console.error('[database] erro ao inicializar short links tables:', error);
+  }
+}
