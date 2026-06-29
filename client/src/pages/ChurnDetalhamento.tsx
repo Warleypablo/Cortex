@@ -12,6 +12,7 @@ import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { RitmoDiario } from "@/components/churn/RitmoDiario";
+import { ChurnHistoricoMensal } from "@/components/churn/ChurnHistoricoMensal";
 import { ChurnPorDimensao } from "@/components/churn/ChurnPorDimensao";
 
 import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
@@ -197,16 +198,17 @@ export default function ChurnDetalhamento() {
       return { total_churned: 0, total_pausados: 0, mrr_perdido: 0, mrr_pausado: 0, ltv_total: 0, lt_medio: 0, ticket_medio: 0, total_abonado: 0, mrr_abonado: 0, abonado_por_motivo: {} as Record<string, { count: number; mrr: number }> };
     }
 
-    // Separar contratos regulares de abonados
-    const regulares = filteredContratos.filter(c => !c.is_abonado);
+    // O filtro por abono já foi aplicado em filteredContratos (toggle Todos/Não abonados/Abonados).
+    // Por padrão ("Todos") os abonados CONTAM como churn — alinhado ao ClickUp.
+    const churns = filteredContratos;
     const abonados = filteredContratos.filter(c => c.is_abonado);
 
-    const totalChurned = regulares.length;
+    const totalChurned = churns.length;
     const totalPausados = 0;
-    const mrrPerdido = regulares.reduce((sum, c) => sum + (c.valorr || 0), 0);
+    const mrrPerdido = churns.reduce((sum, c) => sum + (c.valorr || 0), 0);
     const mrrPausado = 0;
-    const ltvTotal = regulares.reduce((sum, c) => sum + (c.ltv || 0), 0);
-    const ltMedio = totalChurned > 0 ? regulares.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / totalChurned : 0;
+    const ltvTotal = churns.reduce((sum, c) => sum + (c.ltv || 0), 0);
+    const ltMedio = totalChurned > 0 ? churns.reduce((sum, c) => sum + (c.lifetime_meses || 0), 0) / totalChurned : 0;
     const ticketMedio = totalChurned > 0 ? mrrPerdido / totalChurned : 0;
 
     const totalAbonado = abonados.length;
@@ -401,6 +403,9 @@ export default function ChurnDetalhamento() {
           churnPorPessoa={data?.metricas?.churn_por_pessoa}
         />
       )}
+
+      {/* Histórico mensal de churn do ano (mesma régua da tela) — fim da página */}
+      <ChurnHistoricoMensal filterAbono={filterAbono} churnTargets={BP_CHURN_MRR_TARGETS} />
 
       <ChurnDrillDrawer
         open={!!drill}

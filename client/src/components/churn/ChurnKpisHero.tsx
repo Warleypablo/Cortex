@@ -16,7 +16,7 @@ import { formatCurrencyNoDecimals } from "@/lib/utils";
  * contains "evit" but NOT "inevit".
  */
 export function pctEvitavel(contratos: ChurnContract[]): number {
-  const churns = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
+  const churns = contratos.filter(c => c.tipo === "churn");
   const classified = churns.filter(c => c.evitabilidade_churn != null && c.evitabilidade_churn !== "");
   if (classified.length === 0) return 0;
 
@@ -113,7 +113,7 @@ export function ChurnKpisHero({
   ticketMedio,
   onDrill,
 }: ChurnKpisHeroProps): JSX.Element {
-  const churns = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
+  const churns = contratos.filter(c => c.tipo === "churn");
   const logosCount = churns.length;
   const evitavelPct = pctEvitavel(contratos);
 

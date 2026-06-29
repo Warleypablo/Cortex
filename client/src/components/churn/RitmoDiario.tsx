@@ -10,6 +10,7 @@ import {
   Tooltip,
   ResponsiveContainer,
   Cell,
+  LabelList,
 } from "recharts";
 import { type ChurnContract } from "@/components/churn/types";
 import { severityHex } from "@/components/churn/severity";
@@ -19,6 +20,17 @@ const SQUAD_BLACKLIST = ["turbo interno", "squad x", "interno", "x"];
 
 function isBlacklisted(squad: string): boolean {
   return SQUAD_BLACKLIST.includes((squad ?? "").toLowerCase().trim());
+}
+
+// Rótulo compacto no topo da barra: MRR em milhares ("28k", "6,5k"); contagem como inteiro.
+function barLabel(value: number, metric: MetricKey): string {
+  if (!value || value <= 0) return "";
+  if (metric === "count") return String(Math.round(value));
+  if (value >= 1000) {
+    const k = value / 1000;
+    return `${k >= 10 ? Math.round(k) : k.toFixed(1).replace(".", ",")}k`;
+  }
+  return String(Math.round(value));
 }
 
 function getDateKey(c: ChurnContract): string | null {
@@ -81,7 +93,7 @@ export function RitmoDiario({
   // Distinct squads from churn contracts (excluding blacklist)
   const squads = useMemo(() => {
     const churnContratos = contratos.filter(
-      (c) => c.tipo === "churn" && !c.is_abonado
+      (c) => c.tipo === "churn"
     );
     const set = new Set<string>();
     churnContratos.forEach((c) => {
@@ -93,7 +105,7 @@ export function RitmoDiario({
 
   // Base churn contracts
   const baseContratos = useMemo(() => {
-    let list = contratos.filter((c) => c.tipo === "churn" && !c.is_abonado);
+    let list = contratos.filter((c) => c.tipo === "churn");
     if (squadFilter !== "total") {
       list = list.filter(
         (c) => (c.squad ?? "").trim() === squadFilter
@@ -203,7 +215,7 @@ export function RitmoDiario({
       <ResponsiveContainer width="100%" height={220}>
         <BarChart
           data={series}
-          margin={{ top: 4, right: 8, left: 8, bottom: 4 }}
+          margin={{ top: 22, right: 8, left: 8, bottom: 4 }}
           barCategoryGap="30%"
         >
           <CartesianGrid
@@ -213,13 +225,13 @@ export function RitmoDiario({
           />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: 11, fill: "var(--foreground)" }}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
             tickFormatter={yTickFormatter}
-            tick={{ fontSize: 11, fill: "var(--muted-foreground)" }}
+            tick={{ fontSize: 11, fill: "var(--foreground)" }}
             tickLine={false}
             axisLine={false}
             width={metric === "mrr" ? 72 : 30}
@@ -247,6 +259,12 @@ export function RitmoDiario({
                 <Cell key={entry.dayKey} fill={severityHex(normalised)} />
               );
             })}
+            <LabelList
+              dataKey={metric}
+              position="top"
+              formatter={(v: number) => barLabel(v, metric)}
+              style={{ fontSize: 10, fontWeight: 700, fill: "var(--foreground)" }}
+            />
           </Bar>
         </BarChart>
       </ResponsiveContainer>
