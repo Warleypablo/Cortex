@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-06-29 | feat(ads-creation): módulo lotUploader (batch + thumb + descoberta estrita) p/ lotes manuais
+
+**O que foi feito:**
+- `server/services/adsCreation/lotUploader.ts`: helpers reutilizáveis pro fluxo "sobe esses ads" (vídeos subidos à mão no Gerenciador), trazendo-o pro mesmo padrão saudável da produção (`creator.ts`) — objetivo: **menos chamadas + taxa de erro ~0** (saúde pro upgrade de tier):
+  - **Descoberta ESTRITA** por nome exato (`<base>_9x16`/`<base>_4x5`) com **EARLY-EXIT** na paginação de `advideos` (para na 1ª página quando os vídeos são recentes) — não confunde famílias parecidas (`*_react_*` sem `_v2`, `creators_summit_lucas_h10_b*`, etc.) e escolhe id determinístico em duplicatas
+  - **Criação em BATCH** (`[creative, ad]` por ad via `metaBatch`) em vez de 2 calls/ad
+  - **Pré-busca de thumbnail** + `thumbnail_url` no creative → previne o `code=100` "problem uploading your video thumbnail" (que tomamos no lote Summit React); + **retry transitório** (regex inclui "please try again") + **fallback de Instagram**
+  - Lógica pura (index/match/montagem de batch) separada e **testada** (17 testes)
+- `test/services/lotUploader.test.ts`: 17 testes (match estrito ignora famílias parecidas, dedup determinístico, par faltando, early-exit set, thumbnail_url, montagem de batch com `{result=...}`+`depends_on`, chunking ≤25 ads, regex transitório/rate-limit) — **todos passando**, `tsc` limpo
+- `subir-lote-ads.ts`: **template config-driven** (edita só faixa de TP + campanha + tema) que consolida os `subir-*-ads.ts` soltos usando o módulo, com DRY padrão e idempotência
+
+**Por que:**
+- Usuário quer subir o tier da Marketing API de forma saudável e rápida; o gate é a taxa de erro (já <1%) + volume de chamadas. A produção já batcheia, mas os scripts soltos de lote faziam call-por-ad e não pré-buscavam thumb (causa do único erro do dia). Este módulo fecha essa lacuna
+
+**Não testado ao vivo nesta sessão:** API estava em ~106% (recuperando); validação por `tsc` + 17 testes unitários. O caminho de rede reusa o padrão de `metaBatch` já comprovado em `creator.ts`. DRY ao vivo pendente pra quando a janela de rate-limit limpar.
+
+**Arquivos novos:**
+- `server/services/adsCreation/lotUploader.ts` - helpers de descoberta + criação em batch
+- `test/services/lotUploader.test.ts` - 17 testes unitários
+- `subir-lote-ads.ts` - template de subida de lote
+
+**Impacto arquitetural:** Novo módulo de serviço reutilizável; não altera o pipeline de produção existente. Scripts de lote passam a ter um caminho único, testado e econômico em quota.
+
+---
+
 ## 2026-06-29 | feat(ads-creation): sobe 5 ads Estratégia Peculiar React V2 (Lucas) no conjunto 173 na CBO Creators
 
 **O que foi feito:**
