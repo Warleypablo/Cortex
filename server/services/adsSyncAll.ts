@@ -1,7 +1,7 @@
 /**
- * Orquestrador único dos syncs de mídia paga: Meta + Google Turbo + TikTok Ads +
- * LinkedIn Ads. Roda as 4 plataformas EM PARALELO, cada uma com seu próprio pool
- * e isolada (Promise.allSettled) — uma falhar não derruba as outras.
+ * Orquestrador único dos syncs de plataformas: Meta + Google Turbo + TikTok Ads +
+ * LinkedIn Ads + LinkedIn Orgânico + YouTube. Roda todas EM PARALELO, cada uma
+ * isolada (Promise.allSettled) — uma falhar não derruba as outras.
  *
  * Usado pelo job agendado (server/index.ts, 12h) e pode ser reusado por um
  * endpoint admin de "sync all".
@@ -11,6 +11,7 @@ import { syncMetaAds, backfillMetaInsightsGaps } from './metaAdsSync';
 import { syncGoogleTurbo } from './googleSync';
 import { syncTiktokAds } from './tiktokAdsSync';
 import { syncLinkedinAds } from './linkedinAdsSync';
+import { syncLinkedin } from './linkedinSync';
 
 export interface AdsSyncPlatformResult {
   label: string;
@@ -55,6 +56,13 @@ export async function syncAllAdsPlatforms(): Promise<AdsSyncPlatformResult[]> {
     runOne('google', (p) => syncGoogleTurbo(p)),
     runOne('tiktok', (p) => syncTiktokAds(p, 30)),
     runOne('linkedin', (p) => syncLinkedinAds(p, 30)),
+    runOne('linkedin-organic', (p) => syncLinkedin(p)),
+    // YouTube usa Drizzle (db), não Pool cru — o pool do runOne é ignorado aqui.
+    runOne('youtube', async () => {
+      const { db } = await import('../db');
+      const { syncAllChannels } = await import('./youtubeSync');
+      return syncAllChannels(db);
+    }),
   ]);
   return settled.map((s) =>
     s.status === 'fulfilled'

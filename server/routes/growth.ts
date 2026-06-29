@@ -87,7 +87,9 @@ END`;
  * esperar utm_medium acumular.
  */
 const MEDIUM_CASE_SQL = `CASE
-  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound') THEN LOWER(TRIM(utm_medium))
+  -- Sources de indicação são sempre referral, mesmo com utm_medium errado (ex: cliente tagueado como 'organic').
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('cliente','colaborador','afiliado','influencer','marketplace') THEN 'referral'
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound','victor','andre','rodrigo') THEN LOWER(TRIM(utm_medium))
   WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'organic'
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'organic'
   WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'organic'
@@ -115,7 +117,11 @@ END`;
  * source (ex: linkedin_ads e linkedin → 'linkedin'); o medium é quem distingue.
  */
 const SOURCE_CANON_SQL = `CASE
-  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound')
+  -- Referral com source fora do vocabulário canônico (ex: 'noway' = nome do cliente que indicou)
+  -- vira 'cliente'; o nome cru do indicador fica no nível de campanha.
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('cliente','colaborador','afiliado','influencer','marketplace') THEN LOWER(TRIM(utm_source))
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) = 'referral' THEN 'cliente'
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','outbound','victor','andre','rodrigo')
        AND NULLIF(LOWER(TRIM(COALESCE(utm_source, ''))), '') IS NOT NULL THEN LOWER(TRIM(utm_source))
   WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
@@ -2260,6 +2266,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const ma = await db.execute(sql`SELECT ad_id::text AS id, ad_name FROM meta_ads.meta_ads`);
         for (const r of ma.rows as any[]) if (r.ad_name) metaAdNames.set(r.id, r.ad_name);
       } catch (e) { /* schema meta_ads ausente → mantém IDs */ }
+      // TikTok: campaign=campaign_id, term=adgroup_id (sufixo "-TikTok"), content=ad_id.
+      const tiktokCampNames = new Map<string, string>();
+      const tiktokAdsetNames = new Map<string, string>();
+      const tiktokAdNames = new Map<string, string>();
+      try {
+        // tiktok.ad_campaigns só existe depois de rodar scripts/create-tiktok-ads-tables.ts.
+        const tc = await db.execute(sql`SELECT campaign_id::text AS id, campaign_name FROM tiktok.ad_campaigns`);
+        for (const r of tc.rows as any[]) if (r.campaign_name) tiktokCampNames.set(r.id, r.campaign_name);
+      } catch (e) { /* tabela tiktok.ad_campaigns ausente → campanha fica como ID */ }
+      try {
+        const ts = await db.execute(sql`SELECT adgroup_id::text AS id, adgroup_name FROM tiktok.ad_groups`);
+        for (const r of ts.rows as any[]) if (r.adgroup_name) tiktokAdsetNames.set(r.id, r.adgroup_name);
+        const ta = await db.execute(sql`SELECT ad_id::text AS id, ad_name FROM tiktok.ads`);
+        for (const r of ta.rows as any[]) if (r.ad_name) tiktokAdNames.set(r.id, r.ad_name);
+      } catch (e) { /* schema tiktok ausente → mantém IDs */ }
 
       // Extrai o ID numérico líder (Meta usa sufixos tipo "1203...450-Instagram_Feed").
       const leadingId = (v: string): string => { const m = String(v).match(/^(\d{5,})/); return m ? m[1] : ''; };
@@ -2276,15 +2297,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           if (level === 'term') return metaAdsetNames.get(id) || raw;
           if (level === 'content') return metaAdNames.get(id) || raw;
         }
+        if (source === 'tiktok') {
+          if (level === 'campaign') return tiktokCampNames.get(id) || raw; // campanha
+          if (level === 'term') return tiktokAdsetNames.get(id) || raw; // conjunto
+          if (level === 'content') return tiktokAdNames.get(id) || raw; // anúncio
+        }
         return raw;
       };
 
       // ---- Montar árvore: medium → source → campaign → term → content ----
       const MEDIUM_LABELS: Record<string, string> = {
-        paid: 'Mídia Paga', organic: 'Orgânico', crm: 'CRM',
-        eventos: 'Eventos', referral: 'Referral', outbound: 'Outbound', outros: 'Outros',
+        paid: 'Mídia Paga', organic: 'Orgânico',
+        victor: 'Victor (canal próprio)', andre: 'André (canal próprio)', rodrigo: 'Rodrigo (canal próprio)',
+        crm: 'CRM', eventos: 'Eventos', referral: 'Referral', outbound: 'Outbound', outros: 'Outros',
       };
-      const MEDIUM_ORDER = ['paid', 'organic', 'crm', 'eventos', 'referral', 'outbound', 'outros'];
+      // Sócios (figuras-exceção) entram logo após Orgânico — dimensão de 1ª ordem (Constituição UTM §3.7).
+      const MEDIUM_ORDER = ['paid', 'organic', 'victor', 'andre', 'rodrigo', 'crm', 'eventos', 'referral', 'outbound', 'outros'];
       const mediumOrderOf = (m: string) => { const i = MEDIUM_ORDER.indexOf(m); return i >= 0 ? i : 998; };
       const sourceLabel = (s: string): string =>
         UTM_SOURCE_LABELS[s]
@@ -2340,6 +2368,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       injectSpend('facebook', metaInvestimento, metaSessoes);
       injectSpend('google', googleInvestimento, googleSessoes);
 
+      // Um nó tem "sinal" se ele (ou qualquer descendente) teve atividade real no período.
+      // Inclui investimento/sessões → mídia paga com gasto e ZERO leads continua visível
+      // (sinal de problema de atribuição). Só some quando TUDO está zerado.
+      const hasSignal = (r: Raw): boolean =>
+        r.leads > 0 || r.mqls > 0 || r.ra > 0 || r.rr > 0 ||
+        r.vendas > 0 || r.clientesUnicos > 0 || r.contratos > 0 ||
+        r.receitaPontual > 0 || r.receitaRecorrente > 0 ||
+        (r.investimento ?? 0) > 0 || (r.sessoes ?? 0) > 0 ||
+        r.leadTimeCount > 0;
+
       // Agregar bottom-up (soma os contadores brutos) e derivar métricas em cada nível.
       const buildNode = (node: TNode): { out: any; agg: Raw } => {
         const agg = emptyRaw();
@@ -2347,13 +2385,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const built = Array.from(node.children.values()).map((child) => {
           const r = buildNode(child);
           addRaw(agg, r.agg);
-          return { child, out: r.out, leads: r.agg.leads };
+          return { child, out: r.out, agg: r.agg, leads: r.agg.leads };
         });
         built.sort((a, b) => (a.child.order - b.child.order) || (b.leads - a.leads) || a.child.name.localeCompare(b.child.name));
+        // Poda recursiva: descarta filhos cuja subárvore inteira está zerada (esqueleto canônico sem dados).
+        const kept = built.filter((b) => hasSignal(b.agg));
         const out = {
           id: node.key, name: node.name, level: node.level,
           ...deriveMetrics(agg),
-          children: built.length ? built.map((b) => b.out) : undefined,
+          children: kept.length ? kept.map((b) => b.out) : undefined,
         };
         return { out, agg };
       };
@@ -2363,7 +2403,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const totalRaw = emptyRaw();
       for (const m of mediums) addRaw(totalRaw, m.built.agg);
 
-      const rows = mediums.map((m) => m.built.out);
+      const rows = mediums.filter((m) => hasSignal(m.built.agg)).map((m) => m.built.out);
       const total = { id: 'total', name: 'TOTAL GERAL', level: 'total', ...deriveMetrics(totalRaw) };
 
       console.log(`[api] Performance Plataformas: ${rows.length} mediums, ${leafMap.size} folhas`);

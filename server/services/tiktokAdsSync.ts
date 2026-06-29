@@ -15,6 +15,11 @@ import { decryptToken } from '../utils/encryption';
 
 const TT_BIZ_API = 'https://business-api.tiktok.com/open_api/v1.3';
 
+// Só sincronizamos a conta de ads da própria Turbo. Bready (Hevo) e Suburb são
+// advertisers de CLIENTES geridos pela Turbo no mesmo token — fora do escopo do
+// dashboard (a leitura em growth.ts já filtra por esse mesmo ID).
+const TURBO_ADVERTISER_IDS = ['7065303755092131842'];
+
 // Métricas básicas pedidas no report. cpc/cpm/ctr são derivados na leitura.
 const REPORT_METRICS = ['spend', 'impressions', 'clicks', 'conversion'];
 // Métricas a nível de anúncio (inclui video_play_actions → video_views).
@@ -72,8 +77,11 @@ export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsRes
     if (credRes.rows.length === 0) throw new Error('Nenhuma credencial TikTok "advertiser" ativa — autorize o fluxo de Ads');
     const token = decryptToken(credRes.rows[0].access_token_enc);
 
-    const advRes = await pool.query(`SELECT advertiser_id FROM tiktok.advertisers`);
-    if (advRes.rows.length === 0) throw new Error('Nenhum advertiser descoberto — re-autorize o TikTok advertiser');
+    const advRes = await pool.query(
+      `SELECT advertiser_id FROM tiktok.advertisers WHERE advertiser_id = ANY($1)`,
+      [TURBO_ADVERTISER_IDS],
+    );
+    if (advRes.rows.length === 0) throw new Error('Advertiser Turbo (7065303755092131842) não encontrado em tiktok.advertisers — re-autorize o TikTok advertiser');
 
     for (const { advertiser_id } of advRes.rows) {
       try {
@@ -269,8 +277,9 @@ export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsRes
     }
 
     await pool.query(
-      `UPDATE tiktok.sync_runs SET status=$2, rows_upserted=$3, finished_at=NOW() WHERE id=$1`,
-      [runId, result.errors.length ? 'partial' : 'ok', result.metricRows],
+      `UPDATE tiktok.sync_runs SET status=$2, rows_upserted=$3, error=$4, finished_at=NOW() WHERE id=$1`,
+      [runId, result.errors.length ? 'partial' : 'ok', result.metricRows,
+       result.errors.length ? result.errors.join(' | ').slice(0, 2000) : null],
     );
   } catch (err: any) {
     result.errors.push(err.message);
