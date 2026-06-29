@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-29 | feat(ads-creation): sobe 9 ads Creators Summit React em 2 conjuntos (Esther/Lucas) na CBO Creators
+
+**O que foi feito:**
+- `subir-summit-react-ads.ts`: cria **2 conjuntos** na camp CBO Creators teste (`120249141209100450`), **1 por persona** (máx 5 ads/conjunto), com ads pareados 9x16+4x5 via `asset_feed_spec`, tudo **PAUSED**:
+  - **171** `120252543545770450` — [Esther] Creator Summit React (4 ads): TP1731 (`…550390450`), TP1732 (`…555160450`), TP1733 (`…561880450`), TP1734 (`…568540450`)
+  - **172** `120252543570290450` — [Lucas] Creator Summit React (5 ads): TP1735 (`…572930450`), TP1736 (`…580280450`), TP1737 (`…611760450`), TP1738 (`…618280450`), TP1739 (`…636100450`)
+- **Match de vídeo ESTRITO** pelo nome EXATO do arquivo (`<base>_9x16` / `<base>_4x5`): o Gerenciador tinha várias famílias parecidas (`creators_summit_lucas_h1..h10_b1..b3_c1`, `Estrategia_peculiar_react_*`, `Mockup_caprichado_react_*`, `vv-creatorssummit-*`) que um match permissivo casava errado (h10→h1, b2/b3). Duplicatas do mesmo nome (os 4x5 da Esther estavam subidos 3×) → escolhe id determinístico (menor)
+- Clona config (otim/billing/pixel/atribuição/targeting/destination_type) + copy/link/CTA/UTM do irmão **142 Processo Bready** (placeholder Creators, link `pages.turbopartners.com.br/creators/`); idempotente por sufixo do nome do conjunto + TP do ad
+- **Erro transitório** code=100 "problem uploading your video thumbnail" no TP1737 no 1º run (Meta gerando thumb do vídeo) → re-run idempotente completou os 3 ads restantes. Conta chegou a 91% de uso, sem travar
+
+**Por que:**
+- Usuário pediu pra subir os ads (vídeos já no Gerenciador) pausados; estrutura = máx 5 ads/conjunto → 1 conjunto por persona (Esther 4, Lucas 5); pediu pra VERIFICAR contra Drive+planilha antes de subir (o que pegou o match permissivo errado)
+
+**Arquivos novos:**
+- `subir-summit-react-ads.ts` - criação dos 2 conjuntos + 9 ads pareados (DRY por padrão, `--go`, idempotente, match estrito)
+- `inspecionar-summit-react.ts` - verify read-only (cruza planilha × Gerenciador com match estrito + reporte de duplicatas)
+
+**Impacto arquitetural:** Nenhum — scripts standalone na raiz, mesmo padrão do `subir-caio-roteiros-ads.ts` / `subir-victor-ads.ts`.
+
+---
+
 ## 2026-06-29 | feat(ads-creation): cadastra 9 hooks Creators Summit React (TP1731-1739) na Biblioteca
 
 **O que foi feito:**
