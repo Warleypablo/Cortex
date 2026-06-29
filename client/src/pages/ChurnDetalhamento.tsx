@@ -12,6 +12,7 @@ import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { RitmoDiario } from "@/components/churn/RitmoDiario";
+import { ChurnHistoricoMensal } from "@/components/churn/ChurnHistoricoMensal";
 import { ChurnPorDimensao } from "@/components/churn/ChurnPorDimensao";
 
 import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
@@ -354,6 +355,9 @@ export default function ChurnDetalhamento() {
           onDrill={onDrill}
         />
       )}
+
+      {/* Histórico mensal de churn do ano (mesma régua da tela) */}
+      <ChurnHistoricoMensal filterAbono={filterAbono} churnTargets={BP_CHURN_MRR_TARGETS} />
 
       {/* Ritmo Diário — série por dia do período */}
       {!isLoading && (
