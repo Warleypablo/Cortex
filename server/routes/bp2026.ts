@@ -536,16 +536,17 @@ export async function computarBpReceitas(db: any): Promise<any> {
           i + 1 <= mesCorrente ? (agg.get(i + 1)?.get(seg)?.contratosRec ?? 0) : null);
       }
       // total de contratos vendidos no mês — denominador do "CAC por contrato".
-      // Régua: cada serviço vendido no deal (campo servicos_vendidos do Bitrix) = 1 contrato,
-      // então um deal com N serviços conta N contratos. Um deal vendido sem serviço listado
-      // conta 1 (piso). É ≥ deals ganhos (base do "por cliente"), logo mantém CAC/contrato ≤
-      // CAC/cliente. Mais granular que contar por segmento (que colapsa 2 serviços do mesmo
-      // segmento num só).
+      // Régua: contrato = serviço vendido (campo servicos_vendidos). O agg já conta serviços
+      // por segmento (contarServicosPorSegmento), então este total e as sub-linhas por produto
+      // (contratosVendidosRec) usam a MESMA régua e batem entre si. Como serviços ≥ deals
+      // ganhos, mantém CAC/contrato ≤ CAC/cliente.
       const servicosVendidosTotalPorMes: (number | null)[] = Array.from({ length: 12 }, (_, i) => {
         if (i + 1 > mesCorrente) return null;
-        return atrib.deals
-          .filter((d) => d.mes === i + 1)
-          .reduce((t, d) => t + (d.ids.length || 1), 0);
+        const porMes = agg.get(i + 1);
+        if (!porMes) return 0;
+        let t = 0;
+        porMes.forEach((cell) => { t += cell.contratosRec + cell.contratosPont; });
+        return t;
       });
       const { agg: aggVendas, totais: totaisVendas } = await carregarVendasProdutoClickup(db);
       const vendasProduto = montarVendasProduto({ agg: aggVendas, totais: totaisVendas, orcado, mesCorrente, mesFechado });
