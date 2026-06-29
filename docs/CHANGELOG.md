@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-29 | feat(encurtador): Fase 3 — Cloudflare Worker (redirect na borda + ingestão de clique)
+
+**O que foi feito:**
+- `cloudflare/shortener-worker/` (nova pasta, deploy separado via wrangler — fora do build do Cortex):
+  - `src/index.ts` — Worker que responde em `marketing.turbopartners.com.br/<slug>`: lê o slug no KV (`LINKS`), faz 302 pro destino com UTM intacta, e via `ctx.waitUntil` dispara `POST /api/clicks` pro Cortex (header `x-click-secret`, com country/ipHash SHA-256/userAgent/referrer) sem atrasar o redirect. Slug inexistente ou raiz → `FALLBACK_URL` (o site), nunca 404.
+  - `wrangler.toml` — rota `marketing.turbopartners.com.br/*`, binding KV `LINKS`, vars `CORTEX_CLICKS_URL`/`FALLBACK_URL` (secret fica via `wrangler secret put`).
+  - `package.json` (wrangler + @cloudflare/workers-types), `tsconfig.json` (isolado, types do Cloudflare — não entra no tsconfig do app, que só inclui client/shared/server).
+  - `README.md` — passo a passo da infra (KV namespace, secret, DNS AAAA `marketing`→`100::` proxied, `wrangler deploy`) + vars do Render no Cortex.
+- `.gitignore` — `.wrangler`.
+
+**Por que:**
+- Fase 3 do encurtador: a peça que faz o link **de fato redirecionar e contar o clique**. Fecha o ciclo criar (Cortex) → redirecionar (Worker) → clique no Postgres → cruzar com Bitrix.
+
+**Arquivos alterados:**
+- `cloudflare/shortener-worker/{src/index.ts,wrangler.toml,package.json,tsconfig.json,README.md}` (novos).
+- `.gitignore` - `.wrangler`.
+
+**Impacto arquitetural:** Nenhum no app (pasta isolada, deploy separado). Código validado por `esbuild` (sintaxe OK). **Ativação depende da infra do Ichino** (login Cloudflare, criar KV, secret, DNS, `wrangler deploy`, vars no Render) — passo a passo no README. Sem isso, o Cortex segue criando/listando links com `kvSynced:false`.
+
+---
+
 ## 2026-06-29 | feat(encurtador): Fase 4 revisão + Fase 5 — auto-encurtar + atribuição no Histórico
 
 **O que foi feito:**
