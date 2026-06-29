@@ -1,0 +1,6 @@
+# Publicador Orgânico — SEM dependências de terceiros.
+#
+# O pacote `agente/` é Python puro stdlib: HTTP via urllib, assinatura RS256 do
+# Google via `openssl` (binário do SO, presente na imagem Python da Render).
+# Este arquivo existe só pra o build Python da Render ter um requirements pra
+# instalar (instala nada e sai 0). Se um dia entrar uma lib de terceiros, lista aqui.

@@ -1,0 +1,70 @@
+# ============================================================
+# Blueprint da Render — Cron Job do Publicador Orgânico (Instagram)
+# ============================================================
+# Roda `agente.main_poller --once` a cada 5 min: reporta o estado pro painel,
+# consome comandos do painel e publica os cards cujo horário venceu.
+#
+# ⚠️  Este arquivo está DENTRO de automacoes/instagram-turbo/ de propósito —
+#     assim ele NÃO vira um Blueprint ativo (a Render só lê render.yaml na RAIZ
+#     do repo) e não mexe no web service do Cortex já configurado no dashboard.
+#
+#     Dois jeitos de usar (ver DEPLOY-RENDER.md):
+#       A) RECOMENDADO: criar o Cron Job pelo dashboard com os valores abaixo.
+#       B) IaC: mover este arquivo pra raiz do repo e conectar como Blueprint
+#          (revise antes — o web service do Cortex é gerenciado pelo dashboard).
+#
+# Secrets (sync: false) NÃO vão aqui — são preenchidos no dashboard da Render.
+# O service-account do Google é um "Secret File" (não cabe em env var).
+# ============================================================
+services:
+  - type: cron
+    name: organico-poller-instagram
+    runtime: python
+    plan: starter
+    schedule: "*/5 * * * *"           # a cada 5 min; tick não-publicante é rápido (<30s)
+    rootDir: automacoes/instagram-turbo
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m agente.main_poller --once
+    autoDeploy: true                  # redeploy no push pra main (mesmo do Cortex)
+    envVars:
+      # ---- Operação ----
+      - key: DRY_RUN
+        value: "0"                    # 0 = publica de verdade. Comece com "1" pra validar!
+      - key: POLL_INTERVAL_SECONDS
+        value: "300"                  # ignorado no modo --once; inofensivo
+      # ---- ClickUp ----
+      - key: CLICKUP_API_TOKEN
+        sync: false
+      - key: CLICKUP_WORKSPACE_ID
+        value: "31021986"
+      - key: CLICKUP_LIST_ID_INSTAGRAM
+        value: "901300920768"
+      # Campos do card (o de data é "Data de postagem", p minúsculo; horário é TEXTO)
+      - key: CLICKUP_POSTING_DATE_FIELD
+        value: "Data de postagem"
+      - key: CLICKUP_HORARIO_FIELD
+        value: "Horário"
+      # ---- Google (Drive/Docs) ----
+      # Secret File no dashboard → este path é onde a Render monta em runtime.
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        value: "/etc/secrets/service-account.json"
+      - key: GOOGLE_DRIVE_MESES_ROOT_FOLDER_ID
+        value: "1yGxKCORxe7PipuYKY1yd508IWQyKgIIt"
+      # ---- Re-host de mídia (Drive → GCS → signed URL pra Meta) ----
+      - key: GCS_REHOST_BUCKET
+        value: "turbo-ig-rehost"
+      # ---- Meta / Instagram ----
+      - key: META_LONG_LIVED_TOKEN     # ⚠️ expira a cada 60 dias — ver DEPLOY-RENDER.md
+        sync: false
+      - key: IG_BUSINESS_ACCOUNT_ID
+        sync: false
+      # ---- Anthropic (fallback de legenda quando o Doc está vazio) ----
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: ANTHROPIC_MODEL
+        value: "claude-sonnet-4-6"
+      # ---- Telemetria pro painel "Orgânico" do Cortex ----
+      - key: CORTEX_INGEST_URL
+        value: "https://cortex.turbopartners.com.br/api/growth/organico/ingest"
+      - key: ORGANICO_INGEST_TOKEN     # MESMO valor do .env do Cortex
+        sync: false
