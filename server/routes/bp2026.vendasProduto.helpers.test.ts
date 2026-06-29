@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { distribuirDeal, aovMedioPorSegmento } from "./bp2026.vendasProduto.helpers";
+import { distribuirDeal, aovMedioPorSegmento, contarServicosPorSegmento } from "./bp2026.vendasProduto.helpers";
 
 const noPr = new Map<number, Map<any, number>>();
 const noMix = new Map<string, Map<any, number>>();
@@ -11,7 +11,7 @@ describe("distribuirDeal", () => {
       { id: 1, cnpjNorm: "X", mes: 6, valorRec: 2997, valorPont: 0, ids: [846] },
       noPr, noMix, noMix, aovVazio, aovVazio
     );
-    expect(r).toEqual([{ segmento: "Performance", natureza: "recorrente", valor: 2997, contrato: 1 }]);
+    expect(r).toEqual([{ segmento: "Performance", natureza: "recorrente", valor: 2997 }]);
   });
 
   it("multi-produto com mix do ClickUp cobrindo todos os segmentos: usa proporção, total = deal (Badbeat)", () => {
@@ -59,12 +59,39 @@ describe("distribuirDeal", () => {
     expect(r.find((x) => x.segmento === "E-commerce")!.valor).toBe(7000);
   });
 
-  it("conta 1 contrato por segmento distinto da natureza", () => {
-    const r = distribuirDeal(
-      { id: 5, cnpjNorm: "Z", mes: 5, valorRec: 6000, valorPont: 0, ids: [846, 848] },
-      noPr, new Map([["Z", new Map<any, number>([["Performance", 1], ["Social", 1]])]]), noMix, {}, {}
+});
+
+describe("contarServicosPorSegmento (1 serviço = 1 contrato)", () => {
+  it("conta 1 contrato por serviço, agrupado por segmento×natureza", () => {
+    // 846 = Performance rec, 848 = Social rec -> 1 contrato em cada
+    const { recorrente, pontual } = contarServicosPorSegmento(
+      { id: 5, cnpjNorm: "Z", mes: 5, valorRec: 6000, valorPont: 0, ids: [846, 848] }
     );
-    expect(r.filter((x) => x.contrato === 1).length).toBe(2);
+    expect(recorrente.get("Performance")).toBe(1);
+    expect(recorrente.get("Social")).toBe(1);
+    expect(pontual.size).toBe(0);
+  });
+
+  it("2 serviços do MESMO segmento contam 2 (não colapsam)", () => {
+    // 850 = Creators pontual, 852 = Creators recorrente -> 1 rec + 1 pont (segmento Creators)
+    const dual = contarServicosPorSegmento(
+      { id: 6, cnpjNorm: "Z", mes: 5, valorRec: 5000, valorPont: 6000, ids: [850, 852] }
+    );
+    expect(dual.recorrente.get("Creators")).toBe(1);
+    expect(dual.pontual.get("Creators")).toBe(1);
+    // 866 = Blog Post rec (Others) duas vezes -> 2 contratos em Others recorrente
+    const repetido = contarServicosPorSegmento(
+      { id: 7, cnpjNorm: "Z", mes: 5, valorRec: 4000, valorPont: 0, ids: [866, 858] }
+    );
+    expect(repetido.recorrente.get("Others")).toBe(2);
+  });
+
+  it("deal vendido sem serviço mapeado conta 1 contrato em Others (piso)", () => {
+    const semServico = contarServicosPorSegmento(
+      { id: 8, cnpjNorm: "Z", mes: 5, valorRec: 3000, valorPont: 0, ids: [] }
+    );
+    expect(semServico.recorrente.get("Others")).toBe(1);
+    expect(semServico.pontual.size).toBe(0);
   });
 });
 
