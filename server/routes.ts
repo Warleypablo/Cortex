@@ -5306,6 +5306,61 @@ Estruture sua resposta em:
     }
   });
 
+  // Histórico mensal de churn (por motivo) — MESMA régua da tela Detalhamento de Churn:
+  // exclui os 3 motivos "nunca virou base" e aplica o abono conforme o toggle (filterAbono).
+  app.get("/api/analytics/churn-historico-mensal", async (req, res) => {
+    try {
+      const filterAbono = (req.query.filterAbono as string) || "todos"; // todos | nao_abonados | abonados
+      const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
+      const inicio = `${ano}-01-01`;
+      const fim = `${ano}-12-31`;
+
+      let abonoFilter = sql``;
+      if (filterAbono === "nao_abonados") abonoFilter = sql`AND COALESCE(abonar_churn, '') <> 'Sim'`;
+      else if (filterAbono === "abonados") abonoFilter = sql`AND COALESCE(abonar_churn, '') = 'Sim'`;
+
+      const result = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') AS mes,
+          COALESCE(NULLIF(TRIM(motivo_cancelamento), ''), 'Não especificado') AS motivo,
+          SUM(COALESCE(valor_r, 0)) AS mrr,
+          COUNT(*) AS logos
+        FROM cortex_core.vw_cup_churn_ajustado
+        WHERE data_solicitacao_encerramento >= ${inicio}::date
+          AND data_solicitacao_encerramento <= ${fim}::date
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+          ${abonoFilter}
+        GROUP BY 1, 2
+        ORDER BY 1
+      `);
+
+      // Pivot: mês -> { total, porMotivo }
+      const mesesMap: Record<string, { mes: string; total: number; logos: number; porMotivo: Record<string, number> }> = {};
+      const motivoTotals: Record<string, number> = {};
+      for (const r of result.rows as any[]) {
+        const mes = r.mes as string;
+        const motivo = r.motivo as string;
+        const mrr = Number(r.mrr) || 0;
+        const logos = Number(r.logos) || 0;
+        if (!mesesMap[mes]) mesesMap[mes] = { mes, total: 0, logos: 0, porMotivo: {} };
+        mesesMap[mes].porMotivo[motivo] = (mesesMap[mes].porMotivo[motivo] || 0) + mrr;
+        mesesMap[mes].total += mrr;
+        mesesMap[mes].logos += logos;
+        motivoTotals[motivo] = (motivoTotals[motivo] || 0) + mrr;
+      }
+
+      const motivos = Object.entries(motivoTotals)
+        .sort((a, b) => b[1] - a[1])
+        .map(([m]) => m);
+      const series = Object.values(mesesMap).sort((a, b) => a.mes.localeCompare(b.mes));
+
+      res.json({ series, motivos, ano, filterAbono });
+    } catch (error) {
+      console.error("[api] Error fetching churn historico mensal:", error);
+      res.status(500).json({ error: "Failed to fetch churn historico mensal data" });
+    }
+  });
+
   // Churn Consolidado Trimestral - churns agrupados por squad e trimestre
   app.get("/api/churn/consolidado-trimestral", async (req, res) => {
     try {
