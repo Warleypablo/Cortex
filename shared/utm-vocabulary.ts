@@ -30,7 +30,7 @@ export const UTM_MEDIUM_LABELS: Record<UtmMedium, string> = {
 
 export const UTM_SOURCES_BY_MEDIUM: Record<UtmMedium, readonly string[]> = {
   paid: ['facebook', 'google', 'youtube', 'linkedin', 'tiktok', 'pinterest'],
-  organic: ['instagram', 'linkedin', 'youtube', 'tiktok', 'pinterest'],
+  organic: ['instagram', 'linkedin', 'youtube', 'youtube-cast', 'tiktok', 'pinterest'],
   eventos: [], // vocabulário aberto — input livre com slug do nome do evento
   referral: ['cliente', 'colaborador', 'afiliado', 'influencer', 'marketplace'],
   crm: ['email', 'whatsapp', 'sms'],
@@ -45,6 +45,7 @@ export const UTM_SOURCE_LABELS: Record<string, string> = {
   facebook: 'Facebook (Meta Ads)',
   google: 'Google Ads',
   youtube: 'YouTube',
+  'youtube-cast': 'YouTube — Turbo Cast',
   linkedin: 'LinkedIn',
   tiktok: 'TikTok',
   pinterest: 'Pinterest',
