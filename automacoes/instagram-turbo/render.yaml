@@ -1,37 +1,28 @@
 # ============================================================
-# Blueprint da Render — Cron Job do Publicador Orgânico (Instagram)
+# Blueprint da Render — Publicador Orgânico (Instagram), DOIS crons
 # ============================================================
-# Roda `agente.main_poller --once` a cada 5 min: reporta o estado pro painel,
-# consome comandos do painel e publica os cards cujo horário venceu.
+# Dois ritmos de propósito (ver DEPLOY-RENDER.md):
+#   1) RELEITURA do ClickUp  → de hora em hora  (--mode report) — parte PESADA,
+#      atualiza o calendário com os cards novos do dia.
+#   2) PUBLICAÇÃO + botões    → a cada 5 min     (--mode publish) — parte LEVE,
+#      não relê o ClickUp inteiro; só pergunta ao Cortex "tem algo pra postar /
+#      algum botão clicado?". Mantém o post no horário e o "Soltar agora" rápido.
 #
 # ⚠️  Este arquivo está DENTRO de automacoes/instagram-turbo/ de propósito —
-#     assim ele NÃO vira um Blueprint ativo (a Render só lê render.yaml na RAIZ
-#     do repo) e não mexe no web service do Cortex já configurado no dashboard.
+#     assim NÃO vira um Blueprint ativo (a Render só lê render.yaml na RAIZ do
+#     repo) e não mexe no web service do Cortex já configurado no dashboard.
+#     Para usar como IaC, mova-o pra raiz e conecte como Blueprint (revise antes).
+#     RECOMENDADO: criar os 2 Cron Jobs pelo dashboard com os valores abaixo.
 #
-#     Dois jeitos de usar (ver DEPLOY-RENDER.md):
-#       A) RECOMENDADO: criar o Cron Job pelo dashboard com os valores abaixo.
-#       B) IaC: mover este arquivo pra raiz do repo e conectar como Blueprint
-#          (revise antes — o web service do Cortex é gerenciado pelo dashboard).
-#
-# Secrets (sync: false) NÃO vão aqui — são preenchidos no dashboard da Render.
-# O service-account do Google é um "Secret File" (não cabe em env var).
+# Secrets (sync:false) e o Secret File do Google são preenchidos no dashboard.
 # ============================================================
-services:
-  - type: cron
-    name: organico-poller-instagram
-    runtime: python
-    plan: starter
-    schedule: "*/5 * * * *"           # a cada 5 min; tick não-publicante é rápido (<30s)
-    rootDir: automacoes/instagram-turbo
-    buildCommand: pip install -r requirements.txt
-    startCommand: python -m agente.main_poller --once
-    autoDeploy: true                  # redeploy no push pra main (mesmo do Cortex)
+
+# Variáveis compartilhadas pelos dois crons (preencha os sync:false no dashboard).
+envVarGroups:
+  - name: organico-instagram
     envVars:
-      # ---- Operação ----
       - key: DRY_RUN
         value: "0"                    # 0 = publica de verdade. Comece com "1" pra validar!
-      - key: POLL_INTERVAL_SECONDS
-        value: "300"                  # ignorado no modo --once; inofensivo
       # ---- ClickUp ----
       - key: CLICKUP_API_TOKEN
         sync: false
@@ -39,13 +30,11 @@ services:
         value: "31021986"
       - key: CLICKUP_LIST_ID_INSTAGRAM
         value: "901300920768"
-      # Campos do card (o de data é "Data de postagem", p minúsculo; horário é TEXTO)
       - key: CLICKUP_POSTING_DATE_FIELD
-        value: "Data de postagem"
+        value: "Data de postagem"     # p minúsculo de propósito (nome real do campo)
       - key: CLICKUP_HORARIO_FIELD
         value: "Horário"
-      # ---- Google (Drive/Docs) ----
-      # Secret File no dashboard → este path é onde a Render monta em runtime.
+      # ---- Google (Drive/Docs) — Secret File montado em runtime ----
       - key: GOOGLE_SERVICE_ACCOUNT_JSON
         value: "/etc/secrets/service-account.json"
       - key: GOOGLE_DRIVE_MESES_ROOT_FOLDER_ID
@@ -68,3 +57,30 @@ services:
         value: "https://cortex.turbopartners.com.br/api/growth/organico/ingest"
       - key: ORGANICO_INGEST_TOKEN     # MESMO valor do .env do Cortex
         sync: false
+
+services:
+  # (1) RELEITURA do ClickUp — de hora em hora. Pega cards novos, atualiza calendário.
+  - type: cron
+    name: organico-report-instagram
+    runtime: python
+    plan: starter
+    schedule: "0 * * * *"             # minuto 0 de toda hora (24x/dia ≫ 3x pedidas)
+    rootDir: automacoes/instagram-turbo
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m agente.main_poller --once --mode report
+    autoDeploy: true
+    envVars:
+      - fromGroup: organico-instagram
+
+  # (2) PUBLICAÇÃO + botões — a cada 5 min. Leve (consulta o Cortex, não o ClickUp).
+  - type: cron
+    name: organico-publish-instagram
+    runtime: python
+    plan: starter
+    schedule: "*/5 * * * *"           # a cada 5 min → post no horário + "Soltar agora" rápido
+    rootDir: automacoes/instagram-turbo
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m agente.main_poller --once --mode publish
+    autoDeploy: true
+    envVars:
+      - fromGroup: organico-instagram

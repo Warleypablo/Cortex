@@ -4,26 +4,32 @@ Como deixar o agente publicando **sozinho na nuvem** — Mac ligado, desligado o
 fechado não importa. O motor (`agente/main_poller.py`) já existe; aqui só
 hospedamos ele.
 
-**Escopo desta v1:** Instagram, via **Cron Job** que roda `--once` a cada 5 min.
+**Escopo desta v1:** Instagram, via **dois Cron Jobs** em ritmos diferentes.
 TikTok fica pra depois (precisa resolver token efêmero — ver fim do doc).
 
 ---
 
-## Como funciona (modelo de execução)
+## Como funciona (modelo de execução) — DOIS ritmos
 
-A cada 5 min a Render sobe um container novo, roda **um tick** e desliga:
+A releitura do ClickUp é **pesada** (lista as aprovadas + lê Doc/Drive de cada
+card), mas a publicação precisa ser **frequente** (pra sair no horário). Resolver
+os dois com um cron único forçaria escolher entre "martelar o ClickUp" ou "postar
+atrasado". Por isso são **dois crons**:
 
-```
-python -m agente.main_poller --once
-```
+| Cron | Ritmo | Comando | O que faz |
+|---|---|---|---|
+| **Releitura** | de hora em hora | `--mode report` | Relê o ClickUp, pega cards novos do dia, atualiza o calendário (24x/dia ≫ as 3x pedidas). |
+| **Publicação** | a cada 5 min | `--mode publish` | Publica os cards cujo horário venceu + executa os botões (Soltar/Agendar/Cancelar/Pausar). **Não relê o ClickUp inteiro** — só pergunta ao Cortex "tem algo pra postar / botão clicado?" (consulta leve no banco; só toca o ClickUp quando vai publicar um card específico). |
 
-Um tick faz 3 coisas (`main_poller.py:tick`):
-1. **reporta** o estado de cada card aprovado pro painel (saúde + readiness)
-2. **consome** os comandos do painel (Soltar agora / Agendar / Cancelar)
-3. **publica** os cards cujo horário (campo do card) já venceu
+Resultado: card novo aparece no calendário em até ~1h; post sai no horário (atraso
+≤5 min); "Soltar agora" responde em ≤5 min (lê aquele card na hora, não espera a
+releitura). Ninguém precisa clicar nada pro fluxo automático.
 
-Não precisa de ninguém clicando nada. O card sai no horário dele (com até ~5 min
-de atraso, que é a granularidade do cron).
+> **Trade-off da releitura horária:** um card adicionado no ClickUp *entre* duas
+> releituras (ex.: criado 14h05 pra sair 14h30) só entra no calendário na próxima
+> hora — e pode sair atrasado. Se for urgente, o atalho é **"Soltar agora"** no
+> painel (não depende da releitura). Quer menos atraso? Suba a frequência do cron
+> de releitura (ex.: `*/30 * * * *`).
 
 > **Por que Cron e não Worker 24/7?** Mais barato, sem processo travado em
 > memória, e cada run é isolado — se um tick crashar, o próximo sobe limpo.
@@ -48,24 +54,34 @@ de atraso, que é a granularidade do cron).
 
 ## Passo a passo (Dashboard da Render — recomendado)
 
+São **dois Cron Jobs**, idênticos exceto **Schedule** e **Command**. Crie os dois:
+
+| | Cron 1 — Releitura | Cron 2 — Publicação |
+|---|---|---|
+| **Name** | `organico-report-instagram` | `organico-publish-instagram` |
+| **Schedule** | `0 * * * *` (de hora em hora) | `*/5 * * * *` (a cada 5 min) |
+| **Command** | `python -m agente.main_poller --once --mode report` | `python -m agente.main_poller --once --mode publish` |
+
+Para **cada** cron:
 1. **New → Cron Job** → conecte o repo do Cortex.
 2. **Root Directory:** `automacoes/instagram-turbo`
 3. **Runtime:** Python · **Build:** `pip install -r requirements.txt`
-4. **Command:** `python -m agente.main_poller --once`
-5. **Schedule:** `*/5 * * * *`
-6. **Secret File:** adicione um arquivo chamado **`service-account.json`** com o
-   conteúdo do JSON. A Render monta em `/etc/secrets/service-account.json`
-   (já é o valor de `GOOGLE_SERVICE_ACCOUNT_JSON` abaixo).
-7. **Environment Variables:** preencha a tabela abaixo.
-8. **⚠️ Suba primeiro com `DRY_RUN=1`** e rode o cron manualmente (botão *Run*)
-   uma vez. Confira nos logs que ele lista as tasks e reporta pro painel **sem
-   publicar**. Veja o painel "Orgânico" do Cortex atualizar.
-9. Validado? Troque **`DRY_RUN=0`** e salve. A partir daí publica de verdade.
+4. **Command** e **Schedule:** conforme a tabela acima.
+5. **Secret File:** adicione um arquivo chamado **`service-account.json`** com o
+   conteúdo do JSON (precisa nos **dois** crons). A Render monta em
+   `/etc/secrets/service-account.json` (já é o valor de `GOOGLE_SERVICE_ACCOUNT_JSON`).
+6. **Environment Variables:** preencha a tabela abaixo (nos dois). Dica: crie um
+   **Environment Group** `organico-instagram` com tudo e linke nos dois crons —
+   aí você mantém as variáveis num lugar só.
+7. **⚠️ Suba primeiro com `DRY_RUN=1`** e rode cada cron na mão (botão *Run*).
+   Confira nos logs: o `report` lista as tasks e atualiza o painel; o `publish`
+   roda leve **sem publicar**. Veja o painel "Orgânico" do Cortex atualizar.
+8. Validado? Troque **`DRY_RUN=0`** no grupo/variáveis e salve. A partir daí publica.
 
-> Alternativa IaC: o `render.yaml` ao lado tem essa mesma spec pronta. Pra usar
-> como Blueprint, **mova-o pra raiz do repo** e conecte — mas revise antes,
-> porque o web service do Cortex hoje é gerenciado pelo dashboard, não por
-> Blueprint.
+> Alternativa IaC: o `render.yaml` ao lado já tem os dois crons + o Environment
+> Group prontos. Pra usar como Blueprint, **mova-o pra raiz do repo** e conecte —
+> mas revise antes, porque o web service do Cortex hoje é gerenciado pelo
+> dashboard, não por Blueprint. (O Secret File continua sendo upload manual.)
 
 ### Variáveis de ambiente
 
@@ -114,10 +130,12 @@ card antes do marcador ser escrito. Na prática um tick que não publica é < 30
 o `schedule` pra `*/10` ou migre pra Worker 24/7 com lock real.
 
 ### 3. Monitoramento / heartbeat
-Cada tick faz POST do ciclo pro painel (`state_sink.report_cycle`) — então o
-painel "Orgânico" mostra "último tick" e saúde. Configure um **alerta** (o
-WhatsApp da Fase 4 já estava no mapa) pra avisar "sem tick há > 20 min" ou
-"falha ao publicar". Sem isso, você não fica sabendo que parou.
+Os **dois** crons batem heartbeat no painel: o `report` (de hora em hora) manda o
+ciclo completo com as contagens, e o `publish` (a cada 5 min) manda um heartbeat
+leve — então a saúde do painel ("último tick") fica fresca a ≤5 min, sem parecer
+parada entre as releituras. Configure um **alerta** (o WhatsApp da Fase 4 já
+estava no mapa) pra avisar "sem tick há > 15 min" ou "falha ao publicar". Sem
+isso, você não fica sabendo que parou.
 
 ### 4. O conteúdo upstream continua humano
 O agente publica sozinho, mas só sai card **pronto**: legenda no Doc, mídia no
@@ -125,21 +143,28 @@ Drive, **Data de postagem + Horário** preenchidos. Card incompleto ele pula de
 propósito (é o `readiness` funcionando). A publicação é 100% automática; o
 *abastecimento dos cards* segue manual.
 
-### 5. Custo do Anthropic
-Todo tick replaneja cada card aprovado, e cards sem legenda podem chamar o Claude.
-Com muitos cards isso é custo + latência a cada 5 min. Se virar problema, dá pra
-separar o "report" (frequente) do "publish" (frequente) do replanejamento pesado.
+### 5. Custo do Anthropic e carga no ClickUp — já mitigados pela separação
+A releitura pesada (listar aprovadas + ler Doc/Drive de cada card, podendo chamar
+o Claude pra legenda) roda **só de hora em hora** (`--mode report`), não a cada
+5 min. O cron de 5 min (`--mode publish`) é leve: consulta o Cortex e só toca
+ClickUp/Drive/Anthropic quando *de fato* vai publicar um card. Isso já segura
+custo do Anthropic e rate-limit do ClickUp. Se ainda assim apertar, baixe a
+frequência da releitura (ex.: `0 6-22 * * *` = só em horário comercial).
 
 ---
 
 ## Validação pós-deploy (checklist)
 
-- [ ] Cron rodou com `DRY_RUN=1` e logou as tasks **sem publicar**.
+- [ ] Os **dois** crons rodaram com `DRY_RUN=1`: o `report` listou as tasks e o
+      `publish` rodou leve, ambos **sem publicar**.
 - [ ] Painel "Orgânico" do Cortex atualizou (a rota `/ingest` aceitou o bearer
-      token — ela é token-auth, não sessão).
+      token — ela é token-auth, não sessão), e a saúde mostra "último tick" recente.
+- [ ] Card novo criado no ClickUp aparece no calendário **na releitura seguinte**
+      (≤ 1h) — confirma o ciclo ClickUp → calendário.
 - [ ] Service Account lê Drive/Docs e tem acesso ao bucket `turbo-ig-rehost`.
 - [ ] `DRY_RUN=0` e **um** post real saiu no horário do card (confira que o
       comentário `[agente:postado v1]` apareceu na task e que NÃO duplicou).
+- [ ] **"Soltar agora"** no painel publica em ≤5 min (testa o cron `publish`).
 - [ ] Lembrete de rotação do token Meta criado (~50 dias).
 
 ---
