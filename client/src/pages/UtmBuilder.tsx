@@ -50,6 +50,12 @@ interface HistoryRow {
   createdAt: string;
   userName: string | null;
   userEmail: string | null;
+  shortSlug: string | null;
+  clicks: number;
+  mqls: number;
+  reunioesMarcadas: number;
+  reunioesRealizadas: number;
+  vendas: number;
 }
 
 const OUTRO_VALUE = "__outro__";
@@ -135,6 +141,11 @@ function TabGerar() {
   const [content, setContent] = useState("");
   const [copied, setCopied] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  // Encurtador: depois de gerar a UTM, dá pra criar um link curto (Fase 4)
+  const [generatedLinkId, setGeneratedLinkId] = useState<string | null>(null);
+  const [slug, setSlug] = useState("");
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [shortCopied, setShortCopied] = useState(false);
 
   // Reset cascata ao trocar medium
   useEffect(() => {
@@ -234,20 +245,51 @@ function TabGerar() {
     onSuccess: async (res: any) => {
       const data = await res.json();
       setGeneratedUrl(data.url);
+      setGeneratedLinkId(data.id || null);
+      setShortUrl(null);
       navigator.clipboard.writeText(data.url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
-      toast({
-        title: "Link gerado e copiado!",
-        description: data.isAdhoc
-          ? "Você usou um valor que ainda não está cadastrado — admin vai oficializar depois."
-          : "URL pronta para colar onde precisar.",
-      });
+      // Auto-encurtar: todo link gerado já nasce com um curto (slug digitado ou aleatório).
+      shortenMutation.mutate({ slug, targetUrl: data.url, generatedUtmLinkId: data.id || undefined });
       queryClient.invalidateQueries({ queryKey: ["/api/utm/history"] });
       queryClient.invalidateQueries({ queryKey: ["/api/utm/base-urls"] });
     },
     onError: (err: any) => {
       toast({ title: "Erro", description: err.message || "Falha ao gerar link", variant: "destructive" });
+    },
+  });
+
+  const shortenMutation = useMutation({
+    mutationFn: async (vars: { slug: string; targetUrl: string; generatedUtmLinkId?: string }) => {
+      return apiRequest("POST", "/api/links/shorten", {
+        slug: vars.slug,
+        targetUrl: vars.targetUrl,
+        generatedUtmLinkId: vars.generatedUtmLinkId,
+      });
+    },
+    onSuccess: async (res: any) => {
+      const data = await res.json();
+      setShortUrl(data.shortUrl);
+      setSlug(data.slug); // reflete o slug final (aleatório quando o campo ficou vazio)
+      toast({
+        title: data.deduped ? "Essa UTM já existia — reutilizada" : "Link gerado e encurtado!",
+        description: data.deduped
+          ? "Não criei duplicata: é o mesmo link curto, pra centralizar os cliques."
+          : data.kvSynced
+          ? "URL longa copiada. Link curto já redireciona."
+          : "URL longa copiada. Link curto salvo (redirect ativa com o Cloudflare).",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/utm/history"] });
+    },
+    onError: (err: any) => {
+      toast({
+        title: "Link gerado, mas o nome curto falhou",
+        description: (err.message || "").includes("uso")
+          ? "Esse nome já está em uso. Escolha outro e clique em Encurtar."
+          : err.message || "Falha ao criar link curto",
+        variant: "destructive",
+      });
     },
   });
 
@@ -459,18 +501,37 @@ function TabGerar() {
 
         {/* Preview */}
         {previewUrl && (
-          <div className="space-y-2 pt-4 border-t">
+          <div className="space-y-3 pt-4 border-t">
             <Label>URL gerada</Label>
             <div className="rounded-md bg-muted p-3 font-mono text-sm break-all" data-testid="preview-url">
               {previewUrl}
             </div>
+
+            {/* Nome do link curto — definido ANTES de gerar; vazio = aleatório. Todo link vira curto. */}
+            <div className="space-y-1.5">
+              <Label className="flex items-center gap-1.5">
+                <Link2 className="w-3.5 h-3.5" /> Nome do link curto{" "}
+                <span className="text-muted-foreground font-normal text-xs">(opcional — vazio gera um aleatório)</span>
+              </Label>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-xs text-muted-foreground font-mono shrink-0">marketing.turbopartners.com.br/</span>
+                <Input
+                  data-testid="input-slug"
+                  className="flex-1 min-w-[140px] font-mono"
+                  placeholder="reuniao-vitor"
+                  value={slug}
+                  onChange={(e) => setSlug(sanitizeUtmValueLive(e.target.value).replace(/[{}.]/g, ""))}
+                />
+              </div>
+            </div>
+
             <div className="flex gap-2 items-center">
               <Button
                 onClick={() => generateMutation.mutate()}
-                disabled={!canGenerate || generateMutation.isPending}
+                disabled={!canGenerate || generateMutation.isPending || shortenMutation.isPending}
                 data-testid="button-generate"
               >
-                {generateMutation.isPending ? (
+                {generateMutation.isPending || shortenMutation.isPending ? (
                   <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                 ) : copied ? (
                   <Check className="w-4 h-4 mr-2" />
@@ -485,6 +546,49 @@ function TabGerar() {
                 </Badge>
               )}
             </div>
+
+            {/* Resultado do link curto (auto-criado ao gerar) */}
+            {shortUrl && (
+              <div className="rounded-md border border-dashed p-3 space-y-1.5">
+                <Label className="text-xs text-muted-foreground">Link curto</Label>
+                <div className="flex gap-2 items-center">
+                  <div className="rounded-md bg-muted p-2 font-mono text-sm break-all flex-1" data-testid="short-url">
+                    {shortUrl}
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="shrink-0"
+                    onClick={() => {
+                      navigator.clipboard.writeText(shortUrl);
+                      setShortCopied(true);
+                      setTimeout(() => setShortCopied(false), 2000);
+                    }}
+                  >
+                    {shortCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Retry: o link foi gerado mas o nome curto custom estava em uso */}
+            {generatedUrl && !shortUrl && shortenMutation.isError && (
+              <div className="flex gap-2 items-center flex-wrap">
+                <span className="text-xs text-destructive">Esse nome já está em uso — troque acima e clique:</span>
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={slug.length < 2 || shortenMutation.isPending}
+                  onClick={() =>
+                    shortenMutation.mutate({ slug, targetUrl: generatedUrl, generatedUtmLinkId: generatedLinkId || undefined })
+                  }
+                  data-testid="button-shorten-retry"
+                >
+                  {shortenMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Link2 className="w-4 h-4 mr-2" />}
+                  Encurtar
+                </Button>
+              </div>
+            )}
           </div>
         )}
 
@@ -608,13 +712,19 @@ function TabHistorico() {
                 <TableHead>Term</TableHead>
                 <TableHead>Content</TableHead>
                 <TableHead>URL</TableHead>
+                <TableHead>Link curto</TableHead>
+                <TableHead className="text-right">Cliques</TableHead>
+                <TableHead className="text-right">MQL</TableHead>
+                <TableHead className="text-right">Reun. marc.</TableHead>
+                <TableHead className="text-right">Reun. real.</TableHead>
+                <TableHead className="text-right">Vendas</TableHead>
                 <TableHead></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
               {data?.rows.length === 0 && (
                 <TableRow>
-                  <TableCell colSpan={9} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={15} className="text-center text-muted-foreground py-8">
                     Nenhum link gerado ainda.
                   </TableCell>
                 </TableRow>
@@ -635,6 +745,25 @@ function TabHistorico() {
                   <TableCell className="text-xs max-w-xs truncate" title={row.fullUrl}>
                     {row.fullUrl}
                   </TableCell>
+                  <TableCell className="text-xs">
+                    {row.shortSlug ? (
+                      <button
+                        type="button"
+                        className="font-mono text-primary hover:underline"
+                        title={`Copiar marketing.turbopartners.com.br/${row.shortSlug}`}
+                        onClick={() => copyToClipboard(`https://marketing.turbopartners.com.br/${row.shortSlug}`)}
+                      >
+                        /{row.shortSlug}
+                      </button>
+                    ) : (
+                      <span className="text-muted-foreground">—</span>
+                    )}
+                  </TableCell>
+                  <TableCell className="text-xs text-right tabular-nums">{row.clicks || 0}</TableCell>
+                  <TableCell className="text-xs text-right tabular-nums">{row.mqls || 0}</TableCell>
+                  <TableCell className="text-xs text-right tabular-nums">{row.reunioesMarcadas || 0}</TableCell>
+                  <TableCell className="text-xs text-right tabular-nums">{row.reunioesRealizadas || 0}</TableCell>
+                  <TableCell className="text-xs text-right tabular-nums font-medium">{row.vendas || 0}</TableCell>
                   <TableCell>
                     <Button
                       size="sm"

@@ -72,6 +72,7 @@ import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
 import { registerUtmRoutes } from "./routes/utm";
+import { registerShortenerRoutes } from "./routes/shortener";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
@@ -8542,6 +8543,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // UTM Builder - registered from separate file
   registerUtmRoutes(app);
+
+  // Encurtador de links - registered from separate file
+  registerShortenerRoutes(app);
 
   // BP Produtos Module
   registerBpProdutosRoutes(app);
