@@ -12,7 +12,7 @@ routes = [
 # KV: chave = slug, valor = URL longa. Trocar o id pelo do namespace criado
 # (`npx wrangler kv namespace create LINKS` cospe o id) ou pelo CF_KV_NAMESPACE_ID.
 kv_namespaces = [
-  { binding = "LINKS", id = "COLOQUE_O_KV_NAMESPACE_ID_AQUI" }
+  { binding = "LINKS", id = "1eb38e5ff79f4d769aeb19790f7fb2d9" }
 ]
 
 [vars]
