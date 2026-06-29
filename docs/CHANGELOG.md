@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-29 | feat(encurtador): Fase 1 — tabelas short_links e short_link_clicks
+
+**O que foi feito:**
+- `shared/schema.ts` — duas tabelas novas no schema `cortex_core` para o encurtador de links da Turbo (`marketing.turbopartners.com.br/<slug>`):
+  - `short_links`: cadastro do link curto (slug único personalizado, target_url com UTM, UTM desmembrada, FK lógica p/ generated_utm_links, created_by, expires_at). Índices em created_by e utm_campaign.
+  - `short_link_clicks`: um registro por clique (slug, clicked_at, country ISO-2, ip_hash, user_agent, referrer) para cruzar clique → lead (Bitrix) → venda por UTM. Índices em slug e clicked_at.
+- Tipos `ShortLink`/`InsertShortLink`/`ShortLinkClick`/`InsertShortLinkClick` exportados.
+- Plano completo do encurtador documentado em `docs/encurtador-links-plano.md`.
+
+**Por que:**
+- Base (Fase 1) do encurtador próprio: redirect via Cloudflare Worker na borda, mas cadastro + cliques no Postgres do Cortex para atribuição cruzada com Bitrix/Meta (nível "contar + cruzar"). Arquitetura e decisões em `docs/encurtador-links-plano.md`.
+
+**Arquivos alterados:**
+- `shared/schema.ts` - tabelas `short_links` e `short_link_clicks` + tipos (schema `cortex_core`).
+- `docs/encurtador-links-plano.md` (novo) - plano de implementação (5 fases) e decisões travadas.
+
+**Impacto arquitetural:** Nenhum estrutural. Só definição de schema (Drizzle); `tsc --noEmit` não acusa erros no schema. Criação física das tabelas (`npm run db:push`) é passo separado, ainda não executado.
+
+---
+
 ## 2026-06-24 | feat(bp-copilot): UI do chat (Fase 2)
 
 **O que foi feito:**
