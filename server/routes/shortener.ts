@@ -138,6 +138,29 @@ export function registerShortenerRoutes(app: Express) {
 
       const utm = parseUtmFromUrl(targetUrl);
 
+      // Dedup: a UTM é única e centraliza os cliques. Se esse destino exato já tem
+      // um link curto, reusa o mesmo (garante o KV) em vez de criar outro slug.
+      const existing = await pool.query(
+        `SELECT id, slug, target_url AS "targetUrl"
+         FROM cortex_core.short_links
+         WHERE target_url = $1
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [targetUrl]
+      );
+      if (existing.rows.length > 0) {
+        const row = existing.rows[0];
+        const kvSynced = await writeToCloudflareKV(row.slug, targetUrl);
+        return res.json({
+          id: row.id,
+          slug: row.slug,
+          shortUrl: `${SHORTENER_BASE_URL}/${row.slug}`,
+          targetUrl: row.targetUrl,
+          kvSynced,
+          deduped: true,
+        });
+      }
+
       // Custom = 1 tentativa (409 se ocupado). Aleatório = algumas tentativas até achar livre.
       let insertedRow: any = null;
       let slug = "";

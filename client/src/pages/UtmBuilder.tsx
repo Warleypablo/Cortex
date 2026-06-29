@@ -273,8 +273,10 @@ function TabGerar() {
       setShortUrl(data.shortUrl);
       setSlug(data.slug); // reflete o slug final (aleatório quando o campo ficou vazio)
       toast({
-        title: "Link gerado e encurtado!",
-        description: data.kvSynced
+        title: data.deduped ? "Essa UTM já existia — reutilizada" : "Link gerado e encurtado!",
+        description: data.deduped
+          ? "Não criei duplicata: é o mesmo link curto, pra centralizar os cliques."
+          : data.kvSynced
           ? "URL longa copiada. Link curto já redireciona."
           : "URL longa copiada. Link curto salvo (redirect ativa com o Cloudflare).",
       });

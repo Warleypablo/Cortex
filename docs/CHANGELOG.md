@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-29 | fix(encurtador): UTM única (dedup) — não cria link duplicado
+
+**O que foi feito:**
+- `server/routes/utm.ts` — `POST /api/utm/generate` agora é **idempotente**: se a `full_url` exata já existe, reusa a linha existente (não cria duplicata). Clicar "Copiar e salvar" 2-3x na mesma UTM devolve sempre o mesmo registro.
+- `server/routes/shortener.ts` — `POST /api/links/shorten` dedup por `target_url`: se o destino já tem um link curto, reusa o mesmo slug (e garante o KV) em vez de criar outro.
+- `client/src/pages/UtmBuilder.tsx` — toast avisa "Essa UTM já existia — reutilizada" quando bate na dedup.
+
+**Por que:**
+- Ichino criou 3 UTMs idênticas sem querer (3 cliques no botão). A UTM tem que ser única e centralizadora — todos os cliques/MQL/venda de um destino ficam num link só, não espalhados em cópias.
+
+**Arquivos alterados:**
+- `server/routes/utm.ts` - dedup por full_url no generate.
+- `server/routes/shortener.ts` - dedup por target_url no shorten.
+- `client/src/pages/UtmBuilder.tsx` - toast de reutilização.
+
+**Impacto arquitetural:** Nenhum. Dedup é só leitura-antes-de-inserir. Linhas duplicadas já existentes (criadas antes do fix) não são removidas automaticamente — limpeza é opcional/manual.
+
+---
+
 ## 2026-06-29 | feat(encurtador): Fase 3 — Cloudflare Worker (redirect na borda + ingestão de clique)
 
 **O que foi feito:**

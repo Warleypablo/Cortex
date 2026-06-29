@@ -155,6 +155,25 @@ export function registerUtmRoutes(app: Express) {
         utmContent: utmContent || undefined,
       });
 
+      // Dedup: a UTM é única e centralizadora. Se essa URL exata já foi gerada,
+      // reusa a mesma (não cria duplicata) — clicar "salvar" 2x não vira 2 linhas.
+      const dup = await pool.query(
+        `SELECT id, full_url AS "fullUrl", is_adhoc AS "isAdhoc"
+         FROM cortex_core.generated_utm_links
+         WHERE full_url = $1
+         ORDER BY created_at ASC
+         LIMIT 1`,
+        [fullUrl]
+      );
+      if (dup.rows.length > 0) {
+        return res.json({
+          id: dup.rows[0].id,
+          url: dup.rows[0].fullUrl,
+          isAdhoc: dup.rows[0].isAdhoc,
+          deduped: true,
+        });
+      }
+
       const insertResult = await pool.query(
         `INSERT INTO cortex_core.generated_utm_links
          (user_id, base_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content, full_url, is_adhoc)
