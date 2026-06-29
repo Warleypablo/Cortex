@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-29 | feat(churn): histórico mensal de churn por motivo na tela Detalhamento
+
+**O que foi feito:**
+- Novo gráfico na tela /detalhamento-churn (abaixo dos KPIs): barras empilhadas por mês × motivo de cancelamento + linha tracejada com a meta de churn do BP 2026.
+- Novo endpoint `GET /api/analytics/churn-historico-mensal?ano&filterAbono` retornando a série mensal pivotada por motivo.
+- Novo componente `client/src/components/churn/ChurnHistoricoMensal.tsx` (Recharts ComposedChart), eixo de jan até o mês atual.
+
+**Por que:**
+- Faltava a visão histórica do ano na tela; o pedido foi reproduzir o estilo do gráfico "Churn Squad Mês" do ClickUp, mas com a régua da própria tela (consistência com o card MRR Perdido).
+
+**Arquivos alterados:**
+- `server/routes.ts` - endpoint do histórico mensal (mesma régua da tela: exclui os 3 motivos "não-base", aplica abono via filterAbono).
+- `client/src/components/churn/ChurnHistoricoMensal.tsx` - componente do gráfico.
+- `client/src/pages/ChurnDetalhamento.tsx` - integração (passa filterAbono e BP_CHURN_MRR_TARGETS).
+
+**Impacto arquitetural:** Nenhum — endpoint e componente novos, isolados; o histórico acompanha o toggle de abono da tela.
+
+---
+
 ## 2026-06-29 | fix(churn): alinhar Detalhamento de Churn ao ClickUp (abonados contam por padrão)
 
 **O que foi feito:**
