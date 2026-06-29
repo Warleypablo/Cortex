@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-29 | feat(encurtador): Fase 4 — frontend (botão "Encurtar" no UTM Builder + página /links)
+
+**O que foi feito:**
+- `client/src/pages/UtmBuilder.tsx` — depois de gerar a UTM, aparece um bloco **"Encurtar este link"**: input de slug (prefixo `marketing.turbopartners.com.br/`, sanitizado ao digitar, Enter envia) + botão que chama `POST /api/links/shorten` (passa `targetUrl` = URL gerada e `generatedUtmLinkId`). Mostra o link curto resultante com botão copiar. Toast informa se já redireciona (`kvSynced`) ou se está só no banco. Botão **"Links curtos"** no topo (ao lado das tabs) leva pra `/links`.
+- `client/src/pages/LinkShortener.tsx` (novo) — página `/links`: tabela dos links curtos (slug, destino, campanha/UTM, **cliques**, criador, data) via `GET /api/links`, com copiar e estado vazio. Dark/light mode (tokens `muted`/`foreground`).
+- `client/src/App.tsx` — lazy import + rota `/links` (ProtectedRoute, mesmo padrão do UTM Builder).
+- `.env.example` — documentadas as vars do encurtador (`SHORTENER_BASE_URL`, `CF_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`, `CF_API_TOKEN`, `CLICK_INGEST_SECRET`) com nota de que em local roda sem elas.
+
+**Por que:**
+- Fase 4 do encurtador (plano em `docs/encurtador-links-plano.md`): a UI que fecha o fluxo de criar e gerir links curtos a partir do UTM Builder, testável no preview mesmo sem o Cloudflare (Fase 3) configurado.
+
+**Arquivos alterados:**
+- `client/src/pages/UtmBuilder.tsx` - bloco "Encurtar" na aba Gerar + botão "Links curtos" + import do `Link` (wouter).
+- `client/src/pages/LinkShortener.tsx` (novo) - página de gestão.
+- `client/src/App.tsx` - lazy import + rota `/links`.
+- `.env.example` - vars do encurtador.
+
+**Impacto arquitetural:** Nenhum estrutural. Validado: `vite build` passa (chunk `LinkShortener-*.js` gerado, `UtmBuilder-*.js` rebuildado), sem erro de import/sintaxe. Fluxo end-to-end de redirect depende da Fase 3 (Cloudflare Worker + KV) e das env vars de prod; em local o link é criado e listado, e o clique pode ser simulado via `POST /api/clicks`.
+
+---
+
 ## 2026-06-29 | feat(encurtador): Fase 2 — backend (rotas + criação das tabelas no boot)
 
 **O que foi feito:**

@@ -3,6 +3,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent } from "@/components/ui/card";
+import { Link } from "wouter";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -75,7 +76,8 @@ export default function UtmBuilder() {
   return (
     <div className="container mx-auto p-6 max-w-6xl">
       <Tabs defaultValue="gerar" className="w-full">
-        <TabsList className="mb-6">
+        <div className="flex items-center justify-between gap-4 mb-6 flex-wrap">
+        <TabsList>
           <TabsTrigger value="gerar" data-testid="tab-gerar">
             <Link2 className="w-4 h-4 mr-2" />
             Gerar link
@@ -98,6 +100,13 @@ export default function UtmBuilder() {
             Guia
           </TabsTrigger>
         </TabsList>
+          <Link href="/links">
+            <Button variant="outline" size="sm" data-testid="link-short-links">
+              <Link2 className="w-4 h-4 mr-2" />
+              Links curtos
+            </Button>
+          </Link>
+        </div>
 
         <TabsContent value="gerar">
           <TabGerar />
@@ -135,6 +144,11 @@ function TabGerar() {
   const [content, setContent] = useState("");
   const [copied, setCopied] = useState(false);
   const [generatedUrl, setGeneratedUrl] = useState<string | null>(null);
+  // Encurtador: depois de gerar a UTM, dá pra criar um link curto (Fase 4)
+  const [generatedLinkId, setGeneratedLinkId] = useState<string | null>(null);
+  const [slug, setSlug] = useState("");
+  const [shortUrl, setShortUrl] = useState<string | null>(null);
+  const [shortCopied, setShortCopied] = useState(false);
 
   // Reset cascata ao trocar medium
   useEffect(() => {
@@ -234,6 +248,10 @@ function TabGerar() {
     onSuccess: async (res: any) => {
       const data = await res.json();
       setGeneratedUrl(data.url);
+      setGeneratedLinkId(data.id || null);
+      // Reseta o estado do encurtador — o link curto anterior não vale pra esta nova UTM
+      setShortUrl(null);
+      setSlug("");
       navigator.clipboard.writeText(data.url);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
@@ -248,6 +266,33 @@ function TabGerar() {
     },
     onError: (err: any) => {
       toast({ title: "Erro", description: err.message || "Falha ao gerar link", variant: "destructive" });
+    },
+  });
+
+  const shortenMutation = useMutation({
+    mutationFn: async () => {
+      return apiRequest("POST", "/api/links/shorten", {
+        slug,
+        targetUrl: generatedUrl,
+        generatedUtmLinkId: generatedLinkId || undefined,
+      });
+    },
+    onSuccess: async (res: any) => {
+      const data = await res.json();
+      setShortUrl(data.shortUrl);
+      navigator.clipboard.writeText(data.shortUrl);
+      setShortCopied(true);
+      setTimeout(() => setShortCopied(false), 2000);
+      toast({
+        title: "Link curto criado e copiado!",
+        description: data.kvSynced
+          ? "Já está redirecionando."
+          : "Salvo no banco. O redirect ativa quando o Cloudflare estiver configurado.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["/api/links"] });
+    },
+    onError: (err: any) => {
+      toast({ title: "Erro ao encurtar", description: err.message || "Falha ao criar link curto", variant: "destructive" });
     },
   });
 
@@ -485,6 +530,64 @@ function TabGerar() {
                 </Badge>
               )}
             </div>
+
+            {/* Encurtador — só aparece depois de gerar a UTM */}
+            {generatedUrl && (
+              <div className="rounded-md border border-dashed p-3 space-y-2 mt-2">
+                <Label className="flex items-center gap-1.5">
+                  <Link2 className="w-3.5 h-3.5" /> Encurtar este link (opcional)
+                </Label>
+                <div className="flex gap-2 items-center flex-wrap">
+                  <span className="text-xs text-muted-foreground font-mono shrink-0">marketing.turbopartners.com.br/</span>
+                  <Input
+                    data-testid="input-slug"
+                    className="flex-1 min-w-[140px] font-mono"
+                    placeholder="reuniao-vitor"
+                    value={slug}
+                    onChange={(e) =>
+                      setSlug(sanitizeUtmValueLive(e.target.value).replace(/[{}.]/g, ""))
+                    }
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && slug.length >= 2 && !shortenMutation.isPending) {
+                        shortenMutation.mutate();
+                      }
+                    }}
+                  />
+                  <Button
+                    variant="secondary"
+                    onClick={() => shortenMutation.mutate()}
+                    disabled={slug.length < 2 || shortenMutation.isPending}
+                    data-testid="button-shorten"
+                  >
+                    {shortenMutation.isPending ? (
+                      <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                    ) : (
+                      <Link2 className="w-4 h-4 mr-2" />
+                    )}
+                    Encurtar
+                  </Button>
+                </div>
+                {shortUrl && (
+                  <div className="flex gap-2 items-center">
+                    <div className="rounded-md bg-muted p-2 font-mono text-sm break-all flex-1" data-testid="short-url">
+                      {shortUrl}
+                    </div>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="shrink-0"
+                      onClick={() => {
+                        navigator.clipboard.writeText(shortUrl);
+                        setShortCopied(true);
+                        setTimeout(() => setShortCopied(false), 2000);
+                      }}
+                    >
+                      {shortCopied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+                    </Button>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         )}
 
