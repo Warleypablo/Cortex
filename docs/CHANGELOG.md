@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-29 | feat(ads-creation): cadastra 9 hooks Creators Summit React (TP1731-1739) na Biblioteca
+
+**O que foi feito:**
+- `subir-summit-react-planilha.ts`: cadastra na Biblioteca os 9 hooks do lote `1 - Creators Summit React / 01 - Editados` — personas **Esther** (h1–h4) e **Lucas** (h1–h5), b1c1, **1 linha/TP por hook pareado** (9x16 stories + 4x5 feed), na ordem Esther h1..h4 → Lucas h1..h5 → **TP1731–TP1739**
+- Cada linha: `nome_drive` = base do arquivo (ex.: `Creator_Summit_React_Esther_h1b1c1`), `produto=Creators`, `plataforma=Meta`, `tipo=Vídeo`, `personagem`=Esther/Lucas, funil vazio; primário (`drive_file_id`+`link_drive`) = o **9x16**, e o **4x5** (link + file_id) na `observacao` (com tema "Creator Summit React")
+
+**Por que:**
+- Usuário pediu pra preencher a planilha (Biblioteca) com os dois personagens (Esther e Lucas) do lote Creators Summit React, antes de subir os ads
+
+**Arquivos novos:**
+- `subir-summit-react-planilha.ts` - cadastro dos 9 hooks (DRY por padrão, `--go` pra gravar, idempotente via dedup por `drive_file_id`)
+
+**Impacto arquitetural:** Nenhum — script standalone na raiz, mesmo padrão do `subir-caio-roteiros-planilha.ts`.
+
+---
+
 ## 2026-06-29 | feat(ads-creation): sobe 9 ads Caio pareados em 3 conjuntos (Roteiro 1-3) na CBO Creators
 
 **O que foi feito:**
