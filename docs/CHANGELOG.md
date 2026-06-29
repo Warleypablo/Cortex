@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-29 | feat(encurtador): Fase 4 revisão + Fase 5 — auto-encurtar + atribuição no Histórico
+
+**O que foi feito:**
+- **Auto-encurtar (decisão Ichino):** todo link gerado no UTM Builder já nasce com um link curto. `server/routes/shortener.ts` — `POST /api/links/shorten` aceita slug vazio e gera um aleatório (8 hex, com retry até achar livre); slug digitado mantém a guarda de unicidade (409 se ocupado).
+- **Frontend (`client/src/pages/UtmBuilder.tsx`):** campo opcional "Nome do link curto" **antes** do botão; ao clicar "Copiar e salvar", gera a UTM **e** o link curto num passo só (auto-chama o shorten). Mostra o link curto resultante com copiar. Botão de retry "Encurtar" só aparece se o nome custom estava em uso.
+- **Atribuição no Histórico (Fase 5, Caminho A — por UTM):** `GET /api/utm/history` ganhou CTEs `click_agg` (cliques por slug) e `deal_agg` (cruza `"Bitrix".crm_deal` por tupla UTM source+medium+campaign+content) com as **mesmas regras do Orçado x Realizado** (`growth.ts:232-269`): MQL = `mql '1'/'true'`, Reunião marcada = `data_reuniao_agendada`, realizada = `data_reuniao_realizada`, Venda = `stage_name 'Negócio Ganho'`. A tabela do Histórico ganhou colunas: Link curto, Cliques, MQL, Reun. marc., Reun. real., Vendas.
+- **Removida a página `/links` separada** (decisão Ichino: tudo no Histórico): deletado `client/src/pages/LinkShortener.tsx`, rota + lazy import em `App.tsx`, botão "Links curtos" no UTM Builder.
+
+**Por que:**
+- Ichino pediu: (1) todo link já encurtado por padrão; (2) MQL/reunião/venda por link junto do histórico, "igual ao Orçado x Realizado", em vez de aba separada. Atribuição por UTM (Caminho A) — granularidade = unicidade da UTM.
+
+**Arquivos alterados:**
+- `server/routes/shortener.ts` - slug aleatório quando vazio (retry).
+- `server/routes/utm.ts` - history com cliques + funil cruzando crm_deal por UTM.
+- `client/src/pages/UtmBuilder.tsx` - fluxo gera+encurta; colunas de funil no Histórico; remove botão/import de /links.
+- `client/src/App.tsx` - remove rota /links.
+- `client/src/pages/LinkShortener.tsx` - **deletado**.
+
+**Impacto arquitetural:** Nenhum estrutural. Validado: `esbuild` (server) e `vite build` passam; a query nova do Histórico foi executada direto no banco local (roda sem erro de permissão na `"Bitrix".crm_deal`; local tem 19.509 deals / 3.645 MQLs / 793 vendas, confirmando que a atribuição produz números reais). Atribuição por UTM: links de UTM idêntica compartilham os mesmos números (limitação aceita do Caminho A). Redirect real ainda depende da Fase 3 (Cloudflare).
+
+---
+
 ## 2026-06-29 | feat(encurtador): Fase 4 — frontend (botão "Encurtar" no UTM Builder + página /links)
 
 **O que foi feito:**

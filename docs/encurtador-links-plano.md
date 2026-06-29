@@ -18,9 +18,12 @@ Encurtador de links próprio da Turbo em **`marketing.turbopartners.com.br/<slug
 | Redirect | **Cloudflare Worker** (na borda) | Domínio já vive no Cloudflare → rota de Worker é trivial; rápido e independente do Cortex estar de pé |
 | Cérebro (criar/gerir/dado) | **Cortex** (Render) | UTM Builder + Postgres + cruzamento com Bitrix/Meta já moram aqui |
 | Nível de tracking | **B — contar + cruzar** | Cliente quer otimizar por clique→venda, não só volume |
-| Slug | **Personalizado** (`/reuniao-vitor`); aleatório só fallback | Decisão Ichino 2026-06-29 |
+| Slug | **Personalizado** (`/reuniao-vitor`); aleatório quando não digitado | Decisão Ichino 2026-06-29 |
 | Acesso | **Growth + admins** (igual UTM Builder) | Decisão Ichino 2026-06-29 |
 | Fonte de verdade do redirect | **Cloudflare KV** | Leitura rápida na borda, resiliente; Postgres é o store analítico |
+| **Auto-encurtar** | **Todo link gerado vira curto automaticamente** (slug custom ou aleatório) | Decisão Ichino 2026-06-29 — histórico 100% rastreável |
+| **UI** | **Sem página `/links` separada**: colunas (curto/cliques/MQL/reunião/venda) entram na aba **Histórico** | Decisão Ichino 2026-06-29 |
+| **Atribuição** | **Caminho A — por UTM**: cruza `short_links.utm_*` ⋈ `Bitrix.crm_deal.utm_*`. Granularidade = unicidade da UTM (links de mesma UTM ficam agrupados) | Decisão Ichino 2026-06-29 |
 
 ## Arquitetura
 

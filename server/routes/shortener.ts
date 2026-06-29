@@ -1,4 +1,5 @@
 import type { Express } from "express";
+import { randomBytes } from "crypto";
 import { pool } from "../db";
 import { isGrowthTeam } from "../../shared/growth-team";
 
@@ -21,6 +22,11 @@ const SHORTENER_BASE_URL = (process.env.SHORTENER_BASE_URL || "https://marketing
 
 // Slugs reservados (rotas utilitárias que o Worker pode querer pra si)
 const RESERVED_SLUGS = new Set(["api", "favicon.ico", "robots.txt", "health", "_health", "s", "l", "go", "admin"]);
+
+// Slug aleatório (quando o usuário não digita um nome) — 8 chars hex, fácil de ditar.
+function randomSlug(): string {
+  return randomBytes(4).toString("hex");
+}
 
 // Slug: estrito [a-z0-9-], 2..80, sem acento, sem hífen nas pontas.
 function sanitizeSlug(input: string): string {
@@ -118,47 +124,66 @@ export function registerShortenerRoutes(app: Express) {
         return res.status(400).json({ error: "targetUrl deve começar com http:// ou https://" });
       }
 
-      const slug = sanitizeSlug(rawSlug || "");
-      if (slug.length < 2) {
-        return res.status(400).json({ error: "slug deve ter ao menos 2 caracteres (apenas letras, números e hífen)." });
-      }
-      if (RESERVED_SLUGS.has(slug)) {
-        return res.status(400).json({ error: `slug "${slug}" é reservado. Escolha outro.` });
+      // Slug custom (digitado) vs aleatório (campo vazio → auto-encurtar todo link).
+      const customSlug = sanitizeSlug(rawSlug || "");
+      const isCustom = (rawSlug || "").trim().length > 0;
+      if (isCustom) {
+        if (customSlug.length < 2) {
+          return res.status(400).json({ error: "Nome do link deve ter ao menos 2 caracteres (letras, números e hífen)." });
+        }
+        if (RESERVED_SLUGS.has(customSlug)) {
+          return res.status(400).json({ error: `"${customSlug}" é reservado. Escolha outro.` });
+        }
       }
 
       const utm = parseUtmFromUrl(targetUrl);
 
-      // INSERT com guarda de unicidade do slug (ON CONFLICT → 409).
-      const insert = await pool.query(
-        `INSERT INTO cortex_core.short_links
-           (slug, target_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content, generated_utm_link_id, created_by)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-         ON CONFLICT (slug) DO NOTHING
-         RETURNING id, slug, target_url AS "targetUrl", created_at AS "createdAt"`,
-        [
-          slug,
-          targetUrl,
-          utm.utmSource,
-          utm.utmMedium,
-          utm.utmCampaign,
-          utm.utmTerm,
-          utm.utmContent,
-          generatedUtmLinkId || null,
-          userId,
-        ]
-      );
+      // Custom = 1 tentativa (409 se ocupado). Aleatório = algumas tentativas até achar livre.
+      let insertedRow: any = null;
+      let slug = "";
+      const maxTries = isCustom ? 1 : 6;
+      for (let i = 0; i < maxTries; i++) {
+        const candidate = isCustom ? customSlug : randomSlug();
+        if (!isCustom && RESERVED_SLUGS.has(candidate)) continue;
+        const insert = await pool.query(
+          `INSERT INTO cortex_core.short_links
+             (slug, target_url, utm_source, utm_medium, utm_campaign, utm_term, utm_content, generated_utm_link_id, created_by)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+           ON CONFLICT (slug) DO NOTHING
+           RETURNING id, slug, target_url AS "targetUrl", created_at AS "createdAt"`,
+          [
+            candidate,
+            targetUrl,
+            utm.utmSource,
+            utm.utmMedium,
+            utm.utmCampaign,
+            utm.utmTerm,
+            utm.utmContent,
+            generatedUtmLinkId || null,
+            userId,
+          ]
+        );
+        if (insert.rows.length > 0) {
+          insertedRow = insert.rows[0];
+          slug = candidate;
+          break;
+        }
+      }
 
-      if (insert.rows.length === 0) {
-        return res.status(409).json({ error: `O slug "${slug}" já está em uso. Escolha outro.` });
+      if (!insertedRow) {
+        if (isCustom) {
+          return res.status(409).json({ error: `O nome "${customSlug}" já está em uso. Escolha outro.` });
+        }
+        return res.status(500).json({ error: "Não foi possível gerar um nome único. Tente de novo." });
       }
 
       const kvSynced = await writeToCloudflareKV(slug, targetUrl);
 
       res.json({
-        id: insert.rows[0].id,
+        id: insertedRow.id,
         slug,
         shortUrl: `${SHORTENER_BASE_URL}/${slug}`,
-        targetUrl: insert.rows[0].targetUrl,
+        targetUrl: insertedRow.targetUrl,
         kvSynced, // false em local sem CF_* — link existe no banco mas ainda não redireciona
       });
     } catch (error: any) {

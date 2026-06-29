@@ -208,7 +208,30 @@ export function registerUtmRoutes(app: Express) {
       params.push(pageSize);
       params.push(offset);
 
+      // Funil por UTM — MESMAS regras do Orçado x Realizado (server/routes/growth.ts:232-269):
+      //   MQL = mql '1'/'true' · Reunião marcada = data_reuniao_agendada · realizada = data_reuniao_realizada
+      //   Venda = stage_name 'Negócio Ganho'. Caminho A: cruza pelo tupla UTM (source+medium+campaign+content).
+      // CTEs sem input do usuário (condições são constantes), então é seguro inline.
       const sql = `
+        WITH click_agg AS (
+          SELECT slug, COUNT(*)::int AS clicks
+          FROM cortex_core.short_link_clicks
+          GROUP BY slug
+        ),
+        deal_agg AS (
+          SELECT
+            LOWER(TRIM(COALESCE(d.utm_source, '')))   AS s,
+            LOWER(TRIM(COALESCE(d.utm_medium, '')))   AS m,
+            LOWER(TRIM(COALESCE(d.utm_campaign, ''))) AS c,
+            LOWER(TRIM(COALESCE(d.utm_content, '')))  AS ct,
+            SUM(CASE WHEN (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END)::int AS mqls,
+            SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END)::int AS rm,
+            SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END)::int AS rr,
+            SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END)::int AS vendas
+          FROM "Bitrix".crm_deal d
+          WHERE NULLIF(TRIM(COALESCE(d.utm_campaign, '')), '') IS NOT NULL
+          GROUP BY 1, 2, 3, 4
+        )
         SELECT
           g.id,
           g.base_url AS "baseUrl",
@@ -221,9 +244,22 @@ export function registerUtmRoutes(app: Express) {
           g.is_adhoc AS "isAdhoc",
           g.created_at AS "createdAt",
           u.name AS "userName",
-          u.email AS "userEmail"
+          u.email AS "userEmail",
+          sl.slug AS "shortSlug",
+          COALESCE(cl.clicks, 0) AS "clicks",
+          COALESCE(da.mqls, 0) AS "mqls",
+          COALESCE(da.rm, 0) AS "reunioesMarcadas",
+          COALESCE(da.rr, 0) AS "reunioesRealizadas",
+          COALESCE(da.vendas, 0) AS "vendas"
         FROM cortex_core.generated_utm_links g
         LEFT JOIN cortex_core.auth_users u ON u.id = g.user_id
+        LEFT JOIN cortex_core.short_links sl ON sl.generated_utm_link_id = g.id
+        LEFT JOIN click_agg cl ON cl.slug = sl.slug
+        LEFT JOIN deal_agg da
+          ON  da.s  = LOWER(TRIM(COALESCE(g.utm_source, '')))
+          AND da.m  = LOWER(TRIM(COALESCE(g.utm_medium, '')))
+          AND da.c  = LOWER(TRIM(COALESCE(g.utm_campaign, '')))
+          AND da.ct = LOWER(TRIM(COALESCE(g.utm_content, '')))
         ${whereClause}
         ORDER BY g.created_at DESC
         LIMIT $${params.length - 1} OFFSET $${params.length}
