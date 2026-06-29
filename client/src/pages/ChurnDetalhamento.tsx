@@ -241,6 +241,8 @@ export default function ChurnDetalhamento() {
   const mrrBaseReal = data?.metricas?.mrr_ativo_ref ?? 0;
   // Soma dos MRR bases de cada mês (para média ponderada em ranges multi-mês)
   const somaMrrBases = data?.metricas?.soma_mrr_bases ?? mrrBaseReal;
+  // Denominador efetivo da taxa de churn — exibido no card para tornar o cálculo auditável
+  const mrrBaseCalculo = somaMrrBases > 0 ? somaMrrBases : mrrBaseReal;
 
   const filteredTaxaChurn = useMemo(() => {
     // Usar soma dos MRR bases para média ponderada correta em ranges multi-mês
@@ -349,6 +351,7 @@ export default function ChurnDetalhamento() {
           contratos={filteredContratos}
           mrrPerdido={filteredMetricas.mrr_perdido}
           taxaChurn={filteredTaxaChurn}
+          mrrBase={mrrBaseCalculo}
           nrrPct={nrrData?.nrr_pct}
           ltMedio={filteredMetricas.lt_medio}
           ticketMedio={filteredMetricas.ticket_medio}

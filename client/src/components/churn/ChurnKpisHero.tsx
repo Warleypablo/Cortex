@@ -33,6 +33,7 @@ export interface ChurnKpisHeroProps {
   contratos: ChurnContract[];
   mrrPerdido: number;
   taxaChurn: number;
+  mrrBase?: number;
   nrrPct?: number;
   ltMedio?: number;
   ticketMedio?: number;
@@ -108,6 +109,7 @@ export function ChurnKpisHero({
   contratos,
   mrrPerdido,
   taxaChurn,
+  mrrBase,
   nrrPct,
   ltMedio,
   ticketMedio,
@@ -146,7 +148,7 @@ export function ChurnKpisHero({
           label="Taxa de Churn %"
           value={`${taxaChurn.toFixed(2)}%`}
           valueClass={severityTextClass(taxaNorm)}
-          sub="do MRR base no período"
+          sub={mrrBase && mrrBase > 0 ? `base: ${formatCurrencyNoDecimals(mrrBase)}` : "do MRR base no período"}
           severityNorm={taxaNorm}
           onClick={makeDrill("Churn do período", churns)}
         />
