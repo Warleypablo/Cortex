@@ -60,7 +60,7 @@ export function DrawerTiming({ contratos }: { contratos: ChurnContract[] }): JSX
     if (contratos.length === 0) return [];
 
     const churnContratos = contratos.filter(
-      (c) => c.tipo === "churn" && !c.is_abonado && c.data_inicio
+      (c) => c.tipo === "churn" && c.data_inicio
     );
     if (churnContratos.length === 0) return [];
 

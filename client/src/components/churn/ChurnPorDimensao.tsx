@@ -67,7 +67,7 @@ export function ChurnPorDimensao({
   // ── Motivo / Produto / Cluster — share-of-churn from contracts ──────────────
   const grupos = useMemo((): GroupedItem[] => {
     if (dimensao === "squad" || dimensao === "pessoa") return [];
-    const churnOnly = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
+    const churnOnly = contratos.filter(c => c.tipo === "churn");
     if (churnOnly.length === 0) return [];
 
     const map: Record<string, { count: number; mrr: number; contratos: ChurnContract[] }> = {};
@@ -98,7 +98,7 @@ export function ChurnPorDimensao({
   const rateItems = useMemo((): RateItem[] => {
     if (dimensao !== "squad" && dimensao !== "pessoa") return [];
 
-    const churnOnly = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
+    const churnOnly = contratos.filter(c => c.tipo === "churn");
 
     // Normalize exactly like the backend: trim + blank/null → "Não especificado"
     const normKey = (v: string | null | undefined): string =>
@@ -159,7 +159,7 @@ export function ChurnPorDimensao({
   // Fallback groups for squad/pessoa when no backend data
   const fallbackGrupos = useMemo((): GroupedItem[] => {
     if (!isRateMode || backendAvailable) return [];
-    const churnOnly = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
+    const churnOnly = contratos.filter(c => c.tipo === "churn");
     if (churnOnly.length === 0) return [];
 
     const map: Record<string, { count: number; mrr: number; contratos: ChurnContract[] }> = {};

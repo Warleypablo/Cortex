@@ -81,7 +81,7 @@ export function RitmoDiario({
   // Distinct squads from churn contracts (excluding blacklist)
   const squads = useMemo(() => {
     const churnContratos = contratos.filter(
-      (c) => c.tipo === "churn" && !c.is_abonado
+      (c) => c.tipo === "churn"
     );
     const set = new Set<string>();
     churnContratos.forEach((c) => {
@@ -93,7 +93,7 @@ export function RitmoDiario({
 
   // Base churn contracts
   const baseContratos = useMemo(() => {
-    let list = contratos.filter((c) => c.tipo === "churn" && !c.is_abonado);
+    let list = contratos.filter((c) => c.tipo === "churn");
     if (squadFilter !== "total") {
       list = list.filter(
         (c) => (c.squad ?? "").trim() === squadFilter

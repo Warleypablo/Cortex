@@ -4943,6 +4943,10 @@ Estruture sua resposta em:
         FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
+          -- "Venda que nunca virou base" (inadimplente de 1º mês / não começou / erro de venda)
+          -- é descontada sempre, igual ao ClickUp. NÃO confundir com abono (abonar_churn),
+          -- que passa a contar como churn por padrão (controlado pelo toggle da tela).
+          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND ${dateFilter}
         ORDER BY c.data_solicitacao_encerramento DESC
       `);
@@ -4953,10 +4957,9 @@ Estruture sua resposta em:
         const valorr = Number(row.valor_r) || 0;
         const tipo = 'churn' as const;
         const motivo = row.motivo_cancelamento || 'Não especificado';
-        const isAbonado = row.abonar_churn === 'Sim' ||
-          motivo === 'Inadimplente 1º Mês' ||
-          motivo === 'Não começou' ||
-          motivo === 'Erro na Venda';
+        // Abonado = flag manual de gestão. Os motivos "nunca virou base" já foram
+        // descontados na query, então aqui é apenas o flag (alinhado ao ClickUp).
+        const isAbonado = row.abonar_churn === 'Sim';
 
         return {
           id: row.task_id,
@@ -5003,17 +5006,19 @@ Estruture sua resposta em:
       const evitabilidades = Array.from(new Set(allContratos.map((c: any) => c.evitabilidade_churn).filter(Boolean))).sort();
       const possibilidades_retencao = Array.from(new Set(allContratos.map((c: any) => c.possibilidade_retencao).filter(Boolean))).sort();
 
-      // Separar contratos regulares de abonados
+      // Separar contratos regulares de abonados (apenas para o breakdown de abono;
+      // o abono NÃO é mais excluído do churn oficial — é controlado pelo toggle da tela)
       const contratosRegulares = allContratos.filter((c: any) => !c.is_abonado);
       const contratosAbonados = allContratos.filter((c: any) => c.is_abonado);
 
-      // Métricas - apenas churn regular (excluindo abonado)
-      const totalChurned = contratosRegulares.length;
+      // Métricas - churn cheio: abonados contam por padrão (alinhado ao ClickUp).
+      // O filtro por abono é aplicado no frontend via toggle "Todos/Não abonados/Abonados".
+      const totalChurned = allContratos.length;
       const totalEmCancelamento = 0;
-      const mrrPerdidoChurn = contratosRegulares.reduce((sum: number, c: any) => sum + c.valorr, 0);
+      const mrrPerdidoChurn = allContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
       const mrrEmCancelamento = 0;
-      const ltvTotal = contratosRegulares.reduce((sum: number, c: any) => sum + c.ltv, 0);
-      const ltMedio = totalChurned > 0 ? contratosRegulares.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
+      const ltvTotal = allContratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
+      const ltMedio = totalChurned > 0 ? allContratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
 
       // Métricas de churn abonado
       const totalAbonado = contratosAbonados.length;
