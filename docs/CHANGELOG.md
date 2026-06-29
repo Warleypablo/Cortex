@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-29 | feat(ads-creation): cadastra 5 hooks Estratégia Peculiar React V2 (TP1740-1744) na Biblioteca
+
+**O que foi feito:**
+- `subir-react-v2-planilha.ts`: cadastra na Biblioteca os 5 hooks do lote `60 - Estratégia Peculiar React V2 / 01 - Editados` — persona **Lucas** (h1–h5), b1c1, **1 linha/TP por hook pareado** (9x16 stories + 4x5 feed) → **TP1740–TP1744**
+- Cada linha: `nome_drive` = base do arquivo (`Estrategia_peculiar_react_v2_Lucas_hNb1c1`), `produto=Creators`, `plataforma=Meta`, `tipo=Vídeo`, `personagem=Lucas`, funil vazio; primário (`drive_file_id`+`link_drive`) = o **9x16**, e o **4x5** (link + file_id) na `observacao`
+- `status-meta-api.ts`: ferramenta read-only de status da Marketing API (1 GET barato lendo `x-business-use-case-usage` / `x-ad-account-usage` + status/saldo da conta). No momento: conta ativa (status=1), uso `ads_management` em **92%** (time), liberar em 0min
+
+**Por que:**
+- Usuário pediu pra cadastrar o lote na planilha (vídeos já subindo no Gerenciador) e perguntou o status da API do Meta
+
+**Arquivos novos:**
+- `subir-react-v2-planilha.ts` - cadastro dos 5 hooks (DRY por padrão, `--go`, idempotente por `drive_file_id`)
+- `status-meta-api.ts` - status/uso da Marketing API (read-only, 1 chamada)
+
+**Impacto arquitetural:** Nenhum — scripts standalone na raiz, mesmo padrão dos `subir-*-planilha.ts`.
+
+---
+
 ## 2026-06-29 | feat(ads-creation): sobe 9 ads Creators Summit React em 2 conjuntos (Esther/Lucas) na CBO Creators
 
 **O que foi feito:**
