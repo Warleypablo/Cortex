@@ -356,9 +356,6 @@ export default function ChurnDetalhamento() {
         />
       )}
 
-      {/* Histórico mensal de churn do ano (mesma régua da tela) */}
-      <ChurnHistoricoMensal filterAbono={filterAbono} churnTargets={BP_CHURN_MRR_TARGETS} />
-
       {/* Ritmo Diário — série por dia do período */}
       {!isLoading && (
         <RitmoDiario contratos={filteredContratos} onDrill={onDrill} />
@@ -406,6 +403,9 @@ export default function ChurnDetalhamento() {
           churnPorPessoa={data?.metricas?.churn_por_pessoa}
         />
       )}
+
+      {/* Histórico mensal de churn do ano (mesma régua da tela) — fim da página */}
+      <ChurnHistoricoMensal filterAbono={filterAbono} churnTargets={BP_CHURN_MRR_TARGETS} />
 
       <ChurnDrillDrawer
         open={!!drill}
