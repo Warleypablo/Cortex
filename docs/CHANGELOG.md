@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-29 | fix(churn): alinhar Detalhamento de Churn ao ClickUp (abonados contam por padrão)
+
+**O que foi feito:**
+- A tela /detalhamento-churn passou a contar contratos abonados (`abonar_churn='Sim'`) como churn por padrão; o toggle "Todos/Não abonados/Abonados" virou o único controle de exclusão de abono.
+- Mantida a exclusão dos motivos "nunca virou base" (Inadimplente 1º Mês / Não começou / Erro na Venda) na query do endpoint, que é o que o ClickUp também desconta.
+- `isAbonado` no backend agora é apenas o flag manual; removido o `!is_abonado` redundante de ChurnKpisHero, RitmoDiario, ChurnPorDimensao, DrawerTiming e do `filteredMetricas`.
+
+**Por que:**
+- O "Churn MRR" do ClickUp (jun/2026 = R$ 161.468) não batia com o "MRR Perdido" do Cortex (R$ 139.080). A diferença de R$ 22.388 eram 4 contratos marcados `abonar_churn='Sim'` que o ClickUp conta e o Cortex escondia. Validado no banco de prod: régua nova → "Todos" = R$ 161.468 (bate), "Não abonados" = R$ 139.080, "Abonados" = R$ 22.388.
+
+**Arquivos alterados:**
+- `server/routes.ts` - endpoint `/api/analytics/churn-detalhamento`: exclui os 3 motivos no WHERE, `isAbonado` = só flag, métricas usam `allContratos`.
+- `client/src/pages/ChurnDetalhamento.tsx` - `filteredMetricas` usa a lista já filtrada pelo toggle.
+- `client/src/components/churn/{ChurnKpisHero,RitmoDiario,ChurnPorDimensao,drawer/DrawerTiming}.tsx` - removido o filtro `!is_abonado` interno.
+
+**Impacto arquitetural:** Nenhum — escopo restrito à tela Detalhamento de Churn; BP 2026, OKR, NRR e slides não foram tocados (continuam com a régua de churn líquido).
+
+---
+
 ## 2026-06-24 | feat(bp-copilot): UI do chat (Fase 2)
 
 **O que foi feito:**
