@@ -108,7 +108,7 @@ export function ChurnHistoricoMensal({
         </p>
         {meta > 0 && (
           <p className="text-muted-foreground">
-            Meta BP: <span className="font-medium text-foreground">{formatCurrencyNoDecimals(meta)}</span>
+            Meta (8%): <span className="font-medium text-foreground">{formatCurrencyNoDecimals(meta)}</span>
             {total > meta && <span className="text-red-500"> (+{formatCurrencyNoDecimals(total - meta)})</span>}
           </p>
         )}
@@ -133,7 +133,7 @@ export function ChurnHistoricoMensal({
         <div>
           <p className="text-sm font-semibold text-foreground">Histórico de Churn {ano}</p>
           <p className="text-xs text-muted-foreground">
-            MRR perdido por mês e motivo · linha tracejada = meta BP
+            MRR perdido por mês e motivo · linha tracejada = meta 8%
             {filterAbono === "nao_abonados" && " · sem abonados"}
             {filterAbono === "abonados" && " · só abonados"}
           </p>
@@ -189,7 +189,7 @@ export function ChurnHistoricoMensal({
             <Line
               type="monotone"
               dataKey="meta"
-              name="Meta BP"
+              name="Meta 8%"
               stroke="#ef4444"
               strokeWidth={2}
               strokeDasharray="5 4"
