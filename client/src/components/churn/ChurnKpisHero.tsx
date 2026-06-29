@@ -16,7 +16,7 @@ import { formatCurrencyNoDecimals } from "@/lib/utils";
  * contains "evit" but NOT "inevit".
  */
 export function pctEvitavel(contratos: ChurnContract[]): number {
-  const churns = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
+  const churns = contratos.filter(c => c.tipo === "churn");
   const classified = churns.filter(c => c.evitabilidade_churn != null && c.evitabilidade_churn !== "");
   if (classified.length === 0) return 0;
 
@@ -33,6 +33,7 @@ export interface ChurnKpisHeroProps {
   contratos: ChurnContract[];
   mrrPerdido: number;
   taxaChurn: number;
+  mrrBase?: number;
   nrrPct?: number;
   ltMedio?: number;
   ticketMedio?: number;
@@ -108,12 +109,13 @@ export function ChurnKpisHero({
   contratos,
   mrrPerdido,
   taxaChurn,
+  mrrBase,
   nrrPct,
   ltMedio,
   ticketMedio,
   onDrill,
 }: ChurnKpisHeroProps): JSX.Element {
-  const churns = contratos.filter(c => c.tipo === "churn" && !c.is_abonado);
+  const churns = contratos.filter(c => c.tipo === "churn");
   const logosCount = churns.length;
   const evitavelPct = pctEvitavel(contratos);
 
@@ -146,7 +148,7 @@ export function ChurnKpisHero({
           label="Taxa de Churn %"
           value={`${taxaChurn.toFixed(2)}%`}
           valueClass={severityTextClass(taxaNorm)}
-          sub="do MRR base no período"
+          sub={mrrBase && mrrBase > 0 ? `base: ${formatCurrencyNoDecimals(mrrBase)}` : "do MRR base no período"}
           severityNorm={taxaNorm}
           onClick={makeDrill("Churn do período", churns)}
         />

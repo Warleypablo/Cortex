@@ -4944,6 +4944,10 @@ Estruture sua resposta em:
         FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
+          -- "Venda que nunca virou base" (inadimplente de 1º mês / não começou / erro de venda)
+          -- é descontada sempre, igual ao ClickUp. NÃO confundir com abono (abonar_churn),
+          -- que passa a contar como churn por padrão (controlado pelo toggle da tela).
+          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
           AND ${dateFilter}
         ORDER BY c.data_solicitacao_encerramento DESC
       `);
@@ -4954,10 +4958,9 @@ Estruture sua resposta em:
         const valorr = Number(row.valor_r) || 0;
         const tipo = 'churn' as const;
         const motivo = row.motivo_cancelamento || 'Não especificado';
-        const isAbonado = row.abonar_churn === 'Sim' ||
-          motivo === 'Inadimplente 1º Mês' ||
-          motivo === 'Não começou' ||
-          motivo === 'Erro na Venda';
+        // Abonado = flag manual de gestão. Os motivos "nunca virou base" já foram
+        // descontados na query, então aqui é apenas o flag (alinhado ao ClickUp).
+        const isAbonado = row.abonar_churn === 'Sim';
 
         return {
           id: row.task_id,
@@ -5004,17 +5007,19 @@ Estruture sua resposta em:
       const evitabilidades = Array.from(new Set(allContratos.map((c: any) => c.evitabilidade_churn).filter(Boolean))).sort();
       const possibilidades_retencao = Array.from(new Set(allContratos.map((c: any) => c.possibilidade_retencao).filter(Boolean))).sort();
 
-      // Separar contratos regulares de abonados
+      // Separar contratos regulares de abonados (apenas para o breakdown de abono;
+      // o abono NÃO é mais excluído do churn oficial — é controlado pelo toggle da tela)
       const contratosRegulares = allContratos.filter((c: any) => !c.is_abonado);
       const contratosAbonados = allContratos.filter((c: any) => c.is_abonado);
 
-      // Métricas - apenas churn regular (excluindo abonado)
-      const totalChurned = contratosRegulares.length;
+      // Métricas - churn cheio: abonados contam por padrão (alinhado ao ClickUp).
+      // O filtro por abono é aplicado no frontend via toggle "Todos/Não abonados/Abonados".
+      const totalChurned = allContratos.length;
       const totalEmCancelamento = 0;
-      const mrrPerdidoChurn = contratosRegulares.reduce((sum: number, c: any) => sum + c.valorr, 0);
+      const mrrPerdidoChurn = allContratos.reduce((sum: number, c: any) => sum + c.valorr, 0);
       const mrrEmCancelamento = 0;
-      const ltvTotal = contratosRegulares.reduce((sum: number, c: any) => sum + c.ltv, 0);
-      const ltMedio = totalChurned > 0 ? contratosRegulares.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
+      const ltvTotal = allContratos.reduce((sum: number, c: any) => sum + c.ltv, 0);
+      const ltMedio = totalChurned > 0 ? allContratos.reduce((sum: number, c: any) => sum + c.lifetime_meses, 0) / totalChurned : 0;
 
       // Métricas de churn abonado
       const totalAbonado = contratosAbonados.length;
@@ -5299,6 +5304,108 @@ Estruture sua resposta em:
     } catch (error) {
       console.error("[api] Error fetching churn detalhamento:", error);
       res.status(500).json({ error: "Failed to fetch churn detalhamento data" });
+    }
+  });
+
+  // Histórico mensal de churn (por motivo) — MESMA régua da tela Detalhamento de Churn:
+  // exclui os 3 motivos "nunca virou base" e aplica o abono conforme o toggle (filterAbono).
+  app.get("/api/analytics/churn-historico-mensal", async (req, res) => {
+    try {
+      const filterAbono = (req.query.filterAbono as string) || "todos"; // todos | nao_abonados | abonados
+      const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
+      const inicio = `${ano}-01-01`;
+      const fim = `${ano}-12-31`;
+
+      let abonoFilter = sql``;
+      if (filterAbono === "nao_abonados") abonoFilter = sql`AND COALESCE(abonar_churn, '') <> 'Sim'`;
+      else if (filterAbono === "abonados") abonoFilter = sql`AND COALESCE(abonar_churn, '') = 'Sim'`;
+
+      const result = await db.execute(sql`
+        SELECT
+          TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') AS mes,
+          COALESCE(NULLIF(TRIM(motivo_cancelamento), ''), 'Não especificado') AS motivo,
+          SUM(COALESCE(valor_r, 0)) AS mrr,
+          COUNT(*) AS logos
+        FROM cortex_core.vw_cup_churn_ajustado
+        WHERE data_solicitacao_encerramento >= ${inicio}::date
+          AND data_solicitacao_encerramento <= ${fim}::date
+          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+          ${abonoFilter}
+        GROUP BY 1, 2
+        ORDER BY 1
+      `);
+
+      // Pivot: mês -> { total, porMotivo }
+      const mesesMap: Record<string, { mes: string; total: number; logos: number; porMotivo: Record<string, number> }> = {};
+      const motivoTotals: Record<string, number> = {};
+      for (const r of result.rows as any[]) {
+        const mes = r.mes as string;
+        const motivo = r.motivo as string;
+        const mrr = Number(r.mrr) || 0;
+        const logos = Number(r.logos) || 0;
+        if (!mesesMap[mes]) mesesMap[mes] = { mes, total: 0, logos: 0, porMotivo: {} };
+        mesesMap[mes].porMotivo[motivo] = (mesesMap[mes].porMotivo[motivo] || 0) + mrr;
+        mesesMap[mes].total += mrr;
+        mesesMap[mes].logos += logos;
+        motivoTotals[motivo] = (motivoTotals[motivo] || 0) + mrr;
+      }
+
+      const motivos = Object.entries(motivoTotals)
+        .sort((a, b) => b[1] - a[1])
+        .map(([m]) => m);
+      const series = Object.values(mesesMap).sort((a, b) => a.mes.localeCompare(b.mes));
+
+      // MRR base real de cada mês (mesma régua do card de Taxa de Churn): primeiro snapshot
+      // do mês (dias 1-5), fallback último do mês anterior; status ativo/onboarding/triagem;
+      // exclui squads irrelevantes. Usado para a meta de 8% do histórico.
+      const agora = new Date();
+      const ultimoMes = ano === agora.getFullYear() ? agora.getMonth() + 1 : 12;
+      const SQUADS_IRRELEVANTES_LOWER = ['turbo interno', 'squad x', 'interno', 'x'];
+      const mrrBasePorMes: Record<string, number> = {};
+      for (let mes = 1; mes <= ultimoMes; mes++) {
+        const mesKey = `${ano}-${String(mes).padStart(2, '0')}`;
+        const inicioMesAtual = new Date(ano, mes - 1, 1);
+        const fimMesAtual = new Date(ano, mes - 1, 5, 23, 59, 59);
+        const refMonth = mes === 1 ? 12 : mes - 1;
+        const refYear = mes === 1 ? ano - 1 : ano;
+        const inicioRef = new Date(refYear, refMonth - 1, 1);
+        const fimRef = new Date(refYear, refMonth, 0, 23, 59, 59);
+        const mrrResult = await db.execute(sql`
+          WITH snapshot_atual AS (
+            SELECT MIN(data_snapshot) as data_snapshot FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioMesAtual}::timestamp AND data_snapshot <= ${fimMesAtual}::timestamp
+          ),
+          snapshot_anterior AS (
+            SELECT MAX(data_snapshot) as data_snapshot FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioRef}::timestamp AND data_snapshot <= ${fimRef}::timestamp
+          ),
+          snapshot_ref AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM snapshot_atual WHERE data_snapshot IS NOT NULL),
+              (SELECT data_snapshot FROM snapshot_anterior)
+            ) as data_ultimo_snapshot
+          )
+          SELECT COALESCE(NULLIF(TRIM(h.squad), ''), 'Não especificado') as squad,
+                 COALESCE(h.valorr::numeric, 0) as valorr
+          FROM snapshot_ref us
+          JOIN "Clickup".cup_data_hist h
+            ON h.data_snapshot = us.data_ultimo_snapshot
+            AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
+        `);
+        let total = 0;
+        for (const row of mrrResult.rows as any[]) {
+          const squadRaw: string = row.squad || 'Não especificado';
+          if (!SQUADS_IRRELEVANTES_LOWER.includes(squadRaw.trim().toLowerCase())) {
+            total += Number(row.valorr) || 0;
+          }
+        }
+        mrrBasePorMes[mesKey] = total;
+      }
+
+      res.json({ series, motivos, ano, filterAbono, mrrBasePorMes });
+    } catch (error) {
+      console.error("[api] Error fetching churn historico mensal:", error);
+      res.status(500).json({ error: "Failed to fetch churn historico mensal data" });
     }
   });
 

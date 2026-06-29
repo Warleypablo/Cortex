@@ -12,7 +12,7 @@ export type MixClickup = Map<string, Map<SegmentoBP, number>>;
 // product rows do Bitrix por deal (deal.id -> valor por segmento) — fonte exata de mix
 export type ProdutoRowMix = Map<number, Map<SegmentoBP, number>>;
 export type AovMedio = Record<string, number>;
-export interface ParteDeal { segmento: SegmentoBP; natureza: Natureza; valor: number; contrato: 1 }
+export interface ParteDeal { segmento: SegmentoBP; natureza: Natureza; valor: number }
 
 function pesar(valor: number, segmentos: SegmentoBP[], pesos: Map<SegmentoBP, number> | undefined): Map<SegmentoBP, number> | null {
   if (!pesos) return null;
@@ -43,7 +43,7 @@ function distribuirNatureza(
 ): ParteDeal[] {
   if (valor <= 0 || segmentos.length === 0) return [];
   if (segmentos.length === 1) {
-    return [{ segmento: segmentos[0], natureza, valor, contrato: 1 }];
+    return [{ segmento: segmentos[0], natureza, valor }];
   }
   let pesado: Map<SegmentoBP, number> | null = null;
   for (const f of fontes) {
@@ -51,7 +51,7 @@ function distribuirNatureza(
     if (pesado) break;
   }
   if (!pesado) pesado = pesar(valor, segmentos, pesosAov(segmentos, aov))!;
-  return segmentos.map((s) => ({ segmento: s, natureza, valor: pesado!.get(s) ?? 0, contrato: 1 as const }));
+  return segmentos.map((s) => ({ segmento: s, natureza, valor: pesado!.get(s) ?? 0 }));
 }
 
 export function distribuirDeal(
@@ -65,6 +65,27 @@ export function distribuirDeal(
     ...distribuirNatureza(deal.valorRec, segRec, "recorrente", [pr, mixRec.get(deal.cnpjNorm)], aovRec),
     ...distribuirNatureza(deal.valorPont, segPont, "pontual", [pr, mixPont.get(deal.cnpjNorm)], aovPont),
   ];
+}
+
+// Contagem de contratos por segmento×natureza = nº de serviços vendidos no deal (campo
+// servicos_vendidos), via de-para. Régua: 1 serviço = 1 contrato. Desacoplada da distribuição
+// de valor: 2 serviços do mesmo segmento contam 2 (a contagem por segmento colapsava em 1).
+// Deal vendido sem nenhum serviço mapeado conta 1 contrato em Others, na natureza que tem
+// valor — piso que evita sumir o deal e mantém CAC/contrato ≤ CAC/cliente.
+export function contarServicosPorSegmento(deal: DealVenda): { recorrente: Map<SegmentoBP, number>; pontual: Map<SegmentoBP, number> } {
+  const rec = new Map<SegmentoBP, number>();
+  const pont = new Map<SegmentoBP, number>();
+  for (const id of deal.ids) {
+    const s = SERVICOS_BITRIX[id];
+    if (!s) continue;
+    const m = s.natureza === "recorrente" ? rec : pont;
+    m.set(s.segmento, (m.get(s.segmento) ?? 0) + 1);
+  }
+  if (rec.size === 0 && pont.size === 0) {
+    if (deal.valorRec > 0) rec.set("Others", 1);
+    else if (deal.valorPont > 0) pont.set("Others", 1);
+  }
+  return { recorrente: rec, pontual: pont };
 }
 
 export function aovMedioPorSegmento(deals: DealVenda[], natureza: Natureza): AovMedio {
@@ -83,21 +104,29 @@ export function aovMedioPorSegmento(deals: DealVenda[], natureza: Natureza): Aov
   return out;
 }
 
+// contratosRec/contratosPont = nº de serviços vendidos por segmento (régua: 1 serviço = 1 contrato)
 export interface CelulaSeg { mrr: number; pont: number; contratosRec: number; contratosPont: number }
 export function agregarVendasProduto(
   deals: DealVenda[], prMix: ProdutoRowMix, mixRec: MixClickup, mixPont: MixClickup, aovRec: AovMedio, aovPont: AovMedio
 ): Map<number, Map<SegmentoBP, CelulaSeg>> {
   const out = new Map<number, Map<SegmentoBP, CelulaSeg>>();
   for (const d of deals) {
-    const partes = distribuirDeal(d, prMix, mixRec, mixPont, aovRec, aovPont);
     const porMes = out.get(d.mes) ?? new Map<SegmentoBP, CelulaSeg>();
-    for (const p of partes) {
-      const c = porMes.get(p.segmento) ?? { mrr: 0, pont: 0, contratosRec: 0, contratosPont: 0 };
-      if (p.natureza === "recorrente") { c.mrr += p.valor; c.contratosRec += p.contrato; }
-      else { c.pont += p.valor; c.contratosPont += p.contrato; }
-      porMes.set(p.segmento, c);
-    }
     out.set(d.mes, porMes);
+    const cel = (seg: SegmentoBP): CelulaSeg => {
+      const c = porMes.get(seg) ?? { mrr: 0, pont: 0, contratosRec: 0, contratosPont: 0 };
+      porMes.set(seg, c);
+      return c;
+    };
+    // valor: distribui valorRec/valorPont entre os segmentos (pesar mantém total = deal)
+    for (const p of distribuirDeal(d, prMix, mixRec, mixPont, aovRec, aovPont)) {
+      const c = cel(p.segmento);
+      if (p.natureza === "recorrente") c.mrr += p.valor; else c.pont += p.valor;
+    }
+    // contagem: 1 contrato por serviço vendido (servicos_vendidos), agrupado por segmento
+    const cont = contarServicosPorSegmento(d);
+    cont.recorrente.forEach((n, seg) => { cel(seg).contratosRec += n; });
+    cont.pontual.forEach((n, seg) => { cel(seg).contratosPont += n; });
   }
   return out;
 }

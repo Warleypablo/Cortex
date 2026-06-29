@@ -463,9 +463,9 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
     calculo: "Despesa CAC ÷ deals ganhos no mês (proxy de clientes — o CRM não separa novo de cross-sell). Orçado ÷ deals esperados pelo BP (reuniões × conversão).",
   },
   cac_por_contrato: {
-    definicao: "Quanto custou cada contrato vendido no mês (um cliente pode fechar vários contratos).",
-    fonte: "Derivada (despesa do Conta Azul ÷ contratos do Bitrix).",
-    calculo: "Despesa CAC ÷ contratos vendidos no mês (recorrentes + pontuais; um deal com N produtos conta N). Comparável ao CAC por cliente — fica menor quando um cliente fecha mais de um contrato. Orçado ÷ contratos vendidos orçados. YTD = Σ ÷ Σ.",
+    definicao: "Quanto custou cada contrato vendido no mês (um deal pode trazer vários serviços/contratos).",
+    fonte: "Derivada (despesa do Conta Azul ÷ serviços vendidos no Bitrix).",
+    calculo: "Despesa CAC ÷ serviços vendidos no mês (campo servicos_vendidos do deal: cada serviço = 1 contrato; um deal com N serviços conta N). Comparável ao CAC por cliente — fica menor quando um deal traz mais de um serviço. Orçado ÷ contratos vendidos orçados. YTD = Σ ÷ Σ.",
   },
   cac_pct_receita: {
     definicao: "Quanto de cada real novo foi consumido para adquiri-lo.",
