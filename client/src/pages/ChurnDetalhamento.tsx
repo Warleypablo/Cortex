@@ -48,6 +48,12 @@ export default function ChurnDetalhamento() {
     return churnBP / mrrBP;
   };
 
+  // Meta de churn fixa em 8% do MRR (planejado BP) de cada mês — referência da linha do histórico
+  const META_CHURN_PCT = 0.08;
+  const metaChurn8Pct: Record<string, number> = Object.fromEntries(
+    Object.entries(BP_MRR_TARGETS).map(([mes, mrr]) => [mes, mrr * META_CHURN_PCT])
+  );
+
   const [dataInicio, setDataInicio] = useState<string>(format(startOfMonth(new Date()), "yyyy-MM-dd"));
   const [dataFim, setDataFim] = useState<string>(format(endOfMonth(new Date()), "yyyy-MM-dd"));
   const [filterAbono, setFilterAbono] = useState<"todos" | "abonados" | "nao_abonados">("todos");
@@ -408,7 +414,7 @@ export default function ChurnDetalhamento() {
       )}
 
       {/* Histórico mensal de churn do ano (mesma régua da tela) — fim da página */}
-      <ChurnHistoricoMensal filterAbono={filterAbono} churnTargets={BP_CHURN_MRR_TARGETS} />
+      <ChurnHistoricoMensal filterAbono={filterAbono} churnTargets={metaChurn8Pct} />
 
       <ChurnDrillDrawer
         open={!!drill}
