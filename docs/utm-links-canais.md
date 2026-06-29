@@ -7,7 +7,7 @@
 ## Regras rápidas
 
 - **FIXO** (link da bio): cola **uma vez** no perfil e esquece. `utm_content=site-home`.
-- **POST** (link na publicação): troca o `utm_content` por `{tema}-{aaaa-mm-dd}` a cada post (ex: `creators-2026-06-28`). O `{tema}` é o assunto (`creators`, `ecommerce`, `comercial`, `flash`).
+- **POST** (link na publicação): troca o `utm_content` por `{nome-curto}-{aaaa-mm-dd}` a cada post. O `{nome-curto}` é um apelido do post de **3-5 palavras**, minúsculo, com hífen (ex: `5-erros-ecommerce-2026-06-28`). Não use o título completo (fica grande e quebra com acento/espaço).
 - **`utm_campaign`** = a iniciativa. Padrão `always-on` (conteúdo contínuo, sem campanha nomeada). **Troque** quando o post fizer parte de algo:
   - Lançamento → `lancamento-{produto}-{aaaa-mm}` (ex: `lancamento-creators-2026-06`)
   - Evento → `{evento}-{aaaa-mm}` (ex: `creator-summit-2026-06`)
@@ -59,12 +59,12 @@ TikTok     https://www.turbopartners.com.br/?utm_source=tiktok&utm_medium=organi
 YouTube    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=site-home
 LinkedIn   https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=site-home
 ```
-**POST (troca `utm_content` por `{tema}-{data}`):**
+**POST (troca `utm_content` por `{nome-curto}-{aaaa-mm-dd}`):**
 ```
-LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-28
-YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-2026-06-28
-Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=stories&utm_content=creators-2026-06-28
-ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=organic&utm_campaign=automacoes&utm_term=dm&utm_content=creators-2026-06-28
+LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=organic&utm_campaign=always-on&utm_term=feed&utm_content={nome-curto}-{aaaa-mm-dd}
+YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-video&utm_content={nome-curto}-{aaaa-mm-dd}
+Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=organic&utm_campaign=always-on&utm_term=stories&utm_content={nome-curto}-{aaaa-mm-dd}
+ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=organic&utm_campaign=automacoes&utm_term=dm&utm_content={nome-curto}-{aaaa-mm-dd}
 ```
 > TikTok e feed/reels do Instagram não têm post com link clicável → usam o **link fixo da bio** ou **ManyChat**.
 
@@ -79,12 +79,12 @@ TikTok     https://www.turbopartners.com.br/?utm_source=tiktok&utm_medium=victor
 YouTube    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=bio&utm_content=site-home
 LinkedIn   https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=victor&utm_campaign=always-on&utm_term=bio&utm_content=site-home
 ```
-**POST (troca `utm_content` por `{tema}-{data}`):**
+**POST (troca `utm_content` por `{nome-curto}-{aaaa-mm-dd}`):**
 ```
-LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=victor&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-28
-YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-2026-06-28
-Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=victor&utm_campaign=always-on&utm_term=stories&utm_content=creators-2026-06-28
-ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=victor&utm_campaign=automacoes&utm_term=dm&utm_content=creators-2026-06-28
+LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=victor&utm_campaign=always-on&utm_term=feed&utm_content={nome-curto}-{aaaa-mm-dd}
+YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=victor&utm_campaign=always-on&utm_term=descricao-video&utm_content={nome-curto}-{aaaa-mm-dd}
+Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=victor&utm_campaign=always-on&utm_term=stories&utm_content={nome-curto}-{aaaa-mm-dd}
+ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=victor&utm_campaign=automacoes&utm_term=dm&utm_content={nome-curto}-{aaaa-mm-dd}
 ```
 
 ---
@@ -98,12 +98,12 @@ TikTok     https://www.turbopartners.com.br/?utm_source=tiktok&utm_medium=andre&
 YouTube    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=andre&utm_campaign=always-on&utm_term=bio&utm_content=site-home
 LinkedIn   https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=andre&utm_campaign=always-on&utm_term=bio&utm_content=site-home
 ```
-**POST (troca `utm_content` por `{tema}-{data}`):**
+**POST (troca `utm_content` por `{nome-curto}-{aaaa-mm-dd}`):**
 ```
-LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=andre&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-28
-YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=andre&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-2026-06-28
-Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=andre&utm_campaign=always-on&utm_term=stories&utm_content=creators-2026-06-28
-ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=andre&utm_campaign=automacoes&utm_term=dm&utm_content=creators-2026-06-28
+LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=andre&utm_campaign=always-on&utm_term=feed&utm_content={nome-curto}-{aaaa-mm-dd}
+YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=andre&utm_campaign=always-on&utm_term=descricao-video&utm_content={nome-curto}-{aaaa-mm-dd}
+Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=andre&utm_campaign=always-on&utm_term=stories&utm_content={nome-curto}-{aaaa-mm-dd}
+ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=andre&utm_campaign=automacoes&utm_term=dm&utm_content={nome-curto}-{aaaa-mm-dd}
 ```
 
 ---
@@ -117,12 +117,12 @@ TikTok     https://www.turbopartners.com.br/?utm_source=tiktok&utm_medium=rodrig
 YouTube    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=rodrigo&utm_campaign=always-on&utm_term=bio&utm_content=site-home
 LinkedIn   https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=bio&utm_content=site-home
 ```
-**POST (troca `utm_content` por `{tema}-{data}`):**
+**POST (troca `utm_content` por `{nome-curto}-{aaaa-mm-dd}`):**
 ```
-LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=feed&utm_content=creators-2026-06-28
-YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=rodrigo&utm_campaign=always-on&utm_term=descricao-video&utm_content=creators-2026-06-28
-Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=always-on&utm_term=stories&utm_content=creators-2026-06-28
-ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=automacoes&utm_term=dm&utm_content=creators-2026-06-28
+LinkedIn (feed)        https://www.turbopartners.com.br/?utm_source=linkedin&utm_medium=rodrigo&utm_campaign=always-on&utm_term=feed&utm_content={nome-curto}-{aaaa-mm-dd}
+YouTube (descrição)    https://www.turbopartners.com.br/?utm_source=youtube&utm_medium=rodrigo&utm_campaign=always-on&utm_term=descricao-video&utm_content={nome-curto}-{aaaa-mm-dd}
+Instagram (stories)    https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=always-on&utm_term=stories&utm_content={nome-curto}-{aaaa-mm-dd}
+ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&utm_medium=rodrigo&utm_campaign=automacoes&utm_term=dm&utm_content={nome-curto}-{aaaa-mm-dd}
 ```
 
 ---
