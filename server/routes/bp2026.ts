@@ -311,6 +311,7 @@ export async function computarBpReceitas(db: any): Promise<any> {
       // 4l. Fluxo de caixa real (DFC): entradas − saídas quitadas no mês
       const dfcResult = await db.execute(sql`
         SELECT EXTRACT(MONTH FROM data_quitacao)::int AS mes,
+               SUM(CASE WHEN tipo_evento = 'RECEITA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END) AS entradas,
                SUM(CASE WHEN tipo_evento = 'RECEITA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END)
              - SUM(CASE WHEN tipo_evento = 'DESPESA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END) AS fluxo
         FROM "Conta Azul".caz_parcelas
@@ -319,8 +320,10 @@ export async function computarBpReceitas(db: any): Promise<any> {
         GROUP BY 1 ORDER BY 1
       `);
       const dfcPorMes: Record<number, number> = {};
+      const faturamentoCaixaPorMes: Record<number, number> = {};
       for (const row of dfcResult.rows as any[]) {
         dfcPorMes[Number(row.mes)] = parseFloat(row.fluxo);
+        faturamentoCaixaPorMes[Number(row.mes)] = parseFloat(row.entradas);
       }
 
       // 5. Montagem: meses futuros => realizado null
@@ -552,7 +555,7 @@ export async function computarBpReceitas(db: any): Promise<any> {
       // 12. Detalhamentos: SG&A e CAC por sub-linha, Outras Receitas por categoria
       const { sga: sgaDetalhe, cac: cacDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
         db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec,
-        contratosVendidosTotalPorMes, mesCorrente, mesFechado,
+        contratosVendidosTotalPorMes, faturamentoCaixaPorMes, mesCorrente, mesFechado,
       });
 
       // documentação por linha (o que é / fonte / cálculo) — dicionário único
