@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-06-29 | feat(ads-creation): sobe 9 ads Caio pareados em 3 conjuntos (Roteiro 1-3) na CBO Creators
+
+**O que foi feito:**
+- `subir-caio-roteiros-ads.ts`: cria **3 conjuntos** na camp CBO Creators teste (`120249141209100450`), **1 roteiro por conjunto**, cada um com **3 ads pareados 9x16+4x5** via `asset_feed_spec`+`asset_customization_rules`, tudo **PAUSED**:
+  - **168** `120252533645760450` — Roteiro 1 → TP1722 (`…654800450`), TP1723 (`…660490450`), TP1724 (`…679910450`)
+  - **169** `120252533687400450` — Roteiro 2 → TP1725 (`…697720450`), TP1726 (`…755680450`), TP1727 (`…794650450`)
+  - **170** `120252533808570450` — Roteiro 3 → TP1728 (`…820500450`), TP1729 (`…842000450`), TP1730 (`…884570450`)
+- Auto-descobre os 18 `video_id` no Gerenciador (`R#H#-Caio-(9x16|4x5)`) e pareia por hook; cruza com a Biblioteca (TP1722–1730) por R#H# pra usar o `nome_final` como nome do ad
+- Clona config (otimização/billing/pixel/atribuição/targeting/destination_type) do conjunto irmão **142 Processo Bready** e reaproveita copy/link/CTA/UTM de um ad dele (placeholder Creators, link `pages.turbopartners.com.br/creators/`, CTA LEARN_MORE, UTM dinâmico) — refinar a legenda depois já que sobem pausados
+- Idempotente: reusa conjunto pelo sufixo do nome (`[Caio] - … - Roteiro N`) e pula ad cujo TP já existe; backoff de rate-limit (writes passaram sem travar)
+
+**Por que:**
+- Usuário pediu pra subir os ads (já com os vídeos no Gerenciador) pausados, **um roteiro por conjunto** → 3 conjuntos diferentes
+
+**Arquivos novos:**
+- `subir-caio-roteiros-ads.ts` - criação dos 3 conjuntos + 9 ads pareados (DRY por padrão, `--go`, idempotente)
+- `inspecionar-caio-roteiros.ts` - sondagem read-only (match dos 18 vídeos + NN/estrutura da campanha)
+
+**Impacto arquitetural:** Nenhum — scripts standalone na raiz, mesmo padrão do `subir-victor-ads.ts` (vídeo pareado) e demais `subir-*-ads.ts`.
+
+---
+
 ## 2026-06-29 | feat(ads-creation): cadastra 9 hooks Caio (TP1722-1730) na Biblioteca
 
 **O que foi feito:**
