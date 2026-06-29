@@ -123,6 +123,7 @@ Mesmo que uma iniciativa (ex: social selling) seja conceitualmente "diferente", 
 | `instagram` | Posts, reels, stories, destaques, DM, link na bio (direto ou via Linktree — ver seção 4.2) |
 | `linkedin` | Posts da página Turbo, DMs de SDR via canal LinkedIn da Turbo |
 | `youtube` | Descrição de vídeo, Shorts, card, bio do canal, banner |
+| `youtube-cast` | Canal **Turbo Cast** no YouTube — separado do canal principal pra leitura própria no relatório (exige `utm_medium=organic` explícito) |
 | `tiktok` | Bio, descrição de vídeos, DMs |
 | `pinterest` | Pins orgânicos (raro hoje mas reservado) |
 

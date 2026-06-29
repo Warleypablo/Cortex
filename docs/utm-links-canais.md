@@ -70,6 +70,21 @@ ManyChat (IG, DM)      https://www.turbopartners.com.br/?utm_source=instagram&ut
 
 ---
 
+## 🎙️ TURBO CAST (YouTube) — `utm_medium=organic` · `utm_source=youtube-cast`
+
+> Canal separado do YouTube principal da Turbo. A **única** diferença pro canal principal é o `utm_source=youtube-cast` (em vez de `youtube`). Exige `utm_medium=organic` explícito.
+
+**FIXO (Sobre/links do canal):**
+```
+YouTube  https://www.turbopartners.com.br/?utm_source=youtube-cast&utm_medium=organic&utm_campaign=always-on&utm_term=bio&utm_content=site-home
+```
+**POST (descrição — troca `{nome-curto}-{aaaa-mm-dd}`):**
+```
+YouTube  https://www.turbopartners.com.br/?utm_source=youtube-cast&utm_medium=organic&utm_campaign=always-on&utm_term=descricao-video&utm_content={nome-curto}-{aaaa-mm-dd}
+```
+
+---
+
 ## 🔵 VICTOR — `utm_medium=victor`
 
 **FIXO (bio):**
