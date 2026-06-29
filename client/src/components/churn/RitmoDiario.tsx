@@ -15,6 +15,7 @@ import {
 import { type ChurnContract } from "@/components/churn/types";
 import { severityHex } from "@/components/churn/severity";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
+import { useTheme } from "@/components/ThemeProvider";
 
 const SQUAD_BLACKLIST = ["turbo interno", "squad x", "interno", "x"];
 
@@ -87,6 +88,11 @@ export function RitmoDiario({
   contratos: ChurnContract[];
   onDrill: (titulo: string, contratos: ChurnContract[]) => void;
 }): JSX.Element {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  // Cor das legendas: clara (quase branca) no dark, escura no light.
+  // var(--foreground) NÃO serve aqui: é HSL cru e fica inválido como `fill` de SVG.
+  const axisColor = isDark ? "#e5e7eb" : "#374151";
   const [metric, setMetric] = useState<MetricKey>("mrr");
   const [squadFilter, setSquadFilter] = useState<string>("total");
 
@@ -225,13 +231,13 @@ export function RitmoDiario({
           />
           <XAxis
             dataKey="label"
-            tick={{ fontSize: 11, fill: "var(--foreground)" }}
+            tick={{ fontSize: 11, fill: axisColor }}
             tickLine={false}
             axisLine={false}
           />
           <YAxis
             tickFormatter={yTickFormatter}
-            tick={{ fontSize: 11, fill: "var(--foreground)" }}
+            tick={{ fontSize: 11, fill: axisColor }}
             tickLine={false}
             axisLine={false}
             width={metric === "mrr" ? 72 : 30}
@@ -263,7 +269,7 @@ export function RitmoDiario({
               dataKey={metric}
               position="top"
               formatter={(v: number) => barLabel(v, metric)}
-              style={{ fontSize: 10, fontWeight: 700, fill: "var(--foreground)" }}
+              style={{ fontSize: 10, fontWeight: 700, fill: axisColor }}
             />
           </Bar>
         </BarChart>
