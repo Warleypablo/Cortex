@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-29 | feat(ads-creation): sobe 5 ads Estratégia Peculiar React V2 (Lucas) no conjunto 173 na CBO Creators
+
+**O que foi feito:**
+- `subir-react-v2-ads.ts`: cria **1 conjunto** na camp CBO Creators teste (`120249141209100450`), **PAUSED**, com 5 ads pareados 9x16+4x5 via `asset_feed_spec`:
+  - **173** `120252544356900450` — [Lucas] Estratégia Peculiar React V2 (5 ads): TP1740 (`…360480450`), TP1741 (`…364760450`), TP1742 (`…367090450`), TP1743 (`…371860450`), TP1744 (`…375970450`)
+- **Match de vídeo ESTRITO** pelo nome exato (`<base>_9x16`/`<base>_4x5`) — crítico porque o Gerenciador tem `Estrategia_peculiar_react_*` SEM o `_v2` (outro lote); **paginação com EARLY-EXIT** (achou os 10 vídeos em 1 página) pra poupar rate-limit
+- Clona config (otim/billing/pixel/atribuição/targeting/destination_type) + copy/link/CTA/UTM do irmão **142** (placeholder Creators, link `pages.turbopartners.com.br/creators/`); idempotente por sufixo do conjunto + TP do ad
+- **Rate-limit:** conta foi de 92%→**110%** durante o run; as escritas passaram mesmo assim (confirma "writes passam"), mas ao final ficou throttled com `estimated_time_to_regain_access=17min`
+
+**Por que:**
+- Usuário avisou que os vídeos do React V2 já estavam no Gerenciador e pediu pra subir os ads (pausados)
+
+**Arquivos novos:**
+- `subir-react-v2-ads.ts` - criação do conjunto + 5 ads pareados (DRY por padrão, `--go`, idempotente, match estrito, early-exit na busca de vídeo)
+
+**Impacto arquitetural:** Nenhum — script standalone na raiz, mesmo padrão do `subir-summit-react-ads.ts`.
+
+---
+
 ## 2026-06-29 | feat(ads-creation): cadastra 5 hooks Estratégia Peculiar React V2 (TP1740-1744) na Biblioteca
 
 **O que foi feito:**
