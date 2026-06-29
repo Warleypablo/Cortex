@@ -42,7 +42,9 @@ class Config:
     organico_ingest_token: str
     # Nomes dos custom fields do ClickUp (case-insensitive no match). Configuráveis
     # porque o nome real diverge do esperado: o campo de data é "Data de postagem"
-    # (p minúsculo), não "Data de Postagem". O horário é um campo de TEXTO novo.
+    # (p minúsculo), não "Data de Postagem". A HORA agora vem embutida NESSE campo de
+    # data (time picker do ClickUp, ex.: 2026-06-29 11:00); "Horário" é só fallback de
+    # TEXTO legado e pode nem existir na lista. Ver clickup.Task.posting_time().
     posting_date_field: str
     horario_field: str
 

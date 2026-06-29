@@ -137,17 +137,37 @@ class Task:
         return datetime.fromtimestamp(ms / 1000).date()  # fallback: fuso local
 
     def posting_time(self) -> str | None:
-        """Horário EXPLÍCITO do card (campo de texto 'Horário'), normalizado 'HH:MM'.
+        """Horário EXPLÍCITO do card, 'HH:MM'. Duas fontes, nesta ordem:
 
-        None se o campo está vazio ou ilegível — nesse caso o agente cai no
-        horário padrão (CONFIG.horario_padrao). Saber se foi explícito ou padrão
-        deixa o painel mostrar "(padrão)".
+        1) a HORA embutida no próprio campo 'Data de postagem' — é o novo padrão do
+           time, que usa o time picker do ClickUp (a data já vem com hora, ex.:
+           2026-06-29 11:00). Lida no MESMO fuso de posting_date (São Paulo).
+           00:00 conta como "sem hora" (date picker puro, sem time) → cai no fallback.
+        2) [legado] um campo de TEXTO separado 'Horário' (CONFIG.horario_field), se
+           existir e estiver preenchido.
+
+        None quando nenhuma traz hora — aí scheduled_datetime() NÃO agenda (o card
+        fica em 'aprovado' esperando alguém definir a hora).
         """
+        # (1) hora dentro do 'Data de postagem' (mesmo timestamp/fuso de posting_date)
+        dtv = self._cf(CONFIG.posting_date_field)
+        if dtv not in (None, ""):
+            try:
+                ms = int(dtv)
+            except (TypeError, ValueError):
+                ms = None
+            if ms is not None:
+                dt = (datetime.fromtimestamp(ms / 1000, tz=_TZ_POSTAGEM)
+                      if _TZ_POSTAGEM is not None else datetime.fromtimestamp(ms / 1000))
+                if (dt.hour, dt.minute) != (0, 0):  # 00:00 = data sem hora (date picker puro)
+                    return f"{dt.hour:02d}:{dt.minute:02d}"
+        # (2) legado: campo de texto separado 'Horário'
         val = self._cf(CONFIG.horario_field)
-        if val in (None, ""):
-            return None
-        hm = parse_hhmm(str(val))
-        return f"{hm[0]:02d}:{hm[1]:02d}" if hm else None
+        if val not in (None, ""):
+            hm = parse_hhmm(str(val))
+            if hm:
+                return f"{hm[0]:02d}:{hm[1]:02d}"
+        return None
 
     def scheduled_datetime(self) -> datetime | None:
         """Data + horário do card combinados, tz-aware (America/Sao_Paulo), ou None.
