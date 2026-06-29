@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-29 | feat(ads-creation): cadastra 9 hooks Caio (TP1722-1730) na Biblioteca
+
+**O que foi feito:**
+- `subir-caio-roteiros-planilha.ts`: cadastra na Biblioteca os 9 hooks do lote `59 - 3x ads validados re-escritos` (apresentador **Caio**) — roteiros 1–3 × hooks 1–3, **1 linha/TP por hook pareado** (9x16 stories + 4x5 feed), na ordem **R1H1 … R3H3** → **TP1722–TP1730**
+- Cada linha: `nome_drive` = base do hook (ex.: `R1H1-Caio`), `produto=Creators`, `plataforma=Meta`, `tipo=Vídeo`, `personagem=Caio`, funil vazio; primário (`drive_file_id`+`link_drive`) = o **9x16**, e o **4x5** (link + file_id) registrado na `observacao` pra não perder o match
+- `checar-caio-roteiros.ts`: check read-only que confirmou próximo TP livre (TP1722) e dedup por `drive_file_id` (0/18 já cadastrados)
+
+**Por que:**
+- Usuário subindo os vídeos no Gerenciador manualmente e pediu pra preencher a planilha (Biblioteca) em paralelo, com TP correto e na ordem por roteiro→hook
+
+**Arquivos novos:**
+- `subir-caio-roteiros-planilha.ts` - cadastro dos 9 hooks (DRY por padrão, `--go` pra gravar, idempotente via dedup por `drive_file_id`)
+- `checar-caio-roteiros.ts` - check read-only de próximo TP + dedup
+
+**Impacto arquitetural:** Nenhum — scripts standalone na raiz, mesmo padrão dos `subir-*-planilha.ts` existentes; reusam `createCreative`/`generateNextTpId`.
+
+---
+
 ## 2026-06-26 | test(ads-creation): valida metaUploadVideo (Drive → Gerenciador) com smoke test real
 
 **O que foi feito:**
