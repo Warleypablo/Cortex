@@ -43,12 +43,18 @@ class Rec:
         self.pending = []
         self.due = []
         self.exec_calls = 0
+        self.claims = []
+        self.claimed = True  # por padrão, ESTE worker ganha o claim
 
     def pull_pending(self, platform):
         return list(self.pending)
 
     def get_due(self, platform):
         return list(self.due)
+
+    def claim(self, platform, task_id):
+        self.claims.append((platform, task_id))
+        return self.claimed
 
     def ack(self, cid, status, result=None, error=None):
         self.acks.append((cid, status, result, error))
@@ -58,6 +64,7 @@ class Rec:
 def _wire(rec, plan, exec_result=None):
     commands.panel_client.pull_pending = rec.pull_pending
     commands.panel_client.get_due = rec.get_due
+    commands.panel_client.claim = rec.claim
     commands.panel_client.ack = rec.ack
     commands.state_sink.report_posts = lambda platform, posts: rec.reports.append((platform, posts))
     commands._plan = lambda tid: plan
@@ -139,3 +146,27 @@ def test_publish_due_real_publica():
     rec.due = [{"clickupTaskId": "t1", "platform": "instagram"}]
     n = commands.publish_due("instagram", run_id="r", dry_run=False)
     assert rec.exec_calls == 1 and n == 1
+
+
+def test_claim_negado_nao_publica_publish_now():
+    # anti-duplicação: se outro worker já reivindicou (claim=False), NÃO publica
+    rec = Rec(); rec.claimed = False; _wire(rec, FakePlan(ready=True))
+    rec.pending = [{"id": 7, "action": "publish_now", "clickupTaskId": "t1"}]
+    commands.consume("instagram", run_id="r", dry_run=False)
+    assert rec.exec_calls == 0, "claim negado NÃO pode chamar execute_plan"
+    assert _statuses(rec, 7) == ["running", "failed"]
+
+
+def test_claim_negado_nao_publica_publish_due():
+    rec = Rec(); rec.claimed = False; _wire(rec, FakePlan(ready=True))
+    rec.due = [{"clickupTaskId": "t1", "platform": "instagram"}]
+    n = commands.publish_due("instagram", run_id="r", dry_run=False)
+    assert rec.exec_calls == 0 and n == 0, "claim negado NÃO publica nem conta"
+
+
+def test_claim_so_e_chamado_no_modo_real():
+    # dry-run não deve reivindicar (claim é antes do publish real, depois do dry-run guard)
+    rec = Rec(); _wire(rec, FakePlan(ready=True))
+    rec.due = [{"clickupTaskId": "t1", "platform": "instagram"}]
+    commands.publish_due("instagram", run_id="r", dry_run=True)
+    assert rec.claims == [], "dry-run não pode reivindicar claim"

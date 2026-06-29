@@ -62,6 +62,35 @@ def get_due(platform: str) -> list[dict]:
     return list(data.get("posts") or []) if data else []
 
 
+def claim(platform: str, task_id: Any) -> bool:
+    """Reivindica ATOMICAMENTE uma task pra publicar — só UM worker ganha, evitando post
+    DUPLICADO em crons de publish sobrepostos. Retorna True só se ESTE worker ganhou o claim.
+
+    Fail-CLOSED de propósito: se o painel não confirmar (não configurado, erro de rede,
+    erro 5xx), retorna False e o worker NÃO publica neste tick — tenta no próximo. A
+    segurança contra duplicata vem antes da pressa; o post não se perde, só atrasa 1 ciclo.
+    Exceção: 404 (Cortex antigo sem /posts/claim) → fail-OPEN (publica sem claim, compat)."""
+    if not _ready() or task_id is None:
+        return False
+    body = json.dumps({"platform": platform, "clickupTaskId": str(task_id)}).encode("utf-8")
+    req = urllib.request.Request(
+        f"{_base()}/posts/claim", data=body, method="POST", headers=_headers(),
+    )
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            data = json.loads(r.read().decode("utf-8"))
+            return bool(data.get("claimed"))
+    except urllib.error.HTTPError as e:
+        if e.code == 404:
+            print("   ℹ️  painel sem /posts/claim (Cortex antigo) — publico sem claim")
+            return True
+        print(f"   ⚠️  painel claim({task_id}) HTTP {e.code} — NÃO publico neste tick (tenta no próximo)")
+        return False
+    except Exception as e:  # noqa: BLE001
+        print(f"   ⚠️  painel claim({task_id}) falhou — NÃO publico neste tick — {type(e).__name__}: {e}")
+        return False
+
+
 def ack(command_id: Any, status: str, *, result: dict | None = None, error: str | None = None) -> bool:
     """Marca um comando: running | done | failed | canceled. Fail-soft."""
     if not _ready() or command_id is None:

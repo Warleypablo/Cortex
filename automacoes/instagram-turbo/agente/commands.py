@@ -39,8 +39,16 @@ def _publish(platform: str, task_id: str, *, run_id: str, dry_run: bool) -> tupl
         return False, plan.skip_reason or "post não está pronto para publicar"
     if dry_run:
         return True, {"dry_run": True, "tipo": plan.tipo_post, "task": task_id}
+    # Claim atômico ANTES de publicar: só UM worker ganha (evita post duplicado em crons
+    # de publish sobrepostos). Sem claim confirmado, não publica — tenta no próximo tick.
+    if not panel_client.claim(platform, task_id):
+        return False, "já em publicação por outro worker (claim não obtido)"
     res = core.execute_plan(plan, run_id=run_id, force_now=True)
     if res.error:
+        # libera o claim marcando 'falhou' (sai da fila de /due; operador re-solta na mão)
+        post = state_sink.panel_post(plan, platform)
+        post.update(state="falhou", readiness="failed", error_text=res.error)
+        state_sink.report_posts(platform, [post])
         return False, res.error
     post = state_sink.panel_post(plan, platform)
     post.update(state="publicado", readiness="published", published_media_id=res.ig_media_id, permalink=res.permalink)
@@ -120,7 +128,11 @@ def publish_due(platform: str = "instagram", *, run_id: str, dry_run: bool) -> i
         if dry_run:
             print(f"   🌙 (dry-run) venceu {task_id} — publicaria agora")
             continue
-        ok, info = _publish(platform, task_id, run_id=run_id, dry_run=False)
+        try:
+            ok, info = _publish(platform, task_id, run_id=run_id, dry_run=False)
+        except Exception as e:  # noqa: BLE001 — um card com erro não derruba os outros do tick
+            print(f"   ❌ erro publicando agendado {task_id} (segue): {type(e).__name__}: {e}")
+            continue
         if ok:
             published += 1
             print(f"   ✅ agendado publicado {task_id}: {info}")

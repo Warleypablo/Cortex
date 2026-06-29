@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { desc, asc, eq, ne, and } from "drizzle-orm";
+import { desc, asc, eq, ne, and, or, lt, notInArray } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import {
   contentPosts,
@@ -63,14 +63,29 @@ export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage
         .orderBy(desc(contentPosts.postingDate))
         .limit(500);
 
-      const today = new Date().toISOString().slice(0, 10);
-      const day = (d: any) => (d ? String(d).slice(0, 10) : "");
+      // Datas em America/Sao_Paulo. CUIDADO: colunas `date` (postingDate) voltam como
+      // string "YYYY-MM-DD" e NÃO podem passar por fuso (deslocaria o dia); colunas
+      // timestamptz (updatedAt/scheduledAt) voltam como Date e PRECISAM de fuso —
+      // por isso String(Date).slice(0,10) dava "Mon Jun 29" e a comparação nunca casava.
+      const SP = "America/Sao_Paulo";
+      const today = new Intl.DateTimeFormat("en-CA", { timeZone: SP }).format(new Date());
+      const dayStr = (d: any) => (d ? String(d).slice(0, 10) : ""); // colunas date (postingDate)
+      const dayTZ = (d: any) => {
+        // colunas timestamptz (updatedAt): normaliza pro dia em SP
+        if (!d) return "";
+        const dt = new Date(d);
+        return isNaN(dt.getTime())
+          ? String(d).slice(0, 10)
+          : new Intl.DateTimeFormat("en-CA", { timeZone: SP }).format(dt);
+      };
+      const schedMs = (p: any) => {
+        const v = p.scheduledAt ?? p.cardScheduledAt ?? p.postingDate;
+        const t = v ? new Date(v).getTime() : NaN;
+        return isNaN(t) ? Infinity : t;
+      };
       const byDateAsc = (a: any, b: any) =>
-        day(a.postingDate).localeCompare(day(b.postingDate));
-      const bySchedAsc = (a: any, b: any) =>
-        String(a.scheduledAt ?? a.cardScheduledAt ?? a.postingDate ?? "").localeCompare(
-          String(b.scheduledAt ?? b.cardScheduledAt ?? b.postingDate ?? ""),
-        );
+        dayStr(a.postingDate).localeCompare(dayStr(b.postingDate));
+      const bySchedAsc = (a: any, b: any) => schedMs(a) - schedMs(b);
 
       // (A) APROVADOS — prontos/esperando legenda, SEM horário (operador nem card) nem publicação.
       // Com horário-por-card, um card com data+hora já tem card_scheduled_at → cai em AGENDADOS.
@@ -94,8 +109,8 @@ export function registerOrganicoRoutes(app: Express, db: any, _storage: IStorage
 
       // (C) PUBLICADOS DO DIA — publicados hoje (updatedAt = carimbo da publicação).
       const publicados = posts
-        .filter((p: any) => p.state === "publicado" && day(p.updatedAt) === today)
-        .sort((a: any, b: any) => String(b.updatedAt).localeCompare(String(a.updatedAt)));
+        .filter((p: any) => p.state === "publicado" && dayTZ(p.updatedAt) === today)
+        .sort((a: any, b: any) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime());
 
       const platforms = settings.map((s: any) => s.platform);
 
@@ -230,6 +245,43 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
     return true;
   };
 
+  // Claim travado (publish que crashou) expira após este tempo e o post volta à fila.
+  // Maior que o pior caso de upload (reel ~10 min) p/ não roubar um publish em andamento.
+  const STALE_CLAIM_MS = 15 * 60_000;
+
+  // POST /api/growth/organico/posts/claim  body: { platform, clickupTaskId }
+  // Claim ATÔMICO p/ evitar post DUPLICADO em crons de publish sobrepostos (um reel pode
+  // levar até 10 min > 5 min do cron). O UPDATE condicional é atômico no Postgres: das N
+  // chamadas concorrentes, só UMA casa o WHERE e flipa state→'publicando'; as outras pegam
+  // 0 linhas (claimed:false) e NÃO publicam. Claims travados (>STALE_CLAIM_MS) são reclamáveis.
+  app.post("/api/growth/organico/posts/claim", async (req, res) => {
+    if (!requireToken(req, res)) return;
+    try {
+      const { platform, clickupTaskId } = req.body || {};
+      if (!platform || !clickupTaskId)
+        return res.status(400).json({ error: "platform e clickupTaskId obrigatórios" });
+      const staleBefore = new Date(Date.now() - STALE_CLAIM_MS);
+      const rows = await db
+        .update(contentPosts)
+        .set({ state: "publicando", updatedAt: new Date() })
+        .where(
+          and(
+            eq(contentPosts.platform, platform),
+            eq(contentPosts.clickupTaskId, String(clickupTaskId)),
+            or(
+              and(ne(contentPosts.state, "publicado"), ne(contentPosts.state, "publicando")),
+              and(eq(contentPosts.state, "publicando"), lt(contentPosts.updatedAt, staleBefore)),
+            ),
+          ),
+        )
+        .returning();
+      res.json({ ok: true, claimed: rows.length > 0 });
+    } catch (err: any) {
+      console.error("[organico] claim error:", err);
+      res.status(500).json({ error: "falha no claim" });
+    }
+  });
+
   // GET /api/growth/organico/commands/pending?platform=instagram
   // O worker-poller puxa os comandos pending da sua plataforma (mais antigos primeiro).
   app.get("/api/growth/organico/commands/pending", async (req, res) => {
@@ -304,10 +356,22 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
         const v = p.scheduledAt ?? p.cardScheduledAt;
         return v ? new Date(v) : null;
       };
+      // Exclui terminais (publicado/falhou/pulado) e os 'publicando' ainda FRESCOS
+      // (claim em andamento). Um 'publicando' travado > STALE_CLAIM_MS volta à fila.
+      const staleBefore = new Date(now.getTime() - STALE_CLAIM_MS);
       const candidates = await db
         .select()
         .from(contentPosts)
-        .where(and(eq(contentPosts.platform, platform), ne(contentPosts.state, "publicado")))
+        .where(
+          and(
+            eq(contentPosts.platform, platform),
+            notInArray(contentPosts.state, ["publicado", "falhou", "pulado"]),
+            or(
+              ne(contentPosts.state, "publicando"),
+              lt(contentPosts.updatedAt, staleBefore),
+            ),
+          ),
+        )
         .limit(500);
       const due = candidates
         .filter((p: any) => {
