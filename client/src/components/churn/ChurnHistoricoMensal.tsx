@@ -88,7 +88,7 @@ export function ChurnHistoricoMensal({
     return linhas;
   }, [data, motivos, churnTargets, ano]);
 
-  const axisColor = isDark ? "#a1a1aa" : "#6b7280";
+  const axisColor = isDark ? "#e5e7eb" : "#374151";
   const gridColor = isDark ? "#3f3f46" : "#e5e7eb";
 
   const CustomTooltip = ({ active, payload, label }: any) => {
