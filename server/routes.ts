@@ -5,8 +5,9 @@ import { insertPatrimonioSchema, updateContratoSchema, pageViews } from "@shared
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
 import { validateBody } from "./middleware/validate";
-import { createUserSchema, updatePermissionsSchema, updateRoleSchema } from "./middleware/schemas";
-import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser } from "./auth/userDb";
+import { createUserSchema, updatePermissionsSchema, updateRoleSchema, updateBpTabsSchema } from "./middleware/schemas";
+import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser, updateUserBpTabs } from "./auth/userDb";
+import { BP2026_TAB_IDS } from "../shared/bp2026-tabs";
 import { db } from "./db";
 import { sql, type SQL } from "drizzle-orm";
 import { computeEvolucaoChurn } from "./investorsReport/churn";
@@ -25,6 +26,7 @@ import { registerHRRoutes } from "./routes/hr";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
+import { registerCreatorSummitRoutes } from "./routes/creatorSummit";
 import { registerYoutubeOAuthPublicRoutes, registerYoutubeOAuthStatusRoute } from "./routes/youtubeOAuth";
 import { registerYoutubeAdminRoutes } from "./routes/youtubeAdmin";
 import { registerGoogleAdsAdminRoutes } from "./routes/googleAdsAdmin";
@@ -54,6 +56,7 @@ import { registerSaldoDiarioRoutes } from "./routes/saldoDiario";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
 import { registerFechamentoSemanalRoutes } from "./routes/fechamentoSemanal";
+import { registerReportsSemanalRoutes } from "./routes/reportsSemanal";
 import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
@@ -62,6 +65,7 @@ import { registerCreatorsRoutes } from "./routes/creators";
 import { registerPortalCreatorRoutes } from "./routes/portal-creator";
 import { registerGrowthAiRoutes } from "./routes/growth-ai";
 import { registerSdrAssistantRoutes } from "./routes/sdr-assistant";
+import { registerBpCopilotRoutes } from "./routes/bp-copilot";
 import { registerAdsCreationRoutes } from "./routes/ads-creation";
 import { registerCreativesRoutes } from "./routes/creatives";
 import { registerClientesRoutes } from "./routes/clientes";
@@ -542,6 +546,22 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error) {
       console.error("[api] Error updating permissions:", error);
       res.status(500).json({ error: "Failed to update permissions" });
+    }
+  });
+
+  app.post("/api/users/:userId/bp-tabs", isAuthenticated, isAdmin, validateBody(updateBpTabsSchema), async (req, res) => {
+    try {
+      const { userId } = req.params;
+      const { allowedBpTabs } = req.body;
+      const validos = allowedBpTabs.filter((t: string) => (BP2026_TAB_IDS as string[]).includes(t));
+      const updatedUser = await updateUserBpTabs(userId, validos);
+      if (!updatedUser) {
+        return res.status(404).json({ error: "User not found" });
+      }
+      res.json(updatedUser);
+    } catch (error) {
+      console.error("[api] Error updating bp-tabs:", error);
+      res.status(500).json({ error: "Failed to update bp-tabs" });
     }
   });
 
@@ -5019,7 +5039,7 @@ Estruture sua resposta em:
       }
 
       // Para cada mês no range, buscar MRR base: primeiro snapshot do mês atual, fallback último do mês anterior
-      const mrrBasePorMes: Record<string, { total: number; por_squad: Record<string, number> }> = {};
+      const mrrBasePorMes: Record<string, { total: number; por_squad: Record<string, number>; por_responsavel: Record<string, number> }> = {};
 
       for (const mesKey of mesesNoRange) {
         const [ano, mes] = mesKey.split('-').map(Number);
@@ -5032,6 +5052,8 @@ Estruture sua resposta em:
         const inicioRef = new Date(refYear, refMonth - 1, 1);
         const fimRef = new Date(refYear, refMonth, 0, 23, 59, 59);
 
+        // Single query: fetch squad + responsavel + valorr per row, aggregate in JS
+        // Squad aggregation excludes irrelevant squads; pessoa does NOT
         const mrrResult = await db.execute(sql`
           WITH snapshot_atual AS (
             SELECT MIN(data_snapshot) as data_snapshot
@@ -5052,25 +5074,33 @@ Estruture sua resposta em:
             ) as data_ultimo_snapshot
           )
           SELECT
-            COALESCE(h.squad, 'Não especificado') as squad,
-            COALESCE(SUM(h.valorr::numeric), 0) as mrr_ativo
+            COALESCE(NULLIF(TRIM(h.squad), ''), 'Não especificado') as squad,
+            COALESCE(NULLIF(TRIM(h.responsavel), ''), 'Não especificado') as responsavel,
+            COALESCE(h.valorr::numeric, 0) as valorr
           FROM snapshot_ref us
           JOIN "Clickup".cup_data_hist h
             ON h.data_snapshot = us.data_ultimo_snapshot
             AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
-            AND LOWER(COALESCE(h.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
-          GROUP BY COALESCE(h.squad, 'Não especificado')
         `);
 
         const porSquad: Record<string, number> = {};
+        const porResponsavel: Record<string, number> = {};
         let totalMes = 0;
+        const SQUADS_IRRELEVANTES_LOWER = ['turbo interno', 'squad x', 'interno', 'x'];
         for (const row of mrrResult.rows as any[]) {
-          const squadName = row.squad || 'Não especificado';
-          const mrr = Number(row.mrr_ativo) || 0;
-          porSquad[squadName] = mrr;
-          totalMes += mrr;
+          const squadRaw: string = row.squad || 'Não especificado';
+          const pessoa: string = row.responsavel || 'Não especificado';
+          const mrr = Number(row.valorr) || 0;
+          // squad: exclude irrelevant squads (matches original query filter)
+          if (!SQUADS_IRRELEVANTES_LOWER.includes(squadRaw.trim().toLowerCase())) {
+            porSquad[squadRaw] = (porSquad[squadRaw] || 0) + mrr;
+            totalMes += mrr;
+          }
+          // pessoa: all rows (no squad filter)
+          porResponsavel[pessoa] = (porResponsavel[pessoa] || 0) + mrr;
         }
-        mrrBasePorMes[mesKey] = { total: totalMes, por_squad: porSquad };
+
+        mrrBasePorMes[mesKey] = { total: totalMes, por_squad: porSquad, por_responsavel: porResponsavel };
       }
 
       // MRR base agregado = soma dos MRR base de cada mês (para média ponderada)
@@ -5079,7 +5109,7 @@ Estruture sua resposta em:
 
       // Para exibição e cálculo de churn por squad, usar o MRR base do primeiro mês (referência principal)
       const primeiroMes = mesesNoRange[0];
-      const mrrBasePrimeiro = mrrBasePorMes[primeiroMes] || { total: 0, por_squad: {} };
+      const mrrBasePrimeiro = mrrBasePorMes[primeiroMes] || { total: 0, por_squad: {}, por_responsavel: {} };
       for (const [squad, mrr] of Object.entries(mrrBasePrimeiro.por_squad)) {
         mrrAtivoPorSquad[squad] = mrr;
       }
@@ -5120,6 +5150,37 @@ Estruture sua resposta em:
         mrr_ativo: mrrAtivoPorSquad[squadName] || 0,
         mrr_perdido: mrrPerdidoPorSquad[squadName] || 0,
         percentual: (somaMrrBasesPorSquad[squadName] || 0) > 0 ? ((mrrPerdidoPorSquad[squadName] || 0) / (somaMrrBasesPorSquad[squadName] || 1)) * 100 : 0,
+      })).sort((a, b) => b.percentual - a.percentual);
+
+      // Churn por pessoa (responsavel)
+      const somaMrrBasesPorPessoa: Record<string, number> = {};
+      for (const mesData of Object.values(mrrBasePorMes)) {
+        for (const [pessoa, mrr] of Object.entries(mesData.por_responsavel)) {
+          somaMrrBasesPorPessoa[pessoa] = (somaMrrBasesPorPessoa[pessoa] || 0) + mrr;
+        }
+      }
+
+      const mrrBasesPrimeiroPorPessoa = mrrBasePrimeiro.por_responsavel || {};
+
+      const mrrPerdidoPorPessoa: Record<string, number> = {};
+      for (const contrato of allContratos) {
+        const rawResp = (contrato as any).responsavel;
+        const pessoa = (rawResp && rawResp.trim()) ? rawResp.trim() : 'Não especificado';
+        mrrPerdidoPorPessoa[pessoa] = (mrrPerdidoPorPessoa[pessoa] || 0) + (contrato as any).valorr;
+      }
+
+      const allPessoaNames = Array.from(new Set([
+        ...Object.keys(mrrBasesPrimeiroPorPessoa),
+        ...Object.keys(mrrPerdidoPorPessoa),
+        ...Object.keys(somaMrrBasesPorPessoa),
+      ]));
+      const churnPorPessoa = allPessoaNames.map(pessoa => ({
+        pessoa,
+        mrr_ativo: mrrBasesPrimeiroPorPessoa[pessoa] || 0,
+        mrr_perdido: mrrPerdidoPorPessoa[pessoa] || 0,
+        percentual: (somaMrrBasesPorPessoa[pessoa] || 0) > 0
+          ? ((mrrPerdidoPorPessoa[pessoa] || 0) / somaMrrBasesPorPessoa[pessoa]) * 100
+          : 0,
       })).sort((a, b) => b.percentual - a.percentual);
 
       // Retention curve
@@ -5211,6 +5272,7 @@ Estruture sua resposta em:
           mrr_ativo_ref: mrrAtivoTotal,
           churn_percentual: churnPercentualGeral,
           churn_por_squad: churnPercentualPorSquad,
+          churn_por_pessoa: churnPorPessoa,
           churn_por_motivo: churnPorMotivo,
           churn_por_evitabilidade: churnPorEvitabilidade,
           churn_por_cluster: churnPorCluster,
@@ -8249,6 +8311,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // Growth — Evolução Temporal (matriz métricas × meses/semanas)
   registerGrowthTimeseriesRoutes(app, db);
 
+  // Growth — Creator Summit (dashboard do funil de eventos, cat 10)
+  registerCreatorSummitRoutes(app, db);
+
   // YouTube OAuth — /status (protegido; start/callback são públicos, registrados acima)
   registerYoutubeOAuthStatusRoute(app, db);
 
@@ -8285,6 +8350,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // SDR Assistant Module - registered from separate file
   registerSdrAssistantRoutes(app, db);
+
+  // BP Copilot - chat especialista de decisão sobre o Business Plan
+  registerBpCopilotRoutes(app, db);
 
   // Capacity Module - registered from separate file
   registerCapacityRoutes(app, db);
@@ -8344,6 +8412,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Fechamento Semanal - novos contratos e saúde de squads
   registerFechamentoSemanalRoutes(app);
+
+  // Reporte Semanal - 4 KPIs de desempenho semanal
+  registerReportsSemanalRoutes(app);
 
   // Cross-Sell Management - registered from separate file
   registerCrossSellRoutes(app);

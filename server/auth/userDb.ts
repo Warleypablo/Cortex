@@ -11,6 +11,7 @@ export interface User {
   createdAt: string;
   role: 'admin' | 'user';
   allowedRoutes: string[];
+  allowedBpTabs: string[];
   department: 'admin' | 'comercial' | 'financeiro' | 'operacao' | null;
 }
 
@@ -130,9 +131,10 @@ export async function createExternalUser(email: string): Promise<User> {
   const newUser: User = {
     ...newUserData,
     createdAt: new Date().toISOString(),
+    allowedBpTabs: [],
     department: null,
   };
-  
+
   setCachedUser(newUser);
   console.log(`✅ Novo usuário externo criado: ${normalizedEmail}`);
   return newUser;
@@ -327,6 +329,7 @@ function dbUserToUser(dbUser: typeof authUsers.$inferSelect): User {
     createdAt: dbUser.createdAt?.toISOString() || new Date().toISOString(),
     role: dbUser.role as 'admin' | 'user',
     allowedRoutes: migrateAllowedRoutes(dbUser.allowedRoutes),
+    allowedBpTabs: dbUser.allowedBpTabs ?? [],
     department: (dbUser.department as 'admin' | 'comercial' | 'financeiro' | 'operacao') || null,
   };
 }
@@ -365,6 +368,25 @@ export async function updateUserPermissions(userId: string, allowedRoutes: strin
     return user;
   } catch (error) {
     console.error("Erro ao atualizar permissões:", error);
+    return null;
+  }
+}
+
+export async function updateUserBpTabs(userId: string, allowedBpTabs: string[]): Promise<User | null> {
+  try {
+    const result = await db
+      .update(authUsers)
+      .set({ allowedBpTabs })
+      .where(eq(authUsers.id, userId))
+      .returning();
+
+    if (result.length === 0) return null;
+
+    const user = dbUserToUser(result[0]);
+    setCachedUser(user);
+    return user;
+  } catch (error) {
+    console.error("Erro ao atualizar abas do BP:", error);
     return null;
   }
 }
@@ -511,9 +533,10 @@ export async function createOrUpdateUser(profile: {
     ...newUserData,
     createdAt: new Date().toISOString(),
     role: newUserData.role as 'admin' | 'user',
+    allowedBpTabs: [],
     department: null,
   };
-  
+
   setCachedUser(newUser);
   console.log(`✅ Novo usuário criado: ${email} (${isExternal ? 'externo' : 'interno'})`);
   return newUser;
@@ -559,9 +582,10 @@ export async function createManualUser(data: {
   const newUser: User = {
     ...newUserData,
     createdAt: new Date().toISOString(),
+    allowedBpTabs: [],
     department: null,
   };
-  
+
   setCachedUser(newUser);
   console.log(`✅ Novo usuário manual criado: ${normalizedEmail}`);
   return newUser;

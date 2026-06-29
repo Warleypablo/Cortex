@@ -103,6 +103,62 @@ Script `scripts/apply-content-migration.ts`: aplica `migrations/2026-06-24-conte
 
 ---
 
+## 2026-06-24 | feat(bp-copilot): UI do chat (Fase 2)
+
+**O que foi feito:**
+- `client/src/pages/BpCopilot.tsx` — página de chat no padrão Growth AI (sidebar de conversas + chat com ReactMarkdown + cards de sugestão + input), tema azul, dark/light, modelo "Claude Opus 4.8".
+- Cards de sugestão específicos do BP: fechamento do ano, maior gargalo, what-if de churn (+2pp), queima de caixa, atingimento por produto, linhas fora da meta.
+- Rota `/bp-2026/copilot` registrada em `App.tsx` (lazy + ProtectedRoute).
+- Botão **"BP Copilot"** no header do BP 2026; botão "Voltar ao BP 2026" na sidebar do chat.
+
+**Por que:**
+- Fase 2 do BP Copilot (spec em `docs/superpowers/specs/2026-06-24-bp-copilot-design.md`): a interface sobre o backend da Fase 1.
+
+**Arquivos alterados:**
+- `client/src/pages/BpCopilot.tsx` (novo) - página do chat.
+- `client/src/App.tsx` - lazy import + rota `/bp-2026/copilot`.
+- `client/src/pages/BP2026.tsx` - botão de acesso ao Copilot no header.
+
+**Impacto arquitetural:** Nenhum estrutural. Validado: `vite build` passa e a página é bundleada (chunk `BpCopilot-*.js`); typecheck não introduz erros novos (delta 0). Fluxo real depende da chave Anthropic válida (Fase 1).
+
+---
+
+## 2026-06-24 | feat(bp-copilot): backend núcleo (Fase 1) — tools, agentic loop, histórico
+
+**O que foi feito:**
+- `computarBpReceitas(db)` extraída da rota `/api/bp2026/receitas` em `bp2026.ts` (handler virou wrapper) — mesmo cálculo e cache de 10min, agora reutilizável.
+- `bp-copilot.tools.ts`: 7 ferramentas read-only que fatiam o payload do BP (overview, revenue, vendas-produto, funil, capacity, detalhamentos, pontual) + `montarResumoBp()` (snapshot textual do estado do BP p/ o contexto).
+- `bp-copilot.ts`: endpoint do chat (Anthropic `claude-opus-4-8`, adaptive thinking, prompt caching na skill) com agentic loop (tools + code execution server-side p/ projeções), histórico em `bp_copilot_conversas`/`mensagens`, logging em `bp_copilot_usage`, auth restrita a admin/sócios. Registrado em `routes.ts`.
+
+**Por que:**
+- Fase 1 do BP Copilot (spec em `docs/superpowers/specs/2026-06-24-bp-copilot-design.md`): o "corpo" do agente. UI, streaming e ações registráveis vêm nas fases 2-4.
+
+**Arquivos alterados:**
+- `server/routes/bp2026.ts` - extraída `computarBpReceitas`; rota vira wrapper (comportamento idêntico).
+- `server/routes/bp-copilot.tools.ts` (novo) - ferramentas read-only + resumo do BP.
+- `server/routes/bp-copilot.ts` (novo) - endpoint, agentic loop, histórico, auth.
+- `server/routes.ts` - registro de `registerBpCopilotRoutes`.
+
+**Impacto arquitetural:** Reaproveita os módulos `bp2026.*` (agente vê os mesmos números da tela). Validado: camada de dados roda contra dados reais (smoke local OK); typecheck não introduz erros novos (delta 0). End-to-end com Anthropic não validado localmente — chave `ANTHROPIC_API_KEY` do .env local retorna 401 (expirada); em produção usa a mesma var do SDR Assistant.
+
+---
+
+## 2026-06-24 | feat(bp-copilot): skill/persona do BP Copilot (system prompt)
+
+**O que foi feito:**
+- Criado `agents/bp-copilot-SKILL.md` — system prompt do **BP Copilot**, o copiloto de decisão do BP (Anthropic `claude-opus-4-8`).
+- 7 blocos: identidade/postura (copiloto consultivo híbrido, C-level), princípios de comportamento (BLUF, número real ou nada, faixa não ponto), domínio do negócio com **os gotchas críticos do BP embutidos** (churn bruto, produto×servico jan corrompido, AOV só valorr>0, venda-estoque×receita-pontual com lag, regime caixa×competência), estrutura do BP (abas + YTD fluxo/estoque), ferramentas (drill bp2026.* + code execution + ações registráveis), capacidades (diagnóstico/gargalo/predição), formato executivo.
+
+**Por que:**
+- Primeira etapa da feature "chat especialista de tomada de decisão no BP". A persona é o que impede o agente de confundir artefato de dados com tendência e garante recomendações ancoradas em número real.
+
+**Arquivos alterados:**
+- `agents/bp-copilot-SKILL.md` (novo) - persona e habilidades do agente.
+
+**Impacto arquitetural:** Nenhum ainda — artefato de prompt; backend/UI/tools virão nas próximas etapas. Design em `docs/superpowers/specs/` (a seguir).
+
+---
+
 ## 2026-06-24 | feat(comercial): exibir só os 7 closers ativos nas telas de comercial
 
 **O que foi feito:**

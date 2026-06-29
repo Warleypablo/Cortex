@@ -35,6 +35,7 @@ export interface CriativoData {
   // contadores brutos (presentes nas linhas de anúncio vindas da API)
   impressions?: number;
   outboundClicks?: number;
+  uniqueOutboundClicks?: number;
   landingPageViews?: number;
   reach?: number;
   video3sec?: number;
@@ -62,6 +63,7 @@ export interface CriativoData {
   videoHook: number | null;
   videoHold: number | null;
   ctr: number | null;
+  ctrUnico: number | null;
   cpm: number | null;
   connectRate: number | null;
   taxaConversao: number | null;
@@ -109,6 +111,7 @@ interface RawTotals {
   investimento: number;
   impressions: number;
   outboundClicks: number;
+  uniqueOutboundClicks: number;
   landingPageViews: number;
   reach: number;
   video3sec: number;
@@ -141,7 +144,7 @@ interface RawTotals {
 
 function zeros(): RawTotals {
   return {
-    investimento: 0, impressions: 0, outboundClicks: 0, landingPageViews: 0, reach: 0,
+    investimento: 0, impressions: 0, outboundClicks: 0, uniqueOutboundClicks: 0, landingPageViews: 0, reach: 0,
     video3sec: 0, videoThruplay: 0, conversions: 0, conversionValue: 0, videoViews: 0,
     leads: 0, mql: 0, nmqls: 0,
     rm: 0, rmMql: 0, rmNmql: 0, rr: 0, rrMql: 0, rrNmql: 0,
@@ -157,6 +160,7 @@ function sumRaw(rows: CriativoData[]): RawTotals {
     t.investimento += r.investimento || 0;
     t.impressions += r.impressions || 0;
     t.outboundClicks += r.outboundClicks || 0;
+    t.uniqueOutboundClicks += r.uniqueOutboundClicks || 0;
     t.landingPageViews += r.landingPageViews || 0;
     t.reach += r.reach || 0;
     t.video3sec += r.video3sec || 0;
@@ -204,6 +208,7 @@ function computeDerived(t: RawTotals) {
     investimento: Math.round(inv),
     impressions: t.impressions,
     outboundClicks: t.outboundClicks,
+    uniqueOutboundClicks: t.uniqueOutboundClicks,
     landingPageViews: t.landingPageViews,
     reach: t.reach,
     video3sec: t.video3sec,
@@ -225,6 +230,8 @@ function computeDerived(t: RawTotals) {
 
     cpm: t.impressions > 0 ? Math.round((inv / t.impressions) * 1000) : null,
     ctr: t.impressions > 0 && t.outboundClicks > 0 ? r2((t.outboundClicks / t.impressions) * 100) : null,
+    // CTR de saída único = unique_outbound_clicks / reach (Meta-only; demais → null)
+    ctrUnico: t.reach > 0 && t.uniqueOutboundClicks > 0 ? r2((t.uniqueOutboundClicks / t.reach) * 100) : null,
     videoHook: t.impressions > 0 && t.video3sec > 0 ? r2((t.video3sec / t.impressions) * 100) : null,
     videoHold: t.impressions > 0 && t.videoThruplay > 0 ? r2((t.videoThruplay / t.impressions) * 100) : null,
     connectRate: t.outboundClicks > 0 && t.landingPageViews > 0 ? r2((t.landingPageViews / t.outboundClicks) * 100) : null,

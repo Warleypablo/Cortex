@@ -40,13 +40,14 @@ const PLATFORM_STYLES: Record<Platform, { row: string; icon: string }> = {
 };
 
 // Tags/grupos (pools). Manter em sincronia com CAMPAIGN_TAGS no backend.
-type CampaignTag = "inbound" | "evento";
+type CampaignTag = "inbound" | "evento" | "creators_summit";
 const TAG_OPTIONS: { value: CampaignTag; label: string }[] = [
   { value: "inbound", label: "Inbound" },
   { value: "evento", label: "Evento" },
+  { value: "creators_summit", label: "Creators Summit" },
 ];
-const TAG_LABELS: Record<CampaignTag, string> = { inbound: "Inbound", evento: "Evento" };
-const POOLS: CampaignTag[] = ["inbound", "evento"];
+const TAG_LABELS: Record<CampaignTag, string> = { inbound: "Inbound", evento: "Evento", creators_summit: "Creators Summit" };
+const POOLS: CampaignTag[] = ["inbound", "evento", "creators_summit"];
 const NO_TAG = "__none__"; // sentinela p/ "Sem tag" no Select (Radix não aceita value vazio)
 
 // Etapas do funil. Manter em sincronia com CAMPAIGN_STAGES no backend.
@@ -74,6 +75,7 @@ const TABS: { value: TabValue; label: string }[] = [
   { value: "todas", label: "Todas" },
   { value: "inbound", label: "Inbound" },
   { value: "evento", label: "Evento" },
+  { value: "creators_summit", label: "Creators Summit" },
   { value: "sem-tag", label: "Sem tag" },
 ];
 
@@ -92,6 +94,7 @@ interface Campanha {
   campaignId: string;
   name: string;
   status: string | null;
+  isActive: boolean;
   dailyBudgetAtual: number;
   investidoTotal: number;
   projecaoAsIs: number;
@@ -378,8 +381,7 @@ interface StageSums {
 function sumStage(rows: Campanha[]): StageSums {
   let daily = 0, projecao = 0, investido = 0;
   for (const c of rows) {
-    const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
-    daily += isActive ? c.dailyBudgetAtual : 0;
+    daily += c.isActive ? c.dailyBudgetAtual : 0;
     projecao += c.projecaoAsIs;
     investido += c.investidoTotal;
   }
@@ -391,7 +393,7 @@ const COLSPAN = 9;
 export default function GrowthOrcamentoCampanhas() {
   useSetPageInfo(
     "Orçamento por Campanha",
-    "Planejamento por etapa do funil — Meta + Google",
+    "Planejamento por etapa do funil — Meta, Google, TikTok e LinkedIn",
   );
 
   const { user } = useAuth();
@@ -429,7 +431,7 @@ export default function GrowthOrcamentoCampanhas() {
   const plans: Record<string, PoolPlan> = data?.plans ?? {};
   const diasRestantes = data?.diasRestantes ?? 0;
   const poolForTab: CampaignTag | null =
-    activeTab === "inbound" || activeTab === "evento" ? activeTab : null;
+    activeTab === "inbound" || activeTab === "evento" || activeTab === "creators_summit" ? activeTab : null;
 
   // Contagem por aba sobre TODAS as campanhas (independe da aba ativa).
   const tabCounts = useMemo(() => {
@@ -438,6 +440,7 @@ export default function GrowthOrcamentoCampanhas() {
       todas: all.length,
       inbound: all.filter((c) => c.tag === "inbound").length,
       evento: all.filter((c) => c.tag === "evento").length,
+      creators_summit: all.filter((c) => c.tag === "creators_summit").length,
       "sem-tag": all.filter((c) => !c.tag).length,
     } as Record<TabValue, number>;
   }, [data]);
@@ -535,14 +538,14 @@ export default function GrowthOrcamentoCampanhas() {
   };
 
   const renderCampaignRow = (c: Campanha) => {
-    const isActive = c.status === "ACTIVE" || c.status === "ENABLED";
+    const isActive = c.isActive;
     return (
       <TableRow key={`${c.platform}-${c.campaignId}`} className={PLATFORM_STYLES[c.platform].row} data-testid={`row-${c.platform}-${c.campaignId}`}>
         <TableCell className="font-medium pl-12">
           <div className="flex items-center gap-2">
             <span className="truncate max-w-[300px]" title={c.name}>{c.name}</span>
-            {c.status === "PAUSED" && <Badge variant="outline" className="text-xs">Pausada</Badge>}
-            {c.status !== "PAUSED" && !c.isDelivering && (
+            {!isActive && <Badge variant="outline" className="text-xs">Pausada</Badge>}
+            {isActive && !c.isDelivering && (
               <Badge variant="outline" className="text-xs" title="Sem gasto nos últimos 3 dias — projeção não extrapola.">
                 Sem entrega
               </Badge>

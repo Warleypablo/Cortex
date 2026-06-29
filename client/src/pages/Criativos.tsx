@@ -21,6 +21,7 @@ import { aggregateByLevel, sortRows, type CriativoData, type Level, type SortCon
 import { loadConfig, persistConfig, loadViews, persistViews, resolveColumns, columnAppliesToPlatforms, type ColumnConfig, type SavedView } from "@/lib/criativosColumns";
 import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle, Building2, Megaphone, Layers3, Wallet, Image as ImageIcon } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
+import { classificarProdutoCampanha, PRODUTOS_CRIATIVOS } from "@shared/produtos";
 import { cn } from "@/lib/utils";
 import { getMetricColor, getColorClasses, getBenchmarkColor, CRIATIVOS_BENCHMARK_MAP } from "@/lib/metricFormatting";
 import { apiRequest, queryClient } from "@/lib/queryClient";
@@ -182,32 +183,18 @@ export default function Criativos() {
     },
   });
 
-  // Extrair produtos únicos dos nomes das campanhas (padrão: [Produto] no nome)
+  // Produtos canônicos presentes nas campanhas (classificados pelo nome).
+  // Fonte única: @shared/produtos. Mostra só os buckets que existem, na ordem canônica.
   const produtos = useMemo(() => {
-    const prodSet = new Set<string>();
-    campanhas.forEach(c => {
-      // Pegar todos os termos entre colchetes
-      const matches = c.name.match(/\[([^\]]+)\]/g);
-      if (matches) {
-        // O produto geralmente é o último colchete antes do " - " ou o 4º colchete
-        // Excluir termos conhecidos que não são produto
-        const nonProduct = ['TP', 'Leads', 'Vendas', 'Tráfego', 'Reconhecimento', 'ABO', 'CBO', 'CLASS', 'COMMERCE'];
-        matches.forEach(m => {
-          const term = m.replace(/[\[\]]/g, '');
-          if (!nonProduct.includes(term)) {
-            prodSet.add(term);
-          }
-        });
-      }
-    });
-    return Array.from(prodSet).sort();
+    const present = new Set(campanhas.map(c => classificarProdutoCampanha(c.name)));
+    return PRODUTOS_CRIATIVOS.filter(p => present.has(p));
   }, [campanhas]);
 
   // Campanhas filtradas por produto(s) selecionado(s)
   const campanhasFiltradas = useMemo(() => {
     if (selectedProdutos.length === 0) return campanhas;
     return campanhas.filter(c =>
-      selectedProdutos.some(p => c.name.includes(`[${p}]`))
+      selectedProdutos.includes(classificarProdutoCampanha(c.name))
     );
   }, [campanhas, selectedProdutos]);
 

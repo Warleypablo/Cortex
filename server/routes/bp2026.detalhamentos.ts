@@ -6,7 +6,7 @@ import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd, type MesValor } from "./bp2026.helpers";
 import { PREDICADOS_DESPESA, PREDICADOS_SGA_SUB, PREDICADOS_OUTRAS_SUB, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { somaDespesaCaixaPorMes } from "./bp2026";
-import { ratearSeriePorPeso, participacaoPct, razaoYtd } from "./bp2026.cac.helpers";
+import { participacaoPct, razaoYtd } from "./bp2026.cac.helpers";
 import { SEGMENTOS_RECORRENTES, SEGMENTOS_PONTUAIS, SLUG } from "../okr2026/servicosBitrix";
 
 interface MesLinha extends MesValor { atingimento: number | null }
@@ -42,6 +42,8 @@ interface Deps {
   contratosVendidosRec: Record<string, (number | null)[]>;
   // realizado do total de contratos vendidos no mês (recorrentes + pontuais) — denom. do CAC por contrato
   contratosVendidosTotalPorMes: (number | null)[];
+  // faturamento recebido no mês (entradas de RECEITA quitadas, regime caixa) — denom. do % do faturamento no SG&A
+  faturamentoCaixaPorMes: Record<number, number>;
   mesCorrente: number;
   mesFechado: number;
 }
@@ -61,12 +63,7 @@ const NOTA_CAC_OUTRAS =
   "Categorias que entram no CAC do DRE mas não têm linha no BP " +
   "(Outras Despesas Comerciais, Patrocínios).";
 
-const NOTA_CAC_PRODUTO =
-  "CAC total do mês rateado pela participação do produto nos contratos recorrentes " +
-  "vendidos (Bitrix). Soma dos produtos = CAC total. Pontual não recebe bucket próprio.";
-
-// derivado da fonte única (servicosBitrix): garante que CAC por produto cubra
-// exatamente os mesmos produtos da aba Vendas por Produto (invariante soma = CAC total)
+// derivado da fonte única (servicosBitrix): produtos das sub-linhas de CAC por contrato
 const PRODUTOS_CAC: { slug: string; titulo: string }[] =
   SEGMENTOS_RECORRENTES.map((seg) => ({ slug: SLUG[seg], titulo: seg }));
 
@@ -95,7 +92,7 @@ const SUB_SGA: DefSub[] = [
 ];
 
 export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; cac: Linha[]; outrasReceitas: Linha[] }> {
-  const { db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec, contratosVendidosTotalPorMes, mesCorrente, mesFechado } = deps;
+  const { db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec, contratosVendidosTotalPorMes, faturamentoCaixaPorMes, mesCorrente, mesFechado } = deps;
 
   const mensal = (porMes: Record<number, number>) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? porMes[i + 1] ?? 0 : null));
@@ -335,26 +332,36 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     cacLinhasComPct.push(pctChild);
   });
 
-  // ---- bloco "CAC por Produto": rateio do CAC pelos contratos vendidos ----
-  const orcContratos: Record<string, (number | null)[]> = {};
-  for (const p of PRODUTOS_CAC) {
-    orcContratos[p.slug] = Array.from({ length: 12 }, (_, i) => orcado[`contratos_vendidos_mrr_${p.slug}`]?.[i + 1] ?? 0);
-  }
-  const allocReal = ratearSeriePorPeso(cacTotalSerie, contratosVendidosRec);
-  const allocOrc = ratearSeriePorPeso(cacOrcSerie, orcContratos);
-  const cacPorProduto: Linha[] = PRODUTOS_CAC.map((p) => ({
+  // ---- sub-linha "% do faturamento" sob o total de SG&A ----
+  // SG&A do mês (caixa) ÷ faturamento recebido no mês (entradas de RECEITA quitadas, mesma base de caixa da DFC).
+  const sgaTotalSerie = somaSeries(sgaSeries);
+  const sgaOrcMes = (m: number) => SUB_SGA.reduce((acc, d) => acc + (orcado[d.metrica]?.[m] ?? 0), 0);
+  const fatCaixaMes = (m: number) => faturamentoCaixaPorMes[m] ?? 0;
+  const fatOrcMes = (m: number) =>
+    (orcado["mrr_ativo"]?.[m] ?? 0) + (orcado["receita_pontual"]?.[m] ?? 0) + (orcado["outras_receitas"]?.[m] ?? 0);
+  const sgaPctFatSerie = Array.from({ length: 12 }, (_, i) =>
+    i + 1 <= mesCorrente ? razao(sgaTotalSerie[i], fatCaixaMes(i + 1)) : null
+  );
+  const sgaTotalYtdReal = mesFechado === 0 ? null :
+    sgaTotalSerie.slice(0, mesFechado).reduce<number | null>((acc, v) => (v === null ? acc : (acc ?? 0) + v), null);
+  const sgaPctFaturamento: Linha = {
     ...fazLinha(
-      { metrica: `cac_produto_${p.slug}`, titulo: p.titulo, direcao: "menor_melhor", nota: NOTA_CAC_PRODUTO },
-      allocReal[p.slug],
-      (m) => allocOrc[p.slug][m - 1] ?? 0,
+      { metrica: "sga_pct_faturamento", titulo: "↳ % do faturamento", direcao: "menor_melhor", unidade: "pct",
+        nota: "SG&A do mês (caixa) ÷ faturamento recebido no mês — entradas de RECEITA quitadas (mesma base de caixa da DFC). Orçado ÷ plano de receita do BP (MRR ativo + pontual + outras)." },
+      sgaPctFatSerie,
+      (m) => razao(sgaOrcMes(m), fatOrcMes(m)) ?? 0,
+      mesFechado === 0 ? undefined : {
+        orcado: razao(somaAte(sgaOrcMes), somaAte(fatOrcMes)) ?? 0,
+        realizado: razao(sgaTotalYtdReal, somaAte(fatCaixaMes)),
+      }
     ),
-    grupo: "CAC por Produto",
+    subItem: true,
     semDetalhe: true,
-  }));
+  };
 
   return {
-    sga: [sgaTotal, ...sgaLinhas],
-    cac: [cacTotal, ...cacLinhasComPct, cacPorCliente, cacPorContrato, ...cacPorContratoFilhos, cacPctReceita, cacPayback, ...cacPorProduto],
+    sga: [sgaTotal, sgaPctFaturamento, ...sgaLinhas],
+    cac: [cacTotal, ...cacLinhasComPct, cacPorCliente, cacPorContrato, ...cacPorContratoFilhos, cacPctReceita, cacPayback],
     outrasReceitas: [orTotal, variavelL, stackL, demaisL],
   };
 }

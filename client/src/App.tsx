@@ -87,6 +87,7 @@ const TechResponsavel = lazyWithRetry(() => import("@/pages/TechResponsavel"));
 const FluxoCaixa = lazyWithRetry(() => import("@/pages/FluxoCaixa"));
 const DRE = lazyWithRetry(() => import("@/pages/DRE"));
 const BP2026 = lazyWithRetry(() => import("@/pages/BP2026"));
+const BpCopilot = lazyWithRetry(() => import("@/pages/BpCopilot"));
 const NotasFiscais = lazyWithRetry(() => import("@/pages/NotasFiscais"));
 const MetaAds = lazyWithRetry(() => import("@/pages/MetaAds"));
 const InstagramDashboard = lazyWithRetry(() => import("@/pages/InstagramDashboard"));
@@ -118,6 +119,7 @@ const GrowthOrcadoRealizado = lazyWithRetry(() => import("@/pages/GrowthOrcadoRe
 const GrowthEvolucaoTemporal = lazyWithRetry(() => import("@/pages/GrowthEvolucaoTemporal"));
 const GrowthOrcamentoCampanhas = lazyWithRetry(() => import("@/pages/GrowthOrcamentoCampanhas"));
 const GrowthOrganico = lazyWithRetry(() => import("@/pages/GrowthOrganico"));
+const GrowthCreatorSummit = lazyWithRetry(() => import("@/pages/GrowthCreatorSummit"));
 const PlanejamentoMetas = lazyWithRetry(() => import("@/pages/PlanejamentoMetas"));
 const GrowthAI = lazyWithRetry(() => import("@/pages/GrowthAI"));
 const SdrAssistant = lazyWithRetry(() => import("@/pages/SdrAssistant"));
@@ -134,6 +136,7 @@ const Creators = lazyWithRetry(() => import("@/pages/Creators"));
 const PagamentoFreelancers = lazyWithRetry(() => import("@/pages/PagamentoFreelancers"));
 const InvestorsReport = lazyWithRetry(() => import("@/pages/InvestorsReport"));
 const RelatorioMensal = lazyWithRetry(() => import("@/pages/RelatorioMensal"));
+const RelatorioSemanal = lazyWithRetry(() => import("@/pages/RelatorioSemanal"));
 const Acessos = lazyWithRetry(() => import("@/pages/Acessos"));
 const Conhecimentos = lazyWithRetry(() => import("@/pages/Conhecimentos"));
 const TreinamentoInternoVideo = lazyWithRetry(() => import("@/pages/TreinamentoInternoVideo"));
@@ -356,6 +359,7 @@ function ProtectedRouter() {
       <Route path="/dashboard/contribuicao-squad">{() => <ProtectedRoute path="/dashboard/contribuicao-squad" component={ContribuicaoSquad} />}</Route>
       <Route path="/dashboard/dre">{() => <ProtectedRoute path="/dashboard/dre" component={DRE} />}</Route>
       <Route path="/bp-2026">{() => <ProtectedRoute path="/bp-2026" component={BP2026} />}</Route>
+      <Route path="/bp-2026/copilot">{() => <ProtectedRoute path="/bp-2026/copilot" component={BpCopilot} />}</Route>
       <Route path="/dashboard/notas-fiscais">{() => <ProtectedRoute path="/dashboard/notas-fiscais" component={NotasFiscais} />}</Route>
       <Route path="/financeiro/negativacao">{() => <ProtectedRoute path="/financeiro/negativacao" component={Negativacao} />}</Route>
       <Route path="/triagem">{() => <ProtectedRoute path="/triagem" component={Triagem} />}</Route>
@@ -409,6 +413,7 @@ function ProtectedRouter() {
       <Route path="/growth/orcado-realizado">{() => <ProtectedRoute path="/growth/orcado-realizado" component={GrowthOrcadoRealizado} />}</Route>
       <Route path="/growth/evolucao-temporal">{() => <ProtectedRoute path="/growth/evolucao-temporal" component={GrowthEvolucaoTemporal} />}</Route>
       <Route path="/growth/orcamento-campanhas">{() => <ProtectedRoute path="/growth/orcamento-campanhas" component={GrowthOrcamentoCampanhas} />}</Route>
+      <Route path="/growth/creator-summit">{() => <ProtectedRoute path="/growth/creator-summit" component={GrowthCreatorSummit} />}</Route>
       <Route path="/growth/planejamento-metas">{() => <ProtectedRoute path="/growth/planejamento-metas" component={PlanejamentoMetas} />}</Route>
       <Route path="/growth/ai">{() => <ProtectedRoute path="/growth/ai" component={GrowthAI} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
@@ -430,6 +435,7 @@ function ProtectedRouter() {
       {/* Investidores */}
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
       <Route path="/reports/mensal">{() => <ProtectedRoute path="/reports/mensal" component={RelatorioMensal} />}</Route>
+      <Route path="/reports/semanal">{() => <ProtectedRoute path="/reports/semanal" component={RelatorioSemanal} />}</Route>
       
       {/* OKR 2026 */}
       <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>

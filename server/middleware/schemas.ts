@@ -29,6 +29,10 @@ export const updateRoleSchema = z.object({
   role: z.enum(['admin', 'user']),
 });
 
+export const updateBpTabsSchema = z.object({
+  allowedBpTabs: z.array(z.string()),
+});
+
 // ========== Client ==========
 
 export const updateClienteSchema = z.object({

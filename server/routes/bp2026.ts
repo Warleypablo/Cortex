@@ -21,6 +21,9 @@ import { montarCapacity } from "./bp2026.capacity";
 import { montarDetalhamentos } from "./bp2026.detalhamentos";
 import { montarPontual } from "./bp2026.pontual";
 import { INFO_METRICAS } from "./bp2026.info";
+import { abasPermitidas } from "../../shared/bp2026-tabs";
+import { filtrarPayloadPorAbas } from "./bp2026.enforcement";
+import type { User } from "../auth/userDb";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -162,11 +165,12 @@ function buildLinhas(
   }));
 }
 
-export function registerBp2026Routes(app: Express, db: any) {
-  app.get("/api/bp2026/receitas", async (_req, res) => {
-    try {
+// Cálculo completo do BP (orçado×realizado + todas as sub-abas). Extraído da rota
+// /api/bp2026/receitas para ser reutilizado pelas ferramentas do BP Copilot.
+// Reusa o mesmo cache de 10min do handler.
+export async function computarBpReceitas(db: any): Promise<any> {
       if (cache && Date.now() < cache.expiraEm) {
-        return res.json(cache.payload);
+        return cache.payload;
       }
 
       // 1. Orçado
@@ -310,6 +314,7 @@ export function registerBp2026Routes(app: Express, db: any) {
       // 4l. Fluxo de caixa real (DFC): entradas − saídas quitadas no mês
       const dfcResult = await db.execute(sql`
         SELECT EXTRACT(MONTH FROM data_quitacao)::int AS mes,
+               SUM(CASE WHEN tipo_evento = 'RECEITA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END) AS entradas,
                SUM(CASE WHEN tipo_evento = 'RECEITA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END)
              - SUM(CASE WHEN tipo_evento = 'DESPESA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END) AS fluxo
         FROM "Conta Azul".caz_parcelas
@@ -318,8 +323,10 @@ export function registerBp2026Routes(app: Express, db: any) {
         GROUP BY 1 ORDER BY 1
       `);
       const dfcPorMes: Record<number, number> = {};
+      const faturamentoCaixaPorMes: Record<number, number> = {};
       for (const row of dfcResult.rows as any[]) {
         dfcPorMes[Number(row.mes)] = parseFloat(row.fluxo);
+        faturamentoCaixaPorMes[Number(row.mes)] = parseFloat(row.entradas);
       }
 
       // 5. Montagem: meses futuros => realizado null
@@ -551,7 +558,7 @@ export function registerBp2026Routes(app: Express, db: any) {
       // 12. Detalhamentos: SG&A e CAC por sub-linha, Outras Receitas por categoria
       const { sga: sgaDetalhe, cac: cacDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
         db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec,
-        contratosVendidosTotalPorMes, mesCorrente, mesFechado,
+        contratosVendidosTotalPorMes, faturamentoCaixaPorMes, mesCorrente, mesFechado,
       });
 
       // documentação por linha (o que é / fonte / cálculo) — dicionário único
@@ -585,15 +592,28 @@ export function registerBp2026Routes(app: Express, db: any) {
       };
 
       cache = { payload, expiraEm: Date.now() + CACHE_TTL_MS };
-      res.json(payload);
+      return payload;
+}
+
+export function registerBp2026Routes(app: Express, db: any) {
+  app.get("/api/bp2026/receitas", async (req, res) => {
+    try {
+      const user = req.user as User;
+      const abas = abasPermitidas(user?.role, user?.allowedBpTabs);
+      const payload = await computarBpReceitas(db);
+      res.json(filtrarPayloadPorAbas(payload, abas));
     } catch (error) {
       console.error("[bp2026] Erro em /api/bp2026/receitas:", error);
       res.status(500).json({ error: "Erro ao calcular orçado x realizado" });
     }
   });
 
-  app.get("/api/bp2026/pontual-creators", async (_req, res) => {
+  app.get("/api/bp2026/pontual-creators", async (req, res) => {
     try {
+      const user = req.user as User;
+      if (!abasPermitidas(user?.role, user?.allowedBpTabs).includes("pontual-creators")) {
+        return res.status(403).json({ error: "Sem acesso a esta aba" });
+      }
       const agora = new Date();
       const anoAtual = agora.getFullYear();
       const mesCorrente = anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;

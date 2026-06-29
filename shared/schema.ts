@@ -25,6 +25,7 @@ export const authUsers = cortexCoreSchema.table("auth_users", {
   createdAt: timestamp("created_at").defaultNow(),
   role: varchar("role", { length: 20 }).notNull().default("user"),
   allowedRoutes: text("allowed_routes").array(),
+  allowedBpTabs: text("allowed_bp_tabs").array(),
   department: varchar("department", { length: 50 }),
 });
 

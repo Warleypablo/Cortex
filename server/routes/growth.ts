@@ -5,9 +5,23 @@ import { format } from "date-fns";
 import { getLinktreeMetrics } from "../services/linktreeGa4";
 import { getSessionsByPlatform, getGa4SourceMediumDiagnostic } from "../services/ga4Sessions";
 import { UTM_SOURCES_BY_MEDIUM, UTM_SOURCE_LABELS, type UtmMedium } from "@shared/utm-vocabulary";
+import { classificarProdutoCampanha, bucketForFnlNgc, expandFunilValues, FNL_NGC_BUCKET_ORDER } from "@shared/produtos";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
+
+// Advertiser ID da Turbo no TikTok ("Turbo Partners LTDA - CA Oficial").
+// O login do TikTok Business Center enxerga também contas de clientes geridos
+// (ex.: Brady / "Target CPA Manual Maquina de Waffle"), que entram no banco pelo
+// OAuth/sync sem distinção. Na LEITURA filtramos só o(s) advertiser(s) da Turbo
+// para não vazar campanhas de cliente na aba Criativos. Se a Turbo abrir outra
+// conta própria no TikTok, adicionar o advertiser_id aqui.
+const TURBO_TIKTOK_ADVERTISER_IDS = ['7065303755092131842'];
+
+// Customer ID da conta de anúncios própria da Turbo no Google Ads (mesmo valor
+// de googleSync.TURBO_CUSTOMER_ID). O sync já é travado nessa conta, mas filtramos
+// também na leitura como blindagem caso outra conta entre no schema google.*.
+const TURBO_GOOGLE_CUSTOMER_ID = '3795436039';
 
 /**
  * Expressão SQL que classifica um deal do Bitrix em plataforma de marketing.
@@ -73,7 +87,9 @@ END`;
  * esperar utm_medium acumular.
  */
 const MEDIUM_CASE_SQL = `CASE
-  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound') THEN LOWER(TRIM(utm_medium))
+  -- Sources de indicação são sempre referral, mesmo com utm_medium errado (ex: cliente tagueado como 'organic').
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('cliente','colaborador','afiliado','influencer','marketplace') THEN 'referral'
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound','victor','andre','rodrigo') THEN LOWER(TRIM(utm_medium))
   WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'organic'
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'organic'
   WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'organic'
@@ -101,7 +117,11 @@ END`;
  * source (ex: linkedin_ads e linkedin → 'linkedin'); o medium é quem distingue.
  */
 const SOURCE_CANON_SQL = `CASE
-  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','referral','outbound')
+  -- Referral com source fora do vocabulário canônico (ex: 'noway' = nome do cliente que indicou)
+  -- vira 'cliente'; o nome cru do indicador fica no nível de campanha.
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('cliente','colaborador','afiliado','influencer','marketplace') THEN LOWER(TRIM(utm_source))
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) = 'referral' THEN 'cliente'
+  WHEN LOWER(TRIM(COALESCE(utm_medium, ''))) IN ('paid','organic','crm','eventos','outbound','victor','andre','rodrigo')
        AND NULLIF(LOWER(TRIM(COALESCE(utm_source, ''))), '') IS NOT NULL THEN LOWER(TRIM(utm_source))
   WHEN source = 'UC_4VCKGM' OR source = 'WEB' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
@@ -118,11 +138,6 @@ const SOURCE_CANON_SQL = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) IN ('organic','organico','direct','(direct)','(none)','') THEN 'direto'
   ELSE COALESCE(NULLIF(LOWER(TRIM(utm_source)), ''), 'outros')
 END`;
-
-// Funnel name aliases: normalized name → all DB variations
-const FUNNEL_ALIASES: Record<string, string[]> = {
-  'ecommerce': ['Ecommerce', 'E-commerce', 'ecommerce'],
-};
 
 /**
  * Constrói um filtro SQL pra utm_source/plataforma consistente com PLATFORM_CASE_SQL_BASIC.
@@ -152,20 +167,6 @@ function buildPlatformFilterSql(utmValues: string[]) {
     return sql`LOWER(d.utm_source) LIKE ${v + '%'}`;
   });
   return sql`AND (${sql.join(expressions, sql` OR `)})`;
-}
-
-// Expand funnel values: if a normalized name has aliases, expand to all variants
-function expandFunilValues(values: string[]): string[] {
-  const expanded: string[] = [];
-  for (const v of values) {
-    const aliases = FUNNEL_ALIASES[v.toLowerCase()];
-    if (aliases) {
-      expanded.push(...aliases);
-    } else {
-      expanded.push(v);
-    }
-  }
-  return expanded;
 }
 
 // Resolve os campaign_id (Meta) cujas campanhas casam com o funil selecionado.
@@ -250,6 +251,7 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
       WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
       GROUP BY ad_id
     ) m ON m.ad_id = a.ad_id
+    WHERE c.customer_id = ${TURBO_GOOGLE_CUSTOMER_ID}
   `);
 
   // 2. CRM por (utm_campaign, utm_term) — mesmas regras do funil (source canônico google).
@@ -381,6 +383,7 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
       videoHook: null,
       videoHold: null,
       ctr,
+      ctrUnico: null,
       cpm,
       connectRate: null,
       taxaConversao: null,
@@ -467,6 +470,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
       GROUP BY ad_id
     ) m ON m.ad_id = a.ad_id
+    WHERE a.advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
   `);
 
   // 1b. Metadados de campanha (nome/status/budget) vêm de tiktok.ad_campaigns, que é do
@@ -477,6 +481,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
     const campRes = await db.execute(sql`
       SELECT campaign_id::text AS campaign_id, campaign_name, operation_status, budget
       FROM tiktok.ad_campaigns
+      WHERE advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
     `);
     for (const c of campRes.rows as any[]) {
       campMeta.set(String(c.campaign_id), {
@@ -578,6 +583,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       videoHook: null,
       videoHold: null,
       ctr,
+      ctrUnico: null,
       cpm,
       connectRate: null,
       taxaConversao: null,
@@ -1481,10 +1487,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const campanhaId = req.query.campanhaId as string || ''; // campaign_id filter
       const campanhaIds = req.query.campanhaIds as string || ''; // comma-separated campaign_ids (seleção manual de campanha — Meta)
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
-      // Filtro de PRODUTO por NOME de campanha (padrão [Produto]), cross-plataforma.
+      // Filtro de PRODUTO por NOME de campanha (produto canônico classificado), cross-plataforma.
       const produtos = (req.query.produtos as string || '').split(',').map(p => p.trim()).filter(Boolean);
       const matchProduto = (campaignName: string | null | undefined) =>
-        produtos.length === 0 || produtos.some(p => (campaignName || '').includes(`[${p}]`));
+        produtos.length === 0 || produtos.includes(classificarProdutoCampanha(campaignName));
 
       // Validar formato de data
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
@@ -1526,6 +1532,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(i.clicks) as clicks,
           SUM(i.reach) as reach,
           COALESCE(SUM(i.outbound_clicks), 0) as outbound_clicks,
+          COALESCE(SUM(i.unique_outbound_clicks), 0) as unique_outbound_clicks,
           AVG(i.cpm::numeric) as cpm,
           SUM(i.video_play_actions) as video_plays,
           SUM(i.video_p25_watched_actions) as video_p25,
@@ -1693,8 +1700,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           const landingPageViews = parseInt(row.landing_page_views) || 0;
 
           const outboundClicks = parseInt(row.outbound_clicks) || 0;
+          const uniqueOutboundClicks = parseInt(row.unique_outbound_clicks) || 0;
           // CTR de saída = outbound_clicks / impressions
           const ctr = impressions > 0 && outboundClicks > 0 ? (outboundClicks / impressions) * 100 : null;
+          // CTR de saída único = unique_outbound_clicks / reach (Meta-only)
+          const ctrUnico = reach > 0 && uniqueOutboundClicks > 0 ? (uniqueOutboundClicks / reach) * 100 : null;
           const cpm = parseFloat(row.cpm) || (impressions > 0 ? (investimento / impressions) * 1000 : null);
 
           // Vídeo Hook = video_3_sec_watched_actions (actions[].video_view) / impressões
@@ -1785,6 +1795,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             // contadores brutos do Meta (para agregação por nível no frontend)
             impressions,
             outboundClicks,
+            uniqueOutboundClicks,
             landingPageViews,
             reach,
             video3sec: video3Sec,
@@ -1792,6 +1803,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             videoHook: videoHook ? parseFloat(videoHook.toFixed(2)) : null,
             videoHold: videoHold ? parseFloat(videoHold.toFixed(2)) : null,
             ctr: ctr ? parseFloat(ctr.toFixed(2)) : null,
+            ctrUnico: ctrUnico ? parseFloat(ctrUnico.toFixed(2)) : null,
             cpm: cpm ? Math.round(cpm) : null,
             connectRate: connectRate ? parseFloat(connectRate.toFixed(2)) : null,
             taxaConversao: taxaConversao ? parseFloat(taxaConversao.toFixed(2)) : null,
@@ -1920,7 +1932,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const campanhaIdSet = campanhaIds ? new Set(campanhaIds.split(',')) : null;
       const produtos = (req.query.produtos as string || '').split(',').map(p => p.trim()).filter(Boolean);
       const matchProduto = (campaignName: string | null | undefined) =>
-        produtos.length === 0 || produtos.some(p => (campaignName || '').includes(`[${p}]`));
+        produtos.length === 0 || produtos.includes(classificarProdutoCampanha(campaignName));
 
       const dateRegex = /^\d{4}-\d{2}-\d{2}$/;
       if (!dateRegex.test(startDate) || !dateRegex.test(endDate)) {
@@ -2254,6 +2266,21 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const ma = await db.execute(sql`SELECT ad_id::text AS id, ad_name FROM meta_ads.meta_ads`);
         for (const r of ma.rows as any[]) if (r.ad_name) metaAdNames.set(r.id, r.ad_name);
       } catch (e) { /* schema meta_ads ausente → mantém IDs */ }
+      // TikTok: campaign=campaign_id, term=adgroup_id (sufixo "-TikTok"), content=ad_id.
+      const tiktokCampNames = new Map<string, string>();
+      const tiktokAdsetNames = new Map<string, string>();
+      const tiktokAdNames = new Map<string, string>();
+      try {
+        // tiktok.ad_campaigns só existe depois de rodar scripts/create-tiktok-ads-tables.ts.
+        const tc = await db.execute(sql`SELECT campaign_id::text AS id, campaign_name FROM tiktok.ad_campaigns`);
+        for (const r of tc.rows as any[]) if (r.campaign_name) tiktokCampNames.set(r.id, r.campaign_name);
+      } catch (e) { /* tabela tiktok.ad_campaigns ausente → campanha fica como ID */ }
+      try {
+        const ts = await db.execute(sql`SELECT adgroup_id::text AS id, adgroup_name FROM tiktok.ad_groups`);
+        for (const r of ts.rows as any[]) if (r.adgroup_name) tiktokAdsetNames.set(r.id, r.adgroup_name);
+        const ta = await db.execute(sql`SELECT ad_id::text AS id, ad_name FROM tiktok.ads`);
+        for (const r of ta.rows as any[]) if (r.ad_name) tiktokAdNames.set(r.id, r.ad_name);
+      } catch (e) { /* schema tiktok ausente → mantém IDs */ }
 
       // Extrai o ID numérico líder (Meta usa sufixos tipo "1203...450-Instagram_Feed").
       const leadingId = (v: string): string => { const m = String(v).match(/^(\d{5,})/); return m ? m[1] : ''; };
@@ -2270,15 +2297,22 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           if (level === 'term') return metaAdsetNames.get(id) || raw;
           if (level === 'content') return metaAdNames.get(id) || raw;
         }
+        if (source === 'tiktok') {
+          if (level === 'campaign') return tiktokCampNames.get(id) || raw; // campanha
+          if (level === 'term') return tiktokAdsetNames.get(id) || raw; // conjunto
+          if (level === 'content') return tiktokAdNames.get(id) || raw; // anúncio
+        }
         return raw;
       };
 
       // ---- Montar árvore: medium → source → campaign → term → content ----
       const MEDIUM_LABELS: Record<string, string> = {
-        paid: 'Mídia Paga', organic: 'Orgânico', crm: 'CRM',
-        eventos: 'Eventos', referral: 'Referral', outbound: 'Outbound', outros: 'Outros',
+        paid: 'Mídia Paga', organic: 'Orgânico',
+        victor: 'Victor (canal próprio)', andre: 'André (canal próprio)', rodrigo: 'Rodrigo (canal próprio)',
+        crm: 'CRM', eventos: 'Eventos', referral: 'Referral', outbound: 'Outbound', outros: 'Outros',
       };
-      const MEDIUM_ORDER = ['paid', 'organic', 'crm', 'eventos', 'referral', 'outbound', 'outros'];
+      // Sócios (figuras-exceção) entram logo após Orgânico — dimensão de 1ª ordem (Constituição UTM §3.7).
+      const MEDIUM_ORDER = ['paid', 'organic', 'victor', 'andre', 'rodrigo', 'crm', 'eventos', 'referral', 'outbound', 'outros'];
       const mediumOrderOf = (m: string) => { const i = MEDIUM_ORDER.indexOf(m); return i >= 0 ? i : 998; };
       const sourceLabel = (s: string): string =>
         UTM_SOURCE_LABELS[s]
@@ -2334,6 +2368,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       injectSpend('facebook', metaInvestimento, metaSessoes);
       injectSpend('google', googleInvestimento, googleSessoes);
 
+      // Um nó tem "sinal" se ele (ou qualquer descendente) teve atividade real no período.
+      // Inclui investimento/sessões → mídia paga com gasto e ZERO leads continua visível
+      // (sinal de problema de atribuição). Só some quando TUDO está zerado.
+      const hasSignal = (r: Raw): boolean =>
+        r.leads > 0 || r.mqls > 0 || r.ra > 0 || r.rr > 0 ||
+        r.vendas > 0 || r.clientesUnicos > 0 || r.contratos > 0 ||
+        r.receitaPontual > 0 || r.receitaRecorrente > 0 ||
+        (r.investimento ?? 0) > 0 || (r.sessoes ?? 0) > 0 ||
+        r.leadTimeCount > 0;
+
       // Agregar bottom-up (soma os contadores brutos) e derivar métricas em cada nível.
       const buildNode = (node: TNode): { out: any; agg: Raw } => {
         const agg = emptyRaw();
@@ -2341,13 +2385,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         const built = Array.from(node.children.values()).map((child) => {
           const r = buildNode(child);
           addRaw(agg, r.agg);
-          return { child, out: r.out, leads: r.agg.leads };
+          return { child, out: r.out, agg: r.agg, leads: r.agg.leads };
         });
         built.sort((a, b) => (a.child.order - b.child.order) || (b.leads - a.leads) || a.child.name.localeCompare(b.child.name));
+        // Poda recursiva: descarta filhos cuja subárvore inteira está zerada (esqueleto canônico sem dados).
+        const kept = built.filter((b) => hasSignal(b.agg));
         const out = {
           id: node.key, name: node.name, level: node.level,
           ...deriveMetrics(agg),
-          children: built.length ? built.map((b) => b.out) : undefined,
+          children: kept.length ? kept.map((b) => b.out) : undefined,
         };
         return { out, agg };
       };
@@ -2357,7 +2403,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const totalRaw = emptyRaw();
       for (const m of mediums) addRaw(totalRaw, m.built.agg);
 
-      const rows = mediums.map((m) => m.built.out);
+      const rows = mediums.filter((m) => hasSignal(m.built.agg)).map((m) => m.built.out);
       const total = { id: 'total', name: 'TOTAL GERAL', level: 'total', ...deriveMetrics(totalRaw) };
 
       console.log(`[api] Performance Plataformas: ${rows.length} mediums, ${leafMap.size} folhas`);
@@ -2712,28 +2758,20 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Growth - Orçado x Realizado - Valores distintos de fnl_ngc (funil) com atividade
   app.get("/api/growth/orcado-realizado/funis", async (req, res) => {
     try {
+      // Allowlist por bucket canônico (ver FNL_NGC_BUCKETS / bucketForFnlNgc).
+      // Classifica cada valor real de fnl_ngc no seu bucket e devolve só os buckets
+      // que existem, em ordem fixa. Creator Summit é escondido (outra iniciativa).
       const result = await db.execute(sql`
         SELECT DISTINCT fnl_ngc
         FROM "Bitrix".crm_deal
         WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
-          AND LOWER(fnl_ngc) NOT IN (
-            'cross sell', 'commerce', 'indicação', 'lead',
-            'ifv', 'odonto', 'bootcamp vendas', 'bootcamp performance'
-          )
-        ORDER BY fnl_ngc
       `);
-      // Normalize: merge ecommerce/E-commerce/Ecommerce into single "Ecommerce"
-      const ECOMMERCE_VARIANTS = ['ecommerce', 'e-commerce'];
-      const rawFunis = (result.rows as any[]).map((r: any) => r.fnl_ngc);
-      const normalizedSet = new Set<string>();
-      for (const f of rawFunis) {
-        if (ECOMMERCE_VARIANTS.includes(f.toLowerCase())) {
-          normalizedSet.add('Ecommerce');
-        } else {
-          normalizedSet.add(f);
-        }
+      const present = new Set<string>();
+      for (const row of result.rows as any[]) {
+        const bucket = bucketForFnlNgc(row.fnl_ngc as string);
+        if (bucket) present.add(bucket);
       }
-      const funis = Array.from(normalizedSet).sort();
+      const funis = FNL_NGC_BUCKET_ORDER.filter((b) => present.has(b));
       funis.unshift("(Vazio)");
       res.json(funis);
     } catch (error) {
@@ -3210,6 +3248,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         || utmValues.some(v => v.includes('facebook') || v === 'meta' || v.includes('instagram') || v === 'ig' || v === 'fb');
       const includeGoogle = utmValues.length === 0
         || utmValues.some(v => v.includes('google') || v.includes('adwords') || v === 'gads');
+      // TikTok/LinkedIn Ads: somados ao consolidado SOMENTE quando não há filtro de
+      // produto. As tabelas *.ad_metrics_daily não atribuem gasto por funil (não seguem
+      // a convenção [Funil] no nome como Meta/Google), então sob filtro de produto ficam
+      // de fora pra não superatribuir. As mesmas queries dos endpoints dedicados
+      // (tiktok-ads / linkedin-ads) — garante reconciliação com o Aprofundado.
+      const noFunnelFilter = funilValues.length === 0;
+      const includeTikTokAds = noFunnelFilter
+        && (utmValues.length === 0 || utmValues.some(v => v.includes('tiktok')));
+      const includeLinkedInAds = noFunnelFilter
+        && (utmValues.length === 0 || utmValues.some(v => v.includes('linkedin')));
 
       // Build campaign filter: match campaign names containing [funil] pattern
       // Campaign naming convention: [TP] [Leads] [ABO] [Odonto] - ...
@@ -3241,6 +3289,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let metaImpressoes = 0;
       let metaCliques = 0;
       let cliquesSaida = 0;
+      let metaCliquesSaidaUnicos = 0;
+      let metaAlcance = 0;
       let visualizacoesPagina = 0;
       if (includeMeta) {
         const metaResult = await db.execute(sql`
@@ -3249,6 +3299,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             COALESCE(SUM(mid.impressions), 0) as impressoes,
             COALESCE(SUM(mid.clicks), 0) as cliques,
             COALESCE(SUM(mid.outbound_clicks), 0) as cliques_saida,
+            COALESCE(SUM(mid.unique_outbound_clicks), 0) as cliques_saida_unicos,
+            COALESCE(SUM(mid.reach), 0) as alcance,
             COALESCE(SUM(mid.landing_page_views), 0) as visualizacoes_pagina
           FROM meta_ads.meta_insights_daily mid
           WHERE mid.date_start >= ${startDate}::date
@@ -3261,6 +3313,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         metaImpressoes = parseInt(metaRow.impressoes) || 0;
         metaCliques = parseInt(metaRow.cliques) || 0;
         cliquesSaida = parseInt(metaRow.cliques_saida) || 0;
+        metaCliquesSaidaUnicos = parseInt(metaRow.cliques_saida_unicos) || 0;
+        metaAlcance = parseInt(metaRow.alcance) || 0;
         visualizacoesPagina = parseInt(metaRow.visualizacoes_pagina) || 0;
       }
 
@@ -3319,20 +3373,70 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.log("[api] Google Ads query error in orcado-realizado/ads (may not have data):", googleError);
       }
 
-      // Cliques de saída consolidados: Meta outbound_clicks + Google clicks
-      // (Google clicks são cliques no anúncio que levam à LP — equivalente a outbound).
+      // Query TikTok Ads (mesma query do endpoint /tiktok-ads). Só quando incluído.
+      let tiktokInvestimento = 0, tiktokImpressoes = 0, tiktokCliques = 0;
+      if (includeTikTokAds) {
+        try {
+          const r = await db.execute(sql`
+            SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
+                   COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+                   COALESCE(SUM(clicks), 0)::bigint AS cliques
+            FROM tiktok.ad_metrics_daily
+            WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+              AND advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
+          `);
+          const row = r.rows[0] as any;
+          tiktokInvestimento = parseFloat(row.investimento) || 0;
+          tiktokImpressoes = parseInt(row.impressoes) || 0;
+          tiktokCliques = parseInt(row.cliques) || 0;
+        } catch (e: any) {
+          console.warn("[orcado-realizado/ads] TikTok Ads indisponível (schema/permissão):", e?.message);
+        }
+      }
+
+      // Query LinkedIn Ads (mesma query do endpoint /linkedin-ads). Só quando incluído.
+      let linkedinInvestimento = 0, linkedinImpressoes = 0, linkedinCliques = 0;
+      if (includeLinkedInAds) {
+        try {
+          const r = await db.execute(sql`
+            SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
+                   COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+                   COALESCE(SUM(clicks), 0)::bigint AS cliques
+            FROM linkedin.ad_metrics_daily
+            WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          `);
+          const row = r.rows[0] as any;
+          linkedinInvestimento = parseFloat(row.investimento) || 0;
+          linkedinImpressoes = parseInt(row.impressoes) || 0;
+          linkedinCliques = parseInt(row.cliques) || 0;
+        } catch (e: any) {
+          console.warn("[orcado-realizado/ads] LinkedIn Ads indisponível (schema/permissão):", e?.message);
+        }
+      }
+
+      // Cliques de saída consolidados: Meta outbound_clicks + cliques de anúncio das
+      // demais plataformas (Google/TikTok/LinkedIn) — todos levam à LP (equiv. outbound).
       if (includeGoogle) {
         cliquesSaida += googleCliques;
       }
+      cliquesSaida += tiktokCliques + linkedinCliques;
 
-      // Combine Meta + Google
-      const investimento = metaInvestimento + googleInvestimento;
-      const impressoes = metaImpressoes + googleImpressoes;
-      const cliques = metaCliques + googleCliques;
+      // Combine Meta + Google + TikTok + LinkedIn
+      const investimento = metaInvestimento + googleInvestimento + tiktokInvestimento + linkedinInvestimento;
+      const impressoes = metaImpressoes + googleImpressoes + tiktokImpressoes + linkedinImpressoes;
+      const cliques = metaCliques + googleCliques + tiktokCliques + linkedinCliques;
       const cpm = impressoes > 0 ? (investimento / impressoes * 1000) : 0;
       // CTR de saída = cliques_saida / impressões (Meta outbound_clicks + Google clicks).
       // Padrão da casa — alinhado com Criativos e Aprofundado por plataforma.
       const ctr = impressoes > 0 ? (cliquesSaida / impressoes) : 0;
+      // CTR de saída ÚNICO = unique_outbound_clicks / reach. Só o Meta expõe cliques
+      // de saída únicos — Google/TikTok/LinkedIn não têm. No consolidado, portanto, só
+      // é definível quando o Meta é a única fonte paga incluída (senão misturaria
+      // numerador Meta com denominador de outras plataformas). Caso contrário → null
+      // (front mostra "—"). ctrUnicoAvailable comunica essa disponibilidade.
+      const ctrUnicoAvailable = includeMeta && !includeGoogle && !includeTikTokAds
+        && !includeLinkedInAds && metaAlcance > 0;
+      const ctrUnico = ctrUnicoAvailable ? metaCliquesSaidaUnicos / metaAlcance : null;
 
       // CPS = Custo por Sessão (Investimento / Visualizações de Página)
       const cps = visualizacoesPagina > 0 ? investimento / visualizacoesPagina : 0;
@@ -3350,12 +3454,15 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           : undefined,
       );
       let sessoes = 0;
-      if (includeMeta && includeGoogle) {
+      if (utmValues.length === 0) {
+        // "Todas as plataformas": ga4.total cobre Meta+Google+TikTok+LinkedIn+orgânico
+        // (e já é funnel-scoped quando há filtro de produto, via utmCampaignContains).
         sessoes = ga4.total;
-      } else if (includeMeta) {
-        sessoes = ga4.byPlatform.meta_ads;
-      } else if (includeGoogle) {
-        sessoes = ga4.byPlatform.google_ads;
+      } else {
+        if (includeMeta) sessoes += ga4.byPlatform.meta_ads;
+        if (includeGoogle) sessoes += ga4.byPlatform.google_ads;
+        if (includeTikTokAds) sessoes += ga4.byPlatform.tiktok_ads;
+        if (includeLinkedInAds) sessoes += ga4.byPlatform.linkedin_ads;
       }
 
       // Visualizações de Página consolidadas via GA4 (screenPageViews), cobrindo
@@ -3366,12 +3473,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const sumPageViews = (b: Record<string, number>) =>
         Object.values(b).reduce((acc, v) => acc + (Number(v) || 0), 0);
       let visualizacoesPaginaGa4 = 0;
-      if (includeMeta && includeGoogle) {
+      if (utmValues.length === 0) {
         visualizacoesPaginaGa4 = sumPageViews(ga4.byPlatformPageViews);
-      } else if (includeMeta) {
-        visualizacoesPaginaGa4 = ga4.byPlatformPageViews.meta_ads;
-      } else if (includeGoogle) {
-        visualizacoesPaginaGa4 = ga4.byPlatformPageViews.google_ads;
+      } else {
+        if (includeMeta) visualizacoesPaginaGa4 += ga4.byPlatformPageViews.meta_ads;
+        if (includeGoogle) visualizacoesPaginaGa4 += ga4.byPlatformPageViews.google_ads;
+        if (includeTikTokAds) visualizacoesPaginaGa4 += ga4.byPlatformPageViews.tiktok_ads;
+        if (includeLinkedInAds) visualizacoesPaginaGa4 += ga4.byPlatformPageViews.linkedin_ads;
       }
 
       // Query Leads e MQLs do Bitrix (tráfego pago)
@@ -3465,6 +3573,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const cliquesSaidaExposto = onlyInstagram ? 0 : cliquesSaida;
       const cpmExposto = onlyInstagram ? 0 : cpm;
       const ctrExposto = onlyInstagram ? 0 : ctr;
+      const ctrUnicoExposto = onlyInstagram ? null : ctrUnico;
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
       const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPaginaGa4;
@@ -3488,6 +3597,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         cliquesSaida: cliquesSaidaExposto,
         cpm: cpmExposto,
         ctr: ctrExposto,
+        ctrUnico: ctrUnicoExposto,
+        ctrUnicoAvailable: onlyInstagram ? false : ctrUnicoAvailable,
         cps: cpsExposto,
         connectRate: connectRateExposto,
         visualizacoesPagina: visualizacoesPaginaExposto,
@@ -3531,7 +3642,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       if (!includeMeta) {
         return res.json({
           investimento: 0, impressoes: 0, alcance: 0, frequencia: 0,
-          cpm: 0, ctr: 0, videoHook: null, videoHold: null,
+          cpm: 0, ctr: 0, ctrUnico: 0, videoHook: null, videoHold: null,
           visualizacoesPagina: 0, connectRate: 0,
           sessoes: 0, sessoesAvailable: false,
         });
@@ -3617,10 +3728,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           : undefined,
       );
       const sessoes = ga4.byPlatform.meta_ads;
-      // Padrão GA4 (igual aos outros canais): Viz Página = page views GA4,
-      // Connect Rate = Sessões ÷ cliques de saída.
+      // Viz Página (GA4) = page views GA4. O Connect Rate do Meta é calculado no
+      // cliente a partir do pixel (connectRatePixel = landing_page_views ÷ cliques de
+      // saída) — same-source. A versão GA4 (sessões ÷ cliques) foi removida por não
+      // ser usada na UI e misturar fontes.
       const visualizacoesPagina = ga4.byPlatformPageViews.meta_ads;
-      const connectRate = cliquesSaida > 0 ? sessoes / cliquesSaida : 0;
 
       res.json({
         investimento,
@@ -3633,10 +3745,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         videoHook,
         videoHold,
         visualizacoesPagina,
-        connectRate,
         sessoes,
         sessoesAvailable: ga4.available,
-        // Comparação: valores antigos pelo pixel Meta (p/ avaliar o impacto da migração)
+        // Connect Rate e Viz Página do recorte Meta usam o pixel (same-source):
+        // connectRatePixel = landing_page_views ÷ cliques de saída.
         visualizacoesPaginaPixel: landingPageViewsPixel,
         connectRatePixel,
       });
@@ -4344,6 +4456,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                COALESCE(SUM(conversions), 0)::numeric AS conversoes
         FROM tiktok.ad_metrics_daily
         WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+          AND advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
       `);
       const m = mRes.rows[0] as any;
       const investimento = parseFloat(m.investimento) || 0;
@@ -4641,7 +4754,24 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       let utmSourceFilterSql = '';
       if (utmValues.length > 0) {
-        const conds = utmValues.map(v => `LOWER(utm_source) LIKE '${escapeSql(v)}%'`).join(' OR ');
+        // Mesma lógica do buildPlatformFilterSql (usado em /mql, /nao-mql, /ads):
+        // 'instagram' captura também DM/social selling (source WEB/UC_4VCKGM) e
+        // linktree. Sem isso, filtrar por Instagram dropa esses leads — que o GROUP BY
+        // já classifica como instagram (ver PLATFORM_CASE_SQL_BASIC) —, fazendo o funil
+        // por plataforma não bater com o card de Ads. Versão raw (sem alias d.) porque
+        // esta query usa sql.raw com colunas sem prefixo.
+        const conds = utmValues.map(v => {
+          if (v === 'instagram') {
+            return `(
+              LOWER(utm_source) LIKE 'instagram%'
+              OR LOWER(utm_source) = 'ig'
+              OR source IN ('WEB', 'UC_4VCKGM')
+              OR LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree'
+              OR (LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree')
+            )`;
+          }
+          return `LOWER(utm_source) LIKE '${escapeSql(v)}%'`;
+        }).join(' OR ');
         utmSourceFilterSql = `AND (${conds})`;
       }
 

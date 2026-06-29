@@ -13,7 +13,14 @@ const EXPORT_ALLOWED_EMAILS = new Set([
   "vinicius.ichino@turbopartners.com.br",
   "ferramentas@turbopartners.com.br",
 ]);
-import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM } from "@/lib/metasBudgetConfig";
+import {
+  PLATFORM_MULTISELECT_OPTIONS,
+  PLATFORM_TO_UTM,
+  UNIVERSAL,
+  PAID_ONLY,
+  META_ONLY,
+  isMetricVisibleForSelection,
+} from "@/lib/metasBudgetConfig";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { cn } from "@/lib/utils";
 
@@ -56,6 +63,8 @@ interface AdsData {
   cliquesSaida: number;
   cpm: number;
   ctr: number;
+  ctrUnico: number | null;
+  ctrUnicoAvailable?: boolean;
   connectRate: number;
   visualizacoesPagina: number;
   sessoes: number;
@@ -204,16 +213,10 @@ function formatValue(value: number | null, format: MetricFormat): string {
   }
 }
 
-function percColor(pct: number | null, inverted = false): string {
-  if (pct === null) return "";
-  if (inverted) {
-    if (pct <= 100) return "text-emerald-600 dark:text-emerald-400";
-    if (pct <= 120) return "text-amber-600 dark:text-amber-400";
-    return "text-red-600 dark:text-red-400";
-  }
-  if (pct >= 100) return "text-emerald-600 dark:text-emerald-400";
-  if (pct >= 80) return "text-amber-600 dark:text-amber-400";
-  return "text-red-600 dark:text-red-400";
+// Coloração por performance (verde/laranja/vermelho) removida — não usamos.
+// Mantém o número de % atingido vs. orçado, mas em cinza neutro.
+function percColor(_pct: number | null, _inverted = false): string {
+  return "text-muted-foreground";
 }
 
 interface MetricDef {
@@ -241,9 +244,14 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "ads_cpm", name: "CPM", format: "currency", section: "marketing", inverted: true,
     realizado: ({ ads }) => ads?.cpm ?? null,
     orcado: (b) => b.marketing?.cpm ?? null },
-  { id: "ads_ctr", name: "CTR", format: "percent", section: "marketing",
+  { id: "ads_ctr", name: "CTR de saída", format: "percent", section: "marketing",
     realizado: ({ ads }) => ads?.ctr ?? null,
     orcado: (b) => b.marketing?.ctr ?? null },
+  // CTR de saída único (cliques de saída únicos / alcance) — só o Meta expõe; no
+  // consolidado só é definível quando Meta é a única fonte paga (senão "—"). Sem orçado.
+  { id: "ads_ctr_unico", name: "CTR de saída único", format: "percent", section: "marketing",
+    realizado: ({ ads }) => ads?.ctrUnico ?? null,
+    orcado: () => null },
   { id: "ads_impressoes", name: "Impressões", format: "number", section: "marketing",
     realizado: ({ ads }) => ads?.impressoes ?? null,
     orcado: (b) => b.marketing?.impressoes ?? null },
@@ -264,6 +272,18 @@ const METRIC_DEFS: MetricDef[] = [
     orcado: () => null },
   { id: "ads_taxa_conversao_pagina_nmql", name: "Não-MQL", format: "percent", section: "marketing", sub: true,
     realizado: ({ ads }) => (ads && ads.visualizacoesPagina > 0 ? (ads.leads - ads.mqls) / ads.visualizacoesPagina : null),
+    orcado: () => null },
+  // Conversão por Sessões (GA4): denominador = sessões em vez de visualizações de
+  // página. Sem alvo orçado (não há taxaConversaoSessoes no budget). null quando não
+  // há sessões (GA4 indisponível) — evita exibir 0% falso.
+  { id: "ads_taxa_conversao_sessoes", name: "Tx Conversão de Sessões", format: "percent", section: "marketing",
+    realizado: ({ ads }) => (ads && ads.sessoes > 0 ? ads.leads / ads.sessoes : null),
+    orcado: () => null },
+  { id: "ads_taxa_conversao_sessoes_mql", name: "MQL", format: "percent", section: "marketing", sub: true,
+    realizado: ({ ads }) => (ads && ads.sessoes > 0 ? ads.mqls / ads.sessoes : null),
+    orcado: () => null },
+  { id: "ads_taxa_conversao_sessoes_nmql", name: "Não-MQL", format: "percent", section: "marketing", sub: true,
+    realizado: ({ ads }) => (ads && ads.sessoes > 0 ? (ads.leads - ads.mqls) / ads.sessoes : null),
     orcado: () => null },
   { id: "ads_connect_rate", name: "Connect Rate", format: "percent", section: "marketing",
     realizado: ({ ads }) => ads?.connectRate ?? null,
@@ -294,9 +314,23 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "mql_ra_num", name: "Nº RA MQL", format: "number", section: "mql",
     realizado: ({ mql }) => mql?.reunioesAgendadas ?? null,
     orcado: (b) => b.mql?.reunioesAgendadas ?? null },
+  { id: "mql_cpra", name: "CPRA MQL", format: "currency", section: "mql", inverted: true,
+    realizado: ({ ads, mql }) => {
+      const invest = ads?.investimento ?? 0;
+      const ra = mql?.reunioesAgendadas ?? 0;
+      return invest > 0 && ra > 0 ? invest / ra : null;
+    },
+    orcado: (b) => b.mql?.cpraMql ?? null },
   { id: "mql_rr_num", name: "Nº RR MQL", format: "number", section: "mql",
     realizado: ({ mql }) => mql?.reunioesRealizadas ?? null,
     orcado: (b) => b.mql?.reunioesRealizadas ?? null },
+  { id: "mql_cprr", name: "CPRR MQL", format: "currency", section: "mql", inverted: true,
+    realizado: ({ ads, mql }) => {
+      const invest = ads?.investimento ?? 0;
+      const rr = mql?.reunioesRealizadas ?? 0;
+      return invest > 0 && rr > 0 ? invest / rr : null;
+    },
+    orcado: (b) => b.mql?.cprrMql ?? null },
   { id: "mql_noshow", name: "% No-Show MQL", format: "percent", section: "mql", inverted: true,
     realizado: ({ mql }) => mql?.percNoShow ?? null,
     orcado: (b) => b.mql?.percNoShow ?? null },
@@ -306,8 +340,8 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "mql_taxa_vendas", name: "Taxa Vendas MQL", format: "percent", section: "mql",
     realizado: ({ mql }) => mql?.taxaVendas ?? null,
     orcado: (b) => b.mql?.taxaVendas ?? null },
-  { id: "mql_novos_clientes", name: "Novos Clientes MQL", format: "number", section: "mql",
-    realizado: ({ mql }) => mql?.novosClientes ?? null,
+  { id: "mql_novos_clientes", name: "Negócios Ganhos MQL", format: "number", section: "mql",
+    realizado: ({ mql }) => mql?.dealsGanhos ?? null,
     orcado: (b) => b.mql?.novosClientes ?? null },
   { id: "mql_tx_recorrente", name: "Tx Recorrente MQL", format: "percent", section: "mql",
     realizado: ({ mql }) => mql?.txContratosRecorrentes ?? null,
@@ -344,9 +378,23 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "nmql_ra_num", name: "Nº RA Não-MQL", format: "number", section: "nao-mql",
     realizado: ({ naoMql }) => naoMql?.reunioesAgendadas ?? null,
     orcado: (b) => b["nao-mql"]?.reunioesAgendadas ?? null },
+  { id: "nmql_cpra", name: "CPRA Não-MQL", format: "currency", section: "nao-mql", inverted: true,
+    realizado: ({ ads, naoMql }) => {
+      const invest = ads?.investimento ?? 0;
+      const ra = naoMql?.reunioesAgendadas ?? 0;
+      return invest > 0 && ra > 0 ? invest / ra : null;
+    },
+    orcado: (b) => b["nao-mql"]?.cpraNmql ?? null },
   { id: "nmql_rr_num", name: "Nº RR Não-MQL", format: "number", section: "nao-mql",
     realizado: ({ naoMql }) => naoMql?.reunioesRealizadas ?? null,
     orcado: (b) => b["nao-mql"]?.reunioesRealizadas ?? null },
+  { id: "nmql_cprr", name: "CPRR Não-MQL", format: "currency", section: "nao-mql", inverted: true,
+    realizado: ({ ads, naoMql }) => {
+      const invest = ads?.investimento ?? 0;
+      const rr = naoMql?.reunioesRealizadas ?? 0;
+      return invest > 0 && rr > 0 ? invest / rr : null;
+    },
+    orcado: (b) => b["nao-mql"]?.cprrNmql ?? null },
   { id: "nmql_noshow", name: "% No-Show Não-MQL", format: "percent", section: "nao-mql", inverted: true,
     realizado: ({ naoMql }) => naoMql?.percNoShow ?? null,
     orcado: (b) => b["nao-mql"]?.percNoShow ?? null },
@@ -356,8 +404,8 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "nmql_taxa_vendas", name: "Taxa Vendas Não-MQL", format: "percent", section: "nao-mql",
     realizado: ({ naoMql }) => naoMql?.taxaVendas ?? null,
     orcado: (b) => b["nao-mql"]?.taxaVendas ?? null },
-  { id: "nmql_novos_clientes", name: "Novos Clientes Não-MQL", format: "number", section: "nao-mql",
-    realizado: ({ naoMql }) => naoMql?.novosClientes ?? null,
+  { id: "nmql_novos_clientes", name: "Negócios Ganhos Não-MQL", format: "number", section: "nao-mql",
+    realizado: ({ naoMql }) => naoMql?.dealsGanhos ?? null,
     orcado: (b) => b["nao-mql"]?.novosClientes ?? null },
   { id: "nmql_tx_recorrente", name: "Tx Recorrente Não-MQL", format: "percent", section: "nao-mql",
     realizado: ({ naoMql }) => naoMql?.txContratosRecorrentes ?? null,
@@ -492,6 +540,31 @@ const METRIC_DEFS: MetricDef[] = [
     },
     orcado: (b) => b.total?.ticketMedioImplantacao ?? null },
 ];
+
+// Disponibilidade por plataforma das métricas da seção "Marketing". As demais
+// seções (MQL / Não-MQL / Total) vêm do CRM e independem de plataforma — sempre
+// aparecem. Métricas de marketing não listadas aqui assumem UNIVERSAL (sempre).
+const MARKETING_METRIC_PLATFORMS: Record<string, readonly string[]> = {
+  ads_investimento: UNIVERSAL,
+  ads_cpm: PAID_ONLY,
+  ads_ctr: PAID_ONLY,                         // CTR de saída
+  ads_ctr_unico: META_ONLY,                   // CTR de saída único — só Meta
+  ads_impressoes: PAID_ONLY,
+  ads_visualizacoes_pagina: PAID_ONLY,
+  ads_taxa_conversao_pagina: PAID_ONLY,       // Tx Conversão por Visualização de Página (pixel)
+  ads_taxa_conversao_pagina_mql: PAID_ONLY,
+  ads_taxa_conversao_pagina_nmql: PAID_ONLY,
+  ads_sessoes: UNIVERSAL,
+  ads_taxa_conversao_sessoes: UNIVERSAL,      // Tx Conversão por Sessões (GA4) — padrão da casa
+  ads_taxa_conversao_sessoes_mql: UNIVERSAL,
+  ads_taxa_conversao_sessoes_nmql: UNIVERSAL,
+  ads_connect_rate: PAID_ONLY,
+  ads_leads: UNIVERSAL,
+  ads_mqls: UNIVERSAL,
+  ads_cpl: UNIVERSAL,
+  ads_cpmql: UNIVERSAL,
+  ads_perc_mqls: UNIVERSAL,
+};
 
 export default function GrowthEvolucaoTemporal() {
   usePageTitle("Evolução Temporal");
@@ -699,9 +772,18 @@ export default function GrowthEvolucaoTemporal() {
     const grouped: Record<SectionKey, MetricDef[]> = {
       marketing: [], mql: [], "nao-mql": [], total: [],
     };
-    for (const m of METRIC_DEFS) grouped[m.section].push(m);
+    for (const m of METRIC_DEFS) {
+      // Só a seção de Marketing depende de plataforma. Uma métrica de marketing
+      // só entra se existir em todas as plataformas selecionadas (sem filtro =
+      // todas → restam só as universais). Demais seções entram sempre.
+      if (m.section === "marketing") {
+        const avail = MARKETING_METRIC_PLATFORMS[m.id] ?? UNIVERSAL;
+        if (!isMetricVisibleForSelection(avail, selectedPlataformas)) continue;
+      }
+      grouped[m.section].push(m);
+    }
     return grouped;
-  }, []);
+  }, [selectedPlataformas]);
 
   const renderCell = (m: MetricDef, col: Column) => {
     const bKey = col.kind === "month" ? col.bucket.key : col.week.key;

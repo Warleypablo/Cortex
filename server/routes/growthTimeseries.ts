@@ -1,21 +1,8 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
+import { expandFunilValues } from "@shared/produtos";
 
 const TURBO_PARTNERS_ACCOUNT_ID = "act_1331413260627780";
-
-const FUNNEL_ALIASES: Record<string, string[]> = {
-  ecommerce: ["Ecommerce", "E-commerce", "ecommerce"],
-};
-
-function expandFunilValues(values: string[]): string[] {
-  const expanded: string[] = [];
-  for (const v of values) {
-    const aliases = FUNNEL_ALIASES[v.toLowerCase()];
-    if (aliases) expanded.push(...aliases);
-    else expanded.push(v);
-  }
-  return expanded;
-}
 
 type Bucket = {
   key: string;

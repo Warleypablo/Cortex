@@ -60,7 +60,10 @@ export const ALL_COLUMNS: ColumnDef[] = [
   // Video views: contador nativo do Google e do TikTok.
   C("videoViews", "Video views", "Vídeo", "number", { platforms: [PLAT_GOOGLE, PLAT_TIKTOK] }),
   // Tráfego
-  C("ctr", "CTR", "Tráfego", "percent", { color: true }),
+  C("ctr", "CTR de saída", "Tráfego", "percent", { color: true }),
+  // CTR de saída único = cliques de saída únicos / alcance. Só o Meta expõe o dado;
+  // demais plataformas mostram "—".
+  C("ctrUnico", "CTR de saída único", "Tráfego", "percent", { color: true, defaultWidth: 116 }),
   // Connect rate depende de landing_page_views (só Meta reporta) → nativa do Meta.
   C("connectRate", "Connect rate", "Tráfego", "percent", { color: true, defaultWidth: 104, platforms: [PLAT_META] }),
   C("taxaConversao", "Taxa conv.", "Tráfego", "percent", { color: true, defaultWidth: 96 }),

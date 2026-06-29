@@ -193,6 +193,35 @@ export const PLATFORM_TO_UTM: Record<string, string> = {
   tiktok: 'tiktok',
 };
 
+// ===== Disponibilidade de métricas por plataforma =====
+// Métricas de marketing não existem em todos os canais: CPM/CTR/Visualizações de
+// Página só fazem sentido em mídia paga; CTR de saída único só o Meta expõe. Quando
+// blendadas no consolidado (sem filtro), viram número sem significado. Estas
+// constantes definem "em quais plataformas a métrica existe" e a regra de exibição:
+// uma métrica só aparece se existir em TODAS as plataformas selecionadas (interseção).
+// Sem filtro = todas as plataformas = só as métricas universais.
+
+export const PAID_PLATFORMS = ['meta_ads', 'google_ads', 'tiktok_ads', 'linkedin_ads'] as const;
+export const ORGANIC_PLATFORMS = ['instagram', 'youtube', 'linkedin', 'tiktok'] as const;
+export const ALL_PLATFORM_KEYS = [...PAID_PLATFORMS, ...ORGANIC_PLATFORMS] as const;
+
+// Grupos de disponibilidade reutilizáveis pelos mapas de cada aba.
+export const UNIVERSAL = ALL_PLATFORM_KEYS;        // existe em todo canal (pago e orgânico)
+export const PAID_ONLY = PAID_PLATFORMS;           // só mídia paga
+export const META_ONLY = ['meta_ads'] as const;    // só o Meta expõe
+
+// Uma métrica disponível em `availablePlatforms` aparece para a seleção atual
+// quando TODAS as plataformas selecionadas a possuem (interseção). Lista de seleção
+// vazia = considera todas as plataformas, então sobram só as universais.
+export function isMetricVisibleForSelection(
+  availablePlatforms: readonly string[],
+  selectedPlataformas: string[],
+): boolean {
+  const effective = selectedPlataformas.length > 0 ? selectedPlataformas : ALL_PLATFORM_KEYS;
+  const avail = new Set(availablePlatforms);
+  return effective.every((p) => avail.has(p));
+}
+
 // ===== Default Orçado Values =====
 
 export const DEFAULT_ORCADO_MQL = {
