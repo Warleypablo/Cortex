@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-06-29 | feat(encurtador): Fase 2 — backend (rotas + criação das tabelas no boot)
+
+**O que foi feito:**
+- `server/db.ts` — função `initializeShortLinksTables()` cria `cortex_core.short_links` e `short_link_clicks` (CREATE TABLE IF NOT EXISTS + índices), seguindo o padrão das demais `initialize*Table()` do repo. Idempotente; roda no boot (local e prod), sem precisar de `db:push`.
+- `server/index.ts` — `initializeShortLinksTables()` adicionada ao `Promise.all` de inicialização + import.
+- `server/routes/shortener.ts` (novo) — três rotas:
+  - `POST /api/links/shorten` (Growth + admins): valida/sanitiza o slug (estrito `[a-z0-9-]`, reservados bloqueados), extrai a UTM do `targetUrl`, grava em `short_links` com guarda de unicidade (`ON CONFLICT (slug)` → 409) e escreve `slug→targetUrl` no KV do Cloudflare (best-effort: sem `CF_*` em local, pula o KV e retorna `kvSynced:false`).
+  - `GET /api/links` (Growth + admins): lista links + contagem de cliques (LEFT JOIN agregado) + nome do criador.
+  - `POST /api/clicks`: ingestão de clique do Worker, protegida por header secreto `x-click-secret` (`CLICK_INGEST_SECRET`); grava em `short_link_clicks`.
+- `server/routes.ts` — registro de `registerShortenerRoutes(app)` + import.
+
+**Por que:**
+- Fase 2 do encurtador (plano em `docs/encurtador-links-plano.md`): a camada de servidor pra criar/gerir links e receber cliques, pronta pra ser consumida pelo frontend (Fase 4) e pelo Worker (Fase 3).
+
+**Arquivos alterados:**
+- `server/db.ts` - função de init das duas tabelas.
+- `server/index.ts` - wiring no boot.
+- `server/routes/shortener.ts` (novo) - rotas shorten/links/clicks.
+- `server/routes.ts` - import + registro.
+
+**Impacto arquitetural:** Nenhum estrutural. Tabelas criadas pela convenção `initialize*Table()` existente (não usa `db:push`, evitando diff do schema inteiro). Validado: `tsc` não acusa erro novo nos arquivos tocados (erros restantes são pré-existentes no `routes.ts`); `esbuild` bundla o server limpo (exit 0). KV e auth de clique são best-effort sem `CF_*`/`CLICK_INGEST_SECRET`, então o backend roda no preview local. Falta env de prod: `SHORTENER_BASE_URL`, `CF_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`, `CF_API_TOKEN`, `CLICK_INGEST_SECRET`.
+
+---
+
 ## 2026-06-29 | feat(encurtador): Fase 1 — tabelas short_links e short_link_clicks
 
 **O que foi feito:**
