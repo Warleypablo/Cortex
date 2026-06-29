@@ -85,81 +85,94 @@ export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsRes
 
     for (const { advertiser_id } of advRes.rows) {
       try {
-        // 1. Campanhas (metadados) — paginado.
-        let cpage = 1;
-        let cguard = 0;
-        do {
-          const data = await ttGet('/campaign/get/', token, {
-            advertiser_id,
-            fields: ['campaign_id', 'campaign_name', 'objective_type', 'operation_status', 'budget', 'budget_mode'],
-            page: cpage,
-            page_size: 100,
-          });
-          const list: any[] = data?.list || [];
-          for (const c of list) {
-            await pool.query(
-              `INSERT INTO tiktok.ad_campaigns
-                 (campaign_id, advertiser_id, campaign_name, objective_type, operation_status, budget, budget_mode, raw, synced_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
-               ON CONFLICT (campaign_id) DO UPDATE SET
-                 advertiser_id = EXCLUDED.advertiser_id, campaign_name = EXCLUDED.campaign_name,
-                 objective_type = EXCLUDED.objective_type, operation_status = EXCLUDED.operation_status,
-                 budget = EXCLUDED.budget, budget_mode = EXCLUDED.budget_mode, raw = EXCLUDED.raw, synced_at = NOW()`,
-              [String(c.campaign_id), String(advertiser_id), c.campaign_name || null,
-               c.objective_type || null, c.operation_status || null,
-               numOrNull(c.budget), c.budget_mode || null, JSON.stringify(c)],
-            );
-            result.campaigns++;
-          }
-          const pageInfo = data?.page_info || {};
-          cpage = (pageInfo.total_page && cpage < pageInfo.total_page) ? cpage + 1 : 0;
-        } while (cpage && ++cguard < 50);
+        // Nível-campanha (tiktok.ad_campaigns + ad_metrics_daily) são owned por `postgres`. Quando o
+        // app conecta como `growth_dev` SEM grant nessas tabelas, a escrita falha com "permission
+        // denied" — e isso NÃO pode abortar o nível-anúncio (ads/adgroups/insights, owned por
+        // growth_dev), que é o que alimenta a aba Criativos. Best-effort: registra e segue.
+        // Correção definitiva: GRANT em tiktok.ad_campaigns/ad_metrics_daily p/ growth_dev (ver SQL no PR).
+        try {
+          // 1. Campanhas (metadados) — paginado.
+          let cpage = 1;
+          let cguard = 0;
+          do {
+            const data = await ttGet('/campaign/get/', token, {
+              advertiser_id,
+              fields: ['campaign_id', 'campaign_name', 'objective_type', 'operation_status', 'budget', 'budget_mode'],
+              page: cpage,
+              page_size: 100,
+            });
+            const list: any[] = data?.list || [];
+            for (const c of list) {
+              await pool.query(
+                `INSERT INTO tiktok.ad_campaigns
+                   (campaign_id, advertiser_id, campaign_name, objective_type, operation_status, budget, budget_mode, raw, synced_at)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
+                 ON CONFLICT (campaign_id) DO UPDATE SET
+                   advertiser_id = EXCLUDED.advertiser_id, campaign_name = EXCLUDED.campaign_name,
+                   objective_type = EXCLUDED.objective_type, operation_status = EXCLUDED.operation_status,
+                   budget = EXCLUDED.budget, budget_mode = EXCLUDED.budget_mode, raw = EXCLUDED.raw, synced_at = NOW()`,
+                [String(c.campaign_id), String(advertiser_id), c.campaign_name || null,
+                 c.objective_type || null, c.operation_status || null,
+                 numOrNull(c.budget), c.budget_mode || null, JSON.stringify(c)],
+              );
+              result.campaigns++;
+            }
+            const pageInfo = data?.page_info || {};
+            cpage = (pageInfo.total_page && cpage < pageInfo.total_page) ? cpage + 1 : 0;
+          } while (cpage && ++cguard < 50);
 
-        // 2. Métricas diárias por campanha — report/integrated/get, paginado.
-        let mpage = 1;
-        let mguard = 0;
-        do {
-          const data = await ttGet('/report/integrated/get/', token, {
-            advertiser_id,
-            report_type: 'BASIC',
-            data_level: 'AUCTION_CAMPAIGN',
-            dimensions: ['campaign_id', 'stat_time_day'],
-            metrics: REPORT_METRICS,
-            start_date: startDate,
-            end_date: endDate,
-            page: mpage,
-            page_size: 1000,
-          });
-          const list: any[] = data?.list || [];
-          for (const row of list) {
-            const dim = row.dimensions || {};
-            const met = row.metrics || {};
-            const campaignId = String(dim.campaign_id);
-            const statDate = String(dim.stat_time_day || '').slice(0, 10);
-            if (!campaignId || !statDate) continue;
-            // FK exige a campanha existir; se o report trouxe campanha não listada, garante stub.
-            await pool.query(
-              `INSERT INTO tiktok.ad_campaigns (campaign_id, advertiser_id, synced_at)
-               VALUES ($1,$2, NOW()) ON CONFLICT (campaign_id) DO NOTHING`,
-              [campaignId, String(advertiser_id)],
-            );
-            await pool.query(
-              `INSERT INTO tiktok.ad_metrics_daily
-                 (campaign_id, stat_date, advertiser_id, spend, impressions, clicks, conversions, raw, synced_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
-               ON CONFLICT (campaign_id, stat_date) DO UPDATE SET
-                 advertiser_id = EXCLUDED.advertiser_id, spend = EXCLUDED.spend,
-                 impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
-                 conversions = EXCLUDED.conversions, raw = EXCLUDED.raw, synced_at = NOW()`,
-              [campaignId, statDate, String(advertiser_id),
-               numOrNull(met.spend), numOrNull(met.impressions), numOrNull(met.clicks),
-               numOrNull(met.conversion), JSON.stringify(row)],
-            );
-            result.metricRows++;
-          }
-          const pageInfo = data?.page_info || {};
-          mpage = (pageInfo.total_page && mpage < pageInfo.total_page) ? mpage + 1 : 0;
-        } while (mpage && ++mguard < 100);
+          // 2. Métricas diárias por campanha — report/integrated/get, paginado.
+          let mpage = 1;
+          let mguard = 0;
+          do {
+            const data = await ttGet('/report/integrated/get/', token, {
+              advertiser_id,
+              report_type: 'BASIC',
+              data_level: 'AUCTION_CAMPAIGN',
+              dimensions: ['campaign_id', 'stat_time_day'],
+              metrics: REPORT_METRICS,
+              start_date: startDate,
+              end_date: endDate,
+              page: mpage,
+              page_size: 1000,
+            });
+            const list: any[] = data?.list || [];
+            for (const row of list) {
+              const dim = row.dimensions || {};
+              const met = row.metrics || {};
+              const campaignId = String(dim.campaign_id);
+              const statDate = String(dim.stat_time_day || '').slice(0, 10);
+              if (!campaignId || !statDate) continue;
+              // FK exige a campanha existir; se o report trouxe campanha não listada, garante stub.
+              await pool.query(
+                `INSERT INTO tiktok.ad_campaigns (campaign_id, advertiser_id, synced_at)
+                 VALUES ($1,$2, NOW()) ON CONFLICT (campaign_id) DO NOTHING`,
+                [campaignId, String(advertiser_id)],
+              );
+              await pool.query(
+                `INSERT INTO tiktok.ad_metrics_daily
+                   (campaign_id, stat_date, advertiser_id, spend, impressions, clicks, conversions, raw, synced_at)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
+                 ON CONFLICT (campaign_id, stat_date) DO UPDATE SET
+                   advertiser_id = EXCLUDED.advertiser_id, spend = EXCLUDED.spend,
+                   impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
+                   conversions = EXCLUDED.conversions, raw = EXCLUDED.raw, synced_at = NOW()`,
+                [campaignId, statDate, String(advertiser_id),
+                 numOrNull(met.spend), numOrNull(met.impressions), numOrNull(met.clicks),
+                 numOrNull(met.conversion), JSON.stringify(row)],
+              );
+              result.metricRows++;
+            }
+            const pageInfo = data?.page_info || {};
+            mpage = (pageInfo.total_page && mpage < pageInfo.total_page) ? mpage + 1 : 0;
+          } while (mpage && ++mguard < 100);
+        } catch (campErr: any) {
+          // Sem grant em ad_campaigns/ad_metrics_daily (owned por postgres): pula o nível-campanha e
+          // segue p/ adgroups/ads/insights. A aba Criativos passa a mostrar os anúncios (nome da
+          // campanha cai no fallback campaign_id) mesmo sem o GRANT.
+          result.errors.push(`advertiser ${advertiser_id} (nível-campanha, best-effort): ${campErr.message}`);
+          console.warn(`[tiktok-ads] nível-campanha pulado p/ advertiser ${advertiser_id}:`, campErr.message);
+        }
 
         // 3. Ad groups (conjuntos) — metadados, paginado.
         let gpage = 1, gguard = 0;
