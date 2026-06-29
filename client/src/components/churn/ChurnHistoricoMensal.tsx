@@ -22,6 +22,7 @@ interface HistoricoResponse {
   motivos: string[]; // ordenados por volume desc
   ano: number;
   filterAbono: FilterAbono;
+  mrrBasePorMes: Record<string, number>; // "YYYY-MM" -> MRR ativo real do mês
 }
 
 // Paleta por motivo (ordem = volume desc). "Outros"/"Não especificado" ficam cinza.
@@ -41,11 +42,11 @@ function corDoMotivo(motivo: string, index: number): string {
 
 export function ChurnHistoricoMensal({
   filterAbono,
-  churnTargets,
+  metaPct = 0.08,
   ano = new Date().getFullYear(),
 }: {
   filterAbono: FilterAbono;
-  churnTargets: Record<string, number>; // "YYYY-MM" -> meta de churn MRR (BP 2026)
+  metaPct?: number; // meta de churn como % do MRR real do mês (default 8%)
   ano?: number;
 }): JSX.Element {
   const { theme } = useTheme();
@@ -74,11 +75,13 @@ export function ChurnHistoricoMensal({
     for (let m = 1; m <= ultimoMes; m++) {
       const mesKey = `${ano}-${String(m).padStart(2, "0")}`;
       const serie = porMes[mesKey];
+      // Meta = % fixo do MRR real (ativo) daquele mês
+      const mrrBaseMes = data?.mrrBasePorMes?.[mesKey] ?? 0;
       const row: Record<string, number | string> = {
         mes: mesKey,
         mesLabel: MESES_PT[m - 1],
         total: serie ? Math.round(serie.total) : 0,
-        meta: churnTargets[mesKey] ?? 0,
+        meta: Math.round(mrrBaseMes * metaPct),
       };
       motivos.forEach((motivo) => {
         row[motivo] = serie ? Math.round(serie.porMotivo[motivo] ?? 0) : 0;
@@ -86,7 +89,7 @@ export function ChurnHistoricoMensal({
       linhas.push(row);
     }
     return linhas;
-  }, [data, motivos, churnTargets, ano]);
+  }, [data, motivos, metaPct, ano]);
 
   const axisColor = isDark ? "#e5e7eb" : "#374151";
   const gridColor = isDark ? "#3f3f46" : "#e5e7eb";
