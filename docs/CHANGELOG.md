@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-30 | chore(distribuicao): clona 4 conjuntos (74-77) lote 30/06 na camp Distribuição de Conteúdo
+
+**O que foi feito:**
+- `subir-distribuicao-conjuntos.ts`: atualizado o `CONTENTS` p/ o lote de 30/06 (4 tasks "Impulsionar conteúdo" do Caio, due hoje) e clonados 4 conjuntos na camp `Distribuição de Conteúdo` (`120211269781870450`): **74** Afiliado Tiktok (`120252593100580450`), **75** Como criar um perfil no tiktok do zero (`120252593102800450`), **76** Roas alto? Travou nos 50k? (`120252593104100450`), **77** O maior evento sobre criação de conteúdo do ES (`120252593105420450`) — todos PAUSED
+- Clone shallow do Bali (`120243474649070450`, só config, sem ad) via `/copies deep_copy:false`; nome `{NN} - [IG] [Aberto] {conteúdo}`
+
+**Por que:**
+- Fluxo recorrente de impulsionar conteúdo orgânico; conteúdo de cada conjunto vem da task-mãe (parent) de cada subtask no ClickUp (lista Instagram 📷)
+- ⚠️ O **ad** (selecionar o post orgânico do IG) continua sendo feito na UI pelo Caio — o token Meta segue só com `ads_management`/`business_management` (sem `instagram_basic`/`pages_read_engagement`), então puxar/selecionar post orgânico falha por API
+
+**Arquivos alterados:**
+- `subir-distribuicao-conjuntos.ts` - lista `CONTENTS` do lote 30/06
+
+**Impacto arquitetural:** Nenhum — só atualização de dados de input do script existente.
+
+---
+
 ## 2026-06-29 | feat(ads-creation): módulo lotUploader (batch + thumb + descoberta estrita) p/ lotes manuais
 
 **O que foi feito:**
