@@ -3838,6 +3838,51 @@ export type InsertUtmVocabulary = typeof utmVocabulary.$inferInsert;
 export type GeneratedUtmLink = typeof generatedUtmLinks.$inferSelect;
 export type InsertGeneratedUtmLink = typeof generatedUtmLinks.$inferInsert;
 
+// ============== ENCURTADOR DE LINKS ==============
+// Links curtos servidos por marketing.turbopartners.com.br (Cloudflare Worker).
+// O Worker lê o slug no KV do Cloudflare e redireciona pro target_url (UTM intacta).
+// Estas tabelas são o store analítico no Postgres: short_links é a fonte de verdade
+// do cadastro (o KV é só cache de redirect); short_link_clicks recebe cada clique
+// via POST do Worker → cruza com Bitrix.crm_deal/meta_ads por UTM.
+
+export const shortLinks = cortexCoreSchema.table("short_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 80 }).notNull().unique(), // personalizado (ex: reuniao-vitor)
+  targetUrl: text("target_url").notNull(),                  // URL longa de destino, com UTM completa
+  // UTM desmembrada — espelha o que vai no target_url, pra cruzar com Bitrix/Meta
+  utmSource: varchar("utm_source", { length: 40 }),
+  utmMedium: varchar("utm_medium", { length: 20 }),
+  utmCampaign: varchar("utm_campaign", { length: 120 }),
+  utmTerm: varchar("utm_term", { length: 120 }),
+  utmContent: varchar("utm_content", { length: 200 }),
+  generatedUtmLinkId: varchar("generated_utm_link_id"),     // FK lógica -> generated_utm_links.id (reuso do UTM Builder)
+  createdBy: varchar("created_by").notNull(),               // userId (Growth + admins)
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),                       // NULL = não expira
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  createdByIdx: index("idx_short_links_created_by").on(table.createdBy),
+  campaignIdx: index("idx_short_links_utm_campaign").on(table.utmCampaign),
+}));
+
+export const shortLinkClicks = cortexCoreSchema.table("short_link_clicks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 80 }).notNull(),          // FK lógica -> short_links.slug
+  clickedAt: timestamp("clicked_at").notNull().defaultNow(),
+  country: varchar("country", { length: 2 }),               // cf.country (ISO-2)
+  ipHash: varchar("ip_hash", { length: 64 }),               // hash do IP (privacidade) — dedup opcional
+  userAgent: text("user_agent"),
+  referrer: text("referrer"),
+}, (table) => ({
+  slugIdx: index("idx_short_link_clicks_slug").on(table.slug),
+  clickedAtIdx: index("idx_short_link_clicks_clicked_at").on(table.clickedAt),
+}));
+
+export type ShortLink = typeof shortLinks.$inferSelect;
+export type InsertShortLink = typeof shortLinks.$inferInsert;
+export type ShortLinkClick = typeof shortLinkClicks.$inferSelect;
+export type InsertShortLinkClick = typeof shortLinkClicks.$inferInsert;
+
 // ============================================================
 // YouTube — sync de dados orgânicos (Data API v3 + Analytics API)
 // Schema dedicado `youtube` (igual google_ads/meta_ads terem o seu).

@@ -72,6 +72,7 @@ import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
 import { registerFavoritesRoutes } from "./routes/favorites";
 import { registerUtmRoutes } from "./routes/utm";
+import { registerShortenerRoutes } from "./routes/shortener";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
@@ -5358,7 +5359,54 @@ Estruture sua resposta em:
         .map(([m]) => m);
       const series = Object.values(mesesMap).sort((a, b) => a.mes.localeCompare(b.mes));
 
-      res.json({ series, motivos, ano, filterAbono });
+      // MRR base real de cada mês (mesma régua do card de Taxa de Churn): primeiro snapshot
+      // do mês (dias 1-5), fallback último do mês anterior; status ativo/onboarding/triagem;
+      // exclui squads irrelevantes. Usado para a meta de 8% do histórico.
+      const agora = new Date();
+      const ultimoMes = ano === agora.getFullYear() ? agora.getMonth() + 1 : 12;
+      const SQUADS_IRRELEVANTES_LOWER = ['turbo interno', 'squad x', 'interno', 'x'];
+      const mrrBasePorMes: Record<string, number> = {};
+      for (let mes = 1; mes <= ultimoMes; mes++) {
+        const mesKey = `${ano}-${String(mes).padStart(2, '0')}`;
+        const inicioMesAtual = new Date(ano, mes - 1, 1);
+        const fimMesAtual = new Date(ano, mes - 1, 5, 23, 59, 59);
+        const refMonth = mes === 1 ? 12 : mes - 1;
+        const refYear = mes === 1 ? ano - 1 : ano;
+        const inicioRef = new Date(refYear, refMonth - 1, 1);
+        const fimRef = new Date(refYear, refMonth, 0, 23, 59, 59);
+        const mrrResult = await db.execute(sql`
+          WITH snapshot_atual AS (
+            SELECT MIN(data_snapshot) as data_snapshot FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioMesAtual}::timestamp AND data_snapshot <= ${fimMesAtual}::timestamp
+          ),
+          snapshot_anterior AS (
+            SELECT MAX(data_snapshot) as data_snapshot FROM "Clickup".cup_data_hist
+            WHERE data_snapshot >= ${inicioRef}::timestamp AND data_snapshot <= ${fimRef}::timestamp
+          ),
+          snapshot_ref AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM snapshot_atual WHERE data_snapshot IS NOT NULL),
+              (SELECT data_snapshot FROM snapshot_anterior)
+            ) as data_ultimo_snapshot
+          )
+          SELECT COALESCE(NULLIF(TRIM(h.squad), ''), 'Não especificado') as squad,
+                 COALESCE(h.valorr::numeric, 0) as valorr
+          FROM snapshot_ref us
+          JOIN "Clickup".cup_data_hist h
+            ON h.data_snapshot = us.data_ultimo_snapshot
+            AND LOWER(TRIM(h.status)) IN ('ativo', 'onboarding', 'triagem')
+        `);
+        let total = 0;
+        for (const row of mrrResult.rows as any[]) {
+          const squadRaw: string = row.squad || 'Não especificado';
+          if (!SQUADS_IRRELEVANTES_LOWER.includes(squadRaw.trim().toLowerCase())) {
+            total += Number(row.valorr) || 0;
+          }
+        }
+        mrrBasePorMes[mesKey] = total;
+      }
+
+      res.json({ series, motivos, ano, filterAbono, mrrBasePorMes });
     } catch (error) {
       console.error("[api] Error fetching churn historico mensal:", error);
       res.status(500).json({ error: "Failed to fetch churn historico mensal data" });
@@ -8502,6 +8550,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // UTM Builder - registered from separate file
   registerUtmRoutes(app);
+
+  // Encurtador de links - registered from separate file
+  registerShortenerRoutes(app);
 
   // BP Produtos Module
   registerBpProdutosRoutes(app);

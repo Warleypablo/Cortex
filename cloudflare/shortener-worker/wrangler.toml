@@ -1,0 +1,24 @@
+name = "turbo-shortener"
+main = "src/index.ts"
+compatibility_date = "2025-01-01"
+workers_dev = false
+
+# Rota: TODO path de marketing.turbopartners.com.br é tratado como slug pelo Worker.
+# (zone_name = domínio raiz gerenciado no Cloudflare)
+routes = [
+  { pattern = "marketing.turbopartners.com.br/*", zone_name = "turbopartners.com.br" }
+]
+
+# KV: chave = slug, valor = URL longa. Trocar o id pelo do namespace criado
+# (`npx wrangler kv namespace create LINKS` cospe o id) ou pelo CF_KV_NAMESPACE_ID.
+kv_namespaces = [
+  { binding = "LINKS", id = "1eb38e5ff79f4d769aeb19790f7fb2d9" }
+]
+
+[vars]
+CORTEX_CLICKS_URL = "https://cortex.turbopartners.com.br/api/clicks"
+FALLBACK_URL = "https://turbopartners.com.br"
+
+# CLICK_INGEST_SECRET NÃO vai aqui — é segredo. Configurar com:
+#   npx wrangler secret put CLICK_INGEST_SECRET
+# (mesmo valor da env CLICK_INGEST_SECRET no Render do Cortex)
