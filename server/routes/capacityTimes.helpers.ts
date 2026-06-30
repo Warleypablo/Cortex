@@ -99,10 +99,65 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
   };
 }
 
+// ── Squads de comunicação (Pulse, Olimpo): CS via capacity_metas, régua rec+pontual ──
+
+export interface CsRow {
+  nome: string;
+  op_recorrente: number;
+  cap_recorrente: number | null;
+  op_pontual: number;
+  cap_pontual: number | null;
+  op_total: number;
+  mrr_operando: number;
+  mrr_ativo: number;
+  mrr_onboarding: number;
+  mrr_cancelamento: number;
+  cap_mrr: number | null;
+  util_mrr_pct: number | null; // mrr_operando / cap_mrr
+  util_contas_pct: number | null; // (rec+pont) / (cap rec + cap pont)
+  util_pct: number | null; // legado: MRR quando há cap, senão contas/cap_recorrente
+}
+
+export interface SquadGroup {
+  squad: string;
+  rows: CsRow[];
+}
+
+export function toCsRow(raw: any): CsRow {
+  const op_recorrente = num(raw.op_recorrente);
+  const op_pontual = num(raw.op_pontual);
+  const op_total = op_recorrente + op_pontual;
+  const cap_recorrente = numOrNull(raw.cap_recorrente);
+  const cap_pontual = numOrNull(raw.cap_pontual);
+  const cap_mrr = numOrNull(raw.cap_mrr);
+  const mrr_operando = num(raw.mrr_operando);
+  const cap_contas_total = (cap_recorrente ?? 0) + (cap_pontual ?? 0);
+  const util_mrr_pct = utilPct(mrr_operando, cap_mrr);
+  const util_contas_pct = utilPct(op_total, cap_contas_total > 0 ? cap_contas_total : null);
+  const util_pct = cap_mrr !== null && cap_mrr !== 0 ? util_mrr_pct : utilPct(op_total, cap_recorrente);
+  return {
+    nome: String(raw.nome),
+    op_recorrente,
+    cap_recorrente,
+    op_pontual,
+    cap_pontual,
+    op_total,
+    mrr_operando,
+    mrr_ativo: num(raw.mrr_ativo),
+    mrr_onboarding: num(raw.mrr_onboarding),
+    mrr_cancelamento: num(raw.mrr_cancelamento),
+    cap_mrr,
+    util_mrr_pct,
+    util_contas_pct,
+    util_pct,
+  };
+}
+
 export interface CapacityTimesResponse {
   selva: SelvaRow[];
   black: ComercialRow[];
   squadra: ComercialRow[];
   cxcs: ComercialRow[];
+  squads: SquadGroup[];
   metaContasDesigner: number;
 }
