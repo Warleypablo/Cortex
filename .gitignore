@@ -16,6 +16,7 @@ credentials/
 contracts.db/
 attached_assets/
 .claude/worktrees/
+.claude/scheduled_tasks.lock
 out/
 # dev.sh é gerado por worktree (porta dedicada) via scripts/worktree.sh
 dev.sh

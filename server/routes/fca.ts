@@ -14,12 +14,30 @@ const CLICKUP_FIELDS = {
   date: "8cfba79a-d243-4911-8563-fd39c2523357",
 };
 const CLICKUP_OPTS: Record<string, Record<string, string>> = {
-  canal: { metaAds: "2b7e74d1-78ec-4d5b-a0c8-553b64d2d1c0" },
-  funil: {
-    Creators: "d96d739e-a3f0-4c2e-9edb-5e22a0d84d05",
-    Ecommerce: "62a087fc-73a5-4bbd-bddc-aaa9caeb1c5d",
-  },
   tipo: { relatorioMidia: "3ca91709-20ed-4c67-9e60-1a5525f522d9" },
+};
+
+// Canal: opção do ClickUp + predicado de plataforma no Bitrix (utm_source).
+// platformUtm = null mantém o comportamento legado (filtra só por funil, sem split de plataforma).
+const CANAL_CFG: Record<string, { clickup: string; segmento: string; platformUtm: string | null }> = {
+  metaAds: { clickup: "2b7e74d1-78ec-4d5b-a0c8-553b64d2d1c0", segmento: "meta_ads", platformUtm: null },
+  googleAds: { clickup: "ef42936f-2e34-41b8-b019-6b176a6cb1ce", segmento: "google_ads", platformUtm: "google" },
+  tiktokAds: { clickup: "81541b88-5e03-4193-b1c7-716173c98901", segmento: "meta_ads", platformUtm: "tiktok" },
+};
+
+// Funil: opção do ClickUp + padrão fnl_ngc (Bitrix, ILIKE) + tag no nome da campanha (LIKE, lower).
+const FUNIL_CFG: Record<string, { clickup: string; fnlNgc: string; campaignLike: string }> = {
+  Creators: { clickup: "d96d739e-a3f0-4c2e-9edb-5e22a0d84d05", fnlNgc: "Creators%", campaignLike: "%[creators]%" },
+  Ecommerce: { clickup: "62a087fc-73a5-4bbd-bddc-aaa9caeb1c5d", fnlNgc: "Ecommerce%", campaignLike: "%[ecommerce]%" },
+  CRM: { clickup: "883bd637-4a0c-467c-a58c-398ee68125f4", fnlNgc: "CRM%", campaignLike: "%[crm]%" },
+  Summit: { clickup: "7f02079a-aa74-4e9b-a7a3-4af5a2f1aac0", fnlNgc: "Creator Summit%", campaignLike: "%[summit]%" },
+};
+
+// Predicado SQL de plataforma sobre utm_source (alinhado a server/routes/growth.ts).
+const PLATFORM_UTM_SQL: Record<string, string> = {
+  google: "(utm_source ILIKE 'google%' OR utm_source ILIKE 'adwords%' OR utm_source = 'gads')",
+  tiktok: "(utm_source ILIKE 'tiktok%')",
+  facebook: "(utm_source ILIKE 'facebook%' OR utm_source ILIKE 'fb%' OR utm_source ILIKE 'meta%')",
 };
 
 type Periodo = { de: string; ate: string };
@@ -87,6 +105,38 @@ function periodos(now: Date) {
   };
 }
 
+function periodosMensal(now: Date, mesParam?: string) {
+  const explicito = !!(mesParam && /^\d{4}-\d{2}$/.test(mesParam));
+  let y: number, m: number; // m = 1-12
+  if (explicito) {
+    const [yy, mm] = mesParam!.split("-").map(Number);
+    y = yy; m = mm;
+  } else {
+    const ref = new Date(now);
+    ref.setUTCDate(ref.getUTCDate() - 1); // ontem → evita contar o dia corrente incompleto
+    y = ref.getUTCFullYear();
+    m = ref.getUTCMonth() + 1;
+  }
+  const first = new Date(Date.UTC(y, m - 1, 1));
+  const lastDay = new Date(Date.UTC(y, m, 0));
+  const yesterday = new Date(now);
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  // Mês explícito → mês inteiro (fechado). Mês omitido (corrente) → MTD até ontem,
+  // mas se ontem já passou do fim do mês, usa o mês inteiro.
+  const ate = explicito
+    ? lastDay
+    : (yesterday.getTime() >= first.getTime() && yesterday.getTime() < lastDay.getTime() ? yesterday : lastDay);
+  const prevFirst = new Date(Date.UTC(y, m - 2, 1));
+  const prevLast = new Date(Date.UTC(y, m - 1, 0));
+  return {
+    mes: `${y}-${String(m).padStart(2, "0")}`,
+    principal: { de: fmtDate(first), ate: fmtDate(ate) },
+    prev: { de: fmtDate(prevFirst), ate: fmtDate(prevLast) },
+    diasNoMes: lastDay.getUTCDate(),
+    diasDecorridos: ate.getUTCDate(),
+  };
+}
+
 async function getMetas(funil: string, mes: string, segmento: string): Promise<{ metricas: any; fonte: string }> {
   const mesAnterior = (() => {
     const [y, m] = mes.split("-").map(Number);
@@ -110,8 +160,27 @@ async function getMetas(funil: string, mes: string, segmento: string): Promise<{
   return { metricas: {}, fonte: "NENHUMA" };
 }
 
-async function metaAdsRealizado(funil: string, p: Periodo) {
-  const funilLower = funil.toLowerCase();
+type MidiaRealizado = {
+  investimento: number;
+  impressoes: number;
+  outboundClicks: number;
+  lpv: number;
+  cpm: number;
+  ctr: number;
+};
+
+function midiaResumo(invest: number, imps: number, oc: number, lpv: number): MidiaRealizado {
+  return {
+    investimento: invest,
+    impressoes: imps,
+    outboundClicks: oc,
+    lpv,
+    cpm: imps ? (invest / imps) * 1000 : 0,
+    ctr: imps ? oc / imps : 0,
+  };
+}
+
+async function metaAdsRealizado(campaignLike: string, p: Periodo): Promise<MidiaRealizado> {
   const r = await db.execute(sql`
     SELECT
       COALESCE(SUM(i.spend), 0)::float AS investimento,
@@ -121,31 +190,62 @@ async function metaAdsRealizado(funil: string, p: Periodo) {
     FROM meta_ads.meta_insights_daily i
     JOIN meta_ads.meta_campaigns c ON c.campaign_id = i.campaign_id
     WHERE i.date_start BETWEEN ${p.de} AND ${p.ate}
-      AND LOWER(c.campaign_name) LIKE ${"%" + funilLower + "%"}
+      AND LOWER(c.campaign_name) LIKE ${campaignLike}
   `);
   const row = r.rows[0] as any;
-  const imps = Number(row.impressoes) || 0;
-  const oc = Number(row.oc) || 0;
-  const invest = Number(row.investimento) || 0;
-  return {
-    investimento: invest,
-    impressoes: imps,
-    outboundClicks: oc,
-    lpv: Number(row.lpv) || 0,
-    cpm: imps ? (invest / imps) * 1000 : 0,
-    ctr: imps ? oc / imps : 0,
-  };
+  return midiaResumo(Number(row.investimento) || 0, Number(row.impressoes) || 0, Number(row.oc) || 0, Number(row.lpv) || 0);
 }
 
-async function bitrixRealizado(funil: string, p: Periodo) {
-  const funilLike = funil;
+async function googleAdsRealizado(campaignLike: string, p: Periodo): Promise<MidiaRealizado> {
+  const r = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(m.cost_micros), 0)::float / 1e6 AS investimento,
+      COALESCE(SUM(m.impressions), 0)::bigint AS impressoes,
+      COALESCE(SUM(m.clicks), 0)::bigint AS clicks
+    FROM google.campaign_daily_metrics m
+    JOIN google.campaigns c ON c.campaign_id = m.campaign_id
+    WHERE m.report_date BETWEEN ${p.de} AND ${p.ate}
+      AND LOWER(c.name) LIKE ${campaignLike}
+  `);
+  const row = r.rows[0] as any;
+  // Google não tem outbound_clicks/landing_page_views nativos — usa clicks; lpv=0 (Connect Rate/Tx Página ficam 🔘).
+  return midiaResumo(Number(row.investimento) || 0, Number(row.impressoes) || 0, Number(row.clicks) || 0, 0);
+}
+
+async function tiktokAdsRealizado(_campaignLike: string, p: Periodo): Promise<MidiaRealizado> {
+  // TikTok não tem split confiável de funil pelo nome — soma o gasto do anunciante no período.
+  // O recorte de funil acontece no Bitrix via utm_source=tiktok.
+  const r = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(spend), 0)::float AS investimento,
+      COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+      COALESCE(SUM(clicks), 0)::bigint AS clicks
+    FROM tiktok.ad_insights_daily
+    WHERE stat_date BETWEEN ${p.de} AND ${p.ate}
+  `);
+  const row = r.rows[0] as any;
+  return midiaResumo(Number(row.investimento) || 0, Number(row.impressoes) || 0, Number(row.clicks) || 0, 0);
+}
+
+async function midiaRealizado(canal: string, campaignLike: string, p: Periodo): Promise<MidiaRealizado> {
+  if (canal === "googleAds") return googleAdsRealizado(campaignLike, p);
+  if (canal === "tiktokAds") return tiktokAdsRealizado(campaignLike, p);
+  return metaAdsRealizado(campaignLike, p);
+}
+
+async function bitrixRealizado(fnlNgcPattern: string, platformUtm: string | null, p: Periodo) {
+  const funilLike = fnlNgcPattern;
+  // Filtro opcional de plataforma (canal) via utm_source — channel-pure para Google/TikTok.
+  const platSql = platformUtm && PLATFORM_UTM_SQL[platformUtm]
+    ? sql` AND ${sql.raw(PLATFORM_UTM_SQL[platformUtm])}`
+    : sql``;
   const vol = await db.execute(sql`
     SELECT
       COUNT(*)::int AS leads,
       SUM(CASE WHEN mql::text='1' OR LOWER(mql::text)='true' THEN 1 ELSE 0 END)::int AS mqls
     FROM "Bitrix".crm_deal
-    WHERE created_at BETWEEN ${p.de} AND ${p.ate}
-      AND fnl_ngc ILIKE ${funilLike}
+    WHERE created_at >= ${p.de}::date AND created_at < (${p.ate}::date + INTERVAL '1 day')
+      AND fnl_ngc ILIKE ${funilLike}${platSql}
   `);
   const ra = await db.execute(sql`
     SELECT
@@ -153,7 +253,7 @@ async function bitrixRealizado(funil: string, p: Periodo) {
       SUM(CASE WHEN NOT (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS rm_nmql
     FROM "Bitrix".crm_deal
     WHERE data_reuniao_agendada BETWEEN ${p.de} AND ${p.ate}
-      AND fnl_ngc ILIKE ${funilLike}
+      AND fnl_ngc ILIKE ${funilLike}${platSql}
   `);
   const rr = await db.execute(sql`
     SELECT
@@ -161,20 +261,20 @@ async function bitrixRealizado(funil: string, p: Periodo) {
       SUM(CASE WHEN NOT (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS rr_nmql
     FROM "Bitrix".crm_deal
     WHERE data_reuniao_realizada BETWEEN ${p.de} AND ${p.ate}
-      AND fnl_ngc ILIKE ${funilLike}
+      AND fnl_ngc ILIKE ${funilLike}${platSql}
   `);
   const vendas = await db.execute(sql`
     SELECT
-      SUM(CASE WHEN stage='Negócio Ganho' THEN 1 ELSE 0 END)::int AS negocios,
-      SUM(CASE WHEN stage='Negócio Ganho' AND (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS neg_mql,
-      SUM(CASE WHEN stage='Negócio Ganho' AND NOT (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS neg_nmql,
-      SUM(CASE WHEN stage='Negócio Ganho' AND COALESCE(valor_pontual,0)>0 THEN 1 ELSE 0 END)::int AS c_impl,
-      SUM(CASE WHEN stage='Negócio Ganho' AND COALESCE(valor_recorrente,0)>0 THEN 1 ELSE 0 END)::int AS c_acel,
-      COALESCE(SUM(CASE WHEN stage='Negócio Ganho' THEN COALESCE(valor_pontual,0) ELSE 0 END), 0)::float AS fat_impl,
-      COALESCE(SUM(CASE WHEN stage='Negócio Ganho' THEN COALESCE(valor_recorrente,0) ELSE 0 END), 0)::float AS fat_acel
+      SUM(CASE WHEN stage_name='Negócio Ganho' THEN 1 ELSE 0 END)::int AS negocios,
+      SUM(CASE WHEN stage_name='Negócio Ganho' AND (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS neg_mql,
+      SUM(CASE WHEN stage_name='Negócio Ganho' AND NOT (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS neg_nmql,
+      SUM(CASE WHEN stage_name='Negócio Ganho' AND COALESCE(valor_pontual,0)>0 THEN 1 ELSE 0 END)::int AS c_impl,
+      SUM(CASE WHEN stage_name='Negócio Ganho' AND COALESCE(valor_recorrente,0)>0 THEN 1 ELSE 0 END)::int AS c_acel,
+      COALESCE(SUM(CASE WHEN stage_name='Negócio Ganho' THEN COALESCE(valor_pontual,0) ELSE 0 END), 0)::float AS fat_impl,
+      COALESCE(SUM(CASE WHEN stage_name='Negócio Ganho' THEN COALESCE(valor_recorrente,0) ELSE 0 END), 0)::float AS fat_acel
     FROM "Bitrix".crm_deal
     WHERE data_fechamento BETWEEN ${p.de} AND ${p.ate}
-      AND fnl_ngc ILIKE ${funilLike}
+      AND fnl_ngc ILIKE ${funilLike}${platSql}
   `);
   const v = vol.rows[0] as any;
   const a = ra.rows[0] as any;
@@ -425,11 +525,143 @@ function montarMarkdown(args: {
 🤖 Gerado por endpoint \`POST /api/fca/run\` — skill \`turbo-fca-report\` v3.14.`;
 }
 
-async function criarTaskClickUp(args: { funil: string; semanaNum: number; semana: Periodo; markdown: string }) {
-  const { funil, semanaNum, semana, markdown } = args;
-  const nome = `[FCA] ${funil} - Semana 2026-W${semanaNum} (${fmtBR(semana.de)}-${fmtBR(semana.ate)})`;
-  const funilOpt = CLICKUP_OPTS.funil[funil];
+function montarMarkdownMensal(args: {
+  funil: string;
+  canal: string;
+  pm: ReturnType<typeof periodosMensal>;
+  metas: { metaAds: any; mql: any; nmql: any };
+  atual: Realizado;
+  prev: Realizado;
+}): string {
+  const { funil, canal, pm, metas, atual, prev } = args;
+  const mAds = metas.metaAds;
+  const mMql = metas.mql;
+  const mNmql = metas.nmql;
+  const fator = pm.diasNoMes ? pm.diasDecorridos / pm.diasNoMes : 1;
+  const parcial = pm.diasDecorridos < pm.diasNoMes;
+  const canalLabel = CANAL_LABEL[canal] || canal;
+
+  const invest = atual.invest;
+  const cpmql = atual.bx.mqls ? invest / atual.bx.mqls : 0;
+  const cpl = atual.bx.leads ? invest / atual.bx.leads : 0;
+  const txConvLP = atual.ma.lpv ? atual.bx.leads / atual.ma.lpv : 0;
+  const connectRate = atual.ma.outboundClicks ? atual.ma.lpv / atual.ma.outboundClicks : 0;
+  const cacNeg = atual.bx.negocios ? invest / atual.bx.negocios : 0;
+  const ticketMedio = atual.bx.negocios ? atual.bx.fatTotal / atual.bx.negocios : 0;
+
+  // Metas de volume pro-ratadas pelos dias decorridos (mês fechado → fator 1).
+  const investMeta = (mAds.investimento || 0) * fator;
+  const leadsMeta = (mAds.leads || 0) * fator;
+  const mqlsMeta = (mAds.mqls || 0) * fator;
+
+  const stInvest = rowStatus(invest, investMeta, true);
+  const stCpm = rowStatus(atual.ma.cpm, mAds.cpm || 0, true);
+  const stCtr = rowStatus(atual.ma.ctr, mAds.ctr || 0, false);
+  const stConnect = rowStatus(connectRate, mAds.connectRate || 0, false);
+  const stTxConv = rowStatus(txConvLP, mAds.taxaConversaoPagina || 0, false);
+  const stLeads = rowStatus(atual.bx.leads, leadsMeta, false);
+  const stCpl = rowStatus(cpl, mAds.cpl || 0, true);
+  const stMqls = rowStatus(atual.bx.mqls, mqlsMeta, false);
+  const stPercMql = rowStatus(atual.bx.percMql, mAds.percMqls || 0, false);
+  const stCpmql = rowStatus(cpmql, mAds.cpmql || 0, true);
+  const stRaMql = rowStatus(atual.bx.percRaMql, mMql.percReuniaoAgendada || 0, false);
+  const stNoShowMql = rowStatus(atual.bx.percNoShowMql, mMql.percNoShow || 0, true);
+  const stRrvMql = rowStatus(atual.bx.percRrVendaMql, mMql.taxaVendas || 0, false);
+
+  // Comparação M-1.
+  const cpmqlPrev = prev.bx.mqls ? prev.invest / prev.bx.mqls : 0;
+  const cplPrev = prev.bx.leads ? prev.invest / prev.bx.leads : 0;
+  const cpmPrev = prev.ma.impressoes ? (prev.invest / prev.ma.impressoes) * 1000 : 0;
+  const dM = (a: number, b: number, menor = false) => {
+    if (!b) return "—";
+    const d = ((a - b) / b) * 100;
+    const sign = d >= 0 ? "+" : "";
+    let tag = "";
+    if (Math.abs(d) >= 5) tag = menor ? (d > 0 ? " 🔴" : " 🟢") : (d > 0 ? " 🟢" : " 🔴");
+    return `${sign}${d.toFixed(1).replace(".", ",")}%${tag}`;
+  };
+
+  const notaParcial = parcial
+    ? `\n> ⚠️ **Mês parcial** — ${pm.diasDecorridos}/${pm.diasNoMes} dias. Metas de volume (Leads/MQLs/Investimento) pro-ratadas por ${(fator * 100).toFixed(0)}%.`
+    : "";
+  const semOrcado = !(mAds.cpmql || mAds.investimento || mAds.cpm);
+
+  return `## Contexto
+
+- **Funil × Canal:** ${funil} · ${canalLabel}
+- **Mês:** ${pm.mes} (${fmtBR(pm.principal.de)}–${fmtBR(pm.principal.ate)})
+- **Comparação:** mês anterior (${fmtBR(pm.prev.de)}–${fmtBR(pm.prev.ate)})${notaParcial}
+${semOrcado ? "\n> ℹ️ Sem orçado cadastrado para este funil/canal em `growth_budgets` — colunas de meta saem 🔘. Compare com o planejamento de mídia do mês.\n" : ""}
+---
+
+## Resumo executivo
+
+- **Growth:** CPMQL ${fmtCurr(cpmql)} no mês (${stCpmql.delta} vs meta ${fmtCurr(mAds.cpmql || 0)}).
+- **Pré-vendas:** No-show MQL ${fmtPct(atual.bx.percNoShowMql)} (vs meta ${fmtPct(mMql.percNoShow || 0)}).
+- **Resultado:** ${atual.bx.negocios} Negócios Ganhos · Faturamento ${fmtCurrInt(atual.bx.fatTotal)} · CAC ${fmtCurrInt(cacNeg)}.
+
+---
+
+## Cascata Realizado × Orçado (mês)
+
+| #  | Métrica | Realizado | Orçado | Δ | |
+|---:|---|---:|---:|---:|:--:|
+|    | **— Growth —** | | | | |
+| 1 | Investimento | ${fmtCurrInt(invest)} | ${fmtCurrInt(investMeta)} | ${stInvest.delta} | ${stInvest.status} |
+| 2 | CPM | ${fmtCurr(atual.ma.cpm)} | ${fmtCurr(mAds.cpm || 0)} | ${stCpm.delta} | ${stCpm.status} |
+| 3 | CTR de saída | ${fmtPct(atual.ma.ctr, 2)} | ${fmtPct(mAds.ctr || 0, 2)} | ${stCtr.delta} | ${stCtr.status} |
+| 4 | Connect Rate | ${fmtPct(connectRate)} | ${fmtPct(mAds.connectRate || 0)} | ${stConnect.delta} | ${stConnect.status} |
+| 5 | Tx Conversão da Página | ${fmtPct(txConvLP)} | ${fmtPct(mAds.taxaConversaoPagina || 0)} | ${stTxConv.delta} | ${stTxConv.status} |
+| 6 | Leads | ${atual.bx.leads} | ${Math.round(leadsMeta)} | ${stLeads.delta} | ${stLeads.status} |
+| 7 | CPL | ${fmtCurr(cpl)} | ${fmtCurr(mAds.cpl || 0)} | ${stCpl.delta} | ${stCpl.status} |
+| 8 | MQLs | ${atual.bx.mqls} | ${Math.round(mqlsMeta)} | ${stMqls.delta} | ${stMqls.status} |
+| 9 | % MQL | ${fmtPct(atual.bx.percMql)} | ${fmtPct(mAds.percMqls || 0)} | ${stPercMql.delta} | ${stPercMql.status} |
+| 10 | **CPMQL ⭐** | **${fmtCurr(cpmql)}** | **${fmtCurr(mAds.cpmql || 0)}** | **${stCpmql.delta}** | ${stCpmql.status} |
+|    | **— Pré-vendas (MQL) —** | | | | |
+| 11 | %RA MQL | ${fmtPct(atual.bx.percRaMql)} | ${fmtPct(mMql.percReuniaoAgendada || 0)} | ${stRaMql.delta} | ${stRaMql.status} |
+| 12 | No-show MQL | ${fmtPct(atual.bx.percNoShowMql)} | ${fmtPct(mMql.percNoShow || 0)} | ${stNoShowMql.delta} | ${stNoShowMql.status} |
+| 13 | Taxa Vendas MQL | ${fmtPct(atual.bx.percRrVendaMql)} | ${fmtPct(mMql.taxaVendas || 0)} | ${stRrvMql.delta} | ${stRrvMql.status} |
+|    | **— Resultado —** | | | | |
+| 14 | Negócios Ganhos | ${atual.bx.negocios} | (sem meta) | — | 🔘 |
+| 15 | Faturamento Total | ${fmtCurrInt(atual.bx.fatTotal)} | (sem meta) | — | 🔘 |
+| 16 | Ticket Médio Geral | ${fmtCurrInt(ticketMedio)} | (sem meta) | — | 🔘 |
+| 17 | CAC - Negócios | ${fmtCurrInt(cacNeg)} | (sem meta) | — | 🔘 |
+
+---
+
+## Comparação vs mês anterior (M-1)
+
+| Métrica | ${pm.mes} | Mês anterior | Δ |
+|---|---:|---:|---:|
+| CPM | ${fmtCurr(atual.ma.cpm)} | ${fmtCurr(cpmPrev)} | ${dM(atual.ma.cpm, cpmPrev, true)} |
+| CPL | ${fmtCurr(cpl)} | ${fmtCurr(cplPrev)} | ${dM(cpl, cplPrev, true)} |
+| **CPMQL** ⭐ | ${fmtCurr(cpmql)} | ${fmtCurr(cpmqlPrev)} | ${dM(cpmql, cpmqlPrev, true)} |
+| Leads | ${atual.bx.leads} | ${prev.bx.leads} | ${dM(atual.bx.leads, prev.bx.leads)} |
+| MQLs | ${atual.bx.mqls} | ${prev.bx.mqls} | ${dM(atual.bx.mqls, prev.bx.mqls)} |
+| Negócios Ganhos | ${atual.bx.negocios} | ${prev.bx.negocios} | ${dM(atual.bx.negocios, prev.bx.negocios)} |
+| Faturamento Total | ${fmtCurrInt(atual.bx.fatTotal)} | ${fmtCurrInt(prev.bx.fatTotal)} | ${dM(atual.bx.fatTotal, prev.bx.fatTotal)} |
+
+---
+
+## Impedimentos
+
+1. Atribuição de funil/plataforma por \`fnl_ngc\` + \`utm_source\` — leads sem utm não entram no recorte de canal.
+2. Negócios/Faturamento por \`stage_name='Negócio Ganho'\` em \`data_fechamento\`; atribuição de funil pode atrasar (subconta o mês corrente).
+3. Funis/canais sem orçado em \`growth_budgets\` exibem metas 🔘.
+${canal !== "metaAds" ? "4. Connect Rate / Tx Conversão da Página dependem do pixel Meta (landing_page_views) — em Google/TikTok saem 🔘.\n" : ""}
+---
+
+🤖 Gerado por endpoint \`POST /api/fca/run\` (modo mensal) — skill \`turbo-fca-report\`.`;
+}
+
+const CANAL_LABEL: Record<string, string> = { metaAds: "Meta", googleAds: "Google", tiktokAds: "TikTok" };
+
+async function criarTaskClickUp(args: { funil: string; canal: string; nome: string; markdown: string }) {
+  const { funil, canal, nome, markdown } = args;
+  const funilOpt = FUNIL_CFG[funil]?.clickup;
   if (!funilOpt) throw new Error(`Funil sem mapping ClickUp: ${funil}`);
+  const canalOpt = CANAL_CFG[canal]?.clickup;
+  if (!canalOpt) throw new Error(`Canal sem mapping ClickUp: ${canal}`);
 
   const body = {
     name: nome,
@@ -437,7 +669,7 @@ async function criarTaskClickUp(args: { funil: string; semanaNum: number; semana
     assignees: [Number(CLICKUP_ICHINO_USER_ID)],
     status: "complete",
     custom_fields: [
-      { id: CLICKUP_FIELDS.canal, value: [CLICKUP_OPTS.canal.metaAds] },
+      { id: CLICKUP_FIELDS.canal, value: [canalOpt] },
       { id: CLICKUP_FIELDS.funil, value: [funilOpt] },
       { id: CLICKUP_FIELDS.tipo, value: [CLICKUP_OPTS.tipo.relatorioMidia] },
       { id: CLICKUP_FIELDS.date, value: Date.now() },
@@ -460,10 +692,12 @@ export function registerFcaRoutes(app: Express) {
   app.get("/api/fca/health", (_req: Request, res: Response) => {
     res.json({
       ok: true,
-      version: "v3.14",
+      version: "v3.16",
       endpoint: "POST /api/fca/run",
+      params: { funil: "Creators|Ecommerce|CRM|Summit", canal: "metaAds|googleAds|tiktokAds", createTask: "bool" },
       auth: "Authorization: Bearer <FCA_API_TOKEN>",
-      funilSuportado: ["Creators"],
+      funilSuportado: Object.keys(FUNIL_CFG),
+      canalSuportado: Object.keys(CANAL_CFG),
       tokenConfigured: Boolean(FCA_API_TOKEN),
       time: new Date().toISOString(),
     });
@@ -472,23 +706,73 @@ export function registerFcaRoutes(app: Express) {
   app.post("/api/fca/run", bearerAuth, async (req: Request, res: Response) => {
     try {
       const funil = (req.body?.funil || "Creators") as string;
+      const canal = (req.body?.canal || "metaAds") as string;
+      const modo = req.body?.modo === "mensal" ? "mensal" : "weekly";
       const createTask = req.body?.createTask !== false;
+
+      const funilCfg = FUNIL_CFG[funil];
+      if (!funilCfg) {
+        return res.status(400).json({ error: `Funil inválido: ${funil}. Suportados: ${Object.keys(FUNIL_CFG).join(", ")}` });
+      }
+      const canalCfg = CANAL_CFG[canal];
+      if (!canalCfg) {
+        return res.status(400).json({ error: `Canal inválido: ${canal}. Suportados: ${Object.keys(CANAL_CFG).join(", ")}` });
+      }
+      const platUtm = canalCfg.platformUtm;
+      const campaignLike = funilCfg.campaignLike;
+      const fnlNgc = funilCfg.fnlNgc;
       const now = new Date();
+
+      // ===== MODO MENSAL =====
+      if (modo === "mensal") {
+        const pm = periodosMensal(now, req.body?.mes);
+        const [mAds, mMql, mNmql] = await Promise.all([
+          getMetas(funil, pm.mes, canalCfg.segmento),
+          getMetas(funil, pm.mes, "mql"),
+          getMetas(funil, pm.mes, "nao_mql"),
+        ]);
+        const [maAtual, bxAtual, maPrev, bxPrev] = await Promise.all([
+          midiaRealizado(canal, campaignLike, pm.principal),
+          bitrixRealizado(fnlNgc, platUtm, pm.principal),
+          midiaRealizado(canal, campaignLike, pm.prev),
+          bitrixRealizado(fnlNgc, platUtm, pm.prev),
+        ]);
+        const markdown = montarMarkdownMensal({
+          funil,
+          canal,
+          pm,
+          metas: { metaAds: mAds.metricas, mql: mMql.metricas, nmql: mNmql.metricas },
+          atual: { ma: maAtual, bx: bxAtual, invest: maAtual.investimento },
+          prev: { ma: maPrev, bx: bxPrev, invest: maPrev.investimento },
+        });
+        let taskResult: { id: string; url: string } | null = null;
+        if (createTask) {
+          taskResult = await criarTaskClickUp({
+            funil,
+            canal,
+            nome: `[FCA] ${funil} · ${CANAL_LABEL[canal] || canal} - Mensal ${pm.mes}`,
+            markdown,
+          });
+        }
+        return res.json({ ok: true, modo, funil, canal, periodos: pm, task: taskResult, markdown });
+      }
+
+      // ===== MODO SEMANAL (default) =====
       const p = periodos(now);
 
       const [metaAdsMTD, mqlMTD, nmqlMTD] = await Promise.all([
-        getMetas(funil, p.mesRef, "meta_ads"),
+        getMetas(funil, p.mesRef, canalCfg.segmento),
         getMetas(funil, p.mesRef, "mql"),
         getMetas(funil, p.mesRef, "nao_mql"),
       ]);
 
       const [maMTD, bxMTD, maW, bxW, maWp, bxWp] = await Promise.all([
-        metaAdsRealizado(funil, p.mtd),
-        bitrixRealizado(funil, p.mtd),
-        metaAdsRealizado(funil, p.semana),
-        bitrixRealizado(funil, p.semana),
-        metaAdsRealizado(funil, p.semanaPrev),
-        bitrixRealizado(funil, p.semanaPrev),
+        midiaRealizado(canal, campaignLike, p.mtd),
+        bitrixRealizado(fnlNgc, platUtm, p.mtd),
+        midiaRealizado(canal, campaignLike, p.semana),
+        bitrixRealizado(fnlNgc, platUtm, p.semana),
+        midiaRealizado(canal, campaignLike, p.semanaPrev),
+        bitrixRealizado(fnlNgc, platUtm, p.semanaPrev),
       ]);
 
       const markdown = montarMarkdown({
@@ -504,15 +788,17 @@ export function registerFcaRoutes(app: Express) {
       if (createTask) {
         taskResult = await criarTaskClickUp({
           funil,
-          semanaNum: p.semana.num,
-          semana: p.semana,
+          canal,
+          nome: `[FCA] ${funil} · ${CANAL_LABEL[canal] || canal} - Semana 2026-W${p.semana.num} (${fmtBR(p.semana.de)}-${fmtBR(p.semana.ate)})`,
           markdown,
         });
       }
 
       return res.json({
         ok: true,
+        modo,
         funil,
+        canal,
         periodos: p,
         task: taskResult,
         markdown,
