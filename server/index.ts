@@ -950,6 +950,19 @@ app.use((req, res, next) => {
     );
   }
 
+  // Automação de ads — sobe conjuntos/anúncios toda segunda (ClickUp "Subir ad" → Meta)
+  try {
+    const { setupAdsAutomationJob } = await import(
+      "./services/adsAutomationJob"
+    );
+    setupAdsAutomationJob();
+  } catch (err) {
+    console.error(
+      "[ads-automation] Falha ao registrar job:",
+      err,
+    );
+  }
+
   app.use((err: any, _req: Request, res: Response, _next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";

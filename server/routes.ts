@@ -43,6 +43,7 @@ import { registerIaHubRoutes } from "./routes/ia-hub";
 import { registerJuridicoRelatoriosRoutes } from "./routes/juridico-relatorios";
 import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
 import { registerSaldoDiarioRoutes } from "./routes/saldoDiario";
+import { registerAdsAutomationRoutes } from "./routes/adsAutomation";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
 import { registerCrossSellRoutes } from "./routes/crosssell";
@@ -8097,6 +8098,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Saldo Diário Snapshot - registered from separate file
   registerSaldoDiarioRoutes(app, isAuthenticated, isAdmin);
+
+  // Automação de Ads (painel read-only) - registered from separate file
+  registerAdsAutomationRoutes(app, isAuthenticated, isAdmin);
 
   // GEG (Gestão Estratégica de Gente) - registered from separate file
   registerGEGRoutes(app, db, storage);

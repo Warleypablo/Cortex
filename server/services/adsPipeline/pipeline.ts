@@ -23,6 +23,9 @@ export interface LotePlan {
   taskId: string;
   taskName: string;
   taskUrl: string;
+  /** Subtask "Subir ad" que disparou o lote (p/ mover status). Ausente no fluxo CLI antigo. */
+  triggerTaskId?: string;
+  triggerTaskUrl?: string;
   status: string;
   isCreative: boolean;
   skipReason?: string;
@@ -48,8 +51,10 @@ export interface LotePlan {
 
 function extractDriveFolder(desc: string | null | undefined): string | null {
   if (!desc) return null;
-  const m = desc.match(/https:\/\/drive\.google\.com\/[^\s)\]]+/);
-  return m ? m[0] : null;
+  const all = [...desc.matchAll(/https:\/\/drive\.google\.com\/[^\s)\]]+/g)].map((m) => m[0]);
+  if (!all.length) return null;
+  // prefere link de PASTA (/folders/) ao link de arquivo único (/file/d/, ex.: roteiro)
+  return all.find((u) => /\/folders\//.test(u)) ?? all[0];
 }
 
 function parseVerbaCents(raw: string | null, fallback: number): number {
@@ -219,23 +224,41 @@ function buildConjuntoNome(p: {
 
 // ============== planejamento ==============
 
-export async function planLote(task: cu.ClickUpTask, opts: { checkProcessed?: boolean } = {}): Promise<LotePlan> {
+/** LotePlan "vazio" para um lote pulado (não-criativo, YouTube, etc.). */
+export function buildSkipPlan(
+  task: cu.ClickUpTask,
+  reason: string,
+  trigger?: cu.ClickUpTask,
+): LotePlan {
+  return {
+    taskId: task.id, taskName: task.name, taskUrl: task.url,
+    triggerTaskId: trigger?.id, triggerTaskUrl: trigger?.url,
+    status: cu.statusName(task), isCreative: false, skipReason: reason,
+    funil: null, target: null, publico: "", verbaCents: 0, driveFolderUrl: null,
+    tpIds: [], nomeFinais: [], personagem: "", conjuntoNome: "", nn: null,
+    conjuntoJaExiste: false, alreadyProcessed: false, whatsappText: "", warnings: [],
+  };
+}
+
+export async function planLote(
+  task: cu.ClickUpTask,
+  opts: { checkProcessed?: boolean; triggerTaskId?: string; triggerTaskUrl?: string } = {},
+): Promise<LotePlan> {
   const warnings: string[] = [];
   const status = cu.statusName(task);
 
-  // Filtro: o status `aprovado` é ruidoso — mistura criativos com etapas de produção
-  // (Edição, Design, "Editar criativos"). Só tratamos como lote o que PARECE criativo.
+  // Filtro: a fonte (task mãe) deve PARECER criativo. As subtasks de produção
+  // (Edição, Design, "Editar criativos") não viram lote. A mãe casa "vv-/img-/car-".
   const tipoTask = cu.cfLabels(task, cfg.FIELD.tipoTask)[0] ?? "";
   const isCreative = CREATIVE_NAME_RE.test(task.name) || /criativo/i.test(tipoTask);
   if (!isCreative) {
-    return {
-      taskId: task.id, taskName: task.name, taskUrl: task.url, status,
-      isCreative: false,
-      skipReason: "não parece criativo (provável etapa de produção: edição/design)",
-      funil: null, target: null, publico: "", verbaCents: 0, driveFolderUrl: null,
-      tpIds: [], nomeFinais: [], personagem: "", conjuntoNome: "", nn: null,
-      conjuntoJaExiste: false, alreadyProcessed: false, whatsappText: "", warnings: [],
-    };
+    const skip = buildSkipPlan(
+      task,
+      "não parece criativo (provável etapa de produção: edição/design)",
+    );
+    skip.triggerTaskId = opts.triggerTaskId;
+    skip.triggerTaskUrl = opts.triggerTaskUrl;
+    return skip;
   }
 
   const funil = cu.cfLabels(task, cfg.FIELD.funil)[0] ?? null;
@@ -323,6 +346,8 @@ export async function planLote(task: cu.ClickUpTask, opts: { checkProcessed?: bo
     taskId: task.id,
     taskName: task.name,
     taskUrl: task.url,
+    triggerTaskId: opts.triggerTaskId,
+    triggerTaskUrl: opts.triggerTaskUrl,
     status,
     isCreative: true,
     funil,
@@ -382,8 +407,18 @@ export function buildMessage(plan: LotePlan): string {
 
 // ============== execução (gated por dry-run) ==============
 
-export async function executeLote(plan: LotePlan): Promise<LotePlan> {
+export async function executeLote(
+  plan: LotePlan,
+  opts: { sendWhatsapp?: boolean; comment?: boolean; moveStatus?: boolean } = {},
+): Promise<LotePlan> {
   if (cfg.runtime.dryRun) return plan;
+  // No fluxo CLI tudo liga por padrão; a automação semanal passa tudo false e
+  // controla o ClickUp ela mesma (status só vai p/ "upado" quando o lote fecha).
+  const sendWhatsapp = opts.sendWhatsapp ?? true;
+  const doComment = opts.comment ?? true;
+  const moveStatus = opts.moveStatus ?? true;
+  /** Subtask "Subir ad" recebe o status/comentário; fallback p/ a própria task (CLI). */
+  const statusTarget = plan.triggerTaskId ?? plan.taskId;
   plan.result = {};
 
   // 1. cria conjunto (clone, sem ads) — só se tem target e ainda não existe
@@ -407,26 +442,30 @@ export async function executeLote(plan: LotePlan): Promise<LotePlan> {
   }
 
   // 2. WhatsApp (Evolution/TurboZap)
-  if (cfg.WPP_DEST) {
-    const { enviarMensagemWhatsApp } = await import("../turbozap");
-    const r = await enviarMensagemWhatsApp(cfg.WPP_DEST, plan.whatsappText, cfg.WPP_INSTANCE);
-    plan.result.whatsappSent = r.success;
-    if (!r.success) plan.warnings.push(`WhatsApp falhou: ${r.error}`);
-  } else {
-    plan.warnings.push("ADS_PIPELINE_WPP_DEST vazio — não enviei WhatsApp.");
+  if (sendWhatsapp) {
+    if (cfg.WPP_DEST) {
+      const { enviarMensagemWhatsApp } = await import("../turbozap");
+      const r = await enviarMensagemWhatsApp(cfg.WPP_DEST, plan.whatsappText, cfg.WPP_INSTANCE);
+      plan.result.whatsappSent = r.success;
+      if (!r.success) plan.warnings.push(`WhatsApp falhou: ${r.error}`);
+    } else {
+      plan.warnings.push("ADS_PIPELINE_WPP_DEST vazio — não enviei WhatsApp.");
+    }
   }
 
   // 3. comenta na task (marcador de idempotência)
-  const adsetTxt = plan.result.adsetId ? ` Conjunto ${plan.result.adsetId} criado (PAUSED).` : "";
-  await cu.addComment(
-    plan.taskId,
-    `${cfg.PROCESSED_MARKER} Pipeline preparou o lote.${adsetTxt} Falta o upload manual dos criativos no Gerenciador.`,
-  );
-  plan.result.commented = true;
+  if (doComment) {
+    const adsetTxt = plan.result.adsetId ? ` Conjunto ${plan.result.adsetId} criado (PAUSED).` : "";
+    await cu.addComment(
+      statusTarget,
+      `${cfg.PROCESSED_MARKER} Pipeline preparou o lote.${adsetTxt} Falta o upload manual dos criativos no Gerenciador.`,
+    );
+    plan.result.commented = true;
+  }
 
   // 4. move status (opcional)
-  if (cfg.DONE_STATUS) {
-    await cu.setStatus(plan.taskId, cfg.DONE_STATUS);
+  if (moveStatus && cfg.DONE_STATUS) {
+    await cu.setStatus(statusTarget, cfg.DONE_STATUS);
     plan.result.statusMoved = true;
   }
   return plan;
@@ -454,4 +493,62 @@ export async function runSingleTask(taskId: string): Promise<LotePlan> {
   const plan = await planLote(task, { checkProcessed: true });
   await executeLote(plan);
   return plan;
+}
+
+// ============== automação semanal (gatilho "Subir ad") ==============
+
+/**
+ * Coleta os lotes da automação a partir das subtasks "Subir ad" em `to do`:
+ *  - filtra as subtasks-gatilho (nome ~ /subir/i OU assignee Caio);
+ *  - resolve a task MÃE (onde moram Funil/Público/Verba/Range/Drive) e a usa como fonte;
+ *  - deduplica por mãe (várias "Subir ad" sob a mesma mãe = 1 lote);
+ *  - pula lotes marcados Formato=YouTube.
+ * Read-only — NÃO escreve em Meta/ClickUp. Respeita MAX_LOTES.
+ * O `triggerTaskId` de cada plano aponta p/ a subtask (p/ mover status depois).
+ */
+export async function planAutomationLotes(): Promise<LotePlan[]> {
+  const subtasks = await cu.listTasksByStatus(cfg.ANUNCIOS_LIST_ID, [cfg.TRIGGER_STATUS]);
+  const triggers = subtasks.filter(
+    (t) => cfg.TRIGGER_NAME_RE.test(t.name) || cu.hasAssignee(t, cfg.TRIGGER_ASSIGNEE_ID),
+  );
+
+  // dedup por mãe (ou pela própria task quando não há mãe / USE_PARENT desligado)
+  const seen = new Set<string>();
+  const lotes: { trigger: cu.ClickUpTask; sourceId: string }[] = [];
+  for (const t of triggers) {
+    const parentId = cfg.USE_PARENT_FIELDS ? t.parent || null : null;
+    const sourceId = parentId || t.id;
+    if (seen.has(sourceId)) continue;
+    seen.add(sourceId);
+    lotes.push({ trigger: t, sourceId });
+  }
+  const limited = cfg.MAX_LOTES > 0 ? lotes.slice(0, cfg.MAX_LOTES) : lotes;
+
+  const plans: LotePlan[] = [];
+  for (const { trigger, sourceId } of limited) {
+    // fonte dos campos = mãe (quando há) — buscar a task completa com custom_fields
+    let source = trigger;
+    if (sourceId !== trigger.id) {
+      try {
+        source = await cu.getTask(sourceId);
+      } catch {
+        source = trigger; // sem a mãe, planeja com a própria subtask (gera warnings)
+      }
+    }
+    // pula lotes marcados YouTube no campo Formato (plataforma), se configurado
+    if (cfg.FIELD_FORMATO_PLATAFORMA) {
+      const fmt = cu.cfLabels(source, cfg.FIELD_FORMATO_PLATAFORMA).map((s) => s.toLowerCase());
+      if (fmt.some((f) => f.includes("youtube"))) {
+        plans.push(buildSkipPlan(source, "Formato = YouTube (pula Meta Ads)", trigger));
+        continue;
+      }
+    }
+    const plan = await planLote(source, {
+      checkProcessed: true,
+      triggerTaskId: trigger.id,
+      triggerTaskUrl: trigger.url,
+    });
+    plans.push(plan);
+  }
+  return plans;
 }

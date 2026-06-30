@@ -23,12 +23,28 @@ export const runtime = {
 export const CLICKUP_TOKEN = process.env.CLICKUP_API_KEY || "";
 /** Lista "Anúncios" em GROWTH › GROWTH (descoberta via API). */
 export const ANUNCIOS_LIST_ID = process.env.CLICKUP_ANUNCIOS_LIST_ID || "901305784866";
-/** Status-gatilho: "gravado + editado + pronto". */
-export const TRIGGER_STATUS = process.env.ADS_PIPELINE_TRIGGER_STATUS || "aprovado";
-/** Para onde mover a task depois de preparar. Vazio = não move (só comenta). */
-export const DONE_STATUS = process.env.ADS_PIPELINE_DONE_STATUS || "";
+/** Status-gatilho real das subtasks "Subir ad" (minúsculo, com espaço). */
+export const TRIGGER_STATUS = process.env.ADS_PIPELINE_TRIGGER_STATUS || "to do";
+/** Para onde mover a subtask depois de subir. Default "upado". Vazio = não move (só comenta). */
+export const DONE_STATUS = process.env.ADS_PIPELINE_DONE_STATUS || "upado";
 /** Marcador de idempotência no comentário — evita reprocessar o mesmo lote. */
 export const PROCESSED_MARKER = "[ads-pipeline:preparado]";
+/** Marcador para lote criado mas com upload pendente (cota dev-tier). */
+export const AWAITING_UPLOAD_MARKER = "[ads-pipeline:aguardando-upload-manual]";
+
+// ---------- Gatilho da automação semanal ----------
+// As tasks-gatilho são SUBTASKS "(X) Subir ad" / "Subir anúncio" atribuídas ao Caio.
+// Os campos do lote (Funil/Público/Verba/Range TPs/Drive) moram na task MÃE.
+/** Assignee que marca a subtask-gatilho (Caio Malini). Sinal estável além do nome. */
+export const TRIGGER_ASSIGNEE_ID = process.env.ADS_AUTOMATION_ASSIGNEE_ID || "111964992";
+/** Regex do nome da subtask-gatilho (default: contém "subir"). */
+export const TRIGGER_NAME_RE = new RegExp(process.env.ADS_AUTOMATION_NAME_RE || "subir", "i");
+/** Ler os campos do lote da task MÃE (subtasks "Subir ad" vêm vazias). */
+export const USE_PARENT_FIELDS = process.env.ADS_AUTOMATION_USE_PARENT !== "0";
+/** Teto de lotes por execução (blast radius). 0 = sem limite. */
+export const MAX_LOTES = parseInt(process.env.ADS_AUTOMATION_MAX_LOTES || "0", 10) || 0;
+/** Campo labels "Formato" (Meta Ads / YouTube) — p/ pular lotes YouTube. Vazio = não filtra. */
+export const FIELD_FORMATO_PLATAFORMA = process.env.ADS_AUTOMATION_FORMATO_PLATAFORMA_FIELD || "";
 
 // ---------- Meta ----------
 export const META_ACC = process.env.META_DEFAULT_AD_ACCOUNT_ID || "";
@@ -72,6 +88,19 @@ export const FUNIL_TARGETS: Record<string, FunilTarget> = {
     defaultDailyBudgetCents: 2000, // R$20/dia
   },
 };
+
+// Estende FUNIL_TARGETS via env (JSON: { "Gestão de Comunidade": { campaignId, templateAdsetId,
+// defaultDailyBudgetCents } }) sem mexer no código — evita lote travar por funil não mapeado.
+(() => {
+  const raw = process.env.ADS_PIPELINE_FUNIL_TARGETS_JSON;
+  if (!raw) return;
+  try {
+    const extra = JSON.parse(raw) as Record<string, FunilTarget>;
+    for (const [k, v] of Object.entries(extra)) FUNIL_TARGETS[k] = v;
+  } catch (e) {
+    console.warn("[ads-pipeline] ADS_PIPELINE_FUNIL_TARGETS_JSON inválido:", (e as Error).message);
+  }
+})();
 
 /** Resolve a campanha/template a partir do label de Funil do ClickUp. */
 export function resolveFunilTarget(funil: string | null | undefined): FunilTarget | null {

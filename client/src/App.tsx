@@ -140,6 +140,7 @@ const NpsPesquisa = lazyWithRetry(() => import("@/pages/NpsPesquisa"));
 const MeuPerfil = lazyWithRetry(() => import("@/pages/MeuPerfil"));
 const Avisos = lazyWithRetry(() => import("@/pages/Avisos"));
 const AdminHealth = lazyWithRetry(() => import("@/pages/AdminHealth"));
+const AdsAutomationRuns = lazyWithRetry(() => import("@/pages/AdsAutomationRuns"));
 const AdminOverrides = lazyWithRetry(() => import("@/pages/AdminOverrides"));
 const AdminUsageLog = lazyWithRetry(() => import("@/pages/AdminUsageLog"));
 const Sugestoes = lazyWithRetry(() => import("@/pages/Sugestoes"));
@@ -389,6 +390,7 @@ function ProtectedRouter() {
       <Route path="/growth/planejamento-metas">{() => <ProtectedRoute path="/growth/planejamento-metas" component={PlanejamentoMetas} />}</Route>
       <Route path="/growth/ai">{() => <ProtectedRoute path="/growth/ai" component={GrowthAI} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
+      <Route path="/growth/ads-automacao">{() => <ProtectedRoute path="/growth/ads-automacao" component={AdsAutomationRuns} />}</Route>
       <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramDashboard} />}</Route>
       
       {/* Social (Makers) */}

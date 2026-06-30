@@ -22,6 +22,12 @@ export interface ClickUpCustomField {
   type_config?: { options?: Array<{ id: string; name?: string; label?: string; orderindex?: number }> };
 }
 
+export interface ClickUpAssignee {
+  id: number;
+  username?: string;
+  email?: string;
+}
+
 export interface ClickUpTask {
   id: string;
   name: string;
@@ -31,11 +37,18 @@ export interface ClickUpTask {
   parent?: string | null;
   url: string;
   custom_fields: ClickUpCustomField[];
+  assignees?: ClickUpAssignee[];
 }
 
 /** Normaliza o status (a API às vezes devolve objeto, às vezes string). */
 export function statusName(t: ClickUpTask): string {
   return typeof t.status === "string" ? t.status : t.status?.status ?? "";
+}
+
+/** A task está atribuída a este usuário? (id do ClickUp, ex.: Caio = 111964992). */
+export function hasAssignee(t: ClickUpTask, userId: string | number): boolean {
+  const target = String(userId);
+  return (t.assignees ?? []).some((a) => String(a.id) === target);
 }
 
 /** Lista tasks de uma lista filtrando por status (paginado). */

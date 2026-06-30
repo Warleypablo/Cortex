@@ -88,6 +88,7 @@ export const PERMISSION_KEYS = {
     PLANEJAMENTO_METAS: 'growth.planejamento_metas',
     UTM_BUILDER: 'growth.utm_builder',
     GHL_MARKETING: 'growth.ghl_marketing',
+    ADS_AUTOMACAO: 'growth.ads_automacao',
   },
   // G&G (Pessoas)
   GG: {
@@ -274,6 +275,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/growth/instagram': PERMISSION_KEYS.GROWTH.INSTAGRAM,
   '/utm-builder': PERMISSION_KEYS.GROWTH.UTM_BUILDER,
   '/ghl-marketing': PERMISSION_KEYS.GROWTH.GHL_MARKETING,
+  '/growth/ads-automacao': PERMISSION_KEYS.GROWTH.ADS_AUTOMACAO,
   // G&G
   '/dashboard/geg': PERMISSION_KEYS.GG.VISAO_GERAL,
   '/dashboard/recrutamento': PERMISSION_KEYS.GG.RECRUTAMENTO,
@@ -484,6 +486,7 @@ export const NAV_CONFIG = {
         { title: 'Por Plataforma', url: '/growth/performance-plataformas', icon: 'Layers', permissionKey: PERMISSION_KEYS.GROWTH.PLATAFORMA },
         { title: 'Criativos', url: '/growth/criativos', icon: 'Image', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS },
         { title: 'Biblioteca de Criativos', url: '/growth/criativos/biblioteca', icon: 'BookOpen', permissionKey: PERMISSION_KEYS.GROWTH.CRIATIVOS_BIBLIOTECA },
+        { title: 'Automação de Ads', url: '/growth/ads-automacao', icon: 'Bot', permissionKey: PERMISSION_KEYS.GROWTH.ADS_AUTOMACAO },
         { title: 'Orçado x Realizado', url: '/growth/orcado-realizado', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.GROWTH.ORCADO_REALIZADO },
         { title: 'Evolução Temporal', url: '/growth/evolucao-temporal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GROWTH.EVOLUCAO_TEMPORAL },
         { title: 'Orçamento por Campanha', url: '/growth/orcamento-campanhas', icon: 'Wallet', permissionKey: PERMISSION_KEYS.GROWTH.ORCAMENTO_CAMPANHAS },
