@@ -55,6 +55,7 @@ import { registerInadimplenciaRoutes } from "./routes/inadimplencia";
 import { registerSaldoDiarioRoutes } from "./routes/saldoDiario";
 import { registerGEGRoutes } from "./routes/geg";
 import { registerComercialRoutes } from "./routes/comercial";
+import { registerGestaoReceitaRoutes } from "./routes/gestaoReceita";
 import { registerFechamentoSemanalRoutes } from "./routes/fechamentoSemanal";
 import { registerReportsSemanalRoutes } from "./routes/reportsSemanal";
 import { registerCrossSellRoutes } from "./routes/crosssell";
@@ -8531,6 +8532,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Comercial (Closers, SDRs, Vendas) - registered from separate file
   registerComercialRoutes(app);
+
+  // Gestão de Receita (painel orçado × realizado comercial)
+  registerGestaoReceitaRoutes(app);
 
   // Fechamento Semanal - novos contratos e saúde de squads
   registerFechamentoSemanalRoutes(app);
