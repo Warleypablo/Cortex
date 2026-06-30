@@ -55,6 +55,7 @@ export const PERMISSION_KEYS = {
     CHURN_PRODUTO: 'gestao.churn_produto',
     CHURN_ABONADOS: 'gestao.churn_abonados',
     CHURN_PONTORRENTE: 'gestao.churn_pontorrente',
+    RECEITA: 'gestao.receita',
   },
   // Operação (projetos pontuais, tasks, onboardings)
   OPS: {
@@ -250,6 +251,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/dashboard/evolucao-mensal': PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL,
   '/dashboard/analise-squads': PERMISSION_KEYS.GESTAO.ANALISE_SQUADS,
   '/gestao/tv-leaderboard': PERMISSION_KEYS.GESTAO.TV_LEADERBOARD,
+  '/gestao/receita': PERMISSION_KEYS.GESTAO.RECEITA,
   '/lt-ltv-churn': PERMISSION_KEYS.GESTAO.LT_LTV_CHURN,
   '/ltv-clientes': PERMISSION_KEYS.GESTAO.LTV_CLIENTES,
   '/estoque-pontual': PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL,
@@ -482,6 +484,7 @@ export const NAV_CONFIG = {
       icon: 'Briefcase',
       items: [
         { title: 'Visão Geral', url: '/visao-geral', icon: 'Eye', permissionKey: PERMISSION_KEYS.GESTAO.VISAO_GERAL },
+        { title: 'Gestão de Receita', url: '/gestao/receita', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.RECEITA },
         { title: 'Clientes & Contratos', url: '/clientes', icon: 'Users', permissionKey: PERMISSION_KEYS.GESTAO.CLIENTES_CONTRATOS },
         { title: 'Evolução Mensal', url: '/dashboard/evolucao-mensal', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.GESTAO.EVOLUCAO_MENSAL },
         { title: 'Detalhamento de Churn', url: '/dashboard/churn-detalhamento', icon: 'TrendingDown', permissionKey: PERMISSION_KEYS.GESTAO.CHURN_DETALHAMENTO },
@@ -740,6 +743,7 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.GESTAO.ESTOQUE_PONTUAL]: 'Estoque de Pontual',
   [PERMISSION_KEYS.GESTAO.CREATORS_PONTUAL]: 'Creators Pontual',
   [PERMISSION_KEYS.GESTAO.CAPACITY_TIMES]: 'Capacity Times',
+  [PERMISSION_KEYS.GESTAO.RECEITA]: 'Gestão de Receita',
   [PERMISSION_KEYS.OPS.PROJETOS_PONTUAIS]: 'Projetos Pontuais',
   [PERMISSION_KEYS.OPS.TASKS_CLIENTES]: 'Tasks de Clientes',
   [PERMISSION_KEYS.OPS.ONBOARDINGS]: 'Onboardings',

@@ -77,6 +77,7 @@ const ChurnAbonados = lazyWithRetry(() => import("@/pages/ChurnAbonados"));
 const ChurnPontorrente = lazyWithRetry(() => import("@/pages/ChurnPontorrente"));
 const AnalisePreditiva = lazyWithRetry(() => import("@/pages/gestao/AnalisePreditiva"));
 const TvLeaderboard = lazyWithRetry(() => import("@/pages/gestao/TvLeaderboard"));
+const GestaoReceita = lazyWithRetry(() => import("@/pages/gestao/GestaoReceita"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
 const DashboardDFC = lazyWithRetry(() => import("@/pages/DashboardDFC"));
 const DashboardInadimplencia = lazyWithRetry(() => import("@/pages/DashboardInadimplencia"));
@@ -370,6 +371,9 @@ function ProtectedRouter() {
       <Route path="/dashboard/analise-preditiva">{() => <ProtectedRoute path="/dashboard/analise-preditiva" component={AnalisePreditiva} />}</Route>
       <Route path="/gestao/tv-leaderboard">
         {() => <ProtectedRoute path="/gestao/tv-leaderboard" component={TvLeaderboard} />}
+      </Route>
+      <Route path="/gestao/receita">
+        {() => <ProtectedRoute path="/gestao/receita" component={GestaoReceita} />}
       </Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       <Route path="/utm-builder">{() => <ProtectedRoute path="/utm-builder" component={UtmBuilder} />}</Route>
