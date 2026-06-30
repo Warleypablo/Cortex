@@ -34,9 +34,18 @@ interface SelvaRow {
   cap_fat: number | null;
   util_pct: number | null;
 }
+// Black: accounts, carteira = todas as subtasks dos clientes que cuida (responsavel_geral).
+interface BlackRow {
+  nome: string;
+  match: string;
+  clientes: number;
+  contas: number;
+  fat_recorrente: number; fat_pontual: number; faturamento: number;
+  ticket_medio: number | null;
+}
 interface CapacityTimesResponse {
   selva: SelvaRow[];
-  black: ComercialRow[];
+  black: BlackRow[];
   squadra: ComercialRow[];
   cxcs: ComercialRow[];
   metaContasDesigner: number;
@@ -340,6 +349,90 @@ function SelvaTab({ rows, metaContas, onSelect }: { rows: SelvaRow[]; metaContas
   );
 }
 
+function BlackTable({ rows, onSelect }: { rows: BlackRow[]; onSelect: (s: DrawerSelecao) => void }) {
+  if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Nenhum account configurado.</p>;
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          <TableRow className="border-gray-200 dark:border-zinc-700">
+            <TableHead className={th()}>Account</TableHead>
+            <TableHead className={th("text-right")} title="Clientes que o account cuida (responsável geral)">Clientes</TableHead>
+            <TableHead className={th("text-right")} title="Subtasks (contratos) dos clientes que cuida">Contas</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento recorrente + pontual da carteira">Faturamento (Rec+Pont)</TableHead>
+            <TableHead className={th("text-right")}>Recorrente</TableHead>
+            <TableHead className={th("text-right")}>Pontual</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento / contas">Ticket Médio</TableHead>
+            <TableHead className={th("text-right")} title="Participação no faturamento do time">% Time</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {(() => {
+            const teamFat = sum(rows.map((r) => r.faturamento));
+            return rows.map((r, i) => (
+              <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
+                <TableCell
+                  className={cn(td("font-medium"), "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline")}
+                  onClick={() => onSelect({ label: `Carteira de ${r.nome}`, nome: r.match, campo: "geral" })}
+                >
+                  {r.nome}
+                </TableCell>
+                <TableCell className={td("text-right")}>{r.clientes}</TableCell>
+                <TableCell className={td("text-right")}>{r.contas}</TableCell>
+                <TableCell className={td("text-right")}>{formatCurrency(r.faturamento)}</TableCell>
+                <TableCell className="text-right text-gray-700 dark:text-zinc-300">{formatCurrency(r.fat_recorrente)}</TableCell>
+                <TableCell className="text-right text-gray-500 dark:text-zinc-400">{formatCurrency(r.fat_pontual)}</TableCell>
+                <TableCell className={td("text-right")}>{moneyOrDash(r.ticket_medio)}</TableCell>
+                <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(r.faturamento, teamFat))}</TableCell>
+              </TableRow>
+            ));
+          })()}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+function BlackTab({ rows, onSelect }: { rows: BlackRow[]; onSelect: (s: DrawerSelecao) => void }) {
+  const totFat = sum(rows.map((r) => r.faturamento));
+  const totRec = sum(rows.map((r) => r.fat_recorrente));
+  const totPont = sum(rows.map((r) => r.fat_pontual));
+  const totClientes = sum(rows.map((r) => r.clientes));
+  const totContas = sum(rows.map((r) => r.contas));
+  const cards = [
+    { label: "Accounts", value: String(rows.length) },
+    { label: "Clientes", value: String(totClientes) },
+    { label: "Contas", value: String(totContas) },
+    { label: "Faturamento (Rec+Pont)", value: formatCurrency(totFat) },
+    { label: "Recorrente / Pontual", value: `${formatCurrency(totRec)} · ${formatCurrency(totPont)}` },
+    { label: "Ticket médio", value: moneyOrDash(ticket(totFat, totContas)) },
+  ];
+  return (
+    <div className="space-y-4">
+      <StatCards cards={cards} />
+      <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+        <CardHeader>
+          <CardTitle className="text-gray-900 dark:text-white">Black — Accounts</CardTitle>
+          <p className="text-xs text-gray-500 dark:text-zinc-400">
+            Carteira = todas as subtasks (recorrente + pontual) dos clientes que cada account cuida (responsável geral no ClickUp)
+          </p>
+        </CardHeader>
+        <CardContent><BlackTable rows={rows} onSelect={onSelect} /></CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function summarizeBlack(rows: BlackRow[]): TeamSummary {
+  return {
+    time: "Black",
+    pessoas: rows.length,
+    operando: sum(rows.map((r) => r.faturamento)),
+    util_pct: null,
+    cancelamento: 0,
+  };
+}
+
 function summarizeComercial(time: string, rows: ComercialRow[]): TeamSummary {
   return {
     time,
@@ -459,7 +552,7 @@ export default function CapacityTimes() {
 
   const teams: TeamSummary[] = [
     ...(SELVA_BLOQUEADA ? [] : [summarizeSelva(selva)]),
-    summarizeComercial("Black", black),
+    summarizeBlack(black),
     summarizeComercial("Squadra", squadra),
     summarizeComercial("CXCS", cxcs),
   ];
@@ -498,7 +591,7 @@ export default function CapacityTimes() {
             <Overview teams={teams} />
           </TabsContent>
           <TabsContent value="selva"><SelvaTab rows={selva} metaContas={metaContas} onSelect={setSelecao} /></TabsContent>
-          <TabsContent value="black"><ComercialTab title="Black — Accounts" rows={black} onSelect={setSelecao} /></TabsContent>
+          <TabsContent value="black"><BlackTab rows={black} onSelect={setSelecao} /></TabsContent>
           <TabsContent value="squadra"><ComercialTab title="Squadra — GPs" rows={squadra} onSelect={setSelecao} /></TabsContent>
           <TabsContent value="cxcs"><ComercialTab title="CXCS — Customer Success" rows={cxcs} onSelect={setSelecao} campo="cs" /></TabsContent>
           <TabsContent value="__config__"><CapacityMetasConfig /></TabsContent>

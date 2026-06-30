@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { toComercialRow, toSelvaRow, type CapacityTimesResponse } from "./capacityTimes.helpers";
-import { META_CONTAS_DESIGNER } from "../../shared/capacityGrupos";
+import { toComercialRow, toSelvaRow, toBlackRow, type CapacityTimesResponse } from "./capacityTimes.helpers";
+import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS } from "../../shared/capacityGrupos";
 
 // Tabela de referência: nível do Gestor de Performance → metas
 const GESTOR_LEVELS: Record<string, { mrr_alvo: number; ticket_alvo: number }> = {
@@ -132,22 +132,35 @@ export function registerCapacityRoutes(app: Express, db: any) {
     res.json(GESTOR_LEVELS);
   });
 
-  // GET /api/capacity-times — capacity por função (Selva / Black / Squadra)
-  // Pessoas vêm de "Inhire".rh_pessoal por cargo; carteira via `responsavel` da subtask:
-  //   Designer              → Selva   (régua por faturamento rec+pontual; cap via TM)
-  //   cargo ILIKE '%account%' → Black  (régua MRR + contas)
-  //   Gestor de Performance → Squadra (régua MRR + contas)
+  // GET /api/capacity-times — capacity por função (Selva / Black / Squadra / CXCS)
+  //   Designer              → Selva   (responsavel; faturamento rec+pontual; cap via TM)
+  //   Gestor de Performance → Squadra (responsavel; MRR + contas) — exceto os Black accounts
+  //   CXCS                  → CXCS    (cs_responsavel; MRR + contas) — exceto os Black accounts
+  //   Black = lista explícita BLACK_ACCOUNTS (clientes via responsavel_geral; faturamento)
   app.get("/api/capacity-times", async (_req, res) => {
+    // Nomes (RH) dos accounts → removidos dos grupos por cargo (eles foram para a Black).
+    const blackNomesValues = sql.join(
+      BLACK_ACCOUNTS.map((a) => sql`(${a.rhNome})`),
+      sql`, `,
+    );
+    // VALUES (label, match) para a query da Black.
+    const accountsValues = sql.join(
+      BLACK_ACCOUNTS.map((a) => sql`(${a.label}, ${a.match})`),
+      sql`, `,
+    );
     try {
       const result = await db.execute(sql`
         WITH pessoas AS (
           SELECT r.nome,
                  CASE WHEN r.cargo = 'Designer'              THEN 'selva'
-                      WHEN r.cargo ILIKE '%account%'         THEN 'black'
                       WHEN r.cargo = 'Gestor de Performance' THEN 'squadra' END AS grupo
           FROM "Inhire".rh_pessoal r
           WHERE r.status = 'Ativo'
-            AND (r.cargo = 'Designer' OR r.cargo ILIKE '%account%' OR r.cargo = 'Gestor de Performance')
+            AND (r.cargo = 'Designer' OR r.cargo = 'Gestor de Performance')
+            AND NOT EXISTS (
+              SELECT 1 FROM (VALUES ${blackNomesValues}) AS bn(n)
+              WHERE similarity(r.nome, bn.n) > 0.5
+            )
         ),
         contratos_expanded AS (
           SELECT c.id_subtask, TRIM(rp.part) AS responsavel_part,
@@ -201,6 +214,10 @@ export function registerCapacityRoutes(app: Express, db: any) {
         WITH pessoas AS (
           SELECT r.nome FROM "Inhire".rh_pessoal r
           WHERE r.status = 'Ativo' AND r.cargo = 'CXCS'
+            AND NOT EXISTS (
+              SELECT 1 FROM (VALUES ${blackNomesValues}) AS bn(n)
+              WHERE similarity(r.nome, bn.n) > 0.5
+            )
         ),
         contratos_expanded AS (
           SELECT c.id_subtask, TRIM(rp.part) AS cs_part,
@@ -245,10 +262,42 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ORDER BY COALESCE(a.mrr_operando, 0) DESC
       `);
 
+      // Black: cada account → clientes (cup_clientes.responsavel_geral) → TODAS as
+      // subtasks desses clientes (valorr + valorp). Régua por faturamento + contas.
+      const blackResult = await db.execute(sql`
+        WITH accounts(label, match) AS (VALUES ${accountsValues}),
+        clientes_do_account AS (
+          SELECT a.label, cl.task_id
+          FROM accounts a
+          JOIN "Clickup".cup_clientes cl ON EXISTS (
+            SELECT 1 FROM regexp_split_to_table(COALESCE(cl.responsavel_geral, ''), ';') rp(part)
+            WHERE TRIM(rp.part) = a.match
+          )
+        ),
+        subs AS (
+          SELECT cda.label, cda.task_id, c.id_subtask,
+                 COALESCE(c.valorr, 0) AS vr, COALESCE(c.valorp, 0) AS vp
+          FROM clientes_do_account cda
+          JOIN "Clickup".cup_contratos c
+            ON c.id_task = cda.task_id AND c.status IN ('ativo','onboarding','em cancelamento')
+        ),
+        cli AS (SELECT label, COUNT(DISTINCT task_id) AS clientes FROM clientes_do_account GROUP BY label)
+        SELECT a.label AS nome, a.match,
+          COALESCE(cli.clientes, 0)              AS clientes,
+          COUNT(DISTINCT s.id_subtask)           AS contas,
+          COALESCE(SUM(s.vr), 0)                 AS fat_recorrente,
+          COALESCE(SUM(s.vp), 0)                 AS fat_pontual
+        FROM accounts a
+        LEFT JOIN cli ON cli.label = a.label
+        LEFT JOIN subs s ON s.label = a.label
+        GROUP BY a.label, a.match, cli.clientes
+        ORDER BY (COALESCE(SUM(s.vr), 0) + COALESCE(SUM(s.vp), 0)) DESC
+      `);
+
       const rows = result.rows as any[];
       const response: CapacityTimesResponse = {
         selva: rows.filter((r) => r.grupo === "selva").map((r) => toSelvaRow(r, META_CONTAS_DESIGNER)),
-        black: rows.filter((r) => r.grupo === "black").map(toComercialRow),
+        black: (blackResult.rows as any[]).map(toBlackRow),
         squadra: rows.filter((r) => r.grupo === "squadra").map(toComercialRow),
         cxcs: (cxcsResult.rows as any[]).map(toComercialRow),
         metaContasDesigner: META_CONTAS_DESIGNER,
@@ -260,13 +309,41 @@ export function registerCapacityRoutes(app: Express, db: any) {
     }
   });
 
-  // GET /api/capacity-times/contratos?nome=<nome>[&campo=cs] — carteira pela coluna
-  // responsável da subtask (campo=cs usa cs_responsavel; default usa responsavel).
+  // GET /api/capacity-times/contratos?nome=<nome>[&campo=cs|geral] — carteira:
+  //   campo=cs    → subtasks onde é cs_responsavel
+  //   campo=geral → todas as subtasks dos clientes que cuida (responsavel_geral)
+  //   default     → subtasks onde é responsavel
   app.get("/api/capacity-times/contratos", async (req, res) => {
     const nome = (req.query.nome as string | undefined)?.trim();
-    const usaCs = (req.query.campo as string | undefined)?.trim() === "cs";
+    const campo = (req.query.campo as string | undefined)?.trim();
+    const usaCs = campo === "cs";
     if (!nome) return res.status(400).json({ error: "nome é obrigatório" });
     try {
+      if (campo === "geral") {
+        const rows = (await db.execute(sql`
+          SELECT DISTINCT ON (c.id_subtask)
+                 cl.nome AS cliente, c.produto, c.status,
+                 COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask
+          FROM "Clickup".cup_clientes cl
+          JOIN "Clickup".cup_contratos c
+            ON c.id_task = cl.task_id AND c.status IN ('ativo','onboarding','em cancelamento')
+          WHERE EXISTS (
+            SELECT 1 FROM regexp_split_to_table(COALESCE(cl.responsavel_geral, ''), ';') rp(part)
+            WHERE TRIM(rp.part) = ${nome}
+          )
+          ORDER BY c.id_subtask
+        `)).rows as any[];
+        const ordemStatus: Record<string, number> = { ativo: 1, onboarding: 2 };
+        rows.sort((a, b) =>
+          (ordemStatus[a.status] ?? 3) - (ordemStatus[b.status] ?? 3) ||
+          (Number(b.valorr) + Number(b.valorp)) - (Number(a.valorr) + Number(a.valorp)));
+        return res.json({
+          contratos: rows.map((r) => ({
+            cliente: r.cliente || "—", produto: r.produto || "—", status: r.status as string,
+            valorr: Number(r.valorr) || 0, valorp: Number(r.valorp) || 0, id_subtask: r.id_subtask ?? null,
+          })),
+        });
+      }
       const rows = (await db.execute(usaCs ? sql`
         SELECT DISTINCT ON (c.id_subtask)
                cl.nome AS cliente, c.produto, c.status,

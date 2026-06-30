@@ -96,9 +96,39 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
   };
 }
 
+// ── Black (accounts): carteira = todas as subtasks dos clientes que cuida ──
+
+export interface BlackRow {
+  nome: string; // label
+  match: string; // nome em responsavel_geral (para o drawer)
+  clientes: number;
+  contas: number; // nº de subtasks dos clientes
+  fat_recorrente: number;
+  fat_pontual: number;
+  faturamento: number; // rec + pont
+  ticket_medio: number | null; // faturamento / contas
+}
+
+export function toBlackRow(raw: any): BlackRow {
+  const contas = num(raw.contas);
+  const fat_recorrente = num(raw.fat_recorrente);
+  const fat_pontual = num(raw.fat_pontual);
+  const faturamento = fat_recorrente + fat_pontual;
+  return {
+    nome: String(raw.nome),
+    match: String(raw.match),
+    clientes: num(raw.clientes),
+    contas,
+    fat_recorrente,
+    fat_pontual,
+    faturamento,
+    ticket_medio: contas > 0 ? faturamento / contas : null,
+  };
+}
+
 export interface CapacityTimesResponse {
   selva: SelvaRow[];
-  black: ComercialRow[];
+  black: BlackRow[];
   squadra: ComercialRow[];
   cxcs: ComercialRow[];
   metaContasDesigner: number;
