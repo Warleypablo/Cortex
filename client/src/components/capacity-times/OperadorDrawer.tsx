@@ -28,7 +28,7 @@ interface Contrato {
 export interface DrawerSelecao {
   label: string; // título exibido no topo
   nome: string; // pessoa → contratos onde é responsável na subtask
-  campo?: "cs"; // "cs" usa cs_responsavel (CXCS); ausente usa responsavel
+  campo?: "cs" | "geral"; // "cs"=cs_responsavel (CXCS); "geral"=clientes via responsavel_geral (Black); ausente=responsavel
 }
 
 interface Props {
