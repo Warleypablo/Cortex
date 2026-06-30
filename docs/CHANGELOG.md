@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-06-30 | feat(gestao): painel Gestão de Receita (orçado × realizado comercial)
+
+**O que foi feito:**
+- Novo endpoint `GET /api/gestao/receita?mes=YYYY-MM` que agrega, por mês: venda nova (Bitrix), metas (BP 2026) e custos em regime caixa (Conta Azul), reusando `somaDespesaCaixaPorMes` + predicados do BP.
+- Nova página `/gestao/receita` com 5 seções em abas (Pessoas, Macro, Micro, Funil, Qualidade): venda MRR/Pontual orçado×realizado, top/bottom closers e SDRs, canais de aquisição, CAC por contrato/cliente, funil Lead→RA→RR→Venda, composição MQL/NMQL, churn por motivo/vendedor.
+- Item no menu Gestão, rota protegida e nova permission `gestao.receita`.
+
+**Por que:**
+- Dar ao comercial uma visão única de orçado×realizado com dados reais (antes era um mockup com dados fictícios).
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - endpoint agregador (novo).
+- `server/routes.ts` - registro do endpoint.
+- `client/src/pages/gestao/GestaoReceita.tsx` - página em componentes do Cortex + dark mode (novo).
+- `client/src/App.tsx` - rota lazy.
+- `shared/nav-config.ts` - permission, label e item de menu.
+
+**Impacto arquitetural:** Nenhum — reusa infraestrutura existente (padrão `db.execute`, predicados/custos do BP, React Query). Visão por produto (ClickUp) pode divergir da venda (Bitrix) por design; MQL/source refletem o preenchimento ralo do CRM.
+
+---
+
 ## 2026-06-25 | feat(organico): painel operador (3 visões + Soltar agora/Agendar) + engine do worker
 
 **O que foi feito:**
