@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-06-30 | feat(ads-automation): agente semanal de subida de ads + painel read-only
+
+**O que foi feito:**
+- Novo job in-process `server/services/adsAutomationJob.ts` que roda toda segunda (≥8h, TZ do processo): planeja os lotes das subtasks "Subir ad" em `to do` no ClickUp, cria o conjunto (PAUSED) clonando o template com a nomenclatura certa, descobre os vídeos já no Gerenciador e cria os anúncios pareados (PAUSED). Vídeo faltando / cota dev-tier → `awaiting_manual_upload` (retoma no próximo run).
+- Trigger do `adsPipeline` adaptado: status real `to do`, campos lidos da **task mãe** (subtasks "Subir ad" vêm vazias), dedup por mãe, gatilho por nome (`/subir/i`) OU assignee Caio (111964992); `executeLote` ganhou flags p/ a automação controlar o ClickUp (status só vai p/ `upado` quando o lote fecha).
+- Tabelas `cortex_core.ads_automation_runs` (1/semana, `week_of` UNIQUE) e `ads_automation_steps` (1/lote, `plan_snapshot`+`bookmark` p/ retomar) + migration idempotente.
+- API read-only `GET /api/ads-automation/{runs, runs/:id, next}` + disparo admin `POST /api/admin/ads-automation/run`.
+- Painel `/growth/ads-automacao` (seção Growth): "Agora / Vai fazer / Já fez" do run + histórico, polling, dark/light. Só visualização (sem botões de operar).
+- Agendamento in-process (guarda horária + `recoverOnStartup`) no padrão dos snapshots de inadimplência/saldo; idempotência semanal.
+
+**Por que:**
+- A subida de ads toda segunda era 100% manual (biblioteca → baixar → subir no Gerenciador → nomear). Automatiza o fluxo reaproveitando o pipeline existente e dá visibilidade do agente dentro do Cortex.
+
+**Arquivos alterados:**
+- `server/services/adsAutomationJob.ts` - novo job/orquestrador semanal
+- `server/services/adsPipeline/{config,clickupClient,pipeline}.ts` - trigger `to do` + mãe + dedup + `planAutomationLotes`
+- `server/routes/adsAutomation.ts` + `server/routes.ts` - API read-only
+- `server/index.ts` - wiring do job
+- `shared/schema.ts` + `migrations/2026-06-30-ads-automation.sql` - tabelas de rastreamento
+- `client/src/pages/AdsAutomationRuns.tsx`, `client/src/App.tsx`, `shared/nav-config.ts` - painel + rota + permissão
+
+**Impacto arquitetural:** Adiciona um job agendado in-process e duas tabelas em `cortex_core`; reusa o pipeline ClickUp→Meta existente. Execução real fica atrás de `ADS_PIPELINE_DRY_RUN=0` (default seguro) e requer `TZ=America/Sao_Paulo` + tokens Meta/ClickUp.
+
+---
+
 ## 2026-06-30 | chore(distribuicao): clona 4 conjuntos (74-77) lote 30/06 na camp Distribuição de Conteúdo
 
 **O que foi feito:**
