@@ -14,12 +14,30 @@ const CLICKUP_FIELDS = {
   date: "8cfba79a-d243-4911-8563-fd39c2523357",
 };
 const CLICKUP_OPTS: Record<string, Record<string, string>> = {
-  canal: { metaAds: "2b7e74d1-78ec-4d5b-a0c8-553b64d2d1c0" },
-  funil: {
-    Creators: "d96d739e-a3f0-4c2e-9edb-5e22a0d84d05",
-    Ecommerce: "62a087fc-73a5-4bbd-bddc-aaa9caeb1c5d",
-  },
   tipo: { relatorioMidia: "3ca91709-20ed-4c67-9e60-1a5525f522d9" },
+};
+
+// Canal: opção do ClickUp + predicado de plataforma no Bitrix (utm_source).
+// platformUtm = null mantém o comportamento legado (filtra só por funil, sem split de plataforma).
+const CANAL_CFG: Record<string, { clickup: string; segmento: string; platformUtm: string | null }> = {
+  metaAds: { clickup: "2b7e74d1-78ec-4d5b-a0c8-553b64d2d1c0", segmento: "meta_ads", platformUtm: null },
+  googleAds: { clickup: "ef42936f-2e34-41b8-b019-6b176a6cb1ce", segmento: "google_ads", platformUtm: "google" },
+  tiktokAds: { clickup: "81541b88-5e03-4193-b1c7-716173c98901", segmento: "meta_ads", platformUtm: "tiktok" },
+};
+
+// Funil: opção do ClickUp + padrão fnl_ngc (Bitrix, ILIKE) + tag no nome da campanha (LIKE, lower).
+const FUNIL_CFG: Record<string, { clickup: string; fnlNgc: string; campaignLike: string }> = {
+  Creators: { clickup: "d96d739e-a3f0-4c2e-9edb-5e22a0d84d05", fnlNgc: "Creators%", campaignLike: "%[creators]%" },
+  Ecommerce: { clickup: "62a087fc-73a5-4bbd-bddc-aaa9caeb1c5d", fnlNgc: "Ecommerce%", campaignLike: "%[ecommerce]%" },
+  CRM: { clickup: "883bd637-4a0c-467c-a58c-398ee68125f4", fnlNgc: "CRM%", campaignLike: "%[crm]%" },
+  Summit: { clickup: "7f02079a-aa74-4e9b-a7a3-4af5a2f1aac0", fnlNgc: "Creator Summit%", campaignLike: "%[summit]%" },
+};
+
+// Predicado SQL de plataforma sobre utm_source (alinhado a server/routes/growth.ts).
+const PLATFORM_UTM_SQL: Record<string, string> = {
+  google: "(utm_source ILIKE 'google%' OR utm_source ILIKE 'adwords%' OR utm_source = 'gads')",
+  tiktok: "(utm_source ILIKE 'tiktok%')",
+  facebook: "(utm_source ILIKE 'facebook%' OR utm_source ILIKE 'fb%' OR utm_source ILIKE 'meta%')",
 };
 
 type Periodo = { de: string; ate: string };
@@ -110,8 +128,27 @@ async function getMetas(funil: string, mes: string, segmento: string): Promise<{
   return { metricas: {}, fonte: "NENHUMA" };
 }
 
-async function metaAdsRealizado(funil: string, p: Periodo) {
-  const funilLower = funil.toLowerCase();
+type MidiaRealizado = {
+  investimento: number;
+  impressoes: number;
+  outboundClicks: number;
+  lpv: number;
+  cpm: number;
+  ctr: number;
+};
+
+function midiaResumo(invest: number, imps: number, oc: number, lpv: number): MidiaRealizado {
+  return {
+    investimento: invest,
+    impressoes: imps,
+    outboundClicks: oc,
+    lpv,
+    cpm: imps ? (invest / imps) * 1000 : 0,
+    ctr: imps ? oc / imps : 0,
+  };
+}
+
+async function metaAdsRealizado(campaignLike: string, p: Periodo): Promise<MidiaRealizado> {
   const r = await db.execute(sql`
     SELECT
       COALESCE(SUM(i.spend), 0)::float AS investimento,
@@ -121,31 +158,62 @@ async function metaAdsRealizado(funil: string, p: Periodo) {
     FROM meta_ads.meta_insights_daily i
     JOIN meta_ads.meta_campaigns c ON c.campaign_id = i.campaign_id
     WHERE i.date_start BETWEEN ${p.de} AND ${p.ate}
-      AND LOWER(c.campaign_name) LIKE ${"%" + funilLower + "%"}
+      AND LOWER(c.campaign_name) LIKE ${campaignLike}
   `);
   const row = r.rows[0] as any;
-  const imps = Number(row.impressoes) || 0;
-  const oc = Number(row.oc) || 0;
-  const invest = Number(row.investimento) || 0;
-  return {
-    investimento: invest,
-    impressoes: imps,
-    outboundClicks: oc,
-    lpv: Number(row.lpv) || 0,
-    cpm: imps ? (invest / imps) * 1000 : 0,
-    ctr: imps ? oc / imps : 0,
-  };
+  return midiaResumo(Number(row.investimento) || 0, Number(row.impressoes) || 0, Number(row.oc) || 0, Number(row.lpv) || 0);
 }
 
-async function bitrixRealizado(funil: string, p: Periodo) {
-  const funilLike = funil;
+async function googleAdsRealizado(campaignLike: string, p: Periodo): Promise<MidiaRealizado> {
+  const r = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(m.cost_micros), 0)::float / 1e6 AS investimento,
+      COALESCE(SUM(m.impressions), 0)::bigint AS impressoes,
+      COALESCE(SUM(m.clicks), 0)::bigint AS clicks
+    FROM google.campaign_daily_metrics m
+    JOIN google.campaigns c ON c.campaign_id = m.campaign_id
+    WHERE m.report_date BETWEEN ${p.de} AND ${p.ate}
+      AND LOWER(c.name) LIKE ${campaignLike}
+  `);
+  const row = r.rows[0] as any;
+  // Google não tem outbound_clicks/landing_page_views nativos — usa clicks; lpv=0 (Connect Rate/Tx Página ficam 🔘).
+  return midiaResumo(Number(row.investimento) || 0, Number(row.impressoes) || 0, Number(row.clicks) || 0, 0);
+}
+
+async function tiktokAdsRealizado(_campaignLike: string, p: Periodo): Promise<MidiaRealizado> {
+  // TikTok não tem split confiável de funil pelo nome — soma o gasto do anunciante no período.
+  // O recorte de funil acontece no Bitrix via utm_source=tiktok.
+  const r = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(spend), 0)::float AS investimento,
+      COALESCE(SUM(impressions), 0)::bigint AS impressoes,
+      COALESCE(SUM(clicks), 0)::bigint AS clicks
+    FROM tiktok.ad_insights_daily
+    WHERE stat_date BETWEEN ${p.de} AND ${p.ate}
+  `);
+  const row = r.rows[0] as any;
+  return midiaResumo(Number(row.investimento) || 0, Number(row.impressoes) || 0, Number(row.clicks) || 0, 0);
+}
+
+async function midiaRealizado(canal: string, campaignLike: string, p: Periodo): Promise<MidiaRealizado> {
+  if (canal === "googleAds") return googleAdsRealizado(campaignLike, p);
+  if (canal === "tiktokAds") return tiktokAdsRealizado(campaignLike, p);
+  return metaAdsRealizado(campaignLike, p);
+}
+
+async function bitrixRealizado(fnlNgcPattern: string, platformUtm: string | null, p: Periodo) {
+  const funilLike = fnlNgcPattern;
+  // Filtro opcional de plataforma (canal) via utm_source — channel-pure para Google/TikTok.
+  const platSql = platformUtm && PLATFORM_UTM_SQL[platformUtm]
+    ? sql` AND ${sql.raw(PLATFORM_UTM_SQL[platformUtm])}`
+    : sql``;
   const vol = await db.execute(sql`
     SELECT
       COUNT(*)::int AS leads,
       SUM(CASE WHEN mql::text='1' OR LOWER(mql::text)='true' THEN 1 ELSE 0 END)::int AS mqls
     FROM "Bitrix".crm_deal
     WHERE created_at BETWEEN ${p.de} AND ${p.ate}
-      AND fnl_ngc ILIKE ${funilLike}
+      AND fnl_ngc ILIKE ${funilLike}${platSql}
   `);
   const ra = await db.execute(sql`
     SELECT
@@ -153,7 +221,7 @@ async function bitrixRealizado(funil: string, p: Periodo) {
       SUM(CASE WHEN NOT (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS rm_nmql
     FROM "Bitrix".crm_deal
     WHERE data_reuniao_agendada BETWEEN ${p.de} AND ${p.ate}
-      AND fnl_ngc ILIKE ${funilLike}
+      AND fnl_ngc ILIKE ${funilLike}${platSql}
   `);
   const rr = await db.execute(sql`
     SELECT
@@ -161,20 +229,20 @@ async function bitrixRealizado(funil: string, p: Periodo) {
       SUM(CASE WHEN NOT (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS rr_nmql
     FROM "Bitrix".crm_deal
     WHERE data_reuniao_realizada BETWEEN ${p.de} AND ${p.ate}
-      AND fnl_ngc ILIKE ${funilLike}
+      AND fnl_ngc ILIKE ${funilLike}${platSql}
   `);
   const vendas = await db.execute(sql`
     SELECT
-      SUM(CASE WHEN stage='Negócio Ganho' THEN 1 ELSE 0 END)::int AS negocios,
-      SUM(CASE WHEN stage='Negócio Ganho' AND (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS neg_mql,
-      SUM(CASE WHEN stage='Negócio Ganho' AND NOT (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS neg_nmql,
-      SUM(CASE WHEN stage='Negócio Ganho' AND COALESCE(valor_pontual,0)>0 THEN 1 ELSE 0 END)::int AS c_impl,
-      SUM(CASE WHEN stage='Negócio Ganho' AND COALESCE(valor_recorrente,0)>0 THEN 1 ELSE 0 END)::int AS c_acel,
-      COALESCE(SUM(CASE WHEN stage='Negócio Ganho' THEN COALESCE(valor_pontual,0) ELSE 0 END), 0)::float AS fat_impl,
-      COALESCE(SUM(CASE WHEN stage='Negócio Ganho' THEN COALESCE(valor_recorrente,0) ELSE 0 END), 0)::float AS fat_acel
+      SUM(CASE WHEN stage_name='Negócio Ganho' THEN 1 ELSE 0 END)::int AS negocios,
+      SUM(CASE WHEN stage_name='Negócio Ganho' AND (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS neg_mql,
+      SUM(CASE WHEN stage_name='Negócio Ganho' AND NOT (mql::text='1' OR LOWER(mql::text)='true') THEN 1 ELSE 0 END)::int AS neg_nmql,
+      SUM(CASE WHEN stage_name='Negócio Ganho' AND COALESCE(valor_pontual,0)>0 THEN 1 ELSE 0 END)::int AS c_impl,
+      SUM(CASE WHEN stage_name='Negócio Ganho' AND COALESCE(valor_recorrente,0)>0 THEN 1 ELSE 0 END)::int AS c_acel,
+      COALESCE(SUM(CASE WHEN stage_name='Negócio Ganho' THEN COALESCE(valor_pontual,0) ELSE 0 END), 0)::float AS fat_impl,
+      COALESCE(SUM(CASE WHEN stage_name='Negócio Ganho' THEN COALESCE(valor_recorrente,0) ELSE 0 END), 0)::float AS fat_acel
     FROM "Bitrix".crm_deal
     WHERE data_fechamento BETWEEN ${p.de} AND ${p.ate}
-      AND fnl_ngc ILIKE ${funilLike}
+      AND fnl_ngc ILIKE ${funilLike}${platSql}
   `);
   const v = vol.rows[0] as any;
   const a = ra.rows[0] as any;
@@ -425,11 +493,15 @@ function montarMarkdown(args: {
 🤖 Gerado por endpoint \`POST /api/fca/run\` — skill \`turbo-fca-report\` v3.14.`;
 }
 
-async function criarTaskClickUp(args: { funil: string; semanaNum: number; semana: Periodo; markdown: string }) {
-  const { funil, semanaNum, semana, markdown } = args;
-  const nome = `[FCA] ${funil} - Semana 2026-W${semanaNum} (${fmtBR(semana.de)}-${fmtBR(semana.ate)})`;
-  const funilOpt = CLICKUP_OPTS.funil[funil];
+const CANAL_LABEL: Record<string, string> = { metaAds: "Meta", googleAds: "Google", tiktokAds: "TikTok" };
+
+async function criarTaskClickUp(args: { funil: string; canal: string; semanaNum: number; semana: Periodo; markdown: string }) {
+  const { funil, canal, semanaNum, semana, markdown } = args;
+  const nome = `[FCA] ${funil} · ${CANAL_LABEL[canal] || canal} - Semana 2026-W${semanaNum} (${fmtBR(semana.de)}-${fmtBR(semana.ate)})`;
+  const funilOpt = FUNIL_CFG[funil]?.clickup;
   if (!funilOpt) throw new Error(`Funil sem mapping ClickUp: ${funil}`);
+  const canalOpt = CANAL_CFG[canal]?.clickup;
+  if (!canalOpt) throw new Error(`Canal sem mapping ClickUp: ${canal}`);
 
   const body = {
     name: nome,
@@ -437,7 +509,7 @@ async function criarTaskClickUp(args: { funil: string; semanaNum: number; semana
     assignees: [Number(CLICKUP_ICHINO_USER_ID)],
     status: "complete",
     custom_fields: [
-      { id: CLICKUP_FIELDS.canal, value: [CLICKUP_OPTS.canal.metaAds] },
+      { id: CLICKUP_FIELDS.canal, value: [canalOpt] },
       { id: CLICKUP_FIELDS.funil, value: [funilOpt] },
       { id: CLICKUP_FIELDS.tipo, value: [CLICKUP_OPTS.tipo.relatorioMidia] },
       { id: CLICKUP_FIELDS.date, value: Date.now() },
@@ -460,10 +532,12 @@ export function registerFcaRoutes(app: Express) {
   app.get("/api/fca/health", (_req: Request, res: Response) => {
     res.json({
       ok: true,
-      version: "v3.14",
+      version: "v3.16",
       endpoint: "POST /api/fca/run",
+      params: { funil: "Creators|Ecommerce|CRM|Summit", canal: "metaAds|googleAds|tiktokAds", createTask: "bool" },
       auth: "Authorization: Bearer <FCA_API_TOKEN>",
-      funilSuportado: ["Creators"],
+      funilSuportado: Object.keys(FUNIL_CFG),
+      canalSuportado: Object.keys(CANAL_CFG),
       tokenConfigured: Boolean(FCA_API_TOKEN),
       time: new Date().toISOString(),
     });
@@ -472,23 +546,37 @@ export function registerFcaRoutes(app: Express) {
   app.post("/api/fca/run", bearerAuth, async (req: Request, res: Response) => {
     try {
       const funil = (req.body?.funil || "Creators") as string;
+      const canal = (req.body?.canal || "metaAds") as string;
       const createTask = req.body?.createTask !== false;
+
+      const funilCfg = FUNIL_CFG[funil];
+      if (!funilCfg) {
+        return res.status(400).json({ error: `Funil inválido: ${funil}. Suportados: ${Object.keys(FUNIL_CFG).join(", ")}` });
+      }
+      const canalCfg = CANAL_CFG[canal];
+      if (!canalCfg) {
+        return res.status(400).json({ error: `Canal inválido: ${canal}. Suportados: ${Object.keys(CANAL_CFG).join(", ")}` });
+      }
+      const platUtm = canalCfg.platformUtm;
+      const campaignLike = funilCfg.campaignLike;
+      const fnlNgc = funilCfg.fnlNgc;
+
       const now = new Date();
       const p = periodos(now);
 
       const [metaAdsMTD, mqlMTD, nmqlMTD] = await Promise.all([
-        getMetas(funil, p.mesRef, "meta_ads"),
+        getMetas(funil, p.mesRef, canalCfg.segmento),
         getMetas(funil, p.mesRef, "mql"),
         getMetas(funil, p.mesRef, "nao_mql"),
       ]);
 
       const [maMTD, bxMTD, maW, bxW, maWp, bxWp] = await Promise.all([
-        metaAdsRealizado(funil, p.mtd),
-        bitrixRealizado(funil, p.mtd),
-        metaAdsRealizado(funil, p.semana),
-        bitrixRealizado(funil, p.semana),
-        metaAdsRealizado(funil, p.semanaPrev),
-        bitrixRealizado(funil, p.semanaPrev),
+        midiaRealizado(canal, campaignLike, p.mtd),
+        bitrixRealizado(fnlNgc, platUtm, p.mtd),
+        midiaRealizado(canal, campaignLike, p.semana),
+        bitrixRealizado(fnlNgc, platUtm, p.semana),
+        midiaRealizado(canal, campaignLike, p.semanaPrev),
+        bitrixRealizado(fnlNgc, platUtm, p.semanaPrev),
       ]);
 
       const markdown = montarMarkdown({
@@ -504,6 +592,7 @@ export function registerFcaRoutes(app: Express) {
       if (createTask) {
         taskResult = await criarTaskClickUp({
           funil,
+          canal,
           semanaNum: p.semana.num,
           semana: p.semana,
           markdown,
@@ -513,6 +602,7 @@ export function registerFcaRoutes(app: Express) {
       return res.json({
         ok: true,
         funil,
+        canal,
         periodos: p,
         task: taskResult,
         markdown,
