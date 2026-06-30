@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-30 | feat(gestao): drill-down ao clicar nas células de Gestão de Receita
+
+**O que foi feito:**
+- Novo endpoint `GET /api/gestao/receita/detalhe?tipo&chave&mes` que lista os itens por trás de cada número, agrupados (reusa `agruparItens` do BP). 13 tipos: venda MRR/Pontual, canal, closer, sdr, funil_etapa, mql, produto, churn_motivo/vendedor, cac, custo_comercial, comissoes.
+- Componente Sheet lateral `GestaoReceitaDetalhe` (espelha o `BPCellDetail` do BP 2026).
+- Cards, linhas de tabela, itens de ranking e barras do funil ficam clicáveis e abrem o detalhamento; o total do Sheet bate com a célula clicada.
+
+**Por que:** dar visibilidade do que compõe cada número sem sair da tela.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.detalhe.ts` - queries de detalhe por tipo (novo).
+- `server/routes/gestaoReceita.ts` - registro do endpoint.
+- `client/src/components/gestao/GestaoReceitaDetalhe.tsx` - Sheet (novo).
+- `client/src/pages/gestao/GestaoReceita.tsx` - elementos clicáveis + estado do drill.
+
+**Impacto arquitetural:** Nenhum — reusa o padrão de drill-down e os helpers do BP.
+
+---
+
 ## 2026-06-30 | fix(gestao): corrige dupla contagem do pontual e conversões enganosas
 
 **O que foi feito:**
