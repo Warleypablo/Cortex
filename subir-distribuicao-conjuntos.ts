@@ -13,12 +13,13 @@ import { metaGet, metaPostForm } from "./server/services/adsCreation/metaApi";
 const BALI_ADSET = "120243474649070450"; // 58 - [IG] [Aberto] Bali
 const CAMP = "120211269781870450"; // [TP] [Tráfego] [ABO] [Distribuição] - Distribuição de Conteúdo
 
-// nome curto do conjunto ↔ task do ClickUp
+// nome curto do conjunto ↔ task do ClickUp (subtask "Impulsionar conteúdo")
+// Lote 30/06/2026 — conteúdo vem da task-mãe (parent) de cada subtask.
 const CONTENTS = [
-  { content: "Reserve seu lugar no evento", task: "86aj56jav" },
-  { content: "Vídeo Manu", task: "86aj55x4e" },
-  { content: "Como aumentar o LTV do e-com", task: "86ahubckj" },
-  { content: "O que é estratégico no marketing", task: "86ahubcgg" },
+  { content: "Afiliado Tiktok", task: "86aj9phn8" },
+  { content: "Como criar um perfil no tiktok do zero", task: "86ahuegar" },
+  { content: "Roas alto? Travou nos 50k?", task: "86ahubfpu" },
+  { content: "O maior evento sobre criação de conteúdo do ES", task: "86ahbye4j" },
 ];
 
 const go = process.argv.includes("--go");
