@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-30 | fix(receita): inclui TURBO FILIAL no painel de Metas de Receita
+
+**O que foi feito:**
+- Trocada a fonte das queries de `revenue-goals` (resumo, evolução diária, histórico de inadimplência e detalhe do dia) de `"Conta Azul".caz_receber` para `"Conta Azul".caz_parcelas`.
+- Mapeamento fiel: `total`→`valor_bruto`, status `ACQUITTED`/`PAGO`→`QUITADO`, e novo filtro `UPPER(tipo_evento)='RECEITA'`. No detalhe do dia, join passa a usar `id_cliente` e os fallbacks de colunas exclusivas de `caz_receber` (cnpj/telefone/status_clickup) foram removidos.
+
+**Por que:**
+- `caz_receber` é sincronizada (por processo externo) apenas com a empresa `TURBO PARTNERS`. A `TURBO FILIAL` — empresa nova do grupo que começou a faturar em jun/2026 (106 parcelas, ~R$853k) — nunca entrava na tabela, subnotando o "Total a Receber" do painel (jun/2026: R$978k em vez de ~R$1,83M). `caz_parcelas` já contém todas as empresas do grupo.
+
+**Arquivos alterados:**
+- `server/storage.ts` - migradas 4 queries SQL em `getRevenueGoals`, `getHistoricoInadimplencia` e `getRevenueGoalsDiaDetalhes` de `caz_receber` para `caz_parcelas`.
+
+**Impacto arquitetural:** Nenhum estrutural. Muda a tabela-fonte do painel de Metas de Receita para a tabela mais completa do financeiro. Limitação conhecida: o nome do cliente no drill-down das parcelas da TURBO FILIAL aparece como "Cliente Desconhecido" porque o cadastro de clientes da filial também não está em `caz_clientes` (totais não afetados).
+
+---
+
 ## 2026-06-30 | feat(gestao): drill-down ao clicar nas células de Gestão de Receita
 
 **O que foi feito:**
