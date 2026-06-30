@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-06-30 | fix(gestao): corrige dupla contagem do pontual e conversões enganosas
+
+**O que foi feito:**
+- Venda pontual por produto agora deduplica por jornada (entregas 1ª/2ª/3ª… do mesmo cliente repetiam o valor do pacote) — Creators jun caiu de 35 entregas/R$357k para 22 jornadas/R$197k; o total passa a bater com a venda do Bitrix. Alinhado à régua do BP (data_criado, exclui status 'não usar').
+- Removidas as conversões reunião→venda (closer) e lead→reunião (SDR) que passavam de 100% por contarem janelas de data diferentes; substituídas por notas explicativas.
+- CAC por contrato/cliente passa a usar a contagem deduplicada.
+
+**Por que:** revisão apontou números inflados/enganosos na aba Micro e Pessoas.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - query de produto (CTE de dedup por jornada) e CAC.
+- `client/src/pages/gestao/GestaoReceita.tsx` - remoção das conversões e notas.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-06-30 | feat(gestao): painel Gestão de Receita (orçado × realizado comercial)
 
 **O que foi feito:**
