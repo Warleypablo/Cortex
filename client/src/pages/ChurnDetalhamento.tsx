@@ -10,6 +10,7 @@ import { AlertTriangle } from "lucide-react";
 import { type ChurnContract, type ChurnDetalhamentoData } from "@/components/churn/types";
 import { ChurnControls } from "@/components/churn/ChurnControls";
 import { ChurnKpisHero } from "@/components/churn/ChurnKpisHero";
+import { CrossSellDrillDrawer, type CrosssellDeal } from "@/components/churn/CrossSellDrillDrawer";
 import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { RitmoDiario } from "@/components/churn/RitmoDiario";
 import { ChurnHistoricoMensal } from "@/components/churn/ChurnHistoricoMensal";
@@ -56,7 +57,25 @@ export default function ChurnDetalhamento() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [drill, setDrill] = useState<{ titulo: string; contratos: ChurnContract[] } | null>(null);
   const onDrill = (titulo: string, contratos: ChurnContract[]) => setDrill({ titulo, contratos });
+  const [nrrDrillOpen, setNrrDrillOpen] = useState(false);
   const queryClient = useQueryClient();
+
+  // Deals de cross-sell/up-sell do período — buscados só quando o drawer do NRR abre
+  const { data: crosssellDeals, isLoading: isLoadingCrosssell } = useQuery<{
+    items: CrosssellDeal[];
+    total_recorrente: number;
+    total_pontual: number;
+    count: number;
+  }>({
+    queryKey: ["/api/analytics/nrr/crosssell-deals", dataInicio, dataFim],
+    queryFn: async () => {
+      const params = new URLSearchParams({ startDate: dataInicio, endDate: dataFim });
+      const res = await fetch(`/api/analytics/nrr/crosssell-deals?${params.toString()}`);
+      if (!res.ok) throw new Error("Failed to fetch cross-sell deals");
+      return res.json();
+    },
+    enabled: nrrDrillOpen && !!dataInicio && !!dataFim,
+  });
 
   const abonarMutation = useMutation({
     mutationFn: async ({ taskId, abonar }: { taskId: string; abonar: boolean }) => {
@@ -356,6 +375,7 @@ export default function ChurnDetalhamento() {
           ltMedio={filteredMetricas.lt_medio}
           ticketMedio={filteredMetricas.ticket_medio}
           onDrill={onDrill}
+          onNrrClick={() => setNrrDrillOpen(true)}
         />
       )}
 
@@ -418,6 +438,15 @@ export default function ChurnDetalhamento() {
         onToggleAbono={onToggleAbono}
         pendingIds={pendingIds}
         abonadoOverrides={abonadoOverrides}
+      />
+
+      <CrossSellDrillDrawer
+        open={nrrDrillOpen}
+        onClose={() => setNrrDrillOpen(false)}
+        deals={crosssellDeals?.items ?? []}
+        totalRecorrente={crosssellDeals?.total_recorrente ?? 0}
+        totalPontual={crosssellDeals?.total_pontual ?? 0}
+        isLoading={isLoadingCrosssell}
       />
     </div>
   );

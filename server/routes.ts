@@ -4868,6 +4868,20 @@ Estruture sua resposta em:
     }
   });
 
+  // Lista os deals de cross-sell que compõem o NRR no período (drill do card NRR)
+  app.get("/api/analytics/nrr/crosssell-deals", async (req, res) => {
+    try {
+      const startDate = req.query.startDate as string | undefined;
+      const endDate = req.query.endDate as string | undefined;
+      const { getCrosssellDealsDetail } = await import("./okr2026/metricsAdapter");
+      const result = await getCrosssellDealsDetail(startDate, endDate);
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error fetching NRR cross-sell deals:", error);
+      res.status(500).json({ error: "Failed to fetch NRR cross-sell deals" });
+    }
+  });
+
   app.patch("/api/churn/abonar/:taskId", async (req, res) => {
     const { taskId } = req.params;
     const { abonar } = req.body as { abonar: boolean };

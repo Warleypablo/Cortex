@@ -38,6 +38,8 @@ export interface ChurnKpisHeroProps {
   ltMedio?: number;
   ticketMedio?: number;
   onDrill?: (titulo: string, contratos: ChurnContract[]) => void;
+  /** Clique no card NRR → abre o drawer de cross-sell/up-sell do período */
+  onNrrClick?: () => void;
 }
 
 // TETO de taxa de churn: 10% = severidade máxima.
@@ -114,6 +116,7 @@ export function ChurnKpisHero({
   ltMedio,
   ticketMedio,
   onDrill,
+  onNrrClick,
 }: ChurnKpisHeroProps): JSX.Element {
   const churns = contratos.filter(c => c.tipo === "churn");
   const logosCount = churns.length;
@@ -178,7 +181,7 @@ export function ChurnKpisHero({
           valueClass={nrrNorm !== undefined ? severityTextClass(nrrNorm) : "text-muted-foreground"}
           sub="net revenue retention"
           severityNorm={nrrNorm}
-          onClick={makeDrill("Churn do período", churns)}
+          onClick={onNrrClick}
         />
       </div>
       {hasSecondary && (
