@@ -1,11 +1,10 @@
 import { sql } from "drizzle-orm";
 import { db } from "../db";
-import type { Categoria } from "../routes/capacityTimes.helpers";
 
 export interface CapacityMetaSeed {
   nome: string;
   match_responsavel: string;
-  categoria: Categoria;
+  categoria: string;
   cap_recorrente: number | null;
   cap_mrr: number | null;
   cap_pontual: number | null;
