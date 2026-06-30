@@ -190,7 +190,7 @@ function SecaoPessoas({ d }: { d: GestaoReceitaData }) {
           <SectionCard title="Pré-vendas (SDR) · Top 3" fonte={<Fonte tipo="bitrix" />}>{sdrTop.length ? <Ranking rows={sdrTop} tone="top" /> : <Vazio />}</SectionCard>
           <SectionCard title="Pré-vendas (SDR) · Bottom 3" fonte={<Fonte tipo="bitrix" />}>{sdrBot.length ? <Ranking rows={sdrBot} tone="bot" /> : <Vazio />}</SectionCard>
         </div>
-        <Nota>Closers ordenados por <b>score = MRR + Pontual ÷ 5</b>. Pré-vendas ordenados pelo <b>valor gerado</b> nas reuniões/vendas atribuídas ao SDR.</Nota>
+        <Nota>Closers ordenados por <b>score = MRR + Pontual ÷ 5</b>. Pré-vendas ordenados pelo <b>valor gerado</b> nas vendas atribuídas ao SDR. Quem acumula os dois papéis (ex.: atua como closer e SDR) aparece nas duas listas — é o mesmo cadastro, não duplicidade.</Nota>
       </div>
     </div>
   );
@@ -270,7 +270,7 @@ function SecaoMicro({ d }: { d: GestaoReceitaData }) {
               </TableBody>
             </Table>
           </TableScroll>
-          <Nota>Visão por produto vem do <b>ClickUp</b> (o Bitrix não tem produto por deal) → o total aqui pode divergir da venda do Bitrix na aba Macro. Orçado por produto só onde há mapeamento direto com os segmentos do BP.</Nota>
+          <Nota>Mesma régua da aba "Vendas por produto" do <b>BP 2026</b> (ClickUp, por <code>data_criado</code>): <b>MRR</b> é a visão operacional do ClickUp (difere da venda comercial do Bitrix por design — o ClickUp reclassifica MRR↔pontual). <b>Pontual</b> é deduplicado por jornada (entregas 1ª/2ª/3ª… do mesmo cliente contam como 1 venda, não somam o valor do pacote repetido). Orçado por produto só onde há mapeamento direto com os segmentos do BP.</Nota>
         </SectionCard>
       </div>
       <div>
@@ -279,18 +279,18 @@ function SecaoMicro({ d }: { d: GestaoReceitaData }) {
           <TableScroll>
             <Table>
               <TableHeader>
-                <TableRow><Th left>Vendedor</Th><Th>Vendido MRR</Th><Th>Vendido Pont.</Th><Th>Deals</Th><Th>Reuniões</Th><Th>Conv. reun.→venda</Th></TableRow>
+                <TableRow><Th left>Vendedor</Th><Th>Vendido MRR</Th><Th>Vendido Pont.</Th><Th>Deals ganhos</Th><Th>Reuniões no mês</Th></TableRow>
               </TableHeader>
               <TableBody>
                 {vendedores.map((v) => (
                   <TableRow key={v.nome}>
                     <Td left>{v.nome}</Td><Td>{brl(v.mrr)}</Td><Td>{brl(v.pont)}</Td><Td>{intBR(v.deals)}</Td><Td>{intBR(v.reunioes)}</Td>
-                    <Td><span className={convColor(v.conv, 28, 20)}>{pct(v.conv)}</span></Td>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableScroll>
+          <Nota>Deals ganhos (por fechamento) e reuniões (por realização) são de janelas separadas no mês, então não calculamos conversão direta reunião→venda aqui (um deal de junho pode ter tido a reunião em meses anteriores).</Nota>
         </SectionCard>
       </div>
       <div>
@@ -299,18 +299,18 @@ function SecaoMicro({ d }: { d: GestaoReceitaData }) {
           <TableScroll>
             <Table>
               <TableHeader>
-                <TableRow><Th left>Pré-vendedor</Th><Th>Leads</Th><Th>Reuniões</Th><Th>Valor gerado</Th><Th>Conv. lead→reun.</Th></TableRow>
+                <TableRow><Th left>Pré-vendedor</Th><Th>Leads no mês</Th><Th>Reuniões no mês</Th><Th>Valor gerado</Th></TableRow>
               </TableHeader>
               <TableBody>
                 {sdrs.map((s) => (
                   <TableRow key={s.nome}>
                     <Td left>{s.nome}</Td><Td>{intBR(s.leads)}</Td><Td>{intBR(s.reunioes)}</Td><Td>{brl(s.valor)}</Td>
-                    <Td><span className={convColor(s.conv, 20, 14)}>{pct(s.conv)}</span></Td>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableScroll>
+          <Nota>Leads (por criação) e reuniões (por realização) são contados em janelas separadas — uma reunião de junho costuma vir de um lead de meses anteriores, então não há conversão direta lead→reunião dentro do mês. <b>Valor gerado</b> é o valor da venda atribuída ao SDR (o mesmo deal também conta para o closer; não some as duas listas).</Nota>
         </SectionCard>
       </div>
     </div>
@@ -432,11 +432,6 @@ const Td = ({ children, left, className = "" }: { children: React.ReactNode; lef
   <TableCell className={`${left ? "text-left font-medium" : "text-right tabular-nums"} ${className}`}>{children}</TableCell>
 );
 const Vazio = () => <p className="py-4 text-center text-sm text-gray-400 dark:text-zinc-500">Sem dados no mês</p>;
-function convColor(v: number, hi: number, mid: number) {
-  if (v >= hi) return "font-bold text-emerald-600 dark:text-emerald-400";
-  if (v >= mid) return "font-bold text-amber-600 dark:text-amber-400";
-  return "font-bold text-red-600 dark:text-red-400";
-}
 
 const MESES = [
   { v: "2026-01", l: "Janeiro 2026" }, { v: "2026-02", l: "Fevereiro 2026" }, { v: "2026-03", l: "Março 2026" },

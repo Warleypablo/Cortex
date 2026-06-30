@@ -188,18 +188,43 @@ export function registerGestaoReceitaRoutes(app: Express) {
         ganhos: Number(r.ganhos) || 0,
       }));
 
-      // ---------- 9. VENDA / TICKET POR PRODUTO (ClickUp, data_inicio no mês) ----------
+      // ---------- 9. VENDA / TICKET POR PRODUTO (ClickUp, alinhado ao BP) ----------
+      // Mesma régua da sub-aba "Vendas por produto" do BP: cup_contratos por data_criado,
+      // exclui status 'não usar'. MRR = SUM(valorr) por contrato (mesmo do BP).
+      // Pontual = dedup por JORNADA: entregas (1ª/2ª/3ª...) do mesmo cliente repetem o valor
+      // do pacote, então conta 1 valor por jornada (id_task p/ Creators, id_subtask p/ demais)
+      // — evita a dupla contagem que inflava o pontual.
       const prodRows = await db.execute(sql`
-        SELECT COALESCE(NULLIF(produto, ''), '(sem produto)') AS produto,
-          COUNT(*) FILTER (WHERE valorr::numeric > 0) AS c_mrr,
-          COALESCE(SUM(valorr::numeric) FILTER (WHERE valorr::numeric > 0), 0) AS mrr,
-          ROUND(AVG(NULLIF(valorr::numeric, 0))) AS tm_mrr,
-          COUNT(*) FILTER (WHERE valorp::numeric > 0) AS c_pont,
-          COALESCE(SUM(valorp::numeric) FILTER (WHERE valorp::numeric > 0), 0) AS pont,
-          ROUND(AVG(NULLIF(valorp::numeric, 0))) AS tm_pont
-        FROM "Clickup".cup_contratos
-        WHERE data_inicio >= ${dIni} AND data_inicio < ${dFim}
-        GROUP BY 1 ORDER BY 3 DESC NULLS LAST
+        WITH base AS (
+          SELECT COALESCE(NULLIF(TRIM(produto), ''), '(sem produto)') AS produto,
+                 id_task, id_subtask, valorr::numeric AS vr, valorp::numeric AS vp
+          FROM "Clickup".cup_contratos
+          WHERE data_criado >= ${dIni} AND data_criado < ${dFim}
+            AND LOWER(TRIM(status)) <> 'não usar'
+        ),
+        mrr AS (
+          SELECT produto,
+                 COALESCE(SUM(vr) FILTER (WHERE vr > 0), 0) AS mrr,
+                 COUNT(*) FILTER (WHERE vr > 0) AS c_mrr,
+                 ROUND(AVG(NULLIF(vr, 0))) AS tm_mrr
+          FROM base GROUP BY produto
+        ),
+        pj AS (
+          SELECT produto,
+                 CASE WHEN produto = 'Creators' THEN 'task:' || id_task ELSE 'sub:' || id_subtask END AS jornada,
+                 MAX(vp) AS vp
+          FROM base WHERE vp > 0
+          GROUP BY produto, CASE WHEN produto = 'Creators' THEN 'task:' || id_task ELSE 'sub:' || id_subtask END
+        ),
+        pont AS (
+          SELECT produto, SUM(vp) AS pont, COUNT(*) AS c_pont, ROUND(AVG(vp)) AS tm_pont
+          FROM pj GROUP BY produto
+        )
+        SELECT COALESCE(m.produto, p.produto) AS produto,
+               COALESCE(m.c_mrr, 0) AS c_mrr, COALESCE(m.mrr, 0) AS mrr, m.tm_mrr,
+               COALESCE(p.c_pont, 0) AS c_pont, COALESCE(p.pont, 0) AS pont, p.tm_pont
+        FROM mrr m FULL OUTER JOIN pont p ON m.produto = p.produto
+        ORDER BY COALESCE(m.mrr, 0) + COALESCE(p.pont, 0) DESC
       `);
       const produtos = (prodRows.rows as any[]).map((r) => {
         const seg = PRODUTO_TO_SEG_MRR[r.produto];
