@@ -76,6 +76,7 @@ import { registerShortenerRoutes } from "./routes/shortener";
 import { registerBpProdutosRoutes } from "./routes/bpProdutos";
 import { registerSolicitacaoFerramentasRoutes } from "./routes/solicitacao-ferramentas";
 import { registerInstagramRoutes } from "./routes/instagram";
+import { registerOrganicoRoutes, registerOrganicoIngestRoutes } from "./routes/organico";
 import { registerCrmInstagramRoutes } from "./routes/crmInstagram";
 import { registerGrowthDfcCacRoutes } from "./routes/growthDfcCac";
 import { registerGhlPublicRoutes, registerGhlApiRoutes } from "./routes/ghl";
@@ -470,6 +471,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Instagram Module (before isAuthenticated — OAuth routes need to be accessible)
   registerInstagramRoutes(app, db, storage);
+
+  // Painel Orgânico — ingest do worker (token-auth próprio, ANTES do isAuthenticated global)
+  registerOrganicoIngestRoutes(app, db);
 
   // YouTube OAuth start/callback (before isAuthenticated — donos de canal externos
   // autorizam com a própria conta Google, sem login no Cortex). O /status fica protegido.
@@ -8419,6 +8423,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
+
+  // Painel Orgânico (publicação de conteúdo orgânico) — leitura das tabelas content_* (pós-auth)
+  registerOrganicoRoutes(app, db, storage, isAdmin);
 
   // Growth — Orçamento por Campanha
   registerOrcamentoCampanhasRoutes(app, db);

@@ -31,6 +31,26 @@ except Exception:  # noqa: BLE001 — fallback pro fuso local da máquina
 API_BASE = "https://api.clickup.com/api/v2"
 
 
+# Aceita os formatos que a cardista digita num campo de TEXTO: "14:00", "14h",
+# "14h30", "14", "9:5" (→09:05), "14h00", "18:30 às ..." (pega o primeiro).
+# O separador é OBRIGATÓRIO pra ter minutos, senão "830" viraria (8,30) por engano.
+_HHMM_RE = re.compile(r"(\d{1,2})(?:\s*[:hH.]\s*(\d{1,2}))?")
+
+
+def parse_hhmm(s: str) -> tuple[int, int] | None:
+    """'14h30' → (14, 30). None se não der pra ler uma hora válida (0–23h, 0–59m)."""
+    if not s:
+        return None
+    m = _HHMM_RE.search(s.strip())
+    if not m:
+        return None
+    h = int(m.group(1))
+    mm = int(m.group(2)) if m.group(2) else 0
+    if 0 <= h <= 23 and 0 <= mm <= 59:
+        return h, mm
+    return None
+
+
 def _get(path: str, params: dict | None = None) -> dict:
     CONFIG.require_clickup()
     url = f"{API_BASE}{path}"
@@ -80,18 +100,32 @@ class Task:
             raw=t,
         )
 
+    def _cf(self, name: str) -> Any:
+        """Lê um custom field por nome, tolerando diferença de caixa/espaços.
+
+        O dict do ClickUp é keyed pelo nome EXATO do campo, e o nome real diverge
+        do esperado (ex.: "Data de postagem" com p minúsculo). Match exato primeiro,
+        depois case-insensitive.
+        """
+        if name in self.custom_fields:
+            return self.custom_fields[name]
+        low = name.strip().lower()
+        for k, v in self.custom_fields.items():
+            if k.strip().lower() == low:
+                return v
+        return None
+
     def posting_date(self) -> date | None:
         """
-        Lê o custom field 'Data de Postagem' (epoch ms) e retorna a data-calendário
-        no fuso de São Paulo (o fuso em que a pessoa marca a data no ClickUp).
-        None se ausente/inválido. Comparar com `date.today()` pra decidir se a
-        task é do dia atual em diante.
+        Lê o custom field de data (CONFIG.posting_date_field, default 'Data de
+        postagem') — epoch ms — e retorna a data-calendário no fuso de São Paulo
+        (o fuso em que a pessoa marca a data no ClickUp). None se ausente/inválido.
 
         ATENÇÃO: usar UTC aqui empurra posts agendados à noite (>21h BRT) pro dia
         seguinte — bug corrigido em 2026-06-08. Usa America/Sao_Paulo (ou fuso
         local da máquina como fallback).
         """
-        val = self.custom_fields.get("Data de Postagem")
+        val = self._cf(CONFIG.posting_date_field)
         if val in (None, ""):
             return None
         try:
@@ -101,6 +135,60 @@ class Task:
         if _TZ_POSTAGEM is not None:
             return datetime.fromtimestamp(ms / 1000, tz=_TZ_POSTAGEM).date()
         return datetime.fromtimestamp(ms / 1000).date()  # fallback: fuso local
+
+    def posting_time(self) -> str | None:
+        """Horário EXPLÍCITO do card, 'HH:MM'. Duas fontes, nesta ordem:
+
+        1) a HORA embutida no próprio campo 'Data de postagem' — é o novo padrão do
+           time, que usa o time picker do ClickUp (a data já vem com hora, ex.:
+           2026-06-29 11:00). Lida no MESMO fuso de posting_date (São Paulo).
+           00:00 conta como "sem hora" (date picker puro, sem time) → cai no fallback.
+        2) [legado] um campo de TEXTO separado 'Horário' (CONFIG.horario_field), se
+           existir e estiver preenchido.
+
+        None quando nenhuma traz hora — aí scheduled_datetime() NÃO agenda (o card
+        fica em 'aprovado' esperando alguém definir a hora).
+        """
+        # (1) hora dentro do 'Data de postagem' (mesmo timestamp/fuso de posting_date)
+        dtv = self._cf(CONFIG.posting_date_field)
+        if dtv not in (None, ""):
+            try:
+                ms = int(dtv)
+            except (TypeError, ValueError):
+                ms = None
+            if ms is not None:
+                dt = (datetime.fromtimestamp(ms / 1000, tz=_TZ_POSTAGEM)
+                      if _TZ_POSTAGEM is not None else datetime.fromtimestamp(ms / 1000))
+                if (dt.hour, dt.minute) != (0, 0):  # 00:00 = data sem hora (date picker puro)
+                    return f"{dt.hour:02d}:{dt.minute:02d}"
+        # (2) legado: campo de texto separado 'Horário'
+        val = self._cf(CONFIG.horario_field)
+        if val not in (None, ""):
+            hm = parse_hhmm(str(val))
+            if hm:
+                return f"{hm[0]:02d}:{hm[1]:02d}"
+        return None
+
+    def scheduled_datetime(self) -> datetime | None:
+        """Data + horário do card combinados, tz-aware (America/Sao_Paulo), ou None.
+
+        EXIGE Horário explícito no card. Sem Horário (ou sem Data) NÃO agenda
+        (retorna None) — de propósito: um horário padrão faria todo post sem hora
+        cair no mesmo minuto e colidir. Posts sem horário ficam em 'aprovado'
+        esperando alguém definir a hora (no card ou via "Agendar").
+        """
+        d = self.posting_date()
+        if d is None:
+            return None
+        t = self.posting_time()
+        if not t:
+            return None
+        hm = parse_hhmm(t)
+        if not hm:
+            return None
+        if _TZ_POSTAGEM is not None:
+            return datetime(d.year, d.month, d.day, hm[0], hm[1], tzinfo=_TZ_POSTAGEM)
+        return datetime(d.year, d.month, d.day, hm[0], hm[1])  # naive: fuso local
 
 
 @dataclass

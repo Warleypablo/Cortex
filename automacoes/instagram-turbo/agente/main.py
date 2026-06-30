@@ -28,9 +28,9 @@ import sys
 import traceback
 import uuid
 from dataclasses import dataclass, field
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 
-from agente import clickup, docs_parser
+from agente import clickup, docs_parser, state_sink
 from agente.config import CONFIG
 from agente.idempotency import Lock, LockHeld, inspect_comments, should_process
 
@@ -39,30 +39,62 @@ from agente.idempotency import Lock, LockHeld, inspect_comments, should_process
 _mes_cache: dict[str, dict] = {}
 
 
-# ── Slots fixos (modo atual) ───────────────────────────────────────────────
-SLOT_HOURS = (12, 18)
-SLOT_TOLERANCE_HOURS = 1
+# ── Slots fixos (hora, minuto) ─────────────────────────────────────────────
+# O agente só publica dentro de uma destas janelas. Cada slot abre no horário
+# indicado e fica aberto por SLOT_TOLERANCE_MINUTES (margem pra pegar a rodada
+# do cron, que não cai no segundo exato do slot).
+#   12:00 → janela 12:00–12:59   ·   17:30 → janela 17:30–18:29
+SLOTS = ((12, 0), (17, 30))
+SLOT_TOLERANCE_MINUTES = 60
+
+
+def _slot_label(h: int, m: int) -> str:
+    """Rótulo curto do slot: '12h' em ponto, '17h30' quando tem minutos."""
+    return f"{h}h" if m == 0 else f"{h}h{m:02d}"
+
+
+def _mins(h: int, m: int = 0) -> int:
+    """Minutos desde a meia-noite."""
+    return h * 60 + m
+
+
+def _hhmm(total_min: int) -> str:
+    return f"{total_min // 60:02d}:{total_min % 60:02d}"
 
 
 def current_slot(now: datetime | None = None) -> str | None:
     now = now or datetime.now()
-    for h in SLOT_HOURS:
-        if h <= now.hour < h + SLOT_TOLERANCE_HOURS:
-            return f"{h}h"
+    now_min = _mins(now.hour, now.minute)
+    for h, m in SLOTS:
+        start = _mins(h, m)
+        if start <= now_min < start + SLOT_TOLERANCE_MINUTES:
+            return _slot_label(h, m)
     return None
 
 
 def slot_status_human(now: datetime | None = None) -> str:
     now = now or datetime.now()
-    h = now.hour
+    now_min = _mins(now.hour, now.minute)
     slot = current_slot(now)
     if slot:
-        return f"no slot {slot} (até {SLOT_HOURS[0] + SLOT_TOLERANCE_HOURS if slot=='12h' else SLOT_HOURS[1] + SLOT_TOLERANCE_HOURS}h)"
-    if h < SLOT_HOURS[0]:
-        return f"antes do 1º slot — abre {SLOT_HOURS[0]}h"
-    if SLOT_HOURS[0] + SLOT_TOLERANCE_HOURS <= h < SLOT_HOURS[1]:
-        return f"entre slots — slot {SLOT_HOURS[0]}h fechou, {SLOT_HOURS[1]}h abre depois"
-    return f"depois do último slot — slot {SLOT_HOURS[1]}h fechou às {SLOT_HOURS[1] + SLOT_TOLERANCE_HOURS}h"
+        for h, m in SLOTS:
+            if _slot_label(h, m) == slot:
+                return f"no slot {slot} (até {_hhmm(_mins(h, m) + SLOT_TOLERANCE_MINUTES)})"
+    ordered = sorted(SLOTS, key=lambda s: _mins(*s))
+    first, last = ordered[0], ordered[-1]
+    if now_min < _mins(*first):
+        return f"antes do 1º slot — abre {_slot_label(*first)}"
+    if now_min >= _mins(*last) + SLOT_TOLERANCE_MINUTES:
+        return (f"depois do último slot — slot {_slot_label(*last)} "
+                f"fechou às {_hhmm(_mins(*last) + SLOT_TOLERANCE_MINUTES)}")
+    # entre dois slots: qual fechou e qual abre em seguida
+    prev_label = next_label = None
+    for h, m in ordered:
+        if _mins(h, m) + SLOT_TOLERANCE_MINUTES <= now_min:
+            prev_label = _slot_label(h, m)
+        elif next_label is None and now_min < _mins(h, m):
+            next_label = _slot_label(h, m)
+    return f"entre slots — slot {prev_label} fechou, {next_label} abre depois"
 
 
 @dataclass
@@ -76,6 +108,8 @@ class PlannedAction:
     criativo: str | None
     is_placeholder: bool
     posting_date: str | None = None
+    posting_time: str | None = None      # 'HH:MM' explícito do card, ou None (→ padrão)
+    scheduled_at: str | None = None      # data+hora do card, ISO tz-aware (horário-alvo)
     slot_now: str | None = None
     slot_status: str = ""
     already_posted: bool = False
@@ -163,6 +197,9 @@ def plan_task(t: clickup.Task, *, force_now: bool = False) -> PlannedAction:
     )
     pdate = t.posting_date()
     plan.posting_date = pdate.isoformat() if pdate else None
+    plan.posting_time = t.posting_time()
+    sdt = t.scheduled_datetime()
+    plan.scheduled_at = sdt.isoformat() if sdt else None
     plan.slot_now = current_slot()
     plan.slot_status = slot_status_human()
 
@@ -406,7 +443,7 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     ap.add_argument("--task-id", help="processa só essa task (debug / teste)")
     ap.add_argument(
         "--force-now", action="store_true",
-        help="bypassa filtro de Data=hoje e de slot 12h/18h. Use em testes em "
+        help="bypassa filtro de Data=hoje e de slot 12h/17h30. Use em testes em "
              "conta IG de teste. NÃO use em produção.",
     )
     ap.add_argument(
@@ -420,6 +457,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     run_id = uuid.uuid4().hex[:8]
+    posts: list[dict] = []
+    started_at = datetime.now(timezone.utc).isoformat()
 
     print("═══════════════════════════════════════════════════════════")
     print(f"  Agente Instagram — DRY_RUN={CONFIG.dry_run}   run_id={run_id}")
@@ -495,6 +534,8 @@ def main(argv: list[str] | None = None) -> int:
                     traceback.print_exc()
                     errors += 1
                     continue
+                post = state_sink.panel_post(plan)
+                posts.append(post)
                 if plan.skip_reason:
                     skipped_lines.append(render_skip_compact(plan))
                     if "já passou" in plan.skip_reason:
@@ -522,6 +563,12 @@ def main(argv: list[str] | None = None) -> int:
                 if not plan.is_ready_to_publish:
                     errors += 1
                     continue
+                # horário-por-card: o slot-cron NÃO auto-publica post sem Horário (alinha
+                # com o poller e com o readiness — sem horário, não há auto-publish).
+                if not plan.scheduled_at and not args.force_now:
+                    skipped += 1
+                    skipped_lines.append(f"⏭  {t.id} «{t.name}» — sem horário (não auto-publica)")
+                    continue
 
                 # Tudo certo. Em dry-run, apenas conta. Em produção, executa.
                 ok += 1
@@ -532,8 +579,15 @@ def main(argv: list[str] | None = None) -> int:
                 if exec_res.error:
                     print(f"   ❌ {exec_res.error}")
                     publish_failed += 1
+                    post["state"] = "falhou"
+                    post["readiness"] = "failed"
+                    post["error_text"] = exec_res.error
                 else:
                     published += 1
+                    post["state"] = "publicado"
+                    post["readiness"] = "published"
+                    post["permalink"] = exec_res.permalink
+                    post["published_media_id"] = exec_res.ig_media_id
                     print(f"   ✅ publicado: media_id={exec_res.ig_media_id}")
                     if exec_res.permalink:
                         print(f"      {exec_res.permalink}")
@@ -557,6 +611,19 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  puladas (idempotência/outros):  {skipped}")
             print(f"  erros / info incompleta:        {errors}")
             print("──────────────────────────────────")
+
+            counts = {
+                "ready": ok, "published": published, "publish_failed": publish_failed,
+                "legenda_vazia": empty_docs, "sem_pasta_drive": missing_drive,
+                "oauth_pending": oauth_pending, "data_passou": skip_past,
+                "data_futura": skip_future, "sem_data": skip_no_date,
+                "pulados": skipped, "errors": errors,
+            }
+            state_sink.report_cycle(
+                "instagram", run_id=run_id, dry_run=CONFIG.dry_run,
+                started_at=started_at, counts=counts, posts=posts,
+                status="error" if (errors or publish_failed) else "ok",
+            )
             return 0
     except LockHeld as e:
         print(f"⛔ {e}")
