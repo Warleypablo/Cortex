@@ -270,7 +270,7 @@ function SecaoMicro({ d }: { d: GestaoReceitaData }) {
               </TableBody>
             </Table>
           </TableScroll>
-          <Nota>Mesma régua da aba "Vendas por produto" do <b>BP 2026</b> (ClickUp, por <code>data_criado</code>): <b>MRR</b> é a visão operacional do ClickUp (difere da venda comercial do Bitrix por design — o ClickUp reclassifica MRR↔pontual). <b>Pontual</b> é deduplicado por jornada (entregas 1ª/2ª/3ª… do mesmo cliente contam como 1 venda, não somam o valor do pacote repetido). Orçado por produto só onde há mapeamento direto com os segmentos do BP.</Nota>
+          <Nota>Base ClickUp por <code>data_criado</code> (mesma régua do <b>BP 2026</b>). <b>MRR por produto bate com o BP</b>. <b>Pontual</b> é deduplicado por jornada (entregas 1ª/2ª/3ª… do mesmo cliente contam como 1 venda) — por isso fica <b>menor que o BP</b>, que soma o valor do pacote repetido em cada entrega. A venda comercial real está na aba <b>Macro</b> (via Bitrix). Orçado por produto só onde há mapeamento direto com os segmentos do BP.</Nota>
         </SectionCard>
       </div>
       <div>
