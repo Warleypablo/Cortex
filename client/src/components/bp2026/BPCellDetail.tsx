@@ -43,6 +43,8 @@ const DERIVADAS: Record<string, string[]> = {
   aov_venda_pontual_ecommerce: ["vendas_pontual_ecommerce", "contratos_vendidos_pontual_ecommerce"],
   aov_venda_pontual_site: ["vendas_pontual_site", "contratos_vendidos_pontual_site"],
   aov_venda_pontual_landing: ["vendas_pontual_landing", "contratos_vendidos_pontual_landing"],
+  aov_venda_pontual_creators: ["vendas_pontual_creators", "contratos_vendidos_pontual_creators"],
+  aov_venda_pontual_crm: ["vendas_pontual_crm", "contratos_vendidos_pontual_crm"],
   aov_venda_pontual_others: ["vendas_pontual_others", "contratos_vendidos_pontual_others"],
   // Capacity
   gestores_necessarios: ["cap_contratos_performance"],
