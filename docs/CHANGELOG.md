@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-30 | chore(scripts): move 42 scripts one-off de ads da raiz p/ scripts/ads/
+
+**O que foi feito:**
+- Movidos 42 scripts operacionais de ads (`subir-*`, `reestruturar-*`, `renumerar-*`, `reordenar-*`, `checar-*`, `inspecionar-*`, `limpa-*`, `verificar-*`, `smoke-upload`, `status-meta-api`, `pipeline-clickup-ads`) da raiz do repo para `scripts/ads/`, via `git mv` (histórico preservado).
+- Imports relativos `./server/...` reescritos para `../../server/...` (estáticos + um `import()` dinâmico no `reestruturar-crm-flash.ts`). Aliases `@shared/*`/`@/*` são absolutos (baseUrl `.`) → intocados.
+- Exemplos de uso (`npx tsx ...`) atualizados nas duas ferramentas vivas (`subir-lote-ads.ts`, `pipeline-clickup-ads.ts`) para o novo caminho.
+
+**Por que:**
+- A raiz estava poluída com ~42 scripts "rode uma vez" (snapshots de lote), misturados aos configs do projeto. Não são load-bearing (não estão no `package.json`, ninguém importa, fora do `tsconfig`/build). Agora a raiz só tem configs e os scripts seguem a convenção da pasta `scripts/` que já existia.
+
+**Arquivos alterados:**
+- `scripts/ads/*.ts` - 42 scripts movidos + imports corrigidos
+- raiz: removidos os 42 (mantidos só `*.config.ts` + `vitest.setup.ts`)
+
+**Impacto arquitetural:** Nenhum em runtime — scripts são CLIs avulsos (tsx), fora do app/build. Invocação muda de `npx tsx subir-x.ts` para `npx tsx scripts/ads/subir-x.ts`.
+
 ## 2026-06-30 | feat(ads-automation): agente semanal de subida de ads + painel read-only
 
 **O que foi feito:**
