@@ -28,6 +28,7 @@ interface Contrato {
 export interface DrawerSelecao {
   label: string; // título exibido no topo
   nome: string; // pessoa → contratos onde é responsável na subtask
+  campo?: "cs"; // "cs" usa cs_responsavel (CXCS); ausente usa responsavel
 }
 
 interface Props {
@@ -63,9 +64,10 @@ export function OperadorDrawer({ selecao, onClose }: Props) {
   const isDark = theme === "dark";
 
   const { data, isLoading } = useQuery<{ contratos: Contrato[] }>({
-    queryKey: ["/api/capacity-times/contratos", selecao?.nome],
+    queryKey: ["/api/capacity-times/contratos", selecao?.nome, selecao?.campo],
     queryFn: async () => {
-      const res = await fetch(`/api/capacity-times/contratos?nome=${encodeURIComponent(selecao!.nome)}`);
+      const campoQs = selecao?.campo ? `&campo=${selecao.campo}` : "";
+      const res = await fetch(`/api/capacity-times/contratos?nome=${encodeURIComponent(selecao!.nome)}${campoQs}`);
       if (!res.ok) throw new Error("Erro ao buscar contratos");
       return res.json();
     },

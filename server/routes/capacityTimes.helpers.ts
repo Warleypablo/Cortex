@@ -100,5 +100,6 @@ export interface CapacityTimesResponse {
   selva: SelvaRow[];
   black: ComercialRow[];
   squadra: ComercialRow[];
+  cxcs: ComercialRow[];
   metaContasDesigner: number;
 }

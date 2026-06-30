@@ -2,23 +2,24 @@
 // A pessoa é classificada pelo CARGO em "Inhire".rh_pessoal (status = 'Ativo').
 // Ajuste aqui quando o RH padronizar os nomes de cargo.
 
-export type CapacityGrupoKey = "selva" | "black" | "squadra";
+export type CapacityGrupoKey = "selva" | "black" | "squadra" | "cxcs";
 
 export interface CapacityGrupoDef {
   key: CapacityGrupoKey;
   label: string; // nome exibido na aba
   funcao: string; // descrição da função
-  /** Régua de carteira: "squad" = via squad de CS (designers); "responsavel" = via campo responsavel. */
-  carteira: "squad" | "responsavel";
+  /** Régua de carteira: "squad" = via squad de CS; "responsavel" = campo responsavel; "cs_responsavel" = campo cs_responsavel. */
+  carteira: "squad" | "responsavel" | "cs_responsavel";
 }
 
 export const CAPACITY_GRUPOS: Record<CapacityGrupoKey, CapacityGrupoDef> = {
-  selva: { key: "selva", label: "Selva", funcao: "Designers", carteira: "squad" },
+  selva: { key: "selva", label: "Selva", funcao: "Designers", carteira: "responsavel" },
   black: { key: "black", label: "Black", funcao: "Accounts", carteira: "responsavel" },
   squadra: { key: "squadra", label: "Squadra", funcao: "GPs", carteira: "responsavel" },
+  cxcs: { key: "cxcs", label: "CXCS", funcao: "Customer Success", carteira: "cs_responsavel" },
 };
 
-export const CAPACITY_GRUPOS_ORDER: CapacityGrupoKey[] = ["selva", "black", "squadra"];
+export const CAPACITY_GRUPOS_ORDER: CapacityGrupoKey[] = ["selva", "black", "squadra", "cxcs"];
 
 // Meta de contas que um designer comporta — usada para derivar a Cap. de
 // faturamento da Selva (Cap R$ = Ticket Médio da carteira × META_CONTAS_DESIGNER).
