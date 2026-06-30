@@ -483,6 +483,12 @@ async function recoverOnStartup(): Promise<void> {
 }
 
 export function setupAdsAutomationJob(): void {
+  // Kill-switch — setar ADS_AUTOMATION_ENABLED=0 desliga o agendador (ex.: preview local).
+  if (process.env.ADS_AUTOMATION_ENABLED === "0") {
+    console.log(`${LOG} desativado (ADS_AUTOMATION_ENABLED=0) — não agenda nem dispara.`);
+    return;
+  }
+
   setTimeout(() => {
     recoverOnStartup().catch((err) => console.error(`${LOG} recoverOnStartup erro:`, err));
   }, 45_000);
