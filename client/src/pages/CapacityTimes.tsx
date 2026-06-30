@@ -9,7 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Gauge, AlertTriangle, TrendingDown } from "lucide-react";
+import { Gauge, AlertTriangle, TrendingDown, Lock } from "lucide-react";
+import { SELVA_BLOQUEADA } from "@shared/capacityGrupos";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
 } from "recharts";
@@ -455,7 +456,7 @@ export default function CapacityTimes() {
   const metaContas = data?.metaContasDesigner ?? 0;
 
   const teams: TeamSummary[] = [
-    summarizeSelva(selva),
+    ...(SELVA_BLOQUEADA ? [] : [summarizeSelva(selva)]),
     summarizeComercial("Black", black),
     summarizeComercial("Squadra", squadra),
   ];
@@ -476,7 +477,14 @@ export default function CapacityTimes() {
         <Tabs defaultValue="__overview__">
           <TabsList>
             <TabsTrigger value="__overview__">Visão Geral</TabsTrigger>
-            <TabsTrigger value="selva">Selva ({selva.length})</TabsTrigger>
+            <TabsTrigger
+              value="selva"
+              disabled={SELVA_BLOQUEADA}
+              title={SELVA_BLOQUEADA ? "Em breve — carteira dos designers em preenchimento" : undefined}
+            >
+              {SELVA_BLOQUEADA && <Lock className="h-3 w-3 mr-1 inline" />}
+              Selva ({selva.length})
+            </TabsTrigger>
             <TabsTrigger value="black">Black ({black.length})</TabsTrigger>
             <TabsTrigger value="squadra">Squadra ({squadra.length})</TabsTrigger>
             <TabsTrigger value="__config__">⚙️ Configurar</TabsTrigger>
