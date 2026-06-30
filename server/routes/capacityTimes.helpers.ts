@@ -44,7 +44,7 @@ export interface ComercialRow {
 export function toComercialRow(raw: any): ComercialRow {
   const mrr_atual = num(raw.mrr_operando);
   const cap_mrr = numOrNull(raw.cap_mrr);
-  const contas_ativas = num(raw.contas_ativas);
+  const contas_ativas = num(raw.contas_rec ?? raw.contas_ativas);
   const cap_contas = numOrNull(raw.cap_contas);
   const util_mrr_pct = utilPct(mrr_atual, cap_mrr);
   return {
@@ -64,43 +64,35 @@ export function toComercialRow(raw: any): ComercialRow {
   };
 }
 
-// ── Selva (carteira via squad de CS, régua por faturamento) ──
+// ── Selva (designers): carteira via responsavel da subtask, régua por faturamento ──
 
 export interface SelvaRow {
   nome: string;
-  squad: string;
-  designers_no_squad: number;
-  contas: number; // contas da carteira do squad
+  contas: number; // contas (rec + pontual) onde o designer é responsável
   fat_recorrente: number;
   fat_pontual: number;
-  faturamento: number; // rec + pont (carteira do squad)
-  fatia: number; // faturamento / nº designers do squad
+  faturamento: number; // rec + pont
   ticket_medio: number | null; // faturamento / contas
   cap_fat: number | null; // ticket_medio * meta_contas_designer
-  util_pct: number | null; // fatia / cap_fat
+  util_pct: number | null; // faturamento / cap_fat
 }
 
 export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
-  const designers_no_squad = Math.max(1, num(raw.designers_no_squad));
-  const contas = num(raw.contas);
-  const fat_recorrente = num(raw.fat_recorrente);
-  const fat_pontual = num(raw.fat_pontual);
+  const contas = num(raw.contas_total);
+  const fat_recorrente = num(raw.mrr_operando);
+  const fat_pontual = num(raw.pontual_operando);
   const faturamento = fat_recorrente + fat_pontual;
-  const fatia = faturamento / designers_no_squad;
   const ticket_medio = contas > 0 ? faturamento / contas : null;
   const cap_fat = ticket_medio !== null ? ticket_medio * metaContasDesigner : null;
   return {
     nome: String(raw.nome),
-    squad: String(raw.squad || "—"),
-    designers_no_squad,
     contas,
     fat_recorrente,
     fat_pontual,
     faturamento,
-    fatia,
     ticket_medio,
     cap_fat,
-    util_pct: utilPct(fatia, cap_fat),
+    util_pct: utilPct(faturamento, cap_fat),
   };
 }
 

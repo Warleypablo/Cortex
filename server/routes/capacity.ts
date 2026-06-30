@@ -133,24 +133,25 @@ export function registerCapacityRoutes(app: Express, db: any) {
   });
 
   // GET /api/capacity-times — capacity por função (Selva / Black / Squadra)
-  // Pessoas vêm de "Inhire".rh_pessoal por cargo:
-  //   Designer              → Selva   (carteira via squad de CS; régua por faturamento rec+pontual)
-  //   cargo ILIKE '%account%' → Black  (carteira via responsavel)
-  //   Gestor de Performance → Squadra (carteira via responsavel)
+  // Pessoas vêm de "Inhire".rh_pessoal por cargo; carteira via `responsavel` da subtask:
+  //   Designer              → Selva   (régua por faturamento rec+pontual; cap via TM)
+  //   cargo ILIKE '%account%' → Black  (régua MRR + contas)
+  //   Gestor de Performance → Squadra (régua MRR + contas)
   app.get("/api/capacity-times", async (_req, res) => {
     try {
-      // Black + Squadra: carteira via `responsavel` (fuzzy match); caps de capacity_metas por nome.
-      const comercial = await db.execute(sql`
+      const result = await db.execute(sql`
         WITH pessoas AS (
           SELECT r.nome,
-                 CASE WHEN r.cargo ILIKE '%account%' THEN 'black' ELSE 'squadra' END AS grupo
+                 CASE WHEN r.cargo = 'Designer'              THEN 'selva'
+                      WHEN r.cargo ILIKE '%account%'         THEN 'black'
+                      WHEN r.cargo = 'Gestor de Performance' THEN 'squadra' END AS grupo
           FROM "Inhire".rh_pessoal r
           WHERE r.status = 'Ativo'
-            AND (r.cargo = 'Gestor de Performance' OR r.cargo ILIKE '%account%')
+            AND (r.cargo = 'Designer' OR r.cargo ILIKE '%account%' OR r.cargo = 'Gestor de Performance')
         ),
         contratos_expanded AS (
           SELECT c.id_subtask, TRIM(rp.part) AS responsavel_part,
-                 COALESCE(c.valorr, 0) AS valorr, c.status
+                 COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.status
           FROM "Clickup".cup_contratos c
           CROSS JOIN LATERAL regexp_split_to_table(c.responsavel, ';') AS rp(part)
           WHERE c.status IN ('ativo','onboarding','em cancelamento')
@@ -158,26 +159,30 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ),
         best AS (
           SELECT DISTINCT ON (ce.id_subtask, ce.responsavel_part)
-            p.nome AS pessoa, p.grupo, ce.id_subtask, ce.valorr, ce.status
+            p.nome AS pessoa, p.grupo, ce.id_subtask, ce.valorr, ce.valorp, ce.status
           FROM contratos_expanded ce
           JOIN pessoas p ON similarity(p.nome, ce.responsavel_part) > 0.4
           ORDER BY ce.id_subtask, ce.responsavel_part, similarity(p.nome, ce.responsavel_part) DESC
         ),
         agg AS (
           SELECT pessoa, grupo,
-            COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_ativas,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0 OR valorp > 0) AS contas_total,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
             COALESCE(SUM(valorr), 0) AS mrr_operando,
+            COALESCE(SUM(valorp), 0) AS pontual_operando,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'onboarding'), 0) AS mrr_onboarding,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
           FROM best GROUP BY pessoa, grupo
         )
         SELECT p.nome, p.grupo,
-          COALESCE(a.mrr_operando, 0)     AS mrr_operando,
-          COALESCE(a.mrr_ativo, 0)        AS mrr_ativo,
-          COALESCE(a.mrr_onboarding, 0)   AS mrr_onboarding,
-          COALESCE(a.mrr_cancelamento, 0) AS mrr_cancelamento,
-          COALESCE(a.contas_ativas, 0)    AS contas_ativas,
+          COALESCE(a.contas_total, 0)      AS contas_total,
+          COALESCE(a.contas_rec, 0)        AS contas_rec,
+          COALESCE(a.mrr_operando, 0)      AS mrr_operando,
+          COALESCE(a.pontual_operando, 0)  AS pontual_operando,
+          COALESCE(a.mrr_ativo, 0)         AS mrr_ativo,
+          COALESCE(a.mrr_onboarding, 0)    AS mrr_onboarding,
+          COALESCE(a.mrr_cancelamento, 0)  AS mrr_cancelamento,
           cap.cap_mrr, cap.cap_contas
         FROM pessoas p
         LEFT JOIN agg a ON a.pessoa = p.nome
@@ -188,41 +193,14 @@ export function registerCapacityRoutes(app: Express, db: any) {
           ORDER BY similarity(m.match_responsavel, p.nome) DESC
           LIMIT 1
         ) cap ON TRUE
-        ORDER BY p.grupo, COALESCE(a.mrr_operando, 0) DESC
+        ORDER BY p.grupo, (COALESCE(a.mrr_operando, 0) + COALESCE(a.pontual_operando, 0)) DESC
       `);
 
-      // Selva: designers, carteira via squad de CS (faturamento recorrente + pontual).
-      const selva = await db.execute(sql`
-        WITH des AS (
-          SELECT r.nome,
-            TRIM(regexp_replace(regexp_replace(r.squad, '[^[:alpha:][:space:]&]', '', 'g'), '\\s+', ' ', 'g')) AS squad_norm
-          FROM "Inhire".rh_pessoal r
-          WHERE r.status = 'Ativo' AND r.cargo = 'Designer'
-        ),
-        squad_fat AS (
-          SELECT
-            TRIM(regexp_replace(regexp_replace(c.squad, '[^[:alpha:][:space:]&]', '', 'g'), '\\s+', ' ', 'g')) AS squad_norm,
-            COUNT(*) FILTER (WHERE COALESCE(c.valorr,0) > 0 OR COALESCE(c.valorp,0) > 0) AS contas,
-            COALESCE(SUM(c.valorr), 0) AS fat_recorrente,
-            COALESCE(SUM(c.valorp), 0) AS fat_pontual
-          FROM "Clickup".cup_contratos c
-          WHERE c.status IN ('ativo','onboarding','em cancelamento')
-          GROUP BY 1
-        )
-        SELECT d.nome, d.squad_norm AS squad,
-          COUNT(*) OVER (PARTITION BY d.squad_norm) AS designers_no_squad,
-          COALESCE(sf.contas, 0)         AS contas,
-          COALESCE(sf.fat_recorrente, 0) AS fat_recorrente,
-          COALESCE(sf.fat_pontual, 0)    AS fat_pontual
-        FROM des d
-        LEFT JOIN squad_fat sf ON sf.squad_norm = d.squad_norm
-        ORDER BY d.squad_norm, d.nome
-      `);
-
+      const rows = result.rows as any[];
       const response: CapacityTimesResponse = {
-        selva: selva.rows.map((r: any) => toSelvaRow(r, META_CONTAS_DESIGNER)),
-        black: comercial.rows.filter((r: any) => r.grupo === "black").map(toComercialRow),
-        squadra: comercial.rows.filter((r: any) => r.grupo === "squadra").map(toComercialRow),
+        selva: rows.filter((r) => r.grupo === "selva").map((r) => toSelvaRow(r, META_CONTAS_DESIGNER)),
+        black: rows.filter((r) => r.grupo === "black").map(toComercialRow),
+        squadra: rows.filter((r) => r.grupo === "squadra").map(toComercialRow),
         metaContasDesigner: META_CONTAS_DESIGNER,
       };
       res.json(response);
@@ -232,45 +210,28 @@ export function registerCapacityRoutes(app: Express, db: any) {
     }
   });
 
-  // GET /api/capacity-times/contratos?nome=<nome>  (GP/account: carteira via responsavel)
-  //                                  ?squad=<squad> (designer: carteira do squad de CS)
+  // GET /api/capacity-times/contratos?nome=<nome> — carteira (responsável da subtask)
   app.get("/api/capacity-times/contratos", async (req, res) => {
     const nome = (req.query.nome as string | undefined)?.trim();
-    const squad = (req.query.squad as string | undefined)?.trim();
-    if (!nome && !squad) return res.status(400).json({ error: "nome ou squad é obrigatório" });
+    if (!nome) return res.status(400).json({ error: "nome é obrigatório" });
     try {
-      let rows: any[];
-      if (squad) {
-        rows = (await db.execute(sql`
-          SELECT cl.nome AS cliente, c.produto, c.status,
-                 COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask
-          FROM "Clickup".cup_contratos c
-          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
-          WHERE c.status IN ('ativo','onboarding','em cancelamento')
-            AND TRIM(regexp_replace(regexp_replace(c.squad, '[^[:alpha:][:space:]&]', '', 'g'), '\\s+', ' ', 'g')) = ${squad}
-          ORDER BY
-            CASE c.status WHEN 'ativo' THEN 1 WHEN 'onboarding' THEN 2 ELSE 3 END,
-            (COALESCE(c.valorr, 0) + COALESCE(c.valorp, 0)) DESC
-        `)).rows as any[];
-      } else {
-        rows = (await db.execute(sql`
-          SELECT DISTINCT ON (c.id_subtask)
-                 cl.nome AS cliente, c.produto, c.status,
-                 COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask
-          FROM "Clickup".cup_contratos c
-          CROSS JOIN LATERAL regexp_split_to_table(c.responsavel, ';') AS rp(part)
-          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
-          WHERE c.status IN ('ativo','onboarding','em cancelamento')
-            AND c.responsavel IS NOT NULL AND c.responsavel <> ''
-            AND similarity(TRIM(rp.part), ${nome}) > 0.4
-          ORDER BY c.id_subtask
-        `)).rows as any[];
-        // ordena para exibição (ativo → onboarding → cancelamento, depois por valor)
-        const ordemStatus: Record<string, number> = { ativo: 1, onboarding: 2 };
-        rows.sort((a, b) =>
-          (ordemStatus[a.status] ?? 3) - (ordemStatus[b.status] ?? 3) ||
-          (Number(b.valorr) + Number(b.valorp)) - (Number(a.valorr) + Number(a.valorp)));
-      }
+      const rows = (await db.execute(sql`
+        SELECT DISTINCT ON (c.id_subtask)
+               cl.nome AS cliente, c.produto, c.status,
+               COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask
+        FROM "Clickup".cup_contratos c
+        CROSS JOIN LATERAL regexp_split_to_table(c.responsavel, ';') AS rp(part)
+        LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+        WHERE c.status IN ('ativo','onboarding','em cancelamento')
+          AND c.responsavel IS NOT NULL AND c.responsavel <> ''
+          AND similarity(TRIM(rp.part), ${nome}) > 0.4
+        ORDER BY c.id_subtask
+      `)).rows as any[];
+      // ordena para exibição (ativo → onboarding → cancelamento, depois por valor)
+      const ordemStatus: Record<string, number> = { ativo: 1, onboarding: 2 };
+      rows.sort((a, b) =>
+        (ordemStatus[a.status] ?? 3) - (ordemStatus[b.status] ?? 3) ||
+        (Number(b.valorr) + Number(b.valorp)) - (Number(a.valorr) + Number(a.valorp)));
 
       res.json({
         contratos: rows.map((r) => ({
