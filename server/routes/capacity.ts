@@ -196,11 +196,61 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ORDER BY p.grupo, (COALESCE(a.mrr_operando, 0) + COALESCE(a.pontual_operando, 0)) DESC
       `);
 
+      // CXCS: carteira via `cs_responsavel` da subtask (não `responsavel`); régua MRR + contas.
+      const cxcsResult = await db.execute(sql`
+        WITH pessoas AS (
+          SELECT r.nome FROM "Inhire".rh_pessoal r
+          WHERE r.status = 'Ativo' AND r.cargo = 'CXCS'
+        ),
+        contratos_expanded AS (
+          SELECT c.id_subtask, TRIM(rp.part) AS cs_part,
+                 COALESCE(c.valorr, 0) AS valorr, c.status
+          FROM "Clickup".cup_contratos c
+          CROSS JOIN LATERAL regexp_split_to_table(c.cs_responsavel, ';') AS rp(part)
+          WHERE c.status IN ('ativo','onboarding','em cancelamento')
+            AND c.cs_responsavel IS NOT NULL AND c.cs_responsavel <> ''
+        ),
+        best AS (
+          SELECT DISTINCT ON (ce.id_subtask, ce.cs_part)
+            p.nome AS pessoa, ce.id_subtask, ce.valorr, ce.status
+          FROM contratos_expanded ce
+          JOIN pessoas p ON similarity(p.nome, ce.cs_part) > 0.4
+          ORDER BY ce.id_subtask, ce.cs_part, similarity(p.nome, ce.cs_part) DESC
+        ),
+        agg AS (
+          SELECT pessoa,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
+            COALESCE(SUM(valorr), 0) AS mrr_operando,
+            COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
+            COALESCE(SUM(valorr) FILTER (WHERE status = 'onboarding'), 0) AS mrr_onboarding,
+            COALESCE(SUM(valorr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
+          FROM best GROUP BY pessoa
+        )
+        SELECT p.nome,
+          COALESCE(a.contas_rec, 0)       AS contas_rec,
+          COALESCE(a.mrr_operando, 0)     AS mrr_operando,
+          COALESCE(a.mrr_ativo, 0)        AS mrr_ativo,
+          COALESCE(a.mrr_onboarding, 0)   AS mrr_onboarding,
+          COALESCE(a.mrr_cancelamento, 0) AS mrr_cancelamento,
+          cap.cap_mrr, cap.cap_contas
+        FROM pessoas p
+        LEFT JOIN agg a ON a.pessoa = p.nome
+        LEFT JOIN LATERAL (
+          SELECT m.cap_mrr, m.cap_contas
+          FROM cortex_core.capacity_metas m
+          WHERE m.ativo = TRUE AND similarity(m.match_responsavel, p.nome) > 0.4
+          ORDER BY similarity(m.match_responsavel, p.nome) DESC
+          LIMIT 1
+        ) cap ON TRUE
+        ORDER BY COALESCE(a.mrr_operando, 0) DESC
+      `);
+
       const rows = result.rows as any[];
       const response: CapacityTimesResponse = {
         selva: rows.filter((r) => r.grupo === "selva").map((r) => toSelvaRow(r, META_CONTAS_DESIGNER)),
         black: rows.filter((r) => r.grupo === "black").map(toComercialRow),
         squadra: rows.filter((r) => r.grupo === "squadra").map(toComercialRow),
+        cxcs: (cxcsResult.rows as any[]).map(toComercialRow),
         metaContasDesigner: META_CONTAS_DESIGNER,
       };
       res.json(response);
@@ -210,12 +260,25 @@ export function registerCapacityRoutes(app: Express, db: any) {
     }
   });
 
-  // GET /api/capacity-times/contratos?nome=<nome> — carteira (responsável da subtask)
+  // GET /api/capacity-times/contratos?nome=<nome>[&campo=cs] — carteira pela coluna
+  // responsável da subtask (campo=cs usa cs_responsavel; default usa responsavel).
   app.get("/api/capacity-times/contratos", async (req, res) => {
     const nome = (req.query.nome as string | undefined)?.trim();
+    const usaCs = (req.query.campo as string | undefined)?.trim() === "cs";
     if (!nome) return res.status(400).json({ error: "nome é obrigatório" });
     try {
-      const rows = (await db.execute(sql`
+      const rows = (await db.execute(usaCs ? sql`
+        SELECT DISTINCT ON (c.id_subtask)
+               cl.nome AS cliente, c.produto, c.status,
+               COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask
+        FROM "Clickup".cup_contratos c
+        CROSS JOIN LATERAL regexp_split_to_table(c.cs_responsavel, ';') AS rp(part)
+        LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+        WHERE c.status IN ('ativo','onboarding','em cancelamento')
+          AND c.cs_responsavel IS NOT NULL AND c.cs_responsavel <> ''
+          AND similarity(TRIM(rp.part), ${nome}) > 0.4
+        ORDER BY c.id_subtask
+      ` : sql`
         SELECT DISTINCT ON (c.id_subtask)
                cl.nome AS cliente, c.produto, c.status,
                COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask

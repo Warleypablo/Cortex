@@ -38,6 +38,7 @@ interface CapacityTimesResponse {
   selva: SelvaRow[];
   black: ComercialRow[];
   squadra: ComercialRow[];
+  cxcs: ComercialRow[];
   metaContasDesigner: number;
 }
 
@@ -185,7 +186,7 @@ function Alerts({ people }: { people: { nome: string; util_pct: number | null }[
 
 // ── Tabelas ──
 
-function ComercialTable({ rows, onSelect }: { rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void }) {
+function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void; campo?: "cs" }) {
   if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Ninguém neste grupo ainda (popula automaticamente pelo cargo no RH).</p>;
   const teamMrr = sum(rows.map((r) => r.mrr_atual));
   return (
@@ -211,7 +212,7 @@ function ComercialTable({ rows, onSelect }: { rows: ComercialRow[]; onSelect: (s
             <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
               <TableCell
                 className={cn(td("font-medium"), "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline")}
-                onClick={() => onSelect({ label: r.nome, nome: r.nome })}
+                onClick={() => onSelect({ label: r.nome, nome: r.nome, campo })}
               >
                 {r.nome}
               </TableCell>
@@ -279,7 +280,7 @@ function SelvaTable({ rows, onSelect }: { rows: SelvaRow[]; onSelect: (s: Drawer
 
 // ── Conteúdo das abas ──
 
-function ComercialTab({ title, rows, onSelect }: { title: string; rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void }) {
+function ComercialTab({ title, rows, onSelect, campo }: { title: string; rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void; campo?: "cs" }) {
   const totMrr = sum(rows.map((r) => r.mrr_atual));
   const totContas = sum(rows.map((r) => r.contas_ativas));
   const riscoPct = pct(sum(rows.map((r) => r.mrr_cancelamento)), totMrr);
@@ -300,7 +301,7 @@ function ComercialTab({ title, rows, onSelect }: { title: string; rows: Comercia
       <Alerts people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader><CardTitle className="text-gray-900 dark:text-white">{title}</CardTitle></CardHeader>
-        <CardContent><ComercialTable rows={rows} onSelect={onSelect} /></CardContent>
+        <CardContent><ComercialTable rows={rows} onSelect={onSelect} campo={campo} /></CardContent>
       </Card>
     </div>
   );
@@ -453,12 +454,14 @@ export default function CapacityTimes() {
   const selva = data?.selva ?? [];
   const black = data?.black ?? [];
   const squadra = data?.squadra ?? [];
+  const cxcs = data?.cxcs ?? [];
   const metaContas = data?.metaContasDesigner ?? 0;
 
   const teams: TeamSummary[] = [
     ...(SELVA_BLOQUEADA ? [] : [summarizeSelva(selva)]),
     summarizeComercial("Black", black),
     summarizeComercial("Squadra", squadra),
+    summarizeComercial("CXCS", cxcs),
   ];
 
   return (
@@ -487,6 +490,7 @@ export default function CapacityTimes() {
             </TabsTrigger>
             <TabsTrigger value="black">Black ({black.length})</TabsTrigger>
             <TabsTrigger value="squadra">Squadra ({squadra.length})</TabsTrigger>
+            <TabsTrigger value="cxcs">CXCS ({cxcs.length})</TabsTrigger>
             <TabsTrigger value="__config__">⚙️ Configurar</TabsTrigger>
           </TabsList>
 
@@ -496,6 +500,7 @@ export default function CapacityTimes() {
           <TabsContent value="selva"><SelvaTab rows={selva} metaContas={metaContas} onSelect={setSelecao} /></TabsContent>
           <TabsContent value="black"><ComercialTab title="Black — Accounts" rows={black} onSelect={setSelecao} /></TabsContent>
           <TabsContent value="squadra"><ComercialTab title="Squadra — GPs" rows={squadra} onSelect={setSelecao} /></TabsContent>
+          <TabsContent value="cxcs"><ComercialTab title="CXCS — Customer Success" rows={cxcs} onSelect={setSelecao} campo="cs" /></TabsContent>
           <TabsContent value="__config__"><CapacityMetasConfig /></TabsContent>
         </Tabs>
       )}
