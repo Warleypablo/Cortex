@@ -118,6 +118,7 @@ const CriativosBiblioteca = lazyWithRetry(() => import("@/pages/CriativosBibliot
 const GrowthOrcadoRealizado = lazyWithRetry(() => import("@/pages/GrowthOrcadoRealizado"));
 const GrowthEvolucaoTemporal = lazyWithRetry(() => import("@/pages/GrowthEvolucaoTemporal"));
 const GrowthOrcamentoCampanhas = lazyWithRetry(() => import("@/pages/GrowthOrcamentoCampanhas"));
+const GrowthOrganico = lazyWithRetry(() => import("@/pages/GrowthOrganico"));
 const GrowthCreatorSummit = lazyWithRetry(() => import("@/pages/GrowthCreatorSummit"));
 const PlanejamentoMetas = lazyWithRetry(() => import("@/pages/PlanejamentoMetas"));
 const GrowthAI = lazyWithRetry(() => import("@/pages/GrowthAI"));
@@ -444,6 +445,7 @@ function ProtectedRouter() {
       <Route path="/growth/ai">{() => <ProtectedRoute path="/growth/ai" component={GrowthAI} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
       <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramDashboard} />}</Route>
+      <Route path="/growth/organico">{() => <ProtectedRoute path="/growth/organico" component={GrowthOrganico} />}</Route>
       <Route path="/crm-instagram">{() => <ProtectedRoute path="/crm-instagram" component={CrmInstagram} />}</Route>
       <Route path="/growth/dfc-cac">{() => <ProtectedRoute path="/growth/dfc-cac" component={GrowthDfcCac} />}</Route>
       

@@ -1,0 +1,69 @@
+/**
+ * Aplica a migration do painel "Orgânico" (tabelas content_*) no banco do Cortex.
+ *
+ * Roda UMA vez. É aditivo e idempotente (CREATE TABLE IF NOT EXISTS): pode rodar
+ * de novo sem risco — não altera nem apaga nenhuma tabela existente.
+ *
+ * Uso (de um checkout deste branch com as deps instaladas + o .env do Cortex):
+ *   npx tsx --env-file=.env scripts/apply-content-migration.ts
+ *   # se o seu shell já tem as variáveis do banco exportadas, pode omitir --env-file:
+ *   npx tsx scripts/apply-content-migration.ts
+ *
+ * Credenciais: lê do mesmo lugar que o app — DATABASE_URL, ou
+ * DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD (+ DB_SSL opcional).
+ */
+import { readFileSync } from "node:fs";
+import { resolve } from "node:path";
+import { Pool } from "pg";
+
+// Todas as migrations do painel Orgânico, em ordem cronológica. Todas são
+// aditivas/idempotentes (CREATE/ALTER ... IF NOT EXISTS), então rodar de novo é seguro.
+const SQL_FILES = [
+  "migrations/2026-06-24-content-publish.sql",
+  "migrations/2026-06-25-content-publish-operador.sql",
+  "migrations/2026-06-25-content-publish-horario.sql",
+  "migrations/2026-06-28-content-readiness.sql",
+];
+
+function makePool(): Pool {
+  const ssl = process.env.DB_SSL === "false" ? false : { rejectUnauthorized: false };
+  if (process.env.DATABASE_URL) {
+    return new Pool({ connectionString: process.env.DATABASE_URL, ssl });
+  }
+  if (!process.env.DB_HOST) {
+    throw new Error(
+      "Sem credenciais do banco. Defina DATABASE_URL, ou DB_HOST/DB_PORT/DB_NAME/DB_USER/DB_PASSWORD. " +
+        "Dica: rode com `npx tsx --env-file=.env scripts/apply-content-migration.ts`.",
+    );
+  }
+  return new Pool({
+    host: process.env.DB_HOST,
+    port: parseInt(process.env.DB_PORT || "5432", 10),
+    database: process.env.DB_NAME,
+    user: process.env.DB_USER,
+    password: process.env.DB_PASSWORD,
+    ssl,
+  });
+}
+
+async function main() {
+  const pool = makePool();
+  console.log("→ aplicando migrations content_* no banco…");
+  for (const rel of SQL_FILES) {
+    const sql = readFileSync(resolve(process.cwd(), rel), "utf8");
+    process.stdout.write(`   • ${rel} … `);
+    await pool.query(sql);
+    console.log("ok");
+  }
+  const { rows } = await pool.query(
+    "SELECT platform, agent_enabled AS ativo, dry_run FROM cortex_core.content_publish_settings ORDER BY platform",
+  );
+  console.log("✓ Pronto. 4 tabelas content_* criadas/garantidas. Seed de settings:");
+  console.table(rows);
+  await pool.end();
+}
+
+main().catch((err) => {
+  console.error("✗ Falhou:", err.message);
+  process.exit(1);
+});

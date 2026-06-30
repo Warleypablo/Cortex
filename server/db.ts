@@ -1272,6 +1272,122 @@ async function applySysValidationRules(): Promise<void> {
   console.log('[database] sys validation_rules applied');
 }
 
+// Painel "Orgânico" (publicação de conteúdo) — tabelas content_* no schema cortex_core.
+// Espelha shared/schema.ts e as migrations migrations/2026-06-2*-content-*.sql.
+// Idempotente e auto-suficiente: cria do zero E faz ALTER ADD COLUMN p/ DBs que já têm
+// uma versão parcial das tabelas — assim o deploy não depende de rodar migration na mão.
+export async function initializeContentPublishTables(): Promise<void> {
+  try {
+    await db.execute(sql`CREATE SCHEMA IF NOT EXISTS cortex_core`);
+
+    // content_publish_runs — 1 linha/ciclo (saúde/heartbeat)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.content_publish_runs (
+        id          SERIAL PRIMARY KEY,
+        run_id      VARCHAR(16) NOT NULL,
+        platform    VARCHAR(16) NOT NULL,
+        dry_run     BOOLEAN NOT NULL DEFAULT true,
+        status      VARCHAR(16) NOT NULL DEFAULT 'running',
+        counts      JSONB DEFAULT '{}'::jsonb,
+        error_text  TEXT,
+        started_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+        finished_at TIMESTAMPTZ
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_publish_runs_platform_started ON cortex_core.content_publish_runs (platform, started_at)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_publish_runs_run_id ON cortex_core.content_publish_runs (run_id)`);
+
+    // content_posts — 1 linha/task (fila/status). Inclui as colunas das migrations posteriores.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.content_posts (
+        id                 SERIAL PRIMARY KEY,
+        platform           VARCHAR(16) NOT NULL,
+        clickup_task_id    VARCHAR(64) NOT NULL,
+        clickup_list_id    VARCHAR(64),
+        task_name          TEXT,
+        parent_name        TEXT,
+        mes                VARCHAR(24),
+        turbo_slug         VARCHAR(128),
+        posting_date       DATE,
+        posting_time       VARCHAR(8),
+        slot               VARCHAR(8),
+        tipo_post          VARCHAR(16),
+        asset_count        INTEGER DEFAULT 0,
+        legenda_source     VARCHAR(24),
+        legenda_len        INTEGER DEFAULT 0,
+        legenda_empty      BOOLEAN DEFAULT false,
+        legenda_preview    TEXT,
+        state              VARCHAR(24) NOT NULL DEFAULT 'agendado',
+        scheduled_at       TIMESTAMPTZ,
+        card_scheduled_at  TIMESTAMPTZ,
+        readiness          VARCHAR(16),
+        block_reasons      JSONB,
+        skip_reason        TEXT,
+        error_text         TEXT,
+        published_media_id VARCHAR(64),
+        permalink          TEXT,
+        clickup_url        TEXT,
+        last_run_id        VARCHAR(16),
+        first_seen_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_at         TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+    // ALTER idempotente p/ DBs com a tabela criada antes das migrations de coluna
+    await db.execute(sql`ALTER TABLE cortex_core.content_posts ADD COLUMN IF NOT EXISTS scheduled_at TIMESTAMPTZ`);
+    await db.execute(sql`ALTER TABLE cortex_core.content_posts ADD COLUMN IF NOT EXISTS posting_time VARCHAR(8)`);
+    await db.execute(sql`ALTER TABLE cortex_core.content_posts ADD COLUMN IF NOT EXISTS card_scheduled_at TIMESTAMPTZ`);
+    await db.execute(sql`ALTER TABLE cortex_core.content_posts ADD COLUMN IF NOT EXISTS readiness VARCHAR(16)`);
+    await db.execute(sql`ALTER TABLE cortex_core.content_posts ADD COLUMN IF NOT EXISTS block_reasons JSONB`);
+    // chave de upsert estável por task (platform, clickup_task_id)
+    await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_content_posts_platform_task ON cortex_core.content_posts (platform, clickup_task_id)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_posts_platform_date ON cortex_core.content_posts (platform, posting_date)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_posts_scheduled ON cortex_core.content_posts (platform, scheduled_at)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_posts_card_scheduled ON cortex_core.content_posts (platform, card_scheduled_at)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_posts_state ON cortex_core.content_posts (state)`);
+
+    // content_publish_commands — fila painel→worker
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.content_publish_commands (
+        id              SERIAL PRIMARY KEY,
+        platform        VARCHAR(16) NOT NULL,
+        clickup_task_id VARCHAR(64),
+        action          VARCHAR(32) NOT NULL,
+        payload         JSONB DEFAULT '{}'::jsonb,
+        status          VARCHAR(16) NOT NULL DEFAULT 'pending',
+        result          JSONB,
+        error_text      TEXT,
+        requested_by    VARCHAR(255),
+        created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+        consumed_at     TIMESTAMPTZ,
+        finished_at     TIMESTAMPTZ
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_publish_commands_status ON cortex_core.content_publish_commands (status)`);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_publish_commands_platform_task ON cortex_core.content_publish_commands (platform, clickup_task_id)`);
+
+    // content_publish_settings — toggle por plataforma (dry-run LIGADO por segurança)
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.content_publish_settings (
+        platform      VARCHAR(16) PRIMARY KEY,
+        agent_enabled BOOLEAN NOT NULL DEFAULT true,
+        dry_run       BOOLEAN NOT NULL DEFAULT true,
+        slots_config  JSONB,
+        updated_by    VARCHAR(255),
+        updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+      )
+    `);
+    await db.execute(sql`
+      INSERT INTO cortex_core.content_publish_settings (platform, agent_enabled, dry_run)
+      VALUES ('instagram', true, true), ('tiktok', true, true)
+      ON CONFLICT (platform) DO NOTHING
+    `);
+
+    console.log('[database] cortex_core content_* (painel Orgânico) tables ready');
+  } catch (error) {
+    console.error('[database] initializeContentPublishTables error:', error);
+  }
+}
+
 export async function initializeBPTables(): Promise<void> {
   try {
     await db.execute(sql`

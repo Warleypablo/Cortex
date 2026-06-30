@@ -1,5 +1,108 @@
 # Changelog
 
+## 2026-06-25 | feat(organico): painel operador (3 visões + Soltar agora/Agendar) + engine do worker
+
+**O que foi feito:**
+- **Redesenho do painel Orgânico** pro fluxo do operador: 3 visões do dia (**Aprovados / Agendados / Publicados**) e, por post aprovado, ações **"Soltar agora"** (confirmação) e **"Agendar"** (date-picker). Substitui o read-only "Saúde/Fila/Histórico".
+- **Modelo de dados** (migration aditiva `2026-06-25-content-publish-operador.sql`, aplicada): `state` += `aprovado`; coluna `content_posts.scheduled_at`; unique `(platform, clickup_task_id)` (tolera aprovado sem data); `command.action` += `schedule|cancel_schedule`.
+- **Backend** (`server/routes/organico.ts`): `/overview` em 3 visões; `POST /commands` + `POST /settings` (operador, pós-auth); `GET /commands/pending` + `POST /commands/:id/ack` + `GET /posts/due` (máquina, token); ingest com upsert por task e `scheduled_at` chave-presente.
+- **Engine do worker** (monorepo `automacoes/instagram-turbo/agente/`): `main_poller.py` (reporta aprovados + consome fila + publica vencidos; `--once` p/ cron), `commands.py` (consumidor; DRY_RUN não publica), `panel_client.py` (HTTP de máquina fail-soft), `state_sink` (emite `aprovado` + `report_posts`).
+
+**Por que:**
+- O painel só observava; o time precisa **operar** (soltar/agendar) sem terminal. Os cards aprovados costumam estar sem "Data de Postagem" e não saíam sozinhos — o operador passa a comandar a publicação pela fila `content_publish_commands`.
+
+**Arquivos alterados:**
+- `shared/schema.ts`, `migrations/2026-06-25-content-publish-operador.sql` - modelo de dados.
+- `server/routes/organico.ts` - 3 visões + comandos + endpoints de máquina.
+- `client/src/pages/GrowthOrganico.tsx` - UI operador (botões + date-picker).
+- `automacoes/instagram-turbo/agente/{main_poller,commands,panel_client,state_sink}.py` + `tests/test_commands.py` - engine + 12 testes.
+
+**Impacto arquitetural:** Backend continua só lendo/escrevendo Postgres; o worker fala HTTP (pull/ack/ingest/due), nunca toca o banco direto. Engine vive só no monorepo (cópia de referência); ativar exige portar pro repo de prod `automacao-insta` + tokens + launchd recorrente + merge→main. Tudo dry-run + integração testado; nada publicado.
+
+---
+
+## 2026-06-25 | feat(publicacao): telemetria do worker → painel Orgânico (ingest + hooks)
+
+**O que foi feito:**
+- **Cortex:** endpoint `POST /api/growth/organico/ingest` (token-auth via `ORGANICO_INGEST_TOKEN`, registrado PRÉ-`isAuthenticated`): insere 1 `content_publish_runs` + faz upsert dos `content_posts` (chave platform+task+data). Upsert validado contra a prod (transação com rollback).
+- **Worker (instagram-turbo, stdlib):** `agente/state_sink.py` — POST fail-soft (urllib) do estado de cada ciclo; `panel_post`/`panel_state` mapeiam `PlannedAction` → estado do painel (agendado/aguardando_ia/publicado/falhou/pulado). Hooks em `main.py` (IG) e `main_tiktok.py` coletam o estado por task e chamam `report_cycle` no fim. Config nova: `CORTEX_INGEST_URL` + `ORGANICO_INGEST_TOKEN` (opcionais — sem elas o agente roda igual e só não atualiza o painel).
+
+**Por que:**
+- Fecha a Fase 1: o painel sai do vazio. Worker continua **zero-dependência** (só urllib) e **sem credencial de banco** — POSTa pro Cortex, que escreve. Reusa o padrão de endpoint-com-token (FCA).
+
+**Arquivos alterados:**
+- `server/routes/organico.ts` (+ `registerOrganicoIngestRoutes`), `server/routes.ts` (registro pré-auth).
+- `automacoes/instagram-turbo/agente/state_sink.py` (novo) + `config.py` + `.env.example` + `main.py` + `main_tiktok.py`.
+
+**Impacto arquitetural:** Refinamento do plano — em vez de o worker escrever direto no Postgres, ele reporta via HTTP pro Cortex (preserva zero-dep do worker, não espalha creds do banco). Pra ficar LIVE: setar `ORGANICO_INGEST_TOKEN` no Cortex (Render) + `CORTEX_INGEST_URL`/token no `.env` do worker. PROD do worker roda do repo separado `automacao-insta` → essa cópia precisa ser sincronizada lá.
+
+---
+
+## 2026-06-25 | chore(publicacao): script p/ aplicar a migration content_*
+
+Script `scripts/apply-content-migration.ts`: aplica `migrations/2026-06-24-content-publish.sql` reusando a conexão do app (DATABASE_URL ou DB_*). Idempotente — caminho de 1 comando pra criar as tabelas `content_*` sem psql/GUI. **Impacto arquitetural:** Nenhum (helper).
+
+---
+
+## 2026-06-24 | feat(publicacao): página Orgânico (Growth) + endpoint read-only
+
+**O que foi feito:**
+- Nova página **Orgânico** em Growth (`/growth/organico`, permissão `growth.organico`): painel **somente leitura** com Saúde do agente (por plataforma), Fila de publicação e Histórico, filtro por rede (IG/TikTok/…) e refetch a cada 20s. Lê das tabelas `content_*`.
+- Endpoint `GET /api/growth/organico/overview` (`server/routes/organico.ts`): retorna settings + último ciclo por plataforma + fila (hoje/futuro não publicado) + histórico (publicados).
+- Fiação: `nav-config` (permission key + rota + item "Orgânico" + label), `App.tsx` (rota lazy), `app-sidebar` (ícone `Sprout` no mapa).
+
+**Por que:**
+- Fatia visível da Fase 1: o time enxerga fila/status/saúde da automação sem terminal. Read-only de propósito (botões de ação = Fase 3). Platform-aware desde já.
+
+**Arquivos alterados:**
+- `client/src/pages/GrowthOrganico.tsx` (novo) — a página.
+- `server/routes/organico.ts` (novo) — endpoint de leitura.
+- `server/routes.ts` — import + registro **pós-auth**.
+- `shared/nav-config.ts` — permissão/rota/nav/label de `growth.organico`.
+- `client/src/App.tsx` — rota `/growth/organico`.
+- `client/src/components/app-sidebar.tsx` — ícone `Sprout` no mapa.
+
+**Impacto arquitetural:** Endpoint registrado intencionalmente DEPOIS de `app.use("/api", isAuthenticated)` (linha 479) — registrar junto do Instagram (pré-auth por causa do OAuth) deixaria a rota sem autenticação. Sem dado real até a migration `content_*` ser aplicada e o worker popular as tabelas (painel mostra estados vazios). Não typechecado localmente (worktree sem node_modules) — validar no build/CI.
+
+---
+
+## 2026-06-24 | feat(publicacao): slot da tarde às 17h30 (granularidade de minutos)
+
+**O que foi feito:**
+- Move o slot vespertino do publicador de **18h para 17h30 cravado**: `SLOTS = ((12, 0), (17, 30))` em `agente/main.py`.
+- Refatora `current_slot` / `slot_status_human` pra operar em **minutos do dia** (antes era hora cheia, não conseguia representar `:30`). Agora é genérico pra N slots e o rótulo vira `"17h30"` quando há minutos.
+- Tolerância passa a ser `SLOT_TOLERANCE_MINUTES = 60` → janela efetiva 17:30–18:29 (garante que a rodada do cron pegue o slot mesmo sem cair no segundo exato).
+- Teste `agente/tests/test_slots.py` trava o comportamento: 17:29 não abre, 17:30 abre, 18:29 ainda abre, 18:30 fecha.
+
+**Por que:**
+- O conteúdo programado pras 17h30 não saía porque o agente só tinha slots fixos de 12h e 18h — 17h30 caía na zona morta "entre slots" e o `execute_plan` se recusava a publicar. A correção alinha o horário de publicação ao que o time planejou.
+
+**Arquivos alterados:**
+- `automacoes/instagram-turbo/agente/main.py` - novo modelo de slot (hora, minuto) + helpers `_slot_label`/`_mins`/`_hhmm`; texto do `--force-now` atualizado p/ "12h/17h30".
+- `automacoes/instagram-turbo/agente/tests/test_slots.py` - cobertura nova do slot 17h30 e das mensagens de fora-de-slot.
+
+**Impacto arquitetural:** Nenhum. Mudança confinada ao adaptador/orquestrador do Instagram; núcleo agnóstico (`plan_task`, drive, docs) intocado. `slot` continua cabendo em `VARCHAR(8)` no schema `content_posts`.
+
+---
+
+## 2026-06-24 | feat(publicacao): fundação do painel "Orgânico" — skill + schema content_*
+
+**O que foi feito:**
+- Nova skill `.claude/skills/subir-conteudo-organico/SKILL.md`: blueprint do publicador multiplataforma (núcleo agnóstico `plan_task` + adaptador por plataforma) com checklist de "adicionar plataforma" para replicar IG → TikTok/YouTube/LinkedIn.
+- Schema `content_*` no `cortex_core` (fonte da verdade do painel operador, platform-aware): `content_publish_runs` (saúde/heartbeat), `content_posts` (fila/status por task/dia), `content_publish_commands` (fila painel→worker) e `content_publish_settings` (toggle pausar/dry-run por plataforma). Definido em `shared/schema.ts` + migration SQL idempotente, com seed em dry-run ligado.
+
+**Por que:**
+- Início da Fase 1 do painel **Orgânico** (Growth): dar ao time de conteúdo (Esther + editores) visão de fila/status/saúde e operação da automação `instagram-turbo` sem terminal/Claude. Tabelas genéricas (`content_*`, não `instagram_*`) porque o mesmo painel/worker servirá IG, TikTok, YouTube e LinkedIn.
+
+**Arquivos alterados:**
+- `shared/schema.ts` - 4 tabelas `content_*` + tipos `$inferSelect/$inferInsert`.
+- `migrations/2026-06-24-content-publish.sql` - DDL idempotente espelhando o schema + seed das settings (instagram, tiktok).
+- `.claude/skills/subir-conteudo-organico/SKILL.md` - skill nova (blueprint + checklist por plataforma).
+
+**Impacto arquitetural:** Estabelece o Postgres do Cortex como fonte da verdade entre o worker Python e o painel (o backend Express só lê/escreve as tabelas, nunca chama o Python). Aditivo — nenhuma tabela existente alterada. Migration ainda **não aplicada** no banco (pendente `drizzle-kit push` ou rodar o SQL).
+
+---
+
 ## 2026-06-29 | fix(encurtador): UTM única (dedup) — não cria link duplicado
 
 **O que foi feito:**
@@ -124,6 +227,7 @@
 - `docs/encurtador-links-plano.md` (novo) - plano de implementação (5 fases) e decisões travadas.
 
 **Impacto arquitetural:** Nenhum estrutural. Só definição de schema (Drizzle); `tsc --noEmit` não acusa erros no schema. Criação física das tabelas (`npm run db:push`) é passo separado, ainda não executado.
+
 ## 2026-06-29 | feat(churn): histórico mensal de churn por motivo na tela Detalhamento
 
 **O que foi feito:**

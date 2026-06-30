@@ -45,7 +45,7 @@ import traceback
 import uuid
 from datetime import date, datetime, timezone
 
-from agente import clickup, clickup_write, main as ig_main
+from agente import clickup, clickup_write, main as ig_main, state_sink
 from agente.config import CONFIG
 from agente.idempotency import Lock, LockHeld, MARKER_POSTED
 
@@ -124,6 +124,8 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     args = _parse_args(argv)
     run_id = uuid.uuid4().hex[:8]
+    posts: list[dict] = []
+    started_at = datetime.now(timezone.utc).isoformat()
     mode = "direct" if args.direct else _post_mode()
     privacy = _privacy_level()
 
@@ -179,7 +181,12 @@ def main(argv: list[str] | None = None) -> int:
                     errors += 1
                     continue
 
+                post = state_sink.panel_post(plan, "tiktok")
+                posts.append(post)
                 ok, motivo = tiktok_ready(plan, mode)
+                if not ok and not plan.skip_reason and not plan.legenda_empty:
+                    post["state"] = "pulado"          # não-vídeo / readiness do TikTok
+                    post["skip_reason"] = motivo
                 print(f"\n── Task {t.id} «{t.name}»")
                 print(f"   mês={plan.mes or '?'} turbo={plan.turbo_slug or '—'} "
                       f"tipo={plan.tipo_post or '—'} assets={plan.asset_count}")
@@ -203,10 +210,14 @@ def main(argv: list[str] | None = None) -> int:
                 try:
                     pid = publish_tiktok(plan, mode=mode, privacy=privacy, run_id=run_id)
                     published += 1
+                    post["state"] = "publicado"
+                    post["published_media_id"] = pid
                     print(f"   ✅ enviado: publish_id={pid}"
                           + ("  → abra o TikTok e publique o rascunho" if mode == "draft" else ""))
                 except Exception as e:  # noqa: BLE001
                     failed += 1
+                    post["state"] = "falhou"
+                    post["error_text"] = f"{type(e).__name__}: {e}"
                     print(f"   ❌ falha publicando: {type(e).__name__}: {e}")
                     try:
                         clickup_write.mark_error(plan.task_id, f"TikTok: {e}")
@@ -222,6 +233,16 @@ def main(argv: list[str] | None = None) -> int:
             print(f"  puladas (idempot/data): {skipped}")
             print(f"  erros:                  {errors}")
             print("──────────────────────────────────────────")
+
+            counts = {
+                "ready": ready, "published": published, "publish_failed": failed,
+                "nao_video": not_video, "pulados": skipped, "errors": errors,
+            }
+            state_sink.report_cycle(
+                "tiktok", run_id=run_id, dry_run=CONFIG.dry_run,
+                started_at=started_at, counts=counts, posts=posts,
+                status="error" if (errors or failed) else "ok",
+            )
             return 0
     except LockHeld as e:
         print(f"⛔ {e}")
