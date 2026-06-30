@@ -3797,3 +3797,60 @@ export type GhlTagsSnapshot = typeof ghlTagsSnapshot.$inferSelect;
 export type InsertGhlTagsSnapshot = typeof ghlTagsSnapshot.$inferInsert;
 export type GhlSyncRun = typeof ghlSyncRuns.$inferSelect;
 export type InsertGhlSyncRun = typeof ghlSyncRuns.$inferInsert;
+
+// ============================================================
+// Automação semanal de subida de ads (ClickUp "Subir ad" → Meta)
+// Rastreamento de execuções/lotes para o painel read-only no Cortex.
+// Ver server/services/adsAutomationJob.ts e server/routes/adsAutomation.ts
+// ============================================================
+
+export const adsAutomationRuns = cortexCoreSchema.table("ads_automation_runs", {
+  id: serial("id").primaryKey(),
+  status: varchar("status", { length: 20 }).notNull(), // running | success | partial | error
+  triggeredBy: varchar("triggered_by", { length: 20 }).notNull().default("schedule"), // schedule | manual | recovery
+  weekOf: date("week_of").notNull(), // segunda-feira da semana (idempotência: 1 run/semana)
+  dryRun: boolean("dry_run").notNull().default(true),
+  lotesTotal: integer("lotes_total").notNull().default(0),
+  lotesDone: integer("lotes_done").notNull().default(0),
+  lotesAwaitingUpload: integer("lotes_awaiting_upload").notNull().default(0),
+  lotesFailed: integer("lotes_failed").notNull().default(0),
+  conjuntosCriados: integer("conjuntos_criados").notNull().default(0),
+  adsCriados: integer("ads_criados").notNull().default(0),
+  errorMessage: text("error_message"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (table) => ({
+  weekOfIdx: uniqueIndex("ads_automation_runs_week_of_idx").on(table.weekOf),
+  statusIdx: index("ads_automation_runs_status_idx").on(table.status, table.startedAt),
+}));
+
+export const adsAutomationSteps = cortexCoreSchema.table("ads_automation_steps", {
+  id: serial("id").primaryKey(),
+  runId: integer("run_id").notNull().references(() => adsAutomationRuns.id, { onDelete: "cascade" }),
+  ordem: integer("ordem").notNull().default(0),
+  clickupTaskId: varchar("clickup_task_id", { length: 40 }).notNull(), // subtask "Subir ad" (gatilho)
+  clickupParentId: varchar("clickup_parent_id", { length: 40 }), // task mãe (fonte dos campos do lote)
+  loteNome: text("lote_nome"),
+  clickupUrl: text("clickup_url"),
+  // pending | running | done | failed | awaiting_manual_upload | skipped
+  status: varchar("status", { length: 30 }).notNull().default("pending"),
+  detalhe: text("detalhe"),
+  warnings: jsonb("warnings"),
+  conjuntoId: varchar("conjunto_id", { length: 40 }),
+  adIds: jsonb("ad_ids"),
+  bookmark: jsonb("bookmark"), // CreationBookmark.uploadedMedia[] p/ retomar upload de onde parou
+  planSnapshot: jsonb("plan_snapshot"), // LotePlan serializado p/ retomar sem reler ClickUp
+  attempts: integer("attempts").notNull().default(0),
+  clickupStatusMoved: boolean("clickup_status_moved").notNull().default(false),
+  startedAt: timestamp("started_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (table) => ({
+  runOrdemIdx: index("ads_automation_steps_run_ordem_idx").on(table.runId, table.ordem),
+  statusIdx: index("ads_automation_steps_status_idx").on(table.status),
+  runTaskIdx: uniqueIndex("ads_automation_steps_run_task_idx").on(table.runId, table.clickupTaskId),
+}));
+
+export type AdsAutomationRun = typeof adsAutomationRuns.$inferSelect;
+export type InsertAdsAutomationRun = typeof adsAutomationRuns.$inferInsert;
+export type AdsAutomationStep = typeof adsAutomationSteps.$inferSelect;
+export type InsertAdsAutomationStep = typeof adsAutomationSteps.$inferInsert;
