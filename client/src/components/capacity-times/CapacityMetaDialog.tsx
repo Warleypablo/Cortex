@@ -19,9 +19,11 @@ export const CATEGORIA_LABELS: Record<string, string> = {
   vendedor: "Selva (vendedor)",
   account: "Accounts (account)",
   gestor: "Squadra (gestor)",
+  Black: "Black (Accounts)",
+  CXCS: "CXCS (Customer Success)",
 };
 
-const CATEGORIAS_BASE = ["Pulse", "Olimpo", "vendedor", "account", "gestor"];
+const CATEGORIAS_BASE = ["Black", "Squadra", "CXCS", "Pulse", "Olimpo"];
 const NOVA = "__nova__";
 
 interface FormState {

@@ -27,6 +27,7 @@ export function diff(cap: number | null | undefined, atual: number): number | nu
 
 export interface ComercialRow {
   nome: string;
+  match?: string; // nome alternativo p/ o drawer (ex.: Black usa responsavel_geral)
   mrr_atual: number;
   mrr_ativo: number;
   mrr_onboarding: number;
@@ -49,6 +50,7 @@ export function toComercialRow(raw: any): ComercialRow {
   const util_mrr_pct = utilPct(mrr_atual, cap_mrr);
   return {
     nome: String(raw.nome),
+    ...(raw.match ? { match: String(raw.match) } : {}),
     mrr_atual,
     mrr_ativo: num(raw.mrr_ativo),
     mrr_onboarding: num(raw.mrr_onboarding),
@@ -60,7 +62,8 @@ export function toComercialRow(raw: any): ComercialRow {
     dif_contas: diff(cap_contas, contas_ativas),
     util_mrr_pct,
     util_contas_pct: utilPct(contas_ativas, cap_contas),
-    util_pct: util_mrr_pct,
+    // Legado p/ alertas: usa MRR quando há cap de MRR; senão cai p/ contas (ex.: Black).
+    util_pct: util_mrr_pct ?? utilPct(contas_ativas, cap_contas),
   };
 }
 
@@ -96,39 +99,9 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
   };
 }
 
-// ── Black (accounts): carteira = todas as subtasks dos clientes que cuida ──
-
-export interface BlackRow {
-  nome: string; // label
-  match: string; // nome em responsavel_geral (para o drawer)
-  clientes: number;
-  contas: number; // nº de subtasks dos clientes
-  fat_recorrente: number;
-  fat_pontual: number;
-  faturamento: number; // rec + pont
-  ticket_medio: number | null; // faturamento / contas
-}
-
-export function toBlackRow(raw: any): BlackRow {
-  const contas = num(raw.contas);
-  const fat_recorrente = num(raw.fat_recorrente);
-  const fat_pontual = num(raw.fat_pontual);
-  const faturamento = fat_recorrente + fat_pontual;
-  return {
-    nome: String(raw.nome),
-    match: String(raw.match),
-    clientes: num(raw.clientes),
-    contas,
-    fat_recorrente,
-    fat_pontual,
-    faturamento,
-    ticket_medio: contas > 0 ? faturamento / contas : null,
-  };
-}
-
 export interface CapacityTimesResponse {
   selva: SelvaRow[];
-  black: BlackRow[];
+  black: ComercialRow[];
   squadra: ComercialRow[];
   cxcs: ComercialRow[];
   metaContasDesigner: number;

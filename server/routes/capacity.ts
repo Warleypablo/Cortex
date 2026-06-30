@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { toComercialRow, toSelvaRow, toBlackRow, type CapacityTimesResponse } from "./capacityTimes.helpers";
-import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS } from "../../shared/capacityGrupos";
+import { toComercialRow, toSelvaRow, type CapacityTimesResponse } from "./capacityTimes.helpers";
+import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS, CAP_CONTAS_ACCOUNT } from "../../shared/capacityGrupos";
 
 // Tabela de referência: nível do Gestor de Performance → metas
 const GESTOR_LEVELS: Record<string, { mrr_alvo: number; ticket_alvo: number }> = {
@@ -262,8 +262,9 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ORDER BY COALESCE(a.mrr_operando, 0) DESC
       `);
 
-      // Black: cada account → clientes (cup_clientes.responsavel_geral) → TODAS as
-      // subtasks desses clientes (valorr + valorp). Régua por faturamento + contas.
+      // Black: cada account → clientes (cup_clientes.responsavel_geral) → subtasks desses
+      // clientes. Régua igual aos outros squads (MRR + contas), mas "Contas" = nº de
+      // clientes que cuida (cap = CAP_CONTAS_ACCOUNT). Status: só ativo + em cancelamento.
       const blackResult = await db.execute(sql`
         WITH accounts(label, match) AS (VALUES ${accountsValues}),
         clientes_do_account AS (
@@ -275,29 +276,46 @@ export function registerCapacityRoutes(app: Express, db: any) {
           )
         ),
         subs AS (
-          SELECT cda.label, cda.task_id, c.id_subtask,
-                 COALESCE(c.valorr, 0) AS vr, COALESCE(c.valorp, 0) AS vp
+          SELECT cda.label, COALESCE(c.valorr, 0) AS vr, c.status
           FROM clientes_do_account cda
           JOIN "Clickup".cup_contratos c
-            ON c.id_task = cda.task_id AND c.status IN ('ativo','onboarding','em cancelamento')
+            ON c.id_task = cda.task_id AND c.status IN ('ativo','em cancelamento')
+        ),
+        agg AS (
+          SELECT label,
+            COALESCE(SUM(vr), 0) AS mrr_operando,
+            COALESCE(SUM(vr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
+            COALESCE(SUM(vr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
+          FROM subs GROUP BY label
         ),
         cli AS (SELECT label, COUNT(DISTINCT task_id) AS clientes FROM clientes_do_account GROUP BY label)
         SELECT a.label AS nome, a.match,
-          COALESCE(cli.clientes, 0)              AS clientes,
-          COUNT(DISTINCT s.id_subtask)           AS contas,
-          COALESCE(SUM(s.vr), 0)                 AS fat_recorrente,
-          COALESCE(SUM(s.vp), 0)                 AS fat_pontual
+          COALESCE(ag.mrr_operando, 0)     AS mrr_operando,
+          COALESCE(ag.mrr_ativo, 0)        AS mrr_ativo,
+          0                                AS mrr_onboarding,
+          COALESCE(ag.mrr_cancelamento, 0) AS mrr_cancelamento,
+          COALESCE(cli.clientes, 0)        AS contas_rec,
+          cap.cap_mrr,
+          COALESCE(cap.cap_contas, ${CAP_CONTAS_ACCOUNT}) AS cap_contas
         FROM accounts a
+        LEFT JOIN agg ag ON ag.label = a.label
         LEFT JOIN cli ON cli.label = a.label
-        LEFT JOIN subs s ON s.label = a.label
-        GROUP BY a.label, a.match, cli.clientes
-        ORDER BY (COALESCE(SUM(s.vr), 0) + COALESCE(SUM(s.vp), 0)) DESC
+        LEFT JOIN LATERAL (
+          -- Só caps configuradas na categoria 'Black' (aba Configurar) sobrescrevem o default.
+          SELECT m.cap_mrr, m.cap_contas
+          FROM cortex_core.capacity_metas m
+          WHERE m.ativo = TRUE AND m.categoria = 'Black'
+            AND similarity(m.match_responsavel, a.label) > 0.45
+          ORDER BY similarity(m.match_responsavel, a.label) DESC
+          LIMIT 1
+        ) cap ON TRUE
+        ORDER BY COALESCE(ag.mrr_operando, 0) DESC
       `);
 
       const rows = result.rows as any[];
       const response: CapacityTimesResponse = {
         selva: rows.filter((r) => r.grupo === "selva").map((r) => toSelvaRow(r, META_CONTAS_DESIGNER)),
-        black: (blackResult.rows as any[]).map(toBlackRow),
+        black: (blackResult.rows as any[]).map(toComercialRow),
         squadra: rows.filter((r) => r.grupo === "squadra").map(toComercialRow),
         cxcs: (cxcsResult.rows as any[]).map(toComercialRow),
         metaContasDesigner: META_CONTAS_DESIGNER,
@@ -326,7 +344,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
                  COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask
           FROM "Clickup".cup_clientes cl
           JOIN "Clickup".cup_contratos c
-            ON c.id_task = cl.task_id AND c.status IN ('ativo','onboarding','em cancelamento')
+            ON c.id_task = cl.task_id AND c.status IN ('ativo','em cancelamento')
           WHERE EXISTS (
             SELECT 1 FROM regexp_split_to_table(COALESCE(cl.responsavel_geral, ''), ';') rp(part)
             WHERE TRIM(rp.part) = ${nome}
