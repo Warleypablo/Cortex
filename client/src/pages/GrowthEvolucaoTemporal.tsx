@@ -67,6 +67,7 @@ interface AdsData {
   ctrUnicoAvailable?: boolean;
   connectRate: number;
   visualizacoesPagina: number;
+  visualizacoesPaginaPixel: number;
   sessoes: number;
   leads: number;
   mqls: number;
@@ -255,8 +256,11 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "ads_impressoes", name: "Impressões", format: "number", section: "marketing",
     realizado: ({ ads }) => ads?.impressoes ?? null,
     orcado: (b) => b.marketing?.impressoes ?? null },
+  // Visualizações de Página = landing_page_views do pixel do Meta Ads (não GA4).
+  // Padrão da casa: quando falamos de "visualização de página", é o número do Meta.
+  // Por isso a Tx Conversão da Página abaixo divide leads/MQLs pelo pixel (Meta-only).
   { id: "ads_visualizacoes_pagina", name: "Visualizações de Página", format: "number", section: "marketing",
-    realizado: ({ ads }) => ads?.visualizacoesPagina ?? null,
+    realizado: ({ ads }) => ads?.visualizacoesPaginaPixel ?? null,
     orcado: (b) => b.marketing?.visualizacoesPagina ?? null },
   { id: "ads_sessoes", name: "Sessões", format: "number", section: "marketing",
     realizado: ({ ads }) => ads?.sessoes ?? null,
@@ -264,14 +268,16 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "ads_taxa_conversao_pagina", name: "Tx Conversão da Página", format: "percent", section: "marketing",
     realizado: ({ ads }) => {
       if (!ads) return null;
-      return ads.visualizacoesPagina > 0 ? ads.leads / ads.visualizacoesPagina : 0;
+      // null (não 0%) quando não há pixel — ex.: filtro só Google/TikTok/LinkedIn,
+      // onde o landing_page_views do Meta não existe.
+      return ads.visualizacoesPaginaPixel > 0 ? ads.leads / ads.visualizacoesPaginaPixel : null;
     },
     orcado: (b) => b.marketing?.taxaConversaoPagina ?? null },
   { id: "ads_taxa_conversao_pagina_mql", name: "MQL", format: "percent", section: "marketing", sub: true,
-    realizado: ({ ads }) => (ads && ads.visualizacoesPagina > 0 ? ads.mqls / ads.visualizacoesPagina : null),
+    realizado: ({ ads }) => (ads && ads.visualizacoesPaginaPixel > 0 ? ads.mqls / ads.visualizacoesPaginaPixel : null),
     orcado: () => null },
   { id: "ads_taxa_conversao_pagina_nmql", name: "Não-MQL", format: "percent", section: "marketing", sub: true,
-    realizado: ({ ads }) => (ads && ads.visualizacoesPagina > 0 ? (ads.leads - ads.mqls) / ads.visualizacoesPagina : null),
+    realizado: ({ ads }) => (ads && ads.visualizacoesPaginaPixel > 0 ? (ads.leads - ads.mqls) / ads.visualizacoesPaginaPixel : null),
     orcado: () => null },
   // Conversão por Sessões (GA4): denominador = sessões em vez de visualizações de
   // página. Sem alvo orçado (não há taxaConversaoSessoes no budget). null quando não
