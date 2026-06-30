@@ -14,6 +14,10 @@ import {
   Users, Target, Layers, Filter, ShieldCheck, TrendingUp, TrendingDown,
   Trophy, AlertTriangle, Wallet, Database, Info,
 } from "lucide-react";
+import { GestaoReceitaDetalhe, type DrillRef } from "@/components/gestao/GestaoReceitaDetalhe";
+
+// classe das linhas/elementos clicáveis (drill-down)
+const rowClick = "cursor-pointer transition hover:bg-gray-50 dark:hover:bg-zinc-800/50";
 
 /* ---------- tipos ---------- */
 type Stat = { orcado: number; realizado: number };
@@ -70,8 +74,8 @@ function Fonte({ tipo }: { tipo: "bitrix" | "clickup" | "bp" | "caixa" }) {
   return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.cls}`}>{m.label}</span>;
 }
 
-function StatOR({ label, stat, lowerIsBetter = false, money = true, fonte }: {
-  label: string; stat: Stat; lowerIsBetter?: boolean; money?: boolean; fonte?: React.ReactNode;
+function StatOR({ label, stat, lowerIsBetter = false, money = true, fonte, onClick }: {
+  label: string; stat: Stat; lowerIsBetter?: boolean; money?: boolean; fonte?: React.ReactNode; onClick?: () => void;
 }) {
   const atg = stat.orcado ? (stat.realizado / stat.orcado) * 100 : 0;
   const cls = statusClasses(atg, lowerIsBetter);
@@ -79,7 +83,10 @@ function StatOR({ label, stat, lowerIsBetter = false, money = true, fonte }: {
   const delta = stat.realizado - stat.orcado;
   const good = lowerIsBetter ? delta <= 0 : delta >= 0;
   return (
-    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+    <Card
+      onClick={onClick}
+      className={`bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 ${onClick ? "cursor-pointer transition hover:border-teal-400 hover:shadow-sm dark:hover:border-teal-600" : ""}`}
+    >
       <CardContent className="pt-4 pb-4">
         <div className="mb-2 flex items-center justify-between gap-2">
           <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">{label}</span>
@@ -150,11 +157,15 @@ function Nota({ children }: { children: React.ReactNode }) {
 }
 
 /* ---------- ranking (closers/sdr) ---------- */
-function Ranking({ rows, tone }: { rows: { nome: string; primary: string; sub: string }[]; tone: "top" | "bot" }) {
+function Ranking({ rows, tone, onItemClick }: { rows: { nome: string; primary: string; sub: string }[]; tone: "top" | "bot"; onItemClick?: (nome: string) => void }) {
   return (
     <div className="flex flex-col gap-1.5">
       {rows.map((r, i) => (
-        <div key={i} className="flex items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 dark:border-zinc-700 dark:bg-zinc-800/50">
+        <div
+          key={i}
+          onClick={onItemClick ? () => onItemClick(r.nome) : undefined}
+          className={`flex items-center gap-2.5 rounded-lg border border-gray-200 bg-gray-50 px-2.5 py-2 dark:border-zinc-700 dark:bg-zinc-800/50 ${onItemClick ? "cursor-pointer transition hover:border-teal-400 dark:hover:border-teal-600" : ""}`}
+        >
           <span className={`flex h-5 w-5 items-center justify-center rounded text-xs font-bold text-white ${tone === "top" ? "bg-emerald-500" : "bg-red-500"}`}>{i + 1}</span>
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-semibold text-gray-900 dark:text-white">{r.nome}</div>
@@ -168,27 +179,29 @@ function Ranking({ rows, tone }: { rows: { nome: string; primary: string; sub: s
 }
 
 /* ============================================================ SEÇÕES ============================================================ */
-function SecaoPessoas({ d }: { d: GestaoReceitaData }) {
+function SecaoPessoas({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
   const closersTop = d.pessoas.closers.slice(0, 3).map((c) => ({ nome: c.nome, primary: brlk(c.score), sub: `MRR ${brlk(c.mrr)} + Pont ${brlk(c.pont)}/5` }));
   const closersBot = d.pessoas.closers.slice(-3).reverse().map((c) => ({ nome: c.nome, primary: brlk(c.score), sub: `MRR ${brlk(c.mrr)} + Pont ${brlk(c.pont)}/5` }));
   const sdrTop = d.pessoas.sdrs.slice(0, 3).map((s) => ({ nome: s.nome, primary: brlk(s.valor), sub: `${s.reunioes} reuniões · ${s.leads} leads` }));
   const sdrBot = d.pessoas.sdrs.slice(-3).reverse().map((s) => ({ nome: s.nome, primary: brlk(s.valor), sub: `${s.reunioes} reuniões · ${s.leads} leads` }));
+  const drillCloser = (nome: string) => onDrill({ tipo: "closer", chave: nome });
+  const drillSdr = (nome: string) => onDrill({ tipo: "sdr", chave: nome });
   return (
     <div className="space-y-5">
       <div>
         <BlockHead icon={<Wallet className="h-4 w-4" />} title="Custo do time comercial — Orçado × Realizado" />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <StatOR label="Custo comercial (Vendas + Pré-vendas)" stat={d.pessoas.custoComercial} lowerIsBetter fonte={<Fonte tipo="caixa" />} />
-          <StatOR label="Comissões" stat={d.pessoas.comissoes} lowerIsBetter fonte={<Fonte tipo="caixa" />} />
+          <StatOR label="Custo comercial (Vendas + Pré-vendas)" stat={d.pessoas.custoComercial} lowerIsBetter fonte={<Fonte tipo="caixa" />} onClick={() => onDrill({ tipo: "custo_comercial" })} />
+          <StatOR label="Comissões" stat={d.pessoas.comissoes} lowerIsBetter fonte={<Fonte tipo="caixa" />} onClick={() => onDrill({ tipo: "comissoes" })} />
         </div>
       </div>
       <div>
         <BlockHead icon={<Trophy className="h-4 w-4" />} title="Top 3 / Bottom 3 — performance individual" />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <SectionCard title="Closers · Top 3" fonte={<Fonte tipo="bitrix" />}>{closersTop.length ? <Ranking rows={closersTop} tone="top" /> : <Vazio />}</SectionCard>
-          <SectionCard title="Closers · Bottom 3" fonte={<Fonte tipo="bitrix" />}>{closersBot.length ? <Ranking rows={closersBot} tone="bot" /> : <Vazio />}</SectionCard>
-          <SectionCard title="Pré-vendas (SDR) · Top 3" fonte={<Fonte tipo="bitrix" />}>{sdrTop.length ? <Ranking rows={sdrTop} tone="top" /> : <Vazio />}</SectionCard>
-          <SectionCard title="Pré-vendas (SDR) · Bottom 3" fonte={<Fonte tipo="bitrix" />}>{sdrBot.length ? <Ranking rows={sdrBot} tone="bot" /> : <Vazio />}</SectionCard>
+          <SectionCard title="Closers · Top 3" fonte={<Fonte tipo="bitrix" />}>{closersTop.length ? <Ranking rows={closersTop} tone="top" onItemClick={drillCloser} /> : <Vazio />}</SectionCard>
+          <SectionCard title="Closers · Bottom 3" fonte={<Fonte tipo="bitrix" />}>{closersBot.length ? <Ranking rows={closersBot} tone="bot" onItemClick={drillCloser} /> : <Vazio />}</SectionCard>
+          <SectionCard title="Pré-vendas (SDR) · Top 3" fonte={<Fonte tipo="bitrix" />}>{sdrTop.length ? <Ranking rows={sdrTop} tone="top" onItemClick={drillSdr} /> : <Vazio />}</SectionCard>
+          <SectionCard title="Pré-vendas (SDR) · Bottom 3" fonte={<Fonte tipo="bitrix" />}>{sdrBot.length ? <Ranking rows={sdrBot} tone="bot" onItemClick={drillSdr} /> : <Vazio />}</SectionCard>
         </div>
         <Nota>Closers ordenados por <b>score = MRR + Pontual ÷ 5</b>. Pré-vendas ordenados pelo <b>valor gerado</b> nas vendas atribuídas ao SDR. Quem acumula os dois papéis (ex.: atua como closer e SDR) aparece nas duas listas — é o mesmo cadastro, não duplicidade.</Nota>
       </div>
@@ -196,15 +209,15 @@ function SecaoPessoas({ d }: { d: GestaoReceitaData }) {
   );
 }
 
-function SecaoMacro({ d }: { d: GestaoReceitaData }) {
+function SecaoMacro({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
   const { canais, cac } = d.macro;
   return (
     <div className="space-y-5">
       <div>
         <BlockHead icon={<Target className="h-4 w-4" />} title="Venda nova — Orçado × Realizado" />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <StatOR label="Venda de MRR (recorrente nova)" stat={d.macro.vendaMrr} fonte={<Fonte tipo="bitrix" />} />
-          <StatOR label="Venda Pontual" stat={d.macro.vendaPontual} fonte={<Fonte tipo="bitrix" />} />
+          <StatOR label="Venda de MRR (recorrente nova)" stat={d.macro.vendaMrr} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_mrr" })} />
+          <StatOR label="Venda Pontual" stat={d.macro.vendaPontual} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_pontual" })} />
         </div>
       </div>
       <div>
@@ -219,7 +232,7 @@ function SecaoMacro({ d }: { d: GestaoReceitaData }) {
               </TableHeader>
               <TableBody>
                 {canais.map((c) => (
-                  <TableRow key={c.canal}>
+                  <TableRow key={c.canal} onClick={() => onDrill({ tipo: "canal", chave: c.canal })} className={rowClick}>
                     <Td left>{c.canal}</Td><Td>{intBR(c.deals)}</Td><Td>{brl(c.mrr)}</Td><Td>{brl(c.pont)}</Td><Td>{brl(c.total)}</Td><Td>{brl(c.ticket)}</Td>
                   </TableRow>
                 ))}
@@ -232,11 +245,11 @@ function SecaoMacro({ d }: { d: GestaoReceitaData }) {
       <div>
         <BlockHead icon={<Target className="h-4 w-4" />} title="CAC — custo de aquisição" />
         <div className="mb-3">
-          <StatOR label="Custo comercial total (CAC)" stat={cac.custoTotal} lowerIsBetter fonte={<Fonte tipo="caixa" />} />
+          <StatOR label="Custo comercial total (CAC)" stat={cac.custoTotal} lowerIsBetter fonte={<Fonte tipo="caixa" />} onClick={() => onDrill({ tipo: "cac" })} />
         </div>
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <StatOR label={`CAC por contrato  ·  ${cac.produto.n} contratos novos`} stat={cac.produto} lowerIsBetter fonte={<Fonte tipo="caixa" />} />
-          <StatOR label={`CAC por cliente  ·  ${cac.cliente.n} clientes novos`} stat={cac.cliente} lowerIsBetter fonte={<Fonte tipo="caixa" />} />
+          <StatOR label={`CAC por contrato  ·  ${cac.produto.n} contratos novos`} stat={cac.produto} lowerIsBetter fonte={<Fonte tipo="caixa" />} onClick={() => onDrill({ tipo: "cac" })} />
+          <StatOR label={`CAC por cliente  ·  ${cac.cliente.n} clientes novos`} stat={cac.cliente} lowerIsBetter fonte={<Fonte tipo="caixa" />} onClick={() => onDrill({ tipo: "cac" })} />
         </div>
         <Nota>CAC = custo comercial total ÷ novos adquiridos no mês. Realizado: contratos novos (ClickUp) e clientes novos (deals ganhos Bitrix). Orçado: contratos/clientes vendidos do BP.</Nota>
       </div>
@@ -244,7 +257,7 @@ function SecaoMacro({ d }: { d: GestaoReceitaData }) {
   );
 }
 
-function SecaoMicro({ d }: { d: GestaoReceitaData }) {
+function SecaoMicro({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
   const { produtos, vendedores, sdrs } = d.micro;
   return (
     <div className="space-y-5">
@@ -260,7 +273,7 @@ function SecaoMicro({ d }: { d: GestaoReceitaData }) {
               </TableHeader>
               <TableBody>
                 {produtos.map((p) => (
-                  <TableRow key={p.produto}>
+                  <TableRow key={p.produto} onClick={() => onDrill({ tipo: "produto", chave: p.produto })} className={rowClick}>
                     <Td left>{p.produto}</Td>
                     <Td>{intBR(p.cMrr)}</Td><Td>{brl(p.mrr)}</Td><Td>{p.tmMrr ? brl(p.tmMrr) : "—"}</Td>
                     <Td>{intBR(p.cPont)}</Td><Td>{brl(p.pont)}</Td><Td>{p.tmPont ? brl(p.tmPont) : "—"}</Td>
@@ -283,7 +296,7 @@ function SecaoMicro({ d }: { d: GestaoReceitaData }) {
               </TableHeader>
               <TableBody>
                 {vendedores.map((v) => (
-                  <TableRow key={v.nome}>
+                  <TableRow key={v.nome} onClick={() => onDrill({ tipo: "closer", chave: v.nome })} className={rowClick}>
                     <Td left>{v.nome}</Td><Td>{brl(v.mrr)}</Td><Td>{brl(v.pont)}</Td><Td>{intBR(v.deals)}</Td><Td>{intBR(v.reunioes)}</Td>
                   </TableRow>
                 ))}
@@ -303,7 +316,7 @@ function SecaoMicro({ d }: { d: GestaoReceitaData }) {
               </TableHeader>
               <TableBody>
                 {sdrs.map((s) => (
-                  <TableRow key={s.nome}>
+                  <TableRow key={s.nome} onClick={() => onDrill({ tipo: "sdr", chave: s.nome })} className={rowClick}>
                     <Td left>{s.nome}</Td><Td>{intBR(s.leads)}</Td><Td>{intBR(s.reunioes)}</Td><Td>{brl(s.valor)}</Td>
                   </TableRow>
                 ))}
@@ -317,10 +330,11 @@ function SecaoMicro({ d }: { d: GestaoReceitaData }) {
   );
 }
 
-function SecaoFunil({ d }: { d: GestaoReceitaData }) {
+function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
   const { etapas, mql } = d.funil;
   const topo = etapas[0]?.valor || 1;
   const totalLeadsMql = mql.reduce((a, m) => a + m.leads, 0);
+  const etapaChave = ["lead", "ra", "rr", "venda"];
   return (
     <div className="space-y-5">
       <div>
@@ -332,7 +346,11 @@ function SecaoFunil({ d }: { d: GestaoReceitaData }) {
               const convEtapa = prev ? (e.valor / prev) * 100 : null;
               const convAcum = (e.valor / topo) * 100;
               return (
-                <div key={e.etapa} className="grid grid-cols-[130px_1fr_150px] items-center gap-3">
+                <div
+                  key={e.etapa}
+                  onClick={() => onDrill({ tipo: "funil_etapa", chave: etapaChave[i] })}
+                  className="grid grid-cols-[130px_1fr_150px] items-center gap-3 rounded-md cursor-pointer transition hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+                >
                   <span className="text-xs font-semibold text-gray-600 dark:text-zinc-300">{e.etapa}</span>
                   <div className="h-8 overflow-hidden rounded-md bg-gray-100 dark:bg-zinc-800">
                     <div className="flex h-full items-center justify-end rounded-md bg-gradient-to-r from-teal-400 to-teal-600 px-2 text-xs font-bold tabular-nums text-white" style={{ width: Math.max(convAcum, 6) + "%" }}>
@@ -358,7 +376,7 @@ function SecaoFunil({ d }: { d: GestaoReceitaData }) {
               </TableHeader>
               <TableBody>
                 {mql.map((m) => (
-                  <TableRow key={m.classe}>
+                  <TableRow key={m.classe} onClick={() => onDrill({ tipo: "mql", chave: m.classe })} className={rowClick}>
                     <Td left>{m.classe}</Td><Td>{intBR(m.leads)}</Td><Td>{intBR(m.rr)}</Td><Td>{intBR(m.ganhos)}</Td>
                   </TableRow>
                 ))}
@@ -376,7 +394,7 @@ function SecaoFunil({ d }: { d: GestaoReceitaData }) {
   );
 }
 
-function SecaoQualidade({ d }: { d: GestaoReceitaData }) {
+function SecaoQualidade({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
   const { churnPorMotivo, churnPorVendedor, total } = d.qualidade;
   return (
     <div className="space-y-5">
@@ -388,7 +406,7 @@ function SecaoQualidade({ d }: { d: GestaoReceitaData }) {
               <TableHeader><TableRow><Th left>Motivo</Th><Th>Clientes</Th><Th>Valor perdido</Th></TableRow></TableHeader>
               <TableBody>
                 {churnPorMotivo.map((m) => (
-                  <TableRow key={m.motivo}><Td left>{m.motivo}</Td><Td>{intBR(m.qtd)}</Td><Td className="text-red-600 dark:text-red-400">{brl(m.valor)}</Td></TableRow>
+                  <TableRow key={m.motivo} onClick={() => onDrill({ tipo: "churn_motivo", chave: m.motivo })} className={rowClick}><Td left>{m.motivo}</Td><Td>{intBR(m.qtd)}</Td><Td className="text-red-600 dark:text-red-400">{brl(m.valor)}</Td></TableRow>
                 ))}
                 <TableRow className="font-bold"><Td left>Total</Td><Td>{intBR(total.qtd)}</Td><Td>{brl(total.valor)}</Td></TableRow>
               </TableBody>
@@ -412,7 +430,7 @@ function SecaoQualidade({ d }: { d: GestaoReceitaData }) {
               <TableHeader><TableRow><Th left>Vendedor</Th><Th>Clientes</Th><Th>Valor perdido</Th></TableRow></TableHeader>
               <TableBody>
                 {churnPorVendedor.map((v) => (
-                  <TableRow key={v.vendedor}><Td left>{v.vendedor}</Td><Td>{intBR(v.qtd)}</Td><Td className="text-red-600 dark:text-red-400">{brl(v.valor)}</Td></TableRow>
+                  <TableRow key={v.vendedor} onClick={() => onDrill({ tipo: "churn_vendedor", chave: v.vendedor })} className={rowClick}><Td left>{v.vendedor}</Td><Td>{intBR(v.qtd)}</Td><Td className="text-red-600 dark:text-red-400">{brl(v.valor)}</Td></TableRow>
                 ))}
               </TableBody>
             </Table>
@@ -443,6 +461,7 @@ export default function GestaoReceita() {
   usePageTitle("Gestão de Receita");
   useSetPageInfo("Gestão de Receita", "Orçado × Realizado da área comercial");
   const [mes, setMes] = useState("2026-06");
+  const [drill, setDrill] = useState<DrillRef | null>(null);
 
   const { data, isLoading, isError } = useQuery<GestaoReceitaData>({
     queryKey: ["/api/gestao/receita", { mes }],
@@ -496,16 +515,18 @@ export default function GestaoReceita() {
             <TabsTrigger value="funil" className="gap-1.5"><Filter className="h-4 w-4" /> Funil</TabsTrigger>
             <TabsTrigger value="qualidade" className="gap-1.5"><ShieldCheck className="h-4 w-4" /> Qualidade</TabsTrigger>
           </TabsList>
-          <TabsContent value="pessoas" className="mt-4"><SecaoPessoas d={data} /></TabsContent>
-          <TabsContent value="macro" className="mt-4"><SecaoMacro d={data} /></TabsContent>
-          <TabsContent value="micro" className="mt-4"><SecaoMicro d={data} /></TabsContent>
-          <TabsContent value="funil" className="mt-4"><SecaoFunil d={data} /></TabsContent>
-          <TabsContent value="qualidade" className="mt-4"><SecaoQualidade d={data} /></TabsContent>
+          <TabsContent value="pessoas" className="mt-4"><SecaoPessoas d={data} onDrill={setDrill} /></TabsContent>
+          <TabsContent value="macro" className="mt-4"><SecaoMacro d={data} onDrill={setDrill} /></TabsContent>
+          <TabsContent value="micro" className="mt-4"><SecaoMicro d={data} onDrill={setDrill} /></TabsContent>
+          <TabsContent value="funil" className="mt-4"><SecaoFunil d={data} onDrill={setDrill} /></TabsContent>
+          <TabsContent value="qualidade" className="mt-4"><SecaoQualidade d={data} onDrill={setDrill} /></TabsContent>
         </Tabs>
       )}
 
+      <GestaoReceitaDetalhe drill={drill} mes={mes} onClose={() => setDrill(null)} />
+
       <div className="flex items-center gap-2 pt-2 text-xs text-gray-400 dark:text-zinc-500">
-        <Database className="h-3.5 w-3.5" /> Dados via Cortex — Bitrix (venda/funil), ClickUp (produto/churn), Conta Azul (custos), BP 2026 (metas).
+        <Database className="h-3.5 w-3.5" /> Dados via Cortex — Bitrix (venda/funil), ClickUp (produto/churn), Conta Azul (custos), BP 2026 (metas). Clique numa linha ou card para ver o detalhamento.
       </div>
     </div>
   );

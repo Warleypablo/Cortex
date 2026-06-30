@@ -7,6 +7,7 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { somaDespesaCaixaPorMes } from "./bp2026";
 import { PREDICADOS_DESPESA, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
+import { montarDetalhe, tipoValido } from "./gestaoReceita.detalhe";
 
 const STAGE_GANHO = "Negócio Ganho";
 
@@ -306,6 +307,21 @@ export function registerGestaoReceitaRoutes(app: Express) {
     } catch (error) {
       console.error("[api] Error em /api/gestao/receita:", error);
       res.status(500).json({ error: "Falha ao montar Gestão de Receita" });
+    }
+  });
+
+  // Drill-down: lista os itens que compõem uma célula (tipo + chave + mês).
+  app.get("/api/gestao/receita/detalhe", async (req, res) => {
+    try {
+      const tipo = req.query.tipo;
+      if (!tipoValido(tipo)) return res.status(400).json({ error: "tipo inválido" });
+      const { dIni, dFim, label } = parseMes(req.query.mes);
+      const chave = typeof req.query.chave === "string" ? req.query.chave : "";
+      const detalhe = await montarDetalhe(db, { tipo, chave, dIni, dFim, label });
+      res.json(detalhe);
+    } catch (error) {
+      console.error("[api] Error em /api/gestao/receita/detalhe:", error);
+      res.status(500).json({ error: "Falha ao montar detalhamento" });
     }
   });
 }
