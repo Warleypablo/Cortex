@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { toComercialRow, toSelvaRow, type CapacityTimesResponse } from "./capacityTimes.helpers";
+import { toComercialRow, toSelvaRow, toCsRow, type CapacityTimesResponse, type SquadGroup } from "./capacityTimes.helpers";
 import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS, CAP_CONTAS_ACCOUNT } from "../../shared/capacityGrupos";
 
 // Tabela de referência: nível do Gestor de Performance → metas
@@ -312,12 +312,47 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ORDER BY COALESCE(ag.mrr_operando, 0) DESC
       `);
 
+      // Squads de comunicação (Pulse, Olimpo): operadores de CS em capacity_metas,
+      // carteira via `responsavel ILIKE match_responsavel`. Régua recorrente + pontual.
+      const squadsResult = await db.execute(sql`
+        WITH m AS (
+          SELECT nome, categoria, match_responsavel, cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem
+          FROM cortex_core.capacity_metas
+          WHERE ativo = TRUE
+            AND categoria NOT IN ('vendedor','account','gestor','Black','CXCS','Squadra','Selva')
+        ),
+        agg AS (
+          SELECT m.nome, m.categoria, m.ordem,
+            m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas,
+            COUNT(*) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS op_recorrente,
+            COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')), 0) AS mrr_operando,
+            COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'ativo'), 0) AS mrr_ativo,
+            COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'onboarding'), 0) AS mrr_onboarding,
+            COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'em cancelamento'), 0) AS mrr_cancelamento,
+            COUNT(*) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding')) AS op_pontual
+          FROM m
+          LEFT JOIN "Clickup".cup_contratos c ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
+          GROUP BY m.nome, m.categoria, m.ordem, m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas
+        )
+        SELECT * FROM agg ORDER BY categoria, ordem, nome
+      `);
+      // Agrupa por categoria (squad), preservando ordem de primeira aparição.
+      const squads: SquadGroup[] = [];
+      const squadIndex = new Map<string, SquadGroup>();
+      for (const raw of squadsResult.rows as any[]) {
+        const cat = String(raw.categoria);
+        let group = squadIndex.get(cat);
+        if (!group) { group = { squad: cat, rows: [] }; squadIndex.set(cat, group); squads.push(group); }
+        group.rows.push(toCsRow(raw));
+      }
+
       const rows = result.rows as any[];
       const response: CapacityTimesResponse = {
         selva: rows.filter((r) => r.grupo === "selva").map((r) => toSelvaRow(r, META_CONTAS_DESIGNER)),
         black: (blackResult.rows as any[]).map(toComercialRow),
         squadra: rows.filter((r) => r.grupo === "squadra").map(toComercialRow),
         cxcs: (cxcsResult.rows as any[]).map(toComercialRow),
+        squads,
         metaContasDesigner: META_CONTAS_DESIGNER,
       };
       res.json(response);
