@@ -27,8 +27,7 @@ interface Contrato {
 
 export interface DrawerSelecao {
   label: string; // título exibido no topo
-  nome?: string; // GP/account → contratos onde é responsável
-  squad?: string; // designer → contratos da carteira do squad de CS
+  nome: string; // pessoa → contratos onde é responsável na subtask
 }
 
 interface Props {
@@ -64,12 +63,9 @@ export function OperadorDrawer({ selecao, onClose }: Props) {
   const isDark = theme === "dark";
 
   const { data, isLoading } = useQuery<{ contratos: Contrato[] }>({
-    queryKey: ["/api/capacity-times/contratos", selecao?.nome, selecao?.squad],
+    queryKey: ["/api/capacity-times/contratos", selecao?.nome],
     queryFn: async () => {
-      const qs = selecao?.squad
-        ? `squad=${encodeURIComponent(selecao.squad)}`
-        : `nome=${encodeURIComponent(selecao!.nome!)}`;
-      const res = await fetch(`/api/capacity-times/contratos?${qs}`);
+      const res = await fetch(`/api/capacity-times/contratos?nome=${encodeURIComponent(selecao!.nome)}`);
       if (!res.ok) throw new Error("Erro ao buscar contratos");
       return res.json();
     },

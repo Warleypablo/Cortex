@@ -24,14 +24,11 @@ interface ComercialRow {
   util_contas_pct: number | null;
   util_pct: number | null;
 }
-// Selva: designers, carteira via squad de CS (régua por faturamento rec + pontual).
+// Selva: designers, carteira via responsável da subtask (régua por faturamento rec + pontual).
 interface SelvaRow {
   nome: string;
-  squad: string;
-  designers_no_squad: number;
   contas: number;
   fat_recorrente: number; fat_pontual: number; faturamento: number;
-  fatia: number;
   ticket_medio: number | null;
   cap_fat: number | null;
   util_pct: number | null;
@@ -246,13 +243,13 @@ function SelvaTable({ rows, onSelect }: { rows: SelvaRow[]; onSelect: (s: Drawer
         <TableHeader>
           <TableRow className="border-gray-200 dark:border-zinc-700">
             <TableHead className={th()}>Designer</TableHead>
-            <TableHead className={th()}>Squad (CS)</TableHead>
-            <TableHead className={th("text-right")} title="Faturamento recorrente + pontual da carteira do squad">Faturamento (Rec+Pont)</TableHead>
-            <TableHead className={th("text-right")}>Contas</TableHead>
-            <TableHead className={th("text-right")} title="Faturamento / contas da carteira">Ticket Médio</TableHead>
-            <TableHead className={th("text-right")} title="Faturamento do squad ÷ nº de designers do squad">Fatia/Designer</TableHead>
+            <TableHead className={th("text-right")} title="Contas onde o designer é responsável na subtask">Contas</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento recorrente + pontual da carteira">Faturamento (Rec+Pont)</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento recorrente (MRR)">Recorrente</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento pontual">Pontual</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento / contas">Ticket Médio</TableHead>
             <TableHead className={th("text-right")} title="Ticket Médio × meta de contas por designer">Cap. (R$)</TableHead>
-            <TableHead className={th("text-right")} title="Fatia / Cap.">% Ocupação</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento / Cap.">% Ocupação</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -260,15 +257,15 @@ function SelvaTable({ rows, onSelect }: { rows: SelvaRow[]; onSelect: (s: Drawer
             <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
               <TableCell
                 className={cn(td("font-medium"), "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline")}
-                onClick={() => onSelect({ label: `Carteira do squad ${r.squad}`, squad: r.squad })}
+                onClick={() => onSelect({ label: r.nome, nome: r.nome })}
               >
                 {r.nome}
               </TableCell>
-              <TableCell className="text-gray-700 dark:text-zinc-300">{r.squad}</TableCell>
-              <TableCell className={td("text-right")} title={`Recorrente ${formatCurrency(r.fat_recorrente)} · Pontual ${formatCurrency(r.fat_pontual)}`}>{formatCurrency(r.faturamento)}</TableCell>
               <TableCell className={td("text-right")}>{r.contas}</TableCell>
+              <TableCell className={td("text-right")}>{formatCurrency(r.faturamento)}</TableCell>
+              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{formatCurrency(r.fat_recorrente)}</TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{formatCurrency(r.fat_pontual)}</TableCell>
               <TableCell className={td("text-right")}>{moneyOrDash(r.ticket_medio)}</TableCell>
-              <TableCell className={td("text-right")}>{formatCurrency(r.fatia)}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_fat)}</TableCell>
               <TableCell className="text-right"><UtilBar pct={r.util_pct} /></TableCell>
             </TableRow>
@@ -309,19 +306,17 @@ function ComercialTab({ title, rows, onSelect }: { title: string; rows: Comercia
 }
 
 function SelvaTab({ rows, metaContas, onSelect }: { rows: SelvaRow[]; metaContas: number; onSelect: (s: DrawerSelecao) => void }) {
-  // Totais por squad (deduplicados) para não somar a carteira repetida em cada designer.
-  const squadsVistos = new Set<string>();
-  let totFaturamento = 0; // = soma das fatias (cada designer carrega sua parte)
-  let totContas = 0;
-  for (const r of rows) {
-    totFaturamento += r.fatia;
-    if (!squadsVistos.has(r.squad)) { squadsVistos.add(r.squad); totContas += r.contas; }
-  }
+  const totFaturamento = sum(rows.map((r) => r.faturamento));
+  const totRec = sum(rows.map((r) => r.fat_recorrente));
+  const totPont = sum(rows.map((r) => r.fat_pontual));
+  const totContas = sum(rows.map((r) => r.contas));
+  const comCarteira = rows.filter((r) => r.contas > 0).length;
   const mediaOcup = avgOf(rows.map((r) => r.util_pct));
   const cards = [
     { label: "Designers", value: String(rows.length) },
-    { label: "Squads atendidos", value: String(squadsVistos.size) },
-    { label: "Faturamento (carteira)", value: formatCurrency(totFaturamento) },
+    { label: "Com carteira", value: `${comCarteira} / ${rows.length}` },
+    { label: "Faturamento (Rec+Pont)", value: formatCurrency(totFaturamento) },
+    { label: "Recorrente / Pontual", value: `${formatCurrency(totRec)} · ${formatCurrency(totPont)}` },
     { label: "Ticket médio", value: moneyOrDash(ticket(totFaturamento, totContas)) },
     { label: "Ocupação média", value: pctText(mediaOcup), tone: utilColor(mediaOcup) },
   ];
@@ -333,7 +328,7 @@ function SelvaTab({ rows, metaContas, onSelect }: { rows: SelvaRow[]; metaContas
         <CardHeader>
           <CardTitle className="text-gray-900 dark:text-white">Selva — Designers</CardTitle>
           <p className="text-xs text-gray-500 dark:text-zinc-400">
-            Carteira medida pelo squad de CS do designer · Capacity por faturamento (recorrente + pontual) ·
+            Carteira pelo responsável da subtask (ClickUp) · Capacity por faturamento (recorrente + pontual) ·
             Cap. (R$) = Ticket Médio da carteira × {metaContas} contas/designer
           </p>
         </CardHeader>
@@ -356,7 +351,7 @@ function summarizeSelva(rows: SelvaRow[]): TeamSummary {
   return {
     time: "Selva",
     pessoas: rows.length,
-    operando: sum(rows.map((r) => r.fatia)),
+    operando: sum(rows.map((r) => r.faturamento)),
     util_pct: avgOf(rows.map((r) => r.util_pct)),
     cancelamento: 0,
   };
