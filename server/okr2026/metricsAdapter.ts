@@ -773,6 +773,90 @@ export async function getCrosssellMrr(): Promise<number> {
   return breakdown.crosssell;
 }
 
+export interface CrosssellDealItem {
+  id: string;
+  cliente: string;
+  closer: string;
+  recorrente: number;
+  pontual: number;
+  data_fechamento: string | null;
+}
+
+export interface CrosssellDealsResult {
+  items: CrosssellDealItem[];
+  total_recorrente: number;
+  total_pontual: number;
+  count: number;
+}
+
+/**
+ * Lista os deals de cross-sell que compõem o NRR no período.
+ *
+ * Usa EXATAMENTE o mesmo filtro de `buildVendasMrrQuery` (source='PARTNER' +
+ * cliente pré-existente, cujo primeiro contrato começou antes do mês do
+ * fechamento do deal), para que a soma do recorrente bata com `crosssell_mrr`
+ * e a do pontual com `crosssell_pontual`. Inclui deals com recorrente=0 que
+ * só tenham pontual (eles também entram em crosssell_pontual).
+ */
+export async function getCrosssellDealsDetail(startDate?: string, endDate?: string): Promise<CrosssellDealsResult> {
+  const dateFilter = (startDate && endDate)
+    ? sql`d.data_fechamento >= ${startDate}::date AND d.data_fechamento <= ${endDate}::date`
+    : sql`TO_CHAR(d.data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')`;
+
+  try {
+    const result = await db.execute(sql`
+      WITH cliente_inicio AS (
+        SELECT REGEXP_REPLACE(COALESCE(c.cnpj, ''), '[^0-9]', '', 'g') AS cnpj_norm,
+               MIN(ct.data_inicio)::date AS primeiro_contrato,
+               MAX(c.nome) AS cliente_nome
+        FROM "Clickup".cup_clientes c
+        JOIN "Clickup".cup_contratos ct ON ct.id_task = c.task_id
+        WHERE COALESCE(c.cnpj, '') <> ''
+        GROUP BY 1
+      )
+      SELECT
+        d.id,
+        -- nome do cliente do ClickUp é mais limpo que o title (sem prefixos "[cross-sell]")
+        COALESCE(NULLIF(ci.cliente_nome, ''), NULLIF(d.company_name, ''), d.title, 'Sem nome') AS cliente,
+        d.assigned_by_name,
+        COALESCE(d.valor_recorrente::numeric, 0) AS rec,
+        COALESCE(d.valor_pontual::numeric, 0) AS pont,
+        d.data_fechamento
+      FROM "Bitrix".crm_deal d
+      JOIN cliente_inicio ci
+        ON REGEXP_REPLACE(COALESCE(d.cnpj, ''), '[^0-9]', '', 'g') = ci.cnpj_norm
+      WHERE d.stage_name = 'Negócio Ganho'
+        AND d.data_fechamento IS NOT NULL
+        AND d.source = 'PARTNER'
+        AND ci.primeiro_contrato IS NOT NULL
+        AND ci.primeiro_contrato < date_trunc('month', d.data_fechamento)::date
+        AND (COALESCE(d.valor_recorrente::numeric, 0) > 0 OR COALESCE(d.valor_pontual::numeric, 0) > 0)
+        AND ${dateFilter}
+      ORDER BY d.valor_recorrente::numeric DESC NULLS LAST
+    `);
+
+    const rows = result.rows as any[];
+    const items: CrosssellDealItem[] = rows.map(r => ({
+      id: String(r.id || ""),
+      cliente: r.cliente || "Sem nome",
+      closer: r.assigned_by_name || "—",
+      recorrente: parseFloat(r.rec || "0"),
+      pontual: parseFloat(r.pont || "0"),
+      data_fechamento: r.data_fechamento ? String(r.data_fechamento) : null,
+    }));
+
+    return {
+      items,
+      total_recorrente: items.reduce((s, i) => s + i.recorrente, 0),
+      total_pontual: items.reduce((s, i) => s + i.pontual, 0),
+      count: items.length,
+    };
+  } catch (error) {
+    console.error("[OKR] Error fetching Cross-sell Deals Detail:", error);
+    return { items: [], total_recorrente: 0, total_pontual: 0, count: 0 };
+  }
+}
+
 export async function getNrr(): Promise<{ nrr_pct: number; crosssell_mrr: number; gross_churn_mrr: number; mrr_inicio: number }> {
   try {
     const [breakdown, grossChurn, mrrInicio] = await Promise.all([
@@ -854,7 +938,7 @@ export async function getNrrForPeriod(startDate: string, endDate: string): Promi
     };
   } catch (error) {
     console.error("[OKR] Error calculating NRR for period:", error);
-    return { nrr_pct: 100, crosssell_mrr: 0, vendas_mrr_novo: 0, vendas_mrr_total: 0, gross_churn_mrr: 0, mrr_inicio: 0 };
+    return { nrr_pct: 100, crosssell_mrr: 0, crosssell_pontual: 0, vendas_mrr_novo: 0, vendas_mrr_total: 0, gross_churn_mrr: 0, mrr_inicio: 0 };
   }
 }
 
