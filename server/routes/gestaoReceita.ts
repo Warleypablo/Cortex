@@ -86,8 +86,9 @@ export function registerGestaoReceitaRoutes(app: Express) {
           COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}) AS reunioes
         FROM "Bitrix".crm_deal d
         JOIN "Bitrix".crm_closers c ON c.id::text = d.closer::text
-        WHERE (d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim})
-           OR (d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim})
+        WHERE c.active = true
+          AND ((d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim})
+            OR (d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}))
         GROUP BY c.nome
       `);
       const closers = (closersRows.rows as any[])
@@ -116,9 +117,10 @@ export function registerGestaoReceitaRoutes(app: Express) {
             AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}), 0) AS pont
         FROM "Bitrix".crm_deal d
         JOIN "Bitrix".crm_users u ON u.id::text = d.sdr::text
-        WHERE (d.date_create >= ${dIni} AND d.date_create < ${dFim})
-           OR (d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim})
-           OR (d.stage_name = ${STAGE_GANHO} AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim})
+        WHERE u.active = true
+          AND ((d.date_create >= ${dIni} AND d.date_create < ${dFim})
+            OR (d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim})
+            OR (d.stage_name = ${STAGE_GANHO} AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}))
         GROUP BY u.nome
       `);
       const sdrs = (sdrRows.rows as any[])
