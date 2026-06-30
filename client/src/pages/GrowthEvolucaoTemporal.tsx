@@ -556,10 +556,15 @@ const MARKETING_METRIC_PLATFORMS: Record<string, readonly string[]> = {
   ads_ctr: PAID_ONLY,                         // CTR de saída
   ads_ctr_unico: META_ONLY,                   // CTR de saída único — só Meta
   ads_impressoes: PAID_ONLY,
-  ads_visualizacoes_pagina: PAID_ONLY,
-  ads_taxa_conversao_pagina: PAID_ONLY,       // Tx Conversão por Visualização de Página (pixel)
-  ads_taxa_conversao_pagina_mql: PAID_ONLY,
-  ads_taxa_conversao_pagina_nmql: PAID_ONLY,
+  // Visualizações de Página + Tx Conversão da Página usam o landing_page_views do
+  // pixel do Meta (Meta-only). Por isso só aparecem quando a seleção é exatamente
+  // Meta — no agregado/sem filtro ou em outras plataformas o pixel não cobre o
+  // universo e a linha viraria número sem significado. A conversão por Sessões
+  // (GA4, UNIVERSAL) cobre os demais casos.
+  ads_visualizacoes_pagina: META_ONLY,
+  ads_taxa_conversao_pagina: META_ONLY,       // Tx Conversão por Visualização de Página (pixel)
+  ads_taxa_conversao_pagina_mql: META_ONLY,
+  ads_taxa_conversao_pagina_nmql: META_ONLY,
   ads_sessoes: UNIVERSAL,
   ads_taxa_conversao_sessoes: UNIVERSAL,      // Tx Conversão por Sessões (GA4) — padrão da casa
   ads_taxa_conversao_sessoes_mql: UNIVERSAL,
