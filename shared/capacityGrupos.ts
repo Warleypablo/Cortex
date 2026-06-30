@@ -24,3 +24,8 @@ export const CAPACITY_GRUPOS_ORDER: CapacityGrupoKey[] = ["selva", "black", "squ
 // faturamento da Selva (Cap R$ = Ticket Médio da carteira × META_CONTAS_DESIGNER).
 // Calibrar com o time de operações; valor inicial é uma estimativa.
 export const META_CONTAS_DESIGNER = 20;
+
+// Aba Selva bloqueada temporariamente: poucos designers estão setados como
+// responsável nas subtasks (carteira magra). Trocar para false quando o
+// preenchimento no ClickUp estiver maduro.
+export const SELVA_BLOQUEADA = true;
