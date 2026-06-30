@@ -9796,8 +9796,8 @@ export class DbStorage implements IStorage {
     const resumoResult = await db.execute(sql.raw(`
       SELECT
         COALESCE(SUM(CASE
-          WHEN UPPER(status) IN ('PAGO', 'ACQUITTED')
-          THEN COALESCE(total::numeric, 0) ELSE 0
+          WHEN UPPER(status) = 'QUITADO'
+          THEN COALESCE(valor_bruto::numeric, 0) ELSE 0
         END), 0) as total_recebido,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date
@@ -9808,11 +9808,12 @@ export class DbStorage implements IStorage {
           THEN COALESCE(nao_pago::numeric, 0) ELSE 0
         END), 0) as total_inadimplente,
         COUNT(*) as quantidade_parcelas,
-        COUNT(CASE WHEN UPPER(status) IN ('PAGO', 'ACQUITTED') THEN 1 END) as quantidade_recebidas,
+        COUNT(CASE WHEN UPPER(status) = 'QUITADO' THEN 1 END) as quantidade_recebidas,
         COUNT(CASE WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date THEN 1 END) as quantidade_pendentes,
         COUNT(CASE WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date THEN 1 END) as quantidade_inadimplentes
-      FROM "Conta Azul".caz_receber
-      WHERE data_vencimento::date >= '${primeiroDia}'::date
+      FROM "Conta Azul".caz_parcelas
+      WHERE UPPER(tipo_evento) = 'RECEITA'
+        AND data_vencimento::date >= '${primeiroDia}'::date
         AND data_vencimento::date <= '${ultimoDiaStr}'::date
     `));
 
@@ -9827,8 +9828,8 @@ export class DbStorage implements IStorage {
         EXTRACT(DAY FROM data_vencimento::date) as dia,
         TO_CHAR(data_vencimento::date, 'YYYY-MM-DD') as data_completa,
         COALESCE(SUM(CASE
-          WHEN UPPER(status) IN ('PAGO', 'ACQUITTED')
-          THEN COALESCE(total::numeric, 0) ELSE 0
+          WHEN UPPER(status) = 'QUITADO'
+          THEN COALESCE(valor_bruto::numeric, 0) ELSE 0
         END), 0) as recebido,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date >= '${dataReferencia}'::date
@@ -9838,8 +9839,9 @@ export class DbStorage implements IStorage {
           WHEN COALESCE(nao_pago::numeric, 0) > 0 AND data_vencimento::date < '${dataReferencia}'::date
           THEN COALESCE(nao_pago::numeric, 0) ELSE 0
         END), 0) as inadimplente
-      FROM "Conta Azul".caz_receber
-      WHERE data_vencimento::date >= '${primeiroDia}'::date
+      FROM "Conta Azul".caz_parcelas
+      WHERE UPPER(tipo_evento) = 'RECEITA'
+        AND data_vencimento::date >= '${primeiroDia}'::date
         AND data_vencimento::date <= '${ultimoDiaStr}'::date
       GROUP BY EXTRACT(DAY FROM data_vencimento::date), TO_CHAR(data_vencimento::date, 'YYYY-MM-DD')
       ORDER BY dia
@@ -9912,15 +9914,16 @@ export class DbStorage implements IStorage {
       SELECT
         EXTRACT(MONTH FROM data_vencimento::date)::int as mes,
         COALESCE(SUM(CASE
-          WHEN UPPER(status) IN ('PAGO', 'ACQUITTED')
-          THEN COALESCE(total::numeric, 0) ELSE 0
+          WHEN UPPER(status) = 'QUITADO'
+          THEN COALESCE(valor_bruto::numeric, 0) ELSE 0
         END), 0) as recebido,
         COALESCE(SUM(CASE
           WHEN COALESCE(nao_pago::numeric, 0) > 0
           THEN COALESCE(nao_pago::numeric, 0) ELSE 0
         END), 0) as inadimplente
-      FROM "Conta Azul".caz_receber
-      WHERE data_vencimento::date >= '${primeiroDiaAno}'::date
+      FROM "Conta Azul".caz_parcelas
+      WHERE UPPER(tipo_evento) = 'RECEITA'
+        AND data_vencimento::date >= '${primeiroDiaAno}'::date
         AND data_vencimento::date < '${primeiroDiaMesAtual}'::date
       GROUP BY EXTRACT(MONTH FROM data_vencimento::date)
       ORDER BY mes
@@ -10012,36 +10015,36 @@ export class DbStorage implements IStorage {
       SELECT
         cr.id,
         cr.descricao,
-        COALESCE(cr.total, 0) as valor_bruto,
-        COALESCE(cr.pago, 0) as valor_pago,
+        COALESCE(cr.valor_bruto, 0) as valor_bruto,
+        COALESCE(cr.valor_pago, 0) as valor_pago,
         COALESCE(cr.nao_pago, 0) as nao_pago,
         TO_CHAR(cr.data_vencimento::date, 'YYYY-MM-DD') as data_vencimento,
         cr.status,
         cr.empresa,
-        cr.cliente_id as id_cliente,
-        COALESCE(cli.nome_clickup, cli.nome_caz, cr.cliente_nome, 'Cliente Desconhecido') as nome_cliente,
-        COALESCE(cli.cnpj, cr.cnpj) as cnpj,
+        cr.id_cliente as id_cliente,
+        COALESCE(cli.nome_clickup, cli.nome_caz, NULLIF(cr.nome, ''), 'Cliente Desconhecido') as nome_cliente,
+        cli.cnpj as cnpj,
         cli.responsavel,
-        COALESCE(cli.status_clickup, cr.status_clickup) as status_clickup,
-        COALESCE(cli.telefone_clickup, cr.telefone) as telefone,
+        cli.status_clickup as status_clickup,
+        cli.telefone_clickup as telefone,
         cont.squad,
         cont.servico,
         CASE
-          WHEN UPPER(cr.status) IN ('PAGO', 'ACQUITTED') THEN 'pago'
+          WHEN UPPER(cr.status) = 'QUITADO' THEN 'pago'
           WHEN cr.data_vencimento::date < ${dataHoje}::date AND COALESCE(cr.nao_pago::numeric, 0) > 0 THEN 'inadimplente'
           ELSE 'pendente'
         END as status_calculado
-      FROM "Conta Azul".caz_receber cr
-      LEFT JOIN cliente_info cli ON TRIM(cr.cliente_id::text) = cli.id_cliente
+      FROM "Conta Azul".caz_parcelas cr
+      LEFT JOIN cliente_info cli ON TRIM(cr.id_cliente::text) = cli.id_cliente
       LEFT JOIN contrato_info cont ON TRIM(cli.task_id::text) = cont.task_id
-      WHERE cr.data_vencimento::date = ${data}::date
+      WHERE UPPER(cr.tipo_evento) = 'RECEITA' AND cr.data_vencimento::date = ${data}::date
       ORDER BY
         CASE
-          WHEN UPPER(cr.status) IN ('PAGO', 'ACQUITTED') THEN 1
+          WHEN UPPER(cr.status) = 'QUITADO' THEN 1
           WHEN cr.data_vencimento::date > ${dataHoje}::date THEN 2
           ELSE 3
         END,
-        cr.total::numeric DESC
+        cr.valor_bruto::numeric DESC
     `);
     
     let totalPrevisto = 0;
