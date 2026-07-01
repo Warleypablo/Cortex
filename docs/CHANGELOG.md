@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-06-30 | feat(orcado-realizado): soma canais num bloco único ao filtrar 2+ plataformas
+
+**O que foi feito:**
+- Nas abas Consolidado e Aprofundado do Orçado x Realizado, selecionar 2+ plataformas deixa de renderizar um bloco por canal e passa a mostrar um único bloco de Marketing consolidado — investimento, sessões, leads, MQLs etc. já somados via `/ads`.
+- O detalhamento canal a canal (com métricas exclusivas, ex.: CTR de saída única / Visualização de Página do Meta) fica reservado ao caso de exatamente 1 plataforma selecionada.
+- Métricas que não existem em todos os canais selecionados somem do bloco somado (interseção via `isMetricVisibleForSelection`), evitando somas sem sentido.
+
+**Por que:** ao filtrar a "mídia paga inteira" (Meta + Google + LinkedIn + TikTok), o usuário quer a projeção somada de cara, não N blocos separados; o detalhe por canal é papel do drill de 1 canal.
+
+**Arquivos alterados:**
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - builders `consolidadoSections` e `aprofundadoFilteredSections` passam a usar a seção somada para 0/2+ plataformas e só detalham por canal em 1 plataforma.
+
+**Impacto arquitetural:** Nenhum — reusa a seção de Marketing consolidada e o filtro de interseção já existentes; só muda o roteamento de qual seção renderizar por quantidade de plataformas.
+
+---
+
 ## 2026-06-30 | feat(gestao): Gestão de Receita v2 — metas editáveis, novas métricas e funil inbound/outbound
 
 **O que foi feito:**
