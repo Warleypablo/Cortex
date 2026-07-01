@@ -4963,10 +4963,10 @@ Estruture sua resposta em:
         FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
         WHERE c.data_solicitacao_encerramento IS NOT NULL
-          -- "Venda que nunca virou base" (inadimplente de 1º mês / não começou / erro de venda)
-          -- é descontada sempre, igual ao ClickUp. NÃO confundir com abono (abonar_churn),
-          -- que passa a contar como churn por padrão (controlado pelo toggle da tela).
-          AND COALESCE(c.motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+          -- Churn BRUTO total (decisão 2026-06-30): NÃO descontamos mais "venda que nunca
+          -- virou base" (Inadimplente 1º Mês / Não começou / Erro na Venda). Esta tela agora
+          -- bate com o gráfico "Churn Squad Mês" do ClickUp (bruto), não com o card "Churn MRR".
+          -- Abono é dimensão separada, controlada pelo toggle "Todos/Não abonados/Abonados".
           AND ${dateFilter}
         ORDER BY c.data_solicitacao_encerramento DESC
       `);
@@ -5348,7 +5348,8 @@ Estruture sua resposta em:
         FROM cortex_core.vw_cup_churn_ajustado
         WHERE data_solicitacao_encerramento >= ${inicio}::date
           AND data_solicitacao_encerramento <= ${fim}::date
-          AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+          -- Churn BRUTO total (2026-06-30): inclui "nunca virou base" p/ bater com o card
+          -- da tela (ver /api/analytics/churn-detalhamento). Abono via toggle da tela.
           ${abonoFilter}
         GROUP BY 1, 2
         ORDER BY 1
