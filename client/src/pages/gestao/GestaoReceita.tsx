@@ -2,7 +2,7 @@
 // Painel "Gestão de Receita" — Orçado × Realizado da área comercial.
 // Orçado: BP 2026. Venda nova: Bitrix. Custos: regime caixa (Conta Azul).
 import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient, keepPreviousData } from "@tanstack/react-query";
 import { apiRequest } from "@/lib/queryClient";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
@@ -11,6 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PeriodoSelector } from "@/components/PeriodoSelector";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Users, Target, Layers, Filter, ShieldCheck, TrendingUp, TrendingDown,
   Trophy, AlertTriangle, Wallet, Database, Info, PencilLine,
@@ -28,6 +29,7 @@ interface MetasCtx {
   get: (chave: string, fallback: number) => number; set: (chave: string, valor: number) => void;
   iniciar: () => void; salvar: () => void; cancelar: () => void;
 }
+interface EtapaFunil { etapa: string; valor: number; mql: number }
 interface CloserRow { nome: string; mrr: number; pont: number; deals: number; reunioes: number; score: number; conv: number; ticketMrr: number; ticketPont: number; }
 interface SdrRow { nome: string; leads: number; reunioes: number; deals: number; mrr: number; pont: number; valor: number; conv: number; convVenda: number; }
 interface ProdutoRow {
@@ -50,10 +52,12 @@ interface GestaoReceitaData {
   pessoas: { custoComercial: Stat; comissoes: Stat; closers: CloserRow[]; sdrs: SdrRow[] };
   micro: { produtos: ProdutoRow[]; vendedores: CloserRow[]; sdrs: SdrRow[] };
   funil: {
-    inbound: { etapa: string; valor: number; mql: number }[];
-    outbound: { etapa: string; valor: number; mql: number }[];
+    inbound: EtapaFunil[];
+    outbound: EtapaFunil[];
+    outros: EtapaFunil[];
     mql: { classe: string; leads: number; rr: number; ganhos: number }[];
     investimento: { metaAdsSpend: number; adsContaAzul: number; leadsInbound: number; mqlsInbound: number; cpl: number; cplMq: number };
+    opcoesProduto: { produto: string; qtd: number }[];
   };
   qualidade: {
     churnPorMotivo: { motivo: string; qtd: number; valor: number }[];
@@ -451,7 +455,7 @@ function SecaoMicro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
 }
 
 // funil Lead→RA→RR→Venda; se `empilhado`, cada barra mostra composição MQL (verde) / NMQL (cinza)
-function FunilView({ etapas, seg, empilhado, onDrill }: { etapas: { etapa: string; valor: number; mql: number }[]; seg: "inbound" | "outbound"; empilhado: boolean; onDrill: (dr: DrillRef) => void }) {
+function FunilView({ etapas, seg, empilhado, onDrill }: { etapas: EtapaFunil[]; seg: "inbound" | "outbound" | "outros"; empilhado: boolean; onDrill: (dr: DrillRef) => void }) {
   const topo = etapas[0]?.valor || 1;
   const etapaChave = ["lead", "ra", "rr", "venda"];
   const globalConv = topo ? (etapas[etapas.length - 1].valor / topo) * 100 : 0;
@@ -501,16 +505,80 @@ function FunilView({ etapas, seg, empilhado, onDrill }: { etapas: { etapa: strin
   );
 }
 
-function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
-  const { inbound, outbound, investimento: inv } = d.funil;
+// rótulos do filtro de Plataforma (régua utm_source do growth — ver gestaoReceita.funil.ts)
+const PLATAFORMAS_FUNIL = [
+  { valor: "meta", label: "Meta Ads" },
+  { valor: "google", label: "Google Ads" },
+  { valor: "tiktok", label: "TikTok" },
+  { valor: "outros", label: "Outras origens" },
+  { valor: "sem_utm", label: "(sem UTM)" },
+];
+
+function SecaoFunil({ d, de, ate, onDrill }: { d: GestaoReceitaData; de: string; ate: string; onDrill: (dr: DrillRef) => void }) {
+  const { investimento: inv, opcoesProduto } = d.funil;
+  // filtros Produto (fnl_ngc) × Plataforma (utm_source); "todos" = sem filtro
+  const [produto, setProduto] = useState("todos");
+  const [plataforma, setPlataforma] = useState("todos");
+  const filtroAtivo = produto !== "todos" || plataforma !== "todos";
+  // com filtro ativo, busca só o bloco de funis no endpoint dedicado (payload principal segue intacto)
+  const { data: funilFiltrado, isFetching } = useQuery<{ inbound: EtapaFunil[]; outbound: EtapaFunil[]; outros: EtapaFunil[] }>({
+    queryKey: ["/api/gestao/receita/funil", { de, ate, produto, plataforma }],
+    enabled: filtroAtivo,
+    placeholderData: keepPreviousData,
+  });
+  const inbound = filtroAtivo ? funilFiltrado?.inbound ?? [] : d.funil.inbound;
+  const outbound = filtroAtivo ? funilFiltrado?.outbound ?? [] : d.funil.outbound;
+  const outros = filtroAtivo ? funilFiltrado?.outros ?? [] : d.funil.outros;
+  const carregandoFiltro = filtroAtivo && !funilFiltrado;
+  // drill herda os filtros ativos p/ o detalhamento bater com as barras
+  const drill = (dr: DrillRef) =>
+    onDrill({ ...dr, produto: produto !== "todos" ? produto : undefined, plataforma: plataforma !== "todos" ? plataforma : undefined });
   const leadsInb = inbound[0]?.valor || 0;
   const mqlInb = inbound[0]?.mql || 0;
   return (
     <div className="space-y-5">
+      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-gray-200 bg-white p-3 dark:border-zinc-700 dark:bg-zinc-900">
+        <Filter className="h-4 w-4 text-gray-400 dark:text-zinc-500" />
+        <span className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400">Filtrar funis</span>
+        <Select value={produto} onValueChange={setProduto}>
+          <SelectTrigger className="h-8 w-52 text-xs"><SelectValue placeholder="Produto" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todos os produtos</SelectItem>
+            {opcoesProduto.map((o) => (
+              <SelectItem key={o.produto} value={o.produto}>{o.produto} ({intBR(o.qtd)})</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={plataforma} onValueChange={setPlataforma}>
+          <SelectTrigger className="h-8 w-44 text-xs"><SelectValue placeholder="Plataforma" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todas as plataformas</SelectItem>
+            {PLATAFORMAS_FUNIL.map((p) => (
+              <SelectItem key={p.valor} value={p.valor}>{p.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        {filtroAtivo && (
+          <button
+            onClick={() => { setProduto("todos"); setPlataforma("todos"); }}
+            className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-600 transition hover:bg-gray-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+          >
+            Limpar
+          </button>
+        )}
+        <span className="ml-auto text-[11px] text-gray-400 dark:text-zinc-500">
+          Produto = funil do negócio (<code>fnl_ngc</code>) · Plataforma = <code>utm_source</code> · aplica aos funis e ao drill
+        </span>
+      </div>
+      <div className={isFetching ? "space-y-5 opacity-60 transition-opacity" : "space-y-5"}>
+      {carregandoFiltro ? (
+        <div className="space-y-3"><Skeleton className="h-48 w-full" /><Skeleton className="h-40 w-full" /><Skeleton className="h-40 w-full" /></div>
+      ) : (
+      <>
       <div>
         <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil Inbound — Lead → RA → RR → Venda" />
         <SectionCard title="Composição MQL / NMQL por etapa · origem inbound (WEBFORM/WEB/ADVERTISING/CALL/EMAIL…)" fonte={<Fonte tipo="bitrix" />}>
-          <FunilView etapas={inbound} seg="inbound" empilhado onDrill={onDrill} />
+          <FunilView etapas={inbound} seg="inbound" empilhado onDrill={drill} />
           <Nota>
             <AlertTriangle className="mr-1 inline h-3.5 w-3.5 text-amber-500" />
             <b>MQL</b> = campo <code>mql</code> preenchido no Bitrix; <b>NMQL</b> = o resto (inclui não-classificados). Hoje só {leadsInb > 0 ? pct((mqlInb / leadsInb) * 100) : "—"} dos leads inbound estão marcados como MQL — a fatia verde fica pequena porque o CRM classifica poucos.
@@ -519,9 +587,19 @@ function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillR
       </div>
       <div>
         <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil Outbound — Lead → RA → RR → Venda" />
-        <SectionCard title="Prospecção ativa / demais origens (inclui deals sem origem preenchida)" fonte={<Fonte tipo="bitrix" />}>
-          <FunilView etapas={outbound} seg="outbound" empilhado={false} onDrill={onDrill} />
+        <SectionCard title="Somente Prospecção ativa (source “Prospecção” no Bitrix)" fonte={<Fonte tipo="bitrix" />}>
+          <FunilView etapas={outbound} seg="outbound" empilhado={false} onDrill={drill} />
         </SectionCard>
+      </div>
+      <div>
+        <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil Outros — relacionamento & base" />
+        <SectionCard title="Crossell, indicação, recomendação, eventos, recuperação de base e deals sem origem" fonte={<Fonte tipo="bitrix" />}>
+          <FunilView etapas={outros} seg="outros" empilhado={false} onDrill={drill} />
+          <Nota>Origens que não são mídia (inbound) nem prospecção ativa (outbound). Antes esses leads inflavam o funil outbound; desde 2026-07-01 ficam separados aqui.</Nota>
+        </SectionCard>
+      </div>
+      </>
+      )}
       </div>
       <div>
         <BlockHead icon={<Wallet className="h-4 w-4" />} title="Investimento & CPL (mídia paga)" />
@@ -681,7 +759,7 @@ export default function GestaoReceita() {
           <TabsContent value="pessoas" className="mt-4"><SecaoPessoas d={data} onDrill={setDrill} /></TabsContent>
           <TabsContent value="macro" className="mt-4"><SecaoMacro d={data} onDrill={setDrill} metas={metasCtx} /></TabsContent>
           <TabsContent value="micro" className="mt-4"><SecaoMicro d={data} onDrill={setDrill} metas={metasCtx} /></TabsContent>
-          <TabsContent value="funil" className="mt-4"><SecaoFunil d={data} onDrill={setDrill} /></TabsContent>
+          <TabsContent value="funil" className="mt-4"><SecaoFunil d={data} de={periodo.de} ate={periodo.ate} onDrill={setDrill} /></TabsContent>
           <TabsContent value="qualidade" className="mt-4"><SecaoQualidade d={data} onDrill={setDrill} /></TabsContent>
         </Tabs>
       )}

@@ -4,7 +4,8 @@ import { useQuery } from "@tanstack/react-query";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet";
 import { Skeleton } from "@/components/ui/skeleton";
 
-export interface DrillRef { tipo: string; chave?: string }
+// produto/plataforma: filtros da aba Funil (só a família funil_etapa usa no backend)
+export interface DrillRef { tipo: string; chave?: string; produto?: string; plataforma?: string }
 
 interface ItemDet { nome: string; detalhe: string; data: string | null; valor: number; url?: string }
 interface GrupoDet { titulo: string; total: number; itens: ItemDet[]; itensOmitidos?: { qtd: number; valor: number } }
@@ -15,7 +16,7 @@ const fmt = (v: number) => "R$ " + Math.round(v).toLocaleString("pt-BR");
 export function GestaoReceitaDetalhe({ drill, de, ate, onClose }: { drill: DrillRef | null; de: string; ate: string; onClose: () => void }) {
   const aberto = drill !== null;
   const { data, isLoading, error } = useQuery<DetalheResp>({
-    queryKey: ["/api/gestao/receita/detalhe", { tipo: drill?.tipo ?? "", chave: drill?.chave ?? "", de, ate }],
+    queryKey: ["/api/gestao/receita/detalhe", { tipo: drill?.tipo ?? "", chave: drill?.chave ?? "", de, ate, produto: drill?.produto ?? "", plataforma: drill?.plataforma ?? "" }],
     enabled: aberto,
   });
   const isInt = data?.unidade === "int";

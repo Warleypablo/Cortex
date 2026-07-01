@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-07-01 | feat(gestao-receita): filtro Produto × Plataforma na aba Funil + outbound só Prospecção
+
+**O que foi feito:**
+- Aba **Funil** (/gestao/receita) ganhou barra de **filtros Produto × Plataforma**: Produto = campo `fnl_ngc` do Bitrix ("funil do negócio": Creators, Geral, E-commerce, Summit…), com opções dinâmicas por período e contagem; Plataforma = `utm_source` classificado na régua do growth (Meta Ads, Google Ads, TikTok, Outras origens, sem UTM). Filtro se aplica aos funis e ao drill-down (nota "Filtros ativos" no Sheet); Investimento/CPL seguem globais.
+- **Outbound agora é SÓ Prospecção ativa** (source `UC_YWZVA2`). As demais origens que caíam em outbound (Crossell, Indicação, Recomendação, Eventos, Recuperação de Base, Indique e Ganhe e deals sem source) foram para um terceiro funil, **"Outros — relacionamento & base"**.
+- Novo endpoint leve `GET /api/gestao/receita/funil?de&ate&produto&plataforma` — filtrar não refaz o payload agregador inteiro (sem skeleton na página toda).
+- Régua de segmentação e predicados extraídos para `gestaoReceita.funil.ts`, compartilhado entre agregador e drill (antes a régua estava duplicada e podia divergir).
+
+**Por que:**
+- Pedido do time (2026-07-01, com print do drill): o funil outbound estava inflado por origens de relacionamento — em jun/26, 72 dos 381 "outbound" não eram prospecção; e faltava enxergar o funil por produto e por plataforma de mídia.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.funil.ts` - NOVO: régua inbound/outbound/outros, predicados produto/plataforma, `computeFunil`, `opcoesProdutoFunil`.
+- `server/routes/gestaoReceita.ts` - seção 7 delega ao `computeFunil`; payload ganha `funil.outros` + `funil.opcoesProduto`; rota nova `/api/gestao/receita/funil`; drill repassa `produto`/`plataforma`.
+- `server/routes/gestaoReceita.detalhe.ts` - `funil_etapa` usa a régua compartilhada (aceita seg `outros`) + filtros; nota de filtros ativos.
+- `client/src/pages/gestao/GestaoReceita.tsx` - barra de filtros (Selects), terceiro funil, query dedicada com `keepPreviousData`, drill herda filtros.
+- `client/src/components/gestao/GestaoReceitaDetalhe.tsx` - `DrillRef` ganha `produto`/`plataforma`.
+
+**Impacto arquitetural:** números de inbound NÃO mudam; o que era "outbound" se divide em Outbound (Prospecção) + Outros. Jun/26: o antigo outbound (381 leads no print do pedido) hoje corresponde a 309 (Prospecção) + 101 (Outros). Régua de segmento agora tem fonte única.
+
+---
+
 ## 2026-07-01 | feat(gestao-receita): editar metas na aba Micro + conv. reun→venda por SDR + ticket R×P por closer
 
 **O que foi feito:**
