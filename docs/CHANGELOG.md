@@ -6,6 +6,7 @@
 - Nas abas Consolidado e Aprofundado do Orçado x Realizado, selecionar 2+ plataformas deixa de renderizar um bloco por canal e passa a mostrar um único bloco de Marketing consolidado — investimento, sessões, leads, MQLs etc. já somados via `/ads`.
 - O detalhamento canal a canal (com métricas exclusivas, ex.: CTR de saída única / Visualização de Página do Meta) fica reservado ao caso de exatamente 1 plataforma selecionada.
 - Métricas que não existem em todos os canais selecionados somem do bloco somado (interseção via `isMetricVisibleForSelection`), evitando somas sem sentido.
+- Correção de classificação: "Visualizações de Página" (`landing_page_views`) passa de `PAID_ONLY` para `META_ONLY` — só o pixel do Meta a alimenta; antes aparecia no blend das 4 pagas mostrando o número do Meta disfarçado de total. Agora só aparece com Meta sozinho. CPM e CTR de saída seguem `PAID_ONLY` (são totais reais recalculados da soma das 4).
 
 **Por que:** ao filtrar a "mídia paga inteira" (Meta + Google + LinkedIn + TikTok), o usuário quer a projeção somada de cara, não N blocos separados; o detalhe por canal é papel do drill de 1 canal.
 
