@@ -25,6 +25,24 @@
 
 ---
 
+## 2026-07-01 | feat(gestao-receita): editar metas na aba Micro + conv. reun→venda por SDR + ticket R×P por closer
+
+**O que foi feito:**
+- Botão **"Editar metas"** agora também aparece dentro da aba **Micro** (junto ao bloco "Venda por produto", onde ficam as metas editáveis), em versão compacta; ao editar, Salvar/Cancelar aparecem no header E na aba. Lógica extraída no componente `MetasBotoes` (mesmo estado `metasCtx`, sem duplicação).
+- Tabela **"Performance por pré-vendas (SDR)"** ganhou a coluna **Conv. reun→venda** (direta: deals ganhos no mês ÷ reuniões realizadas no mês — mesma régua da tabela de closers; pode passar de 100%). A Conv. lead→reun. (coorte) continua ao lado.
+- Tabela **"Performance por vendedor (Closer)"** trocou a coluna única "Ticket médio" por **Ticket Rec.** e **Ticket Pont.** — valor vendido ÷ deals ganhos com valor daquele tipo (deal misto conta nos dois; mesma régua da tabela por canal). Notas dos dois cards atualizadas.
+
+**Por que:**
+- Pedido do time: (1) editar metas sem sair da aba Micro; (2) medir a qualidade das reuniões geradas pelo SDR (não só volume); (3) regra geral da tela — todo TM aparece dividido entre Recorrente e Pontual, que têm ordens de grandeza diferentes.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - closers: `deals_mrr`/`deals_pont` + `ticketMrr`/`ticketPont` (campo `ticket` removido); SDR: contagem de `deals` ganhos + `convVenda`.
+- `client/src/pages/gestao/GestaoReceita.tsx` - componente `MetasBotoes` (header + aba Micro), `MetasCtx` estendido (iniciar/salvar/cancelar/mesUnico), colunas novas nas tabelas de closer e SDR, tipos `CloserRow`/`SdrRow`.
+
+**Impacto arquitetural:** Nenhum — mesmo endpoint, payload estendido; edição de metas continua via `PUT /api/gestao/receita/metas`.
+
+---
+
 ## 2026-07-01 | feat(gestao-receita): reuniões + taxa de conversão e ticket médio R×P por canal
 
 **O que foi feito:**

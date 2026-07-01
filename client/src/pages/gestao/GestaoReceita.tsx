@@ -23,9 +23,13 @@ const rowClick = "cursor-pointer transition hover:bg-gray-50 dark:hover:bg-zinc-
 /* ---------- tipos ---------- */
 type Stat = { orcado: number; realizado: number; editavel?: boolean; chave?: string };
 // contexto de edição de metas (override): quando editando, os campos de meta viram inputs
-interface MetasCtx { editando: boolean; get: (chave: string, fallback: number) => number; set: (chave: string, valor: number) => void; }
-interface CloserRow { nome: string; mrr: number; pont: number; deals: number; reunioes: number; score: number; conv: number; ticket: number; }
-interface SdrRow { nome: string; leads: number; reunioes: number; mrr: number; pont: number; valor: number; conv: number; }
+interface MetasCtx {
+  editando: boolean; mesUnico: boolean; salvando: boolean; numAlteracoes: number;
+  get: (chave: string, fallback: number) => number; set: (chave: string, valor: number) => void;
+  iniciar: () => void; salvar: () => void; cancelar: () => void;
+}
+interface CloserRow { nome: string; mrr: number; pont: number; deals: number; reunioes: number; score: number; conv: number; ticketMrr: number; ticketPont: number; }
+interface SdrRow { nome: string; leads: number; reunioes: number; deals: number; mrr: number; pont: number; valor: number; conv: number; convVenda: number; }
 // linha da tabela "Custo da operação" (seção CAC): fonteReal 'cortex' = caixa Conta Azul
 // (sub = chave do predicado, usada no drill); 'manual' = digitado via Editar metas
 interface CacOperacaoRow { item: string; label: string; orcado: number; realizado: number; fonteReal: "cortex" | "manual"; sub: string | null }
@@ -104,6 +108,39 @@ function MetaInput({ chave, valorAtual, metas, prefix = "R$" }: { chave: string;
         className="w-20 bg-transparent text-right text-xs font-semibold tabular-nums text-amber-800 outline-none dark:text-amber-300"
       />
     </span>
+  );
+}
+
+// botões "Editar metas / Salvar / Cancelar" — usados no header da página e na aba Micro
+function MetasBotoes({ metas, compact = false }: { metas: MetasCtx; compact?: boolean }) {
+  const sz = compact ? "px-2.5 py-1.5 text-xs" : "px-3 py-2 text-sm";
+  if (metas.editando) {
+    return (
+      <div className="flex items-center gap-2">
+        <button
+          onClick={metas.salvar}
+          disabled={metas.salvando || metas.numAlteracoes === 0}
+          className={`rounded-md bg-teal-600 font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50 ${sz}`}
+        >
+          {metas.salvando ? "Salvando…" : `Salvar metas${metas.numAlteracoes ? ` (${metas.numAlteracoes})` : ""}`}
+        </button>
+        <button
+          onClick={metas.cancelar}
+          className={`rounded-md border border-gray-300 font-medium text-gray-600 transition hover:bg-gray-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800 ${sz}`}
+        >
+          Cancelar
+        </button>
+      </div>
+    );
+  }
+  if (!metas.mesUnico) return null;
+  return (
+    <button
+      onClick={metas.iniciar}
+      className={`inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300 ${sz}`}
+    >
+      <PencilLine className={compact ? "h-3.5 w-3.5" : "h-4 w-4"} /> Editar metas
+    </button>
   );
 }
 
@@ -417,7 +454,10 @@ function SecaoMicro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
   return (
     <div className="space-y-5">
       <div>
-        <BlockHead icon={<Layers className="h-4 w-4" />} title="Venda por produto — MRR e Pontual" />
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <BlockHead icon={<Layers className="h-4 w-4" />} title="Venda por produto — MRR e Pontual" />
+          <MetasBotoes metas={metas} compact />
+        </div>
         <div className="space-y-3">
           <ProdutoTabela produtos={produtos} tipo="mrr" onDrill={onDrill} metas={metas} />
           <ProdutoTabela produtos={produtos} tipo="pont" onDrill={onDrill} metas={metas} />
@@ -426,23 +466,25 @@ function SecaoMicro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
       </div>
       <div>
         <BlockHead icon={<Users className="h-4 w-4" />} title="Performance por vendedor (Closer)" />
-        <SectionCard title="Vendido MRR/Pontual, ticket médio e conversão" fonte={<Fonte tipo="bitrix" />}>
+        <SectionCard title="Vendido MRR/Pontual, ticket médio (Rec. × Pont.) e conversão" fonte={<Fonte tipo="bitrix" />}>
           <TableScroll>
             <Table>
               <TableHeader>
-                <TableRow><Th left>Vendedor</Th><Th>Vendido MRR</Th><Th>Vendido Pont.</Th><Th>Ticket médio</Th><Th>Deals</Th><Th>Reuniões</Th><Th>Conv. reun→venda</Th></TableRow>
+                <TableRow><Th left>Vendedor</Th><Th>Vendido MRR</Th><Th>Vendido Pont.</Th><Th>Ticket Rec.</Th><Th>Ticket Pont.</Th><Th>Deals</Th><Th>Reuniões</Th><Th>Conv. reun→venda</Th></TableRow>
               </TableHeader>
               <TableBody>
                 {vendedores.map((v) => (
                   <TableRow key={v.nome} onClick={() => onDrill({ tipo: "closer", chave: v.nome })} className={rowClick}>
-                    <Td left>{v.nome}</Td><Td>{brl(v.mrr)}</Td><Td>{brl(v.pont)}</Td><Td>{brl(v.ticket)}</Td><Td>{intBR(v.deals)}</Td><Td>{intBR(v.reunioes)}</Td>
+                    <Td left>{v.nome}</Td><Td>{brl(v.mrr)}</Td><Td>{brl(v.pont)}</Td>
+                    <Td>{v.ticketMrr ? brl(v.ticketMrr) : "—"}</Td><Td>{v.ticketPont ? brl(v.ticketPont) : "—"}</Td>
+                    <Td>{intBR(v.deals)}</Td><Td>{intBR(v.reunioes)}</Td>
                     <Td className="font-semibold text-teal-700 dark:text-teal-400">{pct(v.conv)}</Td>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableScroll>
-          <Nota>Ticket médio = total vendido ÷ deals ganhos. <b>Conversão direta</b>: deals ganhos no mês ÷ reuniões realizadas no mês (coortes distintas — o deal pode ter tido reunião em mês anterior; pode passar de 100%).</Nota>
+          <Nota>Ticket Rec./Pont. = valor vendido ÷ deals ganhos <b>com valor daquele tipo</b> (deal misto conta nos dois; mesma régua da tabela por canal). <b>Conversão direta</b>: deals ganhos no mês ÷ reuniões realizadas no mês (coortes distintas — o deal pode ter tido reunião em mês anterior; pode passar de 100%).</Nota>
         </SectionCard>
       </div>
       <div>
@@ -451,19 +493,20 @@ function SecaoMicro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
           <TableScroll>
             <Table>
               <TableHeader>
-                <TableRow><Th left>Pré-vendedor</Th><Th>Leads</Th><Th>Reuniões</Th><Th>Gerado MRR</Th><Th>Gerado Pont.</Th><Th>Conv. lead→reun.</Th></TableRow>
+                <TableRow><Th left>Pré-vendedor</Th><Th>Leads</Th><Th>Reuniões</Th><Th>Gerado MRR</Th><Th>Gerado Pont.</Th><Th>Conv. lead→reun.</Th><Th>Conv. reun→venda</Th></TableRow>
               </TableHeader>
               <TableBody>
                 {sdrs.map((s) => (
                   <TableRow key={s.nome} onClick={() => onDrill({ tipo: "sdr", chave: s.nome })} className={rowClick}>
                     <Td left>{s.nome}</Td><Td>{intBR(s.leads)}</Td><Td>{intBR(s.reunioes)}</Td><Td>{brl(s.mrr)}</Td><Td>{brl(s.pont)}</Td>
                     <Td className="font-semibold text-teal-700 dark:text-teal-400">{pct(s.conv)}</Td>
+                    <Td className="font-semibold text-teal-700 dark:text-teal-400">{pct(s.convVenda)}</Td>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableScroll>
-          <Nota><b>Conversão por coorte</b>: dos leads criados no mês, % que teve reunião realizada. <b>Valor gerado</b> (MRR/Pontual) é da venda atribuída ao SDR (o mesmo deal também conta para o closer; não some as listas).</Nota>
+          <Nota><b>Conv. lead→reun. (coorte)</b>: dos leads criados no mês, % que teve reunião realizada. <b>Conv. reun→venda (direta)</b>: deals ganhos no mês ÷ reuniões realizadas no mês (mesma régua da tabela de closers; pode passar de 100%). <b>Valor gerado</b> (MRR/Pontual) é da venda atribuída ao SDR (o mesmo deal também conta para o closer; não some as listas).</Nota>
         </SectionCard>
       </div>
     </div>
@@ -629,11 +672,6 @@ export default function GestaoReceita() {
   });
   const mesUnico = periodo.de === periodo.ate;
 
-  const metasCtx: MetasCtx = {
-    editando,
-    get: (chave, fallback) => (chave in rascunho ? rascunho[chave] : fallback),
-    set: (chave, valor) => setRascunho((r) => ({ ...r, [chave]: valor })),
-  };
   const salvarMetas = useMutation({
     mutationFn: async () => {
       const metas = Object.entries(rascunho).map(([chave, valor]) => ({ chave, valor }));
@@ -645,6 +683,17 @@ export default function GestaoReceita() {
       setRascunho({});
     },
   });
+  const metasCtx: MetasCtx = {
+    editando,
+    mesUnico,
+    salvando: salvarMetas.isPending,
+    numAlteracoes: Object.keys(rascunho).length,
+    get: (chave, fallback) => (chave in rascunho ? rascunho[chave] : fallback),
+    set: (chave, valor) => setRascunho((r) => ({ ...r, [chave]: valor })),
+    iniciar: () => setEditando(true),
+    salvar: () => salvarMetas.mutate(),
+    cancelar: () => { setEditando(false); setRascunho({}); },
+  };
 
   return (
     <div className="space-y-6 p-6">
@@ -657,32 +706,7 @@ export default function GestaoReceita() {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {editando ? (
-            <>
-              <button
-                onClick={() => salvarMetas.mutate()}
-                disabled={salvarMetas.isPending || Object.keys(rascunho).length === 0}
-                className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50"
-              >
-                {salvarMetas.isPending ? "Salvando…" : `Salvar metas${Object.keys(rascunho).length ? ` (${Object.keys(rascunho).length})` : ""}`}
-              </button>
-              <button
-                onClick={() => { setEditando(false); setRascunho({}); }}
-                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
-              >
-                Cancelar
-              </button>
-            </>
-          ) : (
-            mesUnico && (
-              <button
-                onClick={() => setEditando(true)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-              >
-                <PencilLine className="h-4 w-4" /> Editar metas
-              </button>
-            )
-          )}
+          <MetasBotoes metas={metasCtx} />
           <PeriodoSelector value={periodo} onChange={(p) => { setPeriodo({ de: p.de, ate: p.ate }); setEditando(false); setRascunho({}); }} />
         </div>
       </div>
