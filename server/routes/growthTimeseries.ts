@@ -3,6 +3,13 @@ import { sql } from "drizzle-orm";
 import { expandFunilValues } from "@shared/produtos";
 
 const TURBO_PARTNERS_ACCOUNT_ID = "act_1331413260627780";
+const TURBO_TIKTOK_ADVERTISER_IDS = ["7065303755092131842"];
+// Mesmo motivo do array literal em growth.ts: Drizzle espalha array JS em params
+// soltos dentro de sql`` → ANY($1) escalar → "malformed array literal". Montamos o
+// ARRAY[...] explícito. Valores são constantes internas, sql.raw é seguro.
+const TIKTOK_ADVERTISER_IDS_SQL = sql.raw(
+  `ARRAY[${TURBO_TIKTOK_ADVERTISER_IDS.map((id) => `'${id}'`).join(",")}]`,
+);
 
 type Bucket = {
   key: string;
@@ -258,6 +265,75 @@ export function registerGrowthTimeseriesRoutes(app: Express, db: any) {
         }
       }
 
+      // ---- TikTok + LinkedIn Ads (spend/impressões/cliques por mês) ----
+      // Espelha o Orçado x Realizado /ads: atribui gasto por funil via nome da campanha
+      // ([Funil]). Query resiliente (schema/permissão) — se falhar, mapa vazio.
+      const buildCampaignNameFunnelFilter = (campaignsTable: ReturnType<typeof sql.raw>) => {
+        if (realFunilValues.length > 0) {
+          const conds = realFunilValues.map(
+            (v) => sql`(c.campaign_name ILIKE ${"%[" + v + "]%"} OR c.campaign_name ILIKE ${"%" + v + "%"})`,
+          );
+          let nameFilter = sql.join(conds, sql` OR `);
+          if (hasVazio) {
+            nameFilter = sql`(${nameFilter} OR c.campaign_name NOT LIKE '%[%]%')`;
+          }
+          return sql`AND m.campaign_id IN (SELECT c.campaign_id FROM ${campaignsTable} c WHERE (${nameFilter}))`;
+        }
+        if (hasVazio) {
+          return sql`AND m.campaign_id IN (SELECT c.campaign_id FROM ${campaignsTable} c WHERE c.campaign_name NOT LIKE '%[%]%')`;
+        }
+        return sql``;
+      };
+
+      const tiktokAdsMonthly: Record<string, { investimento: number; impressoes: number; cliques: number }> = {};
+      try {
+        const ttFilter = buildCampaignNameFunnelFilter(sql.raw("tiktok.ad_campaigns"));
+        const ttRes = await db.execute(sql`
+          SELECT to_char(m.stat_date, 'YYYY-MM') AS bucket,
+            COALESCE(SUM(m.spend), 0)::numeric AS investimento,
+            COALESCE(SUM(m.impressions), 0)::bigint AS impressoes,
+            COALESCE(SUM(m.clicks), 0)::bigint AS cliques
+          FROM tiktok.ad_metrics_daily m
+          WHERE m.stat_date >= ${yearStart}::date AND m.stat_date <= ${yearEnd}::date
+            AND m.advertiser_id = ANY(${TIKTOK_ADVERTISER_IDS_SQL})
+            ${ttFilter}
+          GROUP BY to_char(m.stat_date, 'YYYY-MM')
+        `);
+        for (const row of ttRes.rows as any[]) {
+          tiktokAdsMonthly[row.bucket] = {
+            investimento: parseFloat(row.investimento) || 0,
+            impressoes: parseInt(row.impressoes) || 0,
+            cliques: parseInt(row.cliques) || 0,
+          };
+        }
+      } catch (err) {
+        console.log("[timeseries] TikTok Ads query skipped:", (err as any)?.message || err);
+      }
+
+      const linkedinAdsMonthly: Record<string, { investimento: number; impressoes: number; cliques: number }> = {};
+      try {
+        const liFilter = buildCampaignNameFunnelFilter(sql.raw("linkedin.ad_campaigns"));
+        const liRes = await db.execute(sql`
+          SELECT to_char(m.stat_date, 'YYYY-MM') AS bucket,
+            COALESCE(SUM(m.spend), 0)::numeric AS investimento,
+            COALESCE(SUM(m.impressions), 0)::bigint AS impressoes,
+            COALESCE(SUM(m.clicks), 0)::bigint AS cliques
+          FROM linkedin.ad_metrics_daily m
+          WHERE m.stat_date >= ${yearStart}::date AND m.stat_date <= ${yearEnd}::date
+            ${liFilter}
+          GROUP BY to_char(m.stat_date, 'YYYY-MM')
+        `);
+        for (const row of liRes.rows as any[]) {
+          linkedinAdsMonthly[row.bucket] = {
+            investimento: parseFloat(row.investimento) || 0,
+            impressoes: parseInt(row.impressoes) || 0,
+            cliques: parseInt(row.cliques) || 0,
+          };
+        }
+      } catch (err) {
+        console.log("[timeseries] LinkedIn Ads query skipped:", (err as any)?.message || err);
+      }
+
       // ---- Transformar rows em mapas por bucket ----
       const mapBy = (rows: any[], field: string) => {
         const out: Record<string, number> = {};
@@ -334,16 +410,26 @@ export function registerGrowthTimeseriesRoutes(app: Express, db: any) {
         return { id, name, format, section, values };
       };
 
-      // Investimento consolidado (Meta + Google)
+      // Investimento consolidado (Meta + Google + TikTok + LinkedIn) — alinhado com o
+      // Orçado x Realizado /ads. Impressões e Cliques de Saída idem (soma dos canais pagos);
+      // TikTok/LinkedIn não têm "outbound" separado, então o clique de anúncio (que leva à
+      // LP) entra como equivalente, mesmo critério do consolidado do /ads.
       const investimentoRealizado: Record<string, number> = {};
+      const impressoesRealizado: Record<string, number> = {};
+      const cliquesSaidaRealizado: Record<string, number> = {};
       for (const b of buckets) {
-        investimentoRealizado[b.key] = (metaInvest[b.key] || 0) + (googleAdsMonthly[b.key] || 0);
+        const tt = tiktokAdsMonthly[b.key];
+        const li = linkedinAdsMonthly[b.key];
+        investimentoRealizado[b.key] =
+          (metaInvest[b.key] || 0) + (googleAdsMonthly[b.key] || 0) + (tt?.investimento || 0) + (li?.investimento || 0);
+        impressoesRealizado[b.key] = (metaImpr[b.key] || 0) + (tt?.impressoes || 0) + (li?.impressoes || 0);
+        cliquesSaidaRealizado[b.key] = (metaCliquesSaida[b.key] || 0) + (tt?.cliques || 0) + (li?.cliques || 0);
       }
 
       const metrics: MetricRow[] = [
         buildMetric("investimento", "Investimento", "currency", "marketing", investimentoRealizado, orcInvestByMonth),
-        buildMetric("impressoes", "Impressões", "number", "marketing", metaImpr, null),
-        buildMetric("cliques_saida", "Cliques de Saída", "number", "marketing", metaCliquesSaida, null),
+        buildMetric("impressoes", "Impressões", "number", "marketing", impressoesRealizado, null),
+        buildMetric("cliques_saida", "Cliques de Saída", "number", "marketing", cliquesSaidaRealizado, null),
         buildMetric("visualizacoes_pagina", "Visualizações de Página", "number", "marketing", metaViews, null),
         buildMetric("leads", "Leads", "number", "site", leadsByMonth, orcLeadsByMonth),
         buildMetric("mqls", "MQL", "number", "site", mqlsByMonth, orcMqlByMonth),

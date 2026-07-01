@@ -44,6 +44,17 @@ export interface CriativoData {
   conversions?: number;       // conversões reportadas pela plataforma (Google/TikTok)
   conversionValue?: number;   // valor de conversão (Google)
   videoViews?: number;        // views de vídeo (Google/TikTok)
+  // contadores nativos do TikTok (somáveis; demais plataformas não os preenchem)
+  videoP25?: number;          // views que assistiram 25% do vídeo
+  videoP50?: number;
+  videoP75?: number;
+  videoP100?: number;
+  likes?: number;
+  comments?: number;
+  shares?: number;
+  follows?: number;
+  profileVisits?: number;
+  engagements?: number;
   nmqls?: number;
   rm?: number;
   rmMql?: number;
@@ -60,6 +71,7 @@ export interface CriativoData {
   descartadosNmql?: number;
   // métricas exibidas (derivadas)
   investimento: number;
+  frequency: number | null; // impressões / alcance
   videoHook: number | null;
   videoHold: number | null;
   ctr: number | null;
@@ -119,6 +131,16 @@ interface RawTotals {
   conversions: number;
   conversionValue: number;
   videoViews: number;
+  videoP25: number;
+  videoP50: number;
+  videoP75: number;
+  videoP100: number;
+  likes: number;
+  comments: number;
+  shares: number;
+  follows: number;
+  profileVisits: number;
+  engagements: number;
   leads: number;
   mql: number;
   nmqls: number;
@@ -146,6 +168,8 @@ function zeros(): RawTotals {
   return {
     investimento: 0, impressions: 0, outboundClicks: 0, uniqueOutboundClicks: 0, landingPageViews: 0, reach: 0,
     video3sec: 0, videoThruplay: 0, conversions: 0, conversionValue: 0, videoViews: 0,
+    videoP25: 0, videoP50: 0, videoP75: 0, videoP100: 0,
+    likes: 0, comments: 0, shares: 0, follows: 0, profileVisits: 0, engagements: 0,
     leads: 0, mql: 0, nmqls: 0,
     rm: 0, rmMql: 0, rmNmql: 0, rr: 0, rrMql: 0, rrNmql: 0,
     vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0, contratos: 0,
@@ -168,6 +192,16 @@ function sumRaw(rows: CriativoData[]): RawTotals {
     t.conversions += r.conversions || 0;
     t.conversionValue += r.conversionValue || 0;
     t.videoViews += r.videoViews || 0;
+    t.videoP25 += r.videoP25 || 0;
+    t.videoP50 += r.videoP50 || 0;
+    t.videoP75 += r.videoP75 || 0;
+    t.videoP100 += r.videoP100 || 0;
+    t.likes += r.likes || 0;
+    t.comments += r.comments || 0;
+    t.shares += r.shares || 0;
+    t.follows += r.follows || 0;
+    t.profileVisits += r.profileVisits || 0;
+    t.engagements += r.engagements || 0;
     t.leads += r.leads || 0;
     t.mql += r.mql || 0;
     t.nmqls += r.nmqls || 0;
@@ -216,6 +250,16 @@ function computeDerived(t: RawTotals) {
     conversions: t.conversions,
     conversionValue: t.conversionValue,
     videoViews: t.videoViews,
+    videoP25: t.videoP25,
+    videoP50: t.videoP50,
+    videoP75: t.videoP75,
+    videoP100: t.videoP100,
+    likes: t.likes,
+    comments: t.comments,
+    shares: t.shares,
+    follows: t.follows,
+    profileVisits: t.profileVisits,
+    engagements: t.engagements,
     leads: t.leads,
     mql: t.mql,
     nmqls: t.nmqls,
@@ -229,6 +273,7 @@ function computeDerived(t: RawTotals) {
     receitaRecorrente: t.receitaRecorrente,
 
     cpm: t.impressions > 0 ? Math.round((inv / t.impressions) * 1000) : null,
+    frequency: t.reach > 0 ? r2(t.impressions / t.reach) : null,
     ctr: t.impressions > 0 && t.outboundClicks > 0 ? r2((t.outboundClicks / t.impressions) * 100) : null,
     // CTR de saída único = unique_outbound_clicks / reach (Meta-only; demais → null)
     ctrUnico: t.reach > 0 && t.uniqueOutboundClicks > 0 ? r2((t.uniqueOutboundClicks / t.reach) * 100) : null,
