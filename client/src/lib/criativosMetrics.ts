@@ -44,6 +44,10 @@ export interface CriativoData {
   conversions?: number;       // conversões reportadas pela plataforma (Google/TikTok)
   conversionValue?: number;   // valor de conversão (Google)
   videoViews?: number;        // views de vídeo (Google/TikTok)
+  // contadores nativos estendidos do Google (somáveis)
+  viewThroughConversions?: number; // conversões view-through
+  allConversions?: number;         // todas as conversões (inclui micro/secundárias)
+  interactions?: number;           // interações (cliques + engajamentos por formato)
   // contadores nativos do TikTok (somáveis; demais plataformas não os preenchem)
   videoP25?: number;          // views que assistiram 25% do vídeo
   videoP50?: number;
@@ -86,6 +90,8 @@ export interface CriativoData {
   cpa: number | null;              // custo / conversão plataforma
   roasPlataforma: number | null;   // valor conv. plataforma / investimento
   videoViewRate: number | null;    // video views / impressões
+  interactionRate: number | null;  // interações / impressões (Google)
+  engagementRate: number | null;   // engajamentos / impressões (Google)
   leads: number;
   cpl: number | null;
   mql: number;
@@ -138,6 +144,9 @@ interface RawTotals {
   conversions: number;
   conversionValue: number;
   videoViews: number;
+  viewThroughConversions: number;
+  allConversions: number;
+  interactions: number;
   videoP25: number;
   videoP50: number;
   videoP75: number;
@@ -175,6 +184,7 @@ function zeros(): RawTotals {
   return {
     investimento: 0, impressions: 0, outboundClicks: 0, uniqueOutboundClicks: 0, landingPageViews: 0, reach: 0,
     video3sec: 0, videoThruplay: 0, conversions: 0, conversionValue: 0, videoViews: 0,
+    viewThroughConversions: 0, allConversions: 0, interactions: 0,
     videoP25: 0, videoP50: 0, videoP75: 0, videoP100: 0,
     likes: 0, comments: 0, shares: 0, follows: 0, profileVisits: 0, engagements: 0,
     leads: 0, mql: 0, nmqls: 0,
@@ -199,6 +209,9 @@ function sumRaw(rows: CriativoData[]): RawTotals {
     t.conversions += r.conversions || 0;
     t.conversionValue += r.conversionValue || 0;
     t.videoViews += r.videoViews || 0;
+    t.viewThroughConversions += r.viewThroughConversions || 0;
+    t.allConversions += r.allConversions || 0;
+    t.interactions += r.interactions || 0;
     t.videoP25 += r.videoP25 || 0;
     t.videoP50 += r.videoP50 || 0;
     t.videoP75 += r.videoP75 || 0;
@@ -257,6 +270,9 @@ function computeDerived(t: RawTotals) {
     conversions: t.conversions,
     conversionValue: t.conversionValue,
     videoViews: t.videoViews,
+    viewThroughConversions: t.viewThroughConversions,
+    allConversions: t.allConversions,
+    interactions: t.interactions,
     videoP25: t.videoP25,
     videoP50: t.videoP50,
     videoP75: t.videoP75,
@@ -288,6 +304,8 @@ function computeDerived(t: RawTotals) {
     cpa: t.conversions > 0 ? Math.round(inv / t.conversions) : null,
     roasPlataforma: inv > 0 && t.conversionValue > 0 ? r2(t.conversionValue / inv) : null,
     videoViewRate: t.impressions > 0 && t.videoViews > 0 ? r2((t.videoViews / t.impressions) * 100) : null,
+    interactionRate: t.impressions > 0 && t.interactions > 0 ? r2((t.interactions / t.impressions) * 100) : null,
+    engagementRate: t.impressions > 0 && t.engagements > 0 ? r2((t.engagements / t.impressions) * 100) : null,
     // CTR de saída único = unique_outbound_clicks / reach (Meta-only; demais → null)
     ctrUnico: t.reach > 0 && t.uniqueOutboundClicks > 0 ? r2((t.uniqueOutboundClicks / t.reach) * 100) : null,
     videoHook: t.impressions > 0 && t.video3sec > 0 ? r2((t.video3sec / t.impressions) * 100) : null,

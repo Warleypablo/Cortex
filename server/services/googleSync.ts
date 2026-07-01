@@ -314,7 +314,9 @@ export async function syncGoogleTurbo(
       SELECT segments.date, segments.device, segments.ad_network_type,
              ad_group_ad.ad.id,
              metrics.impressions, metrics.clicks, metrics.cost_micros,
-             metrics.conversions, metrics.conversions_value, metrics.video_views
+             metrics.conversions, metrics.conversions_value, metrics.video_views,
+             metrics.view_through_conversions, metrics.all_conversions,
+             metrics.interactions, metrics.engagements
       FROM ad_group_ad
       WHERE segments.date BETWEEN '${since}' AND '${until}'
         AND campaign.status != 'REMOVED' AND ad_group.status != 'REMOVED'
@@ -326,12 +328,16 @@ export async function syncGoogleTurbo(
       await pool.query(
         `INSERT INTO google.ad_daily_metrics
            (report_date, ad_id, device_type, network_type,
-            impressions, clicks, cost_micros, conversions, conversion_value, video_views, synced_at)
-         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, NOW())
+            impressions, clicks, cost_micros, conversions, conversion_value, video_views,
+            view_through_conversions, all_conversions, interactions, engagements, synced_at)
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, NOW())
          ON CONFLICT (report_date, ad_id, device_type, network_type) DO UPDATE
            SET impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
                cost_micros = EXCLUDED.cost_micros, conversions = EXCLUDED.conversions,
                conversion_value = EXCLUDED.conversion_value, video_views = EXCLUDED.video_views,
+               view_through_conversions = EXCLUDED.view_through_conversions,
+               all_conversions = EXCLUDED.all_conversions,
+               interactions = EXCLUDED.interactions, engagements = EXCLUDED.engagements,
                synced_at = NOW()`,
         [
           row.segments?.date, String(adId), row.segments?.device || 'UNSPECIFIED',
@@ -339,6 +345,8 @@ export async function syncGoogleTurbo(
           parseInt(m.impressions || '0', 10), parseInt(m.clicks || '0', 10),
           parseInt(m.costMicros || '0', 10), parseFloat(m.conversions || '0'),
           parseFloat(m.conversionsValue || '0'), parseInt(m.videoViews || '0', 10),
+          parseInt(m.viewThroughConversions || '0', 10), parseFloat(m.allConversions || '0'),
+          parseInt(m.interactions || '0', 10), parseInt(m.engagements || '0', 10),
         ],
       );
       result.adMetrics++;

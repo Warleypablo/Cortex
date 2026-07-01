@@ -160,6 +160,10 @@ async function main() {
       conversions      NUMERIC NOT NULL DEFAULT 0,
       conversion_value NUMERIC NOT NULL DEFAULT 0,
       video_views      BIGINT NOT NULL DEFAULT 0,
+      view_through_conversions BIGINT NOT NULL DEFAULT 0,
+      all_conversions  NUMERIC NOT NULL DEFAULT 0,
+      interactions     BIGINT NOT NULL DEFAULT 0,
+      engagements      BIGINT NOT NULL DEFAULT 0,
       synced_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (report_date, ad_id, device_type, network_type)
     )`);

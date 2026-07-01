@@ -88,6 +88,12 @@ export const ALL_COLUMNS: ColumnDef[] = [
   C("conversionValue", "Valor conv.", "Tráfego", "currency", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 104 }),
   // ROAS pela plataforma = valor de conversão / investimento (Google reporta valor).
   C("roasPlataforma", "ROAS plat.", "Tráfego", "roas", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 96 }),
+  // Métricas estendidas nativas do Google (contadores + taxas).
+  C("viewThroughConversions", "Conv. view-thru", "Tráfego", "number", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 116 }),
+  C("allConversions", "Todas conv.", "Tráfego", "number", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
+  C("interactions", "Interações", "Tráfego", "number", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
+  C("interactionRate", "Taxa interação", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 108 }),
+  C("engagementRate", "Taxa engaj.", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
   // Engajamento (nativo do TikTok)
   C("engagements", "Engajam.", "Engajamento", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
   C("likes", "Likes", "Engajamento", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),

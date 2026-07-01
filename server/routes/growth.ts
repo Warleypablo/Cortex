@@ -248,13 +248,18 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
            c.name AS campaign_name, c.status AS campaign_status, c.budget_amount_micros,
            COALESCE(m.impressions, 0) AS impressions, COALESCE(m.clicks, 0) AS clicks,
            COALESCE(m.cost_micros, 0) AS cost_micros, COALESCE(m.conversions, 0) AS conversions,
-           COALESCE(m.conversion_value, 0) AS conversion_value, COALESCE(m.video_views, 0) AS video_views
+           COALESCE(m.conversion_value, 0) AS conversion_value, COALESCE(m.video_views, 0) AS video_views,
+           COALESCE(m.view_through_conversions, 0) AS view_through_conversions,
+           COALESCE(m.all_conversions, 0) AS all_conversions,
+           COALESCE(m.interactions, 0) AS interactions, COALESCE(m.engagements, 0) AS engagements
     FROM google.ads a
     LEFT JOIN google.ad_groups ag ON ag.ad_group_id = a.ad_group_id
     LEFT JOIN google.campaigns c ON c.campaign_id = a.campaign_id
     LEFT JOIN (
       SELECT ad_id, SUM(impressions) AS impressions, SUM(clicks) AS clicks, SUM(cost_micros) AS cost_micros,
-             SUM(conversions) AS conversions, SUM(conversion_value) AS conversion_value, SUM(video_views) AS video_views
+             SUM(conversions) AS conversions, SUM(conversion_value) AS conversion_value, SUM(video_views) AS video_views,
+             SUM(view_through_conversions) AS view_through_conversions, SUM(all_conversions) AS all_conversions,
+             SUM(interactions) AS interactions, SUM(engagements) AS engagements
       FROM google.ad_daily_metrics
       WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
       GROUP BY ad_id
@@ -399,6 +404,11 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
       conversions: Math.round(parseFloat(a.conversions) || 0),
       conversionValue: Math.round(parseFloat(a.conversion_value) || 0),
       videoViews: parseInt(a.video_views) || 0,
+      // Métricas estendidas nativas do Google (contadores somáveis).
+      viewThroughConversions: Math.round(parseFloat(a.view_through_conversions) || 0),
+      allConversions: Math.round(parseFloat(a.all_conversions) || 0),
+      interactions: parseInt(a.interactions) || 0,
+      engagements: parseInt(a.engagements) || 0,
       // CRM (carregado na linha portadora do ad group / campanha)
       leads: crm.leads,
       cpl: crm.leads > 0 ? Math.round(investimento / crm.leads) : null,
