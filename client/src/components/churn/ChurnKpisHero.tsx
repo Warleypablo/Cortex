@@ -31,9 +31,16 @@ export function pctEvitavel(contratos: ChurnContract[]): number {
 // ── Props ────────────────────────────────────────────────────────────────────
 export interface ChurnKpisHeroProps {
   contratos: ChurnContract[];
-  mrrPerdido: number;
+  /** Churn BRUTO total do período (com abonados) — card fixo, independe do toggle */
+  churnTotal: number;
+  /** Churn descontando os abonados (abonar_churn='Sim') — card fixo */
+  churnSemAbonados: number;
+  /** MRR e nº de logos abonados no período (pill explícito) */
+  mrrAbonado?: number;
+  abonadoCount?: number;
   taxaChurn: number;
   mrrBase?: number;
+  /** NRR já descontando abonados (líquido) — vem de getNrrForPeriod */
   nrrPct?: number;
   ltMedio?: number;
   ticketMedio?: number;
@@ -97,9 +104,18 @@ function KpiCard({
 }
 
 // ── StatPill: compact secondary metric ───────────────────────────────────────
-function StatPill({ label, value }: { label: string; value: string }): JSX.Element {
+function StatPill({ label, value, onClick }: { label: string; value: string; onClick?: () => void }): JSX.Element {
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40">
+    <div
+      className={[
+        "flex items-center gap-2 px-3 py-1.5 rounded-md bg-muted/50 border border-border/40",
+        onClick ? "cursor-pointer hover:bg-muted/70 transition-colors" : "",
+      ].join(" ")}
+      onClick={onClick}
+      role={onClick ? "button" : undefined}
+      tabIndex={onClick ? 0 : undefined}
+      onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") onClick(); } : undefined}
+    >
       <span className="text-xs text-muted-foreground">{label}</span>
       <span className="text-xs font-semibold tabular-nums text-foreground">{value}</span>
     </div>
@@ -109,7 +125,10 @@ function StatPill({ label, value }: { label: string; value: string }): JSX.Eleme
 // ── Component ────────────────────────────────────────────────────────────────
 export function ChurnKpisHero({
   contratos,
-  mrrPerdido,
+  churnTotal,
+  churnSemAbonados,
+  mrrAbonado,
+  abonadoCount,
   taxaChurn,
   mrrBase,
   nrrPct,
@@ -133,20 +152,25 @@ export function ChurnKpisHero({
     ? Math.min(Math.max(100 - nrrPct, 0) / NRR_TETO_QUEDA, 1)
     : undefined;
 
-  const hasSecondary = (ltMedio !== undefined && ltMedio > 0) || (ticketMedio !== undefined && ticketMedio > 0);
+  const hasSecondary =
+    (ltMedio !== undefined && ltMedio > 0) ||
+    (ticketMedio !== undefined && ticketMedio > 0) ||
+    (mrrAbonado !== undefined && mrrAbonado > 0);
 
   // Subsets for drill
   const evitaveis = churns.filter(c => {
     const val = (c.evitabilidade_churn ?? "").toLowerCase();
     return val.includes("evit") && !val.includes("inevit");
   });
+  const naoAbonados = churns.filter(c => !c.is_abonado);
+  const abonadosChurns = churns.filter(c => c.is_abonado);
 
   const makeDrill = (titulo: string, subset: ChurnContract[]) =>
     onDrill && subset.length > 0 ? () => onDrill(titulo, subset) : undefined;
 
   return (
     <div className="space-y-2">
-      <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
         <KpiCard
           label="Taxa de Churn %"
           value={`${taxaChurn.toFixed(2)}%`}
@@ -156,10 +180,16 @@ export function ChurnKpisHero({
           onClick={makeDrill("Churn do período", churns)}
         />
         <KpiCard
-          label="MRR Perdido"
-          value={formatCurrencyNoDecimals(mrrPerdido)}
-          sub="receita recorrente encerrada"
-          onClick={makeDrill("Churn do período — MRR perdido", churns)}
+          label="Churn Total"
+          value={formatCurrencyNoDecimals(churnTotal)}
+          sub="bruto (com abonados)"
+          onClick={makeDrill("Churn Total do período", churns)}
+        />
+        <KpiCard
+          label="Churn s/ Abonados"
+          value={formatCurrencyNoDecimals(churnSemAbonados)}
+          sub="descontando abonados"
+          onClick={makeDrill("Churn sem abonados", naoAbonados)}
         />
         <KpiCard
           label="Logos Perdidos"
@@ -176,16 +206,23 @@ export function ChurnKpisHero({
           onClick={makeDrill("Churn evitável", evitaveis)}
         />
         <KpiCard
-          label="NRR"
+          label="NRR (s/ abonados)"
           value={nrrPct !== undefined ? `${nrrPct.toFixed(1)}%` : "—"}
           valueClass={nrrNorm !== undefined ? severityTextClass(nrrNorm) : "text-muted-foreground"}
-          sub="net revenue retention"
+          sub="descontando abonados"
           severityNorm={nrrNorm}
           onClick={onNrrClick}
         />
       </div>
       {hasSecondary && (
         <div className="flex flex-wrap gap-2">
+          {mrrAbonado !== undefined && mrrAbonado > 0 && (
+            <StatPill
+              label="Abonados"
+              value={`${formatCurrencyNoDecimals(mrrAbonado)}${abonadoCount ? ` · ${abonadoCount} logo${abonadoCount !== 1 ? "s" : ""}` : ""}`}
+              onClick={makeDrill("Churn abonado", abonadosChurns)}
+            />
+          )}
           {ltMedio !== undefined && ltMedio > 0 && (
             <StatPill label="Lifetime médio" value={`${ltMedio.toFixed(1)} meses`} />
           )}
