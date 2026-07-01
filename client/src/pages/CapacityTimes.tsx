@@ -219,11 +219,11 @@ function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSel
             <TableHead className={th("text-right")}>Δ MRR</TableHead>
             <TableHead className={th("text-right")} title="MRR / contas ativas">Ticket Médio</TableHead>
             <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
-            <TableHead className={th("text-right")}>Contas</TableHead>
-            <TableHead className={th("text-right")}>Cap. Contas</TableHead>
-            <TableHead className={th("text-right")}>Δ Contas</TableHead>
+            <TableHead className={th("text-right")}>Contratos</TableHead>
+            <TableHead className={th("text-right")}>Cap. Contratos</TableHead>
+            <TableHead className={th("text-right")}>Δ Contratos</TableHead>
             <TableHead className={th("text-right")} title="MRR Atual / Cap. MRR">% MRR</TableHead>
-            <TableHead className={th("text-right")} title="Contas ativas / Cap. Contas">% Contas</TableHead>
+            <TableHead className={th("text-right")} title="Contas ativas / Cap. Contratos">% Contratos</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -312,7 +312,7 @@ function ComercialTab({ title, rows, onSelect, campo }: { title: string; rows: C
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totContas)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
     { label: "Capacity MRR (média)", value: pctText(mediaMrr), tone: utilColor(mediaMrr) },
-    { label: "Capacity Contas (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
+    { label: "Capacity Contratos (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
   ];
   return (
     <div className="space-y-4">
@@ -377,7 +377,7 @@ function UtilChart({ people }: { people: { nome: string; util_fat_pct: number | 
             <Tooltip formatter={(v: number, name: string) => [`${v}%`, name]} contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
             <Bar dataKey="fat" name="Capacity FAT" fill={COLOR_MRR} radius={[0, 4, 4, 0]} maxBarSize={14} />
-            <Bar dataKey="contas" name="Capacity Contas" fill={COLOR_CONTAS} radius={[0, 4, 4, 0]} maxBarSize={14} />
+            <Bar dataKey="contas" name="Capacity Contratos" fill={COLOR_CONTAS} radius={[0, 4, 4, 0]} maxBarSize={14} />
           </BarChart>
         </ResponsiveContainer>
       </CardContent>
@@ -395,14 +395,14 @@ function CsTable({ rows, onSelect }: { rows: CsRow[]; onSelect: (s: DrawerSeleca
           <TableRow className="border-gray-200 dark:border-zinc-700">
             <TableHead className={th()}>Nome</TableHead>
             <TableHead className={th("text-right")}>Recorrente</TableHead>
-            <TableHead className={th("text-right")} title="Capacity de contratos">Cap. Contas</TableHead>
+            <TableHead className={th("text-right")} title="Capacity de contratos">Cap. Contratos</TableHead>
             <TableHead className={th("text-right")}>Pontual</TableHead>
             <TableHead className={th("text-right")}>MRR Operando</TableHead>
             <TableHead className={th("text-right")} title="MRR recorrente / contas recorrentes">Ticket Médio</TableHead>
             <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
             <TableHead className={th("text-right")} title="Ticket médio da equipe × capacity de contratos">Cap. FAT ($)</TableHead>
             <TableHead className={th("text-right")} title="MRR Operando / Cap. FAT">% FAT</TableHead>
-            <TableHead className={th("text-right")} title="Contas recorrentes / capacity de contratos">% Contas</TableHead>
+            <TableHead className={th("text-right")} title="Contas recorrentes / capacity de contratos">% Contratos</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -449,7 +449,7 @@ function SquadTab({ group, onSelect }: { group: SquadGroup; onSelect: (s: Drawer
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totRec)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
     { label: "Capacity FAT (média)", value: pctText(mediaFat), tone: utilColor(mediaFat) },
-    { label: "Capacity Contas (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
+    { label: "Capacity Contratos (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
   ];
   return (
     <div className="space-y-4">
