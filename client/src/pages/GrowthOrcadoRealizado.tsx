@@ -1271,12 +1271,13 @@ export default function GrowthOrcadoRealizado() {
     // Base pixel Meta (landing_page_views) — usada em Connect Rate e Tx Conversão da Página,
     // que devem ser calculadas a partir do Meta Ads, não do GA4.
     connectRatePixel?: number; visualizacoesPaginaPixel?: number;
+    taxaConexao?: number;
   }
 
   interface GoogleAdsDetailMetrics {
     investimento: number; impressoes: number; cliques: number;
     cpm: number; cpc: number; ctr: number;
-    visualizacoesPagina: number; connectRate: number;
+    visualizacoesPagina: number; connectRate: number; taxaConexao?: number;
     conversoes: number; valorConversoes: number; custoConversao: number;
     sessoes: number;
   }
@@ -1325,14 +1326,14 @@ export default function GrowthOrcadoRealizado() {
   interface TiktokAdsDetailMetrics {
     investimento: number; impressoes: number; cliques: number; conversoes: number;
     cpm: number; ctr: number;
-    visualizacoesPagina: number; sessoes: number; connectRate: number;
+    visualizacoesPagina: number; sessoes: number; connectRate: number; taxaConexao?: number;
     hasConnection: boolean;
   }
 
   interface LinkedinAdsDetailMetrics {
     investimento: number; impressoes: number; cliques: number; conversoes: number;
     cpm: number; ctr: number;
-    visualizacoesPagina: number; sessoes: number; connectRate: number;
+    visualizacoesPagina: number; sessoes: number; connectRate: number; taxaConexao?: number;
     hasConnection: boolean;
   }
 
@@ -1772,10 +1773,10 @@ export default function GrowthOrcadoRealizado() {
       { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
       // Connect Rate GA4 = Sessões GA4 ÷ Cliques (universal, comparável entre canais).
       // Padronizável — some quando misturado? Não: é PAID_ONLY (todos os pagos têm cliques).
-      { id: 'connect_rate_ga4', name: 'Connect Rate GA4', type: 'formula', orcado: null, realizado: data.connectRateGa4 ?? null, percentual: null, format: 'percent' },
-      // Connect Rate (Pixel) = landing_page_views (pixel Meta) ÷ Cliques. Só same-source
-      // (Meta) faz sentido → META_ONLY. Fica ao lado do GA4 para comparação no 1º momento.
-      { id: 'connect_rate', name: 'Connect Rate (Pixel)', type: 'formula', orcado: null, realizado: data.connectRate ?? null, percentual: null, format: 'percent' },
+      { id: 'connect_rate_ga4', name: 'Taxa de Conexão', type: 'formula', orcado: null, realizado: data.connectRateGa4 ?? null, percentual: null, format: 'percent' },
+      // Connect Rate (Meta) = landing_page_views (pixel Meta) ÷ Cliques. Só same-source
+      // (Meta) faz sentido → META_ONLY. Fica ao lado da Taxa de Conexão para comparação.
+      { id: 'connect_rate', name: 'Connect Rate (Meta)', type: 'formula', orcado: null, realizado: data.connectRate ?? null, percentual: null, format: 'percent' },
       // Connect Rate NÃO entra no consolidado de Marketing (blend): ele só faz sentido
       // por plataforma, com numerador e denominador da MESMA fonte. No blend, o
       // numerador (landing_page_views do pixel Meta) e o denominador (cliques de saída
@@ -1876,7 +1877,8 @@ export default function GrowthOrcadoRealizado() {
       { id: 'meta_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: d.ctrUnico ?? null, percentual: null, format: 'percent' },
       { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: lpvPixel, percentual: calcPercentual(O.visualizacoesPagina, lpvPixel), format: 'number', warning: pixelWarning },
       { id: 'meta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent', warning: pixelWarning },
+      { id: 'meta_taxaConexao', name: 'Taxa de Conexão', type: 'formula', orcado: null, realizado: d.taxaConexao ?? null, percentual: null, format: 'percent' },
+      { id: 'meta_connectRate', name: 'Connect Rate (Meta)', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent', warning: pixelWarning },
       { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página - Visualização de Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent', warning: pixelWarning },
       { id: 'meta_taxaConversaoPagina_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? (funnel?.mqls ?? 0) / lpvPixel : 0, percentual: null, format: 'percent' },
       { id: 'meta_taxaConversaoPagina_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? ((funnel?.leads ?? 0) - (funnel?.mqls ?? 0)) / lpvPixel : 0, percentual: null, format: 'percent' },
@@ -1912,6 +1914,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'gads_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
       { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'gads_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
+      { id: 'gads_taxaConexao', name: 'Taxa de Conexão', type: 'formula', orcado: null, realizado: d.taxaConexao ?? null, percentual: null, format: 'percent' },
       // Connect Rate segue removido do Aprofundado do Google (despriorizado). A Tx
       // Conversão da Página usa Visualizações de Página (Leads ÷ VdP), coerente com
       // o Connect Rate do TikTok/LinkedIn e com o funil do Meta (que usa LPV do pixel).
@@ -2098,9 +2101,9 @@ export default function GrowthOrcadoRealizado() {
       { id: 'tta_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
       { id: 'tta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'tta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      // Connect Rate placeholder: TikTok não tem LPV nativo → sem cálculo fiel ≤100%.
-      // Mantido zerado a pedido (linha presente p/ paridade visual com os demais blocos).
-      { id: 'tta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: 0, percentual: null, format: 'percent' },
+      // Taxa de Conexão (GA4) = Sessões ÷ Cliques. TikTok não tem pixel de LP nativo,
+      // então esta é a única medida de "chegada na página" para o canal.
+      { id: 'tta_taxaConexao', name: 'Taxa de Conexão', type: 'formula', orcado: null, realizado: d.taxaConexao ?? null, percentual: null, format: 'percent' },
       { id: 'tta_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('tta', funnel, O, d.investimento ?? null)];
@@ -2124,9 +2127,9 @@ export default function GrowthOrcadoRealizado() {
       { id: 'lia_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
       { id: 'lia_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'lia_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      // Connect Rate placeholder: LinkedIn não tem LPV nativo → sem cálculo fiel ≤100%.
-      // Mantido zerado a pedido (linha presente p/ paridade visual com os demais blocos).
-      { id: 'lia_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: 0, percentual: null, format: 'percent' },
+      // Taxa de Conexão (GA4) = Sessões ÷ Cliques. LinkedIn não tem pixel de LP nativo,
+      // então esta é a única medida de "chegada na página" para o canal.
+      { id: 'lia_taxaConexao', name: 'Taxa de Conexão', type: 'formula', orcado: null, realizado: d.taxaConexao ?? null, percentual: null, format: 'percent' },
       { id: 'lia_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('lia', funnel, O, d.investimento ?? null)];
