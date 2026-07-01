@@ -2503,19 +2503,16 @@ export default function GrowthOrcadoRealizado() {
       tiktok_ads: aprofundadoPlatformSections[6],
       linkedin_ads: aprofundadoPlatformSections[7],
     };
-    if (selectedPlataformas.length === 0) {
-      return [
-        ...marketingSections,
-        { title: 'Vendas — MQL', icon: <Users className="w-5 h-5" />, metrics: mqlMetrics },
-        { title: 'Vendas — Não-MQL', icon: <Users className="w-5 h-5" />, metrics: naoMqlMetrics },
-        totalSection,
-      ];
-    }
-    const platformSections = selectedPlataformas
-      .map(p => platformMap[p])
-      .filter(Boolean);
+    // Marketing: com UMA plataforma marcada, mostramos a seção detalhada do canal
+    // (inclui métricas exclusivas, ex.: CTR único / Vis. de Página do Meta). Com 0 ou
+    // 2+ plataformas usamos o bloco de Marketing consolidado — já somado via /ads e
+    // filtrado por interseção (só aparecem métricas que existem em todos os canais
+    // selecionados). Nunca quebramos em blocos por canal quando há soma.
+    const marketingBase: MetricSection[] = selectedPlataformas.length === 1
+      ? [platformMap[selectedPlataformas[0]] ?? aprofundadoPlatformSections[0]]
+      : marketingSections;
     return [
-      ...(platformSections.length > 0 ? platformSections : [aprofundadoPlatformSections[0]]),
+      ...marketingBase,
       { title: 'Vendas — MQL', icon: <Users className="w-5 h-5" />, metrics: mqlMetrics },
       { title: 'Vendas — Não-MQL', icon: <Users className="w-5 h-5" />, metrics: naoMqlMetrics },
       totalSection,
@@ -2562,20 +2559,16 @@ export default function GrowthOrcadoRealizado() {
     };
 
     let baseSections: MetricSection[];
-    if (selectedPlataformas.length > 0) {
-      // Replace marketing section with selected platform(s)' metrics
-      const platformSections = selectedPlataformas
-        .map(p => platformMap[p])
-        .filter(Boolean);
-      if (platformSections.length > 0) {
-        baseSections = [
-          ...platformSections,
-          ...allSections.filter(s => s.title !== 'Métricas de Marketing'),
-        ];
-      } else {
-        baseSections = allSections;
-      }
+    if (selectedPlataformas.length === 1) {
+      // Uma plataforma → seção detalhada do canal no lugar do Marketing consolidado
+      // (mostra as métricas exclusivas do canal).
+      const only = platformMap[selectedPlataformas[0]];
+      baseSections = only
+        ? [only, ...allSections.filter(s => s.title !== 'Métricas de Marketing')]
+        : allSections;
     } else {
+      // 0 ou 2+ plataformas → Marketing consolidado (somado via /ads + interseção de
+      // métricas). Nunca quebra em blocos por canal quando há soma.
       baseSections = allSections;
     }
 
