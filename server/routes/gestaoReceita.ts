@@ -9,6 +9,7 @@ import { somaDespesaCaixaPorMes } from "./bp2026";
 import { PREDICADOS_DESPESA, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { montarDetalhe, tipoValido } from "./gestaoReceita.detalhe";
 import { sourceLabel } from "./bitrixSources";
+import { computeFunil, opcoesProdutoFunil, segPredSql, produtoValido, plataformaValida } from "./gestaoReceita.funil";
 
 const STAGE_GANHO = "Negócio Ganho";
 
@@ -262,33 +263,13 @@ export function registerGestaoReceitaRoutes(app: Express) {
         };
       });
 
-      // ---------- 7. FUNIL por segmento (inbound / outbound) ----------
-      // Inbound = source na régua do growth.ts; outbound = o resto (inclui deals sem origem).
-      const segExpr = sql`CASE WHEN source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM') THEN 'inbound' ELSE 'outbound' END`;
-      const isMql = sql`(mql::text = '1' OR lower(mql::text) = 'true')`;
-      const funilRows = await db.execute(sql`
-        SELECT ${segExpr} AS seg,
-          COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim}) AS leads,
-          COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim} AND ${isMql}) AS leads_mql,
-          COUNT(*) FILTER (WHERE data_reuniao_agendada >= ${dIni} AND data_reuniao_agendada < ${dFim}) AS ra,
-          COUNT(*) FILTER (WHERE data_reuniao_agendada >= ${dIni} AND data_reuniao_agendada < ${dFim} AND ${isMql}) AS ra_mql,
-          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}) AS rr,
-          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim} AND ${isMql}) AS rr_mql,
-          COUNT(*) FILTER (WHERE stage_name = ${STAGE_GANHO} AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}) AS venda,
-          COUNT(*) FILTER (WHERE stage_name = ${STAGE_GANHO} AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim} AND ${isMql}) AS venda_mql
-        FROM "Bitrix".crm_deal GROUP BY 1
-      `);
-      const funilPorSeg: Record<string, any> = {};
-      for (const r of funilRows.rows as any[]) funilPorSeg[r.seg] = r;
-      // cada etapa traz volume total + quantos são MQL (o resto = NMQL), p/ as barras empilhadas
-      const etapasDe = (r: any) => [
-        { etapa: "Lead", valor: Number(r?.leads) || 0, mql: Number(r?.leads_mql) || 0 },
-        { etapa: "Reunião agendada", valor: Number(r?.ra) || 0, mql: Number(r?.ra_mql) || 0 },
-        { etapa: "Reunião realizada", valor: Number(r?.rr) || 0, mql: Number(r?.rr_mql) || 0 },
-        { etapa: "Venda", valor: Number(r?.venda) || 0, mql: Number(r?.venda_mql) || 0 },
-      ];
-      const funilInbound = etapasDe(funilPorSeg["inbound"]);
-      const funilOutbound = etapasDe(funilPorSeg["outbound"]);
+      // ---------- 7. FUNIL por segmento (inbound / outbound / outros) ----------
+      // Régua e queries em gestaoReceita.funil.ts (compartilhado com o drill e com
+      // o endpoint filtrado /api/gestao/receita/funil). Aqui vem sem filtros.
+      const [{ inbound: funilInbound, outbound: funilOutbound, outros: funilOutros }, opcoesProduto] = await Promise.all([
+        computeFunil(db, { dIni, dFim }),
+        opcoesProdutoFunil(db, { dIni, dFim }),
+      ]);
 
       // ---------- 7b. INVESTIMENTO & CPL (Meta Ads + Conta Azul) ----------
       const invSpendRow = await db.execute(sql`
@@ -304,7 +285,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
           COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim}
             AND (mql::text = '1' OR lower(mql::text) = 'true')) AS mqls
         FROM "Bitrix".crm_deal
-        WHERE ${segExpr} = 'inbound'
+        WHERE ${segPredSql("inbound")}
       `);
       const invL = (invLeadsRow.rows as any[])[0] || {};
       const leadsInbound = Number(invL.leads) || 0;
@@ -476,12 +457,26 @@ export function registerGestaoReceitaRoutes(app: Express) {
           sdrs,
         },
         micro: { produtos, vendedores: closers, sdrs },
-        funil: { inbound: funilInbound, outbound: funilOutbound, mql, investimento },
+        funil: { inbound: funilInbound, outbound: funilOutbound, outros: funilOutros, mql, investimento, opcoesProduto },
         qualidade: { churnPorMotivo, churnPorVendedor, total: churnTotal },
       });
     } catch (error) {
       console.error("[api] Error em /api/gestao/receita:", error);
       res.status(500).json({ error: "Falha ao montar Gestão de Receita" });
+    }
+  });
+
+  // Funil filtrado por Produto (fnl_ngc) × Plataforma (utm_source) — usado pela aba
+  // Funil quando algum filtro está ativo, sem refazer o payload agregador inteiro.
+  app.get("/api/gestao/receita/funil", async (req, res) => {
+    try {
+      const { dIni, dFim } = parsePeriodo(req.query);
+      const produto = produtoValido(req.query.produto) ? req.query.produto : undefined;
+      const plataforma = plataformaValida(req.query.plataforma) ? req.query.plataforma : undefined;
+      res.json(await computeFunil(db, { dIni, dFim, produto, plataforma }));
+    } catch (error) {
+      console.error("[api] Error em /api/gestao/receita/funil:", error);
+      res.status(500).json({ error: "Falha ao montar funil" });
     }
   });
 
@@ -492,7 +487,10 @@ export function registerGestaoReceitaRoutes(app: Express) {
       if (!tipoValido(tipo)) return res.status(400).json({ error: "tipo inválido" });
       const { dIni, dFim, label } = parsePeriodo(req.query);
       const chave = typeof req.query.chave === "string" ? req.query.chave : "";
-      const detalhe = await montarDetalhe(db, { tipo, chave, dIni, dFim, label });
+      // filtros do funil (só a família funil_etapa usa; nos demais tipos são ignorados)
+      const produto = produtoValido(req.query.produto) ? req.query.produto : undefined;
+      const plataforma = plataformaValida(req.query.plataforma) ? req.query.plataforma : undefined;
+      const detalhe = await montarDetalhe(db, { tipo, chave, dIni, dFim, label, produto, plataforma });
       res.json(detalhe);
     } catch (error) {
       console.error("[api] Error em /api/gestao/receita/detalhe:", error);

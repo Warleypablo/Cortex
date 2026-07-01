@@ -5,6 +5,7 @@ import { sql } from "drizzle-orm";
 import { agruparItens, type ItemDetalhe, type GrupoDetalhe } from "./bp2026.helpers";
 import { PREDICADOS_DESPESA, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { sourceLabel } from "./bitrixSources";
+import { segPredSql, filtrosFunilSql, PLATAFORMA_LABELS } from "./gestaoReceita.funil";
 
 const LIMITE = 50;
 const STAGE_GANHO = "Negócio Ganho";
@@ -47,7 +48,8 @@ function montar(titulo: string, itens: ItemDetalhe[], unidade: "brl" | "int", no
 
 export async function montarDetalhe(
   db: any,
-  { tipo, chave, dIni, dFim, label }: { tipo: string; chave: string; dIni: string; dFim: string; label: string }
+  { tipo, chave, dIni, dFim, label, produto, plataforma }:
+    { tipo: string; chave: string; dIni: string; dFim: string; label: string; produto?: string; plataforma?: string }
 ): Promise<DetalheResult> {
   // ---------- Família DEALS (Bitrix) ----------
   const dealBase = (where: ReturnType<typeof sql>, valorExpr: ReturnType<typeof sql>, dataExpr: ReturnType<typeof sql>, grupoExpr: ReturnType<typeof sql>) =>
@@ -85,15 +87,19 @@ export async function montarDetalhe(
     return montar(`SDR: ${chave} · ${label}`, toDealItens(rs), "brl", "Valor das vendas ganhas atribuídas ao SDR (o mesmo deal também conta para o closer).");
   }
   if (tipo === "funil_etapa") {
-    // chave pode vir como "inbound:lead" / "outbound:venda" ou só "lead"
+    // chave pode vir como "inbound:lead" / "outbound:venda" / "outros:rr" ou só "lead"
     const [maybeSeg, maybeEtapa] = chave.includes(":") ? chave.split(":") : ["", chave];
     const etapa = maybeEtapa;
     const segRotulo = maybeSeg ? ` (${maybeSeg})` : "";
-    const IN = sql`d.source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM')`;
-    const segFiltro = maybeSeg === "inbound" ? sql` AND ${IN}` : maybeSeg === "outbound" ? sql` AND NOT (${IN})` : sql``;
+    // mesma régua do agregador (gestaoReceita.funil.ts) + filtros Produto × Plataforma
+    const segFiltro = maybeSeg ? sql` AND ${segPredSql(maybeSeg, "d")}` : sql``;
+    const extras = sql`${segFiltro}${filtrosFunilSql({ produto, plataforma }, "d")}`;
+    const notaFiltro = produto || plataforma
+      ? `Filtros ativos — ${[produto ? `produto: ${produto}` : "", plataforma ? `plataforma: ${PLATAFORMA_LABELS[plataforma] || plataforma}` : ""].filter(Boolean).join(" · ")}.`
+      : undefined;
     if (etapa === "venda") {
-      const rs = await rows(db, dealBase(sql`${ganhoNoMes}${segFiltro}`, valMrrPont, sql`d.data_fechamento`, grpCloser));
-      return montar(`Funil${segRotulo} · Venda · ${label}`, toDealItens(rs), "brl");
+      const rs = await rows(db, dealBase(sql`${ganhoNoMes}${extras}`, valMrrPont, sql`d.data_fechamento`, grpCloser));
+      return montar(`Funil${segRotulo} · Venda · ${label}`, toDealItens(rs), "brl", notaFiltro);
     }
     const mapa: Record<string, { campo: ReturnType<typeof sql>; rotulo: string }> = {
       lead: { campo: sql`d.date_create`, rotulo: "Lead" },
@@ -102,8 +108,8 @@ export async function montarDetalhe(
     };
     const m = mapa[etapa];
     if (!m) return montar("Funil", [], "int");
-    const rs = await rows(db, dealBase(sql`${m.campo} >= ${dIni} AND ${m.campo} < ${dFim}${segFiltro}`, sql`0::numeric`, m.campo, grpCanal));
-    return montar(`Funil${segRotulo} · ${m.rotulo} · ${label}`, toDealItens(rs, "", sourceLabel).map((i) => ({ ...i, valor: 0 })), "int");
+    const rs = await rows(db, dealBase(sql`${m.campo} >= ${dIni} AND ${m.campo} < ${dFim}${extras}`, sql`0::numeric`, m.campo, grpCanal));
+    return montar(`Funil${segRotulo} · ${m.rotulo} · ${label}`, toDealItens(rs, "", sourceLabel).map((i) => ({ ...i, valor: 0 })), "int", notaFiltro);
   }
   if (tipo === "mql") {
     const classeExpr = sql`CASE WHEN d.mql::text = '1' OR lower(d.mql::text) = 'true' THEN 'MQL'
