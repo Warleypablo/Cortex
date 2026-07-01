@@ -179,7 +179,6 @@ const LtLtvChurn = lazyWithRetry(() => import("@/pages/LtLtvChurn"));
 const LtvClientes = lazyWithRetry(() => import("@/pages/LtvClientes"));
 const EstoquePontual = lazyWithRetry(() => import("@/pages/EstoquePontual"));
 const CreatorsPontual = lazyWithRetry(() => import("@/pages/CreatorsPontual"));
-const MigradoSynapse = lazyWithRetry(() => import("@/pages/MigradoSynapse"));
 
 // Error boundary to catch silent crashes in the portal.
 // The lazyWithRetry wrapper handles the first auto-reload attempt at the
@@ -275,20 +274,6 @@ function ProtectedRoute({ path, component: Component }: { path: string; componen
   );
 }
 
-// Bloqueio visual temporário: telas de G&G migradas para o Synapse.
-// Para reativar, basta remover este array e o bloco `isGegBlocked` abaixo.
-// As rotas/componentes originais permanecem definidos no Switch.
-const GEG_BLOCKED_PREFIXES = [
-  "/dashboard/geg",
-  "/dashboard/recrutamento",
-  "/dashboard/inhire",
-  "/colaboradores",
-  "/colaborador/",
-  "/patrimonio",
-  "/rh/pesquisas",
-  "/gg/",
-];
-
 function ProtectedRouter() {
   const [location, setLocation] = useLocation();
   const { user, isLoading, error } = useAuth();
@@ -307,18 +292,6 @@ function ProtectedRouter() {
 
   if (error || !user) {
     return null;
-  }
-
-  // G&G migrado para o Synapse — bloqueio visual (não impede acesso a outras telas)
-  const isGegBlocked = GEG_BLOCKED_PREFIXES.some(
-    (prefix) => location === prefix || location.startsWith(prefix)
-  );
-  if (isGegBlocked) {
-    return (
-      <Suspense fallback={<PageSkeleton />}>
-        <MigradoSynapse />
-      </Suspense>
-    );
   }
 
   return (
