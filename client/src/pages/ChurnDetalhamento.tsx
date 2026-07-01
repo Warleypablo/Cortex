@@ -270,6 +270,56 @@ export default function ChurnDetalhamento() {
     return mrrBase > 0 ? (mrrPerdido / mrrBase) * 100 : 0;
   }, [filteredMetricas.mrr_perdido, somaMrrBases, mrrBaseReal]);
 
+  // ── KPIs do topo (FIXOS — independem do toggle de abono) ────────────────────
+  // Os cards Churn Total / Churn s/ Abonados / NRR são SEMPRE sobre a população
+  // do período (só filtrada por data). O toggle "Todos/Não abonados/Abonados"
+  // filtra apenas a tabela e os gráficos abaixo.
+  const heroContratos = useMemo(() => {
+    if (!data?.contratos) return [] as any[];
+    let filtered = [...data.contratos];
+    if (dataInicio) {
+      const inicio = new Date(dataInicio);
+      filtered = filtered.filter((c: any) => {
+        const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
+        return refDate && new Date(refDate) >= inicio;
+      });
+    }
+    if (dataFim) {
+      const fim = new Date(dataFim);
+      fim.setHours(23, 59, 59, 999);
+      filtered = filtered.filter((c: any) => {
+        const refDate = c.tipo === 'pausado' ? c.data_pausa : c.data_encerramento;
+        return refDate && new Date(refDate) <= fim;
+      });
+    }
+    return filtered;
+  }, [data?.contratos, dataInicio, dataFim]);
+
+  const heroMetricas = useMemo(() => {
+    const churns = heroContratos;
+    const isAbon = (c: any) => (abonadoOverrides[c.id] ?? c.is_abonado ?? false);
+    const churnTotal = churns.reduce((s: number, c: any) => s + (c.valorr || 0), 0);
+    const abonados = churns.filter(isAbon);
+    const mrrAbonado = abonados.reduce((s: number, c: any) => s + (c.valorr || 0), 0);
+    const logos = churns.length;
+    const ltMedio = logos > 0 ? churns.reduce((s: number, c: any) => s + (c.lifetime_meses || 0), 0) / logos : 0;
+    const ticketMedio = logos > 0 ? churnTotal / logos : 0;
+    return {
+      churnTotal,
+      churnSemAbonados: churnTotal - mrrAbonado,
+      mrrAbonado,
+      abonadoCount: abonados.length,
+      logos,
+      ltMedio,
+      ticketMedio,
+    };
+  }, [heroContratos, abonadoOverrides]);
+
+  const heroTaxaChurn = useMemo(() => {
+    const mrrBase = somaMrrBases > 0 ? somaMrrBases : mrrBaseReal;
+    return mrrBase > 0 ? (heroMetricas.churnTotal / mrrBase) * 100 : 0;
+  }, [heroMetricas.churnTotal, somaMrrBases, mrrBaseReal]);
+
   const churnDailyInsights = useMemo(() => {
     const mrrBase = mrrBaseReal;
     const monthKey = dataInicio ? format(parseISO(dataInicio), "yyyy-MM") : "";
@@ -367,13 +417,16 @@ export default function ChurnDetalhamento() {
       {/* Painel Executivo Hero - KPIs de Diagnóstico */}
       {!isLoading && data?.metricas?.mrr_ativo_ref !== undefined && (
         <ChurnKpisHero
-          contratos={filteredContratos}
-          mrrPerdido={filteredMetricas.mrr_perdido}
-          taxaChurn={filteredTaxaChurn}
+          contratos={heroContratos}
+          churnTotal={heroMetricas.churnTotal}
+          churnSemAbonados={heroMetricas.churnSemAbonados}
+          mrrAbonado={heroMetricas.mrrAbonado}
+          abonadoCount={heroMetricas.abonadoCount}
+          taxaChurn={heroTaxaChurn}
           mrrBase={mrrBaseCalculo}
           nrrPct={nrrData?.nrr_pct}
-          ltMedio={filteredMetricas.lt_medio}
-          ticketMedio={filteredMetricas.ticket_medio}
+          ltMedio={heroMetricas.ltMedio}
+          ticketMedio={heroMetricas.ticketMedio}
           onDrill={onDrill}
           onNrrClick={() => setNrrDrillOpen(true)}
         />
