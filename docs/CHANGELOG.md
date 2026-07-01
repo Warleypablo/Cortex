@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-06-30 | feat(orcado-realizado): Connect Rate GA4 ao lado do pixel
+
+**O que foi feito:**
+- Backend `/ads`: expõe `connectRateGa4` = Sessões (GA4) ÷ Cliques de saída — métrica universal e comparável entre canais. O `connectRate` (pixel Meta ÷ cliques) segue exposto.
+- Orçado x Realizado e Evolução Temporal: nova linha "Connect Rate GA4" (PAID_ONLY, aparece somada no blend dos pagos) ao lado de "Connect Rate (Pixel)" (META_ONLY, só aparece com Meta sozinho).
+
+**Por que:** o Connect Rate hoje é calculado com numeradores de fontes diferentes por canal — Meta usa o pixel (`landing_page_views`), Google usa GA4 (`pageviews`) — o que enviesa a comparação. A saída para padronizar é usar Sessões GA4 ÷ Cliques para todos (o pixel só o Meta tem). Este passo mostra os dois lado a lado antes de migrar o funil para Sessões.
+
+**Nota de tracking:** o GA4 não conta cliques (o denominador vem da plataforma de ads). Ele atribui Sessões ao canal via `sessionSource`/`sessionMedium` (UTMs). Requer `utm_source`=plataforma + `utm_medium`=paid; sem isso a sessão cai em "orgânico/outros" e o Connect Rate do canal zera.
+
+**Arquivos alterados:**
+- `server/routes/growth.ts` - `connectRateGa4` no endpoint /ads.
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - linhas Connect Rate GA4 / (Pixel) + disponibilidade.
+- `client/src/pages/GrowthEvolucaoTemporal.tsx` - idem.
+
+**Impacto arquitetural:** Nenhum — aditivo; prepara a padronização do Connect Rate (e do funil por Sessões).
+
+---
+
 ## 2026-06-30 | feat(orcado-realizado): Orçado bottom-up — consolidado = soma dos canais pagos
 
 **O que foi feito:**
