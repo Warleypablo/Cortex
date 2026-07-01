@@ -352,6 +352,43 @@ export async function syncGoogleTurbo(
       result.adMetrics++;
     }
 
+    // 9. Impression Share por AD GROUP (a API só expõe IS em campaign/ad_group, nunca
+    // em ad_group_ad). Guardado por dia p/ permitir ponderação por impressões no período.
+    const agMetrics = await gaql(customerId, `
+      SELECT segments.date, ad_group.id,
+             metrics.impressions,
+             metrics.search_impression_share,
+             metrics.search_top_impression_share,
+             metrics.search_absolute_top_impression_share
+      FROM ad_group
+      WHERE segments.date BETWEEN '${since}' AND '${until}'
+        AND campaign.status != 'REMOVED' AND ad_group.status != 'REMOVED'
+        AND metrics.impressions > 0`);
+    for (const row of agMetrics) {
+      const adGroupId = row.adGroup?.id;
+      if (!adGroupId) continue;
+      const m = row.metrics || {};
+      // IS pode não vir (campanhas non-search): grava NULL, não 0, p/ não poluir a média.
+      const numOrNull = (v: any) => (v === undefined || v === null || v === '' ? null : Number(v));
+      await pool.query(
+        `INSERT INTO google.ad_group_daily_metrics
+           (report_date, ad_group_id, impressions,
+            search_impression_share, search_top_impression_share, search_absolute_top_impression_share, synced_at)
+         VALUES ($1, $2, $3, $4, $5, $6, NOW())
+         ON CONFLICT (report_date, ad_group_id) DO UPDATE
+           SET impressions = EXCLUDED.impressions,
+               search_impression_share = EXCLUDED.search_impression_share,
+               search_top_impression_share = EXCLUDED.search_top_impression_share,
+               search_absolute_top_impression_share = EXCLUDED.search_absolute_top_impression_share,
+               synced_at = NOW()`,
+        [
+          row.segments?.date, String(adGroupId), parseInt(m.impressions || '0', 10),
+          numOrNull(m.searchImpressionShare), numOrNull(m.searchTopImpressionShare),
+          numOrNull(m.searchAbsoluteTopImpressionShare),
+        ],
+      );
+    }
+
     await pool.query(
       `UPDATE google.sync_runs SET status='ok', campaigns=$2, metrics=$3, finished_at=NOW() WHERE id=$1`,
       [runId, result.campaigns, result.metrics],

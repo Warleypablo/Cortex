@@ -248,18 +248,13 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
            c.name AS campaign_name, c.status AS campaign_status, c.budget_amount_micros,
            COALESCE(m.impressions, 0) AS impressions, COALESCE(m.clicks, 0) AS clicks,
            COALESCE(m.cost_micros, 0) AS cost_micros, COALESCE(m.conversions, 0) AS conversions,
-           COALESCE(m.conversion_value, 0) AS conversion_value, COALESCE(m.video_views, 0) AS video_views,
-           COALESCE(m.view_through_conversions, 0) AS view_through_conversions,
-           COALESCE(m.all_conversions, 0) AS all_conversions,
-           COALESCE(m.interactions, 0) AS interactions, COALESCE(m.engagements, 0) AS engagements
+           COALESCE(m.conversion_value, 0) AS conversion_value, COALESCE(m.video_views, 0) AS video_views
     FROM google.ads a
     LEFT JOIN google.ad_groups ag ON ag.ad_group_id = a.ad_group_id
     LEFT JOIN google.campaigns c ON c.campaign_id = a.campaign_id
     LEFT JOIN (
       SELECT ad_id, SUM(impressions) AS impressions, SUM(clicks) AS clicks, SUM(cost_micros) AS cost_micros,
-             SUM(conversions) AS conversions, SUM(conversion_value) AS conversion_value, SUM(video_views) AS video_views,
-             SUM(view_through_conversions) AS view_through_conversions, SUM(all_conversions) AS all_conversions,
-             SUM(interactions) AS interactions, SUM(engagements) AS engagements
+             SUM(conversions) AS conversions, SUM(conversion_value) AS conversion_value, SUM(video_views) AS video_views
       FROM google.ad_daily_metrics
       WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
       GROUP BY ad_id
@@ -344,6 +339,61 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
     if (carrier) { const cur = crmByAd.get(carrier.ad_id) || emptyCrm(); addCrm(cur, crm); crmByAd.set(carrier.ad_id, cur); }
   }
 
+  // 2b. Métricas estendidas ad-level (view-through/all-conv/interactions/engagements).
+  // Query SEPARADA e resiliente: as colunas só existem após a migração 2026-07-01. Se
+  // ainda não rodou, o try/catch mantém o Google vivo (sem essas métricas) em vez de
+  // derrubar a query inteira — evita repetir o bug de zeragem silenciosa.
+  const extByAd = new Map<string, { vtc: number; allc: number; inter: number; eng: number }>();
+  try {
+    const extRes = await db.execute(sql`
+      SELECT ad_id::text AS ad_id,
+             SUM(view_through_conversions) AS vtc, SUM(all_conversions) AS allc,
+             SUM(interactions) AS inter, SUM(engagements) AS eng
+      FROM google.ad_daily_metrics
+      WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+      GROUP BY ad_id
+    `);
+    for (const r of extRes.rows as any[]) {
+      extByAd.set(String(r.ad_id), {
+        vtc: Math.round(parseFloat(r.vtc) || 0), allc: Math.round(parseFloat(r.allc) || 0),
+        inter: parseInt(r.inter) || 0, eng: parseInt(r.eng) || 0,
+      });
+    }
+  } catch (e: any) {
+    console.log("[api] buildGoogleCriativos - métricas estendidas indisponíveis (migração):", e?.message || e);
+  }
+
+  // 2c. Impression Share por AD GROUP no período — ponderado por impressões (a média
+  // correta de IS ao longo de dias). A API só dá IS em campaign/ad_group; anexamos o IS
+  // do ad group a cada anúncio-filho, e o frontend só o exibe nos níveis Campanha/Conjunto
+  // (blank no Anúncio). Leitura opcional: tabela pode não existir até a migração rodar.
+  const isByAdGroup = new Map<string, { sis: number | null; stis: number | null; satis: number | null; weight: number }>();
+  try {
+    const isRes = await db.execute(sql`
+      SELECT ad_group_id::text AS ad_group_id,
+        SUM(COALESCE(search_impression_share, 0) * impressions)
+          / NULLIF(SUM(CASE WHEN search_impression_share IS NOT NULL THEN impressions ELSE 0 END), 0) AS sis,
+        SUM(COALESCE(search_top_impression_share, 0) * impressions)
+          / NULLIF(SUM(CASE WHEN search_top_impression_share IS NOT NULL THEN impressions ELSE 0 END), 0) AS stis,
+        SUM(COALESCE(search_absolute_top_impression_share, 0) * impressions)
+          / NULLIF(SUM(CASE WHEN search_absolute_top_impression_share IS NOT NULL THEN impressions ELSE 0 END), 0) AS satis,
+        SUM(CASE WHEN search_impression_share IS NOT NULL THEN impressions ELSE 0 END) AS weight
+      FROM google.ad_group_daily_metrics
+      WHERE report_date >= ${startDate}::date AND report_date <= ${endDate}::date
+      GROUP BY ad_group_id
+    `);
+    for (const r of isRes.rows as any[]) {
+      isByAdGroup.set(String(r.ad_group_id), {
+        sis: r.sis != null ? Number(r.sis) * 100 : null,     // fração 0..1 → %
+        stis: r.stis != null ? Number(r.stis) * 100 : null,
+        satis: r.satis != null ? Number(r.satis) * 100 : null,
+        weight: parseInt(r.weight) || 0,
+      });
+    }
+  } catch (e: any) {
+    console.log("[api] buildGoogleCriativos - impression share indisponível (tabela/migração):", e?.message || e);
+  }
+
   // 3. Montar linhas no formato CriativoData. Mantém só anúncios com gasto, CRM, ou ativos.
   const r1 = (v: number) => parseFloat(v.toFixed(1));
   const r2 = (v: number) => parseFloat(v.toFixed(2));
@@ -404,11 +454,17 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
       conversions: Math.round(parseFloat(a.conversions) || 0),
       conversionValue: Math.round(parseFloat(a.conversion_value) || 0),
       videoViews: parseInt(a.video_views) || 0,
-      // Métricas estendidas nativas do Google (contadores somáveis).
-      viewThroughConversions: Math.round(parseFloat(a.view_through_conversions) || 0),
-      allConversions: Math.round(parseFloat(a.all_conversions) || 0),
-      interactions: parseInt(a.interactions) || 0,
-      engagements: parseInt(a.engagements) || 0,
+      // Métricas estendidas nativas do Google (contadores somáveis; query resiliente 2b).
+      viewThroughConversions: extByAd.get(a.ad_id)?.vtc ?? 0,
+      allConversions: extByAd.get(a.ad_id)?.allc ?? 0,
+      interactions: extByAd.get(a.ad_id)?.inter ?? 0,
+      engagements: extByAd.get(a.ad_id)?.eng ?? 0,
+      // Impression Share do AD GROUP (não-somável; frontend exibe só em Campanha/Conjunto,
+      // ponderado por impressões entre ad groups). isWeight = impressões-search do ad group.
+      impressionShare: isByAdGroup.get(a.ad_group_id)?.sis ?? null,
+      impressionShareTop: isByAdGroup.get(a.ad_group_id)?.stis ?? null,
+      impressionShareAbsTop: isByAdGroup.get(a.ad_group_id)?.satis ?? null,
+      isWeight: isByAdGroup.get(a.ad_group_id)?.weight ?? 0,
       // CRM (carregado na linha portadora do ad group / campanha)
       leads: crm.leads,
       cpl: crm.leads > 0 ? Math.round(investimento / crm.leads) : null,

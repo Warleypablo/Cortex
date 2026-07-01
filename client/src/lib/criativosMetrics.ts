@@ -48,6 +48,13 @@ export interface CriativoData {
   viewThroughConversions?: number; // conversões view-through
   allConversions?: number;         // todas as conversões (inclui micro/secundárias)
   interactions?: number;           // interações (cliques + engajamentos por formato)
+  // Impression Share do ad group (Google) — NÃO-SOMÁVEL. Vem por anúncio carregando o
+  // valor do ad group pai; o frontend pondera por impressões entre ad groups distintos
+  // e só exibe em Campanha/Conjunto (null no Anúncio). isWeight = impressões-search.
+  impressionShare?: number | null;
+  impressionShareTop?: number | null;
+  impressionShareAbsTop?: number | null;
+  isWeight?: number;
   // contadores nativos do TikTok (somáveis; demais plataformas não os preenchem)
   videoP25?: number;          // views que assistiram 25% do vídeo
   videoP50?: number;
@@ -422,15 +429,52 @@ function computeBudget(rows: CriativoData[], level: Level): BudgetCell {
   return { value: null, info: null }; // anúncio
 }
 
+type ImpressionShareCell = { sis: number | null; top: number | null; absTop: number | null };
+
+/**
+ * Impression Share (Google) — NÃO-SOMÁVEL. A API só fornece IS por ad group, então
+ * cada anúncio carrega o IS do seu ad group. Ao agregar:
+ *  - Anúncio: null (IS não é métrica de criativo individual → "—").
+ *  - Conjunto/Campanha/Conta: média PONDERADA por impressões entre ad groups DISTINTOS
+ *    (dedupe por adsetId), que é como o Google Ads combina IS de vários grupos.
+ */
+function computeImpressionShare(rows: CriativoData[], level: Level): ImpressionShareCell {
+  if (level === "anuncio") return { sis: null, top: null, absTop: null };
+  const seen = new Map<string, { sis: number | null; top: number | null; absTop: number | null; w: number }>();
+  for (const r of rows) {
+    const id = r.adsetId || "—";
+    if (seen.has(id)) continue;
+    if (r.impressionShare == null) continue;
+    seen.set(id, { sis: r.impressionShare, top: r.impressionShareTop ?? null, absTop: r.impressionShareAbsTop ?? null, w: r.isWeight || 0 });
+  }
+  let wSum = 0, sisSum = 0, topSum = 0, absSum = 0, topW = 0, absW = 0;
+  for (const v of Array.from(seen.values())) {
+    if (v.w <= 0) continue;
+    wSum += v.w; sisSum += (v.sis || 0) * v.w;
+    if (v.top != null) { topSum += v.top * v.w; topW += v.w; }
+    if (v.absTop != null) { absSum += v.absTop * v.w; absW += v.w; }
+  }
+  const r2 = (v: number) => parseFloat(v.toFixed(2));
+  return {
+    sis: wSum > 0 ? r2(sisSum / wSum) : null,
+    top: topW > 0 ? r2(topSum / topW) : null,
+    absTop: absW > 0 ? r2(absSum / absW) : null,
+  };
+}
+
 /** Agrega um conjunto de linhas (anúncios) em uma única linha CriativoData. */
 export function aggregateGroup(rows: CriativoData[], meta: GroupMeta, level: Level): CriativoData {
   const derived = computeDerived(sumRaw(rows));
   const budget = computeBudget(rows, level);
+  const is = computeImpressionShare(rows, level);
   return {
     link: "",
     plataforma: rows[0]?.plataforma || "Meta Ads",
     orcamentoDiario: budget.value,
     orcamentoInfo: budget.info,
+    impressionShare: is.sis,
+    impressionShareTop: is.top,
+    impressionShareAbsTop: is.absTop,
     ...meta,
     ...derived,
   } as CriativoData;
@@ -444,8 +488,12 @@ function deriveStatus(rows: CriativoData[]): string {
 /** Agrega as linhas de anúncio para o nível pedido. */
 export function aggregateByLevel(rows: CriativoData[], level: Level): CriativoData[] {
   if (level === "anuncio") {
-    // Nível de anúncio não tem orçamento próprio (mora no conjunto/campanha).
-    return rows.map((r) => ({ ...r, orcamentoDiario: null, orcamentoInfo: null }));
+    // Nível de anúncio não tem orçamento próprio (mora no conjunto/campanha) nem
+    // Impression Share (é métrica de ad group, não de criativo) → ambos "—".
+    return rows.map((r) => ({
+      ...r, orcamentoDiario: null, orcamentoInfo: null,
+      impressionShare: null, impressionShareTop: null, impressionShareAbsTop: null,
+    }));
   }
 
   if (level === "conta") {

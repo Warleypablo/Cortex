@@ -94,6 +94,11 @@ export const ALL_COLUMNS: ColumnDef[] = [
   C("interactions", "Interações", "Tráfego", "number", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
   C("interactionRate", "Taxa interação", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 108 }),
   C("engagementRate", "Taxa engaj.", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
+  // Impression Share (Google) — só existe por ad group; aparece em Campanha/Conjunto,
+  // "—" no nível Anúncio. Não-somável: média ponderada por impressões entre ad groups.
+  C("impressionShare", "Impr. Share", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
+  C("impressionShareTop", "IS topo", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 92 }),
+  C("impressionShareAbsTop", "IS topo abs.", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 104 }),
   // Engajamento (nativo do TikTok)
   C("engagements", "Engajam.", "Engajamento", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
   C("likes", "Likes", "Engajamento", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
