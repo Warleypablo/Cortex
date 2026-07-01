@@ -21,6 +21,43 @@
 | André (canal próprio) | `andre` |
 | Rodrigo (canal próprio) | `rodrigo` |
 
+## 🔗 Padrão do link curto (slug)
+
+Todo link gerado no UTM Builder já nasce **encurtado** em `marketing.turbopartners.com.br/<slug>`. O slug segue um padrão único, flat (hífen, sem `/`), **descritivo** — não é copy persuasiva, é rastreável e padronizado:
+
+```
+{plataforma}-{pessoa}-{destino ou apelido}
+```
+
+- **plataforma** (vem do `utm_source`): `ig` · `tt` · `yt` · `li` · `ytcast` (Turbo Cast, só YouTube)
+- **pessoa** (vem do `utm_medium`): `victor` · `andre` · `rodrigo`. **Turbo (`organic`) OMITE a pessoa** — é o default.
+- **destino** (bio) ou **apelido** (post):
+  - Bio → `site-turbo` · `criativos-ugc` · `creators-summit`
+  - Post → nome curto descritivo do conteúdo, **sem data** (ex: `5-coisas-ugc`). A data você lê na coluna do Histórico.
+
+| | Formato | Exemplo |
+|---|---|---|
+| **Bio** (perfil — reforça persuasão no conteúdo, não na URL) | `{plataforma}-[pessoa]-{destino}` | `ig-victor-criativos-ugc` · `ig-site-turbo` |
+| **Post** (descrição/DM — só clicado, funcional) | `{plataforma}-[pessoa]-{apelido}` | `yt-victor-5-coisas-ugc` · `yt-5-coisas-ugc` |
+
+> **Por que sem canal separado no slug e com plataforma no prefixo?** A plataforma precisa entrar porque o `utm_source` muda por plataforma (é 1 link por plataforma). Bio e post têm o **mesmo shape** pra decorar fácil. O UTM Builder **monta o slug sozinho** a partir de plataforma + pessoa + destino/apelido — dá pra editar, e vazio gera aleatório.
+
+**Colisão:** slug é chave única global. Mesmo **destino** = o Builder reusa o link (dedup, não duplica). Slug igual apontando pra **destino diferente** = conflito → escolha outro nome (ou some um sufixo, ex: `-2`).
+
+### Lista fixa das bios (criar 1 vez cada)
+
+3 destinos por entidade. Instagram mostrado abaixo — **pras outras plataformas troca só o prefixo** (`ig`→`tt`/`yt`/`li`). UTM por baixo: `utm_medium` = a coluna, `utm_term=bio`, `utm_content` = `site-home` / `lp-creators` / `lp-summit`, destino = home / `pages…/creators` / página do Summit.
+
+| Destino (bio) | Turbo | Victor | André | Rodrigo |
+|---|---|---|---|---|
+| **Site** | `ig-site-turbo` | `ig-victor-site-turbo` | `ig-andre-site-turbo` | `ig-rodrigo-site-turbo` |
+| **Creators/UGC** | `ig-criativos-ugc` | `ig-victor-criativos-ugc` | `ig-andre-criativos-ugc` | `ig-rodrigo-criativos-ugc` |
+| **Creator Summit** | `ig-creators-summit` | `ig-victor-creators-summit` | `ig-andre-creators-summit` | `ig-rodrigo-creators-summit` |
+
+**Cast (Turbo Cast — só YouTube):** `ytcast-site-turbo` · `ytcast-criativos-ugc` · `ytcast-creators-summit` (`utm_source=youtube-cast`, `utm_medium=organic`).
+
+> Total do pattern: 4 entidades × 4 plataformas × 3 destinos + Cast (3) = **51 links de bio fixos**. Criar só os que a pessoa realmente tem no perfil. O Builder monta o slug + a UTM sozinho — é escolher nos dropdowns e salvar.
+
 ## ⚠️ Clicabilidade — onde o link funciona
 
 | Plataforma | 🟢 Fixo (bio) | 🔵 Post | Link clicável no post? |
