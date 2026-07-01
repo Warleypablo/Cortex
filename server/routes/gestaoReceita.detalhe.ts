@@ -4,6 +4,7 @@
 import { sql } from "drizzle-orm";
 import { agruparItens, type ItemDetalhe, type GrupoDetalhe } from "./bp2026.helpers";
 import { PREDICADOS_DESPESA, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
+import { sourceLabel } from "./bitrixSources";
 
 const LIMITE = 50;
 const STAGE_GANHO = "Negócio Ganho";
@@ -53,8 +54,8 @@ export async function montarDetalhe(
   const grpCloser = sql`COALESCE(NULLIF(c.nome, ''), '(sem closer)')`;
   const grpCanal = sql`COALESCE(NULLIF(d.source, ''), '(não informado)')`;
   const valMrrPont = sql`(COALESCE(d.valor_recorrente::numeric, 0) + COALESCE(d.valor_pontual::numeric, 0))`;
-  const toDealItens = (rs: any[], detalhe = ""): ItemDetalhe[] =>
-    rs.map((r) => ({ grupo: r.grupo, nome: r.nome || "(sem título)", detalhe, data: r.data, valor: num(r.valor) }));
+  const toDealItens = (rs: any[], detalhe = "", labelGrupo?: (g: string) => string): ItemDetalhe[] =>
+    rs.map((r) => ({ grupo: labelGrupo ? labelGrupo(r.grupo) : r.grupo, nome: r.nome || "(sem título)", detalhe, data: r.data, valor: num(r.valor) }));
 
   if (tipo === "venda_mrr") {
     const rs = await rows(db, dealBase(sql`${ganhoNoMes} AND COALESCE(d.valor_recorrente::numeric, 0) > 0`, sql`d.valor_recorrente::numeric`, sql`d.data_fechamento`, grpCloser));
@@ -67,7 +68,7 @@ export async function montarDetalhe(
   if (tipo === "canal") {
     const filtroCanal = chave === "(não informado)" ? sql`COALESCE(NULLIF(d.source, ''), '(não informado)') = '(não informado)'` : sql`d.source = ${chave}`;
     const rs = await rows(db, dealBase(sql`${ganhoNoMes} AND ${filtroCanal}`, valMrrPont, sql`d.data_fechamento`, grpCloser));
-    return montar(`Canal: ${chave} · ${label}`, toDealItens(rs), "brl");
+    return montar(`Canal: ${sourceLabel(chave)} · ${label}`, toDealItens(rs), "brl");
   }
   if (tipo === "closer") {
     const rs = await rows(db, dealBase(sql`${ganhoNoMes} AND c.nome = ${chave}`, valMrrPont, sql`d.data_fechamento`, grpCanal));
@@ -96,13 +97,13 @@ export async function montarDetalhe(
     const m = mapa[etapa];
     if (!m) return montar("Funil", [], "int");
     const rs = await rows(db, dealBase(sql`${m.campo} >= ${dIni} AND ${m.campo} < ${dFim}${segFiltro}`, sql`0::numeric`, m.campo, grpCanal));
-    return montar(`Funil${segRotulo} · ${m.rotulo} · ${label}`, toDealItens(rs).map((i) => ({ ...i, valor: 0 })), "int");
+    return montar(`Funil${segRotulo} · ${m.rotulo} · ${label}`, toDealItens(rs, "", sourceLabel).map((i) => ({ ...i, valor: 0 })), "int");
   }
   if (tipo === "mql") {
     const classeExpr = sql`CASE WHEN d.mql::text = '1' OR lower(d.mql::text) = 'true' THEN 'MQL'
       WHEN d.mql IS NULL OR d.mql::text = '' THEN '(sem classificação)' ELSE 'NMQL' END`;
     const rs = await rows(db, dealBase(sql`d.date_create >= ${dIni} AND d.date_create < ${dFim} AND ${classeExpr} = ${chave}`, sql`0::numeric`, sql`d.date_create`, grpCanal));
-    return montar(`MQL: ${chave} · ${label}`, toDealItens(rs).map((i) => ({ ...i, valor: 0 })), "int");
+    return montar(`MQL: ${chave} · ${label}`, toDealItens(rs, "", sourceLabel).map((i) => ({ ...i, valor: 0 })), "int");
   }
 
   // ---------- Família PRODUTO (ClickUp) ----------

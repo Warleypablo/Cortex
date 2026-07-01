@@ -8,6 +8,7 @@ import { sql } from "drizzle-orm";
 import { somaDespesaCaixaPorMes } from "./bp2026";
 import { PREDICADOS_DESPESA, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { montarDetalhe, tipoValido } from "./gestaoReceita.detalhe";
+import { sourceLabel } from "./bitrixSources";
 
 const STAGE_GANHO = "Negócio Ganho";
 
@@ -183,7 +184,8 @@ export function registerGestaoReceitaRoutes(app: Express) {
       `);
       const canais = (canaisRows.rows as any[]).map((r) => {
         const mrr = num(r.mrr), pont = num(r.pont), deals = Number(r.deals) || 0;
-        return { canal: r.canal, deals, mrr, pont, total: mrr + pont, ticket: deals > 0 ? (mrr + pont) / deals : 0 };
+        // canal = código cru (chave do drill); canalLabel = nome legível do Bitrix (exibição)
+        return { canal: r.canal, canalLabel: sourceLabel(r.canal), deals, mrr, pont, total: mrr + pont, ticket: deals > 0 ? (mrr + pont) / deals : 0 };
       });
 
       // ---------- 7. FUNIL por segmento (inbound / outbound) ----------

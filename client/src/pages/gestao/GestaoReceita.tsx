@@ -36,7 +36,7 @@ interface GestaoReceitaData {
   macro: {
     vendaMrr: Stat; vendaPontual: Stat;
     ticketMrr: number; ticketPontual: number; taxaConversao: number; numReunioes: number;
-    canais: { canal: string; deals: number; mrr: number; pont: number; total: number; ticket: number }[];
+    canais: { canal: string; canalLabel: string; deals: number; mrr: number; pont: number; total: number; ticket: number }[];
     cac: {
       custoTotal: Stat;
       produto: { orcado: number; realizado: number; n: number };
@@ -288,7 +288,7 @@ function SecaoMacro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
               <TableBody>
                 {canais.map((c) => (
                   <TableRow key={c.canal} onClick={() => onDrill({ tipo: "canal", chave: c.canal })} className={rowClick}>
-                    <Td left>{c.canal}</Td><Td>{intBR(c.deals)}</Td><Td>{brl(c.mrr)}</Td><Td>{brl(c.pont)}</Td><Td>{brl(c.total)}</Td><Td>{brl(c.ticket)}</Td>
+                    <Td left>{c.canalLabel}</Td><Td>{intBR(c.deals)}</Td><Td>{brl(c.mrr)}</Td><Td>{brl(c.pont)}</Td><Td>{brl(c.total)}</Td><Td>{brl(c.ticket)}</Td>
                   </TableRow>
                 ))}
               </TableBody>
