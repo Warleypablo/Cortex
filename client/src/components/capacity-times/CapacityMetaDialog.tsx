@@ -181,7 +181,7 @@ export function CapacityMetaDialog({ open, onOpenChange, meta, existingCategoria
             {/* Cap. Faturamento (R$) grava em cap_mrr; Cap. Contas em cap_contas.
                 cap_recorrente/cap_pontual/ordem existentes são preservados no payload. */}
             {numField(form.cap_mrr, (n) => setForm({ ...form, cap_mrr: n }), "Cap. Faturamento ($)", "meta-cap-fat")}
-            {numField(form.cap_contas, (n) => setForm({ ...form, cap_contas: n }), "Cap. Contas", "meta-cap-contas")}
+            {numField(form.cap_contas, (n) => setForm({ ...form, cap_contas: n }), "Cap. Contratos", "meta-cap-contas")}
           </div>
 
           <div className="flex items-center gap-2">
