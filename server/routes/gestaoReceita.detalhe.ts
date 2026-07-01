@@ -78,19 +78,25 @@ export async function montarDetalhe(
     return montar(`SDR: ${chave} · ${label}`, toDealItens(rs), "brl", "Valor das vendas ganhas atribuídas ao SDR (o mesmo deal também conta para o closer).");
   }
   if (tipo === "funil_etapa") {
-    if (chave === "venda") {
-      const rs = await rows(db, dealBase(ganhoNoMes, valMrrPont, sql`d.data_fechamento`, grpCloser));
-      return montar(`Funil · Venda · ${label}`, toDealItens(rs), "brl");
+    // chave pode vir como "inbound:lead" / "outbound:venda" ou só "lead"
+    const [maybeSeg, maybeEtapa] = chave.includes(":") ? chave.split(":") : ["", chave];
+    const etapa = maybeEtapa;
+    const segRotulo = maybeSeg ? ` (${maybeSeg})` : "";
+    const IN = sql`d.source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM')`;
+    const segFiltro = maybeSeg === "inbound" ? sql` AND ${IN}` : maybeSeg === "outbound" ? sql` AND NOT (${IN})` : sql``;
+    if (etapa === "venda") {
+      const rs = await rows(db, dealBase(sql`${ganhoNoMes}${segFiltro}`, valMrrPont, sql`d.data_fechamento`, grpCloser));
+      return montar(`Funil${segRotulo} · Venda · ${label}`, toDealItens(rs), "brl");
     }
     const mapa: Record<string, { campo: ReturnType<typeof sql>; rotulo: string }> = {
       lead: { campo: sql`d.date_create`, rotulo: "Lead" },
       ra: { campo: sql`d.data_reuniao_agendada`, rotulo: "Reunião agendada" },
       rr: { campo: sql`d.data_reuniao_realizada`, rotulo: "Reunião realizada" },
     };
-    const m = mapa[chave];
+    const m = mapa[etapa];
     if (!m) return montar("Funil", [], "int");
-    const rs = await rows(db, dealBase(sql`${m.campo} >= ${dIni} AND ${m.campo} < ${dFim}`, sql`0::numeric`, m.campo, grpCanal));
-    return montar(`Funil · ${m.rotulo} · ${label}`, toDealItens(rs).map((i) => ({ ...i, valor: 0 })), "int");
+    const rs = await rows(db, dealBase(sql`${m.campo} >= ${dIni} AND ${m.campo} < ${dFim}${segFiltro}`, sql`0::numeric`, m.campo, grpCanal));
+    return montar(`Funil${segRotulo} · ${m.rotulo} · ${label}`, toDealItens(rs).map((i) => ({ ...i, valor: 0 })), "int");
   }
   if (tipo === "mql") {
     const classeExpr = sql`CASE WHEN d.mql::text = '1' OR lower(d.mql::text) = 'true' THEN 'MQL'

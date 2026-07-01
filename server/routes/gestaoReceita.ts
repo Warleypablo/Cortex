@@ -186,22 +186,56 @@ export function registerGestaoReceitaRoutes(app: Express) {
         return { canal: r.canal, deals, mrr, pont, total: mrr + pont, ticket: deals > 0 ? (mrr + pont) / deals : 0 };
       });
 
-      // ---------- 7. FUNIL (Lead -> RA -> RR -> Venda) ----------
-      const funilRow = await db.execute(sql`
-        SELECT
+      // ---------- 7. FUNIL por segmento (inbound / outbound) ----------
+      // Inbound = source na régua do growth.ts; outbound = o resto (inclui deals sem origem).
+      const segExpr = sql`CASE WHEN source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM') THEN 'inbound' ELSE 'outbound' END`;
+      const funilRows = await db.execute(sql`
+        SELECT ${segExpr} AS seg,
           COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim}) AS leads,
           COUNT(*) FILTER (WHERE data_reuniao_agendada >= ${dIni} AND data_reuniao_agendada < ${dFim}) AS ra,
           COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}) AS rr,
           COUNT(*) FILTER (WHERE stage_name = ${STAGE_GANHO} AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}) AS venda
-        FROM "Bitrix".crm_deal
+        FROM "Bitrix".crm_deal GROUP BY 1
       `);
-      const f = (funilRow.rows as any[])[0] || {};
-      const funilEtapas = [
-        { etapa: "Lead", valor: Number(f.leads) || 0 },
-        { etapa: "Reunião agendada", valor: Number(f.ra) || 0 },
-        { etapa: "Reunião realizada", valor: Number(f.rr) || 0 },
-        { etapa: "Venda", valor: Number(f.venda) || 0 },
+      const funilPorSeg: Record<string, any> = {};
+      for (const r of funilRows.rows as any[]) funilPorSeg[r.seg] = r;
+      const etapasDe = (r: any) => [
+        { etapa: "Lead", valor: Number(r?.leads) || 0 },
+        { etapa: "Reunião agendada", valor: Number(r?.ra) || 0 },
+        { etapa: "Reunião realizada", valor: Number(r?.rr) || 0 },
+        { etapa: "Venda", valor: Number(r?.venda) || 0 },
       ];
+      const funilInbound = etapasDe(funilPorSeg["inbound"]);
+      const funilOutbound = etapasDe(funilPorSeg["outbound"]);
+
+      // ---------- 7b. INVESTIMENTO & CPL (Meta Ads + Conta Azul) ----------
+      const invSpendRow = await db.execute(sql`
+        SELECT COALESCE(SUM(spend::numeric), 0) AS spend
+        FROM meta_ads.meta_insights_daily
+        WHERE date_start >= ${dIni} AND date_start < ${dFim}
+      `);
+      const metaAdsSpend = num((invSpendRow.rows as any[])[0]?.spend);
+      const cacAdsPM = await somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_ads);
+      const adsContaAzul = cacAdsPM[mesNum] || 0;
+      const invLeadsRow = await db.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim}) AS leads,
+          COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim}
+            AND (mql::text = '1' OR lower(mql::text) = 'true')) AS mqls
+        FROM "Bitrix".crm_deal
+        WHERE ${segExpr} = 'inbound'
+      `);
+      const invL = (invLeadsRow.rows as any[])[0] || {};
+      const leadsInbound = Number(invL.leads) || 0;
+      const mqlsInbound = Number(invL.mqls) || 0;
+      const investimento = {
+        metaAdsSpend,
+        adsContaAzul,
+        leadsInbound,
+        mqlsInbound,
+        cpl: leadsInbound > 0 ? Math.round(metaAdsSpend / leadsInbound) : 0,
+        cplMq: mqlsInbound > 0 ? Math.round(metaAdsSpend / mqlsInbound) : 0,
+      };
 
       // ---------- 8. MQL / NMQL por etapa ----------
       const mqlRows = await db.execute(sql`
@@ -348,7 +382,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
           sdrs,
         },
         micro: { produtos, vendedores: closers, sdrs },
-        funil: { etapas: funilEtapas, mql },
+        funil: { inbound: funilInbound, outbound: funilOutbound, mql, investimento },
         qualidade: { churnPorMotivo, churnPorVendedor, total: churnTotal },
       });
     } catch (error) {

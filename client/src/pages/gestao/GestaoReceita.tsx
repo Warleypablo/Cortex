@@ -45,7 +45,12 @@ interface GestaoReceitaData {
   };
   pessoas: { custoComercial: Stat; comissoes: Stat; closers: CloserRow[]; sdrs: SdrRow[] };
   micro: { produtos: ProdutoRow[]; vendedores: CloserRow[]; sdrs: SdrRow[] };
-  funil: { etapas: { etapa: string; valor: number }[]; mql: { classe: string; leads: number; rr: number; ganhos: number }[] };
+  funil: {
+    inbound: { etapa: string; valor: number }[];
+    outbound: { etapa: string; valor: number }[];
+    mql: { classe: string; leads: number; rr: number; ganhos: number }[];
+    investimento: { metaAdsSpend: number; adsContaAzul: number; leadsInbound: number; mqlsInbound: number; cpl: number; cplMq: number };
+  };
   qualidade: {
     churnPorMotivo: { motivo: string; qtd: number; valor: number }[];
     churnPorVendedor: { vendedor: string; qtd: number; valor: number }[];
@@ -401,41 +406,64 @@ function SecaoMicro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
   );
 }
 
-function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
-  const { etapas, mql } = d.funil;
+// barras de um funil (Lead→RA→RR→Venda), clicáveis com drill segmentado
+function FunilBarras({ etapas, seg, onDrill }: { etapas: { etapa: string; valor: number }[]; seg: "inbound" | "outbound"; onDrill: (dr: DrillRef) => void }) {
   const topo = etapas[0]?.valor || 1;
-  const totalLeadsMql = mql.reduce((a, m) => a + m.leads, 0);
   const etapaChave = ["lead", "ra", "rr", "venda"];
+  return (
+    <div className="flex flex-col gap-2">
+      {etapas.map((e, i) => {
+        const prev = i > 0 ? etapas[i - 1].valor : null;
+        const convEtapa = prev ? (e.valor / prev) * 100 : null;
+        const convAcum = (e.valor / topo) * 100;
+        return (
+          <div
+            key={e.etapa}
+            onClick={() => onDrill({ tipo: "funil_etapa", chave: `${seg}:${etapaChave[i]}` })}
+            className="grid grid-cols-[130px_1fr_150px] items-center gap-3 rounded-md cursor-pointer transition hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+          >
+            <span className="text-xs font-semibold text-gray-600 dark:text-zinc-300">{e.etapa}</span>
+            <div className="h-8 overflow-hidden rounded-md bg-gray-100 dark:bg-zinc-800">
+              <div className="flex h-full items-center justify-end rounded-md bg-gradient-to-r from-teal-400 to-teal-600 px-2 text-xs font-bold tabular-nums text-white" style={{ width: Math.max(convAcum, 6) + "%" }}>
+                {intBR(e.valor)}
+              </div>
+            </div>
+            <span className="text-right text-xs tabular-nums text-gray-500 dark:text-zinc-400">
+              {convEtapa != null ? <><b className="text-gray-800 dark:text-zinc-100">{pct(convEtapa)}</b> etapa · </> : "topo · "}{pct(convAcum)} acum.
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
+  const { inbound, outbound, mql, investimento: inv } = d.funil;
+  const totalLeadsMql = mql.reduce((a, m) => a + m.leads, 0);
   return (
     <div className="space-y-5">
       <div>
-        <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil comercial — Lead → Reunião → Venda" />
-        <SectionCard title="Volume e conversão por etapa" fonte={<Fonte tipo="bitrix" />}>
-          <div className="flex flex-col gap-2">
-            {etapas.map((e, i) => {
-              const prev = i > 0 ? etapas[i - 1].valor : null;
-              const convEtapa = prev ? (e.valor / prev) * 100 : null;
-              const convAcum = (e.valor / topo) * 100;
-              return (
-                <div
-                  key={e.etapa}
-                  onClick={() => onDrill({ tipo: "funil_etapa", chave: etapaChave[i] })}
-                  className="grid grid-cols-[130px_1fr_150px] items-center gap-3 rounded-md cursor-pointer transition hover:bg-gray-50 dark:hover:bg-zinc-800/50"
-                >
-                  <span className="text-xs font-semibold text-gray-600 dark:text-zinc-300">{e.etapa}</span>
-                  <div className="h-8 overflow-hidden rounded-md bg-gray-100 dark:bg-zinc-800">
-                    <div className="flex h-full items-center justify-end rounded-md bg-gradient-to-r from-teal-400 to-teal-600 px-2 text-xs font-bold tabular-nums text-white" style={{ width: Math.max(convAcum, 6) + "%" }}>
-                      {intBR(e.valor)}
-                    </div>
-                  </div>
-                  <span className="text-right text-xs tabular-nums text-gray-500 dark:text-zinc-400">
-                    {convEtapa != null ? <><b className="text-gray-800 dark:text-zinc-100">{pct(convEtapa)}</b> etapa · </> : "topo · "}{pct(convAcum)} acum.
-                  </span>
-                </div>
-              );
-            })}
-          </div>
+        <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil Inbound — Lead → Reunião → Venda" />
+        <SectionCard title="Origem na régua de inbound (WEB/WEBFORM/ADVERTISING/CALL/EMAIL…)" fonte={<Fonte tipo="bitrix" />}>
+          <FunilBarras etapas={inbound} seg="inbound" onDrill={onDrill} />
         </SectionCard>
+      </div>
+      <div>
+        <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil Outbound — Lead → Reunião → Venda" />
+        <SectionCard title="Prospecção ativa / demais origens (inclui deals sem origem preenchida)" fonte={<Fonte tipo="bitrix" />}>
+          <FunilBarras etapas={outbound} seg="outbound" onDrill={onDrill} />
+        </SectionCard>
+      </div>
+      <div>
+        <BlockHead icon={<Wallet className="h-4 w-4" />} title="Investimento & CPL (mídia paga)" />
+        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+          <KpiCard label="Investimento Meta Ads" valor={brl(inv.metaAdsSpend)} sub="spend do mês" fonte={<Fonte tipo="bitrix" />} />
+          <KpiCard label="ADs (Conta Azul)" valor={brl(inv.adsContaAzul)} sub="regime caixa 06.06.01" fonte={<Fonte tipo="caixa" />} onClick={() => onDrill({ tipo: "cac" })} />
+          <KpiCard label="CPL" valor={brl(inv.cpl)} sub={`spend ÷ ${intBR(inv.leadsInbound)} leads inbound`} />
+          <KpiCard label="CPL-MQ" valor={brl(inv.cplMq)} sub={`spend ÷ ${intBR(inv.mqlsInbound)} MQLs`} />
+        </div>
+        <Nota>Investimento = spend do Meta Ads no mês (<code>meta_ads</code>). <b>CPL</b> = spend ÷ leads inbound; <b>CPL-MQ</b> = spend ÷ MQLs inbound. Google/outros aparecem no ADs via Conta Azul.</Nota>
       </div>
       <div>
         <BlockHead icon={<Filter className="h-4 w-4" />} title="Composição MQL / NMQL por etapa" />
