@@ -76,12 +76,13 @@ function statusClasses(atingimento: number, lowerIsBetter = false) {
 }
 
 /* ---------- componentes base ---------- */
-function Fonte({ tipo }: { tipo: "bitrix" | "clickup" | "bp" | "caixa" }) {
+function Fonte({ tipo }: { tipo: "bitrix" | "clickup" | "bp" | "caixa" | "meta" }) {
   const map = {
     bitrix: { label: "Bitrix", cls: "bg-blue-50 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
     clickup: { label: "ClickUp", cls: "bg-violet-50 text-violet-700 dark:bg-violet-950 dark:text-violet-300" },
     bp: { label: "BP 2026", cls: "bg-amber-50 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
     caixa: { label: "Conta Azul", cls: "bg-teal-50 text-teal-700 dark:bg-teal-950 dark:text-teal-300" },
+    meta: { label: "Meta Ads", cls: "bg-pink-50 text-pink-700 dark:bg-pink-950 dark:text-pink-300" },
   } as const;
   const m = map[tipo];
   return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.cls}`}>{m.label}</span>;
@@ -458,10 +459,10 @@ function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillR
       <div>
         <BlockHead icon={<Wallet className="h-4 w-4" />} title="Investimento & CPL (mídia paga)" />
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard label="Investimento Meta Ads" valor={brl(inv.metaAdsSpend)} sub="spend do mês" fonte={<Fonte tipo="bitrix" />} />
+          <KpiCard label="Investimento Meta Ads" valor={brl(inv.metaAdsSpend)} sub="spend do mês (meta_ads)" fonte={<Fonte tipo="meta" />} />
           <KpiCard label="ADs (Conta Azul)" valor={brl(inv.adsContaAzul)} sub="regime caixa 06.06.01" fonte={<Fonte tipo="caixa" />} onClick={() => onDrill({ tipo: "cac" })} />
-          <KpiCard label="CPL" valor={brl(inv.cpl)} sub={`spend ÷ ${intBR(inv.leadsInbound)} leads inbound`} />
-          <KpiCard label="CPL-MQ" valor={brl(inv.cplMq)} sub={`spend ÷ ${intBR(inv.mqlsInbound)} MQLs`} />
+          <KpiCard label="CPL" valor={brl(inv.cpl)} sub={`spend Meta ÷ ${intBR(inv.leadsInbound)} leads inbound`} fonte={<Fonte tipo="meta" />} />
+          <KpiCard label="CPL-MQ" valor={brl(inv.cplMq)} sub={`spend Meta ÷ ${intBR(inv.mqlsInbound)} MQLs`} fonte={<Fonte tipo="meta" />} />
         </div>
         <Nota>Investimento = spend do Meta Ads no mês (<code>meta_ads</code>). <b>CPL</b> = spend ÷ leads inbound; <b>CPL-MQ</b> = spend ÷ MQLs inbound. Google/outros aparecem no ADs via Conta Azul.</Nota>
       </div>
