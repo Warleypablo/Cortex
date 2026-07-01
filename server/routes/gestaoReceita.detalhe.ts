@@ -20,8 +20,14 @@ export interface DetalheResult {
 
 const TIPOS = new Set([
   "venda_mrr", "venda_pontual", "canal", "closer", "sdr", "funil_etapa", "mql",
-  "produto", "churn_motivo", "churn_vendedor", "cac", "custo_comercial", "comissoes",
+  "produto", "churn_motivo", "churn_vendedor", "cac", "custo_comercial", "comissoes", "cac_sub",
 ]);
+
+// rótulos das sub-linhas do CAC no drill (chave = predicado em PREDICADOS_CAC_SUB)
+const CAC_SUB_LABELS: Record<string, string> = {
+  cac_growth: "Growth", cac_ads: "ADs", cac_pre_vendas: "Pré-vendas",
+  cac_vendas: "Vendas", cac_gerencia: "Gerência", cac_eventos: "Eventos",
+};
 export const tipoValido = (t: unknown): t is string => typeof t === "string" && TIPOS.has(t);
 
 const brl = (n: number) => "R$ " + Math.round(n).toLocaleString("pt-BR");
@@ -142,11 +148,15 @@ export async function montarDetalhe(
   }
 
   // ---------- Família CUSTOS (Conta Azul, regime caixa) ----------
-  if (tipo === "cac" || tipo === "custo_comercial" || tipo === "comissoes") {
+  if (tipo === "cac" || tipo === "custo_comercial" || tipo === "comissoes" || tipo === "cac_sub") {
+    // cac_sub: chave vem do cliente — só aceita predicados whitelisted (hasOwnProperty
+    // evita cair no prototype com chaves como "constructor").
     const predicado =
       tipo === "cac" ? PREDICADOS_DESPESA.cac :
       tipo === "comissoes" ? PREDICADOS_CAC_SUB.cac_comissoes :
+      tipo === "cac_sub" ? (Object.prototype.hasOwnProperty.call(PREDICADOS_CAC_SUB, chave) ? PREDICADOS_CAC_SUB[chave] : undefined) :
       sql`(${PREDICADOS_CAC_SUB.cac_vendas}) OR (${PREDICADOS_CAC_SUB.cac_pre_vendas})`;
+    if (!predicado) return montar(`CAC · ${chave} · ${label}`, [], "brl");
     const rs = await rows(db, sql`
       SELECT COALESCE(NULLIF(TRIM(nome), ''), NULLIF(TRIM(descricao), ''), '(sem descrição)') AS nome,
              COALESCE(NULLIF(TRIM(categoria_nome), ''), '(sem categoria)') AS grupo,
@@ -157,7 +167,11 @@ export async function montarDetalhe(
         AND (${predicado})
       ORDER BY valor DESC`);
     const itens: ItemDetalhe[] = rs.map((r) => ({ grupo: r.grupo, nome: r.nome, detalhe: "", data: r.data, valor: num(r.valor) }));
-    const titulo = tipo === "cac" ? `CAC (custo total) · ${label}` : tipo === "comissoes" ? `Comissões · ${label}` : `Custo comercial · ${label}`;
+    const titulo =
+      tipo === "cac" ? `CAC (custo total) · ${label}` :
+      tipo === "comissoes" ? `Comissões · ${label}` :
+      tipo === "cac_sub" ? `CAC · ${CAC_SUB_LABELS[chave] || chave} · ${label}` :
+      `Custo comercial · ${label}`;
     return montar(titulo, itens, "brl");
   }
 

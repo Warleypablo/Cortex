@@ -1,5 +1,30 @@
 # Changelog
 
+## 2026-07-01 | feat(gestao-receita): tabela "Custo da operação" — composição do CAC item a item
+
+**O que foi feito:**
+- Nova tabela **"Custo da operação — Orçado × Realizado"** na seção "CAC — custo de aquisição" (aba Macro de /gestao/receita), com 9 itens + linha de total: Growth, ADs, Ferramentas, Pré-vendas, Comissões PV, Vendas, Comissões Vendas, Gerência, Eventos.
+- **Realizado automático** (regime caixa, `PREDICADOS_CAC_SUB`): Growth (06.06.02), ADs (06.06.01), Pré-vendas (06.04.03), Vendas (06.04.02), Gerência (06.04.01) — pill "Conta Azul", linha clicável abre drill.
+- **Realizado manual** (pill "manual", editável no "Editar metas"): Ferramentas, Comissões PV, Comissões Vendas (o Conta Azul só tem o total 06.04.04+05, não separa PV × Vendas) e Eventos — decisão do mockup do time.
+- **Orçado editável em todos os itens** (default = BP 2026 onde há mapeamento: `cac_growth`, `cac_ads`, `cac_pre_vendas`, `cac_vendas`, `cac_gerencia`, `cac_eventos`; Ferramentas e split de comissões começam em 0).
+- Valores manuais/overrides em `cortex_core.gestao_receita_metas` com chaves novas `cac_op_orc:<item>` e `cac_op_real:<item>` (sem tabela nova). Regra de período: override de orçado só em mês único (regra existente); realizado manual soma as entradas mensais do período.
+- Novo tipo de drill `cac_sub` (chave whitelisted em `PREDICADOS_CAC_SUB`, com guard de prototype) — abre as parcelas quitadas do item.
+- Totais da tabela recalculam **ao vivo** durante a edição (rascunho incluído).
+- Nota explica reconciliação: o card "Custo comercial total (CAC)" inclui também Brindes/Viagens/Outras, fora da tabela — o Custo total daqui tende a ser menor.
+
+**Por que:**
+- Pedido do time (mockup): detalhar a composição do custo comercial na visão macro, com itens que o financeiro não separa entráveis à mão.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - catálogo `CAC_OPERACAO_ITENS`, seção 11b (payload `macro.cac.operacao`), mapa `manualReal`, predicados gerência/growth/ads no Promise.all da seção 2 (ads deixa de ser buscado 2×), regex `CHAVE_META_OK` estendida.
+- `server/routes/gestaoReceita.detalhe.ts` - tipo `cac_sub` + `CAC_SUB_LABELS`.
+- `client/src/pages/gestao/GestaoReceita.tsx` - componente `CustoOperacaoTabela` + tipo `CacOperacaoRow` + pill "manual", inserido na seção CAC.
+- `docs/superpowers/specs/2026-07-01-gestao-receita-cac-operacao-design.md` - spec da feature.
+
+**Impacto arquitetural:** Nenhum — payload estendido, mesma tabela de overrides, drill reusa a query de custos.
+
+---
+
 ## 2026-07-01 | feat(gestao-receita): reuniões + taxa de conversão e ticket médio R×P por canal
 
 **O que foi feito:**

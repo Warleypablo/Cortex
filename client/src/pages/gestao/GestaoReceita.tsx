@@ -26,6 +26,9 @@ type Stat = { orcado: number; realizado: number; editavel?: boolean; chave?: str
 interface MetasCtx { editando: boolean; get: (chave: string, fallback: number) => number; set: (chave: string, valor: number) => void; }
 interface CloserRow { nome: string; mrr: number; pont: number; deals: number; reunioes: number; score: number; conv: number; ticket: number; }
 interface SdrRow { nome: string; leads: number; reunioes: number; mrr: number; pont: number; valor: number; conv: number; }
+// linha da tabela "Custo da operação" (seção CAC): fonteReal 'cortex' = caixa Conta Azul
+// (sub = chave do predicado, usada no drill); 'manual' = digitado via Editar metas
+interface CacOperacaoRow { item: string; label: string; orcado: number; realizado: number; fonteReal: "cortex" | "manual"; sub: string | null }
 interface ProdutoRow {
   produto: string; cMrr: number; mrr: number; tmMrr: number; cPont: number; pont: number; tmPont: number;
   metaTmMrr: number | null; metaCtrMrr: number | null; metaTmPont: number | null; metaCtrPont: number | null;
@@ -41,6 +44,7 @@ interface GestaoReceitaData {
       custoTotal: Stat;
       produto: { orcado: number; realizado: number; n: number };
       cliente: { orcado: number; realizado: number; n: number };
+      operacao: CacOperacaoRow[];
     };
   };
   pessoas: { custoComercial: Stat; comissoes: Stat; closers: CloserRow[]; sdrs: SdrRow[] };
@@ -257,6 +261,62 @@ function SecaoPessoas({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: Dril
   );
 }
 
+// pill das linhas de realizado manual da tabela "Custo da operação"
+const PillManual = () => (
+  <span className="inline-flex items-center rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-semibold text-amber-700 dark:bg-amber-950 dark:text-amber-300">manual</span>
+);
+
+// Tabela "Custo da operação": composição do CAC item a item. Orçado editável em todos
+// (default = BP 2026); realizado manual só onde o Conta Azul não separa (comissões
+// PV × Vendas) ou o time preenche à mão (Ferramentas, Eventos). Totais ao vivo no modo edição.
+function CustoOperacaoTabela({ rows, metas, onDrill }: { rows: CacOperacaoRow[]; metas: MetasCtx; onDrill: (dr: DrillRef) => void }) {
+  const orcVivo = (r: CacOperacaoRow) => metas.get(`cac_op_orc:${r.item}`, r.orcado);
+  const realVivo = (r: CacOperacaoRow) => (r.fonteReal === "manual" ? metas.get(`cac_op_real:${r.item}`, r.realizado) : r.realizado);
+  const orcTotal = rows.reduce((a, r) => a + orcVivo(r), 0);
+  const realTotal = rows.reduce((a, r) => a + realVivo(r), 0);
+  return (
+    <SectionCard title="Custo da operação — Orçado × Realizado" fonte={<Fonte tipo="caixa" />}>
+      <TableScroll>
+        <Table>
+          <TableHeader>
+            <TableRow><Th left>Item</Th><Th>Orçado</Th><Th>Realizado</Th><Th>Var.</Th></TableRow>
+          </TableHeader>
+          <TableBody>
+            {rows.map((r) => {
+              const clicavel = !metas.editando && r.sub != null;
+              return (
+                <TableRow key={r.item} onClick={clicavel ? () => onDrill({ tipo: "cac_sub", chave: r.sub! }) : undefined} className={clicavel ? rowClick : ""}>
+                  <Td left>(-) {r.label}</Td>
+                  <Td>{metas.editando ? <MetaInput chave={`cac_op_orc:${r.item}`} valorAtual={r.orcado} metas={metas} /> : brl(r.orcado)}</Td>
+                  <Td>
+                    {r.fonteReal === "manual" ? (
+                      metas.editando
+                        ? <MetaInput chave={`cac_op_real:${r.item}`} valorAtual={r.realizado} metas={metas} />
+                        : <span className="inline-flex items-center gap-1.5">{brl(r.realizado)}<PillManual /></span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1.5">{brl(r.realizado)}<Fonte tipo="caixa" /></span>
+                    )}
+                  </Td>
+                  <Td>{orcVivo(r) > 0 ? <VarPill orcado={orcVivo(r)} realizado={realVivo(r)} lowerIsBetter /> : "—"}</Td>
+                </TableRow>
+              );
+            })}
+            <TableRow className="font-bold">
+              <Td left>Custo total</Td>
+              <Td>{brl(orcTotal)}</Td>
+              <Td>{brl(realTotal)}</Td>
+              <Td>{orcTotal > 0 ? <VarPill orcado={orcTotal} realizado={realTotal} lowerIsBetter /> : "—"}</Td>
+            </TableRow>
+          </TableBody>
+        </Table>
+      </TableScroll>
+      <Nota>
+        <b>Orçado</b>: todos os itens editáveis no botão "Editar metas" (default = BP 2026). <b>Realizado</b>: Ferramentas, Comissões PV, Comissões Vendas e Eventos são <b>manuais</b> (o Conta Azul não separa comissões de PV × Vendas); os demais vêm do caixa (Conta Azul). O card "Custo comercial total (CAC)" acima inclui também Brindes, Viagens e Outras despesas comerciais, fora desta tabela — por isso o Custo total daqui tende a ser menor.
+      </Nota>
+    </SectionCard>
+  );
+}
+
 function SecaoMacro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void; metas: MetasCtx }) {
   const { canais, cac } = d.macro;
   return (
@@ -307,6 +367,9 @@ function SecaoMacro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
           <StatOR label={`CAC por cliente  ·  ${cac.cliente.n} clientes novos`} stat={cac.cliente} lowerIsBetter fonte={<Fonte tipo="caixa" />} onClick={() => onDrill({ tipo: "cac" })} />
         </div>
         <Nota>CAC = custo comercial total ÷ novos adquiridos no mês. Realizado: contratos novos (ClickUp) e clientes novos (deals ganhos Bitrix). Orçado: contratos/clientes vendidos do BP.</Nota>
+        <div className="mt-3">
+          <CustoOperacaoTabela rows={cac.operacao} metas={metas} onDrill={onDrill} />
+        </div>
       </div>
     </div>
   );

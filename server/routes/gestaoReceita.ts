@@ -20,6 +20,22 @@ const PRODUTO_TO_SEG_MRR: Record<string, string> = {
   "Gestão de Comunidade": "gc",
 };
 
+// Tabela "Custo da operação" (seção CAC da aba Macro). sub = predicado do realizado
+// automático (regime caixa); sem sub = realizado manual via cac_op_real:* (o Conta Azul
+// não separa comissões PV × Vendas; ferramentas e eventos entram à mão por decisão do time).
+// orcBp = chave do orçado default no bp2026_orcado (editável via cac_op_orc:*).
+const CAC_OPERACAO_ITENS: { item: string; label: string; sub?: string; orcBp?: string }[] = [
+  { item: "growth", label: "Growth", sub: "cac_growth", orcBp: "cac_growth" },
+  { item: "ads", label: "ADs", sub: "cac_ads", orcBp: "cac_ads" },
+  { item: "ferramentas", label: "Ferramentas" },
+  { item: "pre_vendas", label: "Pré-vendas", sub: "cac_pre_vendas", orcBp: "cac_pre_vendas" },
+  { item: "comissoes_pv", label: "Comissões PV" },
+  { item: "vendas", label: "Vendas", sub: "cac_vendas", orcBp: "cac_vendas" },
+  { item: "comissoes_vendas", label: "Comissões Vendas" },
+  { item: "gerencia", label: "Gerência", sub: "cac_gerencia", orcBp: "cac_gerencia" },
+  { item: "eventos", label: "Eventos", orcBp: "cac_eventos" },
+];
+
 // Aceita período via de/ate ("YYYY-MM") ou mes ("YYYY-MM", atalho). Período dentro de um ano.
 // Retorna o range [dIni, dFim) e a lista de meses (1-12) p/ somar orçado/custos mensais.
 function parsePeriodo(q: { de?: unknown; ate?: unknown; mes?: unknown }): {
@@ -69,20 +85,32 @@ export function registerGestaoReceitaRoutes(app: Express) {
       const ehMesUnico = mesesNums.length === 1;
       const override: Record<string, number> = {};
       if (ehMesUnico) for (const r of ovRows.rows as any[]) override[r.chave] = num(r.valor);
+      // realizado manual (cac_op_real:*) é fato, não meta: soma as entradas mensais
+      // do período mesmo em multi-mês (diferente dos overrides de meta acima).
+      const manualReal: Record<string, number> = {};
+      for (const r of ovRows.rows as any[]) if (String(r.chave).startsWith("cac_op_real:")) manualReal[r.chave] = num(r.valor);
       // meta final = override editado ?? orçado do BP
       const metaMrr = override["venda_mrr"] ?? orc["vendas_mrr"] ?? 0;
       const metaPontual = override["venda_pontual"] ?? orc["vendas_pontual"] ?? 0;
 
       // ---------- 2. CUSTOS REALIZADOS (regime caixa, Conta Azul) ----------
-      const [cacTotalPM, cacVendasPM, cacPreVendasPM, cacComissoesPM] = await Promise.all([
+      const [cacTotalPM, cacVendasPM, cacPreVendasPM, cacComissoesPM, cacGerenciaPM, cacGrowthPM, cacAdsPM] = await Promise.all([
         somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac),
         somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_vendas),
         somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_pre_vendas),
         somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_comissoes),
+        somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_gerencia),
+        somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_growth),
+        somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_ads),
       ]);
       const cacTotalReal = somaMeses(cacTotalPM);
       const custoComercialReal = somaMeses(cacVendasPM) + somaMeses(cacPreVendasPM);
       const comissoesReal = somaMeses(cacComissoesPM);
+      // realizado caixa por predicado, p/ as linhas automáticas da tabela "Custo da operação"
+      const cacSubPM: Record<string, Record<number, number>> = {
+        cac_vendas: cacVendasPM, cac_pre_vendas: cacPreVendasPM, cac_gerencia: cacGerenciaPM,
+        cac_growth: cacGrowthPM, cac_ads: cacAdsPM,
+      };
 
       // ---------- 3. VENDA NOVA (Bitrix) + ticket médio R×P + nº clientes ----------
       const vendaRow = await db.execute(sql`
@@ -255,8 +283,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
         WHERE date_start >= ${dIni} AND date_start < ${dFim}
       `);
       const metaAdsSpend = num((invSpendRow.rows as any[])[0]?.spend);
-      const cacAdsPM = await somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_ads);
-      const adsContaAzul = somaMeses(cacAdsPM);
+      const adsContaAzul = somaMeses(cacAdsPM); // já buscado na seção 2
       const invLeadsRow = await db.execute(sql`
         SELECT
           COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim}) AS leads,
@@ -395,6 +422,17 @@ export function registerGestaoReceitaRoutes(app: Express) {
       const cacProdutoOrc = orcContratosVendidos > 0 ? Math.round((orc["cac"] || 0) / orcContratosVendidos) : 0;
       const cacClienteOrc = orcClientesVendidos > 0 ? Math.round((orc["cac"] || 0) / orcClientesVendidos) : 0;
 
+      // ---------- 11b. Tabela "Custo da operação" (composição do CAC) ----------
+      // Orçado: override editado ?? BP 2026. Realizado: caixa (predicado) ou manual (cac_op_real:*).
+      const cacOperacao = CAC_OPERACAO_ITENS.map((it) => ({
+        item: it.item,
+        label: it.label,
+        orcado: override[`cac_op_orc:${it.item}`] ?? (it.orcBp ? orc[it.orcBp] || 0 : 0),
+        realizado: it.sub ? somaMeses(cacSubPM[it.sub]) : manualReal[`cac_op_real:${it.item}`] || 0,
+        fonteReal: (it.sub ? "cortex" : "manual") as "cortex" | "manual",
+        sub: it.sub ?? null,
+      }));
+
       // Mês em andamento: custos em regime caixa ficam parciais até o fechamento.
       const hoje = new Date();
       const mesParcial = ano === hoje.getFullYear() && mesesNums.includes(hoje.getMonth() + 1);
@@ -414,6 +452,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
             custoTotal: { orcado: orc["cac"] || 0, realizado: cacTotalReal },
             produto: { orcado: cacProdutoOrc, realizado: cacProdutoReal, n: nContratos },
             cliente: { orcado: cacClienteOrc, realizado: cacClienteReal, n: nClientes },
+            operacao: cacOperacao,
           },
         },
         pessoas: {
@@ -448,7 +487,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
   });
 
   // Salva metas editadas na tela (override do orçado do BP). Body: { mes:"YYYY-MM", metas:[{chave, valor}] }.
-  const CHAVE_META_OK = /^(venda_mrr|venda_pontual|prod_(tm|ctr)_(mrr|pont):.+)$/;
+  const CHAVE_META_OK = /^(venda_mrr|venda_pontual|prod_(tm|ctr)_(mrr|pont):.+|cac_op_(orc|real):[a-z_]+)$/;
   app.put("/api/gestao/receita/metas", async (req, res) => {
     try {
       const { ano, mesNum } = parsePeriodo(req.body || {});
