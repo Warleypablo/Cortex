@@ -17,15 +17,15 @@ export const UTM_MEDIUMS = [
 export type UtmMedium = typeof UTM_MEDIUMS[number];
 
 export const UTM_MEDIUM_LABELS: Record<UtmMedium, string> = {
-  paid: 'Paid — Mídia paga (Meta, Google, etc)',
-  organic: 'Organic — Conteúdo orgânico próprio',
-  eventos: 'Eventos — Presença física ou digital',
-  referral: 'Referral — Alguém externo trazendo lead',
-  crm: 'CRM — Comunicação ativa para base própria',
-  outbound: 'Outbound — Prospecção fria via SDR',
-  victor: 'Victor — Canal próprio (figura-exceção)',
-  andre: 'André — Canal próprio (figura-exceção)',
-  rodrigo: 'Rodrigo — Canal próprio (figura-exceção)',
+  paid: 'Paid — Mídia paga',
+  organic: 'Organic — Conteúdo orgânico',
+  eventos: 'Eventos — Eventos físicos ou digitais',
+  referral: 'Referral — Pessoas ou plataformas externas trazendo lead',
+  crm: 'CRM — Comunicação ativa para nossa base',
+  outbound: 'Outbound — Prospecção fria',
+  victor: 'Victor — Canal do sócio',
+  andre: 'André — Canal do sócio',
+  rodrigo: 'Rodrigo — Canal do sócio',
 };
 
 export const UTM_SOURCES_BY_MEDIUM: Record<UtmMedium, readonly string[]> = {
