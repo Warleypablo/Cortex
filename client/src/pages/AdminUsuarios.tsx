@@ -34,6 +34,7 @@ import { apiRequest, queryClient } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { ColorPicker } from "@/components/ui/color-picker";
+import { BP2026_TABS } from "@shared/bp2026-tabs";
 
 type SortColumn = 'name' | 'email' | 'role' | 'allowedRoutes';
 type SortDirection = 'asc' | 'desc';
@@ -102,6 +103,7 @@ interface User {
   createdAt: string;
   role: 'admin' | 'user';
   allowedRoutes: string[];
+  allowedBpTabs: string[];
   colaborador: ColaboradorVinculado | null;
 }
 
@@ -218,6 +220,25 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
     },
   });
 
+  const [selectedBpTabs, setSelectedBpTabs] = useState<string[]>(user.allowedBpTabs ?? []);
+  const updateBpTabsMutation = useMutation({
+    mutationFn: async (allowedBpTabs: string[]) => {
+      return await apiRequest('POST', `/api/users/${user.id}/bp-tabs`, { allowedBpTabs });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/debug/users'] });
+    },
+    onError: (error: any) => {
+      toast({
+        title: "Erro ao atualizar abas BP",
+        description: error.message || "Ocorreu um erro ao atualizar as abas do BP.",
+        variant: "destructive",
+      });
+    },
+  });
+  const toggleBpTab = (id: string) =>
+    setSelectedBpTabs((prev) => prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]);
+
   // Filter out ADMIN category permissions - these are sensitive and should not be selectable for regular users
   const selectablePermissions = ALL_PERMISSION_KEYS.filter(key => !key.startsWith('admin.'));
   // Filter out ADMIN category from display
@@ -277,6 +298,7 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
     // Convert permission keys to routes for API compatibility
     const routesToSave = permissionsToRoutes(selectedRoutes);
     updatePermissionsMutation.mutate(routesToSave);
+    updateBpTabsMutation.mutate(selectedBpTabs);
   };
 
   const handlePromoteToAdmin = () => {
@@ -427,6 +449,26 @@ function EditPermissionsDialog({ user, open, onOpenChange, onToggleRole }: {
                     </div>
                   );
                 })}
+              </div>
+
+              <Separator />
+
+              {/* BP 2026 tabs section */}
+              <div>
+                <h4 className="text-sm font-semibold text-muted-foreground mb-3">Abas do BP 2026 (Orçado × Realizado)</h4>
+                <div className="grid grid-cols-2 gap-3">
+                  {BP2026_TABS.map((t) => (
+                    <div key={t.id} className="flex items-center space-x-2">
+                      <Checkbox
+                        id={`bptab-${t.id}`}
+                        checked={selectedBpTabs.includes(t.id)}
+                        onCheckedChange={() => toggleBpTab(t.id)}
+                        data-testid={`checkbox-bptab-${t.id}`}
+                      />
+                      <Label htmlFor={`bptab-${t.id}`} className="text-sm font-normal cursor-pointer">{t.label}</Label>
+                    </div>
+                  ))}
+                </div>
               </div>
             </>
           )}

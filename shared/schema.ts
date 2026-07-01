@@ -25,6 +25,7 @@ export const authUsers = cortexCoreSchema.table("auth_users", {
   createdAt: timestamp("created_at").defaultNow(),
   role: varchar("role", { length: 20 }).notNull().default("user"),
   allowedRoutes: text("allowed_routes").array(),
+  allowedBpTabs: text("allowed_bp_tabs").array(),
   department: varchar("department", { length: 50 }),
 });
 
@@ -1055,6 +1056,115 @@ export const creativeVocab = cortexCoreSchema.table("creative_vocab", {
   kindValueIdx: uniqueIndex("idx_creative_vocab_kind_value").on(table.kind, table.value),
   kindIdx: index("idx_creative_vocab_kind").on(table.kind),
 }));
+
+// ============== CONTENT PUBLISH (painel "Orgânico" — automacoes/instagram-turbo) ==============
+// Contrato Postgres entre o worker de publicação (Python, automacoes/instagram-turbo) e o
+// painel "Orgânico" no Cortex. Platform-agnóstico de propósito: a coluna `platform`
+// ('instagram' | 'tiktok' | 'youtube' | 'linkedin') faz o MESMO painel/worker servir todas as
+// redes. O worker ESCREVE runs/posts (+heartbeat) e CONSOME commands; o backend Express só lê/
+// escreve estas tabelas — nunca chama o Python. Ver memory/instagram-turbo-painel-operador e a
+// skill subir-conteudo-organico.
+
+// Um registro por ciclo do agente — alimenta a "saúde do agente" (heartbeat + contagens).
+export const contentPublishRuns = cortexCoreSchema.table("content_publish_runs", {
+  id: serial("id").primaryKey(),
+  runId: varchar("run_id", { length: 16 }).notNull(),          // run_id do agente (uuid hex[:8])
+  platform: varchar("platform", { length: 16 }).notNull(),     // instagram | tiktok | youtube | linkedin
+  dryRun: boolean("dry_run").notNull().default(true),
+  status: varchar("status", { length: 16 }).notNull().default("running"), // running | ok | error
+  counts: jsonb("counts").default({}),                         // { approved_seen, ready, published, failed, skipped, errors }
+  errorText: text("error_text"),
+  startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (table) => ({
+  platformStartedIdx: index("idx_content_publish_runs_platform_started").on(table.platform, table.startedAt),
+  runIdIdx: index("idx_content_publish_runs_run_id").on(table.runId),
+}));
+
+export type ContentPublishRun = typeof contentPublishRuns.$inferSelect;
+export type InsertContentPublishRun = typeof contentPublishRuns.$inferInsert;
+
+// Um registro por task/dia (upsert a cada ciclo) — é a FILA/STATUS que o painel mostra.
+export const contentPosts = cortexCoreSchema.table("content_posts", {
+  id: serial("id").primaryKey(),
+  platform: varchar("platform", { length: 16 }).notNull(),
+  clickupTaskId: varchar("clickup_task_id", { length: 64 }).notNull(),
+  clickupListId: varchar("clickup_list_id", { length: 64 }),
+  taskName: text("task_name"),
+  parentName: text("parent_name"),                             // "Social Media - ABRIL"
+  mes: varchar("mes", { length: 24 }),
+  turboSlug: varchar("turbo_slug", { length: 128 }),
+  postingDate: date("posting_date"),                           // data planejada no ClickUp (sem hora)
+  postingTime: varchar("posting_time", { length: 8 }),         // 'HH:MM' explícito do card (campo Horário); NULL = usou padrão
+  slot: varchar("slot", { length: 8 }),                        // '12h' | '17h30' (slot fixo legado do agente)
+  scheduledAt: timestamp("scheduled_at", { withTimezone: true }), // horário escolhido pelo operador ("Agendar"); NULL = não agendado
+  cardScheduledAt: timestamp("card_scheduled_at", { withTimezone: true }), // horário-alvo vindo do card (Data+Horário); o worker escreve a cada ciclo
+  tipoPost: varchar("tipo_post", { length: 16 }),              // single | reels | carousel
+  assetCount: integer("asset_count").default(0),
+  legendaSource: varchar("legenda_source", { length: 24 }),    // doc | claude-precisa | ia | none
+  legendaLen: integer("legenda_len").default(0),
+  legendaEmpty: boolean("legenda_empty").default(false),
+  legendaPreview: text("legenda_preview"),                     // preview da legenda (p/ aprovação de IA)
+  state: varchar("state", { length: 24 }).notNull().default("agendado"),
+    // aprovado | agendado | aguardando_ia | publicado | falhou | pulado
+  readiness: varchar("readiness", { length: 16 }),            // ready | blocked | published | failed — prontidão AUTORITATIVA calculada pelo worker
+  blockReasons: jsonb("block_reasons").$type<string[]>(),     // quando blocked: códigos do que falta (legenda/midia/horario/google/erro/pulado/dry_run)
+  skipReason: text("skip_reason"),
+  errorText: text("error_text"),
+  publishedMediaId: varchar("published_media_id", { length: 64 }), // ig media_id / tiktok publish_id
+  permalink: text("permalink"),                                // URL do post na rede
+  clickupUrl: text("clickup_url"),
+  lastRunId: varchar("last_run_id", { length: 16 }),
+  firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+}, (table) => ({
+  // upsert estável por task (cada card = 1 post; tolera posts sem data agendada)
+  uniqTask: uniqueIndex("idx_content_posts_platform_task").on(table.platform, table.clickupTaskId),
+  uniqTaskDate: uniqueIndex("idx_content_posts_platform_task_date").on(table.platform, table.clickupTaskId, table.postingDate),
+  platformDateIdx: index("idx_content_posts_platform_date").on(table.platform, table.postingDate),
+  scheduledIdx: index("idx_content_posts_scheduled").on(table.platform, table.scheduledAt),
+  cardScheduledIdx: index("idx_content_posts_card_scheduled").on(table.platform, table.cardScheduledAt),
+  stateIdx: index("idx_content_posts_state").on(table.state),
+}));
+
+export type ContentPost = typeof contentPosts.$inferSelect;
+export type InsertContentPost = typeof contentPosts.$inferInsert;
+
+// Fila de comandos painel→worker. O worker lê status='pending', executa e marca done/failed.
+export const contentPublishCommands = cortexCoreSchema.table("content_publish_commands", {
+  id: serial("id").primaryKey(),
+  platform: varchar("platform", { length: 16 }).notNull(),
+  clickupTaskId: varchar("clickup_task_id", { length: 64 }),   // null em comandos globais (pause/resume)
+  action: varchar("action", { length: 32 }).notNull(),
+    // publish_now | schedule | cancel_schedule | retry | skip | approve_caption | edit_caption | pause_agent | resume_agent
+  payload: jsonb("payload").default({}),                       // ex.: { caption } no edit_caption; { scheduled_at } no schedule
+  status: varchar("status", { length: 16 }).notNull().default("pending"), // pending | running | done | failed | canceled
+  result: jsonb("result"),
+  errorText: text("error_text"),
+  requestedBy: varchar("requested_by", { length: 255 }),       // email do usuário do painel
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  finishedAt: timestamp("finished_at", { withTimezone: true }),
+}, (table) => ({
+  statusIdx: index("idx_content_publish_commands_status").on(table.status),
+  platformTaskIdx: index("idx_content_publish_commands_platform_task").on(table.platform, table.clickupTaskId),
+}));
+
+export type ContentPublishCommand = typeof contentPublishCommands.$inferSelect;
+export type InsertContentPublishCommand = typeof contentPublishCommands.$inferInsert;
+
+// Estado/config por plataforma (1 linha por rede): pausar agente + dry-run.
+export const contentPublishSettings = cortexCoreSchema.table("content_publish_settings", {
+  platform: varchar("platform", { length: 16 }).primaryKey(),  // instagram | tiktok | ...
+  agentEnabled: boolean("agent_enabled").notNull().default(true),
+  dryRun: boolean("dry_run").notNull().default(true),          // default seguro = não publica
+  slotsConfig: jsonb("slots_config"),                          // override opcional dos slots 12h/18h
+  updatedBy: varchar("updated_by", { length: 255 }),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
+});
+
+export type ContentPublishSetting = typeof contentPublishSettings.$inferSelect;
+export type InsertContentPublishSetting = typeof contentPublishSettings.$inferInsert;
 
 // CRM Deal table
 export const crmDeal = bitrixSchema.table("crm_deal", {
@@ -3727,6 +3837,51 @@ export type UtmVocabulary = typeof utmVocabulary.$inferSelect;
 export type InsertUtmVocabulary = typeof utmVocabulary.$inferInsert;
 export type GeneratedUtmLink = typeof generatedUtmLinks.$inferSelect;
 export type InsertGeneratedUtmLink = typeof generatedUtmLinks.$inferInsert;
+
+// ============== ENCURTADOR DE LINKS ==============
+// Links curtos servidos por marketing.turbopartners.com.br (Cloudflare Worker).
+// O Worker lê o slug no KV do Cloudflare e redireciona pro target_url (UTM intacta).
+// Estas tabelas são o store analítico no Postgres: short_links é a fonte de verdade
+// do cadastro (o KV é só cache de redirect); short_link_clicks recebe cada clique
+// via POST do Worker → cruza com Bitrix.crm_deal/meta_ads por UTM.
+
+export const shortLinks = cortexCoreSchema.table("short_links", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 80 }).notNull().unique(), // personalizado (ex: reuniao-vitor)
+  targetUrl: text("target_url").notNull(),                  // URL longa de destino, com UTM completa
+  // UTM desmembrada — espelha o que vai no target_url, pra cruzar com Bitrix/Meta
+  utmSource: varchar("utm_source", { length: 40 }),
+  utmMedium: varchar("utm_medium", { length: 20 }),
+  utmCampaign: varchar("utm_campaign", { length: 120 }),
+  utmTerm: varchar("utm_term", { length: 120 }),
+  utmContent: varchar("utm_content", { length: 200 }),
+  generatedUtmLinkId: varchar("generated_utm_link_id"),     // FK lógica -> generated_utm_links.id (reuso do UTM Builder)
+  createdBy: varchar("created_by").notNull(),               // userId (Growth + admins)
+  isActive: boolean("is_active").notNull().default(true),
+  expiresAt: timestamp("expires_at"),                       // NULL = não expira
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (table) => ({
+  createdByIdx: index("idx_short_links_created_by").on(table.createdBy),
+  campaignIdx: index("idx_short_links_utm_campaign").on(table.utmCampaign),
+}));
+
+export const shortLinkClicks = cortexCoreSchema.table("short_link_clicks", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  slug: varchar("slug", { length: 80 }).notNull(),          // FK lógica -> short_links.slug
+  clickedAt: timestamp("clicked_at").notNull().defaultNow(),
+  country: varchar("country", { length: 2 }),               // cf.country (ISO-2)
+  ipHash: varchar("ip_hash", { length: 64 }),               // hash do IP (privacidade) — dedup opcional
+  userAgent: text("user_agent"),
+  referrer: text("referrer"),
+}, (table) => ({
+  slugIdx: index("idx_short_link_clicks_slug").on(table.slug),
+  clickedAtIdx: index("idx_short_link_clicks_clicked_at").on(table.clickedAt),
+}));
+
+export type ShortLink = typeof shortLinks.$inferSelect;
+export type InsertShortLink = typeof shortLinks.$inferInsert;
+export type ShortLinkClick = typeof shortLinkClicks.$inferSelect;
+export type InsertShortLinkClick = typeof shortLinkClicks.$inferInsert;
 
 // ============================================================
 // YouTube — sync de dados orgânicos (Data API v3 + Analytics API)

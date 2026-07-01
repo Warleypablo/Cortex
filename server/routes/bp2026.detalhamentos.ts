@@ -40,8 +40,11 @@ interface Deps {
   ganhosPorMes: Record<number, number>; // deals ganhos (MRR ou pontual) — proxy de clientes adquiridos
   // realizado de contratos recorrentes vendidos por produto (slug -> série 12 meses, null no futuro)
   contratosVendidosRec: Record<string, (number | null)[]>;
-  // realizado do total de contratos vendidos no mês (recorrentes + pontuais) — denom. do CAC por contrato
-  contratosVendidosTotalPorMes: (number | null)[];
+  // realizado do total de serviços vendidos no mês (campo servicos_vendidos do Bitrix) —
+  // denom. do CAC por contrato (régua: 1 serviço = 1 contrato)
+  servicosVendidosTotalPorMes: (number | null)[];
+  // faturamento recebido no mês (entradas de RECEITA quitadas, regime caixa) — denom. do % do faturamento no SG&A
+  faturamentoCaixaPorMes: Record<number, number>;
   mesCorrente: number;
   mesFechado: number;
 }
@@ -90,7 +93,7 @@ const SUB_SGA: DefSub[] = [
 ];
 
 export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; cac: Linha[]; outrasReceitas: Linha[] }> {
-  const { db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec, contratosVendidosTotalPorMes, mesCorrente, mesFechado } = deps;
+  const { db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec, servicosVendidosTotalPorMes, faturamentoCaixaPorMes, mesCorrente, mesFechado } = deps;
 
   const mensal = (porMes: Record<number, number>) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? porMes[i + 1] ?? 0 : null));
@@ -209,16 +212,16 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     }
   );
 
-  // CAC por contrato: despesa CAC ÷ contratos vendidos no mês (recorrentes + pontuais).
-  // Numerador = CAC total (cobre a aquisição de rec E pontual), então o denominador conta
-  // TODOS os contratos: um deal com N produtos/naturezas conta N contratos (distribuirDeal dá
-  // contrato:1 por segmento). Como contratos ≥ deals ganhos, fica ≤ CAC por cliente — apples-
+  // CAC por contrato: despesa CAC ÷ contratos vendidos no mês.
+  // Régua de contrato = nº de serviços vendidos no deal (campo servicos_vendidos do Bitrix):
+  // cada serviço = 1 contrato (um deal com N serviços conta N). Numerador = CAC total (cobre a
+  // aquisição de rec E pontual). Como serviços ≥ deals ganhos, fica ≤ CAC por cliente — apples-
   // to-apples com aquela linha (que usa o mesmo CAC ÷ deals). Orçado ÷ contratos orçados.
   const contratosOrcMes = (m: number) =>
     SEGMENTOS_RECORRENTES.reduce((s, seg) => s + (orcado[`contratos_vendidos_mrr_${SLUG[seg]}`]?.[m] ?? 0), 0) +
     SEGMENTOS_PONTUAIS.reduce((s, seg) => s + (orcado[`contratos_vendidos_pontual_${SLUG[seg]}`]?.[m] ?? 0), 0);
   const porContratoSerie = Array.from({ length: 12 }, (_, i) =>
-    i + 1 <= mesCorrente ? razao(cacTotalSerie[i], contratosVendidosTotalPorMes[i]) : null
+    i + 1 <= mesCorrente ? razao(cacTotalSerie[i], servicosVendidosTotalPorMes[i]) : null
   );
   // sub-linhas por produto: CAC total ÷ contratos do produto (mesma premissa de CAC)
   const cacPorContratoFilhos: Linha[] = PRODUTOS_CAC.map((p) => {
@@ -245,12 +248,12 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
   const cacPorContrato: Linha = {
     ...fazLinha(
       { metrica: "cac_por_contrato", titulo: "CAC por contrato", direcao: "menor_melhor", unidade: "brl",
-        nota: "Despesa CAC do mês ÷ contratos vendidos no Bitrix (recorrentes + pontuais; um deal com N produtos conta N contratos). Comparável ao CAC por cliente: fica menor que ele quando um cliente fecha mais de um contrato. Orçado ÷ contratos vendidos orçados." },
+        nota: "Despesa CAC do mês ÷ serviços vendidos no Bitrix (campo servicos_vendidos: cada serviço do deal = 1 contrato). Comparável ao CAC por cliente: fica menor que ele quando um deal traz mais de um serviço. Orçado ÷ contratos vendidos orçados." },
       porContratoSerie,
       (m) => razao(cacOrcMes(m), contratosOrcMes(m)) ?? 0,
       mesFechado === 0 ? undefined : {
         orcado: razao(somaAte(cacOrcMes), somaAte(contratosOrcMes)) ?? 0,
-        realizado: razao(cacYtdReal, somaAte((m) => contratosVendidosTotalPorMes[m - 1] ?? 0)),
+        realizado: razao(cacYtdReal, somaAte((m) => servicosVendidosTotalPorMes[m - 1] ?? 0)),
       }
     ),
     semDetalhe: true,
@@ -330,8 +333,35 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     cacLinhasComPct.push(pctChild);
   });
 
+  // ---- sub-linha "% do faturamento" sob o total de SG&A ----
+  // SG&A do mês (caixa) ÷ faturamento recebido no mês (entradas de RECEITA quitadas, mesma base de caixa da DFC).
+  const sgaTotalSerie = somaSeries(sgaSeries);
+  const sgaOrcMes = (m: number) => SUB_SGA.reduce((acc, d) => acc + (orcado[d.metrica]?.[m] ?? 0), 0);
+  const fatCaixaMes = (m: number) => faturamentoCaixaPorMes[m] ?? 0;
+  const fatOrcMes = (m: number) =>
+    (orcado["mrr_ativo"]?.[m] ?? 0) + (orcado["receita_pontual"]?.[m] ?? 0) + (orcado["outras_receitas"]?.[m] ?? 0);
+  const sgaPctFatSerie = Array.from({ length: 12 }, (_, i) =>
+    i + 1 <= mesCorrente ? razao(sgaTotalSerie[i], fatCaixaMes(i + 1)) : null
+  );
+  const sgaTotalYtdReal = mesFechado === 0 ? null :
+    sgaTotalSerie.slice(0, mesFechado).reduce<number | null>((acc, v) => (v === null ? acc : (acc ?? 0) + v), null);
+  const sgaPctFaturamento: Linha = {
+    ...fazLinha(
+      { metrica: "sga_pct_faturamento", titulo: "↳ % do faturamento", direcao: "menor_melhor", unidade: "pct",
+        nota: "SG&A do mês (caixa) ÷ faturamento recebido no mês — entradas de RECEITA quitadas (mesma base de caixa da DFC). Orçado ÷ plano de receita do BP (MRR ativo + pontual + outras)." },
+      sgaPctFatSerie,
+      (m) => razao(sgaOrcMes(m), fatOrcMes(m)) ?? 0,
+      mesFechado === 0 ? undefined : {
+        orcado: razao(somaAte(sgaOrcMes), somaAte(fatOrcMes)) ?? 0,
+        realizado: razao(sgaTotalYtdReal, somaAte(fatCaixaMes)),
+      }
+    ),
+    subItem: true,
+    semDetalhe: true,
+  };
+
   return {
-    sga: [sgaTotal, ...sgaLinhas],
+    sga: [sgaTotal, sgaPctFaturamento, ...sgaLinhas],
     cac: [cacTotal, ...cacLinhasComPct, cacPorCliente, cacPorContrato, ...cacPorContratoFilhos, cacPctReceita, cacPayback],
     outrasReceitas: [orTotal, variavelL, stackL, demaisL],
   };

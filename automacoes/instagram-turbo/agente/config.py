@@ -38,6 +38,15 @@ class Config:
     anthropic_model: str
     dry_run: bool
     poll_interval_seconds: int
+    cortex_ingest_url: str
+    organico_ingest_token: str
+    # Nomes dos custom fields do ClickUp (case-insensitive no match). Configuráveis
+    # porque o nome real diverge do esperado: o campo de data é "Data de postagem"
+    # (p minúsculo), não "Data de Postagem". A HORA agora vem embutida NESSE campo de
+    # data (time picker do ClickUp, ex.: 2026-06-29 11:00); "Horário" é só fallback de
+    # TEXTO legado e pode nem existir na lista. Ver clickup.Task.posting_time().
+    posting_date_field: str
+    horario_field: str
 
     @classmethod
     def load(cls) -> "Config":
@@ -61,6 +70,10 @@ class Config:
             anthropic_model=env.get("ANTHROPIC_MODEL", "claude-sonnet-4-6"),
             dry_run=env.get("DRY_RUN", "1") not in ("0", "false", "False", ""),
             poll_interval_seconds=int(env.get("POLL_INTERVAL_SECONDS", "300")),
+            cortex_ingest_url=env.get("CORTEX_INGEST_URL", ""),
+            organico_ingest_token=env.get("ORGANICO_INGEST_TOKEN", ""),
+            posting_date_field=env.get("CLICKUP_POSTING_DATE_FIELD", "Data de postagem"),
+            horario_field=env.get("CLICKUP_HORARIO_FIELD", "Horário"),
         )
 
     def require_clickup(self) -> None:

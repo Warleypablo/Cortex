@@ -1,7 +1,8 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { parseAggRow, buildResponse } from "./capacityTimes.helpers";
+import { toComercialRow, toSelvaRow, toCsRow, type CapacityTimesResponse, type SquadGroup } from "./capacityTimes.helpers";
+import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS, CAP_CONTAS_ACCOUNT } from "../../shared/capacityGrupos";
 
 // Tabela de referência: nível do Gestor de Performance → metas
 const GESTOR_LEVELS: Record<string, { mrr_alvo: number; ticket_alvo: number }> = {
@@ -131,82 +132,299 @@ export function registerCapacityRoutes(app: Express, db: any) {
     res.json(GESTOR_LEVELS);
   });
 
-  // GET /api/capacity-times — ocupação atual vs capacidade por pessoa/time
+  // GET /api/capacity-times — capacity por função (Selva / Black / Squadra / CXCS)
+  //   Designer              → Selva   (responsavel; faturamento rec+pontual; cap via TM)
+  //   Gestor de Performance → Squadra (responsavel; MRR + contas) — exceto os Black accounts
+  //   CXCS                  → CXCS    (cs_responsavel; MRR + contas) — exceto os Black accounts
+  //   Black = lista explícita BLACK_ACCOUNTS (clientes via responsavel_geral; faturamento)
   app.get("/api/capacity-times", async (_req, res) => {
+    // Nomes (RH) dos accounts → removidos dos grupos por cargo (eles foram para a Black).
+    const blackNomesValues = sql.join(
+      BLACK_ACCOUNTS.map((a) => sql`(${a.rhNome})`),
+      sql`, `,
+    );
+    // VALUES (label, match) para a query da Black.
+    const accountsValues = sql.join(
+      BLACK_ACCOUNTS.map((a) => sql`(${a.label}, ${a.match})`),
+      sql`, `,
+    );
     try {
       const result = await db.execute(sql`
-        WITH m AS (
-          SELECT nome, categoria, match_responsavel,
-                 cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem
-          FROM cortex_core.capacity_metas
-          WHERE ativo = TRUE
+        WITH pessoas AS (
+          SELECT r.nome,
+                 CASE WHEN r.cargo = 'Designer'              THEN 'selva'
+                      WHEN r.cargo = 'Gestor de Performance' THEN 'squadra' END AS grupo
+          FROM "Inhire".rh_pessoal r
+          WHERE r.status = 'Ativo'
+            AND (r.cargo = 'Designer' OR r.cargo = 'Gestor de Performance')
+            AND NOT EXISTS (
+              SELECT 1 FROM (VALUES ${blackNomesValues}) AS bn(n)
+              WHERE similarity(r.nome, bn.n) > 0.5
+            )
+        ),
+        contratos_expanded AS (
+          SELECT c.id_subtask, TRIM(rp.part) AS responsavel_part,
+                 COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.status
+          FROM "Clickup".cup_contratos c
+          CROSS JOIN LATERAL regexp_split_to_table(c.responsavel, ';') AS rp(part)
+          WHERE c.status IN ('ativo','onboarding','em cancelamento')
+            AND c.responsavel IS NOT NULL AND c.responsavel <> ''
+        ),
+        best AS (
+          SELECT DISTINCT ON (ce.id_subtask, ce.responsavel_part)
+            p.nome AS pessoa, p.grupo, ce.id_subtask, ce.valorr, ce.valorp, ce.status
+          FROM contratos_expanded ce
+          JOIN pessoas p ON similarity(p.nome, ce.responsavel_part) > 0.4
+          ORDER BY ce.id_subtask, ce.responsavel_part, similarity(p.nome, ce.responsavel_part) DESC
         ),
         agg AS (
-          SELECT
-            m.nome, m.categoria, m.ordem,
-            m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas,
-            COUNT(*) FILTER (
-              WHERE COALESCE(c.valorr, 0) > 0
-                AND c.status IN ('ativo','onboarding','em cancelamento')
-            ) AS op_recorrente,
-            COALESCE(SUM(c.valorr) FILTER (
-              WHERE COALESCE(c.valorr, 0) > 0
-                AND c.status IN ('ativo','onboarding','em cancelamento')
-            ), 0) AS mrr_operando,
-            COALESCE(SUM(c.valorr) FILTER (
-              WHERE COALESCE(c.valorr, 0) > 0 AND c.status = 'ativo'
-            ), 0) AS mrr_ativo,
-            COALESCE(SUM(c.valorr) FILTER (
-              WHERE COALESCE(c.valorr, 0) > 0 AND c.status = 'onboarding'
-            ), 0) AS mrr_onboarding,
-            COALESCE(SUM(c.valorr) FILTER (
-              WHERE COALESCE(c.valorr, 0) > 0 AND c.status = 'em cancelamento'
-            ), 0) AS mrr_cancelamento,
-            COUNT(*) FILTER (
-              WHERE COALESCE(c.valorp, 0) > 0
-                AND c.status IN ('ativo','onboarding')
-            ) AS op_pontual
-          FROM m
-          LEFT JOIN "Clickup".cup_contratos c
-            ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
-          GROUP BY m.nome, m.categoria, m.ordem,
-                   m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas
+          SELECT pessoa, grupo,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0 OR valorp > 0) AS contas_total,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
+            COALESCE(SUM(valorr), 0) AS mrr_operando,
+            COALESCE(SUM(valorp), 0) AS pontual_operando,
+            COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
+            COALESCE(SUM(valorr) FILTER (WHERE status = 'onboarding'), 0) AS mrr_onboarding,
+            COALESCE(SUM(valorr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
+          FROM best GROUP BY pessoa, grupo
         )
-        SELECT * FROM agg ORDER BY ordem, nome
+        SELECT p.nome, p.grupo,
+          COALESCE(a.contas_total, 0)      AS contas_total,
+          COALESCE(a.contas_rec, 0)        AS contas_rec,
+          COALESCE(a.mrr_operando, 0)      AS mrr_operando,
+          COALESCE(a.pontual_operando, 0)  AS pontual_operando,
+          COALESCE(a.mrr_ativo, 0)         AS mrr_ativo,
+          COALESCE(a.mrr_onboarding, 0)    AS mrr_onboarding,
+          COALESCE(a.mrr_cancelamento, 0)  AS mrr_cancelamento,
+          cap.cap_mrr, cap.cap_contas
+        FROM pessoas p
+        LEFT JOIN agg a ON a.pessoa = p.nome
+        LEFT JOIN LATERAL (
+          SELECT m.cap_mrr, m.cap_contas
+          FROM cortex_core.capacity_metas m
+          WHERE m.ativo = TRUE AND similarity(m.match_responsavel, p.nome) > 0.4
+          ORDER BY similarity(m.match_responsavel, p.nome) DESC
+          LIMIT 1
+        ) cap ON TRUE
+        ORDER BY p.grupo, (COALESCE(a.mrr_operando, 0) + COALESCE(a.pontual_operando, 0)) DESC
       `);
 
-      const rows = result.rows.map(parseAggRow);
-      res.json(buildResponse(rows));
+      // CXCS: carteira via `cs_responsavel` da subtask (não `responsavel`); régua MRR + contas.
+      const cxcsResult = await db.execute(sql`
+        WITH pessoas AS (
+          SELECT r.nome FROM "Inhire".rh_pessoal r
+          WHERE r.status = 'Ativo' AND r.cargo = 'CXCS'
+            AND NOT EXISTS (
+              SELECT 1 FROM (VALUES ${blackNomesValues}) AS bn(n)
+              WHERE similarity(r.nome, bn.n) > 0.5
+            )
+        ),
+        contratos_expanded AS (
+          SELECT c.id_subtask, TRIM(rp.part) AS cs_part,
+                 COALESCE(c.valorr, 0) AS valorr, c.status
+          FROM "Clickup".cup_contratos c
+          CROSS JOIN LATERAL regexp_split_to_table(c.cs_responsavel, ';') AS rp(part)
+          WHERE c.status IN ('ativo','onboarding','em cancelamento')
+            AND c.cs_responsavel IS NOT NULL AND c.cs_responsavel <> ''
+        ),
+        best AS (
+          SELECT DISTINCT ON (ce.id_subtask, ce.cs_part)
+            p.nome AS pessoa, ce.id_subtask, ce.valorr, ce.status
+          FROM contratos_expanded ce
+          JOIN pessoas p ON similarity(p.nome, ce.cs_part) > 0.4
+          ORDER BY ce.id_subtask, ce.cs_part, similarity(p.nome, ce.cs_part) DESC
+        ),
+        agg AS (
+          SELECT pessoa,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
+            COALESCE(SUM(valorr), 0) AS mrr_operando,
+            COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
+            COALESCE(SUM(valorr) FILTER (WHERE status = 'onboarding'), 0) AS mrr_onboarding,
+            COALESCE(SUM(valorr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
+          FROM best GROUP BY pessoa
+        )
+        SELECT p.nome,
+          COALESCE(a.contas_rec, 0)       AS contas_rec,
+          COALESCE(a.mrr_operando, 0)     AS mrr_operando,
+          COALESCE(a.mrr_ativo, 0)        AS mrr_ativo,
+          COALESCE(a.mrr_onboarding, 0)   AS mrr_onboarding,
+          COALESCE(a.mrr_cancelamento, 0) AS mrr_cancelamento,
+          cap.cap_mrr, cap.cap_contas
+        FROM pessoas p
+        LEFT JOIN agg a ON a.pessoa = p.nome
+        LEFT JOIN LATERAL (
+          SELECT m.cap_mrr, m.cap_contas
+          FROM cortex_core.capacity_metas m
+          WHERE m.ativo = TRUE AND similarity(m.match_responsavel, p.nome) > 0.4
+          ORDER BY similarity(m.match_responsavel, p.nome) DESC
+          LIMIT 1
+        ) cap ON TRUE
+        ORDER BY COALESCE(a.mrr_operando, 0) DESC
+      `);
+
+      // Black: cada account → clientes (cup_clientes.responsavel_geral) → subtasks desses
+      // clientes. Régua igual aos outros squads (MRR + contas), mas "Contas" = nº de
+      // clientes que cuida (cap = CAP_CONTAS_ACCOUNT). Status: só ativo + em cancelamento.
+      const blackResult = await db.execute(sql`
+        WITH accounts(label, match) AS (VALUES ${accountsValues}),
+        clientes_do_account AS (
+          SELECT a.label, cl.task_id
+          FROM accounts a
+          JOIN "Clickup".cup_clientes cl ON EXISTS (
+            SELECT 1 FROM regexp_split_to_table(COALESCE(cl.responsavel_geral, ''), ';') rp(part)
+            WHERE TRIM(rp.part) = a.match
+          )
+        ),
+        subs AS (
+          SELECT cda.label, COALESCE(c.valorr, 0) AS vr, c.status
+          FROM clientes_do_account cda
+          JOIN "Clickup".cup_contratos c
+            ON c.id_task = cda.task_id AND c.status IN ('ativo','em cancelamento')
+        ),
+        agg AS (
+          SELECT label,
+            COALESCE(SUM(vr), 0) AS mrr_operando,
+            COALESCE(SUM(vr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
+            COALESCE(SUM(vr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
+          FROM subs GROUP BY label
+        ),
+        cli AS (SELECT label, COUNT(DISTINCT task_id) AS clientes FROM clientes_do_account GROUP BY label)
+        SELECT a.label AS nome, a.match,
+          COALESCE(ag.mrr_operando, 0)     AS mrr_operando,
+          COALESCE(ag.mrr_ativo, 0)        AS mrr_ativo,
+          0                                AS mrr_onboarding,
+          COALESCE(ag.mrr_cancelamento, 0) AS mrr_cancelamento,
+          COALESCE(cli.clientes, 0)        AS contas_rec,
+          cap.cap_mrr,
+          COALESCE(cap.cap_contas, ${CAP_CONTAS_ACCOUNT}) AS cap_contas
+        FROM accounts a
+        LEFT JOIN agg ag ON ag.label = a.label
+        LEFT JOIN cli ON cli.label = a.label
+        LEFT JOIN LATERAL (
+          -- Só caps configuradas na categoria 'Black' (aba Configurar) sobrescrevem o default.
+          SELECT m.cap_mrr, m.cap_contas
+          FROM cortex_core.capacity_metas m
+          WHERE m.ativo = TRUE AND m.categoria = 'Black'
+            AND similarity(m.match_responsavel, a.label) > 0.45
+          ORDER BY similarity(m.match_responsavel, a.label) DESC
+          LIMIT 1
+        ) cap ON TRUE
+        ORDER BY COALESCE(ag.mrr_operando, 0) DESC
+      `);
+
+      // Squads de comunicação (Pulse, Olimpo): operadores de CS em capacity_metas,
+      // carteira via `responsavel ILIKE match_responsavel`. Régua recorrente + pontual.
+      const squadsResult = await db.execute(sql`
+        WITH m AS (
+          SELECT nome, categoria, match_responsavel, cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem
+          FROM cortex_core.capacity_metas
+          WHERE ativo = TRUE
+            AND categoria NOT IN ('vendedor','account','gestor','Black','CXCS','Squadra','Selva')
+        ),
+        agg AS (
+          SELECT m.nome, m.categoria, m.ordem,
+            m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas,
+            COUNT(*) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS op_recorrente,
+            COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')), 0) AS mrr_operando,
+            COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'ativo'), 0) AS mrr_ativo,
+            COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'onboarding'), 0) AS mrr_onboarding,
+            COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'em cancelamento'), 0) AS mrr_cancelamento,
+            COUNT(*) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding')) AS op_pontual
+          FROM m
+          LEFT JOIN "Clickup".cup_contratos c ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
+          GROUP BY m.nome, m.categoria, m.ordem, m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas
+        )
+        SELECT * FROM agg ORDER BY categoria, ordem, nome
+      `);
+      // Agrupa por categoria (squad), preservando ordem de primeira aparição.
+      const squads: SquadGroup[] = [];
+      const squadIndex = new Map<string, SquadGroup>();
+      for (const raw of squadsResult.rows as any[]) {
+        const cat = String(raw.categoria);
+        let group = squadIndex.get(cat);
+        if (!group) { group = { squad: cat, rows: [] }; squadIndex.set(cat, group); squads.push(group); }
+        group.rows.push(toCsRow(raw));
+      }
+
+      const rows = result.rows as any[];
+      const response: CapacityTimesResponse = {
+        selva: rows.filter((r) => r.grupo === "selva").map((r) => toSelvaRow(r, META_CONTAS_DESIGNER)),
+        black: (blackResult.rows as any[]).map(toComercialRow),
+        squadra: rows.filter((r) => r.grupo === "squadra").map(toComercialRow),
+        cxcs: (cxcsResult.rows as any[]).map(toComercialRow),
+        squads,
+        metaContasDesigner: META_CONTAS_DESIGNER,
+      };
+      res.json(response);
     } catch (error) {
       console.error("[api] Error fetching capacity-times:", error);
       res.status(500).json({ error: "Failed to fetch capacity-times" });
     }
   });
 
-  // GET /api/capacity-times/contratos?nome=<nome>
+  // GET /api/capacity-times/contratos?nome=<nome>[&campo=cs|geral] — carteira:
+  //   campo=cs    → subtasks onde é cs_responsavel
+  //   campo=geral → todas as subtasks dos clientes que cuida (responsavel_geral)
+  //   default     → subtasks onde é responsavel
   app.get("/api/capacity-times/contratos", async (req, res) => {
     const nome = (req.query.nome as string | undefined)?.trim();
+    const campo = (req.query.campo as string | undefined)?.trim();
+    const usaCs = campo === "cs";
     if (!nome) return res.status(400).json({ error: "nome é obrigatório" });
     try {
-      const rows = (await db.execute(sql`
-        SELECT
-          cl.nome AS cliente,
-          c.produto,
-          c.status,
-          COALESCE(c.valorr, 0) AS valorr,
-          COALESCE(c.valorp, 0) AS valorp,
-          c.id_subtask
-        FROM cortex_core.capacity_metas m
-        JOIN "Clickup".cup_contratos c
-          ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
-          AND c.status IN ('ativo','onboarding','em cancelamento')
+      if (campo === "geral") {
+        const rows = (await db.execute(sql`
+          SELECT DISTINCT ON (c.id_subtask)
+                 cl.nome AS cliente, c.produto, c.status,
+                 COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask
+          FROM "Clickup".cup_clientes cl
+          JOIN "Clickup".cup_contratos c
+            ON c.id_task = cl.task_id AND c.status IN ('ativo','em cancelamento')
+          WHERE EXISTS (
+            SELECT 1 FROM regexp_split_to_table(COALESCE(cl.responsavel_geral, ''), ';') rp(part)
+            WHERE TRIM(rp.part) = ${nome}
+          )
+          ORDER BY c.id_subtask
+        `)).rows as any[];
+        const ordemStatus: Record<string, number> = { ativo: 1, onboarding: 2 };
+        rows.sort((a, b) =>
+          (ordemStatus[a.status] ?? 3) - (ordemStatus[b.status] ?? 3) ||
+          (Number(b.valorr) + Number(b.valorp)) - (Number(a.valorr) + Number(a.valorp)));
+        return res.json({
+          contratos: rows.map((r) => ({
+            cliente: r.cliente || "—", produto: r.produto || "—", status: r.status as string,
+            valorr: Number(r.valorr) || 0, valorp: Number(r.valorp) || 0, id_subtask: r.id_subtask ?? null,
+          })),
+        });
+      }
+      const rows = (await db.execute(usaCs ? sql`
+        SELECT DISTINCT ON (c.id_subtask)
+               cl.nome AS cliente, c.produto, c.status,
+               COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask
+        FROM "Clickup".cup_contratos c
+        CROSS JOIN LATERAL regexp_split_to_table(c.cs_responsavel, ';') AS rp(part)
         LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
-        WHERE m.nome = ${nome}
-          AND m.ativo = TRUE
-        ORDER BY
-          CASE c.status WHEN 'ativo' THEN 1 WHEN 'onboarding' THEN 2 ELSE 3 END,
-          COALESCE(c.valorr, 0) DESC
+        WHERE c.status IN ('ativo','onboarding','em cancelamento')
+          AND c.cs_responsavel IS NOT NULL AND c.cs_responsavel <> ''
+          AND similarity(TRIM(rp.part), ${nome}) > 0.4
+        ORDER BY c.id_subtask
+      ` : sql`
+        SELECT DISTINCT ON (c.id_subtask)
+               cl.nome AS cliente, c.produto, c.status,
+               COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.id_subtask
+        FROM "Clickup".cup_contratos c
+        CROSS JOIN LATERAL regexp_split_to_table(c.responsavel, ';') AS rp(part)
+        LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+        WHERE c.status IN ('ativo','onboarding','em cancelamento')
+          AND c.responsavel IS NOT NULL AND c.responsavel <> ''
+          AND similarity(TRIM(rp.part), ${nome}) > 0.4
+        ORDER BY c.id_subtask
       `)).rows as any[];
+      // ordena para exibição (ativo → onboarding → cancelamento, depois por valor)
+      const ordemStatus: Record<string, number> = { ativo: 1, onboarding: 2 };
+      rows.sort((a, b) =>
+        (ordemStatus[a.status] ?? 3) - (ordemStatus[b.status] ?? 3) ||
+        (Number(b.valorr) + Number(b.valorp)) - (Number(a.valorr) + Number(a.valorp)));
 
       res.json({
         contratos: rows.map((r) => ({

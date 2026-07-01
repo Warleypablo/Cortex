@@ -77,6 +77,7 @@ const ChurnAbonados = lazyWithRetry(() => import("@/pages/ChurnAbonados"));
 const ChurnPontorrente = lazyWithRetry(() => import("@/pages/ChurnPontorrente"));
 const AnalisePreditiva = lazyWithRetry(() => import("@/pages/gestao/AnalisePreditiva"));
 const TvLeaderboard = lazyWithRetry(() => import("@/pages/gestao/TvLeaderboard"));
+const GestaoReceita = lazyWithRetry(() => import("@/pages/gestao/GestaoReceita"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
 const DashboardDFC = lazyWithRetry(() => import("@/pages/DashboardDFC"));
 const DashboardInadimplencia = lazyWithRetry(() => import("@/pages/DashboardInadimplencia"));
@@ -118,6 +119,7 @@ const CriativosBiblioteca = lazyWithRetry(() => import("@/pages/CriativosBibliot
 const GrowthOrcadoRealizado = lazyWithRetry(() => import("@/pages/GrowthOrcadoRealizado"));
 const GrowthEvolucaoTemporal = lazyWithRetry(() => import("@/pages/GrowthEvolucaoTemporal"));
 const GrowthOrcamentoCampanhas = lazyWithRetry(() => import("@/pages/GrowthOrcamentoCampanhas"));
+const GrowthOrganico = lazyWithRetry(() => import("@/pages/GrowthOrganico"));
 const GrowthCreatorSummit = lazyWithRetry(() => import("@/pages/GrowthCreatorSummit"));
 const PlanejamentoMetas = lazyWithRetry(() => import("@/pages/PlanejamentoMetas"));
 const GrowthAI = lazyWithRetry(() => import("@/pages/GrowthAI"));
@@ -177,6 +179,7 @@ const LtLtvChurn = lazyWithRetry(() => import("@/pages/LtLtvChurn"));
 const LtvClientes = lazyWithRetry(() => import("@/pages/LtvClientes"));
 const EstoquePontual = lazyWithRetry(() => import("@/pages/EstoquePontual"));
 const CreatorsPontual = lazyWithRetry(() => import("@/pages/CreatorsPontual"));
+const MigradoSynapse = lazyWithRetry(() => import("@/pages/MigradoSynapse"));
 
 // Error boundary to catch silent crashes in the portal.
 // The lazyWithRetry wrapper handles the first auto-reload attempt at the
@@ -272,6 +275,20 @@ function ProtectedRoute({ path, component: Component }: { path: string; componen
   );
 }
 
+// Bloqueio visual temporário: telas de G&G migradas para o Synapse.
+// Para reativar, basta remover este array e o bloco `isGegBlocked` abaixo.
+// As rotas/componentes originais permanecem definidos no Switch.
+const GEG_BLOCKED_PREFIXES = [
+  "/dashboard/geg",
+  "/dashboard/recrutamento",
+  "/dashboard/inhire",
+  "/colaboradores",
+  "/colaborador/",
+  "/patrimonio",
+  "/rh/pesquisas",
+  "/gg/",
+];
+
 function ProtectedRouter() {
   const [location, setLocation] = useLocation();
   const { user, isLoading, error } = useAuth();
@@ -290,6 +307,18 @@ function ProtectedRouter() {
 
   if (error || !user) {
     return null;
+  }
+
+  // G&G migrado para o Synapse — bloqueio visual (não impede acesso a outras telas)
+  const isGegBlocked = GEG_BLOCKED_PREFIXES.some(
+    (prefix) => location === prefix || location.startsWith(prefix)
+  );
+  if (isGegBlocked) {
+    return (
+      <Suspense fallback={<PageSkeleton />}>
+        <MigradoSynapse />
+      </Suspense>
+    );
   }
 
   return (
@@ -342,6 +371,9 @@ function ProtectedRouter() {
       <Route path="/dashboard/analise-preditiva">{() => <ProtectedRoute path="/dashboard/analise-preditiva" component={AnalisePreditiva} />}</Route>
       <Route path="/gestao/tv-leaderboard">
         {() => <ProtectedRoute path="/gestao/tv-leaderboard" component={TvLeaderboard} />}
+      </Route>
+      <Route path="/gestao/receita">
+        {() => <ProtectedRoute path="/gestao/receita" component={GestaoReceita} />}
       </Route>
       <Route path="/dashboard/meta-ads">{() => <ProtectedRoute path="/dashboard/meta-ads" component={MetaAds} />}</Route>
       <Route path="/utm-builder">{() => <ProtectedRoute path="/utm-builder" component={UtmBuilder} />}</Route>
@@ -417,6 +449,7 @@ function ProtectedRouter() {
       <Route path="/growth/ai">{() => <ProtectedRoute path="/growth/ai" component={GrowthAI} />}</Route>
       <Route path="/growth/auto-report">{() => <ProtectedRoute path="/growth/auto-report" component={AutoReport} />}</Route>
       <Route path="/growth/instagram">{() => <ProtectedRoute path="/growth/instagram" component={InstagramDashboard} />}</Route>
+      <Route path="/growth/organico">{() => <ProtectedRoute path="/growth/organico" component={GrowthOrganico} />}</Route>
       <Route path="/crm-instagram">{() => <ProtectedRoute path="/crm-instagram" component={CrmInstagram} />}</Route>
       <Route path="/growth/dfc-cac">{() => <ProtectedRoute path="/growth/dfc-cac" component={GrowthDfcCac} />}</Route>
       

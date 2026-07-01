@@ -3265,16 +3265,12 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         || utmValues.some(v => v.includes('facebook') || v === 'meta' || v.includes('instagram') || v === 'ig' || v === 'fb');
       const includeGoogle = utmValues.length === 0
         || utmValues.some(v => v.includes('google') || v.includes('adwords') || v === 'gads');
-      // TikTok/LinkedIn Ads: somados ao consolidado SOMENTE quando não há filtro de
-      // produto. As tabelas *.ad_metrics_daily não atribuem gasto por funil (não seguem
-      // a convenção [Funil] no nome como Meta/Google), então sob filtro de produto ficam
-      // de fora pra não superatribuir. As mesmas queries dos endpoints dedicados
-      // (tiktok-ads / linkedin-ads) — garante reconciliação com o Aprofundado.
-      const noFunnelFilter = funilValues.length === 0;
-      const includeTikTokAds = noFunnelFilter
-        && (utmValues.length === 0 || utmValues.some(v => v.includes('tiktok')));
-      const includeLinkedInAds = noFunnelFilter
-        && (utmValues.length === 0 || utmValues.some(v => v.includes('linkedin')));
+      // TikTok/LinkedIn Ads: somados ao consolidado. Sob filtro de produto, o gasto é
+      // atribuído por funil via JOIN com *.ad_campaigns parseando o `campaign_name`
+      // (mesma convenção `[Funil]` usada em Meta/Google). Campanhas cujo nome não casa
+      // com o funil — ou sem nome sincronizado — ficam de fora, evitando superatribuição.
+      const includeTikTokAds = utmValues.length === 0 || utmValues.some(v => v.includes('tiktok'));
+      const includeLinkedInAds = utmValues.length === 0 || utmValues.some(v => v.includes('linkedin'));
 
       // Build campaign filter: match campaign names containing [funil] pattern
       // Campaign naming convention: [TP] [Leads] [ABO] [Odonto] - ...
@@ -3390,17 +3386,38 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         console.log("[api] Google Ads query error in orcado-realizado/ads (may not have data):", googleError);
       }
 
+      // Filtro de funil para TikTok/LinkedIn: atribui o gasto por funil via JOIN com a
+      // tabela de campanhas, parseando `campaign_name` pelo padrão `[Funil]` — idêntico
+      // ao Meta/Google. Sem filtro de produto, retorna sql`` (soma tudo, como antes).
+      const buildCampaignNameFunnelFilter = (campaignsTable: ReturnType<typeof sql.raw>) => {
+        if (realFunilValues.length > 0) {
+          const conds = realFunilValues.map(v =>
+            sql`(c.campaign_name ILIKE ${'%[' + v + ']%'} OR c.campaign_name ILIKE ${'%' + v + '%'})`);
+          let nameFilter = sql.join(conds, sql` OR `);
+          if (hasVazio) {
+            nameFilter = sql`(${nameFilter} OR c.campaign_name NOT LIKE '%[%]%')`;
+          }
+          return sql`AND m.campaign_id IN (SELECT c.campaign_id FROM ${campaignsTable} c WHERE (${nameFilter}))`;
+        }
+        if (hasVazio) {
+          return sql`AND m.campaign_id IN (SELECT c.campaign_id FROM ${campaignsTable} c WHERE c.campaign_name NOT LIKE '%[%]%')`;
+        }
+        return sql``;
+      };
+
       // Query TikTok Ads (mesma query do endpoint /tiktok-ads). Só quando incluído.
       let tiktokInvestimento = 0, tiktokImpressoes = 0, tiktokCliques = 0;
       if (includeTikTokAds) {
         try {
+          const tiktokFunnelFilter = buildCampaignNameFunnelFilter(sql.raw('tiktok.ad_campaigns'));
           const r = await db.execute(sql`
             SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
                    COALESCE(SUM(impressions), 0)::bigint AS impressoes,
                    COALESCE(SUM(clicks), 0)::bigint AS cliques
-            FROM tiktok.ad_metrics_daily
+            FROM tiktok.ad_metrics_daily m
             WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
               AND advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
+              ${tiktokFunnelFilter}
           `);
           const row = r.rows[0] as any;
           tiktokInvestimento = parseFloat(row.investimento) || 0;
@@ -3415,12 +3432,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       let linkedinInvestimento = 0, linkedinImpressoes = 0, linkedinCliques = 0;
       if (includeLinkedInAds) {
         try {
+          const linkedinFunnelFilter = buildCampaignNameFunnelFilter(sql.raw('linkedin.ad_campaigns'));
           const r = await db.execute(sql`
             SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
                    COALESCE(SUM(impressions), 0)::bigint AS impressoes,
                    COALESCE(SUM(clicks), 0)::bigint AS cliques
-            FROM linkedin.ad_metrics_daily
+            FROM linkedin.ad_metrics_daily m
             WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
+              ${linkedinFunnelFilter}
           `);
           const row = r.rows[0] as any;
           linkedinInvestimento = parseFloat(row.investimento) || 0;

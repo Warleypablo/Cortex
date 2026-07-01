@@ -1,0 +1,15 @@
+{
+  "name": "turbo-shortener-worker",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Cloudflare Worker do encurtador da Turbo (marketing.turbopartners.com.br)",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20250101.0",
+    "wrangler": "^3.99.0"
+  }
+}

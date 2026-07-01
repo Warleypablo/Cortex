@@ -76,7 +76,7 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
   const totalMotivoMrr = motivoSubmotivoTree.reduce((s, d) => s + d.mrr, 0);
 
   return (
-    <div className="space-y-4">
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {/* ── Evitabilidade donut ──────────────────────────────────────────────── */}
       {evitabilidadeData.length > 0 && (
         <div>

@@ -21,6 +21,9 @@ import { montarCapacity } from "./bp2026.capacity";
 import { montarDetalhamentos } from "./bp2026.detalhamentos";
 import { montarPontual } from "./bp2026.pontual";
 import { INFO_METRICAS } from "./bp2026.info";
+import { abasPermitidas } from "../../shared/bp2026-tabs";
+import { filtrarPayloadPorAbas } from "./bp2026.enforcement";
+import type { User } from "../auth/userDb";
 
 const ANO = 2026;
 const CACHE_TTL_MS = 10 * 60 * 1000;
@@ -311,6 +314,7 @@ export async function computarBpReceitas(db: any): Promise<any> {
       // 4l. Fluxo de caixa real (DFC): entradas − saídas quitadas no mês
       const dfcResult = await db.execute(sql`
         SELECT EXTRACT(MONTH FROM data_quitacao)::int AS mes,
+               SUM(CASE WHEN tipo_evento = 'RECEITA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END) AS entradas,
                SUM(CASE WHEN tipo_evento = 'RECEITA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END)
              - SUM(CASE WHEN tipo_evento = 'DESPESA' THEN COALESCE(valor_pago::numeric, 0) ELSE 0 END) AS fluxo
         FROM "Conta Azul".caz_parcelas
@@ -319,8 +323,10 @@ export async function computarBpReceitas(db: any): Promise<any> {
         GROUP BY 1 ORDER BY 1
       `);
       const dfcPorMes: Record<number, number> = {};
+      const faturamentoCaixaPorMes: Record<number, number> = {};
       for (const row of dfcResult.rows as any[]) {
         dfcPorMes[Number(row.mes)] = parseFloat(row.fluxo);
+        faturamentoCaixaPorMes[Number(row.mes)] = parseFloat(row.entradas);
       }
 
       // 5. Montagem: meses futuros => realizado null
@@ -529,14 +535,18 @@ export async function computarBpReceitas(db: any): Promise<any> {
         contratosVendidosRec[SLUG[seg]] = Array.from({ length: 12 }, (_, i) =>
           i + 1 <= mesCorrente ? (agg.get(i + 1)?.get(seg)?.contratosRec ?? 0) : null);
       }
-      // total de contratos vendidos no mês (recorrentes + pontuais, todos os segmentos) —
-      // denominador do "CAC por contrato": cada deal conta 1 contrato por produto/natureza,
-      // então é ≥ deals ganhos (base do "por cliente"). Mesma fonte (agg) do CAC por produto.
-      const contratosVendidosTotalPorMes: (number | null)[] = Array.from({ length: 12 }, (_, i) => {
+      // total de contratos vendidos no mês — denominador do "CAC por contrato".
+      // Régua: contrato = serviço vendido (campo servicos_vendidos). O agg já conta serviços
+      // por segmento (contarServicosPorSegmento), então este total e as sub-linhas por produto
+      // (contratosVendidosRec) usam a MESMA régua e batem entre si. Como serviços ≥ deals
+      // ganhos, mantém CAC/contrato ≤ CAC/cliente.
+      const servicosVendidosTotalPorMes: (number | null)[] = Array.from({ length: 12 }, (_, i) => {
         if (i + 1 > mesCorrente) return null;
         const porMes = agg.get(i + 1);
         if (!porMes) return 0;
-        return Array.from(porMes.values()).reduce((t, cell) => t + cell.contratosRec + cell.contratosPont, 0);
+        let t = 0;
+        porMes.forEach((cell) => { t += cell.contratosRec + cell.contratosPont; });
+        return t;
       });
       const { agg: aggVendas, totais: totaisVendas } = await carregarVendasProdutoClickup(db);
       const vendasProduto = montarVendasProduto({ agg: aggVendas, totais: totaisVendas, orcado, mesCorrente, mesFechado });
@@ -552,7 +562,7 @@ export async function computarBpReceitas(db: any): Promise<any> {
       // 12. Detalhamentos: SG&A e CAC por sub-linha, Outras Receitas por categoria
       const { sga: sgaDetalhe, cac: cacDetalhe, outrasReceitas: outrasDetalhe } = await montarDetalhamentos({
         db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec,
-        contratosVendidosTotalPorMes, mesCorrente, mesFechado,
+        servicosVendidosTotalPorMes, faturamentoCaixaPorMes, mesCorrente, mesFechado,
       });
 
       // documentação por linha (o que é / fonte / cálculo) — dicionário único
@@ -590,17 +600,24 @@ export async function computarBpReceitas(db: any): Promise<any> {
 }
 
 export function registerBp2026Routes(app: Express, db: any) {
-  app.get("/api/bp2026/receitas", async (_req, res) => {
+  app.get("/api/bp2026/receitas", async (req, res) => {
     try {
-      res.json(await computarBpReceitas(db));
+      const user = req.user as User;
+      const abas = abasPermitidas(user?.role, user?.allowedBpTabs);
+      const payload = await computarBpReceitas(db);
+      res.json(filtrarPayloadPorAbas(payload, abas));
     } catch (error) {
       console.error("[bp2026] Erro em /api/bp2026/receitas:", error);
       res.status(500).json({ error: "Erro ao calcular orçado x realizado" });
     }
   });
 
-  app.get("/api/bp2026/pontual-creators", async (_req, res) => {
+  app.get("/api/bp2026/pontual-creators", async (req, res) => {
     try {
+      const user = req.user as User;
+      if (!abasPermitidas(user?.role, user?.allowedBpTabs).includes("pontual-creators")) {
+        return res.status(403).json({ error: "Sem acesso a esta aba" });
+      }
       const agora = new Date();
       const anoAtual = agora.getFullYear();
       const mesCorrente = anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;

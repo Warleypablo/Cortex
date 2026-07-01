@@ -25,8 +25,14 @@ interface Contrato {
   id_subtask: string;
 }
 
+export interface DrawerSelecao {
+  label: string; // título exibido no topo
+  nome: string; // pessoa → contratos onde é responsável na subtask
+  campo?: "cs" | "geral"; // "cs"=cs_responsavel (CXCS); "geral"=clientes via responsavel_geral (Black); ausente=responsavel
+}
+
 interface Props {
-  operador: string | null;
+  selecao: DrawerSelecao | null;
   onClose: () => void;
 }
 
@@ -53,39 +59,44 @@ function StatusBadge({ status }: { status: string }) {
   );
 }
 
-export function OperadorDrawer({ operador, onClose }: Props) {
+export function OperadorDrawer({ selecao, onClose }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
 
   const { data, isLoading } = useQuery<{ contratos: Contrato[] }>({
-    queryKey: ["/api/capacity-times/contratos", operador],
+    queryKey: ["/api/capacity-times/contratos", selecao?.nome, selecao?.campo],
     queryFn: async () => {
-      const res = await fetch(`/api/capacity-times/contratos?nome=${encodeURIComponent(operador!)}`);
+      const campoQs = selecao?.campo ? `&campo=${selecao.campo}` : "";
+      const res = await fetch(`/api/capacity-times/contratos?nome=${encodeURIComponent(selecao!.nome)}${campoQs}`);
       if (!res.ok) throw new Error("Erro ao buscar contratos");
       return res.json();
     },
-    enabled: !!operador,
+    enabled: !!selecao,
   });
 
   const contratos = data?.contratos ?? [];
   const totalMrr = contratos.reduce((s, c) => s + c.valorr, 0);
+  const totalPontual = contratos.reduce((s, c) => s + c.valorp, 0);
 
   return (
-    <Sheet open={!!operador} onOpenChange={(open) => { if (!open) onClose(); }}>
+    <Sheet open={!!selecao} onOpenChange={(open) => { if (!open) onClose(); }}>
       <SheetContent
         side="right"
         className="w-full sm:max-w-2xl bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 overflow-y-auto"
       >
         <SheetHeader className="mb-4">
           <SheetTitle className="text-gray-900 dark:text-white text-lg">
-            {operador}
+            {selecao?.label}
           </SheetTitle>
           {!isLoading && (
             <p className="text-sm text-gray-500 dark:text-zinc-400">
-              {contratos.length} contrato{contratos.length !== 1 ? "s" : ""} · MRR total{" "}
+              {contratos.length} contrato{contratos.length !== 1 ? "s" : ""} · MRR{" "}
               <span className="font-semibold text-gray-900 dark:text-white">
                 {formatCurrency(totalMrr)}
               </span>
+              {totalPontual > 0 && (
+                <> · Pontual <span className="font-semibold text-gray-900 dark:text-white">{formatCurrency(totalPontual)}</span></>
+              )}
             </p>
           )}
         </SheetHeader>

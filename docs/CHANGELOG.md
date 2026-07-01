@@ -1,5 +1,364 @@
 # Changelog
 
+## 2026-06-30 | feat(gestao): Gestão de Receita v2 — metas editáveis, novas métricas e funil inbound/outbound
+
+**O que foi feito:**
+- **Metas editáveis** (camada de override `cortex_core.gestao_receita_metas` + `PUT /api/gestao/receita/metas`): edição inline de meta de venda MRR/Pontual e, por produto, nº de contratos e ticket médio. Orçado final = override ?? BP (não altera o BP).
+- **Macro:** cards de ticket médio MRR/Pontual, taxa de conversão (reunião→venda por coorte, nunca >100%) e nº de reuniões.
+- **Micro:** produto em 2 tabelas (MRR / Pontual); vendedor com ticket + conversão; SDR com conversão (lead→reunião por coorte) e valor gerado separado em MRR/Pontual.
+- **Funil:** separado em Inbound e Outbound (régua de `source` do growth.ts), cada um clicável com drill por segmento; bloco de Investimento & CPL (Meta Ads spend + ADs Conta Azul, CPL e CPL-MQ).
+
+**Por que:** ajustes pedidos após a primeira versão — metas geridas na própria tela, conversões honestas (coorte) e visão de aquisição por canal.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - override, métricas de coorte, funil por segmento, investimento.
+- `server/routes/gestaoReceita.detalhe.ts` - drill do funil com filtro de segmento.
+- `server/db.ts` / `server/index.ts` - tabela de metas (init no boot).
+- `client/src/pages/gestao/GestaoReceita.tsx` - UI das 3 abas + edição de metas.
+
+**Impacto arquitetural:** Nenhum — override é aditivo (não toca no BP); reusa conversões/predicados existentes.
+
+---
+
+## 2026-06-30 | fix(receita): inclui TURBO FILIAL no painel de Metas de Receita
+
+**O que foi feito:**
+- Trocada a fonte das queries de `revenue-goals` (resumo, evolução diária, histórico de inadimplência e detalhe do dia) de `"Conta Azul".caz_receber` para `"Conta Azul".caz_parcelas`.
+- Mapeamento fiel: `total`→`valor_bruto`, status `ACQUITTED`/`PAGO`→`QUITADO`, e novo filtro `UPPER(tipo_evento)='RECEITA'`. No detalhe do dia, join passa a usar `id_cliente` e os fallbacks de colunas exclusivas de `caz_receber` (cnpj/telefone/status_clickup) foram removidos.
+
+**Por que:**
+- `caz_receber` é sincronizada (por processo externo) apenas com a empresa `TURBO PARTNERS`. A `TURBO FILIAL` — empresa nova do grupo que começou a faturar em jun/2026 (106 parcelas, ~R$853k) — nunca entrava na tabela, subnotando o "Total a Receber" do painel (jun/2026: R$978k em vez de ~R$1,83M). `caz_parcelas` já contém todas as empresas do grupo.
+
+**Arquivos alterados:**
+- `server/storage.ts` - migradas 4 queries SQL em `getRevenueGoals`, `getHistoricoInadimplencia` e `getRevenueGoalsDiaDetalhes` de `caz_receber` para `caz_parcelas`.
+
+**Impacto arquitetural:** Nenhum estrutural. Muda a tabela-fonte do painel de Metas de Receita para a tabela mais completa do financeiro. Limitação conhecida: o nome do cliente no drill-down das parcelas da TURBO FILIAL aparece como "Cliente Desconhecido" porque o cadastro de clientes da filial também não está em `caz_clientes` (totais não afetados).
+
+---
+
+## 2026-06-30 | feat(gestao): drill-down ao clicar nas células de Gestão de Receita
+
+**O que foi feito:**
+- Novo endpoint `GET /api/gestao/receita/detalhe?tipo&chave&mes` que lista os itens por trás de cada número, agrupados (reusa `agruparItens` do BP). 13 tipos: venda MRR/Pontual, canal, closer, sdr, funil_etapa, mql, produto, churn_motivo/vendedor, cac, custo_comercial, comissoes.
+- Componente Sheet lateral `GestaoReceitaDetalhe` (espelha o `BPCellDetail` do BP 2026).
+- Cards, linhas de tabela, itens de ranking e barras do funil ficam clicáveis e abrem o detalhamento; o total do Sheet bate com a célula clicada.
+
+**Por que:** dar visibilidade do que compõe cada número sem sair da tela.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.detalhe.ts` - queries de detalhe por tipo (novo).
+- `server/routes/gestaoReceita.ts` - registro do endpoint.
+- `client/src/components/gestao/GestaoReceitaDetalhe.tsx` - Sheet (novo).
+- `client/src/pages/gestao/GestaoReceita.tsx` - elementos clicáveis + estado do drill.
+
+**Impacto arquitetural:** Nenhum — reusa o padrão de drill-down e os helpers do BP.
+
+---
+
+## 2026-06-30 | fix(gestao): corrige dupla contagem do pontual e conversões enganosas
+
+**O que foi feito:**
+- Venda pontual por produto agora deduplica por jornada (entregas 1ª/2ª/3ª… do mesmo cliente repetiam o valor do pacote) — Creators jun caiu de 35 entregas/R$357k para 22 jornadas/R$197k; o total passa a bater com a venda do Bitrix. Alinhado à régua do BP (data_criado, exclui status 'não usar').
+- Removidas as conversões reunião→venda (closer) e lead→reunião (SDR) que passavam de 100% por contarem janelas de data diferentes; substituídas por notas explicativas.
+- CAC por contrato/cliente passa a usar a contagem deduplicada.
+
+**Por que:** revisão apontou números inflados/enganosos na aba Micro e Pessoas.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - query de produto (CTE de dedup por jornada) e CAC.
+- `client/src/pages/gestao/GestaoReceita.tsx` - remoção das conversões e notas.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-06-30 | feat(gestao): painel Gestão de Receita (orçado × realizado comercial)
+
+**O que foi feito:**
+- Novo endpoint `GET /api/gestao/receita?mes=YYYY-MM` que agrega, por mês: venda nova (Bitrix), metas (BP 2026) e custos em regime caixa (Conta Azul), reusando `somaDespesaCaixaPorMes` + predicados do BP.
+- Nova página `/gestao/receita` com 5 seções em abas (Pessoas, Macro, Micro, Funil, Qualidade): venda MRR/Pontual orçado×realizado, top/bottom closers e SDRs, canais de aquisição, CAC por contrato/cliente, funil Lead→RA→RR→Venda, composição MQL/NMQL, churn por motivo/vendedor.
+- Item no menu Gestão, rota protegida e nova permission `gestao.receita`.
+
+**Por que:**
+- Dar ao comercial uma visão única de orçado×realizado com dados reais (antes era um mockup com dados fictícios).
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - endpoint agregador (novo).
+- `server/routes.ts` - registro do endpoint.
+- `client/src/pages/gestao/GestaoReceita.tsx` - página em componentes do Cortex + dark mode (novo).
+- `client/src/App.tsx` - rota lazy.
+- `shared/nav-config.ts` - permission, label e item de menu.
+
+**Impacto arquitetural:** Nenhum — reusa infraestrutura existente (padrão `db.execute`, predicados/custos do BP, React Query). Visão por produto (ClickUp) pode divergir da venda (Bitrix) por design; MQL/source refletem o preenchimento ralo do CRM.
+
+---
+
+## 2026-06-25 | feat(organico): painel operador (3 visões + Soltar agora/Agendar) + engine do worker
+
+**O que foi feito:**
+- **Redesenho do painel Orgânico** pro fluxo do operador: 3 visões do dia (**Aprovados / Agendados / Publicados**) e, por post aprovado, ações **"Soltar agora"** (confirmação) e **"Agendar"** (date-picker). Substitui o read-only "Saúde/Fila/Histórico".
+- **Modelo de dados** (migration aditiva `2026-06-25-content-publish-operador.sql`, aplicada): `state` += `aprovado`; coluna `content_posts.scheduled_at`; unique `(platform, clickup_task_id)` (tolera aprovado sem data); `command.action` += `schedule|cancel_schedule`.
+- **Backend** (`server/routes/organico.ts`): `/overview` em 3 visões; `POST /commands` + `POST /settings` (operador, pós-auth); `GET /commands/pending` + `POST /commands/:id/ack` + `GET /posts/due` (máquina, token); ingest com upsert por task e `scheduled_at` chave-presente.
+- **Engine do worker** (monorepo `automacoes/instagram-turbo/agente/`): `main_poller.py` (reporta aprovados + consome fila + publica vencidos; `--once` p/ cron), `commands.py` (consumidor; DRY_RUN não publica), `panel_client.py` (HTTP de máquina fail-soft), `state_sink` (emite `aprovado` + `report_posts`).
+
+**Por que:**
+- O painel só observava; o time precisa **operar** (soltar/agendar) sem terminal. Os cards aprovados costumam estar sem "Data de Postagem" e não saíam sozinhos — o operador passa a comandar a publicação pela fila `content_publish_commands`.
+
+**Arquivos alterados:**
+- `shared/schema.ts`, `migrations/2026-06-25-content-publish-operador.sql` - modelo de dados.
+- `server/routes/organico.ts` - 3 visões + comandos + endpoints de máquina.
+- `client/src/pages/GrowthOrganico.tsx` - UI operador (botões + date-picker).
+- `automacoes/instagram-turbo/agente/{main_poller,commands,panel_client,state_sink}.py` + `tests/test_commands.py` - engine + 12 testes.
+
+**Impacto arquitetural:** Backend continua só lendo/escrevendo Postgres; o worker fala HTTP (pull/ack/ingest/due), nunca toca o banco direto. Engine vive só no monorepo (cópia de referência); ativar exige portar pro repo de prod `automacao-insta` + tokens + launchd recorrente + merge→main. Tudo dry-run + integração testado; nada publicado.
+
+---
+
+## 2026-06-25 | feat(publicacao): telemetria do worker → painel Orgânico (ingest + hooks)
+
+**O que foi feito:**
+- **Cortex:** endpoint `POST /api/growth/organico/ingest` (token-auth via `ORGANICO_INGEST_TOKEN`, registrado PRÉ-`isAuthenticated`): insere 1 `content_publish_runs` + faz upsert dos `content_posts` (chave platform+task+data). Upsert validado contra a prod (transação com rollback).
+- **Worker (instagram-turbo, stdlib):** `agente/state_sink.py` — POST fail-soft (urllib) do estado de cada ciclo; `panel_post`/`panel_state` mapeiam `PlannedAction` → estado do painel (agendado/aguardando_ia/publicado/falhou/pulado). Hooks em `main.py` (IG) e `main_tiktok.py` coletam o estado por task e chamam `report_cycle` no fim. Config nova: `CORTEX_INGEST_URL` + `ORGANICO_INGEST_TOKEN` (opcionais — sem elas o agente roda igual e só não atualiza o painel).
+
+**Por que:**
+- Fecha a Fase 1: o painel sai do vazio. Worker continua **zero-dependência** (só urllib) e **sem credencial de banco** — POSTa pro Cortex, que escreve. Reusa o padrão de endpoint-com-token (FCA).
+
+**Arquivos alterados:**
+- `server/routes/organico.ts` (+ `registerOrganicoIngestRoutes`), `server/routes.ts` (registro pré-auth).
+- `automacoes/instagram-turbo/agente/state_sink.py` (novo) + `config.py` + `.env.example` + `main.py` + `main_tiktok.py`.
+
+**Impacto arquitetural:** Refinamento do plano — em vez de o worker escrever direto no Postgres, ele reporta via HTTP pro Cortex (preserva zero-dep do worker, não espalha creds do banco). Pra ficar LIVE: setar `ORGANICO_INGEST_TOKEN` no Cortex (Render) + `CORTEX_INGEST_URL`/token no `.env` do worker. PROD do worker roda do repo separado `automacao-insta` → essa cópia precisa ser sincronizada lá.
+
+---
+
+## 2026-06-25 | chore(publicacao): script p/ aplicar a migration content_*
+
+Script `scripts/apply-content-migration.ts`: aplica `migrations/2026-06-24-content-publish.sql` reusando a conexão do app (DATABASE_URL ou DB_*). Idempotente — caminho de 1 comando pra criar as tabelas `content_*` sem psql/GUI. **Impacto arquitetural:** Nenhum (helper).
+
+---
+
+## 2026-06-24 | feat(publicacao): página Orgânico (Growth) + endpoint read-only
+
+**O que foi feito:**
+- Nova página **Orgânico** em Growth (`/growth/organico`, permissão `growth.organico`): painel **somente leitura** com Saúde do agente (por plataforma), Fila de publicação e Histórico, filtro por rede (IG/TikTok/…) e refetch a cada 20s. Lê das tabelas `content_*`.
+- Endpoint `GET /api/growth/organico/overview` (`server/routes/organico.ts`): retorna settings + último ciclo por plataforma + fila (hoje/futuro não publicado) + histórico (publicados).
+- Fiação: `nav-config` (permission key + rota + item "Orgânico" + label), `App.tsx` (rota lazy), `app-sidebar` (ícone `Sprout` no mapa).
+
+**Por que:**
+- Fatia visível da Fase 1: o time enxerga fila/status/saúde da automação sem terminal. Read-only de propósito (botões de ação = Fase 3). Platform-aware desde já.
+
+**Arquivos alterados:**
+- `client/src/pages/GrowthOrganico.tsx` (novo) — a página.
+- `server/routes/organico.ts` (novo) — endpoint de leitura.
+- `server/routes.ts` — import + registro **pós-auth**.
+- `shared/nav-config.ts` — permissão/rota/nav/label de `growth.organico`.
+- `client/src/App.tsx` — rota `/growth/organico`.
+- `client/src/components/app-sidebar.tsx` — ícone `Sprout` no mapa.
+
+**Impacto arquitetural:** Endpoint registrado intencionalmente DEPOIS de `app.use("/api", isAuthenticated)` (linha 479) — registrar junto do Instagram (pré-auth por causa do OAuth) deixaria a rota sem autenticação. Sem dado real até a migration `content_*` ser aplicada e o worker popular as tabelas (painel mostra estados vazios). Não typechecado localmente (worktree sem node_modules) — validar no build/CI.
+
+---
+
+## 2026-06-24 | feat(publicacao): slot da tarde às 17h30 (granularidade de minutos)
+
+**O que foi feito:**
+- Move o slot vespertino do publicador de **18h para 17h30 cravado**: `SLOTS = ((12, 0), (17, 30))` em `agente/main.py`.
+- Refatora `current_slot` / `slot_status_human` pra operar em **minutos do dia** (antes era hora cheia, não conseguia representar `:30`). Agora é genérico pra N slots e o rótulo vira `"17h30"` quando há minutos.
+- Tolerância passa a ser `SLOT_TOLERANCE_MINUTES = 60` → janela efetiva 17:30–18:29 (garante que a rodada do cron pegue o slot mesmo sem cair no segundo exato).
+- Teste `agente/tests/test_slots.py` trava o comportamento: 17:29 não abre, 17:30 abre, 18:29 ainda abre, 18:30 fecha.
+
+**Por que:**
+- O conteúdo programado pras 17h30 não saía porque o agente só tinha slots fixos de 12h e 18h — 17h30 caía na zona morta "entre slots" e o `execute_plan` se recusava a publicar. A correção alinha o horário de publicação ao que o time planejou.
+
+**Arquivos alterados:**
+- `automacoes/instagram-turbo/agente/main.py` - novo modelo de slot (hora, minuto) + helpers `_slot_label`/`_mins`/`_hhmm`; texto do `--force-now` atualizado p/ "12h/17h30".
+- `automacoes/instagram-turbo/agente/tests/test_slots.py` - cobertura nova do slot 17h30 e das mensagens de fora-de-slot.
+
+**Impacto arquitetural:** Nenhum. Mudança confinada ao adaptador/orquestrador do Instagram; núcleo agnóstico (`plan_task`, drive, docs) intocado. `slot` continua cabendo em `VARCHAR(8)` no schema `content_posts`.
+
+---
+
+## 2026-06-24 | feat(publicacao): fundação do painel "Orgânico" — skill + schema content_*
+
+**O que foi feito:**
+- Nova skill `.claude/skills/subir-conteudo-organico/SKILL.md`: blueprint do publicador multiplataforma (núcleo agnóstico `plan_task` + adaptador por plataforma) com checklist de "adicionar plataforma" para replicar IG → TikTok/YouTube/LinkedIn.
+- Schema `content_*` no `cortex_core` (fonte da verdade do painel operador, platform-aware): `content_publish_runs` (saúde/heartbeat), `content_posts` (fila/status por task/dia), `content_publish_commands` (fila painel→worker) e `content_publish_settings` (toggle pausar/dry-run por plataforma). Definido em `shared/schema.ts` + migration SQL idempotente, com seed em dry-run ligado.
+
+**Por que:**
+- Início da Fase 1 do painel **Orgânico** (Growth): dar ao time de conteúdo (Esther + editores) visão de fila/status/saúde e operação da automação `instagram-turbo` sem terminal/Claude. Tabelas genéricas (`content_*`, não `instagram_*`) porque o mesmo painel/worker servirá IG, TikTok, YouTube e LinkedIn.
+
+**Arquivos alterados:**
+- `shared/schema.ts` - 4 tabelas `content_*` + tipos `$inferSelect/$inferInsert`.
+- `migrations/2026-06-24-content-publish.sql` - DDL idempotente espelhando o schema + seed das settings (instagram, tiktok).
+- `.claude/skills/subir-conteudo-organico/SKILL.md` - skill nova (blueprint + checklist por plataforma).
+
+**Impacto arquitetural:** Estabelece o Postgres do Cortex como fonte da verdade entre o worker Python e o painel (o backend Express só lê/escreve as tabelas, nunca chama o Python). Aditivo — nenhuma tabela existente alterada. Migration ainda **não aplicada** no banco (pendente `drizzle-kit push` ou rodar o SQL).
+
+---
+
+## 2026-06-29 | fix(encurtador): UTM única (dedup) — não cria link duplicado
+
+**O que foi feito:**
+- `server/routes/utm.ts` — `POST /api/utm/generate` agora é **idempotente**: se a `full_url` exata já existe, reusa a linha existente (não cria duplicata). Clicar "Copiar e salvar" 2-3x na mesma UTM devolve sempre o mesmo registro.
+- `server/routes/shortener.ts` — `POST /api/links/shorten` dedup por `target_url`: se o destino já tem um link curto, reusa o mesmo slug (e garante o KV) em vez de criar outro.
+- `client/src/pages/UtmBuilder.tsx` — toast avisa "Essa UTM já existia — reutilizada" quando bate na dedup.
+
+**Por que:**
+- Ichino criou 3 UTMs idênticas sem querer (3 cliques no botão). A UTM tem que ser única e centralizadora — todos os cliques/MQL/venda de um destino ficam num link só, não espalhados em cópias.
+
+**Arquivos alterados:**
+- `server/routes/utm.ts` - dedup por full_url no generate.
+- `server/routes/shortener.ts` - dedup por target_url no shorten.
+- `client/src/pages/UtmBuilder.tsx` - toast de reutilização.
+
+**Impacto arquitetural:** Nenhum. Dedup é só leitura-antes-de-inserir. Linhas duplicadas já existentes (criadas antes do fix) não são removidas automaticamente — limpeza é opcional/manual.
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 3 — Cloudflare Worker (redirect na borda + ingestão de clique)
+
+**O que foi feito:**
+- `cloudflare/shortener-worker/` (nova pasta, deploy separado via wrangler — fora do build do Cortex):
+  - `src/index.ts` — Worker que responde em `marketing.turbopartners.com.br/<slug>`: lê o slug no KV (`LINKS`), faz 302 pro destino com UTM intacta, e via `ctx.waitUntil` dispara `POST /api/clicks` pro Cortex (header `x-click-secret`, com country/ipHash SHA-256/userAgent/referrer) sem atrasar o redirect. Slug inexistente ou raiz → `FALLBACK_URL` (o site), nunca 404.
+  - `wrangler.toml` — rota `marketing.turbopartners.com.br/*`, binding KV `LINKS`, vars `CORTEX_CLICKS_URL`/`FALLBACK_URL` (secret fica via `wrangler secret put`).
+  - `package.json` (wrangler + @cloudflare/workers-types), `tsconfig.json` (isolado, types do Cloudflare — não entra no tsconfig do app, que só inclui client/shared/server).
+  - `README.md` — passo a passo da infra (KV namespace, secret, DNS AAAA `marketing`→`100::` proxied, `wrangler deploy`) + vars do Render no Cortex.
+- `.gitignore` — `.wrangler`.
+
+**Por que:**
+- Fase 3 do encurtador: a peça que faz o link **de fato redirecionar e contar o clique**. Fecha o ciclo criar (Cortex) → redirecionar (Worker) → clique no Postgres → cruzar com Bitrix.
+
+**Arquivos alterados:**
+- `cloudflare/shortener-worker/{src/index.ts,wrangler.toml,package.json,tsconfig.json,README.md}` (novos).
+- `.gitignore` - `.wrangler`.
+
+**Impacto arquitetural:** Nenhum no app (pasta isolada, deploy separado). Código validado por `esbuild` (sintaxe OK). **Ativação depende da infra do Ichino** (login Cloudflare, criar KV, secret, DNS, `wrangler deploy`, vars no Render) — passo a passo no README. Sem isso, o Cortex segue criando/listando links com `kvSynced:false`.
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 4 revisão + Fase 5 — auto-encurtar + atribuição no Histórico
+
+**O que foi feito:**
+- **Auto-encurtar (decisão Ichino):** todo link gerado no UTM Builder já nasce com um link curto. `server/routes/shortener.ts` — `POST /api/links/shorten` aceita slug vazio e gera um aleatório (8 hex, com retry até achar livre); slug digitado mantém a guarda de unicidade (409 se ocupado).
+- **Frontend (`client/src/pages/UtmBuilder.tsx`):** campo opcional "Nome do link curto" **antes** do botão; ao clicar "Copiar e salvar", gera a UTM **e** o link curto num passo só (auto-chama o shorten). Mostra o link curto resultante com copiar. Botão de retry "Encurtar" só aparece se o nome custom estava em uso.
+- **Atribuição no Histórico (Fase 5, Caminho A — por UTM):** `GET /api/utm/history` ganhou CTEs `click_agg` (cliques por slug) e `deal_agg` (cruza `"Bitrix".crm_deal` por tupla UTM source+medium+campaign+content) com as **mesmas regras do Orçado x Realizado** (`growth.ts:232-269`): MQL = `mql '1'/'true'`, Reunião marcada = `data_reuniao_agendada`, realizada = `data_reuniao_realizada`, Venda = `stage_name 'Negócio Ganho'`. A tabela do Histórico ganhou colunas: Link curto, Cliques, MQL, Reun. marc., Reun. real., Vendas.
+- **Removida a página `/links` separada** (decisão Ichino: tudo no Histórico): deletado `client/src/pages/LinkShortener.tsx`, rota + lazy import em `App.tsx`, botão "Links curtos" no UTM Builder.
+
+**Por que:**
+- Ichino pediu: (1) todo link já encurtado por padrão; (2) MQL/reunião/venda por link junto do histórico, "igual ao Orçado x Realizado", em vez de aba separada. Atribuição por UTM (Caminho A) — granularidade = unicidade da UTM.
+
+**Arquivos alterados:**
+- `server/routes/shortener.ts` - slug aleatório quando vazio (retry).
+- `server/routes/utm.ts` - history com cliques + funil cruzando crm_deal por UTM.
+- `client/src/pages/UtmBuilder.tsx` - fluxo gera+encurta; colunas de funil no Histórico; remove botão/import de /links.
+- `client/src/App.tsx` - remove rota /links.
+- `client/src/pages/LinkShortener.tsx` - **deletado**.
+
+**Impacto arquitetural:** Nenhum estrutural. Validado: `esbuild` (server) e `vite build` passam; a query nova do Histórico foi executada direto no banco local (roda sem erro de permissão na `"Bitrix".crm_deal`; local tem 19.509 deals / 3.645 MQLs / 793 vendas, confirmando que a atribuição produz números reais). Atribuição por UTM: links de UTM idêntica compartilham os mesmos números (limitação aceita do Caminho A). Redirect real ainda depende da Fase 3 (Cloudflare).
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 4 — frontend (botão "Encurtar" no UTM Builder + página /links)
+
+**O que foi feito:**
+- `client/src/pages/UtmBuilder.tsx` — depois de gerar a UTM, aparece um bloco **"Encurtar este link"**: input de slug (prefixo `marketing.turbopartners.com.br/`, sanitizado ao digitar, Enter envia) + botão que chama `POST /api/links/shorten` (passa `targetUrl` = URL gerada e `generatedUtmLinkId`). Mostra o link curto resultante com botão copiar. Toast informa se já redireciona (`kvSynced`) ou se está só no banco. Botão **"Links curtos"** no topo (ao lado das tabs) leva pra `/links`.
+- `client/src/pages/LinkShortener.tsx` (novo) — página `/links`: tabela dos links curtos (slug, destino, campanha/UTM, **cliques**, criador, data) via `GET /api/links`, com copiar e estado vazio. Dark/light mode (tokens `muted`/`foreground`).
+- `client/src/App.tsx` — lazy import + rota `/links` (ProtectedRoute, mesmo padrão do UTM Builder).
+- `.env.example` — documentadas as vars do encurtador (`SHORTENER_BASE_URL`, `CF_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`, `CF_API_TOKEN`, `CLICK_INGEST_SECRET`) com nota de que em local roda sem elas.
+
+**Por que:**
+- Fase 4 do encurtador (plano em `docs/encurtador-links-plano.md`): a UI que fecha o fluxo de criar e gerir links curtos a partir do UTM Builder, testável no preview mesmo sem o Cloudflare (Fase 3) configurado.
+
+**Arquivos alterados:**
+- `client/src/pages/UtmBuilder.tsx` - bloco "Encurtar" na aba Gerar + botão "Links curtos" + import do `Link` (wouter).
+- `client/src/pages/LinkShortener.tsx` (novo) - página de gestão.
+- `client/src/App.tsx` - lazy import + rota `/links`.
+- `.env.example` - vars do encurtador.
+
+**Impacto arquitetural:** Nenhum estrutural. Validado: `vite build` passa (chunk `LinkShortener-*.js` gerado, `UtmBuilder-*.js` rebuildado), sem erro de import/sintaxe. Fluxo end-to-end de redirect depende da Fase 3 (Cloudflare Worker + KV) e das env vars de prod; em local o link é criado e listado, e o clique pode ser simulado via `POST /api/clicks`.
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 2 — backend (rotas + criação das tabelas no boot)
+
+**O que foi feito:**
+- `server/db.ts` — função `initializeShortLinksTables()` cria `cortex_core.short_links` e `short_link_clicks` (CREATE TABLE IF NOT EXISTS + índices), seguindo o padrão das demais `initialize*Table()` do repo. Idempotente; roda no boot (local e prod), sem precisar de `db:push`.
+- `server/index.ts` — `initializeShortLinksTables()` adicionada ao `Promise.all` de inicialização + import.
+- `server/routes/shortener.ts` (novo) — três rotas:
+  - `POST /api/links/shorten` (Growth + admins): valida/sanitiza o slug (estrito `[a-z0-9-]`, reservados bloqueados), extrai a UTM do `targetUrl`, grava em `short_links` com guarda de unicidade (`ON CONFLICT (slug)` → 409) e escreve `slug→targetUrl` no KV do Cloudflare (best-effort: sem `CF_*` em local, pula o KV e retorna `kvSynced:false`).
+  - `GET /api/links` (Growth + admins): lista links + contagem de cliques (LEFT JOIN agregado) + nome do criador.
+  - `POST /api/clicks`: ingestão de clique do Worker, protegida por header secreto `x-click-secret` (`CLICK_INGEST_SECRET`); grava em `short_link_clicks`.
+- `server/routes.ts` — registro de `registerShortenerRoutes(app)` + import.
+
+**Por que:**
+- Fase 2 do encurtador (plano em `docs/encurtador-links-plano.md`): a camada de servidor pra criar/gerir links e receber cliques, pronta pra ser consumida pelo frontend (Fase 4) e pelo Worker (Fase 3).
+
+**Arquivos alterados:**
+- `server/db.ts` - função de init das duas tabelas.
+- `server/index.ts` - wiring no boot.
+- `server/routes/shortener.ts` (novo) - rotas shorten/links/clicks.
+- `server/routes.ts` - import + registro.
+
+**Impacto arquitetural:** Nenhum estrutural. Tabelas criadas pela convenção `initialize*Table()` existente (não usa `db:push`, evitando diff do schema inteiro). Validado: `tsc` não acusa erro novo nos arquivos tocados (erros restantes são pré-existentes no `routes.ts`); `esbuild` bundla o server limpo (exit 0). KV e auth de clique são best-effort sem `CF_*`/`CLICK_INGEST_SECRET`, então o backend roda no preview local. Falta env de prod: `SHORTENER_BASE_URL`, `CF_ACCOUNT_ID`, `CF_KV_NAMESPACE_ID`, `CF_API_TOKEN`, `CLICK_INGEST_SECRET`.
+
+---
+
+## 2026-06-29 | feat(encurtador): Fase 1 — tabelas short_links e short_link_clicks
+
+**O que foi feito:**
+- `shared/schema.ts` — duas tabelas novas no schema `cortex_core` para o encurtador de links da Turbo (`marketing.turbopartners.com.br/<slug>`):
+  - `short_links`: cadastro do link curto (slug único personalizado, target_url com UTM, UTM desmembrada, FK lógica p/ generated_utm_links, created_by, expires_at). Índices em created_by e utm_campaign.
+  - `short_link_clicks`: um registro por clique (slug, clicked_at, country ISO-2, ip_hash, user_agent, referrer) para cruzar clique → lead (Bitrix) → venda por UTM. Índices em slug e clicked_at.
+- Tipos `ShortLink`/`InsertShortLink`/`ShortLinkClick`/`InsertShortLinkClick` exportados.
+- Plano completo do encurtador documentado em `docs/encurtador-links-plano.md`.
+
+**Por que:**
+- Base (Fase 1) do encurtador próprio: redirect via Cloudflare Worker na borda, mas cadastro + cliques no Postgres do Cortex para atribuição cruzada com Bitrix/Meta (nível "contar + cruzar"). Arquitetura e decisões em `docs/encurtador-links-plano.md`.
+
+**Arquivos alterados:**
+- `shared/schema.ts` - tabelas `short_links` e `short_link_clicks` + tipos (schema `cortex_core`).
+- `docs/encurtador-links-plano.md` (novo) - plano de implementação (5 fases) e decisões travadas.
+
+**Impacto arquitetural:** Nenhum estrutural. Só definição de schema (Drizzle); `tsc --noEmit` não acusa erros no schema. Criação física das tabelas (`npm run db:push`) é passo separado, ainda não executado.
+
+## 2026-06-29 | feat(churn): histórico mensal de churn por motivo na tela Detalhamento
+
+**O que foi feito:**
+- Novo gráfico na tela /detalhamento-churn (abaixo dos KPIs): barras empilhadas por mês × motivo de cancelamento + linha tracejada com a meta de churn do BP 2026.
+- Novo endpoint `GET /api/analytics/churn-historico-mensal?ano&filterAbono` retornando a série mensal pivotada por motivo.
+- Novo componente `client/src/components/churn/ChurnHistoricoMensal.tsx` (Recharts ComposedChart), eixo de jan até o mês atual.
+
+**Por que:**
+- Faltava a visão histórica do ano na tela; o pedido foi reproduzir o estilo do gráfico "Churn Squad Mês" do ClickUp, mas com a régua da própria tela (consistência com o card MRR Perdido).
+
+**Arquivos alterados:**
+- `server/routes.ts` - endpoint do histórico mensal (mesma régua da tela: exclui os 3 motivos "não-base", aplica abono via filterAbono).
+- `client/src/components/churn/ChurnHistoricoMensal.tsx` - componente do gráfico.
+- `client/src/pages/ChurnDetalhamento.tsx` - integração (passa filterAbono e BP_CHURN_MRR_TARGETS).
+
+**Impacto arquitetural:** Nenhum — endpoint e componente novos, isolados; o histórico acompanha o toggle de abono da tela.
+
+---
+
+## 2026-06-29 | fix(churn): alinhar Detalhamento de Churn ao ClickUp (abonados contam por padrão)
+
+**O que foi feito:**
+- A tela /detalhamento-churn passou a contar contratos abonados (`abonar_churn='Sim'`) como churn por padrão; o toggle "Todos/Não abonados/Abonados" virou o único controle de exclusão de abono.
+- Mantida a exclusão dos motivos "nunca virou base" (Inadimplente 1º Mês / Não começou / Erro na Venda) na query do endpoint, que é o que o ClickUp também desconta.
+- `isAbonado` no backend agora é apenas o flag manual; removido o `!is_abonado` redundante de ChurnKpisHero, RitmoDiario, ChurnPorDimensao, DrawerTiming e do `filteredMetricas`.
+
+**Por que:**
+- O "Churn MRR" do ClickUp (jun/2026 = R$ 161.468) não batia com o "MRR Perdido" do Cortex (R$ 139.080). A diferença de R$ 22.388 eram 4 contratos marcados `abonar_churn='Sim'` que o ClickUp conta e o Cortex escondia. Validado no banco de prod: régua nova → "Todos" = R$ 161.468 (bate), "Não abonados" = R$ 139.080, "Abonados" = R$ 22.388.
+
+**Arquivos alterados:**
+- `server/routes.ts` - endpoint `/api/analytics/churn-detalhamento`: exclui os 3 motivos no WHERE, `isAbonado` = só flag, métricas usam `allContratos`.
+- `client/src/pages/ChurnDetalhamento.tsx` - `filteredMetricas` usa a lista já filtrada pelo toggle.
+- `client/src/components/churn/{ChurnKpisHero,RitmoDiario,ChurnPorDimensao,drawer/DrawerTiming}.tsx` - removido o filtro `!is_abonado` interno.
+
+**Impacto arquitetural:** Nenhum — escopo restrito à tela Detalhamento de Churn; BP 2026, OKR, NRR e slides não foram tocados (continuam com a régua de churn líquido).
+
+---
+
 ## 2026-06-24 | feat(bp-copilot): UI do chat (Fase 2)
 
 **O que foi feito:**
