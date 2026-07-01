@@ -33,12 +33,27 @@ const F_REUNIAO_AGENDADA = "UF_CRM_1753386683";
 const F_REUNIAO_REALIZADA = "UF_CRM_1755642298";
 const F_VALOR_RECORRENTE = "UF_CRM_1752256871802";
 const F_VALOR_PONTUAL = "UF_CRM_1752256743002";
+// Campos comerciais (closer/sdr/funil/mql/origem) — sem eles, deals novos entram
+// sem responsável e quebram os rankings/funil das telas de Comercial e Gestão de Receita.
+const F_SDR = "UF_CRM_1752257983";
+const F_CLOSER = "UF_CRM_1753386868";
+const F_FNL_NGC = "UF_CRM_1753388612";
+const F_MQL = "UF_CRM_1753387697";
+const F_FONTE = "UF_CRM_1753388753";
+const F_SEGMENTO = "UF_CRM_1753447931";
 
 const SELECT_FIELDS = [
   "ID", "TITLE", "DATE_CREATE", "DATE_MODIFY", "CATEGORY_ID", "STAGE_ID",
-  "CONTACT_ID", "COMPANY_ID", "CLOSEDATE",
+  "CONTACT_ID", "COMPANY_ID", "CLOSEDATE", "SOURCE_ID", "ASSIGNED_BY_ID",
   F_REUNIAO_AGENDADA, F_REUNIAO_REALIZADA, F_VALOR_RECORRENTE, F_VALOR_PONTUAL,
+  F_SDR, F_CLOSER, F_FNL_NGC, F_MQL, F_FONTE, F_SEGMENTO,
 ];
+
+// valor de campo string do Bitrix → string truncada ou null
+const str = (v: unknown, max = 255): string | null => {
+  if (v == null || v === "") return null;
+  return String(v).slice(0, max);
+};
 
 async function bx<T = any>(base: string, method: string, body: unknown): Promise<T> {
   const r = await fetch(`${base}/${method}`, {
@@ -144,8 +159,10 @@ export async function syncBitrixDeals(opts: { verbose?: boolean; sinceHours?: nu
            id, title, date_create, date_modify, category_id, category_name,
            stage_name, contact_id, company_id, data_fechamento,
            data_reuniao_agendada, data_reuniao_realizada,
-           valor_recorrente, valor_pontual, created_at, updated_at
-         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,NOW(),NOW())
+           valor_recorrente, valor_pontual,
+           sdr, closer, fnl_ngc, mql, source, fonte,
+           created_at, updated_at
+         ) VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,NOW(),NOW())
          ON CONFLICT (id) DO UPDATE SET
            date_modify = EXCLUDED.date_modify,
            stage_name = EXCLUDED.stage_name,
@@ -158,6 +175,12 @@ export async function syncBitrixDeals(opts: { verbose?: boolean; sinceHours?: nu
            data_reuniao_realizada = EXCLUDED.data_reuniao_realizada,
            valor_recorrente = EXCLUDED.valor_recorrente,
            valor_pontual = EXCLUDED.valor_pontual,
+           sdr = COALESCE(EXCLUDED.sdr, "Bitrix".crm_deal.sdr),
+           closer = COALESCE(EXCLUDED.closer, "Bitrix".crm_deal.closer),
+           fnl_ngc = COALESCE(EXCLUDED.fnl_ngc, "Bitrix".crm_deal.fnl_ngc),
+           mql = COALESCE(EXCLUDED.mql, "Bitrix".crm_deal.mql),
+           source = COALESCE(EXCLUDED.source, "Bitrix".crm_deal.source),
+           fonte = COALESCE(EXCLUDED.fonte, "Bitrix".crm_deal.fonte),
            updated_at = NOW()`,
         [
           Number(d.ID), d.TITLE ?? null, wallClock(d.DATE_CREATE), wallClock(d.DATE_MODIFY),
@@ -165,6 +188,7 @@ export async function syncBitrixDeals(opts: { verbose?: boolean; sinceHours?: nu
           stageName, contactId, companyId, dateOnly(d.CLOSEDATE),
           dateOnly(d[F_REUNIAO_AGENDADA]), dateOnly(d[F_REUNIAO_REALIZADA]),
           money(d[F_VALOR_RECORRENTE]), money(d[F_VALOR_PONTUAL]),
+          str(d[F_SDR]), str(d[F_CLOSER]), str(d[F_FNL_NGC]), str(d[F_MQL]), str(d.SOURCE_ID), str(d[F_FONTE]),
         ],
       );
       totalSynced++;
