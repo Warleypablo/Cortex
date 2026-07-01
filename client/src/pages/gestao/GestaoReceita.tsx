@@ -633,7 +633,7 @@ export default function GestaoReceita() {
       {data?.mesParcial && (
         <div className="flex items-center gap-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800 dark:border-amber-900 dark:bg-amber-950/40 dark:text-amber-300">
           <AlertTriangle className="h-4 w-4 shrink-0" />
-          <span>Mês em andamento — venda, funil e conversões ainda estão <b>acumulando</b> e tendem a subir até o fechamento. Custos são por <b>competência</b> (custo do mês, mesmo antes de pago).</span>
+          <span>Mês em andamento — custos em regime caixa (CAC, comissões) ficam <b>parciais</b> até o fechamento; o realizado tende a subir conforme as contas são pagas.</span>
         </div>
       )}
 
