@@ -466,14 +466,28 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
     SELECT a.ad_id::text AS ad_id, a.adgroup_id::text AS adgroup_id, a.campaign_id::text AS campaign_id,
            a.ad_name, a.operation_status AS ad_status, a.landing_page_url,
            ag.adgroup_name, ag.operation_status AS adgroup_status,
+           ag.budget AS adgroup_budget, ag.budget_mode AS adgroup_budget_mode,
            COALESCE(m.spend, 0) AS spend, COALESCE(m.impressions, 0) AS impressions,
            COALESCE(m.clicks, 0) AS clicks, COALESCE(m.conversions, 0) AS conversions,
-           COALESCE(m.video_views, 0) AS video_views
+           COALESCE(m.video_views, 0) AS video_views,
+           COALESCE(m.landing_page_views, 0) AS landing_page_views, COALESCE(m.reach, 0) AS reach,
+           COALESCE(m.video_watched_2s, 0) AS video_watched_2s, COALESCE(m.video_watched_6s, 0) AS video_watched_6s,
+           COALESCE(m.video_views_p25, 0) AS video_views_p25, COALESCE(m.video_views_p50, 0) AS video_views_p50,
+           COALESCE(m.video_views_p75, 0) AS video_views_p75, COALESCE(m.video_views_p100, 0) AS video_views_p100,
+           COALESCE(m.likes, 0) AS likes, COALESCE(m.comments, 0) AS comments, COALESCE(m.shares, 0) AS shares,
+           COALESCE(m.follows, 0) AS follows, COALESCE(m.profile_visits, 0) AS profile_visits,
+           COALESCE(m.engagements, 0) AS engagements
     FROM tiktok.ads a
     LEFT JOIN tiktok.ad_groups ag ON ag.adgroup_id = a.adgroup_id
     LEFT JOIN (
       SELECT ad_id, SUM(spend) AS spend, SUM(impressions) AS impressions, SUM(clicks) AS clicks,
-             SUM(conversions) AS conversions, SUM(video_views) AS video_views
+             SUM(conversions) AS conversions, SUM(video_views) AS video_views,
+             SUM(landing_page_views) AS landing_page_views, SUM(reach) AS reach,
+             SUM(video_watched_2s) AS video_watched_2s, SUM(video_watched_6s) AS video_watched_6s,
+             SUM(video_views_p25) AS video_views_p25, SUM(video_views_p50) AS video_views_p50,
+             SUM(video_views_p75) AS video_views_p75, SUM(video_views_p100) AS video_views_p100,
+             SUM(likes) AS likes, SUM(comments) AS comments, SUM(shares) AS shares,
+             SUM(follows) AS follows, SUM(profile_visits) AS profile_visits, SUM(engagements) AS engagements
       FROM tiktok.ad_insights_daily
       WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
       GROUP BY ad_id
@@ -484,10 +498,10 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
   // 1b. Metadados de campanha (nome/status/budget) vêm de tiktok.ad_campaigns, que é do
   // PR de nível-campanha e pode ter outro owner no banco. Lemos de forma OPCIONAL: se não
   // houver acesso/tabela, seguimos com fallback (campaign_id como nome).
-  const campMeta = new Map<string, { name: string | null; status: string | null; budget: number | null }>();
+  const campMeta = new Map<string, { name: string | null; status: string | null; budget: number | null; budgetMode: string | null }>();
   try {
     const campRes = await db.execute(sql`
-      SELECT campaign_id::text AS campaign_id, campaign_name, operation_status, budget
+      SELECT campaign_id::text AS campaign_id, campaign_name, operation_status, budget, budget_mode
       FROM tiktok.ad_campaigns
       WHERE advertiser_id = ANY(${TIKTOK_ADVERTISER_IDS_SQL})
     `);
@@ -496,6 +510,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
         name: c.campaign_name || null,
         status: c.operation_status || null,
         budget: c.budget != null ? Number(c.budget) : null,
+        budgetMode: c.budget_mode || null,
       });
     }
   } catch (e: any) {
@@ -561,7 +576,22 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
     const receita = crm.valorPontual + crm.valorRecorrente;
     const ctr = impressions > 0 && clicks > 0 ? r2((clicks / impressions) * 100) : null;
     const cpm = impressions > 0 ? Math.round((investimento / impressions) * 1000) : null;
-    const camp = campMeta.get(String(a.campaign_id)) || { name: null, status: null, budget: null };
+    const camp = campMeta.get(String(a.campaign_id)) || { name: null, status: null, budget: null, budgetMode: null };
+
+    // Métricas nativas estendidas (gravadas pelo sync em ad_insights_daily).
+    const landingPageViews = parseInt(a.landing_page_views) || 0;
+    const reach = parseInt(a.reach) || 0;
+    const video2s = parseInt(a.video_watched_2s) || 0;   // ~ "hook" (Meta usa 3s)
+    const video6s = parseInt(a.video_watched_6s) || 0;   // ~ "hold" (Meta usa thruplay)
+    const videoViews = parseInt(a.video_views) || 0;     // video_play_actions
+
+    // Orçamento: no TikTok mora na campanha (CBO) ou no ad group (ABO). budget_mode
+    // BUDGET_MODE_TOTAL = vitalício; qualquer outro com valor > 0 = diário. Espelhamos
+    // os campos que a coluna "Orçamento" do Meta consome (client/src/lib/criativosMetrics).
+    const isTotal = (mode: string | null) => String(mode || '') === 'BUDGET_MODE_TOTAL';
+    const campBudget = camp.budget != null && camp.budget > 0 ? camp.budget : null;
+    const agBudgetRaw = a.adgroup_budget != null ? Number(a.adgroup_budget) : null;
+    const agBudget = agBudgetRaw != null && agBudgetRaw > 0 ? agBudgetRaw : null;
 
     out.push({
       id: a.ad_id,
@@ -576,29 +606,39 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       adsetId: a.adgroup_id || null,
       adsetName: a.adgroup_name || a.adgroup_id || null,
       adsetStatus: normalizeTiktokStatus(a.adgroup_status),
-      // TikTok: budget pode morar na campanha ou no ad group; expomos só o da campanha por ora.
-      campaignDailyBudget: camp.budget,
-      campaignLifetimeBudget: null,
-      adsetDailyBudget: null,
-      adsetLifetimeBudget: null,
+      campaignDailyBudget: isTotal(camp.budgetMode) ? null : campBudget,
+      campaignLifetimeBudget: isTotal(camp.budgetMode) ? campBudget : null,
+      adsetDailyBudget: isTotal(a.adgroup_budget_mode) ? null : agBudget,
+      adsetLifetimeBudget: isTotal(a.adgroup_budget_mode) ? agBudget : null,
       investimento: Math.round(investimento),
       impressions,
       outboundClicks: clicks,
-      landingPageViews: 0,
-      reach: 0,
-      video3sec: 0,
-      videoThruplay: 0,
-      videoHook: null,
-      videoHold: null,
+      landingPageViews,
+      reach,
+      frequency: reach > 0 ? r2(impressions / reach) : null,
+      video3sec: video2s,
+      videoThruplay: video6s,
+      videoHook: impressions > 0 && video2s > 0 ? r2((video2s / impressions) * 100) : null,
+      videoHold: impressions > 0 && video6s > 0 ? r2((video6s / impressions) * 100) : null,
       ctr,
       ctrUnico: null,
       cpm,
-      connectRate: null,
-      taxaConversao: null,
+      connectRate: clicks > 0 && landingPageViews > 0 ? r2((landingPageViews / clicks) * 100) : null,
+      taxaConversao: landingPageViews > 0 && crm.leads > 0 ? r2((crm.leads / landingPageViews) * 100) : null,
       // contadores nativos do TikTok
       conversions: Math.round(parseFloat(a.conversions) || 0),
       conversionValue: 0,
-      videoViews: parseInt(a.video_views) || 0,
+      videoViews,
+      videoP25: parseInt(a.video_views_p25) || 0,
+      videoP50: parseInt(a.video_views_p50) || 0,
+      videoP75: parseInt(a.video_views_p75) || 0,
+      videoP100: parseInt(a.video_views_p100) || 0,
+      likes: parseInt(a.likes) || 0,
+      comments: parseInt(a.comments) || 0,
+      shares: parseInt(a.shares) || 0,
+      follows: parseInt(a.follows) || 0,
+      profileVisits: parseInt(a.profile_visits) || 0,
+      engagements: parseInt(a.engagements) || 0,
       // CRM por anúncio (utm_content = ad_id)
       leads: crm.leads,
       cpl: crm.leads > 0 ? Math.round(investimento / crm.leads) : null,
