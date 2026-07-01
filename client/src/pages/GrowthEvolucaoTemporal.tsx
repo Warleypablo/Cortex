@@ -569,7 +569,7 @@ const MARKETING_METRIC_PLATFORMS: Record<string, readonly string[]> = {
   ads_taxa_conversao_sessoes: UNIVERSAL,      // Tx Conversão por Sessões (GA4) — padrão da casa
   ads_taxa_conversao_sessoes_mql: UNIVERSAL,
   ads_taxa_conversao_sessoes_nmql: UNIVERSAL,
-  ads_connect_rate: PAID_ONLY,
+  ads_connect_rate: META_ONLY,               // numerador = landing_page_views (pixel Meta); só same-source (Meta) faz sentido. Ao somar 2+ vira views-Meta ÷ cliques-das-4 = sem significado
   ads_leads: UNIVERSAL,
   ads_mqls: UNIVERSAL,
   ads_cpl: UNIVERSAL,
