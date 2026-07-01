@@ -2138,6 +2138,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           investimento: inv !== null ? Math.round(inv) : null,
           sessoes: r.sessoes !== null ? Math.round(r.sessoes) : null,
           taxaConversao: r.sessoes && r.sessoes > 0 && r.leads > 0 ? parseFloat(((r.leads / r.sessoes) * 100).toFixed(2)) : null,
+          taxaConversaoMql: r.sessoes && r.sessoes > 0 && r.mqls > 0 ? parseFloat(((r.mqls / r.sessoes) * 100).toFixed(2)) : null,
+          taxaConversaoNmql: r.sessoes && r.sessoes > 0 && (r.leads - r.mqls) > 0 ? parseFloat((((r.leads - r.mqls) / r.sessoes) * 100).toFixed(2)) : null,
           leads: r.leads,
           mqls: r.mqls,
           cpl: inv !== null && inv > 0 && r.leads > 0 ? Math.round(inv / r.leads) : null,
@@ -2308,7 +2310,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // ---- Montar árvore: medium → source → campaign → term → content ----
       const MEDIUM_LABELS: Record<string, string> = {
         paid: 'Mídia Paga', organic: 'Orgânico',
-        victor: 'Victor (canal próprio)', andre: 'André (canal próprio)', rodrigo: 'Rodrigo (canal próprio)',
+        victor: 'Victor', andre: 'André', rodrigo: 'Rodrigo',
         crm: 'CRM', eventos: 'Eventos', referral: 'Referral', outbound: 'Outbound', outros: 'Outros',
       };
       // Sócios (figuras-exceção) entram logo após Orgânico — dimensão de 1ª ordem (Constituição UTM §3.7).
