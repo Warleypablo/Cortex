@@ -488,7 +488,7 @@ function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillR
           <KpiCard label="CPL" valor={brl(inv.cpl)} sub={`spend Meta ÷ ${intBR(inv.leadsInbound)} leads inbound`} fonte={<Fonte tipo="meta" />} />
           <KpiCard label="CPL-MQ" valor={brl(inv.cplMq)} sub={`spend Meta ÷ ${intBR(inv.mqlsInbound)} MQLs`} fonte={<Fonte tipo="meta" />} />
         </div>
-        <Nota><b>Investimento Meta Ads</b> = spend do mês (<code>meta_ads.meta_insights_daily</code>) — <b>não vem do Bitrix</b>. <b>ADs (Conta Azul)</b> = o que saiu do caixa na categoria 06.06.01 (inclui Google/outros). <b>CPL/CPL-MQ</b> são aproximados: dividem o spend do Meta por <b>todos</b> os leads/MQLs inbound (não só os de mídia paga) — 92% dos leads estão sem UTM no Bitrix, então não dá pra isolar os que vieram do Meta.</Nota>
+        <Nota>Os dois cards medem <b>essencialmente o mesmo gasto (Meta)</b> por lentes diferentes — <b>não somar</b>. <b>Investimento Meta Ads</b> = spend por <b>veiculação</b> no mês (<code>meta_ads.meta_insights_daily</code>, competência). <b>ADs (Conta Azul)</b> = a fatura paga pelo <b>caixa</b> na 06.06.01 (99% Facebook + pouco TikTok; <b>não tem Google</b>). A diferença é o descasamento entre veicular e pagar a fatura. <b>CPL/CPL-MQ</b> são aproximados: dividem o spend do Meta por <b>todos</b> os leads/MQLs inbound (não só mídia paga) — 92% dos leads sem UTM no Bitrix impedem isolar os que vieram do Meta.</Nota>
       </div>
     </div>
   );
