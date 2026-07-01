@@ -8,7 +8,7 @@ import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { PeriodoSelector } from "@/components/PeriodoSelector";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
@@ -551,24 +551,20 @@ const Td = ({ children, left, className = "" }: { children: React.ReactNode; lef
 );
 const Vazio = () => <p className="py-4 text-center text-sm text-gray-400 dark:text-zinc-500">Sem dados no mês</p>;
 
-const MESES = [
-  { v: "2026-01", l: "Janeiro 2026" }, { v: "2026-02", l: "Fevereiro 2026" }, { v: "2026-03", l: "Março 2026" },
-  { v: "2026-04", l: "Abril 2026" }, { v: "2026-05", l: "Maio 2026" }, { v: "2026-06", l: "Junho 2026" },
-];
-
 /* ============================================================ PÁGINA ============================================================ */
 export default function GestaoReceita() {
   usePageTitle("Gestão de Receita");
   useSetPageInfo("Gestão de Receita", "Orçado × Realizado da área comercial");
-  const [mes, setMes] = useState("2026-06");
+  const [periodo, setPeriodo] = useState({ de: "2026-06", ate: "2026-06" });
   const [drill, setDrill] = useState<DrillRef | null>(null);
   const [editando, setEditando] = useState(false);
   const [rascunho, setRascunho] = useState<Record<string, number>>({});
   const queryClient = useQueryClient();
 
   const { data, isLoading, isError } = useQuery<GestaoReceitaData>({
-    queryKey: ["/api/gestao/receita", { mes }],
+    queryKey: ["/api/gestao/receita", { de: periodo.de, ate: periodo.ate }],
   });
+  const mesUnico = periodo.de === periodo.ate;
 
   const metasCtx: MetasCtx = {
     editando,
@@ -578,7 +574,7 @@ export default function GestaoReceita() {
   const salvarMetas = useMutation({
     mutationFn: async () => {
       const metas = Object.entries(rascunho).map(([chave, valor]) => ({ chave, valor }));
-      return apiRequest("PUT", "/api/gestao/receita/metas", { mes, metas });
+      return apiRequest("PUT", "/api/gestao/receita/metas", { mes: periodo.de, metas });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["/api/gestao/receita"] });
@@ -597,7 +593,7 @@ export default function GestaoReceita() {
             <p className="text-sm text-gray-500 dark:text-zinc-400">Orçado × Realizado da área comercial · venda via Bitrix, metas do BP 2026</p>
           </div>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {editando ? (
             <>
               <button
@@ -615,19 +611,16 @@ export default function GestaoReceita() {
               </button>
             </>
           ) : (
-            <button
-              onClick={() => setEditando(true)}
-              className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
-            >
-              <PencilLine className="h-4 w-4" /> Editar metas
-            </button>
+            mesUnico && (
+              <button
+                onClick={() => setEditando(true)}
+                className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+              >
+                <PencilLine className="h-4 w-4" /> Editar metas
+              </button>
+            )
           )}
-          <Select value={mes} onValueChange={setMes}>
-            <SelectTrigger className="w-44 bg-white dark:bg-zinc-900"><SelectValue /></SelectTrigger>
-            <SelectContent>
-              {MESES.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}
-            </SelectContent>
-          </Select>
+          <PeriodoSelector value={periodo} onChange={(p) => { setPeriodo({ de: p.de, ate: p.ate }); setEditando(false); setRascunho({}); }} />
         </div>
       </div>
 
@@ -669,7 +662,7 @@ export default function GestaoReceita() {
         </Tabs>
       )}
 
-      <GestaoReceitaDetalhe drill={drill} mes={mes} onClose={() => setDrill(null)} />
+      <GestaoReceitaDetalhe drill={drill} de={periodo.de} ate={periodo.ate} onClose={() => setDrill(null)} />
 
       <div className="flex items-center gap-2 pt-2 text-xs text-gray-400 dark:text-zinc-500">
         <Database className="h-3.5 w-3.5" /> Dados via Cortex — Bitrix (venda/funil), ClickUp (produto/churn), Conta Azul (custos), BP 2026 (metas). Clique numa linha ou card para ver o detalhamento.

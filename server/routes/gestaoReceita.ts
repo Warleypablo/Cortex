@@ -20,21 +20,27 @@ const PRODUTO_TO_SEG_MRR: Record<string, string> = {
   "Gestão de Comunidade": "gc",
 };
 
-function parseMes(mesParam: unknown): { mesNum: number; ano: number; dIni: string; dFim: string; label: string } {
-  // Aceita "YYYY-MM"; default = junho/2026 (último mês com dados fechados no ambiente).
-  let ano = 2026;
-  let mesNum = 6;
-  if (typeof mesParam === "string" && /^\d{4}-\d{2}$/.test(mesParam)) {
-    const [a, m] = mesParam.split("-").map(Number);
-    ano = a;
-    mesNum = m;
-  }
-  const mm = String(mesNum).padStart(2, "0");
-  const dIni = `${ano}-${mm}-01`;
-  const proxAno = mesNum === 12 ? ano + 1 : ano;
-  const proxMes = mesNum === 12 ? 1 : mesNum + 1;
-  const dFim = `${proxAno}-${String(proxMes).padStart(2, "0")}-01`;
-  return { mesNum, ano, dIni, dFim, label: `${ano}-${mm}` };
+// Aceita período via de/ate ("YYYY-MM") ou mes ("YYYY-MM", atalho). Período dentro de um ano.
+// Retorna o range [dIni, dFim) e a lista de meses (1-12) p/ somar orçado/custos mensais.
+function parsePeriodo(q: { de?: unknown; ate?: unknown; mes?: unknown }): {
+  dIni: string; dFim: string; mesesNums: number[]; ano: number; mesNum: number; label: string;
+} {
+  const isYM = (v: unknown): v is string => typeof v === "string" && /^\d{4}-\d{2}$/.test(v);
+  const de = isYM(q.de) ? q.de : isYM(q.mes) ? (q.mes as string) : "2026-06";
+  const ate = isYM(q.ate) ? q.ate : de;
+  const [ano, mDe] = de.split("-").map(Number);
+  const [, mAteRaw] = ate.split("-").map(Number);
+  let mIni = mDe, mFim = mAteRaw;
+  if (mFim < mIni) [mIni, mFim] = [mFim, mIni];
+  const mm = (m: number) => String(m).padStart(2, "0");
+  const dIni = `${ano}-${mm(mIni)}-01`;
+  const proxAno = mFim === 12 ? ano + 1 : ano;
+  const proxMes = mFim === 12 ? 1 : mFim + 1;
+  const dFim = `${proxAno}-${mm(proxMes)}-01`;
+  const mesesNums: number[] = [];
+  for (let m = mIni; m <= mFim; m++) mesesNums.push(m);
+  const label = mIni === mFim ? `${ano}-${mm(mIni)}` : `${ano}-${mm(mIni)} a ${ano}-${mm(mFim)}`;
+  return { dIni, dFim, mesesNums, ano, mesNum: mIni, label };
 }
 
 const num = (v: any) => (v == null ? 0 : parseFloat(v) || 0);
@@ -42,21 +48,27 @@ const num = (v: any) => (v == null ? 0 : parseFloat(v) || 0);
 export function registerGestaoReceitaRoutes(app: Express) {
   app.get("/api/gestao/receita", async (req, res) => {
     try {
-      const { mesNum, ano, dIni, dFim, label } = parseMes(req.query.mes);
+      const { mesNum, ano, dIni, dFim, label, mesesNums } = parsePeriodo(req.query);
+      const somaMeses = (pm: Record<number, number>) => mesesNums.reduce((a, m) => a + (pm[m] || 0), 0);
+      const mesesInSql = sql.join(mesesNums.map((m) => sql`${m}`), sql`, `);
 
       // ---------- 1. ORÇADO (BP 2026) ----------
       const orcRows = await db.execute(sql`
-        SELECT metrica, valor FROM cortex_core.bp2026_orcado WHERE mes = ${mesNum}
+        SELECT metrica, SUM(valor::numeric) AS valor FROM cortex_core.bp2026_orcado
+        WHERE mes IN (${mesesInSql}) GROUP BY metrica
       `);
       const orc: Record<string, number> = {};
       for (const r of orcRows.rows as any[]) orc[r.metrica] = num(r.valor);
 
       // ---------- 1b. OVERRIDES de meta (editados na tela) ----------
       const ovRows = await db.execute(sql`
-        SELECT chave, valor FROM cortex_core.gestao_receita_metas WHERE ano = ${ano} AND mes = ${mesNum}
+        SELECT chave, SUM(valor::numeric) AS valor FROM cortex_core.gestao_receita_metas
+        WHERE ano = ${ano} AND mes IN (${mesesInSql}) GROUP BY chave
       `);
+      // metas editáveis são mensais → só aplicam quando o período é um mês único.
+      const ehMesUnico = mesesNums.length === 1;
       const override: Record<string, number> = {};
-      for (const r of ovRows.rows as any[]) override[r.chave] = num(r.valor);
+      if (ehMesUnico) for (const r of ovRows.rows as any[]) override[r.chave] = num(r.valor);
       // meta final = override editado ?? orçado do BP
       const metaMrr = override["venda_mrr"] ?? orc["vendas_mrr"] ?? 0;
       const metaPontual = override["venda_pontual"] ?? orc["vendas_pontual"] ?? 0;
@@ -68,9 +80,9 @@ export function registerGestaoReceitaRoutes(app: Express) {
         somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_pre_vendas),
         somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_comissoes),
       ]);
-      const cacTotalReal = cacTotalPM[mesNum] || 0;
-      const custoComercialReal = (cacVendasPM[mesNum] || 0) + (cacPreVendasPM[mesNum] || 0);
-      const comissoesReal = cacComissoesPM[mesNum] || 0;
+      const cacTotalReal = somaMeses(cacTotalPM);
+      const custoComercialReal = somaMeses(cacVendasPM) + somaMeses(cacPreVendasPM);
+      const comissoesReal = somaMeses(cacComissoesPM);
 
       // ---------- 3. VENDA NOVA (Bitrix) + ticket médio R×P + nº clientes ----------
       const vendaRow = await db.execute(sql`
@@ -224,7 +236,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
       `);
       const metaAdsSpend = num((invSpendRow.rows as any[])[0]?.spend);
       const cacAdsPM = await somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_ads);
-      const adsContaAzul = cacAdsPM[mesNum] || 0;
+      const adsContaAzul = somaMeses(cacAdsPM);
       const invLeadsRow = await db.execute(sql`
         SELECT
           COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim}) AS leads,
@@ -365,13 +377,14 @@ export function registerGestaoReceitaRoutes(app: Express) {
 
       // Mês em andamento: custos em regime caixa ficam parciais até o fechamento.
       const hoje = new Date();
-      const mesParcial = ano === hoje.getFullYear() && mesNum >= hoje.getMonth() + 1;
+      const mesParcial = ano === hoje.getFullYear() && mesesNums.includes(hoje.getMonth() + 1);
 
       res.json({
         mes: label,
         mesNum,
         ano,
         mesParcial,
+        mesUnico: ehMesUnico,
         macro: {
           vendaMrr: { orcado: metaMrr, realizado: vMrrReal, editavel: true, chave: "venda_mrr" },
           vendaPontual: { orcado: metaPontual, realizado: vPontReal, editavel: true, chave: "venda_pontual" },
@@ -404,7 +417,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
     try {
       const tipo = req.query.tipo;
       if (!tipoValido(tipo)) return res.status(400).json({ error: "tipo inválido" });
-      const { dIni, dFim, label } = parseMes(req.query.mes);
+      const { dIni, dFim, label } = parsePeriodo(req.query);
       const chave = typeof req.query.chave === "string" ? req.query.chave : "";
       const detalhe = await montarDetalhe(db, { tipo, chave, dIni, dFim, label });
       res.json(detalhe);
@@ -418,7 +431,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
   const CHAVE_META_OK = /^(venda_mrr|venda_pontual|prod_(tm|ctr)_(mrr|pont):.+)$/;
   app.put("/api/gestao/receita/metas", async (req, res) => {
     try {
-      const { ano, mesNum } = parseMes(req.body?.mes);
+      const { ano, mesNum } = parsePeriodo(req.body || {});
       const metas = Array.isArray(req.body?.metas) ? req.body.metas : [];
       const user = (req.user as any)?.email || (req.user as any)?.username || "desconhecido";
       const validas = metas.filter((m: any) => typeof m?.chave === "string" && CHAVE_META_OK.test(m.chave) && Number.isFinite(Number(m?.valor)));
