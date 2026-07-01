@@ -50,6 +50,16 @@ export function registerGestaoReceitaRoutes(app: Express) {
       const orc: Record<string, number> = {};
       for (const r of orcRows.rows as any[]) orc[r.metrica] = num(r.valor);
 
+      // ---------- 1b. OVERRIDES de meta (editados na tela) ----------
+      const ovRows = await db.execute(sql`
+        SELECT chave, valor FROM cortex_core.gestao_receita_metas WHERE ano = ${ano} AND mes = ${mesNum}
+      `);
+      const override: Record<string, number> = {};
+      for (const r of ovRows.rows as any[]) override[r.chave] = num(r.valor);
+      // meta final = override editado ?? orçado do BP
+      const metaMrr = override["venda_mrr"] ?? orc["vendas_mrr"] ?? 0;
+      const metaPontual = override["venda_pontual"] ?? orc["vendas_pontual"] ?? 0;
+
       // ---------- 2. CUSTOS REALIZADOS (regime caixa, Conta Azul) ----------
       const [cacTotalPM, cacVendasPM, cacPreVendasPM, cacComissoesPM] = await Promise.all([
         somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac),
@@ -61,19 +71,37 @@ export function registerGestaoReceitaRoutes(app: Express) {
       const custoComercialReal = (cacVendasPM[mesNum] || 0) + (cacPreVendasPM[mesNum] || 0);
       const comissoesReal = cacComissoesPM[mesNum] || 0;
 
-      // ---------- 3. VENDA NOVA (Bitrix) + nº clientes/contratos do mês ----------
+      // ---------- 3. VENDA NOVA (Bitrix) + ticket médio R×P + nº clientes ----------
       const vendaRow = await db.execute(sql`
         SELECT
           COALESCE(SUM(valor_recorrente::numeric), 0) AS mrr,
           COALESCE(SUM(valor_pontual::numeric), 0)   AS pont,
-          COUNT(*) AS deals
+          COUNT(*) AS deals,
+          COUNT(*) FILTER (WHERE valor_recorrente::numeric > 0) AS deals_mrr,
+          COUNT(*) FILTER (WHERE valor_pontual::numeric > 0) AS deals_pont
         FROM "Bitrix".crm_deal
         WHERE stage_name = ${STAGE_GANHO}
           AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}
       `);
-      const vMrrReal = num((vendaRow.rows as any[])[0]?.mrr);
-      const vPontReal = num((vendaRow.rows as any[])[0]?.pont);
-      const nClientes = Number((vendaRow.rows as any[])[0]?.deals) || 0;
+      const vr0 = (vendaRow.rows as any[])[0] || {};
+      const vMrrReal = num(vr0.mrr);
+      const vPontReal = num(vr0.pont);
+      const nClientes = Number(vr0.deals) || 0;
+      const nDealsMrr = Number(vr0.deals_mrr) || 0;
+      const nDealsPont = Number(vr0.deals_pont) || 0;
+      const ticketMrr = nDealsMrr > 0 ? Math.round(vMrrReal / nDealsMrr) : 0;
+      const ticketPontual = nDealsPont > 0 ? Math.round(vPontReal / nDealsPont) : 0;
+
+      // Nº de reuniões realizadas no mês + conversão por coorte (reunião → venda)
+      const reunRow = await db.execute(sql`
+        SELECT
+          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}) AS reunioes,
+          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim} AND stage_name = ${STAGE_GANHO}) AS reun_ganhas
+        FROM "Bitrix".crm_deal
+      `);
+      const rr0 = (reunRow.rows as any[])[0] || {};
+      const numReunioes = Number(rr0.reunioes) || 0;
+      const taxaConversao = numReunioes > 0 ? (Number(rr0.reun_ganhas) / numReunioes) * 100 : 0;
 
       // ---------- 4. CLOSERS (venda + reuniões no mês) ----------
       const closersRows = await db.execute(sql`
@@ -84,7 +112,9 @@ export function registerGestaoReceitaRoutes(app: Express) {
             AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}), 0) AS pont,
           COUNT(*) FILTER (WHERE d.stage_name = ${STAGE_GANHO}
             AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}) AS deals,
-          COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}) AS reunioes
+          COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}) AS reunioes,
+          COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}
+            AND d.stage_name = ${STAGE_GANHO}) AS reun_ganhas
         FROM "Bitrix".crm_deal d
         JOIN "Bitrix".crm_closers c ON c.id::text = d.closer::text
         WHERE c.active = true
@@ -95,13 +125,14 @@ export function registerGestaoReceitaRoutes(app: Express) {
       const closers = (closersRows.rows as any[])
         .map((r) => {
           const mrr = num(r.mrr), pont = num(r.pont);
+          const deals = Number(r.deals) || 0, reunioes = Number(r.reunioes) || 0;
           return {
             nome: r.nome,
-            mrr, pont,
-            deals: Number(r.deals) || 0,
-            reunioes: Number(r.reunioes) || 0,
+            mrr, pont, deals, reunioes,
             score: mrr + pont / 5, // score do mockup
-            conv: Number(r.reunioes) > 0 ? (Number(r.deals) / Number(r.reunioes)) * 100 : 0,
+            ticket: deals > 0 ? Math.round((mrr + pont) / deals) : 0,
+            // conversão por coorte: das reuniões do mês, % que virou venda (nunca > 100%)
+            conv: reunioes > 0 ? (Number(r.reun_ganhas) / reunioes) * 100 : 0,
           };
         })
         .filter((c) => c.mrr > 0 || c.pont > 0 || c.reunioes > 0)
@@ -111,6 +142,8 @@ export function registerGestaoReceitaRoutes(app: Express) {
       const sdrRows = await db.execute(sql`
         SELECT u.nome AS nome,
           COUNT(*) FILTER (WHERE d.date_create >= ${dIni} AND d.date_create < ${dFim}) AS leads,
+          COUNT(*) FILTER (WHERE d.date_create >= ${dIni} AND d.date_create < ${dFim}
+            AND d.data_reuniao_realizada IS NOT NULL) AS leads_com_reuniao,
           COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}) AS reunioes,
           COALESCE(SUM(d.valor_recorrente::numeric) FILTER (WHERE d.stage_name = ${STAGE_GANHO}
             AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}), 0) AS mrr,
@@ -131,7 +164,8 @@ export function registerGestaoReceitaRoutes(app: Express) {
             nome: r.nome, leads, reunioes,
             mrr: num(r.mrr), pont: num(r.pont),
             valor: num(r.mrr) + num(r.pont),
-            conv: leads > 0 ? (reunioes / leads) * 100 : 0,
+            // conversão por coorte: dos leads do mês, % que teve reunião (nunca > 100%)
+            conv: leads > 0 ? (Number(r.leads_com_reuniao) / leads) * 100 : 0,
           };
         })
         .filter((s) => s.leads > 0 || s.reunioes > 0)
@@ -231,11 +265,23 @@ export function registerGestaoReceitaRoutes(app: Express) {
       `);
       const produtos = (prodRows.rows as any[]).map((r) => {
         const seg = PRODUTO_TO_SEG_MRR[r.produto];
+        const p = r.produto as string;
+        // metas editáveis por produto (override) → orçado = nº contratos × ticket médio meta.
+        // fallback do MRR: segmento do BP (onde mapeável); pontual: só via override.
+        const metaTmMrr = override[`prod_tm_mrr:${p}`] ?? null;
+        const metaCtrMrr = override[`prod_ctr_mrr:${p}`] ?? null;
+        const metaTmPont = override[`prod_tm_pont:${p}`] ?? null;
+        const metaCtrPont = override[`prod_ctr_pont:${p}`] ?? null;
+        const orcadoMrr = metaTmMrr != null && metaCtrMrr != null
+          ? Math.round(metaTmMrr * metaCtrMrr)
+          : (seg ? orc[`vendas_mrr_${seg}`] ?? null : null);
+        const orcadoPont = metaTmPont != null && metaCtrPont != null ? Math.round(metaTmPont * metaCtrPont) : null;
         return {
-          produto: r.produto,
+          produto: p,
           cMrr: Number(r.c_mrr) || 0, mrr: num(r.mrr), tmMrr: num(r.tm_mrr),
           cPont: Number(r.c_pont) || 0, pont: num(r.pont), tmPont: num(r.tm_pont),
-          orcadoMrr: seg ? orc[`vendas_mrr_${seg}`] ?? null : null,
+          metaTmMrr, metaCtrMrr, metaTmPont, metaCtrPont,
+          orcadoMrr, orcadoPont,
         };
       });
 
@@ -285,8 +331,9 @@ export function registerGestaoReceitaRoutes(app: Express) {
         ano,
         mesParcial,
         macro: {
-          vendaMrr: { orcado: orc["vendas_mrr"] || 0, realizado: vMrrReal },
-          vendaPontual: { orcado: orc["vendas_pontual"] || 0, realizado: vPontReal },
+          vendaMrr: { orcado: metaMrr, realizado: vMrrReal, editavel: true, chave: "venda_mrr" },
+          vendaPontual: { orcado: metaPontual, realizado: vPontReal, editavel: true, chave: "venda_pontual" },
+          ticketMrr, ticketPontual, taxaConversao, numReunioes,
           canais,
           cac: {
             custoTotal: { orcado: orc["cac"] || 0, realizado: cacTotalReal },
@@ -322,6 +369,28 @@ export function registerGestaoReceitaRoutes(app: Express) {
     } catch (error) {
       console.error("[api] Error em /api/gestao/receita/detalhe:", error);
       res.status(500).json({ error: "Falha ao montar detalhamento" });
+    }
+  });
+
+  // Salva metas editadas na tela (override do orçado do BP). Body: { mes:"YYYY-MM", metas:[{chave, valor}] }.
+  const CHAVE_META_OK = /^(venda_mrr|venda_pontual|prod_(tm|ctr)_(mrr|pont):.+)$/;
+  app.put("/api/gestao/receita/metas", async (req, res) => {
+    try {
+      const { ano, mesNum } = parseMes(req.body?.mes);
+      const metas = Array.isArray(req.body?.metas) ? req.body.metas : [];
+      const user = (req.user as any)?.email || (req.user as any)?.username || "desconhecido";
+      const validas = metas.filter((m: any) => typeof m?.chave === "string" && CHAVE_META_OK.test(m.chave) && Number.isFinite(Number(m?.valor)));
+      for (const m of validas) {
+        await db.execute(sql`
+          INSERT INTO cortex_core.gestao_receita_metas (chave, ano, mes, valor, updated_by, updated_at)
+          VALUES (${m.chave}, ${ano}, ${mesNum}, ${Number(m.valor)}, ${user}, NOW())
+          ON CONFLICT (chave, ano, mes) DO UPDATE SET valor = EXCLUDED.valor, updated_by = EXCLUDED.updated_by, updated_at = NOW()
+        `);
+      }
+      res.json({ ok: true, salvas: validas.length });
+    } catch (error) {
+      console.error("[api] Error em PUT /api/gestao/receita/metas:", error);
+      res.status(500).json({ error: "Falha ao salvar metas" });
     }
   });
 }

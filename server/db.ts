@@ -2188,6 +2188,27 @@ export async function initializeSalesGoalsTable(): Promise<void> {
   }
 }
 
+// Metas editáveis da página Gestão de Receita — camada de override sobre o orçado do BP.
+export async function initializeGestaoReceitaMetasTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.gestao_receita_metas (
+        id SERIAL PRIMARY KEY,
+        chave TEXT NOT NULL,
+        ano INTEGER NOT NULL,
+        mes INTEGER NOT NULL,
+        valor NUMERIC NOT NULL,
+        updated_by TEXT,
+        updated_at TIMESTAMP DEFAULT NOW(),
+        UNIQUE(chave, ano, mes)
+      )
+    `);
+    console.log('[database] Gestão Receita metas table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing Gestão Receita metas table:', error);
+  }
+}
+
 export async function initializeCupDataHistTable(): Promise<void> {
   try {
     // Verificar se a tabela existe
