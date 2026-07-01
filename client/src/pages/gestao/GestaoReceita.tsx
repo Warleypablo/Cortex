@@ -36,7 +36,7 @@ interface GestaoReceitaData {
   macro: {
     vendaMrr: Stat; vendaPontual: Stat;
     ticketMrr: number; ticketPontual: number; taxaConversao: number; numReunioes: number;
-    canais: { canal: string; canalLabel: string; deals: number; mrr: number; pont: number; total: number; ticket: number }[];
+    canais: { canal: string; canalLabel: string; deals: number; reunioes: number; conv: number; mrr: number; pont: number; total: number; ticketMrr: number; ticketPont: number }[];
     cac: {
       custoTotal: Stat;
       produto: { orcado: number; realizado: number; n: number };
@@ -277,24 +277,24 @@ function SecaoMacro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
       </div>
       <div>
         <BlockHead icon={<Filter className="h-4 w-4" />} title="Resultado por canal de aquisição" />
-        <SectionCard title="Deals ganhos, valor vendido e ticket médio por canal" fonte={<Fonte tipo="bitrix" />}>
+        <SectionCard title="Reuniões, deals ganhos, valor vendido e ticket médio por canal" fonte={<Fonte tipo="bitrix" />}>
           <TableScroll>
             <Table>
               <TableHeader>
                 <TableRow>
-                  <Th left>Canal</Th><Th>Deals</Th><Th>Vendido MRR</Th><Th>Vendido Pont.</Th><Th>Total</Th><Th>Ticket médio</Th>
+                  <Th left>Canal</Th><Th>Reuniões</Th><Th>Deals</Th><Th>Tx conv.</Th><Th>Vendido MRR</Th><Th>Vendido Pont.</Th><Th>Total</Th><Th>Ticket Rec.</Th><Th>Ticket Pont.</Th>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {canais.map((c) => (
                   <TableRow key={c.canal} onClick={() => onDrill({ tipo: "canal", chave: c.canal })} className={rowClick}>
-                    <Td left>{c.canalLabel}</Td><Td>{intBR(c.deals)}</Td><Td>{brl(c.mrr)}</Td><Td>{brl(c.pont)}</Td><Td>{brl(c.total)}</Td><Td>{brl(c.ticket)}</Td>
+                    <Td left>{c.canalLabel}</Td><Td>{intBR(c.reunioes)}</Td><Td>{intBR(c.deals)}</Td><Td>{pct(c.conv)}</Td><Td>{brl(c.mrr)}</Td><Td>{brl(c.pont)}</Td><Td>{brl(c.total)}</Td><Td>{brl(c.ticketMrr)}</Td><Td>{brl(c.ticketPont)}</Td>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableScroll>
-          <Nota>Canal = campo <code>source</code> do Bitrix nos deals ganhos. <b>"(não informado)"</b> é um bucket legítimo — boa parte dos deals não tem origem preenchida no CRM.</Nota>
+          <Nota>Canal = campo <code>source</code> do Bitrix. <b>"(não informado)"</b> é um bucket legítimo — boa parte dos deals não tem origem preenchida no CRM. Tx conv. por coorte: das reuniões realizadas no período, % que virou venda. Ticket Rec./Pont. = valor vendido ÷ deals com valor daquele tipo. Canais com reunião e sem venda aparecem com 0 deals.</Nota>
         </SectionCard>
       </div>
       <div>

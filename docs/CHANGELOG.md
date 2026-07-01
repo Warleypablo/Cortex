@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-01 | feat(gestao-receita): reuniões + taxa de conversão e ticket médio R×P por canal
+
+**O que foi feito:**
+- Tabela "Resultado por canal de aquisição" (/gestao/receita, aba Macro) ganhou as colunas **Reuniões** (realizadas no período) e **Tx conv.** (coorte: das reuniões realizadas no período, % que virou venda — mesma régua dos closers e do KPI macro, nunca >100%).
+- Coluna única "Ticket médio" dividida em **Ticket Rec.** e **Ticket Pont.** — cada um = valor vendido ÷ nº de deals com valor daquele tipo (não dilui por deals só-pontuais/só-MRR, mesma régua dos KPIs macro `ticketMrr`/`ticketPontual`).
+- Query por canal reestruturada com `FILTER` (padrão da query de closers): o `WHERE` agora inclui também deals com reunião no período, então canais que geraram reunião mas não venderam aparecem com 0 deals/0%.
+- Nota do card atualizada explicando coorte, ticket por tipo e canais sem venda.
+
+**Por que:**
+- Pedido do time: enxergar volume de reuniões e conversão por canal (não só deals ganhos) e separar o ticket recorrente do pontual, que têm ordens de grandeza diferentes.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - seção 6 (CANAIS): query com FILTERs + campos `reunioes`, `conv`, `ticketMrr`, `ticketPont` (campo `ticket` removido).
+- `client/src/pages/gestao/GestaoReceita.tsx` - tipo `canais`, cabeçalho/células da tabela e nota.
+
+**Impacto arquitetural:** Nenhum — mesmo endpoint, payload estendido (campo `ticket` só era usado nesta tabela).
+
+---
+
 ## 2026-07-01 | feat(closers): Lifetime Médio por closer com fallback global no detalhamento
 
 **O que foi feito:**

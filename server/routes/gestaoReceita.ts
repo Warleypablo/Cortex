@@ -184,20 +184,42 @@ export function registerGestaoReceitaRoutes(app: Express) {
         .filter((s) => s.leads > 0 || s.reunioes > 0)
         .sort((a, b) => b.valor - a.valor);
 
-      // ---------- 6. CANAIS DE AQUISIÇÃO (deals ganhos por source) ----------
+      // ---------- 6. CANAIS DE AQUISIÇÃO (deals ganhos + reuniões por source) ----------
+      // Inclui canais com reunião no período mas sem venda (deals=0), p/ conversão por canal.
       const canaisRows = await db.execute(sql`
         SELECT COALESCE(NULLIF(source, ''), '(não informado)') AS canal,
-          COUNT(*) AS deals,
-          COALESCE(SUM(valor_recorrente::numeric), 0) AS mrr,
-          COALESCE(SUM(valor_pontual::numeric), 0) AS pont
+          COUNT(*) FILTER (WHERE stage_name = ${STAGE_GANHO}
+            AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}) AS deals,
+          COUNT(*) FILTER (WHERE stage_name = ${STAGE_GANHO}
+            AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim} AND valor_recorrente::numeric > 0) AS deals_mrr,
+          COUNT(*) FILTER (WHERE stage_name = ${STAGE_GANHO}
+            AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim} AND valor_pontual::numeric > 0) AS deals_pont,
+          COALESCE(SUM(valor_recorrente::numeric) FILTER (WHERE stage_name = ${STAGE_GANHO}
+            AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}), 0) AS mrr,
+          COALESCE(SUM(valor_pontual::numeric) FILTER (WHERE stage_name = ${STAGE_GANHO}
+            AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}), 0) AS pont,
+          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}) AS reunioes,
+          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}
+            AND stage_name = ${STAGE_GANHO}) AS reun_ganhas
         FROM "Bitrix".crm_deal
-        WHERE stage_name = ${STAGE_GANHO} AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}
-        GROUP BY 1 ORDER BY 2 DESC
+        WHERE (stage_name = ${STAGE_GANHO} AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim})
+          OR (data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim})
+        GROUP BY 1 ORDER BY 2 DESC, 7 DESC
       `);
       const canais = (canaisRows.rows as any[]).map((r) => {
         const mrr = num(r.mrr), pont = num(r.pont), deals = Number(r.deals) || 0;
+        const dealsMrr = Number(r.deals_mrr) || 0, dealsPont = Number(r.deals_pont) || 0;
+        const reunioes = Number(r.reunioes) || 0;
         // canal = código cru (chave do drill); canalLabel = nome legível do Bitrix (exibição)
-        return { canal: r.canal, canalLabel: sourceLabel(r.canal), deals, mrr, pont, total: mrr + pont, ticket: deals > 0 ? (mrr + pont) / deals : 0 };
+        return {
+          canal: r.canal, canalLabel: sourceLabel(r.canal), deals, mrr, pont, total: mrr + pont,
+          reunioes,
+          // conversão por coorte: das reuniões realizadas no período, % que virou venda (nunca > 100%)
+          conv: reunioes > 0 ? (Number(r.reun_ganhas) / reunioes) * 100 : 0,
+          // ticket médio por tipo: só sobre deals que têm valor daquele tipo (não dilui por deals só-pontuais/só-MRR)
+          ticketMrr: dealsMrr > 0 ? mrr / dealsMrr : 0,
+          ticketPont: dealsPont > 0 ? pont / dealsPont : 0,
+        };
       });
 
       // ---------- 7. FUNIL por segmento (inbound / outbound) ----------
