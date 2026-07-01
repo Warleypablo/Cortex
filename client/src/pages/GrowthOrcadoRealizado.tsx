@@ -25,7 +25,8 @@ const GENERIC_MARKETING_PLATFORMS: Record<string, readonly string[]> = {
   ctrUnico: META_ONLY,                  // CTR de saída único — só Meta
   visualizacoes_pagina: META_ONLY,      // landing_page_views: só o pixel do Meta alimenta
   sessoes: UNIVERSAL,
-  // connect_rate removido do blend: só existe por plataforma (same-source) — ver buildAdsMetrics.
+  connect_rate_ga4: PAID_ONLY,          // Sessões GA4 ÷ Cliques — comparável entre os pagos
+  connect_rate: META_ONLY,              // pixel Meta ÷ Cliques — só same-source (Meta)
   taxa_conversao_pagina: UNIVERSAL,     // aqui é por Sessões (Leads ÷ Sessões)
   taxa_conversao_pagina_mql: UNIVERSAL,
   taxa_conversao_pagina_nmql: UNIVERSAL,
@@ -123,6 +124,7 @@ interface AdsMetrics {
   videoHook: number;
   videoHold: number;
   connectRate: number;
+  connectRateGa4?: number;
   visualizacoesPagina: number;
   sessoes: number;
   leads: number;
@@ -1768,6 +1770,12 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: data.ctrUnico ?? null, percentual: null, format: 'percent' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
+      // Connect Rate GA4 = Sessões GA4 ÷ Cliques (universal, comparável entre canais).
+      // Padronizável — some quando misturado? Não: é PAID_ONLY (todos os pagos têm cliques).
+      { id: 'connect_rate_ga4', name: 'Connect Rate GA4', type: 'formula', orcado: null, realizado: data.connectRateGa4 ?? null, percentual: null, format: 'percent' },
+      // Connect Rate (Pixel) = landing_page_views (pixel Meta) ÷ Cliques. Só same-source
+      // (Meta) faz sentido → META_ONLY. Fica ao lado do GA4 para comparação no 1º momento.
+      { id: 'connect_rate', name: 'Connect Rate (Pixel)', type: 'formula', orcado: null, realizado: data.connectRate ?? null, percentual: null, format: 'percent' },
       // Connect Rate NÃO entra no consolidado de Marketing (blend): ele só faz sentido
       // por plataforma, com numerador e denominador da MESMA fonte. No blend, o
       // numerador (landing_page_views do pixel Meta) e o denominador (cliques de saída
@@ -2539,7 +2547,7 @@ export default function GrowthOrcadoRealizado() {
 
   // Métricas amarelas para a aba Consolidado (filtradas por seção)
   const YELLOW_METRIC_IDS = new Set([
-    'investimento', 'sessoes', 'taxa_conversao_pagina', 'leads', 'mqls', 'cpl', 'cpmql', 'perc_mqls',
+    'investimento', 'sessoes', 'connect_rate_ga4', 'connect_rate', 'taxa_conversao_pagina', 'leads', 'mqls', 'cpl', 'cpmql', 'perc_mqls',
     // MQL
     'mql_ra_perc', 'mql_noshow', 'mql_rr_perc', 'mql_taxa_vendas', 'mql_novos_clientes', 'mql_contratos_ganhos', 'mql_ticket_acel', 'mql_ticket_impl', 'mql_fat_total',
     // Não-MQL

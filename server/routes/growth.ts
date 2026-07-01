@@ -3612,6 +3612,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctrUnicoExposto = onlyInstagram ? null : ctrUnico;
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
+      // Connect Rate GA4 = Sessões (GA4, universal) ÷ Cliques de saída. Padronizável
+      // entre todos os canais (o pixel só o Meta tem). Numerador vem do GA4 (sessões
+      // atribuídas por sessionSource/Medium), denominador da plataforma de ads.
+      const connectRateGa4 = onlyInstagram ? 0 : (cliquesSaida > 0 ? sessoes / cliquesSaida : 0);
       const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPaginaGa4;
       const visualizacoesPaginaPixelExposto = onlyInstagram ? 0 : visualizacoesPagina;
       const sessoesExposto = onlyInstagram ? 0 : sessoes;
@@ -3637,6 +3641,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ctrUnicoAvailable: onlyInstagram ? false : ctrUnicoAvailable,
         cps: cpsExposto,
         connectRate: connectRateExposto,
+        connectRateGa4,
         visualizacoesPagina: visualizacoesPaginaExposto,
         visualizacoesPaginaPixel: visualizacoesPaginaPixelExposto,
         sessoes: sessoesExposto,
