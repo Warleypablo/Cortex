@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-01 | revert: remove Taxa de Conexão; Connect Rate volta a ser só do Meta (pixel)
+
+**O que foi feito:**
+- Removida a "Taxa de Conexão" (Sessões GA4 ÷ Cliques) do consolidado, dos 4 builders por-canal e da Evolução, além dos campos `taxaConexao`/`connectRateGa4` no backend (/ads + 4 endpoints por-plataforma).
+- Connect Rate volta a existir só no Meta (pixel = `landing_page_views` ÷ cliques de saída).
+
+**Por que:** a Taxa de Conexão GA4 dava >100% (Sessões 15.930 > Cliques 12.653) porque o GA4 conta sessões — infladas por retorno/UTM persistindo/multi-sessão — que não são a mesma unidade de "clique que carregou a página". O pixel do Meta (80,83%, captura ~64% das sessões = normal na conta) é a medida correta e same-source. Google/TikTok/LinkedIn não têm o LPV nativo do Meta (TikTok tem métrica própria mas não é sincronizada), então não há connect rate confiável cross-channel hoje.
+
+**Arquivos alterados:**
+- `server/routes/growth.ts`, `client/src/pages/GrowthOrcadoRealizado.tsx`, `client/src/pages/GrowthEvolucaoTemporal.tsx`.
+
+**Impacto arquitetural:** Nenhum — volta ao estado anterior (Connect Rate só-pixel no Meta).
+
+---
+
 ## 2026-07-01 | feat(orcado-realizado): Taxa de Conexão (Sessões GA4 ÷ Cliques) nos 4 canais
 
 **O que foi feito:**
