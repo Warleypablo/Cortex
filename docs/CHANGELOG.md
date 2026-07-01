@@ -1,5 +1,112 @@
 # Changelog
 
+## 2026-07-01 | feat(tiktok): LPV nativo + métricas estendidas; Connect Rate real do TikTok
+
+**O que foi feito:**
+- Probe `scripts/probe-tiktok-metrics.ts` confirmou 25 métricas válidas na conta Turbo, incluindo `total_landing_page_view` (o LPV nativo — o código antes dizia, errado, que o TikTok não expunha).
+- Sync `tiktokAdsSync.ts`: métricas ampliadas p/ o conjunto completo (LPV, reach, frequency, funil de vídeo p25/50/75/100 + 2s/6s, likes/comments/shares/follows/profile_visits/engagements). `raw` guarda tudo; colunas tipadas nos 2 níveis (campanha e anúncio).
+- Migração `server/migrations/2026-07-01-tiktok-ads-extended-metrics.sql` (aditiva) — **aplicada em prod**.
+- Endpoint tiktok-ads: Connect Rate = `total_landing_page_view ÷ cliques` (nativo, ≤100%, same-source) no lugar do proxy GA4 (>100%). UI: linha "Connect Rate" volta pro TikTok.
+
+**Verificado (jun/2026, conta Turbo):** LPV 168 / cliques 307 = **Connect Rate 54,7%** (≤100%). Sync rodou com 0 erros (15 metric rows campanha + 59 anúncio).
+
+**Por que:** dar ao TikTok o mesmo Connect Rate confiável do Meta (chegada na página ÷ cliques), usando a métrica nativa em vez de sessões GA4 (que estouravam 100%). E puxar todas as métricas disponíveis p/ uso futuro.
+
+**Arquivos alterados:**
+- `server/services/tiktokAdsSync.ts`, `server/routes/growth.ts`, `client/src/pages/GrowthOrcadoRealizado.tsx`, `server/migrations/2026-07-01-tiktok-ads-extended-metrics.sql`, `scripts/probe-tiktok-metrics.ts`.
+
+**Impacto arquitetural:** Sync do TikTok passa a capturar o conjunto completo de métricas (raw + colunas). Connect Rate do TikTok deixa de depender do GA4.
+
+---
+
+## 2026-07-01 | revert: remove Taxa de Conexão; Connect Rate volta a ser só do Meta (pixel)
+
+**O que foi feito:**
+- Removida a "Taxa de Conexão" (Sessões GA4 ÷ Cliques) do consolidado, dos 4 builders por-canal e da Evolução, além dos campos `taxaConexao`/`connectRateGa4` no backend (/ads + 4 endpoints por-plataforma).
+- Connect Rate volta a existir só no Meta (pixel = `landing_page_views` ÷ cliques de saída).
+
+**Por que:** a Taxa de Conexão GA4 dava >100% (Sessões 15.930 > Cliques 12.653) porque o GA4 conta sessões — infladas por retorno/UTM persistindo/multi-sessão — que não são a mesma unidade de "clique que carregou a página". O pixel do Meta (80,83%, captura ~64% das sessões = normal na conta) é a medida correta e same-source. Google/TikTok/LinkedIn não têm o LPV nativo do Meta (TikTok tem métrica própria mas não é sincronizada), então não há connect rate confiável cross-channel hoje.
+
+**Arquivos alterados:**
+- `server/routes/growth.ts`, `client/src/pages/GrowthOrcadoRealizado.tsx`, `client/src/pages/GrowthEvolucaoTemporal.tsx`.
+
+**Impacto arquitetural:** Nenhum — volta ao estado anterior (Connect Rate só-pixel no Meta).
+
+---
+
+## 2026-07-01 | feat(orcado-realizado): Taxa de Conexão (Sessões GA4 ÷ Cliques) nos 4 canais
+
+**O que foi feito:**
+- "Connect Rate GA4" renomeado para **"Taxa de Conexão"** e "Connect Rate (Pixel)" para **"Connect Rate (Meta)"**.
+- Backend expõe `taxaConexao` = Sessões GA4 ÷ Cliques nos 4 endpoints por-plataforma (meta/google/tiktok/linkedin-ads). No Meta usa o mesmo denominador (cliques de saída) do Connect Rate do pixel → a comparação isola só o numerador (pixel vs GA4).
+- Frontend: "Taxa de Conexão" passa a aparecer na seção por-canal (Aprofundado) dos 4 canais — corrige a invisibilidade no Meta-sozinho, que é onde a comparação é feita. Meta mostra "Taxa de Conexão" + "Connect Rate (Meta)" lado a lado.
+
+**Por que:** a métrica universal de "do clique, quantos chegaram na página" (velocidade/qualidade da LP). Só o Meta tem pixel (landing_page_views); Google/TikTok/LinkedIn só têm GA4 — então a régua comparável é Sessões GA4 ÷ Cliques. Pesquisa de mercado confirmou que "connect rate" é nativo do Meta (LPV Rate) e o padrão cross-channel é via GA4; sessões > cliques (>100%) sinaliza super-atribuição/UTM, não performance.
+
+**Arquivos alterados:**
+- `server/routes/growth.ts` - `taxaConexao` nos 4 endpoints por-plataforma.
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - linhas Taxa de Conexão nos builders por-canal + tipos.
+- `client/src/pages/GrowthEvolucaoTemporal.tsx` - rename das linhas.
+
+**Impacto arquitetural:** Nenhum — aditivo. Connect Rate segue só-pixel (Meta); Taxa de Conexão é a métrica universal para comparação.
+
+---
+
+## 2026-06-30 | feat(orcado-realizado): Connect Rate GA4 ao lado do pixel
+
+**O que foi feito:**
+- Backend `/ads`: expõe `connectRateGa4` = Sessões (GA4) ÷ Cliques de saída — métrica universal e comparável entre canais. O `connectRate` (pixel Meta ÷ cliques) segue exposto.
+- Orçado x Realizado e Evolução Temporal: nova linha "Connect Rate GA4" (PAID_ONLY, aparece somada no blend dos pagos) ao lado de "Connect Rate (Pixel)" (META_ONLY, só aparece com Meta sozinho).
+
+**Por que:** o Connect Rate hoje é calculado com numeradores de fontes diferentes por canal — Meta usa o pixel (`landing_page_views`), Google usa GA4 (`pageviews`) — o que enviesa a comparação. A saída para padronizar é usar Sessões GA4 ÷ Cliques para todos (o pixel só o Meta tem). Este passo mostra os dois lado a lado antes de migrar o funil para Sessões.
+
+**Nota de tracking:** o GA4 não conta cliques (o denominador vem da plataforma de ads). Ele atribui Sessões ao canal via `sessionSource`/`sessionMedium` (UTMs). Requer `utm_source`=plataforma + `utm_medium`=paid; sem isso a sessão cai em "orgânico/outros" e o Connect Rate do canal zera.
+
+**Arquivos alterados:**
+- `server/routes/growth.ts` - `connectRateGa4` no endpoint /ads.
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - linhas Connect Rate GA4 / (Pixel) + disponibilidade.
+- `client/src/pages/GrowthEvolucaoTemporal.tsx` - idem.
+
+**Impacto arquitetural:** Nenhum — aditivo; prepara a padronização do Connect Rate (e do funil por Sessões).
+
+---
+
+## 2026-06-30 | feat(orcado-realizado): Orçado bottom-up — consolidado = soma dos canais pagos
+
+**O que foi feito:**
+- Novo helper compartilhado `deriveConsolidatedAdsBudget` (`metasBudgetConfig.ts`): soma os canais pagos (Meta/Google/TikTok/LinkedIn Ads) e recalcula as taxas a partir dos totais (CPM/CTR/CPL/CPMQL/%MQLs), espelhando o que o endpoint `/ads` faz no realizado. Absolutos somam; taxas nunca são média.
+- **Orçado x Realizado:** `ORCADO_ADS` deixa de ler o segmento `ads` (digitado à parte) e passa a ser a soma dos canais pagos selecionados (ou todos os 4 sem filtro). O "% Atingido" do bloco somado agora bate com o realizado.
+- **Evolução Temporal:** injeta um segmento `marketing` bottom-up por mês (`budgetsWithMarketing`). Corrige bug latente — a UI lia `b.marketing`, que nunca existia (o budget guarda como `ads`/por-canal), então o orçado da seção Marketing nunca aparecia.
+
+**Por que:** fechar a projeção pedida — "planejo por canal e a soma vira a meta da mídia paga inteira". Antes o consolidado era um número digitado independente que podia divergir da soma dos canais.
+
+**Arquivos alterados:**
+- `client/src/lib/metasBudgetConfig.ts` - helper `deriveConsolidatedAdsBudget`.
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - `ORCADO_ADS` bottom-up por plataformas selecionadas.
+- `client/src/pages/GrowthEvolucaoTemporal.tsx` - `budgetsWithMarketing` (segmento marketing derivado) + consumo no orçado mensal/semanal.
+
+**Impacto arquitetural:** Consolidação de orçado passa a ter fonte única (o helper), simétrica ao realizado do `/ads`. Segmento `ads` digitado à parte deixa de ser lido no consolidado (bottom-up read-only).
+
+---
+
+## 2026-06-30 | feat(orcado-realizado): soma canais num bloco único ao filtrar 2+ plataformas
+
+**O que foi feito:**
+- Nas abas Consolidado e Aprofundado do Orçado x Realizado, selecionar 2+ plataformas deixa de renderizar um bloco por canal e passa a mostrar um único bloco de Marketing consolidado — investimento, sessões, leads, MQLs etc. já somados via `/ads`.
+- O detalhamento canal a canal (com métricas exclusivas, ex.: CTR de saída única / Visualização de Página do Meta) fica reservado ao caso de exatamente 1 plataforma selecionada.
+- Métricas que não existem em todos os canais selecionados somem do bloco somado (interseção via `isMetricVisibleForSelection`), evitando somas sem sentido.
+- Correção de classificação: "Visualizações de Página" (`landing_page_views`) passa de `PAID_ONLY` para `META_ONLY` — só o pixel do Meta a alimenta; antes aparecia no blend das 4 pagas mostrando o número do Meta disfarçado de total. Agora só aparece com Meta sozinho. CPM e CTR de saída seguem `PAID_ONLY` (são totais reais recalculados da soma das 4).
+- Padronização entre abas: revisada a Evolução Temporal contra o OxR. Ela já classificava Visualizações de Página / Tx Conversão por Página como META_ONLY (o OxR é que estava fora — agora alinhado). Único gap encontrado e corrigido: `ads_connect_rate` era `PAID_ONLY` e mostrava número sem sentido no blend (pixel Meta ÷ cliques das 4) → agora `META_ONLY`. As 3 abas (Planejamento, OxR, Evolução) compartilham a mesma taxonomia de canais, os mesmos endpoints de soma (`/ads`,`/mql`,`/nao-mql`) e o mesmo filtro de interseção.
+
+**Por que:** ao filtrar a "mídia paga inteira" (Meta + Google + LinkedIn + TikTok), o usuário quer a projeção somada de cara, não N blocos separados; o detalhe por canal é papel do drill de 1 canal.
+
+**Arquivos alterados:**
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - builders `consolidadoSections` e `aprofundadoFilteredSections` passam a usar a seção somada para 0/2+ plataformas e só detalham por canal em 1 plataforma.
+
+**Impacto arquitetural:** Nenhum — reusa a seção de Marketing consolidada e o filtro de interseção já existentes; só muda o roteamento de qual seção renderizar por quantidade de plataformas.
+
+---
+
 ## 2026-06-30 | feat(gestao): Gestão de Receita v2 — metas editáveis, novas métricas e funil inbound/outbound
 
 **O que foi feito:**

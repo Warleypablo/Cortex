@@ -20,10 +20,21 @@ const TT_BIZ_API = 'https://business-api.tiktok.com/open_api/v1.3';
 // dashboard (a leitura em growth.ts já filtra por esse mesmo ID).
 const TURBO_ADVERTISER_IDS = ['7065303755092131842'];
 
-// Métricas básicas pedidas no report. cpc/cpm/ctr são derivados na leitura.
-const REPORT_METRICS = ['spend', 'impressions', 'clicks', 'conversion'];
-// Métricas a nível de anúncio (inclui video_play_actions → video_views).
-const AD_REPORT_METRICS = ['spend', 'impressions', 'clicks', 'conversion', 'video_play_actions'];
+// Métricas pedidas no report. TODAS confirmadas válidas na conta Turbo via
+// scripts/probe-tiktok-metrics.ts. `raw` (JSONB) guarda a resposta inteira; as
+// colunas tipadas cobrem as principais. cpc/cpm/ctr também vêm da API mas seguimos
+// derivando na leitura (spend/impressions/clicks). total_landing_page_view = LPV
+// nativo → habilita o Connect Rate real do TikTok.
+const REPORT_METRICS = [
+  'spend', 'impressions', 'clicks', 'conversion', 'cost_per_conversion', 'conversion_rate_v2',
+  'ctr', 'cpc', 'cpm', 'reach', 'frequency', 'total_landing_page_view',
+  'video_play_actions', 'video_watched_2s', 'video_watched_6s', 'average_video_play',
+  'video_views_p25', 'video_views_p50', 'video_views_p75', 'video_views_p100',
+  'likes', 'comments', 'shares', 'follows', 'profile_visits', 'engagements',
+  'onsite_shopping', 'total_onsite_shopping_value',
+];
+// Nível de anúncio usa o mesmo conjunto.
+const AD_REPORT_METRICS = REPORT_METRICS;
 
 export interface TiktokAdsResult {
   advertisers: number;
@@ -52,6 +63,20 @@ async function ttGet(path: string, token: string, params: Record<string, any>): 
 }
 
 const numOrNull = (v: any) => (v === undefined || v === null || v === '' ? null : Number(v));
+
+// Colunas estendidas gravadas em ad_metrics_daily e ad_insights_daily (mesma ordem
+// nas duas). video_views (=video_play_actions) é tratado à parte no INSERT.
+const EXT_COLS = 'landing_page_views, reach, frequency, video_watched_2s, video_watched_6s, video_views_p25, video_views_p50, video_views_p75, video_views_p100, average_video_play, likes, comments, shares, follows, profile_visits, engagements';
+const EXT_SET = EXT_COLS.split(', ').map((c) => `${c} = EXCLUDED.${c}`).join(', ');
+const extVals = (met: any) => [
+  numOrNull(met.total_landing_page_view), numOrNull(met.reach), numOrNull(met.frequency),
+  numOrNull(met.video_watched_2s), numOrNull(met.video_watched_6s),
+  numOrNull(met.video_views_p25), numOrNull(met.video_views_p50),
+  numOrNull(met.video_views_p75), numOrNull(met.video_views_p100),
+  numOrNull(met.average_video_play),
+  numOrNull(met.likes), numOrNull(met.comments), numOrNull(met.shares),
+  numOrNull(met.follows), numOrNull(met.profile_visits), numOrNull(met.engagements),
+];
 
 /**
  * @param days janela de dias para trás a sincronizar (default 30).
@@ -151,15 +176,17 @@ export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsRes
               );
               await pool.query(
                 `INSERT INTO tiktok.ad_metrics_daily
-                   (campaign_id, stat_date, advertiser_id, spend, impressions, clicks, conversions, raw, synced_at)
-                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8, NOW())
+                   (campaign_id, stat_date, advertiser_id, spend, impressions, clicks, conversions, video_views, ${EXT_COLS}, raw, synced_at)
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25, NOW())
                  ON CONFLICT (campaign_id, stat_date) DO UPDATE SET
                    advertiser_id = EXCLUDED.advertiser_id, spend = EXCLUDED.spend,
                    impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
-                   conversions = EXCLUDED.conversions, raw = EXCLUDED.raw, synced_at = NOW()`,
+                   conversions = EXCLUDED.conversions, video_views = EXCLUDED.video_views,
+                   ${EXT_SET}, raw = EXCLUDED.raw, synced_at = NOW()`,
                 [campaignId, statDate, String(advertiser_id),
                  numOrNull(met.spend), numOrNull(met.impressions), numOrNull(met.clicks),
-                 numOrNull(met.conversion), JSON.stringify(row)],
+                 numOrNull(met.conversion), numOrNull(met.video_play_actions), ...extVals(met),
+                 JSON.stringify(row)],
               );
               result.metricRows++;
             }
@@ -265,16 +292,17 @@ export async function syncTiktokAds(pool: Pool, days = 30): Promise<TiktokAdsRes
             if (adExists.rowCount === 0) continue;
             await pool.query(
               `INSERT INTO tiktok.ad_insights_daily
-                 (ad_id, stat_date, advertiser_id, spend, impressions, clicks, conversions, video_views, raw, synced_at)
-               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9, NOW())
+                 (ad_id, stat_date, advertiser_id, spend, impressions, clicks, conversions, video_views, ${EXT_COLS}, raw, synced_at)
+               VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22,$23,$24,$25, NOW())
                ON CONFLICT (ad_id, stat_date) DO UPDATE SET
                  advertiser_id = EXCLUDED.advertiser_id, spend = EXCLUDED.spend,
                  impressions = EXCLUDED.impressions, clicks = EXCLUDED.clicks,
                  conversions = EXCLUDED.conversions, video_views = EXCLUDED.video_views,
-                 raw = EXCLUDED.raw, synced_at = NOW()`,
+                 ${EXT_SET}, raw = EXCLUDED.raw, synced_at = NOW()`,
               [adId, statDate, String(advertiser_id),
                numOrNull(met.spend), numOrNull(met.impressions), numOrNull(met.clicks),
-               numOrNull(met.conversion), numOrNull(met.video_play_actions), JSON.stringify(row)],
+               numOrNull(met.conversion), numOrNull(met.video_play_actions), ...extVals(met),
+               JSON.stringify(row)],
             );
             result.adMetricRows++;
           }

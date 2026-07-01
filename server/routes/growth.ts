@@ -4489,6 +4489,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT COALESCE(SUM(spend), 0)::numeric AS investimento,
                COALESCE(SUM(impressions), 0)::bigint AS impressoes,
                COALESCE(SUM(clicks), 0)::bigint AS cliques,
+               COALESCE(SUM(landing_page_views), 0)::bigint AS lpv,
                COALESCE(SUM(conversions), 0)::numeric AS conversoes
         FROM tiktok.ad_metrics_daily
         WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
@@ -4498,16 +4499,16 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const investimento = parseFloat(m.investimento) || 0;
       const impressoes = parseInt(m.impressoes) || 0;
       const cliques = parseInt(m.cliques) || 0;
+      // Landing Page View NATIVO do TikTok (total_landing_page_view) — mesmo conceito
+      // do pixel do Meta: cliques que carregaram a página. É ≤ cliques (same-source).
+      const landingPageViews = parseInt(m.lpv) || 0;
 
-      // Meio do funil via GA4: sessões + visualizações de página do tráfego tiktok_ads
+      // GA4 só para Sessões / Tx Conversão por Sessões (o Connect Rate agora é nativo).
       const ga4 = await getSessionsByPlatform(new Date(startDate), new Date(endDate));
       const sessoes = ga4.byPlatform.tiktok_ads;
-      const visualizacoesPagina = ga4.byPlatformPageViews.tiktok_ads;
-      // Connect Rate (proxy GA4): page views GA4 ÷ cliques. TikTok não expõe
-      // landing_page_views nativo, então não há Connect Rate fiel ≤100% — esta métrica
-      // fica calculada mas NÃO é exibida na UI (ver decisão de manter Connect Rate só
-      // no pixel). Mantida no payload para diagnóstico.
-      const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
+      // Connect Rate NATIVO = total_landing_page_view ÷ cliques (≤100%, same-source),
+      // igual ao pixel do Meta. Substitui o antigo proxy GA4 (sessões÷cliques, >100%).
+      const connectRate = cliques > 0 ? landingPageViews / cliques : 0;
 
       res.json({
         investimento,
@@ -4516,7 +4517,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         conversoes: parseFloat(m.conversoes) || 0,
         cpm: impressoes > 0 ? (investimento / impressoes) * 1000 : 0,
         ctr: impressoes > 0 ? cliques / impressoes : 0,
-        visualizacoesPagina,
+        visualizacoesPagina: landingPageViews,
         sessoes,
         connectRate,
         sessoesAvailable: ga4.available,
