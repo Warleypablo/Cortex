@@ -21,8 +21,14 @@ export interface DetalheResult {
 
 const TIPOS = new Set([
   "venda_mrr", "venda_pontual", "canal", "closer", "sdr", "funil_etapa", "mql",
-  "produto", "churn_motivo", "churn_vendedor", "cac", "custo_comercial", "comissoes",
+  "produto", "churn_motivo", "churn_vendedor", "cac", "custo_comercial", "comissoes", "cac_sub",
 ]);
+
+// rótulos das sub-linhas do CAC no drill (chave = predicado em PREDICADOS_CAC_SUB)
+const CAC_SUB_LABELS: Record<string, string> = {
+  cac_growth: "Growth", cac_ads: "ADs", cac_pre_vendas: "Pré-vendas",
+  cac_vendas: "Vendas", cac_gerencia: "Gerência", cac_eventos: "Eventos",
+};
 export const tipoValido = (t: unknown): t is string => typeof t === "string" && TIPOS.has(t);
 
 const brl = (n: number) => "R$ " + Math.round(n).toLocaleString("pt-BR");
@@ -129,30 +135,42 @@ export async function montarDetalhe(
   }
 
   // ---------- Família CHURN (ClickUp) ----------
+  // cup_churn.nome é o SERVIÇO (subtask); o cliente vem via parent_id -> cup_clientes.task_id.
   if (tipo === "churn_motivo" || tipo === "churn_vendedor") {
     const filtro = tipo === "churn_motivo"
-      ? sql`COALESCE(NULLIF(motivo_cancelamento, ''), '(sem motivo)') = ${chave}`
-      : sql`COALESCE(NULLIF(vendedor, ''), '(sem vendedor)') = ${chave}`;
-    const grupoExpr = tipo === "churn_motivo"
-      ? sql`COALESCE(NULLIF(vendedor, ''), '(sem vendedor)')`
-      : sql`COALESCE(NULLIF(motivo_cancelamento, ''), '(sem motivo)')`;
+      ? sql`COALESCE(NULLIF(ch.motivo_cancelamento, ''), '(sem motivo)') = ${chave}`
+      : sql`COALESCE(NULLIF(ch.vendedor, ''), '(sem vendedor)') = ${chave}`;
     const rs = await rows(db, sql`
-      SELECT nome AS cliente, ${grupoExpr} AS grupo, COALESCE(NULLIF(submotivo_cancelamento, ''), motivo_cancelamento, '') AS detalhe,
-             data_solicitacao_encerramento::date::text AS data, COALESCE(valor_r::numeric, 0) AS valor
-      FROM "Clickup".cup_churn
-      WHERE data_solicitacao_encerramento >= ${dIni} AND data_solicitacao_encerramento < ${dFim} AND ${filtro}
+      SELECT ch.nome AS servico, cl.nome AS cliente,
+             COALESCE(NULLIF(ch.vendedor, ''), '(sem vendedor)') AS vendedor,
+             COALESCE(NULLIF(ch.motivo_cancelamento, ''), '(sem motivo)') AS motivo,
+             NULLIF(ch.submotivo_cancelamento, '') AS submotivo,
+             ch.data_solicitacao_encerramento::date::text AS data, COALESCE(ch.valor_r::numeric, 0) AS valor
+      FROM "Clickup".cup_churn ch
+      LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = ch.parent_id
+      WHERE ch.data_solicitacao_encerramento >= ${dIni} AND ch.data_solicitacao_encerramento < ${dFim} AND ${filtro}
       ORDER BY valor DESC`);
-    const itens: ItemDetalhe[] = rs.map((r) => ({ grupo: r.grupo, nome: r.cliente || "(sem cliente)", detalhe: r.detalhe || "", data: r.data, valor: num(r.valor) }));
+    const itens: ItemDetalhe[] = rs.map((r) => {
+      const sub = r.submotivo && r.submotivo !== r.motivo ? r.submotivo : "";
+      const [grupo, detalhe] = tipo === "churn_vendedor"
+        ? [r.cliente || "(sem cliente)", [r.motivo, sub].filter(Boolean).join(" · ")]
+        : [r.vendedor, [r.cliente || "(sem cliente)", sub].filter(Boolean).join(" · ")];
+      return { grupo, nome: r.servico || "(sem serviço)", detalhe, data: r.data, valor: num(r.valor) };
+    });
     const titulo = tipo === "churn_motivo" ? `Churn · ${chave} · ${label}` : `Churn · vendedor ${chave} · ${label}`;
     return montar(titulo, itens, "brl");
   }
 
   // ---------- Família CUSTOS (Conta Azul, regime caixa) ----------
-  if (tipo === "cac" || tipo === "custo_comercial" || tipo === "comissoes") {
+  if (tipo === "cac" || tipo === "custo_comercial" || tipo === "comissoes" || tipo === "cac_sub") {
+    // cac_sub: chave vem do cliente — só aceita predicados whitelisted (hasOwnProperty
+    // evita cair no prototype com chaves como "constructor").
     const predicado =
       tipo === "cac" ? PREDICADOS_DESPESA.cac :
       tipo === "comissoes" ? PREDICADOS_CAC_SUB.cac_comissoes :
+      tipo === "cac_sub" ? (Object.prototype.hasOwnProperty.call(PREDICADOS_CAC_SUB, chave) ? PREDICADOS_CAC_SUB[chave] : undefined) :
       sql`(${PREDICADOS_CAC_SUB.cac_vendas}) OR (${PREDICADOS_CAC_SUB.cac_pre_vendas})`;
+    if (!predicado) return montar(`CAC · ${chave} · ${label}`, [], "brl");
     const rs = await rows(db, sql`
       SELECT COALESCE(NULLIF(TRIM(nome), ''), NULLIF(TRIM(descricao), ''), '(sem descrição)') AS nome,
              COALESCE(NULLIF(TRIM(categoria_nome), ''), '(sem categoria)') AS grupo,
@@ -163,7 +181,11 @@ export async function montarDetalhe(
         AND (${predicado})
       ORDER BY valor DESC`);
     const itens: ItemDetalhe[] = rs.map((r) => ({ grupo: r.grupo, nome: r.nome, detalhe: "", data: r.data, valor: num(r.valor) }));
-    const titulo = tipo === "cac" ? `CAC (custo total) · ${label}` : tipo === "comissoes" ? `Comissões · ${label}` : `Custo comercial · ${label}`;
+    const titulo =
+      tipo === "cac" ? `CAC (custo total) · ${label}` :
+      tipo === "comissoes" ? `Comissões · ${label}` :
+      tipo === "cac_sub" ? `CAC · ${CAC_SUB_LABELS[chave] || chave} · ${label}` :
+      `Custo comercial · ${label}`;
     return montar(titulo, itens, "brl");
   }
 
