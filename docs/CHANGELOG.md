@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-01 | feat(closers): Lifetime Médio por closer com fallback global no detalhamento
+
+**O que foi feito:**
+- Card "Lifetime Médio (Base)" na tela de detalhamento de closers agora calcula o LT dos contratos encerrados fechados pelo próprio closer, casando `crm_deal.cnpj` → `cup_clientes` → `cup_contratos` (mesma régua do global: `valorr>0`, squads internos excluídos, meses via `/30.44`).
+- Fallback para o LT global quando a amostra do closer tem menos de 10 contratos encerrados (`MIN_CONTRATOS_LT`).
+- Cards "LTV Estimado" e "LTV Total Gerado" passam a usar o mesmo LT base do closer (com fallback).
+- Subtítulo do card indica a fonte usada (contratos do closer × base global) e o nº de contratos da amostra.
+
+**Por que:**
+- O card mostrava o mesmo valor (3,77) para TODOS os closers, pois a query calculava um `AVG` global sem filtrar por closer — parecia uma métrica individual mas não era, confundindo a leitura de performance.
+
+**Arquivos alterados:**
+- `server/routes/comercial.ts` - nova query de LT por closer (CTE por CNPJ), lógica de fallback e novos campos no payload de `/api/closers/detail` (`lifetimeMedioBase`, `lifetimeSource`, `lifetimeContratosBase`).
+- `client/src/pages/DetailClosers.tsx` - cards de Lifetime/LTV passam a usar `lifetimeMedioBase`; subtítulo dinâmico por fonte; interface `CloserDetailMetrics` atualizada.
+
+**Impacto arquitetural:** Nenhum — mesma tabela/endpoint, apenas cálculo adicional e campos novos (retrocompatível: `lifetimeMedioGlobal` mantido).
+
+---
+
 ## 2026-07-01 | feat(tiktok): LPV nativo + métricas estendidas; Connect Rate real do TikTok
 
 **O que foi feito:**
