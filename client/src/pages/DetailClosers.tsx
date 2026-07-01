@@ -100,10 +100,13 @@ interface CloserDetailMetrics {
   ultimoNegocio: string | null;
   diasAtivo: number;
   mediaContratosPorMes: number;
-  // LTV metrics (baseado no lifetime médio global)
+  // LTV metrics (baseado no lifetime médio do closer, com fallback global)
   ltvEstimado: number;
   ltvTotal: number;
   lifetimeMedioGlobal: number;
+  lifetimeMedioBase: number;
+  lifetimeSource: "closer" | "global";
+  lifetimeContratosBase: number;
 }
 
 interface MonthlyData {
@@ -1044,7 +1047,7 @@ export default function DetailClosers() {
                 value={metrics.ltvEstimado || 0}
                 icon={Sparkles}
                 color="amber"
-                subtitle={`Ticket × ${formatDecimal(metrics.lifetimeMedioGlobal || 0)} meses`}
+                subtitle={`Ticket × ${formatDecimal(metrics.lifetimeMedioBase || 0)} meses`}
                 delay={1.2}
                 isCurrency
               />
@@ -1059,10 +1062,14 @@ export default function DetailClosers() {
               />
               <PremiumMetricCard
                 title="Lifetime Médio (Base)"
-                value={parseFloat(formatDecimal(metrics.lifetimeMedioGlobal || 0))}
+                value={parseFloat(formatDecimal(metrics.lifetimeMedioBase || 0))}
                 icon={Clock}
                 color="cyan"
-                subtitle="Média global de contratos"
+                subtitle={
+                  metrics.lifetimeSource === "closer"
+                    ? `Contratos deste closer (${metrics.lifetimeContratosBase} encerrados)`
+                    : `Base global — amostra do closer insuficiente (${metrics.lifetimeContratosBase})`
+                }
                 delay={1.4}
                 extraBadge={
                   <span className="text-xs text-muted-foreground">meses</span>

@@ -538,11 +538,46 @@ export function registerComercialRoutes(app: Express) {
       const globalLtRow = globalLifetimeResult.rows[0] as any;
       const lifetimeMedioGlobal = parseFloat(globalLtRow?.lifetime_medio) || 12;
 
-      // LTV Estimado = Ticket Médio Recorrente × Lifetime Médio Global
-      const ltvEstimado = ticketMedioRecorrente * lifetimeMedioGlobal;
+      // Lifetime médio específico do closer: casa os deals ganhos dele (via CNPJ)
+      // com os contratos encerrados dos respectivos clientes. Usa a MESMA régua do
+      // global (valorr > 0, squads internos excluídos, meses via /30.44).
+      const closerLifetimeResult = await db.execute(sql`
+        WITH closer_cnpjs AS (
+          SELECT DISTINCT regexp_replace(COALESCE(d.cnpj, ''), '\D', '', 'g') AS cnpj_norm
+          FROM "Bitrix".crm_deal d
+          WHERE CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = ${closerId}
+            AND d.stage_name = 'Negócio Ganho'
+            AND LENGTH(regexp_replace(COALESCE(d.cnpj, ''), '\D', '', 'g')) = 14
+        )
+        SELECT
+          AVG(GREATEST(0.5, (c.data_solicitacao_encerramento::date - c.data_inicio::date)::numeric / 30.44)) AS lifetime_medio,
+          COUNT(*) AS total_encerrados
+        FROM closer_cnpjs cc
+        JOIN "Clickup".cup_clientes cl
+          ON regexp_replace(COALESCE(cl.cnpj, ''), '\D', '', 'g') = cc.cnpj_norm
+        JOIN "Clickup".cup_contratos c ON c.id_task = cl.task_id
+        WHERE c.valorr IS NOT NULL AND c.valorr > 0
+          AND c.data_inicio IS NOT NULL AND c.data_solicitacao_encerramento IS NOT NULL
+          AND LOWER(COALESCE(c.squad, '')) NOT IN ('turbo interno', 'squad x', 'interno', 'x')
+      `);
 
-      // LTV Total = MRR Total × Lifetime Médio Global
-      const ltvTotal = valorRecorrente * lifetimeMedioGlobal;
+      // Amostra mínima para confiar no LT do closer; abaixo disso, usa o global.
+      const MIN_CONTRATOS_LT = 10;
+      const closerLtRow = closerLifetimeResult.rows[0] as any;
+      const lifetimeMedioCloserRaw = parseFloat(closerLtRow?.lifetime_medio);
+      const lifetimeContratosBase = parseInt(closerLtRow?.total_encerrados) || 0;
+      const usouFallbackLifetime =
+        lifetimeContratosBase < MIN_CONTRATOS_LT || !Number.isFinite(lifetimeMedioCloserRaw);
+
+      // Base usada nos cards de Lifetime e LTV: LT do closer com fallback global.
+      const lifetimeMedioBase = usouFallbackLifetime ? lifetimeMedioGlobal : lifetimeMedioCloserRaw;
+      const lifetimeSource = usouFallbackLifetime ? "global" : "closer";
+
+      // LTV Estimado = Ticket Médio Recorrente × Lifetime Médio (base do closer)
+      const ltvEstimado = ticketMedioRecorrente * lifetimeMedioBase;
+
+      // LTV Total = MRR Total × Lifetime Médio (base do closer)
+      const ltvTotal = valorRecorrente * lifetimeMedioBase;
 
       res.json({
         closerId: parseInt(closerId as string),
@@ -566,10 +601,13 @@ export function registerComercialRoutes(app: Express) {
         ultimoNegocio: ultimoNegocio ? new Date(ultimoNegocio).toISOString() : null,
         diasAtivo,
         mediaContratosPorMes,
-        // LTV metrics (baseado no lifetime médio global dos contratos)
+        // LTV metrics (baseado no lifetime médio do closer, com fallback global)
         ltvEstimado,
         ltvTotal,
-        lifetimeMedioGlobal
+        lifetimeMedioGlobal,
+        lifetimeMedioBase,
+        lifetimeSource,
+        lifetimeContratosBase
       });
     } catch (error) {
       console.error("[api] Error fetching closer detail:", error);
