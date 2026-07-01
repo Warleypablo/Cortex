@@ -12,10 +12,10 @@ interface DetalheResp { titulo: string; subtitulo: string; total: number; unidad
 
 const fmt = (v: number) => "R$ " + Math.round(v).toLocaleString("pt-BR");
 
-export function GestaoReceitaDetalhe({ drill, mes, onClose }: { drill: DrillRef | null; mes: string; onClose: () => void }) {
+export function GestaoReceitaDetalhe({ drill, de, ate, onClose }: { drill: DrillRef | null; de: string; ate: string; onClose: () => void }) {
   const aberto = drill !== null;
   const { data, isLoading, error } = useQuery<DetalheResp>({
-    queryKey: ["/api/gestao/receita/detalhe", { tipo: drill?.tipo ?? "", chave: drill?.chave ?? "", mes }],
+    queryKey: ["/api/gestao/receita/detalhe", { tipo: drill?.tipo ?? "", chave: drill?.chave ?? "", de, ate }],
     enabled: aberto,
   });
   const isInt = data?.unidade === "int";
