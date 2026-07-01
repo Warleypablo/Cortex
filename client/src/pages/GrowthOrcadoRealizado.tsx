@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, Music, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS, UNIVERSAL, PAID_ONLY, META_ONLY, isMetricVisibleForSelection } from "@/lib/metasBudgetConfig";
+import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS, UNIVERSAL, PAID_ONLY, META_ONLY, PAID_PLATFORMS, isMetricVisibleForSelection, deriveConsolidatedAdsBudget } from "@/lib/metasBudgetConfig";
 
 // Disponibilidade por plataforma das métricas da seção genérica de Marketing
 // (blend consolidado). Só aparece a métrica que existe em TODAS as plataformas
@@ -801,7 +801,22 @@ export default function GrowthOrcadoRealizado() {
 
   const ORCADO_MQL = useMemo(() => ({ ...DEFAULT_ORCADO_MQL, ...(budgetsData?.mql || {}) }), [budgetsData]);
   const ORCADO_NAO_MQL = useMemo(() => ({ ...DEFAULT_ORCADO_NAO_MQL, ...(budgetsData?.nao_mql || {}) }), [budgetsData]);
-  const ORCADO_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_ADS, ...(budgetsData?.ads || {}) }), [budgetsData]);
+  // Orçado bottom-up: o consolidado de mídia paga = SOMA dos canais pagos selecionados
+  // (ou todos os 4 quando sem filtro de plataforma). Absolutos somam, taxas recalculam
+  // dos totais — mesma lógica do realizado (/ads). Substitui o antigo segmento 'ads'
+  // digitado à parte, garantindo que a soma dos canais planejados = meta da mídia paga.
+  const ORCADO_ADS = useMemo(() => {
+    const paidSel = selectedPlataformas.filter((p) => (PAID_PLATFORMS as readonly string[]).includes(p));
+    const channelKeys = selectedPlataformas.length === 0 ? [...PAID_PLATFORMS] : paidSel;
+    const perChannel: Record<string, Record<string, number>> = {
+      meta_ads: { ...DEFAULT_ORCADO_META_ADS, ...(budgetsData?.meta_ads || {}) },
+      google_ads: { ...DEFAULT_ORCADO_GOOGLE_ADS, ...(budgetsData?.google_ads || {}) },
+      tiktok_ads: { ...DEFAULT_ORCADO_TIKTOK_ADS, ...(budgetsData?.tiktok_ads || {}) },
+      linkedin_ads: { ...DEFAULT_ORCADO_LINKEDIN_ADS, ...(budgetsData?.linkedin_ads || {}) },
+    };
+    const inputs = channelKeys.map((k) => perChannel[k]).filter(Boolean);
+    return { ...DEFAULT_ORCADO_ADS, ...deriveConsolidatedAdsBudget(inputs) };
+  }, [budgetsData, selectedPlataformas]);
   // Platform-specific budgets
   const ORCADO_META_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_META_ADS, ...(budgetsData?.meta_ads || {}) }), [budgetsData]);
   const ORCADO_GOOGLE_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_GOOGLE_ADS, ...(budgetsData?.google_ads || {}) }), [budgetsData]);

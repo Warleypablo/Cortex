@@ -19,7 +19,9 @@ import {
   UNIVERSAL,
   PAID_ONLY,
   META_ONLY,
+  PAID_PLATFORMS,
   isMetricVisibleForSelection,
+  deriveConsolidatedAdsBudget,
 } from "@/lib/metasBudgetConfig";
 import { MultiSelect } from "@/components/ui/multi-select";
 import { cn } from "@/lib/utils";
@@ -642,6 +644,28 @@ export default function GrowthEvolucaoTemporal() {
     },
   });
 
+  // Orçado bottom-up: injeta em cada mês um segmento `marketing` = SOMA dos canais
+  // pagos (ou todos os 4 sem filtro), recalculando as taxas dos totais. O budgets/year
+  // guarda os canais separados (meta_ads/google_ads/...) mas não um consolidado; sem
+  // isto o orçado da seção Marketing ficaria em branco. Espelha o ORCADO_ADS do OxR.
+  const budgetsWithMarketing = useMemo<Record<string, BudgetMonth> | undefined>(() => {
+    if (!budgetsYear) return budgetsYear;
+    const paidSel = selectedPlataformas.filter((p) => (PAID_PLATFORMS as readonly string[]).includes(p));
+    const channelKeys = selectedPlataformas.length === 0 ? [...PAID_PLATFORMS] : paidSel;
+    const out: Record<string, BudgetMonth> = {};
+    for (const [mes, segs] of Object.entries(budgetsYear)) {
+      const perChannel: Record<string, Record<string, number>> = {
+        meta_ads: segs.meta_ads || {},
+        google_ads: segs.google_ads || {},
+        tiktok_ads: segs.tiktok_ads || {},
+        linkedin_ads: segs.linkedin_ads || {},
+      };
+      const inputs = channelKeys.map((k) => perChannel[k]).filter(Boolean);
+      out[mes] = { ...segs, marketing: deriveConsolidatedAdsBudget(inputs) };
+    }
+    return out;
+  }, [budgetsYear, selectedPlataformas]);
+
   // Fan-out: 12 × 3 = 36 fetches
   const monthlyQueries = useQueries({
     queries: buckets.flatMap((b) => ([
@@ -802,9 +826,9 @@ export default function GrowthEvolucaoTemporal() {
     const realizado = m.realizado(data);
     let orcado: number | null = null;
     if (col.kind === "month") {
-      orcado = m.orcado((budgetsYear?.[bKey] || {}) as BudgetMonth);
+      orcado = m.orcado((budgetsWithMarketing?.[bKey] || {}) as BudgetMonth);
     } else {
-      orcado = prorateBudgetToWeek(budgetsYear, col.week, m.orcado);
+      orcado = prorateBudgetToWeek(budgetsWithMarketing, col.week, m.orcado);
     }
     const pct =
       orcado !== null && orcado !== 0 && realizado !== null
