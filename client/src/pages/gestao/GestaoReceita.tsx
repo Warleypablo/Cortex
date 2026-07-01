@@ -46,8 +46,8 @@ interface GestaoReceitaData {
   pessoas: { custoComercial: Stat; comissoes: Stat; closers: CloserRow[]; sdrs: SdrRow[] };
   micro: { produtos: ProdutoRow[]; vendedores: CloserRow[]; sdrs: SdrRow[] };
   funil: {
-    inbound: { etapa: string; valor: number }[];
-    outbound: { etapa: string; valor: number }[];
+    inbound: { etapa: string; valor: number; mql: number }[];
+    outbound: { etapa: string; valor: number; mql: number }[];
     mql: { classe: string; leads: number; rr: number; ganhos: number }[];
     investimento: { metaAdsSpend: number; adsContaAzul: number; leadsInbound: number; mqlsInbound: number; cpl: number; cplMq: number };
   };
@@ -407,53 +407,77 @@ function SecaoMicro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
   );
 }
 
-// barras de um funil (Lead→RA→RR→Venda), clicáveis com drill segmentado
-function FunilBarras({ etapas, seg, onDrill }: { etapas: { etapa: string; valor: number }[]; seg: "inbound" | "outbound"; onDrill: (dr: DrillRef) => void }) {
+// funil Lead→RA→RR→Venda; se `empilhado`, cada barra mostra composição MQL (verde) / NMQL (cinza)
+function FunilView({ etapas, seg, empilhado, onDrill }: { etapas: { etapa: string; valor: number; mql: number }[]; seg: "inbound" | "outbound"; empilhado: boolean; onDrill: (dr: DrillRef) => void }) {
   const topo = etapas[0]?.valor || 1;
   const etapaChave = ["lead", "ra", "rr", "venda"];
+  const globalConv = topo ? (etapas[etapas.length - 1].valor / topo) * 100 : 0;
   return (
-    <div className="flex flex-col gap-2">
-      {etapas.map((e, i) => {
-        const prev = i > 0 ? etapas[i - 1].valor : null;
-        const convEtapa = prev ? (e.valor / prev) * 100 : null;
-        const convAcum = (e.valor / topo) * 100;
-        return (
-          <div
-            key={e.etapa}
-            onClick={() => onDrill({ tipo: "funil_etapa", chave: `${seg}:${etapaChave[i]}` })}
-            className="grid grid-cols-[130px_1fr_150px] items-center gap-3 rounded-md cursor-pointer transition hover:bg-gray-50 dark:hover:bg-zinc-800/50"
-          >
-            <span className="text-xs font-semibold text-gray-600 dark:text-zinc-300">{e.etapa}</span>
-            <div className="h-8 overflow-hidden rounded-md bg-gray-100 dark:bg-zinc-800">
-              <div className="flex h-full items-center justify-end rounded-md bg-gradient-to-r from-teal-400 to-teal-600 px-2 text-xs font-bold tabular-nums text-white" style={{ width: Math.max(convAcum, 6) + "%" }}>
-                {intBR(e.valor)}
+    <>
+      {empilhado && (
+        <div className="mb-3 flex flex-wrap items-center gap-4 text-xs">
+          <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-zinc-300"><span className="h-3 w-3 rounded bg-gradient-to-r from-teal-400 to-teal-600" /> MQL</span>
+          <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-zinc-300"><span className="h-3 w-3 rounded bg-gray-300 dark:bg-zinc-600" /> NMQL (não-MQL)</span>
+          <span className="ml-auto inline-flex items-center gap-1.5 rounded-md bg-teal-50 px-2.5 py-1 font-semibold text-teal-700 dark:bg-teal-950 dark:text-teal-300">Conversão Lead→Venda <b className="tabular-nums">{pct(globalConv)}</b></span>
+        </div>
+      )}
+      <div className="flex flex-col gap-2">
+        {etapas.map((e, i) => {
+          const prev = i > 0 ? etapas[i - 1].valor : null;
+          const convEtapa = prev ? (e.valor / prev) * 100 : null;
+          const convAcum = (e.valor / topo) * 100;
+          const mqlPct = e.valor ? (e.mql / e.valor) * 100 : 0;
+          return (
+            <div
+              key={e.etapa}
+              onClick={() => onDrill({ tipo: "funil_etapa", chave: `${seg}:${etapaChave[i]}` })}
+              className="grid grid-cols-[130px_1fr_150px] items-center gap-3 rounded-md cursor-pointer transition hover:bg-gray-50 dark:hover:bg-zinc-800/50"
+            >
+              <span className="text-xs font-semibold text-gray-600 dark:text-zinc-300">{e.etapa}</span>
+              <div className="flex items-center gap-2">
+                <div className="flex h-8 overflow-hidden rounded-md bg-gray-100 dark:bg-zinc-800" style={{ width: Math.max(convAcum, 5) + "%" }}>
+                  {empilhado ? (
+                    <>
+                      <div className="flex h-full items-center justify-center bg-gradient-to-r from-teal-400 to-teal-600 text-[10px] font-bold text-white" style={{ width: mqlPct + "%" }}>{mqlPct >= 18 ? Math.round(mqlPct) + "%" : ""}</div>
+                      <div className="flex h-full items-center justify-center bg-gray-300 text-[10px] font-bold text-gray-600 dark:bg-zinc-600 dark:text-zinc-200" style={{ width: 100 - mqlPct + "%" }}>{100 - mqlPct >= 18 ? Math.round(100 - mqlPct) + "%" : ""}</div>
+                    </>
+                  ) : (
+                    <div className="h-full w-full bg-gradient-to-r from-teal-400 to-teal-600" />
+                  )}
+                </div>
+                <span className="shrink-0 text-xs font-bold tabular-nums text-gray-900 dark:text-white">{intBR(e.valor)}</span>
               </div>
+              <span className="text-right text-xs tabular-nums text-gray-500 dark:text-zinc-400">
+                {convEtapa != null ? <><b className="text-gray-800 dark:text-zinc-100">{pct(convEtapa)}</b> etapa · </> : "topo · "}{pct(convAcum)} acum.
+              </span>
             </div>
-            <span className="text-right text-xs tabular-nums text-gray-500 dark:text-zinc-400">
-              {convEtapa != null ? <><b className="text-gray-800 dark:text-zinc-100">{pct(convEtapa)}</b> etapa · </> : "topo · "}{pct(convAcum)} acum.
-            </span>
-          </div>
-        );
-      })}
-    </div>
+          );
+        })}
+      </div>
+    </>
   );
 }
 
 function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
-  const { inbound, outbound, mql, investimento: inv } = d.funil;
-  const totalLeadsMql = mql.reduce((a, m) => a + m.leads, 0);
+  const { inbound, outbound, investimento: inv } = d.funil;
+  const leadsInb = inbound[0]?.valor || 0;
+  const mqlInb = inbound[0]?.mql || 0;
   return (
     <div className="space-y-5">
       <div>
-        <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil Inbound — Lead → Reunião → Venda" />
-        <SectionCard title="Origem na régua de inbound (WEB/WEBFORM/ADVERTISING/CALL/EMAIL…)" fonte={<Fonte tipo="bitrix" />}>
-          <FunilBarras etapas={inbound} seg="inbound" onDrill={onDrill} />
+        <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil Inbound — Lead → RA → RR → Venda" />
+        <SectionCard title="Composição MQL / NMQL por etapa · origem inbound (WEBFORM/WEB/ADVERTISING/CALL/EMAIL…)" fonte={<Fonte tipo="bitrix" />}>
+          <FunilView etapas={inbound} seg="inbound" empilhado onDrill={onDrill} />
+          <Nota>
+            <AlertTriangle className="mr-1 inline h-3.5 w-3.5 text-amber-500" />
+            <b>MQL</b> = campo <code>mql</code> preenchido no Bitrix; <b>NMQL</b> = o resto (inclui não-classificados). Hoje só {leadsInb > 0 ? pct((mqlInb / leadsInb) * 100) : "—"} dos leads inbound estão marcados como MQL — a fatia verde fica pequena porque o CRM classifica poucos.
+          </Nota>
         </SectionCard>
       </div>
       <div>
-        <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil Outbound — Lead → Reunião → Venda" />
+        <BlockHead icon={<Filter className="h-4 w-4" />} title="Funil Outbound — Lead → RA → RR → Venda" />
         <SectionCard title="Prospecção ativa / demais origens (inclui deals sem origem preenchida)" fonte={<Fonte tipo="bitrix" />}>
-          <FunilBarras etapas={outbound} seg="outbound" onDrill={onDrill} />
+          <FunilView etapas={outbound} seg="outbound" empilhado={false} onDrill={onDrill} />
         </SectionCard>
       </div>
       <div>
@@ -465,30 +489,6 @@ function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillR
           <KpiCard label="CPL-MQ" valor={brl(inv.cplMq)} sub={`spend Meta ÷ ${intBR(inv.mqlsInbound)} MQLs`} fonte={<Fonte tipo="meta" />} />
         </div>
         <Nota><b>Investimento Meta Ads</b> = spend do mês (<code>meta_ads.meta_insights_daily</code>) — <b>não vem do Bitrix</b>. <b>ADs (Conta Azul)</b> = o que saiu do caixa na categoria 06.06.01 (inclui Google/outros). <b>CPL/CPL-MQ</b> são aproximados: dividem o spend do Meta por <b>todos</b> os leads/MQLs inbound (não só os de mídia paga) — 92% dos leads estão sem UTM no Bitrix, então não dá pra isolar os que vieram do Meta.</Nota>
-      </div>
-      <div>
-        <BlockHead icon={<Filter className="h-4 w-4" />} title="Composição MQL / NMQL por etapa" />
-        <SectionCard title="Leads, reuniões realizadas e ganhos por classificação" fonte={<Fonte tipo="bitrix" />}>
-          <TableScroll>
-            <Table>
-              <TableHeader>
-                <TableRow><Th left>Classificação</Th><Th>Leads</Th><Th>Reuniões realizadas</Th><Th>Ganhos</Th></TableRow>
-              </TableHeader>
-              <TableBody>
-                {mql.map((m) => (
-                  <TableRow key={m.classe} onClick={() => onDrill({ tipo: "mql", chave: m.classe })} className={rowClick}>
-                    <Td left>{m.classe}</Td><Td>{intBR(m.leads)}</Td><Td>{intBR(m.rr)}</Td><Td>{intBR(m.ganhos)}</Td>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableScroll>
-          <Nota>
-            <AlertTriangle className="mr-1 inline h-3.5 w-3.5 text-amber-500" />
-            A classificação MQL/NMQL depende do campo <code>mql</code> no Bitrix, preenchido em poucos leads
-            ({totalLeadsMql > 0 ? pct((mql.find((m) => m.classe === "(sem classificação)")?.leads || 0) / totalLeadsMql * 100) : "—"} sem classificação no mês). Os números refletem o CRM como está hoje.
-          </Nota>
-        </SectionCard>
       </div>
     </div>
   );
