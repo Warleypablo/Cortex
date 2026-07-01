@@ -19,6 +19,8 @@ interface PlatformData {
   investimento: number | null;
   sessoes: number | null;
   taxaConversao: number | null;
+  taxaConversaoMql: number | null;
+  taxaConversaoNmql: number | null;
   leads: number;
   mqls: number;
   cpl: number | null;
@@ -327,6 +329,12 @@ export default function PerformancePlataformas() {
       {renderCell(row.investimento, comp?.investimento ?? null, 'investimento', formatCurrency)}
       {renderCell(row.sessoes, comp?.sessoes ?? null, 'sessoes', formatNumber)}
       {renderCell(row.taxaConversao, comp?.taxaConversao ?? null, 'taxaConversao', formatPercent, getCellClassName('taxaConversao', row.taxaConversao))}
+      {expandedGroups.has('taxaConv') && (
+        <>
+          {renderCell(row.taxaConversaoMql, comp?.taxaConversaoMql ?? null, 'taxaConversaoMql', formatPercent)}
+          {renderCell(row.taxaConversaoNmql, comp?.taxaConversaoNmql ?? null, 'taxaConversaoNmql', formatPercent)}
+        </>
+      )}
       {renderCell(row.leads, comp?.leads ?? null, 'leads', formatNumber)}
       {renderCell(row.mqls, comp?.mqls ?? null, 'mqls', formatNumber)}
       {renderCell(row.cpl, comp?.cpl ?? null, 'cpl', formatCurrency, getCellClassName('cpl', row.cpl), true)}
@@ -478,7 +486,10 @@ export default function PerformancePlataformas() {
                     <th className="p-2 text-left sticky left-0 bg-muted/50 z-30 min-w-[260px]">Canal / Source / Campanha</th>
                     <SortableHeader column="investimento" label="Investimento" />
                     <SortableHeader column="sessoes" label="Sessões" />
-                    <SortableHeader column="taxaConversao" label="Taxa Conv." />
+                    <GroupableHeader group="taxaConv" label="Taxa Conv." column="taxaConversao">
+                      <SortableHeader column="taxaConversaoMql" label="Conv. MQL %" />
+                      <SortableHeader column="taxaConversaoNmql" label="Conv. NMQL %" />
+                    </GroupableHeader>
                     <SortableHeader column="leads" label="Leads" />
                     <SortableHeader column="mqls" label="MQLs" />
                     <SortableHeader column="cpl" label="CPL" />

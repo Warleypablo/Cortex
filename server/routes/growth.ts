@@ -2111,12 +2111,17 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         receitaPontual: number; receitaRecorrente: number; contratos: number;
         investimento: number | null; sessoes: number | null;
         leadTimeSum: number; leadTimeCount: number;
+        // Leads/MQLs de escopos que têm sessões (carimbados no nível source). Numerador
+        // da Taxa de Conversão de Sessões — evita inflar o total misturando leads
+        // orgânicos/referral (sem sessão) com as sessões só-de-mídia-paga.
+        leadsSessao: number; mqlsSessao: number;
       };
       const emptyRaw = (): Raw => ({
         leads: 0, mqls: 0, ra: 0, raMql: 0, raNmql: 0, rr: 0, rrMql: 0, rrNmql: 0,
         vendas: 0, vendasMql: 0, vendasNmql: 0, clientesUnicos: 0,
         receitaPontual: 0, receitaRecorrente: 0, contratos: 0,
         investimento: null, sessoes: null, leadTimeSum: 0, leadTimeCount: 0,
+        leadsSessao: 0, mqlsSessao: 0,
       });
       const sumN = (a: number | null, b: number | null): number | null =>
         (a === null && b === null) ? null : (a ?? 0) + (b ?? 0);
@@ -2128,6 +2133,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         acc.receitaPontual += x.receitaPontual; acc.receitaRecorrente += x.receitaRecorrente; acc.contratos += x.contratos;
         acc.investimento = sumN(acc.investimento, x.investimento); acc.sessoes = sumN(acc.sessoes, x.sessoes);
         acc.leadTimeSum += x.leadTimeSum; acc.leadTimeCount += x.leadTimeCount;
+        acc.leadsSessao += x.leadsSessao; acc.mqlsSessao += x.mqlsSessao;
       };
 
       // Deriva as métricas exibidas a partir dos contadores brutos agregados.
@@ -2137,7 +2143,11 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         return {
           investimento: inv !== null ? Math.round(inv) : null,
           sessoes: r.sessoes !== null ? Math.round(r.sessoes) : null,
-          taxaConversao: r.sessoes && r.sessoes > 0 && r.leads > 0 ? parseFloat(((r.leads / r.sessoes) * 100).toFixed(2)) : null,
+          // Numerador = leads de escopos com sessão (leadsSessao), não todos os leads:
+          // no total, leads orgânicos/referral não vieram das sessões de mídia paga.
+          taxaConversao: r.sessoes && r.sessoes > 0 && r.leadsSessao > 0 ? parseFloat(((r.leadsSessao / r.sessoes) * 100).toFixed(2)) : null,
+          taxaConversaoMql: r.sessoes && r.sessoes > 0 && r.mqlsSessao > 0 ? parseFloat(((r.mqlsSessao / r.sessoes) * 100).toFixed(2)) : null,
+          taxaConversaoNmql: r.sessoes && r.sessoes > 0 && (r.leadsSessao - r.mqlsSessao) > 0 ? parseFloat((((r.leadsSessao - r.mqlsSessao) / r.sessoes) * 100).toFixed(2)) : null,
           leads: r.leads,
           mqls: r.mqls,
           cpl: inv !== null && inv > 0 && r.leads > 0 ? Math.round(inv / r.leads) : null,
@@ -2308,7 +2318,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // ---- Montar árvore: medium → source → campaign → term → content ----
       const MEDIUM_LABELS: Record<string, string> = {
         paid: 'Mídia Paga', organic: 'Orgânico',
-        victor: 'Victor (canal próprio)', andre: 'André (canal próprio)', rodrigo: 'Rodrigo (canal próprio)',
+        victor: 'Victor', andre: 'André', rodrigo: 'Rodrigo',
         crm: 'CRM', eventos: 'Eventos', referral: 'Referral', outbound: 'Outbound', outros: 'Outros',
       };
       // Sócios (figuras-exceção) entram logo após Orgânico — dimensão de 1ª ordem (Constituição UTM §3.7).
@@ -2388,6 +2398,13 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           return { child, out: r.out, agg: r.agg, leads: r.agg.leads };
         });
         built.sort((a, b) => (a.child.order - b.child.order) || (b.leads - a.leads) || a.child.name.localeCompare(b.child.name));
+        // Carimba leads/MQLs com-sessão no nível source: sessões só existem em sources
+        // de mídia paga (Meta/Google). Todo lead sob um source com sessão conta pro
+        // numerador da Taxa de Conversão; sobe agregado via addRaw pros mediums e total.
+        if (node.level === 'source' && (agg.sessoes ?? 0) > 0) {
+          agg.leadsSessao = agg.leads;
+          agg.mqlsSessao = agg.mqls;
+        }
         // Poda recursiva: descarta filhos cuja subárvore inteira está zerada (esqueleto canônico sem dados).
         const kept = built.filter((b) => hasSignal(b.agg));
         const out = {
