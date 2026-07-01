@@ -12,15 +12,18 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS, UNIVERSAL, PAID_ONLY, META_ONLY, isMetricVisibleForSelection } from "@/lib/metasBudgetConfig";
 
 // Disponibilidade por plataforma das métricas da seção genérica de Marketing
-// (Aprofundado sem filtro). Métricas só-pagas (CPM/CTR/VdP/Connect Rate) não
-// existem em todo canal e não devem aparecer no blend consolidado. As demais
-// seções vêm do CRM e independem de plataforma. IDs não listados → UNIVERSAL.
+// (blend consolidado). Só aparece a métrica que existe em TODAS as plataformas
+// selecionadas (interseção). CPM/CTR de saída são totais reais da mídia paga
+// (recalculados das impressões/cliques somados das 4) → PAID_ONLY. Visualizações
+// de Página e CTR único vêm SÓ do pixel/relatório do Meta → META_ONLY: aparecem
+// com Meta sozinho e somem ao somar 2+ (senão mostrariam o número do Meta
+// disfarçado de total). IDs não listados → UNIVERSAL.
 const GENERIC_MARKETING_PLATFORMS: Record<string, readonly string[]> = {
   investimento: UNIVERSAL,
   cpm: PAID_ONLY,
-  ctr: PAID_ONLY,                       // CTR de saída
+  ctr: PAID_ONLY,                       // CTR de saída — total real (soma das 4)
   ctrUnico: META_ONLY,                  // CTR de saída único — só Meta
-  visualizacoes_pagina: PAID_ONLY,
+  visualizacoes_pagina: META_ONLY,      // landing_page_views: só o pixel do Meta alimenta
   sessoes: UNIVERSAL,
   // connect_rate removido do blend: só existe por plataforma (same-source) — ver buildAdsMetrics.
   taxa_conversao_pagina: UNIVERSAL,     // aqui é por Sessões (Leads ÷ Sessões)
