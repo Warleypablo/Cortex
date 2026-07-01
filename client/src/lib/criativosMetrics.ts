@@ -77,8 +77,15 @@ export interface CriativoData {
   ctr: number | null;
   ctrUnico: number | null;
   cpm: number | null;
+  cpc: number | null;              // custo por clique = investimento / cliques
   connectRate: number | null;
   taxaConversao: number | null;
+  // Métricas nativas da plataforma (pixel/tag) — Google/TikTok. Todas somáveis:
+  // razão de contadores somados. Meta usa o CRM (não preenche estas).
+  convRate: number | null;         // conversões plataforma / cliques
+  cpa: number | null;              // custo / conversão plataforma
+  roasPlataforma: number | null;   // valor conv. plataforma / investimento
+  videoViewRate: number | null;    // video views / impressões
   leads: number;
   cpl: number | null;
   mql: number;
@@ -273,8 +280,14 @@ function computeDerived(t: RawTotals) {
     receitaRecorrente: t.receitaRecorrente,
 
     cpm: t.impressions > 0 ? Math.round((inv / t.impressions) * 1000) : null,
+    cpc: t.outboundClicks > 0 ? r2(inv / t.outboundClicks) : null,
     frequency: t.reach > 0 ? r2(t.impressions / t.reach) : null,
     ctr: t.impressions > 0 && t.outboundClicks > 0 ? r2((t.outboundClicks / t.impressions) * 100) : null,
+    // Nativas da plataforma (Google/TikTok) — razão de contadores somados, somáveis em qualquer nível.
+    convRate: t.outboundClicks > 0 && t.conversions > 0 ? r2((t.conversions / t.outboundClicks) * 100) : null,
+    cpa: t.conversions > 0 ? Math.round(inv / t.conversions) : null,
+    roasPlataforma: inv > 0 && t.conversionValue > 0 ? r2(t.conversionValue / inv) : null,
+    videoViewRate: t.impressions > 0 && t.videoViews > 0 ? r2((t.videoViews / t.impressions) * 100) : null,
     // CTR de saída único = unique_outbound_clicks / reach (Meta-only; demais → null)
     ctrUnico: t.reach > 0 && t.uniqueOutboundClicks > 0 ? r2((t.uniqueOutboundClicks / t.reach) * 100) : null,
     videoHook: t.impressions > 0 && t.video3sec > 0 ? r2((t.video3sec / t.impressions) * 100) : null,

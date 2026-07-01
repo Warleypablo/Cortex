@@ -53,12 +53,16 @@ export const ALL_COLUMNS: ColumnDef[] = [
   C("investimento", "Invest", "Investimento", "currency", { defaultWidth: 104 }),
   C("orcamentoDiario", "Orçamento", "Investimento", "currency", { defaultWidth: 116 }),
   C("cpm", "CPM", "Investimento", "currency", { color: true, invert: true }),
+  // CPC de saída = investimento / cliques de saída. Universal (consistente com "CTR de saída").
+  C("cpc", "CPC", "Investimento", "currency", { color: true, invert: true, defaultVisible: false }),
   // Vídeo
   // Hook/Hold: Meta usa 3s / thruplay sobre impressões; TikTok usa 2s / 6s (proxy equivalente).
   C("videoHook", "Video hook", "Vídeo", "percent", { color: true, platforms: [PLAT_META, PLAT_TIKTOK] }),
   C("videoHold", "Video hold", "Vídeo", "percent", { color: true, platforms: [PLAT_META, PLAT_TIKTOK] }),
   // Video views: contador nativo do Google e do TikTok.
   C("videoViews", "Video views", "Vídeo", "number", { platforms: [PLAT_GOOGLE, PLAT_TIKTOK] }),
+  // Taxa de view = video views / impressões — nativa de Google e TikTok.
+  C("videoViewRate", "Taxa view", "Vídeo", "percent", { color: true, platforms: [PLAT_GOOGLE, PLAT_TIKTOK], defaultVisible: false }),
   // Retenção por quartil (contagem de views que atingiram X% do vídeo) — nativo do TikTok.
   C("videoP25", "Views 25%", "Vídeo", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
   C("videoP50", "Views 50%", "Vídeo", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
@@ -77,7 +81,13 @@ export const ALL_COLUMNS: ColumnDef[] = [
   C("taxaConversao", "Taxa conv.", "Tráfego", "percent", { color: true, defaultWidth: 96 }),
   // Conversões reportadas pela própria plataforma (pixel/tag) — Google e TikTok.
   C("conversions", "Conv. plat.", "Tráfego", "number", { platforms: [PLAT_GOOGLE, PLAT_TIKTOK], defaultWidth: 96 }),
+  // Taxa de conversão NATIVA da plataforma = conversões / cliques (≠ Taxa conv. do CRM).
+  C("convRate", "Conv. rate", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE, PLAT_TIKTOK], defaultVisible: false, defaultWidth: 96 }),
+  // CPA nativo = investimento / conversão da plataforma.
+  C("cpa", "CPA plat.", "Tráfego", "currency", { color: true, invert: true, platforms: [PLAT_GOOGLE, PLAT_TIKTOK], defaultVisible: false, defaultWidth: 96 }),
   C("conversionValue", "Valor conv.", "Tráfego", "currency", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 104 }),
+  // ROAS pela plataforma = valor de conversão / investimento (Google reporta valor).
+  C("roasPlataforma", "ROAS plat.", "Tráfego", "roas", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 96 }),
   // Engajamento (nativo do TikTok)
   C("engagements", "Engajam.", "Engajamento", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
   C("likes", "Likes", "Engajamento", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
