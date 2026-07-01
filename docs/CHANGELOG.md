@@ -7,6 +7,7 @@
 - O detalhamento canal a canal (com métricas exclusivas, ex.: CTR de saída única / Visualização de Página do Meta) fica reservado ao caso de exatamente 1 plataforma selecionada.
 - Métricas que não existem em todos os canais selecionados somem do bloco somado (interseção via `isMetricVisibleForSelection`), evitando somas sem sentido.
 - Correção de classificação: "Visualizações de Página" (`landing_page_views`) passa de `PAID_ONLY` para `META_ONLY` — só o pixel do Meta a alimenta; antes aparecia no blend das 4 pagas mostrando o número do Meta disfarçado de total. Agora só aparece com Meta sozinho. CPM e CTR de saída seguem `PAID_ONLY` (são totais reais recalculados da soma das 4).
+- Padronização entre abas: revisada a Evolução Temporal contra o OxR. Ela já classificava Visualizações de Página / Tx Conversão por Página como META_ONLY (o OxR é que estava fora — agora alinhado). Único gap encontrado e corrigido: `ads_connect_rate` era `PAID_ONLY` e mostrava número sem sentido no blend (pixel Meta ÷ cliques das 4) → agora `META_ONLY`. As 3 abas (Planejamento, OxR, Evolução) compartilham a mesma taxonomia de canais, os mesmos endpoints de soma (`/ads`,`/mql`,`/nao-mql`) e o mesmo filtro de interseção.
 
 **Por que:** ao filtrar a "mídia paga inteira" (Meta + Google + LinkedIn + TikTok), o usuário quer a projeção somada de cara, não N blocos separados; o detalhe por canal é papel do drill de 1 canal.
 
