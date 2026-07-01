@@ -125,6 +125,12 @@ export function registerGestaoReceitaRoutes(app: Express) {
             AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}), 0) AS pont,
           COUNT(*) FILTER (WHERE d.stage_name = ${STAGE_GANHO}
             AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}) AS deals,
+          COUNT(*) FILTER (WHERE d.stage_name = ${STAGE_GANHO}
+            AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}
+            AND d.valor_recorrente::numeric > 0) AS deals_mrr,
+          COUNT(*) FILTER (WHERE d.stage_name = ${STAGE_GANHO}
+            AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}
+            AND d.valor_pontual::numeric > 0) AS deals_pont,
           COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}) AS reunioes
         FROM "Bitrix".crm_deal d
         JOIN "Bitrix".crm_closers c ON c.id::text = d.closer::text
@@ -137,11 +143,14 @@ export function registerGestaoReceitaRoutes(app: Express) {
         .map((r) => {
           const mrr = num(r.mrr), pont = num(r.pont);
           const deals = Number(r.deals) || 0, reunioes = Number(r.reunioes) || 0;
+          const dealsMrr = Number(r.deals_mrr) || 0, dealsPont = Number(r.deals_pont) || 0;
           return {
             nome: r.nome,
             mrr, pont, deals, reunioes,
             score: mrr + pont / 5, // score do mockup
-            ticket: deals > 0 ? Math.round((mrr + pont) / deals) : 0,
+            // ticket por tipo: só sobre deals que têm valor daquele tipo (mesma régua da tabela de canais)
+            ticketMrr: dealsMrr > 0 ? Math.round(mrr / dealsMrr) : 0,
+            ticketPont: dealsPont > 0 ? Math.round(pont / dealsPont) : 0,
             // conversão direta: deals ganhos no mês ÷ reuniões do mês (coortes distintas; pode passar de 100%)
             conv: reunioes > 0 ? (deals / reunioes) * 100 : 0,
           };
@@ -156,6 +165,8 @@ export function registerGestaoReceitaRoutes(app: Express) {
           COUNT(*) FILTER (WHERE d.date_create >= ${dIni} AND d.date_create < ${dFim}
             AND d.data_reuniao_realizada IS NOT NULL) AS leads_com_reuniao,
           COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}) AS reunioes,
+          COUNT(*) FILTER (WHERE d.stage_name = ${STAGE_GANHO}
+            AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}) AS deals,
           COALESCE(SUM(d.valor_recorrente::numeric) FILTER (WHERE d.stage_name = ${STAGE_GANHO}
             AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}), 0) AS mrr,
           COALESCE(SUM(d.valor_pontual::numeric) FILTER (WHERE d.stage_name = ${STAGE_GANHO}
@@ -171,12 +182,15 @@ export function registerGestaoReceitaRoutes(app: Express) {
       const sdrs = (sdrRows.rows as any[])
         .map((r) => {
           const reunioes = Number(r.reunioes) || 0, leads = Number(r.leads) || 0;
+          const deals = Number(r.deals) || 0;
           return {
-            nome: r.nome, leads, reunioes,
+            nome: r.nome, leads, reunioes, deals,
             mrr: num(r.mrr), pont: num(r.pont),
             valor: num(r.mrr) + num(r.pont),
             // conversão por coorte: dos leads do mês, % que teve reunião (nunca > 100%)
             conv: leads > 0 ? (Number(r.leads_com_reuniao) / leads) * 100 : 0,
+            // conversão direta reunião→venda: deals ganhos no mês ÷ reuniões do mês (mesma régua dos closers)
+            convVenda: reunioes > 0 ? (deals / reunioes) * 100 : 0,
           };
         })
         .filter((s) => s.leads > 0 || s.reunioes > 0)
