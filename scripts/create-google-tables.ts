@@ -76,6 +76,21 @@ async function main() {
       updated_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
     )`);
 
+  // Impression Share por ad group (não existe por anúncio na API do Google).
+  await exec('google.ad_group_daily_metrics', `
+    CREATE TABLE IF NOT EXISTS google.ad_group_daily_metrics (
+      report_date                          DATE   NOT NULL,
+      ad_group_id                          BIGINT NOT NULL,
+      impressions                          BIGINT NOT NULL DEFAULT 0,
+      search_impression_share              NUMERIC,
+      search_top_impression_share          NUMERIC,
+      search_absolute_top_impression_share NUMERIC,
+      synced_at                            TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      PRIMARY KEY (report_date, ad_group_id)
+    )`);
+  await exec('idx_google_agm_date',
+    `CREATE INDEX IF NOT EXISTS idx_google_agm_date ON google.ad_group_daily_metrics(report_date)`);
+
   await exec('google.keywords', `
     CREATE TABLE IF NOT EXISTS google.keywords (
       ad_group_id   BIGINT NOT NULL REFERENCES google.ad_groups(ad_group_id) ON DELETE CASCADE,
@@ -160,6 +175,10 @@ async function main() {
       conversions      NUMERIC NOT NULL DEFAULT 0,
       conversion_value NUMERIC NOT NULL DEFAULT 0,
       video_views      BIGINT NOT NULL DEFAULT 0,
+      view_through_conversions BIGINT NOT NULL DEFAULT 0,
+      all_conversions  NUMERIC NOT NULL DEFAULT 0,
+      interactions     BIGINT NOT NULL DEFAULT 0,
+      engagements      BIGINT NOT NULL DEFAULT 0,
       synced_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       PRIMARY KEY (report_date, ad_id, device_type, network_type)
     )`);

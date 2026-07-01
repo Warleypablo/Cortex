@@ -44,6 +44,17 @@ export interface CriativoData {
   conversions?: number;       // conversões reportadas pela plataforma (Google/TikTok)
   conversionValue?: number;   // valor de conversão (Google)
   videoViews?: number;        // views de vídeo (Google/TikTok)
+  // contadores nativos estendidos do Google (somáveis)
+  viewThroughConversions?: number; // conversões view-through
+  allConversions?: number;         // todas as conversões (inclui micro/secundárias)
+  interactions?: number;           // interações (cliques + engajamentos por formato)
+  // Impression Share do ad group (Google) — NÃO-SOMÁVEL. Vem por anúncio carregando o
+  // valor do ad group pai; o frontend pondera por impressões entre ad groups distintos
+  // e só exibe em Campanha/Conjunto (null no Anúncio). isWeight = impressões-search.
+  impressionShare?: number | null;
+  impressionShareTop?: number | null;
+  impressionShareAbsTop?: number | null;
+  isWeight?: number;
   // contadores nativos do TikTok (somáveis; demais plataformas não os preenchem)
   videoP25?: number;          // views que assistiram 25% do vídeo
   videoP50?: number;
@@ -77,8 +88,17 @@ export interface CriativoData {
   ctr: number | null;
   ctrUnico: number | null;
   cpm: number | null;
+  cpc: number | null;              // custo por clique = investimento / cliques
   connectRate: number | null;
   taxaConversao: number | null;
+  // Métricas nativas da plataforma (pixel/tag) — Google/TikTok. Todas somáveis:
+  // razão de contadores somados. Meta usa o CRM (não preenche estas).
+  convRate: number | null;         // conversões plataforma / cliques
+  cpa: number | null;              // custo / conversão plataforma
+  roasPlataforma: number | null;   // valor conv. plataforma / investimento
+  videoViewRate: number | null;    // video views / impressões
+  interactionRate: number | null;  // interações / impressões (Google)
+  engagementRate: number | null;   // engajamentos / impressões (Google)
   leads: number;
   cpl: number | null;
   mql: number;
@@ -131,6 +151,9 @@ interface RawTotals {
   conversions: number;
   conversionValue: number;
   videoViews: number;
+  viewThroughConversions: number;
+  allConversions: number;
+  interactions: number;
   videoP25: number;
   videoP50: number;
   videoP75: number;
@@ -168,6 +191,7 @@ function zeros(): RawTotals {
   return {
     investimento: 0, impressions: 0, outboundClicks: 0, uniqueOutboundClicks: 0, landingPageViews: 0, reach: 0,
     video3sec: 0, videoThruplay: 0, conversions: 0, conversionValue: 0, videoViews: 0,
+    viewThroughConversions: 0, allConversions: 0, interactions: 0,
     videoP25: 0, videoP50: 0, videoP75: 0, videoP100: 0,
     likes: 0, comments: 0, shares: 0, follows: 0, profileVisits: 0, engagements: 0,
     leads: 0, mql: 0, nmqls: 0,
@@ -192,6 +216,9 @@ function sumRaw(rows: CriativoData[]): RawTotals {
     t.conversions += r.conversions || 0;
     t.conversionValue += r.conversionValue || 0;
     t.videoViews += r.videoViews || 0;
+    t.viewThroughConversions += r.viewThroughConversions || 0;
+    t.allConversions += r.allConversions || 0;
+    t.interactions += r.interactions || 0;
     t.videoP25 += r.videoP25 || 0;
     t.videoP50 += r.videoP50 || 0;
     t.videoP75 += r.videoP75 || 0;
@@ -250,6 +277,9 @@ function computeDerived(t: RawTotals) {
     conversions: t.conversions,
     conversionValue: t.conversionValue,
     videoViews: t.videoViews,
+    viewThroughConversions: t.viewThroughConversions,
+    allConversions: t.allConversions,
+    interactions: t.interactions,
     videoP25: t.videoP25,
     videoP50: t.videoP50,
     videoP75: t.videoP75,
@@ -273,8 +303,16 @@ function computeDerived(t: RawTotals) {
     receitaRecorrente: t.receitaRecorrente,
 
     cpm: t.impressions > 0 ? Math.round((inv / t.impressions) * 1000) : null,
+    cpc: t.outboundClicks > 0 ? r2(inv / t.outboundClicks) : null,
     frequency: t.reach > 0 ? r2(t.impressions / t.reach) : null,
     ctr: t.impressions > 0 && t.outboundClicks > 0 ? r2((t.outboundClicks / t.impressions) * 100) : null,
+    // Nativas da plataforma (Google/TikTok) — razão de contadores somados, somáveis em qualquer nível.
+    convRate: t.outboundClicks > 0 && t.conversions > 0 ? r2((t.conversions / t.outboundClicks) * 100) : null,
+    cpa: t.conversions > 0 ? Math.round(inv / t.conversions) : null,
+    roasPlataforma: inv > 0 && t.conversionValue > 0 ? r2(t.conversionValue / inv) : null,
+    videoViewRate: t.impressions > 0 && t.videoViews > 0 ? r2((t.videoViews / t.impressions) * 100) : null,
+    interactionRate: t.impressions > 0 && t.interactions > 0 ? r2((t.interactions / t.impressions) * 100) : null,
+    engagementRate: t.impressions > 0 && t.engagements > 0 ? r2((t.engagements / t.impressions) * 100) : null,
     // CTR de saída único = unique_outbound_clicks / reach (Meta-only; demais → null)
     ctrUnico: t.reach > 0 && t.uniqueOutboundClicks > 0 ? r2((t.uniqueOutboundClicks / t.reach) * 100) : null,
     videoHook: t.impressions > 0 && t.video3sec > 0 ? r2((t.video3sec / t.impressions) * 100) : null,
@@ -391,15 +429,52 @@ function computeBudget(rows: CriativoData[], level: Level): BudgetCell {
   return { value: null, info: null }; // anúncio
 }
 
+type ImpressionShareCell = { sis: number | null; top: number | null; absTop: number | null };
+
+/**
+ * Impression Share (Google) — NÃO-SOMÁVEL. A API só fornece IS por ad group, então
+ * cada anúncio carrega o IS do seu ad group. Ao agregar:
+ *  - Anúncio: null (IS não é métrica de criativo individual → "—").
+ *  - Conjunto/Campanha/Conta: média PONDERADA por impressões entre ad groups DISTINTOS
+ *    (dedupe por adsetId), que é como o Google Ads combina IS de vários grupos.
+ */
+function computeImpressionShare(rows: CriativoData[], level: Level): ImpressionShareCell {
+  if (level === "anuncio") return { sis: null, top: null, absTop: null };
+  const seen = new Map<string, { sis: number | null; top: number | null; absTop: number | null; w: number }>();
+  for (const r of rows) {
+    const id = r.adsetId || "—";
+    if (seen.has(id)) continue;
+    if (r.impressionShare == null) continue;
+    seen.set(id, { sis: r.impressionShare, top: r.impressionShareTop ?? null, absTop: r.impressionShareAbsTop ?? null, w: r.isWeight || 0 });
+  }
+  let wSum = 0, sisSum = 0, topSum = 0, absSum = 0, topW = 0, absW = 0;
+  for (const v of Array.from(seen.values())) {
+    if (v.w <= 0) continue;
+    wSum += v.w; sisSum += (v.sis || 0) * v.w;
+    if (v.top != null) { topSum += v.top * v.w; topW += v.w; }
+    if (v.absTop != null) { absSum += v.absTop * v.w; absW += v.w; }
+  }
+  const r2 = (v: number) => parseFloat(v.toFixed(2));
+  return {
+    sis: wSum > 0 ? r2(sisSum / wSum) : null,
+    top: topW > 0 ? r2(topSum / topW) : null,
+    absTop: absW > 0 ? r2(absSum / absW) : null,
+  };
+}
+
 /** Agrega um conjunto de linhas (anúncios) em uma única linha CriativoData. */
 export function aggregateGroup(rows: CriativoData[], meta: GroupMeta, level: Level): CriativoData {
   const derived = computeDerived(sumRaw(rows));
   const budget = computeBudget(rows, level);
+  const is = computeImpressionShare(rows, level);
   return {
     link: "",
     plataforma: rows[0]?.plataforma || "Meta Ads",
     orcamentoDiario: budget.value,
     orcamentoInfo: budget.info,
+    impressionShare: is.sis,
+    impressionShareTop: is.top,
+    impressionShareAbsTop: is.absTop,
     ...meta,
     ...derived,
   } as CriativoData;
@@ -413,8 +488,12 @@ function deriveStatus(rows: CriativoData[]): string {
 /** Agrega as linhas de anúncio para o nível pedido. */
 export function aggregateByLevel(rows: CriativoData[], level: Level): CriativoData[] {
   if (level === "anuncio") {
-    // Nível de anúncio não tem orçamento próprio (mora no conjunto/campanha).
-    return rows.map((r) => ({ ...r, orcamentoDiario: null, orcamentoInfo: null }));
+    // Nível de anúncio não tem orçamento próprio (mora no conjunto/campanha) nem
+    // Impression Share (é métrica de ad group, não de criativo) → ambos "—".
+    return rows.map((r) => ({
+      ...r, orcamentoDiario: null, orcamentoInfo: null,
+      impressionShare: null, impressionShareTop: null, impressionShareAbsTop: null,
+    }));
   }
 
   if (level === "conta") {

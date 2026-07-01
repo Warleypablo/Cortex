@@ -53,12 +53,16 @@ export const ALL_COLUMNS: ColumnDef[] = [
   C("investimento", "Invest", "Investimento", "currency", { defaultWidth: 104 }),
   C("orcamentoDiario", "Orçamento", "Investimento", "currency", { defaultWidth: 116 }),
   C("cpm", "CPM", "Investimento", "currency", { color: true, invert: true }),
+  // CPC de saída = investimento / cliques de saída. Universal (consistente com "CTR de saída").
+  C("cpc", "CPC", "Investimento", "currency", { color: true, invert: true, defaultVisible: false }),
   // Vídeo
   // Hook/Hold: Meta usa 3s / thruplay sobre impressões; TikTok usa 2s / 6s (proxy equivalente).
   C("videoHook", "Video hook", "Vídeo", "percent", { color: true, platforms: [PLAT_META, PLAT_TIKTOK] }),
   C("videoHold", "Video hold", "Vídeo", "percent", { color: true, platforms: [PLAT_META, PLAT_TIKTOK] }),
   // Video views: contador nativo do Google e do TikTok.
   C("videoViews", "Video views", "Vídeo", "number", { platforms: [PLAT_GOOGLE, PLAT_TIKTOK] }),
+  // Taxa de view = video views / impressões — nativa de Google e TikTok.
+  C("videoViewRate", "Taxa view", "Vídeo", "percent", { color: true, platforms: [PLAT_GOOGLE, PLAT_TIKTOK], defaultVisible: false }),
   // Retenção por quartil (contagem de views que atingiram X% do vídeo) — nativo do TikTok.
   C("videoP25", "Views 25%", "Vídeo", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
   C("videoP50", "Views 50%", "Vídeo", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
@@ -77,7 +81,24 @@ export const ALL_COLUMNS: ColumnDef[] = [
   C("taxaConversao", "Taxa conv.", "Tráfego", "percent", { color: true, defaultWidth: 96 }),
   // Conversões reportadas pela própria plataforma (pixel/tag) — Google e TikTok.
   C("conversions", "Conv. plat.", "Tráfego", "number", { platforms: [PLAT_GOOGLE, PLAT_TIKTOK], defaultWidth: 96 }),
+  // Taxa de conversão NATIVA da plataforma = conversões / cliques (≠ Taxa conv. do CRM).
+  C("convRate", "Conv. rate", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE, PLAT_TIKTOK], defaultVisible: false, defaultWidth: 96 }),
+  // CPA nativo = investimento / conversão da plataforma.
+  C("cpa", "CPA plat.", "Tráfego", "currency", { color: true, invert: true, platforms: [PLAT_GOOGLE, PLAT_TIKTOK], defaultVisible: false, defaultWidth: 96 }),
   C("conversionValue", "Valor conv.", "Tráfego", "currency", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 104 }),
+  // ROAS pela plataforma = valor de conversão / investimento (Google reporta valor).
+  C("roasPlataforma", "ROAS plat.", "Tráfego", "roas", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 96 }),
+  // Métricas estendidas nativas do Google (contadores + taxas).
+  C("viewThroughConversions", "Conv. view-thru", "Tráfego", "number", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 116 }),
+  C("allConversions", "Todas conv.", "Tráfego", "number", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
+  C("interactions", "Interações", "Tráfego", "number", { platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
+  C("interactionRate", "Taxa interação", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 108 }),
+  C("engagementRate", "Taxa engaj.", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
+  // Impression Share (Google) — só existe por ad group; aparece em Campanha/Conjunto,
+  // "—" no nível Anúncio. Não-somável: média ponderada por impressões entre ad groups.
+  C("impressionShare", "Impr. Share", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 100 }),
+  C("impressionShareTop", "IS topo", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 92 }),
+  C("impressionShareAbsTop", "IS topo abs.", "Tráfego", "percent", { color: true, platforms: [PLAT_GOOGLE], defaultVisible: false, defaultWidth: 104 }),
   // Engajamento (nativo do TikTok)
   C("engagements", "Engajam.", "Engajamento", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
   C("likes", "Likes", "Engajamento", "number", { platforms: [PLAT_TIKTOK], defaultVisible: false }),
@@ -152,6 +173,63 @@ export function defaultConfig(): ColumnConfig {
   return {
     order: ALL_COLUMNS.map((c) => c.key as string),
     visible: ALL_COLUMNS.filter((c) => c.defaultVisible).map((c) => c.key as string),
+    widths: {},
+  };
+}
+
+// ───────────── Conjuntos de colunas por plataforma (padrão do TIME, no código) ─────────────
+// Fonte da verdade dos "presets" que todo mundo vê. Definidos aqui (não no localStorage)
+// para serem consistentes entre pessoas/navegadores e mudarem só via código (PR).
+// A ordem de exibição continua sendo a global (ALL_COLUMNS); aqui definimos só QUAIS colunas
+// ficam visíveis por plataforma. Ajustar = editar as listas abaixo.
+
+// Espinha comum: funil de CRM (Bitrix), igual em todas as plataformas.
+const FUNNEL_VISIBLE = [
+  "leads", "cpl", "mql", "cpmql", "percMql",
+  "percRa", "cpra", "percRr", "cprr", "percRrVendas",
+  "clientesUnicos", "aov", "receita", "cacGeral", "roas",
+];
+const INVEST_VISIBLE = ["investimento", "orcamentoDiario"];
+
+export const PLATFORM_DEFAULT_VISIBLE: Record<string, string[]> = {
+  [PLAT_META]: [
+    ...INVEST_VISIBLE, "cpm", "ctr", "ctrUnico", "connectRate", "taxaConversao",
+    "videoHook", "videoHold",
+    ...FUNNEL_VISIBLE,
+  ],
+  // Google: "Taxa conv." (leads/LPV) fica de fora — Google não reporta LPV por anúncio,
+  // então ela vive vazia; a taxa que funciona é "Conv. rate" (conversões/cliques).
+  [PLAT_GOOGLE]: [
+    ...INVEST_VISIBLE, "cpm", "cpc", "ctr",
+    "conversions", "convRate", "cpa", "impressionShare",
+    ...FUNNEL_VISIBLE,
+  ],
+  // TikTok: sem Conv. plat. / Video views / Taxa view (view do TikTok dispara ~instantâneo,
+  // fica perto de 100% e não diferencia). Foco no funil + custo, com Taxa conv. (LPV nativo).
+  [PLAT_TIKTOK]: [
+    ...INVEST_VISIBLE, "cpm", "ctr", "taxaConversao", "connectRate",
+    ...FUNNEL_VISIBLE,
+  ],
+  // Visão "todas" (nenhuma ou várias selecionadas): só o que é comparável entre canais.
+  todos: [
+    ...INVEST_VISIBLE, "cpm", "ctr", "taxaConversao",
+    ...FUNNEL_VISIBLE,
+  ],
+};
+
+/**
+ * Config de colunas para a seleção de plataforma atual — o PADRÃO DO TIME (travado no código).
+ * Exatamente uma plataforma selecionada → o preset dela; nenhuma/várias → "todos".
+ * A ordem é sempre a global; só a visibilidade muda por plataforma.
+ */
+export function configForPlatforms(selected: string[]): ColumnConfig {
+  const known = new Set(ALL_COLUMNS.map((c) => c.key as string));
+  const key = selected.length === 1 ? selected[0] : "todos";
+  const visible = (PLATFORM_DEFAULT_VISIBLE[key] || PLATFORM_DEFAULT_VISIBLE.todos)
+    .filter((k) => known.has(k));
+  return {
+    order: ALL_COLUMNS.map((c) => c.key as string),
+    visible,
     widths: {},
   };
 }

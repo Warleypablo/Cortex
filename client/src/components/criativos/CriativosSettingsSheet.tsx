@@ -19,6 +19,8 @@ interface Props {
   onOpenChange: (o: boolean) => void;
   config: ColumnConfig;
   onChangeConfig: (c: ColumnConfig) => void;
+  // Preset da plataforma atual (padrão do time) — usado por "Restaurar padrão".
+  resetConfig?: ColumnConfig;
   views: SavedView[];
   onChangeViews: (v: SavedView[]) => void;
   // Cores (formatação de métricas)
@@ -31,7 +33,7 @@ interface Props {
 let viewSeq = 0;
 
 export function CriativosSettingsSheet({
-  open, onOpenChange, config, onChangeConfig, views, onChangeViews,
+  open, onOpenChange, config, onChangeConfig, resetConfig, views, onChangeViews,
   metricRules, produtos, onSaveRule, isSavingRule,
 }: Props) {
   const [selectedViewId, setSelectedViewId] = useState<string>("");
@@ -83,7 +85,8 @@ export function CriativosSettingsSheet({
     setSelectedViewId("");
   };
   const restoreDefault = () => {
-    onChangeConfig(defaultConfig());
+    // Volta ao PADRÃO DO TIME da plataforma atual (não ao default global).
+    onChangeConfig(resetConfig ?? defaultConfig());
     setSelectedViewId("");
   };
 
