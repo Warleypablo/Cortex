@@ -379,7 +379,7 @@ function SecaoMicro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
               </TableBody>
             </Table>
           </TableScroll>
-          <Nota>Ticket médio = total vendido ÷ deals ganhos. <b>Conversão por coorte</b>: das reuniões realizadas no mês, % que virou venda (nunca passa de 100%; no mês em andamento subestima).</Nota>
+          <Nota>Ticket médio = total vendido ÷ deals ganhos. <b>Conversão direta</b>: deals ganhos no mês ÷ reuniões realizadas no mês (coortes distintas — o deal pode ter tido reunião em mês anterior; pode passar de 100%).</Nota>
         </SectionCard>
       </div>
       <div>

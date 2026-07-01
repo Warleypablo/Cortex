@@ -125,9 +125,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
             AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}), 0) AS pont,
           COUNT(*) FILTER (WHERE d.stage_name = ${STAGE_GANHO}
             AND d.data_fechamento >= ${dIni} AND d.data_fechamento < ${dFim}) AS deals,
-          COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}) AS reunioes,
-          COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}
-            AND d.stage_name = ${STAGE_GANHO}) AS reun_ganhas
+          COUNT(*) FILTER (WHERE d.data_reuniao_realizada >= ${dIni} AND d.data_reuniao_realizada < ${dFim}) AS reunioes
         FROM "Bitrix".crm_deal d
         JOIN "Bitrix".crm_closers c ON c.id::text = d.closer::text
         WHERE c.active = true
@@ -144,8 +142,8 @@ export function registerGestaoReceitaRoutes(app: Express) {
             mrr, pont, deals, reunioes,
             score: mrr + pont / 5, // score do mockup
             ticket: deals > 0 ? Math.round((mrr + pont) / deals) : 0,
-            // conversão por coorte: das reuniões do mês, % que virou venda (nunca > 100%)
-            conv: reunioes > 0 ? (Number(r.reun_ganhas) / reunioes) * 100 : 0,
+            // conversão direta: deals ganhos no mês ÷ reuniões do mês (coortes distintas; pode passar de 100%)
+            conv: reunioes > 0 ? (deals / reunioes) * 100 : 0,
           };
         })
         .filter((c) => c.mrr > 0 || c.pont > 0 || c.reunioes > 0)
