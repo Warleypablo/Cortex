@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-06-30 | feat(gestao): Gestão de Receita v2 — metas editáveis, novas métricas e funil inbound/outbound
+
+**O que foi feito:**
+- **Metas editáveis** (camada de override `cortex_core.gestao_receita_metas` + `PUT /api/gestao/receita/metas`): edição inline de meta de venda MRR/Pontual e, por produto, nº de contratos e ticket médio. Orçado final = override ?? BP (não altera o BP).
+- **Macro:** cards de ticket médio MRR/Pontual, taxa de conversão (reunião→venda por coorte, nunca >100%) e nº de reuniões.
+- **Micro:** produto em 2 tabelas (MRR / Pontual); vendedor com ticket + conversão; SDR com conversão (lead→reunião por coorte) e valor gerado separado em MRR/Pontual.
+- **Funil:** separado em Inbound e Outbound (régua de `source` do growth.ts), cada um clicável com drill por segmento; bloco de Investimento & CPL (Meta Ads spend + ADs Conta Azul, CPL e CPL-MQ).
+
+**Por que:** ajustes pedidos após a primeira versão — metas geridas na própria tela, conversões honestas (coorte) e visão de aquisição por canal.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - override, métricas de coorte, funil por segmento, investimento.
+- `server/routes/gestaoReceita.detalhe.ts` - drill do funil com filtro de segmento.
+- `server/db.ts` / `server/index.ts` - tabela de metas (init no boot).
+- `client/src/pages/gestao/GestaoReceita.tsx` - UI das 3 abas + edição de metas.
+
+**Impacto arquitetural:** Nenhum — override é aditivo (não toca no BP); reusa conversões/predicados existentes.
+
+---
+
 ## 2026-06-30 | fix(receita): inclui TURBO FILIAL no painel de Metas de Receita
 
 **O que foi feito:**
