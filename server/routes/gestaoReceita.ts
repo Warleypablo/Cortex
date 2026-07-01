@@ -189,21 +189,27 @@ export function registerGestaoReceitaRoutes(app: Express) {
       // ---------- 7. FUNIL por segmento (inbound / outbound) ----------
       // Inbound = source na régua do growth.ts; outbound = o resto (inclui deals sem origem).
       const segExpr = sql`CASE WHEN source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM') THEN 'inbound' ELSE 'outbound' END`;
+      const isMql = sql`(mql::text = '1' OR lower(mql::text) = 'true')`;
       const funilRows = await db.execute(sql`
         SELECT ${segExpr} AS seg,
           COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim}) AS leads,
+          COUNT(*) FILTER (WHERE date_create >= ${dIni} AND date_create < ${dFim} AND ${isMql}) AS leads_mql,
           COUNT(*) FILTER (WHERE data_reuniao_agendada >= ${dIni} AND data_reuniao_agendada < ${dFim}) AS ra,
+          COUNT(*) FILTER (WHERE data_reuniao_agendada >= ${dIni} AND data_reuniao_agendada < ${dFim} AND ${isMql}) AS ra_mql,
           COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}) AS rr,
-          COUNT(*) FILTER (WHERE stage_name = ${STAGE_GANHO} AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}) AS venda
+          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim} AND ${isMql}) AS rr_mql,
+          COUNT(*) FILTER (WHERE stage_name = ${STAGE_GANHO} AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}) AS venda,
+          COUNT(*) FILTER (WHERE stage_name = ${STAGE_GANHO} AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim} AND ${isMql}) AS venda_mql
         FROM "Bitrix".crm_deal GROUP BY 1
       `);
       const funilPorSeg: Record<string, any> = {};
       for (const r of funilRows.rows as any[]) funilPorSeg[r.seg] = r;
+      // cada etapa traz volume total + quantos são MQL (o resto = NMQL), p/ as barras empilhadas
       const etapasDe = (r: any) => [
-        { etapa: "Lead", valor: Number(r?.leads) || 0 },
-        { etapa: "Reunião agendada", valor: Number(r?.ra) || 0 },
-        { etapa: "Reunião realizada", valor: Number(r?.rr) || 0 },
-        { etapa: "Venda", valor: Number(r?.venda) || 0 },
+        { etapa: "Lead", valor: Number(r?.leads) || 0, mql: Number(r?.leads_mql) || 0 },
+        { etapa: "Reunião agendada", valor: Number(r?.ra) || 0, mql: Number(r?.ra_mql) || 0 },
+        { etapa: "Reunião realizada", valor: Number(r?.rr) || 0, mql: Number(r?.rr_mql) || 0 },
+        { etapa: "Venda", valor: Number(r?.venda) || 0, mql: Number(r?.venda_mql) || 0 },
       ];
       const funilInbound = etapasDe(funilPorSeg["inbound"]);
       const funilOutbound = etapasDe(funilPorSeg["outbound"]);
