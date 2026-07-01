@@ -25,6 +25,22 @@
 
 ---
 
+## 2026-07-01 | feat(gestao-receita): drill de churn por vendedor agrupado por cliente
+
+**O que foi feito:**
+- Drawer "Churn · vendedor X" (/gestao/receita, aba Churn) agora agrupa os cards por **cliente** (via `cup_churn.parent_id → cup_clientes.task_id`), com os serviços churnados dentro e o motivo no subtítulo de cada item. Antes agrupava por motivo e o cliente não aparecia em lugar nenhum (`cup_churn.nome` é o serviço, não o cliente).
+- Drawer "Churn · motivo" ganhou o **cliente no subtítulo** de cada item (substitui o submotivo redundante, que quase sempre repetia o motivo do título; submotivo continua aparecendo quando existe e difere do motivo).
+
+**Por que:**
+- Pedido do Ichino: enxergar quais clientes compõem o churn de cada vendedor — o drawer só mostrava serviços e motivos.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.detalhe.ts` - bloco `churn_motivo`/`churn_vendedor`: JOIN com `cup_clientes`, grupo por cliente no drill de vendedor, cliente no detalhe do drill de motivo.
+
+**Impacto arquitetural:** Nenhum — mesmo endpoint e mesmo contrato de payload (grupos + itens).
+
+---
+
 ## 2026-07-01 | feat(gestao-receita): editar metas na aba Micro + conv. reun→venda por SDR + ticket R×P por closer
 
 **O que foi feito:**

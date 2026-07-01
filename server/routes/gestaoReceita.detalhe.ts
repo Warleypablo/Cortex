@@ -129,20 +129,28 @@ export async function montarDetalhe(
   }
 
   // ---------- Família CHURN (ClickUp) ----------
+  // cup_churn.nome é o SERVIÇO (subtask); o cliente vem via parent_id -> cup_clientes.task_id.
   if (tipo === "churn_motivo" || tipo === "churn_vendedor") {
     const filtro = tipo === "churn_motivo"
-      ? sql`COALESCE(NULLIF(motivo_cancelamento, ''), '(sem motivo)') = ${chave}`
-      : sql`COALESCE(NULLIF(vendedor, ''), '(sem vendedor)') = ${chave}`;
-    const grupoExpr = tipo === "churn_motivo"
-      ? sql`COALESCE(NULLIF(vendedor, ''), '(sem vendedor)')`
-      : sql`COALESCE(NULLIF(motivo_cancelamento, ''), '(sem motivo)')`;
+      ? sql`COALESCE(NULLIF(ch.motivo_cancelamento, ''), '(sem motivo)') = ${chave}`
+      : sql`COALESCE(NULLIF(ch.vendedor, ''), '(sem vendedor)') = ${chave}`;
     const rs = await rows(db, sql`
-      SELECT nome AS cliente, ${grupoExpr} AS grupo, COALESCE(NULLIF(submotivo_cancelamento, ''), motivo_cancelamento, '') AS detalhe,
-             data_solicitacao_encerramento::date::text AS data, COALESCE(valor_r::numeric, 0) AS valor
-      FROM "Clickup".cup_churn
-      WHERE data_solicitacao_encerramento >= ${dIni} AND data_solicitacao_encerramento < ${dFim} AND ${filtro}
+      SELECT ch.nome AS servico, cl.nome AS cliente,
+             COALESCE(NULLIF(ch.vendedor, ''), '(sem vendedor)') AS vendedor,
+             COALESCE(NULLIF(ch.motivo_cancelamento, ''), '(sem motivo)') AS motivo,
+             NULLIF(ch.submotivo_cancelamento, '') AS submotivo,
+             ch.data_solicitacao_encerramento::date::text AS data, COALESCE(ch.valor_r::numeric, 0) AS valor
+      FROM "Clickup".cup_churn ch
+      LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = ch.parent_id
+      WHERE ch.data_solicitacao_encerramento >= ${dIni} AND ch.data_solicitacao_encerramento < ${dFim} AND ${filtro}
       ORDER BY valor DESC`);
-    const itens: ItemDetalhe[] = rs.map((r) => ({ grupo: r.grupo, nome: r.cliente || "(sem cliente)", detalhe: r.detalhe || "", data: r.data, valor: num(r.valor) }));
+    const itens: ItemDetalhe[] = rs.map((r) => {
+      const sub = r.submotivo && r.submotivo !== r.motivo ? r.submotivo : "";
+      const [grupo, detalhe] = tipo === "churn_vendedor"
+        ? [r.cliente || "(sem cliente)", [r.motivo, sub].filter(Boolean).join(" · ")]
+        : [r.vendedor, [r.cliente || "(sem cliente)", sub].filter(Boolean).join(" · ")];
+      return { grupo, nome: r.servico || "(sem serviço)", detalhe, data: r.data, valor: num(r.valor) };
+    });
     const titulo = tipo === "churn_motivo" ? `Churn · ${chave} · ${label}` : `Churn · vendedor ${chave} · ${label}`;
     return montar(titulo, itens, "brl");
   }
