@@ -151,6 +151,49 @@ def run():
     _assert(hdr == "O MAIOR EVENTO DO ESTÁ CHEGANDO", "match tolera diferença de espaço (ES TÁ vs ESTÁ)")
     _assert("Creator Summit" in leg, "legenda do header com typo de espaço veio certa")
 
+    print("\n=== bloco com subhead em bold+UPPER antes do LEGENDA (caso Cimed) ===")
+    # Bug real: "O RESULTADO DISSO?" é bold+UPPER e vinha ANTES do **LEGENDA**;
+    # o parser antigo tratava como novo post e a legenda desgrudava do título.
+    # Além disso o título no Doc tem um "DA" a mais que o card ("CIMED DA NA" vs "CIMED NA").
+    _cimed = (
+        "**ESTRATÉGIA DA CIMED DA NA COPA DO MUNDO**\n"
+        "**IMG 1**\n"
+        "Na CIMED, a estratégia começou cedo.\n"
+        "**O RESULTADO DISSO?**\n"
+        "**IMG 5**\n"
+        "O conteúdo UGC envolve estratégia, volume e espontaneidade.\n"
+        "**LEGENDA**\n"
+        "Incrível os recordes e resultado que a @cimedco está construindo nessa copa!\n"
+        "Comente \"QUERO TURBINAR MINHAS VENDAS\" #turbopartners\n"
+        "**TURBO NEWS - 30/06**\n"
+        "**IMG 1**\n"
+        "Manchete da semana.\n"
+        "**LEGENDA**\n"
+        "Comenta NEWS pra receber a Turbo News. #turbonews\n"
+    )
+    secs = parse_doc(_cimed)
+    _assert([s.header for s in secs] == ["ESTRATÉGIA DA CIMED DA NA COPA DO MUNDO", "TURBO NEWS - 30/06"],
+            "2 blocos: o subhead 'O RESULTADO DISSO?' NÃO virou post")
+    cimed = secs[0]
+    _assert("O RESULTADO DISSO?" in cimed.headers, "subhead entra como candidato do bloco (não some)")
+    _assert("@cimedco" in cimed.legenda, "legenda ficou grudada no título certo (não no subhead)")
+
+    # Card com o título "errado" (sem o 'DA' a mais) ainda casa via overlap de tokens
+    leg, hdr = find_legenda_for_task(_cimed, "Estratégia da Cimed na copa do mundo")
+    _assert(hdr == "ESTRATÉGIA DA CIMED DA NA COPA DO MUNDO", "match tolera 'DA' a mais no Doc (token overlap)")
+    _assert("@cimedco" in leg, "legenda do card Cimed veio certa mesmo com typo no título")
+
+    # E o card seguinte não é confundido com a Cimed
+    leg2, hdr2 = find_legenda_for_task(_cimed, "Turbo News 30/06")
+    _assert(hdr2 == "TURBO NEWS - 30/06", "Turbo News casa no bloco certo")
+    _assert("Comenta NEWS" in leg2, "legenda da Turbo News veio certa")
+
+    # Um título genérico ('COPA DO MUNDO') NÃO deve roubar o match do Cimed
+    leg3, hdr3 = find_legenda_for_task(
+        _cimed + "**COPA DO MUNDO**\n**LEGENDA**\n\n**FIM**\n", "Estratégia da Cimed na copa do mundo"
+    )
+    _assert("@cimedco" in leg3, "match não é roubado por divisória genérica 'COPA DO MUNDO'")
+
     print("\n🎉 Todos os testes passaram.")
 
 

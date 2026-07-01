@@ -4,22 +4,38 @@ Parser do Google Docs mestre "SOCIAL MEDIA TURBO [MÊS]".
 O Doc é exportado como texto (via Drive API ou MCP read_file_content) e aqui
 extraímos, por task.name, a LEGENDA correspondente.
 
-Convenções validadas empiricamente (Doc de ABRIL, 2026-04-21):
+Convenções validadas empiricamente (Doc de ABRIL/JUNHO, 2026):
 
   **SOCIAL MEDIA TURBO [ABRIL]**     ← cabeçalho geral (ignorar)
-  **RECORDE NEYMAR**                  ← header de post (bold UPPER)
-  **IMG 1**                           ← header de slide (ignorar pro match)
+  **RECORDE NEYMAR**                  ← TÍTULO do post (bold UPPER)
+  **IMG 1**                           ← rótulo de slide (ignorar pro match)
+  **O RESULTADO DISSO?**              ← subhead do post (bold UPPER, mas NÃO é
+                                        um novo post — pertence ao mesmo bloco)
   ...
-  **LEGENDA**                         ← MARCADOR de início da legenda
+  **LEGENDA**                         ← MARCADOR de início da legenda do post
   <texto que vai pro IG>
-  **PRÓXIMO POST**                    ← fim da legenda anterior
+  **PRÓXIMO POST**                    ← início do próximo post (fim da legenda)
 
-Regras:
-  - Header de post = linha em bold UPPER cuja primeira palavra NÃO é
-    IMG / LEGENDA / TELA / N<número> (news headline).
-  - "Legenda" de uma seção = tudo entre o primeiro `**LEGENDA**` dessa seção
-    e o próximo header de post (ou EOF).
-  - Se seção não tem `**LEGENDA**` OU legenda está vazia → retorna "".
+Modelo de "bloco" (o ponto central deste parser)
+------------------------------------------------
+Cada post é um BLOCO ancorado no marcador `**LEGENDA**`:
+
+    [título]  [subheads/IMG...]  **LEGENDA**  [legenda até o próximo título]
+
+Uma linha em bold+UPPER NÃO é necessariamente um novo post: subheads como
+"O RESULTADO DISSO?" ou "AS CAMPANHAS MAIS CRIATIVAS" aparecem ANTES do
+`**LEGENDA**` do mesmo post. Se cada linha bold+UPPER virasse um post novo, a
+legenda se desgrudava do título certo (bug real: card "Estratégia da Cimed na
+copa do mundo" tinha a legenda no Doc mas caía no subhead "O RESULTADO DISSO?").
+
+Por isso:
+  - Um bloco cobre do fim da legenda anterior até o fim da SUA legenda.
+  - TODAS as linhas bold+UPPER antes do `**LEGENDA**` do bloco são headers
+    CANDIDATOS desse bloco (título + subheads).
+  - No match, o nome da task é comparado contra TODOS os candidatos do bloco —
+    e com tolerância a typo (overlap de tokens), porque a cardista às vezes
+    digita o título com uma palavra a mais/menos que o card (ex.: Doc diz
+    "CIMED DA NA COPA", card diz "CIMED NA COPA").
 
 A exportação do Docs pode vir em markdown (preservando `**...**`) ou plain text
 (sem asteriscos). Este parser aceita as duas. Também aceita o formato do
@@ -28,7 +44,7 @@ read_file_content do MCP (onde colchetes vêm escapados `\\[ABRIL\\]`).
 from __future__ import annotations
 import re
 import unicodedata
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 
 
 # Primeiras palavras que identificam headers INTERNOS de seção (não são títulos de post)
@@ -37,7 +53,13 @@ _INTERNAL_FIRST_WORDS = frozenset({
     "HOOK", "BODY", "CTA", "STORY", "REELS", "LIVE", "CARROSSEL",
 })
 
-_LEGENDA_MARKER = re.compile(r"^\s*\**\s*LEGENDA\s*\**\s*$", re.IGNORECASE | re.MULTILINE)
+# Uma linha isolada "**LEGENDA**" / "LEGENDA" / "LEGENDA:" (marca o início da legenda)
+_LEGENDA_LINE_RE = re.compile(r"\**\s*LEGENDA\s*:?\s*\**", re.IGNORECASE)
+
+# Overlap mínimo de tokens (Jaccard) pra aceitar um match por similaridade quando
+# não houve match exato nem por espaçamento. 0.6 é estrito o suficiente pra não
+# casar títulos genéricos, mas tolera 1 palavra a mais/menos ou um typo de espaço.
+_TOKEN_MATCH_THRESHOLD = 0.6
 
 
 def _strip_bold(s: str) -> str:
@@ -57,9 +79,14 @@ def _normalize(s: str) -> str:
     return s
 
 
+def _is_legenda_line(line: str) -> bool:
+    """A linha é só o marcador LEGENDA (com/sem bold, com/sem `:`)."""
+    return bool(_LEGENDA_LINE_RE.fullmatch(line.strip()))
+
+
 def _is_post_header(line: str) -> bool:
     """
-    Linha candidata a header de post:
+    Linha candidata a header (título OU subhead) de post:
     - Linha INTEIRA em bold (começa com `**`) — regra crítica
     - Conteúdo essencial em UPPER
     - Não é prefixo interno (IMG, LEGENDA, TELA, etc.)
@@ -67,8 +94,11 @@ def _is_post_header(line: str) -> bool:
 
     Exigir bold é essencial: textos internos de slide podem ser caps
     ("Na CIMED", "SEU TIME TEM MEDO DA CÂMERA?") sem estar em bold —
-    sem essa regra, eles eram detectados como falsos headers e cortavam
-    a seção antes do marker **LEGENDA**.
+    sem essa regra, eles eram detectados como falsos headers.
+
+    NOTA: isto detecta headers em geral (título e subheads). A distinção entre
+    "título do post" e "subhead do mesmo post" é feita em parse_doc, agrupando
+    por bloco de LEGENDA — não aqui.
     """
     raw = line.strip()
     if not raw:
@@ -102,121 +132,159 @@ def _is_post_header(line: str) -> bool:
     return True
 
 
+def _is_social_media_header(line: str) -> bool:
+    """Título geral do Doc ('SOCIAL MEDIA TURBO [MÊS]') — não é um post."""
+    return "SOCIAL MEDIA TURBO" in _normalize(_strip_bold(line))
+
+
 def _sanitize_line_for_text(line: str) -> str:
     """Remove bold markers mantendo conteúdo."""
     return re.sub(r"\*+", "", line)
 
 
+def _clean_caption(text: str) -> str:
+    """Limpa a legenda: remove `*`, tira linhas só de ruído (traços/pontos), trim."""
+    text = _sanitize_line_for_text(text).strip()
+    text = "\n".join(
+        l for l in text.splitlines()
+        if l.strip() and not re.fullmatch(r"[\s\-_=·•]+", l.strip())
+    ).strip()
+    return text
+
+
 @dataclass
 class ParsedSection:
-    header: str          # como aparece no doc (UPPER)
+    header: str          # TÍTULO do post (primeiro candidato) — como aparece no doc (UPPER)
     header_normalized: str
     legenda: str         # texto já limpo (sem ** e trim)
     has_marker: bool     # tinha **LEGENDA**
     start_line: int      # pra debug
+    headers: list[str] = field(default_factory=list)             # todos os candidatos (título + subheads)
+    headers_normalized: list[str] = field(default_factory=list)  # normalizados, mesma ordem
 
 
 def parse_doc(content: str) -> list[ParsedSection]:
     """
-    Varre o Doc e retorna lista de ParsedSection, 1 por post.
-    O primeiro header (geralmente "SOCIAL MEDIA TURBO [MES]") é ignorado
-    como duplicata se aparecer logo no começo.
+    Varre o Doc e retorna lista de ParsedSection, 1 por BLOCO de LEGENDA (= 1 post).
+
+    Cada bloco vai do fim da legenda anterior (ou início do doc) até o fim da sua
+    própria legenda. Todos os headers bold+UPPER antes do `**LEGENDA**` do bloco
+    entram como candidatos (`headers`); o primeiro é o título (`header`).
     """
-    # Unescape de colchetes (\[ABRIL\] → [ABRIL])
-    content = content.replace("\\[", "[").replace("\\]", "]")
-    # nbsp → space
-    content = content.replace("\xa0", " ")
-
+    # Unescape de colchetes (\[ABRIL\] → [ABRIL]) + nbsp → space
+    content = content.replace("\\[", "[").replace("\\]", "]").replace("\xa0", " ")
     lines = content.splitlines()
+
+    header_idx = [
+        i for i, line in enumerate(lines)
+        if _is_post_header(line) and not _is_social_media_header(line)
+    ]
+    marker_idx = [i for i, line in enumerate(lines) if _is_legenda_line(line)]
+
     sections: list[ParsedSection] = []
+    prev_end = 0  # linha onde a legenda anterior terminou (início da busca por candidatos)
 
-    # Primeiro passe: acha índices das linhas que são headers de post
-    header_indices: list[int] = []
-    for i, line in enumerate(lines):
-        if _is_post_header(line):
-            header_indices.append(i)
+    for m in marker_idx:
+        # fim da legenda = primeiro header depois do marcador (= título do próximo post)
+        cap_end = next((h for h in header_idx if h > m), len(lines))
+        # candidatos deste bloco = headers em [prev_end, m)
+        cands = [h for h in header_idx if prev_end <= h < m]
+        legenda = _clean_caption("\n".join(lines[m + 1:cap_end]))
 
-    # Descarta 2 primeiras ocorrências do header "SOCIAL MEDIA TURBO [MES]"
-    # (vem como título geral, às vezes repete)
-    def _is_social_media_header(line: str) -> bool:
-        norm = _normalize(_strip_bold(line))
-        return "SOCIAL MEDIA TURBO" in norm
+        if not cands:
+            # LEGENDA sem título antes (ex.: 2º **LEGENDA** dentro do mesmo post).
+            # Não cria bloco novo; só avança pra não engolir o próximo.
+            prev_end = cap_end
+            continue
 
-    # Filtra header_indices removendo os "SOCIAL MEDIA TURBO..."
-    header_indices = [i for i in header_indices if not _is_social_media_header(lines[i])]
-
-    for idx, hdr_line in enumerate(header_indices):
-        next_hdr = header_indices[idx + 1] if idx + 1 < len(header_indices) else len(lines)
-        header_raw = _strip_bold(lines[hdr_line].strip())
-        body_lines = lines[hdr_line + 1 : next_hdr]
-        body = "\n".join(body_lines)
-
-        # procura **LEGENDA** no body
-        legenda_match = _LEGENDA_MARKER.search(body)
-        has_marker = bool(legenda_match)
-        legenda_text = ""
-        if legenda_match:
-            # Pega tudo após o marker até o fim do body
-            after = body[legenda_match.end():]
-            # Se houver um segundo **LEGENDA** (caso de multiple legendas
-            # dentro da mesma seção — raro), paramos no primeiro.
-            legenda_text = after.strip()
-            legenda_text = _sanitize_line_for_text(legenda_text)
-            # Remove linhas que são apenas ruído (linhas só com espaços/traços)
-            legenda_text = "\n".join(
-                l for l in legenda_text.splitlines()
-                if l.strip() and not re.fullmatch(r"[\s\-_=·•]+", l.strip())
-            ).strip()
-
+        headers_raw = [_strip_bold(lines[h].strip()) for h in cands]
         sections.append(
             ParsedSection(
-                header=header_raw,
-                header_normalized=_normalize(header_raw),
-                legenda=legenda_text,
-                has_marker=has_marker,
-                start_line=hdr_line,
+                header=headers_raw[0],
+                header_normalized=_normalize(headers_raw[0]),
+                legenda=legenda,
+                has_marker=True,
+                start_line=cands[0],
+                headers=headers_raw,
+                headers_normalized=[_normalize(h) for h in headers_raw],
             )
         )
+        prev_end = cap_end
 
     return sections
+
+
+def _iter_candidates(sections: list[ParsedSection]):
+    """Gera (section, header_normalizado, header_raw) pra cada candidato de cada bloco."""
+    for s in sections:
+        for hn, hr in zip(s.headers_normalized, s.headers):
+            yield s, hn, hr
 
 
 def find_legenda_for_task(doc_content: str, task_name: str) -> tuple[str, str | None]:
     """
     Retorna (legenda_text, matched_header).
-    - legenda_text = "" se não achar seção ou se seção tem marker mas legenda vazia.
+    - legenda_text = "" se não achar bloco ou se bloco tem marker mas legenda vazia.
     - matched_header = header do doc que bateu (None se sem match).
 
-    Match é por normalização (UPPER + sem acentos + compacta espaços).
+    O nome da task é comparado contra TODOS os headers candidatos de cada bloco
+    (título + subheads), em camadas de tolerância crescente:
+      1. match exato (normalizado)
+      2. match ignorando espaços (typo de espaço: "ES TÁ" vs "ESTÁ")
+      3. overlap de tokens (typo de 1 palavra a mais/menos: "CIMED DA NA" vs "CIMED NA")
+      4. substring em qualquer direção (header é abreviação do card: "GUIA RÁPIDO")
     """
     target = _normalize(task_name)
     sections = parse_doc(doc_content)
-    for s in sections:
-        if s.header_normalized == target:
-            return s.legenda, s.header
-    # tolerância: match em qualquer direção. Casos reais:
-    #  - task "Guia Rápido: otimize seu perfil..." vs header "GUIA RÁPIDO"
-    #    (header do Doc é um prefixo/abreviação do nome da task)
-    #  - task "Justin bieber" vs header "JUSTIN KARAOKE" (task é prefixo)
-    # Preferimos o header mais longo (mais específico) em caso de múltiplos.
+    if not target or not sections:
+        return "", None
+
+    # 1. match exato
+    for s, hn, hr in _iter_candidates(sections):
+        if hn == target:
+            return s.legenda, hr
+
+    # 2. match ignorando espaços (ex.: card "...DO ES TÁ CHEGANDO" vs Doc "...DO ESTÁ CHEGANDO")
+    tns = target.replace(" ", "")
+    for s, hn, hr in _iter_candidates(sections):
+        if hn.replace(" ", "") == tns:
+            return s.legenda, hr
+
+    # 3. overlap de tokens (Jaccard). Pega o melhor acima do threshold — tolera
+    #    palavra a mais/menos e ordem trocada sem afrouxar pra títulos genéricos.
+    target_tokens = set(target.split())
+    best = None  # (score, header_len, section, header_raw)
+    for s, hn, hr in _iter_candidates(sections):
+        htok = set(hn.split())
+        if not htok:
+            continue
+        inter = len(target_tokens & htok)
+        union = len(target_tokens | htok)
+        score = inter / union if union else 0.0
+        key = (score, len(hn))
+        if best is None or key > (best[0], best[1]):
+            best = (score, len(hn), s, hr)
+    if best and best[0] >= _TOKEN_MATCH_THRESHOLD:
+        return best[2].legenda, best[3]
+
+    # 4. substring em qualquer direção (header é prefixo/abreviação do nome da task).
+    #    Preferimos o header mais longo (mais específico) em caso de múltiplos.
     candidates = [
-        s for s in sections
-        if target and (target in s.header_normalized or s.header_normalized in target)
+        (s, hn, hr) for s, hn, hr in _iter_candidates(sections)
+        if target in hn or hn in target
     ]
     if candidates:
-        best = max(candidates, key=lambda s: len(s.header_normalized))
-        return best.legenda, best.header
-    # Última tolerância: diferença SÓ de espaçamento entre título e header
-    # (ex.: card "...DO ES TÁ CHEGANDO" vs Doc "...DO ESTÁ CHEGANDO"). Compara sem
-    # espaços — pega quebra de palavra/typo de espaço sem afrouxar pra letras diferentes.
-    target_ns = target.replace(" ", "")
-    if target_ns:
-        def ns(s: ParsedSection) -> str:
-            return s.header_normalized.replace(" ", "")
-        loose = [s for s in sections if ns(s) == target_ns]
-        if not loose:
-            loose = [s for s in sections if ns(s) and (target_ns in ns(s) or ns(s) in target_ns)]
+        s, hn, hr = max(candidates, key=lambda x: len(x[1]))
+        return s.legenda, hr
+
+    # 4b. mesmo substring, ignorando espaços (última tolerância)
+    if tns:
+        loose = [
+            (s, hn, hr) for s, hn, hr in _iter_candidates(sections)
+            if hn.replace(" ", "") and (tns in hn.replace(" ", "") or hn.replace(" ", "") in tns)
+        ]
         if loose:
-            best = max(loose, key=lambda s: len(s.header_normalized))
-            return best.legenda, best.header
+            s, hn, hr = max(loose, key=lambda x: len(x[1]))
+            return s.legenda, hr
+
     return "", None
