@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-06-30 | feat(orcado-realizado): Orçado bottom-up — consolidado = soma dos canais pagos
+
+**O que foi feito:**
+- Novo helper compartilhado `deriveConsolidatedAdsBudget` (`metasBudgetConfig.ts`): soma os canais pagos (Meta/Google/TikTok/LinkedIn Ads) e recalcula as taxas a partir dos totais (CPM/CTR/CPL/CPMQL/%MQLs), espelhando o que o endpoint `/ads` faz no realizado. Absolutos somam; taxas nunca são média.
+- **Orçado x Realizado:** `ORCADO_ADS` deixa de ler o segmento `ads` (digitado à parte) e passa a ser a soma dos canais pagos selecionados (ou todos os 4 sem filtro). O "% Atingido" do bloco somado agora bate com o realizado.
+- **Evolução Temporal:** injeta um segmento `marketing` bottom-up por mês (`budgetsWithMarketing`). Corrige bug latente — a UI lia `b.marketing`, que nunca existia (o budget guarda como `ads`/por-canal), então o orçado da seção Marketing nunca aparecia.
+
+**Por que:** fechar a projeção pedida — "planejo por canal e a soma vira a meta da mídia paga inteira". Antes o consolidado era um número digitado independente que podia divergir da soma dos canais.
+
+**Arquivos alterados:**
+- `client/src/lib/metasBudgetConfig.ts` - helper `deriveConsolidatedAdsBudget`.
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - `ORCADO_ADS` bottom-up por plataformas selecionadas.
+- `client/src/pages/GrowthEvolucaoTemporal.tsx` - `budgetsWithMarketing` (segmento marketing derivado) + consumo no orçado mensal/semanal.
+
+**Impacto arquitetural:** Consolidação de orçado passa a ter fonte única (o helper), simétrica ao realizado do `/ads`. Segmento `ads` digitado à parte deixa de ser lido no consolidado (bottom-up read-only).
+
+---
+
 ## 2026-06-30 | feat(orcado-realizado): soma canais num bloco único ao filtrar 2+ plataformas
 
 **O que foi feito:**
