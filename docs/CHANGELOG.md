@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-01 | feat(tiktok): LPV nativo + métricas estendidas; Connect Rate real do TikTok
+
+**O que foi feito:**
+- Probe `scripts/probe-tiktok-metrics.ts` confirmou 25 métricas válidas na conta Turbo, incluindo `total_landing_page_view` (o LPV nativo — o código antes dizia, errado, que o TikTok não expunha).
+- Sync `tiktokAdsSync.ts`: métricas ampliadas p/ o conjunto completo (LPV, reach, frequency, funil de vídeo p25/50/75/100 + 2s/6s, likes/comments/shares/follows/profile_visits/engagements). `raw` guarda tudo; colunas tipadas nos 2 níveis (campanha e anúncio).
+- Migração `server/migrations/2026-07-01-tiktok-ads-extended-metrics.sql` (aditiva) — **aplicada em prod**.
+- Endpoint tiktok-ads: Connect Rate = `total_landing_page_view ÷ cliques` (nativo, ≤100%, same-source) no lugar do proxy GA4 (>100%). UI: linha "Connect Rate" volta pro TikTok.
+
+**Verificado (jun/2026, conta Turbo):** LPV 168 / cliques 307 = **Connect Rate 54,7%** (≤100%). Sync rodou com 0 erros (15 metric rows campanha + 59 anúncio).
+
+**Por que:** dar ao TikTok o mesmo Connect Rate confiável do Meta (chegada na página ÷ cliques), usando a métrica nativa em vez de sessões GA4 (que estouravam 100%). E puxar todas as métricas disponíveis p/ uso futuro.
+
+**Arquivos alterados:**
+- `server/services/tiktokAdsSync.ts`, `server/routes/growth.ts`, `client/src/pages/GrowthOrcadoRealizado.tsx`, `server/migrations/2026-07-01-tiktok-ads-extended-metrics.sql`, `scripts/probe-tiktok-metrics.ts`.
+
+**Impacto arquitetural:** Sync do TikTok passa a capturar o conjunto completo de métricas (raw + colunas). Connect Rate do TikTok deixa de depender do GA4.
+
+---
+
 ## 2026-07-01 | revert: remove Taxa de Conexão; Connect Rate volta a ser só do Meta (pixel)
 
 **O que foi feito:**
