@@ -839,6 +839,47 @@ function deriveAdsFunnel(inputs: Record<string, number>): Record<string, number>
   };
 }
 
+/**
+ * Consolidação BOTTOM-UP do orçado de mídia paga: soma os canais pagos informados
+ * (cada um um objeto de inputs Tier-1: investimento, cpm, ctr, connectRate,
+ * taxaConversaoPagina, percMqls…) e recalcula as TAXAS a partir dos totais —
+ * espelhando exatamente o que o endpoint /ads faz no realizado. Absolutos somam;
+ * CPM/CTR/CPL/CPMQL/%MQLs são recalculados dos totais (nunca média). É isto que
+ * torna "a soma dos canais = a meta da mídia paga inteira" (Orçado bottom-up).
+ */
+export function deriveConsolidatedAdsBudget(channels: Array<Record<string, number>>): Record<string, number> {
+  let investimento = 0, impressoes = 0, cliques = 0, visualizacoesPagina = 0, leads = 0, mqls = 0;
+  for (const inp of channels) {
+    const inv = inp.investimento || 0;
+    const cpm = inp.cpm || 0;
+    const ctr = inp.ctr || 0;
+    const imp = cpm > 0 ? (inv / cpm) * 1000 : 0;
+    const d = deriveAdsFunnel(inp);
+    investimento += inv;
+    impressoes += imp;
+    cliques += imp * ctr;
+    visualizacoesPagina += d.visualizacoesPagina || 0;
+    leads += d.leads || 0;
+    mqls += d.mqls || 0;
+  }
+  return {
+    investimento,
+    impressoes: Math.round(impressoes),
+    cliques: Math.round(cliques),
+    cpm: impressoes > 0 ? (investimento / impressoes) * 1000 : 0,
+    ctr: impressoes > 0 ? cliques / impressoes : 0,
+    visualizacoesPagina,
+    sessoes: 0,            // planejamento não projeta sessões por canal (funil é via pixel/VdP)
+    taxaConversaoPagina: 0, // idem — a linha "por Sessões" fica sem orçado
+    connectRate: 0,
+    leads,
+    mqls,
+    cpl: leads > 0 ? investimento / leads : 0,
+    cpmql: mqls > 0 ? investimento / mqls : 0,
+    percMqls: leads > 0 ? mqls / leads : 0,
+  };
+}
+
 export const CHANNEL_DERIVED_FORMULAS: Record<string, (inputs: Record<string, number>) => Record<string, number>> = {
   meta_ads: deriveAdsFunnel,
   google_ads: deriveAdsFunnel,

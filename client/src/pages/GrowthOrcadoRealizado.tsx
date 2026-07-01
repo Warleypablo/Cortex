@@ -9,20 +9,24 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { TrendingUp, TrendingDown, DollarSign, Users, BarChart3, Megaphone, Loader2, Wallet, UserCheck, Receipt, Calendar, Phone, ShoppingCart, Camera, Play, Briefcase, Music, Download, FileText, FileSpreadsheet, ChevronRight, ChevronDown, ChevronLeft, AlertTriangle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS, UNIVERSAL, PAID_ONLY, META_ONLY, isMetricVisibleForSelection } from "@/lib/metasBudgetConfig";
+import { PLATFORM_MULTISELECT_OPTIONS, PLATFORM_TO_UTM, TIER3_METRIC_IDS, UNIVERSAL, PAID_ONLY, META_ONLY, PAID_PLATFORMS, isMetricVisibleForSelection, deriveConsolidatedAdsBudget } from "@/lib/metasBudgetConfig";
 
 // Disponibilidade por plataforma das métricas da seção genérica de Marketing
-// (Aprofundado sem filtro). Métricas só-pagas (CPM/CTR/VdP/Connect Rate) não
-// existem em todo canal e não devem aparecer no blend consolidado. As demais
-// seções vêm do CRM e independem de plataforma. IDs não listados → UNIVERSAL.
+// (blend consolidado). Só aparece a métrica que existe em TODAS as plataformas
+// selecionadas (interseção). CPM/CTR de saída são totais reais da mídia paga
+// (recalculados das impressões/cliques somados das 4) → PAID_ONLY. Visualizações
+// de Página e CTR único vêm SÓ do pixel/relatório do Meta → META_ONLY: aparecem
+// com Meta sozinho e somem ao somar 2+ (senão mostrariam o número do Meta
+// disfarçado de total). IDs não listados → UNIVERSAL.
 const GENERIC_MARKETING_PLATFORMS: Record<string, readonly string[]> = {
   investimento: UNIVERSAL,
   cpm: PAID_ONLY,
-  ctr: PAID_ONLY,                       // CTR de saída
+  ctr: PAID_ONLY,                       // CTR de saída — total real (soma das 4)
   ctrUnico: META_ONLY,                  // CTR de saída único — só Meta
-  visualizacoes_pagina: PAID_ONLY,
+  visualizacoes_pagina: META_ONLY,      // landing_page_views: só o pixel do Meta alimenta
   sessoes: UNIVERSAL,
-  // connect_rate removido do blend: só existe por plataforma (same-source) — ver buildAdsMetrics.
+  // Connect Rate fica FORA do blend: só faz sentido same-source (pixel do Meta) e por
+  // plataforma — ver buildMetaAdsMetrics. Não há connect rate universal confiável.
   taxa_conversao_pagina: UNIVERSAL,     // aqui é por Sessões (Leads ÷ Sessões)
   taxa_conversao_pagina_mql: UNIVERSAL,
   taxa_conversao_pagina_nmql: UNIVERSAL,
@@ -798,7 +802,22 @@ export default function GrowthOrcadoRealizado() {
 
   const ORCADO_MQL = useMemo(() => ({ ...DEFAULT_ORCADO_MQL, ...(budgetsData?.mql || {}) }), [budgetsData]);
   const ORCADO_NAO_MQL = useMemo(() => ({ ...DEFAULT_ORCADO_NAO_MQL, ...(budgetsData?.nao_mql || {}) }), [budgetsData]);
-  const ORCADO_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_ADS, ...(budgetsData?.ads || {}) }), [budgetsData]);
+  // Orçado bottom-up: o consolidado de mídia paga = SOMA dos canais pagos selecionados
+  // (ou todos os 4 quando sem filtro de plataforma). Absolutos somam, taxas recalculam
+  // dos totais — mesma lógica do realizado (/ads). Substitui o antigo segmento 'ads'
+  // digitado à parte, garantindo que a soma dos canais planejados = meta da mídia paga.
+  const ORCADO_ADS = useMemo(() => {
+    const paidSel = selectedPlataformas.filter((p) => (PAID_PLATFORMS as readonly string[]).includes(p));
+    const channelKeys = selectedPlataformas.length === 0 ? [...PAID_PLATFORMS] : paidSel;
+    const perChannel: Record<string, Record<string, number>> = {
+      meta_ads: { ...DEFAULT_ORCADO_META_ADS, ...(budgetsData?.meta_ads || {}) },
+      google_ads: { ...DEFAULT_ORCADO_GOOGLE_ADS, ...(budgetsData?.google_ads || {}) },
+      tiktok_ads: { ...DEFAULT_ORCADO_TIKTOK_ADS, ...(budgetsData?.tiktok_ads || {}) },
+      linkedin_ads: { ...DEFAULT_ORCADO_LINKEDIN_ADS, ...(budgetsData?.linkedin_ads || {}) },
+    };
+    const inputs = channelKeys.map((k) => perChannel[k]).filter(Boolean);
+    return { ...DEFAULT_ORCADO_ADS, ...deriveConsolidatedAdsBudget(inputs) };
+  }, [budgetsData, selectedPlataformas]);
   // Platform-specific budgets
   const ORCADO_META_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_META_ADS, ...(budgetsData?.meta_ads || {}) }), [budgetsData]);
   const ORCADO_GOOGLE_ADS = useMemo(() => ({ ...DEFAULT_ORCADO_GOOGLE_ADS, ...(budgetsData?.google_ads || {}) }), [budgetsData]);
@@ -1750,6 +1769,8 @@ export default function GrowthOrcadoRealizado() {
       { id: 'ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: data.ctrUnico ?? null, percentual: null, format: 'percent' },
       { id: 'visualizacoes_pagina', name: 'Visualizações de Página', type: 'formula', orcado: ORCADO_ADS.visualizacoesPagina, realizado: data.visualizacoesPagina ?? 0, percentual: calcPercentual(ORCADO_ADS.visualizacoesPagina, data.visualizacoesPagina), format: 'number' },
       { id: 'sessoes', name: 'Sessões', type: 'formula', orcado: ORCADO_ADS.sessoes, realizado: data.sessoes ?? 0, percentual: calcPercentual(ORCADO_ADS.sessoes, data.sessoes), format: 'number' },
+      // Connect Rate GA4 = Sessões GA4 ÷ Cliques (universal, comparável entre canais).
+      // Padronizável — some quando misturado? Não: é PAID_ONLY (todos os pagos têm cliques).
       // Connect Rate NÃO entra no consolidado de Marketing (blend): ele só faz sentido
       // por plataforma, com numerador e denominador da MESMA fonte. No blend, o
       // numerador (landing_page_views do pixel Meta) e o denominador (cliques de saída
@@ -1886,7 +1907,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'gads_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
       { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'gads_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      // Connect Rate segue removido do Aprofundado do Google (despriorizado). A Tx
+      // Connect Rate segue removido do Aprofundado do Google (só o Meta tem pixel). A Tx
       // Conversão da Página usa Visualizações de Página (Leads ÷ VdP), coerente com
       // o Connect Rate do TikTok/LinkedIn e com o funil do Meta (que usa LPV do pixel).
       { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
@@ -2072,9 +2093,9 @@ export default function GrowthOrcadoRealizado() {
       { id: 'tta_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
       { id: 'tta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'tta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      // Connect Rate placeholder: TikTok não tem LPV nativo → sem cálculo fiel ≤100%.
-      // Mantido zerado a pedido (linha presente p/ paridade visual com os demais blocos).
-      { id: 'tta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: 0, percentual: null, format: 'percent' },
+      // Connect Rate NATIVO do TikTok (total_landing_page_view ÷ cliques) — same-source,
+      // ≤100%, mesmo conceito do pixel do Meta. Vis. de Página acima já é o LPV nativo.
+      { id: 'tta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate ?? null), format: 'percent' },
       { id: 'tta_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('tta', funnel, O, d.investimento ?? null)];
@@ -2098,9 +2119,7 @@ export default function GrowthOrcadoRealizado() {
       { id: 'lia_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
       { id: 'lia_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
       { id: 'lia_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      // Connect Rate placeholder: LinkedIn não tem LPV nativo → sem cálculo fiel ≤100%.
-      // Mantido zerado a pedido (linha presente p/ paridade visual com os demais blocos).
-      { id: 'lia_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: 0, percentual: null, format: 'percent' },
+      // Connect Rate fica só no Meta (pixel). LinkedIn não expõe landing_page_views nativo.
       { id: 'lia_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
     ];
     return [...topMetrics, ...buildFunnelMetrics('lia', funnel, O, d.investimento ?? null)];
@@ -2503,19 +2522,16 @@ export default function GrowthOrcadoRealizado() {
       tiktok_ads: aprofundadoPlatformSections[6],
       linkedin_ads: aprofundadoPlatformSections[7],
     };
-    if (selectedPlataformas.length === 0) {
-      return [
-        ...marketingSections,
-        { title: 'Vendas — MQL', icon: <Users className="w-5 h-5" />, metrics: mqlMetrics },
-        { title: 'Vendas — Não-MQL', icon: <Users className="w-5 h-5" />, metrics: naoMqlMetrics },
-        totalSection,
-      ];
-    }
-    const platformSections = selectedPlataformas
-      .map(p => platformMap[p])
-      .filter(Boolean);
+    // Marketing: com UMA plataforma marcada, mostramos a seção detalhada do canal
+    // (inclui métricas exclusivas, ex.: CTR único / Vis. de Página do Meta). Com 0 ou
+    // 2+ plataformas usamos o bloco de Marketing consolidado — já somado via /ads e
+    // filtrado por interseção (só aparecem métricas que existem em todos os canais
+    // selecionados). Nunca quebramos em blocos por canal quando há soma.
+    const marketingBase: MetricSection[] = selectedPlataformas.length === 1
+      ? [platformMap[selectedPlataformas[0]] ?? aprofundadoPlatformSections[0]]
+      : marketingSections;
     return [
-      ...(platformSections.length > 0 ? platformSections : [aprofundadoPlatformSections[0]]),
+      ...marketingBase,
       { title: 'Vendas — MQL', icon: <Users className="w-5 h-5" />, metrics: mqlMetrics },
       { title: 'Vendas — Não-MQL', icon: <Users className="w-5 h-5" />, metrics: naoMqlMetrics },
       totalSection,
@@ -2562,20 +2578,16 @@ export default function GrowthOrcadoRealizado() {
     };
 
     let baseSections: MetricSection[];
-    if (selectedPlataformas.length > 0) {
-      // Replace marketing section with selected platform(s)' metrics
-      const platformSections = selectedPlataformas
-        .map(p => platformMap[p])
-        .filter(Boolean);
-      if (platformSections.length > 0) {
-        baseSections = [
-          ...platformSections,
-          ...allSections.filter(s => s.title !== 'Métricas de Marketing'),
-        ];
-      } else {
-        baseSections = allSections;
-      }
+    if (selectedPlataformas.length === 1) {
+      // Uma plataforma → seção detalhada do canal no lugar do Marketing consolidado
+      // (mostra as métricas exclusivas do canal).
+      const only = platformMap[selectedPlataformas[0]];
+      baseSections = only
+        ? [only, ...allSections.filter(s => s.title !== 'Métricas de Marketing')]
+        : allSections;
     } else {
+      // 0 ou 2+ plataformas → Marketing consolidado (somado via /ads + interseção de
+      // métricas). Nunca quebra em blocos por canal quando há soma.
       baseSections = allSections;
     }
 
