@@ -18,7 +18,7 @@ import { MultiSelect } from "@/components/ui/multi-select";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { CriativosTable } from "@/components/criativos/CriativosTable";
 import { aggregateByLevel, sortRows, type CriativoData, type Level, type SortConfig } from "@/lib/criativosMetrics";
-import { loadConfig, persistConfig, loadViews, persistViews, resolveColumns, columnAppliesToPlatforms, type ColumnConfig, type SavedView } from "@/lib/criativosColumns";
+import { configForPlatforms, loadViews, persistViews, resolveColumns, columnAppliesToPlatforms, type ColumnConfig, type SavedView } from "@/lib/criativosColumns";
 import { Search, X, TrendingUp, TrendingDown, Loader2, Settings, Power, PowerOff, Sparkles, CheckCircle2, XCircle, AlertTriangle, Building2, Megaphone, Layers3, Wallet, Image as ImageIcon } from "lucide-react";
 import { format, startOfMonth } from "date-fns";
 import { classificarProdutoCampanha, PRODUTOS_CRIATIVOS } from "@shared/produtos";
@@ -110,10 +110,15 @@ export default function Criativos() {
 
   // Nível de visualização (tabs): conta / campanha / conjunto / anúncio
   const [level, setLevel] = useState<Level>("anuncio");
-  // Configuração de colunas (visibilidade, ordem, larguras) + visualizações salvas
-  const [colConfig, setColConfig] = useState<ColumnConfig>(loadConfig);
+  // Configuração de colunas por plataforma = PADRÃO DO TIME, definido no código
+  // (configForPlatforms). NÃO persiste no navegador: mudanças na engrenagem são
+  // temporárias (tweak) e recarregar/trocar de plataforma volta ao padrão travado.
+  const [colConfig, setColConfig] = useState<ColumnConfig>(() => configForPlatforms(selectedPlataformas));
   const [colViews, setColViews] = useState<SavedView[]>(loadViews);
-  useEffect(() => { persistConfig(colConfig); }, [colConfig]);
+  // Ao trocar a plataforma selecionada, recarrega o preset dela (reset ao padrão do time).
+  useEffect(() => {
+    setColConfig(configForPlatforms(selectedPlataformas));
+  }, [selectedPlataformas]);
   useEffect(() => { persistViews(colViews); }, [colViews]);
   // Colunas visíveis = config do usuário, filtrada pelas métricas nativas da
   // plataforma selecionada (ex.: Google esconde hook/hold do Meta e mostra conversões).
@@ -1041,6 +1046,7 @@ export default function Criativos() {
         onOpenChange={setConfigOpen}
         config={colConfig}
         onChangeConfig={setColConfig}
+        resetConfig={configForPlatforms(selectedPlataformas)}
         views={colViews}
         onChangeViews={setColViews}
         metricRules={metricRules}

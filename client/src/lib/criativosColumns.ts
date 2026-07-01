@@ -177,6 +177,60 @@ export function defaultConfig(): ColumnConfig {
   };
 }
 
+// ───────────── Conjuntos de colunas por plataforma (padrão do TIME, no código) ─────────────
+// Fonte da verdade dos "presets" que todo mundo vê. Definidos aqui (não no localStorage)
+// para serem consistentes entre pessoas/navegadores e mudarem só via código (PR).
+// A ordem de exibição continua sendo a global (ALL_COLUMNS); aqui definimos só QUAIS colunas
+// ficam visíveis por plataforma. Ajustar = editar as listas abaixo.
+
+// Espinha comum: funil de CRM (Bitrix), igual em todas as plataformas.
+const FUNNEL_VISIBLE = [
+  "leads", "cpl", "mql", "cpmql", "percMql",
+  "percRa", "cpra", "percRr", "cprr", "percRrVendas",
+  "clientesUnicos", "aov", "receita", "cacGeral", "roas",
+];
+const INVEST_VISIBLE = ["investimento", "orcamentoDiario"];
+
+export const PLATFORM_DEFAULT_VISIBLE: Record<string, string[]> = {
+  [PLAT_META]: [
+    ...INVEST_VISIBLE, "cpm", "ctr", "ctrUnico", "connectRate", "taxaConversao",
+    "videoHook", "videoHold",
+    ...FUNNEL_VISIBLE,
+  ],
+  [PLAT_GOOGLE]: [
+    ...INVEST_VISIBLE, "cpm", "cpc", "ctr", "taxaConversao",
+    "conversions", "convRate", "cpa", "impressionShare",
+    ...FUNNEL_VISIBLE,
+  ],
+  [PLAT_TIKTOK]: [
+    ...INVEST_VISIBLE, "cpm", "ctr", "taxaConversao",
+    "conversions", "videoViews", "videoViewRate", "connectRate",
+    ...FUNNEL_VISIBLE,
+  ],
+  // Visão "todas" (nenhuma ou várias selecionadas): só o que é comparável entre canais.
+  todos: [
+    ...INVEST_VISIBLE, "cpm", "ctr", "taxaConversao",
+    ...FUNNEL_VISIBLE,
+  ],
+};
+
+/**
+ * Config de colunas para a seleção de plataforma atual — o PADRÃO DO TIME (travado no código).
+ * Exatamente uma plataforma selecionada → o preset dela; nenhuma/várias → "todos".
+ * A ordem é sempre a global; só a visibilidade muda por plataforma.
+ */
+export function configForPlatforms(selected: string[]): ColumnConfig {
+  const known = new Set(ALL_COLUMNS.map((c) => c.key as string));
+  const key = selected.length === 1 ? selected[0] : "todos";
+  const visible = (PLATFORM_DEFAULT_VISIBLE[key] || PLATFORM_DEFAULT_VISIBLE.todos)
+    .filter((k) => known.has(k));
+  return {
+    order: ALL_COLUMNS.map((c) => c.key as string),
+    visible,
+    widths: {},
+  };
+}
+
 /** Garante que a config cobre exatamente as colunas conhecidas (robusto a adição/remoção). */
 export function normalizeConfig(cfg: Partial<ColumnConfig> | null | undefined): ColumnConfig {
   const base = defaultConfig();
