@@ -140,7 +140,7 @@ export async function montarDetalhe(
     return montar(titulo, itens, "brl");
   }
 
-  // ---------- Família CUSTOS (Conta Azul, regime caixa) ----------
+  // ---------- Família CUSTOS (Conta Azul, regime COMPETÊNCIA) ----------
   if (tipo === "cac" || tipo === "custo_comercial" || tipo === "comissoes") {
     const predicado =
       tipo === "cac" ? PREDICADOS_DESPESA.cac :
@@ -149,10 +149,10 @@ export async function montarDetalhe(
     const rs = await rows(db, sql`
       SELECT COALESCE(NULLIF(TRIM(nome), ''), NULLIF(TRIM(descricao), ''), '(sem descrição)') AS nome,
              COALESCE(NULLIF(TRIM(categoria_nome), ''), '(sem categoria)') AS grupo,
-             data_quitacao::date::text AS data, COALESCE(valor_pago::numeric, 0) AS valor
+             data_competencia::date::text AS data, COALESCE(valor_bruto::numeric, 0) AS valor
       FROM "Conta Azul".caz_parcelas
-      WHERE tipo_evento = 'DESPESA' AND status = 'QUITADO'
-        AND data_quitacao >= ${dIni} AND data_quitacao < ${dFim}
+      WHERE tipo_evento = 'DESPESA'
+        AND data_competencia >= ${dIni} AND data_competencia < ${dFim}
         AND (${predicado})
       ORDER BY valor DESC`);
     const itens: ItemDetalhe[] = rs.map((r) => ({ grupo: r.grupo, nome: r.nome, detalhe: "", data: r.data, valor: num(r.valor) }));

@@ -1,11 +1,10 @@
 // server/routes/gestaoReceita.ts
 // Endpoint agregador da página "Gestão de Receita" (/gestao/receita).
 // Orçado: cortex_core.bp2026_orcado (BP 2026). Venda nova: Bitrix crm_deal (stage Negócio Ganho).
-// Custos realizados: regime caixa do Conta Azul, reusando somaDespesaCaixaPorMes + predicados do BP.
+// Custos realizados: regime COMPETÊNCIA do Conta Azul (custo do mês, mesmo não pago) + predicados do BP.
 import type { Express } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
-import { somaDespesaCaixaPorMes } from "./bp2026";
 import { PREDICADOS_DESPESA, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { montarDetalhe, tipoValido } from "./gestaoReceita.detalhe";
 
@@ -38,6 +37,24 @@ function parseMes(mesParam: unknown): { mesNum: number; ano: number; dIni: strin
 
 const num = (v: any) => (v == null ? 0 : parseFloat(v) || 0);
 
+// Soma de despesas por COMPETÊNCIA (data_competencia, valor_bruto), independente de pagamento.
+// Diferente do BP (que usa caixa/quitação): aqui o custo do mês aparece mesmo antes de pago,
+// o que é mais intuitivo para a gestão comercial no mês corrente.
+async function somaDespesaCompetenciaPorMes(db: any, predicadoCategorias: ReturnType<typeof sql>): Promise<Record<number, number>> {
+  const result = await db.execute(sql`
+    SELECT EXTRACT(MONTH FROM data_competencia)::int AS mes,
+           SUM(COALESCE(valor_bruto::numeric, 0)) AS total
+    FROM "Conta Azul".caz_parcelas
+    WHERE tipo_evento = 'DESPESA'
+      AND data_competencia >= '2026-01-01' AND data_competencia < '2027-01-01'
+      AND (${predicadoCategorias})
+    GROUP BY 1 ORDER BY 1
+  `);
+  const porMes: Record<number, number> = {};
+  for (const row of result.rows as any[]) porMes[Number(row.mes)] = parseFloat(row.total);
+  return porMes;
+}
+
 export function registerGestaoReceitaRoutes(app: Express) {
   app.get("/api/gestao/receita", async (req, res) => {
     try {
@@ -60,12 +77,12 @@ export function registerGestaoReceitaRoutes(app: Express) {
       const metaMrr = override["venda_mrr"] ?? orc["vendas_mrr"] ?? 0;
       const metaPontual = override["venda_pontual"] ?? orc["vendas_pontual"] ?? 0;
 
-      // ---------- 2. CUSTOS REALIZADOS (regime caixa, Conta Azul) ----------
+      // ---------- 2. CUSTOS REALIZADOS (regime COMPETÊNCIA, Conta Azul) ----------
       const [cacTotalPM, cacVendasPM, cacPreVendasPM, cacComissoesPM] = await Promise.all([
-        somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac),
-        somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_vendas),
-        somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_pre_vendas),
-        somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_comissoes),
+        somaDespesaCompetenciaPorMes(db, PREDICADOS_DESPESA.cac),
+        somaDespesaCompetenciaPorMes(db, PREDICADOS_CAC_SUB.cac_vendas),
+        somaDespesaCompetenciaPorMes(db, PREDICADOS_CAC_SUB.cac_pre_vendas),
+        somaDespesaCompetenciaPorMes(db, PREDICADOS_CAC_SUB.cac_comissoes),
       ]);
       const cacTotalReal = cacTotalPM[mesNum] || 0;
       const custoComercialReal = (cacVendasPM[mesNum] || 0) + (cacPreVendasPM[mesNum] || 0);
@@ -215,7 +232,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
         WHERE date_start >= ${dIni} AND date_start < ${dFim}
       `);
       const metaAdsSpend = num((invSpendRow.rows as any[])[0]?.spend);
-      const cacAdsPM = await somaDespesaCaixaPorMes(db, PREDICADOS_CAC_SUB.cac_ads);
+      const cacAdsPM = await somaDespesaCompetenciaPorMes(db, PREDICADOS_CAC_SUB.cac_ads);
       const adsContaAzul = cacAdsPM[mesNum] || 0;
       const invLeadsRow = await db.execute(sql`
         SELECT
