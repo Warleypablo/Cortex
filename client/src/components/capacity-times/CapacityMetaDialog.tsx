@@ -178,12 +178,10 @@ export function CapacityMetaDialog({ open, onOpenChange, meta, existingCategoria
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            {/* Cap. Recorrente não é editável aqui: redundante com Cap. MRR (que já é recorrente).
-                O valor existente é preservado no payload para não alterar dados gravados. */}
-            {numField(form.cap_mrr, (n) => setForm({ ...form, cap_mrr: n }), "Cap. MRR", "meta-cap-mrr")}
-            {numField(form.cap_pontual, (n) => setForm({ ...form, cap_pontual: n }), "Cap. Pontual", "meta-cap-pont")}
+            {/* Cap. Faturamento (R$) grava em cap_mrr; Cap. Contas em cap_contas.
+                cap_recorrente/cap_pontual/ordem existentes são preservados no payload. */}
+            {numField(form.cap_mrr, (n) => setForm({ ...form, cap_mrr: n }), "Cap. Faturamento ($)", "meta-cap-fat")}
             {numField(form.cap_contas, (n) => setForm({ ...form, cap_contas: n }), "Cap. Contas", "meta-cap-contas")}
-            {numField(form.ordem, (n) => setForm({ ...form, ordem: n ?? 0 }), "Ordem", "meta-ordem")}
           </div>
 
           <div className="flex items-center gap-2">
