@@ -17,6 +17,14 @@ const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
 // para não vazar campanhas de cliente na aba Criativos. Se a Turbo abrir outra
 // conta própria no TikTok, adicionar o advertiser_id aqui.
 const TURBO_TIKTOK_ADVERTISER_IDS = ['7065303755092131842'];
+// Drizzle ESPALHA um array JS interpolado em params soltos dentro de sql``, então
+// `= ANY(${TURBO_TIKTOK_ADVERTISER_IDS})` vira `ANY($1)` com $1 escalar e o Postgres
+// tenta ler a string como array literal -> "malformed array literal" (a query estoura
+// e o TikTok some em silêncio). Montamos o literal ARRAY[...] explicitamente. Valores
+// são constantes internas (sem input do usuário), logo sql.raw é seguro aqui.
+const TIKTOK_ADVERTISER_IDS_SQL = sql.raw(
+  `ARRAY[${TURBO_TIKTOK_ADVERTISER_IDS.map((id) => `'${id}'`).join(',')}]`,
+);
 
 // Customer ID da conta de anúncios própria da Turbo no Google Ads (mesmo valor
 // de googleSync.TURBO_CUSTOMER_ID). O sync já é travado nessa conta, mas filtramos
@@ -470,7 +478,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
       GROUP BY ad_id
     ) m ON m.ad_id = a.ad_id
-    WHERE a.advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
+    WHERE a.advertiser_id = ANY(${TIKTOK_ADVERTISER_IDS_SQL})
   `);
 
   // 1b. Metadados de campanha (nome/status/budget) vêm de tiktok.ad_campaigns, que é do
@@ -481,7 +489,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
     const campRes = await db.execute(sql`
       SELECT campaign_id::text AS campaign_id, campaign_name, operation_status, budget
       FROM tiktok.ad_campaigns
-      WHERE advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
+      WHERE advertiser_id = ANY(${TIKTOK_ADVERTISER_IDS_SQL})
     `);
     for (const c of campRes.rows as any[]) {
       campMeta.set(String(c.campaign_id), {
@@ -3416,7 +3424,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                    COALESCE(SUM(clicks), 0)::bigint AS cliques
             FROM tiktok.ad_metrics_daily m
             WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
-              AND advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
+              AND advertiser_id = ANY(${TIKTOK_ADVERTISER_IDS_SQL})
               ${tiktokFunnelFilter}
           `);
           const row = r.rows[0] as any;
@@ -4493,7 +4501,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                COALESCE(SUM(conversions), 0)::numeric AS conversoes
         FROM tiktok.ad_metrics_daily
         WHERE stat_date >= ${startDate}::date AND stat_date <= ${endDate}::date
-          AND advertiser_id = ANY(${TURBO_TIKTOK_ADVERTISER_IDS})
+          AND advertiser_id = ANY(${TIKTOK_ADVERTISER_IDS_SQL})
       `);
       const m = mRes.rows[0] as any;
       const investimento = parseFloat(m.investimento) || 0;
