@@ -2,7 +2,8 @@
 // Painel "Gestão de Receita" — Orçado × Realizado da área comercial.
 // Orçado: BP 2026. Venda nova: Bitrix. Custos: regime caixa (Conta Azul).
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { apiRequest } from "@/lib/queryClient";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Card, CardContent } from "@/components/ui/card";
@@ -12,7 +13,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import {
   Users, Target, Layers, Filter, ShieldCheck, TrendingUp, TrendingDown,
-  Trophy, AlertTriangle, Wallet, Database, Info,
+  Trophy, AlertTriangle, Wallet, Database, Info, PencilLine,
 } from "lucide-react";
 import { GestaoReceitaDetalhe, type DrillRef } from "@/components/gestao/GestaoReceitaDetalhe";
 
@@ -20,14 +21,21 @@ import { GestaoReceitaDetalhe, type DrillRef } from "@/components/gestao/GestaoR
 const rowClick = "cursor-pointer transition hover:bg-gray-50 dark:hover:bg-zinc-800/50";
 
 /* ---------- tipos ---------- */
-type Stat = { orcado: number; realizado: number };
-interface CloserRow { nome: string; mrr: number; pont: number; deals: number; reunioes: number; score: number; conv: number; }
+type Stat = { orcado: number; realizado: number; editavel?: boolean; chave?: string };
+// contexto de edição de metas (override): quando editando, os campos de meta viram inputs
+interface MetasCtx { editando: boolean; get: (chave: string, fallback: number) => number; set: (chave: string, valor: number) => void; }
+interface CloserRow { nome: string; mrr: number; pont: number; deals: number; reunioes: number; score: number; conv: number; ticket: number; }
 interface SdrRow { nome: string; leads: number; reunioes: number; mrr: number; pont: number; valor: number; conv: number; }
-interface ProdutoRow { produto: string; cMrr: number; mrr: number; tmMrr: number; cPont: number; pont: number; tmPont: number; orcadoMrr: number | null; }
+interface ProdutoRow {
+  produto: string; cMrr: number; mrr: number; tmMrr: number; cPont: number; pont: number; tmPont: number;
+  metaTmMrr: number | null; metaCtrMrr: number | null; metaTmPont: number | null; metaCtrPont: number | null;
+  orcadoMrr: number | null; orcadoPont: number | null;
+}
 interface GestaoReceitaData {
   mes: string; mesNum: number; ano: number; mesParcial: boolean;
   macro: {
     vendaMrr: Stat; vendaPontual: Stat;
+    ticketMrr: number; ticketPontual: number; taxaConversao: number; numReunioes: number;
     canais: { canal: string; deals: number; mrr: number; pont: number; total: number; ticket: number }[];
     cac: {
       custoTotal: Stat;
@@ -74,18 +82,34 @@ function Fonte({ tipo }: { tipo: "bitrix" | "clickup" | "bp" | "caixa" }) {
   return <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-semibold ${m.cls}`}>{m.label}</span>;
 }
 
-function StatOR({ label, stat, lowerIsBetter = false, money = true, fonte, onClick }: {
-  label: string; stat: Stat; lowerIsBetter?: boolean; money?: boolean; fonte?: React.ReactNode; onClick?: () => void;
+// input de meta editável (override); stopPropagation evita disparar o drill do card ao clicar
+function MetaInput({ chave, valorAtual, metas, prefix = "R$" }: { chave: string; valorAtual: number; metas: MetasCtx; prefix?: string }) {
+  return (
+    <span className="inline-flex items-center gap-1 rounded border border-amber-300 bg-amber-50 px-1.5 py-0.5 dark:border-amber-800 dark:bg-amber-950/40" onClick={(e) => e.stopPropagation()}>
+      {prefix && <span className="text-[10px] font-semibold text-amber-700 dark:text-amber-400">{prefix}</span>}
+      <input
+        type="number"
+        value={metas.get(chave, valorAtual)}
+        onChange={(e) => metas.set(chave, Number(e.target.value))}
+        className="w-20 bg-transparent text-right text-xs font-semibold tabular-nums text-amber-800 outline-none dark:text-amber-300"
+      />
+    </span>
+  );
+}
+
+function StatOR({ label, stat, lowerIsBetter = false, money = true, fonte, onClick, metas }: {
+  label: string; stat: Stat; lowerIsBetter?: boolean; money?: boolean; fonte?: React.ReactNode; onClick?: () => void; metas?: MetasCtx;
 }) {
   const atg = stat.orcado ? (stat.realizado / stat.orcado) * 100 : 0;
   const cls = statusClasses(atg, lowerIsBetter);
   const fmt = money ? brl : intBR;
   const delta = stat.realizado - stat.orcado;
   const good = lowerIsBetter ? delta <= 0 : delta >= 0;
+  const editandoMeta = !!(metas?.editando && stat.editavel && stat.chave);
   return (
     <Card
-      onClick={onClick}
-      className={`bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 ${onClick ? "cursor-pointer transition hover:border-teal-400 hover:shadow-sm dark:hover:border-teal-600" : ""}`}
+      onClick={editandoMeta ? undefined : onClick}
+      className={`bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 ${onClick && !editandoMeta ? "cursor-pointer transition hover:border-teal-400 hover:shadow-sm dark:hover:border-teal-600" : ""}`}
     >
       <CardContent className="pt-4 pb-4">
         <div className="mb-2 flex items-center justify-between gap-2">
@@ -94,7 +118,9 @@ function StatOR({ label, stat, lowerIsBetter = false, money = true, fonte, onCli
         </div>
         <div className="mb-2 flex items-baseline justify-between gap-2">
           <span className={`text-2xl font-bold tabular-nums ${cls.text}`}>{fmt(stat.realizado)}</span>
-          <span className="text-xs text-gray-500 dark:text-zinc-400">orçado <b className="tabular-nums text-gray-600 dark:text-zinc-300">{fmt(stat.orcado)}</b></span>
+          {editandoMeta
+            ? <span className="text-xs text-gray-500 dark:text-zinc-400">meta <MetaInput chave={stat.chave!} valorAtual={stat.orcado} metas={metas!} prefix={money ? "R$" : ""} /></span>
+            : <span className="text-xs text-gray-500 dark:text-zinc-400">orçado <b className="tabular-nums text-gray-600 dark:text-zinc-300">{fmt(stat.orcado)}</b></span>}
         </div>
         <div className="h-1.5 w-full overflow-hidden rounded bg-gray-100 dark:bg-zinc-800">
           <div className={`h-full rounded ${cls.bar}`} style={{ width: Math.min(Math.max(atg, 0), 100) + "%" }} />
@@ -106,6 +132,22 @@ function StatOR({ label, stat, lowerIsBetter = false, money = true, fonte, onCli
             {delta >= 0 ? "+" : ""}{fmt(delta)}
           </span>
         </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// card simples de KPI (sem orçado), opcionalmente clicável para drill
+function KpiCard({ label, valor, sub, fonte, onClick }: { label: string; valor: string; sub?: string; fonte?: React.ReactNode; onClick?: () => void }) {
+  return (
+    <Card onClick={onClick} className={`bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 ${onClick ? "cursor-pointer transition hover:border-teal-400 hover:shadow-sm dark:hover:border-teal-600" : ""}`}>
+      <CardContent className="pt-4 pb-4">
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-gray-700 dark:text-zinc-200">{label}</span>
+          {fonte}
+        </div>
+        <span className="text-2xl font-bold tabular-nums text-gray-900 dark:text-white">{valor}</span>
+        {sub && <div className="mt-1 text-xs text-gray-500 dark:text-zinc-400">{sub}</div>}
       </CardContent>
     </Card>
   );
@@ -209,16 +251,23 @@ function SecaoPessoas({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: Dril
   );
 }
 
-function SecaoMacro({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
+function SecaoMacro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void; metas: MetasCtx }) {
   const { canais, cac } = d.macro;
   return (
     <div className="space-y-5">
       <div>
         <BlockHead icon={<Target className="h-4 w-4" />} title="Venda nova — Orçado × Realizado" />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <StatOR label="Venda de MRR (recorrente nova)" stat={d.macro.vendaMrr} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_mrr" })} />
-          <StatOR label="Venda Pontual" stat={d.macro.vendaPontual} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_pontual" })} />
+          <StatOR label="Venda de MRR (recorrente nova)" stat={d.macro.vendaMrr} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_mrr" })} metas={metas} />
+          <StatOR label="Venda Pontual" stat={d.macro.vendaPontual} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_pontual" })} metas={metas} />
         </div>
+        <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <KpiCard label="Ticket Médio MRR" valor={brl(d.macro.ticketMrr)} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_mrr" })} />
+          <KpiCard label="Ticket Médio Pontual" valor={brl(d.macro.ticketPontual)} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_pontual" })} />
+          <KpiCard label="Taxa de Conversão" valor={pct(d.macro.taxaConversao)} sub="reunião → venda (coorte)" fonte={<Fonte tipo="bitrix" />} />
+          <KpiCard label="Nº de Reuniões" valor={intBR(d.macro.numReunioes)} sub="realizadas no mês" fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "funil_etapa", chave: "rr" })} />
+        </div>
+        {d.mesParcial && <Nota>Conversão por coorte: no mês em andamento as reuniões recentes ainda não fecharam, então a taxa tende a subir até o mês fechar.</Nota>}
       </div>
       <div>
         <BlockHead icon={<Filter className="h-4 w-4" />} title="Resultado por canal de aquisição" />
@@ -257,73 +306,95 @@ function SecaoMacro({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillR
   );
 }
 
-function SecaoMicro({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void }) {
+function ProdutoTabela({ produtos, tipo, onDrill, metas }: { produtos: ProdutoRow[]; tipo: "mrr" | "pont"; onDrill: (dr: DrillRef) => void; metas: MetasCtx }) {
+  const isMrr = tipo === "mrr";
+  return (
+    <SectionCard title={isMrr ? "Venda de MRR por produto" : "Venda Pontual por produto"} fonte={<Fonte tipo="clickup" />}>
+      <TableScroll>
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <Th left>Produto</Th><Th>Contratos</Th><Th>Vendido</Th><Th>TM real</Th><Th>Meta contr.</Th><Th>Meta TM</Th><Th>Orçado</Th><Th>Var.</Th>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {produtos.map((p) => {
+              const c = isMrr ? p.cMrr : p.cPont;
+              const vendido = isMrr ? p.mrr : p.pont;
+              const tm = isMrr ? p.tmMrr : p.tmPont;
+              const metaCtr = isMrr ? p.metaCtrMrr : p.metaCtrPont;
+              const metaTm = isMrr ? p.metaTmMrr : p.metaTmPont;
+              const orcado = isMrr ? p.orcadoMrr : p.orcadoPont;
+              return (
+                <TableRow key={p.produto} onClick={metas.editando ? undefined : () => onDrill({ tipo: "produto", chave: p.produto })} className={metas.editando ? "" : rowClick}>
+                  <Td left>{p.produto}</Td>
+                  <Td>{intBR(c)}</Td><Td>{brl(vendido)}</Td><Td>{tm ? brl(tm) : "—"}</Td>
+                  <Td>{metas.editando ? <MetaInput chave={`prod_ctr_${tipo}:${p.produto}`} valorAtual={metaCtr ?? 0} metas={metas} prefix="" /> : (metaCtr != null ? intBR(metaCtr) : "—")}</Td>
+                  <Td>{metas.editando ? <MetaInput chave={`prod_tm_${tipo}:${p.produto}`} valorAtual={metaTm ?? 0} metas={metas} /> : (metaTm != null ? brl(metaTm) : "—")}</Td>
+                  <Td>{orcado != null ? brl(orcado) : "—"}</Td>
+                  <Td>{orcado != null && orcado > 0 ? <VarPill orcado={orcado} realizado={vendido} /> : "—"}</Td>
+                </TableRow>
+              );
+            })}
+          </TableBody>
+        </Table>
+      </TableScroll>
+    </SectionCard>
+  );
+}
+
+function SecaoMicro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr: DrillRef) => void; metas: MetasCtx }) {
   const { produtos, vendedores, sdrs } = d.micro;
   return (
     <div className="space-y-5">
       <div>
-        <BlockHead icon={<Layers className="h-4 w-4" />} title="Venda e ticket médio por produto" />
-        <SectionCard title="Contratos novos no mês, valor e ticket médio por produto" fonte={<Fonte tipo="clickup" />}>
-          <TableScroll>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <Th left>Produto</Th><Th>Contr. MRR</Th><Th>Vendido MRR</Th><Th>TM MRR</Th><Th>Contr. Pont.</Th><Th>Vendido Pont.</Th><Th>TM Pont.</Th><Th>Orç. MRR</Th>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {produtos.map((p) => (
-                  <TableRow key={p.produto} onClick={() => onDrill({ tipo: "produto", chave: p.produto })} className={rowClick}>
-                    <Td left>{p.produto}</Td>
-                    <Td>{intBR(p.cMrr)}</Td><Td>{brl(p.mrr)}</Td><Td>{p.tmMrr ? brl(p.tmMrr) : "—"}</Td>
-                    <Td>{intBR(p.cPont)}</Td><Td>{brl(p.pont)}</Td><Td>{p.tmPont ? brl(p.tmPont) : "—"}</Td>
-                    <Td>{p.orcadoMrr != null ? brl(p.orcadoMrr) : "—"}</Td>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </TableScroll>
-          <Nota>Base ClickUp por <code>data_criado</code> (mesma régua do <b>BP 2026</b>). <b>MRR por produto bate com o BP</b>. <b>Pontual</b> é deduplicado por jornada (entregas 1ª/2ª/3ª… do mesmo cliente contam como 1 venda) — por isso fica <b>menor que o BP</b>, que soma o valor do pacote repetido em cada entrega. A venda comercial real está na aba <b>Macro</b> (via Bitrix). Orçado por produto só onde há mapeamento direto com os segmentos do BP.</Nota>
-        </SectionCard>
+        <BlockHead icon={<Layers className="h-4 w-4" />} title="Venda por produto — MRR e Pontual" />
+        <div className="space-y-3">
+          <ProdutoTabela produtos={produtos} tipo="mrr" onDrill={onDrill} metas={metas} />
+          <ProdutoTabela produtos={produtos} tipo="pont" onDrill={onDrill} metas={metas} />
+        </div>
+        <Nota>Base ClickUp por <code>data_criado</code> (mesma régua do <b>BP 2026</b>). <b>Orçado</b> por produto = <b>meta de nº contratos × meta de ticket médio</b> (editáveis no botão "Metas"). O pontual é deduplicado por jornada, então fica menor que o BP; a venda comercial real está na aba <b>Macro</b> (Bitrix).</Nota>
       </div>
       <div>
         <BlockHead icon={<Users className="h-4 w-4" />} title="Performance por vendedor (Closer)" />
-        <SectionCard title="Vendido MRR/Pontual, ticket e conversão" fonte={<Fonte tipo="bitrix" />}>
+        <SectionCard title="Vendido MRR/Pontual, ticket médio e conversão" fonte={<Fonte tipo="bitrix" />}>
           <TableScroll>
             <Table>
               <TableHeader>
-                <TableRow><Th left>Vendedor</Th><Th>Vendido MRR</Th><Th>Vendido Pont.</Th><Th>Deals ganhos</Th><Th>Reuniões no mês</Th></TableRow>
+                <TableRow><Th left>Vendedor</Th><Th>Vendido MRR</Th><Th>Vendido Pont.</Th><Th>Ticket médio</Th><Th>Deals</Th><Th>Reuniões</Th><Th>Conv. reun→venda</Th></TableRow>
               </TableHeader>
               <TableBody>
                 {vendedores.map((v) => (
                   <TableRow key={v.nome} onClick={() => onDrill({ tipo: "closer", chave: v.nome })} className={rowClick}>
-                    <Td left>{v.nome}</Td><Td>{brl(v.mrr)}</Td><Td>{brl(v.pont)}</Td><Td>{intBR(v.deals)}</Td><Td>{intBR(v.reunioes)}</Td>
+                    <Td left>{v.nome}</Td><Td>{brl(v.mrr)}</Td><Td>{brl(v.pont)}</Td><Td>{brl(v.ticket)}</Td><Td>{intBR(v.deals)}</Td><Td>{intBR(v.reunioes)}</Td>
+                    <Td className="font-semibold text-teal-700 dark:text-teal-400">{pct(v.conv)}</Td>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableScroll>
-          <Nota>Deals ganhos (por fechamento) e reuniões (por realização) são de janelas separadas no mês, então não calculamos conversão direta reunião→venda aqui (um deal de junho pode ter tido a reunião em meses anteriores).</Nota>
+          <Nota>Ticket médio = total vendido ÷ deals ganhos. <b>Conversão por coorte</b>: das reuniões realizadas no mês, % que virou venda (nunca passa de 100%; no mês em andamento subestima).</Nota>
         </SectionCard>
       </div>
       <div>
         <BlockHead icon={<Users className="h-4 w-4" />} title="Performance por pré-vendas (SDR)" />
-        <SectionCard title="Leads, reuniões, valor gerado e conversão" fonte={<Fonte tipo="bitrix" />}>
+        <SectionCard title="Leads, reuniões, valor gerado (MRR × Pontual) e conversão" fonte={<Fonte tipo="bitrix" />}>
           <TableScroll>
             <Table>
               <TableHeader>
-                <TableRow><Th left>Pré-vendedor</Th><Th>Leads no mês</Th><Th>Reuniões no mês</Th><Th>Valor gerado</Th></TableRow>
+                <TableRow><Th left>Pré-vendedor</Th><Th>Leads</Th><Th>Reuniões</Th><Th>Gerado MRR</Th><Th>Gerado Pont.</Th><Th>Conv. lead→reun.</Th></TableRow>
               </TableHeader>
               <TableBody>
                 {sdrs.map((s) => (
                   <TableRow key={s.nome} onClick={() => onDrill({ tipo: "sdr", chave: s.nome })} className={rowClick}>
-                    <Td left>{s.nome}</Td><Td>{intBR(s.leads)}</Td><Td>{intBR(s.reunioes)}</Td><Td>{brl(s.valor)}</Td>
+                    <Td left>{s.nome}</Td><Td>{intBR(s.leads)}</Td><Td>{intBR(s.reunioes)}</Td><Td>{brl(s.mrr)}</Td><Td>{brl(s.pont)}</Td>
+                    <Td className="font-semibold text-teal-700 dark:text-teal-400">{pct(s.conv)}</Td>
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </TableScroll>
-          <Nota>Leads (por criação) e reuniões (por realização) são contados em janelas separadas — uma reunião de junho costuma vir de um lead de meses anteriores, então não há conversão direta lead→reunião dentro do mês. <b>Valor gerado</b> é o valor da venda atribuída ao SDR (o mesmo deal também conta para o closer; não some as duas listas).</Nota>
+          <Nota><b>Conversão por coorte</b>: dos leads criados no mês, % que teve reunião realizada. <b>Valor gerado</b> (MRR/Pontual) é da venda atribuída ao SDR (o mesmo deal também conta para o closer; não some as listas).</Nota>
         </SectionCard>
       </div>
     </div>
@@ -462,9 +533,29 @@ export default function GestaoReceita() {
   useSetPageInfo("Gestão de Receita", "Orçado × Realizado da área comercial");
   const [mes, setMes] = useState("2026-06");
   const [drill, setDrill] = useState<DrillRef | null>(null);
+  const [editando, setEditando] = useState(false);
+  const [rascunho, setRascunho] = useState<Record<string, number>>({});
+  const queryClient = useQueryClient();
 
   const { data, isLoading, isError } = useQuery<GestaoReceitaData>({
     queryKey: ["/api/gestao/receita", { mes }],
+  });
+
+  const metasCtx: MetasCtx = {
+    editando,
+    get: (chave, fallback) => (chave in rascunho ? rascunho[chave] : fallback),
+    set: (chave, valor) => setRascunho((r) => ({ ...r, [chave]: valor })),
+  };
+  const salvarMetas = useMutation({
+    mutationFn: async () => {
+      const metas = Object.entries(rascunho).map(([chave, valor]) => ({ chave, valor }));
+      return apiRequest("PUT", "/api/gestao/receita/metas", { mes, metas });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/gestao/receita"] });
+      setEditando(false);
+      setRascunho({});
+    },
   });
 
   return (
@@ -477,12 +568,38 @@ export default function GestaoReceita() {
             <p className="text-sm text-gray-500 dark:text-zinc-400">Orçado × Realizado da área comercial · venda via Bitrix, metas do BP 2026</p>
           </div>
         </div>
-        <Select value={mes} onValueChange={setMes}>
-          <SelectTrigger className="w-44 bg-white dark:bg-zinc-900"><SelectValue /></SelectTrigger>
-          <SelectContent>
-            {MESES.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}
-          </SelectContent>
-        </Select>
+        <div className="flex items-center gap-2">
+          {editando ? (
+            <>
+              <button
+                onClick={() => salvarMetas.mutate()}
+                disabled={salvarMetas.isPending || Object.keys(rascunho).length === 0}
+                className="rounded-md bg-teal-600 px-3 py-2 text-sm font-semibold text-white transition hover:bg-teal-700 disabled:opacity-50"
+              >
+                {salvarMetas.isPending ? "Salvando…" : `Salvar metas${Object.keys(rascunho).length ? ` (${Object.keys(rascunho).length})` : ""}`}
+              </button>
+              <button
+                onClick={() => { setEditando(false); setRascunho({}); }}
+                className="rounded-md border border-gray-300 px-3 py-2 text-sm font-medium text-gray-600 transition hover:bg-gray-50 dark:border-zinc-700 dark:text-zinc-300 dark:hover:bg-zinc-800"
+              >
+                Cancelar
+              </button>
+            </>
+          ) : (
+            <button
+              onClick={() => setEditando(true)}
+              className="inline-flex items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-3 py-2 text-sm font-semibold text-amber-700 transition hover:bg-amber-100 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300"
+            >
+              <PencilLine className="h-4 w-4" /> Editar metas
+            </button>
+          )}
+          <Select value={mes} onValueChange={setMes}>
+            <SelectTrigger className="w-44 bg-white dark:bg-zinc-900"><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {MESES.map((m) => <SelectItem key={m.v} value={m.v}>{m.l}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       {data?.mesParcial && (
@@ -516,8 +633,8 @@ export default function GestaoReceita() {
             <TabsTrigger value="qualidade" className="gap-1.5"><ShieldCheck className="h-4 w-4" /> Qualidade</TabsTrigger>
           </TabsList>
           <TabsContent value="pessoas" className="mt-4"><SecaoPessoas d={data} onDrill={setDrill} /></TabsContent>
-          <TabsContent value="macro" className="mt-4"><SecaoMacro d={data} onDrill={setDrill} /></TabsContent>
-          <TabsContent value="micro" className="mt-4"><SecaoMicro d={data} onDrill={setDrill} /></TabsContent>
+          <TabsContent value="macro" className="mt-4"><SecaoMacro d={data} onDrill={setDrill} metas={metasCtx} /></TabsContent>
+          <TabsContent value="micro" className="mt-4"><SecaoMicro d={data} onDrill={setDrill} metas={metasCtx} /></TabsContent>
           <TabsContent value="funil" className="mt-4"><SecaoFunil d={data} onDrill={setDrill} /></TabsContent>
           <TabsContent value="qualidade" className="mt-4"><SecaoQualidade d={data} onDrill={setDrill} /></TabsContent>
         </Tabs>
