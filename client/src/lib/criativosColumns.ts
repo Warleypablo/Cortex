@@ -197,14 +197,17 @@ export const PLATFORM_DEFAULT_VISIBLE: Record<string, string[]> = {
     "videoHook", "videoHold",
     ...FUNNEL_VISIBLE,
   ],
+  // Google: "Taxa conv." (leads/LPV) fica de fora — Google não reporta LPV por anúncio,
+  // então ela vive vazia; a taxa que funciona é "Conv. rate" (conversões/cliques).
   [PLAT_GOOGLE]: [
-    ...INVEST_VISIBLE, "cpm", "cpc", "ctr", "taxaConversao",
+    ...INVEST_VISIBLE, "cpm", "cpc", "ctr",
     "conversions", "convRate", "cpa", "impressionShare",
     ...FUNNEL_VISIBLE,
   ],
+  // TikTok: sem Conv. plat. / Video views / Taxa view (view do TikTok dispara ~instantâneo,
+  // fica perto de 100% e não diferencia). Foco no funil + custo, com Taxa conv. (LPV nativo).
   [PLAT_TIKTOK]: [
-    ...INVEST_VISIBLE, "cpm", "ctr", "taxaConversao",
-    "conversions", "videoViews", "videoViewRate", "connectRate",
+    ...INVEST_VISIBLE, "cpm", "ctr", "taxaConversao", "connectRate",
     ...FUNNEL_VISIBLE,
   ],
   // Visão "todas" (nenhuma ou várias selecionadas): só o que é comparável entre canais.
