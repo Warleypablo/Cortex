@@ -464,7 +464,7 @@ function SecaoFunil({ d, onDrill }: { d: GestaoReceitaData; onDrill: (dr: DrillR
           <KpiCard label="CPL" valor={brl(inv.cpl)} sub={`spend Meta ÷ ${intBR(inv.leadsInbound)} leads inbound`} fonte={<Fonte tipo="meta" />} />
           <KpiCard label="CPL-MQ" valor={brl(inv.cplMq)} sub={`spend Meta ÷ ${intBR(inv.mqlsInbound)} MQLs`} fonte={<Fonte tipo="meta" />} />
         </div>
-        <Nota>Investimento = spend do Meta Ads no mês (<code>meta_ads</code>). <b>CPL</b> = spend ÷ leads inbound; <b>CPL-MQ</b> = spend ÷ MQLs inbound. Google/outros aparecem no ADs via Conta Azul.</Nota>
+        <Nota><b>Investimento Meta Ads</b> = spend do mês (<code>meta_ads.meta_insights_daily</code>) — <b>não vem do Bitrix</b>. <b>ADs (Conta Azul)</b> = o que saiu do caixa na categoria 06.06.01 (inclui Google/outros). <b>CPL/CPL-MQ</b> são aproximados: dividem o spend do Meta por <b>todos</b> os leads/MQLs inbound (não só os de mídia paga) — 92% dos leads estão sem UTM no Bitrix, então não dá pra isolar os que vieram do Meta.</Nota>
       </div>
       <div>
         <BlockHead icon={<Filter className="h-4 w-4" />} title="Composição MQL / NMQL por etapa" />
