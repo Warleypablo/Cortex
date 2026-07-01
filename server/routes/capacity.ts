@@ -313,17 +313,18 @@ export function registerCapacityRoutes(app: Express, db: any) {
       `);
 
       // Squads de comunicação (Pulse, Olimpo): operadores de CS em capacity_metas,
-      // carteira via `responsavel ILIKE match_responsavel`. Régua recorrente + pontual.
+      // carteira via `responsavel ILIKE match_responsavel`. Capacity de contratos =
+      // cap_contas (editável na Configurar), com fallback p/ o cap_recorrente legado.
       const squadsResult = await db.execute(sql`
         WITH m AS (
-          SELECT nome, categoria, match_responsavel, cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem
+          SELECT nome, categoria, match_responsavel,
+                 COALESCE(cap_contas, cap_recorrente) AS cap_contratos, ordem
           FROM cortex_core.capacity_metas
           WHERE ativo = TRUE
             AND categoria NOT IN ('vendedor','account','gestor','Black','CXCS','Squadra','Selva')
         ),
         agg AS (
-          SELECT m.nome, m.categoria, m.ordem,
-            m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas,
+          SELECT m.nome, m.categoria, m.ordem, m.cap_contratos,
             COUNT(*) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS op_recorrente,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')), 0) AS mrr_operando,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'ativo'), 0) AS mrr_ativo,
@@ -332,7 +333,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
             COUNT(*) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding')) AS op_pontual
           FROM m
           LEFT JOIN "Clickup".cup_contratos c ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
-          GROUP BY m.nome, m.categoria, m.ordem, m.cap_recorrente, m.cap_mrr, m.cap_pontual, m.cap_contas
+          GROUP BY m.nome, m.categoria, m.ordem, m.cap_contratos
         )
         SELECT * FROM agg ORDER BY categoria, ordem, nome
       `);

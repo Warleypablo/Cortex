@@ -104,7 +104,7 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
 export interface CsRow {
   nome: string;
   op_recorrente: number;
-  cap_recorrente: number | null; // capacity de contratos
+  cap_contratos: number | null; // capacity de contratos (cap_contas, fallback cap_recorrente)
   op_pontual: number;
   op_total: number;
   mrr_operando: number;
@@ -113,7 +113,7 @@ export interface CsRow {
   mrr_cancelamento: number;
   cap_fat: number | null; // ticket médio da equipe × capacity de contratos (preenchido no route)
   util_fat_pct: number | null; // mrr_operando / cap_fat
-  util_contas_pct: number | null; // op_recorrente / cap_recorrente
+  util_contas_pct: number | null; // op_recorrente / cap_contratos
   util_pct: number | null; // legado p/ alertas = util_fat_pct
 }
 
@@ -126,12 +126,12 @@ export function toCsRow(raw: any): CsRow {
   const op_recorrente = num(raw.op_recorrente);
   const op_pontual = num(raw.op_pontual);
   const op_total = op_recorrente + op_pontual;
-  const cap_recorrente = numOrNull(raw.cap_recorrente);
+  const cap_contratos = numOrNull(raw.cap_contratos);
   const mrr_operando = num(raw.mrr_operando);
   return {
     nome: String(raw.nome),
     op_recorrente,
-    cap_recorrente,
+    cap_contratos,
     op_pontual,
     op_total,
     mrr_operando,
@@ -140,18 +140,18 @@ export function toCsRow(raw: any): CsRow {
     mrr_cancelamento: num(raw.mrr_cancelamento),
     cap_fat: null,
     util_fat_pct: null,
-    util_contas_pct: utilPct(op_recorrente, cap_recorrente),
+    util_contas_pct: utilPct(op_recorrente, cap_contratos),
     util_pct: null,
   };
 }
 
-// Preenche cap_fat/util por squad: Cap. FAT = ticket médio da equipe × cap_recorrente.
+// Preenche cap_fat/util por squad: Cap. FAT = ticket médio da equipe × capacity de contratos.
 export function finalizeSquad(group: SquadGroup): void {
   const totMrr = group.rows.reduce((s, r) => s + r.mrr_operando, 0);
   const totRec = group.rows.reduce((s, r) => s + r.op_recorrente, 0);
   const ticketMedio = totRec > 0 ? totMrr / totRec : 0;
   for (const r of group.rows) {
-    r.cap_fat = r.cap_recorrente !== null ? Math.round(ticketMedio * r.cap_recorrente) : null;
+    r.cap_fat = r.cap_contratos !== null ? Math.round(ticketMedio * r.cap_contratos) : null;
     r.util_fat_pct = utilPct(r.mrr_operando, r.cap_fat);
     r.util_pct = r.util_fat_pct;
   }

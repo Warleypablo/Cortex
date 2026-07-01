@@ -36,10 +36,10 @@ interface SelvaRow {
   util_pct: number | null;
 }
 // Squads de comunicação (Pulse, Olimpo): CS via capacity_metas.
-// Cap. FAT ($) = ticket médio da equipe × capacity de contratos (cap_recorrente).
+// Cap. FAT ($) = ticket médio da equipe × capacity de contratos (cap_contas).
 interface CsRow {
   nome: string;
-  op_recorrente: number; cap_recorrente: number | null;
+  op_recorrente: number; cap_contratos: number | null;
   op_pontual: number;
   op_total: number;
   mrr_operando: number; mrr_ativo: number; mrr_onboarding: number; mrr_cancelamento: number;
@@ -395,7 +395,7 @@ function CsTable({ rows, onSelect }: { rows: CsRow[]; onSelect: (s: DrawerSeleca
           <TableRow className="border-gray-200 dark:border-zinc-700">
             <TableHead className={th()}>Nome</TableHead>
             <TableHead className={th("text-right")}>Recorrente</TableHead>
-            <TableHead className={th("text-right")} title="Capacity de contratos">Cap. Rec.</TableHead>
+            <TableHead className={th("text-right")} title="Capacity de contratos">Cap. Contas</TableHead>
             <TableHead className={th("text-right")}>Pontual</TableHead>
             <TableHead className={th("text-right")}>MRR Operando</TableHead>
             <TableHead className={th("text-right")} title="MRR recorrente / contas recorrentes">Ticket Médio</TableHead>
@@ -415,7 +415,7 @@ function CsTable({ rows, onSelect }: { rows: CsRow[]; onSelect: (s: DrawerSeleca
                 {r.nome}
               </TableCell>
               <TableCell className={td("text-right")}>{r.op_recorrente}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_recorrente)}</TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_contratos)}</TableCell>
               <TableCell className={td("text-right")}>{r.op_pontual}</TableCell>
               <TableCell className={td("text-right")}>
                 {formatCurrency(r.mrr_operando)}
@@ -444,7 +444,7 @@ function SquadTab({ group, onSelect }: { group: SquadGroup; onSelect: (s: Drawer
   const mediaContas = avgOf(rows.map((r) => r.util_contas_pct));
   const cards = [
     { label: "Pessoas", value: String(rows.length) },
-    { label: "Recorrente (op / cap)", value: `${totRec} / ${sum(rows.map((r) => r.cap_recorrente))}` },
+    { label: "Recorrente (op / cap)", value: `${totRec} / ${sum(rows.map((r) => r.cap_contratos))}` },
     { label: "MRR Operando", value: formatCurrency(totMrr) },
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totRec)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
