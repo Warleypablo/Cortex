@@ -35,15 +35,16 @@ interface SelvaRow {
   cap_fat: number | null;
   util_pct: number | null;
 }
-// Squads de comunicação (Pulse, Olimpo): CS via capacity_metas, régua recorrente + pontual.
+// Squads de comunicação (Pulse, Olimpo): CS via capacity_metas.
+// Cap. FAT ($) = ticket médio da equipe × capacity de contratos (cap_recorrente).
 interface CsRow {
   nome: string;
   op_recorrente: number; cap_recorrente: number | null;
-  op_pontual: number; cap_pontual: number | null;
+  op_pontual: number;
   op_total: number;
   mrr_operando: number; mrr_ativo: number; mrr_onboarding: number; mrr_cancelamento: number;
-  cap_mrr: number | null;
-  util_mrr_pct: number | null;
+  cap_fat: number | null;
+  util_fat_pct: number | null;
   util_contas_pct: number | null;
   util_pct: number | null;
 }
@@ -358,15 +359,15 @@ function SelvaTab({ rows, metaContas, onSelect }: { rows: SelvaRow[]; metaContas
   );
 }
 
-function UtilChart({ people }: { people: { nome: string; util_mrr_pct: number | null; util_contas_pct: number | null }[] }) {
+function UtilChart({ people }: { people: { nome: string; util_fat_pct: number | null; util_contas_pct: number | null }[] }) {
   const data = people
-    .filter((p) => p.util_mrr_pct !== null || p.util_contas_pct !== null)
-    .map((p) => ({ nome: p.nome, mrr: p.util_mrr_pct, contas: p.util_contas_pct }))
-    .sort((a, b) => (b.mrr ?? b.contas ?? 0) - (a.mrr ?? a.contas ?? 0));
+    .filter((p) => p.util_fat_pct !== null || p.util_contas_pct !== null)
+    .map((p) => ({ nome: p.nome, fat: p.util_fat_pct, contas: p.util_contas_pct }))
+    .sort((a, b) => (b.fat ?? b.contas ?? 0) - (a.fat ?? a.contas ?? 0));
   if (!data.length) return null;
   return (
     <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-      <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-700 dark:text-zinc-300">Utilização por pessoa — MRR × Contas</CardTitle></CardHeader>
+      <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-700 dark:text-zinc-300">Utilização por pessoa — FAT × Contas</CardTitle></CardHeader>
       <CardContent>
         <ResponsiveContainer width="100%" height={Math.max(200, data.length * 44)}>
           <BarChart data={data} layout="vertical" margin={{ left: 90, right: 30 }}>
@@ -375,7 +376,7 @@ function UtilChart({ people }: { people: { nome: string; util_mrr_pct: number | 
             <YAxis type="category" dataKey="nome" width={110} tick={{ fill: "#9ca3af", fontSize: 12 }} />
             <Tooltip formatter={(v: number, name: string) => [`${v}%`, name]} contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }} />
             <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="mrr" name="Capacity MRR" fill={COLOR_MRR} radius={[0, 4, 4, 0]} maxBarSize={14} />
+            <Bar dataKey="fat" name="Capacity FAT" fill={COLOR_MRR} radius={[0, 4, 4, 0]} maxBarSize={14} />
             <Bar dataKey="contas" name="Capacity Contas" fill={COLOR_CONTAS} radius={[0, 4, 4, 0]} maxBarSize={14} />
           </BarChart>
         </ResponsiveContainer>
@@ -394,15 +395,14 @@ function CsTable({ rows, onSelect }: { rows: CsRow[]; onSelect: (s: DrawerSeleca
           <TableRow className="border-gray-200 dark:border-zinc-700">
             <TableHead className={th()}>Nome</TableHead>
             <TableHead className={th("text-right")}>Recorrente</TableHead>
-            <TableHead className={th("text-right")}>Cap. Rec.</TableHead>
+            <TableHead className={th("text-right")} title="Capacity de contratos">Cap. Rec.</TableHead>
             <TableHead className={th("text-right")}>Pontual</TableHead>
-            <TableHead className={th("text-right")}>Cap. Pont.</TableHead>
             <TableHead className={th("text-right")}>MRR Operando</TableHead>
             <TableHead className={th("text-right")} title="MRR recorrente / contas recorrentes">Ticket Médio</TableHead>
             <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
-            <TableHead className={th("text-right")}>Cap. MRR</TableHead>
-            <TableHead className={th("text-right")} title="MRR Operando / Cap. MRR">% MRR</TableHead>
-            <TableHead className={th("text-right")} title="Contas (rec + pont) / Caps de contas (rec + pont)">% Contas</TableHead>
+            <TableHead className={th("text-right")} title="Ticket médio da equipe × capacity de contratos">Cap. FAT ($)</TableHead>
+            <TableHead className={th("text-right")} title="MRR Operando / Cap. FAT">% FAT</TableHead>
+            <TableHead className={th("text-right")} title="Contas recorrentes / capacity de contratos">% Contas</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
@@ -417,15 +417,14 @@ function CsTable({ rows, onSelect }: { rows: CsRow[]; onSelect: (s: DrawerSeleca
               <TableCell className={td("text-right")}>{r.op_recorrente}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_recorrente)}</TableCell>
               <TableCell className={td("text-right")}>{r.op_pontual}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_pontual)}</TableCell>
               <TableCell className={td("text-right")}>
                 {formatCurrency(r.mrr_operando)}
                 <MrrStatusBar ativo={r.mrr_ativo} onboarding={r.mrr_onboarding} cancelamento={r.mrr_cancelamento} />
               </TableCell>
               <TableCell className={td("text-right")}>{moneyOrDash(ticket(r.mrr_operando, r.op_recorrente))}</TableCell>
               <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(r.mrr_operando, teamMrr))}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_mrr)}</TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_mrr_pct} /></TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_fat)}</TableCell>
+              <TableCell className="text-right"><UtilBar pct={r.util_fat_pct} /></TableCell>
               <TableCell className="text-right"><UtilBar pct={r.util_contas_pct} /></TableCell>
             </TableRow>
           ))}
@@ -441,7 +440,7 @@ function SquadTab({ group, onSelect }: { group: SquadGroup; onSelect: (s: Drawer
   const totRec = sum(rows.map((r) => r.op_recorrente));
   const totCancel = sum(rows.map((r) => r.mrr_cancelamento));
   const riscoPct = pct(totCancel, totMrr);
-  const mediaMrr = avgOf(rows.map((r) => r.util_mrr_pct));
+  const mediaFat = avgOf(rows.map((r) => r.util_fat_pct));
   const mediaContas = avgOf(rows.map((r) => r.util_contas_pct));
   const cards = [
     { label: "Pessoas", value: String(rows.length) },
@@ -449,7 +448,7 @@ function SquadTab({ group, onSelect }: { group: SquadGroup; onSelect: (s: Drawer
     { label: "MRR Operando", value: formatCurrency(totMrr) },
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totRec)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
-    { label: "Capacity MRR (média)", value: pctText(mediaMrr), tone: utilColor(mediaMrr) },
+    { label: "Capacity FAT (média)", value: pctText(mediaFat), tone: utilColor(mediaFat) },
     { label: "Capacity Contas (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
   ];
   return (
@@ -471,7 +470,7 @@ function summarizeSquad(g: SquadGroup): TeamSummary {
     time: g.squad,
     pessoas: rows.length,
     operando: sum(rows.map((r) => r.mrr_operando)),
-    util_pct: avgOf(rows.map((r) => r.util_mrr_pct ?? r.util_contas_pct)),
+    util_pct: avgOf(rows.map((r) => r.util_fat_pct ?? r.util_contas_pct)),
     cancelamento: sum(rows.map((r) => r.mrr_cancelamento)),
   };
 }

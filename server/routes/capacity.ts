@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { toComercialRow, toSelvaRow, toCsRow, type CapacityTimesResponse, type SquadGroup } from "./capacityTimes.helpers";
+import { toComercialRow, toSelvaRow, toCsRow, finalizeSquad, type CapacityTimesResponse, type SquadGroup } from "./capacityTimes.helpers";
 import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS, CAP_CONTAS_ACCOUNT } from "../../shared/capacityGrupos";
 
 // Tabela de referência: nível do Gestor de Performance → metas
@@ -345,6 +345,8 @@ export function registerCapacityRoutes(app: Express, db: any) {
         if (!group) { group = { squad: cat, rows: [] }; squadIndex.set(cat, group); squads.push(group); }
         group.rows.push(toCsRow(raw));
       }
+      // Cap. FAT = ticket médio da equipe × capacity de contratos.
+      squads.forEach(finalizeSquad);
 
       const rows = result.rows as any[];
       const response: CapacityTimesResponse = {
