@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-01 | feat(orcado-realizado): Taxa de Conexão (Sessões GA4 ÷ Cliques) nos 4 canais
+
+**O que foi feito:**
+- "Connect Rate GA4" renomeado para **"Taxa de Conexão"** e "Connect Rate (Pixel)" para **"Connect Rate (Meta)"**.
+- Backend expõe `taxaConexao` = Sessões GA4 ÷ Cliques nos 4 endpoints por-plataforma (meta/google/tiktok/linkedin-ads). No Meta usa o mesmo denominador (cliques de saída) do Connect Rate do pixel → a comparação isola só o numerador (pixel vs GA4).
+- Frontend: "Taxa de Conexão" passa a aparecer na seção por-canal (Aprofundado) dos 4 canais — corrige a invisibilidade no Meta-sozinho, que é onde a comparação é feita. Meta mostra "Taxa de Conexão" + "Connect Rate (Meta)" lado a lado.
+
+**Por que:** a métrica universal de "do clique, quantos chegaram na página" (velocidade/qualidade da LP). Só o Meta tem pixel (landing_page_views); Google/TikTok/LinkedIn só têm GA4 — então a régua comparável é Sessões GA4 ÷ Cliques. Pesquisa de mercado confirmou que "connect rate" é nativo do Meta (LPV Rate) e o padrão cross-channel é via GA4; sessões > cliques (>100%) sinaliza super-atribuição/UTM, não performance.
+
+**Arquivos alterados:**
+- `server/routes/growth.ts` - `taxaConexao` nos 4 endpoints por-plataforma.
+- `client/src/pages/GrowthOrcadoRealizado.tsx` - linhas Taxa de Conexão nos builders por-canal + tipos.
+- `client/src/pages/GrowthEvolucaoTemporal.tsx` - rename das linhas.
+
+**Impacto arquitetural:** Nenhum — aditivo. Connect Rate segue só-pixel (Meta); Taxa de Conexão é a métrica universal para comparação.
+
+---
+
 ## 2026-06-30 | feat(orcado-realizado): Connect Rate GA4 ao lado do pixel
 
 **O que foi feito:**
