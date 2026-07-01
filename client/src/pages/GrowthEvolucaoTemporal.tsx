@@ -68,7 +68,6 @@ interface AdsData {
   ctrUnico: number | null;
   ctrUnicoAvailable?: boolean;
   connectRate: number;
-  connectRateGa4?: number;
   visualizacoesPagina: number;
   visualizacoesPaginaPixel: number;
   sessoes: number;
@@ -294,10 +293,7 @@ const METRIC_DEFS: MetricDef[] = [
   { id: "ads_taxa_conversao_sessoes_nmql", name: "Não-MQL", format: "percent", section: "marketing", sub: true,
     realizado: ({ ads }) => (ads && ads.sessoes > 0 ? (ads.leads - ads.mqls) / ads.sessoes : null),
     orcado: () => null },
-  { id: "ads_connect_rate_ga4", name: "Taxa de Conexão", format: "percent", section: "marketing",
-    realizado: ({ ads }) => ads?.connectRateGa4 ?? null,
-    orcado: () => null },
-  { id: "ads_connect_rate", name: "Connect Rate (Meta)", format: "percent", section: "marketing",
+  { id: "ads_connect_rate", name: "Connect Rate", format: "percent", section: "marketing",
     realizado: ({ ads }) => ads?.connectRate ?? null,
     orcado: (b) => b.marketing?.connectRate ?? null },
   { id: "ads_leads", name: "Leads", format: "number", section: "marketing",
@@ -575,7 +571,6 @@ const MARKETING_METRIC_PLATFORMS: Record<string, readonly string[]> = {
   ads_taxa_conversao_sessoes: UNIVERSAL,      // Tx Conversão por Sessões (GA4) — padrão da casa
   ads_taxa_conversao_sessoes_mql: UNIVERSAL,
   ads_taxa_conversao_sessoes_nmql: UNIVERSAL,
-  ads_connect_rate_ga4: PAID_ONLY,           // Sessões GA4 ÷ Cliques — comparável entre os pagos (padronizável)
   ads_connect_rate: META_ONLY,               // numerador = landing_page_views (pixel Meta); só same-source (Meta) faz sentido. Ao somar 2+ vira views-Meta ÷ cliques-das-4 = sem significado
   ads_leads: UNIVERSAL,
   ads_mqls: UNIVERSAL,

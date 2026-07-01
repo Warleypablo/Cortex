@@ -3612,10 +3612,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const ctrUnicoExposto = onlyInstagram ? null : ctrUnico;
       const cpsExposto = onlyInstagram ? 0 : cps;
       const connectRateExposto = onlyInstagram ? 0 : connectRate;
-      // Connect Rate GA4 = Sessões (GA4, universal) ÷ Cliques de saída. Padronizável
-      // entre todos os canais (o pixel só o Meta tem). Numerador vem do GA4 (sessões
-      // atribuídas por sessionSource/Medium), denominador da plataforma de ads.
-      const connectRateGa4 = onlyInstagram ? 0 : (cliquesSaida > 0 ? sessoes / cliquesSaida : 0);
       const visualizacoesPaginaExposto = onlyInstagram ? 0 : visualizacoesPaginaGa4;
       const visualizacoesPaginaPixelExposto = onlyInstagram ? 0 : visualizacoesPagina;
       const sessoesExposto = onlyInstagram ? 0 : sessoes;
@@ -3641,7 +3637,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ctrUnicoAvailable: onlyInstagram ? false : ctrUnicoAvailable,
         cps: cpsExposto,
         connectRate: connectRateExposto,
-        connectRateGa4,
         visualizacoesPagina: visualizacoesPaginaExposto,
         visualizacoesPaginaPixel: visualizacoesPaginaPixelExposto,
         sessoes: sessoesExposto,
@@ -3774,10 +3769,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // saída) — same-source. A versão GA4 (sessões ÷ cliques) foi removida por não
       // ser usada na UI e misturar fontes.
       const visualizacoesPagina = ga4.byPlatformPageViews.meta_ads;
-      // Taxa de Conexão = Sessões (GA4) ÷ Cliques de saída. Métrica universal
-      // (replicável em todos os canais); mesmo denominador do Connect Rate do pixel,
-      // então a comparação isola só o numerador (pixel Meta vs GA4).
-      const taxaConexao = cliquesSaida > 0 ? sessoes / cliquesSaida : 0;
 
       res.json({
         investimento,
@@ -3796,7 +3787,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         // connectRatePixel = landing_page_views ÷ cliques de saída.
         visualizacoesPaginaPixel: landingPageViewsPixel,
         connectRatePixel,
-        taxaConexao,
       });
     } catch (error) {
       console.error("[api] Error fetching Meta Ads metrics:", error);
@@ -3914,8 +3904,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Connect Rate = VdP ÷ Cliques (não exibido no Aprofundado do Google, mas
       // mantido idêntico a TikTok/LinkedIn Ads p/ consistência).
       const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
-      // Taxa de Conexão = Sessões (GA4) ÷ Cliques — universal (padrão da casa)
-      const taxaConexao = cliques > 0 ? sessoes / cliques : 0;
 
       res.json({
         investimento,
@@ -3926,7 +3914,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ctr,
         visualizacoesPagina,
         connectRate,
-        taxaConexao,
         conversoes,
         valorConversoes,
         custoConversao,
@@ -4521,8 +4508,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // fica calculada mas NÃO é exibida na UI (ver decisão de manter Connect Rate só
       // no pixel). Mantida no payload para diagnóstico.
       const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
-      // Taxa de Conexão = Sessões (GA4) ÷ Cliques — universal (padrão da casa)
-      const taxaConexao = cliques > 0 ? sessoes / cliques : 0;
 
       res.json({
         investimento,
@@ -4534,7 +4519,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         visualizacoesPagina,
         sessoes,
         connectRate,
-        taxaConexao,
         sessoesAvailable: ga4.available,
         hasConnection: advertisers > 0,
       });
@@ -4597,8 +4581,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // fica calculada mas NÃO é exibida na UI (Connect Rate só no pixel). Mantida no
       // payload para diagnóstico.
       const connectRate = cliques > 0 ? visualizacoesPagina / cliques : 0;
-      // Taxa de Conexão = Sessões (GA4) ÷ Cliques — universal (padrão da casa)
-      const taxaConexao = cliques > 0 ? sessoes / cliques : 0;
 
       res.json({
         investimento,
@@ -4610,7 +4592,6 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         visualizacoesPagina,
         sessoes,
         connectRate,
-        taxaConexao,
         sessoesAvailable: ga4.available,
         hasConnection: contas > 0,
       });
