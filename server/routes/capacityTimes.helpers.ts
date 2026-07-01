@@ -104,18 +104,17 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
 export interface CsRow {
   nome: string;
   op_recorrente: number;
-  cap_recorrente: number | null;
+  cap_recorrente: number | null; // capacity de contratos
   op_pontual: number;
-  cap_pontual: number | null;
   op_total: number;
   mrr_operando: number;
   mrr_ativo: number;
   mrr_onboarding: number;
   mrr_cancelamento: number;
-  cap_mrr: number | null;
-  util_mrr_pct: number | null; // mrr_operando / cap_mrr
-  util_contas_pct: number | null; // (rec+pont) / (cap rec + cap pont)
-  util_pct: number | null; // legado: MRR quando há cap, senão contas/cap_recorrente
+  cap_fat: number | null; // ticket médio da equipe × capacity de contratos (preenchido no route)
+  util_fat_pct: number | null; // mrr_operando / cap_fat
+  util_contas_pct: number | null; // op_recorrente / cap_recorrente
+  util_pct: number | null; // legado p/ alertas = util_fat_pct
 }
 
 export interface SquadGroup {
@@ -128,29 +127,34 @@ export function toCsRow(raw: any): CsRow {
   const op_pontual = num(raw.op_pontual);
   const op_total = op_recorrente + op_pontual;
   const cap_recorrente = numOrNull(raw.cap_recorrente);
-  const cap_pontual = numOrNull(raw.cap_pontual);
-  const cap_mrr = numOrNull(raw.cap_mrr);
   const mrr_operando = num(raw.mrr_operando);
-  const cap_contas_total = (cap_recorrente ?? 0) + (cap_pontual ?? 0);
-  const util_mrr_pct = utilPct(mrr_operando, cap_mrr);
-  const util_contas_pct = utilPct(op_total, cap_contas_total > 0 ? cap_contas_total : null);
-  const util_pct = cap_mrr !== null && cap_mrr !== 0 ? util_mrr_pct : utilPct(op_total, cap_recorrente);
   return {
     nome: String(raw.nome),
     op_recorrente,
     cap_recorrente,
     op_pontual,
-    cap_pontual,
     op_total,
     mrr_operando,
     mrr_ativo: num(raw.mrr_ativo),
     mrr_onboarding: num(raw.mrr_onboarding),
     mrr_cancelamento: num(raw.mrr_cancelamento),
-    cap_mrr,
-    util_mrr_pct,
-    util_contas_pct,
-    util_pct,
+    cap_fat: null,
+    util_fat_pct: null,
+    util_contas_pct: utilPct(op_recorrente, cap_recorrente),
+    util_pct: null,
   };
+}
+
+// Preenche cap_fat/util por squad: Cap. FAT = ticket médio da equipe × cap_recorrente.
+export function finalizeSquad(group: SquadGroup): void {
+  const totMrr = group.rows.reduce((s, r) => s + r.mrr_operando, 0);
+  const totRec = group.rows.reduce((s, r) => s + r.op_recorrente, 0);
+  const ticketMedio = totRec > 0 ? totMrr / totRec : 0;
+  for (const r of group.rows) {
+    r.cap_fat = r.cap_recorrente !== null ? Math.round(ticketMedio * r.cap_recorrente) : null;
+    r.util_fat_pct = utilPct(r.mrr_operando, r.cap_fat);
+    r.util_pct = r.util_fat_pct;
+  }
 }
 
 export interface CapacityTimesResponse {
