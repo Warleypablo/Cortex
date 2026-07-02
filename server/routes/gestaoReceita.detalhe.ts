@@ -6,6 +6,7 @@ import { agruparItens, type ItemDetalhe, type GrupoDetalhe } from "./bp2026.help
 import { PREDICADOS_DESPESA, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { sourceLabel } from "./bitrixSources";
 import { segPredSql, filtrosFunilSql, PLATAFORMA_LABELS } from "./gestaoReceita.funil";
+import { CAC_CANAIS } from "./gestaoReceita.cacCanais";
 
 const LIMITE = 50;
 const STAGE_GANHO = "Negócio Ganho";
@@ -21,7 +22,7 @@ export interface DetalheResult {
 
 const TIPOS = new Set([
   "venda_mrr", "venda_pontual", "canal", "closer", "sdr", "funil_etapa", "mql",
-  "produto", "churn_motivo", "churn_vendedor", "cac", "custo_comercial", "comissoes", "cac_sub",
+  "produto", "churn_motivo", "churn_vendedor", "cac", "custo_comercial", "comissoes", "cac_sub", "cac_canal",
 ]);
 
 // rótulos das sub-linhas do CAC no drill (chave = predicado em PREDICADOS_CAC_SUB)
@@ -77,6 +78,17 @@ export async function montarDetalhe(
     const filtroCanal = chave === "(não informado)" ? sql`COALESCE(NULLIF(d.source, ''), '(não informado)') = '(não informado)'` : sql`d.source = ${chave}`;
     const rs = await rows(db, dealBase(sql`${ganhoNoMes} AND ${filtroCanal}`, valMrrPont, sql`d.data_fechamento`, grpCloser));
     return montar(`Canal: ${sourceLabel(chave)} · ${label}`, toDealItens(rs), "brl");
+  }
+  if (tipo === "cac_canal") {
+    // macro-canal da seção "CAC por canal": lista os deals ganhos dos sources do canal
+    const def = CAC_CANAIS.find((c) => c.id === chave);
+    if (!def) return montar(`CAC por canal · ${label}`, [], "brl");
+    if (def.sources.length === 0)
+      return montar(`${def.label} · ${label}`, [], "brl", "Canal ainda sem source correspondente no CRM — nenhum deal atribuído.");
+    const inSources = sql.join(def.sources.map((s) => sql`${s}`), sql`, `);
+    const rs = await rows(db, dealBase(sql`${ganhoNoMes} AND d.source IN (${inSources})`, valMrrPont, sql`d.data_fechamento`, grpCanal));
+    return montar(`${def.label} · ${label}`, toDealItens(rs, "", (g) => sourceLabel(g)), "brl",
+      "Deals ganhos no período (MRR + Pontual), agrupados pelo source do Bitrix que compõe este canal.");
   }
   if (tipo === "closer") {
     const rs = await rows(db, dealBase(sql`${ganhoNoMes} AND c.nome = ${chave}`, valMrrPont, sql`d.data_fechamento`, grpCanal));

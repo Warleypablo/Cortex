@@ -335,7 +335,7 @@ function SecaoMacro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
         </div>
       </div>
       <div>
-        <CacPorCanal dados={d.macro.cacCanais} metas={metas} />
+        <CacPorCanal dados={d.macro.cacCanais} metas={metas} onDrill={onDrill} />
       </div>
     </div>
   );

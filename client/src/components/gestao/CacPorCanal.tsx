@@ -5,6 +5,7 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Filter } from "lucide-react";
 import { Fonte, MetaInput, Nota, BlockHead, SectionCard, brl, intBR, type MetasCtx } from "./gestaoUi";
+import type { DrillRef } from "./GestaoReceitaDetalhe";
 
 export interface CacCanalItem { id: string; label: string; valor: number }
 export interface CacCanalCard {
@@ -17,7 +18,7 @@ export interface CacCanaisData {
   canais: CacCanalCard[];
 }
 
-export function CacPorCanal({ dados, metas }: { dados: CacCanaisData; metas: MetasCtx }) {
+export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; metas: MetasCtx; onDrill: (dr: DrillRef) => void }) {
   // valores "ao vivo" durante a edição (mesma mecânica da tabela Custo da operação);
   // fora do modo edição, metas.get devolve o fallback (valor do payload)
   const itemVivo = (c: CacCanalCard, it: CacCanalItem) => metas.get(`cac_canal:${c.id}:${it.id}`, it.valor);
@@ -50,7 +51,11 @@ export function CacPorCanal({ dados, metas }: { dados: CacCanaisData; metas: Met
           const custo = custoVivo(c);
           const cac = c.clientes > 0 ? Math.round(custo / c.clientes) : null;
           return (
-            <Card key={c.id} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+            <Card
+              key={c.id}
+              onClick={metas.editando ? undefined : () => onDrill({ tipo: "cac_canal", chave: c.id })}
+              className={`bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 ${metas.editando ? "" : "cursor-pointer transition hover:border-teal-400 hover:shadow-sm dark:hover:border-teal-600"}`}
+            >
               <CardContent className="pt-4 pb-4">
                 <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2 dark:border-zinc-800">
                   <span className="text-sm font-semibold text-gray-900 dark:text-white">{c.label}</span>
