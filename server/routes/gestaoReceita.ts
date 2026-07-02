@@ -10,6 +10,7 @@ import { PREDICADOS_DESPESA, PREDICADOS_CAC_SUB } from "./bp2026.predicados";
 import { montarDetalhe, tipoValido } from "./gestaoReceita.detalhe";
 import { sourceLabel } from "./bitrixSources";
 import { computeFunil, opcoesProdutoFunil, segPredSql, produtoValido, plataformaValida } from "./gestaoReceita.funil";
+import { computeCacCanais } from "./gestaoReceita.cacCanais";
 
 const STAGE_GANHO = "Negócio Ganho";
 
@@ -264,9 +265,10 @@ export function registerGestaoReceitaRoutes(app: Express) {
       // ---------- 7. FUNIL por segmento (inbound / outbound / outros) ----------
       // Régua e queries em gestaoReceita.funil.ts (compartilhado com o drill e com
       // o endpoint filtrado /api/gestao/receita/funil). Aqui vem sem filtros.
-      const [{ inbound: funilInbound, outbound: funilOutbound, outros: funilOutros }, opcoesProduto] = await Promise.all([
+      const [{ inbound: funilInbound, outbound: funilOutbound, outros: funilOutros }, opcoesProduto, cacCanais] = await Promise.all([
         computeFunil(db, { dIni, dFim }),
         opcoesProdutoFunil(db, { dIni, dFim }),
+        computeCacCanais(db, { dIni, dFim, ano, mesesNums }),
       ]);
 
       // ---------- 7b. INVESTIMENTO & CPL (Meta Ads + Conta Azul) ----------
@@ -456,6 +458,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
             cliente: { orcado: cacClienteOrc, realizado: cacClienteReal, n: nClientes },
             operacao: cacOperacao,
           },
+          cacCanais,
         },
         pessoas: {
           custoComercial: { orcado: (orc["cac_vendas"] || 0) + (orc["cac_pre_vendas"] || 0), realizado: custoComercialReal },
@@ -506,7 +509,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
   });
 
   // Salva metas editadas na tela (override do orçado do BP). Body: { mes:"YYYY-MM", metas:[{chave, valor}] }.
-  const CHAVE_META_OK = /^(venda_mrr|venda_pontual|prod_(tm|ctr)_(mrr|pont):.+|cac_op_(orc|real):[a-z_]+)$/;
+  const CHAVE_META_OK = /^(venda_mrr|venda_pontual|prod_(tm|ctr)_(mrr|pont):.+|cac_op_(orc|real):[a-z_]+|cac_canal:[a-z_]+:[a-z_]+|cac_canal_unit:[a-z_]+)$/;
   app.put("/api/gestao/receita/metas", async (req, res) => {
     try {
       const { ano, mesNum } = parsePeriodo(req.body || {});
