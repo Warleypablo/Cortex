@@ -3,6 +3,9 @@
 Arquivo específico deste ambiente (remover ao distribuir a skill). Dados observados no banco
 em jul/2026 — **confirmar tudo no intake**; isto acelera a Fase 1, não a substitui.
 
+**Antes de usar:** confirme que a análise é para o grupo Turbo. Se o usuário descrever outra
+empresa (ou um cenário hipotético), NÃO cite estas entidades — trate como caso genérico.
+
 ## Entidades (campo `empresa` em "Conta Azul".caz_parcelas)
 
 | Entidade | Observações |

@@ -20,6 +20,7 @@ Base: EC 132/2023 · LC 214/2025 (institui IBS, CBS e Imposto Seletivo) · LC 22
 2. **Dispensa do recolhimento:** quem **cumpre as obrigações acessórias** (emite os DFe conforme as normas vigentes) fica **dispensado de recolher** CBS/IBS em 2026. Ou seja: em 2026 a carga extra efetiva é ZERO para quem estiver em conformidade — o risco é de conformidade, não de caixa.
 3. **Se recolher:** o valor pago de CBS/IBS em 2026 é **compensável com PIS/COFINS** (e o excedente, ressarcível) — LC 214, art. 348. Verificar se algo foi recolhido sem necessidade → recuperar.
 4. **Apuração assistida/informativa:** RFB/CGIBS calculam com base nos DFe. Divergência entre nota e apuração aparece — consistência documental virou o jogo (liga com o eixo 12).
+5. **Simples Nacional e MEI em 2026:** optantes (CRT 1) estão **dispensados do destaque** de CBS/IBS nos documentos fiscais durante 2026; a obrigatoriedade para o Simples começa em **04/01/2027**. O cronograma de 2026 (incl. o marco de 01/08) vale para o regime normal (CRT 3). Confirmar na NT vigente (NT 2025.002 e sucessoras) antes de afirmar.
 
 ## Créditos financeiros no IVA dual (mapear por produto)
 
