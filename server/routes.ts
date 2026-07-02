@@ -48,6 +48,8 @@ import { registerChatRoutes } from "./routes/chat";
 import { registerChamadosRoutes } from "./routes/chamados";
 import { registerFcaRoutes } from "./routes/fca";
 import { registerTurboZapRoutes, initTurboZapTables } from "./routes/turbozap";
+import { registerResumoLideresRoutes } from "./routes/resumoLideres";
+import { initResumoLideresTable } from "./services/resumoLideres";
 import { registerJuridicoAssistenteRoutes } from "./routes/juridico-assistente";
 import { registerIaHubRoutes } from "./routes/ia-hub";
 import { registerJuridicoRelatoriosRoutes } from "./routes/juridico-relatorios";
@@ -8512,6 +8514,10 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
   // TurboZap - Central de Cobranças via WhatsApp
   registerTurboZapRoutes(app);
   initTurboZapTables().catch((err) => console.error("[turbozap] Init error:", err));
+
+  // Resumo diário de métricas para líderes via WhatsApp
+  registerResumoLideresRoutes(app);
+  initResumoLideresTable().catch((err) => console.error("[resumo-lideres] Init error:", err));
 
   // Jurídico Assistente IA - registered from separate file
   registerJuridicoAssistenteRoutes(app);
