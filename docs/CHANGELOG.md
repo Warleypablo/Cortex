@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-07-02 | feat(gestao-receita): seção "CAC por canal — variáveis de custo" com drill-down e spend automático
+
+**O que foi feito:**
+- Nova seção na aba Macro de /gestao/receita: CAC gerencial por macro-canal (10 canais: Inbound pago/orgânico, Outbound, Social Selling, Reativação, Recomendação, Indique e ganhe, Evento, Parceria, Expansão/Crossell), com card "Como é calculado" + CAC geral.
+- Clientes por canal = deals ganhos Bitrix agrupados por source→macro-canal (catálogo fixo em `gestaoReceita.cacCanais.ts`); mesma régua da coluna Deals da tabela de canais.
+- Custos manuais editáveis por mês via "Editar metas" (chaves novas `cac_canal:<canal>:<item>` em `cortex_core.gestao_receita_metas`); incentivos automáticos (Indique e ganhe, Parceria) = unitário editável (`cac_canal_unit:<canal>`, default R$ 1.000) × clientes, mês a mês.
+- "Investimento em anúncios" (Inbound pago) preenchido automaticamente: spend Meta + Google + TikTok + LinkedIn das contas da Turbo, por competência, com queries resilientes; pill "auto", não editável.
+- Drill-down: clique no card abre Sheet com os deals ganhos dos sources do canal (tipo `cac_canal`), agrupados por source.
+- Refactor: helpers visuais da tela extraídos para `client/src/components/gestao/gestaoUi.tsx` (Fonte, MetaInput, SectionCard, BlockHead, Nota, PillManual, formatadores, MetasCtx).
+
+**Por que:**
+- Mockup do time apontado como faltante na tela ("Falta isso né?"); depois pedidos incrementais: drill nos cards e preenchimento automático do que o Cortex já sabe.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.cacCanais.ts` - módulo novo (catálogo, agregação pura, queries deals/metas/spend).
+- `server/routes/gestaoReceita.cacCanais.test.ts` - 8 testes vitest da agregação.
+- `server/routes/gestaoReceita.ts` - payload `macro.cacCanais` + regex `CHAVE_META_OK` com prefixos novos.
+- `server/routes/gestaoReceita.detalhe.ts` - tipo `cac_canal` no drill.
+- `client/src/components/gestao/CacPorCanal.tsx` - componente da seção.
+- `client/src/components/gestao/gestaoUi.tsx` - helpers compartilhados (extraídos da page).
+- `client/src/pages/gestao/GestaoReceita.tsx` - integração + remoção dos helpers movidos.
+
+**Impacto arquitetural:** Helpers visuais da família Gestão de Receita agora compartilhados via gestaoUi.tsx (novas seções extraídas devem importar de lá). Executado via subagent-driven development (5 tasks + review final "Ready to merge: Yes").
+
+---
+
 ## 2026-07-02 | fix(gestao-receita): alinha Tx conv. dos canais à régua direta (deals ÷ reuniões)
 
 **O que foi feito:**

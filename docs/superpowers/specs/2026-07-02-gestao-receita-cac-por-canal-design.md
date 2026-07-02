@@ -65,11 +65,15 @@ macro.cacCanais = {
   geral: { cac: number | null, clientes: number, custoTotal: number },
   canais: Array<{
     id: string; label: string; clientes: number; custoTotal: number; cacCliente: number | null;
-    itens: Array<{ id: string; label: string; valor: number; tipo: 'manual' }>;
+    itens: Array<{ id: string; label: string; valor: number; fonte: 'auto' | 'manual' }>;
     incentivo?: { label: string; unit: number; qtd: number; total: number };
   }>;
 }
 ```
+
+**Itens automáticos (adendo 2026-07-02, decisão do usuário):** o item `anuncios` do Inbound pago é `fonte: 'auto'` — valor = spend Meta + Google + TikTok + LinkedIn das contas da Turbo no período (competência, mês a mês; queries resilientes a schema ausente/permission denied). Item auto ignora override manual e não é editável na UI (pill "auto"). Demais itens seguem manuais.
+
+**Drill-down (adendo 2026-07-02, entrou na v1 a pedido do usuário):** clique no card abre o Sheet com os deals ganhos do período dos sources do canal (tipo `cac_canal` no drill, agrupado por source com labels legíveis); desabilitado no modo edição; Parceria (sem source) abre vazio com nota.
 
 **Chaves de meta novas** em `cortex_core.gestao_receita_metas` (tabela existente, sem migração):
 - `cac_canal:<canal>:<item>` — custo manual mensal.
