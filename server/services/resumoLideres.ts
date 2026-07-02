@@ -1,6 +1,14 @@
 // Resumo diário de métricas para líderes via WhatsApp.
 // Spec: docs/superpowers/specs/2026-07-02-resumo-lideres-whatsapp-design.md
 
+import { db } from "../db";
+import { sql } from "drizzle-orm";
+import {
+  getMrrAtivo,
+  getMrrInicioMes,
+  getVendasMrrBreakdown,
+} from "../okr2026/metricsAdapter";
+
 export interface MetricasResumo {
   mrrAtivo: number;
   entregaPontual: number;
@@ -83,5 +91,90 @@ export function agoraSaoPaulo(date: Date = new Date()): {
     hora,
     horaFmt: `${hora}h`,
     diaSemana: weekdayMap[weekday] ?? 0,
+  };
+}
+
+// ============================================
+// Cálculo das métricas (mês corrente em America/Sao_Paulo)
+// ============================================
+
+async function getChurnMesBruto(): Promise<number> {
+  // Churn BRUTO (inclui abonados) — alinhado ao card do ClickUp
+  const result = await db.execute(sql`
+    SELECT COALESCE(SUM(valor_r), 0) AS churn
+    FROM "Clickup".cup_churn
+    WHERE data_solicitacao_encerramento >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo'))::date
+      AND data_solicitacao_encerramento < (date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')) + interval '1 month')::date
+  `);
+  return parseFloat((result.rows[0] as any)?.churn || "0");
+}
+
+async function getEmCancelamento(): Promise<number> {
+  const result = await db.execute(sql`
+    SELECT COALESCE(SUM(valorr), 0) AS total
+    FROM "Clickup".cup_contratos
+    WHERE status = 'em cancelamento' AND valorr > 0
+  `);
+  return parseFloat((result.rows[0] as any)?.total || "0");
+}
+
+async function getEntregaPontualMes(): Promise<number> {
+  // Contratos que PASSARAM a 'entregue' no mês: live = 'entregue' e no snapshot
+  // do dia 1º não era 'entregue' (ou nem existia — criado e entregue no mês).
+  const result = await db.execute(sql`
+    WITH primeiro_snapshot AS (
+      SELECT MIN(data_snapshot) AS d
+      FROM "Clickup".cup_data_hist
+      WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM')
+    )
+    SELECT COALESCE(SUM(c.valorp), 0) AS total
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_data_hist h
+      ON h.id_subtask = c.id_subtask
+     AND h.data_snapshot = (SELECT d FROM primeiro_snapshot)
+    WHERE c.status = 'entregue'
+      AND c.valorp > 0
+      AND (h.id_subtask IS NULL OR h.status <> 'entregue')
+  `);
+  return parseFloat((result.rows[0] as any)?.total || "0");
+}
+
+export async function calcularMetricasResumo(): Promise<MetricasResumo> {
+  const [mrrAtivo, mrrInicioMes, breakdown, churn, emCancelamento, entregaPontual] =
+    await Promise.all([
+      getMrrAtivo(),
+      getMrrInicioMes(),
+      getVendasMrrBreakdown(),
+      getChurnMesBruto(),
+      getEmCancelamento(),
+      getEntregaPontualMes(),
+    ]);
+
+  // metricsAdapter engole erros retornando 0 — nunca enviar mensagem com métricas parciais
+  if (mrrAtivo <= 0 || mrrInicioMes <= 0) {
+    throw new Error(
+      `Métricas base inválidas (mrrAtivo=${mrrAtivo}, mrrInicioMes=${mrrInicioMes}) — envio abortado`,
+    );
+  }
+
+  const crossR = breakdown.crosssell;
+  const crossP = breakdown.crosssell_pontual;
+  const crossPAmortizado = crossP / 5;
+  const crossTotal = crossR + crossPAmortizado;
+  const netChurn = churn - crossTotal;
+
+  return {
+    mrrAtivo,
+    entregaPontual,
+    churn,
+    churnPct: (churn / mrrInicioMes) * 100,
+    emCancelamento,
+    crossR,
+    crossP,
+    crossPAmortizado,
+    crossTotal,
+    netChurn,
+    netChurnPct: (netChurn / mrrInicioMes) * 100,
+    mrrInicioMes,
   };
 }
