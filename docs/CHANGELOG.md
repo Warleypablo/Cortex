@@ -1,5 +1,29 @@
 # Changelog
 
+## 2026-07-02 | feat(resumo-lideres): automação da mensagem diária de métricas p/ líderes via WhatsApp
+
+**O que foi feito:**
+- Novo serviço `resumoLideres` que calcula as métricas do mês corrente (MRR ativo, Entrega Pontual, Churn bruto + %, Em cancelamento, Cross R, Cross P ÷ 5, Net Churn + %) e formata a mensagem "Bom dia líderes!!!" idêntica à enviada manualmente hoje (percentuais exatos com 2 casas).
+- Job no server (padrão `setInterval` do `index.ts`): envia todo **dia útil às 10h America/Sao_Paulo** via Evolution API (mesma infra do TurboZap), com janela de retry até 12h e idempotência (máx. 1 envio/dia) via nova tabela `cortex_core.resumo_lideres_envios` (criada em local e prod).
+- Endpoints autenticados: `GET /api/resumo-lideres/preview` (mensagem sem enviar) e `POST /api/resumo-lideres/enviar` (dispara na hora, `{force:true}` reenvia).
+- Config por env: `RESUMO_LIDERES_ATIVO`, `RESUMO_LIDERES_DESTINO` (número de teste agora; ID do grupo depois), `RESUMO_LIDERES_INSTANCIA`.
+- Definições validadas contra a mensagem real de 25/06 em prod (base do % = MRR início do mês, R$ 1.030.229 → 14,37% e 9% exatos); teste unitário reproduz a mensagem caractere a caractere.
+
+**Por que:**
+- Pedido do usuário (2026-07-02, mensagem do WhatsApp dos líderes): "temos que fazer automação dessa mensagem" — hoje alguém monta os números à mão todo dia.
+
+**Arquivos alterados:**
+- `server/services/resumoLideres.ts` - cálculo das métricas, formatador puro, envio idempotente, init da tabela.
+- `server/services/resumoLideres.test.ts` - testes do formatador e timezone (6 testes).
+- `server/routes/resumoLideres.ts` - endpoints preview/enviar.
+- `server/routes.ts` - registro das rotas + init da tabela.
+- `server/index.ts` - job agendado (tick 5min, janela 10h-12h dias úteis).
+- `shared/schema.ts` - definição Drizzle de `resumo_lideres_envios`.
+
+**Impacto arquitetural:** Nenhum (segue padrões existentes: jobs em `index.ts`, envio via `turbozap.enviarMensagemWhatsApp`, tabela interna em `cortex_core`).
+
+---
+
 ## 2026-07-02 | feat(gestao-receita): listar todos os produtos na aba Micro, mesmo sem vendas
 
 **O que foi feito:**
