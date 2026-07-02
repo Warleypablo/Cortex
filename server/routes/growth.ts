@@ -54,7 +54,8 @@ const PLATFORM_CASE_SQL = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' THEN 'linkedin_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin_social'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
-  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%' THEN 'tiktok_ads'
+  WHEN (LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt')
+       AND (LOWER(TRIM(COALESCE(utm_medium, ''))) = 'paid' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%') THEN 'tiktok_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt' THEN 'tiktok_social'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
@@ -78,7 +79,8 @@ const PLATFORM_CASE_SQL_BASIC = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%ads%' THEN 'linkedin_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
-  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%' THEN 'tiktok_ads'
+  WHEN (LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt')
+       AND (LOWER(TRIM(COALESCE(utm_medium, ''))) = 'paid' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%') THEN 'tiktok_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt' THEN 'tiktok'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
@@ -148,11 +150,31 @@ const SOURCE_CANON_SQL = `CASE
 END`;
 
 /**
+ * Predicado de filtro pago/orgânico do TikTok baseado em utm_medium (Constituição UTM,
+ * pós-cutover 21/05/2026) — alinhado ao PLATFORM_CASE_SQL_BASIC. O gasto do TikTok é
+ * atribuído por advertiser_id + tag [Funil], mas os leads só têm utm_medium/utm_source;
+ * o que separa pago de orgânico é o utm_medium='paid', NÃO a substring 'ads' no source
+ * (que muitos setups de LP não emitem). Fallback histórico: source contendo '%tiktok_ads%'.
+ * Retorna o predicado SQL cru (com prefixo de coluna) p/ 'tiktok_ads'/'tiktok'; null p/
+ * os demais valores (o chamador mantém o filtro atual).
+ */
+function tiktokMediumCondRaw(v: string, prefix = ''): string | null {
+  const s = `LOWER(TRIM(COALESCE(${prefix}utm_source, '')))`;
+  const m = `LOWER(TRIM(COALESCE(${prefix}utm_medium, '')))`;
+  const isTiktok = `(${s} LIKE '%tiktok%' OR ${s} = 'tt')`;
+  const isPaid = `(${m} = 'paid' OR ${s} LIKE '%tiktok_ads%' OR ${s} LIKE '%tiktok%ads%')`;
+  if (v === 'tiktok_ads') return `(${isTiktok} AND ${isPaid})`;
+  if (v === 'tiktok') return `(${isTiktok} AND NOT ${isPaid})`;
+  return null;
+}
+
+/**
  * Constrói um filtro SQL pra utm_source/plataforma consistente com PLATFORM_CASE_SQL_BASIC.
  *
  * Diferente do filtro estrito `LOWER(utm_source) LIKE 'instagram%'`, este filtro:
  *   - Para `instagram`: também aceita source='WEB' (Contato IG), source='UC_4VCKGM'
  *     (Social Selling IG), utm_term='linktree', utm_campaign+content='linktree' (legado).
+ *   - Para TikTok: pago/orgânico via utm_medium (ver tiktokMediumCondRaw).
  *   - Para outras plataformas: mantém o LIKE 'platform%' (já cobre 'facebook', 'fb_ads', etc).
  *
  * Usa o alias da tabela `d` (todos os endpoints chamadores já fazem FROM "Bitrix".crm_deal d).
@@ -160,6 +182,8 @@ END`;
 function buildPlatformFilterSql(utmValues: string[]) {
   if (utmValues.length === 0) return sql``;
   const expressions = utmValues.map((v) => {
+    const tiktokCond = tiktokMediumCondRaw(v, 'd.');
+    if (tiktokCond) return sql.raw(tiktokCond);
     if (v === 'instagram') {
       return sql`(
         LOWER(d.utm_source) LIKE 'instagram%'
@@ -3586,11 +3610,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       //   - funilFilter (produto)  → estreita por fnl_ngc do Bitrix
       //   - utmSourceFilter (plataforma) → estreita por utm_source LIKE
       // Sem filtro = universo completo. Sem switch de semântica.
+      // TikTok pago/orgânico é separado por utm_medium (ver tiktokMediumCondRaw); demais
+      // plataformas mantêm o prefixo LIKE 'source%'.
       let utmSourceFilter = sql``;
-      if (utmValues.length === 1) {
-        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
-      } else if (utmValues.length > 1) {
-        utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
+      if (utmValues.length > 0) {
+        utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => {
+          const tiktokCond = tiktokMediumCondRaw(v, 'd.');
+          return tiktokCond ? sql.raw(tiktokCond) : sql`LOWER(d.utm_source) LIKE ${v + '%'}`;
+        }), sql` OR `)})`;
       }
 
       const leadsResult = await db.execute(sql`
@@ -4846,6 +4873,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         // por plataforma não bater com o card de Ads. Versão raw (sem alias d.) porque
         // esta query usa sql.raw com colunas sem prefixo.
         const conds = utmValues.map(v => {
+          const tiktokCond = tiktokMediumCondRaw(v, '');
+          if (tiktokCond) return tiktokCond;
           if (v === 'instagram') {
             return `(
               LOWER(utm_source) LIKE 'instagram%'
