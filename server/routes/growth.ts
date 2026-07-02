@@ -51,10 +51,12 @@ const PLATFORM_CASE_SQL = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
-  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' THEN 'linkedin_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%'
+       AND (LOWER(TRIM(COALESCE(utm_medium, ''))) = 'paid' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%ads%') THEN 'linkedin_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin_social'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
-  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%' THEN 'tiktok_ads'
+  WHEN (LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt')
+       AND (LOWER(TRIM(COALESCE(utm_medium, ''))) = 'paid' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%') THEN 'tiktok_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt' THEN 'tiktok_social'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
@@ -75,10 +77,12 @@ const PLATFORM_CASE_SQL_BASIC = `CASE
   WHEN LOWER(TRIM(COALESCE(utm_term, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_campaign, ''))) = 'linktree' AND LOWER(TRIM(COALESCE(utm_content, ''))) = 'linktree' THEN 'instagram'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%instagram%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'ig' THEN 'instagram'
-  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%ads%' THEN 'linkedin_ads'
+  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%'
+       AND (LOWER(TRIM(COALESCE(utm_medium, ''))) = 'paid' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%ads%') THEN 'linkedin_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%linkedin%' THEN 'linkedin'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%youtube%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'yt' THEN 'youtube'
-  WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%' THEN 'tiktok_ads'
+  WHEN (LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt')
+       AND (LOWER(TRIM(COALESCE(utm_medium, ''))) = 'paid' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok_ads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%ads%') THEN 'tiktok_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%tiktok%' OR LOWER(TRIM(COALESCE(utm_source, ''))) = 'tt' THEN 'tiktok'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%facebook%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%fb%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%meta%' THEN 'meta_ads'
   WHEN LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%google%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%gads%' OR LOWER(TRIM(COALESCE(utm_source, ''))) LIKE '%adwords%' THEN 'google_ads'
@@ -148,11 +152,38 @@ const SOURCE_CANON_SQL = `CASE
 END`;
 
 /**
+ * Predicado de filtro pago/orgânico de TikTok e LinkedIn baseado em utm_medium
+ * (Constituição UTM, pós-cutover 21/05/2026) — alinhado ao PLATFORM_CASE_SQL_BASIC.
+ * O gasto é atribuído por advertiser_id + tag [Funil], mas os leads só têm
+ * utm_medium/utm_source; o que separa pago de orgânico é o utm_medium='paid', NÃO a
+ * substring 'ads' no source (que muitos setups de LP não emitem). Fallback histórico:
+ * source contendo '%<canal>_ads%'. Retorna o predicado SQL cru (com prefixo de coluna)
+ * p/ 'tiktok_ads'/'tiktok'/'linkedin_ads'/'linkedin'; null p/ os demais valores (o
+ * chamador mantém o filtro atual).
+ */
+function paidOrganicCondRaw(v: string, prefix = ''): string | null {
+  const s = `LOWER(TRIM(COALESCE(${prefix}utm_source, '')))`;
+  const m = `LOWER(TRIM(COALESCE(${prefix}utm_medium, '')))`;
+  const build = (channelMatch: string, ch: string, wantPaid: boolean) => {
+    const isPaid = `(${m} = 'paid' OR ${s} LIKE '%${ch}_ads%' OR ${s} LIKE '%${ch}%ads%')`;
+    return wantPaid ? `(${channelMatch} AND ${isPaid})` : `(${channelMatch} AND NOT ${isPaid})`;
+  };
+  const tiktok = `(${s} LIKE '%tiktok%' OR ${s} = 'tt')`;
+  const linkedin = `(${s} LIKE '%linkedin%')`;
+  if (v === 'tiktok_ads') return build(tiktok, 'tiktok', true);
+  if (v === 'tiktok') return build(tiktok, 'tiktok', false);
+  if (v === 'linkedin_ads') return build(linkedin, 'linkedin', true);
+  if (v === 'linkedin') return build(linkedin, 'linkedin', false);
+  return null;
+}
+
+/**
  * Constrói um filtro SQL pra utm_source/plataforma consistente com PLATFORM_CASE_SQL_BASIC.
  *
  * Diferente do filtro estrito `LOWER(utm_source) LIKE 'instagram%'`, este filtro:
  *   - Para `instagram`: também aceita source='WEB' (Contato IG), source='UC_4VCKGM'
  *     (Social Selling IG), utm_term='linktree', utm_campaign+content='linktree' (legado).
+ *   - Para TikTok/LinkedIn: pago/orgânico via utm_medium (ver paidOrganicCondRaw).
  *   - Para outras plataformas: mantém o LIKE 'platform%' (já cobre 'facebook', 'fb_ads', etc).
  *
  * Usa o alias da tabela `d` (todos os endpoints chamadores já fazem FROM "Bitrix".crm_deal d).
@@ -160,6 +191,8 @@ END`;
 function buildPlatformFilterSql(utmValues: string[]) {
   if (utmValues.length === 0) return sql``;
   const expressions = utmValues.map((v) => {
+    const paidCond = paidOrganicCondRaw(v, 'd.');
+    if (paidCond) return sql.raw(paidCond);
     if (v === 'instagram') {
       return sql`(
         LOWER(d.utm_source) LIKE 'instagram%'
@@ -3652,11 +3685,14 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       //   - funilFilter (produto)  → estreita por fnl_ngc do Bitrix
       //   - utmSourceFilter (plataforma) → estreita por utm_source LIKE
       // Sem filtro = universo completo. Sem switch de semântica.
+      // TikTok/LinkedIn pago/orgânico é separado por utm_medium (ver paidOrganicCondRaw); demais
+      // plataformas mantêm o prefixo LIKE 'source%'.
       let utmSourceFilter = sql``;
-      if (utmValues.length === 1) {
-        utmSourceFilter = sql`AND LOWER(d.utm_source) LIKE ${utmValues[0] + '%'}`;
-      } else if (utmValues.length > 1) {
-        utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => sql`LOWER(d.utm_source) LIKE ${v + '%'}`), sql` OR `)})`;
+      if (utmValues.length > 0) {
+        utmSourceFilter = sql`AND (${sql.join(utmValues.map(v => {
+          const paidCond = paidOrganicCondRaw(v, 'd.');
+          return paidCond ? sql.raw(paidCond) : sql`LOWER(d.utm_source) LIKE ${v + '%'}`;
+        }), sql` OR `)})`;
       }
 
       const leadsResult = await db.execute(sql`
@@ -4912,6 +4948,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         // por plataforma não bater com o card de Ads. Versão raw (sem alias d.) porque
         // esta query usa sql.raw com colunas sem prefixo.
         const conds = utmValues.map(v => {
+          const paidCond = paidOrganicCondRaw(v, '');
+          if (paidCond) return paidCond;
           if (v === 'instagram') {
             return `(
               LOWER(utm_source) LIKE 'instagram%'
@@ -5013,7 +5051,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       // Build result per platform
-      const platforms = ['meta_ads', 'google_ads', 'instagram', 'youtube', 'linkedin', 'tiktok_ads', 'tiktok'];
+      const platforms = ['meta_ads', 'google_ads', 'instagram', 'youtube', 'linkedin', 'linkedin_ads', 'tiktok_ads', 'tiktok'];
       const result: Record<string, any> = {};
 
       for (const platKey of platforms) {
