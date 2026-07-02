@@ -10,9 +10,13 @@ empresa (ou um cenário hipotético), NÃO cite estas entidades — trate como c
 
 | Entidade | Observações |
 |---|---|
-| **TURBO PARTNERS** | Principal; receita ~R$ 1,0–1,4 mi/mês (2026). Serviços de marketing/growth. Regime: a confirmar |
-| **TURBO FILIAL** | Empresa nova, fatura desde jun/2026 (~R$ 565 mil no 1º mês). CNPJ/regime: a confirmar. Gotcha: NÃO aparece em caz_receber, e caz_bancos cria contas-fantasma dela (ver cortex-db.md) |
-| **PEIXOTO DEBBANE** | ~R$ 80–250 mil/mês. Atividade/relação societária: a confirmar |
+| **TURBO PARTNERS** | Principal; receita ~R$ 1,0–1,4 mi/mês (2026). Serviços de marketing/growth. **Regime: LUCRO REAL** (confirmado pelo usuário em 2026-07-02); já toma crédito de PIS/COFINS de insumo sobre as notas dos prestadores PJ. PIS/COFINS efetivo observado ~3,0% (líquido de créditos) |
+| **TURBO FILIAL** | Empresa nova, fatura desde jun/2026; recebe a migração de receita da PARTNERS. Provavelmente Lucro Real também (a confirmar). Gotcha: NÃO aparece em caz_receber, e caz_bancos cria contas-fantasma dela (ver cortex-db.md) |
+| **PEIXOTO DEBBANE** | ~R$ 80–250 mil/mês. **Regime: SIMPLES NACIONAL** (confirmado pelo usuário; Anexo III via Fator R — pró-labore alto). Relação societária: a confirmar |
+
+**Régua financeira:** usar `caz_parcelas` como base principal de recebimentos/pagamentos
+(pedido do usuário em 2026-07-02); `caz_vendas` registra a venda cheia na data do fechamento
+(bookings, inclui datas futuras) — não usar como receita mensal.
 
 ## Modelo de negócio
 
