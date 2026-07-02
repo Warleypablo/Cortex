@@ -4234,3 +4234,14 @@ export type GhlTagsSnapshot = typeof ghlTagsSnapshot.$inferSelect;
 export type InsertGhlTagsSnapshot = typeof ghlTagsSnapshot.$inferInsert;
 export type GhlSyncRun = typeof ghlSyncRuns.$inferSelect;
 export type InsertGhlSyncRun = typeof ghlSyncRuns.$inferInsert;
+
+// Resumo diário de métricas para líderes via WhatsApp (idempotência de envio)
+export const resumoLideresEnvios = cortexCoreSchema.table("resumo_lideres_envios", {
+  id: serial("id").primaryKey(),
+  dataRef: date("data_ref").notNull(),
+  destino: text("destino"),
+  mensagem: text("mensagem"),
+  status: text("status").notNull().default("ok"),
+  erro: text("erro"),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});

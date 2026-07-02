@@ -8,6 +8,7 @@ import {
   getMrrInicioMes,
   getVendasMrrBreakdown,
 } from "../okr2026/metricsAdapter";
+import { enviarMensagemWhatsApp } from "./turbozap";
 
 export interface MetricasResumo {
   mrrAtivo: number;
@@ -177,4 +178,86 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
     netChurnPct: (netChurn / mrrInicioMes) * 100,
     mrrInicioMes,
   };
+}
+
+// ============================================
+// Idempotência + envio
+// ============================================
+
+export async function initResumoLideresTable(): Promise<void> {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS cortex_core.resumo_lideres_envios (
+      id SERIAL PRIMARY KEY,
+      data_ref DATE NOT NULL,
+      destino TEXT,
+      mensagem TEXT,
+      status TEXT NOT NULL DEFAULT 'ok',
+      erro TEXT,
+      criado_em TIMESTAMP DEFAULT NOW()
+    )
+  `);
+}
+
+async function jaEnviadoHoje(dataRef: string): Promise<boolean> {
+  const result = await db.execute(sql`
+    SELECT 1 FROM cortex_core.resumo_lideres_envios
+    WHERE data_ref = ${dataRef} AND status = 'ok'
+    LIMIT 1
+  `);
+  return result.rows.length > 0;
+}
+
+async function registrarEnvio(
+  dataRef: string,
+  destino: string,
+  mensagem: string,
+  status: "ok" | "erro",
+  erro?: string,
+): Promise<void> {
+  await db.execute(sql`
+    INSERT INTO cortex_core.resumo_lideres_envios (data_ref, destino, mensagem, status, erro)
+    VALUES (${dataRef}, ${destino}, ${mensagem}, ${status}, ${erro ?? null})
+  `);
+}
+
+export async function enviarResumoLideres(
+  opts: { force?: boolean } = {},
+): Promise<{ success: boolean; skipped?: boolean; mensagem?: string; error?: string }> {
+  const destino = process.env.RESUMO_LIDERES_DESTINO;
+  if (!destino) {
+    return { success: false, error: "RESUMO_LIDERES_DESTINO não configurado" };
+  }
+
+  const sp = agoraSaoPaulo();
+  if (!opts.force && (await jaEnviadoHoje(sp.dataRef))) {
+    return { success: true, skipped: true };
+  }
+
+  let mensagem: string;
+  try {
+    const metricas = await calcularMetricasResumo();
+    mensagem = formatarMensagemResumo(metricas, sp);
+  } catch (err: any) {
+    // Falha de cálculo não registra na tabela — sem envio, o retry fica livre
+    console.error("[resumo-lideres] Falha ao calcular métricas:", err.message);
+    return { success: false, error: err.message };
+  }
+
+  const instancia: "financeiro" | "juridico" =
+    process.env.RESUMO_LIDERES_INSTANCIA === "juridico" ? "juridico" : "financeiro";
+  const resultado = await enviarMensagemWhatsApp(destino, mensagem, instancia);
+
+  await registrarEnvio(
+    sp.dataRef,
+    destino,
+    mensagem,
+    resultado.success ? "ok" : "erro",
+    resultado.error,
+  );
+
+  if (!resultado.success) {
+    console.error("[resumo-lideres] Falha no envio:", resultado.error);
+    return { success: false, error: resultado.error, mensagem };
+  }
+  return { success: true, mensagem };
 }
