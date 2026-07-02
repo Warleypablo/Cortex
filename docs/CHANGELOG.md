@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-02 | feat(gestao-receita): listar todos os produtos na aba Micro, mesmo sem vendas
+
+**O que foi feito:**
+- As tabelas "Venda de MRR por produto" e "Venda Pontual por produto" (aba Micro de /gestao/receita) agora listam o **catálogo completo de produtos** (todos os que já existiram em `cup_contratos`, excluindo status "não usar"), mesmo os com 0 contratos no período.
+- Query da seção 9 do agregador ganhou um CTE `catalogo` (DISTINCT produto sem filtro de data) com LEFT JOIN nas vendas do período; produtos zerados aparecem com 0/R$ 0 e ficam ordenados alfabeticamente após os vendidos.
+
+**Por que:**
+- Pedido do usuário (2026-07-02, print do WhatsApp): produtos sem venda no mês não apareciam na tabela, impossibilitando editar as metas (nº contratos × ticket médio) deles no modo "Editar metas".
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - CTE `catalogo` + LEFT JOIN na query de venda por produto.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-01 | feat(gestao-receita): filtro Produto × Plataforma na aba Funil + outbound só Prospecção
 
 **O que foi feito:**
