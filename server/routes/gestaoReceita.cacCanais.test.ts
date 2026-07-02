@@ -77,15 +77,31 @@ describe("agregarCacCanais", () => {
         { source: "UC_YWZVA2", mes: 6, clientes: 3 },
       ],
       [
-        { chave: "cac_canal:inbound_pago:anuncios", mes: 6, valor: 29500 },
         { chave: "cac_canal:outbound:time", mes: 6, valor: 14000 },
         { chave: "cac_canal:outbound:ferramentas", mes: 6, valor: 1800 },
       ],
       JUN,
+      { ads_spend: { 6: 29500 } },
     );
     expect(out.geral.clientes).toBe(9);
     expect(out.geral.custoTotal).toBe(45300);
     expect(out.geral.cac).toBe(Math.round(45300 / 9));
+  });
+
+  it("item automático (ads_spend): soma a série mensal, ignora override manual e marca fonte", () => {
+    const out = agregarCacCanais(
+      [{ source: "WEBFORM", mes: 6, clientes: 2 }],
+      [{ chave: "cac_canal:inbound_pago:anuncios", mes: 6, valor: 999999 }],
+      MAI_JUN,
+      { ads_spend: { 5: 10000, 6: 19500 } },
+    );
+    const inbound = out.canais.find((c) => c.id === "inbound_pago")!;
+    const anuncios = inbound.itens.find((i) => i.id === "anuncios")!;
+    expect(anuncios.valor).toBe(29500); // 10000 + 19500; override 999999 ignorado
+    expect(anuncios.fonte).toBe("auto");
+    expect(inbound.custoTotal).toBe(29500);
+    const outbound = out.canais.find((c) => c.id === "outbound")!;
+    expect(outbound.itens.every((i) => i.fonte === "manual")).toBe(true);
   });
 
   it("retorna sempre os 10 canais na ordem do catálogo", () => {

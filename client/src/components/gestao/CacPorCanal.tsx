@@ -7,7 +7,7 @@ import { Filter } from "lucide-react";
 import { Fonte, MetaInput, Nota, BlockHead, SectionCard, brl, intBR, type MetasCtx } from "./gestaoUi";
 import type { DrillRef } from "./GestaoReceitaDetalhe";
 
-export interface CacCanalItem { id: string; label: string; valor: number }
+export interface CacCanalItem { id: string; label: string; valor: number; fonte: "auto" | "manual" }
 export interface CacCanalCard {
   id: string; label: string; clientes: number; custoTotal: number; cacCliente: number | null;
   itens: CacCanalItem[];
@@ -20,8 +20,10 @@ export interface CacCanaisData {
 
 export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; metas: MetasCtx; onDrill: (dr: DrillRef) => void }) {
   // valores "ao vivo" durante a edição (mesma mecânica da tabela Custo da operação);
-  // fora do modo edição, metas.get devolve o fallback (valor do payload)
-  const itemVivo = (c: CacCanalCard, it: CacCanalItem) => metas.get(`cac_canal:${c.id}:${it.id}`, it.valor);
+  // fora do modo edição, metas.get devolve o fallback (valor do payload).
+  // Item automático (spend de ads) não é editável — sempre o valor do payload.
+  const itemVivo = (c: CacCanalCard, it: CacCanalItem) =>
+    it.fonte === "auto" ? it.valor : metas.get(`cac_canal:${c.id}:${it.id}`, it.valor);
   const unitVivo = (c: CacCanalCard) => metas.get(`cac_canal_unit:${c.id}`, c.incentivo?.unit ?? 0);
   // fora de edição, usa o total do payload (em multi-mês o unitário pode ter variado
   // entre meses, e unit × qtd divergiria do cálculo mês a mês do backend)
@@ -69,7 +71,12 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
                   {c.itens.map((it) => (
                     <div key={it.id} className="flex items-center justify-between gap-2 py-2 text-sm">
                       <span className="text-gray-700 dark:text-zinc-300">{it.label}</span>
-                      {metas.editando
+                      {it.fonte === "auto" ? (
+                        <span className="inline-flex items-center gap-1.5">
+                          <span className="font-semibold tabular-nums text-gray-900 dark:text-white">{brl(it.valor)}</span>
+                          <span className="inline-flex items-center rounded-full bg-teal-50 px-2 py-0.5 text-[10px] font-semibold text-teal-700 dark:bg-teal-950 dark:text-teal-300">auto</span>
+                        </span>
+                      ) : metas.editando
                         ? <MetaInput chave={`cac_canal:${c.id}:${it.id}`} valorAtual={it.valor} metas={metas} />
                         : <span className="font-semibold tabular-nums text-gray-900 dark:text-white">{brl(it.valor)}</span>}
                     </div>
@@ -109,8 +116,9 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
       </div>
 
       <Nota>
-        Visão gerencial: custos informados manualmente por mês (botão "Editar metas", mês único) + incentivos automáticos por cliente.
-        Não bate com o card "CAC — custo de aquisição" (Conta Azul, regime caixa) por design.
+        Visão gerencial: custos informados manualmente por mês (botão "Editar metas", mês único) + itens automáticos.
+        "Investimento em anúncios" (auto) = spend Meta + Google + TikTok + LinkedIn das contas da Turbo no período (competência, não caixa);
+        incentivos por cliente também são automáticos. Não bate com o card "CAC — custo de aquisição" (Conta Azul, regime caixa) por design.
         Parceria ainda não tem source no CRM (clientes 0). Deals de sources fora dos 10 canais (ex.: sem origem) ficam fora desta seção.
       </Nota>
     </div>
