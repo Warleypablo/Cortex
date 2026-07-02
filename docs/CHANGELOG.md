@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-02 | feat(nps): atualiza áreas do formulário E-NPS
+
+**O que foi feito:**
+- Removida a área "Social Media" da lista de áreas da pesquisa E-NPS.
+- Adicionadas as áreas "Comunicação - Pulse" e "Gestor de Performance".
+
+**Por que:**
+- Pedido do usuário: alinhar as opções do formulário à estrutura atual de áreas da empresa.
+
+**Arquivos alterados:**
+- `client/src/pages/NpsPesquisa.tsx` - constante `AREAS` do formulário.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-02 | feat(resumo-lideres): automação da mensagem diária de métricas p/ líderes via WhatsApp
 
 **O que foi feito:**
