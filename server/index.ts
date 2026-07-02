@@ -730,6 +730,32 @@ app.use((req, res, next) => {
   setInterval(() => runBitrixDealsSync(), BITRIX_DEALS_SYNC_INTERVAL);
   console.log(`[bitrix-deals-sync-job] Scheduled every ${BITRIX_DEALS_SYNC_INTERVAL / 3600000}h`);
 
+  // Resumo diário de métricas para líderes via WhatsApp — dias úteis, 10h São Paulo.
+  // Janela 10h-12h: se o envio das 10h falhar, os ticks seguintes tentam de novo;
+  // idempotência (cortex_core.resumo_lideres_envios) garante no máximo 1 envio/dia.
+  const RESUMO_LIDERES_CHECK_INTERVAL = 5 * 60 * 1000; // 5min
+  const runResumoLideresJob = async () => {
+    try {
+      if (process.env.RESUMO_LIDERES_ATIVO !== "true") return;
+      const { agoraSaoPaulo, enviarResumoLideres } = await import("./services/resumoLideres");
+      const sp = agoraSaoPaulo();
+      const diaUtil = sp.diaSemana >= 1 && sp.diaSemana <= 5;
+      if (!diaUtil || sp.hora < 10 || sp.hora >= 12) return;
+      const resultado = await enviarResumoLideres();
+      if (resultado.skipped) return;
+      if (resultado.success) {
+        console.log("[resumo-lideres-job] Resumo enviado com sucesso");
+      } else {
+        console.error(`[resumo-lideres-job] Falha (retry no próximo tick): ${resultado.error}`);
+      }
+    } catch (err: any) {
+      console.error("[resumo-lideres-job] Erro:", err.message);
+    }
+  };
+  setTimeout(() => runResumoLideresJob(), 60000); // 1min após boot
+  setInterval(() => runResumoLideresJob(), RESUMO_LIDERES_CHECK_INTERVAL);
+  console.log("[resumo-lideres-job] Scheduled every 5min (envia dias úteis ~10h America/Sao_Paulo)");
+
   // Google Ads keywords sync a cada 12 horas
   const GOOGLE_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h
   const runGoogleAdsSync = async () => {
