@@ -17,6 +17,7 @@ import {
   Trophy, AlertTriangle, Wallet, Database, PencilLine,
 } from "lucide-react";
 import { GestaoReceitaDetalhe, type DrillRef } from "@/components/gestao/GestaoReceitaDetalhe";
+import { CacPorCanal, type CacCanaisData } from "@/components/gestao/CacPorCanal";
 import { Fonte, MetaInput, SectionCard, BlockHead, Nota, PillManual, brl, brlk, pct, intBR, type MetasCtx } from "@/components/gestao/gestaoUi";
 
 // classe das linhas/elementos clicáveis (drill-down)
@@ -47,6 +48,7 @@ interface GestaoReceitaData {
       cliente: { orcado: number; realizado: number; n: number };
       operacao: CacOperacaoRow[];
     };
+    cacCanais: CacCanaisData;
   };
   pessoas: { custoComercial: Stat; comissoes: Stat; closers: CloserRow[]; sdrs: SdrRow[] };
   micro: { produtos: ProdutoRow[]; vendedores: CloserRow[]; sdrs: SdrRow[] };
@@ -331,6 +333,9 @@ function SecaoMacro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
         <div className="mt-3">
           <CustoOperacaoTabela rows={cac.operacao} metas={metas} onDrill={onDrill} />
         </div>
+      </div>
+      <div>
+        <CacPorCanal dados={d.macro.cacCanais} metas={metas} />
       </div>
     </div>
   );

@@ -1,0 +1,113 @@
+// client/src/components/gestao/CacPorCanal.tsx
+// Seção "CAC por canal — variáveis de custo" (aba Macro da Gestão de Receita).
+// CAC gerencial: custos manuais editáveis por mês (Editar metas) + incentivos
+// automáticos por cliente. Clientes = deals ganhos Bitrix por macro-canal.
+import { Card, CardContent } from "@/components/ui/card";
+import { Filter } from "lucide-react";
+import { Fonte, MetaInput, Nota, BlockHead, SectionCard, brl, intBR, type MetasCtx } from "./gestaoUi";
+
+export interface CacCanalItem { id: string; label: string; valor: number }
+export interface CacCanalCard {
+  id: string; label: string; clientes: number; custoTotal: number; cacCliente: number | null;
+  itens: CacCanalItem[];
+  incentivo?: { label: string; unit: number; qtd: number; total: number };
+}
+export interface CacCanaisData {
+  geral: { cac: number | null; clientes: number; custoTotal: number };
+  canais: CacCanalCard[];
+}
+
+export function CacPorCanal({ dados, metas }: { dados: CacCanaisData; metas: MetasCtx }) {
+  // valores "ao vivo" durante a edição (mesma mecânica da tabela Custo da operação);
+  // fora do modo edição, metas.get devolve o fallback (valor do payload)
+  const itemVivo = (c: CacCanalCard, it: CacCanalItem) => metas.get(`cac_canal:${c.id}:${it.id}`, it.valor);
+  const unitVivo = (c: CacCanalCard) => metas.get(`cac_canal_unit:${c.id}`, c.incentivo?.unit ?? 0);
+  // fora de edição, usa o total do payload (em multi-mês o unitário pode ter variado
+  // entre meses, e unit × qtd divergiria do cálculo mês a mês do backend)
+  const incentivoVivo = (c: CacCanalCard) =>
+    c.incentivo ? (metas.editando ? unitVivo(c) * c.incentivo.qtd : c.incentivo.total) : 0;
+  const custoVivo = (c: CacCanalCard) => c.itens.reduce((a, it) => a + itemVivo(c, it), 0) + incentivoVivo(c);
+  const geralCusto = dados.canais.reduce((a, c) => a + custoVivo(c), 0);
+  const geralCac = dados.geral.clientes > 0 ? Math.round(geralCusto / dados.geral.clientes) : null;
+
+  return (
+    <div>
+      <BlockHead icon={<Filter className="h-4 w-4" />} title="CAC por canal — variáveis de custo" />
+      <SectionCard>
+        <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400">Como é calculado</div>
+        <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">
+          CAC do canal = soma das variáveis de custo ÷ nº de clientes fechados do canal (Bitrix).
+          Custos manuais editáveis; incentivos por cliente automáticos.
+        </p>
+        <div className="mt-3 text-3xl font-bold tabular-nums text-teal-700 dark:text-teal-400">{geralCac != null ? brl(geralCac) : "—"}</div>
+        <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400">
+          CAC geral · {intBR(dados.geral.clientes)} clientes
+        </div>
+      </SectionCard>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+        {dados.canais.map((c) => {
+          const custo = custoVivo(c);
+          const cac = c.clientes > 0 ? Math.round(custo / c.clientes) : null;
+          return (
+            <Card key={c.id} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
+              <CardContent className="pt-4 pb-4">
+                <div className="flex items-start justify-between gap-2 border-b border-gray-100 pb-2 dark:border-zinc-800">
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">{c.label}</span>
+                  <span className="text-right">
+                    <span className="block text-2xl font-bold tabular-nums text-teal-700 dark:text-teal-400">{cac != null ? brl(cac) : "—"}</span>
+                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-zinc-500">CAC / cliente</span>
+                  </span>
+                </div>
+
+                <div className="divide-y divide-gray-100 dark:divide-zinc-800">
+                  {c.itens.map((it) => (
+                    <div key={it.id} className="flex items-center justify-between gap-2 py-2 text-sm">
+                      <span className="text-gray-700 dark:text-zinc-300">{it.label}</span>
+                      {metas.editando
+                        ? <MetaInput chave={`cac_canal:${c.id}:${it.id}`} valorAtual={it.valor} metas={metas} />
+                        : <span className="font-semibold tabular-nums text-gray-900 dark:text-white">{brl(it.valor)}</span>}
+                    </div>
+                  ))}
+                  {c.incentivo && (
+                    <div className="flex items-center justify-between gap-2 py-2 text-sm">
+                      <span className="text-gray-700 dark:text-zinc-300">
+                        {c.incentivo.label}{" "}
+                        {metas.editando
+                          ? <MetaInput chave={`cac_canal_unit:${c.id}`} valorAtual={c.incentivo.unit} metas={metas} />
+                          : <b className="tabular-nums">{brl(unitVivo(c))}</b>}{" "}
+                        / cliente × {intBR(c.incentivo.qtd)}
+                      </span>
+                      <span className="font-semibold tabular-nums text-gray-500 dark:text-zinc-400">{brl(incentivoVivo(c))}</span>
+                    </div>
+                  )}
+                  {c.itens.length === 0 && !c.incentivo && (
+                    <div className="flex items-center justify-between gap-2 py-2 text-sm">
+                      <span className="text-gray-500 dark:text-zinc-400">Sem custo direto</span>
+                      <span className="text-gray-400 dark:text-zinc-500">—</span>
+                    </div>
+                  )}
+                </div>
+
+                <div className="mt-1 flex items-center justify-between gap-2 border-t border-gray-100 pt-2 text-sm dark:border-zinc-800">
+                  <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-zinc-400">
+                    Clientes <b className="tabular-nums text-gray-900 dark:text-white">{intBR(c.clientes)}</b> <Fonte tipo="bitrix" />
+                  </span>
+                  <span className="text-gray-600 dark:text-zinc-400">
+                    Custo total <b className="tabular-nums text-gray-900 dark:text-white">{brl(custo)}</b>
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          );
+        })}
+      </div>
+
+      <Nota>
+        Visão gerencial: custos informados manualmente por mês (botão "Editar metas", mês único) + incentivos automáticos por cliente.
+        Não bate com o card "CAC — custo de aquisição" (Conta Azul, regime caixa) por design.
+        Parceria ainda não tem source no CRM (clientes 0). Deals de sources fora dos 10 canais (ex.: sem origem) ficam fora desta seção.
+      </Nota>
+    </div>
+  );
+}
