@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-02 | fix(gestao-receita): alinha Tx conv. dos canais à régua direta (deals ÷ reuniões)
+
+**O que foi feito:**
+- Coluna "Tx conv." da tabela "Resultado por canal de aquisição" (/gestao/receita) passou a usar a régua direta: deals ganhos no mês ÷ reuniões do mês, a mesma das tabelas de Closers e SDRs.
+- Removido o cálculo por coorte (`reun_ganhas`/reuniões) daquela tabela; o KPI macro "Taxa de Conversão" segue por coorte (rotulado como tal).
+- Nota da tabela atualizada: explica a régua e por que pode passar de 100% (deals fechados no mês com reunião de meses anteriores).
+
+**Por que:**
+- A linha misturava duas réguas (Deals por data_fechamento × conversão por coorte de reunião) e a conta não fechava aos olhos: Crossell mostrava 12 reuniões, 19 deals e 75%. Usuário apontou como inconsistência e escolheu a régua direta (Crossell agora 158,3%).
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - cálculo de `conv` na seção de canais; `reun_ganhas` removido da query de canais.
+- `client/src/pages/gestao/GestaoReceita.tsx` - nota explicativa da tabela de canais.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-02 | feat(nps): atualiza áreas do formulário E-NPS
 
 **O que foi feito:**
