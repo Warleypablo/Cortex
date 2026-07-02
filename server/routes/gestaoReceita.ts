@@ -239,9 +239,7 @@ export function registerGestaoReceitaRoutes(app: Express) {
             AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}), 0) AS mrr,
           COALESCE(SUM(valor_pontual::numeric) FILTER (WHERE stage_name = ${STAGE_GANHO}
             AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}), 0) AS pont,
-          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}) AS reunioes,
-          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}
-            AND stage_name = ${STAGE_GANHO}) AS reun_ganhas
+          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}) AS reunioes
         FROM "Bitrix".crm_deal
         WHERE (stage_name = ${STAGE_GANHO} AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim})
           OR (data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim})
@@ -255,8 +253,8 @@ export function registerGestaoReceitaRoutes(app: Express) {
         return {
           canal: r.canal, canalLabel: sourceLabel(r.canal), deals, mrr, pont, total: mrr + pont,
           reunioes,
-          // conversão por coorte: das reuniões realizadas no período, % que virou venda (nunca > 100%)
-          conv: reunioes > 0 ? (Number(r.reun_ganhas) / reunioes) * 100 : 0,
+          // conversão direta: deals ganhos no mês ÷ reuniões do mês (mesma régua dos closers; pode passar de 100%)
+          conv: reunioes > 0 ? (deals / reunioes) * 100 : 0,
           // ticket médio por tipo: só sobre deals que têm valor daquele tipo (não dilui por deals só-pontuais/só-MRR)
           ticketMrr: dealsMrr > 0 ? mrr / dealsMrr : 0,
           ticketPont: dealsPont > 0 ? pont / dealsPont : 0,

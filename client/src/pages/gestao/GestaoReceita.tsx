@@ -395,7 +395,7 @@ function SecaoMacro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
               </TableBody>
             </Table>
           </TableScroll>
-          <Nota>Canal = campo <code>source</code> do Bitrix. <b>"(não informado)"</b> é um bucket legítimo — boa parte dos deals não tem origem preenchida no CRM. Tx conv. por coorte: das reuniões realizadas no período, % que virou venda. Ticket Rec./Pont. = valor vendido ÷ deals com valor daquele tipo. Canais com reunião e sem venda aparecem com 0 deals.</Nota>
+          <Nota>Canal = campo <code>source</code> do Bitrix. <b>"(não informado)"</b> é um bucket legítimo — boa parte dos deals não tem origem preenchida no CRM. Tx conv. = deals ganhos no mês ÷ reuniões do mês (mesma régua das tabelas de Closers e SDRs); pode passar de 100% quando fecham deals cuja reunião foi em meses anteriores. Ticket Rec./Pont. = valor vendido ÷ deals com valor daquele tipo. Canais com reunião e sem venda aparecem com 0 deals.</Nota>
         </SectionCard>
       </div>
       <div>
