@@ -327,8 +327,15 @@ export function registerGestaoReceitaRoutes(app: Express) {
       // Pontual = dedup por JORNADA: entregas (1ª/2ª/3ª...) do mesmo cliente repetem o valor
       // do pacote, então conta 1 valor por jornada (id_task p/ Creators, id_subtask p/ demais)
       // — evita a dupla contagem que inflava o pontual.
+      // Catálogo = todos os produtos que já existiram em cup_contratos (qualquer período),
+      // para que produtos com 0 vendas no mês também apareçam e tenham metas editáveis.
       const prodRows = await db.execute(sql`
-        WITH base AS (
+        WITH catalogo AS (
+          SELECT DISTINCT COALESCE(NULLIF(TRIM(produto), ''), '(sem produto)') AS produto
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(TRIM(status)) <> 'não usar'
+        ),
+        base AS (
           SELECT COALESCE(NULLIF(TRIM(produto), ''), '(sem produto)') AS produto,
                  id_task, id_subtask, valorr::numeric AS vr, valorp::numeric AS vp
           FROM "Clickup".cup_contratos
@@ -353,11 +360,13 @@ export function registerGestaoReceitaRoutes(app: Express) {
           SELECT produto, SUM(vp) AS pont, COUNT(*) AS c_pont, ROUND(AVG(vp)) AS tm_pont
           FROM pj GROUP BY produto
         )
-        SELECT COALESCE(m.produto, p.produto) AS produto,
+        SELECT c.produto,
                COALESCE(m.c_mrr, 0) AS c_mrr, COALESCE(m.mrr, 0) AS mrr, m.tm_mrr,
                COALESCE(p.c_pont, 0) AS c_pont, COALESCE(p.pont, 0) AS pont, p.tm_pont
-        FROM mrr m FULL OUTER JOIN pont p ON m.produto = p.produto
-        ORDER BY COALESCE(m.mrr, 0) + COALESCE(p.pont, 0) DESC
+        FROM catalogo c
+        LEFT JOIN mrr m ON m.produto = c.produto
+        LEFT JOIN pont p ON p.produto = c.produto
+        ORDER BY COALESCE(m.mrr, 0) + COALESCE(p.pont, 0) DESC, c.produto
       `);
       const produtos = (prodRows.rows as any[]).map((r) => {
         const seg = PRODUTO_TO_SEG_MRR[r.produto];
