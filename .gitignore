@@ -23,3 +23,8 @@ dev.sh
 
 # Cloudflare Worker
 .wrangler
+
+# Planilhas/exports de dados — contêm informações sensíveis, nunca versionar
+*.csv
+*.xlsx
+*.xls
