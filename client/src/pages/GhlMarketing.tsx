@@ -1723,6 +1723,23 @@ function CalendarioTab() {
                   );
                 })}
               </div>
+              {/* Legenda dos marcadores do calendário (review #1) */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground mt-3">
+                <span className="font-medium text-foreground">Legenda:</span>
+                <span className="inline-flex items-center gap-1">
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300"><MessageCircle className="w-2.5 h-2.5" /></Badge>
+                  disparos WhatsApp no dia
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 bg-blue-50 dark:bg-blue-950/40 border-blue-300"><Mail className="w-2.5 h-2.5" /></Badge>
+                  campanhas de e-mail
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-amber-700 dark:text-amber-300"><AlertCircle className="w-2.5 h-2.5" /></Badge>
+                  alerta de cadência (fadiga) — não é falha de envio
+                </span>
+                <span>Clique num dia com envios para ver os detalhes.</span>
+              </div>
             </>
           )}
         </CardContent>
