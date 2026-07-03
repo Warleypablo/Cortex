@@ -10,6 +10,7 @@ import type { DrillRef } from "./GestaoReceitaDetalhe";
 export interface CacCanalItem { id: string; label: string; valor: number; fonte: "auto" | "manual" }
 export interface CacCanalCard {
   id: string; label: string; clientes: number; custoTotal: number; cacCliente: number | null;
+  sources: string[];
   itens: CacCanalItem[];
   incentivo?: { label: string; unit: number; qtd: number; total: number };
 }
@@ -121,6 +122,28 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
         incentivos por cliente também são automáticos. Não bate com o card "CAC — custo de aquisição" (Conta Azul, regime caixa) por design.
         Parceria ainda não tem source no CRM (clientes 0). Deals de sources fora dos 10 canais (ex.: sem origem) ficam fora desta seção.
       </Nota>
+
+      {/* De-para canal → origem: como cada macro-canal agrupa os sources do Bitrix
+          (mesmos nomes da tabela "Resultado por canal de aquisição"). Vem do
+          catálogo do backend — fonte única, não duplicar aqui. */}
+      <div className="mt-3 rounded-lg border border-gray-200 bg-gray-50 p-3 dark:border-zinc-700 dark:bg-zinc-900/50">
+        <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400">
+          De-para: canal do CAC → origem (source) do Bitrix
+        </div>
+        <div className="mt-2 grid grid-cols-1 gap-x-6 gap-y-1 md:grid-cols-2">
+          {dados.canais.map((c) => (
+            <div key={c.id} className="text-xs text-gray-600 dark:text-zinc-400">
+              <b className="text-gray-800 dark:text-zinc-200">{c.label}</b>
+              {": "}
+              {c.sources.length > 0 ? c.sources.join(", ") : "sem source no CRM ainda"}
+            </div>
+          ))}
+        </div>
+        <p className="mt-2 text-[11px] text-gray-500 dark:text-zinc-500">
+          Clientes do canal = deals ganhos no mês dessas origens; são os mesmos sources da tabela
+          "Resultado por canal de aquisição" (lá sem agrupar).
+        </p>
+      </div>
     </div>
   );
 }

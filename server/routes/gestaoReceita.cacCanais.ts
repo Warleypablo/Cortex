@@ -7,6 +7,7 @@
 // macro-canal. Não confundir com o card "CAC — custo de aquisição" (Conta Azul,
 // regime caixa): não batem por design.
 import { sql } from "drizzle-orm";
+import { sourceLabel } from "./bitrixSources";
 
 const STAGE_GANHO = "Negócio Ganho";
 
@@ -42,6 +43,7 @@ export interface MetaMesRow { chave: string; mes: number; valor: number }
 export type AutosPorMes = Partial<Record<"ads_spend", Record<number, number>>>;
 export interface CacCanalOut {
   id: string; label: string; clientes: number; custoTotal: number; cacCliente: number | null;
+  sources: string[]; // nomes legíveis dos sources do Bitrix mapeados neste canal (de-para exibido na UI)
   itens: { id: string; label: string; valor: number; fonte: "auto" | "manual" }[];
   incentivo?: { label: string; unit: number; qtd: number; total: number };
 }
@@ -91,6 +93,7 @@ export function agregarCacCanais(deals: DealsSourceMes[], metas: MetaMesRow[], m
     return {
       id: def.id, label: def.label, clientes, custoTotal,
       cacCliente: clientes > 0 ? Math.round(custoTotal / clientes) : null,
+      sources: def.sources.map(sourceLabel),
       itens, incentivo,
     };
   });
