@@ -135,16 +135,17 @@ export function registerGestaoReceitaRoutes(app: Express) {
       const ticketMrr = nDealsMrr > 0 ? Math.round(vMrrReal / nDealsMrr) : 0;
       const ticketPontual = nDealsPont > 0 ? Math.round(vPontReal / nDealsPont) : 0;
 
-      // Nº de reuniões realizadas no mês + conversão por coorte (reunião → venda)
+      // Nº de reuniões realizadas no mês + conversão DIRETA (flow, mesma régua das
+      // tabelas de closers/SDRs/canais desde 2026-07-02): deals ganhos no mês ÷
+      // reuniões do mês. Coortes distintas (o ganho pode ter tido reunião em mês
+      // anterior), então pode passar de 100%.
       const reunRow = await db.execute(sql`
-        SELECT
-          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}) AS reunioes,
-          COUNT(*) FILTER (WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim} AND stage_name = ${STAGE_GANHO}) AS reun_ganhas
+        SELECT COUNT(*) AS reunioes
         FROM "Bitrix".crm_deal
+        WHERE data_reuniao_realizada >= ${dIni} AND data_reuniao_realizada < ${dFim}
       `);
-      const rr0 = (reunRow.rows as any[])[0] || {};
-      const numReunioes = Number(rr0.reunioes) || 0;
-      const taxaConversao = numReunioes > 0 ? (Number(rr0.reun_ganhas) / numReunioes) * 100 : 0;
+      const numReunioes = Number((reunRow.rows as any[])[0]?.reunioes) || 0;
+      const taxaConversao = numReunioes > 0 ? (nClientes / numReunioes) * 100 : 0;
 
       // ---------- 4. CLOSERS (venda + reuniões no mês) ----------
       const closersRows = await db.execute(sql`

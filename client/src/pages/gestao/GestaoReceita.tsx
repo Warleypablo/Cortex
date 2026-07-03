@@ -293,10 +293,9 @@ function SecaoMacro({ d, onDrill, metas }: { d: GestaoReceitaData; onDrill: (dr:
         <div className="mt-3 grid grid-cols-2 gap-3 md:grid-cols-4">
           <KpiCard label="Ticket Médio MRR" valor={brl(d.macro.ticketMrr)} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_mrr" })} />
           <KpiCard label="Ticket Médio Pontual" valor={brl(d.macro.ticketPontual)} fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "venda_pontual" })} />
-          <KpiCard label="Taxa de Conversão" valor={pct(d.macro.taxaConversao)} sub="reunião → venda (coorte)" fonte={<Fonte tipo="bitrix" />} />
+          <KpiCard label="Taxa de Conversão" valor={pct(d.macro.taxaConversao)} sub="ganhos no mês ÷ reuniões do mês" fonte={<Fonte tipo="bitrix" />} />
           <KpiCard label="Nº de Reuniões" valor={intBR(d.macro.numReunioes)} sub="realizadas no mês" fonte={<Fonte tipo="bitrix" />} onClick={() => onDrill({ tipo: "funil_etapa", chave: "rr" })} />
         </div>
-        {d.mesParcial && <Nota>Conversão por coorte: no mês em andamento as reuniões recentes ainda não fecharam, então a taxa tende a subir até o mês fechar.</Nota>}
       </div>
       <div>
         <BlockHead icon={<Filter className="h-4 w-4" />} title="Resultado por canal de aquisição" />
