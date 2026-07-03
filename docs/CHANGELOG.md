@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-03 | style(capacity-times): renomear Cap. MRR para Cap. FAT nas abas comerciais
+
+**O que foi feito:**
+- Nas abas Black/Squadra/CXCS do `/capacity-times`, as colunas Cap. MRR / Δ MRR / % MRR viraram **Cap. FAT ($) / Δ FAT / % FAT**, e o card do resumo virou "Capacity FAT (média)".
+- Header da lista da aba Configurar alinhado: Cap. MRR → Cap. FAT ($).
+- Sem mudança de dado: a coluna continua lendo o cap configurado na aba de ajustes (`capacity_metas.cap_mrr`, que o dialog já grava como "Cap. Faturamento ($)").
+
+**Por que:**
+- Pedido do Ichino: a tela deve exibir cap de faturamento (Cap. FAT), com a mesma nomenclatura da aba de ajustes de capacity.
+
+**Arquivos alterados:**
+- `client/src/pages/CapacityTimes.tsx` - headers/tooltips da ComercialTable, card do resumo e comentário do summarize.
+- `client/src/components/capacity-times/CapacityMetasConfig.tsx` - header da coluna na lista de metas.
+- `server/routes/capacityTimes.helpers.ts` - comentário documentando o mapeamento cap_mrr ↔ "Cap. FAT ($)".
+
+**Impacto arquitetural:** Nenhum (rename de rótulos; campo `cap_mrr` mantido no banco e na API).
+
+---
+
 ## 2026-07-03 | feat(resumo-lideres): 2 envios diários (10h e 19h) via instância glauber2 p/ grupo dos líderes
 
 **O que foi feito:**
