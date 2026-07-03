@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-03 | fix+feat(gestao-receita): Taxa de Conversão na régua direta + de-para canal→source na tela
+
+**O que foi feito:**
+- **KPI "Taxa de Conversão" (aba Macro)** saiu da régua coorte (das reuniões do mês, % que virou ganho — 20,6% em jun/26) para a **régua direta/flow** (deals ganhos no mês ÷ reuniões do mês — 27,5% = 79/287), a mesma das tabelas de closers/SDRs/canais migradas em 2026-07-02. Era a última métrica da tela em coorte ("essa taxa ainda tá errada"). Sub do card atualizado e removida a nota de coorte do mês parcial.
+- **De-para canal→source registrado na tela**: rodapé da seção "CAC por canal" agora lista cada macro-canal e os sources do Bitrix que ele agrupa (nomes legíveis, mesmos da tabela "Resultado por canal de aquisição"). O catálogo vem do backend (`CAC_CANAIS` + `sourceLabel`) — payload ganhou `canais[].sources`.
+
+**Por que:**
+- Pedidos do time via WhatsApp (2026-07-03): "registrar essa relação no sistema ali embaixo de tudo" + "essa taxa de conversão ainda tá errada eu acho".
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.ts` - taxaConversao = deals ganhos ÷ reuniões (query de coorte removida).
+- `server/routes/gestaoReceita.cacCanais.ts` - `sources` (labels) no payload de cada canal.
+- `client/src/pages/gestao/GestaoReceita.tsx` - sub do KpiCard e remoção da nota de coorte.
+- `client/src/components/gestao/CacPorCanal.tsx` - bloco de-para no rodapé da seção.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-03 | feat(creators-conversao): tela auxiliar de conversão pontual → recorrente em Creators
 
 **O que foi feito:**
