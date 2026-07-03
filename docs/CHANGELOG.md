@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-03 | feat(resumo-lideres): modelo v2 da mensagem diária dos líderes
+
+**O que foi feito:**
+- Mensagem reformulada para o novo modelo do Ichino (exemplo de 02/07 19h): saudação dinâmica por horário, nomes dos meses no texto (MRR JULHO TOTAL / MRR JUNHO...), footer "estamos de 👀".
+- Novas métricas: **MRR ATIVO** (só status 'ativo', além do total ativo+onb+triagem), **Churn Pontual** (valorp via join `cup_churn`×`cup_contratos`, cup_churn não tem valor_p) e **Churn MRR ajustado** (excluindo motivos 'Erro na Venda', 'Não começou', 'Inadimplente 1º Mês' — diff validado em prod: R$ 2.997 exato).
+- **Net Churn mudou de base**: agora = churn ajustado − cross total (validado contra o exemplo: 16.282 − 1.260 = 15.022 exato).
+- Cross zerado imprime "ZERO"; removidos "Em cancelamento" e as 3 OBS.
+- Decisão do Ichino: Cross R×P segue os campos do Bitrix (valor_recorrente/valor_pontual), mesmo quando a mensagem manual divergir.
+
+**Por que:**
+- Pedido do usuário (2026-07-03): "Atualiza o modelo de msg pra esse" com o novo template.
+
+**Arquivos alterados:**
+- `server/services/resumoLideres.ts` - novas queries, interface e formatador v2.
+- `server/services/resumoLideres.test.ts` - 9 testes, template ancorado no exemplo real.
+- `docs/superpowers/specs/2026-07-02-resumo-lideres-whatsapp-design.md` - nota v2.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-02 | feat(gestao-receita): seção "CAC por canal — variáveis de custo" com drill-down e spend automático
 
 **O que foi feito:**
