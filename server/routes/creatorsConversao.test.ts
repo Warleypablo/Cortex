@@ -66,6 +66,8 @@ describe("GET /api/creators-conversao", () => {
     const res = await request(makeApp()).get("/api/creators-conversao?de=2026-1&ate=x");
     expect(res.status).toBe(400);
     expect(mockExecute).not.toHaveBeenCalled();
+    const res2 = await request(makeApp()).get("/api/creators-conversao?de=2026-13&ate=2026-06");
+    expect(res2.status).toBe(400);
   });
 
   it("falha de banco → 500", async () => {

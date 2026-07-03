@@ -4,7 +4,7 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 
-const PERIODO_RE = /^\d{4}-\d{2}$/;
+const PERIODO_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
 
 /** Primeiro dia do mês seguinte a um 'YYYY-MM' (limite exclusivo do período). */
 function inicioMesSeguinte(ym: string): string {
@@ -43,7 +43,7 @@ export function registerCreatorsConversaoRoutes(app: Express, db: any) {
                  MIN(c.data_criado::date) AS primeiro_rec,
                  BOOL_OR(c.produto ILIKE '%creator%' OR c.servico ILIKE '%creator%') AS rec_em_creators,
                  SUM(c.valorr::numeric) AS mrr,
-                 STRING_AGG(DISTINCT c.servico, ' | ') AS servicos_rec
+                 STRING_AGG(DISTINCT c.servico, ' | ' ORDER BY c.servico) AS servicos_rec
           FROM "Clickup".cup_contratos c
           WHERE c.valorr > 0
           GROUP BY c.id_task
