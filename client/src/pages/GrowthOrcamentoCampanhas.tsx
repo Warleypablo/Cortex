@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect, useRef, Fragment } from "react";
+import { useMemo, useState, useEffect, useRef } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -69,6 +69,30 @@ const STAGE_LABELS: Record<CampaignStage, string> = {
 const STAGE_ORDER: CampaignStage[] = STAGE_OPTIONS.map((o) => o.value);
 const NO_STAGE = "__none__";
 
+// Produtos. Manter em sincronia com CAMPAIGN_PRODUCTS no backend. Novo nível
+// de planejamento entre Etapa e Canal.
+type CampaignProduct = "creators" | "turbo" | "comunidade" | "crm" | "summit";
+const PRODUCT_OPTIONS: { value: CampaignProduct; label: string }[] = [
+  { value: "creators", label: "Creators" },
+  { value: "turbo", label: "Turbo" },
+  { value: "comunidade", label: "Comunidade" },
+  { value: "crm", label: "CRM" },
+  { value: "summit", label: "Summit" },
+];
+const PRODUCT_LABELS: Record<CampaignProduct, string> = {
+  creators: "Creators",
+  turbo: "Turbo",
+  comunidade: "Comunidade",
+  crm: "CRM",
+  summit: "Summit",
+};
+const PRODUCT_ORDER: CampaignProduct[] = PRODUCT_OPTIONS.map((o) => o.value);
+const NO_PRODUCT = "__none__";
+
+// Níveis plantáveis na árvore de metas (budget_plan_node). Manter em
+// sincronia com LEVEL_TYPES no backend.
+type LevelType = "stage" | "product" | "platform";
+
 // Abas de filtro no topo. "sem-tag" lista campanhas ainda não classificadas.
 type TabValue = "todas" | CampaignTag | "sem-tag";
 const TABS: { value: TabValue; label: string }[] = [
@@ -80,13 +104,31 @@ const TABS: { value: TabValue; label: string }[] = [
 ];
 
 type PlanUnit = "pct" | "brl";
-interface StagePlan {
+
+// Plano de um pool no mês: só o total (a árvore de metas por nível vem em
+// `planNodes` — ver PlanNode abaixo).
+interface PoolPlan {
+  total: number | null;
+}
+
+// Um nó da árvore de metas (stage/product/platform) dentro de um pool/mês.
+// parentKey = "" na raiz (pai é o total do pool); senão "type:key|type:key...".
+interface PlanNode {
+  pool: CampaignTag;
+  levelType: LevelType;
+  levelKey: string;
+  parentKey: string;
   value: number;
   unit: PlanUnit;
 }
-interface PoolPlan {
-  total: number | null;
-  stages: Partial<Record<CampaignStage, StagePlan>>;
+
+// Meta travada por campanha individual (qualquer plataforma).
+interface CampaignTargetRow {
+  pool: CampaignTag;
+  platform: Platform;
+  campaignId: string;
+  value: number;
+  unit: PlanUnit;
 }
 
 interface Campanha {
@@ -101,6 +143,7 @@ interface Campanha {
   isDelivering: boolean;
   tag: CampaignTag | null;
   stage: CampaignStage | null;
+  produto: CampaignProduct | null;
 }
 
 interface ApiResponse {
@@ -112,6 +155,8 @@ interface ApiResponse {
   diasRestantes: number;
   campanhas: Campanha[];
   plans: Record<string, PoolPlan>;
+  planNodes: PlanNode[];
+  campaignTargets: CampaignTargetRow[];
 }
 
 function getMonthOptions(): { value: string; label: string }[] {
@@ -132,12 +177,67 @@ function parseNumberInput(raw: string): number {
   return Number.isFinite(n) ? n : 0;
 }
 
-// Alvo R$ de uma etapa: valor travado (brl) ou % do total do pool (pct).
-function deriveStageTarget(plan: StagePlan | undefined, poolTotal: number | null): number | null {
-  if (!plan) return null;
-  if (plan.unit === "brl") return plan.value;
-  if (poolTotal == null) return null;
-  return (plan.value / 100) * poolTotal;
+// Caminho canônico de um nó da árvore de metas (mesma codificação de
+// parent_key no banco): "" na raiz, senão "type:key" encadeado por "|".
+function nodePath(parentKey: string, levelType: LevelType, levelKey: string): string {
+  return parentKey ? `${parentKey}|${levelType}:${levelKey}` : `${levelType}:${levelKey}`;
+}
+
+// Alvo R$ de um nó: valor travado (brl) ou % do pai imediato (pct).
+function resolveNode(node: PlanNode | undefined, resolvedParentBrl: number | null): number | null {
+  if (!node) return null;
+  if (node.unit === "brl") return node.value;
+  if (resolvedParentBrl == null) return null;
+  return (node.value / 100) * resolvedParentBrl;
+}
+
+// Resolve a árvore inteira de um pool numa passada top-down única: raiz =
+// total do pool, cada nível seguinte resolve contra o valor já resolvido do
+// pai (não sempre o total do pool, uma vez que agora há mais de 2 níveis).
+function resolvePlanTree(nodes: PlanNode[], poolTotal: number | null): Map<string, number | null> {
+  const byPath = new Map<string, PlanNode>();
+  for (const n of nodes) byPath.set(nodePath(n.parentKey, n.levelType, n.levelKey), n);
+  const resolved = new Map<string, number | null>();
+  // Guarda contra ciclo em parent_key (não deveria acontecer — a API valida
+  // o path do pai — mas dado legado/editado direto no banco não tem essa
+  // garantia; sem isso um ciclo trava o browser em recursão infinita).
+  const visiting = new Set<string>();
+  const resolveOne = (path: string, node: PlanNode): number | null => {
+    if (resolved.has(path)) return resolved.get(path)!;
+    if (visiting.has(path)) return null;
+    visiting.add(path);
+    let val: number | null;
+    if (node.unit === "brl") {
+      val = node.value;
+    } else {
+      const parentResolved = node.parentKey === ""
+        ? poolTotal
+        : (() => {
+            const parentNode = byPath.get(node.parentKey);
+            return parentNode ? resolveOne(node.parentKey, parentNode) : null;
+          })();
+      val = parentResolved != null ? (node.value / 100) * parentResolved : null;
+    }
+    visiting.delete(path);
+    resolved.set(path, val);
+    return val;
+  };
+  byPath.forEach((node, path) => resolveOne(path, node));
+  return resolved;
+}
+
+// Soma dos valores resolvidos dos filhos diretos de `ownPath` dentre `nodes`
+// (usado pro indicador "fecha 100%" de Etapa/Produto). null se nenhum filho
+// tem alvo definido.
+function directChildrenSum(nodes: { parentKey: string; levelType: LevelType; levelKey: string }[], resolved: Map<string, number | null>, ownPath: string): number | null {
+  let sum = 0;
+  let any = false;
+  for (const n of nodes) {
+    if (n.parentKey !== ownPath) continue;
+    const v = resolved.get(nodePath(n.parentKey, n.levelType, n.levelKey));
+    if (v != null) { sum += v; any = true; }
+  }
+  return any ? sum : null;
 }
 
 // Ritmo diário necessário p/ bater o alvo e o gap vs o orçamento diário atual.
@@ -242,6 +342,38 @@ function StageSelect({ platform, campaignId, value, onSaved, canEdit }: {
   );
 }
 
+// ---- Select de produto por campanha ----
+function ProdutoSelect({ platform, campaignId, value, onSaved, canEdit }: {
+  platform: Platform; campaignId: string; value: CampaignProduct | null; onSaved: () => void; canEdit: boolean;
+}) {
+  const { toast } = useToast();
+  if (!canEdit) {
+    return value
+      ? <Badge variant="outline" className="text-xs">{PRODUCT_LABELS[value]}</Badge>
+      : <span className="text-muted-foreground text-xs">—</span>;
+  }
+  const handleChange = async (next: string) => {
+    const produto = next === NO_PRODUCT ? null : next;
+    try {
+      await apiRequest("PUT", "/api/growth/orcamento-campanhas/produto", { platform, campaignId, produto });
+      onSaved();
+    } catch (err) {
+      toast({ title: "Erro ao salvar produto", description: String(err), variant: "destructive" });
+    }
+  };
+  return (
+    <Select value={value ?? NO_PRODUCT} onValueChange={handleChange}>
+      <SelectTrigger className="h-7 w-[150px] text-xs" data-testid={`select-produto-${platform}-${campaignId}`}>
+        <SelectValue />
+      </SelectTrigger>
+      <SelectContent>
+        <SelectItem value={NO_PRODUCT}><span className="text-muted-foreground">Sem produto</span></SelectItem>
+        {PRODUCT_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
+      </SelectContent>
+    </Select>
+  );
+}
+
 // ---- Editor do total mensal do pool ----
 function PoolTotalInput({ pool, month, value, onSaved, canEdit }: {
   pool: CampaignTag; month: string; value: number | null; onSaved: () => void; canEdit: boolean;
@@ -294,10 +426,10 @@ function PoolTotalInput({ pool, month, value, onSaved, canEdit }: {
   );
 }
 
-// ---- Editor do alvo de uma etapa (híbrido % / R$) ----
-function StageTargetInput({ pool, month, stage, plan, poolTotal, onSaved, canEdit }: {
-  pool: CampaignTag; month: string; stage: CampaignStage; plan: StagePlan | undefined;
-  poolTotal: number | null; onSaved: () => void; canEdit: boolean;
+// ---- Editor do alvo de um nó da árvore (híbrido % / R$) — Etapa/Produto/Canal ----
+function LevelTargetInput({ pool, month, levelType, levelKey, parentKey, plan, resolvedParentBrl, onSaved, canEdit }: {
+  pool: CampaignTag; month: string; levelType: LevelType; levelKey: string; parentKey: string;
+  plan: PlanNode | undefined; resolvedParentBrl: number | null; onSaved: () => void; canEdit: boolean;
 }) {
   const { toast } = useToast();
   const [editing, setEditing] = useState(false);
@@ -306,15 +438,15 @@ function StageTargetInput({ pool, month, stage, plan, poolTotal, onSaved, canEdi
   const inputRef = useRef<HTMLInputElement>(null);
   useEffect(() => { if (editing && inputRef.current) { inputRef.current.focus(); inputRef.current.select(); } }, [editing]);
 
-  const derived = deriveStageTarget(plan, poolTotal);
+  const derived = resolveNode(plan, resolvedParentBrl);
 
   const save = async (overrideUnit?: PlanUnit) => {
     const u = overrideUnit ?? unit;
     const parsed = parseNumberInput(draft);
     setEditing(false);
     try {
-      await apiRequest("PUT", "/api/growth/orcamento-campanhas/plan/stage", {
-        pool, month, stage, value: parsed, unit: u,
+      await apiRequest("PUT", "/api/growth/orcamento-campanhas/plan/node", {
+        pool, month, levelType, levelKey, parentKey, value: parsed, unit: u,
       });
       onSaved();
     } catch (err) {
@@ -366,7 +498,86 @@ function StageTargetInput({ pool, month, stage, plan, poolTotal, onSaved, canEdi
       type="button"
       onClick={() => { setDraft(plan ? String(plan.value) : ""); setUnit(plan?.unit ?? "pct"); setEditing(true); }}
       className="w-full text-right font-mono hover:bg-accent hover:text-accent-foreground rounded px-1 py-1 cursor-pointer transition-colors"
-      data-testid={`input-stage-target-${pool}-${stage}`}
+      data-testid={`input-level-target-${pool}-${nodePath(parentKey, levelType, levelKey)}`}
+    >
+      {display}
+    </button>
+  );
+}
+
+// ---- Editor da meta travada de uma campanha individual (qualquer plataforma) ----
+function CampaignTargetInput({ pool, month, platform, campaignId, plan, resolvedParentBrl, onSaved, canEdit }: {
+  pool: CampaignTag; month: string; platform: Platform; campaignId: string;
+  plan: CampaignTargetRow | undefined; resolvedParentBrl: number | null; onSaved: () => void; canEdit: boolean;
+}) {
+  const { toast } = useToast();
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState("");
+  const [unit, setUnit] = useState<PlanUnit>(plan?.unit ?? "brl");
+  const inputRef = useRef<HTMLInputElement>(null);
+  useEffect(() => { if (editing && inputRef.current) { inputRef.current.focus(); inputRef.current.select(); } }, [editing]);
+
+  const derived = plan ? (plan.unit === "brl" ? plan.value : resolvedParentBrl != null ? (plan.value / 100) * resolvedParentBrl : null) : null;
+
+  const save = async (overrideUnit?: PlanUnit) => {
+    const u = overrideUnit ?? unit;
+    const parsed = parseNumberInput(draft);
+    setEditing(false);
+    try {
+      await apiRequest("PUT", "/api/growth/orcamento-campanhas/plan/campaign", {
+        pool, month, platform, campaignId, value: parsed, unit: u,
+      });
+      onSaved();
+    } catch (err) {
+      toast({ title: "Erro ao salvar meta da campanha", description: String(err), variant: "destructive" });
+    }
+  };
+
+  if (editing) {
+    return (
+      <div className="flex items-center gap-1 justify-end">
+        <Input
+          ref={inputRef} type="text" inputMode="decimal"
+          defaultValue={plan ? String(plan.value) : ""}
+          onChange={(e) => setDraft(e.target.value)}
+          onBlur={() => save()}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+            if (e.key === "Escape") { setDraft(""); setEditing(false); }
+          }}
+          className="h-7 w-[80px] text-right font-mono text-xs" placeholder="0"
+        />
+        <div className="flex rounded border overflow-hidden">
+          {(["pct", "brl"] as PlanUnit[]).map((u) => (
+            <button
+              key={u} type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => setUnit(u)}
+              className={cn("px-1 py-0.5 text-[10px]", unit === u ? "bg-primary text-primary-foreground" : "bg-background hover:bg-accent")}
+            >
+              {u === "pct" ? "%" : "R$"}
+            </button>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  const display = !plan ? (
+    <span className="text-muted-foreground italic text-xs">—</span>
+  ) : plan.unit === "pct" ? (
+    <span className="text-xs">{plan.value}%{derived != null && <span className="text-muted-foreground"> · {formatCurrency(derived)}</span>}</span>
+  ) : (
+    <span className="text-xs">{formatCurrency(plan.value)} <span className="text-muted-foreground" title="Valor travado">🔒</span></span>
+  );
+
+  if (!canEdit) return <span className="font-mono text-right block">{display}</span>;
+  return (
+    <button
+      type="button"
+      onClick={() => { setDraft(plan ? String(plan.value) : ""); setUnit(plan?.unit ?? "brl"); setEditing(true); }}
+      className="w-full text-right font-mono hover:bg-accent hover:text-accent-foreground rounded px-1 py-1 cursor-pointer transition-colors"
+      data-testid={`input-campaign-target-${platform}-${campaignId}`}
     >
       {display}
     </button>
@@ -388,12 +599,28 @@ function sumStage(rows: Campanha[]): StageSums {
   return { daily, projecao, investido };
 }
 
-const COLSPAN = 9;
+const COLSPAN = 10;
+
+// Níveis da árvore de agrupamento/planejamento, em ordem: Etapa → Produto →
+// Canal. Campanha é o caso-base da recursão (depth === LEVELS.length),
+// tratado à parte em renderCampaignRow.
+interface LevelDef {
+  type: LevelType;
+  groupKey: (c: Campanha) => string;
+  order: string[];
+  labels: Record<string, string>;
+  hasNone: boolean;
+}
+const LEVELS: LevelDef[] = [
+  { type: "stage", groupKey: (c) => c.stage ?? "none", order: STAGE_ORDER, labels: STAGE_LABELS, hasNone: true },
+  { type: "product", groupKey: (c) => c.produto ?? "none", order: PRODUCT_ORDER, labels: PRODUCT_LABELS, hasNone: true },
+  { type: "platform", groupKey: (c) => c.platform, order: PLATFORM_ORDER, labels: PLATFORM_LABELS, hasNone: false },
+];
 
 export default function GrowthOrcamentoCampanhas() {
   useSetPageInfo(
     "Orçamento por Campanha",
-    "Planejamento por etapa do funil — Meta, Google, TikTok e LinkedIn",
+    "Planejamento por etapa, produto e canal — Meta, Google, TikTok e LinkedIn",
   );
 
   const { user } = useAuth();
@@ -407,9 +634,10 @@ export default function GrowthOrcamentoCampanhas() {
   }, []);
   const [month, setMonth] = useState<string>(defaultMonth);
   const [activeTab, setActiveTab] = useState<TabValue>("todas");
-  // Plataformas expandidas (chave `${etapa}:${plataforma}`). Padrão: fechado.
+  // Nós expandidos (chave = path completo do nó, só relevante no nível Canal).
+  // Padrão: fechado — Etapa/Produto ficam sempre abertos.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
-  const togglePlatform = (key: string) =>
+  const toggleNode = (key: string) =>
     setExpanded((prev) => {
       const next = new Set(prev);
       next.has(key) ? next.delete(key) : next.add(key);
@@ -429,6 +657,7 @@ export default function GrowthOrcamentoCampanhas() {
     queryClient.invalidateQueries({ queryKey: ["/api/growth/orcamento-campanhas", month] });
 
   const plans: Record<string, PoolPlan> = data?.plans ?? {};
+  const allPlanNodes: PlanNode[] = data?.planNodes ?? [];
   const diasRestantes = data?.diasRestantes ?? 0;
   const poolForTab: CampaignTag | null =
     activeTab === "inbound" || activeTab === "evento" || activeTab === "creators_summit" ? activeTab : null;
@@ -452,24 +681,6 @@ export default function GrowthOrcamentoCampanhas() {
     return all.filter((c) => c.tag === activeTab);
   }, [data, activeTab]);
 
-  // Alvo R$ de uma etapa na aba ativa (pool único, soma p/ "todas", null p/ sem-tag).
-  const targetForStage = (stage: CampaignStage): number | null => {
-    if (poolForTab) {
-      const p = plans[poolForTab];
-      return p ? deriveStageTarget(p.stages[stage], p.total) : null;
-    }
-    if (activeTab === "todas") {
-      let sum = 0, any = false;
-      for (const pool of POOLS) {
-        const p = plans[pool];
-        const t = p ? deriveStageTarget(p.stages[stage], p.total) : null;
-        if (t != null) { sum += t; any = true; }
-      }
-      return any ? sum : null;
-    }
-    return null;
-  };
-
   const poolTotalForTab: number | null = (() => {
     if (poolForTab) return plans[poolForTab]?.total ?? null;
     if (activeTab === "todas") {
@@ -483,31 +694,90 @@ export default function GrowthOrcamentoCampanhas() {
     return null;
   })();
 
-  // Agrupa campanhas filtradas por etapa (+ bucket "sem etapa").
-  const stageGroups = useMemo(() => {
-    const map = new Map<CampaignStage | "none", Campanha[]>();
-    for (const c of filteredCampanhas) {
-      const key = c.stage ?? "none";
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push(c);
+  // Árvore de metas resolvida por pool (root = total do pool). Uma passada
+  // top-down por pool; "todas" soma o resolvido de cada pool por path.
+  const resolvedByPool = useMemo(() => {
+    const map = new Map<CampaignTag, Map<string, number | null>>();
+    for (const pool of POOLS) {
+      const nodes = allPlanNodes.filter((n) => n.pool === pool);
+      map.set(pool, resolvePlanTree(nodes, plans[pool]?.total ?? null));
     }
     return map;
-  }, [filteredCampanhas]);
+  }, [data]);
+
+  // Nós relevantes pra aba ativa: do pool único, ou a união de shapes
+  // declarados em qualquer pool (pra "todas" saber quais grupos existem —
+  // os valores em si vêm de resolvedForTab, que já soma corretamente por pool).
+  const nodesForTab: PlanNode[] = useMemo(() => {
+    if (poolForTab) return allPlanNodes.filter((n) => n.pool === poolForTab);
+    if (activeTab === "todas") {
+      const seen = new Map<string, PlanNode>();
+      for (const n of allPlanNodes) {
+        const key = nodePath(n.parentKey, n.levelType, n.levelKey);
+        if (!seen.has(key)) seen.set(key, n);
+      }
+      return Array.from(seen.values());
+    }
+    return [];
+  }, [data, activeTab, poolForTab]);
+
+  const resolvedForTab: Map<string, number> = useMemo(() => {
+    const out = new Map<string, number>();
+    if (poolForTab) {
+      const m = resolvedByPool.get(poolForTab);
+      if (m) m.forEach((v, k) => { if (v != null) out.set(k, v); });
+      return out;
+    }
+    if (activeTab === "todas") {
+      for (const pool of POOLS) {
+        const m = resolvedByPool.get(pool);
+        if (!m) continue;
+        m.forEach((v, k) => {
+          if (v == null) return;
+          out.set(k, (out.get(k) ?? 0) + v);
+        });
+      }
+    }
+    return out;
+  }, [resolvedByPool, poolForTab, activeTab]);
+
+  const getResolved = (path: string): number | null => resolvedForTab.get(path) ?? null;
+
+  // Meta declarada de um nó, só quando um pool único está ativo (edição só
+  // faz sentido dentro de um pool — "todas"/"sem-tag" mostram só o resolvido).
+  const planForPoolTab = (levelType: LevelType, levelKey: string, parentKey: string): PlanNode | undefined => {
+    if (!poolForTab) return undefined;
+    return allPlanNodes.find((n) => n.pool === poolForTab && n.levelType === levelType && n.levelKey === levelKey && n.parentKey === parentKey);
+  };
+
+  // Metas travadas por campanha (esparso), escopadas ao pool ativo.
+  const campaignTargetsMap = useMemo(() => {
+    const map = new Map<string, CampaignTargetRow>();
+    if (poolForTab) {
+      for (const t of data?.campaignTargets ?? []) {
+        if (t.pool === poolForTab) map.set(`${t.platform}:${t.campaignId}`, t);
+      }
+    }
+    return map;
+  }, [data, poolForTab]);
 
   const totals = useMemo(() => sumStage(filteredCampanhas), [filteredCampanhas]);
 
-  // Fechamento do plano (só faz sentido num pool único): soma dos alvos vs total.
+  // Fechamento do plano (só faz sentido num pool único): soma dos alvos de
+  // etapa vs total do pool. Continua igual a antes — a árvore por nível tem
+  // seu próprio badge "fecha 100%" no cabeçalho de cada Etapa/Produto.
   const closing = useMemo(() => {
     if (!poolForTab) return null;
     const p = plans[poolForTab];
     const total = p?.total ?? null;
+    const resolved = resolvedByPool.get(poolForTab);
     let sumTargets = 0;
-    for (const s of STAGE_ORDER) {
-      const t = p ? deriveStageTarget(p.stages[s], p.total) : null;
-      if (t != null) sumTargets += t;
+    for (const stage of STAGE_ORDER) {
+      const v = resolved?.get(nodePath("", "stage", stage));
+      if (v != null) sumTargets += v;
     }
     return { total, sumTargets, diff: (total ?? 0) - sumTargets };
-  }, [plans, poolForTab]);
+  }, [plans, poolForTab, resolvedByPool]);
 
   // ---- Renderização ----
   // Célula "Ajuste/dia": quanto subir/baixar o diário p/ ficar no caminho do alvo.
@@ -537,13 +807,25 @@ export default function GrowthOrcamentoCampanhas() {
     );
   };
 
-  const renderCampaignRow = (c: Campanha) => {
+  // Badge "fecha 100%" / "resta X" / "passou X" — reconciliação genérica entre
+  // a meta de um nó e a soma dos filhos diretos dele (Etapa vs Produtos,
+  // Produto vs Canais).
+  const renderClosingBadge = (ownResolved: number | null, childrenSum: number | null) => {
+    if (ownResolved == null || childrenSum == null) return null;
+    const diff = ownResolved - childrenSum;
+    if (Math.abs(diff) < 0.5) return <Badge className="bg-green-600 hover:bg-green-600 text-xs font-normal">fecha 100%</Badge>;
+    if (diff > 0) return <Badge variant="outline" className="text-xs font-normal">resta {formatCurrency(diff)}</Badge>;
+    return <Badge variant="outline" className="text-xs font-normal text-red-500 dark:text-red-400">passou {formatCurrency(-diff)}</Badge>;
+  };
+
+  const renderCampaignRow = (c: Campanha, resolvedPlatformBrl: number | null) => {
     const isActive = c.isActive;
+    const targetPlan = campaignTargetsMap.get(`${c.platform}:${c.campaignId}`);
     return (
       <TableRow key={`${c.platform}-${c.campaignId}`} className={PLATFORM_STYLES[c.platform].row} data-testid={`row-${c.platform}-${c.campaignId}`}>
-        <TableCell className="font-medium pl-12">
+        <TableCell className="font-medium pl-16">
           <div className="flex items-center gap-2">
-            <span className="truncate max-w-[300px]" title={c.name}>{c.name}</span>
+            <span className="truncate max-w-[260px]" title={c.name}>{c.name}</span>
             {!isActive && <Badge variant="outline" className="text-xs">Pausada</Badge>}
             {isActive && !c.isDelivering && (
               <Badge variant="outline" className="text-xs" title="Sem gasto nos últimos 3 dias — projeção não extrapola.">
@@ -554,7 +836,17 @@ export default function GrowthOrcamentoCampanhas() {
         </TableCell>
         <TableCell><TagSelect platform={c.platform} campaignId={c.campaignId} value={c.tag} onSaved={invalidate} canEdit={canEdit} /></TableCell>
         <TableCell><StageSelect platform={c.platform} campaignId={c.campaignId} value={c.stage} onSaved={invalidate} canEdit={canEdit} /></TableCell>
-        <TableCell className="text-right text-muted-foreground">—</TableCell>
+        <TableCell><ProdutoSelect platform={c.platform} campaignId={c.campaignId} value={c.produto} onSaved={invalidate} canEdit={canEdit} /></TableCell>
+        <TableCell className="text-right">
+          {poolForTab ? (
+            <CampaignTargetInput
+              pool={poolForTab} month={month} platform={c.platform} campaignId={c.campaignId}
+              plan={targetPlan} resolvedParentBrl={resolvedPlatformBrl} onSaved={invalidate} canEdit={canEdit}
+            />
+          ) : (
+            <span className="text-muted-foreground text-xs">—</span>
+          )}
+        </TableCell>
         <TableCell className="text-right font-mono">
           {isActive ? formatCurrency(c.dailyBudgetAtual) : <span className="text-muted-foreground">—</span>}
         </TableCell>
@@ -566,90 +858,124 @@ export default function GrowthOrcamentoCampanhas() {
     );
   };
 
-  // Dentro de uma etapa, separa as campanhas por plataforma (sub-cabeçalho + subtotal).
-  const renderPlatformBlocks = (rows: Campanha[], keyPrefix: string) => {
-    const byPlatform = new Map<Platform, Campanha[]>();
+  // Recursão única pra Etapa → Produto → Canal → Campanha. depth indexa
+  // LEVELS; ao chegar em LEVELS.length, cai no caso-base (linhas de campanha).
+  // parentKey é o path do nó pai ("" na raiz); resolvedParentBrl é o valor já
+  // resolvido do pai, usado tanto pra %/R$ do LevelTargetInput quanto pra
+  // colorir projeção/investido contra o alvo.
+  const renderGroupLevel = (rows: Campanha[], depth: number, parentKey: string, resolvedParentBrl: number | null): JSX.Element[] => {
+    if (depth === LEVELS.length) {
+      return rows.map((c) => renderCampaignRow(c, resolvedParentBrl));
+    }
+    const level = LEVELS[depth];
+    const grouped = new Map<string, Campanha[]>();
     for (const c of rows) {
-      if (!byPlatform.has(c.platform)) byPlatform.set(c.platform, []);
-      byPlatform.get(c.platform)!.push(c);
+      const key = level.groupKey(c);
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)!.push(c);
     }
-    const blocks: JSX.Element[] = [];
-    for (const p of PLATFORM_ORDER) {
-      const prs = byPlatform.get(p);
-      if (!prs || prs.length === 0) continue;
-      const s = sumStage(prs);
-      const key = `${keyPrefix}:${p}`;
-      const isOpen = expanded.has(key);
-      const st = PLATFORM_STYLES[p];
-      blocks.push(
-        <TableRow
-          key={`plat-${keyPrefix}-${p}`}
-          className={cn("cursor-pointer font-medium", st.row)}
-          onClick={() => togglePlatform(key)}
-          data-testid={`platform-subheader-${keyPrefix}-${p}`}
-        >
-          <TableCell colSpan={3} className="py-1.5 pl-6">
-            <span className="flex items-center gap-1.5 text-xs">
-              {isOpen
-                ? <ChevronDown className="w-3.5 h-3.5 shrink-0" />
-                : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
-              <PlatformIcon platform={p} className={st.icon} />
-              {PLATFORM_LABELS[p]}
-              <span className="opacity-60">({prs.length})</span>
-            </span>
-          </TableCell>
-          <TableCell className="text-right text-xs opacity-40">—</TableCell>
-          <TableCell className="text-right font-mono text-xs">{formatCurrency(s.daily)}</TableCell>
-          <TableCell className="text-right font-mono text-xs">{formatCurrency(s.projecao)}</TableCell>
-          <TableCell className="text-right font-mono text-xs">{formatCurrency(s.investido)}</TableCell>
-          <TableCell className="text-right text-xs opacity-40">—</TableCell>
-          <TableCell className="text-right text-xs opacity-40">—</TableCell>
-        </TableRow>,
-      );
-      if (isOpen) for (const c of prs) blocks.push(renderCampaignRow(c));
-    }
-    return blocks;
-  };
+    const orderedKeys = level.hasNone ? [...level.order, "none"] : level.order;
+    const elements: JSX.Element[] = [];
 
-  const renderStageGroup = (stage: CampaignStage) => {
-    const rows = stageGroups.get(stage) ?? [];
-    const target = targetForStage(stage);
-    if (rows.length === 0 && target == null) return null;
-    const s = sumStage(rows);
-    return (
-      <>
-        <TableRow className="bg-muted font-bold" data-testid={`stage-header-${stage}`}>
-          <TableCell colSpan={3} className="py-2.5">
-            <div className="flex items-center gap-2">
-              <span className="uppercase tracking-wide text-sm">{STAGE_LABELS[stage]}</span>
-              <span className="opacity-50 text-xs font-normal">({rows.length})</span>
+    for (const key of orderedKeys) {
+      const groupRows = grouped.get(key) ?? [];
+      const isNone = key === "none";
+      const path = isNone ? null : nodePath(parentKey, level.type, key);
+      const ownResolved = path ? getResolved(path) : null;
+      if (groupRows.length === 0 && ownResolved == null) continue;
+
+      const s = sumStage(groupRows);
+      // Mesmo pra bucket "none" usa nodePath() — senão o path vira encoding
+      // inválido (ex.: "|stage:none" em vez de "stage:none" na raiz), que
+      // nunca resolve como pai de um filho real.
+      const nodeKey = path ?? nodePath(parentKey, level.type, "none");
+      const isCollapsible = level.type === "platform"; // Canal — único nível que precisa de clique
+      const isOpen = !isCollapsible || expanded.has(nodeKey);
+      const label = isNone ? (depth === 0 ? "Sem etapa" : "Sem produto") : level.labels[key];
+      const plan = !isNone ? planForPoolTab(level.type, key, parentKey) : undefined;
+      const childPath = path ?? nodeKey;
+
+      if (level.type === "platform") {
+        const p = key as Platform;
+        const st = PLATFORM_STYLES[p];
+        elements.push(
+          <TableRow
+            key={`node-${nodeKey}`}
+            className={cn("cursor-pointer font-medium", st.row)}
+            onClick={() => toggleNode(nodeKey)}
+            data-testid={`platform-subheader-${nodeKey}`}
+          >
+            <TableCell colSpan={4} className="py-1.5 pl-10">
+              <span className="flex items-center gap-1.5 text-xs">
+                {isOpen
+                  ? <ChevronDown className="w-3.5 h-3.5 shrink-0" />
+                  : <ChevronRight className="w-3.5 h-3.5 shrink-0" />}
+                <PlatformIcon platform={p} className={st.icon} />
+                {PLATFORM_LABELS[p]}
+                <span className="opacity-60">({groupRows.length})</span>
+              </span>
+            </TableCell>
+            <TableCell className="text-right text-xs">
+              {poolForTab ? (
+                <LevelTargetInput
+                  pool={poolForTab} month={month} levelType="platform" levelKey={key} parentKey={parentKey}
+                  plan={plan} resolvedParentBrl={resolvedParentBrl} onSaved={invalidate} canEdit={canEdit}
+                />
+              ) : (
+                <span className="font-mono">{ownResolved != null ? formatCurrency(ownResolved) : "—"}</span>
+              )}
+            </TableCell>
+            <TableCell className="text-right font-mono text-xs">{formatCurrency(s.daily)}</TableCell>
+            <TableCell className={cn("text-right font-mono text-xs", projecaoColor(s.projecao, ownResolved))}>{formatCurrency(s.projecao)}</TableCell>
+            <TableCell className={cn("text-right font-mono text-xs", variancePctColor(s.investido, ownResolved))}>{formatCurrency(s.investido)}</TableCell>
+            <TableCell className="text-right text-xs text-muted-foreground">
+              {ownResolved && ownResolved > 0 ? `${((s.investido / ownResolved) * 100).toFixed(0)}%` : "—"}
+            </TableCell>
+            {renderAjusteCell(ownResolved, s.investido, s.daily)}
+          </TableRow>,
+        );
+        if (isOpen) elements.push(...renderGroupLevel(groupRows, depth + 1, childPath, ownResolved));
+        continue;
+      }
+
+      // Etapa (depth 0) e Produto (depth 1) — cabeçalho maior, sempre expandido.
+      const childrenSum = path ? directChildrenSum(nodesForTab, resolvedForTab, path) : null;
+      elements.push(
+        <TableRow
+          key={`node-${nodeKey}`}
+          className={cn("font-bold", depth === 0 ? "bg-muted" : "bg-muted/60")}
+          data-testid={`group-header-${nodeKey}`}
+        >
+          <TableCell colSpan={4} className={cn("py-2.5", depth === 1 && "pl-6")}>
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className={cn("uppercase tracking-wide", depth === 0 ? "text-sm" : "text-xs")}>{label}</span>
+              <span className="opacity-50 text-xs font-normal">({groupRows.length})</span>
+              {renderClosingBadge(ownResolved, childrenSum)}
             </div>
           </TableCell>
           <TableCell className="text-right">
-            {poolForTab ? (
-              <StageTargetInput
-                pool={poolForTab} month={month} stage={stage}
-                plan={plans[poolForTab]?.stages[stage]} poolTotal={plans[poolForTab]?.total ?? null}
-                onSaved={invalidate} canEdit={canEdit}
+            {poolForTab && !isNone ? (
+              <LevelTargetInput
+                pool={poolForTab} month={month} levelType={level.type} levelKey={key} parentKey={parentKey}
+                plan={plan} resolvedParentBrl={resolvedParentBrl} onSaved={invalidate} canEdit={canEdit}
               />
             ) : (
-              <span className="font-mono">{target != null ? formatCurrency(target) : "—"}</span>
+              <span className="font-mono">{ownResolved != null ? formatCurrency(ownResolved) : "—"}</span>
             )}
           </TableCell>
           <TableCell className="text-right font-mono">{formatCurrency(s.daily)}</TableCell>
-          <TableCell className={cn("text-right font-mono", projecaoColor(s.projecao, target))}>{formatCurrency(s.projecao)}</TableCell>
-          <TableCell className={cn("text-right font-mono", variancePctColor(s.investido, target))}>{formatCurrency(s.investido)}</TableCell>
+          <TableCell className={cn("text-right font-mono", projecaoColor(s.projecao, ownResolved))}>{formatCurrency(s.projecao)}</TableCell>
+          <TableCell className={cn("text-right font-mono", variancePctColor(s.investido, ownResolved))}>{formatCurrency(s.investido)}</TableCell>
           <TableCell className="text-right text-xs text-muted-foreground">
-            {target && target > 0 ? `${((s.investido / target) * 100).toFixed(0)}%` : "—"}
+            {ownResolved && ownResolved > 0 ? `${((s.investido / ownResolved) * 100).toFixed(0)}%` : "—"}
           </TableCell>
-          {renderAjusteCell(target, s.investido, s.daily)}
-        </TableRow>
-        {renderPlatformBlocks(rows, stage)}
-      </>
-    );
+          {renderAjusteCell(ownResolved, s.investido, s.daily)}
+        </TableRow>,
+      );
+      elements.push(...renderGroupLevel(groupRows, depth + 1, childPath, ownResolved));
+    }
+    return elements;
   };
-
-  const semEtapaRows = stageGroups.get("none") ?? [];
 
   return (
     <div className="space-y-4 p-4">
@@ -751,6 +1077,7 @@ export default function GrowthOrcamentoCampanhas() {
                   <TableHead>Etapa / Campanha</TableHead>
                   <TableHead>Grupo</TableHead>
                   <TableHead>Etapa</TableHead>
+                  <TableHead>Produto</TableHead>
                   <TableHead className="text-right">Planejado</TableHead>
                   <TableHead className="text-right">Orç. Diário (Atual)</TableHead>
                   <TableHead className="text-right">Projeção (As Is)</TableHead>
@@ -760,25 +1087,7 @@ export default function GrowthOrcamentoCampanhas() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {STAGE_ORDER.map((stage) => <Fragment key={stage}>{renderStageGroup(stage)}</Fragment>)}
-
-                {semEtapaRows.length > 0 && (
-                  <>
-                    <TableRow className="bg-muted font-bold" data-testid="stage-header-none">
-                      <TableCell colSpan={3} className="py-2.5">
-                        <span className="uppercase tracking-wide text-sm text-muted-foreground">Sem etapa</span>
-                        <span className="opacity-50 text-xs font-normal"> ({semEtapaRows.length})</span>
-                      </TableCell>
-                      <TableCell className="text-right text-muted-foreground">—</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(sumStage(semEtapaRows).daily)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(sumStage(semEtapaRows).projecao)}</TableCell>
-                      <TableCell className="text-right font-mono">{formatCurrency(sumStage(semEtapaRows).investido)}</TableCell>
-                      <TableCell className="text-right text-muted-foreground">—</TableCell>
-                      <TableCell className="text-right text-muted-foreground">—</TableCell>
-                    </TableRow>
-                    {renderPlatformBlocks(semEtapaRows, "none")}
-                  </>
-                )}
+                {renderGroupLevel(filteredCampanhas, 0, "", poolTotalForTab)}
 
                 {filteredCampanhas.length === 0 && (
                   <TableRow>
@@ -789,7 +1098,7 @@ export default function GrowthOrcamentoCampanhas() {
                 )}
 
                 <TableRow className="bg-muted font-semibold border-t-2 border-foreground/20">
-                  <TableCell colSpan={3}>TOTAL</TableCell>
+                  <TableCell colSpan={4}>TOTAL</TableCell>
                   <TableCell className="text-right font-mono">{poolTotalForTab != null ? formatCurrency(poolTotalForTab) : "—"}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.daily)}</TableCell>
                   <TableCell className={cn("text-right font-mono", projecaoColor(totals.projecao, poolTotalForTab))}>{formatCurrency(totals.projecao)}</TableCell>

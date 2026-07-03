@@ -803,6 +803,65 @@ export async function initializeSysSchema(): Promise<void> {
       )
     `);
 
+    // Produto: mesma lógica de tag/stage em campaign_tags — classificação
+    // estável por campanha (Creators, Turbo institucional, Comunidade,
+    // Implantação CRM), sem CHECK (validado só em constante de app, ver
+    // CAMPAIGN_PRODUCTS em orcamentoCampanhas.ts), mesmo precedente de stage.
+    await db.execute(sql`ALTER TABLE cortex_core.campaign_tags ADD COLUMN IF NOT EXISTS produto TEXT`);
+
+    // Árvore de metas genérica — substitui budget_stage_plan como fonte de
+    // planejamento pra novos níveis (Produto, Canal), sem exigir tabela nova
+    // por nível. Um nível por linha; parent_key encadeia a ancestralidade
+    // ('' = raiz, pai é o total do pool; senão 'type:key|type:key...') pra
+    // suportar "% do pai imediato" em qualquer profundidade. level_type sem
+    // CHECK, mesmo precedente de tag/stage (validado só em app).
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.budget_plan_node (
+        pool TEXT NOT NULL,
+        month DATE NOT NULL,
+        level_type TEXT NOT NULL,
+        level_key TEXT NOT NULL,
+        parent_key TEXT NOT NULL DEFAULT '',
+        value NUMERIC(12, 2) NOT NULL,
+        unit TEXT NOT NULL CHECK (unit IN ('pct', 'brl')),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT,
+        PRIMARY KEY (pool, month, level_type, level_key, parent_key)
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_budget_plan_node_month ON cortex_core.budget_plan_node(month)`);
+    // Seed único e idempotente a partir de budget_stage_plan (dado legado
+    // vira nós de nível 'stage' na raiz da árvore). ON CONFLICT DO NOTHING
+    // garante que só popula na primeira vez; budget_stage_plan continua
+    // intocada como rede de segurança de rollback.
+    await db.execute(sql`
+      INSERT INTO cortex_core.budget_plan_node (pool, month, level_type, level_key, parent_key, value, unit, updated_at, updated_by)
+      SELECT pool, month, 'stage', stage, '', value, unit, updated_at, updated_by
+      FROM cortex_core.budget_stage_plan
+      ON CONFLICT (pool, month, level_type, level_key, parent_key) DO NOTHING
+    `);
+
+    // Meta travada por campanha individual (qualquer plataforma, inclusive
+    // TikTok/LinkedIn — campaign_monthly_budget só cobre Meta/Google e fica
+    // intocada/não usada pela UI nova). Tabela separada de budget_plan_node
+    // de propósito: campaign_id não é um enum estável como stage/produto/
+    // platform, e o pai de uma campanha já é 100% determinado por
+    // campaign_tags — duplicar isso aqui criaria uma segunda fonte de verdade.
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.campaign_budget_target (
+        pool TEXT NOT NULL,
+        month DATE NOT NULL,
+        platform TEXT NOT NULL,
+        campaign_id TEXT NOT NULL,
+        value NUMERIC(12, 2) NOT NULL,
+        unit TEXT NOT NULL CHECK (unit IN ('pct', 'brl')),
+        updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+        updated_by TEXT,
+        PRIMARY KEY (pool, month, platform, campaign_id)
+      )
+    `);
+    await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_campaign_budget_target_month ON cortex_core.campaign_budget_target(month)`);
+
     console.log('[database] cortex_core schema tables created');
 
     // Apply spec - UPSERT catalogs
