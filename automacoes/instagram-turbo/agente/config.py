@@ -47,6 +47,7 @@ class Config:
     # TEXTO legado e pode nem existir na lista. Ver clickup.Task.posting_time().
     posting_date_field: str
     horario_field: str
+    formato_field: str
 
     @classmethod
     def load(cls) -> "Config":
@@ -74,6 +75,7 @@ class Config:
             organico_ingest_token=env.get("ORGANICO_INGEST_TOKEN", ""),
             posting_date_field=env.get("CLICKUP_POSTING_DATE_FIELD", "Data de postagem"),
             horario_field=env.get("CLICKUP_HORARIO_FIELD", "Horário"),
+            formato_field=env.get("CLICKUP_FORMATO_FIELD", "Formato do post"),
         )
 
     def require_clickup(self) -> None:
