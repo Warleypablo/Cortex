@@ -550,27 +550,35 @@ async function getCalendar(req: Request, res: Response) {
       failed_count: r.failed_count,
     }));
 
-    // WhatsApp broadcasts detectados: agrupa por dia × source
+    // WhatsApp broadcasts: MESMO conceito de "disparo" do card/summary — 1 por
+    // (dia, source, corpo da mensagem) com >=10 contatos distintos. Antes o calendário
+    // agrupava só por (dia, source) com HAVING count(*)>=30, o que colapsava várias
+    // copies num item só e não batia com o card (review #2). id no formato canônico
+    // (wa-YYYYMMDD-source-hash8) pra casar com broadcast_classification/detalhe.
     const waRes = await db.execute(sql`
       SELECT
+        'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source
+             || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS id,
         DATE_TRUNC('day', date_added)::date AS date,
         source,
+        MIN(body) AS preview,
         COUNT(*)::int AS messages,
         COUNT(DISTINCT contact_id)::int AS contacts_reached
       FROM cortex_core.ghl_messages
-      WHERE message_type = 'TYPE_WHATSAPP'
-        AND direction = 'outbound'
+      WHERE direction = 'outbound'
         AND source IN ('workflow', 'bulk_actions', 'campaign')
         AND date_added BETWEEN ${from} AND ${to}
-      GROUP BY DATE_TRUNC('day', date_added)::date, source
-      HAVING COUNT(*) >= 30
+        AND body IS NOT NULL AND body <> ''
+      GROUP BY DATE_TRUNC('day', date_added), source, SUBSTR(MD5(COALESCE(body, '')), 1, 8)
+      HAVING COUNT(DISTINCT contact_id) >= 10
       ORDER BY date DESC
     `);
     const waBroadcasts = ((waRes as any).rows ?? []).map((r: any) => ({
       kind: "wa_broadcast" as const,
-      id: `wa-${r.date.toISOString?.()?.slice(0, 10) ?? r.date}-${r.source}`,
+      id: r.id,
       date: r.date,
       source: r.source,
+      preview: (r.preview ?? "").slice(0, 120),
       messages: r.messages,
       contacts_reached: r.contacts_reached,
     }));
