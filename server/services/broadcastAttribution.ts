@@ -26,6 +26,7 @@ interface ReplyRow {
   reply_body: string | null;
   reply_at: Date | string | null;
   broadcast_id: string | null;
+  origem_body: string | null;
   lead_phone: string | null;
 }
 
@@ -59,9 +60,12 @@ export async function attributeBroadcastReplies(opts: {
         AND m.date_added BETWEEN ${from} AND ${to}
     ),
     attributed AS (
-      SELECT r.*, (
+      SELECT r.*, o.broadcast_id, o.origem_body
+      FROM replies r
+      LEFT JOIN LATERAL (
         SELECT 'wa-' || TO_CHAR(DATE_TRUNC('day', o.date_added), 'YYYYMMDD') || '-'
-               || o.source || '-' || SUBSTR(MD5(COALESCE(o.body, '')), 1, 8)
+               || o.source || '-' || SUBSTR(MD5(COALESCE(o.body, '')), 1, 8) AS broadcast_id,
+               o.body AS origem_body
         FROM cortex_core.ghl_messages o
         WHERE o.conversation_id = r.conversation_id
           AND o.direction = 'outbound'
@@ -69,11 +73,10 @@ export async function attributeBroadcastReplies(opts: {
           AND o.date_added < r.reply_at
         ORDER BY o.date_added DESC
         LIMIT 1
-      ) AS broadcast_id
-      FROM replies r
+      ) o ON true
     )
     SELECT a.reply_message_id, a.conversation_id, a.ghl_contact_id, a.reply_body,
-           a.reply_at, a.broadcast_id,
+           a.reply_at, a.broadcast_id, a.origem_body,
            COALESCE(c.phone, cv.raw->>'phone') AS lead_phone
     FROM attributed a
     LEFT JOIN cortex_core.ghl_contacts c ON c.id = a.ghl_contact_id
@@ -144,7 +147,7 @@ export async function attributeBroadcastReplies(opts: {
   let matchedDeals = 0;
   let unmatchedPhones = 0;
   for (const row of pending) {
-    const cls = await classificarResposta(row.reply_body || "");
+    const cls = await classificarResposta(row.reply_body || "", row.origem_body);
     classified++;
     const norm = phoneToNorm.get(row.reply_message_id) ?? null;
     const bx = norm ? normToBitrix.get(norm) : undefined;

@@ -29,4 +29,30 @@ describe("classificarPorRegra", () => {
       ),
     ).toBeNull();
   });
+
+  it("responde a palavra-chave pedida no CTA → positiva (não neutra)", () => {
+    const cta = "Quer participar da campanha de UGC? Responda UGC aqui que a gente te envia os detalhes.";
+    expect(classificarPorRegra("UGC", cta)?.sentiment).toBe("positiva");
+    expect(classificarPorRegra("ugc", cta)?.sentiment).toBe("positiva");
+  });
+
+  it("palavra-chave do CTA com verbo variado (comente/digite)", () => {
+    expect(classificarPorRegra("EU QUERO", "Comente EU QUERO pra receber o material.")?.sentiment).toBe("positiva");
+    expect(classificarPorRegra("bora", "Digite bora que te mando o link.")?.sentiment).toBe("positiva");
+  });
+
+  it("sem broadcast de contexto, token ambíguo continua null (vai pra IA)", () => {
+    expect(classificarPorRegra("UGC")).toBeNull();
+  });
+
+  it("token que NÃO é pedido pelo CTA não vira positiva por regra", () => {
+    // "XPTO" não aparece após verbo de CTA no corpo → regra não decide (null → IA)
+    expect(classificarPorRegra("XPTO", "Responda UGC pra participar.")).toBeNull();
+  });
+
+  it("negativa/opt-out têm precedência sobre a regra de CTA", () => {
+    const cta = "Responda SIM pra receber.";
+    expect(classificarPorRegra("não tenho interesse", cta)?.sentiment).toBe("negativa");
+    expect(classificarPorRegra("me exclua da lista", cta)?.sentiment).toBe("opt_out");
+  });
 });
