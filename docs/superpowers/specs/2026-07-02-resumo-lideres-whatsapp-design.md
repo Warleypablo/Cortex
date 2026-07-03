@@ -33,7 +33,15 @@ Validação feita contra a mensagem real de 25/06 10h: MRR, Em cancelamento, Chu
 da Entrega Pontual (centavos ,45) conferem; desvios residuais são registros
 retroativos no ClickUp/Bitrix — a automação reflete o estado do momento do envio.
 
-## Formato da mensagem
+> **v2 (2026-07-03):** modelo reformulado a pedido do Ichino (exemplo manual de 02/07 19h).
+> Saudação dinâmica por hora (Bom DIA / Boa TARDE / Boa NOITE); nomes dos meses no texto;
+> MRR TOTAL (ativo+onb+triagem) × MRR ATIVO (só 'ativo'); Churn Pontual (valorp via join
+> cup_churn×cup_contratos); Churn MRR total × ajustado (sem 'Erro na Venda', 'Não começou',
+> 'Inadimplente 1º Mês'); **Net Churn = churn ajustado − cross total**; cross zerado imprime
+> "ZERO"; footer "estamos de 👀". Cross R×P segue os campos do Bitrix (decisão 2026-07-03).
+> "Em cancelamento" saiu do modelo. Template exato no teste `resumoLideres.test.ts`.
+
+## Formato da mensagem (v1 — histórico)
 
 Idêntico ao exemplo manual, com data do dia, hora real do envio (ex.: `dia 02/07, 10h`)
 e percentuais **exatos com 2 casas**

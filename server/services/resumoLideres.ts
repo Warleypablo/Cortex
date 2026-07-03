@@ -1,5 +1,7 @@
 // Resumo diário de métricas para líderes via WhatsApp.
 // Spec: docs/superpowers/specs/2026-07-02-resumo-lideres-whatsapp-design.md
+// Modelo v2 (2026-07-03): MRR total×ativo, churn pontual, churn com/sem motivos
+// operacionais, net churn sobre o churn ajustado. Cross R×P = campos do Bitrix.
 
 import { db } from "../db";
 import { sql } from "drizzle-orm";
@@ -11,19 +13,31 @@ import {
 import { enviarMensagemWhatsApp } from "./turbozap";
 
 export interface MetricasResumo {
-  mrrAtivo: number;
-  entregaPontual: number;
-  churn: number;
-  churnPct: number; // 0-100
-  emCancelamento: number;
+  mrrTotal: number; // ativo + onboarding + triagem (live)
+  mrrAtivo: number; // só status 'ativo' (live)
+  entregaPontual: number; // valorp dos contratos que viraram 'entregue' no mês
+  churnPontual: number; // valorp dos contratos pontuais com pedido de churn no mês
+  churnPontualAjustado: number; // idem, sem os motivos operacionais
+  mrrMesAnterior: number; // snapshot do 1º do mês = fechamento do mês anterior (base dos %)
+  churnTotal: number; // valor_r bruto de cup_churn no mês
+  churnTotalPct: number; // 0-100
+  churnAjustado: number; // sem os motivos operacionais
+  churnAjustadoPct: number; // 0-100
   crossR: number;
-  crossP: number; // pontual bruto
+  crossP: number;
   crossPAmortizado: number; // crossP / 5
   crossTotal: number; // crossR + crossPAmortizado
-  netChurn: number; // churn - crossTotal
+  netChurn: number; // churnAjustado - crossTotal
   netChurnPct: number; // 0-100
-  mrrInicioMes: number;
 }
+
+// Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real)
+const MOTIVOS_EXCLUIDOS = sql`('Erro na Venda', 'Não começou', 'Inadimplente 1º Mês')`;
+
+const MESES = [
+  "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
+  "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO",
+];
 
 export function formatarMoedaBR(valor: number): string {
   return (
@@ -38,28 +52,48 @@ export function formatarPercentBR(valor: number): string {
   );
 }
 
+function saudacao(hora: number): string {
+  if (hora < 12) return "Bom DIA";
+  if (hora < 18) return "Boa TARDE";
+  return "Boa NOITE";
+}
+
 export function formatarMensagemResumo(
   m: MetricasResumo,
-  agora: { dataFmt: string; horaFmt: string },
+  agora: { dataFmt: string; horaFmt: string; hora: number; mes: number },
 ): string {
-  return `Bom dia líderes!!!
-Atualizações sobre nossas métricas principais, dia ${agora.dataFmt}, ${agora.horaFmt}.
+  const mes = MESES[agora.mes - 1];
+  const mesAnterior = MESES[(agora.mes + 10) % 12];
+  const crossRTexto = m.crossR > 0 ? formatarMoedaBR(m.crossR) : "ZERO";
+  const crossPTexto =
+    m.crossP > 0
+      ? `${formatarMoedaBR(m.crossP)} / 5 = ${formatarMoedaBR(m.crossPAmortizado)}`
+      : "ZERO";
 
-MRR: ${formatarMoedaBR(m.mrrAtivo)}
-Entrega Pontual: ${formatarMoedaBR(m.entregaPontual)}
+  return `${saudacao(agora.hora)} líderes!!!
+Atualizações sobre nossas métricas principais, dia *${agora.dataFmt}, ${agora.horaFmt}*.
 
-Churn: ${formatarMoedaBR(m.churn)} - *${formatarPercentBR(m.churnPct)}*
-Em cancelamento: ${formatarMoedaBR(m.emCancelamento)}
 
-Cross R: ${formatarMoedaBR(m.crossR)}
-Cross P: ${formatarMoedaBR(m.crossP)} / 5 = ${formatarMoedaBR(m.crossPAmortizado)}
-Total: ${formatarMoedaBR(m.crossR)} + ${formatarMoedaBR(m.crossPAmortizado)} = ${formatarMoedaBR(m.crossTotal)}
+MRR ${mes} TOTAL: ${formatarMoedaBR(m.mrrTotal)}
+MRR ${mes} ATIVO: ${formatarMoedaBR(m.mrrAtivo)}
+Entrega Pontual ${mes}: ${formatarMoedaBR(m.entregaPontual)}
+
+Churn Pontual ${mes}: ${formatarMoedaBR(m.churnPontual)}
+Churn Pontual ${mes} (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnPontualAjustado)}
+
+MRR ${mesAnterior}: ${formatarMoedaBR(m.mrrMesAnterior)}
+
+Churn MRR TOTAL: ${formatarMoedaBR(m.churnTotal)} - *${formatarPercentBR(m.churnTotalPct)}*
+Churn MRR (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnAjustado)} - *${formatarPercentBR(m.churnAjustadoPct)}*
+
+Cross R: ${crossRTexto}
+Cross P: ${crossPTexto}
+Total: ${formatarMoedaBR(m.crossTotal)}
 
 Net Churn: ${formatarMoedaBR(m.netChurn)} - *${formatarPercentBR(m.netChurnPct)}*
 
-*OBS 1: Bora buscar mais cross*
-*OBS 2: Bora reter*
-*OBS 3: Não sai mais ninguém*`;
+
+estamos de 👀`;
 }
 
 export function agoraSaoPaulo(date: Date = new Date()): {
@@ -68,6 +102,7 @@ export function agoraSaoPaulo(date: Date = new Date()): {
   hora: number;
   horaFmt: string;
   diaSemana: number; // 0=dom ... 6=sáb
+  mes: number; // 1-12
 } {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Sao_Paulo",
@@ -92,6 +127,7 @@ export function agoraSaoPaulo(date: Date = new Date()): {
     hora,
     horaFmt: `${hora}h`,
     diaSemana: weekdayMap[weekday] ?? 0,
+    mes: parseInt(get("month"), 10),
   };
 }
 
@@ -99,24 +135,47 @@ export function agoraSaoPaulo(date: Date = new Date()): {
 // Cálculo das métricas (mês corrente em America/Sao_Paulo)
 // ============================================
 
-async function getChurnMesBruto(): Promise<number> {
-  // Churn BRUTO (inclui abonados) — alinhado ao card do ClickUp
+async function getMrrSoAtivo(): Promise<number> {
   const result = await db.execute(sql`
-    SELECT COALESCE(SUM(valor_r), 0) AS churn
+    SELECT COALESCE(SUM(valorr), 0) AS mrr
+    FROM "Clickup".cup_contratos
+    WHERE status = 'ativo'
+  `);
+  return parseFloat((result.rows[0] as any)?.mrr || "0");
+}
+
+async function getChurnMes(): Promise<{ total: number; ajustado: number }> {
+  // Churn BRUTO (inclui abonados) por data do pedido; "ajustado" exclui os
+  // motivos operacionais (erro de venda / não começou / inadimplente 1º mês)
+  const result = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(valor_r), 0) AS total,
+      COALESCE(SUM(valor_r) FILTER (
+        WHERE COALESCE(motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}
+      ), 0) AS ajustado
     FROM "Clickup".cup_churn
     WHERE data_solicitacao_encerramento >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo'))::date
       AND data_solicitacao_encerramento < (date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')) + interval '1 month')::date
   `);
-  return parseFloat((result.rows[0] as any)?.churn || "0");
+  const row = result.rows[0] as any;
+  return { total: parseFloat(row?.total || "0"), ajustado: parseFloat(row?.ajustado || "0") };
 }
 
-async function getEmCancelamento(): Promise<number> {
+async function getChurnPontualMes(): Promise<{ total: number; ajustado: number }> {
+  // cup_churn não tem valor_p: o valor pontual vem do contrato (join por task_id)
   const result = await db.execute(sql`
-    SELECT COALESCE(SUM(valorr), 0) AS total
-    FROM "Clickup".cup_contratos
-    WHERE status = 'em cancelamento' AND valorr > 0
+    SELECT
+      COALESCE(SUM(ct.valorp), 0) AS total,
+      COALESCE(SUM(ct.valorp) FILTER (
+        WHERE COALESCE(ch.motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}
+      ), 0) AS ajustado
+    FROM "Clickup".cup_churn ch
+    JOIN "Clickup".cup_contratos ct ON ct.id_subtask = ch.task_id AND ct.valorp > 0
+    WHERE ch.data_solicitacao_encerramento >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo'))::date
+      AND ch.data_solicitacao_encerramento < (date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')) + interval '1 month')::date
   `);
-  return parseFloat((result.rows[0] as any)?.total || "0");
+  const row = result.rows[0] as any;
+  return { total: parseFloat(row?.total || "0"), ajustado: parseFloat(row?.ajustado || "0") };
 }
 
 async function getEntregaPontualMes(): Promise<number> {
@@ -141,20 +200,21 @@ async function getEntregaPontualMes(): Promise<number> {
 }
 
 export async function calcularMetricasResumo(): Promise<MetricasResumo> {
-  const [mrrAtivo, mrrInicioMes, breakdown, churn, emCancelamento, entregaPontual] =
+  const [mrrTotal, mrrAtivo, mrrMesAnterior, breakdown, churn, churnPontual, entregaPontual] =
     await Promise.all([
-      getMrrAtivo(),
+      getMrrAtivo(), // ativo+onboarding+triagem (metricsAdapter)
+      getMrrSoAtivo(),
       getMrrInicioMes(),
       getVendasMrrBreakdown(),
-      getChurnMesBruto(),
-      getEmCancelamento(),
+      getChurnMes(),
+      getChurnPontualMes(),
       getEntregaPontualMes(),
     ]);
 
   // metricsAdapter engole erros retornando 0 — nunca enviar mensagem com métricas parciais
-  if (mrrAtivo <= 0 || mrrInicioMes <= 0) {
+  if (mrrTotal <= 0 || mrrMesAnterior <= 0) {
     throw new Error(
-      `Métricas base inválidas (mrrAtivo=${mrrAtivo}, mrrInicioMes=${mrrInicioMes}) — envio abortado`,
+      `Métricas base inválidas (mrrTotal=${mrrTotal}, mrrMesAnterior=${mrrMesAnterior}) — envio abortado`,
     );
   }
 
@@ -162,21 +222,25 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
   const crossP = breakdown.crosssell_pontual;
   const crossPAmortizado = crossP / 5;
   const crossTotal = crossR + crossPAmortizado;
-  const netChurn = churn - crossTotal;
+  const netChurn = churn.ajustado - crossTotal;
 
   return {
+    mrrTotal,
     mrrAtivo,
     entregaPontual,
-    churn,
-    churnPct: (churn / mrrInicioMes) * 100,
-    emCancelamento,
+    churnPontual: churnPontual.total,
+    churnPontualAjustado: churnPontual.ajustado,
+    mrrMesAnterior,
+    churnTotal: churn.total,
+    churnTotalPct: (churn.total / mrrMesAnterior) * 100,
+    churnAjustado: churn.ajustado,
+    churnAjustadoPct: (churn.ajustado / mrrMesAnterior) * 100,
     crossR,
     crossP,
     crossPAmortizado,
     crossTotal,
     netChurn,
-    netChurnPct: (netChurn / mrrInicioMes) * 100,
-    mrrInicioMes,
+    netChurnPct: (netChurn / mrrMesAnterior) * 100,
   };
 }
 
