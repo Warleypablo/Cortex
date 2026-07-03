@@ -122,6 +122,7 @@ class PlannedAction:
     legenda_source: str = "none"
     drive_folder_found: bool = False
     tipo_post: str | None = None
+    format_note: str | None = None   # aviso quando o 'Formato do post' do card sobrepõe a inferência
     asset_count: int = 0
     asset_names: list[str] = field(default_factory=list)
     asset_ids: list[str] = field(default_factory=list)
@@ -286,6 +287,11 @@ def plan_task(t: clickup.Task, *, force_now: bool = False) -> PlannedAction:
                 plan.drive_folder_found = True
                 files = drive.list_folder(post_folder.id)
                 tipo, assets = drive.classify_assets(files)
+                # O 'Formato do post' declarado no card manda sobre a inferência
+                # por contagem de arquivos (evita subir REELS como carrossel).
+                declared = drive.declared_tipo_from_label(t.formato_post_label())
+                tipo, assets, note = drive.reconcile_format(declared, tipo, assets)
+                plan.format_note = note
                 plan.tipo_post = tipo
                 plan.asset_count = len(assets)
                 plan.asset_names = [a.name for a in assets][:10]
@@ -421,6 +427,8 @@ def render_plan(p: PlannedAction) -> str:
         if len(p.asset_names) > 3:
             preview += f", … (+{len(p.asset_names)-3})"
         lines.append(f"   📁 Drive: pasta OK → tipo={p.tipo_post}  assets={p.asset_count}  [{preview}]")
+        if p.format_note:
+            lines.append(f"   🎬 Formato: {p.format_note}")
     else:
         lines.append(f"   📁 Drive: pasta {p.turbo_slug} NÃO encontrada no mês")
 

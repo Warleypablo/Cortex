@@ -115,6 +115,49 @@ class Task:
                 return v
         return None
 
+    def _dropdown_label(self, name: str) -> str | None:
+        """Label ('name') da opção selecionada de um custom field drop_down.
+
+        Resolve via `type_config.options` do raw (não do dict simplificado
+        `custom_fields`, que só guarda o valor). O `value` do ClickUp para
+        drop_down vem como o orderindex (int) ou, em algumas versões da API,
+        como o id (str) da opção — toleramos os dois pra não depender de um
+        índice hardcoded que quebraria se reordenarem o dropdown. None se o
+        campo não existe, está vazio, ou a opção não é encontrada.
+        """
+        low = name.strip().lower()
+        for f in self.raw.get("custom_fields", []):
+            if (f.get("name") or "").strip().lower() != low:
+                continue
+            val = f.get("value")
+            if val in (None, ""):
+                return None
+            opts = (f.get("type_config") or {}).get("options") or []
+            for o in opts:                                  # match por id (str)
+                if str(o.get("id")) == str(val):
+                    return o.get("name")
+            try:                                            # match por orderindex (int)
+                idx = int(val)
+            except (TypeError, ValueError):
+                return None
+            for o in opts:
+                if o.get("orderindex") == idx:
+                    return o.get("name")
+            if 0 <= idx < len(opts):                        # fallback: posição na lista
+                return opts[idx].get("name")
+            return None
+        return None
+
+    def formato_post_label(self) -> str | None:
+        """Label do dropdown 'Formato do post' do card (ex.: 'REELS',
+        'CARROSSEL', 'IMG ÚNICA'), ou None se não preenchido.
+
+        É o formato QUE A CARDISTA declarou — fonte da verdade pra decidir
+        reels/carrossel/single, acima da inferência por contagem de arquivos
+        no Drive (drive.classify_assets). Ver drive.declared_tipo_from_label.
+        """
+        return self._dropdown_label(CONFIG.formato_field)
+
     def posting_date(self) -> date | None:
         """
         Lê o custom field de data (CONFIG.posting_date_field, default 'Data de
