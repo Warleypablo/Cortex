@@ -398,3 +398,69 @@ def classify_assets(files: list[DriveFile]) -> tuple[str, list[DriveFile]]:
             return "reels", [only]
         return "single", [only]
     return "empty", []
+
+
+# Label do dropdown "Formato do post" do ClickUp → tipo_post do publicador.
+# Só mapeamos os formatos de post de feed do IG; YT/CORTE/LINKEDIN/THUMB/ADS
+# não são publicados por este agente e caem em None (usa a inferência do Drive).
+_FORMATO_LABEL_TO_TIPO = {
+    "reels": "reels",
+    "carrossel": "carousel",
+    "carousel": "carousel",
+    "img única": "single",
+    "img unica": "single",
+    "imagem única": "single",
+    "imagem unica": "single",
+    "single": "single",
+}
+
+
+def declared_tipo_from_label(label: str | None) -> str | None:
+    """Converte o label do campo 'Formato do post' (REELS/CARROSSEL/IMG ÚNICA)
+    no tipo_post do publicador (reels/carousel/single). None quando ausente ou
+    for um formato fora do escopo do agente (YT, ADS, etc.)."""
+    if not label:
+        return None
+    return _FORMATO_LABEL_TO_TIPO.get(label.strip().lower())
+
+
+def reconcile_format(declared: str | None, tipo: str,
+                     assets: list[DriveFile]) -> tuple[str, list[DriveFile], str | None]:
+    """Faz o formato DECLARADO no card prevalecer sobre a inferência por
+    contagem de arquivos (classify_assets).
+
+    Motivo: uma pasta com vídeo + capa/frame tem 2 arquivos e classify_assets
+    devolve 'carousel', publicando um REELS errado como carrossel (bug de
+    02/07/2026). Quando o card declara o formato, ele manda — e a gente
+    seleciona os assets coerentes (ex.: REELS → só o vídeo principal).
+
+    Retorna (tipo_final, assets_finais, nota). `nota` != None quando houve
+    override, ou quando o formato declarado NÃO bate com os assets (nesse caso
+    mantém a inferência e a nota vira só um aviso). `classify_assets` continua
+    sendo o fallback quando `declared` é None.
+    """
+    if not declared or declared == tipo:
+        return tipo, assets, None
+
+    videos = [a for a in assets if a.mime_type.startswith("video/")]
+    images = [a for a in assets if a.mime_type.startswith("image/")]
+
+    if declared == "reels":
+        if videos:
+            extras = len(assets) - 1
+            nota = (f"card=REELS sobrepõe inferência '{tipo}': publica o vídeo "
+                    f"'{videos[0].name}'" + (f" e ignora {extras} arquivo(s) extra(s)"
+                    if extras > 0 else ""))
+            return "reels", [videos[0]], nota
+        return tipo, assets, f"card=REELS mas não há vídeo na pasta — mantém '{tipo}'"
+
+    if declared == "single":
+        pick = images[0] if images else assets[0]
+        return "single", [pick], f"card=IMG ÚNICA sobrepõe inferência '{tipo}'"
+
+    if declared == "carousel":
+        if len(assets) >= 2:
+            return "carousel", assets, f"card=CARROSSEL sobrepõe inferência '{tipo}'"
+        return tipo, assets, f"card=CARROSSEL mas só há {len(assets)} arquivo — mantém '{tipo}'"
+
+    return tipo, assets, None
