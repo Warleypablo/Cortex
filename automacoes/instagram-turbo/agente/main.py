@@ -307,12 +307,15 @@ class ExecResult:
     error: str | None = None
 
 
-def execute_plan(plan: PlannedAction, *, run_id: str, force_now: bool = False) -> ExecResult:
+def execute_plan(plan: PlannedAction, *, run_id: str, force_now: bool = False,
+                 collaborators: list[str] | None = None) -> ExecResult:
     """
     Publica no IG e marca a task como postada no ClickUp. Só é chamado
     quando DRY_RUN=0 E plan.is_ready_to_publish.
 
     Refuse-soft se estamos fora de slot, exceto quando --force-now.
+
+    collaborators: @usernames a convidar como coautores (feed só; contas públicas).
     """
     from agente import instagram, clickup_write, rehost
 
@@ -332,11 +335,14 @@ def execute_plan(plan: PlannedAction, *, run_id: str, force_now: bool = False) -
 
     try:
         if plan.tipo_post == "single":
-            res = instagram.publish_single(urls[0], plan.legenda_text)
+            res = instagram.publish_single(urls[0], plan.legenda_text,
+                                           collaborators=collaborators)
         elif plan.tipo_post == "reels":
-            res = instagram.publish_reel(urls[0], plan.legenda_text)
+            res = instagram.publish_reel(urls[0], plan.legenda_text,
+                                         collaborators=collaborators)
         elif plan.tipo_post == "carousel":
-            res = instagram.publish_carousel(urls, plan.legenda_text, item_types=types)
+            res = instagram.publish_carousel(urls, plan.legenda_text, item_types=types,
+                                             collaborators=collaborators)
         else:
             return ExecResult(
                 task_id=plan.task_id, ig_media_id=None, permalink=None,
@@ -450,6 +456,11 @@ def _parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--caption-override",
         help="usa esta legenda em vez da que está no Doc (útil pra testar publish "
              "antes do Bloco F estar pronto). Só funciona com --task-id.",
+    )
+    ap.add_argument(
+        "--collaborators",
+        help="@usernames (separados por vírgula) a convidar como coautores no post "
+             "(Collab do IG). Feed só; contas públicas; máx 3. Ex.: --collaborators victor.peixoto",
     )
     return ap.parse_args(argv)
 
@@ -575,7 +586,12 @@ def main(argv: list[str] | None = None) -> int:
                 if CONFIG.dry_run:
                     continue
 
-                exec_res = execute_plan(plan, run_id=run_id, force_now=args.force_now)
+                _collabs = (
+                    [u for u in (args.collaborators or "").split(",") if u.strip()]
+                    if args.collaborators else None
+                )
+                exec_res = execute_plan(plan, run_id=run_id, force_now=args.force_now,
+                                        collaborators=_collabs)
                 if exec_res.error:
                     print(f"   ❌ {exec_res.error}")
                     publish_failed += 1

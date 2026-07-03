@@ -125,40 +125,76 @@ def verify_token() -> IgAccount:
 
 # ── Container creation ─────────────────────────────────────────────────────
 
+def _collaborators_param(collaborators: list[str] | None) -> str | None:
+    """Formata a lista de @usernames pro parâmetro `collaborators` da Graph API.
+
+    A Meta espera um array JSON de strings, ex.: ["victor.peixoto"]. Convida
+    coautores no post (aparece nos dois perfis). Só em feed (imagem/reel/carrossel,
+    NÃO stories), no MÁXIMO 3, e os convidados precisam ter conta PÚBLICA — se não,
+    a Meta recusa a publicação inteira. O convidado ainda precisa ACEITAR no app.
+    Passa o `@` como opcional (a API quer sem o @); a gente limpa aqui.
+    """
+    if not collaborators:
+        return None
+    clean = [u.strip().lstrip("@") for u in collaborators if u and u.strip()]
+    if not clean:
+        return None
+    if len(clean) > 3:
+        raise ValueError(f"máximo 3 colaboradores, recebi {len(clean)}: {clean}")
+    return json.dumps(clean)
+
+
 def _create_image_container(image_url: str, caption: str,
-                            is_carousel_item: bool = False) -> str:
+                            is_carousel_item: bool = False,
+                            collaborators: list[str] | None = None) -> str:
     params: dict = {"image_url": image_url}
     if caption:
         params["caption"] = caption
     if is_carousel_item:
         params["is_carousel_item"] = "true"
+    collab = _collaborators_param(collaborators)
+    if collab:
+        params["collaborators"] = collab
     r = _graph("POST", f"/{CONFIG.ig_business_account_id}/media", params)
     return r["id"]
 
 
 def _create_video_container(video_url: str, caption: str, media_type: str,
-                            is_carousel_item: bool = False) -> str:
+                            is_carousel_item: bool = False,
+                            collaborators: list[str] | None = None,
+                            cover_url: str | None = None) -> str:
     """
     media_type ∈ {'REELS', 'VIDEO'}.
     - REELS → publica como reel no feed/aba reels (uso fora de carousel).
     - VIDEO + is_carousel_item=true → item de vídeo dentro de carousel.
+
+    cover_url: (só REELS) URL pública de imagem pra capa/thumbnail do reel.
     """
     params: dict = {"video_url": video_url, "media_type": media_type}
     if caption:
         params["caption"] = caption
     if is_carousel_item:
         params["is_carousel_item"] = "true"
+    if cover_url and media_type == "REELS":
+        params["cover_url"] = cover_url
+    collab = _collaborators_param(collaborators)
+    if collab:
+        params["collaborators"] = collab
     r = _graph("POST", f"/{CONFIG.ig_business_account_id}/media", params)
     return r["id"]
 
 
-def _create_carousel_container(children_ids: list[str], caption: str) -> str:
+def _create_carousel_container(children_ids: list[str], caption: str,
+                               collaborators: list[str] | None = None) -> str:
     params = {
         "media_type": "CAROUSEL",
         "children": ",".join(children_ids),
     }
     if caption:
         params["caption"] = caption
+    collab = _collaborators_param(collaborators)
+    if collab:
+        params["collaborators"] = collab
     r = _graph("POST", f"/{CONFIG.ig_business_account_id}/media", params)
     return r["id"]
 
@@ -231,8 +267,9 @@ class PublishResult:
     dry_run: bool
 
 
-def publish_single(image_url: str, caption: str) -> PublishResult:
-    container = _create_image_container(image_url, caption)
+def publish_single(image_url: str, caption: str,
+                   collaborators: list[str] | None = None) -> PublishResult:
+    container = _create_image_container(image_url, caption, collaborators=collaborators)
     # Imagem normalmente sai FINISHED na hora, mas damos uma checada rápida.
     _wait_for_finished(container, label="single", max_wait=60)
     media_id = _publish(container)
@@ -244,8 +281,11 @@ def publish_single(image_url: str, caption: str) -> PublishResult:
     )
 
 
-def publish_reel(video_url: str, caption: str) -> PublishResult:
-    container = _create_video_container(video_url, caption, media_type="REELS")
+def publish_reel(video_url: str, caption: str,
+                 collaborators: list[str] | None = None,
+                 cover_url: str | None = None) -> PublishResult:
+    container = _create_video_container(video_url, caption, media_type="REELS",
+                                        collaborators=collaborators, cover_url=cover_url)
     _wait_for_finished(container, label="reel")
     media_id = _publish(container)
     return PublishResult(
@@ -257,10 +297,13 @@ def publish_reel(video_url: str, caption: str) -> PublishResult:
 
 
 def publish_carousel(urls: list[str], caption: str,
-                     item_types: list[str] | None = None) -> PublishResult:
+                     item_types: list[str] | None = None,
+                     collaborators: list[str] | None = None) -> PublishResult:
     """
     urls: 2–10 URLs públicas.
     item_types: lista paralela em {'image','video'}. Se None, assume tudo image.
+    collaborators: @usernames a convidar como coautores (vai só no container-pai,
+      não nos filhos).
     """
     if not (CAROUSEL_MIN <= len(urls) <= CAROUSEL_MAX):
         raise ValueError(
@@ -285,7 +328,7 @@ def publish_carousel(urls: list[str], caption: str,
             _wait_for_finished(cid, label=f"carousel-item({t})")
         child_ids.append(cid)
 
-    parent = _create_carousel_container(child_ids, caption)
+    parent = _create_carousel_container(child_ids, caption, collaborators=collaborators)
     _wait_for_finished(parent, label="carousel", max_wait=120)
     media_id = _publish(parent)
     return PublishResult(
