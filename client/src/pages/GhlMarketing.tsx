@@ -15,6 +15,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths } from "date-fns";
 import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
+import { PADROES_COPY_KEYS, PADROES_COPY_LABEL } from "@shared/ghl-broadcast/types";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
@@ -2019,7 +2020,15 @@ function GeradorTab() {
               </div>
               <div>
                 <Label className="text-xs">Padrão preferido (opcional)</Label>
-                <Input value={padraoAlvo} onChange={(e) => setPadraoAlvo(e.target.value)} placeholder="ex: HOOK_PROVOCATIVO" />
+                <Select value={padraoAlvo || "__none__"} onValueChange={(v) => setPadraoAlvo(v === "__none__" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Sem preferência" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sem preferência</SelectItem>
+                    {PADROES_COPY_KEYS.map((k) => (
+                      <SelectItem key={k} value={k}>{PADROES_COPY_LABEL[k]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs">Contexto adicional (opcional)</Label>
