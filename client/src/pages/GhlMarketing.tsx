@@ -853,7 +853,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
   // Resumo executivo: entrega WhatsApp por status + funil atribuído (causalidade pós-resposta).
   const summary = useQuery<{
     whatsapp: { total: number; enviado: number; entregue: number; lida: number; erro: number; entrega_pct: number | null; leitura_pct: number | null; erro_pct: number | null };
-    funil: { responderam: number; positivas: number; oportunidades: number; reuniao_marcada: number; compareceu: number; venda: number };
+    funil: { responderam: number; positivas: number; oportunidades: number; reuniao_marcada: number; reuniao_direta: number; compareceu: number; venda: number };
     custos: { gasto_total: number; gasto_por_disparo: number | null; custo_reuniao: number | null; cac: number | null; estimado: boolean; unit_cost: number; n_manual: number };
   }>({
     queryKey: ["/api/ghl/broadcasts/summary", from, to],
@@ -881,7 +881,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
         <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp" />
         <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint="responderam ao disparo" />
         <StatCard label="Oportunidades" value={fnl ? fmtInt(fnl.oportunidades) : "—"} hint="responderam positivo ou marcaram reunião" />
-        <StatCard label="Reuniões" value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"} hint="atribuídas (pós-resposta)" />
+        <StatCard label="Reuniões" value={fnl ? `${fmtInt(fnl.reuniao_direta)} / ${fmtInt(fnl.reuniao_marcada)}` : "—"} hint="direta (negócio novo) / influenciada" />
         <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="investimento ÷ reuniões" />
         <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
         <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas" />

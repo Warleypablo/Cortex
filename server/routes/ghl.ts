@@ -1667,8 +1667,12 @@ async function getBroadcastsSummary(req: Request, res: Response) {
           WHERE fr.sentiment = 'positiva'
              OR (d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)
         )::int AS oportunidades,
-        -- causalidade (>=): inclui etapas no mesmo dia da resposta (ver nota no topo)
+        -- INFLUENCIADA (causalidade >=): qualquer reunião agendada a partir da resposta (nº atual).
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)::int AS reuniao_marcada,
+        -- DIRETA: o deal foi CRIADO em torno da resposta (o disparo gerou um negócio novo),
+        -- e não só tocou um deal pré-existente. É o "converteu por causa do disparo" — bem mais
+        -- perto da atribuição manual do Bitrix que a influenciada (review #5).
+        count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.date_create >= fr.reply_at - INTERVAL '2 days')::int AS reuniao_direta,
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= fr.reply_at::date)::int AS venda
       FROM fr LEFT JOIN "Bitrix".crm_deal d ON d.id = fr.bitrix_deal_id
