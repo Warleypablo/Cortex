@@ -1,5 +1,28 @@
 # Changelog
 
+## 2026-07-03 | feat(creators-conversao): tela auxiliar de conversão pontual → recorrente em Creators
+
+**O que foi feito:**
+- Nova tela `/creators-conversao` (grupo Gestão, ícone Clapperboard): lista os clientes com pontual de Creators criado no período (default jan–jun/2026) que depois fecharam contrato **recorrente** — 4 cards (pontuais, convertidos, p/ Creators Rec., taxa) + tabela com link do ClickUp, valores, dias até converter e badge "Creators Rec." vs "Outro produto".
+- Régua: pontual = `(produto ILIKE '%creator%' OR servico ILIKE '%creator%') AND valorp > 0` (data_criado no período); conversão = primeiro recorrente (`valorr > 0`, qualquer produto) estritamente posterior ao 1º pontual. Grão = cliente (id_task).
+- Endpoint `GET /api/creators-conversao?de=&ate=` (validação de mês 01–12, 400 em params inválidos; 4 testes vitest).
+- Filtros: seletor de mês início/fim + toggle "Só Creators Rec." (só filtra a tabela). Dark/light ok.
+- Números validados em prod e local (jan–jun/2026): 181 pontuais, 9 convertidos (~5%), 3 p/ Creators Recorrente (Doctors Group, Creamy — MRR R$ 150k —, Meliuz).
+
+**Por que:**
+- Pedido do Ichino (2026-07-03): "tela auxiliar para puxar de janeiro a junho quais clientes eram pontuais em creators e se tornaram recorrentes".
+
+**Arquivos alterados:**
+- `server/routes/creatorsConversao.ts` + `.test.ts` - endpoint novo (registrado em `server/routes.ts`).
+- `client/src/pages/CreatorsConversao.tsx` - página única (cards + tabela + filtros).
+- `shared/nav-config.ts` - permission key `gestao.creators_conversao`, rota e item de menu.
+- `client/src/App.tsx` - rota lazy `/creators-conversao`.
+- `docs/superpowers/specs|plans/2026-07-03-creators-conversao*` - spec e plano.
+
+**Impacto arquitetural:** Nenhum (tela read-only sobre `cup_contratos`/`cup_clientes`).
+
+---
+
 ## 2026-07-03 | style(capacity-times): renomear Cap. MRR para Cap. FAT nas abas comerciais
 
 **O que foi feito:**
