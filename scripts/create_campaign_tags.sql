@@ -24,5 +24,9 @@ ALTER TABLE cortex_core.campaign_tags ADD COLUMN IF NOT EXISTS stage TEXT;
 ALTER TABLE cortex_core.campaign_tags ALTER COLUMN tag DROP NOT NULL;
 ALTER TABLE cortex_core.campaign_tags DROP CONSTRAINT IF EXISTS campaign_tags_platform_check;
 
+-- Produto: mesmo padrão de stage (adicionado depois, sem CHECK, validado só
+-- em constante de app — CAMPAIGN_PRODUCTS).
+ALTER TABLE cortex_core.campaign_tags ADD COLUMN IF NOT EXISTS produto TEXT;
+
 COMMENT ON TABLE cortex_core.campaign_tags IS
-    'Classificação por campanha (manual). platform: meta|google, campaign_id: meta_campaigns.campaign_id ou google.campaigns.campaign_id (como TEXT), tag: pool ex inbound|evento, stage: etapa ex descoberta|relacionamento|conversao|remarketing|institucional (validados no app). Estável entre meses.';
+    'Classificação por campanha (manual). platform: meta|google|tiktok|linkedin, campaign_id: id da campanha na plataforma (como TEXT), tag: pool ex inbound|evento, stage: etapa ex descoberta|relacionamento|conversao|remarketing|institucional, produto: ex creators|turbo|comunidade|crm|summit (todos validados no app). Estável entre meses.';
