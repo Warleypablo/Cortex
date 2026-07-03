@@ -1,0 +1,105 @@
+# ============================================================
+# Blueprint da Render — Publicador Orgânico (Instagram): 2 CRON JOBS
+# ============================================================
+# Provisiona SÓ os 2 crons do publicador. NÃO declara o web service do Cortex
+# (esse continua gerido no dashboard). A Render deixa serviços FORA do blueprint
+# intactos, então conectar este arquivo NÃO mexe no Cortex já existente.
+#
+# ⚠️  PRÉ-REQUISITO OBRIGATÓRIO (senão os crons rodam e não fazem NADA):
+#     A env var ORGANICO_INGEST_TOKEN precisa estar setada TAMBÉM no WEB SERVICE
+#     do Cortex (o MESMO valor daqui) + redeploy do Cortex. Sem isso, os endpoints
+#     /ingest, /posts/due e /commands/pending retornam HTTP 503 → o report não
+#     grava no painel e o publish não lê a fila. (Hoje o Cortex de prod está SEM
+#     esse token — foi exatamente o 503 diagnosticado.)
+#
+# 🧪  ROLLOUT SEGURO: começa em DRY_RUN=1 (valida sem postar). O report enche o
+#     painel/calendário e o publish MOSTRA o que postaria, sem postar de verdade.
+#     Pra publicar pra valer: troque DRY_RUN para "0" no env group e redeploy.
+#
+# 🔑  Secret File do Google: a Render NÃO cria Secret File por blueprint. Em CADA
+#     cron, no dashboard → Environment → Secret Files → adicione um arquivo
+#     "service-account.json" com o conteúdo do JSON da service account. O caminho
+#     já está apontado em GOOGLE_SERVICE_ACCOUNT_JSON abaixo.
+#
+# 📅  Cadência atual = fase de validação: report 30/30min, publish 1/1h. Quando
+#     for pra valer, aperte o publish pra "*/5 * * * *" (ou "*/15") pra postar no
+#     horário do card (a 1h, um card de 14:00 só sai lá pelas 15:00).
+# ============================================================
+
+# Variáveis compartilhadas pelos dois crons. Os `sync: false` são preenchidos no
+# connect do blueprint (no dashboard). Se um env group "organico-instagram" já
+# existir na conta, a Render reaproveita — confira os valores antes.
+envVarGroups:
+  - name: organico-instagram
+    envVars:
+      - key: DRY_RUN
+        value: "1"                     # 1 = só simula (validação). Vire "0" p/ postar de verdade.
+      - key: TZ
+        value: "America/Sao_Paulo"     # deixa logs/horários no fuso certo
+      - key: PYTHON_VERSION
+        value: "3.12.4"                # ajuste se o build reclamar da versão
+      # ---- ClickUp ----
+      - key: CLICKUP_API_TOKEN
+        sync: false                    # SECRET — preencher no connect
+      - key: CLICKUP_WORKSPACE_ID
+        value: "31021986"
+      - key: CLICKUP_LIST_ID_INSTAGRAM
+        value: "901300920768"
+      - key: CLICKUP_POSTING_DATE_FIELD
+        value: "Data de postagem"      # p minúsculo de propósito (nome real do campo)
+      - key: CLICKUP_HORARIO_FIELD
+        value: "Horário"
+      - key: CLICKUP_FORMATO_FIELD
+        value: "Formato do post"       # usado pelo fix de formato (PR #325)
+      # ---- Google (Drive/Docs) — Secret File montado em runtime ----
+      - key: GOOGLE_SERVICE_ACCOUNT_JSON
+        value: "/etc/secrets/service-account.json"
+      - key: GOOGLE_DRIVE_MESES_ROOT_FOLDER_ID
+        value: "1yGxKCORxe7PipuYKY1yd508IWQyKgIIt"
+      # ---- Re-host de mídia (Drive → GCS → signed URL pra Meta) ----
+      - key: GCS_REHOST_BUCKET
+        value: "turbo-ig-rehost"
+      # ---- Meta / Instagram ----
+      - key: META_LONG_LIVED_TOKEN
+        sync: false                    # SECRET — ⚠️ expira a cada 60 dias
+      - key: IG_BUSINESS_ACCOUNT_ID
+        value: "17841423555147969"
+      # ---- Anthropic (fallback de legenda quando o Doc está vazio) ----
+      - key: ANTHROPIC_API_KEY
+        sync: false                    # SECRET — só p/ gerar legenda quando o Doc está vazio
+      - key: ANTHROPIC_MODEL
+        value: "claude-sonnet-4-6"
+      # ---- Telemetria + fila do painel "Orgânico" do Cortex ----
+      - key: CORTEX_INGEST_URL
+        value: "https://cortex.turbopartners.com.br/api/growth/organico/ingest"
+      - key: ORGANICO_INGEST_TOKEN
+        sync: false                    # SECRET — MESMO valor que vai no web service do Cortex
+
+services:
+  # (1) RELEITURA do ClickUp — a cada 30 min. Enche a fila/calendário (content_posts).
+  #     Parte "pesada": relê todos os aprovados e reporta a prontidão pro painel.
+  - type: cron
+    name: organico-report-instagram
+    runtime: python
+    plan: starter
+    schedule: "*/30 * * * *"           # a cada 30 min
+    rootDir: automacoes/instagram-turbo
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m agente.main_poller --once --mode report
+    autoDeploy: true                   # redeploya quando a main muda (pega fixes futuros)
+    envVars:
+      - fromGroup: organico-instagram
+
+  # (2) PUBLICAÇÃO + botões — a cada 1h. Parte "leve": consulta o Cortex (não relê o
+  #     ClickUp), drena os agendados vencidos e executa "Soltar agora"/"Agendar".
+  - type: cron
+    name: organico-publish-instagram
+    runtime: python
+    plan: starter
+    schedule: "0 * * * *"              # de hora em hora (aperte p/ */5 ou */15 quando for pra valer)
+    rootDir: automacoes/instagram-turbo
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m agente.main_poller --once --mode publish
+    autoDeploy: true
+    envVars:
+      - fromGroup: organico-instagram
