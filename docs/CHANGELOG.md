@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-03 | feat(resumo-lideres): 2 envios diários (10h e 19h) via instância glauber2 p/ grupo dos líderes
+
+**O que foi feito:**
+- Agendamento passou de "dias úteis 10h" para **todos os dias às 10h e às 19h** (janelas de retry 10h-12h e 19h-21h), com idempotência por dia+janela (nova coluna `janela` em `cortex_core.resumo_lideres_envios`, migrada em local e prod).
+- Envio pela instância Evolution dedicada **glauber2** (`RESUMO_LIDERES_EVOLUTION_INSTANCE/TOKEN`), com fallback nas instâncias do TurboZap.
+- Destino agora é o grupo **"Lideres Turbo Partners 2.0"** (`120363324309576530@g.us`, 16 participantes) — JID descoberto via API da Evolution.
+- Teste real validado: envio pela glauber2 chegou no número de teste.
+
+**Por que:**
+- Pedido do Ichino (2026-07-03): "coloca a instancia glauber2 para enviar essa mensagem todos os dias às 10 e às 19 no grupo Lideres Turbo Partners 2.0".
+
+**Arquivos alterados:**
+- `server/services/resumoLideres.ts` - janelaAtual, enviarViaEvolution, idempotência por janela.
+- `server/services/resumoLideres.test.ts` - teste da janelaAtual (10 testes).
+- `server/index.ts` - job com duas janelas diárias, sem filtro de dia útil.
+- `shared/schema.ts` - coluna `janela`.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-03 | feat(resumo-lideres): modelo v2 da mensagem diária dos líderes
 
 **O que foi feito:**
