@@ -90,7 +90,7 @@ export function CapacityMetasConfig() {
               <TableHead>Nome</TableHead>
               <TableHead>Categoria</TableHead>
               <TableHead>Vínculo</TableHead>
-              <TableHead className="text-right">Cap. MRR</TableHead>
+              <TableHead className="text-right">Cap. FAT ($)</TableHead>
               <TableHead className="text-right">Cap. Pont.</TableHead>
               <TableHead className="text-right">Cap. Contas</TableHead>
               <TableHead className="text-center">Ativo</TableHead>

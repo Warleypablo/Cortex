@@ -32,7 +32,7 @@ export interface ComercialRow {
   mrr_ativo: number;
   mrr_onboarding: number;
   mrr_cancelamento: number;
-  cap_mrr: number | null;
+  cap_mrr: number | null; // exibida como "Cap. FAT ($)" — mesmo campo que a Configurar grava (capacity_metas.cap_mrr)
   dif_mrr: number | null;
   contas_ativas: number;
   cap_contas: number | null;

@@ -215,14 +215,14 @@ function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSel
           <TableRow className="border-gray-200 dark:border-zinc-700">
             <TableHead className={th()}>Nome</TableHead>
             <TableHead className={th("text-right")}>MRR Atual</TableHead>
-            <TableHead className={th("text-right")}>Cap. MRR</TableHead>
-            <TableHead className={th("text-right")}>Δ MRR</TableHead>
+            <TableHead className={th("text-right")} title="Cap. Faturamento ($) configurada na aba Configurar">Cap. FAT ($)</TableHead>
+            <TableHead className={th("text-right")}>Δ FAT</TableHead>
             <TableHead className={th("text-right")} title="MRR / contas ativas">Ticket Médio</TableHead>
             <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
             <TableHead className={th("text-right")}>Contratos</TableHead>
             <TableHead className={th("text-right")}>Cap. Contratos</TableHead>
             <TableHead className={th("text-right")}>Δ Contratos</TableHead>
-            <TableHead className={th("text-right")} title="MRR Atual / Cap. MRR">% MRR</TableHead>
+            <TableHead className={th("text-right")} title="MRR Atual / Cap. FAT">% FAT</TableHead>
             <TableHead className={th("text-right")} title="Contas ativas / Cap. Contratos">% Contratos</TableHead>
           </TableRow>
         </TableHeader>
@@ -311,7 +311,7 @@ function ComercialTab({ title, rows, onSelect, campo }: { title: string; rows: C
     { label: "MRR Atual", value: formatCurrency(totMrr) },
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totContas)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
-    { label: "Capacity MRR (média)", value: pctText(mediaMrr), tone: utilColor(mediaMrr) },
+    { label: "Capacity FAT (média)", value: pctText(mediaMrr), tone: utilColor(mediaMrr) },
     { label: "Capacity Contratos (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
   ];
   return (
@@ -480,7 +480,7 @@ function summarizeComercial(time: string, rows: ComercialRow[]): TeamSummary {
     time,
     pessoas: rows.length,
     operando: sum(rows.map((r) => r.mrr_atual)),
-    // usa utilização por MRR; cai p/ contas quando o grupo não tem cap de MRR (Black)
+    // usa utilização por FAT; cai p/ contas quando o grupo não tem Cap. FAT configurada (Black)
     util_pct: avgOf(rows.map((r) => r.util_mrr_pct ?? r.util_contas_pct)),
     cancelamento: sum(rows.map((r) => r.mrr_cancelamento)),
   };
