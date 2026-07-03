@@ -33,6 +33,12 @@ Validação feita contra a mensagem real de 25/06 10h: MRR, Em cancelamento, Chu
 da Entrega Pontual (centavos ,45) conferem; desvios residuais são registros
 retroativos no ClickUp/Bitrix — a automação reflete o estado do momento do envio.
 
+> **v3 (2026-07-03):** agendamento passa a ser TODOS os dias em DUAS janelas (10h-12h e
+> 19h-21h), idempotência por dia+janela (coluna `janela`); destino = grupo "Lideres Turbo
+> Partners 2.0" (`120363324309576530@g.us`); envio pela instância Evolution dedicada
+> `glauber2` (`RESUMO_LIDERES_EVOLUTION_INSTANCE/TOKEN`), com fallback nas instâncias do
+> TurboZap se não configurada.
+
 > **v2 (2026-07-03):** modelo reformulado a pedido do Ichino (exemplo manual de 02/07 19h).
 > Saudação dinâmica por hora (Bom DIA / Boa TARDE / Boa NOITE); nomes dos meses no texto;
 > MRR TOTAL (ativo+onb+triagem) × MRR ATIVO (só 'ativo'); Churn Pontual (valorp via join

@@ -730,21 +730,21 @@ app.use((req, res, next) => {
   setInterval(() => runBitrixDealsSync(), BITRIX_DEALS_SYNC_INTERVAL);
   console.log(`[bitrix-deals-sync-job] Scheduled every ${BITRIX_DEALS_SYNC_INTERVAL / 3600000}h`);
 
-  // Resumo diário de métricas para líderes via WhatsApp — dias úteis, 10h São Paulo.
-  // Janela 10h-12h: se o envio das 10h falhar, os ticks seguintes tentam de novo;
-  // idempotência (cortex_core.resumo_lideres_envios) garante no máximo 1 envio/dia.
+  // Resumo diário de métricas para líderes via WhatsApp — todos os dias às 10h e
+  // às 19h (America/Sao_Paulo). Janelas 10h-12h e 19h-21h: se o envio falhar, os
+  // ticks seguintes tentam de novo; idempotência por dia+janela
+  // (cortex_core.resumo_lideres_envios) garante no máximo 1 envio por janela.
   const RESUMO_LIDERES_CHECK_INTERVAL = 5 * 60 * 1000; // 5min
   const runResumoLideresJob = async () => {
     try {
       if (process.env.RESUMO_LIDERES_ATIVO !== "true") return;
-      const { agoraSaoPaulo, enviarResumoLideres } = await import("./services/resumoLideres");
-      const sp = agoraSaoPaulo();
-      const diaUtil = sp.diaSemana >= 1 && sp.diaSemana <= 5;
-      if (!diaUtil || sp.hora < 10 || sp.hora >= 12) return;
-      const resultado = await enviarResumoLideres();
+      const { agoraSaoPaulo, janelaAtual, enviarResumoLideres } = await import("./services/resumoLideres");
+      const janela = janelaAtual(agoraSaoPaulo().hora);
+      if (!janela) return;
+      const resultado = await enviarResumoLideres({ janela });
       if (resultado.skipped) return;
       if (resultado.success) {
-        console.log("[resumo-lideres-job] Resumo enviado com sucesso");
+        console.log(`[resumo-lideres-job] Resumo enviado com sucesso (janela ${janela})`);
       } else {
         console.error(`[resumo-lideres-job] Falha (retry no próximo tick): ${resultado.error}`);
       }
@@ -754,7 +754,7 @@ app.use((req, res, next) => {
   };
   setTimeout(() => runResumoLideresJob(), 60000); // 1min após boot
   setInterval(() => runResumoLideresJob(), RESUMO_LIDERES_CHECK_INTERVAL);
-  console.log("[resumo-lideres-job] Scheduled every 5min (envia dias úteis ~10h America/Sao_Paulo)");
+  console.log("[resumo-lideres-job] Scheduled every 5min (envia todos os dias ~10h e ~19h America/Sao_Paulo)");
 
   // Google Ads keywords sync a cada 12 horas
   const GOOGLE_ADS_SYNC_INTERVAL = 12 * 60 * 60 * 1000; // 12h

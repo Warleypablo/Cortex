@@ -4,6 +4,7 @@ import {
   formatarPercentBR,
   formatarMensagemResumo,
   agoraSaoPaulo,
+  janelaAtual,
   type MetricasResumo,
 } from "./resumoLideres";
 
@@ -99,6 +100,19 @@ describe("formatarMensagemResumo", () => {
     const msg = formatarMensagemResumo(METRICAS, { dataFmt: "05/01", horaFmt: "10h", hora: 10, mes: 1 });
     expect(msg).toContain("MRR JANEIRO TOTAL:");
     expect(msg).toContain("MRR DEZEMBRO: R$ 1.197.868,00");
+  });
+});
+
+describe("janelaAtual", () => {
+  it("10h-12h é janela 10h; 19h-21h é janela 19h; resto é null", () => {
+    expect(janelaAtual(9)).toBeNull();
+    expect(janelaAtual(10)).toBe("10h");
+    expect(janelaAtual(11)).toBe("10h");
+    expect(janelaAtual(12)).toBeNull();
+    expect(janelaAtual(18)).toBeNull();
+    expect(janelaAtual(19)).toBe("19h");
+    expect(janelaAtual(20)).toBe("19h");
+    expect(janelaAtual(21)).toBeNull();
   });
 });
 

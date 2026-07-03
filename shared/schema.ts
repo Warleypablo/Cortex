@@ -4239,6 +4239,7 @@ export type InsertGhlSyncRun = typeof ghlSyncRuns.$inferInsert;
 export const resumoLideresEnvios = cortexCoreSchema.table("resumo_lideres_envios", {
   id: serial("id").primaryKey(),
   dataRef: date("data_ref").notNull(),
+  janela: text("janela"),
   destino: text("destino"),
   mensagem: text("mensagem"),
   status: text("status").notNull().default("ok"),

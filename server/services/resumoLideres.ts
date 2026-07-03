@@ -248,11 +248,21 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
 // Idempotência + envio
 // ============================================
 
+export type JanelaEnvio = "10h" | "19h" | "manual";
+
+// Janelas de envio agendado: 10h-12h e 19h-21h (retry dentro da janela)
+export function janelaAtual(hora: number): "10h" | "19h" | null {
+  if (hora >= 10 && hora < 12) return "10h";
+  if (hora >= 19 && hora < 21) return "19h";
+  return null;
+}
+
 export async function initResumoLideresTable(): Promise<void> {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS cortex_core.resumo_lideres_envios (
       id SERIAL PRIMARY KEY,
       data_ref DATE NOT NULL,
+      janela TEXT,
       destino TEXT,
       mensagem TEXT,
       status TEXT NOT NULL DEFAULT 'ok',
@@ -260,12 +270,15 @@ export async function initResumoLideresTable(): Promise<void> {
       criado_em TIMESTAMP DEFAULT NOW()
     )
   `);
+  await db.execute(sql`
+    ALTER TABLE cortex_core.resumo_lideres_envios ADD COLUMN IF NOT EXISTS janela TEXT
+  `);
 }
 
-async function jaEnviadoHoje(dataRef: string): Promise<boolean> {
+async function jaEnviadoNaJanela(dataRef: string, janela: JanelaEnvio): Promise<boolean> {
   const result = await db.execute(sql`
     SELECT 1 FROM cortex_core.resumo_lideres_envios
-    WHERE data_ref = ${dataRef} AND status = 'ok'
+    WHERE data_ref = ${dataRef} AND janela = ${janela} AND status = 'ok'
     LIMIT 1
   `);
   return result.rows.length > 0;
@@ -273,19 +286,54 @@ async function jaEnviadoHoje(dataRef: string): Promise<boolean> {
 
 async function registrarEnvio(
   dataRef: string,
+  janela: JanelaEnvio,
   destino: string,
   mensagem: string,
   status: "ok" | "erro",
   erro?: string,
 ): Promise<void> {
   await db.execute(sql`
-    INSERT INTO cortex_core.resumo_lideres_envios (data_ref, destino, mensagem, status, erro)
-    VALUES (${dataRef}, ${destino}, ${mensagem}, ${status}, ${erro ?? null})
+    INSERT INTO cortex_core.resumo_lideres_envios (data_ref, janela, destino, mensagem, status, erro)
+    VALUES (${dataRef}, ${janela}, ${destino}, ${mensagem}, ${status}, ${erro ?? null})
   `);
 }
 
+// Envio via Evolution API. Com RESUMO_LIDERES_EVOLUTION_INSTANCE/TOKEN definidos
+// usa a instância dedicada do resumo (ex: glauber2); senão cai nas instâncias do
+// TurboZap (financeiro/juridico). Aceita número ou JID de grupo (...@g.us).
+async function enviarViaEvolution(
+  numero: string,
+  texto: string,
+): Promise<{ success: boolean; error?: string }> {
+  const serverUrl = process.env.EVOLUTION_SERVER_URL;
+  const instancia = process.env.RESUMO_LIDERES_EVOLUTION_INSTANCE;
+  const token = process.env.RESUMO_LIDERES_EVOLUTION_TOKEN;
+
+  if (serverUrl && instancia && token) {
+    try {
+      const response = await fetch(`https://${serverUrl}/message/sendText/${instancia}`, {
+        method: "POST",
+        headers: { apikey: token, "Content-Type": "application/json" },
+        body: JSON.stringify({
+          number: numero,
+          options: { delay: 100, presence: "composing" },
+          text: texto,
+        }),
+      });
+      if (response.status === 200 || response.status === 201) return { success: true };
+      return { success: false, error: `HTTP ${response.status}: ${await response.text()}` };
+    } catch (error: any) {
+      return { success: false, error: error.message || "Erro de conexão" };
+    }
+  }
+
+  const instanciaTz: "financeiro" | "juridico" =
+    process.env.RESUMO_LIDERES_INSTANCIA === "juridico" ? "juridico" : "financeiro";
+  return enviarMensagemWhatsApp(numero, texto, instanciaTz);
+}
+
 export async function enviarResumoLideres(
-  opts: { force?: boolean } = {},
+  opts: { force?: boolean; janela?: JanelaEnvio } = {},
 ): Promise<{ success: boolean; skipped?: boolean; mensagem?: string; error?: string }> {
   const destino = process.env.RESUMO_LIDERES_DESTINO;
   if (!destino) {
@@ -293,7 +341,8 @@ export async function enviarResumoLideres(
   }
 
   const sp = agoraSaoPaulo();
-  if (!opts.force && (await jaEnviadoHoje(sp.dataRef))) {
+  const janela: JanelaEnvio = opts.janela ?? janelaAtual(sp.hora) ?? "manual";
+  if (!opts.force && janela !== "manual" && (await jaEnviadoNaJanela(sp.dataRef, janela))) {
     return { success: true, skipped: true };
   }
 
@@ -307,12 +356,11 @@ export async function enviarResumoLideres(
     return { success: false, error: err.message };
   }
 
-  const instancia: "financeiro" | "juridico" =
-    process.env.RESUMO_LIDERES_INSTANCIA === "juridico" ? "juridico" : "financeiro";
-  const resultado = await enviarMensagemWhatsApp(destino, mensagem, instancia);
+  const resultado = await enviarViaEvolution(destino, mensagem);
 
   await registrarEnvio(
     sp.dataRef,
+    janela,
     destino,
     mensagem,
     resultado.success ? "ok" : "erro",
