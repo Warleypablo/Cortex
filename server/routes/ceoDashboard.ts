@@ -35,9 +35,10 @@ export async function buildCeoDashboard(db: any, mes?: string): Promise<CeoDashb
       GROUP BY id_task
     ) t
   `);
-  const ltv = Number(ltvRows.rows?.[0]?.ltv) || null;
+  const ltvNum = Number(ltvRows.rows?.[0]?.ltv);
+  const ltv = Number.isNaN(ltvNum) ? null : ltvNum;
 
-  // 4) E-NPS (empresa) — mais recente disponível.
+  // 4) E-NPS (empresa) — agregado de todas as respostas (all-time).
   let enpsScore: number | null = null;
   try {
     const npsDash: any = await storage.getRhNpsDashboard();

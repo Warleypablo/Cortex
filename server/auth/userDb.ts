@@ -156,6 +156,7 @@ const ALL_ROUTES = [
   '/visao-geral',
   '/gestao/tv-leaderboard',
   '/okr-2026',
+  '/ceo-dashboard',
   '/dashboard/geg',
   '/dashboard/inhire',
   '/dashboard/recrutamento',

@@ -14,8 +14,8 @@ const linhaReceita: BpLinha = {
   direcao: "maior_melhor",
   unidade: "brl",
   meses: [
-    { mes: 1, orcado: 100, realizado: 90, atingimento: 90 },
-    { mes: 2, orcado: 100, realizado: 110, atingimento: 110 },
+    { mes: 1, orcado: 100, realizado: 90, atingimento: 0.9 },
+    { mes: 2, orcado: 100, realizado: 110, atingimento: 1.1 },
     { mes: 3, orcado: 100, realizado: null, atingimento: null },
   ],
 };
@@ -85,14 +85,14 @@ describe("emBreveKpi", () => {
 describe("assembleCeoKpis", () => {
   it("devolve 11 KPIs na ordem fixa da grade", () => {
     const kpis = assembleCeoKpis({
-      bpLinhas: [{ metrica: "ebitda", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 10, realizado: 8, atingimento: 80 }] },
-                 { metrica: "cac", direcao: "menor_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 5, realizado: 4, atingimento: 80 }] }],
+      bpLinhas: [{ metrica: "ebitda", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 10, realizado: 8, atingimento: 0.8 }] },
+                 { metrica: "cac", direcao: "menor_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 5, realizado: 4, atingimento: 0.8 }] }],
       bpMetricas: [
-        { metrica: "receita_total", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 100, realizado: 90, atingimento: 90 }] },
-        { metrica: "despesa_total", direcao: "menor_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 80, realizado: 70, atingimento: 87 }] },
-        { metrica: "saldo_caixa", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 50, realizado: 60, atingimento: 120 }] },
-        { metrica: "colaboradores", direcao: "menor_melhor", unidade: "int", meses: [{ mes: 1, orcado: 140, realizado: 142, atingimento: 101 }] },
-        { metrica: "receita_cabeca", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 12, realizado: 13, atingimento: 108 }] },
+        { metrica: "receita_total", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 100, realizado: 90, atingimento: 0.9 }] },
+        { metrica: "despesa_total", direcao: "menor_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 80, realizado: 70, atingimento: 0.87 }] },
+        { metrica: "saldo_caixa", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 50, realizado: 60, atingimento: 1.2 }] },
+        { metrica: "colaboradores", direcao: "menor_melhor", unidade: "int", meses: [{ mes: 1, orcado: 140, realizado: 142, atingimento: 1.01 }] },
+        { metrica: "receita_cabeca", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 12, realizado: 13, atingimento: 1.08 }] },
       ],
       mesNum: 1,
       inadimplencia: { total: 20, serie: [18, 20] },

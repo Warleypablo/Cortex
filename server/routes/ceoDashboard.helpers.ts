@@ -50,7 +50,8 @@ export function bpLinhaToKpi(
     valor: mesData?.realizado ?? null,
     unidade: opts.unidade,
     meta: mesData?.orcado ?? null,
-    atingimentoPct: mesData?.atingimento ?? null,
+    // *100 p/ converter razão→%; Math.round(...*1000)/10 evita ruído de ponto flutuante (ex.: 1.1*100 = 110.00000000000001).
+    atingimentoPct: mesData?.atingimento != null ? Math.round(mesData.atingimento * 1000) / 10 : null,
     direcao: opts.direcao,
     mom: null,
     sparkline: serie.length ? serie : null,
