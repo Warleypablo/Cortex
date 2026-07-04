@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-04 | feat(lt-ltv-churn): seletor de produto próprio no card de cohort
+
+**O que foi feito:**
+- Card de cohort ganhou um **Select de produto** no header, junto aos toggles (cliente/contrato, Qtd/MRR, %/Nº). Estado **local e independente** do seletor de produto global do topo da aba — que ficou fisicamente distante do cohort depois do benchmark ir pro fim da página. Filtra a matriz e o drill de auditoria; a lista de produtos vem do endpoint de benchmark.
+- Antes o cohort era filtrado pelo seletor global (via prop `produto`); agora recebe a lista (`produtos`) e gerencia o próprio. O seletor global continua controlando os KPIs do topo.
+
+**Por que:**
+- Pedido do Ichino (2026-07-04): "Seria interessante ter um seletor de produto tb né?" — com o benchmark movido pro fim, o card de cohort ficou longe do filtro do topo.
+
+**Arquivos alterados:**
+- `client/src/components/lt-ltv-churn/CohortMatriz.tsx` - Select local + estado `produtoSel`.
+- `client/src/pages/LtLtvChurn.tsx` - passa `produtos` (lista) em vez de `produtoParam`.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-04 | refactor(lt-ltv-churn): remove distribuição de LT e move benchmark p/ o fim
 
 **O que foi feito:**
