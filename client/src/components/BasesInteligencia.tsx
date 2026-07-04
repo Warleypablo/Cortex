@@ -17,7 +17,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trophy, TrendingUp, AlertTriangle, Sparkles } from "lucide-react";
+import { Loader2, Trophy, TrendingUp, AlertTriangle, Sparkles, Layers } from "lucide-react";
+
+// Bases "- Todos" são guarda-chuva: contêm as sub-bases do mesmo funil (MQLs,
+// faixas de faturamento). A contagem de Contatos se sobrepõe a elas (review #12).
+const isBaseGuardaChuva = (base: string) => /-\s*Todos$/i.test(base);
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { compatibilidadePadroes, compatibilidadeOfertas, type NivelCompat } from "@shared/ghl-broadcast/matriz-validacao";
 import { PADROES_COPY_LABEL, type PadraoKey } from "@shared/ghl-broadcast/types";
@@ -183,9 +187,9 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
             <TableHeader>
               <TableRow>
                 <TableHead>Base</TableHead>
-                <TableHead className="text-right">Contatos</TableHead>
+                <TableHead className="text-right" title="Contatos atuais na base. As bases '- Todos' (⧉) são guarda-chuva e INCLUEM as sub-bases (MQLs, faixas de faturamento) — há sobreposição nesta coluna.">Contatos ⓘ</TableHead>
                 <TableHead className="text-right">Leads 7d</TableHead>
-                <TableHead className="text-right">Disparos</TableHead>
+                <TableHead className="text-right" title="Cada disparo é atribuído à base MAIS ESPECÍFICA que ele atingiu — Disparos, Reuniões e Ganhos NÃO se sobrepõem entre bases (diferente de Contatos).">Disparos ⓘ</TableHead>
                 <TableHead className="text-right">Entrega</TableHead>
                 <TableHead className="text-right">Abertura</TableHead>
                 <TableHead className="text-right">Reun.</TableHead>
@@ -198,7 +202,17 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
                 const ativo = r.base === baseAtiva;
                 return (
                   <TableRow key={r.base} className={`cursor-pointer ${ativo ? "bg-muted/50" : ""}`} onClick={() => setBaseSel(r.base)}>
-                    <TableCell className="font-medium">{r.base}</TableCell>
+                    <TableCell className="font-medium">
+                      <span className="inline-flex items-center gap-1">
+                        {r.base}
+                        {isBaseGuardaChuva(r.base) && (
+                          <Layers
+                            className="w-3 h-3 text-muted-foreground shrink-0"
+                            aria-label="guarda-chuva"
+                          />
+                        )}
+                      </span>
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{fmtInt(r.contacts)}</TableCell>
                     <TableCell className="text-right tabular-nums text-emerald-600 dark:text-emerald-400">{r.new_leads_7d ? `+${fmtInt(r.new_leads_7d)}` : "—"}</TableCell>
                     <TableCell className="text-right tabular-nums">{r.disparos ? fmtInt(r.disparos) : "—"}</TableCell>
@@ -215,6 +229,12 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
               )}
             </TableBody>
           </Table>
+          <p className="text-[11px] text-muted-foreground mt-2 flex items-center gap-1.5 flex-wrap">
+            <Layers className="w-3 h-3 shrink-0" />
+            base guarda-chuva — inclui as sub-bases do funil (MQLs, faixas de faturamento); a coluna
+            <span className="font-medium">Contatos</span> se sobrepõe a elas. Já
+            <span className="font-medium">Disparos/Reuniões/Ganhos</span> são atribuídos à base mais específica (sem sobreposição).
+          </p>
         </CardContent>
       </Card>
 
