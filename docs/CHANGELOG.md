@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-07-04 | feat(lt-ltv-churn): matriz de cohort de retenção por cliente e por contrato
+
+**O que foi feito:**
+- Nova seção "Cohort de retenção" na aba **Por produto** da tela LTV por Contrato (`/lt-ltv-churn`), entre a distribuição de LT e a tabela de contratos: matriz heatmap safra × meses desde o início, com toggles **Por cliente / Por contrato** e **% / Nº**.
+- Régua **por contrato**: safra = mês de `data_inicio`; contrato vivo do início até `data_fim` (cancelamento) ou hoje se ativo. Régua **por cliente**: safra = mês do 1º contrato recorrente do cliente (`id_task`); vivo em cada mês em que tem ≥1 contrato recorrente vivo (gaps de churn-e-volta aparecem como queda e recuperação na mesma safra).
+- Mesma base do resto da aba: `cortex_core.vw_lt_contratos`, só `tipo_receita='recorrente'`, excluídos `data_inconsistente` e churned sem `data_fim` (3 hoje). Respeita o filtro de produto da aba.
+- Endpoint `GET /api/lt-ltv-churn/cohort?unidade=cliente|contrato&produto=` — expande meses vividos via `generate_series` e devolve células densas por safra (0 = safra morta naquele mês; célula futura fica em branco).
+- Visual: escala sequencial emerald (alpha ∝ retenção) com tinta fixa por tema para contraste ≥4.5:1 em toda a rampa; tooltip nativo por célula; legenda de gradiente e definição da régua no rodapé.
+
+**Por que:**
+- Pedido do Ichino (2026-07-04): "gráfico de cohort por cliente e por contrato na aba de LTV por contrato; cohort do cliente começa na data de criação do primeiro contrato e do contrato começa na data de criação e cancelamento do contrato".
+
+**Arquivos alterados:**
+- `server/routes/ltLtvChurn.ts` - endpoint `/api/lt-ltv-churn/cohort`.
+- `client/src/components/lt-ltv-churn/CohortMatriz.tsx` - componente da matriz (novo).
+- `client/src/components/lt-ltv-churn/types.ts` - tipos `CohortMatrizData`/`CohortMatrizSafra`.
+- `client/src/pages/LtLtvChurn.tsx` - monta `<CohortMatriz produto={...} />` na aba Por produto.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-03 | fix+feat(gestao-receita): Taxa de Conversão na régua direta + de-para canal→source na tela
 
 **O que foi feito:**
