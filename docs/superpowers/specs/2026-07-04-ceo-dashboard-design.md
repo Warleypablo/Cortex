@@ -15,8 +15,10 @@ Não é uma tela analítica com drill-down — é para "bater o olho" e entender
 
 1. **Formato:** snapshot de 1 tela — grade de KPI cards (valor + sparkline + badge). Sem drill-down.
 2. **NPS de clientes:** card placeholder "em breve" — não há fonte de dados; sem backend novo.
-3. **Comparação:** realizado **vs meta do BP 2026** (% de atingimento). Métricas sem meta no BP
-   mostram valor + sparkline + MoM discreto (variação vs mês anterior no subtítulo).
+3. **Comparação:** realizado **vs meta do BP 2026** (% de atingimento). **7 métricas têm meta no BP**
+   (Receita, Custos, Lucro/EBITDA, CAC, Headcount, Receita/Cabeça e **Saldo de Caixa** — este último
+   descoberto na investigação: o BP tem a linha `saldo_caixa` com orçado×realizado). As **3 sem meta**
+   (Inadimplência, LTV, E-NPS) mostram valor + sparkline + MoM discreto (variação vs mês anterior).
 4. **Acesso:** apenas admin / perfil `CONTROL_TOWER`.
 5. **Fonte financeira:** dados financeiros vêm do **BP 2026** (`computarBpReceitas`), **NÃO** do
    Investors Report. Isso garante reconciliação com o BP.
@@ -70,34 +72,37 @@ interface CeoDashboardResponse {
 
 ### Fontes por métrica (reaproveitamento)
 
-Extração do BP via `computarBpReceitas(db)` → `payload.linhas[]`, cada linha
-`{ metrica, meses: [{ mes, orcado, realizado, atingimento }] }`. Seleciona-se `meses` do mês pedido;
-sparkline = últimos 12 `realizado` (ou `orcado` como fallback só quando explicitado).
+**Investigação concluída (sourcing definitivo).** Uma **única** chamada a `computarBpReceitas(db)`
+devolve `payload = { linhas[], metricasGerais[], mesCorrente, mesFechado }`. Cada linha (em ambos os
+arrays) tem `{ metrica, titulo, direcao, unidade, meses: [{ mes, orcado, realizado, atingimento }] }`
+— o `atingimento` **já vem calculado** pelo BP. Seleciona-se `meses[mesNum-1]`; sparkline = série de
+`realizado` dos meses 1..mesNum.
 
-| key | label | Fonte | metrica / função | Meta BP? | Comparação |
+**7 métricas saem dessa única chamada ao BP:**
+
+| key | label | Array | metrica | direcao (BP) | unidade |
 |---|---|---|---|---|---|
-| `receita` | Receita | BP | linha `receita_liquida` | ✅ | atingimento |
-| `custos` | Custos & Despesas | BP (derivado) | `receita_liquida.realizado − ebitda.realizado` (idem orçado) | ✅ | atingimento (menor_melhor) |
-| `lucro` | Lucro (EBITDA) | BP | linha `ebitda` | ✅ | atingimento |
-| `cac` | CAC | BP | linha `cac` | ✅ | atingimento (menor_melhor) |
-| `headcount` | Headcount | BP metricas | `montarMetricasGerais` → linha `colaboradores` (total) | ✅ | atingimento |
-| `receita_cabeca` | Receita / Cabeça | BP (derivado) | `receita_liquida ÷ colaboradores` (real e meta) | ✅ (derivada) | atingimento |
-| `caixa` | Saldo de Caixa | storage | `getSaldoAtualBancos()` (caz_bancos) + snapshot p/ sparkline | ❌ | MoM |
-| `inadimplencia` | Inadimplência Total | storage | `getInadimplenciaResumo()` | ❌ | MoM |
-| `ltv` | LTV | ltLtvChurn | helper `overview` (LTV médio por contrato) | ❌ | MoM |
-| `enps` | E-NPS | hr | dashboard de E-NPS (`rh_enps`/`rh_nps`) | ❌ | MoM |
-| `nps` | NPS Clientes | — | — | — | `status: "em_breve"`, valor null |
+| `receita` | Receita | `metricasGerais` | `receita_total` | maior_melhor | brl |
+| `custos` | Custos & Despesas | `metricasGerais` | `despesa_total` | menor_melhor | brl |
+| `lucro` | Lucro (EBITDA) | `linhas` | `ebitda` | maior_melhor | brl |
+| `cac` | CAC | `linhas` | `cac` | menor_melhor | brl |
+| `headcount` | Headcount | `metricasGerais` | `colaboradores` | menor_melhor | int |
+| `receita_cabeca` | Receita / Cabeça | `metricasGerais` | `receita_cabeca` | maior_melhor | brl |
+| `caixa` | Saldo de Caixa | `metricasGerais` | `saldo_caixa` | maior_melhor | brl |
 
-**Notas de sourcing a resolver na implementação (INVESTIGAR antes de codar):**
-- Confirmar o slug exato da linha de headcount total em `montarMetricasGerais` (provável `colaboradores`).
-- Confirmar se `receita` deve ser `receita_liquida` (líquida de deduções) ou `receita_total_faturavel`
-  (bruta). Default do spec: **`receita_liquida`** (reconciliação com DRE); trocar se o CEO preferir bruta.
-- `caixa`: valor atual = `getSaldoAtualBancos()`. Sparkline 12m = série mensal do snapshot diário
-  de saldo (`saldoDiario`); se a série não for barata de obter, `sparkline: null`.
-- `inadimplencia`: valor = total/percentual do `getInadimplenciaResumo()`; sparkline via snapshot de
-  inadimplência se disponível, senão null. MoM a partir do resumo do mês anterior.
-- `ltv` e `enps`: valor do mês; MoM se a série mensal existir barato, senão `mom: null`.
-- Métricas sem meta **nunca** recebem `atingimentoPct` (evita "comparação dupla"); só `mom`.
+**3 métricas de fontes próprias (sem meta no BP):**
+
+| key | label | Fonte | direcao | unidade | Comparação |
+|---|---|---|---|---|---|
+| `inadimplencia` | Inadimplência Total | `storage.getInadimplenciaResumo()` → `.totalInadimplente`; sparkline+MoM de `.evolucaoMensal[].valor` | menor_melhor | brl | MoM |
+| `ltv` | LTV | SQL direto em `cortex_core.vw_lt_contratos` (`AVG(ltv_recorrente+valorp)` por `id_task`) | maior_melhor | brl | — (sem série) |
+| `enps` | E-NPS | `storage.getRhNpsDashboard()` → `.empresa.nps` | maior_melhor | score | — (sem série) |
+
+**1 placeholder:** `nps` (NPS Clientes) → `status: "em_breve"`, `valor: null`, sem backend.
+
+**Regras:** métricas sem meta **nunca** recebem `atingimentoPct` (evita "comparação dupla"); só `mom`
+quando há série. Meses futuros → `realizado` null → card mostra "—". `mesNum` derivado de `mes` (YYYY-MM);
+BP é fixo em ANO=2026, então mês fora de 2026 cai no `mesCorrente` do payload.
 
 ### Frontend
 
@@ -140,24 +145,24 @@ o estilo deles, mas precisa do sparkline + badge de atingimento, que não existe
 ```
 Browser (CeoDashboard.tsx)
    └─ GET /api/ceo-dashboard?mes=2026-06
-        └─ ceoDashboard.ts (guard CONTROL_TOWER/admin)
-             ├─ computarBpReceitas(db) ........ receita, custos, lucro, cac
-             ├─ montarMetricasGerais(...) ..... headcount, receita/cabeça
-             ├─ getSaldoAtualBancos() ......... caixa
-             ├─ getInadimplenciaResumo() ...... inadimplência
-             ├─ ltLtvChurn overview ........... ltv
-             └─ E-NPS dashboard ............... enps
-        → normaliza em CeoKpi[] → 1 payload
+        └─ ceoDashboard.ts (guard: admin OU allowedRoutes inclui /ceo-dashboard)
+             ├─ computarBpReceitas(db) ........ receita, custos, lucro, cac,
+             │                                   headcount, receita/cabeça, caixa (7)
+             ├─ storage.getInadimplenciaResumo() . inadimplência
+             ├─ SQL vw_lt_contratos ........... ltv
+             └─ storage.getRhNpsDashboard() ... enps (.empresa.nps)
+        → assembleCeoKpis(...) → CeoKpi[] (11, ordem fixa) → 1 payload
 ```
 
 ## Testes
 
-- **Backend (mínimo, lógica de negócio):**
-  - `atingimentoPct` respeita `direcao` (`menor_melhor` inverte: realizado abaixo da meta = bom).
-  - `custos` derivado = `receita_liquida − ebitda` (real e orçado) bate com o BP.
-  - `receita_cabeca` = receita ÷ headcount (guarda divisão por zero → null).
+- **Backend (mínimo, lógica de negócio — funções puras):**
+  - `bpLinhaToKpi` seleciona o mês certo, copia `orcado`/`realizado`/`atingimento` do BP e monta a
+    sparkline (série de `realizado` até o mês pedido).
+  - Coloração do badge respeita `direcao` (`menor_melhor`: realizado abaixo da meta = verde).
+  - `momFromSerie` calcula variação vs ponto anterior; retorna null com <2 pontos.
   - Métrica sem meta nunca retorna `atingimentoPct` (só `mom`).
-  - Guard de acesso: usuário não-admin/não-CONTROL_TOWER recebe 403.
+  - `canAccessCeo(user)`: true para admin ou allowedRoutes com `/ceo-dashboard`; senão false (→403).
 - **Frontend:** smoke render da grade com dados mockados; verificar dark e light mode; card
   `em_breve` renderiza apagado; card sem meta mostra MoM, card com meta mostra badge de atingimento.
 
