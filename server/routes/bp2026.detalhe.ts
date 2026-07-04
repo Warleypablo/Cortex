@@ -461,6 +461,468 @@ async function detPontualMovimento(
   return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
 }
 
+export interface DetalheBpResult {
+  metrica: string;
+  mes: number;
+  titulo: string;
+  orcado: number | null;
+  realizado: number | null;
+  grupos: GrupoDetalhe[];
+  rateio?: { fracao: number; totalBruto: number; totalRateado: number };
+  nota?: string;
+  notaDinamica?: string;
+}
+
+// Monta o detalhamento de uma célula (métrica × mês) da matriz /bp-2026.
+// Extraído da rota GET /api/bp2026/detalhe — o gate (permissões/validação de
+// metrica+mes) permanece na rota; esta função contém o corpo pós-gate, movido
+// verbatim. Nenhuma lógica de query/SQL foi alterada.
+export async function montarDetalheBp(
+  db: any,
+  opts: { metrica: string; mes: number; segmento?: string }
+): Promise<DetalheBpResult> {
+  const { metrica, mes, segmento } = opts;
+  // Recomputados aqui a partir de `metrica` — são funções puras, idênticas às
+  // usadas no gate da rota (que precisa delas para a checagem de "métrica
+  // conhecida" antes de chamar esta função).
+  const def = TODAS_DEFS.find((d) => d.metrica === metrica);
+  const prod = parseMetricaProduto(metrica);
+  const squadAlvo = metrica.startsWith("pontual_squad:") ? metrica.slice("pontual_squad:".length) : null;
+  // pontual_prod:<pai>:<produto> — drill de uma sub-linha por produto
+  const prodAlvo = (() => {
+    if (!metrica.startsWith("pontual_prod:")) return null;
+    const rest = metrica.slice("pontual_prod:".length);
+    const idx = rest.indexOf(":");
+    return idx < 0 ? null : { pai: rest.slice(0, idx), produto: rest.slice(idx + 1) };
+  })();
+  // `segmento` chega aqui já com o efeito de `aba === "pontual-creators"` dobrado
+  // pelo caller (ver rota abaixo) — preserva o `filtroCreators` original sem a
+  // função precisar receber `aba`.
+  const filtroCreators = segmento === "creators";
+
+  const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo
+    ?? (squadAlvo ? `Estoque pontual — ${squadAlvo}` : null)
+    ?? (prodAlvo ? `${TITULOS_SUBABAS[prodAlvo.pai] ?? prodAlvo.pai} — ${prodAlvo.produto}` : metrica);
+
+  let orcado: number | null = null;
+  const orcRes = await db.execute(sql`
+    SELECT valor::numeric AS valor FROM cortex_core.bp2026_orcado
+    WHERE metrica = ${metrica} AND mes = ${mes}
+  `);
+  if (orcRes.rows.length) orcado = parseFloat((orcRes.rows[0] as any).valor);
+  // dfc_real não tem orçado persistido (usa o da Geração de Caixa, derivada);
+  // o frontend lê o orçado da célula no payload da matriz — aqui permanece null.
+
+  const agora = new Date();
+  const anoAtual = agora.getFullYear();
+  const mesCorrente = anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;
+  if (mes > mesCorrente) {
+    return { metrica, mes, titulo, orcado, realizado: null, grupos: [], nota: def?.nota };
+  }
+
+  let grupos: GrupoDetalhe[] = [];
+  let realizado = 0;
+  let rateio: { fracao: number; totalBruto: number; totalRateado: number } | undefined;
+  let notaDinamica: string | undefined;
+
+  if (Object.hasOwn(METRICAS_BUCKET, metrica)) {
+    const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA[METRICAS_BUCKET[metrica]], mes);
+    grupos = agruparItens(itens, LIMITE_ITENS);
+    realizado = itens.reduce((s, i) => s + i.valor, 0);
+  } else if (prod) {
+    const { itens, total } = await detalheVendaProdutoMes(db, prod.natureza, prod.segmento, mes, prod.modo);
+    grupos = agruparItens(itens, LIMITE_ITENS);
+    realizado = total;
+  } else if (metrica === "mrr_ativo") {
+    const result = await db.execute(sql`
+      WITH alvo AS (
+        SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+        WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
+          AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
+      )
+      SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+             COALESCE(h.servico, '') AS servico,
+             COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
+             COALESCE(h.valorr::numeric, 0) AS valor
+      FROM "Clickup".cup_data_hist h
+      JOIN alvo a ON h.data_snapshot::date = a.d
+      LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+      WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+      ORDER BY valor DESC
+    `);
+    const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+      grupo: r.squad, nome: r.cliente, detalhe: r.servico, data: null, valor: parseFloat(r.valor),
+    }));
+    // MRR lista todos os contratos (spec: sem corte) — squads têm até ~100 clientes
+    grupos = agruparItens(itens, Number.MAX_SAFE_INTEGER);
+    realizado = itens.reduce((s, i) => s + i.valor, 0);
+  } else if (metrica === "receita_pontual") {
+    const result = await db.execute(sql`
+      SELECT COALESCE(title, '(sem título)') AS nome, COALESCE(closer::text, '') AS closer,
+             data_fechamento::date::text AS data, valor_pontual::numeric AS valor
+      FROM "Bitrix".crm_deal
+      WHERE stage_name = 'Negócio Ganho' AND valor_pontual > 0
+        AND EXTRACT(YEAR FROM data_fechamento) = ${ANO}
+        AND EXTRACT(MONTH FROM data_fechamento) = ${mes}
+      ORDER BY valor DESC
+    `);
+    const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+      grupo: "Vendas pontuais (Bitrix)", nome: r.nome,
+      detalhe: r.closer ? `closer ${r.closer}` : "", data: r.data, valor: parseFloat(r.valor),
+    }));
+    grupos = agruparItens(itens, LIMITE_ITENS);
+    realizado = itens.reduce((s, i) => s + i.valor, 0);
+  } else if (metrica === "outras_receitas") {
+    const result = await db.execute(sql`
+      SELECT p.categoria_nome,
+             COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
+             COALESCE(p.descricao, '') AS descricao, p.data_competencia::text AS data,
+             COALESCE(p.valor_liquido::numeric, 0) AS valor
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
+      WHERE p.tipo_evento = 'RECEITA'
+        AND EXTRACT(YEAR FROM p.data_competencia) = ${ANO}
+        AND EXTRACT(MONTH FROM p.data_competencia) = ${mes}
+        AND (${PREDICADO_OUTRAS_RECEITAS})
+      ORDER BY valor DESC
+    `);
+    const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+      grupo: normalizaCategoria(r.categoria_nome), nome: r.nome, detalhe: r.descricao,
+      data: r.data, valor: parseFloat(r.valor),
+    }));
+    grupos = agruparItens(itens, LIMITE_ITENS);
+    realizado = itens.reduce((s, i) => s + i.valor, 0);
+  } else if (metrica === "inadimplencia") {
+    const vencidas = await db.execute(sql`
+      SELECT COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
+             COALESCE(p.descricao, '') AS descricao, p.data_vencimento::text AS data,
+             COALESCE(p.nao_pago::numeric, 0) AS valor
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
+      WHERE p.tipo_evento = 'RECEITA' AND p.nao_pago::numeric > 0
+        AND p.data_vencimento <= CURRENT_DATE
+        AND EXTRACT(YEAR FROM p.data_vencimento) = ${ANO}
+        AND EXTRACT(MONTH FROM p.data_vencimento) = ${mes}
+      ORDER BY valor DESC
+    `);
+    const itensVencidas: ItemDetalhe[] = (vencidas.rows as any[]).map((r) => ({
+      grupo: "Vencidas não pagas (foto atual)", nome: r.nome, detalhe: r.descricao,
+      data: r.data, valor: parseFloat(r.valor),
+    }));
+    const itensEstornos = (await itensDespesaBucket(db, PREDICADOS_DESPESA.estornos, mes))
+      .map((i) => ({ ...i, grupo: "Estornos e devoluções" }));
+    const todos = [...itensVencidas, ...itensEstornos];
+    grupos = agruparItens(todos, LIMITE_ITENS);
+    realizado = todos.reduce((s, i) => s + i.valor, 0);
+  } else if (metrica === "csv_beneficio" || metrica === "sga") {
+    const orcRateio = await db.execute(sql`
+      SELECT metrica, valor::numeric AS valor FROM cortex_core.bp2026_orcado
+      WHERE mes = ${mes} AND metrica IN ('csv_beneficio', 'beneficio_total_empresa')
+    `);
+    const orcMap: Record<string, number> = {};
+    for (const r of orcRateio.rows as any[]) orcMap[r.metrica] = parseFloat(r.valor);
+    const itensCaju = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
+    const totalBruto = itensCaju.reduce((s, i) => s + i.valor, 0);
+    if (metrica === "csv_beneficio") {
+      const fracao = orcMap["beneficio_total_empresa"]
+        ? (orcMap["csv_beneficio"] ?? 0) / orcMap["beneficio_total_empresa"] : 0;
+      grupos = agruparItens(itensCaju, LIMITE_ITENS);
+      realizado = ratear(totalBruto, orcMap["csv_beneficio"] ?? 0, orcMap["beneficio_total_empresa"] ?? 0) ?? 0;
+      rateio = { fracao, totalBruto, totalRateado: realizado };
+    } else {
+      const itensBucket = await itensDespesaBucket(db, PREDICADOS_DESPESA.sga_bucket, mes);
+      const complemento = ratear(
+        totalBruto,
+        (orcMap["beneficio_total_empresa"] ?? 0) - (orcMap["csv_beneficio"] ?? 0),
+        orcMap["beneficio_total_empresa"] ?? 0
+      ) ?? 0;
+      const todos: ItemDetalhe[] = [
+        ...itensBucket,
+        { grupo: "Complemento do benefício (rateio)", nome: "Caju — parcela não atribuída ao CSV",
+          detalhe: "benefício total × fração orçada do SG&A", data: null, valor: complemento },
+      ];
+      grupos = agruparItens(todos, LIMITE_ITENS);
+      realizado = todos.reduce((s, i) => s + i.valor, 0);
+    }
+  } else if (metrica === "dfc_real") {
+    const result = await db.execute(sql`
+      SELECT p.tipo_evento, p.categoria_nome,
+             COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
+             COALESCE(p.descricao, '') AS descricao, p.data_quitacao::text AS data,
+             COALESCE(p.valor_pago::numeric, 0) AS valor
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
+      WHERE p.status = 'QUITADO'
+        AND EXTRACT(YEAR FROM p.data_quitacao) = ${ANO}
+        AND EXTRACT(MONTH FROM p.data_quitacao) = ${mes}
+      ORDER BY valor DESC
+    `);
+    const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+      grupo: `${r.tipo_evento === "RECEITA" ? "(+)" : "(−)"} ${normalizaCategoria(r.categoria_nome)}`,
+      nome: r.nome, detalhe: r.descricao, data: r.data, valor: parseFloat(r.valor),
+    }));
+    grupos = agruparItens(itens, LIMITE_ITENS_DFC);
+    grupos.sort((a, b) =>
+      a.titulo.startsWith("(+)") === b.titulo.startsWith("(+)")
+        ? b.total - a.total
+        : a.titulo.startsWith("(+)") ? -1 : 1
+    );
+    const entradas = itens.filter((i) => i.grupo.startsWith("(+)")).reduce((s, i) => s + i.valor, 0);
+    const saidas = itens.filter((i) => i.grupo.startsWith("(−)")).reduce((s, i) => s + i.valor, 0);
+    realizado = entradas - saidas;
+  } else if (metrica === "vendas_mrr" || metrica === "funil_vendas_mrr") {
+    ({ grupos, realizado } = await detDealsBitrix(db, mes, "mrr", "soma", "Vendas MRR (Bitrix)"));
+  } else if (metrica === "vendas_pontual" || metrica === "funil_vendas_pontual") {
+    ({ grupos, realizado } = await detDealsBitrix(db, mes, "pontual", "soma", "Vendas pontuais (Bitrix)"));
+  } else if (metrica === "contratos_vendidos_mrr") {
+    ({ grupos, realizado } = await detDealsBitrix(db, mes, "mrr", "contagem", "Vendas MRR (Bitrix)"));
+  } else if (metrica === "contratos_vendidos_pontual") {
+    ({ grupos, realizado } = await detDealsBitrix(db, mes, "pontual", "contagem", "Vendas pontuais (Bitrix)"));
+  } else if (metrica === "reunioes") {
+    ({ grupos, realizado } = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas"));
+  } else if (metrica === "cac_por_cliente") {
+    const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (clientes adquiridos)");
+    const cacPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac);
+    const despesa = cacPorMes[mes] ?? 0;
+    grupos = ganhos.grupos;
+    realizado = ganhos.realizado ? despesa / ganhos.realizado : 0;
+    notaDinamica = `despesa CAC R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${ganhos.realizado} deals ganhos no mês`;
+  } else if (metrica.startsWith("cac_contrato_produto_")) {
+    const slug = metrica.slice("cac_contrato_produto_".length);
+    const predicadoSlug =
+      slug === "performance" ? sql`(TRIM(COALESCE(c.produto,''))='Performance' OR c.servico ILIKE '%performance%')`
+      : slug === "creators"  ? sql`(TRIM(COALESCE(c.produto,''))='Creators' OR c.servico ILIKE '%creator%')`
+      : slug === "social"    ? sql`(TRIM(COALESCE(c.produto,''))='Social Media' OR c.servico ILIKE '%social%')`
+      : slug === "gc"        ? sql`(TRIM(COALESCE(c.produto,''))='Gestão de Comunidade' OR c.servico ILIKE '%comunidade%')`
+      : sql`(TRIM(COALESCE(c.produto,'')) NOT IN ('Performance','Creators','Social Media','Gestão de Comunidade'))`;
+    const result = await db.execute(sql`
+      SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+             COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+             COALESCE(c.servico, '') AS servico,
+             COALESCE(c.squad, '') AS squad,
+             c.valorr::numeric AS valor,
+             c.data_criado::date::text AS data
+      FROM "Clickup".cup_contratos c
+      LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+      WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
+        AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
+        AND LOWER(TRIM(c.status)) <> 'não usar'
+        AND COALESCE(c.valorr::numeric, 0) > 0
+        AND (${predicadoSlug})
+      ORDER BY cl.nome
+    `);
+    const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+      grupo: r.squad || r.produto || "(sem squad)",
+      nome: r.cliente,
+      detalhe: r.servico,
+      data: r.data ?? null,
+      valor: parseFloat(r.valor),
+    }));
+    const cacPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac);
+    const despesa = cacPorMes[mes] ?? 0;
+    const nContratos = itens.length;
+    grupos = agruparItens(itens, LIMITE_ITENS);
+    realizado = nContratos > 0 ? despesa / nContratos : 0;
+    notaDinamica = `CAC total R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${nContratos} contrato${nContratos !== 1 ? "s" : ""} = R$ ${Math.round(realizado).toLocaleString("pt-BR")}/contrato`;
+  } else if (metrica === "taxa_conversao") {
+    const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (numerador)");
+    const reun = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas");
+    grupos = ganhos.grupos;
+    realizado = reun.realizado ? ganhos.realizado / reun.realizado : 0;
+    notaDinamica = `${ganhos.realizado} deals ganhos ÷ ${reun.realizado} reuniões no mês`;
+  } else if (metrica === "colaboradores") {
+    ({ grupos, realizado } = await detPessoas(db, mes, null, "setor"));
+  } else if (Object.hasOwn(SETOR_FILTROS, metrica)) {
+    ({ grupos, realizado } = await detPessoas(db, mes, SETOR_FILTROS[metrica], metrica.startsWith("pessoas") ? "setor" : "squad"));
+  } else if (metrica === "clientes") {
+    ({ grupos, realizado } = await detSnapshot(db, mes, null, "cliente", "contagem"));
+  } else if (metrica === "contratos") {
+    ({ grupos, realizado } = await detSnapshot(db, mes, null, "contrato", "contagem"));
+  } else if (metrica === "churn_mes") {
+    ({ resultado: { grupos, realizado } } = await detChurn(db, mes, null));
+  } else if (metrica.startsWith("mrr_") && LINHAS_REVENUE.includes(metrica.slice(4) as any)) {
+    ({ grupos, realizado } = await detSnapshot(db, mes, metrica.slice(4), "contrato", "soma"));
+  } else if (metrica === "cap_contratos_performance") {
+    ({ grupos, realizado } = await detSnapshot(db, mes, "performance", "contrato", "contagem"));
+  } else if (metrica.startsWith("contratos_") && LINHAS_REVENUE.includes(metrica.slice(10) as any)) {
+    ({ grupos, realizado } = await detSnapshot(db, mes, metrica.slice(10), "contrato", "contagem"));
+  } else if (metrica.startsWith("churn_pct_")) {
+    const linhaP = metrica.slice(10);
+    const { resultado, somaRs } = await detChurn(db, mes, linhaP);
+    grupos = resultado.grupos;
+    // denominador: MRR da linha no fim do mês anterior (mesma resolução da Revenue)
+    const denRes = await db.execute(sql`
+      WITH alvo AS (
+        SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+        WHERE data_snapshot::date >= (make_date(${ANO}, ${mes}, 1) - INTERVAL '1 month')
+          AND data_snapshot::date < make_date(${ANO}, ${mes}, 1)
+      ),
+      base AS (
+        SELECT h.valorr, ${CASE_PRODUTO} AS linha
+        FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+        WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+      )
+      SELECT COALESCE(SUM(valorr::numeric), 0) AS mrr FROM base WHERE linha = ${linhaP}
+    `);
+    const den = parseFloat((denRes.rows[0] as any).mrr);
+    realizado = den ? somaRs / den : 0;
+    notaDinamica = `churn R$ ${Math.round(somaRs).toLocaleString("pt-BR")} ÷ MRR R$ ${Math.round(den).toLocaleString("pt-BR")} (fim do mês anterior)`;
+  } else if (metrica === "churn_rs_total") {
+    ({ resultado: { grupos, realizado } } = await detChurn(db, mes, null));
+  } else if (metrica.startsWith("churn_rs_")) {
+    const linhaP = metrica.slice(9);
+    const { resultado, somaRs } = await detChurn(db, mes, linhaP);
+    grupos = resultado.grupos;
+    realizado = somaRs;
+  } else if (metrica === "saldo_caixa") {
+    const contasRes = await db.execute(sql`
+      SELECT COALESCE(NULLIF(TRIM(nmbanco), ''), '(sem nome)') AS nome, balance::numeric AS valor
+      FROM "Conta Azul".caz_bancos ORDER BY valor DESC
+    `);
+    const itensContas: ItemDetalhe[] = (contasRes.rows as any[]).map((r) => ({
+      grupo: "Contas bancárias (saldo atual)", nome: r.nome, detalhe: "", data: null, valor: parseFloat(r.valor),
+    }));
+    // fluxos posteriores (DFC líquido por mês m+1..mesCorrente)
+    const fluxosRes = await db.execute(sql`
+      SELECT EXTRACT(MONTH FROM data_quitacao)::int AS m,
+             SUM(CASE WHEN tipo_evento = 'RECEITA' THEN COALESCE(valor_pago::numeric, 0)
+                      ELSE -COALESCE(valor_pago::numeric, 0) END) AS liquido
+      FROM "Conta Azul".caz_parcelas
+      WHERE status = 'QUITADO'
+        AND EXTRACT(YEAR FROM data_quitacao) = ${ANO}
+        AND EXTRACT(MONTH FROM data_quitacao) > ${mes}
+        AND EXTRACT(MONTH FROM data_quitacao) <= ${mesCorrente}
+      GROUP BY 1 ORDER BY 1
+    `);
+    const MESES_NOMES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+    const itensFluxos: ItemDetalhe[] = (fluxosRes.rows as any[]).map((r) => ({
+      grupo: "(−) Fluxos posteriores ao mês (reconstrução)",
+      nome: `DFC líquido de ${MESES_NOMES[Number(r.m) - 1]}`, detalhe: "", data: null,
+      valor: -parseFloat(r.liquido),
+    }));
+    const todos = [...itensContas, ...itensFluxos];
+    grupos = agruparItens(todos, LIMITE_ITENS);
+    realizado = todos.reduce((s, i) => s + i.valor, 0);
+    notaDinamica = "Saldo do fim do mês = saldo bancário atual − fluxos quitados posteriores.";
+  } else if (Object.hasOwn(PREDICADOS_SGA_SUB, metrica) || metrica === "sga_outras") {
+    const chave = metrica === "sga_outras" ? "sga_outras_sub" : metrica;
+    const itens = await itensDespesaBucket(db, PREDICADOS_SGA_SUB[chave], mes);
+    grupos = agruparItens(itens, LIMITE_ITENS);
+    realizado = itens.reduce((s, i) => s + i.valor, 0);
+  } else if (Object.hasOwn(PREDICADOS_CAC_SUB, metrica)) {
+    const itens = await itensDespesaBucket(db, PREDICADOS_CAC_SUB[metrica], mes);
+    grupos = agruparItens(itens, LIMITE_ITENS);
+    realizado = itens.reduce((s, i) => s + i.valor, 0);
+  } else if (metrica === "beneficio_total_empresa") {
+    const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
+    grupos = agruparItens(itens, LIMITE_ITENS);
+    realizado = itens.reduce((s, i) => s + i.valor, 0);
+  } else if (prodAlvo) {
+    const { pai, produto } = prodAlvo;
+    if (pai === "pontual_venda_comercial") {
+      ({ grupos, realizado } = await detVendaPontualComercial(db, mes, produto, filtroCreators));
+    } else if (pai === "pontual_entrada") {
+      ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA, produto, filtroCreators));
+    } else if (pai === "pontual_entrega") {
+      ({ grupos, realizado } = await detPontualMovimento(db, mes, "entrega", produto, filtroCreators));
+    } else if (pai === "pontual_estoque_fim") {
+      ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto, filtroCreators));
+    } else if (pai.startsWith("pontual_status_")) {
+      const chaveMetrica = pai.slice("pontual_status_".length);
+      const statusAlvo = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica)?.chave;
+      ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) =>
+        r.status === statusAlvo && (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto, filtroCreators));
+    }
+  } else if (squadAlvo) {
+    const sq = squadAlvo;
+    ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => normalizarSquad(r.squad) === sq, filtroCreators));
+  } else if (metrica === "pontual_estoque_ini") {
+    ({ grupos, realizado } = await detPontualSnapshot(db, mes, true, undefined, filtroCreators));
+  } else if (metrica === "pontual_estoque_fim") {
+    ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, undefined, filtroCreators));
+  } else if (metrica === "pontual_status_outros") {
+    const conhecidos: Set<string> = new Set(STATUS_DECOMP.map((s) => s.chave));
+    ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => !conhecidos.has(r.status), filtroCreators));
+  } else if (metrica.startsWith("pontual_status_")) {
+    const chaveMetrica = metrica.slice("pontual_status_".length);
+    const def2 = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica);
+    ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false, filtroCreators));
+  } else if (metrica === "pontual_venda_comercial") {
+    ({ grupos, realizado } = await detVendaPontualComercial(db, mes, undefined, filtroCreators));
+  } else if (metrica === "pontual_venda_no_estoque") {
+    ({ grupos, realizado } = await detVendaPorEstoque(db, mes, true, filtroCreators));
+  } else if (metrica === "pontual_venda_fora_estoque") {
+    ({ grupos, realizado } = await detVendaPorEstoque(db, mes, false, filtroCreators));
+  } else if (metrica === "pontual_entrada") {
+    ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA, undefined, filtroCreators));
+  } else if ([
+    "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste",
+  ].includes(metrica)) {
+    ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte, undefined, filtroCreators));
+  } else if (metrica.startsWith("pontual_aging_")) {
+    const bucket = metrica.slice("pontual_aging_".length);
+    const ageCond =
+      bucket === "lt30"  ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) < 30`
+      : bucket === "30_60" ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) BETWEEN 30 AND 59`
+      : bucket === "60_90" ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) BETWEEN 60 AND 89`
+      : sql`(a.d - COALESCE(c.data_criado::date, a.d)) >= 90`;
+    const filtroAging = filtroCreators ? sql`AND LOWER(COALESCE(h.produto, '')) LIKE '%creators%'` : sql``;
+    const resAging = await db.execute(sql`
+      WITH alvo AS (
+        SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+        WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
+          AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
+      )
+      SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+             h.status, h.valorp::numeric AS valor,
+             c.data_criado::date::text AS data_criado,
+             COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
+             (a.d - COALESCE(c.data_criado::date, a.d)) AS idade_dias
+      FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+      LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+      LEFT JOIN "Clickup".cup_contratos c ON c.id_subtask = h.id_subtask
+      WHERE h.valorp::numeric > 0
+        AND h.status NOT IN ('entregue','cancelado/inativo','não usar')
+        AND (${ageCond})
+        ${filtroAging}
+      ORDER BY cl.nome
+    `);
+    const itensAging: ItemDetalhe[] = (resAging.rows as any[]).map((r) => ({
+      grupo: r.squad, nome: r.cliente,
+      detalhe: `${r.idade_dias ?? 0} dias · status ${r.status}`,
+      data: r.data_criado ?? null, valor: parseFloat(r.valor),
+    }));
+    grupos = agruparItens(itensAging, LIMITE_ITENS);
+    realizado = itensAging.reduce((s, i) => s + i.valor, 0);
+  } else if (metrica === "or_receita_variavel" || metrica === "or_stack_digital" || metrica === "or_demais") {
+    const pred = metrica === "or_receita_variavel" ? PREDICADOS_OUTRAS_SUB.or_variavel
+      : metrica === "or_stack_digital" ? PREDICADOS_OUTRAS_SUB.or_stack : PREDICADOS_OUTRAS_SUB.or_demais;
+    const result = await db.execute(sql`
+      SELECT p.categoria_nome,
+             COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
+             COALESCE(p.descricao, '') AS descricao, p.data_competencia::text AS data,
+             COALESCE(p.valor_liquido::numeric, 0) AS valor
+      FROM "Conta Azul".caz_parcelas p
+      LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
+      WHERE p.tipo_evento = 'RECEITA'
+        AND EXTRACT(YEAR FROM p.data_competencia) = ${ANO}
+        AND EXTRACT(MONTH FROM p.data_competencia) = ${mes}
+        AND (${pred})
+      ORDER BY valor DESC
+    `);
+    const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
+      grupo: normalizaCategoria(r.categoria_nome), nome: r.nome, detalhe: r.descricao,
+      data: r.data, valor: parseFloat(r.valor),
+    }));
+    grupos = agruparItens(itens, LIMITE_ITENS);
+    realizado = itens.reduce((s, i) => s + i.valor, 0);
+  } else {
+    throw new Error("metrica/mes inválidos");
+  }
+
+  return { metrica, mes, titulo, orcado, realizado, grupos, rateio, nota: def?.nota, notaDinamica };
+}
+
 export function registerBp2026DetalheRoutes(app: Express, db: any) {
   app.get("/api/bp2026/detalhe", async (req, res) => {
     try {
@@ -491,428 +953,19 @@ export function registerBp2026DetalheRoutes(app: Express, db: any) {
       if (!conhecida || DERIVADAS.includes(metrica) || !Number.isInteger(mes) || mes < 1 || mes > 12) {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }
-      const titulo = def?.titulo ?? TITULOS_SUBABAS[metrica] ?? prod?.titulo
-        ?? (squadAlvo ? `Estoque pontual — ${squadAlvo}` : null)
-        ?? (prodAlvo ? `${TITULOS_SUBABAS[prodAlvo.pai] ?? prodAlvo.pai} — ${prodAlvo.produto}` : metrica);
 
-      let orcado: number | null = null;
-      const orcRes = await db.execute(sql`
-        SELECT valor::numeric AS valor FROM cortex_core.bp2026_orcado
-        WHERE metrica = ${metrica} AND mes = ${mes}
-      `);
-      if (orcRes.rows.length) orcado = parseFloat((orcRes.rows[0] as any).valor);
-      // dfc_real não tem orçado persistido (usa o da Geração de Caixa, derivada);
-      // o frontend lê o orçado da célula no payload da matriz — aqui permanece null.
-
-      const agora = new Date();
-      const anoAtual = agora.getFullYear();
-      const mesCorrente = anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;
-      if (mes > mesCorrente) {
-        return res.json({ metrica, mes, titulo, orcado, realizado: null, grupos: [], nota: def?.nota });
-      }
-
-      let grupos: GrupoDetalhe[] = [];
-      let realizado = 0;
-      let rateio: { fracao: number; totalBruto: number; totalRateado: number } | undefined;
-      let notaDinamica: string | undefined;
-
-      if (Object.hasOwn(METRICAS_BUCKET, metrica)) {
-        const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA[METRICAS_BUCKET[metrica]], mes);
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (prod) {
-        const { itens, total } = await detalheVendaProdutoMes(db, prod.natureza, prod.segmento, mes, prod.modo);
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = total;
-      } else if (metrica === "mrr_ativo") {
-        const result = await db.execute(sql`
-          WITH alvo AS (
-            SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
-            WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
-              AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
-          )
-          SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
-                 COALESCE(h.servico, '') AS servico,
-                 COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
-                 COALESCE(h.valorr::numeric, 0) AS valor
-          FROM "Clickup".cup_data_hist h
-          JOIN alvo a ON h.data_snapshot::date = a.d
-          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
-          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
-          ORDER BY valor DESC
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: r.squad, nome: r.cliente, detalhe: r.servico, data: null, valor: parseFloat(r.valor),
-        }));
-        // MRR lista todos os contratos (spec: sem corte) — squads têm até ~100 clientes
-        grupos = agruparItens(itens, Number.MAX_SAFE_INTEGER);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "receita_pontual") {
-        const result = await db.execute(sql`
-          SELECT COALESCE(title, '(sem título)') AS nome, COALESCE(closer::text, '') AS closer,
-                 data_fechamento::date::text AS data, valor_pontual::numeric AS valor
-          FROM "Bitrix".crm_deal
-          WHERE stage_name = 'Negócio Ganho' AND valor_pontual > 0
-            AND EXTRACT(YEAR FROM data_fechamento) = ${ANO}
-            AND EXTRACT(MONTH FROM data_fechamento) = ${mes}
-          ORDER BY valor DESC
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: "Vendas pontuais (Bitrix)", nome: r.nome,
-          detalhe: r.closer ? `closer ${r.closer}` : "", data: r.data, valor: parseFloat(r.valor),
-        }));
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "outras_receitas") {
-        const result = await db.execute(sql`
-          SELECT p.categoria_nome,
-                 COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
-                 COALESCE(p.descricao, '') AS descricao, p.data_competencia::text AS data,
-                 COALESCE(p.valor_liquido::numeric, 0) AS valor
-          FROM "Conta Azul".caz_parcelas p
-          LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
-          WHERE p.tipo_evento = 'RECEITA'
-            AND EXTRACT(YEAR FROM p.data_competencia) = ${ANO}
-            AND EXTRACT(MONTH FROM p.data_competencia) = ${mes}
-            AND (${PREDICADO_OUTRAS_RECEITAS})
-          ORDER BY valor DESC
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: normalizaCategoria(r.categoria_nome), nome: r.nome, detalhe: r.descricao,
-          data: r.data, valor: parseFloat(r.valor),
-        }));
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "inadimplencia") {
-        const vencidas = await db.execute(sql`
-          SELECT COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
-                 COALESCE(p.descricao, '') AS descricao, p.data_vencimento::text AS data,
-                 COALESCE(p.nao_pago::numeric, 0) AS valor
-          FROM "Conta Azul".caz_parcelas p
-          LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
-          WHERE p.tipo_evento = 'RECEITA' AND p.nao_pago::numeric > 0
-            AND p.data_vencimento <= CURRENT_DATE
-            AND EXTRACT(YEAR FROM p.data_vencimento) = ${ANO}
-            AND EXTRACT(MONTH FROM p.data_vencimento) = ${mes}
-          ORDER BY valor DESC
-        `);
-        const itensVencidas: ItemDetalhe[] = (vencidas.rows as any[]).map((r) => ({
-          grupo: "Vencidas não pagas (foto atual)", nome: r.nome, detalhe: r.descricao,
-          data: r.data, valor: parseFloat(r.valor),
-        }));
-        const itensEstornos = (await itensDespesaBucket(db, PREDICADOS_DESPESA.estornos, mes))
-          .map((i) => ({ ...i, grupo: "Estornos e devoluções" }));
-        const todos = [...itensVencidas, ...itensEstornos];
-        grupos = agruparItens(todos, LIMITE_ITENS);
-        realizado = todos.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "csv_beneficio" || metrica === "sga") {
-        const orcRateio = await db.execute(sql`
-          SELECT metrica, valor::numeric AS valor FROM cortex_core.bp2026_orcado
-          WHERE mes = ${mes} AND metrica IN ('csv_beneficio', 'beneficio_total_empresa')
-        `);
-        const orcMap: Record<string, number> = {};
-        for (const r of orcRateio.rows as any[]) orcMap[r.metrica] = parseFloat(r.valor);
-        const itensCaju = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
-        const totalBruto = itensCaju.reduce((s, i) => s + i.valor, 0);
-        if (metrica === "csv_beneficio") {
-          const fracao = orcMap["beneficio_total_empresa"]
-            ? (orcMap["csv_beneficio"] ?? 0) / orcMap["beneficio_total_empresa"] : 0;
-          grupos = agruparItens(itensCaju, LIMITE_ITENS);
-          realizado = ratear(totalBruto, orcMap["csv_beneficio"] ?? 0, orcMap["beneficio_total_empresa"] ?? 0) ?? 0;
-          rateio = { fracao, totalBruto, totalRateado: realizado };
-        } else {
-          const itensBucket = await itensDespesaBucket(db, PREDICADOS_DESPESA.sga_bucket, mes);
-          const complemento = ratear(
-            totalBruto,
-            (orcMap["beneficio_total_empresa"] ?? 0) - (orcMap["csv_beneficio"] ?? 0),
-            orcMap["beneficio_total_empresa"] ?? 0
-          ) ?? 0;
-          const todos: ItemDetalhe[] = [
-            ...itensBucket,
-            { grupo: "Complemento do benefício (rateio)", nome: "Caju — parcela não atribuída ao CSV",
-              detalhe: "benefício total × fração orçada do SG&A", data: null, valor: complemento },
-          ];
-          grupos = agruparItens(todos, LIMITE_ITENS);
-          realizado = todos.reduce((s, i) => s + i.valor, 0);
-        }
-      } else if (metrica === "dfc_real") {
-        const result = await db.execute(sql`
-          SELECT p.tipo_evento, p.categoria_nome,
-                 COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
-                 COALESCE(p.descricao, '') AS descricao, p.data_quitacao::text AS data,
-                 COALESCE(p.valor_pago::numeric, 0) AS valor
-          FROM "Conta Azul".caz_parcelas p
-          LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
-          WHERE p.status = 'QUITADO'
-            AND EXTRACT(YEAR FROM p.data_quitacao) = ${ANO}
-            AND EXTRACT(MONTH FROM p.data_quitacao) = ${mes}
-          ORDER BY valor DESC
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: `${r.tipo_evento === "RECEITA" ? "(+)" : "(−)"} ${normalizaCategoria(r.categoria_nome)}`,
-          nome: r.nome, detalhe: r.descricao, data: r.data, valor: parseFloat(r.valor),
-        }));
-        grupos = agruparItens(itens, LIMITE_ITENS_DFC);
-        grupos.sort((a, b) =>
-          a.titulo.startsWith("(+)") === b.titulo.startsWith("(+)")
-            ? b.total - a.total
-            : a.titulo.startsWith("(+)") ? -1 : 1
-        );
-        const entradas = itens.filter((i) => i.grupo.startsWith("(+)")).reduce((s, i) => s + i.valor, 0);
-        const saidas = itens.filter((i) => i.grupo.startsWith("(−)")).reduce((s, i) => s + i.valor, 0);
-        realizado = entradas - saidas;
-      } else if (metrica === "vendas_mrr" || metrica === "funil_vendas_mrr") {
-        ({ grupos, realizado } = await detDealsBitrix(db, mes, "mrr", "soma", "Vendas MRR (Bitrix)"));
-      } else if (metrica === "vendas_pontual" || metrica === "funil_vendas_pontual") {
-        ({ grupos, realizado } = await detDealsBitrix(db, mes, "pontual", "soma", "Vendas pontuais (Bitrix)"));
-      } else if (metrica === "contratos_vendidos_mrr") {
-        ({ grupos, realizado } = await detDealsBitrix(db, mes, "mrr", "contagem", "Vendas MRR (Bitrix)"));
-      } else if (metrica === "contratos_vendidos_pontual") {
-        ({ grupos, realizado } = await detDealsBitrix(db, mes, "pontual", "contagem", "Vendas pontuais (Bitrix)"));
-      } else if (metrica === "reunioes") {
-        ({ grupos, realizado } = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas"));
-      } else if (metrica === "cac_por_cliente") {
-        const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (clientes adquiridos)");
-        const cacPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac);
-        const despesa = cacPorMes[mes] ?? 0;
-        grupos = ganhos.grupos;
-        realizado = ganhos.realizado ? despesa / ganhos.realizado : 0;
-        notaDinamica = `despesa CAC R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${ganhos.realizado} deals ganhos no mês`;
-      } else if (metrica.startsWith("cac_contrato_produto_")) {
-        const slug = metrica.slice("cac_contrato_produto_".length);
-        const predicadoSlug =
-          slug === "performance" ? sql`(TRIM(COALESCE(c.produto,''))='Performance' OR c.servico ILIKE '%performance%')`
-          : slug === "creators"  ? sql`(TRIM(COALESCE(c.produto,''))='Creators' OR c.servico ILIKE '%creator%')`
-          : slug === "social"    ? sql`(TRIM(COALESCE(c.produto,''))='Social Media' OR c.servico ILIKE '%social%')`
-          : slug === "gc"        ? sql`(TRIM(COALESCE(c.produto,''))='Gestão de Comunidade' OR c.servico ILIKE '%comunidade%')`
-          : sql`(TRIM(COALESCE(c.produto,'')) NOT IN ('Performance','Creators','Social Media','Gestão de Comunidade'))`;
-        const result = await db.execute(sql`
-          SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
-                 COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
-                 COALESCE(c.servico, '') AS servico,
-                 COALESCE(c.squad, '') AS squad,
-                 c.valorr::numeric AS valor,
-                 c.data_criado::date::text AS data
-          FROM "Clickup".cup_contratos c
-          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
-          WHERE EXTRACT(MONTH FROM c.data_criado)::int = ${mes}
-            AND c.data_criado >= ${`${ANO}-01-01`} AND c.data_criado < ${`${ANO + 1}-01-01`}
-            AND LOWER(TRIM(c.status)) <> 'não usar'
-            AND COALESCE(c.valorr::numeric, 0) > 0
-            AND (${predicadoSlug})
-          ORDER BY cl.nome
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: r.squad || r.produto || "(sem squad)",
-          nome: r.cliente,
-          detalhe: r.servico,
-          data: r.data ?? null,
-          valor: parseFloat(r.valor),
-        }));
-        const cacPorMes = await somaDespesaCaixaPorMes(db, PREDICADOS_DESPESA.cac);
-        const despesa = cacPorMes[mes] ?? 0;
-        const nContratos = itens.length;
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = nContratos > 0 ? despesa / nContratos : 0;
-        notaDinamica = `CAC total R$ ${Math.round(despesa).toLocaleString("pt-BR")} ÷ ${nContratos} contrato${nContratos !== 1 ? "s" : ""} = R$ ${Math.round(realizado).toLocaleString("pt-BR")}/contrato`;
-      } else if (metrica === "taxa_conversao") {
-        const ganhos = await detDealsBitrix(db, mes, "ambos", "contagem", "Deals ganhos (numerador)");
-        const reun = await detDealsBitrix(db, mes, "reunioes", "contagem", "Reuniões realizadas");
-        grupos = ganhos.grupos;
-        realizado = reun.realizado ? ganhos.realizado / reun.realizado : 0;
-        notaDinamica = `${ganhos.realizado} deals ganhos ÷ ${reun.realizado} reuniões no mês`;
-      } else if (metrica === "colaboradores") {
-        ({ grupos, realizado } = await detPessoas(db, mes, null, "setor"));
-      } else if (Object.hasOwn(SETOR_FILTROS, metrica)) {
-        ({ grupos, realizado } = await detPessoas(db, mes, SETOR_FILTROS[metrica], metrica.startsWith("pessoas") ? "setor" : "squad"));
-      } else if (metrica === "clientes") {
-        ({ grupos, realizado } = await detSnapshot(db, mes, null, "cliente", "contagem"));
-      } else if (metrica === "contratos") {
-        ({ grupos, realizado } = await detSnapshot(db, mes, null, "contrato", "contagem"));
-      } else if (metrica === "churn_mes") {
-        ({ resultado: { grupos, realizado } } = await detChurn(db, mes, null));
-      } else if (metrica.startsWith("mrr_") && LINHAS_REVENUE.includes(metrica.slice(4) as any)) {
-        ({ grupos, realizado } = await detSnapshot(db, mes, metrica.slice(4), "contrato", "soma"));
-      } else if (metrica === "cap_contratos_performance") {
-        ({ grupos, realizado } = await detSnapshot(db, mes, "performance", "contrato", "contagem"));
-      } else if (metrica.startsWith("contratos_") && LINHAS_REVENUE.includes(metrica.slice(10) as any)) {
-        ({ grupos, realizado } = await detSnapshot(db, mes, metrica.slice(10), "contrato", "contagem"));
-      } else if (metrica.startsWith("churn_pct_")) {
-        const linhaP = metrica.slice(10);
-        const { resultado, somaRs } = await detChurn(db, mes, linhaP);
-        grupos = resultado.grupos;
-        // denominador: MRR da linha no fim do mês anterior (mesma resolução da Revenue)
-        const denRes = await db.execute(sql`
-          WITH alvo AS (
-            SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
-            WHERE data_snapshot::date >= (make_date(${ANO}, ${mes}, 1) - INTERVAL '1 month')
-              AND data_snapshot::date < make_date(${ANO}, ${mes}, 1)
-          ),
-          base AS (
-            SELECT h.valorr, ${CASE_PRODUTO} AS linha
-            FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
-            WHERE h.status IN ('ativo', 'onboarding', 'triagem')
-          )
-          SELECT COALESCE(SUM(valorr::numeric), 0) AS mrr FROM base WHERE linha = ${linhaP}
-        `);
-        const den = parseFloat((denRes.rows[0] as any).mrr);
-        realizado = den ? somaRs / den : 0;
-        notaDinamica = `churn R$ ${Math.round(somaRs).toLocaleString("pt-BR")} ÷ MRR R$ ${Math.round(den).toLocaleString("pt-BR")} (fim do mês anterior)`;
-      } else if (metrica === "churn_rs_total") {
-        ({ resultado: { grupos, realizado } } = await detChurn(db, mes, null));
-      } else if (metrica.startsWith("churn_rs_")) {
-        const linhaP = metrica.slice(9);
-        const { resultado, somaRs } = await detChurn(db, mes, linhaP);
-        grupos = resultado.grupos;
-        realizado = somaRs;
-      } else if (metrica === "saldo_caixa") {
-        const contasRes = await db.execute(sql`
-          SELECT COALESCE(NULLIF(TRIM(nmbanco), ''), '(sem nome)') AS nome, balance::numeric AS valor
-          FROM "Conta Azul".caz_bancos ORDER BY valor DESC
-        `);
-        const itensContas: ItemDetalhe[] = (contasRes.rows as any[]).map((r) => ({
-          grupo: "Contas bancárias (saldo atual)", nome: r.nome, detalhe: "", data: null, valor: parseFloat(r.valor),
-        }));
-        // fluxos posteriores (DFC líquido por mês m+1..mesCorrente)
-        const fluxosRes = await db.execute(sql`
-          SELECT EXTRACT(MONTH FROM data_quitacao)::int AS m,
-                 SUM(CASE WHEN tipo_evento = 'RECEITA' THEN COALESCE(valor_pago::numeric, 0)
-                          ELSE -COALESCE(valor_pago::numeric, 0) END) AS liquido
-          FROM "Conta Azul".caz_parcelas
-          WHERE status = 'QUITADO'
-            AND EXTRACT(YEAR FROM data_quitacao) = ${ANO}
-            AND EXTRACT(MONTH FROM data_quitacao) > ${mes}
-            AND EXTRACT(MONTH FROM data_quitacao) <= ${mesCorrente}
-          GROUP BY 1 ORDER BY 1
-        `);
-        const MESES_NOMES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
-        const itensFluxos: ItemDetalhe[] = (fluxosRes.rows as any[]).map((r) => ({
-          grupo: "(−) Fluxos posteriores ao mês (reconstrução)",
-          nome: `DFC líquido de ${MESES_NOMES[Number(r.m) - 1]}`, detalhe: "", data: null,
-          valor: -parseFloat(r.liquido),
-        }));
-        const todos = [...itensContas, ...itensFluxos];
-        grupos = agruparItens(todos, LIMITE_ITENS);
-        realizado = todos.reduce((s, i) => s + i.valor, 0);
-        notaDinamica = "Saldo do fim do mês = saldo bancário atual − fluxos quitados posteriores.";
-      } else if (Object.hasOwn(PREDICADOS_SGA_SUB, metrica) || metrica === "sga_outras") {
-        const chave = metrica === "sga_outras" ? "sga_outras_sub" : metrica;
-        const itens = await itensDespesaBucket(db, PREDICADOS_SGA_SUB[chave], mes);
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (Object.hasOwn(PREDICADOS_CAC_SUB, metrica)) {
-        const itens = await itensDespesaBucket(db, PREDICADOS_CAC_SUB[metrica], mes);
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "beneficio_total_empresa") {
-        const itens = await itensDespesaBucket(db, PREDICADOS_DESPESA.beneficio_total, mes);
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else if (prodAlvo) {
-        const { pai, produto } = prodAlvo;
-        if (pai === "pontual_venda_comercial") {
-          ({ grupos, realizado } = await detVendaPontualComercial(db, mes, produto, filtroCreators));
-        } else if (pai === "pontual_entrada") {
-          ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA, produto, filtroCreators));
-        } else if (pai === "pontual_entrega") {
-          ({ grupos, realizado } = await detPontualMovimento(db, mes, "entrega", produto, filtroCreators));
-        } else if (pai === "pontual_estoque_fim") {
-          ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto, filtroCreators));
-        } else if (pai.startsWith("pontual_status_")) {
-          const chaveMetrica = pai.slice("pontual_status_".length);
-          const statusAlvo = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica)?.chave;
-          ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) =>
-            r.status === statusAlvo && (r.produto && r.produto.trim() ? r.produto : "(sem produto)") === produto, filtroCreators));
-        }
-      } else if (squadAlvo) {
-        const sq = squadAlvo;
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => normalizarSquad(r.squad) === sq, filtroCreators));
-      } else if (metrica === "pontual_estoque_ini") {
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, true, undefined, filtroCreators));
-      } else if (metrica === "pontual_estoque_fim") {
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, undefined, filtroCreators));
-      } else if (metrica === "pontual_status_outros") {
-        const conhecidos: Set<string> = new Set(STATUS_DECOMP.map((s) => s.chave));
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, (r) => !conhecidos.has(r.status), filtroCreators));
-      } else if (metrica.startsWith("pontual_status_")) {
-        const chaveMetrica = metrica.slice("pontual_status_".length);
-        const def2 = STATUS_DECOMP.find((s) => s.chave.replace(/\s+/g, "_") === chaveMetrica);
-        ({ grupos, realizado } = await detPontualSnapshot(db, mes, false, def2 ? (r) => r.status === def2.chave : () => false, filtroCreators));
-      } else if (metrica === "pontual_venda_comercial") {
-        ({ grupos, realizado } = await detVendaPontualComercial(db, mes, undefined, filtroCreators));
-      } else if (metrica === "pontual_venda_no_estoque") {
-        ({ grupos, realizado } = await detVendaPorEstoque(db, mes, true, filtroCreators));
-      } else if (metrica === "pontual_venda_fora_estoque") {
-        ({ grupos, realizado } = await detVendaPorEstoque(db, mes, false, filtroCreators));
-      } else if (metrica === "pontual_entrada") {
-        ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA, undefined, filtroCreators));
-      } else if ([
-        "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste",
-      ].includes(metrica)) {
-        ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte, undefined, filtroCreators));
-      } else if (metrica.startsWith("pontual_aging_")) {
-        const bucket = metrica.slice("pontual_aging_".length);
-        const ageCond =
-          bucket === "lt30"  ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) < 30`
-          : bucket === "30_60" ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) BETWEEN 30 AND 59`
-          : bucket === "60_90" ? sql`(a.d - COALESCE(c.data_criado::date, a.d)) BETWEEN 60 AND 89`
-          : sql`(a.d - COALESCE(c.data_criado::date, a.d)) >= 90`;
-        const filtroAging = filtroCreators ? sql`AND LOWER(COALESCE(h.produto, '')) LIKE '%creators%'` : sql``;
-        const resAging = await db.execute(sql`
-          WITH alvo AS (
-            SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
-            WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
-              AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')
-          )
-          SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
-                 h.status, h.valorp::numeric AS valor,
-                 c.data_criado::date::text AS data_criado,
-                 COALESCE(NULLIF(TRIM(h.squad), ''), '(sem squad)') AS squad,
-                 (a.d - COALESCE(c.data_criado::date, a.d)) AS idade_dias
-          FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
-          LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
-          LEFT JOIN "Clickup".cup_contratos c ON c.id_subtask = h.id_subtask
-          WHERE h.valorp::numeric > 0
-            AND h.status NOT IN ('entregue','cancelado/inativo','não usar')
-            AND (${ageCond})
-            ${filtroAging}
-          ORDER BY cl.nome
-        `);
-        const itensAging: ItemDetalhe[] = (resAging.rows as any[]).map((r) => ({
-          grupo: r.squad, nome: r.cliente,
-          detalhe: `${r.idade_dias ?? 0} dias · status ${r.status}`,
-          data: r.data_criado ?? null, valor: parseFloat(r.valor),
-        }));
-        grupos = agruparItens(itensAging, LIMITE_ITENS);
-        realizado = itensAging.reduce((s, i) => s + i.valor, 0);
-      } else if (metrica === "or_receita_variavel" || metrica === "or_stack_digital" || metrica === "or_demais") {
-        const pred = metrica === "or_receita_variavel" ? PREDICADOS_OUTRAS_SUB.or_variavel
-          : metrica === "or_stack_digital" ? PREDICADOS_OUTRAS_SUB.or_stack : PREDICADOS_OUTRAS_SUB.or_demais;
-        const result = await db.execute(sql`
-          SELECT p.categoria_nome,
-                 COALESCE(NULLIF(TRIM(c.nome), ''), p.descricao, '(sem identificação)') AS nome,
-                 COALESCE(p.descricao, '') AS descricao, p.data_competencia::text AS data,
-                 COALESCE(p.valor_liquido::numeric, 0) AS valor
-          FROM "Conta Azul".caz_parcelas p
-          LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = c.ids::text
-          WHERE p.tipo_evento = 'RECEITA'
-            AND EXTRACT(YEAR FROM p.data_competencia) = ${ANO}
-            AND EXTRACT(MONTH FROM p.data_competencia) = ${mes}
-            AND (${pred})
-          ORDER BY valor DESC
-        `);
-        const itens: ItemDetalhe[] = (result.rows as any[]).map((r) => ({
-          grupo: normalizaCategoria(r.categoria_nome), nome: r.nome, detalhe: r.descricao,
-          data: r.data, valor: parseFloat(r.valor),
-        }));
-        grupos = agruparItens(itens, LIMITE_ITENS);
-        realizado = itens.reduce((s, i) => s + i.valor, 0);
-      } else {
+      // montarDetalheBp não recebe `aba` — dobra o efeito de `aba === "pontual-creators"`
+      // dentro de `segmento` antes de chamar (equivalente ao `filtroCreators` original).
+      const result = await montarDetalheBp(db, {
+        metrica,
+        mes,
+        segmento: filtroCreators ? "creators" : segmento,
+      });
+      res.json(result);
+    } catch (error) {
+      if (error instanceof Error && error.message === "metrica/mes inválidos") {
         return res.status(400).json({ error: "metrica/mes inválidos" });
       }
-
-      res.json({ metrica, mes, titulo, orcado, realizado, grupos, rateio, nota: def?.nota, notaDinamica });
-    } catch (error) {
       console.error("[bp2026] Erro em /api/bp2026/detalhe:", error);
       res.status(500).json({ error: "Erro ao montar detalhamento" });
     }
