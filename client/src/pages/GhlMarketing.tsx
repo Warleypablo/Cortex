@@ -83,11 +83,16 @@ function fetchJson<T>(url: string): Promise<T> {
   });
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function StatCard({ label, value, hint, info }: { label: string; value: string | number; hint?: string; info?: string }) {
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+          {label}
+          {info && (
+            <span title={info} className="cursor-help text-muted-foreground/60 normal-case" aria-label="como é calculado">ⓘ</span>
+          )}
+        </div>
         <div className="mt-1 text-2xl font-semibold">{value}</div>
         {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
       </CardContent>
@@ -877,14 +882,22 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
     <div className="space-y-4">
       {/* KPI cards: Investimento · Disparos · Respostas · Oportunidades · Reuniões · Custo/reunião · Vendas · CAC */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
-        <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"} />
-        <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp" />
-        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint="responderam ao disparo" />
-        <StatCard label="Oportunidades" value={fnl ? fmtInt(fnl.oportunidades) : "—"} hint="responderam positivo ou marcaram reunião" />
-        <StatCard label="Reuniões" value={fnl ? `${fmtInt(fnl.reuniao_direta)} / ${fmtInt(fnl.reuniao_marcada)}` : "—"} hint="direta (negócio novo) / influenciada" />
-        <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="investimento ÷ reuniões" />
-        <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
-        <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas" />
+        <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"}
+          info="Custo das mensagens de WhatsApp no período: (total de mensagens enviadas × custo unitário) + ajustes manuais de gasto. 'Estimado' quando não há ajuste manual no período." />
+        <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp"
+          info="Nº de disparos: mensagens agrupadas por (dia, origem, texto da copy) enviadas a pelo menos 10 contatos distintos. Cada copy diferente no mesmo dia conta como um disparo." />
+        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint="responderam ao disparo"
+          info="Contatos distintos que enviaram ao menos uma resposta (1ª resposta) após receber um disparo, no período." />
+        <StatCard label="Oportunidades" value={fnl ? fmtInt(fnl.oportunidades) : "—"} hint="responderam positivo ou marcaram reunião"
+          info="Respondentes com intenção: 1ª resposta classificada como positiva OU que marcaram reunião. Sempre ≥ Reuniões." />
+        <StatCard label="Reuniões" value={fnl ? `${fmtInt(fnl.reuniao_direta)} / ${fmtInt(fnl.reuniao_marcada)}` : "—"} hint="direta (negócio novo) / influenciada"
+          info="Direta: o negócio (deal) foi criado em torno da resposta ao disparo — o broadcast gerou a oportunidade. Influenciada: quem respondeu e teve QUALQUER reunião agendada a partir da data da resposta (inclui negócios que já existiam). Atribuição por telefone (GHL↔Bitrix)." />
+        <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="investimento ÷ reuniões"
+          info="Investimento do período ÷ reuniões influenciadas." />
+        <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)"
+          info="Negócios em 'Negócio Ganho' cujo fechamento ocorreu a partir da data da resposta ao disparo (atribuição por telefone)." />
+        <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas"
+          info="Custo de aquisição: investimento do período ÷ vendas atribuídas." />
       </div>
 
       {/* Evolução do período (2/3) + Gastos (1/3) */}
