@@ -71,27 +71,6 @@ describe("GET /api/lt-ltv-churn/churn-mensal", () => {
   });
 });
 
-describe("GET /api/lt-ltv-churn/contratos", () => {
-  it("retorna contratos paginados", async () => {
-    mockExecute.mockResolvedValueOnce({ rows: [{ total: 1514 }] });
-    mockExecute.mockResolvedValueOnce({
-      rows: [{ id_subtask: "abc", produto: "Performance", status: "ativo",
-        valorr: 1000, lt_meses: 6.3, ltv_recorrente: 6300, is_ativo: true,
-        data_inconsistente: false, nome_cliente: "Cliente X" }],
-    });
-    const res = await request(makeApp()).get("/api/lt-ltv-churn/contratos?status=ativo");
-    expect(res.status).toBe(200);
-    expect(res.body.total).toBe(1514);
-    expect(res.body.contratos[0].produto).toBe("Performance");
-  });
-
-  it("retorna 500 em erro de banco", async () => {
-    mockExecute.mockRejectedValueOnce(new Error("db down"));
-    const res = await request(makeApp()).get("/api/lt-ltv-churn/contratos");
-    expect(res.status).toBe(500);
-  });
-});
-
 describe("GET /api/lt-ltv-churn/overview-clientes", () => {
   it("retorna KPIs agregados por cliente", async () => {
     mockExecute.mockResolvedValueOnce({

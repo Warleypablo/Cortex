@@ -177,51 +177,6 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
     }
   });
 
-  app.get("/api/lt-ltv-churn/contratos", async (req, res) => {
-    try {
-      const status = (req.query.status as string) || undefined;
-      const produto = (req.query.produto as string) || undefined;
-      const squad = (req.query.squad as string) || undefined;
-      const page = Math.max(parseInt(req.query.page as string) || 1, 1);
-      const pageSize = 50;
-      const offset = (page - 1) * pageSize;
-
-      const whereExtra = sql`
-        ${status ? sql`AND status = ${status}` : sql``}
-        ${produto ? sql`AND produto = ${produto}` : sql``}
-        ${squad ? sql`AND squad = ${squad}` : sql``}`;
-
-      const totalRes = await db.execute(sql`
-        SELECT COUNT(*) AS total FROM cortex_core.vw_lt_contratos
-        WHERE tipo_receita='recorrente' ${whereExtra}`);
-
-      const rows = (await db.execute(sql`
-        SELECT id_subtask, nome_cliente, produto, squad, status, valorr,
-               lt_meses, ltv_recorrente, is_ativo, data_inconsistente,
-               data_inicio, data_fim
-        FROM cortex_core.vw_lt_contratos
-        WHERE tipo_receita='recorrente' ${whereExtra}
-        ORDER BY valorr DESC NULLS LAST
-        LIMIT ${pageSize} OFFSET ${offset}`)).rows;
-
-      res.json({
-        total: Number(totalRes.rows[0]?.total) || 0,
-        page, pageSize,
-        contratos: rows.map((r: any) => ({
-          idSubtask: r.id_subtask, nomeCliente: r.nome_cliente, produto: r.produto,
-          squad: r.squad, status: r.status, valorr: Number(r.valorr) || 0,
-          ltMeses: r.lt_meses != null ? Number(r.lt_meses) : null,
-          ltvRecorrente: r.ltv_recorrente != null ? Number(r.ltv_recorrente) : null,
-          isAtivo: r.is_ativo, dataInconsistente: r.data_inconsistente,
-          dataInicio: r.data_inicio, dataFim: r.data_fim,
-        })),
-      });
-    } catch (error) {
-      console.error("[api] Error fetching lt-ltv-churn contratos:", error);
-      res.status(500).json({ error: "Failed to fetch contratos" });
-    }
-  });
-
   app.get("/api/lt-ltv-churn/overview-clientes", async (req, res) => {
     try {
       const produto = (req.query.produto as string) || undefined;

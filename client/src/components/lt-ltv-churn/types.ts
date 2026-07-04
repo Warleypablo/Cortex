@@ -35,19 +35,6 @@ export interface ChurnMensalPonto {
   revChurnPct: number;
 }
 
-export interface ContratoRow {
-  idSubtask: string;
-  nomeCliente: string | null;
-  produto: string | null;
-  squad: string | null;
-  status: string;
-  valorr: number;
-  ltMeses: number | null;
-  ltvRecorrente: number | null;
-  isAtivo: boolean;
-  dataInconsistente: boolean;
-}
-
 export interface OverviewClientesData {
   totalClientes: number;
   ltvMedioCliente: number;

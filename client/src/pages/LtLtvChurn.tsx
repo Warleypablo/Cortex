@@ -6,7 +6,6 @@ import { useSetPageInfo } from "@/contexts/PageContext";
 import { OverviewCards } from "@/components/lt-ltv-churn/OverviewCards";
 import { BenchmarkProduto } from "@/components/lt-ltv-churn/BenchmarkProduto";
 import { LtLtvPorProduto } from "@/components/lt-ltv-churn/LtLtvPorProduto";
-import { ContratosTable } from "@/components/lt-ltv-churn/ContratosTable";
 import { DistLtContratos } from "@/components/lt-ltv-churn/DistLtContratos";
 import { CohortMatriz } from "@/components/lt-ltv-churn/CohortMatriz";
 import { EvolucaoProduto } from "@/components/lt-ltv-churn/EvolucaoProduto";
@@ -98,7 +97,6 @@ export default function LtLtvChurn() {
           )}
           <DistLtContratos produto={produtoParam} />
           <CohortMatriz produto={produtoParam} />
-          <ContratosTable produto={produtoParam} />
         </TabsContent>
 
         <TabsContent value="creators" className="space-y-6">
