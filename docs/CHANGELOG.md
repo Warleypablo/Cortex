@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-07-04 | feat(lt-ltv-churn): células da matriz de cohort auditáveis (drill nominal)
+
+**O que foi feito:**
+- Cada célula da matriz de cohort agora é clicável e abre um **Sheet de auditoria** com a lista nominal da safra no mês alvo, em dois grupos: **Vivos em M{n}** e **Saíram até M{n}** — a soma dos dois reconcilia com a base da safra.
+- **Por contrato**: serviço, Valor R, data de início, data/status de saída e link direto para a subtask no ClickUp.
+- **Por cliente**: contratos vivos/total no mês, MRR vivo (soma do Valor R dos contratos vivos), mês de saída, flags "voltou depois" (novo contrato após o mês auditado) e "ativo hoje", com link para a task do cliente no ClickUp.
+- Endpoint `GET /api/lt-ltv-churn/cohort/detalhe?unidade=&safra=YYYY-MM&offset=N&produto=` (400 em params inválidos); a query base do cohort foi extraída e compartilhada entre matriz e drill — mesma régua garantida.
+- Validado: contrato 2026-01 M3 = 40 vivos + 11 saídos = 51 (bate com a célula); cliente 2026-01 M3 = 22 + 8 = 30.
+
+**Por que:**
+- Pedido do Ichino (2026-07-04): "Quero que as células sejam auditáveis".
+
+**Arquivos alterados:**
+- `server/routes/ltLtvChurn.ts` - endpoint `/cohort/detalhe` + base compartilhada `cohortBase()`.
+- `client/src/components/lt-ltv-churn/CohortDetalhe.tsx` - Sheet de auditoria (novo).
+- `client/src/components/lt-ltv-churn/CohortMatriz.tsx` - células viram botões com drill.
+- `client/src/components/lt-ltv-churn/types.ts` - tipos `CohortDetalheData`/`CohortDetalheItem`.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-04 | feat(lt-ltv-churn): matriz de cohort de retenção por cliente e por contrato
 
 **O que foi feito:**
