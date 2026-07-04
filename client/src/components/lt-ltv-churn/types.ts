@@ -109,3 +109,29 @@ export interface CohortMatrizData {
   safras: CohortMatrizSafra[];
   maxOffset: number;
 }
+
+export interface CohortDetalheItem {
+  id: string; // id_subtask (contrato) ou id_task (cliente) — link do ClickUp
+  nome: string | null;
+  vivo: boolean;
+  // unidade=contrato
+  servico?: string | null;
+  valorr?: number;
+  status?: string;
+  dataInicio?: string | null;
+  dataFim?: string | null;
+  // unidade=cliente
+  nContratos?: number;
+  nVivos?: number;
+  mrrVivo?: number;
+  ultimoMesVivo?: string | null;
+  temContratoPosterior?: boolean;
+  ativoHoje?: boolean;
+}
+
+export interface CohortDetalheData {
+  unidade: "cliente" | "contrato";
+  safra: string;
+  offset: number;
+  itens: CohortDetalheItem[];
+}

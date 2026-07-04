@@ -599,6 +599,25 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
     }
   });
 
+  // Base compartilhada da matriz de cohort e do seu drill de auditoria — mesma régua
+  // da aba: só recorrentes, sem datas inconsistentes; churned sem data_fim não tem
+  // lugar na linha do tempo e fica de fora (3 contratos hoje).
+  const cohortBase = (produto?: string) => sql`
+    SELECT id_task, id_subtask, nome_cliente, servico, valorr, status, is_ativo,
+      data_inicio, data_fim,
+      DATE_TRUNC('month', data_inicio)::date AS mes_ini,
+      LEAST(
+        DATE_TRUNC('month', CASE WHEN is_ativo THEN CURRENT_DATE ELSE data_fim END)::date,
+        DATE_TRUNC('month', CURRENT_DATE)::date
+      ) AS mes_fim
+    FROM cortex_core.vw_lt_contratos
+    WHERE tipo_receita = 'recorrente'
+      AND data_inicio IS NOT NULL
+      AND NOT data_inconsistente
+      AND (is_ativo OR (is_churned AND data_fim IS NOT NULL))
+      ${produto ? sql`AND produto = ${produto}` : sql``}
+  `;
+
   // Matriz de cohort de retenção. unidade=contrato: safra = mês de data_inicio do
   // contrato, vivo até data_fim (cancelamento) ou hoje. unidade=cliente: safra = mês
   // do 1º contrato recorrente do cliente, vivo em cada mês em que tem >=1 contrato
@@ -608,22 +627,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       const produto = (req.query.produto as string) || undefined;
       const unidade = req.query.unidade === "contrato" ? "contrato" : "cliente";
 
-      // Mesma régua da aba: só recorrentes, sem datas inconsistentes; churned sem
-      // data_fim não tem lugar na linha do tempo e fica de fora (3 contratos hoje).
-      const base = sql`
-        SELECT id_task,
-          DATE_TRUNC('month', data_inicio)::date AS mes_ini,
-          LEAST(
-            DATE_TRUNC('month', CASE WHEN is_ativo THEN CURRENT_DATE ELSE data_fim END)::date,
-            DATE_TRUNC('month', CURRENT_DATE)::date
-          ) AS mes_fim
-        FROM cortex_core.vw_lt_contratos
-        WHERE tipo_receita = 'recorrente'
-          AND data_inicio IS NOT NULL
-          AND NOT data_inconsistente
-          AND (is_ativo OR (is_churned AND data_fim IS NOT NULL))
-          ${produto ? sql`AND produto = ${produto}` : sql``}
-      `;
+      const base = cohortBase(produto);
 
       const result =
         unidade === "contrato"
@@ -684,6 +688,94 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[api] Error fetching lt-ltv-churn cohort:", error);
       res.status(500).json({ error: "Failed to fetch cohort" });
+    }
+  });
+
+  // Drill de auditoria de uma célula da matriz: lista nominal de quem estava vivo no
+  // mês alvo (safra + offset) e de quem já tinha saído, reconciliando base -> célula.
+  app.get("/api/lt-ltv-churn/cohort/detalhe", async (req, res) => {
+    try {
+      const produto = (req.query.produto as string) || undefined;
+      const unidade = req.query.unidade === "contrato" ? "contrato" : "cliente";
+      const safra = req.query.safra as string;
+      const offset = parseInt(req.query.offset as string, 10);
+      if (!/^\d{4}-\d{2}$/.test(safra || "") || !Number.isInteger(offset) || offset < 0) {
+        return res.status(400).json({ error: "Params: safra=YYYY-MM, offset>=0" });
+      }
+
+      const base = cohortBase(produto);
+      const safraDate = `${safra}-01`;
+
+      if (unidade === "contrato") {
+        const rows = (await db.execute(sql`
+          WITH base AS (${base}),
+          alvo AS (
+            SELECT (${safraDate}::date + ${offset}::int * interval '1 month')::date AS mes
+          )
+          SELECT b.id_subtask, b.nome_cliente, b.servico, b.valorr, b.status,
+            b.data_inicio, b.data_fim,
+            (b.mes_fim >= a.mes) AS vivo
+          FROM base b CROSS JOIN alvo a
+          WHERE b.mes_ini = ${safraDate}::date
+          ORDER BY (b.mes_fim >= a.mes) DESC, b.valorr DESC NULLS LAST
+        `)).rows;
+        return res.json({
+          unidade, safra, offset,
+          itens: rows.map((r: any) => ({
+            id: r.id_subtask,
+            nome: r.nome_cliente,
+            servico: r.servico,
+            valorr: Number(r.valorr) || 0,
+            status: r.status,
+            dataInicio: r.data_inicio,
+            dataFim: r.data_fim,
+            vivo: Boolean(r.vivo),
+          })),
+        });
+      }
+
+      const rows = (await db.execute(sql`
+        WITH base AS (${base}),
+        alvo AS (
+          SELECT (${safraDate}::date + ${offset}::int * interval '1 month')::date AS mes
+        ),
+        safra_cliente AS (
+          SELECT id_task, MIN(mes_ini) AS safra FROM base GROUP BY id_task
+        )
+        SELECT b.id_task,
+          MAX(b.nome_cliente) AS nome_cliente,
+          COUNT(*)::int AS n_contratos,
+          COUNT(*) FILTER (WHERE b.mes_ini <= a.mes AND b.mes_fim >= a.mes)::int AS n_vivos,
+          COALESCE(SUM(b.valorr) FILTER (WHERE b.mes_ini <= a.mes AND b.mes_fim >= a.mes), 0) AS mrr_vivo,
+          BOOL_OR(b.mes_ini <= a.mes AND b.mes_fim >= a.mes) AS vivo,
+          TO_CHAR(MAX(b.mes_fim) FILTER (WHERE b.mes_ini <= a.mes), 'YYYY-MM') AS ultimo_mes_vivo,
+          BOOL_OR(b.mes_ini > a.mes) AS tem_contrato_posterior,
+          BOOL_OR(b.is_ativo) AS ativo_hoje
+        FROM base b
+        JOIN safra_cliente s USING (id_task)
+        CROSS JOIN alvo a
+        WHERE s.safra = ${safraDate}::date
+        GROUP BY b.id_task
+        ORDER BY BOOL_OR(b.mes_ini <= a.mes AND b.mes_fim >= a.mes) DESC,
+          COALESCE(SUM(b.valorr) FILTER (WHERE b.mes_ini <= a.mes AND b.mes_fim >= a.mes), 0) DESC
+      `)).rows;
+      res.json({
+        unidade, safra, offset,
+        itens: rows.map((r: any) => ({
+          id: r.id_task,
+          nome: r.nome_cliente,
+          nContratos: Number(r.n_contratos) || 0,
+          nVivos: Number(r.n_vivos) || 0,
+          mrrVivo: Number(r.mrr_vivo) || 0,
+          vivo: Boolean(r.vivo),
+          ultimoMesVivo: r.ultimo_mes_vivo,
+          temContratoPosterior: Boolean(r.tem_contrato_posterior),
+          ativoHoje: Boolean(r.ativo_hoje),
+        })),
+      });
+    } catch (error) {
+      console.error("[api] Error fetching lt-ltv-churn cohort detalhe:", error);
+      res.status(500).json({ error: "Failed to fetch cohort detalhe" });
     }
   });
 }

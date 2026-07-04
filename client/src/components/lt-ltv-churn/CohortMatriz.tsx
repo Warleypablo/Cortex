@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "@/components/ThemeProvider";
 import { fetchJson, buildUrl } from "./utils";
+import { CohortDetalhe, type CohortDrillRef } from "./CohortDetalhe";
 import type { CohortMatrizData } from "./types";
 
 interface Props {
@@ -25,6 +26,7 @@ export function CohortMatriz({ produto }: Props) {
   const isDark = theme === "dark";
   const [unidade, setUnidade] = useState<Unidade>("cliente");
   const [modo, setModo] = useState<Modo>("pct");
+  const [drill, setDrill] = useState<CohortDrillRef | null>(null);
 
   const { data } = useQuery({
     queryKey: ["/api/lt-ltv-churn/cohort", unidade, produto],
@@ -143,10 +145,17 @@ export function CohortMatriz({ produto }: Props) {
                             <td
                               key={off}
                               style={corCelula(pct)}
-                              className="border border-gray-200 px-1 py-1 text-center tabular-nums dark:border-zinc-700/50"
-                              title={`${labelSafra(s.safra)} · M${off}: ${n} de ${base} ${unidade === "cliente" ? "clientes" : "contratos"} (${pct.toFixed(1)}%)`}
+                              className="border border-gray-200 p-0 text-center tabular-nums dark:border-zinc-700/50"
                             >
-                              {modo === "pct" ? `${Math.round(pct)}%` : n}
+                              <button
+                                type="button"
+                                onClick={() => setDrill({ unidade, safra: s.safra, offset: off })}
+                                style={{ color: "inherit" }}
+                                className="h-full w-full cursor-pointer px-1 py-1 ring-inset hover:ring-2 hover:ring-emerald-700/70 dark:hover:ring-emerald-300/70"
+                                title={`${labelSafra(s.safra)} · M${off}: ${n} de ${base} ${unidade === "cliente" ? "clientes" : "contratos"} (${pct.toFixed(1)}%) — clique para auditar`}
+                              >
+                                {modo === "pct" ? `${Math.round(pct)}%` : n}
+                              </button>
                             </td>
                           );
                         })}
@@ -160,7 +169,8 @@ export function CohortMatriz({ produto }: Props) {
               <p>
                 {unidade === "cliente"
                   ? "Safra = mês do 1º contrato recorrente do cliente; vivo enquanto tiver ≥1 contrato recorrente ativo no mês."
-                  : "Safra = mês de início do contrato recorrente; vivo do início até o cancelamento."}
+                  : "Safra = mês de início do contrato recorrente; vivo do início até o cancelamento."}{" "}
+                Clique numa célula para auditar quem está vivo e quem saiu.
               </p>
               <div className="flex items-center gap-1.5">
                 <span>0%</span>
@@ -178,6 +188,7 @@ export function CohortMatriz({ produto }: Props) {
           </>
         )}
       </CardContent>
+      <CohortDetalhe drill={drill} produto={produto} onClose={() => setDrill(null)} />
     </Card>
   );
 }
