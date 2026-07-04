@@ -598,4 +598,92 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
       res.status(500).json({ error: "Failed to fetch evolucao-clientes" });
     }
   });
+
+  // Matriz de cohort de retenção. unidade=contrato: safra = mês de data_inicio do
+  // contrato, vivo até data_fim (cancelamento) ou hoje. unidade=cliente: safra = mês
+  // do 1º contrato recorrente do cliente, vivo em cada mês em que tem >=1 contrato
+  // vivo (gaps de churn-e-volta aparecem como queda e recuperação na mesma safra).
+  app.get("/api/lt-ltv-churn/cohort", async (req, res) => {
+    try {
+      const produto = (req.query.produto as string) || undefined;
+      const unidade = req.query.unidade === "contrato" ? "contrato" : "cliente";
+
+      // Mesma régua da aba: só recorrentes, sem datas inconsistentes; churned sem
+      // data_fim não tem lugar na linha do tempo e fica de fora (3 contratos hoje).
+      const base = sql`
+        SELECT id_task,
+          DATE_TRUNC('month', data_inicio)::date AS mes_ini,
+          LEAST(
+            DATE_TRUNC('month', CASE WHEN is_ativo THEN CURRENT_DATE ELSE data_fim END)::date,
+            DATE_TRUNC('month', CURRENT_DATE)::date
+          ) AS mes_fim
+        FROM cortex_core.vw_lt_contratos
+        WHERE tipo_receita = 'recorrente'
+          AND data_inicio IS NOT NULL
+          AND NOT data_inconsistente
+          AND (is_ativo OR (is_churned AND data_fim IS NOT NULL))
+          ${produto ? sql`AND produto = ${produto}` : sql``}
+      `;
+
+      const result =
+        unidade === "contrato"
+          ? await db.execute(sql`
+              WITH base AS (${base}),
+              meses AS (
+                SELECT mes_ini AS safra,
+                  generate_series(mes_ini, mes_fim, interval '1 month')::date AS mes
+                FROM base
+              )
+              SELECT TO_CHAR(safra, 'YYYY-MM') AS safra,
+                (EXTRACT(YEAR FROM age(mes, safra)) * 12 + EXTRACT(MONTH FROM age(mes, safra)))::int AS offset_mes,
+                COUNT(*)::int AS n
+              FROM meses
+              GROUP BY safra, offset_mes
+              ORDER BY safra, offset_mes
+            `)
+          : await db.execute(sql`
+              WITH base AS (${base}),
+              safra_cliente AS (
+                SELECT id_task, MIN(mes_ini) AS safra FROM base GROUP BY id_task
+              ),
+              meses AS (
+                SELECT DISTINCT b.id_task, s.safra,
+                  generate_series(b.mes_ini, b.mes_fim, interval '1 month')::date AS mes
+                FROM base b
+                JOIN safra_cliente s USING (id_task)
+              )
+              SELECT TO_CHAR(safra, 'YYYY-MM') AS safra,
+                (EXTRACT(YEAR FROM age(mes, safra)) * 12 + EXTRACT(MONTH FROM age(mes, safra)))::int AS offset_mes,
+                COUNT(DISTINCT id_task)::int AS n
+              FROM meses
+              GROUP BY safra, offset_mes
+              ORDER BY safra, offset_mes
+            `);
+
+      // Monta por safra um array denso de 0..offset máximo observável (até o mês
+      // atual): offset sem linha = 0 vivos (diferente de célula futura, que não existe).
+      const agora = new Date();
+      const mesAtual = agora.getUTCFullYear() * 12 + agora.getUTCMonth();
+      const porSafra = new Map<string, number[]>();
+      for (const r of result.rows as { safra: string; offset_mes: number; n: number }[]) {
+        if (!porSafra.has(r.safra)) {
+          const [ano, mes] = r.safra.split("-").map(Number);
+          const maxOff = Math.max(0, mesAtual - (ano * 12 + (mes - 1)));
+          porSafra.set(r.safra, new Array(maxOff + 1).fill(0));
+        }
+        const cells = porSafra.get(r.safra)!;
+        if (r.offset_mes < cells.length) cells[r.offset_mes] = Number(r.n);
+      }
+
+      const safras = Array.from(porSafra.entries())
+        .map(([safra, cells]) => ({ safra, cells }))
+        .sort((a, b) => b.safra.localeCompare(a.safra));
+      const maxOffset = safras.reduce((m, s) => Math.max(m, s.cells.length - 1), 0);
+
+      res.json({ unidade, safras, maxOffset });
+    } catch (error) {
+      console.error("[api] Error fetching lt-ltv-churn cohort:", error);
+      res.status(500).json({ error: "Failed to fetch cohort" });
+    }
+  });
 }

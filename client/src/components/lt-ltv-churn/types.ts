@@ -98,3 +98,14 @@ export interface EvolucaoProdutoTabelaData {
   produtos: string[];
   celulas: Record<string, Record<string, EvolucaoProdutoTabelaCelula>>;
 }
+
+export interface CohortMatrizSafra {
+  safra: string; // "YYYY-MM"
+  cells: number[]; // índice = meses desde a safra; valor = vivos naquele mês
+}
+
+export interface CohortMatrizData {
+  unidade: "cliente" | "contrato";
+  safras: CohortMatrizSafra[];
+  maxOffset: number;
+}
