@@ -2327,6 +2327,60 @@ async function postPlanoGerarMes(req: Request, res: Response) {
   }
 }
 
+// ─── Solicitações de base/tag (review #14) ────────────────────────────────
+// Fluxo de "chamado": o time pede a criação de uma tag/base (nome + critério)
+// pela própria ferramenta, sem depender de mexer no GHL manualmente. Registra o
+// pedido; a criação em si segue no GHL (Fase futura pode automatizar o write).
+
+async function ensureTagRequestsTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS cortex_core.ghl_tag_requests (
+      id SERIAL PRIMARY KEY,
+      tipo TEXT NOT NULL DEFAULT 'tag',
+      nome TEXT NOT NULL,
+      criterio TEXT,
+      observacoes TEXT,
+      status TEXT NOT NULL DEFAULT 'aberto',
+      solicitante TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+}
+
+async function getTagRequests(_req: Request, res: Response) {
+  try {
+    await ensureTagRequestsTable();
+    const r = await db.execute(sql`
+      SELECT id, tipo, nome, criterio, observacoes, status, solicitante, created_at
+      FROM cortex_core.ghl_tag_requests ORDER BY created_at DESC LIMIT 100
+    `);
+    res.json({ requests: (r as any).rows ?? [] });
+  } catch (err: any) {
+    console.error("[GHL] getTagRequests error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+async function postTagRequest(req: Request, res: Response) {
+  try {
+    await ensureTagRequestsTable();
+    const { tipo, nome, criterio, observacoes } = req.body ?? {};
+    if (!nome || typeof nome !== "string" || !nome.trim()) {
+      return res.status(400).json({ error: "Campo 'nome' é obrigatório" });
+    }
+    const solicitante = ((req as any).user?.email as string) || null;
+    const r = await db.execute(sql`
+      INSERT INTO cortex_core.ghl_tag_requests (tipo, nome, criterio, observacoes, solicitante)
+      VALUES (${tipo === "base" ? "base" : "tag"}, ${nome.trim()}, ${criterio ?? null}, ${observacoes ?? null}, ${solicitante})
+      RETURNING id
+    `);
+    res.json({ ok: true, id: (r as any).rows?.[0]?.id });
+  } catch (err: any) {
+    console.error("[GHL] postTagRequest error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────
 
 export function registerGhlPublicRoutes(app: Express) {
@@ -2339,6 +2393,8 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/email-campaigns", listEmailCampaigns);
   app.get("/api/ghl/whatsapp-metrics", getWhatsappMetrics);
   app.get("/api/ghl/tags", getTags);
+  app.get("/api/ghl/tag-requests", getTagRequests);
+  app.post("/api/ghl/tag-requests", postTagRequest);
   app.get("/api/ghl/lists", getLists);
   app.get("/api/ghl/workflows", getWorkflows);
   app.get("/api/ghl/overview", getOverview);

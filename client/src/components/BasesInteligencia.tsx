@@ -17,7 +17,11 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Loader2, Trophy, TrendingUp, AlertTriangle, Sparkles, Layers } from "lucide-react";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Loader2, Trophy, TrendingUp, AlertTriangle, Sparkles, Layers, Plus, Inbox } from "lucide-react";
 
 // Bases "- Todos" são guarda-chuva: contêm as sub-bases do mesmo funil (MQLs,
 // faixas de faturamento). A contagem de Contatos se sobrepõe a elas (review #12).
@@ -84,9 +88,42 @@ function diasDesde(iso: string | null): number | null {
   return Math.floor((Date.now() - new Date(iso).getTime()) / 86400000);
 }
 
+interface TagRequest {
+  id: number; tipo: string; nome: string; criterio: string | null;
+  observacoes: string | null; status: string; solicitante: string | null; created_at: string;
+}
+
 export default function BasesInteligencia({ from, to }: { from: string; to: string }) {
   const [sortKey, setSortKey] = useState<SortKey>("contacts");
   const [baseSel, setBaseSel] = useState<string | null>(null);
+
+  // #14 — fluxo de "chamado": solicitar criação de base/tag pela ferramenta.
+  const [reqOpen, setReqOpen] = useState(false);
+  const [reqForm, setReqForm] = useState({ tipo: "tag", nome: "", criterio: "", observacoes: "" });
+  const [reqSaving, setReqSaving] = useState(false);
+  const reqQ = useQuery<{ requests: TagRequest[] }>({
+    queryKey: ["/api/ghl/tag-requests"],
+    queryFn: () => fetchJson("/api/ghl/tag-requests"),
+    enabled: reqOpen,
+  });
+  const enviarSolicitacao = async () => {
+    if (!reqForm.nome.trim()) return;
+    setReqSaving(true);
+    try {
+      const r = await fetch("/api/ghl/tag-requests", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(reqForm),
+      });
+      if (!r.ok) throw new Error(`${r.status}`);
+      setReqForm({ tipo: "tag", nome: "", criterio: "", observacoes: "" });
+      await reqQ.refetch();
+    } catch (e) {
+      console.error("[bases] solicitação falhou", e);
+    } finally {
+      setReqSaving(false);
+    }
+  };
 
   const q = useQuery<{ ranking: BaseRow[]; cruzamento: CruzRow[]; unit_cost: number }>({
     queryKey: ["/api/ghl/bases/performance", from, to],
@@ -154,6 +191,67 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
 
   return (
     <div className="space-y-6">
+      {/* #14 — Solicitar criação de base/tag pela ferramenta (fluxo de chamado) */}
+      <div className="flex justify-end">
+        <Dialog open={reqOpen} onOpenChange={setReqOpen}>
+          <DialogTrigger asChild>
+            <Button variant="outline" size="sm" className="gap-1.5"><Plus className="w-4 h-4" /> Solicitar base/tag</Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-lg">
+            <DialogHeader><DialogTitle>Solicitar nova base/tag</DialogTitle></DialogHeader>
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                Abre um chamado pedindo a criação de uma tag/base no GHL. Descreva o critério de
+                segmentação; o time cria a tag e ela passa a aparecer aqui.
+              </p>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <Label className="text-xs">Tipo</Label>
+                  <Select value={reqForm.tipo} onValueChange={(v) => setReqForm((f) => ({ ...f, tipo: v }))}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="tag">Tag</SelectItem>
+                      <SelectItem value="base">Base (segmento)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-xs">Nome</Label>
+                  <Input value={reqForm.nome} onChange={(e) => setReqForm((f) => ({ ...f, nome: e.target.value }))} placeholder="ex: Creators - Reengajamento" />
+                </div>
+              </div>
+              <div>
+                <Label className="text-xs">Critério (quais tags / regra de segmentação)</Label>
+                <Textarea value={reqForm.criterio} onChange={(e) => setReqForm((f) => ({ ...f, criterio: e.target.value }))} placeholder="ex: leads Creators que abriram nos últimos 30 dias e ainda não responderam" className="min-h-[70px] text-sm" />
+              </div>
+              <div>
+                <Label className="text-xs">Observações (opcional)</Label>
+                <Textarea value={reqForm.observacoes} onChange={(e) => setReqForm((f) => ({ ...f, observacoes: e.target.value }))} className="min-h-[50px] text-sm" />
+              </div>
+
+              {(reqQ.data?.requests?.length ?? 0) > 0 && (
+                <div className="pt-1">
+                  <div className="text-xs font-semibold text-muted-foreground flex items-center gap-1 mb-1"><Inbox className="w-3 h-3" /> Solicitações recentes</div>
+                  <div className="max-h-40 overflow-y-auto space-y-1">
+                    {reqQ.data!.requests.map((r) => (
+                      <div key={r.id} className="text-xs rounded border border-border px-2 py-1 flex items-center justify-between gap-2">
+                        <span className="truncate"><Badge variant="outline" className="mr-1 text-[10px]">{r.tipo}</Badge>{r.nome}</span>
+                        <Badge variant="outline" className="text-[10px] shrink-0">{r.status}</Badge>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            <DialogFooter>
+              <Button onClick={enviarSolicitacao} disabled={reqSaving || !reqForm.nome.trim()}>
+                {reqSaving ? <Loader2 className="w-4 h-4 mr-1 animate-spin" /> : null} Enviar solicitação
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      </div>
+
       {/* Seletor de base (controla matriz + segmentação; funciona pra qualquer base,
           inclusive as sem disparo no período) */}
       <div className="flex items-center gap-2 flex-wrap">
