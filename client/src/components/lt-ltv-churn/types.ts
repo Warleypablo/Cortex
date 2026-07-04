@@ -53,7 +53,6 @@ export interface ClienteRow {
   ativo: boolean;
 }
 
-export interface BucketLtContrato { faixa: string; ativos: number; cancelados: number; }
 export interface BucketDist { faixa: string; qtd: number; }
 
 export interface EvolucaoProdutoData {
