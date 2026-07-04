@@ -15,7 +15,6 @@ interface DetalheResponse {
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 const int = new Intl.NumberFormat("pt-BR", { maximumFractionDigits: 0 });
-const fmt = (v: number, f: "brl" | "num") => (f === "num" ? int.format(v) : brl.format(v));
 
 export function CeoKpiDetail({ kpiKey, mes, onClose }: { kpiKey: string | null; mes: string; onClose: () => void }) {
   const aberto = kpiKey !== null;

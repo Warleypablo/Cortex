@@ -44,7 +44,19 @@ export function CeoKpiCard({ kpi, onClick }: { kpi: CeoKpi; onClick?: () => void
         clicavel ? "cursor-pointer hover:border-gray-300 dark:hover:border-zinc-600 transition-colors" : "",
       ].join(" ")}
       title={kpi.nota}
-      {...(clicavel ? { onClick, role: "button", tabIndex: 0 } : {})}
+      {...(clicavel
+        ? {
+            onClick,
+            role: "button",
+            tabIndex: 0,
+            onKeyDown: (e: React.KeyboardEvent) => {
+              if (e.key === "Enter" || e.key === " ") {
+                e.preventDefault();
+                onClick!();
+              }
+            },
+          }
+        : {})}
     >
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-600 dark:text-zinc-400">{kpi.label}</span>
