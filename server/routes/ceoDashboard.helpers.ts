@@ -149,3 +149,12 @@ export function canAccessCeo(user: { role?: string; allowedRoutes?: string[] } |
   if (user.role === "admin") return true;
   return Array.isArray(user.allowedRoutes) && user.allowedRoutes.includes("/ceo-dashboard");
 }
+
+// "2026-06" -> 6. BP é fixo em ANO=2026; fora disso cai no mês corrente informado.
+export function parseMesNum(mes: string | undefined, mesCorrente: number): number {
+  if (!mes) return mesCorrente;
+  const m = /^2026-(\d{2})$/.exec(mes);
+  if (!m) return mesCorrente;
+  const n = parseInt(m[1], 10);
+  return n >= 1 && n <= 12 ? n : mesCorrente;
+}

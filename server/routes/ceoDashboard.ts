@@ -5,17 +5,9 @@ import { storage } from "../storage";
 import {
   assembleCeoKpis,
   canAccessCeo,
+  parseMesNum,
   type CeoDashboardResponse,
 } from "./ceoDashboard.helpers";
-
-// "2026-06" -> 6. BP é fixo em ANO=2026; fora disso cai no mês corrente do payload.
-function parseMesNum(mes: string | undefined, mesCorrente: number): number {
-  if (!mes) return mesCorrente;
-  const m = /^2026-(\d{2})$/.exec(mes);
-  if (!m) return mesCorrente;
-  const n = parseInt(m[1], 10);
-  return n >= 1 && n <= 12 ? n : mesCorrente;
-}
 
 export async function buildCeoDashboard(db: any, mes?: string): Promise<CeoDashboardResponse> {
   // 1) BP — 7 KPIs de uma só chamada (linhas[] do DRE + metricasGerais[]).
