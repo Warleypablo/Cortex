@@ -140,6 +140,7 @@ export const PERMISSION_KEYS = {
   ADMIN: {
     USUARIOS: 'admin.usuarios',
     OKR_2026: 'admin.okr_2026',
+    CEO_DASHBOARD: 'admin.ceo_dashboard',
     NOTIFICACOES: 'admin.notificacoes',
     DESIGN_SYSTEM: 'admin.design_system',
     HEALTH: 'admin.health',
@@ -227,6 +228,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/chamados': PERMISSION_KEYS.GENERAL.CHAMADOS,
   '/solicitacao-ferramentas': PERMISSION_KEYS.GENERAL.SOLICITACAO_FERRAMENTAS,
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
+  '/ceo-dashboard': PERMISSION_KEYS.ADMIN.CEO_DASHBOARD,
   // Financeiro
   '/dashboard/dfc': PERMISSION_KEYS.FIN.DFC,
   '/dashboard/fluxo-caixa': PERMISSION_KEYS.FIN.FLUXO_CAIXA,
@@ -592,6 +594,7 @@ export const NAV_CONFIG = {
       title: 'Reports',
       icon: 'FileText',
       items: [
+        { title: 'CEO Dashboard', url: '/ceo-dashboard', icon: 'LayoutDashboard', permissionKey: PERMISSION_KEYS.ADMIN.CEO_DASHBOARD },
         { title: 'Investors Report', url: '/investors-report', icon: 'TrendingUp', permissionKey: PERMISSION_KEYS.REPORTS.INVESTORS },
         { title: 'Auto Report', url: '/growth/auto-report', icon: 'FileText', permissionKey: PERMISSION_KEYS.REPORTS.AUTO_REPORT },
         { title: 'Reporte Mensal', url: '/reports/mensal', icon: 'Presentation', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },

@@ -180,6 +180,7 @@ const LtvClientes = lazyWithRetry(() => import("@/pages/LtvClientes"));
 const EstoquePontual = lazyWithRetry(() => import("@/pages/EstoquePontual"));
 const CreatorsPontual = lazyWithRetry(() => import("@/pages/CreatorsPontual"));
 const CreatorsConversao = lazyWithRetry(() => import("@/pages/CreatorsConversao"));
+const CeoDashboard = lazyWithRetry(() => import("@/pages/CeoDashboard"));
 
 // Error boundary to catch silent crashes in the portal.
 // The lazyWithRetry wrapper handles the first auto-reload attempt at the
@@ -442,7 +443,10 @@ function ProtectedRouter() {
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
       <Route path="/reports/mensal">{() => <ProtectedRoute path="/reports/mensal" component={RelatorioMensal} />}</Route>
       <Route path="/reports/semanal">{() => <ProtectedRoute path="/reports/semanal" component={RelatorioSemanal} />}</Route>
-      
+
+      {/* CEO Dashboard */}
+      <Route path="/ceo-dashboard">{() => <ProtectedRoute path="/ceo-dashboard" component={CeoDashboard} />}</Route>
+
       {/* OKR 2026 */}
       <Route path="/okr-2026">{() => <ProtectedRoute path="/okr-2026" component={OKR2026} />}</Route>
       <Route path="/bp-produtos">{() => <ProtectedRoute path="/bp-produtos" component={BpProdutos} />}</Route>
