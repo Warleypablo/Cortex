@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-04 | refactor(lt-ltv-churn): removida a tabela "Contratos" da aba Por produto
+
+**O que foi feito:**
+- Removida a seção "Contratos (1560)" do rodapé da aba Por produto da tela LTV por Contrato, a pedido. Saíram junto os órfãos: componente `ContratosTable.tsx`, endpoint `GET /api/lt-ltv-churn/contratos`, seus 2 testes e o tipo `ContratoRow`. Suite do módulo verde (154 testes) após a remoção.
+
+**Por que:**
+- Pedido do Ichino (2026-07-04): "Pode remover essa aba de contratos aqui embaixo".
+
+**Arquivos alterados:**
+- `client/src/pages/LtLtvChurn.tsx` - remove import/uso.
+- `client/src/components/lt-ltv-churn/ContratosTable.tsx` - deletado.
+- `client/src/components/lt-ltv-churn/types.ts` - remove `ContratoRow`.
+- `server/routes/ltLtvChurn.ts` + `.test.ts` - remove endpoint e testes.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-04 | feat(lt-ltv-churn): toggle Qtd × MRR na matriz de cohort
 
 **O que foi feito:**
