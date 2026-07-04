@@ -36,14 +36,19 @@ export function CohortMatriz({ produto }: Props) {
       ),
   });
 
-  // Escala sequencial de um matiz só (emerald): alpha cresce com a retenção.
-  // Tinta fixa por tema (escura no claro, clara no escuro) mantém contraste >=4.5:1
-  // em toda a rampa; no escuro o alpha é limitado pra célula cheia não clarear demais.
+  // Escala divergente vermelho -> âmbar -> verde (0% -> 50% -> 100% de retenção),
+  // interpolada por segmentos pra não atravessar o marrom. Alpha fixo por tema e
+  // tinta fixa (escura no claro, clara no escuro) mantêm contraste >=4.5:1; o número
+  // na célula segura a leitura pra daltônicos (verde-vermelho é o par crítico).
   const corCelula = (pct: number) => {
-    const alpha = isDark ? 0.08 + 0.57 * (pct / 100) : 0.06 + 0.74 * (pct / 100);
-    const rgb = isDark ? "16,185,129" : "5,150,105";
+    const t = Math.max(0, Math.min(100, pct)) / 100;
+    const vermelho = isDark ? [239, 68, 68] : [220, 38, 38]; // red-500 | red-600
+    const ambar = [245, 158, 11]; // amber-500
+    const verde = isDark ? [16, 185, 129] : [5, 150, 105]; // emerald-500 | emerald-600
+    const [de, ate, f] = t < 0.5 ? [vermelho, ambar, t / 0.5] : [ambar, verde, (t - 0.5) / 0.5];
+    const rgb = de.map((c, i) => Math.round(c + (ate[i] - c) * f)).join(",");
     return {
-      backgroundColor: `rgba(${rgb},${alpha.toFixed(3)})`,
+      backgroundColor: `rgba(${rgb},${isDark ? 0.45 : 0.55})`,
       color: isDark ? "rgb(244,244,245)" : "rgb(31,41,55)", // zinc-100 | gray-800
     };
   };
@@ -151,7 +156,7 @@ export function CohortMatriz({ produto }: Props) {
                                 type="button"
                                 onClick={() => setDrill({ unidade, safra: s.safra, offset: off })}
                                 style={{ color: "inherit" }}
-                                className="h-full w-full cursor-pointer px-1 py-1 ring-inset hover:ring-2 hover:ring-emerald-700/70 dark:hover:ring-emerald-300/70"
+                                className="h-full w-full cursor-pointer px-1 py-1 ring-inset hover:ring-2 hover:ring-gray-900/50 dark:hover:ring-white/60"
                                 title={`${labelSafra(s.safra)} · M${off}: ${n} de ${base} ${unidade === "cliente" ? "clientes" : "contratos"} (${pct.toFixed(1)}%) — clique para auditar`}
                               >
                                 {modo === "pct" ? `${Math.round(pct)}%` : n}
@@ -178,8 +183,8 @@ export function CohortMatriz({ produto }: Props) {
                   className="h-2.5 w-24 rounded-sm"
                   style={{
                     background: isDark
-                      ? "linear-gradient(to right, rgba(16,185,129,0.08), rgba(16,185,129,0.65))"
-                      : "linear-gradient(to right, rgba(5,150,105,0.06), rgba(5,150,105,0.8))",
+                      ? "linear-gradient(to right, rgba(239,68,68,0.45), rgba(245,158,11,0.45), rgba(16,185,129,0.45))"
+                      : "linear-gradient(to right, rgba(220,38,38,0.55), rgba(245,158,11,0.55), rgba(5,150,105,0.55))",
                   }}
                 />
                 <span>100%</span>
