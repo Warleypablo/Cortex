@@ -1458,7 +1458,7 @@ type Broadcast =
       contacts_reached: number;
     };
 
-function CalendarioTab() {
+function CalendarioTab({ onOpenFunil }: { onOpenFunil?: (id: string) => void }) {
   // Calendário tem sua própria seleção de mês — não usa o range do header
   const [monthCursor, setMonthCursor] = useState(new Date());
   const monthStart = startOfMonth(monthCursor);
@@ -1661,10 +1661,20 @@ function CalendarioTab() {
                           <div className="font-medium mt-1">Broadcast detectado · source: <Badge variant="outline" className="ml-1 text-xs">{b.source}</Badge></div>
                         </div>
                       </div>
+                      {b.preview && <div className="text-sm text-muted-foreground mt-2 line-clamp-2" title={b.preview}>{b.preview}</div>}
                       <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
                         <div><span className="text-muted-foreground">Mensagens:</span> <strong>{fmtInt(b.messages)}</strong></div>
                         <div><span className="text-muted-foreground">Contatos alcançados:</span> <strong>{fmtInt(b.contacts_reached)}</strong></div>
                       </div>
+                      {onOpenFunil && (
+                        <button
+                          type="button"
+                          onClick={() => { onOpenFunil(b.id); setSelectedDay(null); }}
+                          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          <Activity className="w-3.5 h-3.5" /> Ver relatório deste disparo
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2002,6 +2012,11 @@ export default function GhlMarketing() {
   const from = format(dateRange.from, "yyyy-MM-dd");
   const to = format(dateRange.to, "yyyy-MM-dd");
 
+  // Abas controladas p/ navegar do Calendário direto pro Funil de um disparo (#15).
+  const [tab, setTab] = useState("biblioteca");
+  const [focusBroadcastId, setFocusBroadcastId] = useState<string | null>(null);
+  const openFunil = (id: string) => { setFocusBroadcastId(id); setTab("funil"); };
+
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
       <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
@@ -2016,10 +2031,13 @@ export default function GhlMarketing() {
         />
       </div>
 
-      <Tabs defaultValue="biblioteca" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList>
           <TabsTrigger value="biblioteca" data-testid="tab-biblioteca">
             <BookOpen className="w-4 h-4 mr-2" /> Broadcast
+          </TabsTrigger>
+          <TabsTrigger value="calendario" data-testid="tab-calendario">
+            <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
           </TabsTrigger>
           <TabsTrigger value="funil" data-testid="tab-funil">
             <Activity className="w-4 h-4 mr-2" /> Funil
@@ -2041,8 +2059,11 @@ export default function GhlMarketing() {
         <TabsContent value="biblioteca" className="mt-6">
           <BibliotecaTab from={from} to={to} />
         </TabsContent>
+        <TabsContent value="calendario" className="mt-6">
+          <CalendarioTab onOpenFunil={openFunil} />
+        </TabsContent>
         <TabsContent value="funil" className="mt-6">
-          <FunilTab from={from} to={to} />
+          <FunilTab from={from} to={to} focusId={focusBroadcastId} />
         </TabsContent>
         <TabsContent value="bases" className="mt-6">
           <BasesInteligencia from={from} to={to} />

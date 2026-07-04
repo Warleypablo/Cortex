@@ -10,7 +10,7 @@
  * Dados: GET /api/ghl/broadcasts (seletor) + /:id/funnel + /:id/leads.
  * As etapas reunião/comparecimento/venda vêm live do Bitrix (crm_deal).
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -180,9 +180,13 @@ function matchDrill(l: LeadRow, d: Drill): boolean {
   }
 }
 
-export default function FunilTab({ from, to }: { from: string; to: string }) {
+export default function FunilTab({ from, to, focusId }: { from: string; to: string; focusId?: string | null }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [drill, setDrill] = useState<Drill | null>(null);
+  // Navegação vinda do Calendário (#15): foca o disparo pedido.
+  useEffect(() => {
+    if (focusId) { setSelectedId(focusId); setDrill(null); }
+  }, [focusId]);
   const toggleDrill = (d: Drill) =>
     setDrill((cur) => (cur && cur.kind === d.kind && (cur as any).value === (d as any).value ? null : d));
 
