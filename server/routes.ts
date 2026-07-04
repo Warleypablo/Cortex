@@ -88,6 +88,7 @@ import { registerTriagemRoutes } from "./routes/triagem";
 import { registerPredictionRoutes } from "./routes/predictions";
 import { registerInternalTrainingsRoutes } from "./routes/internalTrainings";
 import { registerLtLtvChurnRoutes } from "./routes/ltLtvChurn";
+import { registerCeoDashboardRoutes } from "./routes/ceoDashboard";
 import { registerChurnProdutoMotivoRoutes } from "./routes/churnProdutoMotivo";
 import { registerEstoquePontualRoutes } from "./routes/estoquePontual";
 import { registerBp2026Routes } from "./routes/bp2026";
@@ -8600,6 +8601,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // LT/LTV/Churn Dashboard - registered from separate file
   registerLtLtvChurnRoutes(app, db);
+  registerCeoDashboardRoutes(app, db);
   registerChurnProdutoMotivoRoutes(app, db);
   registerEstoquePontualRoutes(app, db);
   registerBp2026Routes(app, db);
