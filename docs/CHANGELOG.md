@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-04 | feat(lt-ltv-churn): toggle Qtd × MRR na matriz de cohort
+
+**O que foi feito:**
+- Novo toggle **Qtd | MRR** na matriz de cohort (ao lado do % | Nº): alterna a métrica das células entre quantidade de vivos e **MRR retido** (soma do Valor R dos contratos vivos no mês ÷ MRR da base). Combina com % (percentual retido) e Nº (valor absoluto, formato compacto 45k/1,2M).
+- Endpoint `/api/lt-ltv-churn/cohort` devolve as duas séries por safra (`cells` + `mrr`) numa chamada só — o toggle não refaz request.
+- Réguas: **por contrato**, MRR considera só os contratos da safra (monotônico decrescente); **por cliente**, inclui contratos abertos depois da safra pelo mesmo cliente (expansão) — leitura NRR-like que pode passar de 100% (nota no rodapé; escala de cor clampa em 100%).
+- Tooltip da célula mostra as duas leituras (qtd e MRR, com base e %). Drill de auditoria reconcilia com a célula MRR: jan/26 M3 cliente = R$ 139.796 (soma dos mrrVivo) e contrato = R$ 147.381 (soma dos valorr vivos), exatos.
+- Caveat conhecido: `valorr` é o valor atual do contrato no ClickUp (não snapshot da época) — mesma régua do LTV da aba.
+
+**Por que:**
+- Pedido do Ichino (2026-07-04): "filtro de percentual de quantidade x MRR".
+
+**Arquivos alterados:**
+- `server/routes/ltLtvChurn.ts` - queries agregam `SUM(valorr)` junto do COUNT; payload com `mrr[]`.
+- `client/src/components/lt-ltv-churn/CohortMatriz.tsx` - toggle de métrica, células/base/tooltip por métrica, nota no rodapé.
+- `client/src/components/lt-ltv-churn/types.ts` - `CohortMatrizSafra.mrr`.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-04 | style(lt-ltv-churn): matriz de cohort com gradiente verde→vermelho
 
 **O que foi feito:**
