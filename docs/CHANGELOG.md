@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-04 | refactor(lt-ltv-churn): remove distribuição de LT e move benchmark p/ o fim
+
+**O que foi feito:**
+- Removida a seção "Distribuição de LT dos contratos" (histograma ativos × cancelados) da aba Por produto, a pedido. Saíram junto os órfãos: componente `DistLtContratos.tsx`, endpoint `GET /api/lt-ltv-churn/dist-lt-contratos`, seu teste e o tipo `BucketLtContrato`.
+- **Benchmark por produto** movido do meio da aba para o **fim**, depois da matriz de cohort. Nova ordem: KPIs → LT/LTV por produto → evolução → cohort → benchmark.
+- Suite do módulo verde (153 testes).
+
+**Por que:**
+- Pedido do Ichino (2026-07-04): "Pode remover isso [distribuição de LT] e o benchmark pode mover pro final da página, depois do gráfico de cohort".
+
+**Arquivos alterados:**
+- `client/src/pages/LtLtvChurn.tsx` - remove import/uso de DistLtContratos; BenchmarkProduto renderizado após CohortMatriz.
+- `client/src/components/lt-ltv-churn/DistLtContratos.tsx` - deletado.
+- `client/src/components/lt-ltv-churn/types.ts` - remove `BucketLtContrato`.
+- `server/routes/ltLtvChurn.ts` + `.test.ts` - remove endpoint e teste.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-04 | refactor(lt-ltv-churn): removida a tabela "Contratos" da aba Por produto
 
 **O que foi feito:**
