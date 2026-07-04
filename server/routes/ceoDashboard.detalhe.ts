@@ -1,0 +1,118 @@
+import type { Express } from "express";
+import { sql } from "drizzle-orm";
+import { montarDetalheBp } from "./bp2026.detalhe";
+import { computarBpReceitas } from "./bp2026";
+import { storage } from "../storage";
+import { canAccessCeo, parseMesNum } from "./ceoDashboard.helpers";
+import {
+  achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
+  enpsRespostasToGrupos, ltvRowsToGrupos, grupoMargemBruta, receitaCabecaGrupos,
+  KPI_COMPONENTES, type CeoGrupo, type CeoDetalheResponse,
+} from "./ceoDashboard.detalhe.helpers";
+
+const TITULOS: Record<string, string> = {
+  receita: "Receita", custos: "Custos & Despesas", lucro: "Lucro (EBITDA)",
+  caixa: "Saldo de Caixa", inadimplencia: "Inadimplência Total", cac: "CAC",
+  ltv: "LTV", headcount: "Headcount", enps: "E-NPS", receita_cabeca: "Receita / Cabeça",
+};
+
+function linhaValor(bp: any, arr: "linhas" | "metricasGerais", metrica: string, mesNum: number): { orcado: number | null; realizado: number | null } {
+  const linha = (bp[arr] ?? []).find((l: any) => l.metrica === metrica);
+  const m = linha?.meses?.find((x: any) => x.mes === mesNum);
+  return { orcado: m?.orcado ?? null, realizado: m?.realizado ?? null };
+}
+
+async function componentesGrupos(db: any, kpi: string, mesNum: number): Promise<CeoGrupo[]> {
+  const comps = KPI_COMPONENTES[kpi];
+  const grupos: CeoGrupo[] = [];
+  for (const c of comps) {
+    const det = await montarDetalheBp(db, { metrica: c.slug, mes: mesNum });
+    grupos.push(achatarComponente(det, { titulo: c.titulo, sinal: c.sinal, formato: "brl" }));
+  }
+  return grupos;
+}
+
+export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promise<CeoDetalheResponse> {
+  const bp: any = await computarBpReceitas(db);
+  const mesNum = parseMesNum(mes, bp.mesCorrente);
+  const base = { kpi, titulo: TITULOS[kpi] ?? kpi, mes: mesNum, orcado: null as number | null, realizado: null as number | null, atingimentoPct: null as number | null };
+  let grupos: CeoGrupo[] = [];
+  let nota: string | undefined;
+
+  if (kpi === "receita" || kpi === "custos") {
+    grupos = await componentesGrupos(db, kpi, mesNum);
+    const metrica = kpi === "receita" ? "receita_total" : "despesa_total";
+    const v = linhaValor(bp, "metricasGerais", metrica, mesNum);
+    base.orcado = v.orcado; base.realizado = v.realizado;
+  } else if (kpi === "cac") {
+    const det = await montarDetalheBp(db, { metrica: "cac", mes: mesNum });
+    grupos = mapDetalheBpGrupos(det, { formato: "brl", sinal: "-" });
+    base.orcado = det.orcado; base.realizado = det.realizado;
+  } else if (kpi === "headcount") {
+    const det = await montarDetalheBp(db, { metrica: "colaboradores", mes: mesNum });
+    grupos = mapDetalheBpGrupos(det, { formato: "num" });
+    const v = linhaValor(bp, "metricasGerais", "colaboradores", mesNum);
+    base.orcado = v.orcado; base.realizado = v.realizado;
+  } else if (kpi === "lucro") {
+    const mb = linhaValor(bp, "linhas", "margem_bruta", mesNum);
+    grupos.push(grupoMargemBruta(mb.realizado ?? 0));
+    for (const slug of ["cac", "sga", "bonus"]) {
+      const det = await montarDetalheBp(db, { metrica: slug, mes: mesNum });
+      grupos.push(achatarComponente(det, { sinal: "-", formato: "brl" }));
+    }
+    const eb = linhaValor(bp, "linhas", "ebitda", mesNum);
+    base.orcado = eb.orcado; base.realizado = eb.realizado;
+    nota = "EBITDA = Margem Bruta − CAC − SG&A − Bônus";
+  } else if (kpi === "receita_cabeca") {
+    const rec = linhaValor(bp, "metricasGerais", "receita_total", mesNum);
+    const head = linhaValor(bp, "metricasGerais", "colaboradores", mesNum);
+    const rc = receitaCabecaGrupos(rec.realizado ?? 0, head.realizado ?? 0);
+    grupos = rc.grupos; nota = rc.nota;
+    const v = linhaValor(bp, "metricasGerais", "receita_cabeca", mesNum);
+    base.orcado = v.orcado; base.realizado = v.realizado;
+  } else if (kpi === "caixa") {
+    const rows: any = await db.execute(sql`
+      SELECT nmbanco, empresa, balance FROM "Conta Azul".caz_bancos ORDER BY balance DESC NULLS LAST`);
+    grupos = [bancosToGrupo(rows.rows ?? [])];
+    base.realizado = grupos[0].total;
+  } else if (kpi === "inadimplencia") {
+    const res = await storage.getInadimplenciaClientes(undefined, undefined, "valor", 200);
+    grupos = inadClientesToGrupos(res.clientes ?? []);
+    base.realizado = (res.clientes ?? []).reduce((s: number, c: any) => s + (Number(c.valorTotal) || 0), 0);
+  } else if (kpi === "ltv") {
+    const rows: any = await db.execute(sql`
+      SELECT COALESCE(c.nome, t.id_task) AS nome, t.ltv_total FROM (
+        SELECT id_task, SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv_total
+        FROM cortex_core.vw_lt_contratos GROUP BY id_task
+      ) t LEFT JOIN "Clickup".cup_clientes c ON c.task_id = t.id_task
+      ORDER BY t.ltv_total DESC NULLS LAST LIMIT 200`);
+    grupos = ltvRowsToGrupos(rows.rows ?? []);
+    nota = "O card mostra a MÉDIA de LTV por cliente; abaixo, o LTV de cada cliente.";
+  } else if (kpi === "enps") {
+    const respostas: any = await storage.getRhNpsRespostas();
+    grupos = enpsRespostasToGrupos(respostas ?? []);
+    nota = "E-NPS (empresa) — todas as respostas disponíveis.";
+  } else {
+    throw new Error("kpi inválido");
+  }
+
+  const atingimentoPct = base.orcado != null && base.realizado != null && base.orcado !== 0
+    ? Math.round((base.realizado / base.orcado) * 1000) / 10 : null;
+  return { ...base, atingimentoPct, grupos, nota };
+}
+
+export function registerCeoDashboardDetalheRoutes(app: Express, db: any) {
+  app.get("/api/ceo-dashboard/detalhe", async (req: any, res) => {
+    try {
+      if (!canAccessCeo(req.user)) return res.status(403).json({ error: "Acesso restrito ao CEO Dashboard" });
+      const kpi = typeof req.query.kpi === "string" ? req.query.kpi : "";
+      if (!kpi || kpi === "nps") return res.status(400).json({ error: "kpi inválido" });
+      const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
+      const payload = await buildCeoDetalhe(db, kpi, mes);
+      res.json(payload);
+    } catch (error) {
+      console.error("[api] Error building CEO detalhe:", error);
+      res.status(500).json({ error: "Falha ao montar o detalhe do CEO Dashboard" });
+    }
+  });
+}
