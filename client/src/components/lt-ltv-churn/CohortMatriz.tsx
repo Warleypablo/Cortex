@@ -2,13 +2,14 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useTheme } from "@/components/ThemeProvider";
 import { fetchJson, buildUrl } from "./utils";
 import { CohortDetalhe, type CohortDrillRef } from "./CohortDetalhe";
 import type { CohortMatrizData } from "./types";
 
 interface Props {
-  produto?: string;
+  produtos: string[]; // lista para o seletor local do card (independente do filtro do topo)
 }
 
 type Unidade = "cliente" | "contrato";
@@ -28,13 +29,15 @@ function fmtMrr(v: number): string {
   return String(Math.round(v));
 }
 
-export function CohortMatriz({ produto }: Props) {
+export function CohortMatriz({ produtos }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [unidade, setUnidade] = useState<Unidade>("cliente");
   const [modo, setModo] = useState<Modo>("pct");
   const [metrica, setMetrica] = useState<Metrica>("qtd");
+  const [produtoSel, setProdutoSel] = useState<string>("todos");
   const [drill, setDrill] = useState<CohortDrillRef | null>(null);
+  const produto = produtoSel === "todos" ? undefined : produtoSel;
 
   const { data } = useQuery({
     queryKey: ["/api/lt-ltv-churn/cohort", unidade, produto],
@@ -67,7 +70,20 @@ export function CohortMatriz({ produto }: Props) {
         <CardTitle className="text-base">
           Cohort de retenção {unidade === "cliente" ? "por cliente" : "por contrato"}
         </CardTitle>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          <Select value={produtoSel} onValueChange={setProdutoSel}>
+            <SelectTrigger className="h-9 w-[180px] bg-white dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-700/50">
+              <SelectValue placeholder="Produto" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="todos">Todos os produtos</SelectItem>
+              {produtos.map((p) => (
+                <SelectItem key={p} value={p}>
+                  {p}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
           <div className="flex items-center overflow-hidden rounded-md border border-gray-200 dark:border-zinc-700/50">
             <Button
               variant={unidade === "cliente" ? "default" : "ghost"}

@@ -93,7 +93,7 @@ export default function LtLtvChurn() {
               <EvolucaoProduto />
             </>
           )}
-          <CohortMatriz produto={produtoParam} />
+          <CohortMatriz produtos={produtos} />
           {benchmark && <BenchmarkProduto produtos={benchmark.produtos} />}
         </TabsContent>
 
