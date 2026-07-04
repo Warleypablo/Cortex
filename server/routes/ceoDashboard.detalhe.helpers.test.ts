@@ -92,8 +92,13 @@ describe("receitaCabecaGrupos", () => {
 });
 
 describe("KPI_COMPONENTES", () => {
-  it("custos tem 6 componentes, receita 3", () => {
-    expect(KPI_COMPONENTES.custos).toHaveLength(6);
-    expect(KPI_COMPONENTES.receita).toHaveLength(3);
+  it("custos tem 9 componentes, receita 4", () => {
+    expect(KPI_COMPONENTES.custos).toHaveLength(9);
+    expect(KPI_COMPONENTES.receita).toHaveLength(4);
+  });
+  it("todos os componentes de custos têm sinal '-'; receita inclui inadimplencia com sinal '-'", () => {
+    expect(KPI_COMPONENTES.custos.every((c) => c.sinal === "-")).toBe(true);
+    const inad = KPI_COMPONENTES.receita.find((c) => c.slug === "inadimplencia");
+    expect(inad?.sinal).toBe("-");
   });
 });

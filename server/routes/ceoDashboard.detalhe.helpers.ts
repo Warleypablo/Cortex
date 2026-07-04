@@ -28,14 +28,18 @@ export const KPI_COMPONENTES: Record<string, ComponenteKpi[]> = {
     { slug: "mrr_ativo", titulo: "MRR Ativo", sinal: "+" },
     { slug: "receita_pontual", titulo: "Venda Pontual", sinal: "+" },
     { slug: "outras_receitas", titulo: "Outras Receitas", sinal: "+" },
+    { slug: "inadimplencia", titulo: "(−) Inadimplência e Estornos", sinal: "-" },
   ],
   custos: [
+    { slug: "impostos_receita", titulo: "Impostos sobre Receita", sinal: "-" },
     { slug: "csv_salarios", titulo: "CSV — Salários", sinal: "-" },
     { slug: "csv_beneficio", titulo: "CSV — Benefício (Caju)", sinal: "-" },
     { slug: "csv_stack", titulo: "CSV — Stack Tecnologia", sinal: "-" },
     { slug: "cac", titulo: "CAC", sinal: "-" },
     { slug: "sga", titulo: "SG&A", sinal: "-" },
     { slug: "bonus", titulo: "Bônus", sinal: "-" },
+    { slug: "impostos_diretos", titulo: "IR + CSLL + ICMS + DIFAL", sinal: "-" },
+    { slug: "capex", titulo: "CAPEX", sinal: "-" },
   ],
 };
 

@@ -64,7 +64,7 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     base.orcado = eb.orcado; base.realizado = eb.realizado;
     nota = "EBITDA = Margem Bruta − CAC − SG&A − Bônus";
   } else if (kpi === "receita_cabeca") {
-    const rec = linhaValor(bp, "metricasGerais", "receita_total", mesNum);
+    const rec = linhaValor(bp, "linhas", "receita_total_faturavel", mesNum);
     const head = linhaValor(bp, "metricasGerais", "colaboradores", mesNum);
     const rc = receitaCabecaGrupos(rec.realizado ?? 0, head.realizado ?? 0);
     grupos = rc.grupos; nota = rc.nota;
@@ -74,11 +74,14 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     const rows: any = await db.execute(sql`
       SELECT nmbanco, empresa, balance FROM "Conta Azul".caz_bancos ORDER BY balance DESC NULLS LAST`);
     grupos = [bancosToGrupo(rows.rows ?? [])];
-    base.realizado = grupos[0].total;
+    const v = linhaValor(bp, "metricasGerais", "saldo_caixa", mesNum);
+    base.orcado = v.orcado; base.realizado = v.realizado;
+    nota = "Itens = saldos atuais das contas (foto de hoje); o total do cabeçalho é o Saldo de Caixa do BP.";
   } else if (kpi === "inadimplencia") {
     const res = await storage.getInadimplenciaClientes(undefined, undefined, "valor", 200);
     grupos = inadClientesToGrupos(res.clientes ?? []);
-    base.realizado = (res.clientes ?? []).reduce((s: number, c: any) => s + (Number(c.valorTotal) || 0), 0);
+    const resumo = await storage.getInadimplenciaResumo();
+    base.realizado = resumo.totalInadimplente ?? null;
   } else if (kpi === "ltv") {
     const rows: any = await db.execute(sql`
       SELECT COALESCE(c.nome, t.id_task) AS nome, t.ltv_total FROM (
@@ -106,7 +109,8 @@ export function registerCeoDashboardDetalheRoutes(app: Express, db: any) {
     try {
       if (!canAccessCeo(req.user)) return res.status(403).json({ error: "Acesso restrito ao CEO Dashboard" });
       const kpi = typeof req.query.kpi === "string" ? req.query.kpi : "";
-      if (!kpi || kpi === "nps") return res.status(400).json({ error: "kpi inválido" });
+      const KPIS_VALIDOS = ["receita","custos","lucro","caixa","inadimplencia","cac","ltv","headcount","enps","receita_cabeca"];
+      if (!kpi || kpi === "nps" || !KPIS_VALIDOS.includes(kpi)) return res.status(400).json({ error: "kpi inválido" });
       const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
       const payload = await buildCeoDetalhe(db, kpi, mes);
       res.json(payload);
