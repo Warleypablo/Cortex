@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-04 | style(lt-ltv-churn): matriz de cohort com gradiente verde→vermelho
+
+**O que foi feito:**
+- Escala de cor da matriz de cohort trocada de sequencial emerald (alpha ∝ retenção) para **divergente vermelho → âmbar → verde** (0% → 50% → 100% de retenção), interpolada por segmentos (não atravessa o marrom). Legenda de gradiente e anel de hover (agora neutro) acompanham; tinta de texto fixa por tema mantém contraste, e o número na célula preserva a leitura para daltônicos.
+
+**Por que:**
+- Pedido do Ichino (2026-07-04): "Coloca o gradiente de verde para vermelho".
+
+**Arquivos alterados:**
+- `client/src/components/lt-ltv-churn/CohortMatriz.tsx` - `corCelula()` divergente + legenda + hover ring.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-04 | feat(lt-ltv-churn): células da matriz de cohort auditáveis (drill nominal)
 
 **O que foi feito:**
