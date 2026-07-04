@@ -1,5 +1,22 @@
 # Changelog
 
+## 2026-07-04 | feat(lt-ltv-churn): matriz de cohort cortada em dez/2024
+
+**O que foi feito:**
+- Matriz de cohort passa a exibir só safras de **dez/2024 em diante** (antes ia até 2023-06 no modo cliente). maxOffset caiu de 37 → 19, matriz bem mais enxuta.
+- Corte aplicado **por safra, não na base**: modo contrato filtra `WHERE mes_ini >= 2024-12-01`; modo cliente usa `HAVING MIN(mes_ini) >= 2024-12-01` no CTE `safra_cliente` — assim não recalcula/distorce a safra de clientes que começaram antes (eles simplesmente saem da matriz). Constante `safraMinima` no handler, trivial de ajustar.
+- **Achado sinalizado:** dez/2024 concentra uma carga de migração — 247 contratos iniciando vs 33 (nov/2024) e 60 (jan/2025), pico isolado de ~7x. São provavelmente contratos legados cadastrados no ClickUp com `data_inicio` = data da migração. A 1ª safra da matriz fica inflada; basta trocar `safraMinima` para `2025-01-01` para descartá-la.
+
+**Por que:**
+- Pedido do Ichino (2026-07-04): "Vamos exibir apenas os dados de dezembro de 2024 pra cá".
+
+**Arquivos alterados:**
+- `server/routes/ltLtvChurn.ts` - filtro de safra nas duas queries do endpoint `/cohort`.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-04 | feat(lt-ltv-churn): seletor de produto próprio no card de cohort
 
 **O que foi feito:**
