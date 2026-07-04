@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { CeoKpiCard, type CeoKpi } from "@/components/ceo/CeoKpiCard";
+import { CeoKpiDetail } from "@/components/ceo/CeoKpiDetail";
 
 interface CeoDashboardResponse {
   mes: string;
@@ -24,6 +25,7 @@ function mesCorrenteDefault(): string {
 
 export default function CeoDashboard() {
   const [mes, setMes] = useState<string>(mesCorrenteDefault());
+  const [detalheKpi, setDetalheKpi] = useState<string | null>(null);
 
   const { data, isLoading, isError } = useQuery<CeoDashboardResponse>({
     queryKey: ["ceo-dashboard", mes],
@@ -72,10 +74,12 @@ export default function CeoDashboard() {
       {data && (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {data.kpis.map((kpi) => (
-            <CeoKpiCard key={kpi.key} kpi={kpi} />
+            <CeoKpiCard key={kpi.key} kpi={kpi} onClick={() => setDetalheKpi(kpi.key)} />
           ))}
         </div>
       )}
+
+      <CeoKpiDetail kpiKey={detalheKpi} mes={mes} onClose={() => setDetalheKpi(null)} />
     </div>
   );
 }

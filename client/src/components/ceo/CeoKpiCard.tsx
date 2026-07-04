@@ -29,8 +29,9 @@ const TOM_STROKE: Record<string, string> = {
   neutro: "#a1a1aa",
 };
 
-export function CeoKpiCard({ kpi }: { kpi: CeoKpi }) {
+export function CeoKpiCard({ kpi, onClick }: { kpi: CeoKpi; onClick?: () => void }) {
   const emBreve = kpi.status === "em_breve";
+  const clicavel = !emBreve && !!onClick;
   const tom = atingimentoTom(kpi.atingimentoPct, kpi.direcao);
   const spark = kpi.sparkline?.map((v, i) => ({ i, v })) ?? null;
 
@@ -40,8 +41,10 @@ export function CeoKpiCard({ kpi }: { kpi: CeoKpi }) {
         "rounded-xl border p-4 flex flex-col gap-2 min-h-[120px]",
         "bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700",
         emBreve ? "opacity-50" : "",
+        clicavel ? "cursor-pointer hover:border-gray-300 dark:hover:border-zinc-600 transition-colors" : "",
       ].join(" ")}
       title={kpi.nota}
+      {...(clicavel ? { onClick, role: "button", tabIndex: 0 } : {})}
     >
       <div className="flex items-center justify-between">
         <span className="text-sm text-gray-600 dark:text-zinc-400">{kpi.label}</span>
