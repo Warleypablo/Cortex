@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, TrendingDown, Minus, Sparkles, Trophy, CalendarClock } from "lucide-react";
+import { PADROES_COPY_LABEL, PADROES_COPY_TESE, type PadraoKey } from "@shared/ghl-broadcast/types";
 
 const fmtInt = (n: number | null | undefined) => (n ?? 0).toLocaleString("pt-BR");
 const fmtBRL = (n: number | null | undefined) =>
@@ -136,7 +137,9 @@ export default function RelatorioBroadcast({ from, to }: { from: string; to: str
           <CardContent className="space-y-1.5">
             {padroes.slice(0, 6).map((p) => (
               <div key={p.padrao} className="flex items-center justify-between text-sm rounded bg-muted/30 px-3 py-1.5">
-                <span>{p.padrao}</span>
+                <span className={p.padrao ? "cursor-help border-b border-dotted border-muted-foreground/40" : ""} title={p.padrao ? PADROES_COPY_TESE[p.padrao as PadraoKey] : undefined}>
+                  {p.padrao ? (PADROES_COPY_LABEL[p.padrao as PadraoKey] ?? p.padrao) : "Sem padrão"}
+                </span>
                 <span className="text-muted-foreground text-xs">{p.abertura_pct != null ? `${p.abertura_pct}% abertura` : "—"} · {p.reunioes} reun</span>
               </div>
             ))}

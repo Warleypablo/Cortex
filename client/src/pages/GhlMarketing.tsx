@@ -15,7 +15,7 @@ import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths } from "date-fns";
 import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
-import { PADROES_COPY_KEYS, PADROES_COPY_LABEL } from "@shared/ghl-broadcast/types";
+import { PADROES_COPY_KEYS, PADROES_COPY_LABEL, PADROES_COPY_TESE } from "@shared/ghl-broadcast/types";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
@@ -1915,7 +1915,7 @@ function GeradorTab() {
                   <SelectContent>
                     <SelectItem value="__none__">Sem preferência</SelectItem>
                     {PADROES_COPY_KEYS.map((k) => (
-                      <SelectItem key={k} value={k}>{PADROES_COPY_LABEL[k]}</SelectItem>
+                      <SelectItem key={k} value={k} title={PADROES_COPY_TESE[k]}>{PADROES_COPY_LABEL[k]}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>

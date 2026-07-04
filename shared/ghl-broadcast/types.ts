@@ -99,6 +99,27 @@ export const PADROES_COPY_LABEL: Record<PadraoKey, string> = {
 
 export const PADROES_COPY_KEYS: PadraoKey[] = Object.keys(PADROES_COPY_LABEL) as PadraoKey[];
 
+/**
+ * Tese/racional de cada padrão de copy — o "porquê" que a mensagem usa pra
+ * converter. Fonte única de verdade da documentação exibida nas tooltips do
+ * produto (dropdown do Gerador, Relatório, cruzamento base×padrão). Review #11.
+ */
+export const PADROES_COPY_TESE: Record<PadraoKey, string> = {
+  HOOK_PROVOCATIVO: "Abre com uma provocação ou afirmação polêmica que quebra o padrão e força a atenção antes do pitch.",
+  CASE_STUDY: "Prova por resultado real de cliente (número + contexto) — credibilidade por evidência, não por promessa.",
+  CONTRASTE: "Mostra o antes ✗ / depois ✓ (ou o jeito errado vs. o certo) pra tornar o ganho tangível e óbvio.",
+  LOSS_AVERSION: "Ativa o medo de perder — o custo de NÃO agir — em vez do ganho. As pessoas evitam perda mais do que buscam ganho.",
+  URGENCIA_SAZONAL: "Ancora numa data ou sazonalidade real (prazo, época) pra justificar agir agora e não depois.",
+  CTA_CONVERSACIONAL: "Pede uma micro-resposta fácil (uma palavra, um 'sim') em vez de um compromisso grande — abre conversa com baixa fricção.",
+  PERSONALIZACAO_NICHO: "Fala a dor específica de um nicho/segmento, como se a mensagem fosse feita sob medida pra ele.",
+  REENVIO_FRIO: "Reaquece lead frio com um novo ângulo/gancho, muitas vezes reconhecendo o silêncio anterior.",
+  LEMBRETE_AO_VIVO: "Lembrete de evento/live acontecendo agora ou em instantes — urgência de presença ('tá começando').",
+  PERGUNTA_ESPELHO: "Abre com uma pergunta que espelha a situação do lead, gerando auto-identificação ('isso é comigo').",
+  REATIVACAO: "Reengaja base parada/inativa com oferta ou novidade pra trazer o lead de volta à conversa.",
+  EVENTO: "Convite/divulgação de um evento (workshop, imersão) com proposta de valor clara e CTA de inscrição.",
+  MISTO: "Combina mais de um padrão — sem um gancho dominante único.",
+};
+
 // ── CATEGORIAS DE BASE ─────────────────────────────────────────────────────
 export type CategoriaBase =
   | "premium"
