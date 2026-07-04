@@ -1859,6 +1859,8 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
     SELECT count(DISTINCT e.ghl_contact_id)::int AS respostas,
       -- causalidade (>=): inclui reunião/venda no mesmo dia da resposta (ver nota no topo)
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
+      -- DIRETA (review #5/#10): deal criado em torno da resposta (o disparo gerou o negócio).
+      count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.date_create >= e.reply_at - INTERVAL '2 days')::int AS reunioes_direta,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
     FROM cortex_core.broadcast_lead_events e
@@ -1875,6 +1877,7 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
     abertura_pct: e.total_msgs ? +(100 * e.lida / e.total_msgs).toFixed(1) : null,
     respostas: f.respostas ?? 0,
     reunioes: f.reunioes ?? 0,
+    reunioes_direta: f.reunioes_direta ?? 0,
     compareceu: f.compareceu ?? 0,
     vendas: f.vendas ?? 0,
     gasto: +(total * unitCost).toFixed(2),
