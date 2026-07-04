@@ -555,6 +555,12 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
 
       const base = cohortBase(produto);
 
+      // Corte: só safras de dez/2024 em diante (safras mais antigas têm operação/dados
+      // menos confiáveis e alongam demais a matriz). Filtra POR SAFRA, não na base: no
+      // modo cliente a safra é o MIN(mes_ini) do cliente, então cortar antes distorceria
+      // a safra de quem começou antes; aqui só removemos safras < dez/2024 já formadas.
+      const safraMinima = "2024-12-01";
+
       // Cada linha expandida = 1 contrato vivo naquele mês; n conta a unidade e mrr
       // soma o valorr dos contratos vivos. No modo cliente, contratos abertos DEPOIS
       // da safra também somam no MRR (expansão) — a régua de MRR vira uma NRR por
@@ -567,6 +573,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
                 SELECT mes_ini AS safra, valorr,
                   generate_series(mes_ini, mes_fim, interval '1 month')::date AS mes
                 FROM base
+                WHERE mes_ini >= ${safraMinima}::date
               )
               SELECT TO_CHAR(safra, 'YYYY-MM') AS safra,
                 (EXTRACT(YEAR FROM age(mes, safra)) * 12 + EXTRACT(MONTH FROM age(mes, safra)))::int AS offset_mes,
@@ -580,6 +587,7 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
               WITH base AS (${base}),
               safra_cliente AS (
                 SELECT id_task, MIN(mes_ini) AS safra FROM base GROUP BY id_task
+                HAVING MIN(mes_ini) >= ${safraMinima}::date
               ),
               meses AS (
                 SELECT b.id_task, s.safra, b.valorr,
