@@ -629,18 +629,23 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
 
       const base = cohortBase(produto);
 
+      // Cada linha expandida = 1 contrato vivo naquele mês; n conta a unidade e mrr
+      // soma o valorr dos contratos vivos. No modo cliente, contratos abertos DEPOIS
+      // da safra também somam no MRR (expansão) — a régua de MRR vira uma NRR por
+      // safra e pode passar de 100%.
       const result =
         unidade === "contrato"
           ? await db.execute(sql`
               WITH base AS (${base}),
               meses AS (
-                SELECT mes_ini AS safra,
+                SELECT mes_ini AS safra, valorr,
                   generate_series(mes_ini, mes_fim, interval '1 month')::date AS mes
                 FROM base
               )
               SELECT TO_CHAR(safra, 'YYYY-MM') AS safra,
                 (EXTRACT(YEAR FROM age(mes, safra)) * 12 + EXTRACT(MONTH FROM age(mes, safra)))::int AS offset_mes,
-                COUNT(*)::int AS n
+                COUNT(*)::int AS n,
+                COALESCE(SUM(valorr), 0)::numeric AS mrr
               FROM meses
               GROUP BY safra, offset_mes
               ORDER BY safra, offset_mes
@@ -651,36 +656,43 @@ export function registerLtLtvChurnRoutes(app: Express, db: any) {
                 SELECT id_task, MIN(mes_ini) AS safra FROM base GROUP BY id_task
               ),
               meses AS (
-                SELECT DISTINCT b.id_task, s.safra,
+                SELECT b.id_task, s.safra, b.valorr,
                   generate_series(b.mes_ini, b.mes_fim, interval '1 month')::date AS mes
                 FROM base b
                 JOIN safra_cliente s USING (id_task)
               )
               SELECT TO_CHAR(safra, 'YYYY-MM') AS safra,
                 (EXTRACT(YEAR FROM age(mes, safra)) * 12 + EXTRACT(MONTH FROM age(mes, safra)))::int AS offset_mes,
-                COUNT(DISTINCT id_task)::int AS n
+                COUNT(DISTINCT id_task)::int AS n,
+                COALESCE(SUM(valorr), 0)::numeric AS mrr
               FROM meses
               GROUP BY safra, offset_mes
               ORDER BY safra, offset_mes
             `);
 
-      // Monta por safra um array denso de 0..offset máximo observável (até o mês
+      // Monta por safra arrays densos de 0..offset máximo observável (até o mês
       // atual): offset sem linha = 0 vivos (diferente de célula futura, que não existe).
       const agora = new Date();
       const mesAtual = agora.getUTCFullYear() * 12 + agora.getUTCMonth();
-      const porSafra = new Map<string, number[]>();
-      for (const r of result.rows as { safra: string; offset_mes: number; n: number }[]) {
+      const porSafra = new Map<string, { cells: number[]; mrr: number[] }>();
+      for (const r of result.rows as { safra: string; offset_mes: number; n: number; mrr: string }[]) {
         if (!porSafra.has(r.safra)) {
           const [ano, mes] = r.safra.split("-").map(Number);
           const maxOff = Math.max(0, mesAtual - (ano * 12 + (mes - 1)));
-          porSafra.set(r.safra, new Array(maxOff + 1).fill(0));
+          porSafra.set(r.safra, {
+            cells: new Array(maxOff + 1).fill(0),
+            mrr: new Array(maxOff + 1).fill(0),
+          });
         }
-        const cells = porSafra.get(r.safra)!;
-        if (r.offset_mes < cells.length) cells[r.offset_mes] = Number(r.n);
+        const s = porSafra.get(r.safra)!;
+        if (r.offset_mes < s.cells.length) {
+          s.cells[r.offset_mes] = Number(r.n);
+          s.mrr[r.offset_mes] = Math.round(Number(r.mrr) || 0);
+        }
       }
 
       const safras = Array.from(porSafra.entries())
-        .map(([safra, cells]) => ({ safra, cells }))
+        .map(([safra, s]) => ({ safra, cells: s.cells, mrr: s.mrr }))
         .sort((a, b) => b.safra.localeCompare(a.safra));
       const maxOffset = safras.reduce((m, s) => Math.max(m, s.cells.length - 1), 0);
 

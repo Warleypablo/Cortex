@@ -102,6 +102,7 @@ export interface EvolucaoProdutoTabelaData {
 export interface CohortMatrizSafra {
   safra: string; // "YYYY-MM"
   cells: number[]; // índice = meses desde a safra; valor = vivos naquele mês
+  mrr: number[]; // soma do valorr dos contratos vivos em cada mês (cliente: inclui expansão)
 }
 
 export interface CohortMatrizData {

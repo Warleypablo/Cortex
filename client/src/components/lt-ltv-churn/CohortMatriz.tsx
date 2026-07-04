@@ -13,6 +13,7 @@ interface Props {
 
 type Unidade = "cliente" | "contrato";
 type Modo = "pct" | "abs";
+type Metrica = "qtd" | "mrr";
 
 const MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
@@ -21,11 +22,18 @@ function labelSafra(safra: string): string {
   return `${MESES_PT[Number(mes) - 1]}/${ano.slice(2)}`;
 }
 
+function fmtMrr(v: number): string {
+  if (v >= 1_000_000) return (v / 1_000_000).toFixed(1).replace(".", ",") + "M";
+  if (v >= 1_000) return Math.round(v / 1_000) + "k";
+  return String(Math.round(v));
+}
+
 export function CohortMatriz({ produto }: Props) {
   const { theme } = useTheme();
   const isDark = theme === "dark";
   const [unidade, setUnidade] = useState<Unidade>("cliente");
   const [modo, setModo] = useState<Modo>("pct");
+  const [metrica, setMetrica] = useState<Metrica>("qtd");
   const [drill, setDrill] = useState<CohortDrillRef | null>(null);
 
   const { data } = useQuery({
@@ -80,6 +88,24 @@ export function CohortMatriz({ produto }: Props) {
           </div>
           <div className="flex items-center overflow-hidden rounded-md border border-gray-200 dark:border-zinc-700/50">
             <Button
+              variant={metrica === "qtd" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none"
+              onClick={() => setMetrica("qtd")}
+            >
+              Qtd
+            </Button>
+            <Button
+              variant={metrica === "mrr" ? "default" : "ghost"}
+              size="sm"
+              className="rounded-none"
+              onClick={() => setMetrica("mrr")}
+            >
+              MRR
+            </Button>
+          </div>
+          <div className="flex items-center overflow-hidden rounded-md border border-gray-200 dark:border-zinc-700/50">
+            <Button
               variant={modo === "pct" ? "default" : "ghost"}
               size="sm"
               className="rounded-none"
@@ -125,14 +151,15 @@ export function CohortMatriz({ produto }: Props) {
                 </thead>
                 <tbody>
                   {data.safras.map((s) => {
-                    const base = s.cells[0] || 0;
+                    const baseQtd = s.cells[0] || 0;
+                    const baseMrr = s.mrr[0] || 0;
                     return (
                       <tr key={s.safra}>
                         <td className="sticky left-0 z-10 whitespace-nowrap border border-gray-200 bg-white px-2 py-1 font-medium text-gray-900 dark:border-zinc-700/50 dark:bg-zinc-900 dark:text-zinc-100">
                           {labelSafra(s.safra)}
                         </td>
                         <td className="border border-gray-200 bg-gray-50 px-2 py-1 text-center font-medium text-gray-900 dark:border-zinc-700/50 dark:bg-zinc-800/50 dark:text-zinc-100">
-                          {base}
+                          {metrica === "qtd" ? baseQtd : fmtMrr(baseMrr)}
                         </td>
                         {Array.from({ length: data.maxOffset + 1 }, (_, off) => {
                           if (off >= s.cells.length) {
@@ -145,7 +172,16 @@ export function CohortMatriz({ produto }: Props) {
                             );
                           }
                           const n = s.cells[off];
-                          const pct = base > 0 ? (n / base) * 100 : 0;
+                          const mrr = s.mrr[off] || 0;
+                          const pctQtd = baseQtd > 0 ? (n / baseQtd) * 100 : 0;
+                          const pctMrr = baseMrr > 0 ? (mrr / baseMrr) * 100 : 0;
+                          const pct = metrica === "qtd" ? pctQtd : pctMrr;
+                          const valor =
+                            modo === "pct"
+                              ? `${Math.round(pct)}%`
+                              : metrica === "qtd"
+                                ? String(n)
+                                : fmtMrr(mrr);
                           return (
                             <td
                               key={off}
@@ -157,9 +193,9 @@ export function CohortMatriz({ produto }: Props) {
                                 onClick={() => setDrill({ unidade, safra: s.safra, offset: off })}
                                 style={{ color: "inherit" }}
                                 className="h-full w-full cursor-pointer px-1 py-1 ring-inset hover:ring-2 hover:ring-gray-900/50 dark:hover:ring-white/60"
-                                title={`${labelSafra(s.safra)} · M${off}: ${n} de ${base} ${unidade === "cliente" ? "clientes" : "contratos"} (${pct.toFixed(1)}%) — clique para auditar`}
+                                title={`${labelSafra(s.safra)} · M${off}: ${n} de ${baseQtd} ${unidade === "cliente" ? "clientes" : "contratos"} (${pctQtd.toFixed(1)}%) · MRR R$ ${Math.round(mrr).toLocaleString("pt-BR")} de R$ ${Math.round(baseMrr).toLocaleString("pt-BR")} (${pctMrr.toFixed(1)}%) — clique para auditar`}
                               >
-                                {modo === "pct" ? `${Math.round(pct)}%` : n}
+                                {valor}
                               </button>
                             </td>
                           );
@@ -175,6 +211,10 @@ export function CohortMatriz({ produto }: Props) {
                 {unidade === "cliente"
                   ? "Safra = mês do 1º contrato recorrente do cliente; vivo enquanto tiver ≥1 contrato recorrente ativo no mês."
                   : "Safra = mês de início do contrato recorrente; vivo do início até o cancelamento."}{" "}
+                {metrica === "mrr" &&
+                  (unidade === "cliente"
+                    ? "MRR = soma do Valor R dos contratos vivos no mês, incluindo contratos abertos depois da safra (expansão) — pode passar de 100%. "
+                    : "MRR = soma do Valor R dos contratos da safra ainda vivos no mês. ")}
                 Clique numa célula para auditar quem está vivo e quem saiu.
               </p>
               <div className="flex items-center gap-1.5">
