@@ -10,7 +10,7 @@
  *
  *   npx tsx scripts/ads/subir-esther-ugcs-ads.ts             # DRY (descobre + mostra plano)
  *   npx tsx scripts/ads/subir-esther-ugcs-ads.ts --go        # cria (PAUSED)
- *   npx tsx scripts/ads/subir-esther-ugcs-ads.ts --activate  # ativa conjuntos + ads do lote
+ *   npx tsx scripts/ads/subir-esther-ugcs-ads.ts --activate  # ativa SÓ os ads (conjunto NUNCA — é manual do Caio)
  */
 import "dotenv/config";
 import { db } from "../../server/db";
@@ -131,7 +131,7 @@ async function resolveCampaign(): Promise<{ id: string; name: string; status: st
   if (activate) {
     if (!loteSets.length) throw new Error(`Nenhum conjunto "${loteSufixo}" na campanha — rode com --go antes.`);
     console.log(`\nAtivando lote "${loteSufixo}": ${loteSets.length} conjunto(s)...`);
-    let adsOn = 0, setsOn = 0;
+    let adsOn = 0;
     for (const s of loteSets) {
       const adsRes = await withBackoff(`GET ads ${s.id}`, () => metaGet(`${s.id}/ads`, { fields: "id,name,status", limit: "200" }));
       const ads: { id: string; name: string; status: string }[] = adsRes.data ?? [];
@@ -142,16 +142,10 @@ async function resolveCampaign(): Promise<{ id: string; name: string; status: st
         adsOn++;
         await sleep(2000);
       }
-      if (s.status !== "ACTIVE") {
-        await withBackoff(`activate adset ${s.id}`, () => metaPostForm(s.id, { status: "ACTIVE" }));
-        console.log(`✅ conjunto ATIVO: ${s.name}`);
-        setsOn++;
-        await sleep(2000);
-      } else {
-        console.log(`↻ conjunto já ativo: ${s.name}`);
-      }
+      // REGRA: conjunto NUNCA é ativado por script — quem liga é o Caio no Gerenciador.
+      console.log(`⏸ conjunto fica ${s.status} (ativação de conjunto é manual): ${s.name}`);
     }
-    console.log(`\nResumo ativação: ${setsOn} conjunto(s) + ${adsOn} ad(s) ativados. Campanha segue ${camp.status}.`);
+    console.log(`\nResumo ativação: ${adsOn} ad(s) ativados; conjuntos intocados (${loteSets.length}). Campanha segue ${camp.status}.`);
     process.exit(0);
   }
 
