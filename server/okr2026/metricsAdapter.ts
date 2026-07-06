@@ -142,6 +142,13 @@ export async function getMrrInicioMes(): Promise<number> {
       WHERE status IN ('ativo', 'onboarding', 'triagem')
         AND valorr IS NOT NULL
         AND valorr > 0
+        -- Ignora contratos que HOJE estão 'excluído' (lançados por engano). O snapshot é uma
+        -- foto imutável e pode tê-los gravado como 'ativo'; o MRR ao vivo já os exclui, então
+        -- descontamos aqui para o snapshot casar com a realidade (ex.: Projeto RF, 60K).
+        AND NOT EXISTS (
+          SELECT 1 FROM "Clickup".cup_contratos c
+          WHERE c.id_task = h.id_task AND c.status = 'excluído'
+        )
     `);
     return parseFloat((result.rows[0] as any)?.mrr || "0");
   } catch (error) {
