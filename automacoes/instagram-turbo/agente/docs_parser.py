@@ -102,6 +102,27 @@ def _is_post_header(line: str) -> bool:
     return True
 
 
+def _is_internal_subheader(line: str) -> bool:
+    """
+    Linha em bold que rotula estrutura INTERNA de um post (slide/cena/etc.):
+    **IMG 1**, **CENA 3**, **TELA**, **N2**... Usada pra saber que o parser
+    está DENTRO do conteúdo de um post (ver regra de demoção em parse_doc).
+    """
+    raw = line.strip()
+    if not raw.startswith("**"):
+        return False
+    norm = _normalize(_strip_bold(raw))
+    words = norm.split(" ") if norm else []
+    if not words or not words[0]:
+        return False
+    first = words[0]
+    if first in _INTERNAL_FIRST_WORDS and len(words) == 1:
+        return True
+    if first in _INTERNAL_FIRST_WORDS and len(words) == 2 and re.fullmatch(r"\d+", words[1]):
+        return True
+    return bool(re.fullmatch(r"N\d+", first))
+
+
 def _sanitize_line_for_text(line: str) -> str:
     """Remove bold markers mantendo conteúdo."""
     return re.sub(r"\*+", "", line)
@@ -130,11 +151,29 @@ def parse_doc(content: str) -> list[ParsedSection]:
     lines = content.splitlines()
     sections: list[ParsedSection] = []
 
-    # Primeiro passe: acha índices das linhas que são headers de post
+    # Primeiro passe: acha índices das linhas que são headers de post.
+    # Regra de DEMOÇÃO: um candidato a header só abre post novo se o post
+    # corrente já "fechou" (passou pelo seu **LEGENDA**) ou se ainda não
+    # entrou em conteúdo de slide (sub-header interno IMG/CENA/TELA...).
+    # Sem isso, placeholders de slide em bold UPPER (ex.: **XPTO**, **LTV**
+    # num slide de métricas) viravam header e cortavam a seção antes da
+    # LEGENDA — card "Cases de sucesso" ficou sem legenda em 06/jul/2026.
     header_indices: list[int] = []
+    saw_internal = False  # sub-header interno desde o último header aceito
+    saw_marker = False    # **LEGENDA** desde o último header aceito
     for i, line in enumerate(lines):
+        if _LEGENDA_MARKER.search(line):
+            saw_marker = True
+            continue
+        if _is_internal_subheader(line):
+            saw_internal = True
+            continue
         if _is_post_header(line):
+            if header_indices and saw_internal and not saw_marker:
+                continue  # bold no meio dos slides de um post ainda aberto
             header_indices.append(i)
+            saw_internal = False
+            saw_marker = False
 
     # Descarta 2 primeiras ocorrências do header "SOCIAL MEDIA TURBO [MES]"
     # (vem como título geral, às vezes repete)
