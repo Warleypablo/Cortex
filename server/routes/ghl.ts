@@ -2410,9 +2410,23 @@ async function getBroadcastGoals(req: Request, res: Response) {
   try {
     await ensureBroadcastGoalsTable();
     const raw = (req.query.month as string) || (req.query.from as string) || "";
-    const ym = raw.slice(0, 7);
-    if (!/^\d{4}-\d{2}$/.test(ym)) return res.status(400).json({ error: "month/from inválido (use YYYY-MM)" });
-    const month = `${ym}-01`;
+    let month: string;
+    if (!raw) {
+      // Sem parâmetro: mês mais recente com metas até hoje — mês corrente ou, se ele
+      // ainda não tiver metas cadastradas, o último mês implementado. Assim o card
+      // "Metas do mês" tem o que mostrar em qualquer período selecionado.
+      const r0 = await db.execute(sql`
+        SELECT TO_CHAR(MAX(month), 'YYYY-MM-DD') AS m
+        FROM cortex_core.broadcast_goals WHERE month <= CURRENT_DATE
+      `);
+      const m = (r0 as any).rows?.[0]?.m;
+      if (!m) return res.json({ month: null, goals: [] });
+      month = m;
+    } else {
+      const ym = raw.slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(ym)) return res.status(400).json({ error: "month/from inválido (use YYYY-MM)" });
+      month = `${ym}-01`;
+    }
     const r = await db.execute(sql`
       SELECT metric_key, target::float AS target, comparator, unit
       FROM cortex_core.broadcast_goals WHERE month = ${month}::date
