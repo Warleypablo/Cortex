@@ -53,6 +53,17 @@ def test_dry_run_nao_e_bloqueio_por_card():
     assert panel_readiness(_p()) == ("ready", [])
 
 
+def test_panel_state_ja_postado_continua_publicado():
+    from agente.state_sink import panel_state
+    # Regressão 06/jul/2026: card com marker re-reportado nos ciclos seguintes
+    # voltava pro painel como 'agendado' e rebaixava o post publicado (apagou o
+    # 1º post automático do histórico). already_posted vence tudo.
+    assert panel_state(_p(already_posted=True)) == "publicado"
+    assert panel_state(_p(already_posted=True, legenda_empty=True)) == "publicado"
+    # sem marker, comportamento antigo preservado (horário definido → agendado)
+    assert panel_state(_p()) == "agendado"
+
+
 if __name__ == "__main__":
     import sys
     fns = [v for k, v in sorted(globals().items()) if k.startswith("test_") and callable(v)]

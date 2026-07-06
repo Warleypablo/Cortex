@@ -1,5 +1,5 @@
 import type { Express } from "express";
-import { desc, asc, eq, ne, and, or, lt, notInArray } from "drizzle-orm";
+import { desc, asc, eq, ne, and, or, lt, notInArray, sql } from "drizzle-orm";
 import type { IStorage } from "../storage";
 import {
   contentPosts,
@@ -442,6 +442,7 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
           errorText: p.error_text ?? null,
           publishedMediaId: p.published_media_id ?? null,
           permalink: p.permalink ?? null,
+          publishedAt: (p.state || "agendado") === "publicado" ? new Date() : null,
           clickupUrl: p.clickup_url ?? null,
           lastRunId: run?.run_id ? String(run.run_id).slice(0, 16) : null,
           updatedAt: new Date(),
@@ -463,13 +464,22 @@ export function registerOrganicoIngestRoutes(app: Express, db: any) {
           legendaLen: insert.legendaLen,
           legendaEmpty: insert.legendaEmpty,
           legendaPreview: insert.legendaPreview,
-          state: insert.state,
+          // NUNCA rebaixa um post já publicado: o worker re-reporta cards já-postados
+          // no formato pré-publicação (state 'agendado', permalink null) e isso apagava
+          // o histórico — foi exatamente o que sumiu com o 1º post automático (06/jul).
+          state: sql`CASE WHEN content_posts.state = 'publicado' AND excluded.state <> 'publicado'
+                          THEN content_posts.state ELSE excluded.state END`,
           readiness: insert.readiness,
           blockReasons: insert.blockReasons,
           skipReason: insert.skipReason,
           errorText: insert.errorText,
-          publishedMediaId: insert.publishedMediaId,
-          permalink: insert.permalink,
+          // permalink/media_id só avançam (null do worker não apaga o que já foi salvo)
+          publishedMediaId: sql`COALESCE(excluded.published_media_id, content_posts.published_media_id)`,
+          permalink: sql`COALESCE(excluded.permalink, content_posts.permalink)`,
+          // carimbo REAL da publicação: marca na 1ª transição pra 'publicado' e nunca mais move
+          // (updated_at deriva a cada report e não serve pra medir pontualidade)
+          publishedAt: sql`CASE WHEN excluded.state = 'publicado' AND content_posts.published_at IS NULL
+                                THEN now() ELSE content_posts.published_at END`,
           clickupUrl: insert.clickupUrl,
           lastRunId: insert.lastRunId,
           updatedAt: insert.updatedAt,

@@ -1113,6 +1113,7 @@ export const contentPosts = cortexCoreSchema.table("content_posts", {
   errorText: text("error_text"),
   publishedMediaId: varchar("published_media_id", { length: 64 }), // ig media_id / tiktok publish_id
   permalink: text("permalink"),                                // URL do post na rede
+  publishedAt: timestamp("published_at", { withTimezone: true }), // carimbo REAL da publicação (updated_at deriva a cada report — não serve p/ pontualidade)
   clickupUrl: text("clickup_url"),
   lastRunId: varchar("last_run_id", { length: 16 }),
   firstSeenAt: timestamp("first_seen_at", { withTimezone: true }).notNull().defaultNow(),

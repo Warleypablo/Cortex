@@ -1397,6 +1397,7 @@ export async function initializeContentPublishTables(): Promise<void> {
     await db.execute(sql`ALTER TABLE cortex_core.content_posts ADD COLUMN IF NOT EXISTS card_scheduled_at TIMESTAMPTZ`);
     await db.execute(sql`ALTER TABLE cortex_core.content_posts ADD COLUMN IF NOT EXISTS readiness VARCHAR(16)`);
     await db.execute(sql`ALTER TABLE cortex_core.content_posts ADD COLUMN IF NOT EXISTS block_reasons JSONB`);
+    await db.execute(sql`ALTER TABLE cortex_core.content_posts ADD COLUMN IF NOT EXISTS published_at TIMESTAMPTZ`);
     // chave de upsert estável por task (platform, clickup_task_id)
     await db.execute(sql`CREATE UNIQUE INDEX IF NOT EXISTS idx_content_posts_platform_task ON cortex_core.content_posts (platform, clickup_task_id)`);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_content_posts_platform_date ON cortex_core.content_posts (platform, posting_date)`);
