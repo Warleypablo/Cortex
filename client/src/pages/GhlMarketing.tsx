@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Wand2, ShieldCheck, ShieldAlert, ShieldX, Copy, Check, Target } from "lucide-react";
+import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Wand2, ShieldCheck, ShieldAlert, ShieldX, Copy, Check, Target, Ticket } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths } from "date-fns";
@@ -26,6 +26,7 @@ import BasesInteligencia from "@/components/BasesInteligencia";
 import EvolucaoBroadcast from "@/components/EvolucaoBroadcast";
 import RelatorioBroadcast from "@/components/RelatorioBroadcast";
 import PlanejamentoMensal from "@/components/PlanejamentoMensal";
+import SummitBroadcasts from "@/components/SummitBroadcasts";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -2131,6 +2132,9 @@ export default function GhlMarketing() {
           <TabsTrigger value="planejamento" data-testid="tab-planejamento">
             <Wand2 className="w-4 h-4 mr-2" /> Planejamento
           </TabsTrigger>
+          <TabsTrigger value="summit" data-testid="tab-summit">
+            <Ticket className="w-4 h-4 mr-2" /> Summit ES
+          </TabsTrigger>
           <TabsTrigger value="gerador" data-testid="tab-gerador">
             <Sparkles className="w-4 h-4 mr-2" /> Gerador IA
           </TabsTrigger>
@@ -2153,6 +2157,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="planejamento" className="mt-6">
           <PlanejamentoMensal />
+        </TabsContent>
+        <TabsContent value="summit" className="mt-6">
+          <SummitBroadcasts />
         </TabsContent>
         <TabsContent value="gerador" className="mt-6">
           <GeradorTab />
