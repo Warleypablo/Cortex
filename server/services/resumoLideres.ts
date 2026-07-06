@@ -275,6 +275,28 @@ export async function initResumoLideresTable(): Promise<void> {
   `);
 }
 
+export interface EnvioResumo {
+  id: number;
+  data_ref: string;
+  janela: string | null;
+  destino: string | null;
+  mensagem: string | null;
+  status: string;
+  erro: string | null;
+  criado_em: string;
+}
+
+// Histórico de envios (mais recentes primeiro) para a interface de resumo dos líderes.
+export async function listarEnviosResumo(limite = 50): Promise<EnvioResumo[]> {
+  const result = await db.execute(sql`
+    SELECT id, data_ref, janela, destino, mensagem, status, erro, criado_em
+    FROM cortex_core.resumo_lideres_envios
+    ORDER BY criado_em DESC
+    LIMIT ${limite}
+  `);
+  return (result.rows ?? []) as unknown as EnvioResumo[];
+}
+
 async function jaEnviadoNaJanela(dataRef: string, janela: JanelaEnvio): Promise<boolean> {
   const result = await db.execute(sql`
     SELECT 1 FROM cortex_core.resumo_lideres_envios
@@ -351,8 +373,10 @@ export async function enviarResumoLideres(
     const metricas = await calcularMetricasResumo();
     mensagem = formatarMensagemResumo(metricas, sp);
   } catch (err: any) {
-    // Falha de cálculo não registra na tabela — sem envio, o retry fica livre
+    // Registra a falha de cálculo no histórico (status 'erro') para dar visibilidade na UI.
+    // Como jaEnviadoNaJanela só considera status='ok', o retry da janela segue livre.
     console.error("[resumo-lideres] Falha ao calcular métricas:", err.message);
+    await registrarEnvio(sp.dataRef, janela, destino, "", "erro", `Cálculo: ${err.message}`);
     return { success: false, error: err.message };
   }
 

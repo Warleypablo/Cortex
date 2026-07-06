@@ -147,6 +147,7 @@ export const PERMISSION_KEYS = {
     KPI: 'admin.kpi',
     AVISOS: 'admin.avisos',
     USO: 'admin.uso',
+    RESUMO_LIDERES: 'admin.resumo_lideres',
   },
 } as const;
 
@@ -229,6 +230,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/solicitacao-ferramentas': PERMISSION_KEYS.GENERAL.SOLICITACAO_FERRAMENTAS,
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   '/ceo-dashboard': PERMISSION_KEYS.ADMIN.CEO_DASHBOARD,
+  '/admin/resumo-lideres': PERMISSION_KEYS.ADMIN.RESUMO_LIDERES,
   // Financeiro
   '/dashboard/dfc': PERMISSION_KEYS.FIN.DFC,
   '/dashboard/fluxo-caixa': PERMISSION_KEYS.FIN.FLUXO_CAIXA,
@@ -610,6 +612,7 @@ export const NAV_CONFIG = {
     items: [
       { title: 'Usuários', url: '/admin/usuarios', icon: 'Users', permissionKey: PERMISSION_KEYS.ADMIN.USUARIOS },
       { title: 'Avisos', url: '/admin/avisos', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.ADMIN.AVISOS },
+      { title: 'Resumo dos Líderes', url: '/admin/resumo-lideres', icon: 'Send', permissionKey: PERMISSION_KEYS.ADMIN.RESUMO_LIDERES },
       { title: 'Uso do Sistema', url: '/admin/uso', icon: 'Activity', permissionKey: PERMISSION_KEYS.ADMIN.USO },
     ],
   },

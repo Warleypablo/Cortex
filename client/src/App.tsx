@@ -100,6 +100,7 @@ const ContribuicaoOperador = lazyWithRetry(() => import("@/pages/ContribuicaoOpe
 const ContribuicaoSquad = lazyWithRetry(() => import("@/pages/ContribuicaoSquad"));
 const AdminUsuarios = lazyWithRetry(() => import("@/pages/AdminUsuarios"));
 const AdminAvisos = lazyWithRetry(() => import("@/pages/AdminAvisos"));
+const AdminResumoLideres = lazyWithRetry(() => import("@/pages/AdminResumoLideres"));
 const AccessDenied = lazyWithRetry(() => import("@/pages/AccessDenied"));
 const Login = lazyWithRetry(() => import("@/pages/Login"));
 const Privacy = lazyWithRetry(() => import("@/pages/Privacy"));
@@ -466,6 +467,7 @@ function ProtectedRouter() {
       {/* Admin */}
       <Route path="/admin/usuarios">{() => <ProtectedRoute path="/admin/usuarios" component={AdminUsuarios} />}</Route>
       <Route path="/admin/avisos">{() => <ProtectedRoute path="/admin/avisos" component={AdminAvisos} />}</Route>
+      <Route path="/admin/resumo-lideres">{() => <ProtectedRoute path="/admin/resumo-lideres" component={AdminResumoLideres} />}</Route>
       <Route path="/admin/regras-notificacoes">{() => <ProtectedRoute path="/admin/regras-notificacoes" component={AdminNotificationRules} />}</Route>
       <Route path="/admin/design-system">{() => <ProtectedRoute path="/admin/design-system" component={AdminDesignSystem} />}</Route>
       <Route path="/admin/health">{() => <ProtectedRoute path="/admin/health" component={AdminHealth} />}</Route>
