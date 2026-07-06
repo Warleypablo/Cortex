@@ -177,6 +177,10 @@ export const BASE_TAG_MAP: Record<string, BaseFiltro> = {
     tagsAll: ["[lead]_creators"],
     tagsAny: [...FAT_30K_A_50K, ...FAT_50K_A_100K],
   },
+  "CRM - Entre 30k a 100k": {
+    tagsAll: ["[lead]_implantacao_funil_vendas"],
+    tagsAny: [...FAT_30K_A_50K, ...FAT_50K_A_100K],
+  },
 
   // ── Leads abaixo de 30k ───────────────────────────────────────────────
   "Geral - Abaixo de 30k": {
