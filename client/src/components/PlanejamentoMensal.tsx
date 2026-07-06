@@ -39,6 +39,16 @@ const STATUS_TONE: Record<string, string> = {
   congelada: "bg-blue-100 text-blue-700 dark:bg-blue-950/40 dark:text-blue-400",
 };
 
+// Ordem + rótulos exibidos na legenda. "enviada" = já disparado (verde); os demais
+// ainda não foram enviados — a cor diferencia enviado x não-enviado (ver review #1).
+const STATUS_LEGENDA: Array<{ key: string; label: string }> = [
+  { key: "backlog", label: "Backlog" },
+  { key: "pronta", label: "Pronta" },
+  { key: "agendada", label: "Agendada" },
+  { key: "enviada", label: "Enviada" },
+  { key: "congelada", label: "Congelada" },
+];
+
 function jsonReq(url: string, method: string, body?: any) {
   return fetch(url, { method, credentials: "include", headers: { "Content-Type": "application/json" }, body: body ? JSON.stringify(body) : undefined })
     .then((r) => { if (!r.ok) throw new Error(`${r.status}`); return r.json(); });
@@ -171,6 +181,7 @@ export default function PlanejamentoMensal() {
                 const block = s.cadencia?.alertas?.some((a) => a.nivel === "block");
                 return (
                   <button key={s.id} onClick={() => { setEditing(s); setVariacoes([]); }}
+                    title={[`Status: ${s.status}`, ...(s.cadencia?.alertas?.map((a) => a.mensagem) ?? [])].join(" · ")}
                     className={`text-left text-[11px] rounded px-1.5 py-1 border-l-2 ${STATUS_TONE[s.status] ?? ""} ${block ? "border-l-rose-500" : "border-l-transparent"}`}>
                     <div className="flex items-center gap-1">
                       {block && <AlertTriangle className="w-2.5 h-2.5 text-rose-500 shrink-0" />}
@@ -183,6 +194,23 @@ export default function PlanejamentoMensal() {
             </div>
           );
         })}
+      </div>
+
+      {/* Legenda — explica as cores de status e os marcadores (review #1) */}
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground pt-1">
+        <span className="font-medium text-foreground">Status do disparo:</span>
+        {STATUS_LEGENDA.map((st) => (
+          <span key={st.key} className="inline-flex items-center gap-1">
+            <span className={`inline-block w-2.5 h-2.5 rounded-sm ${STATUS_TONE[st.key]}`} />
+            {st.label}
+          </span>
+        ))}
+        <span className="inline-flex items-center gap-1">
+          <AlertTriangle className="w-3 h-3 text-rose-500" /> Alerta de cadência (risco de fadiga)
+        </span>
+        <span className="inline-flex items-center gap-1">
+          <CalendarClock className="w-3 h-3 text-rose-500" /> Data comercial
+        </span>
       </div>
 
       {/* Editor de slot */}

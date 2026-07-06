@@ -550,27 +550,35 @@ async function getCalendar(req: Request, res: Response) {
       failed_count: r.failed_count,
     }));
 
-    // WhatsApp broadcasts detectados: agrupa por dia × source
+    // WhatsApp broadcasts: MESMO conceito de "disparo" do card/summary — 1 por
+    // (dia, source, corpo da mensagem) com >=10 contatos distintos. Antes o calendário
+    // agrupava só por (dia, source) com HAVING count(*)>=30, o que colapsava várias
+    // copies num item só e não batia com o card (review #2). id no formato canônico
+    // (wa-YYYYMMDD-source-hash8) pra casar com broadcast_classification/detalhe.
     const waRes = await db.execute(sql`
       SELECT
+        'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source
+             || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS id,
         DATE_TRUNC('day', date_added)::date AS date,
         source,
+        MIN(body) AS preview,
         COUNT(*)::int AS messages,
         COUNT(DISTINCT contact_id)::int AS contacts_reached
       FROM cortex_core.ghl_messages
-      WHERE message_type = 'TYPE_WHATSAPP'
-        AND direction = 'outbound'
+      WHERE direction = 'outbound'
         AND source IN ('workflow', 'bulk_actions', 'campaign')
         AND date_added BETWEEN ${from} AND ${to}
-      GROUP BY DATE_TRUNC('day', date_added)::date, source
-      HAVING COUNT(*) >= 30
+        AND body IS NOT NULL AND body <> ''
+      GROUP BY DATE_TRUNC('day', date_added), source, SUBSTR(MD5(COALESCE(body, '')), 1, 8)
+      HAVING COUNT(DISTINCT contact_id) >= 10
       ORDER BY date DESC
     `);
     const waBroadcasts = ((waRes as any).rows ?? []).map((r: any) => ({
       kind: "wa_broadcast" as const,
-      id: `wa-${r.date.toISOString?.()?.slice(0, 10) ?? r.date}-${r.source}`,
+      id: r.id,
       date: r.date,
       source: r.source,
+      preview: (r.preview ?? "").slice(0, 120),
       messages: r.messages,
       contacts_reached: r.contacts_reached,
     }));
@@ -1659,8 +1667,12 @@ async function getBroadcastsSummary(req: Request, res: Response) {
           WHERE fr.sentiment = 'positiva'
              OR (d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)
         )::int AS oportunidades,
-        -- causalidade (>=): inclui etapas no mesmo dia da resposta (ver nota no topo)
+        -- INFLUENCIADA (causalidade >=): qualquer reunião agendada a partir da resposta (nº atual).
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date)::int AS reuniao_marcada,
+        -- DIRETA: o deal foi CRIADO em torno da resposta (o disparo gerou um negócio novo),
+        -- e não só tocou um deal pré-existente. É o "converteu por causa do disparo" — bem mais
+        -- perto da atribuição manual do Bitrix que a influenciada (review #5).
+        count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.date_create >= fr.reply_at - INTERVAL '2 days')::int AS reuniao_direta,
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= fr.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
         count(DISTINCT fr.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= fr.reply_at::date)::int AS venda
       FROM fr LEFT JOIN "Bitrix".crm_deal d ON d.id = fr.bitrix_deal_id
@@ -1847,6 +1859,8 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
     SELECT count(DISTINCT e.ghl_contact_id)::int AS respostas,
       -- causalidade (>=): inclui reunião/venda no mesmo dia da resposta (ver nota no topo)
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date)::int AS reunioes,
+      -- DIRETA (review #5/#10): deal criado em torno da resposta (o disparo gerou o negócio).
+      count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.date_create >= e.reply_at - INTERVAL '2 days')::int AS reunioes_direta,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.data_reuniao_agendada IS NOT NULL AND d.data_reuniao_agendada >= e.reply_at::date AND d.data_reuniao_realizada IS NOT NULL)::int AS compareceu,
       count(DISTINCT e.bitrix_deal_id) FILTER (WHERE d.stage_name = 'Negócio Ganho' AND d.data_fechamento IS NOT NULL AND d.data_fechamento >= e.reply_at::date)::int AS vendas
     FROM cortex_core.broadcast_lead_events e
@@ -1863,6 +1877,7 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
     abertura_pct: e.total_msgs ? +(100 * e.lida / e.total_msgs).toFixed(1) : null,
     respostas: f.respostas ?? 0,
     reunioes: f.reunioes ?? 0,
+    reunioes_direta: f.reunioes_direta ?? 0,
     compareceu: f.compareceu ?? 0,
     vendas: f.vendas ?? 0,
     gasto: +(total * unitCost).toFixed(2),
@@ -2312,6 +2327,60 @@ async function postPlanoGerarMes(req: Request, res: Response) {
   }
 }
 
+// ─── Solicitações de base/tag (review #14) ────────────────────────────────
+// Fluxo de "chamado": o time pede a criação de uma tag/base (nome + critério)
+// pela própria ferramenta, sem depender de mexer no GHL manualmente. Registra o
+// pedido; a criação em si segue no GHL (Fase futura pode automatizar o write).
+
+async function ensureTagRequestsTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS cortex_core.ghl_tag_requests (
+      id SERIAL PRIMARY KEY,
+      tipo TEXT NOT NULL DEFAULT 'tag',
+      nome TEXT NOT NULL,
+      criterio TEXT,
+      observacoes TEXT,
+      status TEXT NOT NULL DEFAULT 'aberto',
+      solicitante TEXT,
+      created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+    )
+  `);
+}
+
+async function getTagRequests(_req: Request, res: Response) {
+  try {
+    await ensureTagRequestsTable();
+    const r = await db.execute(sql`
+      SELECT id, tipo, nome, criterio, observacoes, status, solicitante, created_at
+      FROM cortex_core.ghl_tag_requests ORDER BY created_at DESC LIMIT 100
+    `);
+    res.json({ requests: (r as any).rows ?? [] });
+  } catch (err: any) {
+    console.error("[GHL] getTagRequests error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+async function postTagRequest(req: Request, res: Response) {
+  try {
+    await ensureTagRequestsTable();
+    const { tipo, nome, criterio, observacoes } = req.body ?? {};
+    if (!nome || typeof nome !== "string" || !nome.trim()) {
+      return res.status(400).json({ error: "Campo 'nome' é obrigatório" });
+    }
+    const solicitante = ((req as any).user?.email as string) || null;
+    const r = await db.execute(sql`
+      INSERT INTO cortex_core.ghl_tag_requests (tipo, nome, criterio, observacoes, solicitante)
+      VALUES (${tipo === "base" ? "base" : "tag"}, ${nome.trim()}, ${criterio ?? null}, ${observacoes ?? null}, ${solicitante})
+      RETURNING id
+    `);
+    res.json({ ok: true, id: (r as any).rows?.[0]?.id });
+  } catch (err: any) {
+    console.error("[GHL] postTagRequest error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────
 
 export function registerGhlPublicRoutes(app: Express) {
@@ -2324,6 +2393,8 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/email-campaigns", listEmailCampaigns);
   app.get("/api/ghl/whatsapp-metrics", getWhatsappMetrics);
   app.get("/api/ghl/tags", getTags);
+  app.get("/api/ghl/tag-requests", getTagRequests);
+  app.post("/api/ghl/tag-requests", postTagRequest);
   app.get("/api/ghl/lists", getLists);
   app.get("/api/ghl/workflows", getWorkflows);
   app.get("/api/ghl/overview", getOverview);

@@ -6,6 +6,7 @@ import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, TrendingUp, TrendingDown, Minus, Sparkles, Trophy, CalendarClock } from "lucide-react";
+import { PADROES_COPY_LABEL, PADROES_COPY_TESE, type PadraoKey } from "@shared/ghl-broadcast/types";
 
 const fmtInt = (n: number | null | undefined) => (n ?? 0).toLocaleString("pt-BR");
 const fmtBRL = (n: number | null | undefined) =>
@@ -18,7 +19,7 @@ function fetchJson<T>(url: string): Promise<T> {
   });
 }
 
-type Metrics = { disparos: number; enviadas: number; leads: number; abertura_pct: number | null; respostas: number; reunioes: number; compareceu: number; vendas: number; gasto: number };
+type Metrics = { disparos: number; enviadas: number; leads: number; abertura_pct: number | null; respostas: number; reunioes: number; reunioes_direta: number; compareceu: number; vendas: number; gasto: number };
 interface RelatorioData {
   atual: Metrics; anterior: Metrics;
   bases: Array<{ base: string; abertura_pct: number | null; reunioes: number; vendas: number }>;
@@ -82,7 +83,7 @@ export default function RelatorioBroadcast({ from, to }: { from: string; to: str
           {([
             { label: "Enviadas", value: atual.enviadas, prev: null as number | null, color: "bg-sky-500" },
             { label: "Responderam", value: atual.respostas, prev: atual.enviadas, color: "bg-cyan-500" },
-            { label: "Reunião marcada", value: atual.reunioes, prev: atual.respostas, color: "bg-violet-500" },
+            { label: "Reunião (influenciada)", value: atual.reunioes, prev: atual.respostas, color: "bg-violet-500" },
             { label: "Compareceu", value: atual.compareceu, prev: atual.reunioes, color: "bg-blue-500" },
             { label: "Venda", value: atual.vendas, prev: atual.compareceu, color: "bg-amber-500" },
           ]).map((s) => {
@@ -106,12 +107,13 @@ export default function RelatorioBroadcast({ from, to }: { from: string; to: str
       </Card>
 
       {/* Métricas com delta vs anterior */}
-      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-7 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-3">
         <MetricDelta label="Disparos" atual={atual.disparos} anterior={anterior.disparos} />
         <MetricDelta label="Leads" atual={atual.leads} anterior={anterior.leads} />
         <MetricDelta label="Abertura" atual={atual.abertura_pct} anterior={anterior.abertura_pct} pct />
         <MetricDelta label="Respostas" atual={atual.respostas} anterior={anterior.respostas} />
-        <MetricDelta label="Reuniões" atual={atual.reunioes} anterior={anterior.reunioes} />
+        <MetricDelta label="Reun. direta" atual={atual.reunioes_direta} anterior={anterior.reunioes_direta} />
+        <MetricDelta label="Reun. influ." atual={atual.reunioes} anterior={anterior.reunioes} />
         <MetricDelta label="Vendas" atual={atual.vendas} anterior={anterior.vendas} />
         <MetricDelta label="Gasto" atual={atual.gasto} anterior={anterior.gasto} money />
       </div>
@@ -135,7 +137,9 @@ export default function RelatorioBroadcast({ from, to }: { from: string; to: str
           <CardContent className="space-y-1.5">
             {padroes.slice(0, 6).map((p) => (
               <div key={p.padrao} className="flex items-center justify-between text-sm rounded bg-muted/30 px-3 py-1.5">
-                <span>{p.padrao}</span>
+                <span className={p.padrao ? "cursor-help border-b border-dotted border-muted-foreground/40" : ""} title={p.padrao ? PADROES_COPY_TESE[p.padrao as PadraoKey] : undefined}>
+                  {p.padrao ? (PADROES_COPY_LABEL[p.padrao as PadraoKey] ?? p.padrao) : "Sem padrão"}
+                </span>
                 <span className="text-muted-foreground text-xs">{p.abertura_pct != null ? `${p.abertura_pct}% abertura` : "—"} · {p.reunioes} reun</span>
               </div>
             ))}

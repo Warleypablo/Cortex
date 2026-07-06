@@ -10,11 +10,12 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Wand2, ShieldCheck, ShieldAlert, ShieldX, Copy, Check, Zap } from "lucide-react";
+import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Wand2, ShieldCheck, ShieldAlert, ShieldX, Copy, Check } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths } from "date-fns";
 import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
+import { PADROES_COPY_KEYS, PADROES_COPY_LABEL, PADROES_COPY_TESE } from "@shared/ghl-broadcast/types";
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
@@ -82,11 +83,16 @@ function fetchJson<T>(url: string): Promise<T> {
   });
 }
 
-function StatCard({ label, value, hint }: { label: string; value: string | number; hint?: string }) {
+function StatCard({ label, value, hint, info }: { label: string; value: string | number; hint?: string; info?: string }) {
   return (
     <Card>
       <CardContent className="pt-6">
-        <div className="text-xs uppercase tracking-wide text-muted-foreground">{label}</div>
+        <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
+          {label}
+          {info && (
+            <span title={info} className="cursor-help text-muted-foreground/60 normal-case" aria-label="como é calculado">ⓘ</span>
+          )}
+        </div>
         <div className="mt-1 text-2xl font-semibold">{value}</div>
         {hint && <div className="mt-1 text-xs text-muted-foreground">{hint}</div>}
       </CardContent>
@@ -498,146 +504,6 @@ function TagsTab() {
 }
 
 // ────────────────────────────────────────────────────────────────────────
-// Tab: Automações (workflows do GHL)
-// ────────────────────────────────────────────────────────────────────────
-
-interface WorkflowRow {
-  id: string;
-  name: string | null;
-  status: string | null;
-  version: number | null;
-  created_at: string | null;
-  updated_at: string | null;
-  synced_at: string | null;
-}
-
-function AutomacoesTab() {
-  const [statusFilter, setStatusFilter] = useState<string>("all");
-  const [search, setSearch] = useState("");
-  const { data, isLoading, error } = useQuery<{
-    workflows: WorkflowRow[];
-    counts: Record<string, number>;
-    total: number;
-  }>({
-    queryKey: ["/api/ghl/workflows"],
-    queryFn: () => fetchJson("/api/ghl/workflows"),
-  });
-
-  const filtered = useMemo(() => {
-    let rows = data?.workflows ?? [];
-    if (statusFilter !== "all") rows = rows.filter((w) => w.status === statusFilter);
-    if (search) {
-      const s = search.toLowerCase();
-      rows = rows.filter((w) => (w.name ?? "").toLowerCase().includes(s));
-    }
-    return rows;
-  }, [data, statusFilter, search]);
-
-  return (
-    <div className="space-y-4">
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatCard label="Total automações" value={fmtInt(data?.total ?? 0)} />
-        <StatCard label="Publicadas" value={fmtInt(data?.counts?.published ?? 0)} />
-        <StatCard label="Rascunho" value={fmtInt(data?.counts?.draft ?? 0)} />
-        <StatCard label="Outras" value={fmtInt((data?.total ?? 0) - (data?.counts?.published ?? 0) - (data?.counts?.draft ?? 0))} />
-      </div>
-
-      <Card>
-        <CardContent className="pt-6 grid grid-cols-1 md:grid-cols-3 gap-3 items-end">
-          <div>
-            <Label className="text-xs">Status</Label>
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="published">Publicadas</SelectItem>
-                <SelectItem value="draft">Rascunho</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="md:col-span-2">
-            <Label className="text-xs">Busca por nome</Label>
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Ex.: DM, Newsletter, Creators..."
-              className="text-sm"
-            />
-          </div>
-        </CardContent>
-      </Card>
-
-      {isLoading && (
-        <div className="flex items-center gap-2 text-muted-foreground">
-          <Loader2 className="w-4 h-4 animate-spin" /> Carregando...
-        </div>
-      )}
-      {error && <div className="text-destructive">Erro: {(error as Error).message}</div>}
-
-      {data && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">
-              Automações ({fmtInt(filtered.length)}{filtered.length !== data.total && ` de ${fmtInt(data.total)}`})
-            </CardTitle>
-            <div className="text-xs text-muted-foreground mt-1">
-              Workflows do GHL. A API não expõe contagem de contatos por workflow nem stats — só metadata.
-              Pra rastrear leads gerados, configure uma ação de Webhook em cada workflow apontando pro Cortex (Fase 2).
-            </div>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead className="text-right">Versão</TableHead>
-                  <TableHead>Criada</TableHead>
-                  <TableHead>Atualizada</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filtered.map((w) => (
-                  <TableRow key={w.id}>
-                    <TableCell className="text-sm font-medium">{w.name ?? "—"}</TableCell>
-                    <TableCell>
-                      <Badge
-                        variant="outline"
-                        className={cn(
-                          "text-xs",
-                          w.status === "published" && "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300",
-                          w.status === "draft" && "bg-muted text-muted-foreground",
-                        )}
-                      >
-                        {w.status === "published" ? "Publicada" : w.status === "draft" ? "Rascunho" : w.status ?? "—"}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-xs text-right">v{w.version ?? "?"}</TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {w.created_at ? format(new Date(w.created_at), "dd/MM/yyyy", { locale: ptBR }) : "—"}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {w.updated_at ? format(new Date(w.updated_at), "dd/MM/yyyy", { locale: ptBR }) : "—"}
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {filtered.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={5} className="text-center text-muted-foreground py-6">
-                      Nenhuma automação encontrada
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
-}
-
-// ────────────────────────────────────────────────────────────────────────
 // Tab: Diagnóstico (benchmarks Turbo + scoring por base)
 // ────────────────────────────────────────────────────────────────────────
 
@@ -992,7 +858,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
   // Resumo executivo: entrega WhatsApp por status + funil atribuído (causalidade pós-resposta).
   const summary = useQuery<{
     whatsapp: { total: number; enviado: number; entregue: number; lida: number; erro: number; entrega_pct: number | null; leitura_pct: number | null; erro_pct: number | null };
-    funil: { responderam: number; positivas: number; oportunidades: number; reuniao_marcada: number; compareceu: number; venda: number };
+    funil: { responderam: number; positivas: number; oportunidades: number; reuniao_marcada: number; reuniao_direta: number; compareceu: number; venda: number };
     custos: { gasto_total: number; gasto_por_disparo: number | null; custo_reuniao: number | null; cac: number | null; estimado: boolean; unit_cost: number; n_manual: number };
   }>({
     queryKey: ["/api/ghl/broadcasts/summary", from, to],
@@ -1016,14 +882,22 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
     <div className="space-y-4">
       {/* KPI cards: Investimento · Disparos · Respostas · Oportunidades · Reuniões · Custo/reunião · Vendas · CAC */}
       <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-8 gap-3">
-        <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"} />
-        <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp" />
-        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint="responderam ao disparo" />
-        <StatCard label="Oportunidades" value={fnl ? fmtInt(fnl.oportunidades) : "—"} hint="responderam positivo ou marcaram reunião" />
-        <StatCard label="Reuniões" value={fnl ? fmtInt(fnl.reuniao_marcada) : "—"} hint="atribuídas (pós-resposta)" />
-        <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="investimento ÷ reuniões" />
-        <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)" />
-        <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas" />
+        <StatCard label="Investimento" value={custos ? fmtBRL(custos.gasto_total) : "—"} hint={custos ? (custos.estimado ? `estimado a ${fmtBRL(custos.unit_cost)}/msg` : "inclui overrides") : "no período"}
+          info="Custo das mensagens de WhatsApp no período: (total de mensagens enviadas × custo unitário) + ajustes manuais de gasto. 'Estimado' quando não há ajuste manual no período." />
+        <StatCard label="Disparos" value={fmtInt(kpis.waCount)} hint="broadcasts WhatsApp"
+          info="Nº de disparos: mensagens agrupadas por (dia, origem, texto da copy) enviadas a pelo menos 10 contatos distintos. Cada copy diferente no mesmo dia conta como um disparo." />
+        <StatCard label="Respostas" value={fnl ? fmtInt(fnl.responderam) : "—"} hint="responderam ao disparo"
+          info="Contatos distintos que enviaram ao menos uma resposta (1ª resposta) após receber um disparo, no período." />
+        <StatCard label="Oportunidades" value={fnl ? fmtInt(fnl.oportunidades) : "—"} hint="responderam positivo ou marcaram reunião"
+          info="Respondentes com intenção: 1ª resposta classificada como positiva OU que marcaram reunião. Sempre ≥ Reuniões." />
+        <StatCard label="Reuniões" value={fnl ? `${fmtInt(fnl.reuniao_direta)} / ${fmtInt(fnl.reuniao_marcada)}` : "—"} hint="direta (negócio novo) / influenciada"
+          info="Direta: o negócio (deal) foi criado em torno da resposta ao disparo — o broadcast gerou a oportunidade. Influenciada: quem respondeu e teve QUALQUER reunião agendada a partir da data da resposta (inclui negócios que já existiam). Atribuição por telefone (GHL↔Bitrix)." />
+        <StatCard label="Custo / reunião" value={custos ? fmtBRL(custos.custo_reuniao) : "—"} hint="investimento ÷ reuniões"
+          info="Investimento do período ÷ reuniões influenciadas." />
+        <StatCard label="Vendas" value={fnl ? fmtInt(fnl.venda) : "—"} hint="atribuídas (pós-resposta)"
+          info="Negócios em 'Negócio Ganho' cujo fechamento ocorreu a partir da data da resposta ao disparo (atribuição por telefone)." />
+        <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas"
+          info="Custo de aquisição: investimento do período ÷ vendas atribuídas." />
       </div>
 
       {/* Evolução do período (2/3) + Gastos (1/3) */}
@@ -1584,7 +1458,7 @@ type Broadcast =
       contacts_reached: number;
     };
 
-function CalendarioTab() {
+function CalendarioTab({ onOpenFunil }: { onOpenFunil?: (id: string) => void }) {
   // Calendário tem sua própria seleção de mês — não usa o range do header
   const [monthCursor, setMonthCursor] = useState(new Date());
   const monthStart = startOfMonth(monthCursor);
@@ -1722,6 +1596,23 @@ function CalendarioTab() {
                   );
                 })}
               </div>
+              {/* Legenda dos marcadores do calendário (review #1) */}
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-muted-foreground mt-3">
+                <span className="font-medium text-foreground">Legenda:</span>
+                <span className="inline-flex items-center gap-1">
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 bg-emerald-50 dark:bg-emerald-950/40 border-emerald-300"><MessageCircle className="w-2.5 h-2.5" /></Badge>
+                  disparos WhatsApp no dia
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 bg-blue-50 dark:bg-blue-950/40 border-blue-300"><Mail className="w-2.5 h-2.5" /></Badge>
+                  campanhas de e-mail
+                </span>
+                <span className="inline-flex items-center gap-1">
+                  <Badge variant="outline" className="text-[10px] px-1 py-0 bg-amber-50 dark:bg-amber-950/40 border-amber-300 text-amber-700 dark:text-amber-300"><AlertCircle className="w-2.5 h-2.5" /></Badge>
+                  alerta de cadência (fadiga) — não é falha de envio
+                </span>
+                <span>Clique num dia com envios para ver os detalhes.</span>
+              </div>
             </>
           )}
         </CardContent>
@@ -1770,10 +1661,20 @@ function CalendarioTab() {
                           <div className="font-medium mt-1">Broadcast detectado · source: <Badge variant="outline" className="ml-1 text-xs">{b.source}</Badge></div>
                         </div>
                       </div>
+                      {b.preview && <div className="text-sm text-muted-foreground mt-2 line-clamp-2" title={b.preview}>{b.preview}</div>}
                       <div className="grid grid-cols-2 gap-2 mt-3 text-sm">
                         <div><span className="text-muted-foreground">Mensagens:</span> <strong>{fmtInt(b.messages)}</strong></div>
                         <div><span className="text-muted-foreground">Contatos alcançados:</span> <strong>{fmtInt(b.contacts_reached)}</strong></div>
                       </div>
+                      {onOpenFunil && (
+                        <button
+                          type="button"
+                          onClick={() => { onOpenFunil(b.id); setSelectedDay(null); }}
+                          className="mt-3 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+                        >
+                          <Activity className="w-3.5 h-3.5" /> Ver relatório deste disparo
+                        </button>
+                      )}
                     </div>
                   )}
                 </div>
@@ -2019,7 +1920,15 @@ function GeradorTab() {
               </div>
               <div>
                 <Label className="text-xs">Padrão preferido (opcional)</Label>
-                <Input value={padraoAlvo} onChange={(e) => setPadraoAlvo(e.target.value)} placeholder="ex: HOOK_PROVOCATIVO" />
+                <Select value={padraoAlvo || "__none__"} onValueChange={(v) => setPadraoAlvo(v === "__none__" ? "" : v)}>
+                  <SelectTrigger><SelectValue placeholder="Sem preferência" /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="__none__">Sem preferência</SelectItem>
+                    {PADROES_COPY_KEYS.map((k) => (
+                      <SelectItem key={k} value={k} title={PADROES_COPY_TESE[k]}>{PADROES_COPY_LABEL[k]}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
               <div>
                 <Label className="text-xs">Contexto adicional (opcional)</Label>
@@ -2103,6 +2012,11 @@ export default function GhlMarketing() {
   const from = format(dateRange.from, "yyyy-MM-dd");
   const to = format(dateRange.to, "yyyy-MM-dd");
 
+  // Abas controladas p/ navegar do Calendário direto pro Funil de um disparo (#15).
+  const [tab, setTab] = useState("biblioteca");
+  const [focusBroadcastId, setFocusBroadcastId] = useState<string | null>(null);
+  const openFunil = (id: string) => { setFocusBroadcastId(id); setTab("funil"); };
+
   return (
     <div className="container mx-auto p-6 max-w-7xl space-y-6">
       <div className="flex flex-col md:flex-row md:items-end gap-4 justify-between">
@@ -2117,13 +2031,13 @@ export default function GhlMarketing() {
         />
       </div>
 
-      <Tabs defaultValue="biblioteca" className="w-full">
+      <Tabs value={tab} onValueChange={setTab} className="w-full">
         <TabsList>
           <TabsTrigger value="biblioteca" data-testid="tab-biblioteca">
             <BookOpen className="w-4 h-4 mr-2" /> Broadcast
           </TabsTrigger>
-          <TabsTrigger value="automacoes" data-testid="tab-automacoes">
-            <Zap className="w-4 h-4 mr-2" /> Automações
+          <TabsTrigger value="calendario" data-testid="tab-calendario">
+            <CalendarIcon className="w-4 h-4 mr-2" /> Calendário
           </TabsTrigger>
           <TabsTrigger value="funil" data-testid="tab-funil">
             <Activity className="w-4 h-4 mr-2" /> Funil
@@ -2145,11 +2059,11 @@ export default function GhlMarketing() {
         <TabsContent value="biblioteca" className="mt-6">
           <BibliotecaTab from={from} to={to} />
         </TabsContent>
-        <TabsContent value="automacoes" className="mt-6">
-          <AutomacoesTab />
+        <TabsContent value="calendario" className="mt-6">
+          <CalendarioTab onOpenFunil={openFunil} />
         </TabsContent>
         <TabsContent value="funil" className="mt-6">
-          <FunilTab from={from} to={to} />
+          <FunilTab from={from} to={to} focusId={focusBroadcastId} />
         </TabsContent>
         <TabsContent value="bases" className="mt-6">
           <BasesInteligencia from={from} to={to} />

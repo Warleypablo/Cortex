@@ -6,10 +6,7 @@
  * é calculada no endpoint (determinística); aqui só a leitura estratégica.
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "" });
-const MODEL = "claude-haiku-4-5-20251001";
+import { gerarTextoIA } from "./aiText";
 
 export interface DadosRelatorio {
   periodo: { from: string; to: string };
@@ -43,13 +40,7 @@ DADOS (JSON):
 ${JSON.stringify(d)}`;
 
   try {
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 700,
-      messages: [{ role: "user", content: prompt }],
-    });
-    const block = response.content[0];
-    const raw = block.type === "text" ? block.text : "{}";
+    const raw = await gerarTextoIA(prompt, { maxTokens: 700, json: true });
     const cleaned = raw.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     const parsed = JSON.parse(cleaned) as Partial<Narrativa>;
     return {
@@ -58,6 +49,12 @@ ${JSON.stringify(d)}`;
     };
   } catch (err: any) {
     console.error("[broadcastReport] narrativa falhou:", err.message);
-    return { resumo: "Falha ao gerar a narrativa por IA.", recomendacoes: [] };
+    const authError = /401|invalid x-api-key|authentication/i.test(err.message);
+    return {
+      resumo: authError
+        ? "Narrativa por IA indisponível: a chave da API está inválida/expirada. Atualizar ANTHROPIC_API_KEY (ou OPENAI_API_KEY)."
+        : "Falha ao gerar a narrativa por IA. Tente novamente em instantes.",
+      recomendacoes: [],
+    };
   }
 }

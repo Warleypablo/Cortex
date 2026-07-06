@@ -10,7 +10,7 @@
  * Dados: GET /api/ghl/broadcasts (seletor) + /:id/funnel + /:id/leads.
  * As etapas reunião/comparecimento/venda vêm live do Bitrix (crm_deal).
  */
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -126,18 +126,27 @@ function FunnelBar({
   base,
   prev,
   color,
+  onClick,
+  active,
 }: {
   label: string;
   value: number;
   base: number; // pra largura (geralmente "enviadas")
   prev?: number; // pra % de conversão da etapa anterior
   color: string;
+  onClick?: () => void; // drill-down: filtra a lista de respondedores (review #6)
+  active?: boolean;
 }) {
   const widthPct = base > 0 ? Math.max(2, (value / base) * 100) : 0;
+  const clickable = !!onClick && value > 0;
   return (
-    <div className="space-y-1">
+    <div
+      className={`space-y-1 rounded px-1 -mx-1 ${clickable ? "cursor-pointer hover:bg-muted/40" : ""} ${active ? "ring-2 ring-primary/60 bg-muted/40" : ""}`}
+      onClick={clickable ? onClick : undefined}
+      title={clickable ? "Clique pra ver quem compõe este número" : undefined}
+    >
       <div className="flex items-baseline justify-between text-sm">
-        <span className="font-medium">{label}</span>
+        <span className="font-medium">{label}{clickable && <span className="ml-1 text-[10px] text-muted-foreground align-middle">›</span>}</span>
         <span className="text-muted-foreground">
           <strong className="text-foreground">{fmtInt(value)}</strong>
           {prev !== undefined && <span className="ml-2 text-xs">({fmtPct(value, prev)} da etapa anterior)</span>}
@@ -150,8 +159,36 @@ function FunnelBar({
   );
 }
 
-export default function FunilTab({ from, to }: { from: string; to: string }) {
+// Drill-down: ao clicar numa etapa do funil / sentimento, filtra a lista de
+// respondedores pra mostrar QUEM compõe aquele número (review #6, auditável — #4).
+type Drill =
+  | { kind: "sentiment"; value: string; label: string }
+  | { kind: "reuniao"; label: string }
+  | { kind: "compareceu"; label: string }
+  | { kind: "venda"; label: string };
+
+function matchDrill(l: LeadRow, d: Drill): boolean {
+  switch (d.kind) {
+    case "sentiment":
+      return l.sentiment === d.value;
+    case "reuniao":
+      return !!l.data_reuniao_agendada && posResposta(l.data_reuniao_agendada, l.reply_at);
+    case "compareceu":
+      return !!l.data_reuniao_realizada && posResposta(l.data_reuniao_realizada, l.reply_at);
+    case "venda":
+      return l.stage_name === "Negócio Ganho" && posResposta(l.data_fechamento, l.reply_at);
+  }
+}
+
+export default function FunilTab({ from, to, focusId }: { from: string; to: string; focusId?: string | null }) {
   const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [drill, setDrill] = useState<Drill | null>(null);
+  // Navegação vinda do Calendário (#15): foca o disparo pedido.
+  useEffect(() => {
+    if (focusId) { setSelectedId(focusId); setDrill(null); }
+  }, [focusId]);
+  const toggleDrill = (d: Drill) =>
+    setDrill((cur) => (cur && cur.kind === d.kind && (cur as any).value === (d as any).value ? null : d));
 
   const broadcasts = useQuery<{ broadcasts: BroadcastRow[] }>({
     queryKey: ["/api/ghl/broadcasts", "wa-funnel", from, to],
@@ -174,6 +211,8 @@ export default function FunilTab({ from, to }: { from: string; to: string }) {
   });
 
   const f = funnel.data?.funnel;
+  const allLeads = leads.data?.leads ?? [];
+  const shownLeads = drill ? allLeads.filter((l) => matchDrill(l, drill)) : allLeads;
 
   return (
     <div className="space-y-6">
@@ -194,7 +233,7 @@ export default function FunilTab({ from, to }: { from: string; to: string }) {
               Nenhum disparo de WhatsApp no período selecionado.
             </p>
           ) : (
-            <Select value={selectedId ?? undefined} onValueChange={setSelectedId}>
+            <Select value={selectedId ?? undefined} onValueChange={(v) => { setSelectedId(v); setDrill(null); }}>
               <SelectTrigger className="w-full md:w-[640px]">
                 <SelectValue placeholder="Selecione um disparo de WhatsApp…" />
               </SelectTrigger>
@@ -243,17 +282,28 @@ export default function FunilTab({ from, to }: { from: string; to: string }) {
                       respondedores, mostrado nos chips abaixo. */}
                   <FunnelBar label="Enviadas" value={f.enviadas} base={f.enviadas} color="bg-sky-500" />
                   <FunnelBar label="Responderam" value={f.responderam} base={f.enviadas} prev={f.enviadas} color="bg-cyan-500" />
-                  <FunnelBar label="Reunião marcada" value={f.reuniao_marcada} base={f.enviadas} prev={f.responderam} color="bg-violet-500" />
-                  <FunnelBar label="Compareceu" value={f.compareceu} base={f.enviadas} prev={f.reuniao_marcada} color="bg-blue-500" />
-                  <FunnelBar label="Venda" value={f.venda} base={f.enviadas} prev={f.reuniao_marcada} color="bg-amber-500" />
+                  <FunnelBar label="Reunião marcada" value={f.reuniao_marcada} base={f.enviadas} prev={f.responderam} color="bg-violet-500"
+                    onClick={() => toggleDrill({ kind: "reuniao", label: "Reunião marcada" })} active={drill?.kind === "reuniao"} />
+                  <FunnelBar label="Compareceu" value={f.compareceu} base={f.enviadas} prev={f.reuniao_marcada} color="bg-blue-500"
+                    onClick={() => toggleDrill({ kind: "compareceu", label: "Compareceu" })} active={drill?.kind === "compareceu"} />
+                  <FunnelBar label="Venda" value={f.venda} base={f.enviadas} prev={f.reuniao_marcada} color="bg-amber-500"
+                    onClick={() => toggleDrill({ kind: "venda", label: "Venda (ganho)" })} active={drill?.kind === "venda"} />
 
                   <div className="pt-2">
                     <div className="text-xs text-muted-foreground mb-1">Detalhamento dos {fmtInt(f.responderam)} respondedores (por sentimento da 1ª resposta):</div>
                     <div className="flex flex-wrap gap-2 text-xs">
-                      <Badge variant="outline" className={SENTIMENT_BADGE.positiva}>Positivas {fmtInt(f.positivas)}</Badge>
-                      <Badge variant="outline" className={SENTIMENT_BADGE.negativa}>Negativas {fmtInt(f.negativas)}</Badge>
-                      <Badge variant="outline" className={SENTIMENT_BADGE.neutra}>Neutras {fmtInt(f.neutras)}</Badge>
-                      <Badge variant="outline" className={SENTIMENT_BADGE.opt_out}>Opt-out {fmtInt(f.opt_out)}</Badge>
+                      {([
+                        { v: "positiva", label: "Positivas", n: f.positivas, cls: SENTIMENT_BADGE.positiva },
+                        { v: "negativa", label: "Negativas", n: f.negativas, cls: SENTIMENT_BADGE.negativa },
+                        { v: "neutra", label: "Neutras", n: f.neutras, cls: SENTIMENT_BADGE.neutra },
+                        { v: "opt_out", label: "Opt-out", n: f.opt_out, cls: SENTIMENT_BADGE.opt_out },
+                      ] as const).map((s) => (
+                        <button key={s.v} type="button" onClick={() => toggleDrill({ kind: "sentiment", value: s.v, label: s.label })} title="Clique pra ver quem compõe este número">
+                          <Badge variant="outline" className={`${s.cls} cursor-pointer ${drill?.kind === "sentiment" && drill.value === s.v ? "ring-2 ring-primary/60" : ""}`}>
+                            {s.label} {fmtInt(s.n)}
+                          </Badge>
+                        </button>
+                      ))}
                     </div>
                   </div>
                 </div>
@@ -267,14 +317,26 @@ export default function FunilTab({ from, to }: { from: string; to: string }) {
               <CardTitle className="text-base">
                 Respondedores {leads.data?.count ? `(${leads.data.count})` : ""}
               </CardTitle>
+              {drill && (
+                <div className="mt-1 flex items-center gap-2 text-xs">
+                  <span className="rounded bg-primary/10 text-primary px-2 py-0.5 font-medium">
+                    Filtrando por: {drill.label} — {fmtInt(shownLeads.length)} de {fmtInt(allLeads.length)}
+                  </span>
+                  <button type="button" onClick={() => setDrill(null)} className="text-muted-foreground hover:text-foreground underline">
+                    limpar filtro
+                  </button>
+                </div>
+              )}
             </CardHeader>
             <CardContent className="p-0">
               {leads.isLoading ? (
                 <div className="flex items-center gap-2 text-sm text-muted-foreground p-6">
                   <Loader2 className="w-4 h-4 animate-spin" /> Carregando respondedores…
                 </div>
-              ) : (leads.data?.leads ?? []).length === 0 ? (
+              ) : allLeads.length === 0 ? (
                 <p className="text-sm text-muted-foreground p-6">Nenhuma resposta atribuída a este disparo ainda.</p>
+              ) : shownLeads.length === 0 ? (
+                <p className="text-sm text-muted-foreground p-6">Nenhum respondedor compõe "{drill?.label}" neste disparo.</p>
               ) : (
                 <div className="overflow-x-auto">
                   <Table>
@@ -289,7 +351,7 @@ export default function FunilTab({ from, to }: { from: string; to: string }) {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {(leads.data?.leads ?? []).map((l) => {
+                      {shownLeads.map((l) => {
                         const etapa = etapaBitrix(l);
                         const venda = l.stage_name === "Negócio Ganho" && etapa.atribuido;
                         const valor = venda ? fmtBRL(l.valor_recorrente || l.valor_pontual) : null;

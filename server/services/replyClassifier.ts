@@ -5,16 +5,14 @@
  * Estratégia em 2 camadas (barato → caro):
  *  1. Regra determinística sobre o texto do botão / palavras-chave. Cobre a maioria
  *     dos cliques de quick-reply ("QUERO ENTENDER MAIS", "Stop Promotions"), sem custo.
- *  2. Fallback no Claude haiku (mesmo SDK/modelo de ghlCopyAi.ts) só pra texto livre
- *     ambíguo, devolvendo rótulo + 1 frase de motivo.
+ *  2. Fallback de IA (Claude→OpenAI, via aiText) só pra texto livre ambíguo,
+ *     devolvendo rótulo + 1 frase de motivo. Recebe também o CONTEXTO do disparo
+ *     (o CTA) — uma resposta que ecoa a palavra-chave pedida é interesse, não neutra.
  *
  * Mantém o resultado pra ser persistido por broadcastAttribution (não reprocessa).
  */
 
-import Anthropic from "@anthropic-ai/sdk";
-
-const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "" });
-const MODEL = "claude-haiku-4-5-20251001";
+import { gerarTextoIA } from "./aiText";
 
 export type Sentiment = "positiva" | "negativa" | "neutra" | "opt_out";
 
@@ -154,8 +152,30 @@ function matchAny(texto: string, termos: string[]): boolean {
   return termos.some((t) => texto.includes(t));
 }
 
+// Verbos de CTA que costumam pedir uma palavra-chave de resposta.
+const CTA_VERBS = [
+  "responda", "responde", "respondam", "comente", "comenta", "comentem",
+  "escreva", "escreve", "digite", "digita", "envie", "envia", "manda", "mande",
+  "me manda", "me envie", "me responde", "responde aqui",
+];
+
+/**
+ * Reply curta que ecoa a palavra-chave pedida no CTA do disparo → interesse.
+ * Ex.: disparo diz "responda UGC pra receber" e o lead responde "UGC".
+ * Só dispara pra token curto (1-2 palavras) precedido de um verbo de CTA no corpo.
+ */
+function respondeuPalavraChaveDoCTA(replyLower: string, broadcastBody?: string | null): boolean {
+  if (!broadcastBody) return false;
+  const token = replyLower.trim();
+  if (token.length < 2 || token.length > 25 || token.split(/\s+/).length > 2) return false;
+  const esc = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const corpo = broadcastBody.toLowerCase();
+  // verbo de CTA seguido (em até ~20 chars) do token exato como palavra
+  return CTA_VERBS.some((v) => new RegExp(`${v}\\b[^.!?\\n]{0,20}\\b${esc}\\b`, "i").test(corpo));
+}
+
 /** Camada 1: regra. Retorna null quando o texto é ambíguo e precisa da IA. */
-export function classificarPorRegra(body: string): Classificacao | null {
+export function classificarPorRegra(body: string, broadcastBody?: string | null): Classificacao | null {
   const t = (body || "").trim().toLowerCase();
   if (!t) return { sentiment: "neutra", motivo: "Resposta vazia.", fonte: "regra" };
 
@@ -173,47 +193,46 @@ export function classificarPorRegra(body: string): Classificacao | null {
   if (matchAny(t, POSITIVAS)) {
     return { sentiment: "positiva", motivo: "Demonstrou interesse / clique em botão de CTA.", fonte: "regra" };
   }
+  // Respondeu exatamente a palavra-chave que o CTA do disparo pediu → interesse.
+  if (respondeuPalavraChaveDoCTA(t, broadcastBody)) {
+    return { sentiment: "positiva", motivo: "Respondeu a palavra-chave pedida no CTA do disparo.", fonte: "regra" };
+  }
   return null;
 }
 
-function buildPrompt(body: string): string {
+function buildPrompt(body: string, broadcastBody?: string | null): string {
+  const contexto = broadcastBody?.trim()
+    ? broadcastBody.trim().slice(0, 1000)
+    : "(mensagem original indisponível)";
   return `Você classifica a resposta de um EMPRESÁRIO a um broadcast de marketing da Turbo no WhatsApp (B2B brasileiro). A Turbo MANDOU a mensagem; isto é a resposta que voltou.
 
 Responda APENAS um JSON válido, sem texto antes ou depois:
 { "sentiment": "positiva" | "negativa" | "neutra" | "opt_out", "motivo": "<frase curta>" }
 
 Critérios (leia com atenção):
-- "positiva": demonstra interesse REAL na oferta, faz pergunta sobre o serviço, quer conversar/agendar, pede mais info. Ex.: "quero saber mais", "podemos marcar?", "como funciona o serviço de vocês?".
+- "positiva": demonstra interesse REAL na oferta, faz pergunta sobre o serviço, quer conversar/agendar, pede mais info. Ex.: "quero saber mais", "podemos marcar?", "como funciona o serviço de vocês?". TAMBÉM é positiva quando o CTA da mensagem original pede pra responder uma palavra/expressão específica e a resposta é exatamente essa palavra (ex.: CTA "responda UGC" e a resposta é "UGC").
 - "negativa": recusa, desinteresse, irritação ou RECLAMAÇÃO. Ex.: "não tenho interesse", "péssima empresa", "que saco", "isso é spam".
 - "opt_out": pede pra parar de receber / ser excluído. Ex.: "me exclua", "para de mandar", "sair da lista".
 - "neutra": NÃO é uma resposta genuína de interesse. Inclui:
   • AUTO-RESPOSTA / CHATBOT do negócio do lead — saudação ou aviso automático. Ex.: "Olá, como posso ajudar?", "Agradeço seu contato, respondo em breve", "Recebi sua msg, já te respondo", "Seja bem-vindo ao atendimento". ISSO É SEMPRE NEUTRA, nunca positiva.
   • resposta vaga/ambígua, número solto, dúvida não relacionada, ausência.
 
-ATENÇÃO: saudações automáticas tipo "como posso ajudar?" são o ATENDENTE/BOT do lead respondendo — NÃO é interesse. Classifique como neutra.
+ATENÇÃO: saudações automáticas tipo "como posso ajudar?" são o ATENDENTE/BOT do lead respondendo — NÃO é interesse. Classifique como neutra. Mas leve em conta o CTA: uma resposta curta que ecoa a palavra-chave pedida NÃO é neutra, é positiva.
 
-Mensagem que voltou:
+MENSAGEM ORIGINAL ENVIADA PELA TURBO (contexto do CTA):
+${contexto}
+
+RESPOSTA QUE VOLTOU (classifique esta):
 ${body}`;
 }
 
-/** Classificação completa: regra primeiro; só chama o Claude no ambíguo. */
-export async function classificarResposta(body: string): Promise<Classificacao> {
-  const porRegra = classificarPorRegra(body);
+/** Classificação completa: regra primeiro; só chama a IA no ambíguo. */
+export async function classificarResposta(body: string, broadcastBody?: string | null): Promise<Classificacao> {
+  const porRegra = classificarPorRegra(body, broadcastBody);
   if (porRegra) return porRegra;
 
-  // Sem API key: degrada pra neutra em vez de quebrar a atribuição.
-  if (!process.env.ANTHROPIC_API_KEY) {
-    return { sentiment: "neutra", motivo: "Texto livre (classificação IA indisponível).", fonte: "regra" };
-  }
-
   try {
-    const response = await anthropic.messages.create({
-      model: MODEL,
-      max_tokens: 200,
-      messages: [{ role: "user", content: buildPrompt(body) }],
-    });
-    const block = response.content[0];
-    const raw = block.type === "text" ? block.text : "{}";
+    const raw = await gerarTextoIA(buildPrompt(body, broadcastBody), { maxTokens: 200, json: true });
     const cleaned = raw.replace(/^```(?:json)?\s*\n?/i, "").replace(/\n?```\s*$/i, "").trim();
     const parsed = JSON.parse(cleaned) as { sentiment?: string; motivo?: string };
     const valid: Sentiment[] = ["positiva", "negativa", "neutra", "opt_out"];
