@@ -9,21 +9,17 @@
 #     A env var ORGANICO_INGEST_TOKEN precisa estar setada TAMBÉM no WEB SERVICE
 #     do Cortex (o MESMO valor daqui) + redeploy do Cortex. Sem isso, os endpoints
 #     /ingest, /posts/due e /commands/pending retornam HTTP 503 → o report não
-#     grava no painel e o publish não lê a fila. (Hoje o Cortex de prod está SEM
-#     esse token — foi exatamente o 503 diagnosticado.)
-#
-# 🧪  ROLLOUT SEGURO: começa em DRY_RUN=1 (valida sem postar). O report enche o
-#     painel/calendário e o publish MOSTRA o que postaria, sem postar de verdade.
-#     Pra publicar pra valer: troque DRY_RUN para "0" no env group e redeploy.
+#     grava no painel e o publish não lê a fila. (Setado em prod desde 06/jul/2026.)
 #
 # 🔑  Secret File do Google: a Render NÃO cria Secret File por blueprint. Em CADA
 #     cron, no dashboard → Environment → Secret Files → adicione um arquivo
 #     "service-account.json" com o conteúdo do JSON da service account. O caminho
-#     já está apontado em GOOGLE_SERVICE_ACCOUNT_JSON abaixo.
+#     já está apontado em GOOGLE_SERVICE_ACCOUNT_JSON abaixo. ⚠️ Mudar env var ou
+#     Secret File SÓ tem efeito no PRÓXIMO deploy — redeploye os dois crons.
 #
-# 📅  Cadência atual = fase de validação: report 30/30min, publish 1/1h. Quando
-#     for pra valer, aperte o publish pra "*/5 * * * *" (ou "*/15") pra postar no
-#     horário do card (a 1h, um card de 14:00 só sai lá pelas 15:00).
+# 📅  Produção desde 06/jul/2026: DRY_RUN=0, report 30/30min, publish 15/15min
+#     (posta no horário do card com atraso máx. de ~15min). Pra pausar o agente:
+#     DRY_RUN="1" no env group + redeploy (ou suspenda os crons no dashboard).
 # ============================================================
 
 # Variáveis compartilhadas pelos dois crons. Os `sync: false` são preenchidos no
@@ -33,7 +29,7 @@ envVarGroups:
   - name: organico-instagram
     envVars:
       - key: DRY_RUN
-        value: "1"                     # 1 = só simula (validação). Vire "0" p/ postar de verdade.
+        value: "0"                     # 0 = posta DE VERDADE (prod desde 06/jul/2026). "1" = só simula.
       - key: TZ
         value: "America/Sao_Paulo"     # deixa logs/horários no fuso certo
       - key: PYTHON_VERSION
@@ -96,7 +92,7 @@ services:
     name: organico-publish-instagram
     runtime: python
     plan: starter
-    schedule: "0 * * * *"              # de hora em hora (aperte p/ */5 ou */15 quando for pra valer)
+    schedule: "*/15 * * * *"           # a cada 15 min — posta no horário do card (atraso máx. ~15min)
     rootDir: automacoes/instagram-turbo
     buildCommand: pip install -r requirements.txt
     startCommand: python -m agente.main_poller --once --mode publish

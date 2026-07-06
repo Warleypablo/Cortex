@@ -17,6 +17,7 @@ import urllib.request
 from typing import Any
 from urllib.parse import quote
 
+from agente import http_retry
 from agente.config import CONFIG
 
 
@@ -43,8 +44,8 @@ def _get(path: str) -> dict | None:
         return None
     req = urllib.request.Request(f"{_base()}{path}", method="GET", headers=_headers())
     try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            return json.loads(r.read().decode("utf-8"))
+        _status, body = http_retry.fetch(req, what=f"GET {path}")
+        return json.loads(body.decode("utf-8"))
     except Exception as e:  # noqa: BLE001
         print(f"   ⚠️  painel GET {path} falhou (segue) — {type(e).__name__}: {e}")
         return None

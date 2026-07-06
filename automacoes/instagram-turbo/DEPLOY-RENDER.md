@@ -1,5 +1,9 @@
 # 🚀 Deploy do Publicador Orgânico na Render (24/7, independente do Mac)
 
+> **NOTA (jul/2026):** o blueprint (`render.yaml`) agora vive na **RAIZ do repo**
+> (a Render só lê blueprint na raiz). A cópia que existia nesta pasta foi removida.
+> Estado atual de prod: DRY_RUN=0, report `*/30`, publish `*/15`.
+
 Como deixar o agente publicando **sozinho na nuvem** — Mac ligado, desligado ou
 fechado não importa. O motor (`agente/main_poller.py`) já existe; aqui só
 hospedamos ele.
