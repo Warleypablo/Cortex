@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-06 | fix(broadcast): Metas do mês sempre visível, ancorado no mês corrente
+
+**O que foi feito:**
+- O card "Metas do mês" ficava oculto com o range default ("últimos 30 dias" começa no mês anterior, que não tem metas). Agora ele é **autocontido e sempre visível**: `GET /api/ghl/goals` sem parâmetro devolve o mês mais recente com metas até hoje (mês corrente ou o último implementado) e o componente busca o próprio realizado (summary de 1º do mês até agora), ignorando o período selecionado no topo. Nota de rodapé atualizada.
+
+**Por que:**
+- Pedido do Caio (06/07): "a parte de metas do mês deve aparecer e ser visível em qualquer tempo escolhido a partir do dia que foi implementado".
+
+**Arquivos alterados:**
+- `server/routes/ghl.ts` - fallback "mês mais recente com metas" no GET /api/ghl/goals.
+- `client/src/pages/GhlMarketing.tsx` - MetasDoMes autocontido (metas + summary próprios, sem props do range).
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-06 | feat(broadcast): plano de julho carregado + base CRM 30k-100k + fix da janela do mês
 
 **O que foi feito:**
