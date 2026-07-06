@@ -1516,6 +1516,7 @@ type Broadcast =
       id: string;
       date: string;
       source: string;
+      preview: string;
       messages: number;
       contacts_reached: number;
     };
