@@ -151,7 +151,43 @@ def run():
     _assert(hdr == "O MAIOR EVENTO DO ESTÁ CHEGANDO", "match tolera diferença de espaço (ES TÁ vs ESTÁ)")
     _assert("Creator Summit" in leg, "legenda do header com typo de espaço veio certa")
 
+    print("\n=== formatação da legenda ===")
+    test_legenda_preserva_paragrafos()
+
     print("\n🎉 Todos os testes passaram.")
+
+
+def test_legenda_preserva_paragrafos():
+    # Regressão do post de 06/jul/2026 ("Datas sazonais"): o Doc TINHA linha em
+    # branco entre os parágrafos e a legenda subiu achatada pro Instagram.
+    # Linha em branco = separação de parágrafo → tem que chegar intacta no IG.
+    doc = (
+        "**DATAS SAZONAIS**\n"
+        "**LEGENDA**\n"
+        "Já hora de planejar? Oi? 👀 \n"
+        "\n"
+        "Aqui estão as principais datas.\n"
+        "\n"
+        "\n"
+        "\n"
+        "----\n"
+        'Comente "CALENDARIO"\x0bno direct. #turbopartners\n'
+        "**PRÓXIMO POST**\n"
+    )
+    leg, hdr = find_legenda_for_task(doc, "Datas sazonais")
+    _assert(hdr == "DATAS SAZONAIS", "header casou")
+    esperado = (
+        "Já hora de planejar? Oi? 👀\n"
+        "\n"
+        "Aqui estão as principais datas.\n"
+        "\n"
+        'Comente "CALENDARIO"\nno direct. #turbopartners'
+    )
+    _assert(
+        leg == esperado,
+        f"parágrafo preservado, 3+ quebras colapsam, ruído (----) fora, "
+        f"\\x0b vira quebra, espaço no fim de linha some — veio: {leg!r}",
+    )
 
 
 if __name__ == "__main__":
