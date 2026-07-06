@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-06 | feat(broadcast): aba Summit ES — mapa dia a dia dos disparos da campanha
+
+**O que foi feito:**
+- Nova aba **"Summit ES"** no CRM Marketing mapeando a campanha de broadcasts do Creator Summit ES 2026 (evento seg 03/08, Brizz, Vitória): card **"Sai HOJE"** com os disparos do dia (ou o próximo, se o dia não tiver), calendário completo semana a semana — 4 ondas de venda × frações A–D (base 6.146 DDD 27/28), follow-ups sex/sáb e a régua de **contagem regressiva** pra quem já comprou (tag `[compra]_creators_summit_es`) — com filtros Tudo/Ondas/Follow-ups/Compradores.
+- Cada disparo abre dialog com a **copy completa**, variantes de hook (teste A/B da Onda 1), público, cupom e observações operacionais (ex.: Onda 1 sem link de propósito), + botão "Copiar copy". Badge "preencher dado" nos que têm placeholder ([X]%, [HORÁRIO]).
+- Cards de contexto: cupons por onda com validade (SUMMIT10/MANU10/BORA10/AGORA10), metas da campanha (entrega ≥95%, leitura ≥60%, resposta O1 ≥8%, clique ≥5%, opt-out ≤2%) e checklist pré-disparo.
+- Plano versionado em `shared/ghl-broadcast/summit-es-2026.ts` — campanha fechada de 4 semanas, copies viram template aprovado na Meta; não é editável no painel (mudou o plano → atualiza o arquivo).
+
+**Por que:**
+- Pedido do Caio (06/07): "add dentro do dash uma aba pros disparos do summit... preciso que fique muito bem mapeado sobre quais mensagens vamos mandar no dia". Fonte: `Planejamento_Broadcasts_Creator_Summit_ES.docx` (v2).
+
+**Arquivos alterados:**
+- `shared/ghl-broadcast/summit-es-2026.ts` - dados do plano (disparos, cupons, metas, checklist).
+- `client/src/components/SummitBroadcasts.tsx` - a aba.
+- `client/src/pages/GhlMarketing.tsx` - registro da aba "Summit ES".
+
+**Impacto arquitetural:** Nenhum (aba 100% front, sem backend nem banco).
+
+---
+
 ## 2026-07-06 | fix(broadcast): Metas do mês sempre visível, ancorado no mês corrente
 
 **O que foi feito:**
