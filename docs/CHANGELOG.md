@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-06 | feat(broadcast): plano de julho carregado + base CRM 30k-100k + fix da janela do mês
+
+**O que foi feito:**
+- **Planejamento de julho/2026 reconciliado no dash** (dado, não código): os 20 slots carregados mais cedo por outra sessão vinham de um rascunho com "live" na semana 3 — atualizados pro doc final (`Planejamento_Broadcasts_Julho_2026.docx`): semana 3 virou Dia do Amigo/indicação + CONTRASTE + repique, copies finais em todos os slots, CTAs no título, status `pronta` (exceto os 2 cases com [placeholder], em `backlog`). Criados os slots extras do piloto de cohort ◐ (versões ≤90d/>90d em 07/07 e 13/07) e o repique de 24/07 recriado **sem base** (público = não-abertos de 22/07; sem base não dispara alerta falso de cadência). Total: 22 registros.
+- `feat`: base **"CRM - Entre 30k a 100k"** adicionada ao `BASE_TAG_MAP` — o plano dispara nela em 31/07 e ela não existia (classificação cairia no guarda-chuva CRM - Todos).
+- `fix`: **visão do mês no Planejamento escondia o dia 31** — `new Date("YYYY-MM-DD")` é meia-noite UTC (21h do dia anterior no fuso local), o bind no `::date` deslocava a janela pra [30/06, 30/07]. `getPlano` agora compara `plan_date` com a string YYYY-MM-DD da query.
+
+**Por que:**
+- Caio trouxe o planejamento final de julho (06/07) e pediu pra atualizar o dash. O fix do fuso saiu da verificação: o slot de 31/07 não aparecia na visão de julho.
+
+**Arquivos alterados:**
+- `shared/ghl-broadcast/base-tag-map.ts` - entrada CRM - Entre 30k a 100k.
+- `server/routes/ghl.ts` - janela de datas do getPlano por string YYYY-MM-DD.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
 ## 2026-07-06 | feat(broadcast): painel Metas do mês — meta vs realizado no Resumo
 
 **O que foi feito:**
