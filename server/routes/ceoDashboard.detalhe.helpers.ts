@@ -145,6 +145,21 @@ export function grupoMargemBruta(valor: number): CeoGrupo {
     itensOmitidos: undefined };
 }
 
+// Grupo do drill de Receita em regime de caixa: uma linha por categoria de recebimento.
+// Remove o código contábil do rótulo ("03.01.01 Receita de Serviços" → "Receita de Serviços").
+export function recebidoCategoriasToGrupo(
+  rows: Array<{ categoria: string; valor: number }>
+): CeoGrupo {
+  const limpar = (c: string) => c.replace(/^[\d.\s]+/, "").trim() || c;
+  const itens: ItemDetalhe[] = rows.map((r) => ({
+    grupo: "Receita Recebida", nome: limpar(r.categoria), detalhe: "", data: null, valor: Number(r.valor) || 0,
+  }));
+  return {
+    titulo: "Receita Recebida (regime de caixa · DFC)", formato: "brl",
+    total: itens.reduce((s, i) => s + i.valor, 0), itens,
+  };
+}
+
 export function receitaCabecaGrupos(receita: number, headcount: number): { grupos: CeoGrupo[]; nota: string } {
   const rc = headcount ? receita / headcount : 0;
   return {

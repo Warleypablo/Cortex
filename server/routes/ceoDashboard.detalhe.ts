@@ -3,23 +3,38 @@ import { sql } from "drizzle-orm";
 import { montarDetalheBp } from "./bp2026.detalhe";
 import { computarBpReceitas } from "./bp2026";
 import { storage } from "../storage";
-import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp } from "./ceoDashboard.helpers";
+import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
   enpsRespostasToGrupos, ltvRowsToGrupos, grupoMargemBruta, receitaCabecaGrupos,
-  serieEvolucao, KPI_COMPONENTES, type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao,
+  recebidoCategoriasToGrupo, serieEvolucao, KPI_COMPONENTES,
+  type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao,
 } from "./ceoDashboard.detalhe.helpers";
 
 // Fonte da série mensal (realizado vs meta) por KPI — só os que têm evolução no BP.
-// receita_cabeca usa a linha sintética de caixa (montada à parte). Saldo/Headcount/etc. saem daqui.
+// receita e receita_cabeca usam as linhas sintéticas de caixa (montadas à parte).
 const EVOLUCAO_FONTE: Record<string, { arr: "linhas" | "metricasGerais"; metrica: string }> = {
-  receita: { arr: "metricasGerais", metrica: "receita_total" },
   custos: { arr: "metricasGerais", metrica: "despesa_total" },
   lucro: { arr: "linhas", metrica: "ebitda" },
   caixa: { arr: "metricasGerais", metrica: "saldo_caixa" },
   cac: { arr: "linhas", metrica: "cac" },
   headcount: { arr: "metricasGerais", metrica: "colaboradores" },
 };
+
+// Receita recebida por categoria no mês (entradas de RECEITA quitadas por data_quitacao).
+// Soma exatamente o faturamentoCaixaPorMes do mês → reconcilia com o header do card.
+async function recebidoPorCategoria(db: any, mesNum: number): Promise<Array<{ categoria: string; valor: number }>> {
+  const ini = `2026-${String(mesNum).padStart(2, "0")}-01`;
+  const fim = mesNum >= 12 ? "2027-01-01" : `2026-${String(mesNum + 1).padStart(2, "0")}-01`;
+  const r: any = await db.execute(sql`
+    SELECT COALESCE(categoria_nome, '(sem categoria)') AS categoria,
+           SUM(COALESCE(valor_pago::numeric, 0)) AS valor
+    FROM "Conta Azul".caz_parcelas
+    WHERE tipo_evento = 'RECEITA' AND status = 'QUITADO'
+      AND data_quitacao >= ${ini}::date AND data_quitacao < ${fim}::date
+    GROUP BY 1 ORDER BY SUM(COALESCE(valor_pago::numeric, 0)) DESC`);
+  return (r.rows ?? []).map((x: any) => ({ categoria: String(x.categoria), valor: Number(x.valor) || 0 }));
+}
 
 const TITULOS: Record<string, string> = {
   receita: "Receita", custos: "Custos & Despesas", lucro: "Lucro (EBITDA)",
@@ -51,10 +66,16 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
   let grupos: CeoGrupo[] = [];
   let nota: string | undefined;
 
-  if (kpi === "receita" || kpi === "custos") {
-    grupos = await componentesGrupos(db, kpi, mesNum);
-    const metrica = kpi === "receita" ? "receita_total" : "despesa_total";
-    const v = linhaValor(bp, "metricasGerais", metrica, mesNum);
+  if (kpi === "receita") {
+    // Regime de caixa: header = recebido (DFC); breakdown por categoria de recebimento.
+    const recebido = bp.receitaRecebidaCaixaPorMes?.[mesNum] ?? 0;
+    grupos = [recebidoCategoriasToGrupo(await recebidoPorCategoria(db, mesNum))];
+    base.orcado = linhaValor(bp, "metricasGerais", "receita_total", mesNum).orcado;
+    base.realizado = recebido;
+    nota = "Receita efetivamente recebida no mês (entradas de RECEITA quitadas · base de caixa da DFC). Meta = plano de receita do BP.";
+  } else if (kpi === "custos") {
+    grupos = await componentesGrupos(db, "custos", mesNum);
+    const v = linhaValor(bp, "metricasGerais", "despesa_total", mesNum);
     base.orcado = v.orcado; base.realizado = v.realizado;
   } else if (kpi === "cac") {
     const det = await montarDetalheBp(db, { metrica: "cac", mes: mesNum });
@@ -119,7 +140,9 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
 
   // Série de evolução mensal (realizado vs meta) p/ o gráfico do drawer.
   let evolucao: PontoEvolucao[] | undefined;
-  if (kpi === "receita_cabeca") {
+  if (kpi === "receita") {
+    evolucao = serieEvolucao(receitaRecebidaFromBp(bp), bp.mesFechado);
+  } else if (kpi === "receita_cabeca") {
     evolucao = serieEvolucao(receitaCabecaCaixaFromBp(bp), bp.mesFechado);
   } else if (EVOLUCAO_FONTE[kpi]) {
     const { arr, metrica } = EVOLUCAO_FONTE[kpi];

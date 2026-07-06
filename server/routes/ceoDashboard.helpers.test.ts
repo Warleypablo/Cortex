@@ -8,6 +8,7 @@ import {
   canAccessCeo,
   receitaCabecaCaixaLinha,
   receitaCabecaCaixaFromBp,
+  receitaRecebidaLinha,
   type BpLinha,
 } from "./ceoDashboard.helpers";
 
@@ -100,6 +101,7 @@ describe("assembleCeoKpis", () => {
       inadimplencia: { total: 20, serie: [18, 20] },
       ltvMedioCliente: 28000,
       enpsScore: 48,
+      receitaRecebida: { metrica: "receita_total", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 100, realizado: 95, atingimento: 0.95 }] },
       receitaCabecaCaixa: { metrica: "receita_cabeca", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 12, realizado: 13.6, atingimento: 1.13 }] },
     });
     expect(kpis.map((k) => k.key)).toEqual([
@@ -113,9 +115,33 @@ describe("assembleCeoKpis", () => {
     expect(kpis.find((k) => k.key === "ltv")!.meta).toBeNull();
     expect(kpis.find((k) => k.key === "ltv")!.valor).toBe(28000);
     expect(kpis.find((k) => k.key === "nps")!.status).toBe("em_breve");
+    // Receita vem da linha em regime de caixa (recebido), não da receita_total por competência
+    expect(kpis.find((k) => k.key === "receita")!.valor).toBe(95);
+    expect(kpis.find((k) => k.key === "receita")!.meta).toBe(100);
     // Receita/Cabeça vem da linha em regime de caixa (não da linha do BP)
     expect(kpis.find((k) => k.key === "receita_cabeca")!.valor).toBe(13.6);
     expect(kpis.find((k) => k.key === "receita_cabeca")!.meta).toBe(12);
+  });
+});
+
+describe("receitaRecebidaLinha", () => {
+  const original: BpLinha = {
+    metrica: "receita_total", direcao: "maior_melhor", unidade: "brl",
+    meses: [
+      { mes: 1, orcado: 1_332_560, realizado: 1_409_050, atingimento: 1.05 }, // competência (ignorado)
+      { mes: 2, orcado: 1_500_000, realizado: null, atingimento: null },
+    ],
+  };
+  it("substitui o realizado pelo recebido e recalcula o atingimento; meta preservada", () => {
+    const linha = receitaRecebidaLinha(original, { 1: 1_525_643 });
+    const m1 = linha.meses.find((m) => m.mes === 1)!;
+    expect(m1.realizado).toBe(1_525_643);
+    expect(m1.orcado).toBe(1_332_560);
+    expect(m1.atingimento).toBeCloseTo(1_525_643 / 1_332_560, 6);
+  });
+  it("mês sem recebido → realizado null", () => {
+    const linha = receitaRecebidaLinha(original, { 1: 1_525_643 });
+    expect(linha.meses.find((m) => m.mes === 2)!.realizado).toBeNull();
   });
 });
 

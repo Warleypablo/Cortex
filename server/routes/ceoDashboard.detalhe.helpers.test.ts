@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
-  enpsRespostasToGrupos, ltvRowsToGrupos, receitaCabecaGrupos, serieEvolucao, KPI_COMPONENTES,
+  enpsRespostasToGrupos, ltvRowsToGrupos, receitaCabecaGrupos, recebidoCategoriasToGrupo,
+  serieEvolucao, KPI_COMPONENTES,
 } from "./ceoDashboard.detalhe.helpers";
 import type { DetalheBpResult } from "./bp2026.detalhe";
 
@@ -91,6 +92,20 @@ describe("receitaCabecaGrupos", () => {
     expect(r.grupos[1].total).toBe(112);
     expect(r.nota).toContain("Receita recebida");
     expect(r.nota).toContain("÷ 112");
+  });
+});
+
+describe("recebidoCategoriasToGrupo", () => {
+  it("um item por categoria, total = soma, e limpa o código contábil do nome", () => {
+    const g = recebidoCategoriasToGrupo([
+      { categoria: "03.01.01 Receita de Serviços", valor: 1_508_432 },
+      { categoria: "04.01.02 Rendimento de Investimentos", valor: 6_776 },
+    ]);
+    expect(g.titulo).toContain("regime de caixa");
+    expect(g.total).toBe(1_515_208);
+    expect(g.itens[0].nome).toBe("Receita de Serviços");
+    expect(g.itens[1].nome).toBe("Rendimento de Investimentos");
+    expect(g.formato).toBe("brl");
   });
 });
 

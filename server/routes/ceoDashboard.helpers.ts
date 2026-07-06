@@ -149,6 +149,33 @@ export function receitaCabecaCaixaFromBp(bp: {
   );
 }
 
+// Linha "Receita" em regime de CAIXA (receita efetivamente recebida / DFC) no lugar da
+// receita por competência. Meta e estrutura de meses herdadas da linha receita_total do BP.
+// Garante a identidade Receita ÷ Headcount = Receita/Cabeça (as duas usam o mesmo recebido).
+export function receitaRecebidaLinha(
+  original: BpLinha | undefined,
+  recebidoPorMes: Record<number, number> | undefined
+): BpLinha {
+  const rec = recebidoPorMes ?? {};
+  const meses = (original?.meses ?? []).map((m) => {
+    const realizado = rec[m.mes] ?? null;
+    const atingimento = realizado != null && m.orcado ? realizado / m.orcado : null;
+    return { mes: m.mes, orcado: m.orcado, realizado, atingimento };
+  });
+  return { metrica: "receita_total", titulo: original?.titulo, direcao: "maior_melhor", unidade: "brl", meses };
+}
+
+export function receitaRecebidaFromBp(bp: {
+  metricasGerais?: BpLinha[];
+  receitaRecebidaCaixaPorMes?: Record<number, number>;
+}): BpLinha {
+  const metricas = bp.metricasGerais ?? [];
+  return receitaRecebidaLinha(
+    metricas.find((l) => l.metrica === "receita_total"),
+    bp.receitaRecebidaCaixaPorMes
+  );
+}
+
 export interface CeoSources {
   bpLinhas: BpLinha[];
   bpMetricas: BpLinha[];
@@ -156,7 +183,8 @@ export interface CeoSources {
   inadimplencia: { total: number | null; serie: number[] | null };
   ltvMedioCliente: number | null;
   enpsScore: number | null;
-  // Linha "Receita por Cabeça" já reconstruída em regime de caixa (ver receitaCabecaCaixaFromBp).
+  // Linhas já reconstruídas em regime de caixa (recebido/DFC) — ver *FromBp helpers.
+  receitaRecebida: BpLinha;
   receitaCabecaCaixa: BpLinha;
 }
 
@@ -168,7 +196,12 @@ export function assembleCeoKpis(s: CeoSources): CeoKpi[] {
   ) => bpLinhaToKpi(find(arr, metrica), { key, label, mesNum: s.mesNum, direcao, unidade });
 
   return [
-    bp(s.bpMetricas, "receita_total",  "receita",        "Receita",           "maior_melhor", "brl"),
+    // Receita em regime de caixa (recebido/DFC); meta = plano de receita do BP.
+    // Mesma base da Receita/Cabeça, então Receita ÷ Headcount = Receita/Cabeça.
+    bpLinhaToKpi(s.receitaRecebida, {
+      key: "receita", label: "Receita", mesNum: s.mesNum, direcao: "maior_melhor", unidade: "brl",
+      nota: "Receita efetivamente recebida no mês (regime de caixa · DFC). Meta = plano de receita do BP.",
+    }),
     bp(s.bpMetricas, "despesa_total",  "custos",         "Custos & Despesas", "menor_melhor", "brl"),
     bp(s.bpLinhas,   "ebitda",         "lucro",          "Lucro (EBITDA)",    "maior_melhor", "brl"),
     bp(s.bpMetricas, "saldo_caixa",    "caixa",          "Saldo de Caixa",    "maior_melhor", "brl"),

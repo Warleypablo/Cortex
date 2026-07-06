@@ -7,6 +7,7 @@ import {
   canAccessCeo,
   parseMesNum,
   receitaCabecaCaixaFromBp,
+  receitaRecebidaFromBp,
   type CeoDashboardResponse,
 } from "./ceoDashboard.helpers";
 
@@ -50,6 +51,7 @@ export async function buildCeoDashboard(db: any, mes?: string): Promise<CeoDashb
     },
     ltvMedioCliente: ltv,
     enpsScore,
+    receitaRecebida: receitaRecebidaFromBp(bp),
     receitaCabecaCaixa: receitaCabecaCaixaFromBp(bp),
   });
 
