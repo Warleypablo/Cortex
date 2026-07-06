@@ -160,13 +160,21 @@ def parse_doc(content: str) -> list[ParsedSection]:
             after = body[legenda_match.end():]
             # Se houver um segundo **LEGENDA** (caso de multiple legendas
             # dentro da mesma seção — raro), paramos no primeiro.
-            legenda_text = after.strip()
-            legenda_text = _sanitize_line_for_text(legenda_text)
-            # Remove linhas que são apenas ruído (linhas só com espaços/traços)
-            legenda_text = "\n".join(
-                l for l in legenda_text.splitlines()
-                if l.strip() and not re.fullmatch(r"[\s\-_=·•]+", l.strip())
-            ).strip()
+            legenda_text = _sanitize_line_for_text(after)
+            # \x0b = quebra "soft" (Shift+Enter) na exportação do Docs → vira \n
+            legenda_text = legenda_text.replace("\x0b", "\n")
+            # Linha em branco é SEPARAÇÃO DE PARÁGRAFO — vai pro Instagram como
+            # está no Doc. Só descartamos linhas de ruído visual (----, ====, •••)
+            # e espaços penduradas no fim de cada linha.
+            kept = []
+            for l in legenda_text.splitlines():
+                s = l.strip()
+                if s and re.fullmatch(r"[\-_=·•]+", s):
+                    continue
+                kept.append(l.rstrip())
+            legenda_text = "\n".join(kept)
+            # 2+ linhas em branco seguidas viram uma só (o IG colapsa mesmo)
+            legenda_text = re.sub(r"\n{3,}", "\n\n", legenda_text).strip()
 
         sections.append(
             ParsedSection(
