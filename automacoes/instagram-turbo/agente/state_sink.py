@@ -36,6 +36,11 @@ def panel_state(plan: Any) -> str:
     'aguardando_ia'. Sem assets/placeholder = 'pulado'.
     Planejar com force_now=True faz os skips de data não mascararem a prontidão.
     """
+    # Já postado vence tudo: card com marker re-reportado nos ciclos seguintes tem que
+    # continuar 'publicado' no painel — reportar 'agendado' rebaixava o post publicado
+    # (foi o que apagou o 1º post automático do histórico em 06/jul/2026).
+    if getattr(plan, "already_posted", False):
+        return "publicado"
     src = getattr(plan, "legenda_source", None)
     if plan.legenda_empty or src in ("claude-precisa", "ia"):
         return "aguardando_ia"

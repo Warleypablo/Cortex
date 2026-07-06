@@ -3,6 +3,8 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useSetPageInfo } from "@/contexts/PageContext";
 import { apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
+import { useAuth } from "@/contexts/AuthContext";
+import { useTheme } from "@/components/ThemeProvider";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
@@ -17,10 +19,13 @@ import {
   AlertDialogDescription, AlertDialogFooter, AlertDialogCancel, AlertDialogAction,
 } from "@/components/ui/alert-dialog";
 import {
-  Sprout, Instagram, Music2, Youtube, Linkedin, Loader2, PauseCircle, PlayCircle,
+  Sprout, Instagram, Loader2, PauseCircle, PlayCircle,
   ExternalLink, Send, CalendarClock, CalendarX, AlertTriangle,
-  CalendarDays, List, ChevronLeft, ChevronRight,
+  CalendarDays, BarChart3, ChevronLeft, ChevronRight,
 } from "lucide-react";
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+} from "recharts";
 
 // ── tipos do payload de /api/growth/organico/overview ──────────────────────
 interface Setting { platform: string; agentEnabled: boolean; dryRun: boolean; updatedAt: string }
@@ -32,38 +37,12 @@ interface Post {
   tipoPost: string | null; assetCount: number | null; legendaSource: string | null;
   legendaLen: number | null; state: string; permalink: string | null; clickupUrl: string | null;
   readiness: string | null; blockReasons: string[] | null;
+  updatedAt: string | null;   // último toque do worker (deriva a cada report)
+  publishedAt: string | null; // carimbo REAL da publicação (não deriva)
 }
 interface Overview {
   today: string; platforms: string[]; settings: Setting[]; health: Run[];
   aprovados: Post[]; agendados: Post[]; publicados: Post[]; posts: Post[];
-}
-
-const PLATFORM_LABEL: Record<string, string> = {
-  instagram: "Instagram", tiktok: "TikTok", youtube: "YouTube", linkedin: "LinkedIn",
-};
-
-function PlatformIcon({ platform, className }: { platform: string; className?: string }) {
-  switch (platform) {
-    case "instagram": return <Instagram className={className} />;
-    case "tiktok": return <Music2 className={className} />;
-    case "youtube": return <Youtube className={className} />;
-    case "linkedin": return <Linkedin className={className} />;
-    default: return <Sprout className={className} />;
-  }
-}
-
-const STATE_STYLES: Record<string, { label: string; className: string }> = {
-  aprovado: { label: "Aprovado", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
-  agendado: { label: "Agendado", className: "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300" },
-  aguardando_ia: { label: "Aguardando IA", className: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" },
-  publicado: { label: "Publicado", className: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300" },
-  falhou: { label: "Falhou", className: "bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300" },
-  pulado: { label: "Pulado", className: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" },
-};
-
-function StateBadge({ state }: { state: string }) {
-  const s = STATE_STYLES[state] ?? { label: state, className: "bg-zinc-100 text-zinc-600 dark:bg-zinc-800 dark:text-zinc-400" };
-  return <Badge variant="outline" className={`border-0 ${s.className}`}>{s.label}</Badge>;
 }
 
 function minutosAtras(iso?: string | null): string {
@@ -139,15 +118,7 @@ function motivoPerdeu(p: Post, agentActive: boolean): string {
   return "travado";
 }
 
-function TimeBadge({ ts }: { ts: TimeState }) {
-  if (ts === "atrasado")
-    return <Badge variant="outline" className="border-0 bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300">Atrasado</Badge>;
-  if (ts === "perdeu")
-    return <Badge variant="outline" className="border-0 bg-red-100 text-red-700 dark:bg-red-950 dark:text-red-300">Perdeu o horário</Badge>;
-  return null;
-}
-
-// ── Fase 2: prontidão por card → pílula do calendário ───────────────────────
+// ── prontidão por card (veredito do worker) ─────────────────────────────────
 // O `readiness` vem do WORKER (autoritativo). Aqui só PINTAMOS + reconciliamos o que o
 // front conhece e o worker não: override do operador (scheduledAt) e o estado GLOBAL
 // (o agente está publicando? = ativo E não dry-run).
@@ -233,16 +204,63 @@ function fmtHora(iso: string | null): string {
   return `${h}:${m}`;
 }
 
+// ── aba "Como está indo": métricas derivadas dos posts ──────────────────────
+// Tolerância de pontualidade: o publicador roda a cada 15min, então até ~20min
+// depois do horário do card ainda conta como "no horário".
+const TOLERANCIA_MIN = 20;
+
+// dia planejado (YYYY-MM-DD) — coluna date do banco; NUNCA passar por fuso
+function plannedDay(p: Post): string | null {
+  return p.postingDate ? String(p.postingDate).slice(0, 10) : null;
+}
+
+// publicado de verdade? (state pode ficar 'agendado' em linhas antigas; publishedAt não mente)
+function isPublished(p: Post): boolean {
+  return p.state === "publicado" || !!p.publishedAt;
+}
+
+// momento da publicação: publishedAt (carimbo real) com fallback pro updatedAt de
+// linhas antigas gravadas antes da coluna existir
+function publishedMoment(p: Post): string | null {
+  if (!isPublished(p)) return null;
+  return p.publishedAt ?? p.updatedAt;
+}
+
+// atraso da publicação em minutos (null = sem horário-alvo pra comparar)
+function delayMin(p: Post): number | null {
+  const eff = effectiveWhen(p);
+  const pub = publishedMoment(p);
+  if (!eff || !pub) return null;
+  const a = new Date(eff).getTime();
+  const b = new Date(pub).getTime();
+  if (isNaN(a) || isNaN(b)) return null;
+  return Math.round((b - a) / 60000);
+}
+
+function fmtAtraso(min: number): string {
+  if (min < 60) return `+${min}min`;
+  const h = Math.floor(min / 60);
+  return `+${h}h${String(min % 60).padStart(2, "0")}`;
+}
+
+// soma dias a uma chave YYYY-MM-DD sem sofrer com fuso (ancora no meio-dia UTC)
+function addDays(key: string, days: number): string {
+  const d = new Date(`${key}T12:00:00Z`);
+  d.setUTCDate(d.getUTCDate() + days);
+  return d.toISOString().slice(0, 10);
+}
+
 export default function GrowthOrganico() {
-  useSetPageInfo("Orgânico", "Publicação de conteúdo orgânico — IG, TikTok e além");
-  const [plat, setPlat] = useState<string>("all");
+  useSetPageInfo("Orgânico", "Publicação de conteúdo orgânico — Instagram");
   const [confirmPost, setConfirmPost] = useState<Post | null>(null);
   const [schedulePost, setSchedulePost] = useState<Post | null>(null);
-  const [view, setView] = useState<"calendario" | "listas">("calendario");
+  const [view, setView] = useState<"resumo" | "calendario">("resumo");
   const [monthDate, setMonthDate] = useState<Date>(() => new Date());
 
   const qc = useQueryClient();
   const { toast } = useToast();
+  const { user } = useAuth();
+  const isAdmin = user?.role === "admin";
   const invalidate = () => qc.invalidateQueries({ queryKey: ["/api/growth/organico/overview"] });
 
   const { data, isLoading, isError } = useQuery<Overview>({
@@ -276,72 +294,55 @@ export default function GrowthOrganico() {
     onError: (e: any) => toast({ title: "Falhou", description: String(e?.message ?? e), variant: "destructive" }),
   });
 
-  const inFlightTask = commandMut.isPending ? (commandMut.variables as any)?.clickupTaskId : null;
+  // painel é só Instagram por ora (TikTok volta quando a automação de lá existir)
+  const onlyIg = (rows: Post[]) => rows.filter((r) => r.platform === "instagram");
+  const setting = (data?.settings ?? []).find((s) => s.platform === "instagram");
+  const run = (data?.health ?? []).find((h) => h.platform === "instagram");
+  const agendados = onlyIg(data?.agendados ?? []);
+  const allPosts = onlyIg(data?.posts ?? []);
 
-  const settings = data?.settings ?? [];
-  const healthByPlat = useMemo(() => {
-    const m = new Map<string, Run>();
-    (data?.health ?? []).forEach((h) => m.set(h.platform, h));
-    return m;
-  }, [data]);
-
-  const platforms = settings.length ? settings.map((s) => s.platform) : ["instagram", "tiktok"];
-  const onlyPlat = (rows: Post[]) => (plat === "all" ? rows : rows.filter((r) => r.platform === plat));
-  const aprovados = onlyPlat(data?.aprovados ?? []);
-  const agendados = onlyPlat(data?.agendados ?? []);
-  const publicados = onlyPlat(data?.publicados ?? []);
-  const allPosts = onlyPlat(data?.posts ?? []);  // conjunto completo p/ o calendário
-
-  const agentActiveFor = (platform: string) =>
-    settings.find((s) => s.platform === platform)?.agentEnabled ?? true;
-  const tsOf = (p: Post) => timeState(p, agentActiveFor(p.platform));
+  const agentActive = setting?.agentEnabled ?? true;
+  const publishing = agentActive && !(setting?.dryRun ?? true);
   // posts que passaram do horário e NÃO vão sair sozinhos → alimentam o banner de alerta
-  const perdidos = agendados.filter((p) => tsOf(p) === "perdeu");
+  const perdidos = agendados.filter((p) => timeState(p, agentActive) === "perdeu");
 
-  // conflito de horário: 2+ posts da MESMA rede no MESMO horário efetivo (minuto).
+  // conflito de horário: 2+ posts no MESMO horário efetivo (minuto).
   // Regra: nunca deve sair mais de um post no mesmo horário.
   const horarioKey = (p: Post) => {
     const eff = effectiveWhen(p);
-    return eff ? `${p.platform}|${new Date(eff).toISOString().slice(0, 16)}` : null;
+    return eff ? new Date(eff).toISOString().slice(0, 16) : null;
   };
   const horarioCount = new Map<string, number>();
   agendados.forEach((p) => {
     const k = horarioKey(p);
     if (k) horarioCount.set(k, (horarioCount.get(k) ?? 0) + 1);
   });
-  const emConflito = (p: Post) => {
+  const temConflito = agendados.some((p) => {
     const k = horarioKey(p);
     return !!k && (horarioCount.get(k) ?? 0) > 1;
-  };
-  const temConflito = agendados.some(emConflito);
+  });
 
-  const runNow = (p: Post) =>
-    commandMut.mutate({ platform: p.platform, clickupTaskId: p.clickupTaskId, action: "publish_now" });
   const doSchedule = (p: Post, whenIso: string) =>
     commandMut.mutate({ platform: p.platform, clickupTaskId: p.clickupTaskId, action: "schedule", payload: { scheduled_at: whenIso } });
-  const cancelSchedule = (p: Post) =>
-    commandMut.mutate({ platform: p.platform, clickupTaskId: p.clickupTaskId, action: "cancel_schedule" });
+  const runNow = (p: Post) =>
+    commandMut.mutate({ platform: p.platform, clickupTaskId: p.clickupTaskId, action: "publish_now" });
 
   return (
     <div className="flex flex-col h-full overflow-auto">
       <div className="p-4 space-y-5">
-        {/* filtro de plataforma */}
+        {/* cabeçalho + troca de visão */}
         <div className="flex items-center gap-2 flex-wrap">
           <Sprout className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
-          <span className="text-sm font-semibold mr-2">Orgânico</span>
-          <Chip active={plat === "all"} onClick={() => setPlat("all")}>Todos</Chip>
-          {platforms.map((p) => (
-            <Chip key={p} active={plat === p} onClick={() => setPlat(p)}>
-              <PlatformIcon platform={p} className="h-3.5 w-3.5" />
-              {PLATFORM_LABEL[p] ?? p}
-            </Chip>
-          ))}
+          <span className="text-sm font-semibold">Orgânico</span>
+          <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+            <Instagram className="h-3.5 w-3.5" />Instagram
+          </span>
           <div className="ml-auto inline-flex items-center gap-1.5">
+            <Chip active={view === "resumo"} onClick={() => setView("resumo")}>
+              <BarChart3 className="h-3.5 w-3.5" />Como está indo
+            </Chip>
             <Chip active={view === "calendario"} onClick={() => setView("calendario")}>
               <CalendarDays className="h-3.5 w-3.5" />Calendário
-            </Chip>
-            <Chip active={view === "listas"} onClick={() => setView("listas")}>
-              <List className="h-3.5 w-3.5" />Listas
             </Chip>
           </div>
         </div>
@@ -358,9 +359,8 @@ export default function GrowthOrganico() {
                 </span>
                 <div className="text-red-700/80 dark:text-red-300/80 mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5">
                   {perdidos.slice(0, 3).map((p) => (
-                    <span key={`${p.platform}-${p.id}`} className="truncate">
-                      "{p.taskName ?? "—"}" · {fmtDataHora(effectiveWhen(p))} ·{" "}
-                      {motivoPerdeu(p, agentActiveFor(p.platform))}
+                    <span key={p.id} className="truncate">
+                      "{p.taskName ?? "—"}" · {fmtDataHora(effectiveWhen(p))} · {motivoPerdeu(p, agentActive)}
                     </span>
                   ))}
                   {perdidos.length > 3 && <span>+{perdidos.length - 3}</span>}
@@ -379,7 +379,7 @@ export default function GrowthOrganico() {
                 <span className="font-semibold text-amber-700 dark:text-amber-300">Conflito de horário</span>
                 <span className="text-amber-700/80 dark:text-amber-300/80">
                   {" "}— há posts marcados pro mesmo horário. Nunca deve sair mais de um post na mesma hora;
-                  ajuste o campo <strong>Horário</strong> no card pra dar um horário diferente a cada um.
+                  ajuste a hora no campo <strong>Data de postagem</strong> pra dar um horário diferente a cada um.
                 </span>
               </div>
             </CardContent>
@@ -398,226 +398,47 @@ export default function GrowthOrganico() {
         <section className="space-y-2">
           <h2 className="text-sm font-semibold text-muted-foreground">Saúde do agente</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-3">
-            {platforms
-              .filter((p) => plat === "all" || p === plat)
-              .map((p) => (
-                <HealthCard
-                  key={p}
-                  platform={p}
-                  setting={settings.find((x) => x.platform === p)}
-                  run={healthByPlat.get(p)}
-                  loading={isLoading}
-                  onToggleAgent={(enabled) => settingsMut.mutate({ platform: p, agentEnabled: enabled })}
-                  toggling={settingsMut.isPending && (settingsMut.variables as any)?.platform === p}
-                />
-              ))}
+            <HealthCard
+              setting={setting}
+              run={run}
+              loading={isLoading}
+              canToggle={isAdmin}
+              onToggleAgent={(enabled) => settingsMut.mutate({ platform: "instagram", agentEnabled: enabled })}
+              toggling={settingsMut.isPending}
+            />
           </div>
         </section>
 
-        {/* CALENDÁRIO DE PRONTIDÃO (Fase 2) — a cor de cada card vem do readiness do worker */}
-        {view === "calendario" && (
-          <CalendarSection
+        {/* COMO ESTÁ INDO — avaliação pro time: pontualidade, volume e gargalos */}
+        {view === "resumo" && (
+          <ResumoSection
             posts={allPosts}
-            monthDate={monthDate}
-            settings={settings}
             loading={isLoading}
-            onPrev={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
-            onNext={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
-            onToday={() => setMonthDate(new Date())}
+            isAdmin={isAdmin}
+            commandPending={commandMut.isPending}
+            onPublishNow={setConfirmPost}
+            onSchedule={setSchedulePost}
           />
         )}
 
-        {view === "listas" && (
+        {/* CALENDÁRIO DE PRONTIDÃO — a cor de cada card vem do readiness do worker */}
+        {view === "calendario" && (
           <>
-        {/* (A) APROVADOS — com ações */}
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">
-            Aprovados <span className="text-xs font-normal">({aprovados.length})</span>
-          </h2>
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Rede</TableHead>
-                    <TableHead>Post</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead className="text-center">Assets</TableHead>
-                    <TableHead>Legenda</TableHead>
-                    <TableHead>Data plan.</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {isLoading && <EmptyRow span={7}><Loader2 className="h-4 w-4 animate-spin inline mr-2" />Carregando…</EmptyRow>}
-                  {!isLoading && aprovados.length === 0 && (
-                    <EmptyRow span={7}>Nenhum post aprovado aguardando ação.</EmptyRow>
-                  )}
-                  {aprovados.map((p) => (
-                    <TableRow key={`${p.platform}-${p.id}`}>
-                      <TableCell><PlatformCell platform={p.platform} /></TableCell>
-                      <TableCell className="max-w-[260px] truncate" title={p.taskName ?? ""}>{p.taskName ?? "—"}</TableCell>
-                      <TableCell>{p.tipoPost ?? "—"}</TableCell>
-                      <TableCell className="text-center">{p.assetCount ?? 0}</TableCell>
-                      <TableCell><LegendaCell post={p} /></TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        {fmtData(p.postingDate)}
-                        {p.postingDate && (
-                          <span className="text-xs text-amber-600 dark:text-amber-400 ml-1">· sem horário</span>
-                        )}
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="inline-flex items-center gap-1.5 justify-end">
-                          <ClickUpButton post={p} />
-                          <Button size="sm" variant="default" className="h-7 px-2"
-                            disabled={commandMut.isPending}
-                            onClick={() => setConfirmPost(p)}>
-                            {inFlightTask === p.clickupTaskId
-                              ? <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                              : <Send className="h-3.5 w-3.5" />}
-                            <span className="ml-1">Soltar agora</span>
-                          </Button>
-                          <Button size="sm" variant="outline" className="h-7 px-2"
-                            disabled={commandMut.isPending}
-                            onClick={() => setSchedulePost(p)}>
-                            <CalendarClock className="h-3.5 w-3.5" /><span className="ml-1">Agendar</span>
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* (B) AGENDADOS */}
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">
-            Agendados <span className="text-xs font-normal">({agendados.length})</span>
-          </h2>
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Quando</TableHead>
-                    <TableHead>Rede</TableHead>
-                    <TableHead>Post</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {!isLoading && agendados.length === 0 && (
-                    <EmptyRow span={6}>Nada agendado.</EmptyRow>
-                  )}
-                  {agendados.map((p) => {
-                    const eff = effectiveWhen(p);
-                    return (
-                    <TableRow key={`${p.platform}-${p.id}`}>
-                      <TableCell className="whitespace-nowrap font-medium">
-                        {eff ? (
-                          <>
-                            {fmtDataHora(eff)}
-                            {!p.scheduledAt && !p.postingTime && p.cardScheduledAt && (
-                              <span className="text-xs font-normal text-muted-foreground ml-1">(padrão)</span>
-                            )}
-                          </>
-                        ) : `${fmtData(p.postingDate)}${p.slot ? ` · ${p.slot}` : ""}`}
-                      </TableCell>
-                      <TableCell><PlatformCell platform={p.platform} /></TableCell>
-                      <TableCell className="max-w-[260px] truncate" title={p.taskName ?? ""}>{p.taskName ?? "—"}</TableCell>
-                      <TableCell>{p.tipoPost ?? "—"}</TableCell>
-                      <TableCell>
-                        <div className="inline-flex items-center gap-1.5 flex-wrap">
-                          <StateBadge state={p.state} />
-                          <TimeBadge ts={tsOf(p)} />
-                          {emConflito(p) && (
-                            <Badge variant="outline" className="border-0 bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">
-                              Mesmo horário
-                            </Badge>
-                          )}
-                        </div>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <div className="inline-flex items-center gap-1.5 justify-end">
-                          <ClickUpButton post={p} />
-                          <Button size="sm" variant="default" className="h-7 px-2"
-                            disabled={commandMut.isPending} onClick={() => setConfirmPost(p)}>
-                            <Send className="h-3.5 w-3.5" /><span className="ml-1">Soltar agora</span>
-                          </Button>
-                          {p.scheduledAt && (
-                            <Button size="sm" variant="ghost" className="h-7 px-2 text-muted-foreground"
-                              disabled={commandMut.isPending} onClick={() => cancelSchedule(p)}>
-                              <CalendarX className="h-3.5 w-3.5" /><span className="ml-1">Cancelar</span>
-                            </Button>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </section>
-
-        {/* (C) PUBLICADOS DO DIA */}
-        <section className="space-y-2">
-          <h2 className="text-sm font-semibold text-muted-foreground">
-            Publicados hoje <span className="text-xs font-normal">({publicados.length})</span>
-          </h2>
-          <Card>
-            <CardContent className="p-0">
-              <Table>
-                <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Rede</TableHead>
-                    <TableHead>Post</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Estado</TableHead>
-                    <TableHead>Link</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {!isLoading && publicados.length === 0 && (
-                    <EmptyRow span={5}>Nada publicado hoje ainda.</EmptyRow>
-                  )}
-                  {publicados.map((p) => (
-                    <TableRow key={`${p.platform}-${p.id}`}>
-                      <TableCell><PlatformCell platform={p.platform} /></TableCell>
-                      <TableCell className="max-w-[280px] truncate" title={p.taskName ?? ""}>{p.taskName ?? "—"}</TableCell>
-                      <TableCell>{p.tipoPost ?? "—"}</TableCell>
-                      <TableCell><StateBadge state={p.state} /></TableCell>
-                      <TableCell>
-                        <div className="inline-flex items-center gap-1.5">
-                          <ClickUpButton post={p} />
-                          {p.permalink && (
-                            <a href={p.permalink} target="_blank" rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-blue-600 dark:text-blue-400 hover:underline">
-                              abrir post <ExternalLink className="h-3 w-3" />
-                            </a>
-                          )}
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </CardContent>
-          </Card>
-        </section>
-
-        <p className="text-xs text-muted-foreground">
-          O horário de cada post vem do próprio card (campo <strong>Horário</strong> + <strong>Data de postagem</strong>);
-          "Reagendar" sobrescreve pontualmente e "Soltar agora" publica no próximo ciclo. <span className="text-orange-600 dark:text-orange-400">Atrasado</span> = passou
-          da hora mas ainda sai; <span className="text-red-600 dark:text-red-400">Perdeu o horário</span> = não sai sozinho, precisa de você.
-          A produção do conteúdo segue no Google Doc + Drive + ClickUp.
-        </p>
+            <CalendarSection
+              posts={allPosts}
+              monthDate={monthDate}
+              publishing={publishing}
+              loading={isLoading}
+              onPrev={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+              onNext={() => setMonthDate((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+              onToday={() => setMonthDate(new Date())}
+            />
+            <p className="text-xs text-muted-foreground">
+              O horário de cada post vem do próprio card (hora dentro do campo <strong>Data de postagem</strong>).
+              <span className="text-orange-600 dark:text-orange-400"> Atrasado</span> = passou da hora mas ainda sai;{" "}
+              <span className="text-red-600 dark:text-red-400">perdeu o horário</span> = não sai sozinho, precisa de ação.
+              A produção do conteúdo segue no Google Doc + Drive + ClickUp.
+            </p>
           </>
         )}
       </div>
@@ -628,9 +449,8 @@ export default function GrowthOrganico() {
           <AlertDialogHeader>
             <AlertDialogTitle>Soltar agora?</AlertDialogTitle>
             <AlertDialogDescription>
-              Vai publicar <strong>{confirmPost?.taskName ?? "este post"}</strong> em{" "}
-              {PLATFORM_LABEL[confirmPost?.platform ?? ""] ?? confirmPost?.platform} no próximo ciclo do agente.
-              Publicação é irreversível na conta real.
+              Vai publicar <strong>{confirmPost?.taskName ?? "este post"}</strong> no Instagram no próximo
+              ciclo do agente. Publicação é irreversível na conta real.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -649,6 +469,275 @@ export default function GrowthOrganico() {
         onConfirm={(whenIso) => { if (schedulePost) doSchedule(schedulePost, whenIso); setSchedulePost(null); }}
       />
     </div>
+  );
+}
+
+// ── aba "Como está indo" ─────────────────────────────────────────────────────
+// Cores das 2 séries validadas (lightness/chroma/CVD/contraste) contra superfície
+// clara E escura — o mesmo par passa nos dois temas.
+const COR_PLANEJADO = "#3b82f6";
+const COR_PUBLICADO = "#059669";
+
+function ResumoSection({ posts, loading, isAdmin, commandPending, onPublishNow, onSchedule }: {
+  posts: Post[]; loading: boolean; isAdmin: boolean; commandPending: boolean;
+  onPublishNow: (p: Post) => void; onSchedule: (p: Post) => void;
+}) {
+  const { theme } = useTheme();
+  const isDark = theme === "dark";
+  const chartColors = {
+    grid: isDark ? "#27272a" : "#e5e7eb",
+    axisLine: isDark ? "#3f3f46" : "#d1d5db",
+    axisTick: isDark ? "#71717a" : "#6b7280",
+  };
+
+  const stats = useMemo(() => {
+    const todayKey = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+    const monthPrefix = todayKey.slice(0, 7);
+
+    // publicados no mês (pelo dia da PUBLICAÇÃO, em SP)
+    const publicadosMes = posts.filter(
+      (p) => isPublished(p) && (spDayKey(publishedMoment(p)) ?? "").startsWith(monthPrefix),
+    );
+    const comAlvo = publicadosMes.filter((p) => delayMin(p) != null);
+    const noHorario = comAlvo.filter((p) => (delayMin(p) as number) <= TOLERANCIA_MIN);
+    const atrasados = comAlvo.filter((p) => (delayMin(p) as number) > TOLERANCIA_MIN);
+
+    // planejado pro mês que o dia passou e não saiu
+    const naoSairam = posts.filter((p) => {
+      const d = plannedDay(p);
+      return !isPublished(p) && p.state !== "pulado" &&
+        !!d && d < todayKey && d.startsWith(monthPrefix);
+    });
+
+    // planejado × publicado por semana (últimas 6, seg→dom, pelo dia PLANEJADO)
+    const base = new Date(`${todayKey}T12:00:00Z`);
+    base.setUTCDate(base.getUTCDate() - ((base.getUTCDay() + 6) % 7)); // segunda da semana atual
+    const mondayKey = base.toISOString().slice(0, 10);
+    const semanas = Array.from({ length: 6 }, (_, i) => {
+      const ini = addDays(mondayKey, (i - 5) * 7);
+      const fim = addDays(ini, 6);
+      const daSemana = posts.filter((p) => {
+        const d = plannedDay(p);
+        return p.state !== "pulado" && !!d && d >= ini && d <= fim;
+      });
+      return {
+        label: `${fmtData(ini)}–${fmtData(fim)}`,
+        planejado: daSemana.length,
+        publicado: daSemana.filter(isPublished).length,
+      };
+    });
+
+    // o que está travando agora: bloqueios dos posts pendentes (recentes ou futuros)
+    const corte = addDays(todayKey, -14);
+    const travados = posts
+      .filter((p) => {
+        if (isPublished(p) || p.state === "pulado") return false;
+        if (readinessOf(p) !== "blocked" || effectiveReasons(p).length === 0) return false;
+        const d = plannedDay(p);
+        return !d || d >= corte;
+      })
+      .sort((a, b) => String(plannedDay(a) ?? "9999").localeCompare(String(plannedDay(b) ?? "9999")));
+    const motivos = new Map<string, number>();
+    travados.forEach((p) =>
+      effectiveReasons(p).forEach((r) => {
+        const label = REASON_LABEL[r] ?? r;
+        motivos.set(label, (motivos.get(label) ?? 0) + 1);
+      }),
+    );
+    const motivosRank = Array.from(motivos.entries()).sort((a, b) => b[1] - a[1]);
+
+    // feed dos últimos publicados (qualquer mês), mais recente primeiro
+    const feed = posts
+      .filter((p) => isPublished(p) && publishedMoment(p))
+      .sort((a, b) => new Date(publishedMoment(b)!).getTime() - new Date(publishedMoment(a)!).getTime())
+      .slice(0, 12);
+
+    return { publicadosMes, comAlvo, noHorario, atrasados, naoSairam, semanas, travados, motivosRank, feed };
+  }, [posts]);
+
+  const pct = stats.comAlvo.length
+    ? Math.round((stats.noHorario.length / stats.comAlvo.length) * 100)
+    : null;
+
+  return (
+    <>
+      {/* KPIs do mês */}
+      <section className="grid grid-cols-2 xl:grid-cols-4 gap-3">
+        <KpiTile label="Publicados no mês" value={String(stats.publicadosMes.length)} sub="posts no ar" />
+        <KpiTile
+          label="No horário"
+          value={pct == null ? "—" : `${pct}%`}
+          sub={pct == null ? "sem posts com horário ainda" : `${stats.noHorario.length} de ${stats.comAlvo.length} com horário`}
+        />
+        <KpiTile label="Atrasados" value={String(stats.atrasados.length)} sub={`saíram >${TOLERANCIA_MIN}min depois`} />
+        <KpiTile label="Não saíram" value={String(stats.naoSairam.length)} sub="o dia passou sem publicar" tone={stats.naoSairam.length > 0 ? "bad" : undefined} />
+      </section>
+
+      {/* planejado × publicado por semana */}
+      <section className="space-y-2">
+        <h2 className="text-sm font-semibold text-muted-foreground">Planejado × publicado por semana</h2>
+        <Card>
+          <CardContent className="p-3 pt-4">
+            {loading ? (
+              <div className="h-[220px] flex items-center justify-center text-sm text-muted-foreground">
+                <Loader2 className="h-4 w-4 animate-spin mr-2" />Carregando…
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height={220}>
+                <BarChart data={stats.semanas} margin={{ top: 4, right: 8, left: -22, bottom: 0 }} barCategoryGap="28%" barGap={2}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={chartColors.grid} vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: chartColors.axisTick }}
+                    axisLine={{ stroke: chartColors.axisLine }} tickLine={false} />
+                  <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: chartColors.axisTick }}
+                    axisLine={false} tickLine={false} />
+                  <Tooltip
+                    cursor={{ fill: isDark ? "#27272a55" : "#e5e7eb55" }}
+                    contentStyle={{
+                      backgroundColor: isDark ? "#18181b" : "#ffffff",
+                      border: `1px solid ${chartColors.grid}`, borderRadius: 8, fontSize: 12,
+                    }}
+                    labelStyle={{ color: chartColors.axisTick }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 12 }} />
+                  {/* sem animação: com refetch a cada 20s a animação inicial trava as
+                      barras em zero quando os dados chegam durante o primeiro paint */}
+                  <Bar dataKey="planejado" name="Planejado" fill={COR_PLANEJADO} radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false} />
+                  <Bar dataKey="publicado" name="Publicado" fill={COR_PUBLICADO} radius={[4, 4, 0, 0]} maxBarSize={22} isAnimationActive={false} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <div className="grid grid-cols-1 xl:grid-cols-2 gap-4 items-start">
+        {/* o que está travando agora */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">
+            O que está travando <span className="text-xs font-normal">({stats.travados.length} post{stats.travados.length === 1 ? "" : "s"})</span>
+          </h2>
+          <Card>
+            <CardContent className="p-3 space-y-3">
+              {!loading && stats.travados.length === 0 && (
+                <p className="text-sm text-muted-foreground py-4 text-center">Nada travado — fila limpa. 🎉</p>
+              )}
+
+              {stats.motivosRank.length > 0 && (
+                <div className="space-y-1.5">
+                  {stats.motivosRank.map(([label, n]) => (
+                    <div key={label} className="flex items-center gap-2 text-xs">
+                      <span className="w-20 shrink-0 text-muted-foreground capitalize">{label}</span>
+                      <div className="flex-1 h-2 rounded-full bg-muted overflow-hidden">
+                        <div className="h-full rounded-full bg-amber-500"
+                          style={{ width: `${(n / stats.motivosRank[0][1]) * 100}%` }} />
+                      </div>
+                      <span className="w-6 text-right font-semibold tabular-nums">{n}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {stats.travados.slice(0, 8).map((p) => (
+                <div key={p.id} className="flex items-center gap-2 text-sm border-t border-border pt-2 first:border-t-0 first:pt-0">
+                  <div className="flex-1 min-w-0">
+                    <div className="truncate" title={p.taskName ?? ""}>{p.taskName ?? "—"}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {plannedDay(p) ? fmtData(plannedDay(p)) : "sem data"} · falta:{" "}
+                      {effectiveReasons(p).map((r) => REASON_LABEL[r] ?? r).join(", ")}
+                    </div>
+                  </div>
+                  <ClickUpButton post={p} />
+                  {isAdmin && (
+                    <>
+                      <Button size="sm" variant="outline" className="h-7 px-2" disabled={commandPending}
+                        onClick={() => onSchedule(p)}>
+                        <CalendarClock className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button size="sm" variant="default" className="h-7 px-2" disabled={commandPending}
+                        onClick={() => onPublishNow(p)}>
+                        <Send className="h-3.5 w-3.5" />
+                      </Button>
+                    </>
+                  )}
+                </div>
+              ))}
+              {stats.travados.length > 8 && (
+                <p className="text-xs text-muted-foreground">+{stats.travados.length - 8} outros — veja o Calendário.</p>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        {/* últimos publicados */}
+        <section className="space-y-2">
+          <h2 className="text-sm font-semibold text-muted-foreground">Últimos publicados</h2>
+          <Card>
+            <CardContent className="p-0">
+              <Table>
+                <TableHeader>
+                  <TableRow className="bg-muted/50">
+                    <TableHead>Quando</TableHead>
+                    <TableHead>Post</TableHead>
+                    <TableHead>Pontualidade</TableHead>
+                    <TableHead className="text-right">Link</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {loading && <EmptyRow span={4}><Loader2 className="h-4 w-4 animate-spin inline mr-2" />Carregando…</EmptyRow>}
+                  {!loading && stats.feed.length === 0 && <EmptyRow span={4}>Nada publicado ainda.</EmptyRow>}
+                  {stats.feed.map((p) => {
+                    const d = delayMin(p);
+                    return (
+                      <TableRow key={p.id}>
+                        <TableCell className="whitespace-nowrap text-xs">{fmtDataHora(publishedMoment(p))}</TableCell>
+                        <TableCell className="max-w-[220px] truncate" title={p.taskName ?? ""}>{p.taskName ?? "—"}</TableCell>
+                        <TableCell>
+                          {d == null ? (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          ) : d <= TOLERANCIA_MIN ? (
+                            <Badge variant="outline" className="border-0 bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300">no horário</Badge>
+                          ) : (
+                            <Badge variant="outline" className="border-0 bg-orange-100 text-orange-700 dark:bg-orange-950 dark:text-orange-300">{fmtAtraso(d)}</Badge>
+                          )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          {p.permalink ? (
+                            <a href={p.permalink} target="_blank" rel="noreferrer"
+                              className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline whitespace-nowrap">
+                              abrir post <ExternalLink className="h-3 w-3" />
+                            </a>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">—</span>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </section>
+      </div>
+
+      <p className="text-xs text-muted-foreground">
+        <strong>No horário</strong> = publicado até {TOLERANCIA_MIN}min depois da hora do card (o publicador roda a
+        cada 15min). <strong>Não saiu</strong> = o dia planejado passou sem publicação — os motivos aparecem em
+        "O que está travando". A produção do conteúdo segue no Google Doc + Drive + ClickUp.
+      </p>
+    </>
+  );
+}
+
+function KpiTile({ label, value, sub, tone }: { label: string; value: string; sub: string; tone?: "bad" }) {
+  return (
+    <Card>
+      <CardContent className="p-4">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className={`text-2xl font-bold tabular-nums mt-1 ${tone === "bad" ? "text-red-600 dark:text-red-400" : ""}`}>{value}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">{sub}</p>
+      </CardContent>
+    </Card>
   );
 }
 
@@ -701,23 +790,6 @@ function Chip({ active, onClick, children }: { active: boolean; onClick: () => v
   );
 }
 
-function PlatformCell({ platform }: { platform: string }) {
-  return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap">
-      <PlatformIcon platform={platform} className="h-4 w-4" />
-      {PLATFORM_LABEL[platform] ?? platform}
-    </span>
-  );
-}
-
-function LegendaCell({ post }: { post: Post }) {
-  if (post.legendaSource === "doc")
-    return <span className="text-xs text-muted-foreground">Doc ({post.legendaLen ?? 0})</span>;
-  if (post.legendaSource === "ia" || post.legendaSource === "claude-precisa")
-    return <Badge variant="outline" className="border-0 bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300">IA</Badge>;
-  return <span className="text-xs text-muted-foreground">—</span>;
-}
-
 // Botão que abre o card correspondente no ClickUp. Usa a URL salva (clickupUrl)
 // quando existe; senão monta a partir do task id (formato curto que redireciona).
 function ClickUpButton({ post }: { post: Post }) {
@@ -743,8 +815,8 @@ function EmptyRow({ span, children }: { span: number; children: ReactNode }) {
   );
 }
 
-function HealthCard({ platform, setting, run, loading, onToggleAgent, toggling }: {
-  platform: string; setting?: Setting; run?: Run; loading: boolean;
+function HealthCard({ setting, run, loading, canToggle, onToggleAgent, toggling }: {
+  setting?: Setting; run?: Run; loading: boolean; canToggle: boolean;
   onToggleAgent: (enabled: boolean) => void; toggling: boolean;
 }) {
   const enabled = setting?.agentEnabled ?? true;
@@ -757,8 +829,8 @@ function HealthCard({ platform, setting, run, loading, onToggleAgent, toggling }
       <CardHeader className="pb-2">
         <CardTitle className="text-sm flex items-center justify-between">
           <span className="inline-flex items-center gap-2">
-            <PlatformIcon platform={platform} className="h-4 w-4" />
-            {PLATFORM_LABEL[platform] ?? platform}
+            <Instagram className="h-4 w-4" />
+            Instagram
           </span>
           <span className={`h-2.5 w-2.5 rounded-full ${dot}`} title={run?.status ?? "sem ciclo"} />
         </CardTitle>
@@ -775,10 +847,12 @@ function HealthCard({ platform, setting, run, loading, onToggleAgent, toggling }
           <Badge variant="outline" className={`border-0 ${dryRun ? "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300" : "bg-blue-100 text-blue-700 dark:bg-blue-950 dark:text-blue-300"}`}>
             {dryRun ? "Dry-run" : "Publicando"}
           </Badge>
-          <Button size="sm" variant="ghost" className="h-6 px-2 ml-auto text-xs"
-            disabled={toggling} onClick={() => onToggleAgent(!enabled)}>
-            {toggling ? <Loader2 className="h-3 w-3 animate-spin" /> : enabled ? "Pausar" : "Retomar"}
-          </Button>
+          {canToggle && (
+            <Button size="sm" variant="ghost" className="h-6 px-2 ml-auto text-xs"
+              disabled={toggling} onClick={() => onToggleAgent(!enabled)}>
+              {toggling ? <Loader2 className="h-3 w-3 animate-spin" /> : enabled ? "Pausar" : "Retomar"}
+            </Button>
+          )}
         </div>
         {run?.counts && (run.counts.published != null || run.counts.errors != null) && (
           <div className="text-xs text-muted-foreground">
@@ -792,15 +866,11 @@ function HealthCard({ platform, setting, run, loading, onToggleAgent, toggling }
   );
 }
 
-// ── Fase 2: Calendário de Prontidão (grade do mês + resumo/legenda) ─────────
-function CalendarSection({ posts, monthDate, settings, loading, onPrev, onNext, onToday }: {
-  posts: Post[]; monthDate: Date; settings: Setting[]; loading: boolean;
+// ── Calendário de Prontidão (grade do mês + resumo/legenda) ─────────────────
+function CalendarSection({ posts, monthDate, publishing, loading, onPrev, onNext, onToday }: {
+  posts: Post[]; monthDate: Date; publishing: boolean; loading: boolean;
   onPrev: () => void; onNext: () => void; onToday: () => void;
 }) {
-  const publishingFor = (platform: string) => {
-    const s = settings.find((x) => x.platform === platform);
-    return (s?.agentEnabled ?? true) && !(s?.dryRun ?? true);
-  };
   const year = monthDate.getFullYear();
   const month = monthDate.getMonth();
   const pad = (n: number) => String(n).padStart(2, "0");
@@ -816,14 +886,14 @@ function CalendarSection({ posts, monthDate, settings, loading, onPrev, onNext, 
   }
   byDay.forEach((arr) =>
     arr.sort((a, b) => String(effectiveWhen(a) ?? "").localeCompare(String(effectiveWhen(b) ?? ""))));
-  const semData = posts.filter((p) => !postDayKey(p)).length;  // somem do calendário → avisar
+  const semData = posts.filter((p) => !postDayKey(p) && p.state !== "pulado").length;
 
   // resumo do mês visível (conta por tipo de pílula)
   const summary: Partial<Record<PillKind, number>> = {};
   for (const p of posts) {
     const k = postDayKey(p);
     if (!k || !k.startsWith(monthPrefix)) continue;
-    const kind = pillKind(p, publishingFor(p.platform));
+    const kind = pillKind(p, publishing);
     summary[kind] = (summary[kind] ?? 0) + 1;
   }
 
@@ -853,7 +923,7 @@ function CalendarSection({ posts, monthDate, settings, loading, onPrev, onNext, 
         {semData > 0 && (
           <span className="inline-flex items-center gap-1 text-amber-600 dark:text-amber-400" title="Posts sem Data de postagem não aparecem no calendário">
             <AlertTriangle className="h-3 w-3" />
-            {semData} sem data — veja em "Listas"
+            {semData} sem data (fora do calendário)
           </span>
         )}
       </div>
@@ -884,7 +954,7 @@ function CalendarSection({ posts, monthDate, settings, loading, onPrev, onNext, 
                 <div key={key} className={`min-h-[92px] rounded-md border p-1 flex flex-col gap-1 overflow-hidden ${isToday ? "border-primary bg-primary/5" : "border-border bg-card"}`}>
                   <div className={`text-[11px] font-medium ${isToday ? "text-primary" : "text-muted-foreground"}`}>{d}</div>
                   {dayPosts.slice(0, 4).map((p) => (
-                    <CalPill key={`${p.platform}-${p.id}`} post={p} publishing={publishingFor(p.platform)} />
+                    <CalPill key={p.id} post={p} publishing={publishing} />
                   ))}
                   {dayPosts.length > 4 && (
                     <span className="text-[10px] text-muted-foreground pl-0.5">+{dayPosts.length - 4} mais</span>
