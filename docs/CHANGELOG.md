@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-06 | feat(ads): lotes Esther UGCs (TP1751-1770) e Lucas UGC (TP1771-1792) — 1º fluxo 100% via API, do Drive ao ad ativo
+
+**O que foi feito:**
+- **Lote Esther "UGCs x Anúncios"**: 20 hooks pareados (b1/b2 × h1-h10) cadastrados na Biblioteca (TP1751-1770), 40 vídeos (~125MB) baixados do Drive e subidos pro Gerenciador via `metaUploadVideo` chunked (40,8min, 0 falhas) e 4 conjuntos (1-4, split h01-05/h06-10 por body) com 20 ads pareados 9x16+4x5 na campanha CBO QUENTE Creators (`120252335029070450`).
+- **Lote Lucas "UGC x Anúncios"**: 22 hooks pareados (b1/b2 × h1-h11) na Biblioteca (TP1771-1792), 44 vídeos subidos (27,6min, 0 falhas) e 4 conjuntos (5-8, split 5+6: h01-05/h06-11) com 22 ads na mesma campanha.
+- Scripts por lote (`subir-{esther-ugcs,lucas-ugc}-{planilha,upload,ads}.ts`): campanha resolvida PELO NOME (não por ID fixo), copy/config clonados do conjunto irmão de maior NN com ads, posições do criativo derivadas do targeting clonado (IG-only vs FB+IG), tudo DRY por padrão e idempotente (re-run pula o que existe).
+- **Regra nova no `--activate`: ativa SÓ os ads — conjunto NUNCA é ativado por script** (ligar conjunto é decisão manual do Caio no Gerenciador). Estado final dos dois lotes: 42 ads ACTIVE dentro de 8 conjuntos PAUSED.
+
+**Por que:**
+- Primeira vez que o fluxo completo (planilha → upload de vídeo → conjuntos/ads → ativação) roda 100% via API, sem upload manual no Gerenciador. Upload de vídeo em produção valida o `metaUploadVideo` chunked pro pipeline automático semanal.
+- A regra do conjunto pausado nasceu de incidente real: o primeiro `--activate` ligou os 4 conjuntos da Esther junto com os ads e o gasto começou sem aprovação manual.
+
+**Arquivos alterados:**
+- `scripts/ads/subir-esther-ugcs-{planilha,upload,ads}.ts` - lote Esther (novos)
+- `scripts/ads/subir-lucas-ugc-{planilha,upload,ads}.ts` - lote Lucas (novos)
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLIs avulsos (tsx). Padrão novo pros próximos lotes: upload via API + ativação só de ads.
+
 ## 2026-06-30 | chore(scripts): move 42 scripts one-off de ads da raiz p/ scripts/ads/
 
 **O que foi feito:**
