@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
-  enpsRespostasToGrupos, ltvRowsToGrupos, receitaCabecaGrupos, KPI_COMPONENTES,
+  enpsRespostasToGrupos, ltvRowsToGrupos, receitaCabecaGrupos, serieEvolucao, KPI_COMPONENTES,
 } from "./ceoDashboard.detalhe.helpers";
 import type { DetalheBpResult } from "./bp2026.detalhe";
 
@@ -91,6 +91,34 @@ describe("receitaCabecaGrupos", () => {
     expect(r.grupos[1].total).toBe(112);
     expect(r.nota).toContain("Receita recebida");
     expect(r.nota).toContain("÷ 112");
+  });
+});
+
+describe("serieEvolucao", () => {
+  const linha = {
+    meses: [
+      { mes: 1, orcado: 100, realizado: 90 },
+      { mes: 2, orcado: 100, realizado: 110 },
+      { mes: 3, orcado: 100, realizado: null }, // mês futuro: descartado
+    ],
+  };
+  it("mantém só meses com realizado e carrega o orçado em paralelo", () => {
+    const s = serieEvolucao(linha);
+    expect(s).toEqual([
+      { mes: 1, realizado: 90, orcado: 100 },
+      { mes: 2, realizado: 110, orcado: 100 },
+    ]);
+  });
+  it("corta no mês fechado — exclui o mês corrente parcial", () => {
+    const s = serieEvolucao({ meses: [
+      { mes: 1, orcado: 100, realizado: 90 },
+      { mes: 2, orcado: 100, realizado: 110 },
+      { mes: 3, orcado: 100, realizado: 5 }, // mês corrente parcial: excluído
+    ] }, 2);
+    expect(s.map((p) => p.mes)).toEqual([1, 2]);
+  });
+  it("linha ausente → série vazia, sem quebrar", () => {
+    expect(serieEvolucao(undefined)).toEqual([]);
   });
 });
 

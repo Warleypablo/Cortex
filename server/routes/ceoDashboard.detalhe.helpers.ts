@@ -8,15 +8,32 @@ export interface CeoGrupo extends GrupoDetalhe {
   formato: "brl" | "num";
 }
 
+// Um ponto da série de evolução mensal (realizado vs meta) exibida no gráfico do drawer.
+export interface PontoEvolucao { mes: number; realizado: number | null; orcado: number | null }
+
 export interface CeoDetalheResponse {
   kpi: string;
   titulo: string;
   mes: number;
+  unidade: "brl" | "int";
   orcado: number | null;
   realizado: number | null;
   atingimentoPct: number | null;
   grupos: CeoGrupo[];
+  evolucao?: PontoEvolucao[];
   nota?: string;
+}
+
+// Extrai a série mensal (jan→mês fechado) de uma linha do BP para o gráfico de evolução.
+// Só meses com realizado e ATÉ o mês fechado — o mês corrente é parcial e distorceria a curva
+// (ex.: receita do mês em andamento cai a zero). Carrega o orçado p/ traçar a meta em paralelo.
+export function serieEvolucao(
+  linha: { meses?: Array<{ mes: number; orcado: number; realizado: number | null }> } | undefined,
+  mesFechado?: number
+): PontoEvolucao[] {
+  return (linha?.meses ?? [])
+    .filter((m) => m.realizado !== null && (mesFechado == null || m.mes <= mesFechado))
+    .map((m) => ({ mes: m.mes, realizado: m.realizado, orcado: m.orcado ?? null }));
 }
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });

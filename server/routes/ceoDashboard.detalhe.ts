@@ -7,8 +7,19 @@ import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp } from "./ceoDashbo
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
   enpsRespostasToGrupos, ltvRowsToGrupos, grupoMargemBruta, receitaCabecaGrupos,
-  KPI_COMPONENTES, type CeoGrupo, type CeoDetalheResponse,
+  serieEvolucao, KPI_COMPONENTES, type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao,
 } from "./ceoDashboard.detalhe.helpers";
+
+// Fonte da série mensal (realizado vs meta) por KPI — só os que têm evolução no BP.
+// receita_cabeca usa a linha sintética de caixa (montada à parte). Saldo/Headcount/etc. saem daqui.
+const EVOLUCAO_FONTE: Record<string, { arr: "linhas" | "metricasGerais"; metrica: string }> = {
+  receita: { arr: "metricasGerais", metrica: "receita_total" },
+  custos: { arr: "metricasGerais", metrica: "despesa_total" },
+  lucro: { arr: "linhas", metrica: "ebitda" },
+  caixa: { arr: "metricasGerais", metrica: "saldo_caixa" },
+  cac: { arr: "linhas", metrica: "cac" },
+  headcount: { arr: "metricasGerais", metrica: "colaboradores" },
+};
 
 const TITULOS: Record<string, string> = {
   receita: "Receita", custos: "Custos & Despesas", lucro: "Lucro (EBITDA)",
@@ -35,7 +46,8 @@ async function componentesGrupos(db: any, kpi: string, mesNum: number): Promise<
 export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promise<CeoDetalheResponse> {
   const bp: any = await computarBpReceitas(db);
   const mesNum = parseMesNum(mes, bp.mesCorrente);
-  const base = { kpi, titulo: TITULOS[kpi] ?? kpi, mes: mesNum, orcado: null as number | null, realizado: null as number | null, atingimentoPct: null as number | null };
+  const unidade: "brl" | "int" = kpi === "headcount" ? "int" : "brl";
+  const base = { kpi, titulo: TITULOS[kpi] ?? kpi, mes: mesNum, unidade, orcado: null as number | null, realizado: null as number | null, atingimentoPct: null as number | null };
   let grupos: CeoGrupo[] = [];
   let nota: string | undefined;
 
@@ -104,7 +116,18 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
 
   const atingimentoPct = base.orcado != null && base.realizado != null && base.orcado !== 0
     ? Math.round((base.realizado / base.orcado) * 1000) / 10 : null;
-  return { ...base, atingimentoPct, grupos, nota };
+
+  // Série de evolução mensal (realizado vs meta) p/ o gráfico do drawer.
+  let evolucao: PontoEvolucao[] | undefined;
+  if (kpi === "receita_cabeca") {
+    evolucao = serieEvolucao(receitaCabecaCaixaFromBp(bp), bp.mesFechado);
+  } else if (EVOLUCAO_FONTE[kpi]) {
+    const { arr, metrica } = EVOLUCAO_FONTE[kpi];
+    evolucao = serieEvolucao((bp[arr] ?? []).find((l: any) => l.metrica === metrica), bp.mesFechado);
+  }
+  if (evolucao && evolucao.length < 2) evolucao = undefined; // 1 ponto não é evolução
+
+  return { ...base, atingimentoPct, grupos, evolucao, nota };
 }
 
 export function registerCeoDashboardDetalheRoutes(app: Express, db: any) {
