@@ -190,5 +190,67 @@ def test_legenda_preserva_paragrafos():
     )
 
 
+def test_placeholder_bold_nao_corta_secao():
+    # Regressão do post de 06/jul/2026 ("Cases de sucesso da nossa agência"):
+    # placeholders de métrica em bold UPPER no slide 5 (**XPTO**, **LTV**)
+    # viravam header de post e cortavam a seção ANTES do **LEGENDA** — o
+    # worker via legenda vazia e recusou publicar às 18h. Bold no meio dos
+    # slides de um post ainda aberto (IMG visto, LEGENDA não) não é header.
+    doc = (
+        "**CASES DE SUCESSO DA NOSSA AGÊNCIA**\n"
+        "\n"
+        "**IMG 1**\n"
+        "\n"
+        "CASE DE SUCESSO \n"
+        "\n"
+        "Haux\n"
+        "\n"
+        "**IMG 5**\n"
+        "\n"
+        "**XPTO**\n"
+        "**XPTO ROAS**\n"
+        "**LTV**\n"
+        "\n"
+        "Esse crescimento não veio do acaso.\n"
+        "\n"
+        "**IMG 6**\n"
+        "\n"
+        "Clique no **Link da Bio** e fale com um de nossos especialistas.\n"
+        "\n"
+        "**LEGENDA**\n"
+        "Antes de aumentar as vendas, foi preciso mudar a percepção da marca.\n"
+        "\n"
+        "Se a sua marca está pronta, fala com a gente. #turbopartners\n"
+        "\n"
+        "**PRÓXIMO POST QUALQUER**\n"
+        "**LEGENDA**\n"
+        "Legenda do post seguinte.\n"
+    )
+    leg, hdr = find_legenda_for_task(doc, "Cases de sucesso da nossa agência")
+    _assert(hdr == "CASES DE SUCESSO DA NOSSA AGÊNCIA", "header do card casou")
+    _assert("Antes de aumentar as vendas" in leg, "legenda achada apesar dos placeholders bold")
+    _assert("Legenda do post seguinte" not in leg, "legenda não vaza pro post seguinte")
+
+    # Depois do **LEGENDA** o post "fecha": o próximo bold UPPER volta a ser header
+    leg2, hdr2 = find_legenda_for_task(doc, "Próximo post qualquer")
+    _assert(hdr2 == "PRÓXIMO POST QUALQUER", "post seguinte continua sendo seção própria")
+    _assert(leg2 == "Legenda do post seguinte.", "legenda do post seguinte intacta")
+
+    # Post SEM slide interno (sem IMG/CENA) seguido de outro post: split normal,
+    # a demoção só vale dentro de conteúdo de slide.
+    doc2 = (
+        "**POST SEM LEGENDA**\n"
+        "anotação solta\n"
+        "**OUTRO POST**\n"
+        "**LEGENDA**\n"
+        "Legenda do outro post.\n"
+    )
+    leg3, hdr3 = find_legenda_for_task(doc2, "Post sem legenda")
+    _assert(hdr3 == "POST SEM LEGENDA", "post sem legenda ainda é seção")
+    _assert(leg3 == "", "post sem legenda não rouba a legenda do vizinho")
+
+
 if __name__ == "__main__":
     run()
+    test_legenda_preserva_paragrafos()
+    test_placeholder_bold_nao_corta_secao()
