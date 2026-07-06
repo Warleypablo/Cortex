@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-06 | feat(broadcast): painel Metas do mês — meta vs realizado no Resumo
+
+**O que foi feito:**
+- Card **"Metas do mês"** no Resumo executivo do Broadcast: compara o realizado do período selecionado com a meta do mês, tile por métrica com verde/vermelho por atingimento. Métricas: abertura %, taxa de resposta %, respostas positivas %, opt-outs, reuniões diretas e vendas.
+- Tabela nova `cortex_core.broadcast_goals` (mês × métrica, alvo numérico + comparador ≥/≤) com endpoints `GET/POST /api/ghl/goals` (upsert com `updated_by`). O realizado é calculado no front a partir do `/broadcasts/summary` já existente.
+- Metas de julho/2026 já cadastradas no banco: abertura ≥33%, resposta ≥6%, positivas ≥60%, opt-outs ≤25, reuniões diretas ≥12, vendas ≥4.
+- O card só renderiza se o mês tiver metas cadastradas; com o range default (últimos 30 dias, começa no mês anterior) ele fica oculto — selecionar "Esse mês" no seletor de período pra ver.
+- De carona: tipo do broadcast WA do calendário passou a declarar `preview` (o JSX já usava o campo e o tsc acusava TS2339).
+
+**Por que:**
+- Acompanhar as metas de broadcast de julho direto no painel, sem planilha paralela — continuação natural da série do review de produto (16 pontos) já commitada nesta branch.
+
+**Arquivos alterados:**
+- `server/routes/ghl.ts` - tabela `broadcast_goals` + endpoints `GET/POST /api/ghl/goals`.
+- `client/src/pages/GhlMarketing.tsx` - componente `MetasDoMes` no Resumo executivo + tipo `preview` no calendário.
+
+**Impacto arquitetural:** Nenhum (tabela nova isolada em `cortex_core`, padrão `CREATE TABLE IF NOT EXISTS` idem `ghl_tag_requests`).
+
+---
+
 ## 2026-07-04 | feat(lt-ltv-churn): matriz de cohort cortada em dez/2024
 
 **O que foi feito:**
