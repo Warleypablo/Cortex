@@ -1982,11 +1982,16 @@ async function buildDisparosHistoricos(): Promise<DisparoHistorico[]> {
 /** GET /api/ghl/plano?from=&to= — slots do período + cadência por slot + datas comerciais. */
 async function getPlano(req: Request, res: Response) {
   try {
+    // plan_date é DATE puro: comparar com a string YYYY-MM-DD recebida, não com
+    // Date do parsePeriod — new Date("YYYY-MM-DD") é meia-noite UTC, que no fuso
+    // local vira o dia ANTERIOR e escondia o dia 31 da visão do mês.
     const { from, to } = parsePeriod(req);
+    const fromYmd = ((req.query.from as string) || from.toISOString()).slice(0, 10);
+    const toYmd = ((req.query.to as string) || to.toISOString()).slice(0, 10);
     const r = await db.execute(sql`
       SELECT id, TO_CHAR(plan_date, 'YYYY-MM-DD') AS plan_date, canal, base, objetivo, padrao, titulo, copy_text, status
       FROM cortex_core.broadcast_plan
-      WHERE plan_date BETWEEN ${from}::date AND ${to}::date
+      WHERE plan_date BETWEEN ${fromYmd}::date AND ${toYmd}::date
       ORDER BY plan_date, id
     `);
     const slots = (r as any).rows ?? [];
@@ -1998,8 +2003,7 @@ async function getPlano(req: Request, res: Response) {
       const cad = validarCadencia({ base: s.base, padrao: s.padrao || undefined, data: s.plan_date, disparosHistoricos: outros });
       return { ...s, cadencia: { status: cad.status, alertas: cad.alertas } };
     });
-    const fromYmd = from.toISOString().slice(0, 10), toYmd = to.toISOString().slice(0, 10);
-    const anos = Array.from(new Set([from.getFullYear(), to.getFullYear()]));
+    const anos = Array.from(new Set([+fromYmd.slice(0, 4), +toYmd.slice(0, 4)]));
     const datas = anos.flatMap((a) => datasComerciaisDoAno(a)).filter((d) => d.data >= fromYmd && d.data <= toYmd);
     res.json({ slots: enriched, datasComerciais: datas });
   } catch (err: any) {
