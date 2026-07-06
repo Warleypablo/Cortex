@@ -2381,6 +2381,70 @@ async function postTagRequest(req: Request, res: Response) {
   }
 }
 
+// ─── Metas mensais de broadcast (painel meta vs realizado) ────────────────
+// Alvos por mês × métrica. O "realizado" é calculado no front a partir do
+// /broadcasts/summary — aqui só guardamos e servimos os alvos.
+
+const BROADCAST_GOAL_METRICS = ["abertura_pct", "resposta_pct", "positivas_pct", "opt_outs", "reuniao_direta", "vendas"];
+
+async function ensureBroadcastGoalsTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS cortex_core.broadcast_goals (
+      month DATE NOT NULL,
+      metric_key TEXT NOT NULL,
+      target NUMERIC NOT NULL,
+      comparator TEXT NOT NULL DEFAULT 'gte',
+      unit TEXT DEFAULT 'num',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_by TEXT,
+      PRIMARY KEY (month, metric_key)
+    )
+  `);
+}
+
+async function getBroadcastGoals(req: Request, res: Response) {
+  try {
+    await ensureBroadcastGoalsTable();
+    const raw = (req.query.month as string) || (req.query.from as string) || "";
+    const ym = raw.slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(ym)) return res.status(400).json({ error: "month/from inválido (use YYYY-MM)" });
+    const month = `${ym}-01`;
+    const r = await db.execute(sql`
+      SELECT metric_key, target::float AS target, comparator, unit
+      FROM cortex_core.broadcast_goals WHERE month = ${month}::date
+    `);
+    res.json({ month, goals: (r as any).rows ?? [] });
+  } catch (err: any) {
+    console.error("[GHL] getBroadcastGoals error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+async function postBroadcastGoals(req: Request, res: Response) {
+  try {
+    await ensureBroadcastGoalsTable();
+    const { month, metric_key, target, comparator, unit } = req.body ?? {};
+    const ym = String(month ?? "").slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(ym)) return res.status(400).json({ error: "month inválido (YYYY-MM)" });
+    if (!BROADCAST_GOAL_METRICS.includes(metric_key)) return res.status(400).json({ error: "metric_key inválido" });
+    if (target == null || isNaN(Number(target))) return res.status(400).json({ error: "target inválido" });
+    const cmp = comparator === "lte" ? "lte" : "gte";
+    const un = unit === "pct" ? "pct" : "num";
+    const updatedBy = ((req as any).user?.email as string) || null;
+    await db.execute(sql`
+      INSERT INTO cortex_core.broadcast_goals (month, metric_key, target, comparator, unit, updated_by, updated_at)
+      VALUES (${`${ym}-01`}::date, ${metric_key}, ${Number(target)}, ${cmp}, ${un}, ${updatedBy}, now())
+      ON CONFLICT (month, metric_key) DO UPDATE SET
+        target = EXCLUDED.target, comparator = EXCLUDED.comparator, unit = EXCLUDED.unit,
+        updated_by = EXCLUDED.updated_by, updated_at = now()
+    `);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[GHL] postBroadcastGoals error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────
 
 export function registerGhlPublicRoutes(app: Express) {
@@ -2395,6 +2459,8 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/tags", getTags);
   app.get("/api/ghl/tag-requests", getTagRequests);
   app.post("/api/ghl/tag-requests", postTagRequest);
+  app.get("/api/ghl/goals", getBroadcastGoals);
+  app.post("/api/ghl/goals", postBroadcastGoals);
   app.get("/api/ghl/lists", getLists);
   app.get("/api/ghl/workflows", getWorkflows);
   app.get("/api/ghl/overview", getOverview);
