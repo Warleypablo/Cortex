@@ -10,7 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
-import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Wand2, ShieldCheck, ShieldAlert, ShieldX, Copy, Check } from "lucide-react";
+import { Mail, MessageCircle, Tag as TagIcon, Loader2, AlertCircle, TrendingUp, TrendingDown, Activity, BarChart2, BookOpen, Search, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, Sparkles, Wand2, ShieldCheck, ShieldAlert, ShieldX, Copy, Check, Target, Ticket } from "lucide-react";
 import { useMutation } from "@tanstack/react-query";
 import { Textarea } from "@/components/ui/textarea";
 import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, eachDayOfInterval, isSameMonth, isSameDay, addMonths } from "date-fns";
@@ -26,6 +26,7 @@ import BasesInteligencia from "@/components/BasesInteligencia";
 import EvolucaoBroadcast from "@/components/EvolucaoBroadcast";
 import RelatorioBroadcast from "@/components/RelatorioBroadcast";
 import PlanejamentoMensal from "@/components/PlanejamentoMensal";
+import SummitBroadcasts from "@/components/SummitBroadcasts";
 
 // ────────────────────────────────────────────────────────────────────────
 // Tipos
@@ -775,6 +776,82 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "cac", label: "CAC" },
 ];
 
+// Metas mensais do broadcast: meta vs realizado. Ancorado no mês corrente (ou no
+// mês mais recente com metas), INDEPENDENTE do período selecionado no topo — o
+// card fica visível em qualquer range. Realizado = summary do dia 1º até agora.
+const GOAL_DEFS: Record<string, { label: string; realizado: (wa: any, fnl: any) => number | null; fmt: (n: number) => string }> = {
+  abertura_pct:   { label: "Abertura",            realizado: (wa) => wa?.leitura_pct ?? null,                                                      fmt: (n) => `${n.toFixed(1)}%` },
+  resposta_pct:   { label: "Taxa de resposta",    realizado: (wa, fnl) => (wa?.total && fnl ? +(100 * fnl.responderam / wa.total).toFixed(1) : null), fmt: (n) => `${n.toFixed(1)}%` },
+  positivas_pct:  { label: "Respostas positivas", realizado: (_wa, fnl) => (fnl?.responderam ? +(100 * fnl.positivas / fnl.responderam).toFixed(0) : null), fmt: (n) => `${n.toFixed(0)}%` },
+  opt_outs:       { label: "Opt-outs",            realizado: (_wa, fnl) => fnl?.opt_out ?? null,                                                   fmt: (n) => fmtInt(n) },
+  reuniao_direta: { label: "Reuniões diretas",    realizado: (_wa, fnl) => fnl?.reuniao_direta ?? null,                                            fmt: (n) => fmtInt(n) },
+  vendas:         { label: "Vendas",              realizado: (_wa, fnl) => fnl?.venda ?? null,                                                     fmt: (n) => fmtInt(n) },
+};
+const GOAL_ORDER = ["abertura_pct", "resposta_pct", "positivas_pct", "opt_outs", "reuniao_direta", "vendas"];
+
+function MetasDoMes() {
+  const goalsQ = useQuery<{ month: string | null; goals: Array<{ metric_key: string; target: number; comparator: string; unit: string }> }>({
+    queryKey: ["/api/ghl/goals"],
+    queryFn: () => fetchJson(`/api/ghl/goals`),
+  });
+  const month = goalsQ.data?.month ?? null; // "YYYY-MM-01" do mês com metas
+  // [1º do mês, 1º do mês seguinte) — aritmética em string pra não escorregar de fuso
+  const nextMonth = useMemo(() => {
+    if (!month) return null;
+    const [y, m] = month.slice(0, 7).split("-").map(Number);
+    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
+  }, [month]);
+  const sumQ = useQuery<{
+    whatsapp: { total: number; leitura_pct: number | null };
+    funil: { responderam: number; positivas: number; opt_out: number; reuniao_direta: number; venda: number };
+  }>({
+    queryKey: ["/api/ghl/broadcasts/summary", "metas-mes", month],
+    queryFn: () => fetchJson(`/api/ghl/broadcasts/summary?from=${month}&to=${nextMonth}`),
+    enabled: !!month,
+  });
+  const goals = goalsQ.data?.goals ?? [];
+  if (!month || goals.length === 0) return null;
+  const wa = sumQ.data?.whatsapp;
+  const fnl = sumQ.data?.funil;
+  const mesLabel = month.slice(0, 7);
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Target className="w-4 h-4" /> Metas do mês
+          <span className="text-xs font-normal text-muted-foreground">({mesLabel})</span>
+        </CardTitle>
+      </CardHeader>
+      <CardContent>
+        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+          {GOAL_ORDER.filter((k) => goals.some((g) => g.metric_key === k)).map((k) => {
+            const g = goals.find((x) => x.metric_key === k)!;
+            const def = GOAL_DEFS[k];
+            const real = def.realizado(wa, fnl);
+            const atingiu = real == null ? null : g.comparator === "lte" ? real <= g.target : real >= g.target;
+            const metaTxt = `${g.comparator === "lte" ? "≤" : "≥"} ${def.fmt(g.target)}`;
+            return (
+              <div key={k} className={`rounded border p-2.5 ${atingiu === true ? "border-emerald-300 bg-emerald-50/50 dark:border-emerald-800 dark:bg-emerald-950/20" : atingiu === false ? "border-rose-300 bg-rose-50/40 dark:border-rose-900 dark:bg-rose-950/20" : "border-border"}`}>
+                <div className="text-xs text-muted-foreground">{def.label}</div>
+                <div className="mt-0.5 flex items-baseline gap-1.5 flex-wrap">
+                  <span className={`text-lg font-semibold tabular-nums ${atingiu === true ? "text-emerald-600 dark:text-emerald-400" : atingiu === false ? "text-rose-600 dark:text-rose-400" : ""}`}>
+                    {real == null ? "—" : def.fmt(real)}
+                  </span>
+                  <span className="text-[11px] text-muted-foreground">meta {metaTxt}</span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        <p className="text-[11px] text-muted-foreground mt-2">
+          Realizado de {mesLabel} (do dia 1º até agora) vs. metas do mês — independente do período selecionado acima.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function BibliotecaTab({ from, to }: { from: string; to: string }) {
   const [channel, setChannel] = useState<string>("all");
   const [search, setSearch] = useState("");
@@ -858,7 +935,7 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
   // Resumo executivo: entrega WhatsApp por status + funil atribuído (causalidade pós-resposta).
   const summary = useQuery<{
     whatsapp: { total: number; enviado: number; entregue: number; lida: number; erro: number; entrega_pct: number | null; leitura_pct: number | null; erro_pct: number | null };
-    funil: { responderam: number; positivas: number; oportunidades: number; reuniao_marcada: number; reuniao_direta: number; compareceu: number; venda: number };
+    funil: { responderam: number; positivas: number; negativas: number; neutras: number; opt_out: number; oportunidades: number; reuniao_marcada: number; reuniao_direta: number; compareceu: number; venda: number };
     custos: { gasto_total: number; gasto_por_disparo: number | null; custo_reuniao: number | null; cac: number | null; estimado: boolean; unit_cost: number; n_manual: number };
   }>({
     queryKey: ["/api/ghl/broadcasts/summary", from, to],
@@ -899,6 +976,9 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
         <StatCard label="CAC" value={custos ? fmtBRL(custos.cac) : "—"} hint="investimento ÷ vendas"
           info="Custo de aquisição: investimento do período ÷ vendas atribuídas." />
       </div>
+
+      {/* Metas do mês: sempre visível — ancorado no mês corrente, não no range */}
+      <MetasDoMes />
 
       {/* Evolução do período (2/3) + Gastos (1/3) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
@@ -1454,6 +1534,7 @@ type Broadcast =
       id: string;
       date: string;
       source: string;
+      preview: string;
       messages: number;
       contacts_reached: number;
     };
@@ -2051,6 +2132,9 @@ export default function GhlMarketing() {
           <TabsTrigger value="planejamento" data-testid="tab-planejamento">
             <Wand2 className="w-4 h-4 mr-2" /> Planejamento
           </TabsTrigger>
+          <TabsTrigger value="summit" data-testid="tab-summit">
+            <Ticket className="w-4 h-4 mr-2" /> Summit ES
+          </TabsTrigger>
           <TabsTrigger value="gerador" data-testid="tab-gerador">
             <Sparkles className="w-4 h-4 mr-2" /> Gerador IA
           </TabsTrigger>
@@ -2073,6 +2157,9 @@ export default function GhlMarketing() {
         </TabsContent>
         <TabsContent value="planejamento" className="mt-6">
           <PlanejamentoMensal />
+        </TabsContent>
+        <TabsContent value="summit" className="mt-6">
+          <SummitBroadcasts />
         </TabsContent>
         <TabsContent value="gerador" className="mt-6">
           <GeradorTab />

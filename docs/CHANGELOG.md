@@ -1,5 +1,79 @@
 # Changelog
 
+## 2026-07-06 | feat(broadcast): aba Summit ES — mapa dia a dia dos disparos da campanha
+
+**O que foi feito:**
+- Nova aba **"Summit ES"** no CRM Marketing mapeando a campanha de broadcasts do Creator Summit ES 2026 (evento seg 03/08, Brizz, Vitória): card **"Sai HOJE"** com os disparos do dia (ou o próximo, se o dia não tiver), calendário completo semana a semana — 4 ondas de venda × frações A–D (base 6.146 DDD 27/28), follow-ups sex/sáb e a régua de **contagem regressiva** pra quem já comprou (tag `[compra]_creators_summit_es`) — com filtros Tudo/Ondas/Follow-ups/Compradores.
+- Cada disparo abre dialog com a **copy completa**, variantes de hook (teste A/B da Onda 1), público, cupom e observações operacionais (ex.: Onda 1 sem link de propósito), + botão "Copiar copy". Badge "preencher dado" nos que têm placeholder ([X]%, [HORÁRIO]).
+- Cards de contexto: cupons por onda com validade (SUMMIT10/MANU10/BORA10/AGORA10), metas da campanha (entrega ≥95%, leitura ≥60%, resposta O1 ≥8%, clique ≥5%, opt-out ≤2%) e checklist pré-disparo.
+- Plano versionado em `shared/ghl-broadcast/summit-es-2026.ts` — campanha fechada de 4 semanas, copies viram template aprovado na Meta; não é editável no painel (mudou o plano → atualiza o arquivo).
+
+**Por que:**
+- Pedido do Caio (06/07): "add dentro do dash uma aba pros disparos do summit... preciso que fique muito bem mapeado sobre quais mensagens vamos mandar no dia". Fonte: `Planejamento_Broadcasts_Creator_Summit_ES.docx` (v2).
+
+**Arquivos alterados:**
+- `shared/ghl-broadcast/summit-es-2026.ts` - dados do plano (disparos, cupons, metas, checklist).
+- `client/src/components/SummitBroadcasts.tsx` - a aba.
+- `client/src/pages/GhlMarketing.tsx` - registro da aba "Summit ES".
+
+**Impacto arquitetural:** Nenhum (aba 100% front, sem backend nem banco).
+
+---
+
+## 2026-07-06 | fix(broadcast): Metas do mês sempre visível, ancorado no mês corrente
+
+**O que foi feito:**
+- O card "Metas do mês" ficava oculto com o range default ("últimos 30 dias" começa no mês anterior, que não tem metas). Agora ele é **autocontido e sempre visível**: `GET /api/ghl/goals` sem parâmetro devolve o mês mais recente com metas até hoje (mês corrente ou o último implementado) e o componente busca o próprio realizado (summary de 1º do mês até agora), ignorando o período selecionado no topo. Nota de rodapé atualizada.
+
+**Por que:**
+- Pedido do Caio (06/07): "a parte de metas do mês deve aparecer e ser visível em qualquer tempo escolhido a partir do dia que foi implementado".
+
+**Arquivos alterados:**
+- `server/routes/ghl.ts` - fallback "mês mais recente com metas" no GET /api/ghl/goals.
+- `client/src/pages/GhlMarketing.tsx` - MetasDoMes autocontido (metas + summary próprios, sem props do range).
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-07-06 | feat(broadcast): plano de julho carregado + base CRM 30k-100k + fix da janela do mês
+
+**O que foi feito:**
+- **Planejamento de julho/2026 reconciliado no dash** (dado, não código): os 20 slots carregados mais cedo por outra sessão vinham de um rascunho com "live" na semana 3 — atualizados pro doc final (`Planejamento_Broadcasts_Julho_2026.docx`): semana 3 virou Dia do Amigo/indicação + CONTRASTE + repique, copies finais em todos os slots, CTAs no título, status `pronta` (exceto os 2 cases com [placeholder], em `backlog`). Criados os slots extras do piloto de cohort ◐ (versões ≤90d/>90d em 07/07 e 13/07) e o repique de 24/07 recriado **sem base** (público = não-abertos de 22/07; sem base não dispara alerta falso de cadência). Total: 22 registros.
+- `feat`: base **"CRM - Entre 30k a 100k"** adicionada ao `BASE_TAG_MAP` — o plano dispara nela em 31/07 e ela não existia (classificação cairia no guarda-chuva CRM - Todos).
+- `fix`: **visão do mês no Planejamento escondia o dia 31** — `new Date("YYYY-MM-DD")` é meia-noite UTC (21h do dia anterior no fuso local), o bind no `::date` deslocava a janela pra [30/06, 30/07]. `getPlano` agora compara `plan_date` com a string YYYY-MM-DD da query.
+
+**Por que:**
+- Caio trouxe o planejamento final de julho (06/07) e pediu pra atualizar o dash. O fix do fuso saiu da verificação: o slot de 31/07 não aparecia na visão de julho.
+
+**Arquivos alterados:**
+- `shared/ghl-broadcast/base-tag-map.ts` - entrada CRM - Entre 30k a 100k.
+- `server/routes/ghl.ts` - janela de datas do getPlano por string YYYY-MM-DD.
+
+**Impacto arquitetural:** Nenhum.
+
+---
+
+## 2026-07-06 | feat(broadcast): painel Metas do mês — meta vs realizado no Resumo
+
+**O que foi feito:**
+- Card **"Metas do mês"** no Resumo executivo do Broadcast: compara o realizado do período selecionado com a meta do mês, tile por métrica com verde/vermelho por atingimento. Métricas: abertura %, taxa de resposta %, respostas positivas %, opt-outs, reuniões diretas e vendas.
+- Tabela nova `cortex_core.broadcast_goals` (mês × métrica, alvo numérico + comparador ≥/≤) com endpoints `GET/POST /api/ghl/goals` (upsert com `updated_by`). O realizado é calculado no front a partir do `/broadcasts/summary` já existente.
+- Metas de julho/2026 já cadastradas no banco: abertura ≥33%, resposta ≥6%, positivas ≥60%, opt-outs ≤25, reuniões diretas ≥12, vendas ≥4.
+- O card só renderiza se o mês tiver metas cadastradas; com o range default (últimos 30 dias, começa no mês anterior) ele fica oculto — selecionar "Esse mês" no seletor de período pra ver.
+- De carona: tipo do broadcast WA do calendário passou a declarar `preview` (o JSX já usava o campo e o tsc acusava TS2339).
+
+**Por que:**
+- Acompanhar as metas de broadcast de julho direto no painel, sem planilha paralela — continuação natural da série do review de produto (16 pontos) já commitada nesta branch.
+
+**Arquivos alterados:**
+- `server/routes/ghl.ts` - tabela `broadcast_goals` + endpoints `GET/POST /api/ghl/goals`.
+- `client/src/pages/GhlMarketing.tsx` - componente `MetasDoMes` no Resumo executivo + tipo `preview` no calendário.
+
+**Impacto arquitetural:** Nenhum (tabela nova isolada em `cortex_core`, padrão `CREATE TABLE IF NOT EXISTS` idem `ghl_tag_requests`).
+
+---
+
 ## 2026-07-04 | feat(lt-ltv-churn): matriz de cohort cortada em dez/2024
 
 **O que foi feito:**

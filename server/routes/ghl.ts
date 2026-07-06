@@ -1982,11 +1982,16 @@ async function buildDisparosHistoricos(): Promise<DisparoHistorico[]> {
 /** GET /api/ghl/plano?from=&to= — slots do período + cadência por slot + datas comerciais. */
 async function getPlano(req: Request, res: Response) {
   try {
+    // plan_date é DATE puro: comparar com a string YYYY-MM-DD recebida, não com
+    // Date do parsePeriod — new Date("YYYY-MM-DD") é meia-noite UTC, que no fuso
+    // local vira o dia ANTERIOR e escondia o dia 31 da visão do mês.
     const { from, to } = parsePeriod(req);
+    const fromYmd = ((req.query.from as string) || from.toISOString()).slice(0, 10);
+    const toYmd = ((req.query.to as string) || to.toISOString()).slice(0, 10);
     const r = await db.execute(sql`
       SELECT id, TO_CHAR(plan_date, 'YYYY-MM-DD') AS plan_date, canal, base, objetivo, padrao, titulo, copy_text, status
       FROM cortex_core.broadcast_plan
-      WHERE plan_date BETWEEN ${from}::date AND ${to}::date
+      WHERE plan_date BETWEEN ${fromYmd}::date AND ${toYmd}::date
       ORDER BY plan_date, id
     `);
     const slots = (r as any).rows ?? [];
@@ -1998,8 +2003,7 @@ async function getPlano(req: Request, res: Response) {
       const cad = validarCadencia({ base: s.base, padrao: s.padrao || undefined, data: s.plan_date, disparosHistoricos: outros });
       return { ...s, cadencia: { status: cad.status, alertas: cad.alertas } };
     });
-    const fromYmd = from.toISOString().slice(0, 10), toYmd = to.toISOString().slice(0, 10);
-    const anos = Array.from(new Set([from.getFullYear(), to.getFullYear()]));
+    const anos = Array.from(new Set([+fromYmd.slice(0, 4), +toYmd.slice(0, 4)]));
     const datas = anos.flatMap((a) => datasComerciaisDoAno(a)).filter((d) => d.data >= fromYmd && d.data <= toYmd);
     res.json({ slots: enriched, datasComerciais: datas });
   } catch (err: any) {
@@ -2381,6 +2385,84 @@ async function postTagRequest(req: Request, res: Response) {
   }
 }
 
+// ─── Metas mensais de broadcast (painel meta vs realizado) ────────────────
+// Alvos por mês × métrica. O "realizado" é calculado no front a partir do
+// /broadcasts/summary — aqui só guardamos e servimos os alvos.
+
+const BROADCAST_GOAL_METRICS = ["abertura_pct", "resposta_pct", "positivas_pct", "opt_outs", "reuniao_direta", "vendas"];
+
+async function ensureBroadcastGoalsTable() {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS cortex_core.broadcast_goals (
+      month DATE NOT NULL,
+      metric_key TEXT NOT NULL,
+      target NUMERIC NOT NULL,
+      comparator TEXT NOT NULL DEFAULT 'gte',
+      unit TEXT DEFAULT 'num',
+      updated_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+      updated_by TEXT,
+      PRIMARY KEY (month, metric_key)
+    )
+  `);
+}
+
+async function getBroadcastGoals(req: Request, res: Response) {
+  try {
+    await ensureBroadcastGoalsTable();
+    const raw = (req.query.month as string) || (req.query.from as string) || "";
+    let month: string;
+    if (!raw) {
+      // Sem parâmetro: mês mais recente com metas até hoje — mês corrente ou, se ele
+      // ainda não tiver metas cadastradas, o último mês implementado. Assim o card
+      // "Metas do mês" tem o que mostrar em qualquer período selecionado.
+      const r0 = await db.execute(sql`
+        SELECT TO_CHAR(MAX(month), 'YYYY-MM-DD') AS m
+        FROM cortex_core.broadcast_goals WHERE month <= CURRENT_DATE
+      `);
+      const m = (r0 as any).rows?.[0]?.m;
+      if (!m) return res.json({ month: null, goals: [] });
+      month = m;
+    } else {
+      const ym = raw.slice(0, 7);
+      if (!/^\d{4}-\d{2}$/.test(ym)) return res.status(400).json({ error: "month/from inválido (use YYYY-MM)" });
+      month = `${ym}-01`;
+    }
+    const r = await db.execute(sql`
+      SELECT metric_key, target::float AS target, comparator, unit
+      FROM cortex_core.broadcast_goals WHERE month = ${month}::date
+    `);
+    res.json({ month, goals: (r as any).rows ?? [] });
+  } catch (err: any) {
+    console.error("[GHL] getBroadcastGoals error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
+async function postBroadcastGoals(req: Request, res: Response) {
+  try {
+    await ensureBroadcastGoalsTable();
+    const { month, metric_key, target, comparator, unit } = req.body ?? {};
+    const ym = String(month ?? "").slice(0, 7);
+    if (!/^\d{4}-\d{2}$/.test(ym)) return res.status(400).json({ error: "month inválido (YYYY-MM)" });
+    if (!BROADCAST_GOAL_METRICS.includes(metric_key)) return res.status(400).json({ error: "metric_key inválido" });
+    if (target == null || isNaN(Number(target))) return res.status(400).json({ error: "target inválido" });
+    const cmp = comparator === "lte" ? "lte" : "gte";
+    const un = unit === "pct" ? "pct" : "num";
+    const updatedBy = ((req as any).user?.email as string) || null;
+    await db.execute(sql`
+      INSERT INTO cortex_core.broadcast_goals (month, metric_key, target, comparator, unit, updated_by, updated_at)
+      VALUES (${`${ym}-01`}::date, ${metric_key}, ${Number(target)}, ${cmp}, ${un}, ${updatedBy}, now())
+      ON CONFLICT (month, metric_key) DO UPDATE SET
+        target = EXCLUDED.target, comparator = EXCLUDED.comparator, unit = EXCLUDED.unit,
+        updated_by = EXCLUDED.updated_by, updated_at = now()
+    `);
+    res.json({ ok: true });
+  } catch (err: any) {
+    console.error("[GHL] postBroadcastGoals error:", err);
+    res.status(500).json({ error: err.message });
+  }
+}
+
 // ─── Registration ─────────────────────────────────────────────────────────
 
 export function registerGhlPublicRoutes(app: Express) {
@@ -2395,6 +2477,8 @@ export function registerGhlApiRoutes(app: Express) {
   app.get("/api/ghl/tags", getTags);
   app.get("/api/ghl/tag-requests", getTagRequests);
   app.post("/api/ghl/tag-requests", postTagRequest);
+  app.get("/api/ghl/goals", getBroadcastGoals);
+  app.post("/api/ghl/goals", postBroadcastGoals);
   app.get("/api/ghl/lists", getLists);
   app.get("/api/ghl/workflows", getWorkflows);
   app.get("/api/ghl/overview", getOverview);
