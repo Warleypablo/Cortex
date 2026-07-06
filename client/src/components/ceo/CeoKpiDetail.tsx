@@ -139,7 +139,7 @@ export function CeoKpiDetail({ kpiKey, mes, tom = "neutro", onClose }: { kpiKey:
           )}
 
           {data && temEvolucao && (
-            <Tabs defaultValue="detalhe">
+            <Tabs defaultValue="evolucao">
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="detalhe">Detalhamento</TabsTrigger>
                 <TabsTrigger value="evolucao">Evolução</TabsTrigger>
