@@ -20,6 +20,7 @@ import urllib.request
 from datetime import date
 from typing import Any
 
+from agente import http_retry
 from agente.config import CONFIG
 
 
@@ -123,10 +124,10 @@ def _send_ingest(payload: dict) -> bool:
         headers={"Content-Type": "application/json", "Authorization": f"Bearer {token}"},
     )
     try:
-        with urllib.request.urlopen(req, timeout=15) as r:
-            n = len(payload.get("posts") or [])
-            print(f"   📡 painel atualizado: {n} post(s) reportado(s) (HTTP {r.status})")
-            return True
+        status, _body = http_retry.fetch(req, what="POST /ingest")
+        n = len(payload.get("posts") or [])
+        print(f"   📡 painel atualizado: {n} post(s) reportado(s) (HTTP {status})")
+        return True
     except urllib.error.HTTPError as e:
         body = e.read()[:200] if hasattr(e, "read") else b""
         print(f"   ⚠️  painel: ingest retornou {e.code} (segue normal) — {body!r}")
