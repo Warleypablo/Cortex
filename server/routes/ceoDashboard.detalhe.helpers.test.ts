@@ -83,11 +83,14 @@ describe("ltvRowsToGrupos", () => {
 });
 
 describe("receitaCabecaGrupos", () => {
-  it("dois grupos só-valor (Receita brl, Headcount num) + nota da fórmula", () => {
-    const r = receitaCabecaGrupos(1938555, 140);
+  it("dois grupos só-valor (Receita recebida brl, Headcount num) + nota da fórmula", () => {
+    const r = receitaCabecaGrupos(1525643, 112);
     expect(r.grupos.map((g) => g.formato)).toEqual(["brl", "num"]);
-    expect(r.grupos[1].total).toBe(140);
-    expect(r.nota).toContain("÷ 140");
+    expect(r.grupos[0].titulo).toContain("regime de caixa");
+    expect(r.grupos[0].total).toBe(1525643);
+    expect(r.grupos[1].total).toBe(112);
+    expect(r.nota).toContain("Receita recebida");
+    expect(r.nota).toContain("÷ 112");
   });
 });
 

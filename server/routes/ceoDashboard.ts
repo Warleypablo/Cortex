@@ -6,6 +6,7 @@ import {
   assembleCeoKpis,
   canAccessCeo,
   parseMesNum,
+  receitaCabecaCaixaFromBp,
   type CeoDashboardResponse,
 } from "./ceoDashboard.helpers";
 
@@ -49,6 +50,7 @@ export async function buildCeoDashboard(db: any, mes?: string): Promise<CeoDashb
     },
     ltvMedioCliente: ltv,
     enpsScore,
+    receitaCabecaCaixa: receitaCabecaCaixaFromBp(bp),
   });
 
   return { mes: `2026-${String(mesNum).padStart(2, "0")}`, kpis };

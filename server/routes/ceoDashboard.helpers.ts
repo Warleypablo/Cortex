@@ -112,6 +112,43 @@ export function emBreveKpi(opts: { key: string; label: string; unidade: CeoUnida
   };
 }
 
+// Reconstrói a linha "Receita por Cabeça" com o numerador em regime de CAIXA (receita
+// efetivamente recebida / DFC) em vez de faturável (competência). A META (orcado) e a
+// estrutura de meses são herdadas da linha original do BP — só o realizado/atingimento
+// passam a refletir o recebido. Fica isolado no CEO Dashboard; o BP 2026 não muda.
+export function receitaCabecaCaixaLinha(
+  original: BpLinha | undefined,
+  colaboradores: BpLinha | undefined,
+  recebidoPorMes: Record<number, number> | undefined
+): BpLinha {
+  const rec = recebidoPorMes ?? {};
+  const headPorMes = new Map<number, number | null>(
+    (colaboradores?.meses ?? []).map((m) => [m.mes, m.realizado])
+  );
+  const meses = (original?.meses ?? []).map((m) => {
+    const head = headPorMes.get(m.mes) ?? null;
+    const recebido = rec[m.mes];
+    const realizado = recebido != null && head != null && head !== 0 ? recebido / head : null;
+    const atingimento = realizado != null && m.orcado ? realizado / m.orcado : null;
+    return { mes: m.mes, orcado: m.orcado, realizado, atingimento };
+  });
+  return { metrica: "receita_cabeca", titulo: original?.titulo, direcao: "maior_melhor", unidade: "brl", meses };
+}
+
+// Extrai do payload do BP os ingredientes e monta a linha de Receita/Cabeça em caixa.
+// Fonte única para card (assembleCeoKpis) e drawer (buildCeoDetalhe) — garante reconciliação.
+export function receitaCabecaCaixaFromBp(bp: {
+  metricasGerais?: BpLinha[];
+  receitaRecebidaCaixaPorMes?: Record<number, number>;
+}): BpLinha {
+  const metricas = bp.metricasGerais ?? [];
+  return receitaCabecaCaixaLinha(
+    metricas.find((l) => l.metrica === "receita_cabeca"),
+    metricas.find((l) => l.metrica === "colaboradores"),
+    bp.receitaRecebidaCaixaPorMes
+  );
+}
+
 export interface CeoSources {
   bpLinhas: BpLinha[];
   bpMetricas: BpLinha[];
@@ -119,6 +156,8 @@ export interface CeoSources {
   inadimplencia: { total: number | null; serie: number[] | null };
   ltvMedioCliente: number | null;
   enpsScore: number | null;
+  // Linha "Receita por Cabeça" já reconstruída em regime de caixa (ver receitaCabecaCaixaFromBp).
+  receitaCabecaCaixa: BpLinha;
 }
 
 // Monta os 11 KPIs na ordem fixa da grade (4 / 4 / 3).
@@ -139,7 +178,11 @@ export function assembleCeoKpis(s: CeoSources): CeoKpi[] {
     simpleKpi({ key: "ltv", label: "LTV", valor: s.ltvMedioCliente, unidade: "brl", direcao: "maior_melhor" }),
     bp(s.bpMetricas, "colaboradores",  "headcount",      "Headcount",         "menor_melhor", "int"),
     simpleKpi({ key: "enps", label: "E-NPS", valor: s.enpsScore, unidade: "score", direcao: "maior_melhor" }),
-    bp(s.bpMetricas, "receita_cabeca", "receita_cabeca", "Receita / Cabeça",  "maior_melhor", "brl"),
+    // Receita/Cabeça em regime de caixa (recebido/DFC); a meta segue o plano de receita do BP.
+    bpLinhaToKpi(s.receitaCabecaCaixa, {
+      key: "receita_cabeca", label: "Receita / Cabeça", mesNum: s.mesNum, direcao: "maior_melhor", unidade: "brl",
+      nota: "Realizado = receita efetivamente recebida no mês (regime de caixa · DFC) ÷ headcount. Meta = plano de receita do BP.",
+    }),
   ];
 }
 

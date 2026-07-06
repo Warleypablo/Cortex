@@ -6,6 +6,8 @@ import {
   emBreveKpi,
   assembleCeoKpis,
   canAccessCeo,
+  receitaCabecaCaixaLinha,
+  receitaCabecaCaixaFromBp,
   type BpLinha,
 } from "./ceoDashboard.helpers";
 
@@ -98,6 +100,7 @@ describe("assembleCeoKpis", () => {
       inadimplencia: { total: 20, serie: [18, 20] },
       ltvMedioCliente: 28000,
       enpsScore: 48,
+      receitaCabecaCaixa: { metrica: "receita_cabeca", direcao: "maior_melhor", unidade: "brl", meses: [{ mes: 1, orcado: 12, realizado: 13.6, atingimento: 1.13 }] },
     });
     expect(kpis.map((k) => k.key)).toEqual([
       "receita", "custos", "lucro", "caixa",
@@ -110,6 +113,55 @@ describe("assembleCeoKpis", () => {
     expect(kpis.find((k) => k.key === "ltv")!.meta).toBeNull();
     expect(kpis.find((k) => k.key === "ltv")!.valor).toBe(28000);
     expect(kpis.find((k) => k.key === "nps")!.status).toBe("em_breve");
+    // Receita/Cabeça vem da linha em regime de caixa (não da linha do BP)
+    expect(kpis.find((k) => k.key === "receita_cabeca")!.valor).toBe(13.6);
+    expect(kpis.find((k) => k.key === "receita_cabeca")!.meta).toBe(12);
+  });
+});
+
+describe("receitaCabecaCaixaLinha", () => {
+  const original: BpLinha = {
+    metrica: "receita_cabeca", direcao: "maior_melhor", unidade: "brl",
+    meses: [
+      { mes: 1, orcado: 14000, realizado: 13797, atingimento: 0.985 }, // realizado antigo (competência)
+      { mes: 2, orcado: 14000, realizado: null, atingimento: null },   // mês futuro
+    ],
+  };
+  const colaboradores: BpLinha = {
+    metrica: "colaboradores", direcao: "menor_melhor", unidade: "int",
+    meses: [
+      { mes: 1, orcado: 110, realizado: 112, atingimento: 1.01 },
+      { mes: 2, orcado: 110, realizado: null, atingimento: null },
+    ],
+  };
+
+  it("usa o recebido ÷ headcount como realizado e preserva a meta do BP", () => {
+    const linha = receitaCabecaCaixaLinha(original, colaboradores, { 1: 1_525_643 });
+    const m1 = linha.meses.find((m) => m.mes === 1)!;
+    expect(m1.orcado).toBe(14000); // meta herdada, intacta
+    expect(m1.realizado).toBeCloseTo(1_525_643 / 112, 4); // ~13622,7
+    expect(m1.atingimento).toBeCloseTo(1_525_643 / 112 / 14000, 6);
+  });
+
+  it("mês sem recebido (ou headcount 0/ausente) → realizado null", () => {
+    const linha = receitaCabecaCaixaLinha(original, colaboradores, { 1: 1_525_643 });
+    expect(linha.meses.find((m) => m.mes === 2)!.realizado).toBeNull(); // sem recebido no mês 2
+    const semHead = receitaCabecaCaixaLinha(original, { ...colaboradores, meses: [{ mes: 1, orcado: 0, realizado: 0, atingimento: null }] }, { 1: 1000 });
+    expect(semHead.meses.find((m) => m.mes === 1)!.realizado).toBeNull(); // headcount 0
+  });
+
+  it("linha original ausente → sem meses, não quebra", () => {
+    const linha = receitaCabecaCaixaLinha(undefined, colaboradores, { 1: 1000 });
+    expect(linha.metrica).toBe("receita_cabeca");
+    expect(linha.meses).toEqual([]);
+  });
+
+  it("receitaCabecaCaixaFromBp extrai as linhas certas do payload do BP", () => {
+    const linha = receitaCabecaCaixaFromBp({
+      metricasGerais: [original, colaboradores],
+      receitaRecebidaCaixaPorMes: { 1: 1_525_643 },
+    });
+    expect(linha.meses.find((m) => m.mes === 1)!.realizado).toBeCloseTo(1_525_643 / 112, 4);
   });
 });
 

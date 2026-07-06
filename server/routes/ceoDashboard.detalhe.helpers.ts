@@ -132,9 +132,9 @@ export function receitaCabecaGrupos(receita: number, headcount: number): { grupo
   const rc = headcount ? receita / headcount : 0;
   return {
     grupos: [
-      { titulo: "Receita (MRR + Pontual + Outras)", total: receita, formato: "brl", itens: [] },
+      { titulo: "Receita Recebida (regime de caixa · DFC)", total: receita, formato: "brl", itens: [] },
       { titulo: "Headcount (colaboradores ativos)", total: headcount, formato: "num", itens: [] },
     ],
-    nota: `Receita ÷ Headcount = ${formatBRL(receita)} ÷ ${headcount} = ${formatBRL(rc)}`,
+    nota: `Receita recebida ÷ Headcount = ${formatBRL(receita)} ÷ ${headcount} = ${formatBRL(rc)}`,
   };
 }

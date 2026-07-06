@@ -573,6 +573,9 @@ export async function computarBpReceitas(db: any): Promise<any> {
         ano: ANO,
         mesCorrente,
         mesFechado,
+        // Receita efetivamente recebida por mês (entradas de RECEITA quitadas, base de caixa da DFC).
+        // Campo bruto (não é aba do BP) — consumido pelo CEO Dashboard p/ a Receita/Cabeça em regime de caixa.
+        receitaRecebidaCaixaPorMes: faturamentoCaixaPorMes,
         linhas: anexarInfo(linhas.map((l) => ({
           ...l,
           ytd: (() => {

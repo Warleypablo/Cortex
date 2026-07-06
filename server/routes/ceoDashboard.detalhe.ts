@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { montarDetalheBp } from "./bp2026.detalhe";
 import { computarBpReceitas } from "./bp2026";
 import { storage } from "../storage";
-import { canAccessCeo, parseMesNum } from "./ceoDashboard.helpers";
+import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp } from "./ceoDashboard.helpers";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
   enpsRespostasToGrupos, ltvRowsToGrupos, grupoMargemBruta, receitaCabecaGrupos,
@@ -64,12 +64,15 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     base.orcado = eb.orcado; base.realizado = eb.realizado;
     nota = "EBITDA = Margem Bruta − CAC − SG&A − Bônus";
   } else if (kpi === "receita_cabeca") {
-    const rec = linhaValor(bp, "linhas", "receita_total_faturavel", mesNum);
+    // Numerador em regime de caixa (receita recebida / DFC), não o faturável (competência).
+    const recebido = bp.receitaRecebidaCaixaPorMes?.[mesNum] ?? 0;
     const head = linhaValor(bp, "metricasGerais", "colaboradores", mesNum);
-    const rc = receitaCabecaGrupos(rec.realizado ?? 0, head.realizado ?? 0);
+    const rc = receitaCabecaGrupos(recebido, head.realizado ?? 0);
     grupos = rc.grupos; nota = rc.nota;
-    const v = linhaValor(bp, "metricasGerais", "receita_cabeca", mesNum);
-    base.orcado = v.orcado; base.realizado = v.realizado;
+    // Cabeçalho vem da MESMA linha sintética usada no card, p/ reconciliar orçado/realizado.
+    const linha = receitaCabecaCaixaFromBp(bp);
+    const m = linha.meses.find((x) => x.mes === mesNum);
+    base.orcado = m?.orcado ?? null; base.realizado = m?.realizado ?? null;
   } else if (kpi === "caixa") {
     const rows: any = await db.execute(sql`
       SELECT nmbanco, empresa, balance FROM "Conta Azul".caz_bancos ORDER BY balance DESC NULLS LAST`);
