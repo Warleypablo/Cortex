@@ -730,6 +730,37 @@ app.use((req, res, next) => {
   setInterval(() => runBitrixDealsSync(), BITRIX_DEALS_SYNC_INTERVAL);
   console.log(`[bitrix-deals-sync-job] Scheduled every ${BITRIX_DEALS_SYNC_INTERVAL / 3600000}h`);
 
+  // Bitrix UTM sync horário — preenche utm_source/medium/campaign/term/content dos deals
+  // recentes (janela móvel de 14d, só onde está em branco). Incremental e com throttle,
+  // então não estoura o rate limit do Bitrix como o pull externo pesado (puxardados.py)
+  // fazia ao morrer no meio e deixar dias de leads sem UTM → CPMQL de canal pago inflado.
+  const BITRIX_UTM_SYNC_INTERVAL = 60 * 60 * 1000; // 1h
+  const runBitrixUtmSync = async () => {
+    try {
+      console.log("[bitrix-utm-sync-job] Starting scheduled Bitrix UTM sync...");
+      const { syncBitrixUtm } = await import("./services/bitrixUtmSync");
+      const { totalSeen, comUtm, atualizados } = await syncBitrixUtm({ sinceDays: 14 });
+      (globalThis as any).__bitrixUtmSyncStatus = {
+        lastSync: new Date().toISOString(),
+        totalSeen,
+        comUtm,
+        atualizados,
+        status: "success",
+      };
+      console.log(`[bitrix-utm-sync-job] Sync complete: ${atualizados} atualizados (${comUtm}/${totalSeen} com UTM)`);
+    } catch (err: any) {
+      console.error("[bitrix-utm-sync-job] Sync failed:", err.message);
+      (globalThis as any).__bitrixUtmSyncStatus = {
+        lastSync: new Date().toISOString(),
+        status: "error",
+        error: err.message,
+      };
+    }
+  };
+  setTimeout(() => runBitrixUtmSync(), 300000); // 5min após boot (após o refresh de deals)
+  setInterval(() => runBitrixUtmSync(), BITRIX_UTM_SYNC_INTERVAL);
+  console.log(`[bitrix-utm-sync-job] Scheduled every ${BITRIX_UTM_SYNC_INTERVAL / 3600000}h`);
+
   // Resumo diário de métricas para líderes via WhatsApp — todos os dias às 10h e
   // às 19h (America/Sao_Paulo). Janelas 10h-12h e 19h-21h: se o envio falhar, os
   // ticks seguintes tentam de novo; idempotência por dia+janela
