@@ -55,49 +55,22 @@ function slug(s: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) {
-  const overviewQ = useLtLtvOverview();
-  const distQ = useLtLtvDist();
-  const clientesQ = useLtLtvClientes();
-  // Histórico completo (Onda3) — query isolada (não bloqueia a aba): loading/erro só deixam
-  // a seção "LTV por produto (evolução)" vazia, mesma filosofia de clientesQ/distQ acima.
-  const evolucaoProdutoQ = useLtLtvEvolucaoProduto();
-  // Aba 100% snapshot — sem metas hoje, mas mantém o hook por consistência com as demais
-  // seções (caso metas de LT/LTV sejam cadastradas futuramente em cortex_core.scorecard_metas).
-  useScorecardMetas(mes);
-  const responsaveis = useScorecardResponsaveis();
-  const salvarResponsaveis = useSalvarResponsaveis();
+export interface MontarSecoesLtLtvEvolucaoProduto {
+  data: EvolucaoProdutoTabelaData | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}
 
-  function onEditResponsavel(metricaKey: string, valor: string) {
-    const atuais = responsaveis.data?.itens ?? [];
-    const atualizado: ScorecardResponsavelItem[] = [
-      ...atuais.filter((i) => i.metrica_key !== metricaKey),
-      { metrica_key: metricaKey, responsavel: valor },
-    ];
-    salvarResponsaveis.mutate(atualizado);
-  }
-
-  if (overviewQ.isError) {
-    return (
-      <div className="space-y-4">
-        <AvisoSnapshot />
-        <ErroCard mensagem="Falha ao carregar LT/LTV. Tente recarregar." />
-      </div>
-    );
-  }
-  if (overviewQ.isLoading || !overviewQ.data) {
-    return (
-      <div className="space-y-4">
-        <AvisoSnapshot />
-        {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}
-      </div>
-    );
-  }
-
-  const overview = overviewQ.data as OverviewData;
-  const dist = (distQ.data as { ltv: BucketDist[]; lt: BucketDist[] } | undefined)?.ltv ?? [];
-  const clientes = (clientesQ.data as { clientes: ClienteRow[] } | undefined)?.clientes ?? [];
-
+/** Função pura: monta as seções de LT/LTV a partir dos dados já resolvidos (snapshot, ignora
+   `mes`). `evolucaoProduto` carrega `isLoading`/`isError` porque o texto exibido no subtítulo
+   distingue os dois estados (mesmo comportamento do componente original). Extraída de
+   SecaoLtLtv para reuso pela aba Consolidado. */
+export function montarSecoesLtLtv(
+  overview: OverviewData,
+  dist: BucketDist[],
+  clientes: ClienteRow[],
+  evolucaoProduto: MontarSecoesLtLtvEvolucaoProduto,
+): ScorecardSection[] {
   const clienteRows: ScorecardRow[] = clientes.slice(0, 10).map((c) => ({
     key: `lt_ltv_cliente_${c.idTask}`,
     metrica: c.nomeCliente ?? "—",
@@ -124,11 +97,10 @@ export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) 
   // Sem `mes` no endpoint (histórico completo) — `atual` é o ÚLTIMO ponto da própria série, não
   // o ponto do mês selecionado no topo da página (essa aba já ignora o seletor de mês, ver
   // AvisoSnapshot; aqui a métrica em si é mensal, só a "atual" não é filtrada por ele).
-  const evolucaoProduto = evolucaoProdutoQ.data as EvolucaoProdutoTabelaData | undefined;
-  const evolucaoProdutoRows: ScorecardRow[] = evolucaoProduto
-    ? evolucaoProduto.produtos.map((produto) => {
-        const porMes = evolucaoProduto.celulas[produto] ?? {};
-        const pontos: { mes: string; cell: EvolucaoProdutoTabelaCelula }[] = evolucaoProduto.meses
+  const evolucaoProdutoRows: ScorecardRow[] = evolucaoProduto.data
+    ? evolucaoProduto.data.produtos.map((produto) => {
+        const porMes = evolucaoProduto.data!.celulas[produto] ?? {};
+        const pontos: { mes: string; cell: EvolucaoProdutoTabelaCelula }[] = evolucaoProduto.data!.meses
           .map((mes) => ({ mes, cell: porMes[mes] }))
           .filter((p): p is { mes: string; cell: EvolucaoProdutoTabelaCelula } => p.cell !== undefined);
         const serie: ScorecardSeriePonto[] = pontos.map((p) => ({ month: p.mes, label: labelMesCurto(p.mes), valor: p.cell.ltv }));
@@ -145,7 +117,7 @@ export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) 
       })
     : [];
 
-  const secoes: ScorecardSection[] = [
+  return [
     {
       id: "lt-ltv-base-ativa",
       titulo: "LT / LTV — Base ativa (snapshot)",
@@ -193,14 +165,65 @@ export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) 
     {
       id: "lt-ltv-evolucao-produto",
       titulo: "LTV por produto (evolução)",
-      subtitulo: evolucaoProdutoQ.isLoading
+      subtitulo: evolucaoProduto.isLoading
         ? "carregando série…"
-        : evolucaoProdutoQ.isError
+        : evolucaoProduto.isError
           ? "falha ao carregar série"
           : undefined,
       linhas: evolucaoProdutoRows,
     },
   ];
+}
+
+export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) {
+  const overviewQ = useLtLtvOverview();
+  const distQ = useLtLtvDist();
+  const clientesQ = useLtLtvClientes();
+  // Histórico completo (Onda3) — query isolada (não bloqueia a aba): loading/erro só deixam
+  // a seção "LTV por produto (evolução)" vazia, mesma filosofia de clientesQ/distQ acima.
+  const evolucaoProdutoQ = useLtLtvEvolucaoProduto();
+  // Aba 100% snapshot — sem metas hoje, mas mantém o hook por consistência com as demais
+  // seções (caso metas de LT/LTV sejam cadastradas futuramente em cortex_core.scorecard_metas).
+  useScorecardMetas(mes);
+  const responsaveis = useScorecardResponsaveis();
+  const salvarResponsaveis = useSalvarResponsaveis();
+
+  function onEditResponsavel(metricaKey: string, valor: string) {
+    const atuais = responsaveis.data?.itens ?? [];
+    const atualizado: ScorecardResponsavelItem[] = [
+      ...atuais.filter((i) => i.metrica_key !== metricaKey),
+      { metrica_key: metricaKey, responsavel: valor },
+    ];
+    salvarResponsaveis.mutate(atualizado);
+  }
+
+  if (overviewQ.isError) {
+    return (
+      <div className="space-y-4">
+        <AvisoSnapshot />
+        <ErroCard mensagem="Falha ao carregar LT/LTV. Tente recarregar." />
+      </div>
+    );
+  }
+  if (overviewQ.isLoading || !overviewQ.data) {
+    return (
+      <div className="space-y-4">
+        <AvisoSnapshot />
+        {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}
+      </div>
+    );
+  }
+
+  const overview = overviewQ.data as OverviewData;
+  const dist = (distQ.data as { ltv: BucketDist[]; lt: BucketDist[] } | undefined)?.ltv ?? [];
+  const clientes = (clientesQ.data as { clientes: ClienteRow[] } | undefined)?.clientes ?? [];
+  const evolucaoProduto = evolucaoProdutoQ.data as EvolucaoProdutoTabelaData | undefined;
+
+  const secoes = montarSecoesLtLtv(overview, dist, clientes, {
+    data: evolucaoProduto,
+    isLoading: evolucaoProdutoQ.isLoading,
+    isError: evolucaoProdutoQ.isError,
+  });
 
   return (
     <div className="space-y-4">

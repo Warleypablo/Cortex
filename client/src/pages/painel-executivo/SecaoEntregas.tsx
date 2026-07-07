@@ -10,9 +10,15 @@ import {
   useSalvarResponsaveis,
   useScorecardSeries,
 } from "./hooks";
-import type { ScorecardSection, ScorecardRow, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
+import type {
+  ScorecardSection,
+  ScorecardRow,
+  ScorecardSeriePonto,
+  ScorecardResponsavelItem,
+  ScorecardSeriesResponse,
+} from "./scorecard/tipos";
 import { linhasPorDimensao } from "./scorecard/logica";
-import type { EntregaProdutoMes } from "./tipos";
+import type { EntregaProdutoMes, ReportsMensal } from "./tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -70,43 +76,17 @@ function serieEntregasTech(rows: Record<string, unknown>[] | undefined): Scoreca
   });
 }
 
-export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo }) {
-  const rm = useReportsMensal(mes);
-  const estoqueQ = useEstoqueOverview();
-  // Série por operador (Onda2-A) — fonte de `operadorRows` abaixo. Falha/loading isolados
-  // (não bloqueiam a seção): linhasPorDimensao devolve [] sem `series.data`.
-  const series = useScorecardSeries(mes);
-  const metas = useScorecardMetas(mes);
-  const responsaveis = useScorecardResponsaveis();
-  const salvarResponsaveis = useSalvarResponsaveis();
-
-  function onEditResponsavel(metricaKey: string, valor: string) {
-    const atuais = responsaveis.data?.itens ?? [];
-    const atualizado: ScorecardResponsavelItem[] = [
-      ...atuais.filter((i) => i.metrica_key !== metricaKey),
-      { metrica_key: metricaKey, responsavel: valor },
-    ];
-    salvarResponsaveis.mutate(atualizado);
-  }
-
-  if (rm.isError) {
-    return (
-      <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
-        <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
-          <AlertTriangle className="h-4 w-4" /> Falha ao carregar entregas.
-        </CardContent>
-      </Card>
-    );
-  }
-  if (rm.isLoading || !rm.data) {
-    return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
-  }
-
-  const p = rm.data.pontualData;
-  const techKpis = rm.data.techData.kpis;
-  // Query isolada (não bloqueia a seção inteira, mesma filosofia de SecaoChurn) — ausente
-  // (loading ou erro) só zera a linha "Aberto (estoque)" (atual: null renderiza "—").
-  const estoque = estoqueQ.data as EstoqueOverview | undefined;
+/** Função pura: monta as seções de Entregas a partir do payload já resolvido de
+   /api/reports/mensal + estoque/series (ambos isolados, toleram `undefined`). Extraída de
+   SecaoEntregas para reuso pela aba Consolidado. */
+export function montarSecoesEntregas(
+  rm: ReportsMensal,
+  estoque: EstoqueOverview | undefined,
+  series: ScorecardSeriesResponse | undefined,
+  mes: string,
+): ScorecardSection[] {
+  const p = rm.pontualData;
+  const techKpis = rm.techData.kpis;
 
   // Ausente = mês sem snapshot de entregas por produto registrado ainda (ex: mês corrente
   // antes do fechamento) — mesma leitura da v1 desta seção.
@@ -130,7 +110,7 @@ export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo 
   // operador — mesma fonte para `atual` E `serie` (reconcilia número do mês com a linha do
   // tempo do modo Evolução). Formato "brl" (a query soma `valorp`, R$ entregue — não é mais
   // uma contagem de entregas).
-  const operadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.entregasPorOperador, mes, {
+  const operadorRows: ScorecardRow[] = linhasPorDimensao(series?.series.entregasPorOperador, mes, {
     keyFn: (dim) => `entregas_operador_${slug(dim)}`,
     formato: "brl",
     labelMes: labelMesCurto,
@@ -151,7 +131,7 @@ export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo 
       temporalidade: "mes",
     }));
 
-  const secoes: ScorecardSection[] = [
+  return [
     {
       id: "entregas-resumo",
       titulo: "Entregas — Resumo (mês)",
@@ -169,7 +149,7 @@ export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo 
           metrica: "Entregas Tech",
           atual: techKpis.entregues,
           formato: "int",
-          serie: serieEntregasTech(rm.data.techData.entregasPorTipo),
+          serie: serieEntregasTech(rm.techData.entregasPorTipo),
           temporalidade: "mes",
         },
         {
@@ -223,6 +203,45 @@ export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo 
       linhas: leadTimeRows,
     },
   ];
+}
+
+export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo }) {
+  const rm = useReportsMensal(mes);
+  const estoqueQ = useEstoqueOverview();
+  // Série por operador (Onda2-A) — fonte de `operadorRows` abaixo. Falha/loading isolados
+  // (não bloqueiam a seção): linhasPorDimensao devolve [] sem `series.data`.
+  const series = useScorecardSeries(mes);
+  const metas = useScorecardMetas(mes);
+  const responsaveis = useScorecardResponsaveis();
+  const salvarResponsaveis = useSalvarResponsaveis();
+
+  function onEditResponsavel(metricaKey: string, valor: string) {
+    const atuais = responsaveis.data?.itens ?? [];
+    const atualizado: ScorecardResponsavelItem[] = [
+      ...atuais.filter((i) => i.metrica_key !== metricaKey),
+      { metrica_key: metricaKey, responsavel: valor },
+    ];
+    salvarResponsaveis.mutate(atualizado);
+  }
+
+  if (rm.isError) {
+    return (
+      <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
+        <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
+          <AlertTriangle className="h-4 w-4" /> Falha ao carregar entregas.
+        </CardContent>
+      </Card>
+    );
+  }
+  if (rm.isLoading || !rm.data) {
+    return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
+  }
+
+  // Query isolada (não bloqueia a seção inteira, mesma filosofia de SecaoChurn) — ausente
+  // (loading ou erro) só zera a linha "Aberto (estoque)" (atual: null renderiza "—").
+  const estoque = estoqueQ.data as EstoqueOverview | undefined;
+
+  const secoes = montarSecoesEntregas(rm.data, estoque, series.data, mes);
 
   return (
     <Scorecard

@@ -11,9 +11,10 @@ import {
   useSalvarResponsaveis,
   useScorecardSeries,
 } from "./hooks";
-import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem } from "./scorecard/tipos";
+import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
 import { linhasPorDimensao } from "./scorecard/logica";
 import type { ClienteRow } from "@/components/lt-ltv-churn/types";
+import type { ReportsMensal } from "./tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -34,6 +35,74 @@ function slug(s: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, "-")
     .replace(/(^-|-$)/g, "");
+}
+
+export interface MontarSecoesPerformanceSeries {
+  data: ScorecardSeriesResponse | undefined;
+  isLoading: boolean;
+  isError: boolean;
+}
+
+/** Função pura: monta as seções de Performance a partir do payload já resolvido de
+   /api/reports/mensal + clientes (LTV) + série por dimensão. `series` carrega
+   `isLoading`/`isError` porque o subtítulo das 2 seções de ranking distingue os dois estados
+   (mesmo comportamento do componente original). Extraída de SecaoPerformance para reuso pela
+   aba Consolidado. */
+export function montarSecoesPerformance(
+  rm: ReportsMensal,
+  ltvClientes: ClienteRow[],
+  series: MontarSecoesPerformanceSeries,
+  mes: string,
+): ScorecardSection[] {
+  const topClientes = [...ltvClientes].sort((a, b) => b.ltvTotal - a.ltvTotal).slice(0, 10);
+
+  // Onda3: substitui `topOperadores.topMrrPontual`/`rankingSquads` (só do mês, sem série) pelas
+  // séries por dimensão (mesma fonte de SecaoChurn/SecaoEntregas) — reconcilia número do mês
+  // com a linha do tempo do modo Evolução.
+  const operadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorOperador, mes, {
+    keyFn: (dim) => `performance_operador_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+    top: 10,
+    // Dono automático (o próprio operador) — célula somente-leitura, mesmo padrão de
+    // operadorRows em SecaoChurn.tsx/SecaoEntregas.tsx.
+    responsavelAuto: true,
+  });
+
+  const squadRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorSquad, mes, {
+    keyFn: (dim) => `performance_squad_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+  });
+
+  const clienteRows: ScorecardRow[] = topClientes.map((c) => ({
+    key: `performance_cliente_${c.idTask}`,
+    metrica: c.nomeCliente ?? "—",
+    sub: c.ltMeses != null ? `${c.ltMeses} meses` : undefined,
+    atual: c.ltvTotal,
+    formato: "brl",
+    temporalidade: "snapshot",
+  }));
+
+  return [
+    {
+      id: "performance-top-operadores",
+      titulo: "Top operadores (mês)",
+      subtitulo: series.isLoading ? "carregando série…" : series.isError ? "falha ao carregar série" : undefined,
+      linhas: operadorRows,
+    },
+    {
+      id: "performance-ranking-squads",
+      titulo: "Ranking de squads (mês)",
+      subtitulo: series.isLoading ? "carregando série…" : series.isError ? "falha ao carregar série" : undefined,
+      linhas: squadRows,
+    },
+    {
+      id: "performance-maiores-clientes",
+      titulo: "Maiores clientes por R$ (snapshot)",
+      linhas: clienteRows,
+    },
+  ];
 }
 
 export function SecaoPerformance({ mes, modo }: { mes: string; modo: ScorecardModo }) {
@@ -71,55 +140,13 @@ export function SecaoPerformance({ mes, modo }: { mes: string; modo: ScorecardMo
   // Query isolada (não bloqueia a seção inteira, mesma filosofia de SecaoEntregas/estoqueQ) —
   // ausente (loading ou erro) só deixa a seção de maiores clientes vazia.
   const clientes = (clientesQ.data as { clientes: ClienteRow[] } | undefined)?.clientes ?? [];
-  const topClientes = [...clientes].sort((a, b) => b.ltvTotal - a.ltvTotal).slice(0, 10);
 
-  // Onda3: substitui `topOperadores.topMrrPontual`/`rankingSquads` (só do mês, sem série) pelas
-  // séries por dimensão (mesma fonte de SecaoChurn/SecaoEntregas) — reconcilia número do mês
-  // com a linha do tempo do modo Evolução.
-  const operadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorOperador, mes, {
-    keyFn: (dim) => `performance_operador_${slug(dim)}`,
-    formato: "brl",
-    labelMes: labelMesCurto,
-    top: 10,
-    // Dono automático (o próprio operador) — célula somente-leitura, mesmo padrão de
-    // operadorRows em SecaoChurn.tsx/SecaoEntregas.tsx.
-    responsavelAuto: true,
-  });
-
-  const squadRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorSquad, mes, {
-    keyFn: (dim) => `performance_squad_${slug(dim)}`,
-    formato: "brl",
-    labelMes: labelMesCurto,
-  });
-
-  const clienteRows: ScorecardRow[] = topClientes.map((c) => ({
-    key: `performance_cliente_${c.idTask}`,
-    metrica: c.nomeCliente ?? "—",
-    sub: c.ltMeses != null ? `${c.ltMeses} meses` : undefined,
-    atual: c.ltvTotal,
-    formato: "brl",
-    temporalidade: "snapshot",
-  }));
-
-  const secoes: ScorecardSection[] = [
-    {
-      id: "performance-top-operadores",
-      titulo: "Top operadores (mês)",
-      subtitulo: series.isLoading ? "carregando série…" : series.isError ? "falha ao carregar série" : undefined,
-      linhas: operadorRows,
-    },
-    {
-      id: "performance-ranking-squads",
-      titulo: "Ranking de squads (mês)",
-      subtitulo: series.isLoading ? "carregando série…" : series.isError ? "falha ao carregar série" : undefined,
-      linhas: squadRows,
-    },
-    {
-      id: "performance-maiores-clientes",
-      titulo: "Maiores clientes por R$ (snapshot)",
-      linhas: clienteRows,
-    },
-  ];
+  const secoes = montarSecoesPerformance(
+    rm.data,
+    clientes,
+    { data: series.data, isLoading: series.isLoading, isError: series.isError },
+    mes,
+  );
 
   return (
     <div className="space-y-4">

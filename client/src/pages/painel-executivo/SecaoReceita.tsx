@@ -13,7 +13,7 @@ import {
 } from "./hooks";
 import { paramsParaMes, labelMes } from "./temporalidade";
 import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
-import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes } from "./tipos";
+import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes, ReportsMensal } from "./tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -44,42 +44,19 @@ function serieCrosssell(rows: CrosssellHistoricoPonto[] | undefined, valor: (r: 
 // Tipos válidos aceitos por /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts,
 // const TIPOS). "venda"/"churn" (soltos) NÃO existem — usar "venda_mrr"/"venda_pontual" e
 // "churn_motivo"/"churn_vendedor" (que exigem uma chave específica, não "total").
-export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }) {
-  const rm = useReportsMensal(mes);
-  const metas = useScorecardMetas(mes);
-  const responsaveis = useScorecardResponsaveis();
-  const salvarResponsaveis = useSalvarResponsaveis();
-  const [detalheParams, setDetalheParams] = useState<Record<string, string> | null>(null);
-  const detalhe = useGestaoReceitaDetalhe(detalheParams);
-  const [drillAberto, setDrillAberto] = useState(false);
 
-  function abrirDrill(tipo: string, chave: string) {
-    const { de, ate } = paramsParaMes(mes).deAte;
-    setDetalheParams({ de, ate, tipo, chave });
-    setDrillAberto(true);
-  }
+export interface MontarSecoesReceitaExtras {
+  /** Abre o DrillSheet (estado fica no componente) — omitido = linha "Nova receita" sem drill. */
+  onDrill?: (tipo: string, chave: string) => void;
+}
 
-  function onEditResponsavel(metricaKey: string, valor: string) {
-    const atuais = responsaveis.data?.itens ?? [];
-    const atualizado: ScorecardResponsavelItem[] = [
-      ...atuais.filter((i) => i.metrica_key !== metricaKey),
-      { metrica_key: metricaKey, responsavel: valor },
-    ];
-    salvarResponsaveis.mutate(atualizado);
-  }
+/** Função pura: monta as seções de Receita a partir do payload já resolvido de
+   /api/reports/mensal. Extraída de SecaoReceita para reuso pela aba Consolidado. */
+export function montarSecoesReceita(rm: ReportsMensal, extras: MontarSecoesReceitaExtras = {}): ScorecardSection[] {
+  const tm = rm.turboMetrics;
+  const p = rm.pontualData;
 
-  if (rm.isError) return <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40"><CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300"><AlertTriangle className="h-4 w-4" /> Falha ao carregar receita.</CardContent></Card>;
-  if (rm.isLoading || !rm.data) return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
-
-  const tm = rm.data.turboMetrics;
-  const p = rm.data.pontualData;
-  // /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts, DetalheResult) não tem
-  // tipo compartilhado client/server — um único cast local evita repetir "as any" por linha
-  // (inclui `total`, usado pelo rodapé de auditabilidade do DrillSheet).
-  const detalheData = detalhe.data as { titulo?: string; subtitulo?: string; total?: number; grupos?: Record<string, unknown>[] } | undefined;
-  const grupos = detalheData?.grupos ?? [];
-
-  const secoes: ScorecardSection[] = [
+  return [
     {
       id: "receita-mrr",
       titulo: "Receita — MRR",
@@ -101,9 +78,9 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
           atual: tm.mrrAdicionado,
           formato: "brl",
           metaKey: "sales_mrr_new_target",
-          serie: serieComLabel<VendasSeriePonto>(rm.data.contratosMes.vendasSeries, (r) => r.vendasMrr),
+          serie: serieComLabel<VendasSeriePonto>(rm.contratosMes.vendasSeries, (r) => r.vendasMrr),
           temporalidade: "mes",
-          drill: () => abrirDrill("venda_mrr", "mrr"),
+          drill: extras.onDrill ? () => extras.onDrill!("venda_mrr", "mrr") : undefined,
         },
         {
           key: "receita_mrr_churn",
@@ -145,7 +122,7 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
           atual: p.aquisicao.valor,
           formato: "brl",
           metaKey: "revenue_one_time",
-          serie: serieComLabel<VendasSeriePonto>(rm.data.contratosMes.vendasSeries, (r) => r.vendasPontual),
+          serie: serieComLabel<VendasSeriePonto>(rm.contratosMes.vendasSeries, (r) => r.vendasPontual),
           temporalidade: "mes",
         },
         {
@@ -177,6 +154,42 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
       ],
     },
   ];
+}
+
+export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }) {
+  const rm = useReportsMensal(mes);
+  const metas = useScorecardMetas(mes);
+  const responsaveis = useScorecardResponsaveis();
+  const salvarResponsaveis = useSalvarResponsaveis();
+  const [detalheParams, setDetalheParams] = useState<Record<string, string> | null>(null);
+  const detalhe = useGestaoReceitaDetalhe(detalheParams);
+  const [drillAberto, setDrillAberto] = useState(false);
+
+  function abrirDrill(tipo: string, chave: string) {
+    const { de, ate } = paramsParaMes(mes).deAte;
+    setDetalheParams({ de, ate, tipo, chave });
+    setDrillAberto(true);
+  }
+
+  function onEditResponsavel(metricaKey: string, valor: string) {
+    const atuais = responsaveis.data?.itens ?? [];
+    const atualizado: ScorecardResponsavelItem[] = [
+      ...atuais.filter((i) => i.metrica_key !== metricaKey),
+      { metrica_key: metricaKey, responsavel: valor },
+    ];
+    salvarResponsaveis.mutate(atualizado);
+  }
+
+  if (rm.isError) return <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40"><CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300"><AlertTriangle className="h-4 w-4" /> Falha ao carregar receita.</CardContent></Card>;
+  if (rm.isLoading || !rm.data) return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
+
+  // /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts, DetalheResult) não tem
+  // tipo compartilhado client/server — um único cast local evita repetir "as any" por linha
+  // (inclui `total`, usado pelo rodapé de auditabilidade do DrillSheet).
+  const detalheData = detalhe.data as { titulo?: string; subtitulo?: string; total?: number; grupos?: Record<string, unknown>[] } | undefined;
+  const grupos = detalheData?.grupos ?? [];
+
+  const secoes = montarSecoesReceita(rm.data, { onDrill: abrirDrill });
 
   return (
     <div className="space-y-4">

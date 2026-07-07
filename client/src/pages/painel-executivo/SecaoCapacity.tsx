@@ -13,7 +13,7 @@ import { linhasPorDimensao } from "./scorecard/logica";
 import { SELVA_BLOQUEADA } from "@shared/capacityGrupos";
 import { ErroCard } from "./_ui";
 import type { CeoKpi } from "@/components/ceo/CeoKpiCard";
-import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem } from "./scorecard/tipos";
+import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -126,30 +126,28 @@ function montarLinhasCapacidade(cap: CapacityTimesResponse): ScorecardRow[] {
   return linhas;
 }
 
-export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo }) {
-  const ceo = useCeoDashboard(mes);
-  const capacity = useCapacityTimes();
-  // Série de MRR por squad/operador (Onda2-A) — fonte das 2 seções de evolução abaixo. Falha/
-  // loading isolados (não bloqueiam a aba): linhasPorDimensao devolve [] sem `series.data`.
-  const series = useScorecardSeries(mes);
-  const metas = useScorecardMetas(mes);
-  const responsaveis = useScorecardResponsaveis();
-  const salvarResponsaveis = useSalvarResponsaveis();
+export interface MontarSecoesCapacityCeo {
+  isError: boolean;
+  kpis: CeoKpi[] | undefined;
+}
+export interface MontarSecoesCapacitySeries {
+  isError: boolean;
+  data: ScorecardSeriesResponse | undefined;
+}
 
-  function onEditResponsavel(metricaKey: string, valor: string) {
-    const atuais = responsaveis.data?.itens ?? [];
-    const atualizado: ScorecardResponsavelItem[] = [
-      ...atuais.filter((i) => i.metrica_key !== metricaKey),
-      { metrica_key: metricaKey, responsavel: valor },
-    ];
-    salvarResponsaveis.mutate(atualizado);
-  }
-
+/** Função pura: monta as seções de Capacity a partir dos payloads já resolvidos. `ceo`/`series`
+   carregam o `isError` de cada query (além dos dados) porque o texto exibido distingue erro de
+   loading (mesmo comportamento do componente original). Extraída de SecaoCapacity para reuso
+   pela aba Consolidado. */
+export function montarSecoesCapacity(
+  ceo: MontarSecoesCapacityCeo,
+  capacity: CapacityTimesResponse | undefined,
+  series: MontarSecoesCapacitySeries,
+  mes: string,
+): ScorecardSection[] {
   // /api/ceo-dashboard exige permissão de CEO (403 para os demais papéis; useCeoDashboard já
   // usa retry:false). Isolado: a linha mostra atual=null + aviso, sem derrubar a aba inteira.
-  const receitaCabecaValor = ceo.isError
-    ? null
-    : ((ceo.data as { kpis?: CeoKpi[] } | undefined)?.kpis?.find((k) => k.key === "receita_cabeca")?.valor ?? null);
+  const receitaCabecaValor = ceo.isError ? null : (ceo.kpis?.find((k) => k.key === "receita_cabeca")?.valor ?? null);
 
   const secaoReceitaCabeca: ScorecardSection = {
     id: "capacity-receita-cabeca",
@@ -206,18 +204,43 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
 
   // capacity-times bloqueia SÓ a seção snapshot (Receita/Cabeça e as 2 seções de série
   // continuam acima, independentes).
-  const cap = capacity.data as CapacityTimesResponse | undefined;
   const secoes: ScorecardSection[] = [secaoReceitaCabeca, secaoMrrSquad, secaoMrrOperador];
-  if (cap) {
+  if (capacity) {
     secoes.push({
       id: "capacity-squad-snapshot",
       titulo: "Capacity por squad (snapshot)",
       subtitulo: SELVA_BLOQUEADA
         ? "Selva (Designers) desativada temporariamente — carteira em preenchimento no ClickUp."
         : undefined,
-      linhas: montarLinhasCapacidade(cap),
+      linhas: montarLinhasCapacidade(capacity),
     });
   }
+
+  return secoes;
+}
+
+export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo }) {
+  const ceo = useCeoDashboard(mes);
+  const capacity = useCapacityTimes();
+  // Série de MRR por squad/operador (Onda2-A) — fonte das 2 seções de evolução abaixo. Falha/
+  // loading isolados (não bloqueiam a aba): linhasPorDimensao devolve [] sem `series.data`.
+  const series = useScorecardSeries(mes);
+  const metas = useScorecardMetas(mes);
+  const responsaveis = useScorecardResponsaveis();
+  const salvarResponsaveis = useSalvarResponsaveis();
+
+  function onEditResponsavel(metricaKey: string, valor: string) {
+    const atuais = responsaveis.data?.itens ?? [];
+    const atualizado: ScorecardResponsavelItem[] = [
+      ...atuais.filter((i) => i.metrica_key !== metricaKey),
+      { metrica_key: metricaKey, responsavel: valor },
+    ];
+    salvarResponsaveis.mutate(atualizado);
+  }
+
+  const cap = capacity.data as CapacityTimesResponse | undefined;
+  const ceoKpis = (ceo.data as { kpis?: CeoKpi[] } | undefined)?.kpis;
+  const secoes = montarSecoesCapacity({ isError: ceo.isError, kpis: ceoKpis }, cap, { isError: series.isError, data: series.data }, mes);
 
   return (
     <div className="space-y-4">

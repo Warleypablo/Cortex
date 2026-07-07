@@ -14,9 +14,16 @@ import {
   useSalvarResponsaveis,
   useScorecardSeries,
 } from "./hooks";
-import type { ScorecardSection, ScorecardRow, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
+import type {
+  ScorecardSection,
+  ScorecardRow,
+  ScorecardSeriePonto,
+  ScorecardResponsavelItem,
+  ScorecardSeriesResponse,
+} from "./scorecard/tipos";
 import { linhasPorDimensao } from "./scorecard/logica";
-import type { ChurnTaxaMensalRow, ChurnProdutoMotivoCelula, ReceitaChurnPonto } from "./tipos";
+import type { ChurnDetalhamento, ChurnProdutoMotivo, ChurnTaxaMensal, ChurnTaxaMensalRow, ChurnProdutoMotivoCelula, ReceitaChurnPonto, ReportsMensal } from "./tipos";
+import type { ChurnPontorrentePayload } from "@/components/churn-pontorrente/types";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -62,6 +69,131 @@ function topMotivoPorProduto(produto: string, celulas: ChurnProdutoMotivoCelula[
   return [...doProduto].sort((a, b) => b.mrr_perdido - a.mrr_perdido)[0]?.motivo_cancelamento;
 }
 
+/** Função pura: monta as seções de Churn a partir dos payloads já resolvidos (o `churnDet` é a
+   fonte primária/bloqueante do componente — as demais são isoladas e podem estar `undefined`
+   em loading/erro, mesma tolerância do componente original). Extraída de SecaoChurn para
+   reuso pela aba Consolidado. */
+export function montarSecoesChurn(
+  churnDet: ChurnDetalhamento,
+  produtoMotivo: ChurnProdutoMotivo | undefined,
+  taxaMensal: ChurnTaxaMensal | undefined,
+  pontorrente: ChurnPontorrentePayload | undefined,
+  series: ScorecardSeriesResponse | undefined,
+  rm: ReportsMensal | undefined,
+  mes: string,
+): ScorecardSection[] {
+  const m = churnDet.metricas;
+
+  // Breakdowns por dimensão (produto/operador/squad) — Onda2-A: fonte única `series` para
+  // `atual` E `serie`, reconciliando o número do mês com a linha do tempo do modo Evolução.
+  const produtoRows: ScorecardRow[] = linhasPorDimensao(series?.series.churnPorProduto, mes, {
+    keyFn: (dim) => `churn_produto_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+    top: 8,
+    sub: (dim) => topMotivoPorProduto(dim, produtoMotivo?.celulas),
+  });
+
+  const operadorRows: ScorecardRow[] = linhasPorDimensao(series?.series.churnPorOperador, mes, {
+    keyFn: (dim) => `churn_operador_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+    top: 6,
+    // Dono automático (o próprio operador) — célula somente-leitura, não faz sentido reatribuir.
+    responsavelAuto: true,
+  });
+
+  const squadRowsSemSub = linhasPorDimensao(series?.series.churnPorSquad, mes, {
+    keyFn: (dim) => `churn_squad_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+  });
+  // % do total (share entre as squads da própria série — mesma fonte do `atual`, não mistura
+  // com `m.churn_por_squad`, que agora é uma fonte diferente/desalinhada desta série nova).
+  const totalSquadChurn = squadRowsSemSub.reduce((acc, r) => acc + (r.atual ?? 0), 0);
+  const squadRows: ScorecardRow[] = squadRowsSemSub.map((r) => ({
+    ...r,
+    sub: totalSquadChurn > 0 && r.atual !== null ? formatPercent((r.atual / totalSquadChurn) * 100) : undefined,
+  }));
+
+  const pontualOverview = pontorrente?.overview;
+  const pontualRows: ScorecardRow[] = pontualOverview
+    ? [
+        {
+          key: "churn_pontual_confirmado_brl",
+          metrica: "Churn confirmado (R$)",
+          atual: pontualOverview.valorpPerdido,
+          formato: "brl",
+          temporalidade: "mes",
+        },
+        {
+          key: "churn_pontual_drop_medio",
+          metrica: "Drop médio",
+          atual: pontualOverview.dropMedio,
+          formato: "pct",
+          temporalidade: "mes",
+        },
+      ]
+    : [];
+
+  return [
+    {
+      id: "churn-geral",
+      titulo: "Churn Recorrente — Geral",
+      linhas: [
+        {
+          key: "churn_geral_brl",
+          metrica: "Churn R$",
+          // Mesma fonte e mesma meta de Receita/Visão Geral (turboMetrics.churnMrr +
+          // churn_mrr_month) — evita 2 valores/2 metas para a mesma métrica no scorecard.
+          atual: rm?.turboMetrics.churnMrr ?? null,
+          formato: "brl",
+          metaKey: "churn_mrr_month",
+          serie: serieComLabel<ReceitaChurnPonto>(rm?.turboMetrics.receitaChurnSeries, (r) => r.churnBrl),
+          temporalidade: "mes",
+        },
+        {
+          key: "churn_geral_pct",
+          metrica: "Churn %",
+          atual: m.churn_percentual,
+          formato: "pct",
+          serie: serieTaxaMensal(taxaMensal?.rows, (r) => r.taxa),
+          temporalidade: "mes",
+        },
+        {
+          key: "churn_geral_contratos",
+          metrica: "Contratos cancelados",
+          atual: m.total_churned,
+          formato: "int",
+          serie: serieTaxaMensal(taxaMensal?.rows, (r) => r.cancelamentos),
+          temporalidade: "mes",
+        },
+      ],
+    },
+    {
+      id: "churn-produto",
+      titulo: "Churn Recorrente — Por produto",
+      subtitulo: "detalhamento (fonte ClickUp); pode não somar ao geral",
+      linhas: produtoRows,
+    },
+    {
+      id: "churn-operador",
+      titulo: "Churn Recorrente — Por operador",
+      linhas: operadorRows,
+    },
+    {
+      id: "churn-squad",
+      titulo: "Churn Recorrente — Por squad",
+      linhas: squadRows,
+    },
+    {
+      id: "churn-pontual",
+      titulo: "Churn Pontual",
+      linhas: pontualRows,
+    },
+  ];
+}
+
 export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) {
   // Fonte mensal canônica do painel (mesma de SecaoReceita/SecaoVisaoGeral) — usada SÓ para
   // o "Churn R$" geral, para que as 3 abas mostrem o MESMO valor e a MESMA meta. Os
@@ -103,116 +235,7 @@ export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) 
     return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
   }
 
-  const m = detalhamento.data.metricas;
-
-  // Breakdowns por dimensão (produto/operador/squad) — Onda2-A: fonte única `series` para
-  // `atual` E `serie`, reconciliando o número do mês com a linha do tempo do modo Evolução.
-  const produtoRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.churnPorProduto, mes, {
-    keyFn: (dim) => `churn_produto_${slug(dim)}`,
-    formato: "brl",
-    labelMes: labelMesCurto,
-    top: 8,
-    sub: (dim) => topMotivoPorProduto(dim, produtoMotivo.data?.celulas),
-  });
-
-  const operadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.churnPorOperador, mes, {
-    keyFn: (dim) => `churn_operador_${slug(dim)}`,
-    formato: "brl",
-    labelMes: labelMesCurto,
-    top: 6,
-    // Dono automático (o próprio operador) — célula somente-leitura, não faz sentido reatribuir.
-    responsavelAuto: true,
-  });
-
-  const squadRowsSemSub = linhasPorDimensao(series.data?.series.churnPorSquad, mes, {
-    keyFn: (dim) => `churn_squad_${slug(dim)}`,
-    formato: "brl",
-    labelMes: labelMesCurto,
-  });
-  // % do total (share entre as squads da própria série — mesma fonte do `atual`, não mistura
-  // com `m.churn_por_squad`, que agora é uma fonte diferente/desalinhada desta série nova).
-  const totalSquadChurn = squadRowsSemSub.reduce((acc, r) => acc + (r.atual ?? 0), 0);
-  const squadRows: ScorecardRow[] = squadRowsSemSub.map((r) => ({
-    ...r,
-    sub: totalSquadChurn > 0 && r.atual !== null ? formatPercent((r.atual / totalSquadChurn) * 100) : undefined,
-  }));
-
-  const pontualOverview = pontorrente.data?.overview;
-  const pontualRows: ScorecardRow[] = pontualOverview
-    ? [
-        {
-          key: "churn_pontual_confirmado_brl",
-          metrica: "Churn confirmado (R$)",
-          atual: pontualOverview.valorpPerdido,
-          formato: "brl",
-          temporalidade: "mes",
-        },
-        {
-          key: "churn_pontual_drop_medio",
-          metrica: "Drop médio",
-          atual: pontualOverview.dropMedio,
-          formato: "pct",
-          temporalidade: "mes",
-        },
-      ]
-    : [];
-
-  const secoes: ScorecardSection[] = [
-    {
-      id: "churn-geral",
-      titulo: "Churn Recorrente — Geral",
-      linhas: [
-        {
-          key: "churn_geral_brl",
-          metrica: "Churn R$",
-          // Mesma fonte e mesma meta de Receita/Visão Geral (turboMetrics.churnMrr +
-          // churn_mrr_month) — evita 2 valores/2 metas para a mesma métrica no scorecard.
-          atual: rm.data?.turboMetrics.churnMrr ?? null,
-          formato: "brl",
-          metaKey: "churn_mrr_month",
-          serie: serieComLabel<ReceitaChurnPonto>(rm.data?.turboMetrics.receitaChurnSeries, (r) => r.churnBrl),
-          temporalidade: "mes",
-        },
-        {
-          key: "churn_geral_pct",
-          metrica: "Churn %",
-          atual: m.churn_percentual,
-          formato: "pct",
-          serie: serieTaxaMensal(taxaMensal.data?.rows, (r) => r.taxa),
-          temporalidade: "mes",
-        },
-        {
-          key: "churn_geral_contratos",
-          metrica: "Contratos cancelados",
-          atual: m.total_churned,
-          formato: "int",
-          serie: serieTaxaMensal(taxaMensal.data?.rows, (r) => r.cancelamentos),
-          temporalidade: "mes",
-        },
-      ],
-    },
-    {
-      id: "churn-produto",
-      titulo: "Churn Recorrente — Por produto",
-      subtitulo: "detalhamento (fonte ClickUp); pode não somar ao geral",
-      linhas: produtoRows,
-    },
-    {
-      id: "churn-operador",
-      titulo: "Churn Recorrente — Por operador",
-      linhas: operadorRows,
-    },
-    {
-      id: "churn-squad",
-      titulo: "Churn Recorrente — Por squad",
-      linhas: squadRows,
-    },
-    {
-      id: "churn-pontual",
-      titulo: "Churn Pontual",
-      linhas: pontualRows,
-    },
-  ];
+  const secoes = montarSecoesChurn(detalhamento.data, produtoMotivo.data, taxaMensal.data, pontorrente.data, series.data, rm.data, mes);
 
   return (
     <Scorecard

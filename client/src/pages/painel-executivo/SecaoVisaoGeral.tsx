@@ -12,7 +12,7 @@ import {
   useSalvarResponsaveis,
 } from "./hooks";
 import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
-import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes } from "./tipos";
+import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes, ReportsMensal } from "./tipos";
 import type { OverviewData } from "@/components/lt-ltv-churn/types";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -44,54 +44,27 @@ function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | 
   return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r), month: r.month }));
 }
 
-/** Aba-síntese: 1 linha por métrica-chave de cada uma das outras 6 abas, com meta/status
-   automáticos via `metaKey` (mesmo componente Scorecard, mesma fonte /api/scorecard/metas). */
-export function SecaoVisaoGeral({ mes, modo }: { mes: string; modo: ScorecardModo }) {
-  const rm = useReportsMensal(mes);
-  const metas = useScorecardMetas(mes);
-  const ltv = useLtLtvOverview();
-  const ceo = useCeoDashboard(mes);
-  const responsaveis = useScorecardResponsaveis();
-  const salvarResponsaveis = useSalvarResponsaveis();
+export interface MontarSecoesVisaoGeralCeo {
+  isError: boolean;
+  kpis: CeoKpiMin[] | undefined;
+}
 
-  function onEditResponsavel(metricaKey: string, valor: string) {
-    const atuais = responsaveis.data?.itens ?? [];
-    const atualizado: ScorecardResponsavelItem[] = [
-      ...atuais.filter((i) => i.metrica_key !== metricaKey),
-      { metrica_key: metricaKey, responsavel: valor },
-    ];
-    salvarResponsaveis.mutate(atualizado);
-  }
+/** Função pura: monta a seção-síntese de Visão Geral a partir do payload já resolvido de
+   /api/reports/mensal + LTV overview + CEO dashboard (isolado, com `isError` porque o `sub`
+   da linha "Receita/Cabeça" distingue falta de permissão de outros estados). Extraída de
+   SecaoVisaoGeral para reuso pela aba Consolidado. */
+export function montarSecoesVisaoGeral(rm: ReportsMensal, ltvOverview: OverviewData | undefined, ceo: MontarSecoesVisaoGeralCeo): ScorecardSection[] {
+  const tm = rm.turboMetrics;
+  const p = rm.pontualData;
 
-  if (rm.isError) {
-    return (
-      <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
-        <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
-          <AlertTriangle className="h-4 w-4" /> Falha ao carregar os dados do mês. Tente recarregar.
-        </CardContent>
-      </Card>
-    );
-  }
-  if (rm.isLoading || !rm.data) {
-    return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
-  }
-
-  const tm = rm.data.turboMetrics;
-  const p = rm.data.pontualData;
-
-  // kpis é um array (CeoKpi[]), não um mapa por chave — busca pelo campo `key`. ceo.isError
-  // (403 sem permissão de CEO Dashboard) deixa ceo.data undefined → receitaCabeca cai em null
-  // (linha mostra "—", só a meta fica visível), sem bloquear o resto da aba.
-  const ceoKpis = (ceo.data as { kpis?: CeoKpiMin[] } | undefined)?.kpis;
-  const receitaCabeca = ceoKpis?.find((k) => k.key === "receita_cabeca")?.valor ?? null;
-
-  const ltvMedioCliente = (ltv.data as OverviewData | undefined)?.ltvMedioCliente ?? null;
+  const receitaCabeca = ceo.isError ? null : (ceo.kpis?.find((k) => k.key === "receita_cabeca")?.valor ?? null);
+  const ltvMedioCliente = ltvOverview?.ltvMedioCliente ?? null;
 
   // Último ponto válido da série mensal de churn % (mesma fonte que a linha "Churn R$" abaixo).
   const churnSerie = tm.receitaChurnSeries ?? [];
   const churnPctAtual = churnSerie.length > 0 ? churnSerie[churnSerie.length - 1].churnPct : null;
 
-  const secoes: ScorecardSection[] = [
+  return [
     {
       id: "resumo-mes",
       titulo: "Resumo do mês",
@@ -111,7 +84,7 @@ export function SecaoVisaoGeral({ mes, modo }: { mes: string; modo: ScorecardMod
           atual: tm.mrrAdicionado,
           formato: "brl",
           metaKey: "sales_mrr_new_target",
-          serie: serieComLabel<VendasSeriePonto>(rm.data.contratosMes.vendasSeries, (r) => r.vendasMrr),
+          serie: serieComLabel<VendasSeriePonto>(rm.contratosMes.vendasSeries, (r) => r.vendasMrr),
           temporalidade: "mes",
         },
         {
@@ -180,6 +153,47 @@ export function SecaoVisaoGeral({ mes, modo }: { mes: string; modo: ScorecardMod
       ],
     },
   ];
+}
+
+/** Aba-síntese: 1 linha por métrica-chave de cada uma das outras 6 abas, com meta/status
+   automáticos via `metaKey` (mesmo componente Scorecard, mesma fonte /api/scorecard/metas). */
+export function SecaoVisaoGeral({ mes, modo }: { mes: string; modo: ScorecardModo }) {
+  const rm = useReportsMensal(mes);
+  const metas = useScorecardMetas(mes);
+  const ltv = useLtLtvOverview();
+  const ceo = useCeoDashboard(mes);
+  const responsaveis = useScorecardResponsaveis();
+  const salvarResponsaveis = useSalvarResponsaveis();
+
+  function onEditResponsavel(metricaKey: string, valor: string) {
+    const atuais = responsaveis.data?.itens ?? [];
+    const atualizado: ScorecardResponsavelItem[] = [
+      ...atuais.filter((i) => i.metrica_key !== metricaKey),
+      { metrica_key: metricaKey, responsavel: valor },
+    ];
+    salvarResponsaveis.mutate(atualizado);
+  }
+
+  if (rm.isError) {
+    return (
+      <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
+        <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
+          <AlertTriangle className="h-4 w-4" /> Falha ao carregar os dados do mês. Tente recarregar.
+        </CardContent>
+      </Card>
+    );
+  }
+  if (rm.isLoading || !rm.data) {
+    return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
+  }
+
+  // kpis é um array (CeoKpi[]), não um mapa por chave — busca pelo campo `key`. ceo.isError
+  // (403 sem permissão de CEO Dashboard) deixa ceo.data undefined → receitaCabeca cai em null
+  // (linha mostra "—", só a meta fica visível), sem bloquear o resto da aba.
+  const ceoKpis = (ceo.data as { kpis?: CeoKpiMin[] } | undefined)?.kpis;
+  const ltvOverview = ltv.data as OverviewData | undefined;
+
+  const secoes = montarSecoesVisaoGeral(rm.data, ltvOverview, { isError: ceo.isError, kpis: ceoKpis });
 
   return (
     <div className="space-y-4">
