@@ -121,7 +121,7 @@ export default function PainelExecutivo() {
         {ABAS.map((a) => (
           <TabsContent key={a.value} value={a.value} className="mt-4">
             {a.value === "visao-geral" ? (
-              <SecaoVisaoGeral mes={mes} />
+              <SecaoVisaoGeral mes={mes} modo={modo} />
             ) : a.value === "receita" ? (
               <SecaoReceita mes={mes} modo={modo} />
             ) : a.value === "churn" ? (

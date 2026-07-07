@@ -1,16 +1,51 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle } from "lucide-react";
-import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
-import { formatCurrencyCompact, formatCurrencyNoDecimals, formatPercent } from "@/lib/utils";
-import { KpiCard } from "./KpiCard";
+import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
 import { EmBreveCard } from "./EmBreveCard";
-import { useReportsMensal, useLtLtvOverview, useCeoDashboard } from "./hooks";
+import {
+  useReportsMensal,
+  useScorecardMetas,
+  useLtLtvOverview,
+  useCeoDashboard,
+  useScorecardResponsaveis,
+  useSalvarResponsaveis,
+} from "./hooks";
+import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
+import type { ReceitaChurnPonto, VendasSeriePonto } from "./tipos";
+import type { OverviewData } from "@/components/lt-ltv-churn/types";
 
-export function SecaoVisaoGeral({ mes }: { mes: string }) {
+// Shape mínimo do payload de GET /api/ceo-dashboard (server/routes/ceoDashboard.helpers.ts,
+// CeoKpi) — sem tipo compartilhado client/server, mesmo cast local usado na v1 desta seção.
+interface CeoKpiMin {
+  key: string;
+  valor: number | null;
+}
+
+/** Normaliza uma série que já vem com `label` do backend para o formato do Scorecard
+   (mesmo helper de SecaoReceita.tsx/SecaoEntregas.tsx). */
+function serieComLabel<T extends { label: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r) }));
+}
+
+/** Aba-síntese: 1 linha por métrica-chave de cada uma das outras 6 abas, com meta/status
+   automáticos via `metaKey` (mesmo componente Scorecard, mesma fonte /api/scorecard/metas). */
+export function SecaoVisaoGeral({ mes, modo }: { mes: string; modo: ScorecardModo }) {
   const rm = useReportsMensal(mes);
+  const metas = useScorecardMetas(mes);
   const ltv = useLtLtvOverview();
   const ceo = useCeoDashboard(mes);
+  const responsaveis = useScorecardResponsaveis();
+  const salvarResponsaveis = useSalvarResponsaveis();
+
+  function onEditResponsavel(metricaKey: string, valor: string) {
+    const atuais = responsaveis.data?.itens ?? [];
+    const atualizado: ScorecardResponsavelItem[] = [
+      ...atuais.filter((i) => i.metrica_key !== metricaKey),
+      { metrica_key: metricaKey, responsavel: valor },
+    ];
+    salvarResponsaveis.mutate(atualizado);
+  }
 
   if (rm.isError) {
     return (
@@ -22,53 +57,121 @@ export function SecaoVisaoGeral({ mes }: { mes: string }) {
     );
   }
   if (rm.isLoading || !rm.data) {
-    return (
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        {Array.from({ length: 8 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
-      </div>
-    );
+    return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
   }
 
   const tm = rm.data.turboMetrics;
-  // kpis é um array (CeoKpi[]), não um mapa por chave — buscar pelo campo `key`.
-  const receitaCabeca = (ceo.data as any)?.kpis?.find((k: any) => k.key === "receita_cabeca")?.valor;
+  const p = rm.data.pontualData;
+
+  // kpis é um array (CeoKpi[]), não um mapa por chave — busca pelo campo `key`. ceo.isError
+  // (403 sem permissão de CEO Dashboard) deixa ceo.data undefined → receitaCabeca cai em null
+  // (linha mostra "—", só a meta fica visível), sem bloquear o resto da aba.
+  const ceoKpis = (ceo.data as { kpis?: CeoKpiMin[] } | undefined)?.kpis;
+  const receitaCabeca = ceoKpis?.find((k) => k.key === "receita_cabeca")?.valor ?? null;
+
+  const ltvMedioCliente = (ltv.data as OverviewData | undefined)?.ltvMedioCliente ?? null;
+
+  // Último ponto válido da série mensal de churn % (mesma fonte que a linha "Churn R$" abaixo).
+  const churnSerie = tm.receitaChurnSeries ?? [];
+  const churnPctAtual = churnSerie.length > 0 ? churnSerie[churnSerie.length - 1].churnPct : null;
+
+  const secoes: ScorecardSection[] = [
+    {
+      id: "resumo-mes",
+      titulo: "Resumo do mês",
+      linhas: [
+        {
+          key: "visao_mrr_ativo",
+          metrica: "MRR ativo",
+          atual: tm.mrrAtivo,
+          formato: "brl",
+          metaKey: "mrr_active",
+          serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.mrr),
+          temporalidade: "mes",
+        },
+        {
+          key: "visao_mrr_nova",
+          metrica: "Nova receita MRR",
+          atual: tm.mrrAdicionado,
+          formato: "brl",
+          metaKey: "sales_mrr_new_target",
+          serie: serieComLabel<VendasSeriePonto>(rm.data.contratosMes.vendasSeries, (r) => r.vendasMrr),
+          temporalidade: "mes",
+        },
+        {
+          key: "visao_churn_brl",
+          metrica: "Churn R$",
+          sub: `${tm.churnCount} contratos`,
+          atual: tm.churnMrr,
+          formato: "brl",
+          metaKey: "churn_mrr_month",
+          serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnBrl),
+          temporalidade: "mes",
+        },
+        {
+          key: "visao_churn_pct",
+          metrica: "Churn %",
+          atual: churnPctAtual,
+          formato: "pct",
+          serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnPct),
+          temporalidade: "mes",
+        },
+        {
+          key: "visao_crosssell",
+          metrica: "Cross-sell",
+          atual: tm.crosssellMrr + tm.crosssellPontual,
+          formato: "brl",
+          metaKey: "sales_mrr_monetization_target",
+          temporalidade: "mes",
+        },
+        {
+          key: "visao_entregas",
+          metrica: "Entregas (R$)",
+          atual: p.entregasMes.total,
+          formato: "brl",
+          temporalidade: "mes",
+        },
+        {
+          key: "visao_receita_cabeca",
+          metrica: "Receita / Cabeça",
+          sub: ceo.isError ? "sem permissão" : undefined,
+          atual: receitaCabeca,
+          formato: "brl",
+          metaKey: "receita_cabeca",
+          temporalidade: "mes",
+        },
+        {
+          key: "visao_ltv_medio",
+          metrica: "LTV médio/cliente",
+          atual: ltvMedioCliente,
+          formato: "brl",
+          temporalidade: "snapshot",
+        },
+        {
+          key: "visao_nps",
+          metrica: "NPS",
+          atual: null,
+          formato: "int",
+          metaKey: "nps",
+          temporalidade: "mes",
+        },
+      ],
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-4">
-        <KpiCard mes={mes} temporalidade="mes" titulo="MRR Ativo" valor={formatCurrencyNoDecimals(tm.mrrAtivo)} />
-        <KpiCard mes={mes} temporalidade="mes" titulo="Nova Receita MRR" valor={formatCurrencyNoDecimals(tm.mrrAdicionado)} />
-        <KpiCard mes={mes} temporalidade="mes" titulo="Churn MRR" valor={formatCurrencyNoDecimals(tm.churnMrr)} sub={`${tm.churnCount} contratos`} />
-        <KpiCard mes={mes} temporalidade="mes" titulo="Cross-sell / Upsell" valor={formatCurrencyNoDecimals(tm.crosssellMrr + tm.crosssellPontual)} />
-        <KpiCard mes={mes} temporalidade="mes" titulo="Entregas Pontuais" valor={formatCurrencyNoDecimals(rm.data.pontualData.entregasMes.total)} />
-        <KpiCard mes={mes} temporalidade="mes" titulo="Entregas Tech" valor={String(rm.data.techData.kpis.entregues)} />
-        <KpiCard mes={mes} temporalidade="snapshot" titulo="LTV médio/cliente" valor={ltv.data ? formatCurrencyNoDecimals((ltv.data as any).ltvMedioCliente) : "—"} />
-        <KpiCard mes={mes} temporalidade="mes" titulo="Receita / Cabeça" valor={receitaCabeca != null ? formatCurrencyNoDecimals(receitaCabeca) : "—"} sub={ceo.isError ? "sem permissão" : "meta R$ 20k"} />
-      </div>
-
-      <Card>
-        <CardContent className="p-4">
-          <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">Receita × Churn — 12 meses</h3>
-          <ResponsiveContainer width="100%" height={300}>
-            <ComposedChart data={tm.receitaChurnSeries}>
-              <XAxis dataKey="label" tick={{ fill: "#9ca3af", fontSize: 12 }} />
-              <YAxis yAxisId="l" tickFormatter={(v) => formatCurrencyCompact(v)} tick={{ fill: "#9ca3af", fontSize: 12 }} />
-              <YAxis yAxisId="r" orientation="right" tickFormatter={(v) => `${v}%`} tick={{ fill: "#9ca3af", fontSize: 12 }} />
-              <Tooltip
-                formatter={(v: number, n) => n === "Churn %" ? formatPercent(v) : formatCurrencyNoDecimals(v)}
-                contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }}
-              />
-              <Legend />
-              <Bar yAxisId="l" dataKey="mrr" name="MRR" fill="#14b8a6" stackId="a" />
-              <Bar yAxisId="l" dataKey="pontual" name="Pontual" fill="#0ea5e9" stackId="a" />
-              <Line yAxisId="r" dataKey="churnPct" name="Churn %" stroke="#ef4444" strokeWidth={2} />
-            </ComposedChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+    <div className="space-y-4">
+      <Scorecard
+        secoes={secoes}
+        mes={mes}
+        modo={modo}
+        metas={metas.data?.metas ?? {}}
+        responsaveis={responsaveis.data?.itens ?? []}
+        onEditResponsavel={onEditResponsavel}
+      />
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-        <EmBreveCard titulo="NPS" motivo="Fase 2 — requer fonte cortex_core.nps_clientes" />
+        <EmBreveCard titulo="NPS de clientes" motivo="Fase 2 — requer fonte cortex_core.nps_clientes" />
         <EmBreveCard titulo="Margem de Contribuição" motivo="Fase 2 — receita − custos de operação por squad" />
       </div>
     </div>
