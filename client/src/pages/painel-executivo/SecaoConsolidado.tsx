@@ -18,6 +18,7 @@ import {
   useLtLtvDist,
   useLtLtvClientes,
   useLtLtvEvolucaoProduto,
+  useLtLtvEvolucaoClientes,
   useScorecardSeries,
 } from "./hooks";
 import { paramsParaMes, labelMes } from "./temporalidade";
@@ -62,6 +63,7 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const distQ = useLtLtvDist();
   const clientesQ = useLtLtvClientes();
   const evolucaoProdutoQ = useLtLtvEvolucaoProduto();
+  const evolucaoClientesQ = useLtLtvEvolucaoClientes();
 
   const [detalheParams, setDetalheParams] = useState<Record<string, string> | null>(null);
   const detalhe = useGestaoReceitaDetalhe(detalheParams);
@@ -103,7 +105,13 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const secoesEntregas = rm.data ? montarSecoesEntregas(rm.data, estoque, series.data, mes) : [];
   const secoesCapacity = montarSecoesCapacity({ isError: ceo.isError, kpis: ceoKpis }, { isError: series.isError, data: series.data }, mes);
   const secoesLtLtv = ltvOverview
-    ? montarSecoesLtLtv(ltvOverview, dist, clientes, { data: evolucaoProdutoQ.data, isLoading: evolucaoProdutoQ.isLoading, isError: evolucaoProdutoQ.isError })
+    ? montarSecoesLtLtv(
+        ltvOverview,
+        dist,
+        clientes,
+        { data: evolucaoProdutoQ.data, isLoading: evolucaoProdutoQ.isLoading, isError: evolucaoProdutoQ.isError },
+        evolucaoClientesQ.data?.serie,
+      )
     : [];
   const secoesPerformance = rm.data
     ? montarSecoesPerformance(rm.data, clientes, { data: series.data, isLoading: series.isLoading, isError: series.isError }, mes)

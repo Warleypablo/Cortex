@@ -8,6 +8,7 @@ import {
   useLtLtvDist,
   useLtLtvClientes,
   useLtLtvEvolucaoProduto,
+  useLtLtvEvolucaoClientes,
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
@@ -19,6 +20,7 @@ import type {
   ClienteRow,
   EvolucaoProdutoTabelaData,
   EvolucaoProdutoTabelaCelula,
+  EvolucaoClientePonto,
 } from "@/components/lt-ltv-churn/types";
 import { ErroCard } from "./_ui";
 
@@ -73,6 +75,7 @@ export function montarSecoesLtLtv(
   dist: BucketDist[],
   clientes: ClienteRow[],
   evolucaoProduto: MontarSecoesLtLtvEvolucaoProduto,
+  evolucaoClientes: EvolucaoClientePonto[] | undefined,
 ): ScorecardSection[] {
   const clienteRows: ScorecardRow[] = clientes.slice(0, 10).map((c) => ({
     key: `lt_ltv_cliente_${c.idTask}`,
@@ -134,6 +137,17 @@ export function montarSecoesLtLtv(
   const ltvMedioSerie = toScorecardSerie(overviewSeries.ltv);
   const totalRecorrentesSerie = toScorecardSerie(overviewSeries.totalRecorrentes);
 
+  // Onda B1: mediana de LT/LTV ao nível de CLIENTE (base ativa), via PERCENTILE_CONT no backend
+  // (GET /api/lt-ltv-churn/evolucao-clientes, server/routes/ltLtvChurn.ts:485-521) — grão e
+  // fonte diferentes da série "por produto" acima (aqui já vem pronta por mês, sem precisar
+  // agregar matriz produto×mês). `atual` = último ponto da própria série (endpoint não recebe
+  // `mes`, mesma convenção das demais séries desta seção). Sem dado → array vazio, linha cai
+  // para "sem série" (degradação graciosa do próprio Scorecard).
+  const serieClientesOrdenada = [...(evolucaoClientes ?? [])].sort((a, b) => (a.mes < b.mes ? -1 : a.mes > b.mes ? 1 : 0));
+  const ltMedianaSerie: ScorecardSeriePonto[] = serieClientesOrdenada.map((p) => ({ month: p.mes, label: labelMesCurto(p.mes), valor: p.ltMediana }));
+  const ltvMedianaSerie: ScorecardSeriePonto[] = serieClientesOrdenada.map((p) => ({ month: p.mes, label: labelMesCurto(p.mes), valor: p.ltvMediana }));
+  const ultimoClientes = serieClientesOrdenada.length > 0 ? serieClientesOrdenada[serieClientesOrdenada.length - 1] : undefined;
+
   return [
     {
       id: "lt-ltv-base-ativa",
@@ -145,6 +159,14 @@ export function montarSecoesLtLtv(
           atual: overview.ltMedioAtivo,
           formato: "meses",
           serie: ltMedioSerie.length > 0 ? ltMedioSerie : undefined,
+          temporalidade: "mes",
+        },
+        {
+          key: "lt_ltv_lt_mediano",
+          metrica: "LT mediano",
+          atual: ultimoClientes ? ultimoClientes.ltMediana : null,
+          formato: "meses",
+          serie: ltMedianaSerie.length > 0 ? ltMedianaSerie : undefined,
           temporalidade: "mes",
         },
         {
@@ -160,6 +182,14 @@ export function montarSecoesLtLtv(
           atual: overview.ltvMedioCliente,
           formato: "brl",
           serie: ltvMedioSerie.length > 0 ? ltvMedioSerie : undefined,
+          temporalidade: "mes",
+        },
+        {
+          key: "lt_ltv_ltv_mediano_cliente",
+          metrica: "LTV mediano/cliente",
+          atual: ultimoClientes ? ultimoClientes.ltvMediana : null,
+          formato: "brl",
+          serie: ltvMedianaSerie.length > 0 ? ltvMedianaSerie : undefined,
           temporalidade: "mes",
         },
         {
@@ -204,6 +234,10 @@ export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) 
   // Histórico completo (Onda3) — query isolada (não bloqueia a aba): loading/erro só deixam
   // a seção "LTV por produto (evolução)" vazia, mesma filosofia de clientesQ/distQ acima.
   const evolucaoProdutoQ = useLtLtvEvolucaoProduto();
+  // Série mensal de mediana (nível cliente, Onda B1) — query isolada (não bloqueia a aba), mesma
+  // filosofia de evolucaoProdutoQ acima: loading/erro só deixam "LT mediano"/"LTV mediano/
+  // cliente" sem série (atual null → "—", ver formatValor).
+  const evolucaoClientesQ = useLtLtvEvolucaoClientes();
   // Aba 100% snapshot — sem metas hoje, mas mantém o hook por consistência com as demais
   // seções (caso metas de LT/LTV sejam cadastradas futuramente em cortex_core.scorecard_metas).
   useScorecardMetas(mes);
@@ -241,11 +275,13 @@ export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) 
   const clientes = (clientesQ.data as { clientes: ClienteRow[] } | undefined)?.clientes ?? [];
   const evolucaoProduto = evolucaoProdutoQ.data as EvolucaoProdutoTabelaData | undefined;
 
-  const secoes = montarSecoesLtLtv(overview, dist, clientes, {
-    data: evolucaoProduto,
-    isLoading: evolucaoProdutoQ.isLoading,
-    isError: evolucaoProdutoQ.isError,
-  });
+  const secoes = montarSecoesLtLtv(
+    overview,
+    dist,
+    clientes,
+    { data: evolucaoProduto, isLoading: evolucaoProdutoQ.isLoading, isError: evolucaoProdutoQ.isError },
+    evolucaoClientesQ.data?.serie,
+  );
 
   return (
     <div className="space-y-4">

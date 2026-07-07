@@ -4,7 +4,7 @@ import { paramsParaMes } from "./temporalidade";
 import type { ReportsMensal, ChurnDetalhamento, ChurnProdutoMotivo, ChurnTaxaMensal } from "./tipos";
 import type { ChurnPorResponsavel } from "@shared/schema";
 import type { ChurnPontorrentePayload } from "@/components/churn-pontorrente/types";
-import type { EvolucaoProdutoTabelaData } from "@/components/lt-ltv-churn/types";
+import type { EvolucaoProdutoTabelaData, EvolucaoClientePonto } from "@/components/lt-ltv-churn/types";
 import type {
   ScorecardMetasResponse,
   ScorecardResponsaveisResponse,
@@ -59,6 +59,14 @@ export function useLtLtvClientes() { return useQuery({ queryKey: ["/api/lt-ltv-c
 // ltLtvChurn.ts). Fonte da seção "LTV por produto (evolução)" de SecaoLtLtv.tsx (Onda3).
 export function useLtLtvEvolucaoProduto() {
   return useQuery<EvolucaoProdutoTabelaData>({ queryKey: ["/api/lt-ltv-churn/evolucao-produto-tabela"], staleTime: STALE });
+}
+// Série mensal de LT/LTV ao nível de CLIENTE (mediana + média via PERCENTILE_CONT/AVG, base
+// ativa) — server/routes/ltLtvChurn.ts:485-521. Mesmo padrão de useLtLtvEvolucaoProduto acima
+// (sem `mes`, histórico completo definido no backend). Fonte de "LT mediano"/"LTV mediano/
+// cliente" em SecaoLtLtv.tsx (Onda B1); já consumida (shape idêntico) por
+// client/src/components/lt-ltv-churn/EvolucaoClientes.tsx.
+export function useLtLtvEvolucaoClientes() {
+  return useQuery<{ serie: EvolucaoClientePonto[] }>({ queryKey: ["/api/lt-ltv-churn/evolucao-clientes"], staleTime: STALE });
 }
 export function useEstoqueOverview() { return useQuery({ queryKey: ["/api/estoque-pontual/overview"], staleTime: STALE }); }
 

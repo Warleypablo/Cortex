@@ -23,7 +23,7 @@ import type {
 } from "./scorecard/tipos";
 import { linhasPorDimensao } from "./scorecard/logica";
 import type { ChurnDetalhamento, ChurnProdutoMotivo, ChurnTaxaMensal, ChurnTaxaMensalRow, ChurnProdutoMotivoCelula, ReceitaChurnPonto, ReportsMensal } from "./tipos";
-import type { ChurnPontorrentePayload } from "@/components/churn-pontorrente/types";
+import type { ChurnPontorrentePayload, DetalheRow as ChurnPontualDetalheRow, DimRow as ChurnPontualDimRow } from "@/components/churn-pontorrente/types";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -95,6 +95,50 @@ function topMotivoPorProduto(produto: string, celulas: ChurnProdutoMotivoCelula[
   return [...doProduto].sort((a, b) => b.mrr_perdido - a.mrr_perdido)[0]?.motivo_cancelamento;
 }
 
+/** Agrega `detalhamento` do Churn Pontual (/api/churn-pontorrente) POR PRODUTO — soma `valorp`
+   e conta itens. Fonte da seção "Churn Pontual — Por produto". Sem série: o payload é um
+   snapshot do período selecionado (mesma limitação de `linhasPorMotivo` acima, que também não
+   tem histórico mensal por dimensão). Ordena por valorp desc, top 8. */
+function linhasPorProdutoPontual(detalhamento: ChurnPontualDetalheRow[] | undefined): ScorecardRow[] {
+  const porProduto = new Map<string, { valorp: number; qtd: number }>();
+  for (const d of detalhamento ?? []) {
+    const acc = porProduto.get(d.produto) ?? { valorp: 0, qtd: 0 };
+    acc.valorp += d.valorp;
+    acc.qtd += 1;
+    porProduto.set(d.produto, acc);
+  }
+
+  return Array.from(porProduto.entries())
+    .sort((a, b) => b[1].valorp - a[1].valorp)
+    .slice(0, 8)
+    .map(([produto, agg]) => ({
+      key: `churn_pontual_produto_${slug(produto)}`,
+      metrica: produto,
+      sub: `${agg.qtd} ${agg.qtd === 1 ? "cancelamento" : "cancelamentos"}`,
+      atual: agg.valorp,
+      formato: "brl",
+      temporalidade: "mes",
+    }));
+}
+
+/** Converte `churnPorDimensao.<dim>` (já agregado pelo backend, ver churnPontorrente.helpers.ts:
+   aggregateChurnPorDimensao) em linhas de scorecard — usada pelas seções "Motivos"/"Por
+   operador"/"Por squad" do Churn Pontual. Sem série (mesmo motivo de `linhasPorProdutoPontual`
+   acima). Ordena por valorp desc (a ordenação do backend é qtd desc), top 8. */
+function linhasPorDimPontual(rows: ChurnPontualDimRow[] | undefined, prefixo: string): ScorecardRow[] {
+  return [...(rows ?? [])]
+    .sort((a, b) => b.valorp - a.valorp)
+    .slice(0, 8)
+    .map((r) => ({
+      key: `churn_pontual_${prefixo}_${slug(r.label)}`,
+      metrica: r.label,
+      sub: `${r.qtd} ${r.qtd === 1 ? "cancelamento" : "cancelamentos"}`,
+      atual: r.valorp,
+      formato: "brl",
+      temporalidade: "mes",
+    }));
+}
+
 /** Função pura: monta as seções de Churn a partir dos payloads já resolvidos (o `churnDet` é a
    fonte primária/bloqueante do componente — as demais são isoladas e podem estar `undefined`
    em loading/erro, mesma tolerância do componente original). Extraída de SecaoChurn para
@@ -162,6 +206,16 @@ export function montarSecoesChurn(
       ]
     : [];
 
+  // Onda B1: detalhamento do Churn Pontual por dimensão — mesmo payload de `pontualOverview`
+  // acima (/api/churn-pontorrente), campos `detalhamento`/`churnPorDimensao` já agregados no
+  // backend (churnPontorrente.helpers.ts). Sem série (payload é snapshot do período, não há
+  // histórico mensal por dimensão aqui — mesma limitação de "Motivos de Churn"/linhasPorMotivo
+  // do recorrente acima).
+  const pontualProdutoRows = linhasPorProdutoPontual(pontorrente?.detalhamento);
+  const pontualMotivoRows = linhasPorDimPontual(pontorrente?.churnPorDimensao?.motivo, "motivo");
+  const pontualOperadorRows = linhasPorDimPontual(pontorrente?.churnPorDimensao?.responsavel, "operador");
+  const pontualSquadRows = linhasPorDimPontual(pontorrente?.churnPorDimensao?.squad, "squad");
+
   return [
     {
       id: "churn-geral",
@@ -222,6 +276,26 @@ export function montarSecoesChurn(
       id: "churn-pontual",
       titulo: "Churn Pontual",
       linhas: pontualRows,
+    },
+    {
+      id: "churn-pontual-produto",
+      titulo: "Churn Pontual — Por produto",
+      linhas: pontualProdutoRows,
+    },
+    {
+      id: "churn-pontual-motivos",
+      titulo: "Churn Pontual — Motivos",
+      linhas: pontualMotivoRows,
+    },
+    {
+      id: "churn-pontual-operador",
+      titulo: "Churn Pontual — Por operador",
+      linhas: pontualOperadorRows,
+    },
+    {
+      id: "churn-pontual-squad",
+      titulo: "Churn Pontual — Por squad",
+      linhas: pontualSquadRows,
     },
   ];
 }
