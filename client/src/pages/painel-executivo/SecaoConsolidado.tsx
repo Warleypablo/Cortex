@@ -108,7 +108,7 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
     ? montarSecoesReceita(rm.data, mes, { onDrill: abrirDrill }, {
         reconciliacaoTotal: reconciliacaoTotal.data,
         pontualTotal: pontualTotal.data?.linhas,
-      })
+      }, series.data)
     : [];
   const secoesChurn = churnDet.data
     ? montarSecoesChurn(churnDet.data, produtoMotivo.data, taxaMensal.data, pontorrente.data, series.data, rm.data, mes)

@@ -82,6 +82,10 @@ export interface ScorecardSeriesPorDimensao {
   churnPorProduto: Record<string, ScorecardSerieDimPonto[]>;
   churnPorOperador: Record<string, ScorecardSerieDimPonto[]>;
   churnPorSquad: Record<string, ScorecardSerieDimPonto[]>;
+  /** Churn Recorrente por motivo de cancelamento × mês — Onda D (mesma fonte/exclusões das
+     outras dimensões de churn, ver `fetchChurnPorDimensao` no backend). Alimenta a seção "Churn
+     Recorrente — Motivos". */
+  churnPorMotivo: Record<string, ScorecardSerieDimPonto[]>;
   entregasPorOperador: Record<string, ScorecardSerieDimPonto[]>;
   /** Entregas pontuais (deploy) por squad × mês — Onda C2 (mesmo padrão de entregasPorOperador,
      dimensão squad). */
@@ -93,6 +97,12 @@ export interface ScorecardSeriesPorDimensao {
      ATUAL, denominador constante de "Receita por Cabeça por squad"). Chaveado pela MESMA forma
      (com emoji) usada em `mrrPorSquad` — ver `fetchPessoasPorSquad` no backend. */
   pessoasPorSquad: Record<string, number>;
+  /** Estoque pontual EM ABERTO por mês (ESTOQUE — snapshot de fim de mês) — Onda D. Série ÚNICA
+     (sem dimensão), zero-fill (ver `rowsParaSerieUnica` no backend). Alimenta "Receita —
+     Pontual: Em aberto (estoque)". */
+  estoquePontualEmAbertoPorMes: ScorecardSerieDimPonto[];
+  /** Como `estoquePontualEmAbertoPorMes`, status `pausado` — alimenta "Pausado (estoque)". */
+  estoquePausadoPorMes: ScorecardSerieDimPonto[];
 }
 
 export interface ScorecardSeriesResponse {

@@ -91,6 +91,28 @@ export function rowsParaSeriesNullFill(rows: SerieRow[], meses: string[]): Recor
   return out;
 }
 
+/** Linha crua de uma série SEM dimensão (mes/valor), antes do preenchimento de meses — ex:
+   saldo de estoque pontual (em aberto/pausado), que não quebra por produto/squad/operador. */
+export interface SerieValorRow {
+  mes: string;
+  valor: number | string | null;
+}
+
+/**
+ * Como `rowsParaSeries`, mas para uma série ÚNICA (sem dimensão) — devolve `SeriePonto[]`
+ * direto em vez de `Record<dim, SeriePonto[]>`. Zero-fill nos 12 meses da janela (0 é um saldo
+ * válido aqui — diferente de `rowsParaSeriesNullFill`, usado para médias onde ausência != zero).
+ * Soma valores quando o mesmo mês aparecer em mais de uma linha (defensivo, mesmo padrão de
+ * `rowsParaSeries`).
+ */
+export function rowsParaSerieUnica(rows: SerieValorRow[], meses: string[]): SeriePonto[] {
+  const valoresPorMes = new Map<string, number>();
+  for (const row of rows) {
+    valoresPorMes.set(row.mes, (valoresPorMes.get(row.mes) || 0) + (Number(row.valor) || 0));
+  }
+  return meses.map((month) => ({ month, valor: valoresPorMes.get(month) || 0 }));
+}
+
 /**
  * Normaliza um nome de squad para permitir casar fontes com formatações diferentes — ex.:
  * `"Inhire".rh_pessoal.squad` (sem emoji, ex: "Selva") vs `"Clickup".cup_data_hist/

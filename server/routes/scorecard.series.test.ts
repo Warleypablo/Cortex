@@ -4,6 +4,7 @@ import {
   listaMeses12,
   rowsParaSeries,
   rowsParaSeriesNullFill,
+  rowsParaSerieUnica,
   normalizarNomeSquad,
   encontrarSquadCorrespondente,
 } from "./scorecard.helpers";
@@ -138,6 +139,52 @@ describe("rowsParaSeriesNullFill", () => {
 
   it("retorna objeto vazio quando não há linhas", () => {
     expect(rowsParaSeriesNullFill([], meses)).toEqual({});
+  });
+});
+
+describe("rowsParaSerieUnica", () => {
+  const meses = listaMeses12("2026-03"); // 2025-04 .. 2026-03
+
+  it("preenche os 12 meses com 0 onde não há dado — é um saldo, 0 é válido (diferente de rowsParaSeriesNullFill)", () => {
+    const rows = [{ mes: "2026-03", valor: 1500 }];
+    const serie = rowsParaSerieUnica(rows, meses);
+    expect(serie).toHaveLength(12);
+    expect(serie[11]).toEqual({ month: "2026-03", valor: 1500 });
+    expect(serie.slice(0, 11).every((p) => p.valor === 0)).toBe(true);
+  });
+
+  it("mantém a ordem cronológica dos meses no array de pontos", () => {
+    const rows = [
+      { mes: "2025-04", valor: 100 },
+      { mes: "2026-03", valor: 200 },
+    ];
+    const serie = rowsParaSerieUnica(rows, meses);
+    expect(serie.map((p) => p.month)).toEqual(meses);
+    expect(serie[0].valor).toBe(100);
+    expect(serie[11].valor).toBe(200);
+  });
+
+  it("soma valores quando o mesmo mês aparece em mais de uma linha (defensivo)", () => {
+    const rows = [
+      { mes: "2026-03", valor: 30 },
+      { mes: "2026-03", valor: 20 },
+    ];
+    const serie = rowsParaSerieUnica(rows, meses);
+    expect(serie[11].valor).toBe(50);
+  });
+
+  it("aceita valor como string/null (retorno cru do driver pg para numeric)", () => {
+    const rows = [{ mes: "2026-03", valor: "123.45" as unknown as number }];
+    expect(rowsParaSerieUnica(rows, meses)[11].valor).toBeCloseTo(123.45);
+
+    const rowsNull = [{ mes: "2026-03", valor: null }];
+    expect(rowsParaSerieUnica(rowsNull, meses)[11].valor).toBe(0);
+  });
+
+  it("nenhuma linha → todos os 12 meses zerados", () => {
+    const serie = rowsParaSerieUnica([], meses);
+    expect(serie).toHaveLength(12);
+    expect(serie.every((p) => p.valor === 0)).toBe(true);
   });
 });
 

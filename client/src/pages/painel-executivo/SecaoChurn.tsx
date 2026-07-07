@@ -173,6 +173,20 @@ export function montarSecoesChurn(
     responsavelAuto: true,
   });
 
+  // "Motivos" (Onda D): fonte única `series.churnPorMotivo` (mesma exclusões de
+  // `fetchChurnPorDimensao`, só troca a dimensão) — dá série mensal a uma seção que antes só
+  // tinha o snapshot do período (via `produtoMotivo`, sem histórico mensal). Degradação
+  // graciosa: `series` ausente (erro/loading do endpoint) cai de volta em `linhasPorMotivo`
+  // (snapshot sem série), como antes desta Onda.
+  const motivoRows: ScorecardRow[] = series
+    ? linhasPorDimensao(series.series.churnPorMotivo, mes, {
+        keyFn: (dim) => `churn_motivo_${slug(dim)}`,
+        formato: "brl",
+        labelMes: labelMesCurto,
+        top: 8,
+      })
+    : linhasPorMotivo(produtoMotivo);
+
   const squadRowsSemSub = linhasPorDimensao(series?.series.churnPorSquad, mes, {
     keyFn: (dim) => `churn_squad_${slug(dim)}`,
     formato: "brl",
@@ -260,7 +274,7 @@ export function montarSecoesChurn(
       id: "churn-motivos",
       titulo: "Churn Recorrente — Motivos",
       subtitulo: "detalhamento (fonte ClickUp); pode não somar ao geral",
-      linhas: linhasPorMotivo(produtoMotivo),
+      linhas: motivoRows,
     },
     {
       id: "churn-operador",

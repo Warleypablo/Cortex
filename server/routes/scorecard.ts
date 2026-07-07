@@ -9,6 +9,7 @@ import {
   listaMeses12,
   rowsParaSeries,
   rowsParaSeriesNullFill,
+  rowsParaSerieUnica,
   normalizarNomeSquad,
   encontrarSquadCorrespondente,
   type SeriePonto,
@@ -147,6 +148,11 @@ export interface SeriesScorecard {
   churnPorProduto: Record<string, SeriePonto[]>;
   churnPorOperador: Record<string, SeriePonto[]>;
   churnPorSquad: Record<string, SeriePonto[]>;
+  /** Churn Recorrente por motivo de cancelamento × mês — Onda D (mesma fonte/exclusões de
+     `churnPorProduto`/`churnPorOperador`/`churnPorSquad`: `fetchChurnPorDimensao`, só trocando
+     a dimensão para `motivo_cancelamento`). Alimenta a seção "Churn Recorrente — Motivos", que
+     antes só tinha o snapshot do mês (sem série) via `/api/churn/produto-motivo`. */
+  churnPorMotivo: Record<string, SeriePonto[]>;
   entregasPorOperador: Record<string, SeriePonto[]>;
   /** Entregas pontuais (deploy) por squad × mês — Onda C2, mesmo padrão de
      `entregasPorOperador` trocando a dimensão (ver `fetchEntregasPorSquad`). */
@@ -162,13 +168,25 @@ export interface SeriesScorecard {
      forma (com emoji) usada em `mrrPorSquad`, para o frontend casar direto sem re-normalizar
      (ver `fetchPessoasPorSquad`). */
   pessoasPorSquad: Record<string, number>;
+  /** Estoque pontual (ClickUp, ver `reference_estoque_pontual`) EM ABERTO — `SUM(valorp)` do
+     snapshot de FIM DE MÊS de `cup_data_hist` (ESTOQUE, mesmo padrão de `fetchMrrPorDimensao`),
+     status fora de {entregue, cancelado/inativo, não usar}. Série ÚNICA (sem dimensão) — Onda D,
+     alimenta "Receita — Pontual: Em aberto (estoque)", que antes só tinha o valor atual
+     (snapshot em tempo real de `/api/reports/mensal`, sem série mensal). Zero-fill (0 é um saldo
+     válido, ver `rowsParaSerieUnica`). */
+  estoquePontualEmAbertoPorMes: SeriePonto[];
+  /** Como `estoquePontualEmAbertoPorMes`, para o status `pausado` — alimenta "Pausado
+     (estoque)". */
+  estoquePausadoPorMes: SeriePonto[];
 }
 
 export interface ScorecardSeriesResult {
   series: SeriesScorecard;
 }
 
-type ChurnDim = "produto" | "responsavel_geral" | "squad";
+/** `motivo_cancelamento` (Onda D) reaproveita `fetchChurnPorDimensao` — mesma fonte/exclusões
+   das outras dimensões de churn recorrente, só troca a coluna de agrupamento. */
+type ChurnDim = "produto" | "responsavel_geral" | "squad" | "motivo_cancelamento";
 type MrrDim = "squad" | "responsavel";
 
 /**
@@ -293,6 +311,51 @@ async function fetchMrrPorDimensao(dim: MrrDim, inicio: string, fimUltimoMes: st
   return result.rows as unknown as SerieRow[];
 }
 
+/** Linha crua de `fetchEstoquePontualSaldos`: mês + os 2 saldos (sem dimensão). */
+interface EstoquePontualSaldoRow {
+  mes: string;
+  em_aberto: number | string | null;
+  pausado: number | string | null;
+}
+
+/**
+ * Saldos do estoque pontual (ClickUp) EM ABERTO e PAUSADO, por mês (ESTOQUE — snapshot de fim
+ * de mês, mesmo padrão de `fetchMrrPorDimensao` trocando `valorr`→`valorp` e a condição de
+ * status). Onda D. Definição canônica de estoque pontual (`reference_estoque_pontual`, mesma de
+ * `server/routes/estoquePontual.ts`): `valorp > 0 AND status NOT IN ('entregue',
+ * 'cancelado/inativo','não usar')`. "Pausado" é o subconjunto com `status = 'pausado'` (já
+ * incluso no "em aberto" — não são mutuamente exclusivos, o pausado é uma quebra editorial do
+ * em aberto, não um segundo estoque somado a ele).
+ *
+ * IMPORTANTE (perf): `sr.snap` (a subquery correlacionada de `snap_ref`) é referenciada
+ * APENAS na condição do JOIN — nunca no SELECT/GROUP BY. Como a CTE não é `MATERIALIZED`, o
+ * planner inlina a expressão e a reavalia em cada lugar onde `sr.snap` aparece; incluí-la no
+ * SELECT/GROUP BY (ex.: para debug) faz o Postgres reavaliar a subquery uma vez por linha do
+ * produto cartesiano intermediário (~11 meses × milhares de linhas de `cup_data_hist`) em vez de
+ * uma vez por mês — de ~400ms para minutos em teste local. Os dois saldos (em_aberto/pausado)
+ * saem de UMA passada só pelo JOIN (via `FILTER`), não de duas queries separadas.
+ */
+async function fetchEstoquePontualSaldos(inicio: string, fimUltimoMes: string): Promise<EstoquePontualSaldoRow[]> {
+  const result = await db.execute(sql`
+    WITH meses AS (
+      SELECT to_char(d,'YYYY-MM') AS mes, d::date AS m
+      FROM generate_series(${inicio}::date, ${fimUltimoMes}::date, interval '1 month') d
+    ),
+    snap_ref AS (
+      SELECT meses.mes,
+        (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE date_trunc('month',data_snapshot)=meses.m) AS snap
+      FROM meses
+    )
+    SELECT sr.mes,
+      SUM(h.valorp) FILTER (WHERE LOWER(TRIM(h.status)) NOT IN ('entregue','cancelado/inativo','não usar'))::numeric AS em_aberto,
+      SUM(h.valorp) FILTER (WHERE LOWER(TRIM(h.status)) = 'pausado')::numeric AS pausado
+    FROM snap_ref sr JOIN "Clickup".cup_data_hist h ON h.data_snapshot = sr.snap
+    WHERE h.valorp > 0
+    GROUP BY sr.mes
+  `);
+  return result.rows as unknown as EstoquePontualSaldoRow[];
+}
+
 /**
  * Monta as séries mensais por dimensão do modo Evolução, para a janela de 12 meses
  * terminando em `mes` (inclusive). Cada série vem com os 12 meses preenchidos (0 onde
@@ -305,17 +368,29 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
   const fim = `${addMeses(mes, 1)}-01`;
   const fimUltimoMes = `${mes}-01`;
 
-  const [churnProdutoRows, churnOperadorRows, churnSquadRows, entregasRows, entregasSquadRows, mrrSquadRows, mrrOperadorRows, leadTimeRows] =
-    await Promise.all([
-      fetchChurnPorDimensao("produto", inicio, fim),
-      fetchChurnPorDimensao("responsavel_geral", inicio, fim),
-      fetchChurnPorDimensao("squad", inicio, fim),
-      fetchEntregasPorOperador(inicio, fim),
-      fetchEntregasPorSquad(inicio, fim),
-      fetchMrrPorDimensao("squad", inicio, fimUltimoMes),
-      fetchMrrPorDimensao("responsavel", inicio, fimUltimoMes),
-      fetchLeadTimePorProduto(inicio, fim),
-    ]);
+  const [
+    churnProdutoRows,
+    churnOperadorRows,
+    churnSquadRows,
+    churnMotivoRows,
+    entregasRows,
+    entregasSquadRows,
+    mrrSquadRows,
+    mrrOperadorRows,
+    leadTimeRows,
+    estoquePontualRows,
+  ] = await Promise.all([
+    fetchChurnPorDimensao("produto", inicio, fim),
+    fetchChurnPorDimensao("responsavel_geral", inicio, fim),
+    fetchChurnPorDimensao("squad", inicio, fim),
+    fetchChurnPorDimensao("motivo_cancelamento", inicio, fim),
+    fetchEntregasPorOperador(inicio, fim),
+    fetchEntregasPorSquad(inicio, fim),
+    fetchMrrPorDimensao("squad", inicio, fimUltimoMes),
+    fetchMrrPorDimensao("responsavel", inicio, fimUltimoMes),
+    fetchLeadTimePorProduto(inicio, fim),
+    fetchEstoquePontualSaldos(inicio, fimUltimoMes),
+  ]);
 
   const mrrPorSquad = rowsParaSeries(mrrSquadRows, meses);
   // Depende das chaves de `mrrPorSquad` (squad cru, com emoji) para casar o headcount RH —
@@ -327,10 +402,19 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
       churnPorProduto: rowsParaSeries(churnProdutoRows, meses),
       churnPorOperador: rowsParaSeries(churnOperadorRows, meses),
       churnPorSquad: rowsParaSeries(churnSquadRows, meses),
+      churnPorMotivo: rowsParaSeries(churnMotivoRows, meses),
       entregasPorOperador: rowsParaSeries(entregasRows, meses),
       entregasPorSquad: rowsParaSeries(entregasSquadRows, meses),
       mrrPorSquad,
       mrrPorOperador: rowsParaSeries(mrrOperadorRows, meses),
+      estoquePontualEmAbertoPorMes: rowsParaSerieUnica(
+        estoquePontualRows.map((r) => ({ mes: r.mes, valor: r.em_aberto })),
+        meses,
+      ),
+      estoquePausadoPorMes: rowsParaSerieUnica(
+        estoquePontualRows.map((r) => ({ mes: r.mes, valor: r.pausado })),
+        meses,
+      ),
       leadTimePorProduto: rowsParaSeriesNullFill(leadTimeRows, meses),
       pessoasPorSquad,
     },

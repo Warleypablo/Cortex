@@ -12,11 +12,12 @@ import {
   useSalvarResponsaveis,
   useBp2026ReconciliacaoTotal,
   useBp2026PontualTotal,
+  useScorecardSeries,
   type Bp2026ReconciliacaoTotalResponse,
   type Bp2026PontualLinha,
 } from "./hooks";
 import { paramsParaMes, labelMes } from "./temporalidade";
-import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
+import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
 import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes, ReportsMensal } from "./tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -43,6 +44,15 @@ function serieCrosssell(rows: CrosssellHistoricoPonto[] | undefined, valor: (r: 
     .slice()
     .sort((a, b) => a.mes.localeCompare(b.mes))
     .map((r) => ({ label: labelMesCurto(r.mes), valor: valor(r), month: r.mes }));
+}
+
+/** Converte uma série SEM dimensão de /api/scorecard/series (`{month,valor}[]`, já vem em ordem
+   cronológica e com os 12 meses zero-fillados — ver `rowsParaSerieUnica` no backend) para o
+   formato do Scorecard, derivando o `label` curto. Usada pelos saldos de estoque pontual (Onda
+   D: "Em aberto (estoque)"/"Pausado (estoque)"), que agora têm série mensal legítima em vez de
+   só o snapshot atual. */
+function serieSaldoEstoque(pontos: { month: string; valor: number }[] | undefined): ScorecardSeriePonto[] {
+  return (pontos ?? []).map((p) => ({ label: labelMesCurto(p.month), valor: p.valor, month: p.month }));
 }
 
 // Tipos válidos aceitos por /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts,
@@ -91,12 +101,16 @@ function bp2026PontualLinha(
 }
 
 /** Função pura: monta as seções de Receita a partir do payload já resolvido de
-   /api/reports/mensal. Extraída de SecaoReceita para reuso pela aba Consolidado. */
+   /api/reports/mensal. Extraída de SecaoReceita para reuso pela aba Consolidado.
+   `series` (Onda D, opcional) dá série mensal aos saldos de estoque pontual ("Em aberto"/
+   "Pausado") — mesmo padrão de degradação graciosa do resto do arquivo: ausente (loading/erro
+   do endpoint) mantém o comportamento anterior (snapshot, sem série). */
 export function montarSecoesReceita(
   rm: ReportsMensal,
   mes: string,
   extras: MontarSecoesReceitaExtras = {},
   bp2026: MontarSecoesReceitaBp2026 = {},
+  series?: ScorecardSeriesResponse,
 ): ScorecardSection[] {
   const tm = rm.turboMetrics;
   const p = rm.pontualData;
@@ -212,13 +226,22 @@ export function montarSecoesReceita(
         {
           // "Pausado" aqui é um SALDO (estoque pontual atualmente em status pausado no fim do
           // mês, pontual_status_pausado) — NÃO o mesmo conceito da linha MRR "Pausado/Reativado"
-          // acima (que é fluxo: contratos pausados NESTE mês). O bp2026 não expõe um fluxo de
-          // pausa equivalente para pontual — por isso aqui é "snapshot" (tipoAgregacao=estoque),
-          // e "Reativação" abaixo cobre a metade do fluxo que o bp2026 SIM expõe (retorno ao
-          // estoque de um contrato que estava fora, ex. pausado antes).
+          // acima (que é fluxo: contratos pausados NESTE mês). "Reativação" abaixo cobre a
+          // metade do fluxo que o bp2026 expõe (retorno ao estoque de um contrato que estava
+          // fora, ex. pausado antes).
+          //
+          // Onda D: `series.estoquePausadoPorMes` (snapshot de fim de mês de `cup_data_hist`,
+          // mesma fonte/definição do estoque pontual) dá série mensal legítima — a evolução do
+          // SALDO ao longo do tempo é uma leitura válida (diferente de um fluxo do mês, que não
+          // faria sentido comparar mês a mês da mesma forma). `atual` continua vindo do bp2026
+          // (fonte inalterada); só `serie`/`temporalidade` mudam quando `series` está disponível
+          // — ausente (loading/erro), cai de volta no snapshot sem série de antes desta Onda.
           key: "receita_pontual_pausado",
           metrica: "Pausado (estoque)",
           ...bp2026PontualLinha(pontualLinhas, "pontual_status_pausado", mes),
+          ...(series
+            ? { serie: serieSaldoEstoque(series.series.estoquePausadoPorMes), temporalidade: "mes" as const }
+            : {}),
           formato: "brl",
         },
         {
@@ -244,14 +267,19 @@ export function montarSecoesReceita(
           temporalidade: "mes",
         },
         {
+          // Onda D: `series.estoquePontualEmAbertoPorMes` dá série mensal ao saldo (mesma fonte/
+          // definição de `reference_estoque_pontual`, snapshot de fim de mês de `cup_data_hist`)
+          // — a evolução do estoque em aberto ao longo do tempo é legítima, por isso a
+          // temporalidade muda de "snapshot" para "mes" quando `series` está disponível. `atual`
+          // continua vindo de `/api/reports/mensal` (fonte inalterada). Sem `series` (loading/
+          // erro), mantém o comportamento anterior (snapshot, sem série/meta/Δ M-1).
           key: "receita_pontual_em_aberto",
           metrica: "Em aberto (estoque)",
           sub: `${p.emAberto.contratos} itens`,
           atual: p.emAberto.valor,
           formato: "brl",
-          // Snapshot do estoque em aberto (não é fluxo do mês) — sem meta/série mensal, marcado
-          // como "snapshot" (Scorecard renderiza badge dedicado e não calcula Δ M-1/status).
-          temporalidade: "snapshot",
+          serie: series ? serieSaldoEstoque(series.series.estoquePontualEmAbertoPorMes) : undefined,
+          temporalidade: series ? "mes" : "snapshot",
         },
       ],
     },
@@ -284,6 +312,9 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
   // com sua própria falha de rede; `montarSecoesReceita` já degrada pra "—" se `data` faltar.
   const reconciliacaoTotal = useBp2026ReconciliacaoTotal(mes);
   const pontualTotal = useBp2026PontualTotal();
+  // Onda D: série mensal dos saldos de estoque pontual (em aberto/pausado) — isolado, falha/
+  // loading só faz `montarSecoesReceita` cair de volta no snapshot sem série (ver série lá).
+  const series = useScorecardSeries(mes);
   const [detalheParams, setDetalheParams] = useState<Record<string, string> | null>(null);
   const detalhe = useGestaoReceitaDetalhe(detalheParams);
   const [drillAberto, setDrillAberto] = useState(false);
@@ -315,7 +346,7 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
   const secoes = montarSecoesReceita(rm.data, mes, { onDrill: abrirDrill }, {
     reconciliacaoTotal: reconciliacaoTotal.data,
     pontualTotal: pontualTotal.data?.linhas,
-  });
+  }, series.data);
 
   return (
     <div className="space-y-4">
