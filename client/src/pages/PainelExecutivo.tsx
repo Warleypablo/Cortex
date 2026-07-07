@@ -131,7 +131,7 @@ export default function PainelExecutivo() {
             ) : a.value === "capacity" ? (
               <SecaoCapacity mes={mes} />
             ) : a.value === "entregas" ? (
-              <SecaoEntregas mes={mes} />
+              <SecaoEntregas mes={mes} modo={modo} />
             ) : (
               <SecaoPerformance mes={mes} />
             )}

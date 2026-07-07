@@ -1,14 +1,20 @@
+import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { formatCurrencyNoDecimals } from "@/lib/utils";
-import { KpiCard } from "./KpiCard";
-import { TemporalidadeBadge } from "./TemporalidadeBadge";
-import { useReportsMensal, useEstoqueOverview } from "./hooks";
-import type { OperadorRank } from "./tipos";
-import { ErroCard, BlocoCard, AvatarPequeno } from "./_ui";
+import { AlertTriangle } from "lucide-react";
+import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
+import {
+  useReportsMensal,
+  useEstoqueOverview,
+  useScorecardMetas,
+  useScorecardResponsaveis,
+  useSalvarResponsaveis,
+} from "./hooks";
+import type { ScorecardSection, ScorecardRow, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
+import type { EntregaProdutoMes } from "./tipos";
 
 // Shape espelha o handler de GET /api/estoque-pontual/overview (server/routes/estoquePontual.ts),
-// confirmado lendo o SELECT — não há tipo compartilhado client/server para este endpoint.
+// confirmado lendo o SELECT — não há tipo compartilhado client/server para este endpoint
+// (mesmo cast local já usado na v1 desta seção).
 interface EstoqueOverview {
   valorEstoque: number;
   qtdItens: number;
@@ -17,167 +23,177 @@ interface EstoqueOverview {
   valorEnvelhecidos: number;
 }
 
-function TabelaPorProduto({ produtos }: { produtos: [string, number][] }) {
-  if (produtos.length === 0) {
-    return <p className="text-sm text-gray-400 dark:text-zinc-500">Sem entregas registradas no mês.</p>;
-  }
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Produto</TableHead>
-            <TableHead className="text-right">Valor entregue</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {produtos.map(([produto, valor]) => (
-            <TableRow key={produto}>
-              <TableCell className="font-medium">{produto}</TableCell>
-              <TableCell className="text-right">{formatCurrencyNoDecimals(valor)}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
+/** Chave estável para linhas derivadas de listas variáveis (produto, operador) — usada como
+   `metrica_key` de persistência do responsável manual (CelulaResponsavel), mesmo padrão de
+   `slug` em SecaoChurn.tsx (determinística por entidade, não por índice de posição). */
+function slug(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
 }
 
-function TabelaPorOperador({ operadores }: { operadores: OperadorRank[] }) {
-  if (operadores.length === 0) {
-    return <p className="text-sm text-gray-400 dark:text-zinc-500">Sem entregas registradas no mês.</p>;
-  }
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Operador</TableHead>
-            <TableHead className="text-right">Entregas</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {operadores.map((o) => (
-            <TableRow key={o.nome}>
-              <TableCell className="font-medium">
-                <div className="flex items-center gap-2">
-                  <AvatarPequeno fotoUrl={o.fotoUrl} nome={o.nome} />
-                  <div>
-                    <div>{o.nome}</div>
-                    {o.cargo && <div className="text-xs text-gray-400 dark:text-zinc-500">{o.cargo}</div>}
-                  </div>
-                </div>
-              </TableCell>
-              <TableCell className="text-right">{o.valor.toLocaleString("pt-BR")}</TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
+/** Normaliza uma série que já vem com `label` do backend para o formato do Scorecard
+   (mesmo helper de SecaoReceita.tsx). */
+function serieComLabel<T extends { label: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r) }));
 }
 
-export function SecaoEntregas({ mes }: { mes: string }) {
+export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo }) {
   const rm = useReportsMensal(mes);
   const estoqueQ = useEstoqueOverview();
-  const estoque = estoqueQ.data as EstoqueOverview | undefined;
+  const metas = useScorecardMetas(mes);
+  const responsaveis = useScorecardResponsaveis();
+  const salvarResponsaveis = useSalvarResponsaveis();
+
+  function onEditResponsavel(metricaKey: string, valor: string) {
+    const atuais = responsaveis.data?.itens ?? [];
+    const atualizado: ScorecardResponsavelItem[] = [
+      ...atuais.filter((i) => i.metrica_key !== metricaKey),
+      { metrica_key: metricaKey, responsavel: valor },
+    ];
+    salvarResponsaveis.mutate(atualizado);
+  }
 
   if (rm.isError) {
-    return <ErroCard mensagem="Falha ao carregar entregas pontuais. Tente recarregar." />;
+    return (
+      <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
+        <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
+          <AlertTriangle className="h-4 w-4" /> Falha ao carregar entregas.
+        </CardContent>
+      </Card>
+    );
   }
   if (rm.isLoading || !rm.data) {
-    return (
-      <div className="space-y-6">
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
-        </div>
-        <Skeleton className="h-48 w-full" />
-      </div>
-    );
+    return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
   }
 
   const p = rm.data.pontualData;
   const techKpis = rm.data.techData.kpis;
   const topEntregas = rm.data.topOperadores.topEntregas ?? [];
+  // Query isolada (não bloqueia a seção inteira, mesma filosofia de SecaoChurn) — ausente
+  // (loading ou erro) só zera a linha "Aberto (estoque)" (atual: null renderiza "—").
+  const estoque = estoqueQ.data as EstoqueOverview | undefined;
 
-  // Série do ano — pegamos só o mês selecionado. Ausente = mês sem snapshot de entregas
-  // registrado ainda (ex: mês corrente antes do fechamento).
+  // Ausente = mês sem snapshot de entregas por produto registrado ainda (ex: mês corrente
+  // antes do fechamento) — mesma leitura da v1 desta seção.
   const serieMes = p.entregasPorProdutoMes.find((s) => s.month === mes);
-  const produtosMes: [string, number][] = serieMes
-    ? Object.entries(serieMes.produtos).sort((a, b) => b[1] - a[1])
+  const produtoRows: ScorecardRow[] = serieMes
+    ? Object.entries(serieMes.produtos)
+        .sort((a, b) => b[1] - a[1])
+        .map(([produto, valor]) => ({
+          key: `entregas_produto_${slug(produto)}`,
+          metrica: produto,
+          atual: valor,
+          formato: "brl",
+          temporalidade: "mes",
+        }))
     : [];
 
-  const contratosEntregues = p.entregasMes.porSquad.reduce((acc, s) => acc + s.contratos, 0);
+  const operadorRows: ScorecardRow[] = topEntregas.map((o) => ({
+    key: `entregas_operador_${slug(o.nome)}`,
+    metrica: o.nome,
+    atual: o.valor,
+    formato: "int",
+    temporalidade: "mes",
+    // Dono automático (o próprio operador) — célula somente-leitura, mesmo padrão de
+    // operadorRows em SecaoChurn.tsx.
+    responsavelAuto: o.nome,
+  }));
 
-  const leadTime = [...p.tempoMedioEntrega].sort((a, b) => b.diasMedio - a.diasMedio);
+  const leadTimeRows: ScorecardRow[] = [...p.tempoMedioEntrega]
+    .sort((a, b) => b.diasMedio - a.diasMedio)
+    .map((t) => ({
+      key: `entregas_leadtime_${slug(t.produto)}`,
+      metrica: t.produto,
+      sub: `dias · ${t.contratos} contratos`,
+      atual: t.diasMedio,
+      formato: "int",
+      temporalidade: "mes",
+    }));
+
+  const secoes: ScorecardSection[] = [
+    {
+      id: "entregas-resumo",
+      titulo: "Entregas — Resumo (mês)",
+      linhas: [
+        {
+          key: "entregas_resumo_entregue",
+          metrica: "Entregue (R$)",
+          atual: p.entregasMes.total,
+          formato: "brl",
+          serie: serieComLabel<EntregaProdutoMes>(p.entregasPorProdutoMes, (r) => r.total),
+          temporalidade: "mes",
+        },
+        {
+          key: "entregas_resumo_tech",
+          metrica: "Entregas Tech",
+          atual: techKpis.entregues,
+          formato: "int",
+          temporalidade: "mes",
+        },
+        {
+          key: "entregas_resumo_no_prazo_pct",
+          metrica: "Entregas no prazo %",
+          // Não existe no payload de /api/reports/mensal (o cálculo equivalente só sai no
+          // agregado trimestral de okrObjectives) — sem "atual", a linha mostra só a meta
+          // (BP2026/OKR de entregas_no_prazo_pct).
+          atual: null,
+          formato: "pct",
+          metaKey: "entregas_no_prazo_pct",
+          temporalidade: "mes",
+        },
+      ],
+    },
+    {
+      id: "entregas-produto",
+      titulo: "Entregas — Por produto (mês)",
+      subtitulo: produtoRows.length === 0 ? "sem entregas no mês" : undefined,
+      linhas: produtoRows,
+    },
+    {
+      id: "entregas-operador",
+      titulo: "Entregas — Por operador (mês)",
+      linhas: operadorRows,
+    },
+    {
+      id: "entregas-aberto-entregue",
+      titulo: "Aberto × Entregue",
+      linhas: [
+        {
+          key: "entregas_aberto_estoque",
+          metrica: "Aberto (estoque)",
+          sub: estoque ? `${estoque.qtdItens} itens` : undefined,
+          atual: estoque ? estoque.valorEstoque : null,
+          formato: "brl",
+          temporalidade: "snapshot",
+        },
+        {
+          key: "entregas_aberto_entregue_mes",
+          metrica: "Entregue no mês",
+          atual: p.entregasMes.total,
+          formato: "brl",
+          temporalidade: "mes",
+        },
+      ],
+    },
+    {
+      id: "entregas-leadtime",
+      titulo: "Lead time por produto (janela 6m)",
+      linhas: leadTimeRows,
+    },
+  ];
 
   return (
-    <div className="space-y-6">
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Total entregue (mês)</h3>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard mes={mes} temporalidade="mes" titulo="Entregue (R$)" valor={formatCurrencyNoDecimals(p.entregasMes.total)} sub={`${contratosEntregues} contratos`} />
-          <KpiCard mes={mes} temporalidade="mes" titulo="Entregas técnicas" valor={techKpis.entregues.toLocaleString("pt-BR")} />
-        </div>
-      </section>
-
-      <BlocoCard titulo="Por produto (mês)" isLoading={false} isError={false}>
-        <div className="mb-2 flex items-center gap-2">
-          <TemporalidadeBadge tipo="mes" mes={mes} />
-        </div>
-        <TabelaPorProduto produtos={produtosMes} />
-      </BlocoCard>
-
-      <BlocoCard titulo="Por operador (mês)" isLoading={false} isError={false}>
-        <div className="mb-2 flex items-center gap-2">
-          <TemporalidadeBadge tipo="mes" mes={mes} />
-        </div>
-        <TabelaPorOperador operadores={topEntregas} />
-      </BlocoCard>
-
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Aberto × Entregue</h3>
-        <div className="grid grid-cols-2 gap-3">
-          {estoqueQ.isError ? (
-            <ErroCard mensagem="Falha ao carregar estoque em aberto." />
-          ) : estoqueQ.isLoading || !estoque ? (
-            <Skeleton className="h-28" />
-          ) : (
-            <KpiCard mes={mes} temporalidade="snapshot" titulo="Aberto (estoque)" valor={formatCurrencyNoDecimals(estoque.valorEstoque)} sub={`${estoque.qtdItens} itens`} />
-          )}
-          <KpiCard mes={mes} temporalidade="mes" titulo="Entregue" valor={formatCurrencyNoDecimals(p.entregasMes.total)} sub={`${contratosEntregues} contratos`} />
-        </div>
-      </section>
-
-      <BlocoCard titulo="Lead time por produto" sub="janela 6m" isLoading={false} isError={false}>
-        <div className="mb-2 flex items-center gap-2">
-          <TemporalidadeBadge tipo="mes" mes={mes} />
-        </div>
-        {leadTime.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-zinc-500">Sem entregas nos últimos 6 meses.</p>
-        ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Produto</TableHead>
-                  <TableHead className="text-right">Dias médio</TableHead>
-                  <TableHead className="text-right">Contratos</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {leadTime.map((t) => (
-                  <TableRow key={t.produto}>
-                    <TableCell className="font-medium">{t.produto}</TableCell>
-                    <TableCell className="text-right">{t.diasMedio.toLocaleString("pt-BR")}</TableCell>
-                    <TableCell className="text-right">{t.contratos.toLocaleString("pt-BR")}</TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-        )}
-      </BlocoCard>
-    </div>
+    <Scorecard
+      secoes={secoes}
+      mes={mes}
+      modo={modo}
+      metas={metas.data?.metas ?? {}}
+      responsaveis={responsaveis.data?.itens ?? []}
+      onEditResponsavel={onEditResponsavel}
+    />
   );
 }
