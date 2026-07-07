@@ -66,7 +66,7 @@ export function useLtLtvEvolucaoProduto() {
 // cliente" em SecaoLtLtv.tsx (Onda B1); já consumida (shape idêntico) por
 // client/src/components/lt-ltv-churn/EvolucaoClientes.tsx.
 export function useLtLtvEvolucaoClientes() {
-  return useQuery<{ serie: EvolucaoClientePonto[] }>({ queryKey: ["/api/lt-ltv-churn/evolucao-clientes"], staleTime: STALE });
+  return useQuery<{ serie: EvolucaoClientePonto[] }>({ queryKey: ["/api/lt-ltv-churn/evolucao-clientes"], staleTime: STALE, retry: false });
 }
 export function useEstoqueOverview() { return useQuery({ queryKey: ["/api/estoque-pontual/overview"], staleTime: STALE }); }
 

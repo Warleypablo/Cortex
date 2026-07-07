@@ -233,7 +233,7 @@ async function fetchPessoasPorSquad(squadsMrr: string[]): Promise<Record<string,
   const result = await db.execute(sql`
     SELECT TRIM(squad) AS squad, COUNT(*)::int AS pessoas
     FROM "Inhire".rh_pessoal
-    WHERE status = 'Ativo' AND squad IS NOT NULL AND TRIM(squad) <> ''
+    WHERE LOWER(TRIM(COALESCE(status, ''))) = 'ativo' AND squad IS NOT NULL AND TRIM(squad) <> ''
     GROUP BY 1
   `);
 
