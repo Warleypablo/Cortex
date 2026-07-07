@@ -153,6 +153,23 @@ export function montarSecoesReceita(rm: ReportsMensal, extras: MontarSecoesRecei
         },
       ],
     },
+    {
+      // Última seção do bloco de Receita: soma MRR ativo (estoque) + entregue no mês (pontual).
+      // Sem metaKey (não existe meta de total combinado) e sem drill (agregado de 2 fontes,
+      // não reconcilia com nenhum /detalhe único).
+      id: "receita-total",
+      titulo: "Receita — Total",
+      linhas: [
+        {
+          key: "receita_total_mrr_pontual",
+          metrica: "Total (MRR + Pontual)",
+          atual: tm.mrrAtivo + p.entregasMes.total,
+          formato: "brl",
+          serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.mrr + r.pontual),
+          temporalidade: "mes",
+        },
+      ],
+    },
   ];
 }
 

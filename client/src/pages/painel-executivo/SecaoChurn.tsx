@@ -59,6 +59,32 @@ function slug(s: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+/** Agrega `produtoMotivo.celulas` (produto × motivo) POR MOTIVO — soma `mrr_perdido` e
+   `cancelamentos` de todos os produtos com o mesmo `motivo_cancelamento`. Fonte da seção
+   "Motivos de Churn" (sem série: /api/churn/produto-motivo não traz série mensal por motivo,
+   só o snapshot do período selecionado). Ordena por mrr_perdido desc, top 8. */
+function linhasPorMotivo(produtoMotivo: ChurnProdutoMotivo | undefined): ScorecardRow[] {
+  const porMotivo = new Map<string, { mrr_perdido: number; cancelamentos: number }>();
+  for (const c of produtoMotivo?.celulas ?? []) {
+    const acc = porMotivo.get(c.motivo_cancelamento) ?? { mrr_perdido: 0, cancelamentos: 0 };
+    acc.mrr_perdido += c.mrr_perdido;
+    acc.cancelamentos += c.cancelamentos;
+    porMotivo.set(c.motivo_cancelamento, acc);
+  }
+
+  return Array.from(porMotivo.entries())
+    .sort((a, b) => b[1].mrr_perdido - a[1].mrr_perdido)
+    .slice(0, 8)
+    .map(([motivo, agg]) => ({
+      key: `churn_motivo_${slug(motivo)}`,
+      metrica: motivo,
+      sub: `${agg.cancelamentos} cancelamentos`,
+      atual: agg.mrr_perdido,
+      formato: "brl",
+      temporalidade: "mes",
+    }));
+}
+
 /** Sub opcional da linha "por produto": top motivo de cancelamento daquele produto, casado
    por nome EXATO com o produto da série nova (churn/produto-motivo continua sendo a única
    fonte de motivo — a série de /api/scorecard/series não traz motivo). Quando o produto não
@@ -175,6 +201,12 @@ export function montarSecoesChurn(
       titulo: "Churn Recorrente — Por produto",
       subtitulo: "detalhamento (fonte ClickUp); pode não somar ao geral",
       linhas: produtoRows,
+    },
+    {
+      id: "churn-motivos",
+      titulo: "Churn Recorrente — Motivos",
+      subtitulo: "detalhamento (fonte ClickUp); pode não somar ao geral",
+      linhas: linhasPorMotivo(produtoMotivo),
     },
     {
       id: "churn-operador",
