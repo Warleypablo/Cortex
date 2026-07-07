@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { calcStatus, deltaM1, formatValor, linhasPorDimensao } from "./logica";
+import { calcStatus, deltaM1, formatValor, linhasPorDimensao, serieOverviewLtLtv } from "./logica";
+import type { EvolucaoProdutoTabelaData } from "@/components/lt-ltv-churn/types";
 
 describe("calcStatus", () => {
   it("direction up: atual >= meta → good", () => {
@@ -163,5 +164,56 @@ describe("linhasPorDimensao", () => {
     const series = { A: [{ month: "2026-06", valor: 10 }] };
     const linhas = linhasPorDimensao(series, "2026-06", { keyFn: (d) => d, formato: "brl", labelMes });
     expect(linhas[0].temporalidade).toBe("mes");
+  });
+});
+
+describe("serieOverviewLtLtv", () => {
+  it("undefined → 3 arrays vazios", () => {
+    expect(serieOverviewLtLtv(undefined)).toEqual({ lt: [], ltv: [], totalRecorrentes: [] });
+  });
+
+  it("agrega por mês, ponderado por n, EXCLUINDO o bucket 'Total' (senão dobraria a contagem)", () => {
+    // Performance: mes 06, lt=10 (n=2); Social Media: mes 06, lt=4 (n=1).
+    // "Total" replica a soma dos dois buckets (mesmo shape de buildMatrizEvolucaoProduto) —
+    // se o helper não excluir "Total", totalN sairia 6 (dobrado) em vez de 3.
+    const data: EvolucaoProdutoTabelaData = {
+      meses: ["2026-06"],
+      produtos: ["Performance", "Social Media", "Total"],
+      celulas: {
+        Performance: { "2026-06": { lt: 10, ltv: 1000, lt_mediana: 10, ltv_mediana: 1000, n: 2 } },
+        "Social Media": { "2026-06": { lt: 4, ltv: 400, lt_mediana: 4, ltv_mediana: 400, n: 1 } },
+        Total: { "2026-06": { lt: 8, ltv: 800, lt_mediana: 8, ltv_mediana: 800, n: 3 } },
+      },
+    };
+    const r = serieOverviewLtLtv(data);
+    // ltMedio ponderado = (10*2 + 4*1) / 3 = 8; ltvMedio = (1000*2 + 400*1) / 3 = 800.
+    expect(r.lt).toEqual([{ month: "2026-06", valor: 8 }]);
+    expect(r.ltv).toEqual([{ month: "2026-06", valor: 800 }]);
+    expect(r.totalRecorrentes).toEqual([{ month: "2026-06", valor: 3 }]);
+  });
+
+  it("mês sem nenhum produto com dado é omitido (não vira ponto 0)", () => {
+    const data: EvolucaoProdutoTabelaData = {
+      meses: ["2026-05", "2026-06"],
+      produtos: ["Performance"],
+      celulas: {
+        Performance: { "2026-06": { lt: 5, ltv: 500, lt_mediana: 5, ltv_mediana: 500, n: 1 } },
+      },
+    };
+    const r = serieOverviewLtLtv(data);
+    expect(r.lt).toEqual([{ month: "2026-06", valor: 5 }]);
+    expect(r.totalRecorrentes).toEqual([{ month: "2026-06", valor: 1 }]);
+  });
+
+  it("só o bucket 'Total' presente (sem os produtos individuais) → sem dado (evita usar Total como se fosse um produto normal)", () => {
+    const data: EvolucaoProdutoTabelaData = {
+      meses: ["2026-06"],
+      produtos: ["Total"],
+      celulas: {
+        Total: { "2026-06": { lt: 8, ltv: 800, lt_mediana: 8, ltv_mediana: 800, n: 3 } },
+      },
+    };
+    const r = serieOverviewLtLtv(data);
+    expect(r).toEqual({ lt: [], ltv: [], totalRecorrentes: [] });
   });
 });

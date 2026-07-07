@@ -61,7 +61,6 @@ export function useLtLtvEvolucaoProduto() {
   return useQuery<EvolucaoProdutoTabelaData>({ queryKey: ["/api/lt-ltv-churn/evolucao-produto-tabela"], staleTime: STALE });
 }
 export function useEstoqueOverview() { return useQuery({ queryKey: ["/api/estoque-pontual/overview"], staleTime: STALE }); }
-export function useCapacityTimes() { return useQuery({ queryKey: ["/api/capacity-times"], staleTime: STALE }); }
 
 // Scorecard executivo (Tasks 1-2: /api/scorecard/metas + /api/scorecard/responsaveis)
 export function useScorecardMetas(mes: string) {

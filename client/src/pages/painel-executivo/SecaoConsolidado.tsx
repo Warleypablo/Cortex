@@ -14,7 +14,6 @@ import {
   useChurnPontorrente,
   useEstoqueOverview,
   useCeoDashboard,
-  useCapacityTimes,
   useLtLtvOverview,
   useLtLtvDist,
   useLtLtvClientes,
@@ -26,7 +25,7 @@ import { montarSecoesVisaoGeral } from "./SecaoVisaoGeral";
 import { montarSecoesReceita } from "./SecaoReceita";
 import { montarSecoesChurn } from "./SecaoChurn";
 import { montarSecoesEntregas, type EstoqueOverview } from "./SecaoEntregas";
-import { montarSecoesCapacity, type CapacityTimesResponse } from "./SecaoCapacity";
+import { montarSecoesCapacity } from "./SecaoCapacity";
 import { montarSecoesLtLtv } from "./SecaoLtLtv";
 import { montarSecoesPerformance } from "./SecaoPerformance";
 import type { ScorecardSection, ScorecardResponsavelItem } from "./scorecard/tipos";
@@ -58,7 +57,6 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
 
   const estoqueQ = useEstoqueOverview();
   const ceo = useCeoDashboard(mes);
-  const capacity = useCapacityTimes();
 
   const overviewQ = useLtLtvOverview();
   const distQ = useLtLtvDist();
@@ -96,7 +94,6 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const dist = (distQ.data as { ltv: BucketDist[]; lt: BucketDist[] } | undefined)?.ltv ?? [];
   const clientes = (clientesQ.data as { clientes: ClienteRow[] } | undefined)?.clientes ?? [];
   const estoque = estoqueQ.data as EstoqueOverview | undefined;
-  const cap = capacity.data as CapacityTimesResponse | undefined;
 
   const secoesVisaoGeral = rm.data ? montarSecoesVisaoGeral(rm.data, ltvOverview, { isError: ceo.isError, kpis: ceoKpis }) : [];
   const secoesReceita = rm.data ? montarSecoesReceita(rm.data, { onDrill: abrirDrill }) : [];
@@ -104,7 +101,7 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
     ? montarSecoesChurn(churnDet.data, produtoMotivo.data, taxaMensal.data, pontorrente.data, series.data, rm.data, mes)
     : [];
   const secoesEntregas = rm.data ? montarSecoesEntregas(rm.data, estoque, series.data, mes) : [];
-  const secoesCapacity = montarSecoesCapacity({ isError: ceo.isError, kpis: ceoKpis }, cap, { isError: series.isError, data: series.data }, mes);
+  const secoesCapacity = montarSecoesCapacity({ isError: ceo.isError, kpis: ceoKpis }, { isError: series.isError, data: series.data }, mes);
   const secoesLtLtv = ltvOverview
     ? montarSecoesLtLtv(ltvOverview, dist, clientes, { data: evolucaoProdutoQ.data, isLoading: evolucaoProdutoQ.isLoading, isError: evolucaoProdutoQ.isError })
     : [];

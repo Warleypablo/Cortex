@@ -2,6 +2,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Info } from "lucide-react";
 import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
+import { serieOverviewLtLtv } from "./scorecard/logica";
 import {
   useLtLtvOverview,
   useLtLtvDist,
@@ -30,9 +31,11 @@ function labelMesCurto(mes: string): string {
   return MESES_ABREV[m - 1] ?? mes;
 }
 
-/** Aviso fixo: TODOS os dados desta aba são temporalidade="snapshot" — os endpoints
-   /api/lt-ltv-churn/* ignoram o mês selecionado no topo da página e refletem a base
-   ativa ATUAL (vw_lt_contratos, sem filtro de data). */
+/** Aviso fixo: os endpoints /api/lt-ltv-churn/overview (etc.) ignoram o mês selecionado no
+   topo da página — `atual` sempre reflete a base ativa ATUAL (vw_lt_contratos, sem filtro de
+   data), mesmo nas linhas que ganharam série (Onda4: LT médio ativo, LTV médio/cliente, Total
+   recorrentes) ou têm temporalidade "mes" (LTV por produto). "LT médio cancelado", "Maiores
+   clientes" e "Distribuição de LTV" continuam puro snapshot (sem série histórica). */
 function AvisoSnapshot() {
   return (
     <Card className="border-amber-200 bg-amber-50 dark:border-amber-900 dark:bg-amber-950/40">
@@ -117,6 +120,20 @@ export function montarSecoesLtLtv(
       })
     : [];
 
+  // Onda4: série do overview (LT médio ativo, LTV médio/cliente, Total recorrentes) agregada da
+  // MESMA matriz produto×mês da seção "LTV por produto (evolução)" acima — ponderada por `n`
+  // (ver serieOverviewLtLtv). `atual` continua vindo do endpoint overview (grão diferente:
+  // cliente×contrato/status vs. contrato×produto da matriz) — o último ponto da série pode
+  // divergir um pouco do `atual`, é tendência, não o número de fechamento do mês. Sem dado
+  // (evolucaoProduto.data ausente) → arrays vazios, linha cai para "sem série" (degradação
+  // graciosa do próprio Scorecard, ver LinhaEvolucao).
+  const overviewSeries = serieOverviewLtLtv(evolucaoProduto.data);
+  const toScorecardSerie = (pontos: { month: string; valor: number }[]): ScorecardSeriePonto[] =>
+    pontos.map((p) => ({ month: p.month, label: labelMesCurto(p.month), valor: p.valor }));
+  const ltMedioSerie = toScorecardSerie(overviewSeries.lt);
+  const ltvMedioSerie = toScorecardSerie(overviewSeries.ltv);
+  const totalRecorrentesSerie = toScorecardSerie(overviewSeries.totalRecorrentes);
+
   return [
     {
       id: "lt-ltv-base-ativa",
@@ -127,7 +144,8 @@ export function montarSecoesLtLtv(
           metrica: "LT médio ativo",
           atual: overview.ltMedioAtivo,
           formato: "meses",
-          temporalidade: "snapshot",
+          serie: ltMedioSerie.length > 0 ? ltMedioSerie : undefined,
+          temporalidade: "mes",
         },
         {
           key: "lt_ltv_lt_medio_cancelado",
@@ -141,25 +159,29 @@ export function montarSecoesLtLtv(
           metrica: "LTV médio/cliente",
           atual: overview.ltvMedioCliente,
           formato: "brl",
-          temporalidade: "snapshot",
+          serie: ltvMedioSerie.length > 0 ? ltvMedioSerie : undefined,
+          temporalidade: "mes",
         },
         {
           key: "lt_ltv_total_recorrentes",
           metrica: "Total recorrentes",
           atual: overview.totalRecorrentes,
           formato: "int",
-          temporalidade: "snapshot",
+          serie: totalRecorrentesSerie.length > 0 ? totalRecorrentesSerie : undefined,
+          temporalidade: "mes",
         },
       ],
     },
     {
       id: "lt-ltv-maiores-clientes",
       titulo: "Maiores clientes por LTV (snapshot)",
+      subtitulo: "estado atual da base",
       linhas: clienteRows,
     },
     {
       id: "lt-ltv-distribuicao",
       titulo: "Distribuição de LTV por cliente (snapshot)",
+      subtitulo: "estado atual da base",
       linhas: distRows,
     },
     {

@@ -3,6 +3,7 @@
 
 import { formatCurrencyNoDecimals, formatPercent, formatDecimal } from "@/lib/utils";
 import type { ScorecardDirection, ScorecardFormato, ScorecardRow, ScorecardSeriePonto } from "./tipos";
+import type { EvolucaoProdutoTabelaData } from "@/components/lt-ltv-churn/types";
 
 export type ScorecardStatus = "good" | "warn" | "bad" | null;
 
@@ -123,6 +124,59 @@ export function linhasPorDimensao(
     temporalidade: "mes",
     responsavelAuto: opts.responsavelAuto ? dim : undefined,
   }));
+}
+
+export interface OverviewSeriePonto {
+  month: string;
+  valor: number;
+}
+
+export interface SerieOverviewLtLtv {
+  lt: OverviewSeriePonto[];
+  ltv: OverviewSeriePonto[];
+  totalRecorrentes: OverviewSeriePonto[];
+}
+
+/**
+ * Agrega a matriz de `evolucao-produto-tabela` (produto × mês, já usada por
+ * "LTV por produto (evolução)") numa série mensal para o "overview" (LT médio, LTV médio,
+ * total de recorrentes) — ponderada por `n` de cada produto no mês.
+ *
+ * IMPORTANTE: `evolucaoProduto.produtos` inclui o bucket agregado "Total" (BUCKETS_ORDER em
+ * server/routes/ltLtvChurn.helpers.ts:buildMatrizEvolucaoProduto), que já soma TODOS os outros
+ * produtos (Performance/Social Media/Creators/Outros). Somar `n` sobre TODOS os produtos
+ * incluindo "Total" dobraria a contagem (usada como valor direto em "Total recorrentes", não só
+ * como peso de média) — por isso este helper EXCLUI "Total" da agregação e reconstrói o total a
+ * partir dos buckets individuais.
+ *
+ * Meses sem nenhum produto com dado são omitidos (não entram como ponto 0/null).
+ */
+export function serieOverviewLtLtv(evolucaoProduto: EvolucaoProdutoTabelaData | undefined): SerieOverviewLtLtv {
+  if (!evolucaoProduto) return { lt: [], ltv: [], totalRecorrentes: [] };
+
+  const produtos = evolucaoProduto.produtos.filter((p) => p !== "Total");
+  const lt: OverviewSeriePonto[] = [];
+  const ltv: OverviewSeriePonto[] = [];
+  const totalRecorrentes: OverviewSeriePonto[] = [];
+
+  for (const mes of evolucaoProduto.meses) {
+    let totalN = 0;
+    let ltNumerador = 0;
+    let ltvNumerador = 0;
+    for (const produto of produtos) {
+      const cel = evolucaoProduto.celulas[produto]?.[mes];
+      if (!cel) continue;
+      totalN += cel.n;
+      ltNumerador += cel.lt * cel.n;
+      ltvNumerador += cel.ltv * cel.n;
+    }
+    if (totalN === 0) continue;
+    lt.push({ month: mes, valor: ltNumerador / totalN });
+    ltv.push({ month: mes, valor: ltvNumerador / totalN });
+    totalRecorrentes.push({ month: mes, valor: totalN });
+  }
+
+  return { lt, ltv, totalRecorrentes };
 }
 
 /** Formata um valor numérico conforme o formato do scorecard. null/undefined/NaN → "—". */
