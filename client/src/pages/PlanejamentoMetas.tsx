@@ -39,7 +39,7 @@ const ALL_MONTHS = Array.from({ length: 12 }, (_, i) => String(i + 1).padStart(2
 const HIDDEN_PRODUCTS = new Set(['(Vazio)', 'Odonto', 'IFV', 'Bootcamp Vendas', 'Bootcamp Performance', '[Bootcamp Performance]']);
 
 // Order of sections when rendering all of them (no platform filter applied)
-const ALL_SECTIONS = ['inbound', 'meta_ads', 'google_ads', 'instagram', 'youtube', 'linkedin'];
+const ALL_SECTIONS = ['inbound', 'meta_ads', 'google_ads', 'tiktok_ads', 'instagram', 'youtube', 'linkedin'];
 
 // Map section keys to their segment(s) for budget lookup
 const SECTION_TO_SEGMENTS: Record<string, string[]> = {
@@ -48,6 +48,7 @@ const SECTION_TO_SEGMENTS: Record<string, string[]> = {
   nao_mql: ['nao_mql'],
   meta_ads: ['meta_ads'],
   google_ads: ['google_ads'],
+  tiktok_ads: ['tiktok_ads'],
   instagram: ['instagram'],
   youtube: ['youtube'],
   linkedin: ['linkedin'],
