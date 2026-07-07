@@ -132,7 +132,7 @@ export function SecaoLtLtv({ mes }: { mes: string }) {
                 </TableRow>
               ))}
               {(clientes?.clientes?.length ?? 0) === 0 && (
-                <TableRow><TableCell colSpan={3} className="text-center text-sm text-gray-400">Sem dados.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={3} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem dados.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>

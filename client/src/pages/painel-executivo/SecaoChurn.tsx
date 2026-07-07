@@ -112,7 +112,7 @@ function ChurnRecorrente({ mes }: { mes: string }) {
                 </TableRow>
               ))}
               {(produtoMotivo.data?.celulas?.length ?? 0) === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-sm text-gray-400">Sem cancelamentos no período.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem cancelamentos no período.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -140,7 +140,7 @@ function ChurnRecorrente({ mes }: { mes: string }) {
                 </TableRow>
               ))}
               {(porResponsavel.data?.length ?? 0) === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-sm text-gray-400">Sem churn no período.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem churn no período.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -168,7 +168,7 @@ function ChurnRecorrente({ mes }: { mes: string }) {
                 </TableRow>
               ))}
               {m.churn_por_squad.length === 0 && (
-                <TableRow><TableCell colSpan={4} className="text-center text-sm text-gray-400">Sem churn no período.</TableCell></TableRow>
+                <TableRow><TableCell colSpan={4} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem churn no período.</TableCell></TableRow>
               )}
             </TableBody>
           </Table>
@@ -233,7 +233,7 @@ function ChurnPontual({ mes }: { mes: string }) {
                   </TableRow>
                 ))}
                 {detalhamento.length === 0 && (
-                  <TableRow><TableCell colSpan={7} className="text-center text-sm text-gray-400">Sem cancelamentos pontorrentes no mês.</TableCell></TableRow>
+                  <TableRow><TableCell colSpan={7} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem cancelamentos pontorrentes no mês.</TableCell></TableRow>
                 )}
               </TableBody>
             </Table>

@@ -185,7 +185,7 @@ export function SecaoEntregas({ mes }: { mes: string }) {
 
       <section>
         <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Aberto × Entregue</h3>
-        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <div className="grid grid-cols-2 gap-3">
           {estoqueQ.isError ? (
             <ErroCard mensagem="Falha ao carregar estoque em aberto." />
           ) : estoqueQ.isLoading || !estoque ? (

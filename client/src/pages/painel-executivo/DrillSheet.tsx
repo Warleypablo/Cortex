@@ -30,21 +30,23 @@ export function DrillSheet({ open, onClose, titulo, subtitulo, colunas, linhas, 
           {carregando && <div className="h-40 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800" />}
           {erro && <div className="text-sm text-red-600 dark:text-red-400">Falha ao carregar o detalhe.</div>}
           {!carregando && !erro && (
-            <Table>
-              <TableHeader>
-                <TableRow>{colunas.map((c) => <TableHead key={c.chave}>{c.label}</TableHead>)}</TableRow>
-              </TableHeader>
-              <TableBody>
-                {linhas.length === 0 && (
-                  <TableRow><TableCell colSpan={colunas.length} className="text-center text-sm text-gray-400">Sem registros neste mês.</TableCell></TableRow>
-                )}
-                {linhas.map((linha, i) => (
-                  <TableRow key={i}>
-                    {colunas.map((c) => <TableCell key={c.chave}>{fmt(linha[c.chave], c.tipo)}</TableCell>)}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>{colunas.map((c) => <TableHead key={c.chave}>{c.label}</TableHead>)}</TableRow>
+                </TableHeader>
+                <TableBody>
+                  {linhas.length === 0 && (
+                    <TableRow><TableCell colSpan={colunas.length} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem registros.</TableCell></TableRow>
+                  )}
+                  {linhas.map((linha, i) => (
+                    <TableRow key={i}>
+                      {colunas.map((c) => <TableCell key={c.chave}>{fmt(linha[c.chave], c.tipo)}</TableCell>)}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           )}
         </div>
       </SheetContent>

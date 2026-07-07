@@ -143,7 +143,7 @@ function ComercialTable({ titulo, rows }: { titulo: string; rows: ComercialRow[]
               </TableRow>
             ))}
             {rows.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-sm text-gray-400">Sem dados.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem dados.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -178,7 +178,7 @@ function SelvaTable({ rows }: { rows: SelvaRow[] }) {
               </TableRow>
             ))}
             {rows.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-sm text-gray-400">Sem dados.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem dados.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
@@ -213,7 +213,7 @@ function SquadTable({ group }: { group: SquadGroup }) {
               </TableRow>
             ))}
             {group.rows.length === 0 && (
-              <TableRow><TableCell colSpan={5} className="text-center text-sm text-gray-400">Sem dados.</TableCell></TableRow>
+              <TableRow><TableCell colSpan={5} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem dados.</TableCell></TableRow>
             )}
           </TableBody>
         </Table>
