@@ -170,10 +170,16 @@ export function SecaoEntregas({ mes }: { mes: string }) {
       </section>
 
       <BlocoCard titulo="Por produto (mês)" isLoading={false} isError={false}>
+        <div className="mb-2 flex items-center gap-2">
+          <TemporalidadeBadge tipo="mes" mes={mes} />
+        </div>
         <TabelaPorProduto produtos={produtosMes} />
       </BlocoCard>
 
       <BlocoCard titulo="Por operador (mês)" isLoading={false} isError={false}>
+        <div className="mb-2 flex items-center gap-2">
+          <TemporalidadeBadge tipo="mes" mes={mes} />
+        </div>
         <TabelaPorOperador operadores={topEntregas} />
       </BlocoCard>
 
