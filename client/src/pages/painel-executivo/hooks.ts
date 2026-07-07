@@ -10,10 +10,6 @@ const STALE = 5 * 60 * 1000;
 export function useReportsMensal(mes: string) {
   return useQuery<ReportsMensal>({ queryKey: ["/api/reports/mensal", { mes }], enabled: !!mes, staleTime: STALE });
 }
-export function useGestaoReceita(mes: string) {
-  const { de, ate } = paramsParaMes(mes).deAte;
-  return useQuery({ queryKey: ["/api/gestao/receita", { de, ate }], enabled: !!mes, staleTime: STALE });
-}
 export function useGestaoReceitaDetalhe(params: Record<string, string> | null) {
   return useQuery({ queryKey: ["/api/gestao/receita/detalhe", params ?? {}], enabled: !!params, staleTime: STALE });
 }
@@ -51,5 +47,4 @@ export function useLtLtvOverview() { return useQuery({ queryKey: ["/api/lt-ltv-c
 export function useLtLtvDist() { return useQuery({ queryKey: ["/api/lt-ltv-churn/dist-clientes"], staleTime: STALE }); }
 export function useLtLtvClientes() { return useQuery({ queryKey: ["/api/lt-ltv-churn/clientes", { sort: "ltvTotal", dir: "desc", page: "1" }], staleTime: STALE }); }
 export function useEstoqueOverview() { return useQuery({ queryKey: ["/api/estoque-pontual/overview"], staleTime: STALE }); }
-export function useEstoquePorProduto() { return useQuery({ queryKey: ["/api/estoque-pontual/por-produto"], staleTime: STALE }); }
 export function useCapacityTimes() { return useQuery({ queryKey: ["/api/capacity-times"], staleTime: STALE }); }

@@ -1,22 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { KpiCard } from "./KpiCard";
 import { useLtLtvOverview, useLtLtvDist, useLtLtvClientes } from "./hooks";
 import type { OverviewData, BucketDist, ClienteRow } from "@/components/lt-ltv-churn/types";
-
-function ErroCard({ mensagem }: { mensagem: string }) {
-  return (
-    <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
-      <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
-        <AlertTriangle className="h-4 w-4" /> {mensagem}
-      </CardContent>
-    </Card>
-  );
-}
+import { ErroCard, BlocoCard, formatLt } from "./_ui";
 
 /** Aviso fixo: TODOS os dados desta aba são temporalidade="snapshot" — os endpoints
    /api/lt-ltv-churn/* ignoram o mês selecionado no topo da página e refletem a base
@@ -30,26 +21,6 @@ function AvisoSnapshot() {
       </CardContent>
     </Card>
   );
-}
-
-/** Card com título fixo que troca o conteúdo por skeleton/erro sem desmontar as seções vizinhas. */
-function BlocoCard({ titulo, isLoading, isError, children }: { titulo: string; isLoading: boolean; isError: boolean; children: React.ReactNode }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{titulo}</h3>
-        {isError ? (
-          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400"><AlertTriangle className="h-4 w-4" /> Falha ao carregar.</div>
-        ) : isLoading ? (
-          <Skeleton className="h-64 w-full" />
-        ) : children}
-      </CardContent>
-    </Card>
-  );
-}
-
-function formatLt(v: number | null | undefined): string {
-  return v != null ? `${v}m` : "—";
 }
 
 const tooltipStyleDark = { backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" };
@@ -90,7 +61,7 @@ export function SecaoLtLtv({ mes }: { mes: string }) {
       )}
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <BlocoCard titulo="Distribuição de LTV por cliente" isLoading={distQ.isLoading} isError={distQ.isError}>
+        <BlocoCard titulo="Distribuição de LTV por cliente" isLoading={distQ.isLoading} isError={distQ.isError} skeletonClassName="h-64 w-full">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={dist?.ltv ?? []}>
               <XAxis dataKey="faixa" tick={{ fill: "#9ca3af", fontSize: 12 }} />
@@ -101,7 +72,7 @@ export function SecaoLtLtv({ mes }: { mes: string }) {
           </ResponsiveContainer>
         </BlocoCard>
 
-        <BlocoCard titulo="Distribuição de LT por cliente" isLoading={distQ.isLoading} isError={distQ.isError}>
+        <BlocoCard titulo="Distribuição de LT por cliente" isLoading={distQ.isLoading} isError={distQ.isError} skeletonClassName="h-64 w-full">
           <ResponsiveContainer width="100%" height={260}>
             <BarChart data={dist?.lt ?? []}>
               <XAxis dataKey="faixa" tick={{ fill: "#9ca3af", fontSize: 12 }} />
@@ -113,7 +84,7 @@ export function SecaoLtLtv({ mes }: { mes: string }) {
         </BlocoCard>
       </div>
 
-      <BlocoCard titulo="Maiores por LTV" isLoading={clientesQ.isLoading} isError={clientesQ.isError}>
+      <BlocoCard titulo="Maiores por LTV" isLoading={clientesQ.isLoading} isError={clientesQ.isError} skeletonClassName="h-64 w-full">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>

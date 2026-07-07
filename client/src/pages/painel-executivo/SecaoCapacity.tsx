@@ -1,12 +1,13 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle, Info } from "lucide-react";
+import { Info } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { cn, formatCurrencyNoDecimals, formatPercent } from "@/lib/utils";
 import { KpiCard } from "./KpiCard";
 import { TemporalidadeBadge } from "./TemporalidadeBadge";
 import { useCeoDashboard, useCapacityTimes } from "./hooks";
 import { SELVA_BLOQUEADA } from "@shared/capacityGrupos";
+import { ErroCard } from "./_ui";
 
 const META_RECEITA_CABECA = 20000;
 
@@ -42,16 +43,6 @@ interface CapacityTimesResponse {
   cxcs: ComercialRow[];
   squads: SquadGroup[];
   metaContasDesigner: number;
-}
-
-function ErroCard({ mensagem }: { mensagem: string }) {
-  return (
-    <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
-      <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
-        <AlertTriangle className="h-4 w-4" /> {mensagem}
-      </CardContent>
-    </Card>
-  );
 }
 
 function InfoCard({ mensagem }: { mensagem: string }) {

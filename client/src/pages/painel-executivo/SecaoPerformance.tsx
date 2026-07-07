@@ -1,50 +1,10 @@
-import { Card, CardContent } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { TemporalidadeBadge } from "./TemporalidadeBadge";
 import { EmBreveCard } from "./EmBreveCard";
 import { useLtLtvClientes, useReportsMensal } from "./hooks";
 import type { ClienteRow } from "@/components/lt-ltv-churn/types";
-
-/** Card com título fixo que troca o conteúdo por skeleton/erro sem desmontar as seções vizinhas. */
-function BlocoCard({ titulo, isLoading, isError, children }: { titulo: string; isLoading: boolean; isError: boolean; children: React.ReactNode }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{titulo}</h3>
-        {isError ? (
-          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400"><AlertTriangle className="h-4 w-4" /> Falha ao carregar.</div>
-        ) : isLoading ? (
-          <Skeleton className="h-48 w-full" />
-        ) : children}
-      </CardContent>
-    </Card>
-  );
-}
-
-function formatLt(v: number | null | undefined): string {
-  return v != null ? `${v}m` : "—";
-}
-
-function getInitials(nome: string): string {
-  const partes = nome.trim().split(/\s+/);
-  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
-  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
-}
-
-function AvatarPequeno({ fotoUrl, nome }: { fotoUrl: string | null; nome: string }) {
-  return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-100 text-[10px] font-semibold text-teal-700 dark:bg-teal-950/50 dark:text-teal-300">
-      {fotoUrl ? (
-        <img src={fotoUrl} alt={nome} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-      ) : (
-        getInitials(nome)
-      )}
-    </div>
-  );
-}
+import { BlocoCard, formatLt, AvatarPequeno } from "./_ui";
 
 export function SecaoPerformance({ mes }: { mes: string }) {
   const clientesQ = useLtLtvClientes();

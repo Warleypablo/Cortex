@@ -1,6 +1,5 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle } from "lucide-react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
@@ -13,32 +12,7 @@ import {
   useChurnPorResponsavel,
   useChurnPontorrente,
 } from "./hooks";
-
-function ErroCard({ mensagem }: { mensagem: string }) {
-  return (
-    <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
-      <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
-        <AlertTriangle className="h-4 w-4" /> {mensagem}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Card com título fixo que troca o conteúdo por skeleton/erro sem desmontar as seções vizinhas. */
-function BlocoTabela({ titulo, isLoading, isError, children }: { titulo: string; isLoading: boolean; isError: boolean; children: React.ReactNode }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <h3 className="mb-3 text-sm font-semibold text-gray-900 dark:text-white">{titulo}</h3>
-        {isError ? (
-          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400"><AlertTriangle className="h-4 w-4" /> Falha ao carregar.</div>
-        ) : isLoading ? (
-          <Skeleton className="h-40 w-full" />
-        ) : children}
-      </CardContent>
-    </Card>
-  );
-}
+import { ErroCard, BlocoCard as BlocoTabela } from "./_ui";
 
 function formatMesCurto(mes: string): string {
   const [ano, m] = mes.split("-");
@@ -72,7 +46,7 @@ function ChurnRecorrente({ mes }: { mes: string }) {
         <KpiCard mes={mes} temporalidade="mes" titulo="Contratos churned" valor={String(m.total_churned)} />
       </div>
 
-      <BlocoTabela titulo="Taxa de churn — 12 meses" isLoading={taxaMensal.isLoading} isError={taxaMensal.isError}>
+      <BlocoTabela titulo="Taxa de churn — 12 meses" isLoading={taxaMensal.isLoading} isError={taxaMensal.isError} skeletonClassName="h-40 w-full">
         <ResponsiveContainer width="100%" height={220}>
           <LineChart data={taxaMensal.data?.rows ?? []}>
             <XAxis dataKey="mes" tickFormatter={formatMesCurto} tick={{ fill: "#9ca3af", fontSize: 12 }} />
@@ -91,7 +65,7 @@ function ChurnRecorrente({ mes }: { mes: string }) {
          reconcilia 1:1 com o Churn R$ acima (vw_cup_churn_ajustado, por data_solicitacao_encerramento).
          Conferido em jun/26: 60 cancelamentos/R$200k aqui vs 79/R$186,7k no card. Por isso, sem
          drill nesta tabela (lição Task 4: só dar drill quando os registros batem com o número clicado). */}
-      <BlocoTabela titulo="Por produto + motivo" isLoading={produtoMotivo.isLoading} isError={produtoMotivo.isError}>
+      <BlocoTabela titulo="Por produto + motivo" isLoading={produtoMotivo.isLoading} isError={produtoMotivo.isError} skeletonClassName="h-40 w-full">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -119,7 +93,7 @@ function ChurnRecorrente({ mes }: { mes: string }) {
         </div>
       </BlocoTabela>
 
-      <BlocoTabela titulo="Por operador" isLoading={porResponsavel.isLoading} isError={porResponsavel.isError}>
+      <BlocoTabela titulo="Por operador" isLoading={porResponsavel.isLoading} isError={porResponsavel.isError} skeletonClassName="h-40 w-full">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>
@@ -147,7 +121,7 @@ function ChurnRecorrente({ mes }: { mes: string }) {
         </div>
       </BlocoTabela>
 
-      <BlocoTabela titulo="Por squad" isLoading={false} isError={false}>
+      <BlocoTabela titulo="Por squad" isLoading={false} isError={false} skeletonClassName="h-40 w-full">
         <div className="overflow-x-auto">
           <Table>
             <TableHeader>

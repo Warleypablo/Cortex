@@ -1,12 +1,11 @@
-import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { AlertTriangle } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { KpiCard } from "./KpiCard";
 import { TemporalidadeBadge } from "./TemporalidadeBadge";
 import { useReportsMensal, useEstoqueOverview } from "./hooks";
 import type { OperadorRank } from "./tipos";
+import { ErroCard, BlocoCard, AvatarPequeno } from "./_ui";
 
 // Shape espelha o handler de GET /api/estoque-pontual/overview (server/routes/estoquePontual.ts),
 // confirmado lendo o SELECT — não há tipo compartilhado client/server para este endpoint.
@@ -16,53 +15,6 @@ interface EstoqueOverview {
   idadeMedia: number;
   qtdEnvelhecidos: number;
   valorEnvelhecidos: number;
-}
-
-function ErroCard({ mensagem }: { mensagem: string }) {
-  return (
-    <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
-      <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
-        <AlertTriangle className="h-4 w-4" /> {mensagem}
-      </CardContent>
-    </Card>
-  );
-}
-
-/** Card com título fixo que troca o conteúdo por skeleton/erro sem desmontar as seções vizinhas. */
-function BlocoCard({ titulo, sub, isLoading, isError, children }: { titulo: string; sub?: string; isLoading: boolean; isError: boolean; children: React.ReactNode }) {
-  return (
-    <Card>
-      <CardContent className="p-4">
-        <div className="mb-3 flex items-baseline gap-2">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{titulo}</h3>
-          {sub && <span className="text-xs text-gray-400 dark:text-zinc-500">{sub}</span>}
-        </div>
-        {isError ? (
-          <div className="flex items-center gap-2 text-sm text-red-600 dark:text-red-400"><AlertTriangle className="h-4 w-4" /> Falha ao carregar.</div>
-        ) : isLoading ? (
-          <Skeleton className="h-48 w-full" />
-        ) : children}
-      </CardContent>
-    </Card>
-  );
-}
-
-function getInitials(nome: string): string {
-  const partes = nome.trim().split(/\s+/);
-  if (partes.length === 1) return partes[0].slice(0, 2).toUpperCase();
-  return (partes[0][0] + partes[partes.length - 1][0]).toUpperCase();
-}
-
-function AvatarPequeno({ fotoUrl, nome }: { fotoUrl: string | null; nome: string }) {
-  return (
-    <div className="flex h-7 w-7 shrink-0 items-center justify-center overflow-hidden rounded-full bg-teal-100 text-[10px] font-semibold text-teal-700 dark:bg-teal-950/50 dark:text-teal-300">
-      {fotoUrl ? (
-        <img src={fotoUrl} alt={nome} className="h-full w-full object-cover" referrerPolicy="no-referrer" />
-      ) : (
-        getInitials(nome)
-      )}
-    </div>
-  );
 }
 
 function TabelaPorProduto({ produtos }: { produtos: [string, number][] }) {
