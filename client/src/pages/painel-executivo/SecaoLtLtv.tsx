@@ -6,13 +6,29 @@ import {
   useLtLtvOverview,
   useLtLtvDist,
   useLtLtvClientes,
+  useLtLtvEvolucaoProduto,
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
 } from "./hooks";
-import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem } from "./scorecard/tipos";
-import type { OverviewData, BucketDist, ClienteRow } from "@/components/lt-ltv-churn/types";
+import type { ScorecardSection, ScorecardRow, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
+import type {
+  OverviewData,
+  BucketDist,
+  ClienteRow,
+  EvolucaoProdutoTabelaData,
+  EvolucaoProdutoTabelaCelula,
+} from "@/components/lt-ltv-churn/types";
 import { ErroCard } from "./_ui";
+
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/** "YYYY-MM" → label curto (ex: "Jan") — mesmo padrão de `labelMesCurto` em SecaoChurn.tsx/
+   SecaoEntregas.tsx. */
+function labelMesCurto(mes: string): string {
+  const m = Number(mes.split("-")[1]);
+  return MESES_ABREV[m - 1] ?? mes;
+}
 
 /** Aviso fixo: TODOS os dados desta aba são temporalidade="snapshot" — os endpoints
    /api/lt-ltv-churn/* ignoram o mês selecionado no topo da página e refletem a base
@@ -43,6 +59,9 @@ export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) 
   const overviewQ = useLtLtvOverview();
   const distQ = useLtLtvDist();
   const clientesQ = useLtLtvClientes();
+  // Histórico completo (Onda3) — query isolada (não bloqueia a aba): loading/erro só deixam
+  // a seção "LTV por produto (evolução)" vazia, mesma filosofia de clientesQ/distQ acima.
+  const evolucaoProdutoQ = useLtLtvEvolucaoProduto();
   // Aba 100% snapshot — sem metas hoje, mas mantém o hook por consistência com as demais
   // seções (caso metas de LT/LTV sejam cadastradas futuramente em cortex_core.scorecard_metas).
   useScorecardMetas(mes);
@@ -96,6 +115,36 @@ export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) 
     temporalidade: "snapshot",
   }));
 
+  // Onda3: única seção de fato histórica desta aba — GET /api/lt-ltv-churn/evolucao-produto-tabela
+  // devolve uma MATRIZ `celulas[produto][mes] = {lt, ltv, lt_mediana, ltv_mediana, n}` (shape
+  // confirmado em server/routes/ltLtvChurn.helpers.ts:buildMatrizEvolucaoProduto, já consumido
+  // por client/src/components/lt-ltv-churn/TabelaEvolucaoProduto.tsx). `produtos` já vem ordenado
+  // (BUCKETS_ORDER: Performance, Social Media, Creators, Outros, Total) e só lista buckets com
+  // dado — "Total" entra como mais uma linha (agregado, mesmo tratamento do componente acima).
+  // Sem `mes` no endpoint (histórico completo) — `atual` é o ÚLTIMO ponto da própria série, não
+  // o ponto do mês selecionado no topo da página (essa aba já ignora o seletor de mês, ver
+  // AvisoSnapshot; aqui a métrica em si é mensal, só a "atual" não é filtrada por ele).
+  const evolucaoProduto = evolucaoProdutoQ.data as EvolucaoProdutoTabelaData | undefined;
+  const evolucaoProdutoRows: ScorecardRow[] = evolucaoProduto
+    ? evolucaoProduto.produtos.map((produto) => {
+        const porMes = evolucaoProduto.celulas[produto] ?? {};
+        const pontos: { mes: string; cell: EvolucaoProdutoTabelaCelula }[] = evolucaoProduto.meses
+          .map((mes) => ({ mes, cell: porMes[mes] }))
+          .filter((p): p is { mes: string; cell: EvolucaoProdutoTabelaCelula } => p.cell !== undefined);
+        const serie: ScorecardSeriePonto[] = pontos.map((p) => ({ month: p.mes, label: labelMesCurto(p.mes), valor: p.cell.ltv }));
+        const ultimo = pontos.length > 0 ? pontos[pontos.length - 1] : undefined;
+        return {
+          key: `lt_ltv_evolucao_produto_${slug(produto)}`,
+          metrica: produto,
+          sub: ultimo ? `n=${ultimo.cell.n}` : undefined,
+          atual: ultimo ? ultimo.cell.ltv : null,
+          formato: "brl",
+          serie,
+          temporalidade: "mes",
+        };
+      })
+    : [];
+
   const secoes: ScorecardSection[] = [
     {
       id: "lt-ltv-base-ativa",
@@ -140,6 +189,16 @@ export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) 
       id: "lt-ltv-distribuicao",
       titulo: "Distribuição de LTV por cliente (snapshot)",
       linhas: distRows,
+    },
+    {
+      id: "lt-ltv-evolucao-produto",
+      titulo: "LTV por produto (evolução)",
+      subtitulo: evolucaoProdutoQ.isLoading
+        ? "carregando série…"
+        : evolucaoProdutoQ.isError
+          ? "falha ao carregar série"
+          : undefined,
+      linhas: evolucaoProdutoRows,
     },
   ];
 

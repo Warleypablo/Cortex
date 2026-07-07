@@ -9,10 +9,20 @@ import {
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
+  useScorecardSeries,
 } from "./hooks";
 import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem } from "./scorecard/tipos";
+import { linhasPorDimensao } from "./scorecard/logica";
 import type { ClienteRow } from "@/components/lt-ltv-churn/types";
-import { formatCurrencyNoDecimals } from "@/lib/utils";
+
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/** "YYYY-MM" → label curto (ex: "Jan") — mesmo padrão de `labelMesCurto` em SecaoChurn.tsx/
+   SecaoEntregas.tsx (duplicado localmente, não há util compartilhado entre seções). */
+function labelMesCurto(mes: string): string {
+  const m = Number(mes.split("-")[1]);
+  return MESES_ABREV[m - 1] ?? mes;
+}
 
 /** Chave estável para linhas derivadas de listas variáveis (operador, squad) — mesmo padrão
    de `slug` em SecaoChurn.tsx/SecaoEntregas.tsx (determinística por entidade, não por índice
@@ -29,6 +39,9 @@ function slug(s: string): string {
 export function SecaoPerformance({ mes, modo }: { mes: string; modo: ScorecardModo }) {
   const rm = useReportsMensal(mes);
   const clientesQ = useLtLtvClientes();
+  // Série por operador/squad (Onda2-A/Onda3) — fonte de operadorRows/squadRows abaixo. Falha/
+  // loading isolados (não bloqueiam a seção): linhasPorDimensao devolve [] sem `series.data`.
+  const series = useScorecardSeries(mes);
   const metas = useScorecardMetas(mes);
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
@@ -55,33 +68,29 @@ export function SecaoPerformance({ mes, modo }: { mes: string; modo: ScorecardMo
     return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
   }
 
-  const topOperadores = rm.data.topOperadores.topMrrPontual ?? [];
-  const rankingSquads = [...rm.data.rankingSquads].sort((a, b) => a.posicao - b.posicao);
   // Query isolada (não bloqueia a seção inteira, mesma filosofia de SecaoEntregas/estoqueQ) —
   // ausente (loading ou erro) só deixa a seção de maiores clientes vazia.
   const clientes = (clientesQ.data as { clientes: ClienteRow[] } | undefined)?.clientes ?? [];
   const topClientes = [...clientes].sort((a, b) => b.ltvTotal - a.ltvTotal).slice(0, 10);
 
-  const operadorRows: ScorecardRow[] = topOperadores.slice(0, 10).map((o) => ({
-    key: `performance_operador_${slug(o.nome)}`,
-    metrica: o.nome,
-    sub: o.cargo ?? undefined,
-    atual: o.valor,
+  // Onda3: substitui `topOperadores.topMrrPontual`/`rankingSquads` (só do mês, sem série) pelas
+  // séries por dimensão (mesma fonte de SecaoChurn/SecaoEntregas) — reconcilia número do mês
+  // com a linha do tempo do modo Evolução.
+  const operadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorOperador, mes, {
+    keyFn: (dim) => `performance_operador_${slug(dim)}`,
     formato: "brl",
-    temporalidade: "mes",
+    labelMes: labelMesCurto,
+    top: 10,
     // Dono automático (o próprio operador) — célula somente-leitura, mesmo padrão de
-    // operadorRows em SecaoEntregas.tsx.
-    responsavelAuto: o.nome,
-  }));
+    // operadorRows em SecaoChurn.tsx/SecaoEntregas.tsx.
+    responsavelAuto: true,
+  });
 
-  const squadRows: ScorecardRow[] = rankingSquads.map((s) => ({
-    key: `performance_squad_${slug(s.squad)}`,
-    metrica: s.squad,
-    sub: `Pontual ${formatCurrencyNoDecimals(s.pontual)}`,
-    atual: s.mrr,
+  const squadRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorSquad, mes, {
+    keyFn: (dim) => `performance_squad_${slug(dim)}`,
     formato: "brl",
-    temporalidade: "mes",
-  }));
+    labelMes: labelMesCurto,
+  });
 
   const clienteRows: ScorecardRow[] = topClientes.map((c) => ({
     key: `performance_cliente_${c.idTask}`,
@@ -96,11 +105,13 @@ export function SecaoPerformance({ mes, modo }: { mes: string; modo: ScorecardMo
     {
       id: "performance-top-operadores",
       titulo: "Top operadores (mês)",
+      subtitulo: series.isLoading ? "carregando série…" : series.isError ? "falha ao carregar série" : undefined,
       linhas: operadorRows,
     },
     {
       id: "performance-ranking-squads",
       titulo: "Ranking de squads (mês)",
+      subtitulo: series.isLoading ? "carregando série…" : series.isError ? "falha ao carregar série" : undefined,
       linhas: squadRows,
     },
     {

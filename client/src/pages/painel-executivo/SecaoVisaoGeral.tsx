@@ -12,8 +12,23 @@ import {
   useSalvarResponsaveis,
 } from "./hooks";
 import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
-import type { ReceitaChurnPonto, VendasSeriePonto } from "./tipos";
+import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes } from "./tipos";
 import type { OverviewData } from "@/components/lt-ltv-churn/types";
+
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/** "YYYY-MM" → label curto (ex: "Jan") — mesmo padrão de `labelMesCurto` em SecaoChurn.tsx/
+   SecaoEntregas.tsx/SecaoPerformance.tsx (duplicado localmente, não há util compartilhado). */
+function labelMesCurto(mes: string): string {
+  const m = Number(mes.split("-")[1]);
+  return MESES_ABREV[m - 1] ?? mes;
+}
+
+/** crosssellHistorico não vem com `label` pronto do backend (diferente de ReceitaChurnPonto/
+   VendasSeriePonto) — deriva aqui, mesmo padrão de `serieTaxaMensal` em SecaoChurn.tsx. */
+function serieCrosssell(rows: CrosssellHistoricoPonto[] | undefined): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => ({ label: labelMesCurto(r.mes), valor: r.mrr, month: r.mes }));
+}
 
 // Shape mínimo do payload de GET /api/ceo-dashboard (server/routes/ceoDashboard.helpers.ts,
 // CeoKpi) — sem tipo compartilhado client/server, mesmo cast local usado na v1 desta seção.
@@ -121,10 +136,12 @@ export function SecaoVisaoGeral({ mes, modo }: { mes: string; modo: ScorecardMod
           key: "visao_crosssell",
           metrica: "Cross-sell",
           // metaKey é MRR-only (sales_mrr_monetization_target) — somar o pontual aqui infla o
-          // "atual" e distorce o status vs. a meta. Mesma fonte/meta da aba Receita.
+          // "atual" e distorce o status vs. a meta. Mesma fonte/meta da aba Receita. Série
+          // (Onda3) usa só o `mrr` de cada ponto, pela mesma razão do `atual`.
           atual: tm.crosssellMrr,
           formato: "brl",
           metaKey: "sales_mrr_monetization_target",
+          serie: serieCrosssell(tm.crosssellHistorico),
           temporalidade: "mes",
         },
         {
@@ -132,6 +149,8 @@ export function SecaoVisaoGeral({ mes, modo }: { mes: string; modo: ScorecardMod
           metrica: "Entregas (R$)",
           atual: p.entregasMes.total,
           formato: "brl",
+          // Série real (Onda3) — mesma fonte usada em SecaoEntregas.tsx ("Entregue (R$)").
+          serie: serieComLabel<EntregaProdutoMes>(p.entregasPorProdutoMes, (r) => r.total),
           temporalidade: "mes",
         },
         {

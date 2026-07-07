@@ -4,6 +4,7 @@ import { paramsParaMes } from "./temporalidade";
 import type { ReportsMensal, ChurnDetalhamento, ChurnProdutoMotivo, ChurnTaxaMensal } from "./tipos";
 import type { ChurnPorResponsavel } from "@shared/schema";
 import type { ChurnPontorrentePayload } from "@/components/churn-pontorrente/types";
+import type { EvolucaoProdutoTabelaData } from "@/components/lt-ltv-churn/types";
 import type {
   ScorecardMetasResponse,
   ScorecardResponsaveisResponse,
@@ -53,6 +54,12 @@ export function useCeoDashboard(mes: string) {
 export function useLtLtvOverview() { return useQuery({ queryKey: ["/api/lt-ltv-churn/overview"], staleTime: STALE }); }
 export function useLtLtvDist() { return useQuery({ queryKey: ["/api/lt-ltv-churn/dist-clientes"], staleTime: STALE }); }
 export function useLtLtvClientes() { return useQuery({ queryKey: ["/api/lt-ltv-churn/clientes", { sort: "ltvTotal", dir: "desc", page: "1" }], staleTime: STALE }); }
+// Histórico completo (todos os meses desde o 1º snapshot) — NÃO recebe `mes` (diferente das
+// demais séries deste arquivo), a janela é definida no próprio backend (server/routes/
+// ltLtvChurn.ts). Fonte da seção "LTV por produto (evolução)" de SecaoLtLtv.tsx (Onda3).
+export function useLtLtvEvolucaoProduto() {
+  return useQuery<EvolucaoProdutoTabelaData>({ queryKey: ["/api/lt-ltv-churn/evolucao-produto-tabela"], staleTime: STALE });
+}
 export function useEstoqueOverview() { return useQuery({ queryKey: ["/api/estoque-pontual/overview"], staleTime: STALE }); }
 export function useCapacityTimes() { return useQuery({ queryKey: ["/api/capacity-times"], staleTime: STALE }); }
 
