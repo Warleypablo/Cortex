@@ -73,3 +73,14 @@ export function useSalvarResponsaveis() {
     },
   });
 }
+
+// Responsáveis reais (carteira de contratos ativos) para o dropdown de atribuição manual
+// do Scorecard (CelulaResponsavel, Task 4). Mesmo endpoint já usado por CapacityMetaDialog.
+export interface ScorecardResponsavelOption {
+  responsavel: string;
+  contratos: number;
+  mrr: number;
+}
+export function useResponsaveisDisponiveis() {
+  return useQuery<ScorecardResponsavelOption[]>({ queryKey: ["/api/capacity-metas/responsaveis"], staleTime: STALE });
+}
