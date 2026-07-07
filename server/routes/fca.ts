@@ -24,7 +24,7 @@ const CLICKUP_OPTS: Record<string, Record<string, string>> = {
 const CANAL_CFG: Record<string, { clickup: string; segmento: string; platformUtm: string | null }> = {
   metaAds: { clickup: "2b7e74d1-78ec-4d5b-a0c8-553b64d2d1c0", segmento: "meta_ads", platformUtm: null },
   googleAds: { clickup: "ef42936f-2e34-41b8-b019-6b176a6cb1ce", segmento: "google_ads", platformUtm: "google" },
-  tiktokAds: { clickup: "81541b88-5e03-4193-b1c7-716173c98901", segmento: "meta_ads", platformUtm: "tiktok" },
+  tiktokAds: { clickup: "81541b88-5e03-4193-b1c7-716173c98901", segmento: "tiktok_ads", platformUtm: "tiktok" },
 };
 
 // Funil: opção do ClickUp + padrão fnl_ngc (Bitrix, ILIKE) + tag no nome da campanha (LIKE, lower).
