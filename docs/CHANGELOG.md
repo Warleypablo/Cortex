@@ -1,5 +1,19 @@
 # Changelog
 
+## 2026-07-07 | chore(ads): checagem read-only do lote "Creators Summit - Creator" — NÃO subido
+
+**O que foi feito:**
+- `scripts/ads/checa-summit-creator.ts` (novo, read-only): cruza o lote Drive `4 - Creators Summit - Creator` (Victor h1-3 + Lucas h1-3, `Summit_Creator_*`, 12 vídeos pareados 9x16+4x5) com a Biblioteca (por `driveFileId` e por nome) e com o Gerenciador (`/advideos` com early-exit por data de criação).
+- Resultado: **0 linhas na Biblioteca e 0/12 vídeos no Gerenciador** — o lote Creator nunca passou pelo fluxo (não confundir com o lote 3 "Empresário", TP1745-1750, subido em 03/07).
+
+**Por que:**
+- Caio pediu confirmação se o lote da pasta já tinha sido subido antes de decidir o próximo passo. A pasta tem a MESMA estrutura do Empresário (Victor/Lucas × 9x16/4x5 × Body 1 Cta 1), fácil de confundir.
+
+**Arquivos alterados:**
+- `scripts/ads/checa-summit-creator.ts` - checagem read-only (novo)
+
+**Impacto arquitetural:** Nenhum — script CLI avulso (tsx), só leitura.
+
 ## 2026-07-06 | feat(ads): lotes Esther UGCs (TP1751-1770) e Lucas UGC (TP1771-1792) — 1º fluxo 100% via API, do Drive ao ad ativo
 
 **O que foi feito:**
