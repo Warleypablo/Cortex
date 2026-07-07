@@ -35,7 +35,10 @@ export function SecaoReceita({ mes }: { mes: string }) {
       <section>
         <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">MRR</h3>
         <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          <KpiCard mes={mes} temporalidade="mes" titulo="Receita MRR" valor={formatCurrencyNoDecimals(tm.mrrAtivo)} onClick={() => abrirDrill("venda_mrr", "mrr")} />
+          {/* Receita MRR = ESTOQUE de MRR ativo (ClickUp/cup_data_hist). Não há endpoint que
+             componha esse número; venda_mrr lista a VENDA do mês (fluxo, Bitrix) e NÃO reconcilia
+             com o estoque → card não clicável (mesma regra de Churn/Pausado/Cross-sell). */}
+          <KpiCard mes={mes} temporalidade="mes" titulo="Receita MRR" valor={formatCurrencyNoDecimals(tm.mrrAtivo)} />
           <KpiCard mes={mes} temporalidade="mes" titulo="Nova receita" valor={formatCurrencyNoDecimals(tm.mrrAdicionado)} onClick={() => abrirDrill("venda_mrr", "mrr")} />
           {/* Churn: sem tipo "total" no backend (só churn_motivo/churn_vendedor com chave específica) — não clicável, mesma regra do Pausado/Cross-sell abaixo. */}
           <KpiCard mes={mes} temporalidade="mes" titulo="Churn" valor={formatCurrencyNoDecimals(tm.churnMrr)} sub={`${tm.churnCount} contratos`} />
