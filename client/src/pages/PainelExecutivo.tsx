@@ -10,6 +10,7 @@ import { SecaoReceita } from "./painel-executivo/SecaoReceita";
 import { SecaoChurn } from "./painel-executivo/SecaoChurn";
 import { SecaoLtLtv } from "./painel-executivo/SecaoLtLtv";
 import { SecaoCapacity } from "./painel-executivo/SecaoCapacity";
+import { SecaoEntregas } from "./painel-executivo/SecaoEntregas";
 
 const ABAS = [
   { value: "visao-geral", label: "Visão Geral" },
@@ -61,6 +62,8 @@ export default function PainelExecutivo() {
               <SecaoLtLtv mes={mes} />
             ) : a.value === "capacity" ? (
               <SecaoCapacity mes={mes} />
+            ) : a.value === "entregas" ? (
+              <SecaoEntregas mes={mes} />
             ) : (
               <div className="text-sm text-gray-500 dark:text-zinc-400">Em construção: {a.label} — {mes}</div>
             )}
