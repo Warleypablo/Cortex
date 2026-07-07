@@ -5,6 +5,7 @@ import { useSetPageInfo } from "@/contexts/PageContext";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { mesDefault, mesesOptions } from "./painel-executivo/temporalidade";
+import { SecaoVisaoGeral } from "./painel-executivo/SecaoVisaoGeral";
 
 const ABAS = [
   { value: "visao-geral", label: "Visão Geral" },
@@ -46,7 +47,11 @@ export default function PainelExecutivo() {
         </TabsList>
         {ABAS.map((a) => (
           <TabsContent key={a.value} value={a.value} className="mt-4">
-            <div className="text-sm text-gray-500 dark:text-zinc-400">Em construção: {a.label} — {mes}</div>
+            {a.value === "visao-geral" ? (
+              <SecaoVisaoGeral mes={mes} />
+            ) : (
+              <div className="text-sm text-gray-500 dark:text-zinc-400">Em construção: {a.label} — {mes}</div>
+            )}
           </TabsContent>
         ))}
       </Tabs>
