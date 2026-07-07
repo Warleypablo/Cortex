@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { ComposedChart, Bar, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, Legend } from "recharts";
 import { formatCurrencyCompact, formatCurrencyNoDecimals, formatPercent } from "@/lib/utils";
 import { KpiCard } from "./KpiCard";
+import { EmBreveCard } from "./EmBreveCard";
 import { useReportsMensal, useLtLtvOverview, useCeoDashboard } from "./hooks";
 
 export function SecaoVisaoGeral({ mes }: { mes: string }) {
@@ -65,6 +66,11 @@ export function SecaoVisaoGeral({ mes }: { mes: string }) {
           </ResponsiveContainer>
         </CardContent>
       </Card>
+
+      <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+        <EmBreveCard titulo="NPS" motivo="Fase 2 — requer fonte cortex_core.nps_clientes" />
+        <EmBreveCard titulo="Margem de Contribuição" motivo="Fase 2 — receita − custos de operação por squad" />
+      </div>
     </div>
   );
 }
