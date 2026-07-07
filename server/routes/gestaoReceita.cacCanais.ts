@@ -25,11 +25,11 @@ export interface CacCanalDef {
 
 // Catálogo fixo (spec 2026-07-02). Parceria ainda não tem source no CRM → clientes 0.
 export const CAC_CANAIS: CacCanalDef[] = [
-  { id: "inbound_pago", label: "Inbound pago", sources: ["WEBFORM", "ADVERTISING", "OTHER", "STORE"], itens: [{ id: "anuncios", label: "Investimento em anúncios", auto: "ads_spend" }] },
+  { id: "inbound_pago", label: "Inbound pago", sources: ["WEBFORM", "ADVERTISING", "STORE"], itens: [{ id: "anuncios", label: "Investimento em anúncios", auto: "ads_spend" }] },
   { id: "inbound_organico", label: "Inbound orgânico", sources: ["WEB", "CALL", "BOOKING", "EMAIL", "TRADE_SHOW", "instagram_organic"], itens: [] },
   { id: "outbound", label: "Outbound", sources: ["UC_YWZVA2"], itens: [{ id: "time", label: "Custo de time" }, { id: "ferramentas", label: "Ferramentas (Lemlist, Intexfy...)" }] },
   { id: "social_selling", label: "Social Selling", sources: ["UC_4VCKGM"], itens: [{ id: "anuncios_dist", label: "Anúncios p/ distribuição" }] },
-  { id: "reativacao", label: "Reativação", sources: ["UC_HIBVO6", "UC_8HI30Y"], itens: [{ id: "broadcast", label: "Disparos de broadcast" }, { id: "time", label: "Custo de time" }] },
+  { id: "reativacao", label: "Reativação", sources: ["UC_HIBVO6", "UC_8HI30Y", "OTHER"], itens: [{ id: "broadcast", label: "Disparos de broadcast" }, { id: "time", label: "Custo de time" }] },
   { id: "recomendacao", label: "Recomendação", sources: ["UC_PTYW1Y", "CALLBACK"], itens: [] },
   { id: "indique_ganhe", label: "Indique e ganhe", sources: ["RC_GENERATOR"], itens: [], incentivo: { label: "Incentivo", unitDefault: 1000 } },
   { id: "evento", label: "Evento", sources: ["RECOMMENDATION", "UC_KYOYOW"], itens: [{ id: "custo_evento", label: "Custo do evento (manual)" }] },
