@@ -2,6 +2,7 @@
 // Seção "CAC por canal — variáveis de custo" (aba Macro da Gestão de Receita).
 // CAC gerencial: custos manuais editáveis por mês (Editar metas) + incentivos
 // automáticos por cliente. Clientes = deals ganhos Bitrix por macro-canal.
+import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Filter } from "lucide-react";
 import { Fonte, MetaInput, Nota, BlockHead, SectionCard, brl, intBR, type MetasCtx } from "./gestaoUi";
@@ -9,15 +10,18 @@ import type { DrillRef } from "./GestaoReceitaDetalhe";
 
 export interface CacCanalItem { id: string; label: string; valor: number; fonte: "auto" | "manual" }
 export interface CacCanalCard {
-  id: string; label: string; clientes: number; custoTotal: number; cacCliente: number | null;
+  id: string; label: string; clientes: number; contratos: number; custoTotal: number;
+  cacCliente: number | null; cacContrato: number | null;
   sources: string[];
   itens: CacCanalItem[];
   incentivo?: { label: string; unit: number; qtd: number; total: number };
 }
 export interface CacCanaisData {
-  geral: { cac: number | null; clientes: number; custoTotal: number };
+  geral: { cac: number | null; cacContrato: number | null; clientes: number; contratos: number; custoTotal: number };
   canais: CacCanalCard[];
 }
+
+type ModoCac = "cliente" | "contrato";
 
 export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; metas: MetasCtx; onDrill: (dr: DrillRef) => void }) {
   // valores "ao vivo" durante a edição (mesma mecânica da tabela Custo da operação);
@@ -31,28 +35,55 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
   const incentivoVivo = (c: CacCanalCard) =>
     c.incentivo ? (metas.editando ? unitVivo(c) * c.incentivo.qtd : c.incentivo.total) : 0;
   const custoVivo = (c: CacCanalCard) => c.itens.reduce((a, it) => a + itemVivo(c, it), 0) + incentivoVivo(c);
+
+  // toggle global: denominador do CAC = clientes (deals ganhos) ou contratos
+  // (serviços vendidos, mesma régua do BP). Custo é invariante; só o divisor muda.
+  const [modo, setModo] = useState<ModoCac>("cliente");
+  const ehContrato = modo === "contrato";
+  const denom = (c: CacCanalCard) => (ehContrato ? c.contratos : c.clientes);
+  const denomLabel = ehContrato ? "contrato" : "cliente";
   const geralCusto = dados.canais.reduce((a, c) => a + custoVivo(c), 0);
-  const geralCac = dados.geral.clientes > 0 ? Math.round(geralCusto / dados.geral.clientes) : null;
+  const geralDenom = ehContrato ? dados.geral.contratos : dados.geral.clientes;
+  const geralCac = geralDenom > 0 ? Math.round(geralCusto / geralDenom) : null;
 
   return (
     <div>
-      <BlockHead icon={<Filter className="h-4 w-4" />} title="CAC por canal — variáveis de custo" />
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <BlockHead icon={<Filter className="h-4 w-4" />} title="CAC por canal — variáveis de custo" />
+        <div className="mb-3 inline-flex rounded-md border border-gray-200 p-0.5 text-xs font-semibold dark:border-zinc-700">
+          {(["cliente", "contrato"] as ModoCac[]).map((m) => (
+            <button
+              key={m}
+              type="button"
+              onClick={() => setModo(m)}
+              className={`rounded px-2.5 py-1 transition ${
+                modo === m
+                  ? "bg-teal-600 text-white"
+                  : "text-gray-500 hover:text-gray-700 dark:text-zinc-400 dark:hover:text-zinc-200"
+              }`}
+            >
+              {m === "cliente" ? "Por cliente" : "Por contrato"}
+            </button>
+          ))}
+        </div>
+      </div>
       <SectionCard>
         <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400">Como é calculado</div>
         <p className="mt-1 text-sm text-gray-600 dark:text-zinc-400">
-          CAC do canal = soma das variáveis de custo ÷ nº de clientes fechados do canal (Bitrix).
+          CAC do canal = soma das variáveis de custo ÷ nº de {ehContrato ? "contratos (serviços vendidos, régua do BP)" : "clientes fechados"} do canal (Bitrix).
           Custos manuais editáveis; incentivos por cliente automáticos.
         </p>
         <div className="mt-3 text-3xl font-bold tabular-nums text-teal-700 dark:text-teal-400">{geralCac != null ? brl(geralCac) : "—"}</div>
         <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400">
-          CAC geral · {intBR(dados.geral.clientes)} clientes
+          CAC geral · {intBR(geralDenom)} {ehContrato ? "contratos" : "clientes"}
         </div>
       </SectionCard>
 
       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
         {dados.canais.map((c) => {
           const custo = custoVivo(c);
-          const cac = c.clientes > 0 ? Math.round(custo / c.clientes) : null;
+          const d = denom(c);
+          const cac = d > 0 ? Math.round(custo / d) : null;
           return (
             <Card
               key={c.id}
@@ -64,7 +95,7 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
                   <span className="text-sm font-semibold text-gray-900 dark:text-white">{c.label}</span>
                   <span className="text-right">
                     <span className="block text-2xl font-bold tabular-nums text-teal-700 dark:text-teal-400">{cac != null ? brl(cac) : "—"}</span>
-                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-zinc-500">CAC / cliente</span>
+                    <span className="block text-[10px] font-semibold uppercase tracking-wide text-gray-400 dark:text-zinc-500">CAC / {denomLabel}</span>
                   </span>
                 </div>
 
@@ -104,7 +135,7 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
 
                 <div className="mt-1 flex items-center justify-between gap-2 border-t border-gray-100 pt-2 text-sm dark:border-zinc-800">
                   <span className="inline-flex items-center gap-1.5 text-gray-600 dark:text-zinc-400">
-                    Clientes <b className="tabular-nums text-gray-900 dark:text-white">{intBR(c.clientes)}</b> <Fonte tipo="bitrix" />
+                    {ehContrato ? "Contratos" : "Clientes"} <b className="tabular-nums text-gray-900 dark:text-white">{intBR(d)}</b> <Fonte tipo="bitrix" />
                   </span>
                   <span className="text-gray-600 dark:text-zinc-400">
                     Custo total <b className="tabular-nums text-gray-900 dark:text-white">{brl(custo)}</b>
@@ -120,7 +151,8 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
         Visão gerencial: custos informados manualmente por mês (botão "Editar metas", mês único) + itens automáticos.
         "Investimento em anúncios" (auto) = spend Meta + Google + TikTok + LinkedIn das contas da Turbo no período (competência, não caixa);
         incentivos por cliente também são automáticos. Não bate com o card "CAC — custo de aquisição" (Conta Azul, regime caixa) por design.
-        Parceria ainda não tem source no CRM (clientes 0). Deals de sources fora dos 10 canais (ex.: sem origem) ficam fora desta seção.
+        <b> Por cliente</b> divide pelo nº de deals ganhos; <b>Por contrato</b> divide pelo nº de serviços vendidos (mesma régua do BP: 1 serviço = 1 contrato; um deal com N serviços conta N) — sempre ≤ o CAC por cliente.
+        Parceria ainda não tem source no CRM (clientes 0). Deals de sources fora dos 9 canais (ex.: sem origem) ficam fora desta seção.
       </Nota>
 
       {/* De-para canal → origem: como cada macro-canal agrupa os sources do Bitrix
