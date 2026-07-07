@@ -1,6 +1,6 @@
 // server/routes/gestaoReceita.cacCanais.test.ts
 import { describe, expect, it } from "vitest";
-import { agregarCacCanais, CAC_CANAIS } from "./gestaoReceita.cacCanais";
+import { agregarCacCanais, CAC_CANAIS, contratosDoDeal } from "./gestaoReceita.cacCanais";
 
 const JUN = [6];
 const MAI_JUN = [5, 6];
@@ -16,7 +16,7 @@ describe("agregarCacCanais", () => {
       [],
       JUN,
     );
-    const inbound = out.canais.find((c) => c.id === "inbound_pago")!;
+    const inbound = out.canais.find((c) => c.id === "inbound")!;
     const outbound = out.canais.find((c) => c.id === "outbound")!;
     expect(inbound.clientes).toBe(6);
     expect(outbound.clientes).toBe(3);
@@ -91,11 +91,11 @@ describe("agregarCacCanais", () => {
   it("item automático (ads_spend): soma a série mensal, ignora override manual e marca fonte", () => {
     const out = agregarCacCanais(
       [{ source: "WEBFORM", mes: 6, clientes: 2 }],
-      [{ chave: "cac_canal:inbound_pago:anuncios", mes: 6, valor: 999999 }],
+      [{ chave: "cac_canal:inbound:anuncios", mes: 6, valor: 999999 }],
       MAI_JUN,
       { ads_spend: { 5: 10000, 6: 19500 } },
     );
-    const inbound = out.canais.find((c) => c.id === "inbound_pago")!;
+    const inbound = out.canais.find((c) => c.id === "inbound")!;
     const anuncios = inbound.itens.find((i) => i.id === "anuncios")!;
     expect(anuncios.valor).toBe(29500); // 10000 + 19500; override 999999 ignorado
     expect(anuncios.fonte).toBe("auto");
@@ -104,8 +104,61 @@ describe("agregarCacCanais", () => {
     expect(outbound.itens.every((i) => i.fonte === "manual")).toBe(true);
   });
 
-  it("retorna sempre os 10 canais na ordem do catálogo", () => {
+  it("retorna sempre todos os canais do catálogo na ordem", () => {
     const out = agregarCacCanais([], [], JUN);
     expect(out.canais.map((c) => c.id)).toEqual(CAC_CANAIS.map((c) => c.id));
+  });
+
+  it("fusão inbound: pago + orgânico agora somam no único canal 'inbound'", () => {
+    const out = agregarCacCanais(
+      [
+        { source: "WEBFORM", mes: 6, clientes: 2 },   // era inbound_pago
+        { source: "WEB", mes: 6, clientes: 3 },        // era inbound_organico
+        { source: "CALL", mes: 6, clientes: 1 },       // era inbound_organico
+      ],
+      [],
+      JUN,
+    );
+    expect(out.canais.find((c) => c.id === "inbound_pago")).toBeUndefined();
+    expect(out.canais.find((c) => c.id === "inbound_organico")).toBeUndefined();
+    expect(out.canais.find((c) => c.id === "inbound")!.clientes).toBe(6);
+  });
+
+  it("CAC por contrato: divide o custo pelo nº de contratos (serviços vendidos) do canal", () => {
+    const out = agregarCacCanais(
+      [
+        { source: "UC_YWZVA2", mes: 6, clientes: 1, contratos: 3 }, // outbound: 1 deal, 3 serviços
+        { source: "UC_YWZVA2", mes: 6, clientes: 1, contratos: 1 },
+      ],
+      [{ chave: "cac_canal:outbound:time", mes: 6, valor: 8000 }],
+      JUN,
+    );
+    const outbound = out.canais.find((c) => c.id === "outbound")!;
+    expect(outbound.clientes).toBe(2);
+    expect(outbound.contratos).toBe(4);
+    expect(outbound.cacCliente).toBe(4000);  // 8000 / 2
+    expect(outbound.cacContrato).toBe(2000); // 8000 / 4 — sempre ≤ CAC/cliente
+    expect(out.geral.contratos).toBe(4);
+    expect(out.geral.cacContrato).toBe(2000);
+  });
+
+  it("cacContrato null quando o canal não tem contratos", () => {
+    const out = agregarCacCanais([{ source: "UC_YWZVA2", mes: 6, clientes: 0, contratos: 0 }], [], JUN);
+    expect(out.canais.find((c) => c.id === "outbound")!.cacContrato).toBeNull();
+  });
+});
+
+describe("contratosDoDeal (régua do BP: 1 serviço vendido = 1 contrato)", () => {
+  it("conta 1 por serviço vendido mapeado (deal com N serviços → N)", () => {
+    // 846=Performance(rec), 852=Creators(rec), 868=E-commerce(pont)
+    expect(contratosDoDeal("[846,852,868]", 5000, 2000)).toBe(3);
+  });
+  it("conta repetições do mesmo segmento", () => {
+    expect(contratosDoDeal("[846,846]", 5000, 0)).toBe(2);
+  });
+  it("piso 1 para deal ganho sem serviço mapeado (com ou sem valor)", () => {
+    expect(contratosDoDeal(null, 5000, 0)).toBe(1);
+    expect(contratosDoDeal("[]", 0, 0)).toBe(1);
+    expect(contratosDoDeal("False", 0, 3000)).toBe(1);
   });
 });
