@@ -50,7 +50,8 @@ interface CsRow {
   util_fat_pct: number | null;
 }
 interface SquadGroup { squad: string; rows: CsRow[]; }
-interface CapacityTimesResponse {
+// Exportado para reuso por SecaoConsolidado.tsx (mesmo cast local de `capacity.data`).
+export interface CapacityTimesResponse {
   selva: SelvaRow[];
   black: ComercialRow[];
   squadra: ComercialRow[];

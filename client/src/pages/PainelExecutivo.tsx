@@ -6,6 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { cn } from "@/lib/utils";
 import { mesDefault, mesesOptions } from "./painel-executivo/temporalidade";
 import type { ScorecardModo } from "./painel-executivo/scorecard/Scorecard";
+import { SecaoConsolidado } from "./painel-executivo/SecaoConsolidado";
 import { SecaoVisaoGeral } from "./painel-executivo/SecaoVisaoGeral";
 import { SecaoReceita } from "./painel-executivo/SecaoReceita";
 import { SecaoChurn } from "./painel-executivo/SecaoChurn";
@@ -15,6 +16,7 @@ import { SecaoEntregas } from "./painel-executivo/SecaoEntregas";
 import { SecaoPerformance } from "./painel-executivo/SecaoPerformance";
 
 const ABAS = [
+  { value: "consolidado", label: "Consolidado" },
   { value: "visao-geral", label: "Visão Geral" },
   { value: "receita", label: "Receita" },
   { value: "churn", label: "Churn" },
@@ -98,7 +100,7 @@ export default function PainelExecutivo() {
         </Select>
       </header>
 
-      <Tabs defaultValue="visao-geral">
+      <Tabs defaultValue="consolidado">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <TabsList className="h-auto flex-1 flex-wrap justify-start gap-1 rounded-none border-b border-border bg-transparent p-0">
             {ABAS.map((a) => (
@@ -120,7 +122,9 @@ export default function PainelExecutivo() {
 
         {ABAS.map((a) => (
           <TabsContent key={a.value} value={a.value} className="mt-4">
-            {a.value === "visao-geral" ? (
+            {a.value === "consolidado" ? (
+              <SecaoConsolidado mes={mes} modo={modo} />
+            ) : a.value === "visao-geral" ? (
               <SecaoVisaoGeral mes={mes} modo={modo} />
             ) : a.value === "receita" ? (
               <SecaoReceita mes={mes} modo={modo} />

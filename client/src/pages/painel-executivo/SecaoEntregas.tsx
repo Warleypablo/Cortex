@@ -31,8 +31,8 @@ function labelMesCurto(mes: string): string {
 
 // Shape espelha o handler de GET /api/estoque-pontual/overview (server/routes/estoquePontual.ts),
 // confirmado lendo o SELECT — não há tipo compartilhado client/server para este endpoint
-// (mesmo cast local já usado na v1 desta seção).
-interface EstoqueOverview {
+// (mesmo cast local já usado na v1 desta seção). Exportado para reuso por SecaoConsolidado.tsx.
+export interface EstoqueOverview {
   valorEstoque: number;
   qtdItens: number;
   idadeMedia: number;
