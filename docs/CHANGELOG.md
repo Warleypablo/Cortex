@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-07 | feat(ads): lote "4 - Creators Summit - Creator" (TP1793-1798) — planilha + upload via API + ads na camp Teste de criativos Summit
+
+**O que foi feito:**
+- **Biblioteca:** 6 hooks pareados (Victor h1-3 = TP1793-1795, Lucas h1-3 = TP1796-1798) cadastrados, 1 linha/TP, produto=Creators, primário 9x16 + 4x5 na observação.
+- **Upload:** 12 vídeos GRANDES (~580-760MB cada, ~7,7GB total) baixados do Drive e subidos via `metaUploadVideo` chunked em 36,1min, 0 falhas — valida o fluxo 100% API também pra arquivos de +700MB (Esther/Lucas UGC eram ~125MB).
+- **Meta:** 2 conjuntos novos na camp `[TP] [Vendas] [CBO] [Quente] [Summit] - Teste de criativos` (`120251818147660450`, a MESMA do lote Empresário — campanha escolhida pelo Caio via pergunta): **16 [Victor]** (`120252865990690450`) e **17 [Lucas]** (`120252866012040450`), 6 ads pareados 9x16+4x5 via asset_feed_spec. Config+copy/link/UTM clonados do conjunto 12 do Empresário (copy real Summit ES, pixel PURCHASE, IG-only). **TUDO PAUSED — conjuntos E ads.**
+
+**Por que:**
+- A pasta do lote Creator tem estrutura idêntica à do Empresário e nunca tinha passado pelo fluxo (confirmado pelo `checa-summit-creator.ts`). Caio pediu a subida completa: planilha + Gerenciador.
+
+**Arquivos alterados:**
+- `scripts/ads/subir-summit-creator-{planilha,upload,ads}.ts` - os 3 passos do lote (novos)
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLI avulsos (tsx), DRY por padrão, idempotentes.
+
 ## 2026-07-07 | chore(ads): checagem read-only do lote "Creators Summit - Creator" — NÃO subido
 
 **O que foi feito:**
