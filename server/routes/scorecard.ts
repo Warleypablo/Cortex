@@ -4,7 +4,17 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { BP_2026_TARGETS } from "../okr2026/bp2026Targets";
 import { krs, type KRDef } from "../okr2026/okrRegistry";
-import { addMeses, listaMeses12, rowsParaSeries, rowsParaSeriesNullFill, type SeriePonto, type SeriePontoNullable, type SerieRow } from "./scorecard.helpers";
+import {
+  addMeses,
+  listaMeses12,
+  rowsParaSeries,
+  rowsParaSeriesNullFill,
+  normalizarNomeSquad,
+  encontrarSquadCorrespondente,
+  type SeriePonto,
+  type SeriePontoNullable,
+  type SerieRow,
+} from "./scorecard.helpers";
 
 export type ScorecardUnit = "BRL" | "PCT" | "COUNT";
 export type ScorecardDirection = "up" | "down";
@@ -138,11 +148,20 @@ export interface SeriesScorecard {
   churnPorOperador: Record<string, SeriePonto[]>;
   churnPorSquad: Record<string, SeriePonto[]>;
   entregasPorOperador: Record<string, SeriePonto[]>;
+  /** Entregas pontuais (deploy) por squad × mês — Onda C2, mesmo padrão de
+     `entregasPorOperador` trocando a dimensão (ver `fetchEntregasPorSquad`). */
+  entregasPorSquad: Record<string, SeriePonto[]>;
   mrrPorSquad: Record<string, SeriePonto[]>;
   mrrPorOperador: Record<string, SeriePonto[]>;
   /** Lead time médio de entrega (dias) por produto × mês — Onda5. Meses sem entrega ficam
      `null` (não 0, ver `rowsParaSeriesNullFill`). */
   leadTimePorProduto: Record<string, SeriePontoNullable[]>;
+  /** Headcount ATIVO por squad ("Inhire".rh_pessoal) — Onda C2. NÃO é uma série mensal (é o
+     headcount ATUAL, usado como denominador constante de "Receita por Cabeça por squad") — por
+     isso é `Record<squad, number>` em vez de `Record<squad, SeriePonto[]>`. Chaveado pela MESMA
+     forma (com emoji) usada em `mrrPorSquad`, para o frontend casar direto sem re-normalizar
+     (ver `fetchPessoasPorSquad`). */
+  pessoasPorSquad: Record<string, number>;
 }
 
 export interface ScorecardSeriesResult {
@@ -184,6 +203,50 @@ async function fetchEntregasPorOperador(inicio: string, fim: string): Promise<Se
     GROUP BY 1,2
   `);
   return result.rows as unknown as SerieRow[];
+}
+
+/** Entregas por squad (FLUXO — data de entrega), a partir de `cup_contratos` — mesmo padrão de
+   `fetchEntregasPorOperador` trocando a dimensão `responsavel` → `squad` (ver
+   `relatorioMensalSlides.ts`: "16b. Pontual entregue no mês por squad"). */
+async function fetchEntregasPorSquad(inicio: string, fim: string): Promise<SerieRow[]> {
+  const result = await db.execute(sql`
+    SELECT TO_CHAR(data_entrega,'YYYY-MM') AS mes, TRIM(squad) AS dim, SUM(valorp::numeric)::numeric AS valor
+    FROM "Clickup".cup_contratos
+    WHERE LOWER(TRIM(status))='entregue' AND data_entrega IS NOT NULL
+      AND data_entrega >= ${inicio}::date AND data_entrega < ${fim}::date
+      AND valorp::numeric > 0 AND squad IS NOT NULL AND TRIM(squad) <> ''
+    GROUP BY 1,2
+  `);
+  return result.rows as unknown as SerieRow[];
+}
+
+/**
+ * Headcount ATIVO por squad, a partir de `"Inhire".rh_pessoal` — não é FLUXO nem ESTOQUE
+ * histórico, é o headcount de HOJE (usado como denominador de "Receita por Cabeça por squad").
+ * `squadsMrr` são as chaves cruas (com emoji) já usadas em `mrrPorSquad` — o resultado sai
+ * casado com ELAS (normalização só do lado RH, via `normalizarNomeSquad`/
+ * `encontrarSquadCorrespondente`), para o frontend não precisar re-normalizar nada.
+ * Squads RH sem squad de receita correspondente (ex: "Vendas", time comercial sem MRR/entregas)
+ * ficam de fora do resultado — headcount deles não é atribuível a nenhuma linha do scorecard.
+ */
+async function fetchPessoasPorSquad(squadsMrr: string[]): Promise<Record<string, number>> {
+  const result = await db.execute(sql`
+    SELECT TRIM(squad) AS squad, COUNT(*)::int AS pessoas
+    FROM "Inhire".rh_pessoal
+    WHERE status = 'Ativo' AND squad IS NOT NULL AND TRIM(squad) <> ''
+    GROUP BY 1
+  `);
+
+  const squadsPorNorm = new Map<string, string>();
+  for (const squad of squadsMrr) squadsPorNorm.set(normalizarNomeSquad(squad), squad);
+
+  const pessoasPorSquad: Record<string, number> = {};
+  for (const row of result.rows as unknown as { squad: string; pessoas: number }[]) {
+    const squadRevenue = encontrarSquadCorrespondente(normalizarNomeSquad(row.squad), squadsPorNorm);
+    if (!squadRevenue) continue;
+    pessoasPorSquad[squadRevenue] = (pessoasPorSquad[squadRevenue] || 0) + Number(row.pessoas);
+  }
+  return pessoasPorSquad;
 }
 
 /**
@@ -231,9 +294,10 @@ async function fetchMrrPorDimensao(dim: MrrDim, inicio: string, fimUltimoMes: st
 }
 
 /**
- * Monta as 6 séries mensais por dimensão do modo Evolução, para a janela de 12 meses
+ * Monta as séries mensais por dimensão do modo Evolução, para a janela de 12 meses
  * terminando em `mes` (inclusive). Cada série vem com os 12 meses preenchidos (0 onde
- * não há dado) — ver `rowsParaSeries`.
+ * não há dado) — ver `rowsParaSeries`. Exceção: `pessoasPorSquad` não é série (é headcount
+ * ATUAL, ver `fetchPessoasPorSquad`).
  */
 export async function montarSeriesScorecard(mes: string): Promise<ScorecardSeriesResult> {
   const meses = listaMeses12(mes);
@@ -241,16 +305,22 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
   const fim = `${addMeses(mes, 1)}-01`;
   const fimUltimoMes = `${mes}-01`;
 
-  const [churnProdutoRows, churnOperadorRows, churnSquadRows, entregasRows, mrrSquadRows, mrrOperadorRows, leadTimeRows] =
+  const [churnProdutoRows, churnOperadorRows, churnSquadRows, entregasRows, entregasSquadRows, mrrSquadRows, mrrOperadorRows, leadTimeRows] =
     await Promise.all([
       fetchChurnPorDimensao("produto", inicio, fim),
       fetchChurnPorDimensao("responsavel_geral", inicio, fim),
       fetchChurnPorDimensao("squad", inicio, fim),
       fetchEntregasPorOperador(inicio, fim),
+      fetchEntregasPorSquad(inicio, fim),
       fetchMrrPorDimensao("squad", inicio, fimUltimoMes),
       fetchMrrPorDimensao("responsavel", inicio, fimUltimoMes),
       fetchLeadTimePorProduto(inicio, fim),
     ]);
+
+  const mrrPorSquad = rowsParaSeries(mrrSquadRows, meses);
+  // Depende das chaves de `mrrPorSquad` (squad cru, com emoji) para casar o headcount RH —
+  // por isso roda depois do Promise.all acima, não dentro dele.
+  const pessoasPorSquad = await fetchPessoasPorSquad(Object.keys(mrrPorSquad));
 
   return {
     series: {
@@ -258,9 +328,11 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
       churnPorOperador: rowsParaSeries(churnOperadorRows, meses),
       churnPorSquad: rowsParaSeries(churnSquadRows, meses),
       entregasPorOperador: rowsParaSeries(entregasRows, meses),
-      mrrPorSquad: rowsParaSeries(mrrSquadRows, meses),
+      entregasPorSquad: rowsParaSeries(entregasSquadRows, meses),
+      mrrPorSquad,
       mrrPorOperador: rowsParaSeries(mrrOperadorRows, meses),
       leadTimePorProduto: rowsParaSeriesNullFill(leadTimeRows, meses),
+      pessoasPorSquad,
     },
   };
 }

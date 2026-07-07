@@ -129,6 +129,72 @@ export function linhasPorDimensao(
   }));
 }
 
+export interface LinhasReceitaCabecaOpts {
+  /** Monta o `key` estável da linha a partir do nome da dimensão (squad/operador). */
+  keyFn: (dim: string) => string;
+  /** "YYYY-MM" → label curto (ex: "Jan"). */
+  labelMes: (mes: string) => string;
+  /** Resolve o headcount (denominador) de cada dimensão — para squad, o headcount RH casado
+     (`pessoasPorSquad` do backend); para operador, sempre 1 (o próprio operador é a "cabeça").
+     Retorno falsy (0/null/undefined) → a dimensão inteira (atual E todos os pontos da série)
+     fica `null` — guarda contra divisão por zero/Infinity/NaN em vez de mentir um valor. */
+  pessoasPorDim: (dim: string) => number | null | undefined;
+  /** Limita a quantidade de linhas (após ordenar por atual desc). Omitido = todas as dimensões. */
+  top?: number;
+  /** Quando true, marca o dono automático da linha como a própria dimensão (ex: operador). */
+  responsavelAuto?: boolean;
+}
+
+/**
+ * Constrói linhas de "Receita por Cabeça" por dimensão (squad ou operador) — Onda C2: combina
+ * MRR + entregas pontuais (deploy) da MESMA dimensão/mês e divide pelo headcount resolvido via
+ * `pessoasPorDim`. Como `linhasPorDimensao`, mas para uma métrica DERIVADA de duas séries (MRR e
+ * entregas) em vez de uma só — por isso não reaproveita aquela função diretamente.
+ *
+ * `entregasSeries` pode não ter a dimensão (squad/operador sem entrega no período) — tratado
+ * como 0 em cada mês, sem quebrar a série de MRR. `formato` é sempre "brl" e `metaKey` sempre
+ * "receita_cabeca" (a meta fixa de R$ 20.000 — ver OVERRIDES em server/routes/scorecard.ts):
+ * esta função só serve para esta métrica.
+ */
+export function linhasReceitaCabeca(
+  mrrSeries: Record<string, SerieDimPonto[]> | undefined,
+  entregasSeries: Record<string, SerieDimPonto[]> | undefined,
+  mes: string,
+  opts: LinhasReceitaCabecaOpts,
+): ScorecardRow[] {
+  if (!mrrSeries) return [];
+
+  const linhas = Object.entries(mrrSeries).map(([dim, mrrPontos]) => {
+    const pessoas = opts.pessoasPorDim(dim);
+    const entregasPorMes = new Map((entregasSeries?.[dim] ?? []).map((p) => [p.month, p.valor ?? 0]));
+
+    const ordenados = [...mrrPontos].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+    const serie: ScorecardSeriePonto[] = ordenados.map((p) => {
+      const bruto = (p.valor ?? 0) + (entregasPorMes.get(p.month) ?? 0);
+      const valor = pessoas ? bruto / pessoas : null;
+      return { month: p.month, label: opts.labelMes(p.month), valor };
+    });
+
+    const pontoAtual = serie.find((p) => p.month === mes) ?? [...serie].reverse().find((p) => p.month! <= mes);
+    const atual = pontoAtual ? pontoAtual.valor : null;
+    return { dim, atual, serie };
+  });
+
+  linhas.sort((a, b) => (b.atual ?? -Infinity) - (a.atual ?? -Infinity));
+  const limitadas = typeof opts.top === "number" ? linhas.slice(0, opts.top) : linhas;
+
+  return limitadas.map(({ dim, atual, serie }) => ({
+    key: opts.keyFn(dim),
+    metrica: dim,
+    atual,
+    formato: "brl",
+    serie,
+    metaKey: "receita_cabeca",
+    temporalidade: "mes",
+    responsavelAuto: opts.responsavelAuto ? dim : undefined,
+  }));
+}
+
 export interface OverviewSeriePonto {
   month: string;
   valor: number;

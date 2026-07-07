@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcStatus, deltaM1, formatValor, linhasPorDimensao, serieOverviewLtLtv } from "./logica";
+import { calcStatus, deltaM1, formatValor, linhasPorDimensao, linhasReceitaCabeca, serieOverviewLtLtv } from "./logica";
 import type { EvolucaoProdutoTabelaData } from "@/components/lt-ltv-churn/types";
 
 describe("calcStatus", () => {
@@ -180,6 +180,118 @@ describe("linhasPorDimensao", () => {
     ]);
     // "Social Media" (atual=20) ordena antes de "Performance" (atual=null → -Infinity).
     expect(linhas.map((l) => l.metrica)).toEqual(["Social Media", "Performance"]);
+  });
+});
+
+describe("linhasReceitaCabeca", () => {
+  const labelMes = (mes: string) => `L-${mes.split("-")[1]}`;
+
+  it("mrrSeries undefined → []", () => {
+    expect(
+      linhasReceitaCabeca(undefined, undefined, "2026-06", {
+        keyFn: (d) => d,
+        labelMes,
+        pessoasPorDim: () => 1,
+      }),
+    ).toEqual([]);
+  });
+
+  it("combina MRR + entregas da mesma dimensão/mês e divide pelo headcount", () => {
+    const mrr = { Squadra: [{ month: "2026-06", valor: 100000 }] };
+    const entregas = { Squadra: [{ month: "2026-06", valor: 20000 }] };
+    const linhas = linhasReceitaCabeca(mrr, entregas, "2026-06", {
+      keyFn: (d) => `k_${d}`,
+      labelMes,
+      pessoasPorDim: () => 6,
+    });
+    // (100000 + 20000) / 6 = 20000
+    expect(linhas[0].atual).toBe(20000);
+    expect(linhas[0].serie).toEqual([{ month: "2026-06", valor: 20000, label: "L-06" }]);
+  });
+
+  it("squad sem entrega no mês trata entregasSeries ausente como 0 (não quebra a série de MRR)", () => {
+    const mrr = { Squadra: [{ month: "2026-06", valor: 60000 }] };
+    const linhas = linhasReceitaCabeca(mrr, undefined, "2026-06", {
+      keyFn: (d) => d,
+      labelMes,
+      pessoasPorDim: () => 3,
+    });
+    expect(linhas[0].atual).toBe(20000);
+  });
+
+  it("headcount 0/null/undefined → dimensão inteira (atual e todos os pontos da série) fica null — guarda divisão por zero", () => {
+    const mrr = { "Não Informado": [{ month: "2026-05", valor: 100 }, { month: "2026-06", valor: 200 }] };
+    const semHeadcount = linhasReceitaCabeca(mrr, undefined, "2026-06", {
+      keyFn: (d) => d,
+      labelMes,
+      pessoasPorDim: () => undefined,
+    });
+    expect(semHeadcount[0].atual).toBeNull();
+    expect(semHeadcount[0].serie?.every((p) => p.valor === null)).toBe(true);
+
+    const headcountZero = linhasReceitaCabeca(mrr, undefined, "2026-06", {
+      keyFn: (d) => d,
+      labelMes,
+      pessoasPorDim: () => 0,
+    });
+    expect(headcountZero[0].atual).toBeNull();
+  });
+
+  it("ordena por atual desc", () => {
+    const mrr = {
+      Squadra: [{ month: "2026-06", valor: 100000 }],
+      Pulse: [{ month: "2026-06", valor: 300000 }],
+    };
+    const linhas = linhasReceitaCabeca(mrr, undefined, "2026-06", {
+      keyFn: (d) => d,
+      labelMes,
+      pessoasPorDim: () => 10,
+    });
+    expect(linhas.map((l) => l.metrica)).toEqual(["Pulse", "Squadra"]);
+  });
+
+  it("top limita a quantidade de linhas após ordenar", () => {
+    const mrr = {
+      A: [{ month: "2026-06", valor: 10 }],
+      B: [{ month: "2026-06", valor: 30 }],
+      C: [{ month: "2026-06", valor: 20 }],
+    };
+    const linhas = linhasReceitaCabeca(mrr, undefined, "2026-06", {
+      keyFn: (d) => d,
+      labelMes,
+      pessoasPorDim: () => 1,
+      top: 2,
+    });
+    expect(linhas.map((l) => l.metrica)).toEqual(["B", "C"]);
+  });
+
+  it("responsavelAuto marca a própria dimensão como dono (uso: operador, pessoasPorDim=()=>1)", () => {
+    const mrr = { Ana: [{ month: "2026-06", valor: 20000 }] };
+    const linhas = linhasReceitaCabeca(mrr, undefined, "2026-06", {
+      keyFn: (d) => d,
+      labelMes,
+      pessoasPorDim: () => 1,
+      responsavelAuto: true,
+    });
+    expect(linhas[0].responsavelAuto).toBe("Ana");
+    expect(linhas[0].atual).toBe(20000);
+  });
+
+  it("metaKey sempre 'receita_cabeca' e formato sempre 'brl'", () => {
+    const mrr = { Squadra: [{ month: "2026-06", valor: 100 }] };
+    const linhas = linhasReceitaCabeca(mrr, undefined, "2026-06", { keyFn: (d) => d, labelMes, pessoasPorDim: () => 1 });
+    expect(linhas[0].metaKey).toBe("receita_cabeca");
+    expect(linhas[0].formato).toBe("brl");
+  });
+
+  it("mes selecionado ausente na série → usa o último ponto <= mes", () => {
+    const mrr = { Squadra: [{ month: "2026-04", valor: 10 }, { month: "2026-05", valor: 20 }] };
+    const linhas = linhasReceitaCabeca(mrr, undefined, "2026-06", {
+      keyFn: (d) => d,
+      labelMes,
+      pessoasPorDim: () => 1,
+    });
+    expect(linhas[0].atual).toBe(20);
   });
 });
 

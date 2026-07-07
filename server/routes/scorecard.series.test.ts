@@ -1,5 +1,12 @@
 import { describe, it, expect } from "vitest";
-import { addMeses, listaMeses12, rowsParaSeries, rowsParaSeriesNullFill } from "./scorecard.helpers";
+import {
+  addMeses,
+  listaMeses12,
+  rowsParaSeries,
+  rowsParaSeriesNullFill,
+  normalizarNomeSquad,
+  encontrarSquadCorrespondente,
+} from "./scorecard.helpers";
 
 describe("addMeses", () => {
   it("soma meses dentro do mesmo ano", () => {
@@ -131,5 +138,68 @@ describe("rowsParaSeriesNullFill", () => {
 
   it("retorna objeto vazio quando não há linhas", () => {
     expect(rowsParaSeriesNullFill([], meses)).toEqual({});
+  });
+});
+
+describe("normalizarNomeSquad", () => {
+  it("remove emoji e colapsa espaço, minúsculas — caso simples", () => {
+    expect(normalizarNomeSquad("🪖 Selva")).toBe("selva");
+    expect(normalizarNomeSquad("Selva")).toBe("selva");
+  });
+
+  it("mantém letras de sufixo '(OFF)' mas remove os parênteses (& e . preservados)", () => {
+    expect(normalizarNomeSquad("✨ Aura (OFF)")).toBe("aura off");
+    expect(normalizarNomeSquad("📊 CX&CS")).toBe("cx&cs");
+    expect(normalizarNomeSquad("Squad I.A")).toBe("squad i.a");
+  });
+
+  it("remove diacríticos (ex: 'Não Informado')", () => {
+    expect(normalizarNomeSquad("Não Informado")).toBe("nao informado");
+  });
+
+  it("null/undefined/vazio → string vazia", () => {
+    expect(normalizarNomeSquad("")).toBe("");
+    expect(normalizarNomeSquad(null as unknown as string)).toBe("");
+    expect(normalizarNomeSquad(undefined as unknown as string)).toBe("");
+  });
+
+  it("variante com caractere invisível antes do nome (ex: '️ Squadra') normaliza igual à com emoji", () => {
+    expect(normalizarNomeSquad("️ Squadra")).toBe(normalizarNomeSquad("⚓️ Squadra"));
+  });
+});
+
+describe("encontrarSquadCorrespondente", () => {
+  const squadsPorNorm = new Map<string, string>([
+    ["selva", "🪖 Selva"],
+    ["squadra", "⚓️ Squadra"],
+    ["aura", "✨ Aura"],
+    ["aura off", "✨ Aura (OFF)"],
+    ["aurea off", "🌟 Aurea (OFF)"],
+    ["black", "🐑 Black"],
+  ]);
+
+  it("match exato tem prioridade sobre prefixo", () => {
+    expect(encontrarSquadCorrespondente("aura", squadsPorNorm)).toBe("✨ Aura");
+    expect(encontrarSquadCorrespondente("selva", squadsPorNorm)).toBe("🪖 Selva");
+  });
+
+  it("cai para o melhor match por prefixo quando não há exato (ex: 'Black Sheep' RH → 'Black' revenue)", () => {
+    expect(encontrarSquadCorrespondente("black sheep", squadsPorNorm)).toBe("🐑 Black");
+  });
+
+  it("não confunde squads com prefixo parecido ('aura' vs 'aurea off') no fallback por prefixo", () => {
+    // Sem o match exato "aura", cai no fallback por prefixo — "aura" é prefixo de "aura off"
+    // mas NÃO de "aurea off" (4º caractere diverge: a-u-r-A vs a-u-r-E) — não deve casar com Aurea.
+    const semExato = new Map(squadsPorNorm);
+    semExato.delete("aura");
+    expect(encontrarSquadCorrespondente("aura", semExato)).toBe("✨ Aura (OFF)");
+  });
+
+  it("sem nenhum squad de receita correspondente → null (ex: squad comercial 'Vendas')", () => {
+    expect(encontrarSquadCorrespondente("vendas", squadsPorNorm)).toBeNull();
+  });
+
+  it("chave normalizada vazia → null", () => {
+    expect(encontrarSquadCorrespondente("", squadsPorNorm)).toBeNull();
   });
 });

@@ -8,12 +8,19 @@ import {
   useContribuicaoSquadRanking,
   type ContribuicaoSquadRankingResponse,
 } from "./hooks";
-import { linhasPorDimensao } from "./scorecard/logica";
+import { linhasPorDimensao, linhasReceitaCabeca } from "./scorecard/logica";
 import { formatPercent } from "@/lib/utils";
 import type { CeoKpi } from "@/components/ceo/CeoKpiCard";
 import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/** Onda C2: aviso de não-reconciliação exibido nas 2 seções de "Receita por Cabeça" por
+   dimensão — usam MRR ativo + entregas deploy ÷ headcount RH, uma base DIFERENTE da seção
+   "Receita por Cabeça (mês)" geral acima (receita em CAIXA ÷ headcount total do
+   /api/ceo-dashboard). Não são a mesma métrica reconciliada em granularidades diferentes. */
+const AVISO_RECEITA_CABECA_DIMENSAO =
+  'Base = MRR ativo + entregas pontuais (deploy) ÷ pessoas (rh_pessoal). NÃO reconcilia com o "Receita por Cabeça (mês)" geral acima, que usa receita em CAIXA ÷ headcount total.';
 
 /** "YYYY-MM" → label curto (ex: "Jan") — mesmo padrão de `labelMesCurto` em SecaoChurn.tsx/
    SecaoEntregas.tsx (duplicado localmente, não há util compartilhado entre seções). */
@@ -79,6 +86,51 @@ export function montarSecoesCapacity(
         temporalidade: "mes",
       },
     ],
+  };
+
+  // Onda C2: Receita por Cabeça por squad/operador — (MRR ativo + entregas pontuais deploy) ÷
+  // headcount, com série mensal real (mesma fonte de "MRR por squad/operador (evolução)" abaixo
+  // + entregas). Denominador de squad = headcount RH casado por `pessoasPorSquad` (constante,
+  // não série); de operador = 1 (o próprio operador). NÃO reconcilia com "Receita por Cabeça
+  // (mês)" geral acima — ver `AVISO_RECEITA_CABECA_DIMENSAO`.
+  const receitaCabecaSquadRows: ScorecardRow[] = linhasReceitaCabeca(
+    series.data?.series.mrrPorSquad,
+    series.data?.series.entregasPorSquad,
+    mes,
+    {
+      keyFn: (dim) => `capacity_receita_cabeca_squad_${slug(dim)}`,
+      labelMes: labelMesCurto,
+      pessoasPorDim: (dim) => series.data?.series.pessoasPorSquad?.[dim],
+    },
+  );
+  const secaoReceitaCabecaSquad: ScorecardSection = {
+    id: "capacity-receita-cabeca-squad",
+    titulo: "Receita por Cabeça — por squad",
+    subtitulo: series.isError
+      ? "falha ao carregar série por squad"
+      : AVISO_RECEITA_CABECA_DIMENSAO,
+    linhas: receitaCabecaSquadRows,
+  };
+
+  const receitaCabecaOperadorRows: ScorecardRow[] = linhasReceitaCabeca(
+    series.data?.series.mrrPorOperador,
+    series.data?.series.entregasPorOperador,
+    mes,
+    {
+      keyFn: (dim) => `capacity_receita_cabeca_operador_${slug(dim)}`,
+      labelMes: labelMesCurto,
+      pessoasPorDim: () => 1,
+      top: 10,
+      responsavelAuto: true,
+    },
+  );
+  const secaoReceitaCabecaOperador: ScorecardSection = {
+    id: "capacity-receita-cabeca-operador",
+    titulo: "Receita por Cabeça — por operador",
+    subtitulo: series.isError
+      ? "falha ao carregar série por operador"
+      : AVISO_RECEITA_CABECA_DIMENSAO,
+    linhas: receitaCabecaOperadorRows,
   };
 
   // Onda C1: Margem de Contribuição (Geral + por squad) — GET /api/contribuicao-squad/ranking.
@@ -192,7 +244,15 @@ export function montarSecoesCapacity(
     linhas: mrrOperadorRows,
   };
 
-  return [secaoReceitaCabeca, secaoContribuicaoGeral, secaoContribuicaoSquad, secaoMrrSquad, secaoMrrOperador];
+  return [
+    secaoReceitaCabeca,
+    secaoReceitaCabecaSquad,
+    secaoReceitaCabecaOperador,
+    secaoContribuicaoGeral,
+    secaoContribuicaoSquad,
+    secaoMrrSquad,
+    secaoMrrOperador,
+  ];
 }
 
 export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo }) {

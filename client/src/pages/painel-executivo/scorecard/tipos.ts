@@ -83,9 +83,16 @@ export interface ScorecardSeriesPorDimensao {
   churnPorOperador: Record<string, ScorecardSerieDimPonto[]>;
   churnPorSquad: Record<string, ScorecardSerieDimPonto[]>;
   entregasPorOperador: Record<string, ScorecardSerieDimPonto[]>;
+  /** Entregas pontuais (deploy) por squad × mês — Onda C2 (mesmo padrão de entregasPorOperador,
+     dimensão squad). */
+  entregasPorSquad: Record<string, ScorecardSerieDimPonto[]>;
   mrrPorSquad: Record<string, ScorecardSerieDimPonto[]>;
   mrrPorOperador: Record<string, ScorecardSerieDimPonto[]>;
   leadTimePorProduto: Record<string, ScorecardSerieDimPontoNullable[]>;
+  /** Headcount ATIVO por squad ("Inhire".rh_pessoal) — Onda C2. NÃO é série mensal (headcount
+     ATUAL, denominador constante de "Receita por Cabeça por squad"). Chaveado pela MESMA forma
+     (com emoji) usada em `mrrPorSquad` — ver `fetchPessoasPorSquad` no backend. */
+  pessoasPorSquad: Record<string, number>;
 }
 
 export interface ScorecardSeriesResponse {

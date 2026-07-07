@@ -90,3 +90,55 @@ export function rowsParaSeriesNullFill(rows: SerieRow[], meses: string[]): Recor
   }
   return out;
 }
+
+/**
+ * Normaliza um nome de squad para permitir casar fontes com formatações diferentes — ex.:
+ * `"Inhire".rh_pessoal.squad` (sem emoji, ex: "Selva") vs `"Clickup".cup_data_hist/
+ * cup_contratos.squad` (com emoji, ex: "🪖 Selva"). Mesma lógica de `stripEmoji` usada em
+ * `server/routes.ts` (~L6300, casamento colaborador RH → squad de receita nas despesas do
+ * Relatório Mensal) — reaproveitada aqui para casar headcount RH → squad de MRR.
+ * Mantém letras/números/espaço/`.`/`&`/`+` (remove emoji e demais pontuação), colapsa espaços
+ * repetidos, minúsculas. Ex.: "✨ Aura (OFF)" → "aura off" (o sufixo "(OFF)" perde os parênteses
+ * mas as letras "off" ficam — ver `encontrarSquadCorrespondente` para o match por prefixo que
+ * cobre esse caso quando não há variante ativa sem o sufixo).
+ *
+ * Usa `\w` (sem flag `u`/`\p{L}`) de propósito — o `tsconfig.json` do projeto não declara
+ * `target` (default ES3), e `\p{...}` exige ES2018+ (TS1501). Diacríticos (ã, ç, ...) são
+ * tratados via `normalize("NFD")` + remoção das marcas combinantes antes do filtro de `\w`.
+ */
+export function normalizarNomeSquad(s: string): string {
+  return (s || "")
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^\w\s.&+]/g, "")
+    .replace(/\s+/g, " ")
+    .trim()
+    .toLowerCase();
+}
+
+/**
+ * Casa uma chave de squad já normalizada (lado RH) contra o mapa {squadNormalizado →
+ * squadOriginal} derivado das chaves de `mrrPorSquad` (fonte da verdade dos nomes de squad
+ * exibidos no scorecard). Tenta match exato primeiro; se não achar, cai para o melhor match por
+ * prefixo (mais longo) — cobre casos como "Black Sheep" (RH) → "🐑 Black" (revenue) ou "Aura"
+ * (RH) → "✨ Aura (OFF)" (revenue) quando não há variante ativa sem o sufixo "(OFF)".
+ * `null` quando nenhum squad de receita casa (ex.: "Vendas", squad comercial sem MRR/entregas
+ * registrado) — o headcount desse squad fica de fora do resultado.
+ */
+export function encontrarSquadCorrespondente(normKey: string, squadsPorNorm: Map<string, string>): string | null {
+  if (!normKey) return null;
+  if (squadsPorNorm.has(normKey)) return squadsPorNorm.get(normKey)!;
+
+  let melhor: string | null = null;
+  let melhorLen = 0;
+  for (const [norm, original] of Array.from(squadsPorNorm.entries())) {
+    if (normKey.startsWith(norm) || norm.startsWith(normKey)) {
+      const len = Math.min(normKey.length, norm.length);
+      if (len > melhorLen) {
+        melhorLen = len;
+        melhor = original;
+      }
+    }
+  }
+  return melhor;
+}
