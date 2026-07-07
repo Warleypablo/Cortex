@@ -120,16 +120,32 @@ export function montarSecoesEntregas(
     responsavelAuto: true,
   });
 
-  const leadTimeRows: ScorecardRow[] = [...p.tempoMedioEntrega]
-    .sort((a, b) => b.diasMedio - a.diasMedio)
-    .map((t) => ({
-      key: `entregas_leadtime_${slug(t.produto)}`,
-      metrica: t.produto,
-      sub: `dias · ${t.contratos} contratos`,
-      atual: t.diasMedio,
-      formato: "int",
-      temporalidade: "mes",
-    }));
+  // Onda5: série mensal de lead time por produto (server/routes/scorecard.ts). Meses sem
+  // entrega vêm `null` (não 0 — ver rowsParaSeriesNullFill), então `atual`/`serie` já
+  // "não mentem" sem tratamento extra aqui (linhasPorDimensao e o resto da cadeia do
+  // Scorecard já são null-aware). Degradação graciosa: se `series` ainda não carregou/falhou
+  // (ou o backend não devolveu a dimensão), cai no agregado antigo (`tempoMedioEntrega`,
+  // janela 6m, sem série) — mesmo comportamento de antes desta Onda.
+  const leadTimeSeries = series?.series.leadTimePorProduto;
+  const temSerieLeadTime = !!leadTimeSeries && Object.keys(leadTimeSeries).length > 0;
+  const leadTimeRows: ScorecardRow[] =
+    temSerieLeadTime
+      ? linhasPorDimensao(leadTimeSeries!, mes, {
+          keyFn: (dim) => `entregas_leadtime_${slug(dim)}`,
+          formato: "int",
+          labelMes: labelMesCurto,
+          sub: () => "dias",
+        })
+      : [...p.tempoMedioEntrega]
+          .sort((a, b) => b.diasMedio - a.diasMedio)
+          .map((t) => ({
+            key: `entregas_leadtime_${slug(t.produto)}`,
+            metrica: t.produto,
+            sub: `dias · ${t.contratos} contratos`,
+            atual: t.diasMedio,
+            formato: "int",
+            temporalidade: "mes",
+          }));
 
   return [
     {
@@ -193,13 +209,18 @@ export function montarSecoesEntregas(
           metrica: "Entregue no mês",
           atual: p.entregasMes.total,
           formato: "brl",
+          // Mesma série já usada em "Entregue (R$)" no resumo — antes esta linha não tinha
+          // série (caía em "sem série" no modo Evolução).
+          serie: serieComLabel<EntregaProdutoMes>(p.entregasPorProdutoMes, (r) => r.total),
           temporalidade: "mes",
         },
       ],
     },
     {
       id: "entregas-leadtime",
-      titulo: "Lead time por produto (janela 6m)",
+      // Título depende da fonte: série mensal (janela 12m, como as demais seções do modo
+      // Evolução) quando disponível; agregado antigo (janela 6m fixa, sem série) no fallback.
+      titulo: temSerieLeadTime ? "Lead time por produto" : "Lead time por produto (janela 6m)",
       linhas: leadTimeRows,
     },
   ];

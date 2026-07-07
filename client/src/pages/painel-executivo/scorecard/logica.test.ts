@@ -165,6 +165,22 @@ describe("linhasPorDimensao", () => {
     const linhas = linhasPorDimensao(series, "2026-06", { keyFn: (d) => d, formato: "brl", labelMes });
     expect(linhas[0].temporalidade).toBe("mes");
   });
+
+  it("ponto do mês selecionado com valor null (ex: lead time sem entrega no mês) → atual null, sem quebrar ordenação/serie", () => {
+    const series = {
+      Performance: [{ month: "2026-05", valor: 12 }, { month: "2026-06", valor: null }],
+      "Social Media": [{ month: "2026-05", valor: 8 }, { month: "2026-06", valor: 20 }],
+    };
+    const linhas = linhasPorDimensao(series, "2026-06", { keyFn: (d) => d, formato: "int", labelMes });
+    const performance = linhas.find((l) => l.metrica === "Performance");
+    expect(performance?.atual).toBeNull();
+    expect(performance?.serie).toEqual([
+      { month: "2026-05", valor: 12, label: "L-05" },
+      { month: "2026-06", valor: null, label: "L-06" },
+    ]);
+    // "Social Media" (atual=20) ordena antes de "Performance" (atual=null → -Infinity).
+    expect(linhas.map((l) => l.metrica)).toEqual(["Social Media", "Performance"]);
+  });
 });
 
 describe("serieOverviewLtLtv", () => {

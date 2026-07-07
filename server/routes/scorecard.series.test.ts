@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { addMeses, listaMeses12, rowsParaSeries } from "./scorecard.helpers";
+import { addMeses, listaMeses12, rowsParaSeries, rowsParaSeriesNullFill } from "./scorecard.helpers";
 
 describe("addMeses", () => {
   it("soma meses dentro do mesmo ano", () => {
@@ -87,5 +87,49 @@ describe("rowsParaSeries", () => {
 
   it("retorna objeto vazio quando não há linhas", () => {
     expect(rowsParaSeries([], meses)).toEqual({});
+  });
+});
+
+describe("rowsParaSeriesNullFill", () => {
+  const meses = listaMeses12("2026-03"); // 2025-04 .. 2026-03
+
+  it("preenche meses SEM dado com null (não 0) — ex: lead time, mês sem entrega", () => {
+    const rows = [{ mes: "2026-03", dim: "Performance", valor: 12 }];
+    const series = rowsParaSeriesNullFill(rows, meses);
+    expect(series["Performance"]).toHaveLength(12);
+    expect(series["Performance"][11]).toEqual({ month: "2026-03", valor: 12 });
+    expect(series["Performance"].slice(0, 11).every((p) => p.valor === null)).toBe(true);
+  });
+
+  it("mantém a ordem cronológica dos meses no array de pontos", () => {
+    const rows = [
+      { mes: "2025-04", dim: "Makers", valor: 5 },
+      { mes: "2026-03", dim: "Makers", valor: 8 },
+    ];
+    const series = rowsParaSeriesNullFill(rows, meses);
+    expect(series["Makers"].map((p) => p.month)).toEqual(meses);
+    expect(series["Makers"][0].valor).toBe(5);
+    expect(series["Makers"][11].valor).toBe(8);
+  });
+
+  it("separa séries por dimensão", () => {
+    const rows = [
+      { mes: "2026-01", dim: "Alice", valor: 10 },
+      { mes: "2026-01", dim: "Bob", valor: 20 },
+    ];
+    const series = rowsParaSeriesNullFill(rows, meses);
+    expect(Object.keys(series).sort()).toEqual(["Alice", "Bob"]);
+    expect(series["Alice"].find((p) => p.month === "2026-01")?.valor).toBe(10);
+    expect(series["Bob"].find((p) => p.month === "2026-01")?.valor).toBe(20);
+  });
+
+  it("aceita valor como string (retorno cru do driver pg para numeric)", () => {
+    const rows = [{ mes: "2026-03", dim: "Performance", valor: "12.0" }];
+    const series = rowsParaSeriesNullFill(rows, meses);
+    expect(series["Performance"][11].valor).toBeCloseTo(12);
+  });
+
+  it("retorna objeto vazio quando não há linhas", () => {
+    expect(rowsParaSeriesNullFill([], meses)).toEqual({});
   });
 });

@@ -64,10 +64,13 @@ export function deltaM1(serie?: DeltaM1Ponto[] | null): DeltaM1Result | null {
 
 /** Ponto cru de uma série mensal por dimensão — mesmo shape devolvido por
    GET /api/scorecard/series (server/routes/scorecard.helpers.ts: `SeriePonto`). Sem `label`
-   (o backend só manda `month`) — quem consome decide como abreviar o mês. */
+   (o backend só manda `month`) — quem consome decide como abreviar o mês. `valor` aceita
+   `null` (ex: `leadTimePorProduto`, onde mês sem entrega não deve virar 0 — ver
+   `rowsParaSeriesNullFill`); séries que nunca têm null (churn/mrr/entregas) continuam
+   compatíveis, `number` é atribuível a `number | null`. */
 export interface SerieDimPonto {
   month: string;
-  valor: number;
+  valor: number | null;
 }
 
 export interface LinhasPorDimensaoOpts {

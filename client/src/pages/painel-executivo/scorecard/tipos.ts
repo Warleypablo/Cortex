@@ -70,6 +70,14 @@ export interface ScorecardSerieDimPonto {
   valor: number;
 }
 
+// Lead time (dias) por produto × mês — meses sem entrega ficam `null` (não 0, ver
+// `rowsParaSeriesNullFill` em server/routes/scorecard.helpers.ts): "0 dias" mentiria,
+// sugerindo entrega instantânea, quando na verdade não houve nenhuma entrega no mês.
+export interface ScorecardSerieDimPontoNullable {
+  month: string;
+  valor: number | null;
+}
+
 export interface ScorecardSeriesPorDimensao {
   churnPorProduto: Record<string, ScorecardSerieDimPonto[]>;
   churnPorOperador: Record<string, ScorecardSerieDimPonto[]>;
@@ -77,6 +85,7 @@ export interface ScorecardSeriesPorDimensao {
   entregasPorOperador: Record<string, ScorecardSerieDimPonto[]>;
   mrrPorSquad: Record<string, ScorecardSerieDimPonto[]>;
   mrrPorOperador: Record<string, ScorecardSerieDimPonto[]>;
+  leadTimePorProduto: Record<string, ScorecardSerieDimPontoNullable[]>;
 }
 
 export interface ScorecardSeriesResponse {

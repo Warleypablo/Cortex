@@ -4,6 +4,14 @@ export interface SeriePonto {
   valor: number;
 }
 
+/** Como `SeriePonto`, mas para métricas onde a AUSÊNCIA de dado no mês não deve virar 0 (ex:
+   lead time médio de entrega — "0 dias" mentiria, sugerindo entrega instantânea, quando na
+   verdade não houve nenhuma entrega naquele mês/produto para calcular a média). */
+export interface SeriePontoNullable {
+  month: string;
+  valor: number | null;
+}
+
 /** Linha crua retornada pelas queries de série (mes/dim/valor), antes do preenchimento de meses. */
 export interface SerieRow {
   mes: string;
@@ -55,6 +63,30 @@ export function rowsParaSeries(rows: SerieRow[], meses: string[]): Record<string
   const out: Record<string, SeriePonto[]> = {};
   for (const [dim, valoresPorMes] of Array.from(porDim.entries())) {
     out[dim] = meses.map((month) => ({ month, valor: valoresPorMes.get(month) || 0 }));
+  }
+  return out;
+}
+
+/**
+ * Como `rowsParaSeries`, mas preenche meses sem dado com `null` em vez de 0 — para métricas
+ * tipo média (ex: lead time), onde "sem observação no mês" é semanticamente diferente de
+ * "0 dias/reais". O frontend já trata `valor: null` como "sem dado" em toda a cadeia do modo
+ * Evolução (Sparkline filtra, deltaM1 filtra, TabelaEvolucao renderiza "—").
+ *
+ * Diferente de `rowsParaSeries`, não soma linhas duplicadas de (dim,mes) — as queries que
+ * alimentam esta função já agregam com `GROUP BY mes, dim` no SQL (1 linha por combinação),
+ * então uma segunda linha para a mesma chave apenas sobrescreve a primeira.
+ */
+export function rowsParaSeriesNullFill(rows: SerieRow[], meses: string[]): Record<string, SeriePontoNullable[]> {
+  const porDim = new Map<string, Map<string, number>>();
+  for (const row of rows) {
+    if (!porDim.has(row.dim)) porDim.set(row.dim, new Map());
+    porDim.get(row.dim)!.set(row.mes, Number(row.valor) || 0);
+  }
+
+  const out: Record<string, SeriePontoNullable[]> = {};
+  for (const [dim, valoresPorMes] of Array.from(porDim.entries())) {
+    out[dim] = meses.map((month) => ({ month, valor: valoresPorMes.has(month) ? valoresPorMes.get(month)! : null }));
   }
   return out;
 }

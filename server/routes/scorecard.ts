@@ -4,7 +4,7 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { BP_2026_TARGETS } from "../okr2026/bp2026Targets";
 import { krs, type KRDef } from "../okr2026/okrRegistry";
-import { addMeses, listaMeses12, rowsParaSeries, type SeriePonto, type SerieRow } from "./scorecard.helpers";
+import { addMeses, listaMeses12, rowsParaSeries, rowsParaSeriesNullFill, type SeriePonto, type SeriePontoNullable, type SerieRow } from "./scorecard.helpers";
 
 export type ScorecardUnit = "BRL" | "PCT" | "COUNT";
 export type ScorecardDirection = "up" | "down";
@@ -140,6 +140,9 @@ export interface SeriesScorecard {
   entregasPorOperador: Record<string, SeriePonto[]>;
   mrrPorSquad: Record<string, SeriePonto[]>;
   mrrPorOperador: Record<string, SeriePonto[]>;
+  /** Lead time médio de entrega (dias) por produto × mês — Onda5. Meses sem entrega ficam
+     `null` (não 0, ver `rowsParaSeriesNullFill`). */
+  leadTimePorProduto: Record<string, SeriePontoNullable[]>;
 }
 
 export interface ScorecardSeriesResult {
@@ -184,6 +187,25 @@ async function fetchEntregasPorOperador(inicio: string, fim: string): Promise<Se
 }
 
 /**
+ * Lead time médio de entrega (dias) por produto × mês, a partir de `cup_contratos`
+ * (FLUXO — data de entrega). Mesma definição de lead time do relatório mensal
+ * (`relatorioMensalSlides.ts`: `AVG(data_entrega - data_criado)::int`), mas granularizada
+ * por mês (a fonte original agrega uma janela fixa de 6 meses, sem série).
+ */
+async function fetchLeadTimePorProduto(inicio: string, fim: string): Promise<SerieRow[]> {
+  const result = await db.execute(sql`
+    SELECT TO_CHAR(data_entrega,'YYYY-MM') AS mes,
+           COALESCE(NULLIF(TRIM(produto),''),'Sem produto') AS dim,
+           AVG(data_entrega - data_criado)::int AS valor
+    FROM "Clickup".cup_contratos
+    WHERE LOWER(TRIM(status))='entregue' AND data_entrega IS NOT NULL AND data_criado IS NOT NULL
+      AND data_entrega >= ${inicio}::date AND data_entrega < ${fim}::date
+    GROUP BY 1,2
+  `);
+  return result.rows as unknown as SerieRow[];
+}
+
+/**
  * MRR por dimensão (ESTOQUE — snapshot de fim de mês), a partir de `cup_data_hist`.
  * GOTCHA (ver investigação): `produto` em `cup_data_hist` é instável — por isso este
  * endpoint só expõe `squad` e `responsavel` aqui (MRR por produto usa
@@ -219,7 +241,7 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
   const fim = `${addMeses(mes, 1)}-01`;
   const fimUltimoMes = `${mes}-01`;
 
-  const [churnProdutoRows, churnOperadorRows, churnSquadRows, entregasRows, mrrSquadRows, mrrOperadorRows] =
+  const [churnProdutoRows, churnOperadorRows, churnSquadRows, entregasRows, mrrSquadRows, mrrOperadorRows, leadTimeRows] =
     await Promise.all([
       fetchChurnPorDimensao("produto", inicio, fim),
       fetchChurnPorDimensao("responsavel_geral", inicio, fim),
@@ -227,6 +249,7 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
       fetchEntregasPorOperador(inicio, fim),
       fetchMrrPorDimensao("squad", inicio, fimUltimoMes),
       fetchMrrPorDimensao("responsavel", inicio, fimUltimoMes),
+      fetchLeadTimePorProduto(inicio, fim),
     ]);
 
   return {
@@ -237,6 +260,7 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
       entregasPorOperador: rowsParaSeries(entregasRows, meses),
       mrrPorSquad: rowsParaSeries(mrrSquadRows, meses),
       mrrPorOperador: rowsParaSeries(mrrOperadorRows, meses),
+      leadTimePorProduto: rowsParaSeriesNullFill(leadTimeRows, meses),
     },
   };
 }
