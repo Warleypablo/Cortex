@@ -701,11 +701,12 @@ async function updateTaskDescription(taskId: string, markdown: string) {
 
 // ===================== FCA v5 (imagem do Aprofundado + FATO/CAUSA/AÇÃO) =====================
 
-// Canal → endpoint de mídia do Aprofundado + utm_source pra atribuir as pré-vendas (PLATFORM_TO_UTM).
-const CANAL_APROFUNDADO: Record<string, { media: string; utm: string }> = {
+// Canal → endpoint de mídia do Aprofundado (null = sem endpoint dedicado, usa query nativa do FCA)
+// + utm_source pra atribuir as pré-vendas (PLATFORM_TO_UTM).
+const CANAL_APROFUNDADO: Record<string, { media: string | null; utm: string }> = {
   metaAds: { media: "meta-ads", utm: "facebook" },
   googleAds: { media: "google-ads", utm: "google" },
-  tiktokAds: { media: "meta-ads", utm: "tiktok_ads" }, // mídia TikTok limitada no Aprofundado; degrada
+  tiktokAds: { media: null, utm: "tiktok_ads" }, // TikTok não tem endpoint de mídia no Aprofundado → spend nativo, sem pixel
 };
 
 // Janela 7D rolling (últimos 7 dias fechados = ontem − 6 → ontem).
@@ -718,7 +719,7 @@ function periodo7D(now: Date) {
 }
 
 // Puxa os MESMOS números da aba Aprofundado (self-call interno, FCA_API_TOKEN autoriza GET).
-async function fetchAprofundado(canal: string, funil: string, de: string, ate: string) {
+async function fetchAprofundado(canal: string, funil: string, campaignLike: string, de: string, ate: string) {
   const port = process.env.PORT || "3000";
   const base = `http://127.0.0.1:${port}/api/growth/orcado-realizado`;
   const cfg = CANAL_APROFUNDADO[canal] || CANAL_APROFUNDADO.metaAds;
@@ -729,11 +730,15 @@ async function fetchAprofundado(canal: string, funil: string, de: string, ate: s
     if (!r.ok) throw new Error(`${u} → ${r.status}`);
     return r.json() as any;
   };
-  const [media, mql, nmql] = await Promise.all([
-    j(`${base}/${cfg.media}?${q}`),
-    j(`${base}/mql?${q}`),
-    j(`${base}/nao-mql?${q}`),
-  ]);
+  // Mídia: Meta/Google têm endpoint dedicado (trazem sessões/pixel). TikTok não tem →
+  // usa a query nativa do FCA (só spend/cpm/ctr; sem sessões/connect/LPV de pixel).
+  const mediaP = cfg.media
+    ? j(`${base}/${cfg.media}?${q}`)
+    : midiaRealizado(canal, campaignLike, { de, ate }).then((mr) => ({
+        investimento: mr.investimento, cpm: mr.cpm, ctr: mr.ctr,
+        visualizacoesPagina: mr.lpv, sessoes: 0, connectRate: null,
+      }));
+  const [media, mql, nmql] = await Promise.all([mediaP, j(`${base}/mql?${q}`), j(`${base}/nao-mql?${q}`)]);
   return { media, mql, nmql };
 }
 
@@ -896,7 +901,7 @@ export function registerFcaRoutes(app: Express) {
           getMetas(funil, p7.mesRef, "mql"),
           getMetas(funil, p7.mesRef, "nao_mql"),
         ]);
-        const dados = await fetchAprofundado(canal, funil, p7.de, p7.ate);
+        const dados = await fetchAprofundado(canal, funil, campaignLike, p7.de, p7.ate);
         const sections = montarLinhasV5({
           media: dados.media, mql: dados.mql, nmql: dados.nmql,
           metas: { ma: mAds.metricas, mql: mMql.metricas, nmql: mNmql.metricas },

@@ -177,14 +177,20 @@ export async function renderAprofundadoImage(input: RenderInput): Promise<Buffer
 
 // Sobe o PNG no ClickUp (REST multipart) e devolve a URL clickup-attachments.com pra embutir inline.
 export async function uploadFcaImage(taskId: string, png: Buffer, apiKey: string, fileName = "fca-aprofundado.png"): Promise<string> {
-  const fd = new FormData();
-  fd.append("attachment", new Blob([png], { type: "image/png" }), fileName);
-  const r = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/attachment`, {
-    method: "POST",
-    headers: { Authorization: apiKey },
-    body: fd,
-  });
-  if (!r.ok) throw new Error(`ClickUp attachment error ${r.status}: ${await r.text()}`);
-  const j = (await r.json()) as { url: string };
-  return j.url;
+  // ClickUp às vezes devolve 5xx transitório (ex: OAUTH_024) no attachment — retry com backoff.
+  let lastErr = "";
+  for (let attempt = 1; attempt <= 3; attempt++) {
+    const fd = new FormData();
+    fd.append("attachment", new Blob([png], { type: "image/png" }), fileName);
+    const r = await fetch(`https://api.clickup.com/api/v2/task/${taskId}/attachment`, {
+      method: "POST",
+      headers: { Authorization: apiKey },
+      body: fd,
+    });
+    if (r.ok) return ((await r.json()) as { url: string }).url;
+    lastErr = `${r.status}: ${await r.text()}`;
+    if (r.status < 500 && r.status !== 429) break; // erro não-transitório: não insiste
+    await new Promise((res) => setTimeout(res, attempt * 1500));
+  }
+  throw new Error(`ClickUp attachment error ${lastErr}`);
 }
