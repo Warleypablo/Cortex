@@ -104,3 +104,51 @@ export interface ScorecardResponsavelOption {
 export function useResponsaveisDisponiveis() {
   return useQuery<ScorecardResponsavelOption[]>({ queryKey: ["/api/capacity-metas/responsaveis"], staleTime: STALE });
 }
+
+// Onda B2 (Receita): Upsell/Downsell de MRR + movimentos de Receita Pontual. Fontes reais
+// (server/routes/bp2026.reconciliacao.ts e bp2026.ts) — divergem do endpoint único assumido
+// inicialmente; ver bp2026PontualLinha() em SecaoReceita.tsx para o motivo de cada mapeamento.
+
+// GET /api/bp2026/reconciliacao-total?mes=N (N = mês 1-12 do ano 2026). Só existe para 2026
+// (todo o módulo bp2026 é hardcoded pro ano corrente do BP) — `enabled` trava fora desse ano.
+export interface Bp2026ReconciliacaoTotalResponse {
+  mes: number;
+  upsell: number;
+  upsellContratos: number;
+  downsell: number;
+  downsellContratos: number;
+}
+export function useBp2026ReconciliacaoTotal(mes: string) {
+  const [ano, m] = mes.split("-").map(Number);
+  return useQuery<Bp2026ReconciliacaoTotalResponse>({
+    queryKey: ["/api/bp2026/reconciliacao-total", { mes: m }],
+    enabled: !!mes && ano === 2026,
+    staleTime: STALE,
+    retry: false,
+  });
+}
+
+// GET /api/bp2026/pontual-total — mesmo padrão de /api/bp2026/pontual-creators (server/routes/
+// bp2026.ts), mas sem filtro de produto. Devolve a série do ANO INTEIRO (não aceita `mes`);
+// quem consome indexa `linhas[].meses` pelo mês selecionado (ver SecaoReceita.tsx).
+export interface Bp2026PontualMesPonto {
+  mes: number;
+  realizado: number | null;
+}
+export interface Bp2026PontualLinha {
+  metrica: string;
+  tipoAgregacao: "fluxo" | "estoque";
+  meses: Bp2026PontualMesPonto[];
+}
+export interface Bp2026PontualTotalResponse {
+  linhas: Bp2026PontualLinha[];
+  mesCorrente: number;
+  mesFechado: number;
+}
+export function useBp2026PontualTotal() {
+  return useQuery<Bp2026PontualTotalResponse>({
+    queryKey: ["/api/bp2026/pontual-total"],
+    staleTime: STALE,
+    retry: false,
+  });
+}

@@ -20,6 +20,8 @@ import {
   useLtLtvEvolucaoProduto,
   useLtLtvEvolucaoClientes,
   useScorecardSeries,
+  useBp2026ReconciliacaoTotal,
+  useBp2026PontualTotal,
 } from "./hooks";
 import { paramsParaMes, labelMes } from "./temporalidade";
 import { montarSecoesVisaoGeral } from "./SecaoVisaoGeral";
@@ -55,6 +57,8 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const taxaMensal = useChurnTaxaMensal(mes);
   const pontorrente = useChurnPontorrente(mes);
   const series = useScorecardSeries(mes);
+  const reconciliacaoTotal = useBp2026ReconciliacaoTotal(mes);
+  const pontualTotal = useBp2026PontualTotal();
 
   const estoqueQ = useEstoqueOverview();
   const ceo = useCeoDashboard(mes);
@@ -98,7 +102,12 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const estoque = estoqueQ.data as EstoqueOverview | undefined;
 
   const secoesVisaoGeral = rm.data ? montarSecoesVisaoGeral(rm.data, ltvOverview, { isError: ceo.isError, kpis: ceoKpis }) : [];
-  const secoesReceita = rm.data ? montarSecoesReceita(rm.data, { onDrill: abrirDrill }) : [];
+  const secoesReceita = rm.data
+    ? montarSecoesReceita(rm.data, mes, { onDrill: abrirDrill }, {
+        reconciliacaoTotal: reconciliacaoTotal.data,
+        pontualTotal: pontualTotal.data?.linhas,
+      })
+    : [];
   const secoesChurn = churnDet.data
     ? montarSecoesChurn(churnDet.data, produtoMotivo.data, taxaMensal.data, pontorrente.data, series.data, rm.data, mes)
     : [];

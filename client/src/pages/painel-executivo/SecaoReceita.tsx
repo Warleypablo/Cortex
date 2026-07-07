@@ -10,6 +10,10 @@ import {
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
+  useBp2026ReconciliacaoTotal,
+  useBp2026PontualTotal,
+  type Bp2026ReconciliacaoTotalResponse,
+  type Bp2026PontualLinha,
 } from "./hooks";
 import { paramsParaMes, labelMes } from "./temporalidade";
 import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
@@ -50,11 +54,54 @@ export interface MontarSecoesReceitaExtras {
   onDrill?: (tipo: string, chave: string) => void;
 }
 
+/** Fontes bp2026 (Onda B2) — opcionais: hooks isolados, ausência = linhas com "—" (degradação
+   graciosa), nunca derruba o resto da seção. Ver useBp2026ReconciliacaoTotal/useBp2026PontualTotal
+   em hooks.ts para o motivo de cada endpoint (shape real diverge do assumido inicialmente:
+   reconciliação é por-produto — agregamos os 5; pontual não tem endpoint "?mes=", devolve o
+   ANO inteiro em `linhas[].meses` e quem consome indexa pelo mês selecionado, aqui). */
+export interface MontarSecoesReceitaBp2026 {
+  reconciliacaoTotal?: Bp2026ReconciliacaoTotalResponse;
+  pontualTotal?: Bp2026PontualLinha[];
+}
+
+/** Extrai de `Bp2026PontualLinha[]` (ano inteiro) o ponto do mês selecionado + a série completa
+   já no formato do Scorecard. `temporalidade` deriva do `tipoAgregacao` real da linha (fluxo =
+   movimento do mês, "mes"; estoque = saldo num ponto no tempo, "snapshot" — mesma convenção já
+   usada por "Em aberto (estoque)" abaixo). bp2026 só cobre o ano 2026 (módulo inteiro é
+   hardcoded pro ano do BP) — fora disso, `atual` fica null (linha mostra "—"). */
+function bp2026PontualLinha(
+  linhas: Bp2026PontualLinha[] | undefined,
+  metrica: string,
+  mes: string,
+): { atual: number | null; serie: ScorecardSeriePonto[]; temporalidade: "mes" | "snapshot" } {
+  const linha = linhas?.find((l) => l.metrica === metrica);
+  if (!linha) return { atual: null, serie: [], temporalidade: "mes" };
+  const [ano, mNum] = mes.split("-").map(Number);
+  const ponto = ano === 2026 ? linha.meses.find((m) => m.mes === mNum) : undefined;
+  const serie: ScorecardSeriePonto[] = linha.meses.map((m) => ({
+    label: MESES_ABREV[m.mes - 1] ?? String(m.mes),
+    valor: m.realizado,
+    month: `2026-${String(m.mes).padStart(2, "0")}`,
+  }));
+  return {
+    atual: ponto?.realizado ?? null,
+    serie,
+    temporalidade: linha.tipoAgregacao === "estoque" ? "snapshot" : "mes",
+  };
+}
+
 /** Função pura: monta as seções de Receita a partir do payload já resolvido de
    /api/reports/mensal. Extraída de SecaoReceita para reuso pela aba Consolidado. */
-export function montarSecoesReceita(rm: ReportsMensal, extras: MontarSecoesReceitaExtras = {}): ScorecardSection[] {
+export function montarSecoesReceita(
+  rm: ReportsMensal,
+  mes: string,
+  extras: MontarSecoesReceitaExtras = {},
+  bp2026: MontarSecoesReceitaBp2026 = {},
+): ScorecardSection[] {
   const tm = rm.turboMetrics;
   const p = rm.pontualData;
+  const rec = bp2026.reconciliacaoTotal;
+  const pontualLinhas = bp2026.pontualTotal;
 
   return [
     {
@@ -81,6 +128,26 @@ export function montarSecoesReceita(rm: ReportsMensal, extras: MontarSecoesRecei
           serie: serieComLabel<VendasSeriePonto>(rm.contratosMes.vendasSeries, (r) => r.vendasMrr),
           temporalidade: "mes",
           drill: extras.onDrill ? () => extras.onDrill!("venda_mrr", "mrr") : undefined,
+        },
+        {
+          key: "receita_mrr_upsell",
+          metrica: "Upsell",
+          sub: rec ? `${rec.upsellContratos} contratos` : undefined,
+          // Agregado dos 5 produtos de /api/bp2026/reconciliacao-total (waterfall de
+          // snapshot-diff do ClickUp) — sem série própria (endpoint só cobre o mês
+          // selecionado; ver nota em MontarSecoesReceitaBp2026 acima).
+          atual: rec?.upsell ?? null,
+          formato: "brl",
+          temporalidade: "mes",
+        },
+        {
+          key: "receita_mrr_downsell",
+          metrica: "Downsell",
+          sub: rec ? `${rec.downsellContratos} contratos` : undefined,
+          // Já vem negativo de computeReconciliacao (vFim < vIni) — mantém o sinal.
+          atual: rec?.downsell ?? null,
+          formato: "brl",
+          temporalidade: "mes",
         },
         {
           key: "receita_mrr_churn",
@@ -134,6 +201,41 @@ export function montarSecoesReceita(rm: ReportsMensal, extras: MontarSecoesRecei
           temporalidade: "mes",
         },
         {
+          // Fonte: /api/bp2026/pontual-total, metrica "pontual_churn" — contratos que saíram do
+          // estoque pontual (ClickUp) por cancelamento no mês. Já vem negativo (mesma convenção
+          // de sinal do bp2026: saída = redução do estoque).
+          key: "receita_pontual_churn",
+          metrica: "Churn",
+          ...bp2026PontualLinha(pontualLinhas, "pontual_churn", mes),
+          formato: "brl",
+        },
+        {
+          // "Pausado" aqui é um SALDO (estoque pontual atualmente em status pausado no fim do
+          // mês, pontual_status_pausado) — NÃO o mesmo conceito da linha MRR "Pausado/Reativado"
+          // acima (que é fluxo: contratos pausados NESTE mês). O bp2026 não expõe um fluxo de
+          // pausa equivalente para pontual — por isso aqui é "snapshot" (tipoAgregacao=estoque),
+          // e "Reativação" abaixo cobre a metade do fluxo que o bp2026 SIM expõe (retorno ao
+          // estoque de um contrato que estava fora, ex. pausado antes).
+          key: "receita_pontual_pausado",
+          metrica: "Pausado (estoque)",
+          ...bp2026PontualLinha(pontualLinhas, "pontual_status_pausado", mes),
+          formato: "brl",
+        },
+        {
+          key: "receita_pontual_reativacao",
+          metrica: "Reativação",
+          ...bp2026PontualLinha(pontualLinhas, "pontual_reativacao", mes),
+          formato: "brl",
+        },
+        {
+          // "pontual_reajuste": variação de valor de contratos que permaneceram no estoque no
+          // mês (NET) — positivo = upsell/reajuste pra cima, negativo = desconto concedido.
+          key: "receita_pontual_reajuste",
+          metrica: "Upsell/downsell (desconto)",
+          ...bp2026PontualLinha(pontualLinhas, "pontual_reajuste", mes),
+          formato: "brl",
+        },
+        {
           key: "receita_pontual_crosssell",
           metrica: "Cross-sell",
           atual: tm.crosssellPontual,
@@ -178,6 +280,10 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
   const metas = useScorecardMetas(mes);
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
+  // Onda B2: Upsell/Downsell (MRR) + movimentos de Receita Pontual — hooks isolados, cada um
+  // com sua própria falha de rede; `montarSecoesReceita` já degrada pra "—" se `data` faltar.
+  const reconciliacaoTotal = useBp2026ReconciliacaoTotal(mes);
+  const pontualTotal = useBp2026PontualTotal();
   const [detalheParams, setDetalheParams] = useState<Record<string, string> | null>(null);
   const detalhe = useGestaoReceitaDetalhe(detalheParams);
   const [drillAberto, setDrillAberto] = useState(false);
@@ -206,7 +312,10 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
   const detalheData = detalhe.data as { titulo?: string; subtitulo?: string; total?: number; grupos?: Record<string, unknown>[] } | undefined;
   const grupos = detalheData?.grupos ?? [];
 
-  const secoes = montarSecoesReceita(rm.data, { onDrill: abrirDrill });
+  const secoes = montarSecoesReceita(rm.data, mes, { onDrill: abrirDrill }, {
+    reconciliacaoTotal: reconciliacaoTotal.data,
+    pontualTotal: pontualTotal.data?.linhas,
+  });
 
   return (
     <div className="space-y-4">
