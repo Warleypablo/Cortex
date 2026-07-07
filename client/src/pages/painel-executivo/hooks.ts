@@ -152,3 +152,40 @@ export function useBp2026PontualTotal() {
     retry: false,
   });
 }
+
+// Onda C1 (Capacity): Margem de Contribuição por squad — GET /api/contribuicao-squad/ranking
+// (server/routes.ts:6565). Mesma query da DFC (getContribuicaoSquadDfc), reduzida a um ranking
+// por squad + o total geral. Endpoint exige `dataInicio`/`dataFim` como data COMPLETA
+// (YYYY-MM-DD, valida com regex) — diferente de `dataInicioFim` (que manda só "YYYY-MM"), por
+// isso usamos `startEndDate` (mesmo helper de useChurnDetalhamento) e remapeamos os nomes dos
+// params. `totais` do backend NÃO inclui `margem` (só soma receita/despesa/contribuicao/etc) —
+// calculado no client a partir de `totais.contribuicao / totais.receita`.
+export interface ContribuicaoSquadItem {
+  squad: string;
+  receita: number;
+  despesa: number;
+  resultadoBruto: number;
+  impostos: number;
+  contribuicao: number;
+  margem: number;
+}
+export interface ContribuicaoSquadTotais {
+  receita: number;
+  despesa: number;
+  resultadoBruto: number;
+  impostos: number;
+  contribuicao: number;
+}
+export interface ContribuicaoSquadRankingResponse {
+  ranking: ContribuicaoSquadItem[];
+  totais: ContribuicaoSquadTotais;
+}
+export function useContribuicaoSquadRanking(mes: string) {
+  const { startDate, endDate } = paramsParaMes(mes).startEndDate;
+  return useQuery<ContribuicaoSquadRankingResponse>({
+    queryKey: ["/api/contribuicao-squad/ranking", { dataInicio: startDate, dataFim: endDate }],
+    enabled: !!mes,
+    staleTime: STALE,
+    retry: false,
+  });
+}

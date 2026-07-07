@@ -22,6 +22,7 @@ import {
   useScorecardSeries,
   useBp2026ReconciliacaoTotal,
   useBp2026PontualTotal,
+  useContribuicaoSquadRanking,
 } from "./hooks";
 import { paramsParaMes, labelMes } from "./temporalidade";
 import { montarSecoesVisaoGeral } from "./SecaoVisaoGeral";
@@ -57,6 +58,7 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const taxaMensal = useChurnTaxaMensal(mes);
   const pontorrente = useChurnPontorrente(mes);
   const series = useScorecardSeries(mes);
+  const contribuicaoSquad = useContribuicaoSquadRanking(mes);
   const reconciliacaoTotal = useBp2026ReconciliacaoTotal(mes);
   const pontualTotal = useBp2026PontualTotal();
 
@@ -112,7 +114,12 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
     ? montarSecoesChurn(churnDet.data, produtoMotivo.data, taxaMensal.data, pontorrente.data, series.data, rm.data, mes)
     : [];
   const secoesEntregas = rm.data ? montarSecoesEntregas(rm.data, estoque, series.data, mes) : [];
-  const secoesCapacity = montarSecoesCapacity({ isError: ceo.isError, kpis: ceoKpis }, { isError: series.isError, data: series.data }, mes);
+  const secoesCapacity = montarSecoesCapacity(
+    { isError: ceo.isError, kpis: ceoKpis },
+    { isError: series.isError, data: series.data },
+    mes,
+    { isError: contribuicaoSquad.isError, data: contribuicaoSquad.data },
+  );
   const secoesLtLtv = ltvOverview
     ? montarSecoesLtLtv(
         ltvOverview,

@@ -5,8 +5,11 @@ import {
   useScorecardResponsaveis,
   useSalvarResponsaveis,
   useScorecardSeries,
+  useContribuicaoSquadRanking,
+  type ContribuicaoSquadRankingResponse,
 } from "./hooks";
 import { linhasPorDimensao } from "./scorecard/logica";
+import { formatPercent } from "@/lib/utils";
 import type { CeoKpi } from "@/components/ceo/CeoKpiCard";
 import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
 
@@ -38,6 +41,10 @@ export interface MontarSecoesCapacitySeries {
   isError: boolean;
   data: ScorecardSeriesResponse | undefined;
 }
+export interface MontarSecoesCapacityContribuicao {
+  isError: boolean;
+  data: ContribuicaoSquadRankingResponse | undefined;
+}
 
 /** Função pura: monta as seções de Capacity a partir dos payloads já resolvidos. `ceo`/`series`
    carregam o `isError` de cada query (além dos dados) porque o texto exibido distingue erro de
@@ -51,6 +58,7 @@ export function montarSecoesCapacity(
   ceo: MontarSecoesCapacityCeo,
   series: MontarSecoesCapacitySeries,
   mes: string,
+  contribuicao: MontarSecoesCapacityContribuicao,
 ): ScorecardSection[] {
   // /api/ceo-dashboard exige permissão de CEO (403 para os demais papéis; useCeoDashboard já
   // usa retry:false). Isolado: a linha mostra atual=null + aviso, sem derrubar a aba inteira.
@@ -71,6 +79,81 @@ export function montarSecoesCapacity(
         temporalidade: "mes",
       },
     ],
+  };
+
+  // Onda C1: Margem de Contribuição (Geral + por squad) — GET /api/contribuicao-squad/ranking.
+  // Sem série (o endpoint devolve só o período selecionado, não uma janela mensal) — mesma
+  // limitação de "Receita por Cabeça" acima.
+  const totaisContribuicao = contribuicao.data?.totais;
+  const margemGeral =
+    totaisContribuicao && totaisContribuicao.receita > 0
+      ? (totaisContribuicao.contribuicao / totaisContribuicao.receita) * 100
+      : null;
+
+  const secaoContribuicaoGeral: ScorecardSection = {
+    id: "capacity-contribuicao-geral",
+    titulo: "Margem de Contribuição — Geral (mês)",
+    subtitulo: contribuicao.isError
+      ? "falha ao carregar margem de contribuição"
+      : !totaisContribuicao
+        ? "carregando…"
+        : undefined,
+    linhas: totaisContribuicao
+      ? [
+          {
+            key: "capacity_contribuicao_geral_brl",
+            metrica: "Contribuição (R$)",
+            atual: totaisContribuicao.contribuicao,
+            formato: "brl",
+            temporalidade: "mes",
+          },
+          {
+            key: "capacity_contribuicao_geral_margem",
+            metrica: "Margem %",
+            atual: margemGeral,
+            formato: "pct",
+            temporalidade: "mes",
+          },
+          {
+            key: "capacity_contribuicao_geral_receita",
+            metrica: "Receita",
+            atual: totaisContribuicao.receita,
+            formato: "brl",
+            temporalidade: "mes",
+          },
+          {
+            key: "capacity_contribuicao_geral_custos",
+            metrica: "Custos",
+            atual: totaisContribuicao.despesa,
+            formato: "brl",
+            temporalidade: "mes",
+          },
+        ]
+      : [],
+  };
+
+  const rankingContribuicao = (contribuicao.data?.ranking ?? [])
+    .slice()
+    .sort((a, b) => b.contribuicao - a.contribuicao);
+  const contribuicaoSquadRows: ScorecardRow[] = rankingContribuicao.map((item) => ({
+    key: `capacity_contribuicao_squad_${slug(item.squad)}`,
+    metrica: item.squad,
+    sub: `Margem ${formatPercent(item.margem, 1)}`,
+    atual: item.contribuicao,
+    formato: "brl",
+    temporalidade: "mes",
+  }));
+  const secaoContribuicaoSquad: ScorecardSection = {
+    id: "capacity-contribuicao-squad",
+    titulo: "Margem de Contribuição por squad (mês)",
+    // Nota metodológica (por squad, não por operador — custo/operador no backend é heurístico
+    // e só funciona filtrando 1 pessoa por vez, inviável em lote).
+    subtitulo: contribuicao.isError
+      ? "falha ao carregar margem de contribuição"
+      : contribuicaoSquadRows.length === 0
+        ? "carregando…"
+        : "custo = folha (rh_pessoal) + benefícios + freelas + impostos (18% da receita); margem por operador não é viável (heurística exige filtrar 1 pessoa por vez)",
+    linhas: contribuicaoSquadRows,
   };
 
   // MRR por squad/operador com série real (Onda2-A) — ao contrário da seção "snapshot" abaixo
@@ -109,7 +192,7 @@ export function montarSecoesCapacity(
     linhas: mrrOperadorRows,
   };
 
-  return [secaoReceitaCabeca, secaoMrrSquad, secaoMrrOperador];
+  return [secaoReceitaCabeca, secaoContribuicaoGeral, secaoContribuicaoSquad, secaoMrrSquad, secaoMrrOperador];
 }
 
 export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo }) {
@@ -117,6 +200,7 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
   // Série de MRR por squad/operador (Onda2-A) — fonte das 2 seções de evolução abaixo. Falha/
   // loading isolados (não bloqueiam a aba): linhasPorDimensao devolve [] sem `series.data`.
   const series = useScorecardSeries(mes);
+  const contribuicao = useContribuicaoSquadRanking(mes);
   const metas = useScorecardMetas(mes);
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
@@ -131,7 +215,12 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
   }
 
   const ceoKpis = (ceo.data as { kpis?: CeoKpi[] } | undefined)?.kpis;
-  const secoes = montarSecoesCapacity({ isError: ceo.isError, kpis: ceoKpis }, { isError: series.isError, data: series.data }, mes);
+  const secoes = montarSecoesCapacity(
+    { isError: ceo.isError, kpis: ceoKpis },
+    { isError: series.isError, data: series.data },
+    mes,
+    { isError: contribuicao.isError, data: contribuicao.data },
+  );
 
   return (
     <div className="space-y-4">
