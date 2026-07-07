@@ -182,13 +182,26 @@ function TabelaFoco({
 
 // ─────────────────────── modo "evolução" ───────────────────────
 
-/** Colunas de meses = a maior série entre todas as linhas de todas as seções (assume que
-   compartilham a mesma janela mensal, como as métricas do relatório mensal). */
-function mesesGlobais(secoes: ScorecardSection[]): string[] {
+/** Trunca a série no mês SELECIONADO (`mes`) — descarta pontos de meses POSTERIORES (a série
+   costuma vir até o mês corrente real, mesmo quando o usuário escolhe um mês anterior no
+   seletor). Pontos sem `month` (séries antigas, sem essa info) são mantidos sem corte — mesmo
+   comportamento de antes desta função existir (fallback). */
+function truncarSerie(serie: ScorecardSeriePonto[], mes: string): ScorecardSeriePonto[] {
+  if (!serie.some((p) => p.month)) return serie;
+  return serie.filter((p) => !p.month || p.month <= mes);
+}
+
+/** Colunas de meses = a maior série (JÁ TRUNCADA no mês selecionado) entre todas as linhas de
+   todas as seções (assume que compartilham a mesma janela mensal, como as métricas do
+   relatório mensal). Truncar ANTES de comparar o tamanho garante que a coluna mais à direita
+   corresponda ao mês selecionado, não ao último mês absoluto da série mais longa. */
+function mesesGlobais(secoes: ScorecardSection[], mes: string): string[] {
   let maiorSerie: ScorecardSeriePonto[] = [];
   for (const secao of secoes) {
     for (const row of secao.linhas) {
-      if (row.serie && row.serie.length > maiorSerie.length) maiorSerie = row.serie;
+      if (!row.serie) continue;
+      const truncada = truncarSerie(row.serie, mes);
+      if (truncada.length > maiorSerie.length) maiorSerie = truncada;
     }
   }
   return maiorSerie.map((p) => p.label);
@@ -218,15 +231,18 @@ function Sparkline({ serie, favoravel }: { serie: ScorecardSeriePonto[]; favorav
   );
 }
 
-function LinhaEvolucao({ row, colunas, meta }: { row: ScorecardRow; colunas: string[]; meta?: ScorecardMeta }) {
+function LinhaEvolucao({ row, colunas, meta, mes }: { row: ScorecardRow; colunas: string[]; meta?: ScorecardMeta; mes: string }) {
   // "Snapshot" é um selo de TEMPORALIDADE (estoque medido num ponto no tempo, ex: estoque
   // pontual em aberto, LTV médio) — não um estado genérico para "linha sem série". Uma
   // métrica mensal (temporalidade "mes") que ainda não acumulou histórico é outra coisa:
   // sem série (ainda), não snapshot. Confundir os dois rotula métricas normais como
   // "Snapshot" incorretamente.
   const isSnapshot = row.temporalidade === "snapshot";
-  const semSerie = !row.serie || row.serie.length === 0;
-  const delta = isSnapshot || semSerie ? null : deltaM1(row.serie);
+  // Trunca ANTES de calcular delta/sparkline/alinhamento — sem isso, o M-1 e o sparkline
+  // comparariam meses posteriores ao selecionado (ex. mês corrente real, ainda incompleto).
+  const serieTruncada = row.serie ? truncarSerie(row.serie, mes) : undefined;
+  const semSerie = !serieTruncada || serieTruncada.length === 0;
+  const delta = isSnapshot || semSerie ? null : deltaM1(serieTruncada);
   const favoravel = trendFavoravel(delta, meta?.direction);
 
   return (
@@ -247,7 +263,7 @@ function LinhaEvolucao({ row, colunas, meta }: { row: ScorecardRow; colunas: str
           </div>
         </td>
       ) : (
-        valoresAlinhados(row.serie!, colunas.length).map((valor, i) => (
+        valoresAlinhados(serieTruncada!, colunas.length).map((valor, i) => (
           <td
             key={i}
             className={cn(
@@ -261,14 +277,14 @@ function LinhaEvolucao({ row, colunas, meta }: { row: ScorecardRow; colunas: str
       )}
       <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{formatMeta(meta, row.formato)}</td>
       <td className="px-3 py-3 text-right">
-        {isSnapshot || semSerie ? <span className="text-xs text-muted-foreground">—</span> : <Sparkline serie={row.serie!} favoravel={favoravel} />}
+        {isSnapshot || semSerie ? <span className="text-xs text-muted-foreground">—</span> : <Sparkline serie={serieTruncada!} favoravel={favoravel} />}
       </td>
     </tr>
   );
 }
 
-function TabelaEvolucao({ secoes, metas }: { secoes: ScorecardSection[]; metas: Record<string, ScorecardMeta> }) {
-  const meses = mesesGlobais(secoes);
+function TabelaEvolucao({ secoes, metas, mes }: { secoes: ScorecardSection[]; metas: Record<string, ScorecardMeta>; mes: string }) {
+  const meses = mesesGlobais(secoes, mes);
   // Fallback ["Atual"]: quando NENHUMA linha de NENHUMA seção tem série (ex. seção 100%
   // snapshot), garante ao menos 1 coluna na "zona de meses" — sem isso, colSpan das linhas
   // (sempre >= 1) desalinharia com um header de 0 colunas de mês.
@@ -301,7 +317,7 @@ function TabelaEvolucao({ secoes, metas }: { secoes: ScorecardSection[]; metas: 
             <Fragment key={secao.id}>
               <SecaoHeaderRow titulo={secao.titulo} subtitulo={secao.subtitulo} colSpan={totalCols} />
               {secao.linhas.map((row) => (
-                <LinhaEvolucao key={row.key} row={row} colunas={colunas} meta={row.metaKey ? metas[row.metaKey] : undefined} />
+                <LinhaEvolucao key={row.key} row={row} colunas={colunas} meta={row.metaKey ? metas[row.metaKey] : undefined} mes={mes} />
               ))}
             </Fragment>
           ))}
@@ -318,7 +334,7 @@ function TabelaEvolucao({ secoes, metas }: { secoes: ScorecardSection[]; metas: 
    - "evolucao": a mesma métrica mês a mês em colunas (tendência), sem Δ/Status/Responsável. */
 export function Scorecard({ secoes, mes, modo, metas, responsaveis, onEditResponsavel }: ScorecardProps) {
   if (modo === "evolucao") {
-    return <TabelaEvolucao secoes={secoes} metas={metas} />;
+    return <TabelaEvolucao secoes={secoes} metas={metas} mes={mes} />;
   }
 
   const responsaveisManuais = new Map(responsaveis.map((r) => [r.metrica_key, r.responsavel]));

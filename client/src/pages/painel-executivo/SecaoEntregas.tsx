@@ -36,9 +36,27 @@ function slug(s: string): string {
 }
 
 /** Normaliza uma série que já vem com `label` do backend para o formato do Scorecard
-   (mesmo helper de SecaoReceita.tsx). */
-function serieComLabel<T extends { label: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
-  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r) }));
+   (mesmo helper de SecaoReceita.tsx). Propaga `month` (quando a fonte tiver) para o modo
+   evolução truncar/realçar no mês selecionado (ver Scorecard.tsx). */
+function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r), month: r.month }));
+}
+
+/** entregasPorTipo (techData) é um pivot { month, label, [tipo]: contagem } — soma os tipos
+   por mês para virar uma série de CONTAGEM total de entregas tech. Confirmado lendo
+   server/routes/relatorioMensalSlides.ts: tanto `entregasPorTipo` (COUNT(*) as entregas)
+   quanto `techKpis.entregues` (COUNT(*) as entregues) contam linhas de
+   cup_projetos_tech(_fechados) — mesma unidade (contagem, não R$), por isso a série soma
+   corretamente com `atual: techKpis.entregues`. */
+function serieEntregasTech(rows: Record<string, unknown>[] | undefined): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => {
+    const month = typeof r.month === "string" ? r.month : undefined;
+    const label = typeof r.label === "string" ? r.label : (month ?? "");
+    const valor = Object.entries(r)
+      .filter(([chave]) => chave !== "month" && chave !== "label")
+      .reduce((acc, [, v]) => acc + (typeof v === "number" ? v : 0), 0);
+    return { label, valor, month };
+  });
 }
 
 export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo }) {
@@ -88,6 +106,9 @@ export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo 
           metrica: produto,
           atual: valor,
           formato: "brl",
+          // Série real do produto ao longo do ano (payload já traz todos os meses) — antes só
+          // existia o ponto do mês selecionado, então o modo evolução caía em "sem série".
+          serie: p.entregasPorProdutoMes.map((m) => ({ month: m.month, label: m.label, valor: m.produtos[produto] ?? 0 })),
           temporalidade: "mes",
         }))
     : [];
@@ -132,6 +153,7 @@ export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo 
           metrica: "Entregas Tech",
           atual: techKpis.entregues,
           formato: "int",
+          serie: serieEntregasTech(rm.data.techData.entregasPorTipo),
           temporalidade: "mes",
         },
         {

@@ -25,9 +25,11 @@ function labelMesCurto(mes: string): string {
   return MESES_ABREV[m - 1] ?? mes;
 }
 
-/** Normaliza uma série que já vem com `label` do backend para o formato do Scorecard. */
-function serieComLabel<T extends { label: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
-  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r) }));
+/** Normaliza uma série que já vem com `label` do backend para o formato do Scorecard.
+   Propaga `month` (quando a fonte tiver) para o modo evolução truncar/realçar no mês
+   selecionado (ver Scorecard.tsx). */
+function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r), month: r.month }));
 }
 
 /** crosssellHistorico: sem `label`, ordena por `mes` (string "YYYY-MM", ordena cronologicamente
@@ -36,7 +38,7 @@ function serieCrosssell(rows: CrosssellHistoricoPonto[] | undefined, valor: (r: 
   return (rows ?? [])
     .slice()
     .sort((a, b) => a.mes.localeCompare(b.mes))
-    .map((r) => ({ label: labelMesCurto(r.mes), valor: valor(r) }));
+    .map((r) => ({ label: labelMesCurto(r.mes), valor: valor(r), month: r.mes }));
 }
 
 // Tipos válidos aceitos por /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts,

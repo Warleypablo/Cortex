@@ -28,14 +28,15 @@ function labelMesCurto(mes: string): string {
 }
 
 function serieTaxaMensal(rows: ChurnTaxaMensalRow[] | undefined, valor: (r: ChurnTaxaMensalRow) => number): ScorecardSeriePonto[] {
-  return (rows ?? []).map((r) => ({ label: labelMesCurto(r.mes), valor: valor(r) }));
+  return (rows ?? []).map((r) => ({ label: labelMesCurto(r.mes), valor: valor(r), month: r.mes }));
 }
 
 /** Normaliza uma série que já vem com `label` do backend (mesmo helper de SecaoReceita.tsx/
    SecaoVisaoGeral.tsx) — usado pelo "Churn R$" geral, que agora compartilha fonte com as
-   outras duas abas (turboMetrics.receitaChurnSeries), não mais o churn-detalhamento. */
-function serieComLabel<T extends { label: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
-  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r) }));
+   outras duas abas (turboMetrics.receitaChurnSeries), não mais o churn-detalhamento. Propaga
+   `month` (quando a fonte tiver) para o modo evolução truncar/realçar no mês selecionado. */
+function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r), month: r.month }));
 }
 
 /** Chave estável para linhas derivadas de listas variáveis (produto+motivo, operador, squad) —

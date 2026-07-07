@@ -8,6 +8,10 @@ export type ScorecardTemporalidade = "mes" | "snapshot";
 export interface ScorecardSeriePonto {
   label: string;
   valor: number | null;
+  /** "YYYY-MM" do ponto, quando a fonte trouxer — usado pelo modo "evolução" para truncar a
+     série no mês SELECIONADO (em vez do último ponto absoluto) e realçar a coluna certa.
+     Opcional: pontos sem `month` mantêm o comportamento anterior (sem corte). */
+  month?: string;
 }
 
 export interface ScorecardRow {

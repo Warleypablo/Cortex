@@ -23,9 +23,10 @@ interface CeoKpiMin {
 }
 
 /** Normaliza uma série que já vem com `label` do backend para o formato do Scorecard
-   (mesmo helper de SecaoReceita.tsx/SecaoEntregas.tsx). */
-function serieComLabel<T extends { label: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
-  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r) }));
+   (mesmo helper de SecaoReceita.tsx/SecaoEntregas.tsx). Propaga `month` (quando a fonte
+   tiver) para o modo evolução truncar/realçar no mês selecionado. */
+function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r), month: r.month }));
 }
 
 /** Aba-síntese: 1 linha por métrica-chave de cada uma das outras 6 abas, com meta/status
