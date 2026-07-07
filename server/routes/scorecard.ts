@@ -15,6 +15,7 @@ import {
   type SeriePonto,
   type SeriePontoNullable,
   type SerieRow,
+  type SerieValorRow,
 } from "./scorecard.helpers";
 
 export type ScorecardUnit = "BRL" | "PCT" | "COUNT";
@@ -178,6 +179,28 @@ export interface SeriesScorecard {
   /** Como `estoquePontualEmAbertoPorMes`, para o status `pausado` — alimenta "Pausado
      (estoque)". */
   estoquePausadoPorMes: SeriePonto[];
+  /** Churn Pontual (Onda D2) — série ÚNICA `SUM(valorp)` por mês, base = `cup_contratos` com
+     `servico ILIKE '%entrega%'` e status de churn (mesma definição de `churnPontorrente.ts`/
+     `churnPontorrente.helpers.ts:classifySituacao`, mas em SQL direto — sem a granularidade de
+     jornada por id_task×produto daquele endpoint, que é o motivo dele não ter série mensal).
+     Bucketizada pela data do EVENTO (`data_solicitacao_encerramento`, ver
+     `fetchChurnPontualPorDimensao`). Zero-fill (ver `rowsParaSerieUnica`). Alimenta a linha
+     "Churn confirmado (R$)" de "Churn Pontual — Geral" — o `atual` continua vindo do overview
+     cohort-based de `/api/churn-pontorrente` (só a `serie` é nova; não precisam reconciliar
+     mês a mês, mesma tolerância já aceita em "Churn R$" do Recorrente-Geral). */
+  churnPontualPorMes: SeriePonto[];
+  /** Como `churnPontualPorMes`, quebrado por dimensão — mesma base/exclusões, GROUP BY dim×mês
+     (ver `fetchChurnPontualPorDimensao`). Alimenta "Churn Pontual — Por produto". */
+  churnPontualPorProduto: Record<string, SeriePonto[]>;
+  /** Como `churnPontualPorProduto`, dimensão `responsavel` (operacional). Alimenta "Churn
+     Pontual — Por operador". */
+  churnPontualPorOperador: Record<string, SeriePonto[]>;
+  /** Como `churnPontualPorProduto`, dimensão `squad`. Alimenta "Churn Pontual — Por squad". Squad
+     cru (sem normalização de emoji) — não precisa casar com outra fonte aqui. */
+  churnPontualPorSquad: Record<string, SeriePonto[]>;
+  /** Como `churnPontualPorProduto`, dimensão `motivo_cancelamento`. Alimenta "Churn Pontual —
+     Motivos". */
+  churnPontualPorMotivo: Record<string, SeriePonto[]>;
 }
 
 export interface ScorecardSeriesResult {
@@ -356,6 +379,58 @@ async function fetchEstoquePontualSaldos(inicio: string, fimUltimoMes: string): 
   return result.rows as unknown as EstoquePontualSaldoRow[];
 }
 
+/** `dim` do Churn Pontual (Onda D2) — sempre um literal fixo do nosso código (nunca input do
+   usuário), mesmo cuidado de `ChurnDim`/`fetchChurnPorDimensao` acima. */
+type ChurnPontualDim = "produto" | "responsavel" | "squad" | "motivo_cancelamento";
+
+/**
+ * Churn Pontual por dimensão (EVENTO — data de solicitação de encerramento), a partir de
+ * `"Clickup".cup_contratos` diretamente. Base = `servico ILIKE '%entrega%'` (mesma condição de
+ * `churnPontorrente.ts:34`); churn = `LOWER(TRIM(status)) IN ('cancelado/inativo','não usar')`
+ * (mesma regra de `churnPontorrente.helpers.ts:classifySituacao`); valor = `valorp`. Usa
+ * `data_solicitacao_encerramento` (não `data_encerramento`) como data do evento — mesma coluna
+ * que `churnPontorrente.ts` expõe como "dataEncerramento" no detalhamento e mesma coluna que
+ * `fetchChurnPorDimensao` (Churn Recorrente) usa para bucketizar por mês, mantendo as duas
+ * famílias de série (recorrente e pontual) na mesma convenção de data de evento.
+ *
+ * Não reaproveita `toJornadas`/`aggregateChurnPorDimensao` de `churnPontorrente.helpers.ts` de
+ * propósito: aquela lógica agrupa por jornada (id_task×produto) e restringe a
+ * `PRODUTOS_PONTORRENTE`/linhas com nível de entrega reconhecível no `servico` — útil para o
+ * funil de retenção, mas SQL direto aqui é suficiente para uma série mensal de valor.
+ */
+async function fetchChurnPontualPorDimensao(dim: ChurnPontualDim, inicio: string, fim: string): Promise<SerieRow[]> {
+  const result = await db.execute(sql`
+    SELECT TO_CHAR(DATE_TRUNC('month', data_solicitacao_encerramento),'YYYY-MM') AS mes,
+           COALESCE(NULLIF(TRIM(${sql.raw(dim)}),''),'Não Informado') AS dim,
+           SUM(valorp)::numeric AS valor
+    FROM "Clickup".cup_contratos
+    WHERE servico ILIKE '%entrega%'
+      AND LOWER(TRIM(status)) IN ('cancelado/inativo','não usar')
+      AND valorp > 0
+      AND data_solicitacao_encerramento IS NOT NULL
+      AND data_solicitacao_encerramento >= ${inicio}::date AND data_solicitacao_encerramento < ${fim}::date
+    GROUP BY 1,2
+  `);
+  return result.rows as unknown as SerieRow[];
+}
+
+/** Série ÚNICA (sem dimensão) do Churn Pontual — mesma base/exclusões de
+   `fetchChurnPontualPorDimensao`, sem o `GROUP BY dim`. */
+async function fetchChurnPontualPorMes(inicio: string, fim: string): Promise<SerieValorRow[]> {
+  const result = await db.execute(sql`
+    SELECT TO_CHAR(DATE_TRUNC('month', data_solicitacao_encerramento),'YYYY-MM') AS mes,
+           SUM(valorp)::numeric AS valor
+    FROM "Clickup".cup_contratos
+    WHERE servico ILIKE '%entrega%'
+      AND LOWER(TRIM(status)) IN ('cancelado/inativo','não usar')
+      AND valorp > 0
+      AND data_solicitacao_encerramento IS NOT NULL
+      AND data_solicitacao_encerramento >= ${inicio}::date AND data_solicitacao_encerramento < ${fim}::date
+    GROUP BY 1
+  `);
+  return result.rows as unknown as SerieValorRow[];
+}
+
 /**
  * Monta as séries mensais por dimensão do modo Evolução, para a janela de 12 meses
  * terminando em `mes` (inclusive). Cada série vem com os 12 meses preenchidos (0 onde
@@ -379,6 +454,11 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
     mrrOperadorRows,
     leadTimeRows,
     estoquePontualRows,
+    churnPontualMesRows,
+    churnPontualProdutoRows,
+    churnPontualOperadorRows,
+    churnPontualSquadRows,
+    churnPontualMotivoRows,
   ] = await Promise.all([
     fetchChurnPorDimensao("produto", inicio, fim),
     fetchChurnPorDimensao("responsavel_geral", inicio, fim),
@@ -390,6 +470,11 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
     fetchMrrPorDimensao("responsavel", inicio, fimUltimoMes),
     fetchLeadTimePorProduto(inicio, fim),
     fetchEstoquePontualSaldos(inicio, fimUltimoMes),
+    fetchChurnPontualPorMes(inicio, fim),
+    fetchChurnPontualPorDimensao("produto", inicio, fim),
+    fetchChurnPontualPorDimensao("responsavel", inicio, fim),
+    fetchChurnPontualPorDimensao("squad", inicio, fim),
+    fetchChurnPontualPorDimensao("motivo_cancelamento", inicio, fim),
   ]);
 
   const mrrPorSquad = rowsParaSeries(mrrSquadRows, meses);
@@ -417,6 +502,11 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
       ),
       leadTimePorProduto: rowsParaSeriesNullFill(leadTimeRows, meses),
       pessoasPorSquad,
+      churnPontualPorMes: rowsParaSerieUnica(churnPontualMesRows, meses),
+      churnPontualPorProduto: rowsParaSeries(churnPontualProdutoRows, meses),
+      churnPontualPorOperador: rowsParaSeries(churnPontualOperadorRows, meses),
+      churnPontualPorSquad: rowsParaSeries(churnPontualSquadRows, meses),
+      churnPontualPorMotivo: rowsParaSeries(churnPontualMotivoRows, meses),
     },
   };
 }

@@ -47,6 +47,14 @@ function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | 
   return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r), month: r.month }));
 }
 
+/** Série ÚNICA (sem dimensão) → pontos de Scorecard, derivando o `label` do mês — mesmo padrão de
+   `serieComLabel`, mas para séries cruas `{month,valor}[]` de `/api/scorecard/series` (sem
+   `label` pronto). Usada pela linha "Churn confirmado (R$)" de Churn Pontual — Geral (Onda D2:
+   `series.churnPontualPorMes`). */
+function serieUnicaComLabel(pontos: { month: string; valor: number }[] | undefined): ScorecardSeriePonto[] {
+  return (pontos ?? []).map((p) => ({ month: p.month, label: labelMesCurto(p.month), valor: p.valor }));
+}
+
 /** Chave estável para linhas derivadas de listas variáveis (produto+motivo, operador, squad) —
    usada como `metrica_key` de persistência do responsável manual (CelulaResponsavel), por isso
    precisa ser determinística por entidade (não por índice de posição, que muda mês a mês). */
@@ -206,13 +214,22 @@ export function montarSecoesChurn(
         {
           key: "churn_pontual_confirmado_brl",
           metrica: "Churn confirmado (R$)",
+          // `atual` continua vindo do overview cohort-based de /api/churn-pontorrente (filtra
+          // jornadas pelo MÊS DE INÍCIO da safra — ver applyFiltros em
+          // churnPontorrente.helpers.ts). A `serie` nova (Onda D2) é bucketizada pela DATA DO
+          // EVENTO de cancelamento — os dois não precisam reconciliar mês a mês, mesma
+          // tolerância já aceita em "Churn R$" do Recorrente-Geral (atual/serie de fontes
+          // diferentes).
           atual: pontualOverview.valorpPerdido,
           formato: "brl",
+          serie: series ? serieUnicaComLabel(series.series.churnPontualPorMes) : undefined,
           temporalidade: "mes",
         },
         {
           key: "churn_pontual_drop_medio",
           metrica: "Drop médio",
+          // Sem série: é um % de jornada (retenção até a última entrega), não tem série mensal
+          // fácil de derivar da mesma fonte.
           atual: pontualOverview.dropMedio,
           formato: "pct",
           temporalidade: "mes",
@@ -220,15 +237,44 @@ export function montarSecoesChurn(
       ]
     : [];
 
-  // Onda B1: detalhamento do Churn Pontual por dimensão — mesmo payload de `pontualOverview`
-  // acima (/api/churn-pontorrente), campos `detalhamento`/`churnPorDimensao` já agregados no
-  // backend (churnPontorrente.helpers.ts). Sem série (payload é snapshot do período, não há
-  // histórico mensal por dimensão aqui — mesma limitação de "Motivos de Churn"/linhasPorMotivo
-  // do recorrente acima).
-  const pontualProdutoRows = linhasPorProdutoPontual(pontorrente?.detalhamento);
-  const pontualMotivoRows = linhasPorDimPontual(pontorrente?.churnPorDimensao?.motivo, "motivo");
-  const pontualOperadorRows = linhasPorDimPontual(pontorrente?.churnPorDimensao?.responsavel, "operador");
-  const pontualSquadRows = linhasPorDimPontual(pontorrente?.churnPorDimensao?.squad, "squad");
+  // Onda D2: breakdowns do Churn Pontual por dimensão — fonte única `series.churnPontualPor*`
+  // (série + atual do mês, mesmo padrão de produtoRows/motivoRows do Recorrente acima). Fallback
+  // gracioso para o snapshot do período (`pontorrente`, sem série) quando `series` está
+  // ausente/em erro — mesma tolerância de `motivoRows` acima.
+  const pontualProdutoRows = series
+    ? linhasPorDimensao(series.series.churnPontualPorProduto, mes, {
+        keyFn: (dim) => `churn_pontual_produto_${slug(dim)}`,
+        formato: "brl",
+        labelMes: labelMesCurto,
+        top: 8,
+      })
+    : linhasPorProdutoPontual(pontorrente?.detalhamento);
+  const pontualMotivoRows = series
+    ? linhasPorDimensao(series.series.churnPontualPorMotivo, mes, {
+        keyFn: (dim) => `churn_pontual_motivo_${slug(dim)}`,
+        formato: "brl",
+        labelMes: labelMesCurto,
+        top: 8,
+      })
+    : linhasPorDimPontual(pontorrente?.churnPorDimensao?.motivo, "motivo");
+  const pontualOperadorRows = series
+    ? linhasPorDimensao(series.series.churnPontualPorOperador, mes, {
+        keyFn: (dim) => `churn_pontual_operador_${slug(dim)}`,
+        formato: "brl",
+        labelMes: labelMesCurto,
+        top: 8,
+        // Dono automático (o próprio operador), mesmo padrão de `operadorRows` (Recorrente).
+        responsavelAuto: true,
+      })
+    : linhasPorDimPontual(pontorrente?.churnPorDimensao?.responsavel, "operador");
+  const pontualSquadRows = series
+    ? linhasPorDimensao(series.series.churnPontualPorSquad, mes, {
+        keyFn: (dim) => `churn_pontual_squad_${slug(dim)}`,
+        formato: "brl",
+        labelMes: labelMesCurto,
+        top: 8,
+      })
+    : linhasPorDimPontual(pontorrente?.churnPorDimensao?.squad, "squad");
 
   return [
     {

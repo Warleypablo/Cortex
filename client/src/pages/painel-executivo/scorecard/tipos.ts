@@ -103,6 +103,23 @@ export interface ScorecardSeriesPorDimensao {
   estoquePontualEmAbertoPorMes: ScorecardSerieDimPonto[];
   /** Como `estoquePontualEmAbertoPorMes`, status `pausado` — alimenta "Pausado (estoque)". */
   estoquePausadoPorMes: ScorecardSerieDimPonto[];
+  /** Churn Pontual (Onda D2) — série ÚNICA `SUM(valorp)` por mês, bucketizada pela data do
+     evento (`data_solicitacao_encerramento`), base = `cup_contratos` com `servico ILIKE
+     '%entrega%'` e status de churn (ver `fetchChurnPontualPorMes` no backend). Zero-fill.
+     Alimenta a linha "Churn confirmado (R$)" de "Churn Pontual — Geral" — o `atual` continua
+     vindo do overview cohort-based de `/api/churn-pontorrente` (só a `serie` é nova). */
+  churnPontualPorMes: ScorecardSerieDimPonto[];
+  /** Como `churnPontualPorMes`, quebrado por dimensão (ver `fetchChurnPontualPorDimensao`).
+     Alimenta "Churn Pontual — Por produto". */
+  churnPontualPorProduto: Record<string, ScorecardSerieDimPonto[]>;
+  /** Como `churnPontualPorProduto`, dimensão `responsavel` (operacional). Alimenta "Churn
+     Pontual — Por operador". */
+  churnPontualPorOperador: Record<string, ScorecardSerieDimPonto[]>;
+  /** Como `churnPontualPorProduto`, dimensão `squad`. Alimenta "Churn Pontual — Por squad". */
+  churnPontualPorSquad: Record<string, ScorecardSerieDimPonto[]>;
+  /** Como `churnPontualPorProduto`, dimensão `motivo_cancelamento`. Alimenta "Churn Pontual —
+     Motivos". */
+  churnPontualPorMotivo: Record<string, ScorecardSerieDimPonto[]>;
 }
 
 export interface ScorecardSeriesResponse {
