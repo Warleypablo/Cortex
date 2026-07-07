@@ -8,6 +8,7 @@ import { mesDefault, mesesOptions } from "./painel-executivo/temporalidade";
 import { SecaoVisaoGeral } from "./painel-executivo/SecaoVisaoGeral";
 import { SecaoReceita } from "./painel-executivo/SecaoReceita";
 import { SecaoChurn } from "./painel-executivo/SecaoChurn";
+import { SecaoLtLtv } from "./painel-executivo/SecaoLtLtv";
 
 const ABAS = [
   { value: "visao-geral", label: "Visão Geral" },
@@ -55,6 +56,8 @@ export default function PainelExecutivo() {
               <SecaoReceita mes={mes} />
             ) : a.value === "churn" ? (
               <SecaoChurn mes={mes} />
+            ) : a.value === "lt-ltv" ? (
+              <SecaoLtLtv mes={mes} />
             ) : (
               <div className="text-sm text-gray-500 dark:text-zinc-400">Em construção: {a.label} — {mes}</div>
             )}
