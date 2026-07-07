@@ -127,7 +127,7 @@ export default function PainelExecutivo() {
             ) : a.value === "churn" ? (
               <SecaoChurn mes={mes} modo={modo} />
             ) : a.value === "lt-ltv" ? (
-              <SecaoLtLtv mes={mes} />
+              <SecaoLtLtv mes={mes} modo={modo} />
             ) : a.value === "capacity" ? (
               <SecaoCapacity mes={mes} modo={modo} />
             ) : a.value === "entregas" ? (

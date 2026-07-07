@@ -1,13 +1,18 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Info } from "lucide-react";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
-import { formatCurrencyNoDecimals } from "@/lib/utils";
-import { KpiCard } from "./KpiCard";
-import { useLtLtvOverview, useLtLtvDist, useLtLtvClientes } from "./hooks";
+import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
+import {
+  useLtLtvOverview,
+  useLtLtvDist,
+  useLtLtvClientes,
+  useScorecardMetas,
+  useScorecardResponsaveis,
+  useSalvarResponsaveis,
+} from "./hooks";
+import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem } from "./scorecard/tipos";
 import type { OverviewData, BucketDist, ClienteRow } from "@/components/lt-ltv-churn/types";
-import { ErroCard, BlocoCard, formatLt } from "./_ui";
+import { ErroCard } from "./_ui";
 
 /** Aviso fixo: TODOS os dados desta aba são temporalidade="snapshot" — os endpoints
    /api/lt-ltv-churn/* ignoram o mês selecionado no topo da página e refletem a base
@@ -23,92 +28,132 @@ function AvisoSnapshot() {
   );
 }
 
-const tooltipStyleDark = { backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" };
+/** Chave estável para linhas derivadas de listas variáveis (faixa de distribuição) — mesmo
+   padrão de `slug` usado em SecaoChurn.tsx. */
+function slug(s: string): string {
+  return s
+    .normalize("NFD")
+    .replace(/[̀-ͯ]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)/g, "");
+}
 
-export function SecaoLtLtv({ mes }: { mes: string }) {
+export function SecaoLtLtv({ mes, modo }: { mes: string; modo: ScorecardModo }) {
   const overviewQ = useLtLtvOverview();
   const distQ = useLtLtvDist();
   const clientesQ = useLtLtvClientes();
+  // Aba 100% snapshot — sem metas hoje, mas mantém o hook por consistência com as demais
+  // seções (caso metas de LT/LTV sejam cadastradas futuramente em cortex_core.scorecard_metas).
+  useScorecardMetas(mes);
+  const responsaveis = useScorecardResponsaveis();
+  const salvarResponsaveis = useSalvarResponsaveis();
 
-  const overview = overviewQ.data as OverviewData | undefined;
-  const dist = distQ.data as { ltv: BucketDist[]; lt: BucketDist[] } | undefined;
-  const clientes = clientesQ.data as { clientes: ClienteRow[]; total: number } | undefined;
+  function onEditResponsavel(metricaKey: string, valor: string) {
+    const atuais = responsaveis.data?.itens ?? [];
+    const atualizado: ScorecardResponsavelItem[] = [
+      ...atuais.filter((i) => i.metrica_key !== metricaKey),
+      { metrica_key: metricaKey, responsavel: valor },
+    ];
+    salvarResponsaveis.mutate(atualizado);
+  }
 
   if (overviewQ.isError) {
     return (
-      <div className="space-y-6">
+      <div className="space-y-4">
         <AvisoSnapshot />
         <ErroCard mensagem="Falha ao carregar LT/LTV. Tente recarregar." />
       </div>
     );
   }
+  if (overviewQ.isLoading || !overviewQ.data) {
+    return (
+      <div className="space-y-4">
+        <AvisoSnapshot />
+        {Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}
+      </div>
+    );
+  }
+
+  const overview = overviewQ.data as OverviewData;
+  const dist = (distQ.data as { ltv: BucketDist[]; lt: BucketDist[] } | undefined)?.ltv ?? [];
+  const clientes = (clientesQ.data as { clientes: ClienteRow[] } | undefined)?.clientes ?? [];
+
+  const clienteRows: ScorecardRow[] = clientes.slice(0, 10).map((c) => ({
+    key: `lt_ltv_cliente_${c.idTask}`,
+    metrica: c.nomeCliente ?? "—",
+    sub: c.ltMeses != null ? `${c.ltMeses} meses` : undefined,
+    atual: c.ltvTotal,
+    formato: "brl",
+    temporalidade: "snapshot",
+  }));
+
+  const distRows: ScorecardRow[] = dist.map((b) => ({
+    key: `lt_ltv_dist_${slug(b.faixa)}`,
+    metrica: b.faixa,
+    atual: b.qtd,
+    formato: "int",
+    temporalidade: "snapshot",
+  }));
+
+  const secoes: ScorecardSection[] = [
+    {
+      id: "lt-ltv-base-ativa",
+      titulo: "LT / LTV — Base ativa (snapshot)",
+      linhas: [
+        {
+          key: "lt_ltv_lt_medio_ativo",
+          metrica: "LT médio ativo",
+          atual: overview.ltMedioAtivo,
+          formato: "meses",
+          temporalidade: "snapshot",
+        },
+        {
+          key: "lt_ltv_lt_medio_cancelado",
+          metrica: "LT médio cancelado",
+          atual: overview.ltMedioCancelado,
+          formato: "meses",
+          temporalidade: "snapshot",
+        },
+        {
+          key: "lt_ltv_ltv_medio_cliente",
+          metrica: "LTV médio/cliente",
+          atual: overview.ltvMedioCliente,
+          formato: "brl",
+          temporalidade: "snapshot",
+        },
+        {
+          key: "lt_ltv_total_recorrentes",
+          metrica: "Total recorrentes",
+          atual: overview.totalRecorrentes,
+          formato: "int",
+          temporalidade: "snapshot",
+        },
+      ],
+    },
+    {
+      id: "lt-ltv-maiores-clientes",
+      titulo: "Maiores clientes por LTV (snapshot)",
+      linhas: clienteRows,
+    },
+    {
+      id: "lt-ltv-distribuicao",
+      titulo: "Distribuição de LTV por cliente (snapshot)",
+      linhas: distRows,
+    },
+  ];
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4">
       <AvisoSnapshot />
-
-      {overviewQ.isLoading || !overview ? (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          {Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-28" />)}
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard mes={mes} temporalidade="snapshot" titulo="LT médio ativo" valor={formatLt(overview.ltMedioAtivo)} />
-          <KpiCard mes={mes} temporalidade="snapshot" titulo="LT médio cancelado" valor={formatLt(overview.ltMedioCancelado)} />
-          <KpiCard mes={mes} temporalidade="snapshot" titulo="LTV médio/cliente" valor={formatCurrencyNoDecimals(overview.ltvMedioCliente)} />
-          <KpiCard mes={mes} temporalidade="snapshot" titulo="Total recorrentes" valor={String(overview.totalRecorrentes)} />
-        </div>
-      )}
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <BlocoCard titulo="Distribuição de LTV por cliente" isLoading={distQ.isLoading} isError={distQ.isError} skeletonClassName="h-64 w-full">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={dist?.ltv ?? []}>
-              <XAxis dataKey="faixa" tick={{ fill: "#9ca3af", fontSize: 12 }} />
-              <YAxis tick={{ fill: "#9ca3af", fontSize: 12 }} allowDecimals={false} />
-              <Tooltip formatter={(v: number) => [String(v), "Clientes"]} contentStyle={tooltipStyleDark} />
-              <Bar dataKey="qtd" name="Clientes" fill="#6366f1" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </BlocoCard>
-
-        <BlocoCard titulo="Distribuição de LT por cliente" isLoading={distQ.isLoading} isError={distQ.isError} skeletonClassName="h-64 w-full">
-          <ResponsiveContainer width="100%" height={260}>
-            <BarChart data={dist?.lt ?? []}>
-              <XAxis dataKey="faixa" tick={{ fill: "#9ca3af", fontSize: 12 }} />
-              <YAxis tick={{ fill: "#9ca3af", fontSize: 12 }} allowDecimals={false} />
-              <Tooltip formatter={(v: number) => [String(v), "Clientes"]} contentStyle={tooltipStyleDark} />
-              <Bar dataKey="qtd" name="Clientes" fill="#0ea5e9" radius={[4, 4, 0, 0]} />
-            </BarChart>
-          </ResponsiveContainer>
-        </BlocoCard>
-      </div>
-
-      <BlocoCard titulo="Maiores por LTV" isLoading={clientesQ.isLoading} isError={clientesQ.isError} skeletonClassName="h-64 w-full">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Cliente</TableHead>
-                <TableHead className="text-right">LTV total</TableHead>
-                <TableHead className="text-right">LT</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {(clientes?.clientes ?? []).slice(0, 10).map((c) => (
-                <TableRow key={c.idTask}>
-                  <TableCell>{c.nomeCliente ?? "—"}</TableCell>
-                  <TableCell className="text-right">{formatCurrencyNoDecimals(c.ltvTotal)}</TableCell>
-                  <TableCell className="text-right">{formatLt(c.ltMeses)}</TableCell>
-                </TableRow>
-              ))}
-              {(clientes?.clientes?.length ?? 0) === 0 && (
-                <TableRow><TableCell colSpan={3} className="text-center text-sm text-gray-400 dark:text-zinc-500">Sem dados.</TableCell></TableRow>
-              )}
-            </TableBody>
-          </Table>
-        </div>
-      </BlocoCard>
+      <Scorecard
+        secoes={secoes}
+        mes={mes}
+        modo={modo}
+        metas={{}}
+        responsaveis={responsaveis.data?.itens ?? []}
+        onEditResponsavel={onEditResponsavel}
+      />
     </div>
   );
 }
