@@ -79,6 +79,7 @@ const AnalisePreditiva = lazyWithRetry(() => import("@/pages/gestao/AnalisePredi
 const TvLeaderboard = lazyWithRetry(() => import("@/pages/gestao/TvLeaderboard"));
 const GestaoReceita = lazyWithRetry(() => import("@/pages/gestao/GestaoReceita"));
 const EvolucaoMensal = lazyWithRetry(() => import("@/pages/EvolucaoMensal"));
+const PainelExecutivo = lazyWithRetry(() => import("@/pages/PainelExecutivo"));
 const DashboardDFC = lazyWithRetry(() => import("@/pages/DashboardDFC"));
 const DashboardInadimplencia = lazyWithRetry(() => import("@/pages/DashboardInadimplencia"));
 const DashboardInhire = lazyWithRetry(() => import("@/pages/DashboardInhire"));
@@ -343,6 +344,7 @@ function ProtectedRouter() {
       <Route path="/creators-pontual">{() => <ProtectedRoute path="/creators-pontual" component={CreatorsPontual} />}</Route>
       <Route path="/creators-conversao">{() => <ProtectedRoute path="/creators-conversao" component={CreatorsConversao} />}</Route>
       <Route path="/dashboard/evolucao-mensal">{() => <ProtectedRoute path="/dashboard/evolucao-mensal" component={EvolucaoMensal} />}</Route>
+      <Route path="/dashboard/painel-executivo">{() => <ProtectedRoute path="/dashboard/painel-executivo" component={PainelExecutivo} />}</Route>
       <Route path="/dashboard/analise-squads">{() => <ProtectedRoute path="/dashboard/analise-squads" component={AnaliseSquads} />}</Route>
       <Route path="/dashboard/saude-base-ativa">{() => <ProtectedRoute path="/dashboard/saude-base-ativa" component={SaudeBaseAtiva} />}</Route>
       <Route path="/dashboard/analise-preditiva">{() => <ProtectedRoute path="/dashboard/analise-preditiva" component={AnalisePreditiva} />}</Route>
