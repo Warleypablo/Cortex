@@ -266,4 +266,25 @@ def find_legenda_for_task(doc_content: str, task_name: str) -> tuple[str, str | 
         if loose:
             best = max(loose, key=lambda s: len(s.header_normalized))
             return best.legenda, best.header
+
+    # Última tolerância: MESMAS PALAVRAS, ORDEM DIFERENTE. Caso real (07/jul/2026):
+    # card "Você vai perder pro Instagram de 7x1 de novo" vs header do Doc
+    # "VOCÊ VAI PERDER DE 7X1 PRO INSTAGRAM DE NOVO" — só 'de 7x1' e 'pro instagram'
+    # trocaram de lugar. Os tiers acima (igualdade, substring, sem-espaço) exigem
+    # sequência contígua e não pegam reordenação, então a legenda vinha vazia e o
+    # agente se recusava a postar sozinho — o cardista tinha que intervir toda vez.
+    # Comparamos o MULTICONJUNTO de palavras (ordem-agnóstico): exige exatamente as
+    # mesmas palavras, com a mesma repetição. É deliberadamente estrito — casar por
+    # subconjunto/similaridade arriscaria colar a legenda ERRADA num post (pior que
+    # legenda faltando). Guarda de 3+ palavras evita título curto casar à toa.
+    target_words = target.split()
+    if len(target_words) >= 3:
+        target_multiset = sorted(target_words)
+        reordered = [
+            s for s in sections
+            if sorted(s.header_normalized.split()) == target_multiset
+        ]
+        if reordered:
+            best = max(reordered, key=lambda s: len(s.header_normalized))
+            return best.legenda, best.header
     return "", None

@@ -151,10 +151,45 @@ def run():
     _assert(hdr == "O MAIOR EVENTO DO ESTÁ CHEGANDO", "match tolera diferença de espaço (ES TÁ vs ESTÁ)")
     _assert("Creator Summit" in leg, "legenda do header com typo de espaço veio certa")
 
+    print("\n=== reordenação de palavras (7x1) ===")
+    test_match_ordem_palavras_trocada()
+
     print("\n=== formatação da legenda ===")
     test_legenda_preserva_paragrafos()
 
     print("\n🎉 Todos os testes passaram.")
+
+
+def test_match_ordem_palavras_trocada():
+    # Regressão do post de 07/jul/2026 ("Você vai perder ... 7x1"): o TÍTULO do card
+    # e o HEADER do Doc têm as MESMAS palavras em ORDEM diferente ('de 7x1' e
+    # 'pro Instagram' trocados). Igualdade/substring/sem-espaço exigem sequência
+    # contígua e falhavam → legenda vazia → agente recusava postar sozinho.
+    doc = (
+        "**VOCÊ VAI PERDER DE 7X1 PRO INSTAGRAM DE NOVO**\n"
+        "**LEGENDA**\n"
+        "O feed morreu? Não. Você que parou de postar bem.\n"
+        "**PRÓXIMO POST**\n"
+    )
+    leg, hdr = find_legenda_for_task(doc, "Você vai perder pro Instagram de 7x1 de novo")
+    _assert(hdr == "VOCÊ VAI PERDER DE 7X1 PRO INSTAGRAM DE NOVO",
+            "match tolera palavras reordenadas (mesmo multiconjunto)")
+    _assert("O feed morreu" in leg, "legenda do header reordenado veio certa")
+
+    # GUARDA 1: multiconjunto DIFERENTE (uma palavra a mais/menos) NÃO casa —
+    # melhor legenda faltando do que legenda ERRADA no post.
+    leg2, hdr2 = find_legenda_for_task(doc, "Você vai perder pro Instagram de novo")
+    _assert(hdr2 is None, "palavra faltando (sem '7x1') → NÃO casa (evita legenda errada)")
+
+    # GUARDA 2: dois posts com as mesmas palavras-base mas números diferentes
+    # (Turbo News 1 vs 2) não se confundem — o número faz parte do multiconjunto.
+    doc_news = (
+        "**TURBO NEWS 1**\n**LEGENDA**\nNews um.\n"
+        "**TURBO NEWS 2**\n**LEGENDA**\nNews dois.\n"
+    )
+    leg3, hdr3 = find_legenda_for_task(doc_news, "News Turbo 2")  # ordem trocada
+    _assert(hdr3 == "TURBO NEWS 2", "reordenação casa o número certo (2, não 1)")
+    _assert(leg3 == "News dois.", "legenda do post 2, não do 1")
 
 
 def test_legenda_preserva_paragrafos():
