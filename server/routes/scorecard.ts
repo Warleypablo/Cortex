@@ -4,6 +4,7 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { BP_2026_TARGETS } from "../okr2026/bp2026Targets";
 import { krs, type KRDef } from "../okr2026/okrRegistry";
+import { addMeses, listaMeses12, rowsParaSeries, type SeriePonto, type SerieRow } from "./scorecard.helpers";
 
 export type ScorecardUnit = "BRL" | "PCT" | "COUNT";
 export type ScorecardDirection = "up" | "down";
@@ -128,6 +129,118 @@ export function montarMetasScorecard(mes: string): ScorecardMetasResult {
   return { metas };
 }
 
+// ---------------------------------------------------------------------------
+// Séries mensais por dimensão (modo Evolução)
+// ---------------------------------------------------------------------------
+
+export interface SeriesScorecard {
+  churnPorProduto: Record<string, SeriePonto[]>;
+  churnPorOperador: Record<string, SeriePonto[]>;
+  churnPorSquad: Record<string, SeriePonto[]>;
+  entregasPorOperador: Record<string, SeriePonto[]>;
+  mrrPorSquad: Record<string, SeriePonto[]>;
+  mrrPorOperador: Record<string, SeriePonto[]>;
+}
+
+export interface ScorecardSeriesResult {
+  series: SeriesScorecard;
+}
+
+type ChurnDim = "produto" | "responsavel_geral" | "squad";
+type MrrDim = "squad" | "responsavel";
+
+/**
+ * Churn por dimensão (EVENTO — data de solicitação de encerramento), a partir da view
+ * curada `vw_cup_churn_ajustado`. `dim` vem sempre de um literal fixo do nosso código
+ * (nunca de input do usuário), então é seguro usar `sql.raw` só para o identificador de
+ * coluna — os valores de data seguem parametrizados.
+ */
+async function fetchChurnPorDimensao(dim: ChurnDim, inicio: string, fim: string): Promise<SerieRow[]> {
+  const result = await db.execute(sql`
+    SELECT TO_CHAR(DATE_TRUNC('month', data_solicitacao_encerramento),'YYYY-MM') AS mes,
+           COALESCE(NULLIF(TRIM(${sql.raw(dim)}),''),'Não Informado') AS dim,
+           SUM(valor_r)::numeric AS valor
+    FROM cortex_core.vw_cup_churn_ajustado
+    WHERE valor_r > 0 AND data_solicitacao_encerramento IS NOT NULL
+      AND data_solicitacao_encerramento >= ${inicio}::date AND data_solicitacao_encerramento < ${fim}::date
+      AND COALESCE(abonar_churn,'') <> 'Sim'
+      AND COALESCE(motivo_cancelamento,'') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
+    GROUP BY 1,2
+  `);
+  return result.rows as unknown as SerieRow[];
+}
+
+/** Entregas por operador (FLUXO — data de entrega), a partir de `cup_contratos`. */
+async function fetchEntregasPorOperador(inicio: string, fim: string): Promise<SerieRow[]> {
+  const result = await db.execute(sql`
+    SELECT TO_CHAR(data_entrega,'YYYY-MM') AS mes, TRIM(responsavel) AS dim, SUM(valorp::numeric)::numeric AS valor
+    FROM "Clickup".cup_contratos
+    WHERE LOWER(TRIM(status))='entregue' AND data_entrega IS NOT NULL
+      AND data_entrega >= ${inicio}::date AND data_entrega < ${fim}::date
+      AND valorp::numeric > 0 AND responsavel IS NOT NULL AND TRIM(responsavel) <> ''
+    GROUP BY 1,2
+  `);
+  return result.rows as unknown as SerieRow[];
+}
+
+/**
+ * MRR por dimensão (ESTOQUE — snapshot de fim de mês), a partir de `cup_data_hist`.
+ * GOTCHA (ver investigação): `produto` em `cup_data_hist` é instável — por isso este
+ * endpoint só expõe `squad` e `responsavel` aqui (MRR por produto usa
+ * `/api/lt-ltv-churn/evolucao-produto-tabela`, que reclassifica via `servico`).
+ */
+async function fetchMrrPorDimensao(dim: MrrDim, inicio: string, fimUltimoMes: string): Promise<SerieRow[]> {
+  const result = await db.execute(sql`
+    WITH meses AS (
+      SELECT to_char(d,'YYYY-MM') AS mes, d::date AS m
+      FROM generate_series(${inicio}::date, ${fimUltimoMes}::date, interval '1 month') d
+    ),
+    snap_ref AS (
+      SELECT meses.mes,
+        (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE date_trunc('month',data_snapshot)=meses.m) AS snap
+      FROM meses
+    )
+    SELECT sr.mes, COALESCE(NULLIF(TRIM(h.${sql.raw(dim)}),''),'Não Informado') AS dim, SUM(h.valorr)::numeric AS valor
+    FROM snap_ref sr JOIN "Clickup".cup_data_hist h ON h.data_snapshot = sr.snap
+    WHERE h.status IN ('ativo','onboarding','triagem') AND h.valorr > 0
+    GROUP BY 1,2
+  `);
+  return result.rows as unknown as SerieRow[];
+}
+
+/**
+ * Monta as 6 séries mensais por dimensão do modo Evolução, para a janela de 12 meses
+ * terminando em `mes` (inclusive). Cada série vem com os 12 meses preenchidos (0 onde
+ * não há dado) — ver `rowsParaSeries`.
+ */
+export async function montarSeriesScorecard(mes: string): Promise<ScorecardSeriesResult> {
+  const meses = listaMeses12(mes);
+  const inicio = `${meses[0]}-01`;
+  const fim = `${addMeses(mes, 1)}-01`;
+  const fimUltimoMes = `${mes}-01`;
+
+  const [churnProdutoRows, churnOperadorRows, churnSquadRows, entregasRows, mrrSquadRows, mrrOperadorRows] =
+    await Promise.all([
+      fetchChurnPorDimensao("produto", inicio, fim),
+      fetchChurnPorDimensao("responsavel_geral", inicio, fim),
+      fetchChurnPorDimensao("squad", inicio, fim),
+      fetchEntregasPorOperador(inicio, fim),
+      fetchMrrPorDimensao("squad", inicio, fimUltimoMes),
+      fetchMrrPorDimensao("responsavel", inicio, fimUltimoMes),
+    ]);
+
+  return {
+    series: {
+      churnPorProduto: rowsParaSeries(churnProdutoRows, meses),
+      churnPorOperador: rowsParaSeries(churnOperadorRows, meses),
+      churnPorSquad: rowsParaSeries(churnSquadRows, meses),
+      entregasPorOperador: rowsParaSeries(entregasRows, meses),
+      mrrPorSquad: rowsParaSeries(mrrSquadRows, meses),
+      mrrPorOperador: rowsParaSeries(mrrOperadorRows, meses),
+    },
+  };
+}
+
 export function registerScorecardRoutes(app: Express) {
   app.get("/api/scorecard/metas", isAuthenticated, (req, res) => {
     const mes = req.query.mes as string | undefined;
@@ -142,6 +255,23 @@ export function registerScorecardRoutes(app: Express) {
     } catch (error) {
       console.error("[api] Error building scorecard metas:", error);
       res.status(500).json({ error: "Failed to build scorecard metas" });
+    }
+  });
+
+  // Séries mensais por dimensão (modo Evolução) — janela de 12 meses até `mes`, inclusive.
+  app.get("/api/scorecard/series", isAuthenticated, async (req, res) => {
+    const mes = req.query.mes as string | undefined;
+
+    if (!mes || !MES_REGEX.test(mes)) {
+      return res.status(400).json({ error: "Parâmetro 'mes' inválido. Use o formato YYYY-MM." });
+    }
+
+    try {
+      const result = await montarSeriesScorecard(mes);
+      res.json(result);
+    } catch (error) {
+      console.error("[api] Error building scorecard series:", error);
+      res.status(500).json({ error: "Failed to build scorecard series" });
     }
   });
 
