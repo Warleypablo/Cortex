@@ -4,6 +4,7 @@ import { AlertTriangle } from "lucide-react";
 import { formatPercent } from "@/lib/utils";
 import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
 import {
+  useReportsMensal,
   useChurnDetalhamento,
   useChurnProdutoMotivo,
   useChurnTaxaMensal,
@@ -14,7 +15,7 @@ import {
   useSalvarResponsaveis,
 } from "./hooks";
 import type { ScorecardSection, ScorecardRow, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
-import type { ChurnTaxaMensalRow } from "./tipos";
+import type { ChurnTaxaMensalRow, ReceitaChurnPonto } from "./tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -30,6 +31,13 @@ function serieTaxaMensal(rows: ChurnTaxaMensalRow[] | undefined, valor: (r: Chur
   return (rows ?? []).map((r) => ({ label: labelMesCurto(r.mes), valor: valor(r) }));
 }
 
+/** Normaliza uma série que já vem com `label` do backend (mesmo helper de SecaoReceita.tsx/
+   SecaoVisaoGeral.tsx) — usado pelo "Churn R$" geral, que agora compartilha fonte com as
+   outras duas abas (turboMetrics.receitaChurnSeries), não mais o churn-detalhamento. */
+function serieComLabel<T extends { label: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r) }));
+}
+
 /** Chave estável para linhas derivadas de listas variáveis (produto+motivo, operador, squad) —
    usada como `metrica_key` de persistência do responsável manual (CelulaResponsavel), por isso
    precisa ser determinística por entidade (não por índice de posição, que muda mês a mês). */
@@ -43,6 +51,11 @@ function slug(s: string): string {
 }
 
 export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) {
+  // Fonte mensal canônica do painel (mesma de SecaoReceita/SecaoVisaoGeral) — usada SÓ para
+  // o "Churn R$" geral, para que as 3 abas mostrem o MESMO valor e a MESMA meta. Os
+  // breakdowns abaixo (produto/operador/squad) continuam no churn-detalhamento (são
+  // detalhamentos, não o total).
+  const rm = useReportsMensal(mes);
   const detalhamento = useChurnDetalhamento(mes);
   const produtoMotivo = useChurnProdutoMotivo(mes);
   const taxaMensal = useChurnTaxaMensal(mes);
@@ -141,10 +154,12 @@ export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) 
         {
           key: "churn_geral_brl",
           metrica: "Churn R$",
-          atual: m.mrr_perdido,
+          // Mesma fonte e mesma meta de Receita/Visão Geral (turboMetrics.churnMrr +
+          // churn_mrr_month) — evita 2 valores/2 metas para a mesma métrica no scorecard.
+          atual: rm.data?.turboMetrics.churnMrr ?? null,
           formato: "brl",
-          metaKey: "churn_brl",
-          serie: serieTaxaMensal(taxaMensal.data?.rows, (r) => r.mrr_churn),
+          metaKey: "churn_mrr_month",
+          serie: serieComLabel<ReceitaChurnPonto>(rm.data?.turboMetrics.receitaChurnSeries, (r) => r.churnBrl),
           temporalidade: "mes",
         },
         {
@@ -168,6 +183,7 @@ export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) 
     {
       id: "churn-produto",
       titulo: "Churn Recorrente — Por produto",
+      subtitulo: "detalhamento (fonte ClickUp); pode não somar ao geral",
       linhas: produtoRows,
     },
     {

@@ -119,7 +119,9 @@ export function SecaoVisaoGeral({ mes, modo }: { mes: string; modo: ScorecardMod
         {
           key: "visao_crosssell",
           metrica: "Cross-sell",
-          atual: tm.crosssellMrr + tm.crosssellPontual,
+          // metaKey é MRR-only (sales_mrr_monetization_target) — somar o pontual aqui infla o
+          // "atual" e distorce o status vs. a meta. Mesma fonte/meta da aba Receita.
+          atual: tm.crosssellMrr,
           formato: "brl",
           metaKey: "sales_mrr_monetization_target",
           temporalidade: "mes",

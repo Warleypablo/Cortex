@@ -64,4 +64,16 @@ describe("montarMetasScorecard", () => {
     expect(metas.ebitda.valor).toBe(bpValor);
     expect(metas.ebitda.origem).toBe("bp");
   });
+
+  it("mês fora do ano do planejamento (2025-12) não aplica metas de 2026, só o override fixo", () => {
+    const { metas: metasOutroAno } = montarMetasScorecard("2025-12");
+    expect(Object.keys(metasOutroAno)).toEqual(["receita_cabeca"]);
+    expect(metasOutroAno.receita_cabeca).toEqual({
+      valor: 20000,
+      unit: "BRL",
+      direction: "up",
+      origem: "override",
+      label: "Receita por Cabeça",
+    });
+  });
 });

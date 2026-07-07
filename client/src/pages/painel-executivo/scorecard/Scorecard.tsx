@@ -219,21 +219,31 @@ function Sparkline({ serie, favoravel }: { serie: ScorecardSeriePonto[]; favorav
 }
 
 function LinhaEvolucao({ row, colunas, meta }: { row: ScorecardRow; colunas: string[]; meta?: ScorecardMeta }) {
-  const isSnapshot = !row.serie || row.serie.length === 0;
-  const delta = isSnapshot ? null : deltaM1(row.serie);
+  // "Snapshot" é um selo de TEMPORALIDADE (estoque medido num ponto no tempo, ex: estoque
+  // pontual em aberto, LTV médio) — não um estado genérico para "linha sem série". Uma
+  // métrica mensal (temporalidade "mes") que ainda não acumulou histórico é outra coisa:
+  // sem série (ainda), não snapshot. Confundir os dois rotula métricas normais como
+  // "Snapshot" incorretamente.
+  const isSnapshot = row.temporalidade === "snapshot";
+  const semSerie = !row.serie || row.serie.length === 0;
+  const delta = isSnapshot || semSerie ? null : deltaM1(row.serie);
   const favoravel = trendFavoravel(delta, meta?.direction);
 
   return (
     <tr className="border-b border-border/60 last:border-0 hover:bg-muted/40">
       <td className="sticky left-0 z-10 bg-card px-4 py-3 text-left font-medium text-foreground">{row.metrica}</td>
-      {isSnapshot ? (
+      {isSnapshot || semSerie ? (
         // colSpan == colunas.length sempre — mesmo quando a seção inteira não tem nenhuma
         // série (colunas cai no fallback ["Atual"] de 1 coluna), mantendo a grade alinhada
         // com o header (nº de <th> de mês/placeholder é sempre igual a colunas.length).
         <td colSpan={colunas.length} className="px-4 py-3 text-right">
           <div className="flex items-center justify-end gap-2">
             <span className="font-semibold tabular-nums text-foreground">{formatValor(row.atual, row.formato)}</span>
-            <StatusPill tone="neutral" label="Snapshot" />
+            {isSnapshot ? (
+              <StatusPill tone="neutral" label="Snapshot" />
+            ) : (
+              <span className="text-xs text-muted-foreground">sem série</span>
+            )}
           </div>
         </td>
       ) : (
@@ -251,7 +261,7 @@ function LinhaEvolucao({ row, colunas, meta }: { row: ScorecardRow; colunas: str
       )}
       <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{formatMeta(meta, row.formato)}</td>
       <td className="px-3 py-3 text-right">
-        {isSnapshot ? <span className="text-xs text-muted-foreground">—</span> : <Sparkline serie={row.serie!} favoravel={favoravel} />}
+        {isSnapshot || semSerie ? <span className="text-xs text-muted-foreground">—</span> : <Sparkline serie={row.serie!} favoravel={favoravel} />}
       </td>
     </tr>
   );

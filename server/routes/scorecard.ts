@@ -74,42 +74,53 @@ function mensalizarTargetOkr(kr: KRDef, valorTrimestre: number): number {
 export function montarMetasScorecard(mes: string): ScorecardMetasResult {
   const metas: Record<string, ScorecardMeta> = {};
 
-  const quarter = quarterFromMes(mes);
+  // BP2026 (months) e OKR 2026 (targets por trimestre) só cobrem o ano de planejamento
+  // 2026 — as chaves de `months` são literalmente "2026-XX" (ver bp2026Targets.ts). O
+  // seletor de mês do painel lista 12 meses para trás, o que pode incluir meses de 2025;
+  // aplicar a meta de 2026 a um mês de 2025 (mesmo trimestre/mês numérico) produz um
+  // status falso. Para qualquer ano != 2026 não há meta real — melhor não mostrar
+  // nenhuma do que mostrar a errada.
+  const anoCobertoPeloPlanejamento = mes.slice(0, 4) === "2026";
 
-  // 1) OKR primeiro (trimestral, mensalizado) — processado antes do BP para que
-  //    o BP possa sobrescrever em caso de colisão de metric_key.
-  if (quarter) {
-    for (const kr of krs) {
-      const valorTrimestre = kr.targets[quarter];
-      if (valorTrimestre === undefined || valorTrimestre === null) continue;
+  if (anoCobertoPeloPlanejamento) {
+    const quarter = quarterFromMes(mes);
 
-      metas[kr.metricKey] = {
-        valor: mensalizarTargetOkr(kr, valorTrimestre),
-        unit: kr.unit,
-        direction: krDirectionToScorecard(kr.direction),
-        origem: "okr",
-        label: kr.title,
+    // 1) OKR primeiro (trimestral, mensalizado) — processado antes do BP para que
+    //    o BP possa sobrescrever em caso de colisão de metric_key.
+    if (quarter) {
+      for (const kr of krs) {
+        const valorTrimestre = kr.targets[quarter];
+        if (valorTrimestre === undefined || valorTrimestre === null) continue;
+
+        metas[kr.metricKey] = {
+          valor: mensalizarTargetOkr(kr, valorTrimestre),
+          unit: kr.unit,
+          direction: krDirectionToScorecard(kr.direction),
+          origem: "okr",
+          label: kr.title,
+        };
+      }
+    }
+
+    // 2) BP2026 (mensal) — sobrescreve o OKR quando a metric_key colide.
+    for (const metric of BP_2026_TARGETS) {
+      const valor = metric.months[mes];
+      if (valor === undefined || valor === null) continue;
+
+      metas[metric.metric_key] = {
+        valor,
+        unit: metric.unit,
+        // "flat" não tem um equivalente direto em "up"|"down"; tratamos como "up"
+        // (neutro) já que o contrato do endpoint só suporta as duas direções.
+        direction: metric.direction === "down" ? "down" : "up",
+        origem: "bp",
+        label: metric.title,
       };
     }
   }
 
-  // 2) BP2026 (mensal) — sobrescreve o OKR quando a metric_key colide.
-  for (const metric of BP_2026_TARGETS) {
-    const valor = metric.months[mes];
-    if (valor === undefined || valor === null) continue;
-
-    metas[metric.metric_key] = {
-      valor,
-      unit: metric.unit,
-      // "flat" não tem um equivalente direto em "up"|"down"; tratamos como "up"
-      // (neutro) já que o contrato do endpoint só suporta as duas direções.
-      direction: metric.direction === "down" ? "down" : "up",
-      origem: "bp",
-      label: metric.title,
-    };
-  }
-
-  // 3) Overrides fixos por último — sempre vencem.
+  // 3) Overrides fixos por último — sempre vencem, independente do ano (ex:
+  //    receita_cabeca é uma meta fixa negociada fora do BP/OKR).
   for (const [key, meta] of Object.entries(OVERRIDES)) {
     metas[key] = meta;
   }
