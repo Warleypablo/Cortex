@@ -1,6 +1,8 @@
 import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
+import Anthropic from "@anthropic-ai/sdk";
+import { renderAprofundadoImage, uploadFcaImage, type FcaSection } from "../fca/aprofundadoImage";
 
 const CLICKUP_API_KEY = process.env.CLICKUP_API_KEY!;
 const CLICKUP_FCA_LIST_ID = "901322140780";
@@ -688,6 +690,168 @@ async function criarTaskClickUp(args: { funil: string; canal: string; nome: stri
   return await r.json() as { id: string; url: string };
 }
 
+async function updateTaskDescription(taskId: string, markdown: string) {
+  const r = await fetch(`https://api.clickup.com/api/v2/task/${taskId}`, {
+    method: "PUT",
+    headers: { Authorization: CLICKUP_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ markdown_description: markdown }),
+  });
+  if (!r.ok) throw new Error(`ClickUp update error ${r.status}: ${await r.text()}`);
+}
+
+// ===================== FCA v5 (imagem do Aprofundado + FATO/CAUSA/AÇÃO) =====================
+
+// Canal → endpoint de mídia do Aprofundado + utm_source pra atribuir as pré-vendas (PLATFORM_TO_UTM).
+const CANAL_APROFUNDADO: Record<string, { media: string; utm: string }> = {
+  metaAds: { media: "meta-ads", utm: "facebook" },
+  googleAds: { media: "google-ads", utm: "google" },
+  tiktokAds: { media: "meta-ads", utm: "tiktok_ads" }, // mídia TikTok limitada no Aprofundado; degrada
+};
+
+// Janela 7D rolling (últimos 7 dias fechados = ontem − 6 → ontem).
+function periodo7D(now: Date) {
+  const ate = new Date(now); ate.setUTCDate(ate.getUTCDate() - 1);
+  const de = new Date(ate); de.setUTCDate(de.getUTCDate() - 6);
+  const mesRef = fmtDate(ate).slice(0, 7);
+  const diasMes = new Date(Date.UTC(ate.getUTCFullYear(), ate.getUTCMonth() + 1, 0)).getUTCDate();
+  return { de: fmtDate(de), ate: fmtDate(ate), mesRef, diasMes, dias: 7 };
+}
+
+// Puxa os MESMOS números da aba Aprofundado (self-call interno, FCA_API_TOKEN autoriza GET).
+async function fetchAprofundado(canal: string, funil: string, de: string, ate: string) {
+  const port = process.env.PORT || "3000";
+  const base = `http://127.0.0.1:${port}/api/growth/orcado-realizado`;
+  const cfg = CANAL_APROFUNDADO[canal] || CANAL_APROFUNDADO.metaAds;
+  const q = `startDate=${de}&endDate=${ate}&funilNgc=${encodeURIComponent(funil)}&utmSource=${cfg.utm}`;
+  const headers = { Authorization: `Bearer ${FCA_API_TOKEN}` };
+  const j = async (u: string) => {
+    const r = await fetch(u, { headers });
+    if (!r.ok) throw new Error(`${u} → ${r.status}`);
+    return r.json() as any;
+  };
+  const [media, mql, nmql] = await Promise.all([
+    j(`${base}/${cfg.media}?${q}`),
+    j(`${base}/mql?${q}`),
+    j(`${base}/nao-mql?${q}`),
+  ]);
+  return { media, mql, nmql };
+}
+
+const numOr = (v: any, d: number | null = null): number | null =>
+  (typeof v === "number" && isFinite(v)) ? v : d;
+const div = (a: number | null, b: number | null): number | null =>
+  (a == null || b == null || b === 0) ? null : a / b;
+
+// Monta as seções/linhas idênticas ao Aprofundado (Meta), com quebras MQL/Não-MQL.
+// Orçado mensal das absolutas é escalado pra 7D (× dias/diasMes); taxas/percentuais não escalam.
+function montarLinhasV5(args: { media: any; mql: any; nmql: any; metas: { ma: any; mql: any; nmql: any }; fator7d: number }): FcaSection[] {
+  const { media, mql, nmql, metas, fator7d } = args;
+  const m = metas.ma || {}, mm = metas.mql || {}, mn = metas.nmql || {};
+  const sc = (v: any): number | null => { const n = numOr(v); return n == null ? null : n * fator7d; };
+
+  const invest = numOr(media.investimento, 0)!;
+  const lpv = numOr(media.visualizacoesPagina, 0)!;
+  const sess = numOr(media.sessoes, 0)!;
+  const mqls = numOr(mql.totalMqls, 0)!;
+  const nmqls = numOr(nmql.totalNaoMqls, 0)!;
+  const leads = mqls + nmqls;
+
+  const somaFat = (d: any) => (numOr(d.faturamentoAceleracao, 0)! + numOr(d.faturamentoImplantacao, 0)!);
+  const negocios = numOr(mql.dealsGanhos, 0)! + numOr(nmql.dealsGanhos, 0)!;
+  const contratos = numOr(mql.contratosGanhos, 0)! + numOr(nmql.contratosGanhos, 0)!;
+  const fatTotal = somaFat(mql) + somaFat(nmql);
+
+  return [
+    { title: "Growth — Mídia", metrics: [
+      { name: "Investimento", fmt: "currency", kind: "abs", r: invest, o: sc(m.investimento) },
+      { name: "CPM", fmt: "currency", kind: "rate", r: numOr(media.cpm), o: numOr(m.cpm), inv: true },
+      { name: "CTR de saída", fmt: "percent", kind: "pct", r: numOr(media.ctr), o: numOr(m.ctr) },
+      { name: "Visualizações de Página", fmt: "number", kind: "abs", r: lpv, o: sc(m.visualizacoesPagina) },
+      { name: "Sessões", fmt: "number", kind: "abs", r: sess, o: sc(m.sessoes) },
+      { name: "Connect Rate", fmt: "percent", kind: "pct", r: numOr(media.connectRate), o: numOr(m.connectRate) },
+      { name: "Tx Conversão da Página — Visualização de Página", fmt: "percent", kind: "pct", r: div(leads, lpv), o: numOr(m.taxaConversaoPagina) },
+      { name: "MQL", fmt: "percent", kind: "pct", r: div(mqls, lpv), o: null, indent: true },
+      { name: "Não-MQL", fmt: "percent", kind: "pct", r: div(nmqls, lpv), o: null, indent: true },
+      { name: "Tx Conversão da Página — Sessões", fmt: "percent", kind: "pct", r: div(leads, sess), o: null },
+      { name: "MQL", fmt: "percent", kind: "pct", r: div(mqls, sess), o: null, indent: true },
+      { name: "Não-MQL", fmt: "percent", kind: "pct", r: div(nmqls, sess), o: null, indent: true },
+      { name: "Leads", fmt: "number", kind: "abs", r: leads, o: sc(m.leads) },
+      { name: "CPL", fmt: "currency", kind: "rate", r: div(invest, leads), o: numOr(m.cpl), inv: true },
+      { name: "MQLs", fmt: "number", kind: "abs", r: mqls, o: sc(m.mqls) },
+      { name: "% MQLs", fmt: "percent", kind: "pct", r: div(mqls, leads), o: numOr(m.percMqls) },
+      { name: "CPMQL", fmt: "currency", kind: "rate", r: div(invest, mqls), o: numOr(m.cpmql), inv: true },
+    ]},
+    { title: "Pré-vendas — MQL", metrics: [
+      { name: "%RA MQL", fmt: "percent", kind: "pct", r: numOr(mql.percReuniaoAgendada), o: numOr(mm.percReuniaoAgendada) },
+      { name: "% No-show MQL", fmt: "percent", kind: "pct", r: numOr(mql.percNoShow), o: numOr(mm.percNoShow), inv: true },
+      { name: "RR→Venda MQL", fmt: "percent", kind: "pct", r: numOr(mql.taxaVendas), o: numOr(mm.taxaVendas) },
+    ]},
+    { title: "Pré-vendas — Não-MQL", metrics: [
+      { name: "%RA Não-MQL", fmt: "percent", kind: "pct", r: numOr(nmql.percReuniaoAgendada), o: numOr(mn.percReuniaoAgendada) },
+      { name: "% No-show Não-MQL", fmt: "percent", kind: "pct", r: numOr(nmql.percNoShow), o: numOr(mn.percNoShow), inv: true },
+      { name: "RR→Venda Não-MQL", fmt: "percent", kind: "pct", r: numOr(nmql.taxaVendas), o: numOr(mn.taxaVendas) },
+    ]},
+    { title: "Resultado", metrics: [
+      { name: "Negócios Ganhos", fmt: "number", kind: "abs", r: negocios, o: null },
+      { name: "Contratos Ganhos", fmt: "number", kind: "abs", r: contratos, o: null },
+      { name: "CAC - Negócio", fmt: "currency", kind: "rate", r: div(invest, negocios), o: null, inv: true },
+      { name: "CAC - Contrato", fmt: "currency", kind: "rate", r: div(invest, contratos), o: null, inv: true },
+      { name: "Ticket Médio", fmt: "currency", kind: "rate", r: div(fatTotal, negocios), o: null },
+      { name: "Faturamento Total", fmt: "currency", kind: "abs", r: fatTotal, o: null },
+    ]},
+  ];
+}
+
+const FCA_V5_SYSTEM = `Você é analista de Growth da Turbo Partners escrevendo a análise de um FCA (Fato, Causa, Ação) sobre a tabela Orçado × Realizado (Aprofundado) de um funil × canal, janela de 7 dias. A tabela (imagem) já está no relatório; você escreve SÓ a análise abaixo dela, em markdown PT-BR, direto, sem floreio.
+
+Regra de status (o que é 🔴): métrica normal fica 🔴 quando % Atingido < 80%; métrica de custo/no-show (invertida) fica 🔴 quando > 120% da meta.
+
+Estrutura EXATA (use estes headings):
+
+### Fato
+- 1 a 2 bullets com as métricas 🔴 mais graves (valor realizado, meta, desvio %).
+
+### Causa
+**O que está BOM (descarta as suspeitas óbvias):** liste 2-3 métricas 🟢 que eliminam causas (ex: se CTR e %MQL estão bons, não é criativo/qualificação).
+**Onde está o gargalo:** 1-2 vilões (as métricas 🔴 que puxam o resto), numerados.
+**Leitura:** 1 frase amarrando — onde o funil realmente quebra.
+
+### Ação
+- 3-4 checkboxes \`- [ ]\` específicos e acionáveis. Se o gargalo é pré-vendas/vendas (RA, No-show, RR→Venda), a ação é ESCALAR (1:1 com o responsável, levar a evidência, acordar SLA) — não tente resolver mídia. Termine com 1 item de hipótese em itálico para a próxima FCA cobrar.
+
+Não invente números — use só os fornecidos. Não repita a tabela inteira. Seja conciso.`;
+
+const FALLBACK_NARRATIVA = `### Fato\n\n_(Análise automática indisponível — preencher manualmente sobre a tabela acima.)_\n\n### Causa\n\n_(pendente)_\n\n### Ação\n\n- [ ] Revisar a tabela e registrar o gargalo principal.`;
+
+async function gerarNarrativaV5(sections: FcaSection[], ctx: { funil: string; canal: string; de: string; ate: string }): Promise<string> {
+  const key = process.env.ANTHROPIC_API_KEY;
+  if (!key || key.length < 20) return FALLBACK_NARRATIVA;
+  // Resumo textual das linhas (nome · orçado · realizado · % atingido) pro modelo raciocinar.
+  const resumo = sections.map(s => {
+    const linhas = s.metrics.map(x => {
+      const pct = (x.o && x.o !== 0 && x.r != null) ? Math.round((x.r / x.o) * 100) + "%" : "s/meta";
+      const fr = x.r == null ? "—" : (x.fmt === "percent" ? (x.r * 100).toFixed(1) + "%" : x.fmt === "currency" ? "R$" + x.r.toFixed(2) : String(x.r));
+      const fo = x.o == null ? "—" : (x.fmt === "percent" ? (x.o * 100).toFixed(1) + "%" : x.fmt === "currency" ? "R$" + x.o.toFixed(2) : String(x.o));
+      return `${x.indent ? "  " : ""}${x.name}: real=${fr} orçado=${fo} atingido=${pct}${x.inv ? " (menor é melhor)" : ""}`;
+    }).join("\n");
+    return `## ${s.title}\n${linhas}`;
+  }).join("\n\n");
+  try {
+    const anthropic = new Anthropic({ apiKey: key });
+    const msg = await anthropic.messages.create({
+      model: "claude-opus-4-8",
+      max_tokens: 1600,
+      system: FCA_V5_SYSTEM,
+      messages: [{ role: "user", content: `Funil ${ctx.funil} × ${ctx.canal}, 7 dias (${ctx.de} a ${ctx.ate}).\n\n${resumo}` }],
+    });
+    const txt = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
+    return txt || FALLBACK_NARRATIVA;
+  } catch (e: any) {
+    console.error("[fca v5] IA falhou:", e?.message);
+    return FALLBACK_NARRATIVA;
+  }
+}
+
 export function registerFcaRoutes(app: Express) {
   app.get("/api/fca/health", (_req: Request, res: Response) => {
     res.json({
@@ -722,6 +886,51 @@ export function registerFcaRoutes(app: Express) {
       const campaignLike = funilCfg.campaignLike;
       const fnlNgc = funilCfg.fnlNgc;
       const now = new Date();
+
+      // ===== FORMATO V5 (imagem do Aprofundado + FATO/CAUSA/AÇÃO, janela 7D) =====
+      if (req.body?.formato === "v5") {
+        const p7 = periodo7D(now);
+        const fator7d = p7.dias / p7.diasMes;
+        const [mAds, mMql, mNmql] = await Promise.all([
+          getMetas(funil, p7.mesRef, canalCfg.segmento),
+          getMetas(funil, p7.mesRef, "mql"),
+          getMetas(funil, p7.mesRef, "nao_mql"),
+        ]);
+        const dados = await fetchAprofundado(canal, funil, p7.de, p7.ate);
+        const sections = montarLinhasV5({
+          media: dados.media, mql: dados.mql, nmql: dados.nmql,
+          metas: { ma: mAds.metricas, mql: mMql.metricas, nmql: mNmql.metricas },
+          fator7d,
+        });
+        const canalLabel = CANAL_LABEL[canal] || canal;
+        const png = await renderAprofundadoImage({
+          titulo: `Orçado × Realizado — Aprofundado · ${funil} × ${canalLabel}`,
+          subtitulo: `Últimos 7 dias · ${fmtBR(p7.de)}–${fmtBR(p7.ate)}`,
+          sections, propDias: 1, diasMes: p7.dias, diasRestantes: 0,
+        });
+        const narrativa = await gerarNarrativaV5(sections, { funil, canal, de: p7.de, ate: p7.ate });
+
+        if (!createTask) {
+          return res.json({ ok: true, formato: "v5", funil, canal, periodo: p7, narrativa, note: "createTask=false — imagem não anexada" });
+        }
+        const task = await criarTaskClickUp({
+          funil, canal,
+          nome: `[FCA] ${funil} · ${canalLabel} — 7D (${fmtBR(p7.de)}–${fmtBR(p7.ate)})`,
+          markdown: "_gerando relatório…_",
+        });
+        const imgUrl = await uploadFcaImage(task.id, png, CLICKUP_API_KEY, `fca-${funil}-${canal}-7d.png`);
+        const md = `# [FCA] ${funil} × ${canalLabel} — 7D (${fmtBR(p7.de)}–${fmtBR(p7.ate)})
+
+**Período:** ${fmtBR(p7.de)} a ${fmtBR(p7.ate)} — Últimos 7 dias
+
+![Orçado × Realizado — Aprofundado · ${funil} × ${canalLabel} · 7D](${imgUrl})
+
+${narrativa}
+
+🤖 FCA v5 — imagem do Aprofundado renderizada + FATO/CAUSA/AÇÃO`;
+        await updateTaskDescription(task.id, md);
+        return res.json({ ok: true, formato: "v5", funil, canal, periodo: p7, task, imgUrl });
+      }
 
       // ===== MODO MENSAL =====
       if (modo === "mensal") {

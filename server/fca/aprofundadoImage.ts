@@ -3,7 +3,7 @@
 // barra de % Atingido (faz o constraint saltar), quebras MQL/Não-MQL indentadas.
 // Reaproveita a resolução de Chromium de server/autoreport/pdf.ts (prod-safe).
 import puppeteer from "puppeteer";
-import fs from "fs";
+import * as fs from "fs";
 import { execSync } from "child_process";
 
 export type MetricFmt = "currency" | "number" | "percent";
