@@ -2,17 +2,51 @@ import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle } from "lucide-react";
-import { formatCurrencyNoDecimals } from "@/lib/utils";
-import { KpiCard } from "./KpiCard";
+import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
 import { DrillSheet } from "./DrillSheet";
-import { useReportsMensal, useGestaoReceitaDetalhe } from "./hooks";
+import {
+  useReportsMensal,
+  useGestaoReceitaDetalhe,
+  useScorecardMetas,
+  useScorecardResponsaveis,
+  useSalvarResponsaveis,
+} from "./hooks";
 import { paramsParaMes, labelMes } from "./temporalidade";
+import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
+import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes } from "./tipos";
+
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/** crosssellHistorico (server) só traz `mes` ("YYYY-MM"), sem `label` pronto (diferente das
+   outras séries de ReportsMensal, que já vêm com `label` abreviado) — deriva aqui com a mesma
+   convenção de abreviação ("Jan", "Fev"...) usada pelo backend nas demais séries. */
+function labelMesCurto(mes: string): string {
+  const m = Number(mes.split("-")[1]);
+  return MESES_ABREV[m - 1] ?? mes;
+}
+
+/** Normaliza uma série que já vem com `label` do backend para o formato do Scorecard. */
+function serieComLabel<T extends { label: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+  return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r) }));
+}
+
+/** crosssellHistorico: sem `label`, ordena por `mes` (string "YYYY-MM", ordena cronologicamente
+   por comparação lexicográfica) e deriva o label curto. */
+function serieCrosssell(rows: CrosssellHistoricoPonto[] | undefined, valor: (r: CrosssellHistoricoPonto) => number): ScorecardSeriePonto[] {
+  return (rows ?? [])
+    .slice()
+    .sort((a, b) => a.mes.localeCompare(b.mes))
+    .map((r) => ({ label: labelMesCurto(r.mes), valor: valor(r) }));
+}
 
 // Tipos válidos aceitos por /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts,
 // const TIPOS). "venda"/"churn" (soltos) NÃO existem — usar "venda_mrr"/"venda_pontual" e
 // "churn_motivo"/"churn_vendedor" (que exigem uma chave específica, não "total").
-export function SecaoReceita({ mes }: { mes: string }) {
+export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }) {
   const rm = useReportsMensal(mes);
+  const metas = useScorecardMetas(mes);
+  const responsaveis = useScorecardResponsaveis();
+  const salvarResponsaveis = useSalvarResponsaveis();
   const [detalheParams, setDetalheParams] = useState<Record<string, string> | null>(null);
   const detalhe = useGestaoReceitaDetalhe(detalheParams);
   const [drillAberto, setDrillAberto] = useState(false);
@@ -23,8 +57,17 @@ export function SecaoReceita({ mes }: { mes: string }) {
     setDrillAberto(true);
   }
 
+  function onEditResponsavel(metricaKey: string, valor: string) {
+    const atuais = responsaveis.data?.itens ?? [];
+    const atualizado: ScorecardResponsavelItem[] = [
+      ...atuais.filter((i) => i.metrica_key !== metricaKey),
+      { metrica_key: metricaKey, responsavel: valor },
+    ];
+    salvarResponsaveis.mutate(atualizado);
+  }
+
   if (rm.isError) return <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40"><CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300"><AlertTriangle className="h-4 w-4" /> Falha ao carregar receita.</CardContent></Card>;
-  if (rm.isLoading || !rm.data) return <div className="grid grid-cols-2 gap-3 md:grid-cols-5">{Array.from({ length: 5 }).map((_, i) => <Skeleton key={i} className="h-28" />)}</div>;
+  if (rm.isLoading || !rm.data) return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
 
   const tm = rm.data.turboMetrics;
   const p = rm.data.pontualData;
@@ -34,31 +77,115 @@ export function SecaoReceita({ mes }: { mes: string }) {
   const detalheData = detalhe.data as { titulo?: string; subtitulo?: string; total?: number; grupos?: Record<string, unknown>[] } | undefined;
   const grupos = detalheData?.grupos ?? [];
 
+  const secoes: ScorecardSection[] = [
+    {
+      id: "receita-mrr",
+      titulo: "Receita — MRR",
+      linhas: [
+        {
+          key: "receita_mrr_ativo",
+          metrica: "MRR ativo",
+          atual: tm.mrrAtivo,
+          formato: "brl",
+          metaKey: "mrr_active",
+          // Estoque de MRR ativo (ClickUp/cup_data_hist) — venda_mrr é FLUXO (Bitrix) e não
+          // reconcilia com o estoque, por isso sem drill (mesma regra da v1 em cards).
+          serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.mrr),
+          temporalidade: "mes",
+        },
+        {
+          key: "receita_mrr_nova",
+          metrica: "Nova receita",
+          atual: tm.mrrAdicionado,
+          formato: "brl",
+          metaKey: "sales_mrr_new_target",
+          serie: serieComLabel<VendasSeriePonto>(rm.data.contratosMes.vendasSeries, (r) => r.vendasMrr),
+          temporalidade: "mes",
+          drill: () => abrirDrill("venda_mrr", "mrr"),
+        },
+        {
+          key: "receita_mrr_churn",
+          metrica: "Churn",
+          sub: `${tm.churnCount} contratos`,
+          atual: tm.churnMrr,
+          formato: "brl",
+          metaKey: "churn_mrr_month",
+          serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnBrl),
+          temporalidade: "mes",
+        },
+        {
+          key: "receita_mrr_pausado",
+          metrica: "Pausado/Reativado",
+          sub: `${tm.pausadosCount} contratos`,
+          atual: tm.pausadosMrr,
+          formato: "brl",
+          temporalidade: "mes",
+        },
+        {
+          key: "receita_mrr_crosssell",
+          metrica: "Cross-sell",
+          atual: tm.crosssellMrr,
+          formato: "brl",
+          metaKey: "sales_mrr_monetization_target",
+          serie: serieCrosssell(tm.crosssellHistorico, (r) => r.mrr),
+          temporalidade: "mes",
+        },
+      ],
+    },
+    {
+      id: "receita-pontual",
+      titulo: "Receita — Pontual",
+      linhas: [
+        {
+          key: "receita_pontual_aquisicao",
+          metrica: "Nova receita (aquisição)",
+          sub: `${p.aquisicao.contratos} contratos`,
+          atual: p.aquisicao.valor,
+          formato: "brl",
+          metaKey: "revenue_one_time",
+          serie: serieComLabel<VendasSeriePonto>(rm.data.contratosMes.vendasSeries, (r) => r.vendasPontual),
+          temporalidade: "mes",
+        },
+        {
+          key: "receita_pontual_entregue",
+          metrica: "Entregue",
+          atual: p.entregasMes.total,
+          formato: "brl",
+          serie: serieComLabel<EntregaProdutoMes>(p.entregasPorProdutoMes, (r) => r.total),
+          temporalidade: "mes",
+        },
+        {
+          key: "receita_pontual_crosssell",
+          metrica: "Cross-sell",
+          atual: tm.crosssellPontual,
+          formato: "brl",
+          serie: serieCrosssell(tm.crosssellHistorico, (r) => r.pontual),
+          temporalidade: "mes",
+        },
+        {
+          key: "receita_pontual_em_aberto",
+          metrica: "Em aberto (estoque)",
+          sub: `${p.emAberto.contratos} itens`,
+          atual: p.emAberto.valor,
+          formato: "brl",
+          // Snapshot do estoque em aberto (não é fluxo do mês) — sem meta/série mensal, marcado
+          // como "snapshot" (Scorecard renderiza badge dedicado e não calcula Δ M-1/status).
+          temporalidade: "snapshot",
+        },
+      ],
+    },
+  ];
+
   return (
-    <div className="space-y-6">
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">MRR</h3>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-5">
-          {/* Receita MRR = ESTOQUE de MRR ativo (ClickUp/cup_data_hist). Não há endpoint que
-             componha esse número; venda_mrr lista a VENDA do mês (fluxo, Bitrix) e NÃO reconcilia
-             com o estoque → card não clicável (mesma regra de Churn/Pausado/Cross-sell). */}
-          <KpiCard mes={mes} temporalidade="mes" titulo="Receita MRR" valor={formatCurrencyNoDecimals(tm.mrrAtivo)} />
-          <KpiCard mes={mes} temporalidade="mes" titulo="Nova receita" valor={formatCurrencyNoDecimals(tm.mrrAdicionado)} onClick={() => abrirDrill("venda_mrr", "mrr")} />
-          {/* Churn: sem tipo "total" no backend (só churn_motivo/churn_vendedor com chave específica) — não clicável, mesma regra do Pausado/Cross-sell abaixo. */}
-          <KpiCard mes={mes} temporalidade="mes" titulo="Churn" valor={formatCurrencyNoDecimals(tm.churnMrr)} sub={`${tm.churnCount} contratos`} />
-          <KpiCard mes={mes} temporalidade="mes" titulo="Pausado/Reativado" valor={formatCurrencyNoDecimals(tm.pausadosMrr)} sub={`${tm.pausadosCount} contratos`} />
-          <KpiCard mes={mes} temporalidade="mes" titulo="Cross-sell" valor={formatCurrencyNoDecimals(tm.crosssellMrr)} />
-        </div>
-      </section>
-      <section>
-        <h3 className="mb-2 text-sm font-semibold text-gray-900 dark:text-white">Pontual</h3>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-          <KpiCard mes={mes} temporalidade="mes" titulo="Nova receita" valor={formatCurrencyNoDecimals(p.aquisicao.valor)} sub={`${p.aquisicao.contratos} contratos`} />
-          <KpiCard mes={mes} temporalidade="mes" titulo="Entregue" valor={formatCurrencyNoDecimals(p.entregasMes.total)} />
-          <KpiCard mes={mes} temporalidade="mes" titulo="Cross-sell" valor={formatCurrencyNoDecimals(tm.crosssellPontual)} />
-          <KpiCard mes={mes} temporalidade="snapshot" titulo="Em aberto (estoque)" valor={formatCurrencyNoDecimals(p.emAberto.valor)} sub={`${p.emAberto.contratos} itens`} />
-        </div>
-      </section>
+    <div className="space-y-4">
+      <Scorecard
+        secoes={secoes}
+        mes={mes}
+        modo={modo}
+        metas={metas.data?.metas ?? {}}
+        responsaveis={responsaveis.data?.itens ?? []}
+        onEditResponsavel={onEditResponsavel}
+      />
 
       <DrillSheet
         open={drillAberto}

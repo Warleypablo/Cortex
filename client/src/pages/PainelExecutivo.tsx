@@ -123,7 +123,7 @@ export default function PainelExecutivo() {
             {a.value === "visao-geral" ? (
               <SecaoVisaoGeral mes={mes} />
             ) : a.value === "receita" ? (
-              <SecaoReceita mes={mes} />
+              <SecaoReceita mes={mes} modo={modo} />
             ) : a.value === "churn" ? (
               <SecaoChurn mes={mes} />
             ) : a.value === "lt-ltv" ? (
