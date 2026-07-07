@@ -182,13 +182,18 @@ function TabelaFoco({
 
 // ─────────────────────── modo "evolução" ───────────────────────
 
-/** Trunca a série no mês SELECIONADO (`mes`) — descarta pontos de meses POSTERIORES (a série
-   costuma vir até o mês corrente real, mesmo quando o usuário escolhe um mês anterior no
-   seletor). Pontos sem `month` (séries antigas, sem essa info) são mantidos sem corte — mesmo
-   comportamento de antes desta função existir (fallback). */
+/** Ano de planejamento do painel — o modo Evolução exibe SÓ meses deste ano (2026). Muitas
+   séries vêm 12 meses para trás (incluindo meses de 2025, quando o histórico começou em
+   nov/2025 e é parcial/ruído para a leitura executiva de 2026). */
+const ANO_MIN_EVOLUCAO = "2026-01";
+
+/** Trunca a série à janela do ano corrente (2026) até o mês SELECIONADO (`mes`): descarta pontos
+   de meses POSTERIORES (a série costuma vir até o mês corrente real, mesmo quando o usuário
+   escolhe um mês anterior) E pontos de anos anteriores a 2026. Pontos sem `month` (séries
+   antigas, sem essa info) são mantidos sem corte — fallback. */
 function truncarSerie(serie: ScorecardSeriePonto[], mes: string): ScorecardSeriePonto[] {
   if (!serie.some((p) => p.month)) return serie;
-  return serie.filter((p) => !p.month || p.month <= mes);
+  return serie.filter((p) => !p.month || (p.month >= ANO_MIN_EVOLUCAO && p.month <= mes));
 }
 
 /** Colunas de meses = a maior série (JÁ TRUNCADA no mês selecionado) entre todas as linhas de
