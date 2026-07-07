@@ -8,6 +8,7 @@ import type {
   ScorecardMetasResponse,
   ScorecardResponsaveisResponse,
   ScorecardResponsavelItem,
+  ScorecardSeriesResponse,
 } from "./scorecard/tipos";
 
 const STALE = 5 * 60 * 1000;
@@ -61,6 +62,11 @@ export function useScorecardMetas(mes: string) {
 }
 export function useScorecardResponsaveis() {
   return useQuery<ScorecardResponsaveisResponse>({ queryKey: ["/api/scorecard/responsaveis"], staleTime: STALE });
+}
+// Séries mensais por dimensão (Onda2-A: /api/scorecard/series) — alimenta os breakdowns
+// (produto/operador/squad) do modo Evolução em SecaoChurn/SecaoEntregas/SecaoCapacity.
+export function useScorecardSeries(mes: string) {
+  return useQuery<ScorecardSeriesResponse>({ queryKey: ["/api/scorecard/series", { mes }], enabled: !!mes, staleTime: STALE });
 }
 export function useSalvarResponsaveis() {
   return useMutation({

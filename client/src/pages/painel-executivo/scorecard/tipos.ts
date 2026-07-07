@@ -60,3 +60,25 @@ export interface ScorecardResponsavelItem {
 export interface ScorecardResponsaveisResponse {
   itens: ScorecardResponsavelItem[];
 }
+
+// GET /api/scorecard/series?mes=YYYY-MM — espelha `SeriesScorecard`/`ScorecardSeriesResult` de
+// server/routes/scorecard.ts (dup local no client, mesmo padrão do resto deste arquivo). Cada
+// série já vem com os 12 meses da janela preenchidos (0 onde não há dado — ver `rowsParaSeries`
+// em server/routes/scorecard.helpers.ts). Sem `label` (só `month`) — quem consome deriva o label.
+export interface ScorecardSerieDimPonto {
+  month: string;
+  valor: number;
+}
+
+export interface ScorecardSeriesPorDimensao {
+  churnPorProduto: Record<string, ScorecardSerieDimPonto[]>;
+  churnPorOperador: Record<string, ScorecardSerieDimPonto[]>;
+  churnPorSquad: Record<string, ScorecardSerieDimPonto[]>;
+  entregasPorOperador: Record<string, ScorecardSerieDimPonto[]>;
+  mrrPorSquad: Record<string, ScorecardSerieDimPonto[]>;
+  mrrPorOperador: Record<string, ScorecardSerieDimPonto[]>;
+}
+
+export interface ScorecardSeriesResponse {
+  series: ScorecardSeriesPorDimensao;
+}

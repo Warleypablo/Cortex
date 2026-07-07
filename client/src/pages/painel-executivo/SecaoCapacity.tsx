@@ -1,11 +1,28 @@
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatPercent } from "@/lib/utils";
 import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
-import { useCeoDashboard, useCapacityTimes, useScorecardMetas, useScorecardResponsaveis, useSalvarResponsaveis } from "./hooks";
+import {
+  useCeoDashboard,
+  useCapacityTimes,
+  useScorecardMetas,
+  useScorecardResponsaveis,
+  useSalvarResponsaveis,
+  useScorecardSeries,
+} from "./hooks";
+import { linhasPorDimensao } from "./scorecard/logica";
 import { SELVA_BLOQUEADA } from "@shared/capacityGrupos";
 import { ErroCard } from "./_ui";
 import type { CeoKpi } from "@/components/ceo/CeoKpiCard";
 import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem } from "./scorecard/tipos";
+
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/** "YYYY-MM" → label curto (ex: "Jan") — mesmo padrão de `labelMesCurto` em SecaoChurn.tsx/
+   SecaoEntregas.tsx (duplicado localmente, não há util compartilhado entre seções). */
+function labelMesCurto(mes: string): string {
+  const m = Number(mes.split("-")[1]);
+  return MESES_ABREV[m - 1] ?? mes;
+}
 
 // Shapes espelham server/routes/capacityTimes.helpers.ts (CapacityTimesResponse), confirmadas
 // lendo capacity.ts (GET /api/capacity-times) e o consumidor client/src/pages/CapacityTimes.tsx —
@@ -112,6 +129,9 @@ function montarLinhasCapacidade(cap: CapacityTimesResponse): ScorecardRow[] {
 export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo }) {
   const ceo = useCeoDashboard(mes);
   const capacity = useCapacityTimes();
+  // Série de MRR por squad/operador (Onda2-A) — fonte das 2 seções de evolução abaixo. Falha/
+  // loading isolados (não bloqueiam a aba): linhasPorDimensao devolve [] sem `series.data`.
+  const series = useScorecardSeries(mes);
   const metas = useScorecardMetas(mes);
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
@@ -148,9 +168,46 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
     ],
   };
 
-  // capacity-times bloqueia SÓ a seção snapshot (Receita/Cabeça continua acima, independente).
+  // MRR por squad/operador com série real (Onda2-A) — ao contrário da seção "snapshot" abaixo
+  // (achatada por pessoa, só o valor do momento), estas linhas têm `atual` E `serie` vindos do
+  // MESMO endpoint (/api/scorecard/series), reconciliando o número do mês com o modo Evolução.
+  const mrrSquadRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorSquad, mes, {
+    keyFn: (dim) => `capacity_mrr_squad_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+  });
+  const mrrOperadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorOperador, mes, {
+    keyFn: (dim) => `capacity_mrr_operador_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+    top: 10,
+    responsavelAuto: true,
+  });
+  const secaoMrrSquad: ScorecardSection = {
+    id: "capacity-mrr-squad",
+    titulo: "Capacity — MRR por squad (evolução)",
+    subtitulo: series.isError
+      ? "falha ao carregar série por squad"
+      : mrrSquadRows.length === 0
+        ? "carregando série…"
+        : undefined,
+    linhas: mrrSquadRows,
+  };
+  const secaoMrrOperador: ScorecardSection = {
+    id: "capacity-mrr-operador",
+    titulo: "Capacity — MRR por operador (evolução)",
+    subtitulo: series.isError
+      ? "falha ao carregar série por operador"
+      : mrrOperadorRows.length === 0
+        ? "carregando série…"
+        : undefined,
+    linhas: mrrOperadorRows,
+  };
+
+  // capacity-times bloqueia SÓ a seção snapshot (Receita/Cabeça e as 2 seções de série
+  // continuam acima, independentes).
   const cap = capacity.data as CapacityTimesResponse | undefined;
-  const secoes: ScorecardSection[] = [secaoReceitaCabeca];
+  const secoes: ScorecardSection[] = [secaoReceitaCabeca, secaoMrrSquad, secaoMrrOperador];
   if (cap) {
     secoes.push({
       id: "capacity-squad-snapshot",

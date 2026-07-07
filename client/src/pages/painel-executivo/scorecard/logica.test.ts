@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { calcStatus, deltaM1, formatValor } from "./logica";
+import { calcStatus, deltaM1, formatValor, linhasPorDimensao } from "./logica";
 
 describe("calcStatus", () => {
   it("direction up: atual >= meta → good", () => {
@@ -98,5 +98,70 @@ describe("formatValor", () => {
 
   it("undefined → travessão", () => {
     expect(formatValor(undefined, "pct")).toBe("—");
+  });
+});
+
+describe("linhasPorDimensao", () => {
+  const labelMes = (mes: string) => `L-${mes.split("-")[1]}`;
+
+  it("series undefined → []", () => {
+    expect(linhasPorDimensao(undefined, "2026-06", { keyFn: (d) => d, formato: "brl", labelMes })).toEqual([]);
+  });
+
+  it("atual vem do ponto com month === mes; ordena por atual desc", () => {
+    const series = {
+      Squadra: [{ month: "2026-05", valor: 100 }, { month: "2026-06", valor: 300 }],
+      Makers: [{ month: "2026-05", valor: 50 }, { month: "2026-06", valor: 500 }],
+    };
+    const linhas = linhasPorDimensao(series, "2026-06", { keyFn: (d) => `k_${d}`, formato: "brl", labelMes });
+    expect(linhas.map((l) => l.metrica)).toEqual(["Makers", "Squadra"]);
+    expect(linhas[0].atual).toBe(500);
+    expect(linhas[0].key).toBe("k_Makers");
+  });
+
+  it("série preserva month/label/valor na ordem cronológica", () => {
+    const series = { Squadra: [{ month: "2026-06", valor: 300 }, { month: "2026-05", valor: 100 }] };
+    const linhas = linhasPorDimensao(series, "2026-06", { keyFn: (d) => d, formato: "brl", labelMes });
+    expect(linhas[0].serie).toEqual([
+      { month: "2026-05", valor: 100, label: "L-05" },
+      { month: "2026-06", valor: 300, label: "L-06" },
+    ]);
+  });
+
+  it("mes selecionado ausente na série → usa o último ponto <= mes", () => {
+    const series = { Squadra: [{ month: "2026-04", valor: 10 }, { month: "2026-05", valor: 20 }] };
+    const linhas = linhasPorDimensao(series, "2026-06", { keyFn: (d) => d, formato: "brl", labelMes });
+    expect(linhas[0].atual).toBe(20);
+  });
+
+  it("top limita a quantidade de linhas após ordenar", () => {
+    const series = {
+      A: [{ month: "2026-06", valor: 10 }],
+      B: [{ month: "2026-06", valor: 30 }],
+      C: [{ month: "2026-06", valor: 20 }],
+    };
+    const linhas = linhasPorDimensao(series, "2026-06", { keyFn: (d) => d, formato: "brl", labelMes, top: 2 });
+    expect(linhas.map((l) => l.metrica)).toEqual(["B", "C"]);
+  });
+
+  it("sub recebe (dim, atual) já resolvidos da própria série", () => {
+    const series = { A: [{ month: "2026-06", valor: 10 }] };
+    const linhas = linhasPorDimensao(series, "2026-06", {
+      keyFn: (d) => d, formato: "brl", labelMes,
+      sub: (dim, atual) => `${dim}:${atual}`,
+    });
+    expect(linhas[0].sub).toBe("A:10");
+  });
+
+  it("responsavelAuto marca a própria dimensão como dono", () => {
+    const series = { Ana: [{ month: "2026-06", valor: 10 }] };
+    const linhas = linhasPorDimensao(series, "2026-06", { keyFn: (d) => d, formato: "brl", labelMes, responsavelAuto: true });
+    expect(linhas[0].responsavelAuto).toBe("Ana");
+  });
+
+  it("todas as linhas ficam com temporalidade 'mes'", () => {
+    const series = { A: [{ month: "2026-06", valor: 10 }] };
+    const linhas = linhasPorDimensao(series, "2026-06", { keyFn: (d) => d, formato: "brl", labelMes });
+    expect(linhas[0].temporalidade).toBe("mes");
   });
 });

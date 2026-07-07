@@ -2,7 +2,7 @@
 // Sem I/O, sem React — só lógica testável isoladamente (ver logica.test.ts).
 
 import { formatCurrencyNoDecimals, formatPercent, formatDecimal } from "@/lib/utils";
-import type { ScorecardDirection, ScorecardFormato } from "./tipos";
+import type { ScorecardDirection, ScorecardFormato, ScorecardRow, ScorecardSeriePonto } from "./tipos";
 
 export type ScorecardStatus = "good" | "warn" | "bad" | null;
 
@@ -59,6 +59,70 @@ export function deltaM1(serie?: DeltaM1Ponto[] | null): DeltaM1Result | null {
   const pct = ((atual - base) / base) * 100;
   if (Math.abs(pct) < 0.05) return { pct, dir: "flat" };
   return { pct, dir: pct > 0 ? "up" : "down" };
+}
+
+/** Ponto cru de uma série mensal por dimensão — mesmo shape devolvido por
+   GET /api/scorecard/series (server/routes/scorecard.helpers.ts: `SeriePonto`). Sem `label`
+   (o backend só manda `month`) — quem consome decide como abreviar o mês. */
+export interface SerieDimPonto {
+  month: string;
+  valor: number;
+}
+
+export interface LinhasPorDimensaoOpts {
+  /** Monta o `key` estável da linha a partir do nome da dimensão (produto/operador/squad) —
+     cada seção usa seu próprio `slug` + prefixo (ex: `churn_produto_${slug(dim)}`). */
+  keyFn: (dim: string) => string;
+  formato: ScorecardFormato;
+  /** "YYYY-MM" → label curto (ex: "Jan") — cada seção já tem seu próprio `labelMesCurto`. */
+  labelMes: (mes: string) => string;
+  /** Limita a quantidade de linhas (após ordenar por atual desc). Omitido = todas as dimensões. */
+  top?: number;
+  /** Sub-texto opcional por linha (ex: motivo top casado por nome, ou % do total) — recebe o
+     `atual` já resolvido desta MESMA série (nunca de uma fonte externa, para não descasar
+     com a série exibida). */
+  sub?: (dim: string, atual: number | null) => string | undefined;
+  /** Quando true, marca o dono automático da linha como a própria dimensão (ex: operador). */
+  responsavelAuto?: boolean;
+}
+
+/**
+ * Constrói linhas de Scorecard (`ScorecardRow[]`) a partir de uma série mensal por dimensão —
+ * o shape `Record<dim, {month,valor}[]>` devolvido por GET /api/scorecard/series. O `atual` de
+ * cada linha vem do ponto da série no mês selecionado (ou do último ponto <= mes, defensivo,
+ * caso a janela não inclua `mes` exatamente) — NUNCA de uma fonte diferente da série, para que
+ * o valor do mês e a linha do tempo do modo Evolução sempre reconciliem (mesma regra já seguida
+ * pelo "Churn R$" geral em SecaoChurn.tsx). Ordena por atual desc; `top` (se informado) limita
+ * a quantidade de linhas exibidas.
+ */
+export function linhasPorDimensao(
+  series: Record<string, SerieDimPonto[]> | undefined,
+  mes: string,
+  opts: LinhasPorDimensaoOpts,
+): ScorecardRow[] {
+  if (!series) return [];
+
+  const linhas = Object.entries(series).map(([dim, pontosCrus]) => {
+    const ordenados = [...pontosCrus].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+    const pontoAtual = ordenados.find((p) => p.month === mes) ?? [...ordenados].reverse().find((p) => p.month <= mes);
+    const atual = pontoAtual ? pontoAtual.valor : null;
+    const serie: ScorecardSeriePonto[] = ordenados.map((p) => ({ month: p.month, label: opts.labelMes(p.month), valor: p.valor }));
+    return { dim, atual, serie };
+  });
+
+  linhas.sort((a, b) => (b.atual ?? -Infinity) - (a.atual ?? -Infinity));
+  const limitadas = typeof opts.top === "number" ? linhas.slice(0, opts.top) : linhas;
+
+  return limitadas.map(({ dim, atual, serie }) => ({
+    key: opts.keyFn(dim),
+    metrica: dim,
+    sub: opts.sub?.(dim, atual),
+    atual,
+    formato: opts.formato,
+    serie,
+    temporalidade: "mes",
+    responsavelAuto: opts.responsavelAuto ? dim : undefined,
+  }));
 }
 
 /** Formata um valor numérico conforme o formato do scorecard. null/undefined/NaN → "—". */

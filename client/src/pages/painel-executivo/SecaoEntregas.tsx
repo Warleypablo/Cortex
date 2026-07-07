@@ -8,9 +8,20 @@ import {
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
+  useScorecardSeries,
 } from "./hooks";
 import type { ScorecardSection, ScorecardRow, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
+import { linhasPorDimensao } from "./scorecard/logica";
 import type { EntregaProdutoMes } from "./tipos";
+
+const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+
+/** "YYYY-MM" → label curto (ex: "Jan") — mesmo padrão de `labelMesCurto` em SecaoChurn.tsx/
+   SecaoReceita.tsx (duplicado localmente, não há util compartilhado entre seções). */
+function labelMesCurto(mes: string): string {
+  const m = Number(mes.split("-")[1]);
+  return MESES_ABREV[m - 1] ?? mes;
+}
 
 // Shape espelha o handler de GET /api/estoque-pontual/overview (server/routes/estoquePontual.ts),
 // confirmado lendo o SELECT — não há tipo compartilhado client/server para este endpoint
@@ -62,6 +73,9 @@ function serieEntregasTech(rows: Record<string, unknown>[] | undefined): Scoreca
 export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo }) {
   const rm = useReportsMensal(mes);
   const estoqueQ = useEstoqueOverview();
+  // Série por operador (Onda2-A) — fonte de `operadorRows` abaixo. Falha/loading isolados
+  // (não bloqueiam a seção): linhasPorDimensao devolve [] sem `series.data`.
+  const series = useScorecardSeries(mes);
   const metas = useScorecardMetas(mes);
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
@@ -90,7 +104,6 @@ export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo 
 
   const p = rm.data.pontualData;
   const techKpis = rm.data.techData.kpis;
-  const topEntregas = rm.data.topOperadores.topEntregas ?? [];
   // Query isolada (não bloqueia a seção inteira, mesma filosofia de SecaoChurn) — ausente
   // (loading ou erro) só zera a linha "Aberto (estoque)" (atual: null renderiza "—").
   const estoque = estoqueQ.data as EstoqueOverview | undefined;
@@ -113,16 +126,19 @@ export function SecaoEntregas({ mes, modo }: { mes: string; modo: ScorecardModo 
         }))
     : [];
 
-  const operadorRows: ScorecardRow[] = topEntregas.map((o) => ({
-    key: `entregas_operador_${slug(o.nome)}`,
-    metrica: o.nome,
-    atual: o.valor,
-    formato: "int",
-    temporalidade: "mes",
+  // Onda2-A: substitui o `topOperadores.topEntregas` (só do mês, sem série) pela série por
+  // operador — mesma fonte para `atual` E `serie` (reconcilia número do mês com a linha do
+  // tempo do modo Evolução). Formato "brl" (a query soma `valorp`, R$ entregue — não é mais
+  // uma contagem de entregas).
+  const operadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.entregasPorOperador, mes, {
+    keyFn: (dim) => `entregas_operador_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+    top: 8,
     // Dono automático (o próprio operador) — célula somente-leitura, mesmo padrão de
     // operadorRows em SecaoChurn.tsx.
-    responsavelAuto: o.nome,
-  }));
+    responsavelAuto: true,
+  });
 
   const leadTimeRows: ScorecardRow[] = [...p.tempoMedioEntrega]
     .sort((a, b) => b.diasMedio - a.diasMedio)

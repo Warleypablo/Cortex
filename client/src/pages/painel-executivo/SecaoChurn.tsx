@@ -8,14 +8,15 @@ import {
   useChurnDetalhamento,
   useChurnProdutoMotivo,
   useChurnTaxaMensal,
-  useChurnPorResponsavel,
   useChurnPontorrente,
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
+  useScorecardSeries,
 } from "./hooks";
 import type { ScorecardSection, ScorecardRow, ScorecardSeriePonto, ScorecardResponsavelItem } from "./scorecard/tipos";
-import type { ChurnTaxaMensalRow, ReceitaChurnPonto } from "./tipos";
+import { linhasPorDimensao } from "./scorecard/logica";
+import type { ChurnTaxaMensalRow, ChurnProdutoMotivoCelula, ReceitaChurnPonto } from "./tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -51,17 +52,29 @@ function slug(s: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
+/** Sub opcional da linha "por produto": top motivo de cancelamento daquele produto, casado
+   por nome EXATO com o produto da série nova (churn/produto-motivo continua sendo a única
+   fonte de motivo — a série de /api/scorecard/series não traz motivo). Quando o produto não
+   casa (nome diferente entre as duas fontes), a linha fica sem sub — não aproximamos. */
+function topMotivoPorProduto(produto: string, celulas: ChurnProdutoMotivoCelula[] | undefined): string | undefined {
+  const doProduto = (celulas ?? []).filter((c) => c.produto === produto);
+  if (doProduto.length === 0) return undefined;
+  return [...doProduto].sort((a, b) => b.mrr_perdido - a.mrr_perdido)[0]?.motivo_cancelamento;
+}
+
 export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) {
   // Fonte mensal canônica do painel (mesma de SecaoReceita/SecaoVisaoGeral) — usada SÓ para
   // o "Churn R$" geral, para que as 3 abas mostrem o MESMO valor e a MESMA meta. Os
-  // breakdowns abaixo (produto/operador/squad) continuam no churn-detalhamento (são
-  // detalhamentos, não o total).
+  // breakdowns abaixo (produto/operador/squad) usam `series` (Onda2-A), não o churn-detalhamento
+  // (continuam sendo detalhamentos, não o total — podem não somar ao geral).
   const rm = useReportsMensal(mes);
   const detalhamento = useChurnDetalhamento(mes);
   const produtoMotivo = useChurnProdutoMotivo(mes);
   const taxaMensal = useChurnTaxaMensal(mes);
-  const porResponsavel = useChurnPorResponsavel(mes);
   const pontorrente = useChurnPontorrente(mes);
+  // Séries por dimensão (Onda2-A) — fonte dos 3 breakdowns abaixo (produto/operador/squad).
+  // Falha/loading isolados (não bloqueiam a seção): linhasPorDimensao devolve [] sem `series.data`.
+  const series = useScorecardSeries(mes);
   const metas = useScorecardMetas(mes);
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
@@ -75,8 +88,8 @@ export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) 
     salvarResponsaveis.mutate(atualizado);
   }
 
-  // Fonte primária: bloqueia a seção inteira. As demais (produtoMotivo, taxaMensal,
-  // porResponsavel, pontorrente) falham isoladas — a seção correspondente só fica sem linhas.
+  // Fonte primária: bloqueia a seção inteira. As demais (produtoMotivo, taxaMensal, series,
+  // pontorrente) falham isoladas — a seção correspondente só fica sem linhas.
   if (detalhamento.isError) {
     return (
       <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
@@ -92,39 +105,36 @@ export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) 
 
   const m = detalhamento.data.metricas;
 
-  const produtoRows: ScorecardRow[] = (produtoMotivo.data?.celulas ?? [])
-    .slice()
-    .sort((a, b) => b.mrr_perdido - a.mrr_perdido)
-    .slice(0, 6)
-    .map((c) => ({
-      key: `churn_produto_${slug(c.produto)}_${slug(c.motivo_cancelamento)}`,
-      metrica: c.produto,
-      sub: c.motivo_cancelamento,
-      atual: c.mrr_perdido,
-      formato: "brl",
-      temporalidade: "mes",
-    }));
-
-  const operadorRows: ScorecardRow[] = (porResponsavel.data ?? [])
-    .slice(0, 6)
-    .map((r) => ({
-      key: `churn_operador_${slug(r.responsavel)}`,
-      metrica: r.responsavel,
-      sub: formatPercent(r.percentualChurn),
-      atual: r.valorTotal,
-      formato: "brl",
-      temporalidade: "mes",
-      // Dono automático (o próprio operador) — célula somente-leitura, não faz sentido reatribuir.
-      responsavelAuto: r.responsavel,
-    }));
-
-  const squadRows: ScorecardRow[] = m.churn_por_squad.map((s) => ({
-    key: `churn_squad_${slug(s.squad)}`,
-    metrica: s.squad,
-    sub: formatPercent(s.percentual),
-    atual: s.mrr_perdido,
+  // Breakdowns por dimensão (produto/operador/squad) — Onda2-A: fonte única `series` para
+  // `atual` E `serie`, reconciliando o número do mês com a linha do tempo do modo Evolução.
+  const produtoRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.churnPorProduto, mes, {
+    keyFn: (dim) => `churn_produto_${slug(dim)}`,
     formato: "brl",
-    temporalidade: "mes",
+    labelMes: labelMesCurto,
+    top: 8,
+    sub: (dim) => topMotivoPorProduto(dim, produtoMotivo.data?.celulas),
+  });
+
+  const operadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.churnPorOperador, mes, {
+    keyFn: (dim) => `churn_operador_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+    top: 6,
+    // Dono automático (o próprio operador) — célula somente-leitura, não faz sentido reatribuir.
+    responsavelAuto: true,
+  });
+
+  const squadRowsSemSub = linhasPorDimensao(series.data?.series.churnPorSquad, mes, {
+    keyFn: (dim) => `churn_squad_${slug(dim)}`,
+    formato: "brl",
+    labelMes: labelMesCurto,
+  });
+  // % do total (share entre as squads da própria série — mesma fonte do `atual`, não mistura
+  // com `m.churn_por_squad`, que agora é uma fonte diferente/desalinhada desta série nova).
+  const totalSquadChurn = squadRowsSemSub.reduce((acc, r) => acc + (r.atual ?? 0), 0);
+  const squadRows: ScorecardRow[] = squadRowsSemSub.map((r) => ({
+    ...r,
+    sub: totalSquadChurn > 0 && r.atual !== null ? formatPercent((r.atual / totalSquadChurn) * 100) : undefined,
   }));
 
   const pontualOverview = pontorrente.data?.overview;
