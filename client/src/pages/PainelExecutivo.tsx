@@ -133,7 +133,7 @@ export default function PainelExecutivo() {
             ) : a.value === "entregas" ? (
               <SecaoEntregas mes={mes} modo={modo} />
             ) : (
-              <SecaoPerformance mes={mes} />
+              <SecaoPerformance mes={mes} modo={modo} />
             )}
           </TabsContent>
         ))}
