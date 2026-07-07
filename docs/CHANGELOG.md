@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-07 | fix(gestao-receita): move 'Lista - Wpp Marketing' para o canal Reativação no CAC
+
+**O que foi feito:**
+- Na seção **"CAC por canal"** (aba Macro da Gestão de Receita), o source `OTHER` (label **"Lista - Wpp Marketing"**) saiu do canal **"Inbound pago"** e entrou no canal **"Reativação"**.
+
+**Por que:**
+- Disparos de WhatsApp Marketing são broadcast de reativação de base, não inbound pago. O canal "Reativação" já concentra o item de custo "Disparos de broadcast", então os clientes ganhos por esse source agora compõem o CAC do canal correto.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.cacCanais.ts` - `OTHER` removido de `inbound_pago.sources` e adicionado a `reativacao.sources` no catálogo `CAC_CANAIS`.
+
+**Impacto arquitetural:** Nenhum — apenas reclassificação de de-para (source → macro-canal); agregação e testes inalterados.
+
+---
+
 ## 2026-07-06 | feat(broadcast): aba Summit ES — mapa dia a dia dos disparos da campanha
 
 **O que foi feito:**
