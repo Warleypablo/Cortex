@@ -1,6 +1,8 @@
 export interface OperadorRank { nome: string; valor: number; fotoUrl: string | null; cargo: string | null; }
 export interface SquadRank { squad: string; mrr: number; pontual: number; contratos: number; clientes: number; posicao: number; }
 export interface ReceitaChurnPonto { month: string; label: string; mrr: number; pontual: number; churnBrl: number; churnPct: number; }
+export interface VendasSeriePonto { month: string; label: string; vendasMrr: number; vendasPontual: number; numContratos: number; }
+export interface CrosssellHistoricoPonto { mes: string; mrr: number; pontual: number; }
 export interface EntregaSquad { squad: string; valor: number; contratos: number; }
 export interface EntregaProdutoMes { month: string; label: string; produtos: Record<string, number>; total: number; }
 export interface TempoEntrega { produto: string; diasMedio: number; contratos: number; }
@@ -11,6 +13,10 @@ export interface ReportsMensal {
     mrrAtivo: number; mrrAdicionado: number; churnMrr: number; churnCount: number;
     pausadosMrr: number; pausadosCount: number; crosssellMrr: number; crosssellPontual: number;
     receitaChurnSeries: ReceitaChurnPonto[];
+    crosssellHistorico: CrosssellHistoricoPonto[];
+  };
+  contratosMes: {
+    vendasSeries: VendasSeriePonto[];
   };
   pontualData: {
     aquisicao: { valor: number; contratos: number };

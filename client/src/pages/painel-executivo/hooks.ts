@@ -1,8 +1,14 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
+import { queryClient, apiRequest } from "@/lib/queryClient";
 import { paramsParaMes } from "./temporalidade";
 import type { ReportsMensal, ChurnDetalhamento, ChurnProdutoMotivo, ChurnTaxaMensal } from "./tipos";
 import type { ChurnPorResponsavel } from "@shared/schema";
 import type { ChurnPontorrentePayload } from "@/components/churn-pontorrente/types";
+import type {
+  ScorecardMetasResponse,
+  ScorecardResponsaveisResponse,
+  ScorecardResponsavelItem,
+} from "./scorecard/tipos";
 
 const STALE = 5 * 60 * 1000;
 
@@ -48,3 +54,22 @@ export function useLtLtvDist() { return useQuery({ queryKey: ["/api/lt-ltv-churn
 export function useLtLtvClientes() { return useQuery({ queryKey: ["/api/lt-ltv-churn/clientes", { sort: "ltvTotal", dir: "desc", page: "1" }], staleTime: STALE }); }
 export function useEstoqueOverview() { return useQuery({ queryKey: ["/api/estoque-pontual/overview"], staleTime: STALE }); }
 export function useCapacityTimes() { return useQuery({ queryKey: ["/api/capacity-times"], staleTime: STALE }); }
+
+// Scorecard executivo (Tasks 1-2: /api/scorecard/metas + /api/scorecard/responsaveis)
+export function useScorecardMetas(mes: string) {
+  return useQuery<ScorecardMetasResponse>({ queryKey: ["/api/scorecard/metas", { mes }], enabled: !!mes, staleTime: STALE });
+}
+export function useScorecardResponsaveis() {
+  return useQuery<ScorecardResponsaveisResponse>({ queryKey: ["/api/scorecard/responsaveis"], staleTime: STALE });
+}
+export function useSalvarResponsaveis() {
+  return useMutation({
+    mutationFn: async (itens: ScorecardResponsavelItem[]) => {
+      const res = await apiRequest("PUT", "/api/scorecard/responsaveis", { itens });
+      return res.json();
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["/api/scorecard/responsaveis"] });
+    },
+  });
+}
