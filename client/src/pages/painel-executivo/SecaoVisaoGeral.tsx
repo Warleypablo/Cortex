@@ -55,7 +55,7 @@ export function SecaoVisaoGeral({ mes }: { mes: string }) {
               <YAxis yAxisId="l" tickFormatter={(v) => formatCurrencyCompact(v)} tick={{ fill: "#9ca3af", fontSize: 12 }} />
               <YAxis yAxisId="r" orientation="right" tickFormatter={(v) => `${v}%`} tick={{ fill: "#9ca3af", fontSize: 12 }} />
               <Tooltip
-                formatter={(v: number, n) => n === "churnPct" ? formatPercent(v) : formatCurrencyNoDecimals(v)}
+                formatter={(v: number, n) => n === "Churn %" ? formatPercent(v) : formatCurrencyNoDecimals(v)}
                 contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }}
               />
               <Legend />

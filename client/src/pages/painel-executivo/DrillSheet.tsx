@@ -1,5 +1,5 @@
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Table, TableBody, TableCell, TableFooter, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { formatCurrencyNoDecimals, formatPercent } from "@/lib/utils";
 import type { DrillColuna } from "./tipos";
 
@@ -8,6 +8,10 @@ interface DrillSheetProps {
   titulo: string; subtitulo?: string;
   colunas: DrillColuna[]; linhas: Record<string, unknown>[];
   carregando?: boolean; erro?: boolean;
+  /** Total do card que originou o drill (ex: /api/gestao/receita/detalhe → `total`).
+     Quando informado, renderiza um rodapé somando a coluna numérica (tipo "brl") — fecha
+     o loop de auditabilidade (soma dos grupos == total do card). Opcional/retrocompatível. */
+  total?: number;
 }
 
 function fmt(v: unknown, tipo?: DrillColuna["tipo"]): string {
@@ -18,7 +22,7 @@ function fmt(v: unknown, tipo?: DrillColuna["tipo"]): string {
   return String(v);
 }
 
-export function DrillSheet({ open, onClose, titulo, subtitulo, colunas, linhas, carregando, erro }: DrillSheetProps) {
+export function DrillSheet({ open, onClose, titulo, subtitulo, colunas, linhas, carregando, erro, total }: DrillSheetProps) {
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="right" className="w-[560px] sm:max-w-[560px] overflow-y-auto bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700">
@@ -45,6 +49,17 @@ export function DrillSheet({ open, onClose, titulo, subtitulo, colunas, linhas, 
                     </TableRow>
                   ))}
                 </TableBody>
+                {total != null && (
+                  <TableFooter>
+                    <TableRow>
+                      {colunas.map((c, i) => (
+                        <TableCell key={c.chave} className="font-semibold text-gray-900 dark:text-white">
+                          {c.tipo === "brl" ? formatCurrencyNoDecimals(total) : i === 0 ? "Total" : null}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  </TableFooter>
+                )}
               </Table>
             </div>
           )}

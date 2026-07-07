@@ -28,7 +28,11 @@ export function SecaoReceita({ mes }: { mes: string }) {
 
   const tm = rm.data.turboMetrics;
   const p = rm.data.pontualData;
-  const grupos = (detalhe.data as any)?.grupos ?? [];
+  // /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts, DetalheResult) não tem
+  // tipo compartilhado client/server — um único cast local evita repetir "as any" por linha
+  // (inclui `total`, usado pelo rodapé de auditabilidade do DrillSheet).
+  const detalheData = detalhe.data as { titulo?: string; subtitulo?: string; total?: number; grupos?: Record<string, unknown>[] } | undefined;
+  const grupos = detalheData?.grupos ?? [];
 
   return (
     <div className="space-y-6">
@@ -59,12 +63,13 @@ export function SecaoReceita({ mes }: { mes: string }) {
       <DrillSheet
         open={drillAberto}
         onClose={() => setDrillAberto(false)}
-        titulo={(detalhe.data as any)?.titulo ?? "Detalhe"}
-        subtitulo={`${(detalhe.data as any)?.subtitulo ?? ""} · ${labelMes(mes)}`}
+        titulo={detalheData?.titulo ?? "Detalhe"}
+        subtitulo={`${detalheData?.subtitulo ?? ""} · ${labelMes(mes)}`}
         colunas={[{ chave: "titulo", label: "Grupo", tipo: "text" }, { chave: "total", label: "Valor", tipo: "brl" }]}
         linhas={grupos}
         carregando={detalhe.isLoading}
         erro={detalhe.isError}
+        total={detalheData?.total}
       />
     </div>
   );
