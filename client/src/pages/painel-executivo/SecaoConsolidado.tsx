@@ -23,6 +23,7 @@ import {
   useBp2026ReconciliacaoTotal,
   useBp2026PontualTotal,
   useContribuicaoSquadRanking,
+  useContribuicaoSquadBulk,
 } from "./hooks";
 import { paramsParaMes, labelMes } from "./temporalidade";
 import { montarSecoesVisaoGeral } from "./SecaoVisaoGeral";
@@ -59,6 +60,7 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const pontorrente = useChurnPontorrente(mes);
   const series = useScorecardSeries(mes);
   const contribuicaoSquad = useContribuicaoSquadRanking(mes);
+  const contribuicaoSquadBulk = useContribuicaoSquadBulk(mes);
   const reconciliacaoTotal = useBp2026ReconciliacaoTotal(mes);
   const pontualTotal = useBp2026PontualTotal();
 
@@ -119,6 +121,7 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
     { isError: series.isError, data: series.data },
     mes,
     { isError: contribuicaoSquad.isError, data: contribuicaoSquad.data },
+    { isError: contribuicaoSquadBulk.isError, data: contribuicaoSquadBulk.data },
   );
   const secoesLtLtv = ltvOverview
     ? montarSecoesLtLtv(

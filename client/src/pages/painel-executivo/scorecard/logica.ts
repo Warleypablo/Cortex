@@ -248,6 +248,143 @@ export function serieOverviewLtLtv(evolucaoProduto: EvolucaoProdutoTabelaData | 
   return { lt, ltv, totalRecorrentes };
 }
 
+// ── Onda E (Capacity): série mensal de Margem de Contribuição a partir do bulk ─────────────────
+// GET /api/contribuicao-squad/dfc/bulk?ano=YYYY devolve receita/despesa CRU por squad×mês para o
+// ano inteiro, mas não fecha a fórmula de contribuição — fechamos aqui com a MESMA fórmula do
+// ranking (server/routes.ts:6610-6613): resultadoBruto = receita − despesa (despesa já SEM
+// impostos: folha + freelancers + iFood); impostos = receita × 18%; contribuicao = resultadoBruto
+// − impostos; margem% = contribuicao/receita (guard receita>0, senão null — evita 0% enganoso).
+const IMPOSTOS_PCT_RECEITA = 0.18;
+
+export interface ContribuicaoBulkDespesaMes {
+  salarios: number;
+  freelancers: number;
+  ifood: number;
+}
+export interface ContribuicaoSquadBulkResumo {
+  squad: string;
+  porMes: number[]; // 12 posições, index 0 = janeiro
+}
+export interface ContribuicaoSquadBulkMesTotal {
+  mes: string; // YYYY-MM
+  data: { totais: { receitaTotal: number } } | null;
+}
+export interface ContribuicaoSquadBulkFonte {
+  ano: number;
+  meses: ContribuicaoSquadBulkMesTotal[];
+  resumoPorSquad: ContribuicaoSquadBulkResumo[];
+  despesasMensais: Record<string, ContribuicaoBulkDespesaMes>;
+  despesasPorSquadMensais: Record<string, Record<string, ContribuicaoBulkDespesaMes>>;
+}
+
+export interface ContribuicaoMesCalc {
+  month: string;
+  receita: number;
+  despesa: number;
+  contribuicao: number;
+  margem: number | null;
+}
+
+function somaDespesaSemImpostos(d: ContribuicaoBulkDespesaMes | undefined): number {
+  if (!d) return 0;
+  return (d.salarios || 0) + (d.freelancers || 0) + (d.ifood || 0);
+}
+
+function fecharContribuicaoMes(month: string, receita: number, despesa: number): ContribuicaoMesCalc {
+  const resultadoBruto = receita - despesa;
+  const impostos = receita * IMPOSTOS_PCT_RECEITA;
+  const contribuicao = resultadoBruto - impostos;
+  const margem = receita > 0 ? (contribuicao / receita) * 100 : null;
+  return { month, receita, despesa, contribuicao, margem };
+}
+
+/**
+ * Série mensal (12 meses do ano do bulk) da Margem de Contribuição GERAL — soma receita/despesa
+ * de TODOS os squads por mês. Usa os totais JÁ globais do bulk (`meses[].data.totais.receitaTotal`
+ * e `despesasMensais`) em vez de somar squad a squad: `despesasMensais` conta TODO colaborador/
+ * freela do período (mesmo os de squads de RH sem par de squad de receita, que por isso ficam de
+ * fora de `despesasPorSquadMensais` — ver `findRevenueSquad` no backend), então é o total mais
+ * fiel de "TODOS os squads". Mês sem dado (`data: null`, squad zerado no ano) vira receita=0.
+ */
+export function serieContribuicaoGeral(bulk: ContribuicaoSquadBulkFonte | undefined): ContribuicaoMesCalc[] {
+  if (!bulk) return [];
+  return bulk.meses.map((m) => {
+    const receita = m.data?.totais.receitaTotal ?? 0;
+    const despesa = somaDespesaSemImpostos(bulk.despesasMensais[m.mes]);
+    return fecharContribuicaoMes(m.mes, receita, despesa);
+  });
+}
+
+/**
+ * Série mensal de Margem de Contribuição POR SQUAD a partir do bulk. Squad sem despesa casada
+ * num mês (colaborador de RH sem squad de receita correspondente naquele mês) fica com despesa=0
+ * nesse ponto — subestima custo, mas preserva a receita real do squad (mesma degradação aceita
+ * no backend para squads de RH sem par de receita).
+ */
+export function serieContribuicaoPorSquad(
+  bulk: ContribuicaoSquadBulkFonte | undefined,
+): Record<string, ContribuicaoMesCalc[]> {
+  if (!bulk) return {};
+  const resultado: Record<string, ContribuicaoMesCalc[]> = {};
+  for (const { squad, porMes } of bulk.resumoPorSquad) {
+    const despesasSquad = bulk.despesasPorSquadMensais[squad];
+    resultado[squad] = porMes.map((receita, idx) => {
+      const mesKey = `${bulk.ano}-${String(idx + 1).padStart(2, "0")}`;
+      const despesa = somaDespesaSemImpostos(despesasSquad?.[mesKey]);
+      return fecharContribuicaoMes(mesKey, receita, despesa);
+    });
+  }
+  return resultado;
+}
+
+/**
+ * Ponto de uma série de contribuição no mês selecionado (ou o último <= mes, defensivo) — mesma
+ * regra de seleção de `linhasPorDimensao` acima, reaproveitada para reconciliar `atual`/`sub` com
+ * o ponto exibido no modo Evolução. null se a série estiver vazia ou não tiver ponto <= mes.
+ */
+export function pontoContribuicaoNoMes(serie: ContribuicaoMesCalc[], mes: string): ContribuicaoMesCalc | null {
+  if (serie.length === 0) return null;
+  const ordenados = [...serie].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+  return ordenados.find((p) => p.month === mes) ?? [...ordenados].reverse().find((p) => p.month <= mes) ?? null;
+}
+
+/**
+ * Normaliza um nome de squad para comparação cross-fonte: remove emoji/acentos/espaços e
+ * lowercase — mesma ideia do `stripEmoji` do backend (server/routes.ts, matching squad de RH →
+ * squad de receita). Necessário porque o ranking (`getContribuicaoSquadDfc`, pipeline direto de
+ * `caz_parcelas`) usa o literal "Sem Squad", enquanto o bulk (pipeline de itens) usa
+ * `SEM_SQUAD_LABEL = '⚠️ Sem Squad'` (server/contribuicaoSquad/receitaPorItens.ts) — os dois
+ * normalizam para a mesma chave.
+ */
+export function normalizarChaveSquad(squad: string): string {
+  // Sem \p{L}/flag u (exige target es6+ no tsc deste projeto — mesmo motivo documentado em
+  // squadColor() de ChurnAbonados.tsx): NFKD decompõe acentos em base+combining mark, removida
+  // pelo range ̀-ͯ — o que sobra depois é ASCII puro (letras/dígitos), então
+  // [^A-Za-z0-9]+ é suficiente para varrer emoji/espaço/pontuação sem o flag u.
+  return squad
+    .normalize("NFKD")
+    .replace(/[̀-ͯ]/g, "")
+    .replace(/[^A-Za-z0-9]+/g, "")
+    .toLowerCase();
+}
+
+/**
+ * Busca a série de contribuição de um squad (nome vindo do ranking) dentro do mapa por squad do
+ * bulk, tolerando pequenas diferenças de rótulo (ver `normalizarChaveSquad`). Os dois endpoints
+ * usam pipelines de receita DIFERENTES (ranking: `caz_parcelas` direto; bulk: pipeline de itens),
+ * então o match é por NOME normalizado — não garante que os valores batam entre si, só que é o
+ * mesmo squad. Sem match → undefined (fallback sem série, degradação graciosa).
+ */
+export function encontrarSerieSquad(
+  porSquad: Record<string, ContribuicaoMesCalc[]>,
+  squad: string,
+): ContribuicaoMesCalc[] | undefined {
+  if (porSquad[squad]) return porSquad[squad];
+  const chaveAlvo = normalizarChaveSquad(squad);
+  const match = Object.keys(porSquad).find((k) => normalizarChaveSquad(k) === chaveAlvo);
+  return match ? porSquad[match] : undefined;
+}
+
 /** Formata um valor numérico conforme o formato do scorecard. null/undefined/NaN → "—". */
 export function formatValor(v: number | null | undefined, formato: ScorecardFormato): string {
   if (v === null || v === undefined || isNaN(v)) return "—";

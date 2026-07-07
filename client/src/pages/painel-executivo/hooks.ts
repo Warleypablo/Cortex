@@ -189,3 +189,44 @@ export function useContribuicaoSquadRanking(mes: string) {
     retry: false,
   });
 }
+
+// Onda E (Capacity): série mensal COMPLETA de Margem de Contribuição — GET
+// /api/contribuicao-squad/dfc/bulk?ano=YYYY (server/routes.ts:5871). Ao contrário do ranking
+// acima (só o período do mês selecionado, sem série), o bulk devolve os 12 meses do ANO de uma
+// vez — usado para dar `serie` às linhas de Contribuição/Margem/Receita/Custos (Geral e por
+// squad) no modo Evolução. O bulk devolve receita/despesa CRU por squad×mês; NÃO calcula
+// impostos/contribuição/margem (a `despesa` já é sem impostos: folha (rh_pessoal) + freelancers
+// + iFood) — a fórmula é fechada no client (ver serieContribuicaoGeral/PorSquad em
+// scorecard/logica.ts), mesma fórmula do ranking (server/routes.ts:6610-6613).
+export interface ContribuicaoSquadBulkDespesaMes {
+  salarios: number;
+  freelancers: number;
+  ifood: number;
+}
+export interface ContribuicaoSquadBulkMes {
+  mes: string; // YYYY-MM
+  mesLabel: string;
+  data: { totais: { receitaTotal: number } } | null;
+}
+export interface ContribuicaoSquadBulkResumo {
+  squad: string;
+  receitaTotal: number;
+  porMes: number[]; // 12 posições, index 0 = janeiro
+}
+export interface ContribuicaoSquadBulkResponse {
+  ano: number;
+  squads: string[];
+  meses: ContribuicaoSquadBulkMes[];
+  resumoPorSquad: ContribuicaoSquadBulkResumo[];
+  despesasMensais: Record<string, ContribuicaoSquadBulkDespesaMes>;
+  despesasPorSquadMensais: Record<string, Record<string, ContribuicaoSquadBulkDespesaMes>>;
+}
+export function useContribuicaoSquadBulk(mes: string) {
+  const ano = mes.slice(0, 4);
+  return useQuery<ContribuicaoSquadBulkResponse>({
+    queryKey: ["/api/contribuicao-squad/dfc/bulk", { ano }],
+    enabled: !!mes,
+    staleTime: STALE,
+    retry: false,
+  });
+}

@@ -1,5 +1,18 @@
 import { describe, it, expect } from "vitest";
-import { calcStatus, deltaM1, formatValor, linhasPorDimensao, linhasReceitaCabeca, serieOverviewLtLtv } from "./logica";
+import {
+  calcStatus,
+  deltaM1,
+  formatValor,
+  linhasPorDimensao,
+  linhasReceitaCabeca,
+  serieOverviewLtLtv,
+  serieContribuicaoGeral,
+  serieContribuicaoPorSquad,
+  pontoContribuicaoNoMes,
+  normalizarChaveSquad,
+  encontrarSerieSquad,
+  type ContribuicaoSquadBulkFonte,
+} from "./logica";
 import type { EvolucaoProdutoTabelaData } from "@/components/lt-ltv-churn/types";
 
 describe("calcStatus", () => {
@@ -343,5 +356,138 @@ describe("serieOverviewLtLtv", () => {
     };
     const r = serieOverviewLtLtv(data);
     expect(r).toEqual({ lt: [], ltv: [], totalRecorrentes: [] });
+  });
+});
+
+describe("serieContribuicaoGeral / serieContribuicaoPorSquad (Onda E)", () => {
+  // Fixture mínima do bulk (/api/contribuicao-squad/dfc/bulk): 2 squads, 2 meses.
+  const bulk: ContribuicaoSquadBulkFonte = {
+    ano: 2026,
+    meses: [
+      { mes: "2026-01", data: { totais: { receitaTotal: 100000 } } },
+      { mes: "2026-02", data: { totais: { receitaTotal: 200000 } } },
+    ],
+    resumoPorSquad: [
+      { squad: "Squadra", porMes: [60000, 120000] },
+      { squad: "Pulse", porMes: [40000, 80000] },
+    ],
+    despesasMensais: {
+      "2026-01": { salarios: 30000, freelancers: 5000, ifood: 1000 },
+      "2026-02": { salarios: 30000, freelancers: 5000, ifood: 1000 },
+    },
+    despesasPorSquadMensais: {
+      Squadra: {
+        "2026-01": { salarios: 20000, freelancers: 5000, ifood: 1000 },
+        "2026-02": { salarios: 20000, freelancers: 5000, ifood: 1000 },
+      },
+      // Pulse não tem despesa casada em fevereiro (ex: colaborador sem match de squad de receita).
+      Pulse: {
+        "2026-01": { salarios: 10000, freelancers: 0, ifood: 0 },
+      },
+    },
+  };
+
+  it("serieContribuicaoGeral fecha a fórmula do ranking (resultadoBruto − impostos) mês a mês", () => {
+    const serie = serieContribuicaoGeral(bulk);
+    expect(serie).toHaveLength(2);
+    // Jan: receita=100000, despesa=30000+5000+1000=36000, bruto=64000, impostos=100000*0.18=18000
+    // contribuicao=64000-18000=46000, margem=46/100=46%
+    expect(serie[0]).toEqual({ month: "2026-01", receita: 100000, despesa: 36000, contribuicao: 46000, margem: 46 });
+    // Fev: receita=200000, despesa=36000, bruto=164000, impostos=36000, contribuicao=128000
+    expect(serie[1].contribuicao).toBe(128000);
+    expect(serie[1].margem).toBeCloseTo(64, 5);
+  });
+
+  it("serieContribuicaoGeral: mês sem dado (data null) vira receita=0, despesa ainda soma", () => {
+    const bulkComMesVazio: ContribuicaoSquadBulkFonte = {
+      ...bulk,
+      meses: [{ mes: "2026-03", data: null }],
+      despesasMensais: { "2026-03": { salarios: 1000, freelancers: 0, ifood: 0 } },
+    };
+    const serie = serieContribuicaoGeral(bulkComMesVazio);
+    expect(serie[0].receita).toBe(0);
+    expect(serie[0].despesa).toBe(1000);
+  });
+
+  it("serieContribuicaoGeral: bulk undefined → []", () => {
+    expect(serieContribuicaoGeral(undefined)).toEqual([]);
+  });
+
+  it("serieContribuicaoPorSquad: cada squad fecha a fórmula com a PRÓPRIA despesa por mês", () => {
+    const porSquad = serieContribuicaoPorSquad(bulk);
+    expect(Object.keys(porSquad).sort()).toEqual(["Pulse", "Squadra"]);
+
+    // Squadra Jan: receita=60000, despesa=26000, bruto=34000, impostos=10800, contribuicao=23200
+    expect(porSquad.Squadra[0]).toEqual({ month: "2026-01", receita: 60000, despesa: 26000, contribuicao: 23200, margem: (23200 / 60000) * 100 });
+
+    // Pulse Fev: sem despesa casada → despesa=0, contribuicao = receita - impostos(18%)
+    const pulseFev = porSquad.Pulse[1];
+    expect(pulseFev.month).toBe("2026-02");
+    expect(pulseFev.despesa).toBe(0);
+    expect(pulseFev.contribuicao).toBeCloseTo(80000 - 80000 * 0.18, 5);
+  });
+
+  it("serieContribuicaoPorSquad: bulk undefined → {}", () => {
+    expect(serieContribuicaoPorSquad(undefined)).toEqual({});
+  });
+
+  it("margem null quando receita <= 0 (evita 0% enganoso)", () => {
+    const bulkSemReceita: ContribuicaoSquadBulkFonte = {
+      ano: 2026,
+      meses: [{ mes: "2026-01", data: { totais: { receitaTotal: 0 } } }],
+      resumoPorSquad: [],
+      despesasMensais: { "2026-01": { salarios: 500, freelancers: 0, ifood: 0 } },
+      despesasPorSquadMensais: {},
+    };
+    const serie = serieContribuicaoGeral(bulkSemReceita);
+    expect(serie[0].margem).toBeNull();
+  });
+});
+
+describe("pontoContribuicaoNoMes", () => {
+  const serie = [
+    { month: "2026-01", receita: 1, despesa: 1, contribuicao: 10, margem: 1 },
+    { month: "2026-03", receita: 1, despesa: 1, contribuicao: 30, margem: 3 },
+  ];
+
+  it("mês exato presente na série → retorna o ponto exato", () => {
+    expect(pontoContribuicaoNoMes(serie, "2026-03")?.contribuicao).toBe(30);
+  });
+
+  it("mês ausente → usa o último ponto <= mes (defensivo)", () => {
+    expect(pontoContribuicaoNoMes(serie, "2026-06")?.contribuicao).toBe(30);
+  });
+
+  it("mês anterior a todos os pontos → null", () => {
+    expect(pontoContribuicaoNoMes(serie, "2025-12")).toBeNull();
+  });
+
+  it("série vazia → null", () => {
+    expect(pontoContribuicaoNoMes([], "2026-01")).toBeNull();
+  });
+});
+
+describe("normalizarChaveSquad / encontrarSerieSquad", () => {
+  it("ignora emoji, acento e caixa", () => {
+    expect(normalizarChaveSquad("🚀 Growth")).toBe(normalizarChaveSquad("growth"));
+  });
+
+  it("'Sem Squad' (ranking) e '⚠️ Sem Squad' (bulk, SEM_SQUAD_LABEL) normalizam igual", () => {
+    expect(normalizarChaveSquad("Sem Squad")).toBe(normalizarChaveSquad("⚠️ Sem Squad"));
+  });
+
+  it("encontrarSerieSquad: match exato tem prioridade", () => {
+    const porSquad = { Squadra: [{ month: "2026-01", receita: 1, despesa: 0, contribuicao: 1, margem: 100 }] };
+    expect(encontrarSerieSquad(porSquad, "Squadra")).toBe(porSquad.Squadra);
+  });
+
+  it("encontrarSerieSquad: match tolerante a diferença de rótulo (emoji/whitespace)", () => {
+    const porSquad = { "🚀 Growth": [{ month: "2026-01", receita: 1, despesa: 0, contribuicao: 1, margem: 100 }] };
+    expect(encontrarSerieSquad(porSquad, "Growth")).toBe(porSquad["🚀 Growth"]);
+  });
+
+  it("encontrarSerieSquad: sem match → undefined", () => {
+    const porSquad = { Squadra: [{ month: "2026-01", receita: 1, despesa: 0, contribuicao: 1, margem: 100 }] };
+    expect(encontrarSerieSquad(porSquad, "Pulse")).toBeUndefined();
   });
 });

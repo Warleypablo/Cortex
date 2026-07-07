@@ -6,12 +6,21 @@ import {
   useSalvarResponsaveis,
   useScorecardSeries,
   useContribuicaoSquadRanking,
+  useContribuicaoSquadBulk,
   type ContribuicaoSquadRankingResponse,
+  type ContribuicaoSquadBulkResponse,
 } from "./hooks";
-import { linhasPorDimensao, linhasReceitaCabeca } from "./scorecard/logica";
+import {
+  linhasPorDimensao,
+  linhasReceitaCabeca,
+  serieContribuicaoGeral,
+  serieContribuicaoPorSquad,
+  pontoContribuicaoNoMes,
+  encontrarSerieSquad,
+} from "./scorecard/logica";
 import { formatPercent } from "@/lib/utils";
 import type { CeoKpi } from "@/components/ceo/CeoKpiCard";
-import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
+import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem, ScorecardSeriePonto, ScorecardSeriesResponse } from "./scorecard/tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -52,6 +61,13 @@ export interface MontarSecoesCapacityContribuicao {
   isError: boolean;
   data: ContribuicaoSquadRankingResponse | undefined;
 }
+/** Onda E: fonte da SÉRIE mensal de Margem de Contribuição (bulk do ano) — complementa
+   `MontarSecoesCapacityContribuicao` acima, que só traz o período do mês selecionado (sem série).
+   Falha/loading isolados: degrada para as linhas sem `serie` (ver uso abaixo). */
+export interface MontarSecoesCapacityContribuicaoBulk {
+  isError: boolean;
+  data: ContribuicaoSquadBulkResponse | undefined;
+}
 
 /** Função pura: monta as seções de Capacity a partir dos payloads já resolvidos. `ceo`/`series`
    carregam o `isError` de cada query (além dos dados) porque o texto exibido distingue erro de
@@ -66,6 +82,7 @@ export function montarSecoesCapacity(
   series: MontarSecoesCapacitySeries,
   mes: string,
   contribuicao: MontarSecoesCapacityContribuicao,
+  contribuicaoBulk: MontarSecoesCapacityContribuicaoBulk,
 ): ScorecardSection[] {
   // /api/ceo-dashboard exige permissão de CEO (403 para os demais papéis; useCeoDashboard já
   // usa retry:false). Isolado: a linha mostra atual=null + aviso, sem derrubar a aba inteira.
@@ -133,51 +150,73 @@ export function montarSecoesCapacity(
     linhas: receitaCabecaOperadorRows,
   };
 
-  // Onda C1: Margem de Contribuição (Geral + por squad) — GET /api/contribuicao-squad/ranking.
-  // Sem série (o endpoint devolve só o período selecionado, não uma janela mensal) — mesma
-  // limitação de "Receita por Cabeça" acima.
+  // Onda C1→E: Margem de Contribuição (Geral + por squad) — `contribuicao` (GET
+  // /api/contribuicao-squad/ranking) traz só o período do mês selecionado (sem série);
+  // `contribuicaoBulk` (GET /api/contribuicao-squad/dfc/bulk?ano=YYYY, Onda E) traz os 12 meses
+  // do ano, usados para dar `serie` a estas linhas no modo Evolução. `atual`/`sub` preferem o
+  // ponto do BULK no mês selecionado (reconcilia com a série exibida, mesma regra de
+  // `linhasPorDimensao`); se o bulk não carregar, cai para o ranking (sem série) — degradação
+  // graciosa.
   const totaisContribuicao = contribuicao.data?.totais;
   const margemGeral =
     totaisContribuicao && totaisContribuicao.receita > 0
       ? (totaisContribuicao.contribuicao / totaisContribuicao.receita) * 100
       : null;
 
+  const serieContribGeralCalc = serieContribuicaoGeral(contribuicaoBulk.data);
+  const pontoGeralBulk = pontoContribuicaoNoMes(serieContribGeralCalc, mes);
+  // Fallback: bulk vazio/loading/erro → usa o ranking (sem série).
+  const contribuicaoGeralAtual = pontoGeralBulk
+    ?? (totaisContribuicao
+      ? { receita: totaisContribuicao.receita, despesa: totaisContribuicao.despesa, contribuicao: totaisContribuicao.contribuicao, margem: margemGeral }
+      : null);
+  const serieMetricaGeral = (campo: "contribuicao" | "margem" | "receita" | "despesa"): ScorecardSeriePonto[] | undefined =>
+    serieContribGeralCalc.length > 0
+      ? serieContribGeralCalc.map((p) => ({ month: p.month, label: labelMesCurto(p.month), valor: p[campo] }))
+      : undefined;
+
   const secaoContribuicaoGeral: ScorecardSection = {
     id: "capacity-contribuicao-geral",
     titulo: "Margem de Contribuição — Geral (mês)",
-    subtitulo: contribuicao.isError
+    subtitulo: contribuicao.isError && contribuicaoBulk.isError
       ? "falha ao carregar margem de contribuição"
-      : !totaisContribuicao
+      : !contribuicaoGeralAtual
         ? "carregando…"
-        : undefined,
-    linhas: totaisContribuicao
+        : !pontoGeralBulk
+          ? "série mensal indisponível (falha ao carregar bulk) — mostrando apenas o mês selecionado"
+          : undefined,
+    linhas: contribuicaoGeralAtual
       ? [
           {
             key: "capacity_contribuicao_geral_brl",
             metrica: "Contribuição (R$)",
-            atual: totaisContribuicao.contribuicao,
+            atual: contribuicaoGeralAtual.contribuicao,
             formato: "brl",
+            serie: serieMetricaGeral("contribuicao"),
             temporalidade: "mes",
           },
           {
             key: "capacity_contribuicao_geral_margem",
             metrica: "Margem %",
-            atual: margemGeral,
+            atual: contribuicaoGeralAtual.margem,
             formato: "pct",
+            serie: serieMetricaGeral("margem"),
             temporalidade: "mes",
           },
           {
             key: "capacity_contribuicao_geral_receita",
             metrica: "Receita",
-            atual: totaisContribuicao.receita,
+            atual: contribuicaoGeralAtual.receita,
             formato: "brl",
+            serie: serieMetricaGeral("receita"),
             temporalidade: "mes",
           },
           {
             key: "capacity_contribuicao_geral_custos",
             metrica: "Custos",
-            atual: totaisContribuicao.despesa,
+            atual: contribuicaoGeralAtual.despesa,
             formato: "brl",
+            serie: serieMetricaGeral("despesa"),
             temporalidade: "mes",
           },
         ]
@@ -187,14 +226,27 @@ export function montarSecoesCapacity(
   const rankingContribuicao = (contribuicao.data?.ranking ?? [])
     .slice()
     .sort((a, b) => b.contribuicao - a.contribuicao);
-  const contribuicaoSquadRows: ScorecardRow[] = rankingContribuicao.map((item) => ({
-    key: `capacity_contribuicao_squad_${slug(item.squad)}`,
-    metrica: item.squad,
-    sub: `Margem ${formatPercent(item.margem, 1)}`,
-    atual: item.contribuicao,
-    formato: "brl",
-    temporalidade: "mes",
-  }));
+  const serieContribPorSquadCalc = serieContribuicaoPorSquad(contribuicaoBulk.data);
+  const contribuicaoSquadRows: ScorecardRow[] = rankingContribuicao.map((item) => {
+    const serieSquad = encontrarSerieSquad(serieContribPorSquadCalc, item.squad);
+    const pontoSquad = serieSquad ? pontoContribuicaoNoMes(serieSquad, mes) : null;
+    const atual = pontoSquad ? pontoSquad.contribuicao : item.contribuicao;
+    // pontoSquad.margem pode ser null (receita<=0 no mês) — cai pro margem do ranking (sempre
+    // number, formatPercent abaixo não aceita null) em vez de mostrar "0%" ou quebrar o tipo.
+    const margem = pontoSquad?.margem ?? item.margem;
+    const serie: ScorecardSeriePonto[] | undefined = serieSquad
+      ? serieSquad.map((p) => ({ month: p.month, label: labelMesCurto(p.month), valor: p.contribuicao }))
+      : undefined;
+    return {
+      key: `capacity_contribuicao_squad_${slug(item.squad)}`,
+      metrica: item.squad,
+      sub: `Margem ${formatPercent(margem, 1)}`,
+      atual,
+      formato: "brl",
+      serie,
+      temporalidade: "mes",
+    };
+  });
   const secaoContribuicaoSquad: ScorecardSection = {
     id: "capacity-contribuicao-squad",
     titulo: "Margem de Contribuição por squad (mês)",
@@ -261,6 +313,7 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
   // loading isolados (não bloqueiam a aba): linhasPorDimensao devolve [] sem `series.data`.
   const series = useScorecardSeries(mes);
   const contribuicao = useContribuicaoSquadRanking(mes);
+  const contribuicaoBulk = useContribuicaoSquadBulk(mes);
   const metas = useScorecardMetas(mes);
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
@@ -280,6 +333,7 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
     { isError: series.isError, data: series.data },
     mes,
     { isError: contribuicao.isError, data: contribuicao.data },
+    { isError: contribuicaoBulk.isError, data: contribuicaoBulk.data },
   );
 
   return (
