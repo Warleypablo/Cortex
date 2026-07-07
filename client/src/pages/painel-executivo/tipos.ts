@@ -26,13 +26,28 @@ export interface ReportsMensal {
   okrObjectives: { id: string; title: string; krs: { id: string; title: string; unit: string; actual: number | null; achievement: number }[] }[];
 }
 
+// churn_por_squad/pessoa/motivo: server (routes.ts, /api/analytics/churn-detalhamento) já devolve
+// ARRAYS de objetos (não Record<string,...> — confirmado lendo o handler). Nada de Object.entries aqui.
+export interface ChurnPorSquadRow { squad: string; mrr_ativo: number; mrr_perdido: number; percentual: number; }
+export interface ChurnPorPessoaRow { pessoa: string; mrr_ativo: number; mrr_perdido: number; percentual: number; }
+export interface ChurnPorMotivoRow { motivo: string; mrr_perdido: number; quantidade: number; percentual: number; }
+
 export interface ChurnDetalhamento {
   contratos: { id: number; cliente_nome: string; produto: string; squad: string; responsavel: string; valorr: number; motivo_cancelamento: string; lifetime_meses: number; ltv: number }[];
   metricas: {
     total_churned: number; mrr_perdido: number; churn_percentual: number; lt_medio: number; ltv_total: number;
-    churn_por_squad: Record<string, unknown>; churn_por_pessoa: Record<string, unknown>; churn_por_motivo: Record<string, unknown>;
+    churn_por_squad: ChurnPorSquadRow[]; churn_por_pessoa: ChurnPorPessoaRow[]; churn_por_motivo: ChurnPorMotivoRow[];
   };
 }
+
+export interface ChurnProdutoMotivoCelula { produto: string; motivo_cancelamento: string; cancelamentos: number; mrr_perdido: number; ticket_medio: number; }
+export interface ChurnProdutoMotivo {
+  produtos: string[]; motivos: string[]; celulas: ChurnProdutoMotivoCelula[];
+  totais: { cancelamentos: number; mrr_perdido: number; ticket_medio: number };
+}
+
+export interface ChurnTaxaMensalRow { mes: string; mrr_base: number; mrr_churn: number; cancelamentos: number; taxa: number; }
+export interface ChurnTaxaMensal { rows: ChurnTaxaMensalRow[]; }
 
 export interface DrillColuna { chave: string; label: string; tipo?: "brl" | "int" | "pct" | "text"; }
 export type DrillState = { titulo: string; subtitulo?: string; colunas: DrillColuna[]; linhas: Record<string, unknown>[] } | null;

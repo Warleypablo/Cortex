@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { mesDefault, mesesOptions } from "./painel-executivo/temporalidade";
 import { SecaoVisaoGeral } from "./painel-executivo/SecaoVisaoGeral";
 import { SecaoReceita } from "./painel-executivo/SecaoReceita";
+import { SecaoChurn } from "./painel-executivo/SecaoChurn";
 
 const ABAS = [
   { value: "visao-geral", label: "Visão Geral" },
@@ -52,6 +53,8 @@ export default function PainelExecutivo() {
               <SecaoVisaoGeral mes={mes} />
             ) : a.value === "receita" ? (
               <SecaoReceita mes={mes} />
+            ) : a.value === "churn" ? (
+              <SecaoChurn mes={mes} />
             ) : (
               <div className="text-sm text-gray-500 dark:text-zinc-400">Em construção: {a.label} — {mes}</div>
             )}

@@ -1,6 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
 import { paramsParaMes } from "./temporalidade";
-import type { ReportsMensal, ChurnDetalhamento } from "./tipos";
+import type { ReportsMensal, ChurnDetalhamento, ChurnProdutoMotivo, ChurnTaxaMensal } from "./tipos";
+import type { ChurnPorResponsavel } from "@shared/schema";
+import type { ChurnPontorrentePayload } from "@/components/churn-pontorrente/types";
 
 const STALE = 5 * 60 * 1000;
 
@@ -21,19 +23,25 @@ export function useChurnDetalhamento(mes: string) {
 }
 export function useChurnProdutoMotivo(mes: string) {
   const { dataInicio, dataFim } = paramsParaMes(mes).dataInicioFim;
-  return useQuery({ queryKey: ["/api/churn/produto-motivo", { dataInicio, dataFim }], enabled: !!mes, staleTime: STALE });
+  return useQuery<ChurnProdutoMotivo>({ queryKey: ["/api/churn/produto-motivo", { dataInicio, dataFim }], enabled: !!mes, staleTime: STALE });
 }
 export function useChurnTaxaMensal(mes: string) {
-  const { dataInicio, dataFim } = paramsParaMes(mes).dataInicioFim;
-  return useQuery({ queryKey: ["/api/churn/taxa-mensal", { dataInicio, dataFim }], enabled: !!mes, staleTime: STALE });
+  // GOTCHA: paramsParaMes(mes).dataInicioFim manda dataInicio=dataFim=mes, o que faz o endpoint
+  // (generate_series de X até X) devolver 1 linha só — inútil para o mini-gráfico de série.
+  // Construímos aqui uma janela de 12 meses terminando em `mes` (mesmo padrão do gráfico
+  // "Receita × Churn — 12 meses" da Visão Geral, que usa uma série pronta do /api/reports/mensal).
+  const [ano, m] = mes.split("-").map(Number);
+  const inicio = new Date(ano, m - 1 - 11, 1);
+  const dataInicio = `${inicio.getFullYear()}-${String(inicio.getMonth() + 1).padStart(2, "0")}`;
+  return useQuery<ChurnTaxaMensal>({ queryKey: ["/api/churn/taxa-mensal", { dataInicio, dataFim: mes }], enabled: !!mes, staleTime: STALE });
 }
 export function useChurnPorResponsavel(mes: string) {
   const { mesInicio, mesFim } = paramsParaMes(mes).mesInicioFim;
-  return useQuery({ queryKey: ["/api/churn-por-responsavel", { mesInicio, mesFim }], enabled: !!mes, staleTime: STALE });
+  return useQuery<ChurnPorResponsavel[]>({ queryKey: ["/api/churn-por-responsavel", { mesInicio, mesFim }], enabled: !!mes, staleTime: STALE });
 }
 export function useChurnPontorrente(mes: string) {
   const { de, ate } = paramsParaMes(mes).deAte;
-  return useQuery({ queryKey: ["/api/churn-pontorrente", { de, ate }], enabled: !!mes, staleTime: STALE });
+  return useQuery<ChurnPontorrentePayload>({ queryKey: ["/api/churn-pontorrente", { de, ate }], enabled: !!mes, staleTime: STALE });
 }
 export function useCeoDashboard(mes: string) {
   return useQuery({ queryKey: ["/api/ceo-dashboard", { mes }], enabled: !!mes, staleTime: STALE, retry: false });
