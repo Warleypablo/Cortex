@@ -84,6 +84,7 @@ export function montarSecoesLtLtv(
     atual: c.ltvTotal,
     formato: "brl",
     temporalidade: "snapshot",
+    drillParams: { tipo: "cliente_contratos", valor: String(c.idTask) },
   }));
 
   const distRows: ScorecardRow[] = dist.map((b) => ({
@@ -152,6 +153,17 @@ export function montarSecoesLtLtv(
     {
       id: "lt-ltv-base-ativa",
       titulo: "LT / LTV — Base ativa (snapshot)",
+      // Fase 2C-ii (drill wiring): as 5 linhas abaixo ligam em `lt_medio`/`ltv_medio`/
+      // `mediana_lt`/`mediana_ltv` (server/routes/scorecard.detalhe.ltltv.ts) — auditoria por
+      // LISTA DE CONTEXTO (clientes agregados por id_task, mesma base de `/api/lt-ltv-churn/
+      // clientes`, sem paginação). Números NÃO reconciliam byte-a-byte com o `atual` do card
+      // (mesma classe de divergência já documentada em "Total recorrentes" abaixo): "LT médio
+      // ativo"/"LTV médio/cliente" vêm de `overview` (grão CONTRATO/todos-os-clientes); "LT/LTV
+      // mediano" vêm de `evolucaoClientes` (grão cliente, mas via snapshot `cup_data_hist`); os
+      // drills usam SEMPRE grão CLIENTE via `vw_lt_contratos`, filtrado explicitamente por status
+      // ativo/cancelado (ex: LTV médio ~R$29,7k ativo vs ~R$16k geral do card, LT médio ~6,9 vs
+      // ~6,2 meses, em 2026-06) — o drill é a auditoria mais correta/granular, o card é a
+      // tendência mensal.
       linhas: [
         {
           key: "lt_ltv_lt_medio_ativo",
@@ -162,6 +174,7 @@ export function montarSecoesLtLtv(
           temporalidade: "mes",
           // Snapshot da base ativa (não fluxo) — YTD = último ponto do ano.
           ytdAgg: "ultimo",
+          drillParams: { tipo: "lt_medio", valor: "ativo" },
         },
         {
           key: "lt_ltv_lt_mediano",
@@ -171,6 +184,7 @@ export function montarSecoesLtLtv(
           serie: ltMedianaSerie.length > 0 ? ltMedianaSerie : undefined,
           temporalidade: "mes",
           ytdAgg: "ultimo",
+          drillParams: { tipo: "mediana_lt" },
         },
         {
           key: "lt_ltv_lt_medio_cancelado",
@@ -179,6 +193,7 @@ export function montarSecoesLtLtv(
           formato: "meses",
           temporalidade: "snapshot",
           ytdAgg: "ultimo",
+          drillParams: { tipo: "lt_medio", valor: "cancelado" },
         },
         {
           key: "lt_ltv_ltv_medio_cliente",
@@ -188,6 +203,7 @@ export function montarSecoesLtLtv(
           serie: ltvMedioSerie.length > 0 ? ltvMedioSerie : undefined,
           temporalidade: "mes",
           ytdAgg: "ultimo",
+          drillParams: { tipo: "ltv_medio", valor: "ativo" },
         },
         {
           key: "lt_ltv_ltv_mediano_cliente",
@@ -197,6 +213,7 @@ export function montarSecoesLtLtv(
           serie: ltvMedianaSerie.length > 0 ? ltvMedianaSerie : undefined,
           temporalidade: "mes",
           ytdAgg: "ultimo",
+          drillParams: { tipo: "mediana_ltv" },
         },
         {
           key: "lt_ltv_total_recorrentes",
@@ -207,19 +224,25 @@ export function montarSecoesLtLtv(
           temporalidade: "mes",
           // Contagem de clientes ativos (estoque), não soma-se ao longo do ano.
           ytdAgg: "ultimo",
+          // Fase 2B (drill wiring): SEM propósito ligar `contratos_ativos` aqui — aquele drill
+          // filtra `is_ativo` (portfólio vivo, ~337 em 2026-06), enquanto `overview.totalRecorrentes`
+          // vem de `COUNT(*) FILTER (WHERE tipo_receita='recorrente')` SEM esse filtro (todo
+          // histórico de contratos recorrentes, incluindo já churnados — ~1560, ver
+          // server/routes/ltLtvChurn.ts:23 e a nota em montarContratosAtivosDetalhe,
+          // server/routes/scorecard.detalhe.helpers.ts). Os números não reconciliam — decidir
+          // numa fase futura se o card migra para a definição "ativos" (mais correta como
+          // portfólio atual) antes de ligar o drill.
         },
       ],
     },
     {
       id: "lt-ltv-maiores-clientes",
       titulo: "Maiores clientes por LTV (snapshot)",
-      subtitulo: "estado atual da base",
       linhas: clienteRows,
     },
     {
       id: "lt-ltv-distribuicao",
       titulo: "Distribuição de LTV por cliente (snapshot)",
-      subtitulo: "estado atual da base",
       linhas: distRows,
     },
     {

@@ -103,6 +103,7 @@ export function montarSecoesEntregas(
           // existia o ponto do mês selecionado, então o modo evolução caía em "sem série".
           serie: p.entregasPorProdutoMes.map((m) => ({ month: m.month, label: m.label, valor: m.produtos[produto] ?? 0 })),
           temporalidade: "mes",
+          drillParams: { tipo: "entregue", dim: "produto", valor: produto },
         }))
     : [];
 
@@ -118,6 +119,7 @@ export function montarSecoesEntregas(
     // Dono automático (o próprio operador) — célula somente-leitura, mesmo padrão de
     // operadorRows em SecaoChurn.tsx.
     responsavelAuto: true,
+    drillParams: (dim) => ({ tipo: "entregue", dim: "operador", valor: dim }),
   });
 
   // Onda5: série mensal de lead time por produto (server/routes/scorecard.ts). Meses sem
@@ -135,6 +137,9 @@ export function montarSecoesEntregas(
           formato: "int",
           labelMes: labelMesCurto,
           sub: () => "dias",
+          // Fase 2C-ii: lista as entregas individuais do mês (cliente, datas, dias) que compõem
+          // a média por produto — server/routes/scorecard.detalhe.ltltv.ts.
+          drillParams: (dim) => ({ tipo: "lead_time", dim: "produto", valor: dim }),
         })
       : [...p.tempoMedioEntrega]
           .sort((a, b) => b.diasMedio - a.diasMedio)
@@ -159,6 +164,7 @@ export function montarSecoesEntregas(
           formato: "brl",
           serie: serieComLabel<EntregaProdutoMes>(p.entregasPorProdutoMes, (r) => r.total),
           temporalidade: "mes",
+          drillParams: { tipo: "entregue" },
         },
         {
           key: "entregas_resumo_tech",
@@ -203,6 +209,7 @@ export function montarSecoesEntregas(
           atual: estoque ? estoque.valorEstoque : null,
           formato: "brl",
           temporalidade: "snapshot",
+          drillParams: { tipo: "estoque_aberto" },
         },
         {
           key: "entregas_aberto_entregue_mes",
@@ -213,6 +220,7 @@ export function montarSecoesEntregas(
           // série (caía em "sem série" no modo Evolução).
           serie: serieComLabel<EntregaProdutoMes>(p.entregasPorProdutoMes, (r) => r.total),
           temporalidade: "mes",
+          drillParams: { tipo: "entregue" },
         },
       ],
     },

@@ -63,6 +63,7 @@ import { registerReportsSemanalRoutes } from "./routes/reportsSemanal";
 import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerScorecardRoutes } from "./routes/scorecard";
+import { registerScorecardDetalheRoutes } from "./routes/scorecard.detalhe";
 import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
 import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
@@ -8561,6 +8562,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Company Scorecard - metas consolidadas (BP2026 + OKR)
   registerScorecardRoutes(app);
+
+  // Company Scorecard - drill genérico (Fase 1: infra + piloto Churn)
+  registerScorecardDetalheRoutes(app);
 
   // Receita Recorrente por Centro de Custo
   registerReceitaRecorrenteRoutes(app, db, storage);

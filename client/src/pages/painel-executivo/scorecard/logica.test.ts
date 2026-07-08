@@ -327,6 +327,28 @@ describe("linhasReceitaCabeca", () => {
     expect(linhas[0].serie).toEqual([{ month: "2026-06", valor: 20000, label: "L-06" }]);
   });
 
+  it("drillParams (Fase 2C-i) — monta o drillParams de cada linha a partir da dimensão, quando informado", () => {
+    const mrr = { Growth: [{ month: "2026-06", valor: 100000 }] };
+    const entregas = { Growth: [{ month: "2026-06", valor: 20000 }] };
+    const linhas = linhasReceitaCabeca(mrr, entregas, "2026-06", {
+      keyFn: (d) => `k_${d}`,
+      labelMes,
+      pessoasPorDim: () => 6,
+      drillParams: (dim) => ({ tipo: "receita_cabeca", dim: "squad", valor: dim }),
+    });
+    expect(linhas[0].drillParams).toEqual({ tipo: "receita_cabeca", dim: "squad", valor: "Growth" });
+  });
+
+  it("drillParams omitido → linhas sem drill (undefined)", () => {
+    const mrr = { Growth: [{ month: "2026-06", valor: 100000 }] };
+    const linhas = linhasReceitaCabeca(mrr, undefined, "2026-06", {
+      keyFn: (d) => d,
+      labelMes,
+      pessoasPorDim: () => 6,
+    });
+    expect(linhas[0].drillParams).toBeUndefined();
+  });
+
   it("squad sem entrega no mês trata entregasSeries ausente como 0 (não quebra a série de MRR)", () => {
     const mrr = { Squadra: [{ month: "2026-06", valor: 60000 }] };
     const linhas = linhasReceitaCabeca(mrr, undefined, "2026-06", {

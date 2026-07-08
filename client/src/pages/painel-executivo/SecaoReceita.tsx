@@ -1,12 +1,9 @@
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle } from "lucide-react";
 import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
-import { DrillSheet } from "./DrillSheet";
 import {
   useReportsMensal,
-  useGestaoReceitaDetalhe,
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
@@ -16,7 +13,6 @@ import {
   type Bp2026ReconciliacaoTotalResponse,
   type Bp2026PontualLinha,
 } from "./hooks";
-import { paramsParaMes, labelMes } from "./temporalidade";
 import { atualDaSerie } from "./scorecard/logica";
 import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
 import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes, ReportsMensal } from "./tipos";
@@ -58,12 +54,10 @@ function serieSaldoEstoque(pontos: { month: string; valor: number }[] | undefine
 
 // Tipos válidos aceitos por /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts,
 // const TIPOS). "venda"/"churn" (soltos) NÃO existem — usar "venda_mrr"/"venda_pontual" e
-// "churn_motivo"/"churn_vendedor" (que exigem uma chave específica, não "total").
-
-export interface MontarSecoesReceitaExtras {
-  /** Abre o DrillSheet (estado fica no componente) — omitido = linha "Nova receita" sem drill. */
-  onDrill?: (tipo: string, chave: string) => void;
-}
+// "churn_motivo"/"churn_vendedor" (que exigem uma chave específica, não "total"). O tipo
+// "venda_mrr" também é servido por /api/scorecard/detalhe (delega para o mesmo `montarDetalhe`,
+// ver server/routes/scorecard.detalhe.ts) — é essa a rota usada pelo drill de `receita_mrr_nova`
+// abaixo, centralizado no Scorecard (drillParams), não mais um estado local desta seção.
 
 /** Fontes bp2026 (Onda B2) — opcionais: hooks isolados, ausência = linhas com "—" (degradação
    graciosa), nunca derruba o resto da seção. Ver useBp2026ReconciliacaoTotal/useBp2026PontualTotal
@@ -109,7 +103,6 @@ function bp2026PontualLinha(
 export function montarSecoesReceita(
   rm: ReportsMensal,
   mes: string,
-  extras: MontarSecoesReceitaExtras = {},
   bp2026: MontarSecoesReceitaBp2026 = {},
   series?: ScorecardSeriesResponse,
 ): ScorecardSection[] {
@@ -129,12 +122,11 @@ export function montarSecoesReceita(
           atual: tm.mrrAtivo,
           formato: "brl",
           metaKey: "mrr_active",
-          // Estoque de MRR ativo (ClickUp/cup_data_hist) — venda_mrr é FLUXO (Bitrix) e não
-          // reconcilia com o estoque, por isso sem drill (mesma regra da v1 em cards).
           serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.mrr),
           temporalidade: "mes",
           // Estoque (saldo) — YTD = último ponto do ano, não a soma dos meses.
           ytdAgg: "ultimo",
+          drillParams: { tipo: "mrr_ativo" },
         },
         {
           key: "receita_mrr_nova",
@@ -144,7 +136,7 @@ export function montarSecoesReceita(
           metaKey: "sales_mrr_new_target",
           serie: serieComLabel<VendasSeriePonto>(rm.contratosMes.vendasSeries, (r) => r.vendasMrr),
           temporalidade: "mes",
-          drill: extras.onDrill ? () => extras.onDrill!("venda_mrr", "mrr") : undefined,
+          drillParams: { tipo: "venda_mrr" },
         },
         {
           key: "receita_mrr_upsell",
@@ -156,6 +148,7 @@ export function montarSecoesReceita(
           atual: rec?.upsell ?? null,
           formato: "brl",
           temporalidade: "mes",
+          drillParams: { tipo: "upsell" },
         },
         {
           key: "receita_mrr_downsell",
@@ -165,6 +158,7 @@ export function montarSecoesReceita(
           atual: rec?.downsell ?? null,
           formato: "brl",
           temporalidade: "mes",
+          drillParams: { tipo: "downsell" },
         },
         {
           key: "receita_mrr_churn",
@@ -175,6 +169,7 @@ export function montarSecoesReceita(
           metaKey: "churn_mrr_month",
           serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnBrl),
           temporalidade: "mes",
+          drillParams: { tipo: "churn_recorrente" },
         },
         {
           key: "receita_mrr_pausado",
@@ -192,6 +187,7 @@ export function montarSecoesReceita(
           metaKey: "sales_mrr_monetization_target",
           serie: serieCrosssell(tm.crosssellHistorico, (r) => r.mrr),
           temporalidade: "mes",
+          drillParams: { tipo: "cross_sell" },
         },
       ],
     },
@@ -208,6 +204,7 @@ export function montarSecoesReceita(
           metaKey: "revenue_one_time",
           serie: serieComLabel<VendasSeriePonto>(rm.contratosMes.vendasSeries, (r) => r.vendasPontual),
           temporalidade: "mes",
+          drillParams: { tipo: "venda_pontual" },
         },
         {
           key: "receita_pontual_entregue",
@@ -216,11 +213,21 @@ export function montarSecoesReceita(
           formato: "brl",
           serie: serieComLabel<EntregaProdutoMes>(p.entregasPorProdutoMes, (r) => r.total),
           temporalidade: "mes",
+          drillParams: { tipo: "entregue" },
         },
         {
           // Fonte: /api/bp2026/pontual-total, metrica "pontual_churn" — contratos que saíram do
           // estoque pontual (ClickUp) por cancelamento no mês. Já vem negativo (mesma convenção
           // de sinal do bp2026: saída = redução do estoque).
+          //
+          // SEM drillParams de propósito (fix auditoria 2026-07): o drill genérico `churn_pontual`
+          // soma `valorp` POSITIVO de `cup_contratos` (fonte/sinal diferentes do waterfall
+          // bp2026), então nunca reconciliava com este `atual` (nem o valor nem o sinal batiam).
+          // A auditoria deste MESMO churn pontual já existe e BATE na aba Churn
+          // ("Churn confirmado (R$)", key `churn_pontual_confirmado_brl` em SecaoChurn.tsx, que
+          // usa `series.churnPontualPorMes` — a mesma população do drill `churn_pontual`). Não
+          // duplicar o drill aqui evita a divergência; ver reference_bp2026_venda_estoque_vs_receita_pontual
+          // para mais contexto sobre esta fonte (bp2026) ter ~1 mês de lag vs. o estoque ao vivo.
           key: "receita_pontual_churn",
           metrica: "Churn",
           ...bp2026PontualLinha(pontualLinhas, "pontual_churn", mes),
@@ -254,6 +261,7 @@ export function montarSecoesReceita(
           formato: "brl",
           // Saldo de estoque (pausado no fim do mês) — YTD = último ponto, não soma.
           ytdAgg: "ultimo",
+          drillParams: { tipo: "estoque_pausado" },
         },
         {
           key: "receita_pontual_reativacao",
@@ -276,6 +284,7 @@ export function montarSecoesReceita(
           formato: "brl",
           serie: serieCrosssell(tm.crosssellHistorico, (r) => r.pontual),
           temporalidade: "mes",
+          drillParams: { tipo: "cross_sell" },
         },
         {
           // Onda D: `series.estoquePontualEmAbertoPorMes` dá série mensal ao saldo (mesma fonte/
@@ -297,6 +306,7 @@ export function montarSecoesReceita(
           temporalidade: series ? "mes" : "snapshot",
           // Saldo de estoque (em aberto no fim do mês) — YTD = último ponto, não soma.
           ytdAgg: "ultimo",
+          drillParams: { tipo: "estoque_aberto" },
         },
       ],
     },
@@ -332,15 +342,6 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
   // Onda D: série mensal dos saldos de estoque pontual (em aberto/pausado) — isolado, falha/
   // loading só faz `montarSecoesReceita` cair de volta no snapshot sem série (ver série lá).
   const series = useScorecardSeries(mes);
-  const [detalheParams, setDetalheParams] = useState<Record<string, string> | null>(null);
-  const detalhe = useGestaoReceitaDetalhe(detalheParams);
-  const [drillAberto, setDrillAberto] = useState(false);
-
-  function abrirDrill(tipo: string, chave: string) {
-    const { de, ate } = paramsParaMes(mes).deAte;
-    setDetalheParams({ de, ate, tipo, chave });
-    setDrillAberto(true);
-  }
 
   function onEditResponsavel(metricaKey: string, valor: string) {
     const atuais = responsaveis.data?.itens ?? [];
@@ -354,39 +355,19 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
   if (rm.isError) return <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40"><CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300"><AlertTriangle className="h-4 w-4" /> Falha ao carregar receita.</CardContent></Card>;
   if (rm.isLoading || !rm.data) return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
 
-  // /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts, DetalheResult) não tem
-  // tipo compartilhado client/server — um único cast local evita repetir "as any" por linha
-  // (inclui `total`, usado pelo rodapé de auditabilidade do DrillSheet).
-  const detalheData = detalhe.data as { titulo?: string; subtitulo?: string; total?: number; grupos?: Record<string, unknown>[] } | undefined;
-  const grupos = detalheData?.grupos ?? [];
-
-  const secoes = montarSecoesReceita(rm.data, mes, { onDrill: abrirDrill }, {
+  const secoes = montarSecoesReceita(rm.data, mes, {
     reconciliacaoTotal: reconciliacaoTotal.data,
     pontualTotal: pontualTotal.data?.linhas,
   }, series.data);
 
   return (
-    <div className="space-y-4">
-      <Scorecard
-        secoes={secoes}
-        mes={mes}
-        modo={modo}
-        metas={metas.data?.metas ?? {}}
-        responsaveis={responsaveis.data?.itens ?? []}
-        onEditResponsavel={onEditResponsavel}
-      />
-
-      <DrillSheet
-        open={drillAberto}
-        onClose={() => setDrillAberto(false)}
-        titulo={detalheData?.titulo ?? "Detalhe"}
-        subtitulo={`${detalheData?.subtitulo ?? ""} · ${labelMes(mes)}`}
-        colunas={[{ chave: "titulo", label: "Grupo", tipo: "text" }, { chave: "total", label: "Valor", tipo: "brl" }]}
-        linhas={grupos}
-        carregando={detalhe.isLoading}
-        erro={detalhe.isError}
-        total={detalheData?.total}
-      />
-    </div>
+    <Scorecard
+      secoes={secoes}
+      mes={mes}
+      modo={modo}
+      metas={metas.data?.metas ?? {}}
+      responsaveis={responsaveis.data?.itens ?? []}
+      onEditResponsavel={onEditResponsavel}
+    />
   );
 }

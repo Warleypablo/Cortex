@@ -2,7 +2,7 @@
 // Sem I/O, sem React — só lógica testável isoladamente (ver logica.test.ts).
 
 import { formatCurrencyNoDecimals, formatPercent, formatDecimal } from "@/lib/utils";
-import type { ScorecardDirection, ScorecardFormato, ScorecardRow, ScorecardSeriePonto } from "./tipos";
+import type { ScorecardDirection, ScorecardFormato, ScorecardRow, ScorecardSeriePonto, DrillParams } from "./tipos";
 import type { EvolucaoProdutoTabelaData } from "@/components/lt-ltv-churn/types";
 
 export type ScorecardStatus = "good" | "warn" | "bad" | null;
@@ -126,6 +126,10 @@ export interface LinhasPorDimensaoOpts {
      ESTOQUE (MRR por squad/operador), onde somar os meses no YTD não faz sentido. Omitido = usa
      o default de `calcYtd` (por `formato`). */
   ytdAgg?: "soma" | "ultimo" | "media";
+  /** Monta o `drillParams` (infra de drill genérico, Fase 1) de cada linha a partir da
+     dimensão — ex: `(dim) => ({ tipo: "churn_recorrente", dim: "produto", valor: dim })`.
+     Omitido = linhas geradas sem drill. */
+  drillParams?: (dim: string) => DrillParams | undefined;
 }
 
 /**
@@ -165,6 +169,7 @@ export function linhasPorDimensao(
     temporalidade: "mes",
     responsavelAuto: opts.responsavelAuto ? dim : undefined,
     ytdAgg: opts.ytdAgg,
+    drillParams: opts.drillParams?.(dim),
   }));
 }
 
@@ -182,6 +187,10 @@ export interface LinhasReceitaCabecaOpts {
   top?: number;
   /** Quando true, marca o dono automático da linha como a própria dimensão (ex: operador). */
   responsavelAuto?: boolean;
+  /** Monta o `drillParams` (infra de drill genérico, Fase 1/2C-i) de cada linha a partir da
+     dimensão — ex: `(dim) => ({ tipo: "receita_cabeca", dim: "squad", valor: dim })`. Omitido =
+     linhas geradas sem drill (mesmo padrão de `LinhasPorDimensaoOpts.drillParams`). */
+  drillParams?: (dim: string) => DrillParams | undefined;
 }
 
 /**
@@ -234,6 +243,7 @@ export function linhasReceitaCabeca(
     // Razão (receita ÷ headcount) medida a cada mês — YTD = último ponto, não soma. Esta função
     // só serve para esta métrica (ver docstring acima), por isso hardcoded em vez de opt.
     ytdAgg: "ultimo",
+    drillParams: opts.drillParams?.(dim),
   }));
 }
 

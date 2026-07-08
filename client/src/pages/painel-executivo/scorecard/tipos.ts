@@ -2,8 +2,43 @@
 // (Task 1/2) — sem importar do server, seguindo o padrão já usado no restante de
 // `painel-executivo/tipos.ts` (tipos duplicados manualmente no client).
 
+import type { DrillColuna } from "../tipos";
+
 export type ScorecardFormato = "brl" | "pct" | "int" | "meses";
 export type ScorecardTemporalidade = "mes" | "snapshot";
+
+// Infra de drill genérico (Fase 1) — a linha só DECLARA o que auditar (dados puros); quem abre
+// o DrillSheet é o Scorecard (estado centralizado, ver Scorecard.tsx). `dim`/`valor` filtram um
+// breakdown (ex: churn por produto); ausentes = drill do TOTAL da métrica (ex: Churn R$ geral).
+// `titulo` é um fallback opcional exibido ANTES da resposta do backend chegar (loading) — o
+// título definitivo vem de `DrillDetalhe.titulo` (o backend conhece o dim/valor resolvidos).
+export interface DrillParams {
+  tipo: string;
+  dim?: string;
+  valor?: string;
+  titulo?: string;
+}
+
+// GET /api/scorecard/detalhe?tipo=&mes=&dim=&valor= — espelha `DrillDetalhe` de
+// server/routes/scorecard.detalhe.ts. `total` omitido para composições (ex: `churn_pct`, uma
+// razão — somar os componentes não faz sentido). `formula` (quando presente) é exibida pelo
+// DrillSheet acima da tabela.
+export interface DrillDetalhe {
+  titulo: string;
+  subtitulo?: string;
+  colunas: DrillColuna[];
+  /** Uma linha pode incluir `${chave}Tipo` (ex: `valorTipo: "int"`) para sobrescrever, só naquela
+     linha, o `tipo` da coluna — usado pelas composições da Fase 2C-i (`receita_cabeca`,
+     `conversao_caixa`), cuja coluna "valor" mistura brl/int/pct entre os componentes. Ver
+     `tipoCelula()` em DrillSheet.tsx. */
+  linhas: Record<string, unknown>[];
+  total?: number;
+  /** Presente quando `total` NÃO é a soma de uma coluna "brl" da tabela (ex: `contratos_ativos`:
+     `total` é uma CONTAGEM de contratos, não uma soma de MRR/LTV) — diz ao DrillSheet em qual
+     tipo formatar o `total` no rodapé, em vez de assumir moeda. Ver DrillSheet.tsx. */
+  totalTipo?: DrillColuna["tipo"];
+  formula?: string;
+}
 
 export interface ScorecardSeriePonto {
   label: string;
@@ -23,7 +58,10 @@ export interface ScorecardRow {
   serie?: ScorecardSeriePonto[];
   metaKey?: string;
   temporalidade: ScorecardTemporalidade;
-  drill?: () => void;
+  /** Declara que esta linha é auditável e QUAL detalhe buscar — não abre nada sozinha (dados
+     puros). O Scorecard (foco: linha inteira; evolução: célula do mês) lê isto e dispara
+     `useScorecardDetalhe({ ...drillParams, mes })` no clique. Omitido = linha não clicável. */
+  drillParams?: DrillParams;
   responsavelAuto?: string;
   /** Modo de acumulação da coluna YTD (modo Evolução, ver `calcYtd` em logica.ts). Omitido =
      default por `formato` ("pct" → "media", senão "soma"). Use "ultimo" para linhas de
@@ -127,14 +165,6 @@ export interface ScorecardSeriesPorDimensao {
   /** Como `churnPontualPorProduto`, dimensão `motivo_cancelamento`. Alimenta "Churn Pontual —
      Motivos". */
   churnPontualPorMotivo: Record<string, ScorecardSerieDimPonto[]>;
-  /** Receita/Cabeça GERAL por mês (regime de CAIXA) — Onda F. Mesmo cálculo do card "Receita /
-     Cabeça" do CEO Dashboard (receita recebida em caixa ÷ headcount ativo), reusado no backend
-     via `receitaCabecaCaixaFromBp` em vez de uma nova query (ver server/routes/scorecard.ts:
-     `fetchReceitaCabecaGeralPorMes`). Série ÚNICA (sem dimensão). `null` (não 0) fora do ano do
-     BP2026 ou quando a razão não é calculável (headcount ausente/0) — mesmo padrão de
-     `leadTimePorProduto`. Alimenta "Receita / Cabeça" na Visão Geral e "Receita por Cabeça (mês)"
-     geral em Capacity. */
-  receitaCabecaGeralPorMes: ScorecardSerieDimPontoNullable[];
 }
 
 export interface ScorecardSeriesResponse {

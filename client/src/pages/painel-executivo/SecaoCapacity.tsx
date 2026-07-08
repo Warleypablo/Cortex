@@ -1,6 +1,5 @@
 import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
 import {
-  useCeoDashboard,
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
@@ -23,17 +22,9 @@ import {
   ehSquadOff,
 } from "./scorecard/logica";
 import { formatPercent } from "@/lib/utils";
-import type { CeoKpi } from "@/components/ceo/CeoKpiCard";
 import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem, ScorecardSeriePonto, ScorecardSeriesResponse } from "./scorecard/tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-
-/** Onda C2: aviso de não-reconciliação exibido nas 2 seções de "Receita por Cabeça" por
-   dimensão — usam MRR ativo + entregas deploy ÷ headcount RH, uma base DIFERENTE da seção
-   "Receita por Cabeça (mês)" geral acima (receita em CAIXA ÷ headcount total do
-   /api/ceo-dashboard). Não são a mesma métrica reconciliada em granularidades diferentes. */
-const AVISO_RECEITA_CABECA_DIMENSAO =
-  'Base = MRR ativo + entregas pontuais (deploy) ÷ pessoas (rh_pessoal). NÃO reconcilia com o "Receita por Cabeça (mês)" geral acima, que usa receita em CAIXA ÷ headcount total.';
 
 /** "YYYY-MM" → label curto (ex: "Jan") — mesmo padrão de `labelMesCurto` em SecaoChurn.tsx/
    SecaoEntregas.tsx (duplicado localmente, não há util compartilhado entre seções). */
@@ -53,10 +44,6 @@ function slug(s: string): string {
     .replace(/(^-|-$)/g, "");
 }
 
-export interface MontarSecoesCapacityCeo {
-  isError: boolean;
-  kpis: CeoKpi[] | undefined;
-}
 export interface MontarSecoesCapacitySeries {
   isError: boolean;
   data: ScorecardSeriesResponse | undefined;
@@ -81,8 +68,8 @@ export interface MontarSecoesCapacityGeracaoCaixa {
   data: GeracaoCaixaResponse | undefined;
 }
 
-/** Função pura: monta as seções de Capacity a partir dos payloads já resolvidos. `ceo`/`series`
-   carregam o `isError` de cada query (além dos dados) porque o texto exibido distingue erro de
+/** Função pura: monta as seções de Capacity a partir dos payloads já resolvidos. Cada payload
+   carrega o `isError` da query (além dos dados) porque o texto exibido distingue erro de
    loading (mesmo comportamento do componente original). Extraída de SecaoCapacity para reuso
    pela aba Consolidado.
    Onda4: a seção "Capacity por squad (snapshot)" (achatada por pessoa a partir de
@@ -90,57 +77,17 @@ export interface MontarSecoesCapacityGeracaoCaixa {
    abaixo — mesma granularidade (pessoa), mas esta já tem série mensal real; a snapshot só
    repetia o último ponto. Por isso `capacity`/`CapacityTimesResponse` saíram da assinatura. */
 export function montarSecoesCapacity(
-  ceo: MontarSecoesCapacityCeo,
   series: MontarSecoesCapacitySeries,
   mes: string,
   contribuicao: MontarSecoesCapacityContribuicao,
   contribuicaoBulk: MontarSecoesCapacityContribuicaoBulk,
   geracaoCaixa: MontarSecoesCapacityGeracaoCaixa,
 ): ScorecardSection[] {
-  // /api/ceo-dashboard exige permissão de CEO (403 para os demais papéis; useCeoDashboard já
-  // usa retry:false). Isolado: a linha mostra atual=null + aviso, sem derrubar a aba inteira.
-  const receitaCabecaCeo = ceo.isError ? null : (ceo.kpis?.find((k) => k.key === "receita_cabeca")?.valor ?? null);
-
-  // Onda F: série mensal em regime de CAIXA (receitaCabecaGeralPorMes, novo campo de
-  // /api/scorecard/series — fetchReceitaCabecaGeralPorMes no backend, reusa o mesmo cálculo do
-  // CEO Dashboard). `atual` prioriza o CEO Dashboard; cai pro último ponto NÃO-nulo da série
-  // quando o CEO Dashboard não tiver o valor (loading OU sem permissão) — mesma lógica de
-  // SecaoVisaoGeral.tsx (montarSecoesVisaoGeral).
-  const receitaCabecaSerie: ScorecardSeriePonto[] = (series.data?.series.receitaCabecaGeralPorMes ?? []).map((p) => ({
-    month: p.month,
-    label: labelMesCurto(p.month),
-    valor: p.valor,
-  }));
-  const receitaCabecaUltimoPonto = [...receitaCabecaSerie].reverse().find((p) => p.valor != null)?.valor ?? null;
-  const receitaCabecaValor = receitaCabecaCeo ?? receitaCabecaUltimoPonto;
-
-  const secaoReceitaCabeca: ScorecardSection = {
-    id: "capacity-receita-cabeca",
-    titulo: "Receita por Cabeça (mês)",
-    linhas: [
-      {
-        key: "capacity_receita_cabeca",
-        metrica: "Receita / Cabeça",
-        // "requer permissão CEO" só quando NEM o CEO Dashboard NEM a série resolveram um valor —
-        // evita mostrar o aviso ao lado de um número real vindo da série.
-        sub: ceo.isError && receitaCabecaValor == null ? "requer permissão CEO" : undefined,
-        atual: receitaCabecaValor,
-        formato: "brl",
-        // /api/scorecard/metas já devolve o override fixo (R$ 20.000, direction "up") p/ esta chave.
-        metaKey: "receita_cabeca",
-        serie: receitaCabecaSerie.length > 0 ? receitaCabecaSerie : undefined,
-        temporalidade: "mes",
-        // Razão (receita ÷ headcount) medida a cada mês — YTD = último ponto, não soma.
-        ytdAgg: "ultimo",
-      },
-    ],
-  };
-
   // Onda C2: Receita por Cabeça por squad/operador — (MRR ativo + entregas pontuais deploy) ÷
   // headcount, com série mensal real (mesma fonte de "MRR por squad/operador (evolução)" abaixo
   // + entregas). Denominador de squad = headcount RH casado por `pessoasPorSquad` (constante,
   // não série); de operador = 1 (o próprio operador). NÃO reconcilia com "Receita por Cabeça
-  // (mês)" geral acima — ver `AVISO_RECEITA_CABECA_DIMENSAO`.
+  // (mês)" geral acima.
   const receitaCabecaSquadRows: ScorecardRow[] = linhasReceitaCabeca(
     series.data?.series.mrrPorSquad,
     series.data?.series.entregasPorSquad,
@@ -149,14 +96,13 @@ export function montarSecoesCapacity(
       keyFn: (dim) => `capacity_receita_cabeca_squad_${slug(dim)}`,
       labelMes: labelMesCurto,
       pessoasPorDim: (dim) => series.data?.series.pessoasPorSquad?.[dim],
+      drillParams: (dim) => ({ tipo: "receita_cabeca", dim: "squad", valor: dim }),
     },
   ).filter((row) => !ehSquadOff(row.metrica));
   const secaoReceitaCabecaSquad: ScorecardSection = {
     id: "capacity-receita-cabeca-squad",
     titulo: "Receita por Cabeça — por squad",
-    subtitulo: series.isError
-      ? "falha ao carregar série por squad"
-      : AVISO_RECEITA_CABECA_DIMENSAO,
+    subtitulo: series.isError ? "falha ao carregar série por squad" : undefined,
     linhas: receitaCabecaSquadRows,
   };
 
@@ -170,14 +116,13 @@ export function montarSecoesCapacity(
       pessoasPorDim: () => 1,
       top: 10,
       responsavelAuto: true,
+      drillParams: (dim) => ({ tipo: "receita_cabeca", dim: "operador", valor: dim }),
     },
   );
   const secaoReceitaCabecaOperador: ScorecardSection = {
     id: "capacity-receita-cabeca-operador",
     titulo: "Receita por Cabeça — por operador",
-    subtitulo: series.isError
-      ? "falha ao carregar série por operador"
-      : AVISO_RECEITA_CABECA_DIMENSAO,
+    subtitulo: series.isError ? "falha ao carregar série por operador" : undefined,
     linhas: receitaCabecaOperadorRows,
   };
 
@@ -202,7 +147,7 @@ export function montarSecoesCapacity(
       ? "falha ao carregar geração de caixa"
       : !pontoGeracaoCaixaAtual
         ? "carregando…"
-        : "regime de CAIXA: receita recebida − TODAS as despesas pagas da DFC (folha, estrutura, impostos, sócios etc.)",
+        : undefined,
     linhas: [
       {
         key: "capacity_geracao_caixa_receita",
@@ -211,6 +156,7 @@ export function montarSecoesCapacity(
         formato: "brl",
         serie: serieGeracaoCaixaMetrica("receita"),
         temporalidade: "mes",
+        drillParams: { tipo: "geracao_caixa_receita" },
       },
       {
         key: "capacity_geracao_caixa_despesa",
@@ -220,6 +166,7 @@ export function montarSecoesCapacity(
         formato: "brl",
         serie: serieGeracaoCaixaMetrica("despesa"),
         temporalidade: "mes",
+        drillParams: { tipo: "geracao_caixa_despesa" },
       },
       {
         key: "capacity_geracao_caixa_liquida",
@@ -228,6 +175,7 @@ export function montarSecoesCapacity(
         formato: "brl",
         serie: serieGeracaoCaixaMetrica("geracaoMes"),
         temporalidade: "mes",
+        drillParams: { tipo: "geracao_liquida" },
       },
       {
         key: "capacity_geracao_caixa_conversao",
@@ -236,6 +184,7 @@ export function montarSecoesCapacity(
         formato: "pct",
         serie: serieGeracaoCaixaMetrica("conversaoPct"),
         temporalidade: "mes",
+        drillParams: { tipo: "conversao_caixa" },
       },
       {
         key: "capacity_geracao_caixa_acumulado",
@@ -246,6 +195,9 @@ export function montarSecoesCapacity(
         temporalidade: "mes",
         // Saldo acumulado (já é um total corrente) — YTD = último ponto, não soma dos meses.
         ytdAgg: "ultimo",
+        // Sem drillParams de propósito (Fase 2C-i): é um ACUMULADO de `geracao_liquida` ao longo
+        // do ano (soma corrente), não uma composição do MÊS selecionado — não há uma "fórmula de
+        // 1 mês" auditável aqui sem reabrir toda a série. Fica sem drill.
       },
     ],
   };
@@ -278,6 +230,7 @@ export function montarSecoesCapacity(
         formato: "brl",
         serie,
         temporalidade: "mes",
+        drillParams: { tipo: "contribuicao_squad", valor: item.squad },
       };
     })
     .filter((row) => !ehSquadOff(row.metrica))
@@ -289,15 +242,14 @@ export function montarSecoesCapacity(
   const secaoContribuicaoSquad: ScorecardSection = {
     id: "capacity-contribuicao-squad",
     titulo: "Margem de Contribuição por squad (mês)",
-    // Nota metodológica (por squad, não por operador — custo/operador no backend é heurístico
-    // e só funciona filtrando 1 pessoa por vez, inviável em lote) + aviso explícito de que a base
-    // é DIFERENTE da "Geração de Caixa" acima (custos DIRETOS do squad vs. TODAS as despesas
-    // pagas da DFC) — não reconciliam entre si.
+    // Por squad, não por operador — custo/operador no backend é heurístico e só funciona
+    // filtrando 1 pessoa por vez, inviável em lote. Base DIFERENTE da "Geração de Caixa" acima
+    // (custos DIRETOS do squad vs. TODAS as despesas pagas da DFC) — não reconciliam entre si.
     subtitulo: contribuicao.isError
       ? "falha ao carregar margem de contribuição"
       : contribuicaoSquadRows.length === 0
         ? "carregando…"
-        : "Margem de contribuição por time = receita − custos DIRETOS do squad (folha (rh_pessoal) + freelas + impostos 18% da receita). NÃO é a Geração de Caixa acima (que inclui todas as despesas da DFC); não reconciliam. Margem por operador não é viável (heurística exige filtrar 1 pessoa por vez).",
+        : undefined,
     linhas: contribuicaoSquadRows,
   };
 
@@ -310,6 +262,7 @@ export function montarSecoesCapacity(
     labelMes: labelMesCurto,
     // MRR é estoque (saldo do squad no mês) — YTD = último ponto, não soma dos meses.
     ytdAgg: "ultimo",
+    drillParams: (dim) => ({ tipo: "mrr_ativo", dim: "squad", valor: dim }),
   }).filter((row) => !ehSquadOff(row.metrica));
   const mrrOperadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorOperador, mes, {
     keyFn: (dim) => `capacity_mrr_operador_${slug(dim)}`,
@@ -318,6 +271,7 @@ export function montarSecoesCapacity(
     top: 10,
     responsavelAuto: true,
     ytdAgg: "ultimo",
+    drillParams: (dim) => ({ tipo: "mrr_ativo", dim: "operador", valor: dim }),
   });
   const secaoMrrSquad: ScorecardSection = {
     id: "capacity-mrr-squad",
@@ -341,7 +295,6 @@ export function montarSecoesCapacity(
   };
 
   return [
-    secaoReceitaCabeca,
     secaoReceitaCabecaSquad,
     secaoReceitaCabecaOperador,
     secaoGeracaoCaixa,
@@ -352,7 +305,6 @@ export function montarSecoesCapacity(
 }
 
 export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo }) {
-  const ceo = useCeoDashboard(mes);
   // Série de MRR por squad/operador (Onda2-A) — fonte das 2 seções de evolução abaixo. Falha/
   // loading isolados (não bloqueiam a aba): linhasPorDimensao devolve [] sem `series.data`.
   const series = useScorecardSeries(mes);
@@ -372,9 +324,7 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
     salvarResponsaveis.mutate(atualizado);
   }
 
-  const ceoKpis = (ceo.data as { kpis?: CeoKpi[] } | undefined)?.kpis;
   const secoes = montarSecoesCapacity(
-    { isError: ceo.isError, kpis: ceoKpis },
     { isError: series.isError, data: series.data },
     mes,
     { isError: contribuicao.isError, data: contribuicao.data },
