@@ -216,6 +216,7 @@ export function montarSecoesChurn(
         {
           key: "churn_pontual_confirmado_brl",
           metrica: "Churn confirmado (R$)",
+          sub: "receita pontual perdida por cancelamento no mês",
           // `atual` vem do MESMO ponto (mês selecionado, ou último <= mes) da série
           // `series.churnPontualPorMes` — bucketizada pela DATA DO EVENTO de cancelamento, a
           // mesma população dos breakdowns abaixo (por produto/operador/squad/motivo), que já
@@ -231,7 +232,8 @@ export function montarSecoesChurn(
         },
         {
           key: "churn_pontual_drop_medio",
-          metrica: "Drop médio",
+          metrica: "Drop médio entre entregas",
+          sub: "% médio de clientes que não avança para a próxima entrega (retenção da jornada)",
           // Sem série: é um % de jornada (retenção até a última entrega), não tem série mensal
           // fácil de derivar da mesma fonte.
           atual: pontualOverview.dropMedio,
