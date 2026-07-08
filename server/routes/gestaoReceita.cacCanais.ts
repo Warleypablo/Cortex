@@ -222,13 +222,16 @@ export async function computeCacCanais(
 ): Promise<CacCanaisOut> {
   const mesesInSql = sql.join(mesesNums.map((m) => sql`${m}`), sql`, `);
   const [dealsRows, contratosRows, metasRows, adsSpend] = await Promise.all([
-    // uma linha por deal ganho: source (→ canal) + mês (→ clientes) + cnpj/data p/ montar
+    // uma linha por deal ganho: source (→ canal) + mês (→ clientes) + valores vendidos
+    // (vrec/vpont → ROI, mesma fonte do card "Venda nova") + cnpj/data p/ montar
     // o mapa cnpj→canal (desempate: deal ganho mais recente do período).
     db.execute(sql`
       SELECT COALESCE(NULLIF(source, ''), '(não informado)') AS source,
              EXTRACT(MONTH FROM data_fechamento)::int AS mes,
              regexp_replace(COALESCE(cnpj, ''), '\\D', '', 'g') AS cnpj_norm,
-             data_fechamento
+             data_fechamento,
+             COALESCE(valor_recorrente::numeric, 0) AS vrec,
+             COALESCE(valor_pontual::numeric, 0) AS vpont
       FROM "Bitrix".crm_deal
       WHERE stage_name = ${STAGE_GANHO}
         AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}
@@ -278,7 +281,10 @@ export async function computeCacCanais(
   const clientesDeals: DealsSourceMes[] = [];
   const canalPorCnpj: Record<string, { canal: string; data: string }> = {};
   for (const r of dealsRows.rows as any[]) {
-    clientesDeals.push({ source: r.source, mes: Number(r.mes), clientes: 1 });
+    clientesDeals.push({
+      source: r.source, mes: Number(r.mes), clientes: 1,
+      vrec: parseFloat(r.vrec) || 0, vpont: parseFloat(r.vpont) || 0,
+    });
     const cnpj = String(r.cnpj_norm || "");
     const canal = sourceToCanal[r.source];
     if (!canal || cnpj.length < 11) continue;
