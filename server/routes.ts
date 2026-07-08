@@ -62,6 +62,7 @@ import { registerFechamentoSemanalRoutes } from "./routes/fechamentoSemanal";
 import { registerReportsSemanalRoutes } from "./routes/reportsSemanal";
 import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
+import { registerScorecardRoutes } from "./routes/scorecard";
 import { registerReceitaRecorrenteRoutes } from "./routes/receitaRecorrente";
 import { registerJuridicoRoutes } from "./routes/juridico";
 import { registerCreatorsRoutes } from "./routes/creators";
@@ -8557,6 +8558,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // OKR 2026 - registered from separate file
   registerOKR2026Routes(app);
+
+  // Company Scorecard - metas consolidadas (BP2026 + OKR)
+  registerScorecardRoutes(app);
 
   // Receita Recorrente por Centro de Custo
   registerReceitaRecorrenteRoutes(app, db, storage);

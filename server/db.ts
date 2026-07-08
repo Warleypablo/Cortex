@@ -2269,6 +2269,22 @@ export async function initializeGestaoReceitaMetasTable(): Promise<void> {
   }
 }
 
+// Responsáveis editáveis por métrica do Company Scorecard (quem é o dono de cada metric_key).
+export async function initializeScorecardResponsaveisTable(): Promise<void> {
+  try {
+    await db.execute(sql`
+      CREATE TABLE IF NOT EXISTS cortex_core.scorecard_responsaveis (
+        metrica_key TEXT PRIMARY KEY,
+        responsavel TEXT,
+        atualizado_em TIMESTAMP DEFAULT NOW()
+      )
+    `);
+    console.log('[database] Scorecard responsáveis table initialized');
+  } catch (error) {
+    console.error('[database] Error initializing Scorecard responsáveis table:', error);
+  }
+}
+
 export async function initializeCupDataHistTable(): Promise<void> {
   try {
     // Verificar se a tabela existe

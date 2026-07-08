@@ -116,4 +116,55 @@ export function registerBp2026ReconciliacaoRoutes(app: Express, db: any) {
       res.status(500).json({ error: "Erro ao montar reconciliação" });
     }
   });
+
+  // Agregado dos 5 produtos: Upsell (expansão) e Downsell (churn_downsell) do MRR no mês,
+  // p/ Painel Scorecard (Onda B2) — a rota acima só devolve reconciliação POR produto.
+  // fetchSnapRows já traz TODOS os produtos numa chamada só (sem filtro de produto no SQL),
+  // então computeReconciliacao roda em memória p/ cada produto sobre o mesmo par de snapshots
+  // (sem round-trip extra ao banco por produto).
+  app.get("/api/bp2026/reconciliacao-total", async (req, res) => {
+    try {
+      const mes = Number(req.query.mes);
+      const user = req.user as User;
+      if (!abasPermitidas(user?.role, user?.allowedBpTabs).includes("revenue")) {
+        return res.status(403).json({ error: "Sem acesso a esta aba" });
+      }
+      if (!Number.isInteger(mes) || mes < 1 || mes > 12) {
+        return res.status(400).json({ error: "mes inválido" });
+      }
+
+      const datas = await db.execute(sql`
+        SELECT
+          (SELECT MAX(data_snapshot::date) FROM "Clickup".cup_data_hist
+           WHERE data_snapshot::date >= make_date(${ANO}, ${mes}, 1)
+             AND data_snapshot::date < (make_date(${ANO}, ${mes}, 1) + INTERVAL '1 month')) AS cur,
+          (SELECT MAX(data_snapshot::date) FROM "Clickup".cup_data_hist
+           WHERE data_snapshot::date >= (make_date(${ANO}, ${mes}, 1) - INTERVAL '1 month')
+             AND data_snapshot::date < make_date(${ANO}, ${mes}, 1)) AS prev
+      `);
+      const curD = (datas.rows[0] as any).cur;
+      const prevD = (datas.rows[0] as any).prev;
+      if (!curD || !prevD) {
+        return res.json({ mes, upsell: 0, upsellContratos: 0, downsell: 0, downsellContratos: 0 });
+      }
+
+      const [prevRows, curRows] = await Promise.all([
+        fetchSnapRows(db, prevD), fetchSnapRows(db, curD),
+      ]);
+
+      let upsell = 0, upsellContratos = 0, downsell = 0, downsellContratos = 0;
+      for (const produto of PRODUTOS) {
+        const rec = computeReconciliacao(produto, prevRows, curRows);
+        const exp = rec.componentes.find((c) => c.chave === "expansao");
+        const down = rec.componentes.find((c) => c.chave === "churn_downsell");
+        if (exp) { upsell += exp.valor; upsellContratos += exp.n; }
+        if (down) { downsell += down.valor; downsellContratos += down.n; }
+      }
+
+      res.json({ mes, upsell, upsellContratos, downsell, downsellContratos });
+    } catch (error) {
+      console.error("[bp2026] Erro em /api/bp2026/reconciliacao-total:", error);
+      res.status(500).json({ error: "Erro ao montar reconciliação total" });
+    }
+  });
 }
