@@ -27,6 +27,10 @@ export interface DrillDetalhe {
   titulo: string;
   subtitulo?: string;
   colunas: DrillColuna[];
+  /** Uma linha pode incluir `${chave}Tipo` (ex: `valorTipo: "int"`) para sobrescrever, só naquela
+     linha, o `tipo` da coluna — usado pelas composições da Fase 2C-i (`receita_cabeca`,
+     `conversao_caixa`), cuja coluna "valor" mistura brl/int/pct entre os componentes. Ver
+     `tipoCelula()` em DrillSheet.tsx. */
   linhas: Record<string, unknown>[];
   total?: number;
   formula?: string;

@@ -269,8 +269,14 @@ async function fetchEntregasPorSquad(inicio: string, fim: string): Promise<Serie
  * `encontrarSquadCorrespondente`), para o frontend não precisar re-normalizar nada.
  * Squads RH sem squad de receita correspondente (ex: "Vendas", time comercial sem MRR/entregas)
  * ficam de fora do resultado — headcount deles não é atribuível a nenhuma linha do scorecard.
+ *
+ * Exportada (Fase 2C-i) para reuso pelo drill de composição `receita_cabeca`
+ * (server/routes/scorecard.detalhe.ts) — chamada com um array de 1 elemento (`[valor]`, o squad
+ * clicado) para resolver o MESMO headcount usado por esta função quando chamada com o array
+ * completo (a normalização/match rodam por squad, então o resultado não muda com o tamanho do
+ * array de entrada).
  */
-async function fetchPessoasPorSquad(squadsMrr: string[]): Promise<Record<string, number>> {
+export async function fetchPessoasPorSquad(squadsMrr: string[]): Promise<Record<string, number>> {
   const result = await db.execute(sql`
     SELECT TRIM(squad) AS squad, COUNT(*)::int AS pessoas
     FROM "Inhire".rh_pessoal

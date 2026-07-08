@@ -27,6 +27,16 @@ function fmt(v: unknown, tipo?: DrillColuna["tipo"]): string {
   return String(v);
 }
 
+/** Tipo efetivo de uma célula: por padrão o `tipo` da COLUNA, mas uma linha pode sobrescrever só
+   para si mesma via `${chave}Tipo` (ex: `valorTipo: "int"`) — usado pelas composições da Fase
+   2C-i (`receita_cabeca`, `conversao_caixa`), onde a mesma coluna "valor" mistura brl/int/pct
+   entre os componentes de uma única tabela (ex: "Nº de pessoas" é int, "= Conversão" é pct, o
+   resto é brl). Linhas sem essa chave (a maioria dos drills) usam o `tipo` da coluna normalmente. */
+function tipoCelula(linha: Record<string, unknown>, coluna: DrillColuna): DrillColuna["tipo"] {
+  const override = linha[`${coluna.chave}Tipo`];
+  return (override as DrillColuna["tipo"] | undefined) ?? coluna.tipo;
+}
+
 export function DrillSheet({ open, onClose, titulo, subtitulo, colunas, linhas, carregando, erro, total, formula }: DrillSheetProps) {
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
@@ -55,7 +65,7 @@ export function DrillSheet({ open, onClose, titulo, subtitulo, colunas, linhas, 
                   )}
                   {linhas.map((linha, i) => (
                     <TableRow key={i}>
-                      {colunas.map((c) => <TableCell key={c.chave}>{fmt(linha[c.chave], c.tipo)}</TableCell>)}
+                      {colunas.map((c) => <TableCell key={c.chave}>{fmt(linha[c.chave], tipoCelula(linha, c))}</TableCell>)}
                     </TableRow>
                   ))}
                 </TableBody>

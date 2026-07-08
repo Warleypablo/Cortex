@@ -1,6 +1,10 @@
 // server/routes/scorecard.detalhe.helpers.ts
 // Builders de query da Fase 2A do dispatcher de detalhe do Scorecard (server/routes/
 // scorecard.detalhe.ts) — extraídos para cá para o arquivo principal não passar de 500 linhas.
+// As composições do Capacity (Fase 2C-i: `receita_cabeca`, `geracao_liquida`, `conversao_caixa`)
+// ficam em scorecard.detalhe.composicoes.ts (arquivo à parte, pelo mesmo motivo de tamanho) —
+// aqueles builders REUSAM os SOMÁVEIS deste arquivo (montarMrrAtivoDetalhe, montarEntregueDetalhe,
+// montarGeracaoCaixaDetalhe) em vez de duplicar query.
 // Cada `montar*Detalhe` REUSA a mesma fonte/exclusões da série/card que o originou (mesma regra
 // da Fase 1) — ver docstring de cada função para a fonte espelhada e eventuais divergências
 // documentadas (quando o `total` não reconcilia byte-a-byte com o card, por desenho).

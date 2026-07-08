@@ -1,7 +1,9 @@
 // server/routes/scorecard.detalhe.ts
 // Drill genérico do Scorecard executivo (Fase 1 — infra + piloto Churn; Fase 2A — demais tipos
 // SOMÁVEIS: mrr_ativo, entregue, geração de caixa, estoque, cross-sell, upsell/downsell, venda
-// pontual, contribuição por squad, contratos ativos — ver server/routes/scorecard.detalhe.helpers.ts) — GET
+// pontual, contribuição por squad, contratos ativos (server/routes/scorecard.detalhe.helpers.ts);
+// Fase 2C-i — composições do Capacity: receita_cabeca, geracao_liquida, conversao_caixa
+// (server/routes/scorecard.detalhe.composicoes.ts)) — GET
 // /api/scorecard/detalhe?tipo=&mes=&dim=&valor=. Dado um {tipo, mes, dim?, valor?}, monta o
 // detalhe auditável (colunas + linhas + total) que alimenta o DrillSheet do painel
 // (client/src/pages/painel-executivo/scorecard/tipos.ts: DrillDetalhe).
@@ -17,6 +19,7 @@ import { sql } from "drizzle-orm";
 import { limitesMes } from "./scorecard.helpers";
 import { montarDetalhe as montarDetalheGestaoReceita } from "./gestaoReceita.detalhe";
 import * as fase2a from "./scorecard.detalhe.helpers";
+import * as fase2ci from "./scorecard.detalhe.composicoes";
 
 // Reexport p/ compatibilidade — `limitesMes` foi movida p/ scorecard.helpers.ts (Fase 2A) pra
 // permitir que `scorecard.detalhe.helpers.ts` a importe sem criar circular import com este
@@ -35,6 +38,12 @@ export interface DrillDetalhe {
   titulo: string;
   subtitulo?: string;
   colunas: DrillColuna[];
+  /** Cada linha pode incluir `${chave}Tipo` (ex: `valorTipo: "int"`) para sobrescrever, SÓ NAQUELA
+     linha, o `tipo` declarado em `colunas` para aquela coluna — usado pelas composições da Fase
+     2C-i (`receita_cabeca`, `conversao_caixa`), onde a mesma coluna "valor" mistura brl/int/pct
+     entre os componentes (ex: "Nº de pessoas" é int, "= Conversão" é pct, o resto é brl). Ver
+     `fmt()` em client/src/pages/painel-executivo/DrillSheet.tsx. Colunas sem essa necessidade
+     (a maioria) não usam a convenção — o `tipo` da coluna já basta. */
   linhas: Record<string, unknown>[];
   /** Omitido para composições (ex: `churn_pct`) — soma dos componentes não é uma leitura útil
      (é uma razão, não um total). */
@@ -304,8 +313,10 @@ export interface DetalheScorecardQuery {
 /** Dispatcher por `tipo` — `null` quando o tipo não é suportado (rota devolve 400). Fase 1
    implementou o piloto Churn + `venda_mrr` (migrado de SecaoReceita). Fase 2A acrescenta os
    demais tipos SOMÁVEIS (builders pesados vivem em `scorecard.detalhe.helpers.ts` — extraídos de
-   propósito p/ este arquivo não passar de 500 linhas, ver constraint da Fase 2A). Próximas fases:
-   Capacity/Performance (tipos ainda não somáveis/auditáveis por linha). */
+   propósito p/ este arquivo não passar de 500 linhas, ver constraint da Fase 2A). Fase 2C-i
+   acrescenta as composições do Capacity (`receita_cabeca`, `geracao_liquida`, `conversao_caixa`
+   — razões/derivados, sem `total`, mesmo padrão de `churn_pct`). Próxima fase: Performance
+   (tipos ainda não somáveis/auditáveis por linha). */
 export async function montarDetalheScorecard(q: DetalheScorecardQuery): Promise<DrillDetalhe | null> {
   switch (q.tipo) {
     case "churn_recorrente":
@@ -314,6 +325,12 @@ export async function montarDetalheScorecard(q: DetalheScorecardQuery): Promise<
       return montarChurnPontualDetalhe(q.mes, q.dim, q.valor);
     case "churn_pct":
       return montarChurnPctDetalhe(q.mes);
+    case "receita_cabeca":
+      return fase2ci.montarReceitaCabecaDetalhe(q.mes, q.dim, q.valor);
+    case "geracao_liquida":
+      return fase2ci.montarGeracaoLiquidaDetalhe(q.mes);
+    case "conversao_caixa":
+      return fase2ci.montarConversaoCaixaDetalhe(q.mes);
     case "venda_mrr":
       return montarVendaMrrDetalhe(q.mes);
     case "venda_pontual":

@@ -96,6 +96,7 @@ export function montarSecoesCapacity(
       keyFn: (dim) => `capacity_receita_cabeca_squad_${slug(dim)}`,
       labelMes: labelMesCurto,
       pessoasPorDim: (dim) => series.data?.series.pessoasPorSquad?.[dim],
+      drillParams: (dim) => ({ tipo: "receita_cabeca", dim: "squad", valor: dim }),
     },
   ).filter((row) => !ehSquadOff(row.metrica));
   const secaoReceitaCabecaSquad: ScorecardSection = {
@@ -115,6 +116,7 @@ export function montarSecoesCapacity(
       pessoasPorDim: () => 1,
       top: 10,
       responsavelAuto: true,
+      drillParams: (dim) => ({ tipo: "receita_cabeca", dim: "operador", valor: dim }),
     },
   );
   const secaoReceitaCabecaOperador: ScorecardSection = {
@@ -173,6 +175,7 @@ export function montarSecoesCapacity(
         formato: "brl",
         serie: serieGeracaoCaixaMetrica("geracaoMes"),
         temporalidade: "mes",
+        drillParams: { tipo: "geracao_liquida" },
       },
       {
         key: "capacity_geracao_caixa_conversao",
@@ -181,6 +184,7 @@ export function montarSecoesCapacity(
         formato: "pct",
         serie: serieGeracaoCaixaMetrica("conversaoPct"),
         temporalidade: "mes",
+        drillParams: { tipo: "conversao_caixa" },
       },
       {
         key: "capacity_geracao_caixa_acumulado",
@@ -191,6 +195,9 @@ export function montarSecoesCapacity(
         temporalidade: "mes",
         // Saldo acumulado (já é um total corrente) — YTD = último ponto, não soma dos meses.
         ytdAgg: "ultimo",
+        // Sem drillParams de propósito (Fase 2C-i): é um ACUMULADO de `geracao_liquida` ao longo
+        // do ano (soma corrente), não uma composição do MÊS selecionado — não há uma "fórmula de
+        // 1 mês" auditável aqui sem reabrir toda a série. Fica sem drill.
       },
     ],
   };

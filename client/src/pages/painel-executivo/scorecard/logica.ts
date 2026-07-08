@@ -187,6 +187,10 @@ export interface LinhasReceitaCabecaOpts {
   top?: number;
   /** Quando true, marca o dono automático da linha como a própria dimensão (ex: operador). */
   responsavelAuto?: boolean;
+  /** Monta o `drillParams` (infra de drill genérico, Fase 1/2C-i) de cada linha a partir da
+     dimensão — ex: `(dim) => ({ tipo: "receita_cabeca", dim: "squad", valor: dim })`. Omitido =
+     linhas geradas sem drill (mesmo padrão de `LinhasPorDimensaoOpts.drillParams`). */
+  drillParams?: (dim: string) => DrillParams | undefined;
 }
 
 /**
@@ -239,6 +243,7 @@ export function linhasReceitaCabeca(
     // Razão (receita ÷ headcount) medida a cada mês — YTD = último ponto, não soma. Esta função
     // só serve para esta métrica (ver docstring acima), por isso hardcoded em vez de opt.
     ytdAgg: "ultimo",
+    drillParams: opts.drillParams?.(dim),
   }));
 }
 
