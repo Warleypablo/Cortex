@@ -5,9 +5,7 @@ import { formatPercent } from "@/lib/utils";
 import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
 import {
   useReportsMensal,
-  useChurnDetalhamento,
   useChurnProdutoMotivo,
-  useChurnTaxaMensal,
   useChurnPontorrente,
   useScorecardMetas,
   useScorecardResponsaveis,
@@ -22,28 +20,24 @@ import type {
   ScorecardSeriesResponse,
 } from "./scorecard/tipos";
 import { linhasPorDimensao, atualDaSerie, ehSquadOff } from "./scorecard/logica";
-import type { ChurnDetalhamento, ChurnProdutoMotivo, ChurnTaxaMensal, ChurnTaxaMensalRow, ChurnProdutoMotivoCelula, ReceitaChurnPonto, ReportsMensal } from "./tipos";
+import type { ChurnProdutoMotivo, ChurnProdutoMotivoCelula, ReceitaChurnPonto, ReportsMensal } from "./tipos";
 import type { ChurnPontorrentePayload, DetalheRow as ChurnPontualDetalheRow, DimRow as ChurnPontualDimRow } from "@/components/churn-pontorrente/types";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-/** taxaMensal.rows (server já ordena por mes ASC) só traz `mes` ("YYYY-MM"), sem `label` pronto
-   (diferente das séries de ReportsMensal usadas em SecaoReceita) — deriva aqui, mesmo padrão de
-   `labelMesCurto`/`serieCrosssell` em SecaoReceita.tsx. */
+/** "YYYY-MM" → label curto (ex: "Jan") — mesmo padrão de SecaoVisaoGeral.tsx/SecaoEntregas.tsx
+   (duplicado localmente, não há util compartilhado). */
 function labelMesCurto(mes: string): string {
   const m = Number(mes.split("-")[1]);
   return MESES_ABREV[m - 1] ?? mes;
 }
 
-function serieTaxaMensal(rows: ChurnTaxaMensalRow[] | undefined, valor: (r: ChurnTaxaMensalRow) => number): ScorecardSeriePonto[] {
-  return (rows ?? []).map((r) => ({ label: labelMesCurto(r.mes), valor: valor(r), month: r.mes }));
-}
-
 /** Normaliza uma série que já vem com `label` do backend (mesmo helper de SecaoReceita.tsx/
-   SecaoVisaoGeral.tsx) — usado pelo "Churn R$" geral, que agora compartilha fonte com as
-   outras duas abas (turboMetrics.receitaChurnSeries), não mais o churn-detalhamento. Propaga
-   `month` (quando a fonte tiver) para o modo evolução truncar/realçar no mês selecionado. */
-function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+   SecaoVisaoGeral.tsx) — usado pelas linhas GERAIS (Churn R$/%/contratos), que compartilham
+   fonte com as outras duas abas (turboMetrics.receitaChurnSeries), não mais o churn-detalhamento.
+   Propaga `month` (quando a fonte tiver) para o modo evolução truncar/realçar no mês selecionado.
+   `valor` pode devolver null (ex: churnPctBase no 1º mês da janela) — vira ponto vazio, não 0. */
+function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | undefined, valor: (r: T) => number | null): ScorecardSeriePonto[] {
   return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r), month: r.month }));
 }
 
@@ -151,20 +145,23 @@ function linhasPorDimPontual(rows: ChurnPontualDimRow[] | undefined, prefixo: st
     }));
 }
 
-/** Função pura: monta as seções de Churn a partir dos payloads já resolvidos (o `churnDet` é a
-   fonte primária/bloqueante do componente — as demais são isoladas e podem estar `undefined`
-   em loading/erro, mesma tolerância do componente original). Extraída de SecaoChurn para
-   reuso pela aba Consolidado. */
+/** Função pura: monta as seções de Churn a partir dos payloads já resolvidos (o `rm` —
+   /api/reports/mensal, fonte das linhas GERAIS — é a fonte primária/bloqueante do componente;
+   as demais são isoladas e podem estar `undefined` em loading/erro). Extraída de SecaoChurn
+   para reuso pela aba Consolidado. O /api/churn/detalhamento saiu desta aba (2026-07-08): as
+   linhas gerais que vinham dele (Churn %, Contratos cancelados) usavam população e base
+   próprias e divergiam do card "Churn R$" — agora tudo vem da mesma série. */
 export function montarSecoesChurn(
-  churnDet: ChurnDetalhamento,
   produtoMotivo: ChurnProdutoMotivo | undefined,
-  taxaMensal: ChurnTaxaMensal | undefined,
   pontorrente: ChurnPontorrentePayload | undefined,
   series: ScorecardSeriesResponse | undefined,
   rm: ReportsMensal | undefined,
   mes: string,
 ): ScorecardSection[] {
-  const m = churnDet.metricas;
+  // Churn % canônico do painel — mesmo cálculo da Visão Geral (SecaoVisaoGeral.tsx): último
+  // ponto de churnPctBase (churn ÷ base do fechamento do mês anterior) da série mensal.
+  const churnSerieRm = rm?.turboMetrics.receitaChurnSeries ?? [];
+  const churnPctBaseAtual = [...churnSerieRm].reverse().find((pt) => pt.churnPctBase != null)?.churnPctBase ?? null;
 
   // Breakdowns por dimensão (produto/operador/squad) — Onda2-A: fonte única `series` para
   // `atual` E `serie`, reconciliando o número do mês com a linha do tempo do modo Evolução.
@@ -317,20 +314,27 @@ export function montarSecoesChurn(
         {
           key: "churn_geral_pct",
           metrica: "Churn %",
-          atual: m.churn_percentual,
+          // Mesma régua/fonte da Visão Geral (receitaChurnSeries.churnPctBase): churn do card ÷
+          // base do fechamento do mês anterior — consistente com a meta de 8% e com o "Churn R$"
+          // acima. Substitui o churn_percentual de /api/churn/detalhamento e a série de
+          // /api/churn/taxa-mensal (população E denominador próprios — divergiam do resto do
+          // painel: 18,1% vs 14,6% em jun/26).
+          atual: churnPctBaseAtual,
           formato: "pct",
-          // Régua fixa de 8% sobre a base MRR (ver aplicarMetaChurnBaseReal no backend).
           metaKey: "churn_pct_month",
-          serie: serieTaxaMensal(taxaMensal?.rows, (r) => r.taxa),
+          serie: serieComLabel<ReceitaChurnPonto>(rm?.turboMetrics.receitaChurnSeries, (r) => r.churnPctBase),
           temporalidade: "mes",
           drillParams: { tipo: "churn_pct" },
         },
         {
           key: "churn_geral_contratos",
           metrica: "Contratos cancelados",
-          atual: m.total_churned,
+          // Mesma população do card "Churn R$" (com abonados, sem os 3 motivos não-churn) — o
+          // total_churned de /api/churn/detalhamento conta outra população (79 vs 53 em jun/26)
+          // e descasava do sub "53 contratos" exibido na Visão Geral.
+          atual: rm?.turboMetrics.churnCount ?? null,
           formato: "int",
-          serie: serieTaxaMensal(taxaMensal?.rows, (r) => r.cancelamentos),
+          serie: serieComLabel<ReceitaChurnPonto>(rm?.turboMetrics.receitaChurnSeries, (r) => r.churnCount),
           temporalidade: "mes",
         },
       ],
@@ -389,9 +393,7 @@ export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) 
   // breakdowns abaixo (produto/operador/squad) usam `series` (Onda2-A), não o churn-detalhamento
   // (continuam sendo detalhamentos, não o total — podem não somar ao geral).
   const rm = useReportsMensal(mes);
-  const detalhamento = useChurnDetalhamento(mes);
   const produtoMotivo = useChurnProdutoMotivo(mes);
-  const taxaMensal = useChurnTaxaMensal(mes);
   const pontorrente = useChurnPontorrente(mes);
   // Séries por dimensão (Onda2-A) — fonte dos 3 breakdowns abaixo (produto/operador/squad).
   // Falha/loading isolados (não bloqueiam a seção): linhasPorDimensao devolve [] sem `series.data`.
@@ -409,9 +411,10 @@ export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) 
     salvarResponsaveis.mutate(atualizado);
   }
 
-  // Fonte primária: bloqueia a seção inteira. As demais (produtoMotivo, taxaMensal, series,
-  // pontorrente) falham isoladas — a seção correspondente só fica sem linhas.
-  if (detalhamento.isError) {
+  // Fonte primária: bloqueia a seção inteira (alimenta as linhas GERAIS — Churn R$/%/contratos).
+  // As demais (produtoMotivo, series, pontorrente) falham isoladas — a seção correspondente só
+  // fica sem linhas.
+  if (rm.isError) {
     return (
       <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40">
         <CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300">
@@ -420,11 +423,11 @@ export function SecaoChurn({ mes, modo }: { mes: string; modo: ScorecardModo }) 
       </Card>
     );
   }
-  if (detalhamento.isLoading || !detalhamento.data) {
+  if (rm.isLoading || !rm.data) {
     return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
   }
 
-  const secoes = montarSecoesChurn(detalhamento.data, produtoMotivo.data, taxaMensal.data, pontorrente.data, series.data, rm.data, mes);
+  const secoes = montarSecoesChurn(produtoMotivo.data, pontorrente.data, series.data, rm.data, mes);
 
   return (
     <Scorecard

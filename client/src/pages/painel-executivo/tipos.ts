@@ -1,6 +1,9 @@
 export interface OperadorRank { nome: string; valor: number; fotoUrl: string | null; cargo: string | null; }
 export interface SquadRank { squad: string; mrr: number; pontual: number; contratos: number; clientes: number; posicao: number; }
-export interface ReceitaChurnPonto { month: string; label: string; mrr: number; pontual: number; churnBrl: number; churnPct: number; }
+/** `churnPct` = churn ÷ MRR do fim do PRÓPRIO mês (leitura do Reporte Mensal); `churnPctBase` =
+   churn ÷ MRR do fechamento do mês ANTERIOR — a régua canônica do painel (mesma base da meta de
+   8%), null no 1º mês da janela. `churnCount` = mesma população do card (com abonados). */
+export interface ReceitaChurnPonto { month: string; label: string; mrr: number; pontual: number; churnBrl: number; churnPct: number; churnPctBase: number | null; churnCount: number; }
 export interface VendasSeriePonto { month: string; label: string; vendasMrr: number; vendasPontual: number; numContratos: number; }
 export interface CrosssellHistoricoPonto { mes: string; mrr: number; pontual: number; }
 export interface EntregaSquad { squad: string; valor: number; contratos: number; }

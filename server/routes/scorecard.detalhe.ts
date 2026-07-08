@@ -217,12 +217,11 @@ export function montarChurnPctDrillDetalhe(churnTotal: number, mrrBase: number):
     titulo: "Churn % — Composição",
     subtitulo: mrrBase > 0 ? `${((churnTotal / mrrBase) * 100).toFixed(1)}%` : undefined,
     formula:
-      "Churn % = Churn R$ ÷ MRR base (início do mês). MRR base = snapshot do 1º dia do mês " +
+      "Churn % = Churn R$ ÷ MRR base (início do mês). Churn R$ = mesma fonte do card (inclui " +
+      "abonados, exclui os 3 motivos não-churn). MRR base = snapshot do 1º dia do mês " +
       "(\"Clickup\".cup_data_hist), status ativo/onboarding/triagem, excluindo contratos hoje " +
-      "marcados 'excluído' (mesma definição de getMrrInicioMes em server/okr2026/metricsAdapter.ts, " +
-      "aqui parametrizada por mês em vez de sempre o mês corrente). Pode divergir levemente do " +
-      "'Churn %' exibido no card quando o card cobrir um período de mais de 1 mês (naquele caso " +
-      "é uma média ponderada multi-mês; aqui é sempre o mês único selecionado).",
+      "marcados 'excluído' — ou seja, a base do fechamento do mês ANTERIOR, a mesma régua da " +
+      "meta de 8% (ver aplicarMetaChurnBaseReal em scorecard.ts).",
     colunas: [
       { chave: "componente", label: "Componente", tipo: "text" },
       { chave: "valor", label: "Valor", tipo: "brl" },
@@ -255,17 +254,18 @@ async function fetchMrrInicioMes(mes: string): Promise<number> {
   return Number((result.rows[0] as { total?: number | string })?.total) || 0;
 }
 
-/** Churn R$ do mês — mesma fonte/exclusões de `montarChurnRecorrenteDetalhe` (sem dim/valor,
-   sempre o total). Consulta agregada em vez de reusar `montarChurnRecorrenteDetalhe` para não
-   listar/transformar as linhas individuais só para somá-las de novo. */
+/** Churn R$ do mês — mesma fonte/exclusões do CARD "Churn R$" (query 11 de
+   relatorioMensalSlides.ts): INCLUI abonados (decisão de 2026-06-18) e não filtra `valor_r > 0`,
+   só exclui os 3 motivos não-churn. Numerador do drill de Churn % — precisa bater com o card
+   para a composição reconciliar (antes excluía abonados e o numerador ficava abaixo do card:
+   R$ 146.177 vs R$ 150.174 em jun/26). Consulta agregada em vez de reusar
+   `montarChurnRecorrenteDetalhe` para não listar/transformar as linhas só para somá-las. */
 async function fetchChurnTotalMes(mes: string): Promise<number> {
   const { inicio, fim } = limitesMes(mes);
   const result = await db.execute(sql`
     SELECT COALESCE(SUM(valor_r),0)::numeric AS total
     FROM cortex_core.vw_cup_churn_ajustado
-    WHERE valor_r > 0
-      AND data_solicitacao_encerramento >= ${inicio}::date AND data_solicitacao_encerramento < ${fim}::date
-      AND COALESCE(abonar_churn,'') <> 'Sim'
+    WHERE data_solicitacao_encerramento >= ${inicio}::date AND data_solicitacao_encerramento < ${fim}::date
       AND COALESCE(motivo_cancelamento,'') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
   `);
   return Number((result.rows[0] as { total?: number | string })?.total) || 0;

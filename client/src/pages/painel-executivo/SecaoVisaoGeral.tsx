@@ -32,8 +32,9 @@ function serieCrosssell(rows: CrosssellHistoricoPonto[] | undefined): ScorecardS
 
 /** Normaliza uma série que já vem com `label` do backend para o formato do Scorecard
    (mesmo helper de SecaoReceita.tsx/SecaoEntregas.tsx). Propaga `month` (quando a fonte
-   tiver) para o modo evolução truncar/realçar no mês selecionado. */
-function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | undefined, valor: (r: T) => number): ScorecardSeriePonto[] {
+   tiver) para o modo evolução truncar/realçar no mês selecionado. `valor` pode devolver
+   null (ex: churnPctBase no 1º mês da janela, sem base) — vira ponto vazio, não 0. */
+function serieComLabel<T extends { label: string; month?: string }>(rows: T[] | undefined, valor: (r: T) => number | null): ScorecardSeriePonto[] {
   return (rows ?? []).map((r) => ({ label: r.label, valor: valor(r), month: r.month }));
 }
 
@@ -61,9 +62,11 @@ export function montarSecoesVisaoGeral(
   const ltvUltimoPonto = evolucaoClientesOrdenada.length > 0 ? evolucaoClientesOrdenada[evolucaoClientesOrdenada.length - 1].ltv : null;
   const ltvMedioCliente = ltvOverview?.ltvMedioCliente ?? ltvUltimoPonto ?? null;
 
-  // Último ponto válido da série mensal de churn % (mesma fonte que a linha "Churn R$" abaixo).
+  // Churn % canônico do painel: churn do mês ÷ MRR do fechamento do mês ANTERIOR (churnPctBase)
+  // — mesma base da meta de 8% e do denominador da meta de "Churn R$" (o % Meta das duas linhas
+  // casa). Último ponto com base disponível (o 1º mês da janela vem null).
   const churnSerie = tm.receitaChurnSeries ?? [];
-  const churnPctAtual = churnSerie.length > 0 ? churnSerie[churnSerie.length - 1].churnPct : null;
+  const churnPctAtual = [...churnSerie].reverse().find((pt) => pt.churnPctBase != null)?.churnPctBase ?? null;
 
   return [
     {
@@ -108,11 +111,11 @@ export function montarSecoesVisaoGeral(
           metrica: "Churn %",
           atual: churnPctAtual,
           formato: "pct",
-          // Régua fixa de 8% sobre a base MRR (ver aplicarMetaChurnBaseReal no backend). O atual
-          // desta série divide pelo MRR do fim do PRÓPRIO mês (não do anterior) — diferença de
-          // décimos, aceita para não divergir do gráfico Receita × Churn e do Reporte Mensal.
+          // Meta fixa de 8% sobre a MESMA base do atual (fechamento do mês anterior) — ver
+          // aplicarMetaChurnBaseReal no backend. O drill (churn_pct) reconcilia: mesmo numerador
+          // do card Churn R$ e mesma base.
           metaKey: "churn_pct_month",
-          serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnPct),
+          serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnPctBase),
           temporalidade: "mes",
           drillParams: { tipo: "churn_pct" },
         },

@@ -609,7 +609,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             -- abonar_churn), alinhado ao card Cancelados. Mantém de fora os 3 motivos não-churn.
             SELECT
               TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') as month,
-              COALESCE(SUM(valor_r), 0) as churn_brl
+              COALESCE(SUM(valor_r), 0) as churn_brl,
+              COUNT(*)::int as churn_count
             FROM cortex_core.vw_cup_churn_ajustado, date_range dr
             WHERE data_solicitacao_encerramento IS NOT NULL
               AND data_solicitacao_encerramento >= dr.range_start
@@ -633,7 +634,8 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
             m.month,
             m.mrr,
             COALESCE(p.pontual, 0) as pontual,
-            COALESCE(c.churn_brl, 0) as churn_brl
+            COALESCE(c.churn_brl, 0) as churn_brl,
+            COALESCE(c.churn_count, 0) as churn_count
           FROM mrr_mensal m
           LEFT JOIN churn_mensal c ON m.month = c.month
           LEFT JOIN pontual_mensal p ON m.month = p.month
@@ -1390,18 +1392,36 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
 
       // Build receita x churn series
       const MESES_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      // MRR de fim de mês indexado por "YYYY-MM" — denominador de `churnPctBase` (churn ÷ MRR do
+      // fechamento do mês ANTERIOR, a mesma régua da meta de 8%; ver aplicarMetaChurnBaseReal em
+      // scorecard.ts). Lookup por chave, não por índice: a série só contém meses COM snapshot.
+      const mrrFimPorMes = new Map<string, number>(
+        (receitaChurnResult.rows as any[]).map((row: any) => [row.month, parseFloat(row.mrr) || 0]),
+      );
+      const mesAnteriorDe = (month: string): string => {
+        const [y, m] = month.split("-").map(Number);
+        return m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, "0")}`;
+      };
       const receitaChurnSeries = (receitaChurnResult.rows as any[]).map((row: any) => {
         const mrr = parseFloat(row.mrr) || 0;
         const pontual = parseFloat(row.pontual) || 0;
         const churnBrl = parseFloat(row.churn_brl) || 0;
         const monthNum = parseInt(row.month.split("-")[1]) - 1;
+        const mrrBaseAnterior = mrrFimPorMes.get(mesAnteriorDe(row.month));
         return {
           month: row.month,
           label: MESES_SHORT[monthNum] || row.month,
           mrr,
           pontual,
           churnBrl,
+          churnCount: parseInt(row.churn_count) || 0,
+          // churnPct (base = MRR do fim do PRÓPRIO mês) segue vivo para o SlideTurboMetrics do
+          // Reporte Mensal; o Painel Executivo usa churnPctBase (base = fechamento do mês
+          // anterior — null no 1º mês da janela, que não tem base dentro da própria série).
           churnPct: mrr > 0 ? Math.round((churnBrl / mrr) * 1000) / 10 : 0,
+          churnPctBase: mrrBaseAnterior && mrrBaseAnterior > 0
+            ? Math.round((churnBrl / mrrBaseAnterior) * 1000) / 10
+            : null,
         };
       });
 

@@ -5,9 +5,7 @@ import {
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
-  useChurnDetalhamento,
   useChurnProdutoMotivo,
-  useChurnTaxaMensal,
   useChurnPontorrente,
   useEstoqueOverview,
   useLtLtvOverview,
@@ -49,9 +47,7 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
 
-  const churnDet = useChurnDetalhamento(mes);
   const produtoMotivo = useChurnProdutoMotivo(mes);
-  const taxaMensal = useChurnTaxaMensal(mes);
   const pontorrente = useChurnPontorrente(mes);
   const series = useScorecardSeries(mes);
   const contribuicaoSquad = useContribuicaoSquadRanking(mes);
@@ -104,8 +100,8 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
         pontualTotal: pontualTotal.data?.linhas,
       }, series.data)
     : [];
-  const secoesChurn = churnDet.data
-    ? montarSecoesChurn(churnDet.data, produtoMotivo.data, taxaMensal.data, pontorrente.data, series.data, rm.data, mes)
+  const secoesChurn = rm.data
+    ? montarSecoesChurn(produtoMotivo.data, pontorrente.data, series.data, rm.data, mes)
     : [];
   const secoesEntregas = rm.data ? montarSecoesEntregas(rm.data, estoque, series.data, mes) : [];
   const secoesCapacity = montarSecoesCapacity(
