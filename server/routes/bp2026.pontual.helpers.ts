@@ -361,6 +361,24 @@ export function montarLinhasPontual(
     }
     return totalI > 0 ? totalE / totalI : null;
   })();
+  // Taxa de churn: churn do mês ÷ estoque inicial (= estoque do fim do mês anterior).
+  // Mesma régua da taxa de entrega e do churn % do MRR (base = fechamento anterior).
+  // YTD = Σ churn ÷ Σ estoque inicial (média mensal ponderada). Fração 0-1 p/ display pct.
+  const serieTaxaChurn = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1; const p = ponte[m];
+    if (!(m <= mesCorrente && p && p.estoqueIni > 0)) return null;
+    return p.churn / p.estoqueIni;
+  });
+  const ytdTaxaChurn = (() => {
+    if (mesFechado === 0) return null;
+    let totalC = 0, totalI = 0;
+    for (let m = 1; m <= mesFechado; m++) {
+      const p = ponte[m];
+      if (!p || p.estoqueIni === 0) continue;
+      totalC += p.churn; totalI += p.estoqueIni;
+    }
+    return totalI > 0 ? totalC / totalI : null;
+  })();
 
   const linhas: LinhaPontual[] = [
     mk("pontual_estoque_ini", "(=) Estoque inicial", "estoque", serieEstoqueIni, ponte[1]?.estoqueIni ?? null),
@@ -372,6 +390,7 @@ export function montarLinhasPontual(
     mk("pontual_entrega", "(−) Entrega", "fluxo", serieFluxo((p) => p.entrega, -1), sumYtd(serieFluxo((p) => p.entrega, -1))),
     mk("pontual_taxa_entrega", "· Taxa de entrega", "fluxo", serieTaxaEntrega, ytdTaxaEntrega, { unidade: "pct", semDetalhe: true }),
     mk("pontual_churn", "(−) Churn", "fluxo", serieFluxo((p) => p.churn, -1), sumYtd(serieFluxo((p) => p.churn, -1))),
+    mk("pontual_taxa_churn", "· Taxa de churn", "fluxo", serieTaxaChurn, ytdTaxaChurn, { unidade: "pct", semDetalhe: true }),
     mk("pontual_deletados", "(−) Deletados", "fluxo", serieFluxo((p) => p.deletados, -1), sumYtd(serieFluxo((p) => p.deletados, -1))),
     mk("pontual_saida_atipica", "(−) Saída atípica", "fluxo", serieFluxo((p) => p.saidaAtipica, -1), sumYtd(serieFluxo((p) => p.saidaAtipica, -1))),
     mk("pontual_reajuste", "(±) Reajuste de valor", "fluxo", serieFluxo((p) => p.reajuste, 1), sumYtd(serieFluxo((p) => p.reajuste, 1))),

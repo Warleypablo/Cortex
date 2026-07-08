@@ -268,6 +268,15 @@ describe("montarLinhasPontual", () => {
     expect(by("pontual_estoque_fim").meses[0].realizado).toBe(1800);
     expect(by("pontual_estoque_fim").destaque).toBe(true);
   });
+  it("Taxa de churn = churn ÷ estoque inicial (pct positiva), YTD ponderado", () => {
+    const tc = by("pontual_taxa_churn");
+    expect(tc.titulo).toBe("· Taxa de churn");
+    expect(tc.unidade).toBe("pct");
+    expect(tc.grupo).toBe(GRUPO_ESTOQUE);
+    expect(tc.semDetalhe).toBe(true);
+    expect(tc.meses[0].realizado).toBeCloseTo(300 / 2150, 6); // churn/estoqueIni
+    expect(tc.ytd.realizado).toBeCloseTo(300 / 2150, 6);       // Σchurn/Σini (1 mês fechado)
+  });
   it("decomposição por status soma ao estoque final", () => {
     expect(by("pontual_status_ativo").meses[0].realizado).toBe(1100);
     expect(by("pontual_status_triagem").meses[0].realizado).toBe(700);
