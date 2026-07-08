@@ -10,10 +10,13 @@ import {
   serieContribuicaoGeral,
   serieContribuicaoPorSquad,
   pontoContribuicaoNoMes,
+  serieGeracaoCaixa,
+  pontoGeracaoCaixaNoMes,
   normalizarChaveSquad,
   encontrarSerieSquad,
   ehSquadOff,
   type ContribuicaoSquadBulkFonte,
+  type GeracaoCaixaFonte,
 } from "./logica";
 import type { EvolucaoProdutoTabelaData } from "@/components/lt-ltv-churn/types";
 
@@ -502,6 +505,62 @@ describe("pontoContribuicaoNoMes", () => {
 
   it("série vazia → null", () => {
     expect(pontoContribuicaoNoMes([], "2026-01")).toBeNull();
+  });
+});
+
+describe("serieGeracaoCaixa / pontoGeracaoCaixaNoMes (Geração de Caixa — DFC)", () => {
+  // Fixture mínima do endpoint GET /api/investors-report/geracao-caixa.
+  const fonte: GeracaoCaixaFonte = {
+    series: [
+      { mes: "2026-01", receita: 500000, despesa: 300000, geracaoMes: 200000, caixaAcumulado: 200000 },
+      { mes: "2026-02", receita: 400000, despesa: 450000, geracaoMes: -50000, caixaAcumulado: 150000 },
+    ],
+  };
+
+  it("mapeia mes→month e deriva conversaoPct = geracaoMes/receita", () => {
+    const serie = serieGeracaoCaixa(fonte);
+    expect(serie).toHaveLength(2);
+    expect(serie[0]).toEqual({
+      month: "2026-01",
+      receita: 500000,
+      despesa: 300000,
+      geracaoMes: 200000,
+      caixaAcumulado: 200000,
+      conversaoPct: 40,
+    });
+    // Fev: geração negativa (despesa > receita) — conversão também negativa, não truncada em 0.
+    expect(serie[1].geracaoMes).toBe(-50000);
+    expect(serie[1].conversaoPct).toBeCloseTo(-12.5, 5);
+  });
+
+  it("conversaoPct null quando receita <= 0 (evita 0%/Infinity enganoso)", () => {
+    const semReceita: GeracaoCaixaFonte = {
+      series: [{ mes: "2026-01", receita: 0, despesa: 1000, geracaoMes: -1000, caixaAcumulado: -1000 }],
+    };
+    expect(serieGeracaoCaixa(semReceita)[0].conversaoPct).toBeNull();
+  });
+
+  it("fonte undefined → []", () => {
+    expect(serieGeracaoCaixa(undefined)).toEqual([]);
+  });
+
+  it("pontoGeracaoCaixaNoMes: mês exato presente → retorna o ponto exato", () => {
+    const serie = serieGeracaoCaixa(fonte);
+    expect(pontoGeracaoCaixaNoMes(serie, "2026-02")?.geracaoMes).toBe(-50000);
+  });
+
+  it("pontoGeracaoCaixaNoMes: mês ausente → usa o último ponto <= mes (defensivo)", () => {
+    const serie = serieGeracaoCaixa(fonte);
+    expect(pontoGeracaoCaixaNoMes(serie, "2026-06")?.geracaoMes).toBe(-50000);
+  });
+
+  it("pontoGeracaoCaixaNoMes: mês anterior a todos os pontos → null", () => {
+    const serie = serieGeracaoCaixa(fonte);
+    expect(pontoGeracaoCaixaNoMes(serie, "2025-12")).toBeNull();
+  });
+
+  it("pontoGeracaoCaixaNoMes: série vazia → null (degrada para '—' na UI)", () => {
+    expect(pontoGeracaoCaixaNoMes([], "2026-01")).toBeNull();
   });
 });
 

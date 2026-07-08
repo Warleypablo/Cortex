@@ -412,6 +412,60 @@ export function ehSquadOff(nome: string): boolean {
   return /\(\s*off\s*\)/i.test(nome);
 }
 
+// ── Geração de Caixa (regime de CAIXA) — GET /api/investors-report/geracao-caixa ───────────────
+// Substitui, na Capacity, a antiga "Margem de Contribuição — Geral" (que somava só custos
+// DIRETOS/parciais de squad): aqui receita/despesa já vêm fechadas do backend como TODAS as
+// despesas pagas da DFC (folha + estrutura + impostos + sócios etc). Tipo local mirror da resposta
+// do endpoint (mesmo padrão de `ContribuicaoSquadBulkFonte` acima) — mantém a lógica pura
+// testável sem depender do shape exato do hook (`GeracaoCaixaResponse` em hooks.ts).
+export interface GeracaoCaixaMesFonte {
+  mes: string; // YYYY-MM
+  receita: number;
+  despesa: number;
+  geracaoMes: number;
+  caixaAcumulado: number;
+}
+export interface GeracaoCaixaFonte {
+  series: GeracaoCaixaMesFonte[];
+}
+
+export interface GeracaoCaixaMesCalc {
+  month: string;
+  receita: number;
+  despesa: number;
+  geracaoMes: number;
+  caixaAcumulado: number;
+  /** null quando receita<=0 no mês (guard) — evita 0%/Infinity enganoso. */
+  conversaoPct: number | null;
+}
+
+/**
+ * Série mensal de Geração de Caixa a partir do endpoint — só deriva `conversaoPct`
+ * (geracaoMes/receita), o resto já vem fechado do backend.
+ */
+export function serieGeracaoCaixa(fonte: GeracaoCaixaFonte | undefined): GeracaoCaixaMesCalc[] {
+  if (!fonte) return [];
+  return fonte.series.map((p) => ({
+    month: p.mes,
+    receita: p.receita,
+    despesa: p.despesa,
+    geracaoMes: p.geracaoMes,
+    caixaAcumulado: p.caixaAcumulado,
+    conversaoPct: p.receita > 0 ? (p.geracaoMes / p.receita) * 100 : null,
+  }));
+}
+
+/**
+ * Ponto da série de Geração de Caixa no mês selecionado (ou o último <= mes, defensivo) — mesma
+ * regra de seleção de `pontoContribuicaoNoMes` acima. null se a série estiver vazia (loading/erro
+ * do hook) — quem chama degrada para "—" (ScorecardRow.atual = null → formatValor).
+ */
+export function pontoGeracaoCaixaNoMes(serie: GeracaoCaixaMesCalc[], mes: string): GeracaoCaixaMesCalc | null {
+  if (serie.length === 0) return null;
+  const ordenados = [...serie].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+  return ordenados.find((p) => p.month === mes) ?? [...ordenados].reverse().find((p) => p.month <= mes) ?? null;
+}
+
 /** Formata um valor numérico conforme o formato do scorecard. null/undefined/NaN → "—". */
 export function formatValor(v: number | null | undefined, formato: ScorecardFormato): string {
   if (v === null || v === undefined || isNaN(v)) return "—";

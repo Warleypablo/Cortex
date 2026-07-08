@@ -7,15 +7,18 @@ import {
   useScorecardSeries,
   useContribuicaoSquadRanking,
   useContribuicaoSquadBulk,
+  useGeracaoCaixa,
   type ContribuicaoSquadRankingResponse,
   type ContribuicaoSquadBulkResponse,
+  type GeracaoCaixaResponse,
 } from "./hooks";
 import {
   linhasPorDimensao,
   linhasReceitaCabeca,
-  serieContribuicaoGeral,
   serieContribuicaoPorSquad,
   pontoContribuicaoNoMes,
+  serieGeracaoCaixa,
+  pontoGeracaoCaixaNoMes,
   encontrarSerieSquad,
   ehSquadOff,
 } from "./scorecard/logica";
@@ -69,6 +72,14 @@ export interface MontarSecoesCapacityContribuicaoBulk {
   isError: boolean;
   data: ContribuicaoSquadBulkResponse | undefined;
 }
+/** Fonte da seção "Geração de Caixa (mês)" (GET /api/investors-report/geracao-caixa) — substitui
+   a antiga "Margem de Contribuição — Geral" (custos parciais/diretos) por receita recebida −
+   TODAS as despesas pagas da DFC. Falha/loading isolados: `pontoGeracaoCaixaNoMes` devolve null
+   → linhas mostram "—" em vez de derrubar a seção. */
+export interface MontarSecoesCapacityGeracaoCaixa {
+  isError: boolean;
+  data: GeracaoCaixaResponse | undefined;
+}
 
 /** Função pura: monta as seções de Capacity a partir dos payloads já resolvidos. `ceo`/`series`
    carregam o `isError` de cada query (além dos dados) porque o texto exibido distingue erro de
@@ -84,6 +95,7 @@ export function montarSecoesCapacity(
   mes: string,
   contribuicao: MontarSecoesCapacityContribuicao,
   contribuicaoBulk: MontarSecoesCapacityContribuicaoBulk,
+  geracaoCaixa: MontarSecoesCapacityGeracaoCaixa,
 ): ScorecardSection[] {
   // /api/ceo-dashboard exige permissão de CEO (403 para os demais papéis; useCeoDashboard já
   // usa retry:false). Isolado: a linha mostra atual=null + aviso, sem derrubar a aba inteira.
@@ -167,79 +179,80 @@ export function montarSecoesCapacity(
     linhas: receitaCabecaOperadorRows,
   };
 
-  // Onda C1→E: Margem de Contribuição (Geral + por squad) — `contribuicao` (GET
+  // Geração de Caixa (regime de CAIXA) — GET /api/investors-report/geracao-caixa. Substitui a
+  // antiga "Margem de Contribuição — Geral" (que somava só custos DIRETOS/parciais de squad, uma
+  // base que confundia o leitor): receita recebida − TODAS as despesas pagas da DFC (folha +
+  // estrutura + impostos + sócios etc), já fechada no backend. `pontoGeracaoCaixaNoMes` devolve
+  // null quando a série está vazia (loading/erro do hook) → linhas mostram "—" em vez de quebrar.
+  const serieGeracaoCaixaCalc = serieGeracaoCaixa(geracaoCaixa.data);
+  const pontoGeracaoCaixaAtual = pontoGeracaoCaixaNoMes(serieGeracaoCaixaCalc, mes);
+  const serieGeracaoCaixaMetrica = (
+    campo: "receita" | "despesa" | "geracaoMes" | "conversaoPct" | "caixaAcumulado",
+  ): ScorecardSeriePonto[] | undefined =>
+    serieGeracaoCaixaCalc.length > 0
+      ? serieGeracaoCaixaCalc.map((p) => ({ month: p.month, label: labelMesCurto(p.month), valor: p[campo] }))
+      : undefined;
+
+  const secaoGeracaoCaixa: ScorecardSection = {
+    id: "capacity-geracao-caixa",
+    titulo: "Geração de Caixa (mês)",
+    subtitulo: geracaoCaixa.isError
+      ? "falha ao carregar geração de caixa"
+      : !pontoGeracaoCaixaAtual
+        ? "carregando…"
+        : "regime de CAIXA: receita recebida − TODAS as despesas pagas da DFC (folha, estrutura, impostos, sócios etc.)",
+    linhas: [
+      {
+        key: "capacity_geracao_caixa_receita",
+        metrica: "Receita (caixa)",
+        atual: pontoGeracaoCaixaAtual?.receita ?? null,
+        formato: "brl",
+        serie: serieGeracaoCaixaMetrica("receita"),
+        temporalidade: "mes",
+      },
+      {
+        key: "capacity_geracao_caixa_despesa",
+        metrica: "(−) Despesas (DFC)",
+        sub: "todas as despesas pagas no mês (folha, estrutura, impostos, sócios)",
+        atual: pontoGeracaoCaixaAtual?.despesa ?? null,
+        formato: "brl",
+        serie: serieGeracaoCaixaMetrica("despesa"),
+        temporalidade: "mes",
+      },
+      {
+        key: "capacity_geracao_caixa_liquida",
+        metrica: "(=) Geração de caixa",
+        atual: pontoGeracaoCaixaAtual?.geracaoMes ?? null,
+        formato: "brl",
+        serie: serieGeracaoCaixaMetrica("geracaoMes"),
+        temporalidade: "mes",
+      },
+      {
+        key: "capacity_geracao_caixa_conversao",
+        metrica: "Conversão em caixa %",
+        atual: pontoGeracaoCaixaAtual?.conversaoPct ?? null,
+        formato: "pct",
+        serie: serieGeracaoCaixaMetrica("conversaoPct"),
+        temporalidade: "mes",
+      },
+      {
+        key: "capacity_geracao_caixa_acumulado",
+        metrica: "Caixa acumulado (ano)",
+        atual: pontoGeracaoCaixaAtual?.caixaAcumulado ?? null,
+        formato: "brl",
+        serie: serieGeracaoCaixaMetrica("caixaAcumulado"),
+        temporalidade: "mes",
+      },
+    ],
+  };
+
+  // Onda C1→E: Margem de Contribuição por squad — `contribuicao` (GET
   // /api/contribuicao-squad/ranking) traz só o período do mês selecionado (sem série);
   // `contribuicaoBulk` (GET /api/contribuicao-squad/dfc/bulk?ano=YYYY, Onda E) traz os 12 meses
   // do ano, usados para dar `serie` a estas linhas no modo Evolução. `atual`/`sub` preferem o
   // ponto do BULK no mês selecionado (reconcilia com a série exibida, mesma regra de
   // `linhasPorDimensao`); se o bulk não carregar, cai para o ranking (sem série) — degradação
   // graciosa.
-  const totaisContribuicao = contribuicao.data?.totais;
-  const margemGeral =
-    totaisContribuicao && totaisContribuicao.receita > 0
-      ? (totaisContribuicao.contribuicao / totaisContribuicao.receita) * 100
-      : null;
-
-  const serieContribGeralCalc = serieContribuicaoGeral(contribuicaoBulk.data);
-  const pontoGeralBulk = pontoContribuicaoNoMes(serieContribGeralCalc, mes);
-  // Fallback: bulk vazio/loading/erro → usa o ranking (sem série).
-  const contribuicaoGeralAtual = pontoGeralBulk
-    ?? (totaisContribuicao
-      ? { receita: totaisContribuicao.receita, despesa: totaisContribuicao.despesa, contribuicao: totaisContribuicao.contribuicao, margem: margemGeral }
-      : null);
-  const serieMetricaGeral = (campo: "contribuicao" | "margem" | "receita" | "despesa"): ScorecardSeriePonto[] | undefined =>
-    serieContribGeralCalc.length > 0
-      ? serieContribGeralCalc.map((p) => ({ month: p.month, label: labelMesCurto(p.month), valor: p[campo] }))
-      : undefined;
-
-  const secaoContribuicaoGeral: ScorecardSection = {
-    id: "capacity-contribuicao-geral",
-    titulo: "Margem de Contribuição — Geral (mês)",
-    subtitulo: contribuicao.isError && contribuicaoBulk.isError
-      ? "falha ao carregar margem de contribuição"
-      : !contribuicaoGeralAtual
-        ? "carregando…"
-        : !pontoGeralBulk
-          ? "série mensal indisponível (falha ao carregar bulk) — mostrando apenas o mês selecionado"
-          : undefined,
-    linhas: contribuicaoGeralAtual
-      ? [
-          {
-            key: "capacity_contribuicao_geral_brl",
-            metrica: "Contribuição (R$)",
-            atual: contribuicaoGeralAtual.contribuicao,
-            formato: "brl",
-            serie: serieMetricaGeral("contribuicao"),
-            temporalidade: "mes",
-          },
-          {
-            key: "capacity_contribuicao_geral_margem",
-            metrica: "Margem %",
-            atual: contribuicaoGeralAtual.margem,
-            formato: "pct",
-            serie: serieMetricaGeral("margem"),
-            temporalidade: "mes",
-          },
-          {
-            key: "capacity_contribuicao_geral_receita",
-            metrica: "Receita",
-            atual: contribuicaoGeralAtual.receita,
-            formato: "brl",
-            serie: serieMetricaGeral("receita"),
-            temporalidade: "mes",
-          },
-          {
-            key: "capacity_contribuicao_geral_custos",
-            metrica: "Custos",
-            atual: contribuicaoGeralAtual.despesa,
-            formato: "brl",
-            serie: serieMetricaGeral("despesa"),
-            temporalidade: "mes",
-          },
-        ]
-      : [],
-  };
-
   const rankingContribuicao = contribuicao.data?.ranking ?? [];
   const serieContribPorSquadCalc = serieContribuicaoPorSquad(contribuicaoBulk.data);
   const contribuicaoSquadRows: ScorecardRow[] = rankingContribuicao
@@ -273,12 +286,14 @@ export function montarSecoesCapacity(
     id: "capacity-contribuicao-squad",
     titulo: "Margem de Contribuição por squad (mês)",
     // Nota metodológica (por squad, não por operador — custo/operador no backend é heurístico
-    // e só funciona filtrando 1 pessoa por vez, inviável em lote).
+    // e só funciona filtrando 1 pessoa por vez, inviável em lote) + aviso explícito de que a base
+    // é DIFERENTE da "Geração de Caixa" acima (custos DIRETOS do squad vs. TODAS as despesas
+    // pagas da DFC) — não reconciliam entre si.
     subtitulo: contribuicao.isError
       ? "falha ao carregar margem de contribuição"
       : contribuicaoSquadRows.length === 0
         ? "carregando…"
-        : "custo = folha (rh_pessoal) + benefícios + freelas + impostos (18% da receita); margem por operador não é viável (heurística exige filtrar 1 pessoa por vez)",
+        : "Margem de contribuição por time = receita − custos DIRETOS do squad (folha (rh_pessoal) + freelas + impostos 18% da receita). NÃO é a Geração de Caixa acima (que inclui todas as despesas da DFC); não reconciliam. Margem por operador não é viável (heurística exige filtrar 1 pessoa por vez).",
     linhas: contribuicaoSquadRows,
   };
 
@@ -322,7 +337,7 @@ export function montarSecoesCapacity(
     secaoReceitaCabeca,
     secaoReceitaCabecaSquad,
     secaoReceitaCabecaOperador,
-    secaoContribuicaoGeral,
+    secaoGeracaoCaixa,
     secaoContribuicaoSquad,
     secaoMrrSquad,
     secaoMrrOperador,
@@ -336,6 +351,7 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
   const series = useScorecardSeries(mes);
   const contribuicao = useContribuicaoSquadRanking(mes);
   const contribuicaoBulk = useContribuicaoSquadBulk(mes);
+  const geracaoCaixa = useGeracaoCaixa();
   const metas = useScorecardMetas(mes);
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
@@ -356,6 +372,7 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
     mes,
     { isError: contribuicao.isError, data: contribuicao.data },
     { isError: contribuicaoBulk.isError, data: contribuicaoBulk.data },
+    { isError: geracaoCaixa.isError, data: geracaoCaixa.data },
   );
 
   return (
