@@ -64,6 +64,9 @@ export function montarSecoesPerformance(
     formato: "brl",
     labelMes: labelMesCurto,
     top: 10,
+    // MRR é SALDO (estoque), não fluxo → YTD = último mês, não soma (mesmo critério da
+    // Receita/Cabeça e do MRR por squad/operador em SecaoCapacity.tsx).
+    ytdAgg: "ultimo",
     // Dono automático (o próprio operador) — célula somente-leitura, mesmo padrão de
     // operadorRows em SecaoChurn.tsx/SecaoEntregas.tsx.
     responsavelAuto: true,
@@ -73,6 +76,7 @@ export function montarSecoesPerformance(
     keyFn: (dim) => `performance_squad_${slug(dim)}`,
     formato: "brl",
     labelMes: labelMesCurto,
+    ytdAgg: "ultimo", // MRR é saldo → YTD = último mês (ver operadorRows acima)
   }).filter((row) => !ehSquadOff(row.metrica));
 
   const clienteRows: ScorecardRow[] = topClientes.map((c) => ({
