@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-08 | feat(bp2026): linha Taxa de churn na aba Pontual
+
+**O que foi feito:**
+- Nova linha **· Taxa de churn** logo abaixo de "(−) Churn" no Movimento do Estoque da aba Pontual (e Pontual · Creators).
+- Cálculo: churn do mês ÷ estoque inicial (= estoque do fim do mês anterior) — mesma régua da "· Taxa de entrega" já existente e do churn % do MRR (base = fechamento anterior).
+- Coluna final (YTD) = média mensal ponderada: Σ churn ÷ Σ estoque inicial.
+
+**Validação prévia (pedido do stakeholder):** conferido que churn e estoque pontual fazem sentido — estoque inicial/final e churn batem 100% com a tela nos meses fechados (jan–jun); julho diverge só por ser mês corrente (snapshot em movimento). Churn é majoritariamente `cancelado/inativo`; `em cancelamento` fica no estoque (não conta como churn, diferente do MRR — escolha conservadora). Taxas resultantes: jan 1,4% · mai 7,9% · jun 5,6% · **YTD 3,9%**.
+
+**Por que:**
+- Pedido do stakeholder: ler a taxa de churn pontual (não só o valor absoluto), na mesma régua do churn de MRR.
+
+**Arquivos alterados:**
+- `server/routes/bp2026.pontual.helpers.ts` - série `pontual_taxa_churn` (churn ÷ estoqueIni) + YTD ponderado.
+- `server/routes/bp2026.pontual.helpers.test.ts` - teste da nova linha (valor mensal + YTD ponderado).
+
+**Impacto arquitetural:** Nenhum. Frontend renderiza `pct` automaticamente (BPDreTable); sem drill próprio (o "(−) Churn" já detalha os contratos).
+
+---
+
 ## 2026-07-08 | feat(bp2026): linha Churn % Total na aba Revenue
 
 **O que foi feito:**
