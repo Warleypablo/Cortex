@@ -1,16 +1,10 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { CeoKpiCard, type CeoKpi } from "@/components/ceo/CeoKpiCard";
+import { CeoMatrizTabela, type CeoMatrizResponse } from "@/components/ceo/CeoMatrizTabela";
 import { CeoKpiDetail } from "@/components/ceo/CeoKpiDetail";
-import { atingimentoTom } from "@/components/ceo/ceoFormat";
 
-interface CeoDashboardResponse {
-  mes: string;
-  kpis: CeoKpi[];
-}
-
-// Meses de 2026 até o corrente. Default = mês atual (ou dez/26 se já passou).
+// Meses de 2026. Default = mês atual (ou dez/26 se já passou). Define a última coluna.
 const MESES_2026 = Array.from({ length: 12 }, (_, i) => {
   const n = i + 1;
   const label = new Date(2026, i, 1).toLocaleDateString("pt-BR", { month: "long" });
@@ -24,22 +18,23 @@ function mesCorrenteDefault(): string {
   return `2026-${String(mes).padStart(2, "0")}`;
 }
 
+// Estado do drill: qual KPI, em que mês, com que tom (cor do atingimento da célula).
+interface DrillState { kpi: string; mes: string; tom: string }
+
 export default function CeoDashboard() {
   const [mes, setMes] = useState<string>(mesCorrenteDefault());
-  const [detalheKpi, setDetalheKpi] = useState<string | null>(null);
+  const [drill, setDrill] = useState<DrillState | null>(null);
 
-  const { data, isLoading, isError } = useQuery<CeoDashboardResponse>({
-    queryKey: ["ceo-dashboard", mes],
+  const { data, isLoading, isError } = useQuery<CeoMatrizResponse>({
+    queryKey: ["ceo-dashboard-matriz", mes],
     queryFn: async () => {
-      const res = await fetch(`/api/ceo-dashboard?mes=${mes}`, { credentials: "include" });
+      const res = await fetch(`/api/ceo-dashboard/matriz?ate=${mes}`, { credentials: "include" });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return res.json();
     },
   });
 
   const mesLabel = MESES_2026.find((m) => m.value === mes)?.label ?? "";
-  const kpiSel = data?.kpis.find((k) => k.key === detalheKpi);
-  const tomSel = kpiSel ? atingimentoTom(kpiSel.atingimentoPct, kpiSel.direcao) : "neutro";
 
   return (
     <div className="min-h-full bg-gray-50/50 dark:bg-zinc-950">
@@ -53,7 +48,8 @@ export default function CeoDashboard() {
             </p>
             <h1 className="mt-1 text-3xl font-bold tracking-tight text-gray-900 dark:text-white">CEO Dashboard</h1>
             <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">
-              Realizado vs meta do BP 2026 · <span className="font-medium text-gray-600 dark:text-zinc-300">{mesLabel}</span>
+              Realizado vs meta do BP 2026 · mês a mês até{" "}
+              <span className="font-medium text-gray-600 dark:text-zinc-300">{mesLabel}</span>
             </p>
           </div>
           <Select value={mes} onValueChange={setMes}>
@@ -69,11 +65,7 @@ export default function CeoDashboard() {
         </div>
 
         {isLoading && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {Array.from({ length: 11 }).map((_, i) => (
-              <div key={i} className="rounded-2xl border border-gray-200 dark:border-zinc-800 h-[148px] animate-pulse bg-gray-100 dark:bg-zinc-900" />
-            ))}
-          </div>
+          <div className="rounded-2xl border border-gray-200 dark:border-zinc-800 h-[420px] animate-pulse bg-gray-100 dark:bg-zinc-900" />
         )}
 
         {isError && (
@@ -83,14 +75,20 @@ export default function CeoDashboard() {
         )}
 
         {data && (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {data.kpis.map((kpi) => (
-              <CeoKpiCard key={kpi.key} kpi={kpi} onClick={() => setDetalheKpi(kpi.key)} />
-            ))}
-          </div>
+          <CeoMatrizTabela
+            data={data}
+            onCelula={(kpi, mesNum, tom) =>
+              setDrill({ kpi, mes: `2026-${String(mesNum).padStart(2, "0")}`, tom })
+            }
+          />
         )}
 
-        <CeoKpiDetail kpiKey={detalheKpi} mes={mes} tom={tomSel} onClose={() => setDetalheKpi(null)} />
+        <CeoKpiDetail
+          kpiKey={drill?.kpi ?? null}
+          mes={drill?.mes ?? mes}
+          tom={drill?.tom ?? "neutro"}
+          onClose={() => setDrill(null)}
+        />
       </div>
     </div>
   );
