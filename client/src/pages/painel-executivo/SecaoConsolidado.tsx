@@ -13,7 +13,6 @@ import {
   useChurnTaxaMensal,
   useChurnPontorrente,
   useEstoqueOverview,
-  useCeoDashboard,
   useLtLtvOverview,
   useLtLtvDist,
   useLtLtvClientes,
@@ -35,7 +34,6 @@ import { montarSecoesCapacity } from "./SecaoCapacity";
 import { montarSecoesLtLtv } from "./SecaoLtLtv";
 import { montarSecoesPerformance } from "./SecaoPerformance";
 import type { ScorecardSection, ScorecardResponsavelItem } from "./scorecard/tipos";
-import type { CeoKpi } from "@/components/ceo/CeoKpiCard";
 import type { OverviewData, BucketDist, ClienteRow } from "@/components/lt-ltv-churn/types";
 
 /** Aba "Consolidado": empilha TODAS as seções das 7 abas numa única tabela (mesmo componente
@@ -67,7 +65,6 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const pontualTotal = useBp2026PontualTotal();
 
   const estoqueQ = useEstoqueOverview();
-  const ceo = useCeoDashboard(mes);
 
   const overviewQ = useLtLtvOverview();
   const distQ = useLtLtvDist();
@@ -101,22 +98,18 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
     return <div className="space-y-4">{Array.from({ length: 4 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
   }
 
-  const ceoKpis = (ceo.data as { kpis?: CeoKpi[] } | undefined)?.kpis;
   const ltvOverview = overviewQ.data as OverviewData | undefined;
   const dist = (distQ.data as { ltv: BucketDist[]; lt: BucketDist[] } | undefined)?.ltv ?? [];
   const clientes = (clientesQ.data as { clientes: ClienteRow[] } | undefined)?.clientes ?? [];
   const estoque = estoqueQ.data as EstoqueOverview | undefined;
 
-  // Onda F: mesmas fontes de série já buscadas nesta função para outras abas — evolucaoClientesQ
-  // (LT/LTV) e series (Capacity/Receita/Churn/Entregas/Performance) — reaproveitadas aqui sem
-  // novos hooks (evita duplicar chamadas de rede no Consolidado).
+  // Onda F: mesma fonte de série já buscada nesta função para outras abas — evolucaoClientesQ
+  // (LT/LTV) — reaproveitada aqui sem novo hook (evita duplicar chamadas de rede no Consolidado).
   const secoesVisaoGeral = rm.data
     ? montarSecoesVisaoGeral(
         rm.data,
         ltvOverview,
-        { isError: ceo.isError, kpis: ceoKpis },
         evolucaoClientesQ.data?.serie,
-        series.data?.series.receitaCabecaGeralPorMes,
       )
     : [];
   const secoesReceita = rm.data
@@ -130,7 +123,6 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
     : [];
   const secoesEntregas = rm.data ? montarSecoesEntregas(rm.data, estoque, series.data, mes) : [];
   const secoesCapacity = montarSecoesCapacity(
-    { isError: ceo.isError, kpis: ceoKpis },
     { isError: series.isError, data: series.data },
     mes,
     { isError: contribuicaoSquad.isError, data: contribuicaoSquad.data },

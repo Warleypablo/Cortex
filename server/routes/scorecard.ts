@@ -4,8 +4,6 @@ import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { BP_2026_TARGETS } from "../okr2026/bp2026Targets";
 import { krs, type KRDef } from "../okr2026/okrRegistry";
-import { computarBpReceitas } from "./bp2026";
-import { receitaCabecaCaixaFromBp } from "./ceoDashboard.helpers";
 import {
   addMeses,
   listaMeses12,
@@ -203,15 +201,6 @@ export interface SeriesScorecard {
   /** Como `churnPontualPorProduto`, dimensão `motivo_cancelamento`. Alimenta "Churn Pontual —
      Motivos". */
   churnPontualPorMotivo: Record<string, SeriePonto[]>;
-  /** Receita/Cabeça GERAL por mês (regime de CAIXA) — Onda F. Reusa `receitaCabecaCaixaFromBp`
-     (mesmo cálculo do card "Receita / Cabeça" do CEO Dashboard: receita recebida em caixa
-     `caz_parcelas` QUITADO ÷ headcount ativo `"Inhire".rh_pessoal`, ambos de `computarBpReceitas`
-     em bp2026.ts) em vez de duplicar a query — garante que a série reconcilia com o `atual` que
-     já vem de lá. Série ÚNICA (sem dimensão). `null` (não 0) fora do ano coberto pelo BP2026
-     (`ANO` em bp2026.ts) ou quando a razão não é calculável (headcount ausente/0) — ver
-     `fetchReceitaCabecaGeralPorMes`. Alimenta "Receita / Cabeça" na Visão Geral e "Receita por
-     Cabeça (mês)" geral em Capacity. */
-  receitaCabecaGeralPorMes: SeriePontoNullable[];
 }
 
 export interface ScorecardSeriesResult {
@@ -443,33 +432,6 @@ async function fetchChurnPontualPorMes(inicio: string, fim: string): Promise<Ser
 }
 
 /**
- * Receita/Cabeça GERAL por mês, em regime de CAIXA — reusa o MESMO cálculo já usado pelo card
- * "Receita / Cabeça" do CEO Dashboard (`receitaCabecaCaixaFromBp`, ver ceoDashboard.helpers.ts)
- * em vez de duplicar a query: receita efetivamente recebida (`computarBpReceitas().
- * receitaRecebidaCaixaPorMes`, de `"Conta Azul".caz_parcelas` QUITADO) ÷ headcount ativo (linha
- * "colaboradores" de `metricasGerais`, de `"Inhire".rh_pessoal`). Caminho de menor risco: mesma
- * fonte do CEO Dashboard, garante que esta série reconcilia com o `atual` de lá em vez de poder
- * divergir por causa de uma segunda implementação da mesma conta.
- *
- * `computarBpReceitas`/o BP2026 são hardcoded pro ano corrente de planejamento (`ANO` em
- * bp2026.ts, hoje 2026, exposto aqui como `bp.ano`) — meses da janela de 12m fora desse ano ficam
- * `null` (sem dado calculável, não confundir com headcount 0). Headcount 0/ausente ou receita
- * ausente já viram `null` dentro de `receitaCabecaCaixaLinha` (null-safe, nunca divide por zero).
- */
-async function fetchReceitaCabecaGeralPorMes(meses: string[]): Promise<SeriePontoNullable[]> {
-  const bp = await computarBpReceitas(db);
-  const linha = receitaCabecaCaixaFromBp(bp);
-  const anoBp = String(bp.ano ?? "");
-  const realizadoPorMesNum = new Map<number, number | null>(linha.meses.map((m) => [m.mes, m.realizado]));
-
-  return meses.map((month) => {
-    const [ano, mesStr] = month.split("-");
-    if (ano !== anoBp) return { month, valor: null };
-    return { month, valor: realizadoPorMesNum.get(parseInt(mesStr, 10)) ?? null };
-  });
-}
-
-/**
  * Monta as séries mensais por dimensão do modo Evolução, para a janela de 12 meses
  * terminando em `mes` (inclusive). Cada série vem com os 12 meses preenchidos (0 onde
  * não há dado) — ver `rowsParaSeries`. Exceção: `pessoasPorSquad` não é série (é headcount
@@ -497,7 +459,6 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
     churnPontualOperadorRows,
     churnPontualSquadRows,
     churnPontualMotivoRows,
-    receitaCabecaGeralPorMes,
   ] = await Promise.all([
     fetchChurnPorDimensao("produto", inicio, fim),
     fetchChurnPorDimensao("responsavel_geral", inicio, fim),
@@ -514,7 +475,6 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
     fetchChurnPontualPorDimensao("responsavel", inicio, fim),
     fetchChurnPontualPorDimensao("squad", inicio, fim),
     fetchChurnPontualPorDimensao("motivo_cancelamento", inicio, fim),
-    fetchReceitaCabecaGeralPorMes(meses),
   ]);
 
   const mrrPorSquad = rowsParaSeries(mrrSquadRows, meses);
@@ -547,7 +507,6 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
       churnPontualPorOperador: rowsParaSeries(churnPontualOperadorRows, meses),
       churnPontualPorSquad: rowsParaSeries(churnPontualSquadRows, meses),
       churnPontualPorMotivo: rowsParaSeries(churnPontualMotivoRows, meses),
-      receitaCabecaGeralPorMes,
     },
   };
 }
