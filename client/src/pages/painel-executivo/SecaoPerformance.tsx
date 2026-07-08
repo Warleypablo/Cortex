@@ -88,6 +88,7 @@ export function montarSecoesPerformance(
     atual: c.ltvTotal,
     formato: "brl",
     temporalidade: "snapshot",
+    drillParams: { tipo: "cliente_contratos", valor: String(c.idTask) },
   }));
 
   return [

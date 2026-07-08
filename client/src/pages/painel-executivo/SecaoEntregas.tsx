@@ -137,6 +137,9 @@ export function montarSecoesEntregas(
           formato: "int",
           labelMes: labelMesCurto,
           sub: () => "dias",
+          // Fase 2C-ii: lista as entregas individuais do mês (cliente, datas, dias) que compõem
+          // a média por produto — server/routes/scorecard.detalhe.ltltv.ts.
+          drillParams: (dim) => ({ tipo: "lead_time", dim: "produto", valor: dim }),
         })
       : [...p.tempoMedioEntrega]
           .sort((a, b) => b.diasMedio - a.diasMedio)

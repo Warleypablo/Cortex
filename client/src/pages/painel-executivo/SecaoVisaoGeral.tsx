@@ -144,6 +144,9 @@ export function montarSecoesVisaoGeral(
           temporalidade: "mes",
           // Estoque (saldo médio da base), não fluxo.
           ytdAgg: "ultimo",
+          // Fase 2C-ii: mesmo drill/divergência documentada em SecaoLtLtv.tsx (grão cliente,
+          // status ativo — não reconcilia byte-a-byte com `ltvMedioCliente`, ver nota lá).
+          drillParams: { tipo: "ltv_medio", valor: "ativo" },
         },
         {
           key: "visao_nps",

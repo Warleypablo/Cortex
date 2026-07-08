@@ -20,6 +20,7 @@ import { limitesMes } from "./scorecard.helpers";
 import { montarDetalhe as montarDetalheGestaoReceita } from "./gestaoReceita.detalhe";
 import * as fase2a from "./scorecard.detalhe.helpers";
 import * as fase2ci from "./scorecard.detalhe.composicoes";
+import * as fase2cii from "./scorecard.detalhe.ltltv";
 
 // Reexport p/ compatibilidade — `limitesMes` foi movida p/ scorecard.helpers.ts (Fase 2A) pra
 // permitir que `scorecard.detalhe.helpers.ts` a importe sem criar circular import com este
@@ -315,8 +316,11 @@ export interface DetalheScorecardQuery {
    demais tipos SOMÁVEIS (builders pesados vivem em `scorecard.detalhe.helpers.ts` — extraídos de
    propósito p/ este arquivo não passar de 500 linhas, ver constraint da Fase 2A). Fase 2C-i
    acrescenta as composições do Capacity (`receita_cabeca`, `geracao_liquida`, `conversao_caixa`
-   — razões/derivados, sem `total`, mesmo padrão de `churn_pct`). Próxima fase: Performance
-   (tipos ainda não somáveis/auditáveis por linha). */
+   — razões/derivados, sem `total`, mesmo padrão de `churn_pct`). Fase 2C-ii (última) acrescenta a
+   auditoria de LT/LTV, lead time e maiores clientes (`ltv_medio`, `lt_medio`, `mediana_ltv`,
+   `mediana_lt`, `lead_time`, `cliente_contratos` — builders em `scorecard.detalhe.ltltv.ts`,
+   padrão "lista de contexto": média/mediana no `formula`, sem `total`, exceto
+   `cliente_contratos`, que é somável). */
 export async function montarDetalheScorecard(q: DetalheScorecardQuery): Promise<DrillDetalhe | null> {
   switch (q.tipo) {
     case "churn_recorrente":
@@ -357,6 +361,18 @@ export async function montarDetalheScorecard(q: DetalheScorecardQuery): Promise<
       return fase2a.montarContribuicaoSquadDetalhe(q.mes, q.valor);
     case "contratos_ativos":
       return fase2a.montarContratosAtivosDetalhe();
+    case "ltv_medio":
+      return fase2cii.montarLtvMedioDetalhe(q.valor);
+    case "lt_medio":
+      return fase2cii.montarLtMedioDetalhe(q.valor);
+    case "mediana_ltv":
+      return fase2cii.montarMedianaLtvDetalhe(q.valor);
+    case "mediana_lt":
+      return fase2cii.montarMedianaLtDetalhe(q.valor);
+    case "lead_time":
+      return fase2cii.montarLeadTimeDetalhe(q.mes, q.valor);
+    case "cliente_contratos":
+      return fase2cii.montarClienteContratosDetalhe(q.valor);
     default:
       return null;
   }
