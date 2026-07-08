@@ -29,6 +29,7 @@ const defaultCargos = [
   { id: 16, nome: "Líder de Squad", descricao: null, ativo: "true" },
   { id: 17, nome: "Jurídico", descricao: null, ativo: "true" },
   { id: 18, nome: "Gestor de Comunidade", descricao: null, ativo: "true" },
+  { id: 19, nome: "Account", descricao: null, ativo: "true" },
 ];
 
 const defaultNiveis = [
