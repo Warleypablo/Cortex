@@ -2,6 +2,8 @@ import type { Express, Request, Response, NextFunction } from "express";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import { renderAprofundadoImage, uploadFcaImage, type FcaSection } from "../fca/aprofundadoImage";
 
 const CLICKUP_API_KEY = process.env.CLICKUP_API_KEY!;
@@ -828,9 +830,56 @@ Não invente números — use só os fornecidos. Não repita a tabela inteira. S
 
 const FALLBACK_NARRATIVA = `### Fato\n\n_(Análise automática indisponível — preencher manualmente sobre a tabela acima.)_\n\n### Causa\n\n_(pendente)_\n\n### Ação\n\n- [ ] Revisar a tabela e registrar o gargalo principal.`;
 
+// Gera a narrativa via IA com fallback multi-provider: Anthropic (paridade com prod) →
+// OpenAI → Gemini → texto fallback. Prefere sempre Anthropic; se a key não for real
+// (ex.: placeholder no .env local), cai pro próximo provider com key válida.
+// Assim o endpoint funciona idêntico em prod e local sem depender de uma única key.
+async function callNarrativaLlm(system: string, user: string): Promise<{ text: string; provider: string } | null> {
+  const anthKey = (process.env.ANTHROPIC_API_KEY || "").trim();
+  const oaKey = (process.env.OPENAI_API_KEY || "").trim();
+  const gemKey = (process.env.GOOGLE_GEMINI_API_KEY || "").trim();
+
+  if (anthKey.startsWith("sk-ant")) {
+    try {
+      const anthropic = new Anthropic({ apiKey: anthKey });
+      const msg = await anthropic.messages.create({
+        model: "claude-opus-4-8",
+        max_tokens: 1600,
+        system,
+        messages: [{ role: "user", content: user }],
+      });
+      const txt = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
+      if (txt) return { text: txt, provider: "anthropic/claude-opus-4-8" };
+    } catch (e: any) { console.error("[fca v5] Anthropic falhou:", e?.message); }
+  }
+
+  if (oaKey.startsWith("sk-") && oaKey.length > 20) {
+    try {
+      const openai = new OpenAI({ apiKey: oaKey });
+      const resp = await openai.chat.completions.create({
+        model: "gpt-4o",
+        max_tokens: 1600,
+        messages: [{ role: "system", content: system }, { role: "user", content: user }],
+      });
+      const txt = (resp.choices?.[0]?.message?.content || "").trim();
+      if (txt) return { text: txt, provider: "openai/gpt-4o" };
+    } catch (e: any) { console.error("[fca v5] OpenAI falhou:", e?.message); }
+  }
+
+  if (gemKey.startsWith("AIza")) {
+    try {
+      const genAI = new GoogleGenerativeAI(gemKey);
+      const model = genAI.getGenerativeModel({ model: "gemini-2.0-flash", systemInstruction: system });
+      const r = await model.generateContent(user);
+      const txt = (r.response.text() || "").trim();
+      if (txt) return { text: txt, provider: "google/gemini-2.0-flash" };
+    } catch (e: any) { console.error("[fca v5] Gemini falhou:", e?.message); }
+  }
+
+  return null;
+}
+
 async function gerarNarrativaV5(sections: FcaSection[], ctx: { funil: string; canal: string; de: string; ate: string }): Promise<string> {
-  const key = process.env.ANTHROPIC_API_KEY;
-  if (!key || key.length < 20) return FALLBACK_NARRATIVA;
   // Resumo textual das linhas (nome · orçado · realizado · % atingido) pro modelo raciocinar.
   const resumo = sections.map(s => {
     const linhas = s.metrics.map(x => {
@@ -841,20 +890,14 @@ async function gerarNarrativaV5(sections: FcaSection[], ctx: { funil: string; ca
     }).join("\n");
     return `## ${s.title}\n${linhas}`;
   }).join("\n\n");
-  try {
-    const anthropic = new Anthropic({ apiKey: key });
-    const msg = await anthropic.messages.create({
-      model: "claude-opus-4-8",
-      max_tokens: 1600,
-      system: FCA_V5_SYSTEM,
-      messages: [{ role: "user", content: `Funil ${ctx.funil} × ${ctx.canal}, 7 dias (${ctx.de} a ${ctx.ate}).\n\n${resumo}` }],
-    });
-    const txt = msg.content.filter((b: any) => b.type === "text").map((b: any) => b.text).join("\n").trim();
-    return txt || FALLBACK_NARRATIVA;
-  } catch (e: any) {
-    console.error("[fca v5] IA falhou:", e?.message);
-    return FALLBACK_NARRATIVA;
+  const user = `Funil ${ctx.funil} × ${ctx.canal}, 7 dias (${ctx.de} a ${ctx.ate}).\n\n${resumo}`;
+  const r = await callNarrativaLlm(FCA_V5_SYSTEM, user);
+  if (r) {
+    console.log(`[fca v5] narrativa gerada via ${r.provider}`);
+    return r.text;
   }
+  console.warn("[fca v5] nenhum provider de IA com key válida — usando fallback");
+  return FALLBACK_NARRATIVA;
 }
 
 export function registerFcaRoutes(app: Express) {
