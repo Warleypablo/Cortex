@@ -12,7 +12,7 @@ import {
   useScorecardSeries,
 } from "./hooks";
 import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
-import { linhasPorDimensao } from "./scorecard/logica";
+import { linhasPorDimensao, ehSquadOff } from "./scorecard/logica";
 import type { ClienteRow } from "@/components/lt-ltv-churn/types";
 import type { ReportsMensal } from "./tipos";
 
@@ -73,7 +73,7 @@ export function montarSecoesPerformance(
     keyFn: (dim) => `performance_squad_${slug(dim)}`,
     formato: "brl",
     labelMes: labelMesCurto,
-  });
+  }).filter((row) => !ehSquadOff(row.metrica));
 
   const clienteRows: ScorecardRow[] = topClientes.map((c) => ({
     key: `performance_cliente_${c.idTask}`,

@@ -12,6 +12,7 @@ import {
   pontoContribuicaoNoMes,
   normalizarChaveSquad,
   encontrarSerieSquad,
+  ehSquadOff,
   type ContribuicaoSquadBulkFonte,
 } from "./logica";
 import type { EvolucaoProdutoTabelaData } from "@/components/lt-ltv-churn/types";
@@ -501,6 +502,24 @@ describe("pontoContribuicaoNoMes", () => {
 
   it("série vazia → null", () => {
     expect(pontoContribuicaoNoMes([], "2026-01")).toBeNull();
+  });
+});
+
+describe("ehSquadOff", () => {
+  it("nome com '(OFF)' (caixa alta) → true", () => {
+    expect(ehSquadOff("✨ Aura (OFF)")).toBe(true);
+  });
+
+  it("nome com emoji antes e '(OFF)' → true", () => {
+    expect(ehSquadOff("🐭 Makers (OFF)")).toBe(true);
+  });
+
+  it("squad ativo sem marcador → false", () => {
+    expect(ehSquadOff("🐍 Selva")).toBe(false);
+  });
+
+  it("squad ativo sem emoji nem marcador → false", () => {
+    expect(ehSquadOff("Squadra")).toBe(false);
   });
 });
 

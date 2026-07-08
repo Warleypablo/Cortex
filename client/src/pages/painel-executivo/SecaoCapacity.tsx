@@ -17,6 +17,7 @@ import {
   serieContribuicaoPorSquad,
   pontoContribuicaoNoMes,
   encontrarSerieSquad,
+  ehSquadOff,
 } from "./scorecard/logica";
 import { formatPercent } from "@/lib/utils";
 import type { CeoKpi } from "@/components/ceo/CeoKpiCard";
@@ -135,7 +136,7 @@ export function montarSecoesCapacity(
       labelMes: labelMesCurto,
       pessoasPorDim: (dim) => series.data?.series.pessoasPorSquad?.[dim],
     },
-  );
+  ).filter((row) => !ehSquadOff(row.metrica));
   const secaoReceitaCabecaSquad: ScorecardSection = {
     id: "capacity-receita-cabeca-squad",
     titulo: "Receita por Cabeça — por squad",
@@ -262,6 +263,7 @@ export function montarSecoesCapacity(
         temporalidade: "mes",
       };
     })
+    .filter((row) => !ehSquadOff(row.metrica))
     // Ordena pelo VALOR EXIBIDO (`atual`, que prioriza o bulk reconciliado com a série — ver
     // acima) — não pelo `contribuicao` bruto do ranking, que pode divergir do `atual` mostrado
     // e deixar a lista fora de ordem (squad com bulk mais alto exibido abaixo de um com ranking
@@ -287,7 +289,7 @@ export function montarSecoesCapacity(
     keyFn: (dim) => `capacity_mrr_squad_${slug(dim)}`,
     formato: "brl",
     labelMes: labelMesCurto,
-  });
+  }).filter((row) => !ehSquadOff(row.metrica));
   const mrrOperadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorOperador, mes, {
     keyFn: (dim) => `capacity_mrr_operador_${slug(dim)}`,
     formato: "brl",

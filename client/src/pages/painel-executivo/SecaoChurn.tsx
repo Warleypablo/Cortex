@@ -21,7 +21,7 @@ import type {
   ScorecardResponsavelItem,
   ScorecardSeriesResponse,
 } from "./scorecard/tipos";
-import { linhasPorDimensao, atualDaSerie } from "./scorecard/logica";
+import { linhasPorDimensao, atualDaSerie, ehSquadOff } from "./scorecard/logica";
 import type { ChurnDetalhamento, ChurnProdutoMotivo, ChurnTaxaMensal, ChurnTaxaMensalRow, ChurnProdutoMotivoCelula, ReceitaChurnPonto, ReportsMensal } from "./tipos";
 import type { ChurnPontorrentePayload, DetalheRow as ChurnPontualDetalheRow, DimRow as ChurnPontualDimRow } from "@/components/churn-pontorrente/types";
 
@@ -203,10 +203,12 @@ export function montarSecoesChurn(
   // % do total (share entre as squads da própria série — mesma fonte do `atual`, não mistura
   // com `m.churn_por_squad`, que agora é uma fonte diferente/desalinhada desta série nova).
   const totalSquadChurn = squadRowsSemSub.reduce((acc, r) => acc + (r.atual ?? 0), 0);
-  const squadRows: ScorecardRow[] = squadRowsSemSub.map((r) => ({
-    ...r,
-    sub: totalSquadChurn > 0 && r.atual !== null ? formatPercent((r.atual / totalSquadChurn) * 100) : undefined,
-  }));
+  const squadRows: ScorecardRow[] = squadRowsSemSub
+    .map((r) => ({
+      ...r,
+      sub: totalSquadChurn > 0 && r.atual !== null ? formatPercent((r.atual / totalSquadChurn) * 100) : undefined,
+    }))
+    .filter((row) => !ehSquadOff(row.metrica));
 
   const pontualOverview = pontorrente?.overview;
   const pontualRows: ScorecardRow[] = pontualOverview
@@ -269,14 +271,16 @@ export function montarSecoesChurn(
         responsavelAuto: true,
       })
     : linhasPorDimPontual(pontorrente?.churnPorDimensao?.responsavel, "operador");
-  const pontualSquadRows = series
-    ? linhasPorDimensao(series.series.churnPontualPorSquad, mes, {
-        keyFn: (dim) => `churn_pontual_squad_${slug(dim)}`,
-        formato: "brl",
-        labelMes: labelMesCurto,
-        top: 8,
-      })
-    : linhasPorDimPontual(pontorrente?.churnPorDimensao?.squad, "squad");
+  const pontualSquadRows = (
+    series
+      ? linhasPorDimensao(series.series.churnPontualPorSquad, mes, {
+          keyFn: (dim) => `churn_pontual_squad_${slug(dim)}`,
+          formato: "brl",
+          labelMes: labelMesCurto,
+          top: 8,
+        })
+      : linhasPorDimPontual(pontorrente?.churnPorDimensao?.squad, "squad")
+  ).filter((row) => !ehSquadOff(row.metrica));
 
   return [
     {

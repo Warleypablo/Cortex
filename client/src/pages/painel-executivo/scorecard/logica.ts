@@ -401,6 +401,17 @@ export function encontrarSerieSquad(
   return match ? porSquad[match] : undefined;
 }
 
+/**
+ * Detecta squad DESATIVADO pelo marcador "(OFF)" no nome (ex: "✨ Aura (OFF)", "🐭 Makers (OFF)")
+ * — usado para ocultar a linha desse squad nas seções cujo grão é squad (Ranking de squads,
+ * Churn por squad, Capacity/Contribuição por squad etc.), sem mexer nos totais/agregados gerais
+ * (o histórico do squad enquanto esteve ativo continua neles). Case/espaço-insensitive: casa
+ * "(OFF)", "(off)", "( Off )" etc., independente do emoji que precede o nome.
+ */
+export function ehSquadOff(nome: string): boolean {
+  return /\(\s*off\s*\)/i.test(nome);
+}
+
 /** Formata um valor numérico conforme o formato do scorecard. null/undefined/NaN → "—". */
 export function formatValor(v: number | null | undefined, formato: ScorecardFormato): string {
   if (v === null || v === undefined || isNaN(v)) return "—";
