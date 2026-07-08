@@ -321,13 +321,11 @@ export function montarSecoesChurn(
     {
       id: "churn-produto",
       titulo: "Churn Recorrente — Por produto",
-      subtitulo: "detalhamento (fonte ClickUp); pode não somar ao geral",
       linhas: produtoRows,
     },
     {
       id: "churn-motivos",
       titulo: "Churn Recorrente — Motivos",
-      subtitulo: "detalhamento (fonte ClickUp); pode não somar ao geral",
       linhas: motivoRows,
     },
     {

@@ -26,11 +26,6 @@ import type { ScorecardSection, ScorecardRow, ScorecardResponsavelItem, Scorecar
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-/** Onda C2: nota de metodologia exibida nas 2 seções de "Receita por Cabeça" por dimensão —
-   usam MRR ativo + entregas deploy ÷ headcount RH (não regime de caixa). */
-const AVISO_RECEITA_CABECA_DIMENSAO =
-  'Base = MRR ativo + entregas pontuais (deploy) ÷ pessoas (rh_pessoal).';
-
 /** "YYYY-MM" → label curto (ex: "Jan") — mesmo padrão de `labelMesCurto` em SecaoChurn.tsx/
    SecaoEntregas.tsx (duplicado localmente, não há util compartilhado entre seções). */
 function labelMesCurto(mes: string): string {
@@ -92,7 +87,7 @@ export function montarSecoesCapacity(
   // headcount, com série mensal real (mesma fonte de "MRR por squad/operador (evolução)" abaixo
   // + entregas). Denominador de squad = headcount RH casado por `pessoasPorSquad` (constante,
   // não série); de operador = 1 (o próprio operador). NÃO reconcilia com "Receita por Cabeça
-  // (mês)" geral acima — ver `AVISO_RECEITA_CABECA_DIMENSAO`.
+  // (mês)" geral acima.
   const receitaCabecaSquadRows: ScorecardRow[] = linhasReceitaCabeca(
     series.data?.series.mrrPorSquad,
     series.data?.series.entregasPorSquad,
@@ -106,9 +101,7 @@ export function montarSecoesCapacity(
   const secaoReceitaCabecaSquad: ScorecardSection = {
     id: "capacity-receita-cabeca-squad",
     titulo: "Receita por Cabeça — por squad",
-    subtitulo: series.isError
-      ? "falha ao carregar série por squad"
-      : AVISO_RECEITA_CABECA_DIMENSAO,
+    subtitulo: series.isError ? "falha ao carregar série por squad" : undefined,
     linhas: receitaCabecaSquadRows,
   };
 
@@ -127,9 +120,7 @@ export function montarSecoesCapacity(
   const secaoReceitaCabecaOperador: ScorecardSection = {
     id: "capacity-receita-cabeca-operador",
     titulo: "Receita por Cabeça — por operador",
-    subtitulo: series.isError
-      ? "falha ao carregar série por operador"
-      : AVISO_RECEITA_CABECA_DIMENSAO,
+    subtitulo: series.isError ? "falha ao carregar série por operador" : undefined,
     linhas: receitaCabecaOperadorRows,
   };
 
@@ -154,7 +145,7 @@ export function montarSecoesCapacity(
       ? "falha ao carregar geração de caixa"
       : !pontoGeracaoCaixaAtual
         ? "carregando…"
-        : "regime de CAIXA: receita recebida − TODAS as despesas pagas da DFC (folha, estrutura, impostos, sócios etc.)",
+        : undefined,
     linhas: [
       {
         key: "capacity_geracao_caixa_receita",
@@ -241,15 +232,14 @@ export function montarSecoesCapacity(
   const secaoContribuicaoSquad: ScorecardSection = {
     id: "capacity-contribuicao-squad",
     titulo: "Margem de Contribuição por squad (mês)",
-    // Nota metodológica (por squad, não por operador — custo/operador no backend é heurístico
-    // e só funciona filtrando 1 pessoa por vez, inviável em lote) + aviso explícito de que a base
-    // é DIFERENTE da "Geração de Caixa" acima (custos DIRETOS do squad vs. TODAS as despesas
-    // pagas da DFC) — não reconciliam entre si.
+    // Por squad, não por operador — custo/operador no backend é heurístico e só funciona
+    // filtrando 1 pessoa por vez, inviável em lote. Base DIFERENTE da "Geração de Caixa" acima
+    // (custos DIRETOS do squad vs. TODAS as despesas pagas da DFC) — não reconciliam entre si.
     subtitulo: contribuicao.isError
       ? "falha ao carregar margem de contribuição"
       : contribuicaoSquadRows.length === 0
         ? "carregando…"
-        : "Margem de contribuição por time = receita − custos DIRETOS do squad (folha (rh_pessoal) + freelas + impostos 18% da receita). NÃO é a Geração de Caixa acima (que inclui todas as despesas da DFC); não reconciliam. Margem por operador não é viável (heurística exige filtrar 1 pessoa por vez).",
+        : undefined,
     linhas: contribuicaoSquadRows,
   };
 

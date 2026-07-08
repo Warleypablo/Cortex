@@ -213,13 +213,11 @@ export function montarSecoesLtLtv(
     {
       id: "lt-ltv-maiores-clientes",
       titulo: "Maiores clientes por LTV (snapshot)",
-      subtitulo: "estado atual da base",
       linhas: clienteRows,
     },
     {
       id: "lt-ltv-distribuicao",
       titulo: "Distribuição de LTV por cliente (snapshot)",
-      subtitulo: "estado atual da base",
       linhas: distRows,
     },
     {
