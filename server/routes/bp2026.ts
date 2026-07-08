@@ -633,4 +633,26 @@ export function registerBp2026Routes(app: Express, db: any) {
       res.status(500).json({ error: "Failed to fetch pontual creators" });
     }
   });
+
+  // Pontual TOTAL (todos os produtos) — mesmo padrão de /pontual-creators acima, sem
+  // produtoLike. Painel Scorecard (Onda B2) consome as linhas pontual_churn/pontual_reajuste/
+  // pontual_reativacao/pontual_status_pausado (série completa do ano em `linhas[].meses`).
+  app.get("/api/bp2026/pontual-total", async (req, res) => {
+    try {
+      const user = req.user as User;
+      if (!abasPermitidas(user?.role, user?.allowedBpTabs).includes("pontual")) {
+        return res.status(403).json({ error: "Sem acesso a esta aba" });
+      }
+      const agora = new Date();
+      const anoAtual = agora.getFullYear();
+      const mesCorrente = anoAtual > ANO ? 12 : anoAtual < ANO ? 0 : agora.getMonth() + 1;
+      const mesFechado = anoAtual > ANO ? 12 : mesCorrente <= 1 ? 0 : mesCorrente - 1;
+      const linhas = await montarPontual({ db, mesCorrente, mesFechado });
+      const comInfo = linhas.map((l) => ({ ...l, info: INFO_METRICAS[l.metrica] }));
+      res.json({ linhas: comInfo, mesCorrente, mesFechado });
+    } catch (error) {
+      console.error("[bp2026] Erro em /api/bp2026/pontual-total:", error);
+      res.status(500).json({ error: "Failed to fetch pontual total" });
+    }
+  });
 }

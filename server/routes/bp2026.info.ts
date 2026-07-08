@@ -489,6 +489,11 @@ export const INFO_METRICAS: Record<string, InfoMetrica> = {
     fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
     calculo: "Σ valorp dos contratos em estoque no snapshot do mês que não estavam em estoque no anterior. Não é o 'Vendas Pontual' do Bitrix.",
   },
+  pontual_reativacao: {
+    definicao: "Parte da 'Entrada na foto' referente a contratos que estavam FORA do estoque no snapshot anterior (ex.: pausados) e voltaram a entrar.",
+    fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",
+    calculo: "Σ valorp dos contratos que entraram no estoque e já apareciam no snapshot anterior (fora do estoque). Sub-conjunto de pontual_entrada, não soma de novo na ponte.",
+  },
   pontual_entrega: {
     definicao: "Pontual que saiu do estoque por entrega no mês (saída).",
     fonte: "ClickUp — diferença entre snapshots de cup_data_hist.",

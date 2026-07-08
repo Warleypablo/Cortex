@@ -40,6 +40,37 @@ const CHURN_SQUAD_OVERRIDE: Record<string, { taskId: string; squadDestino: strin
   "2026-05": [{ taskId: "86a78223q", squadDestino: "🐑 Black" }],
 };
 
+// Promoções do trimestre — slide "Promoções do Trimestre" do Reporte Mensal.
+// Lista FIXA, editada a cada trimestre. `nome` é o texto exibido no slide (como enviado
+// pela liderança). `rhNome` é o nome EXATO em "Inhire".rh_pessoal, usado apenas para casar
+// a foto sem ambiguidade (há homônimos no RH — 3 "Anderson", 15 "Gabriel", 11 "Matheus").
+// Ao editar: copie o `rhNome` exatamente como está em rh_pessoal.nome.
+// Validado em 2026-07-08: 22 nomes, todos Ativos, match unívoco (1 registro cada), 21/22 com foto.
+const PROMOCOES_TRIMESTRE: { nome: string; rhNome: string }[] = [
+  { nome: "Ana Clara Cordeiro do Carmo", rhNome: "Ana Clara Cordeiro do Carmo" },
+  { nome: "Amanda Lovise", rhNome: "Amanda Lovise Lopes Comitre" },
+  { nome: "Aline de Souza", rhNome: "Aline de Carvalho de Souza" },
+  { nome: "Anderson Mateus", rhNome: "Anderson Matheus Silva de Moura" },
+  { nome: "Bernardo Soroldani", rhNome: "Bernardo Soroldani Vital Campos" },
+  { nome: "Brenda Federici Vieira", rhNome: "Brenda Federici Vieira" },
+  { nome: "Breno Carmo", rhNome: "Breno Carmo" },
+  { nome: "Davi Ferraz", rhNome: "Davi de Souza Ferraz Matos" },
+  { nome: "Esther Fiorio de Oliveira", rhNome: "Esther Fiorio de Oliveira" },
+  { nome: "Fabio Richard Salgado de Oliveira", rhNome: "Fabio Richard Salgado de Oliveira" },
+  { nome: "Gabriel Taufner", rhNome: "Gabriel Pereira Taufner" },
+  { nome: "Geiziele Izidorio Oliveira", rhNome: "Geiziele Izidorio Oliveira" },
+  { nome: "Ismael Ataide Serafim", rhNome: "Ismael Ataide Serafim" },
+  { nome: "Leonardo Ferreira", rhNome: "Leonardo Soares Ferreira" },
+  { nome: "Lucas Emanoel de Jesus Antunes", rhNome: "Lucas Emanoel de Jesus Antunes" },
+  { nome: "Mariah Eduarda Grippa", rhNome: "Mariah Eduarda Grippa de Sousa" },
+  { nome: "Matheus Henrique", rhNome: "Matheus Henrique De Oliveira Costa" },
+  { nome: "Milena Gomes Vieira", rhNome: "Milena Gomes Vieira" },
+  { nome: "Maria Midyan De Sousa Sequeira Dias", rhNome: "Maria Midyan De Sousa Sequeira Dias" },
+  { nome: "Renan Fortunato", rhNome: "Renan Fortunato Silveira" },
+  { nome: "Thiago Kenzo", rhNome: "Thiago Kenzo Takahashi" },
+  { nome: "Wendeson Eduardo Diniz", rhNome: "Wendeson Eduardo Diniz Barros" },
+];
+
 async function initCustomSlidesTable(db: any) {
   await db.execute(sql`
     CREATE TABLE IF NOT EXISTS cortex_core.relatorio_slides_custom (
@@ -1719,10 +1750,48 @@ export function registerRelatorioMensalSlidesRoutes(app: Express, db: any) {
         })),
       };
 
+      // Promoções do trimestre — lista fixa (PROMOCOES_TRIMESTRE). Casa a foto pelo nome
+      // exato do RH (rhNome) e retorna o nome de exibição. Query independente e leve.
+      const promoValues = sql.join(
+        PROMOCOES_TRIMESTRE.map((p) => sql`(${p.rhNome})`),
+        sql`, `,
+      );
+      const promocoesResult = await db.execute(sql`
+        WITH alvo(rhnome) AS (VALUES ${promoValues})
+        SELECT
+          a.rhnome,
+          COALESCE(
+            NULLIF(a_id.picture, ''),
+            NULLIF(a_turbo.picture, ''),
+            NULLIF(a_pessoal.picture, '')
+          ) AS "fotoUrl"
+        FROM alvo a
+        LEFT JOIN LATERAL (
+          SELECT r.user_id, r.email_turbo, r.email_pessoal
+          FROM "Inhire".rh_pessoal r
+          WHERE lower(btrim(regexp_replace(unaccent(r.nome), '\\s+', ' ', 'g')))
+              = lower(btrim(regexp_replace(unaccent(a.rhnome), '\\s+', ' ', 'g')))
+            AND r.status = 'Ativo'
+          LIMIT 1
+        ) r ON true
+        LEFT JOIN cortex_core.auth_users a_id     ON r.user_id IS NOT NULL AND r.user_id = a_id.id
+        LEFT JOIN cortex_core.auth_users a_turbo  ON r.email_turbo IS NOT NULL AND LOWER(TRIM(r.email_turbo)) = LOWER(TRIM(a_turbo.email))
+        LEFT JOIN cortex_core.auth_users a_pessoal ON r.email_pessoal IS NOT NULL AND LOWER(TRIM(r.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+      `);
+      const fotoPorRh = new Map<string, string | null>();
+      for (const row of promocoesResult.rows as any[]) {
+        fotoPorRh.set(row.rhnome as string, (row.fotoUrl as string) || null);
+      }
+      const promocoes = PROMOCOES_TRIMESTRE.map((p) => ({
+        nome: p.nome,
+        fotoUrl: fotoPorRh.get(p.rhNome) ?? null,
+      }));
+
       res.json({
         mesReferencia: mesParam,
         mesLabel,
         mesDadosLabel,
+        promocoes,
         novosColaboradores: novosResult.rows,
         aniversariantes: aniversariantesResult.rows,
         aniversariosEmpresa: aniversarioEmpresaResult.rows,

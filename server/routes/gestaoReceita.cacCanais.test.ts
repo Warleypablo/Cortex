@@ -16,7 +16,7 @@ describe("agregarCacCanais", () => {
       [],
       JUN,
     );
-    const inbound = out.canais.find((c) => c.id === "inbound_pago")!;
+    const inbound = out.canais.find((c) => c.id === "inbound")!;
     const outbound = out.canais.find((c) => c.id === "outbound")!;
     expect(inbound.clientes).toBe(6);
     expect(outbound.clientes).toBe(3);
@@ -91,11 +91,11 @@ describe("agregarCacCanais", () => {
   it("item automático (ads_spend): soma a série mensal, ignora override manual e marca fonte", () => {
     const out = agregarCacCanais(
       [{ source: "WEBFORM", mes: 6, clientes: 2 }],
-      [{ chave: "cac_canal:inbound_pago:anuncios", mes: 6, valor: 999999 }],
+      [{ chave: "cac_canal:inbound:anuncios", mes: 6, valor: 999999 }],
       MAI_JUN,
       { ads_spend: { 5: 10000, 6: 19500 } },
     );
-    const inbound = out.canais.find((c) => c.id === "inbound_pago")!;
+    const inbound = out.canais.find((c) => c.id === "inbound")!;
     const anuncios = inbound.itens.find((i) => i.id === "anuncios")!;
     expect(anuncios.valor).toBe(29500); // 10000 + 19500; override 999999 ignorado
     expect(anuncios.fonte).toBe("auto");
@@ -104,8 +104,76 @@ describe("agregarCacCanais", () => {
     expect(outbound.itens.every((i) => i.fonte === "manual")).toBe(true);
   });
 
-  it("retorna sempre os 10 canais na ordem do catálogo", () => {
+  it("retorna sempre todos os canais do catálogo na ordem", () => {
     const out = agregarCacCanais([], [], JUN);
     expect(out.canais.map((c) => c.id)).toEqual(CAC_CANAIS.map((c) => c.id));
+  });
+
+  it("fusão inbound: pago + orgânico agora somam no único canal 'inbound'", () => {
+    const out = agregarCacCanais(
+      [
+        { source: "WEBFORM", mes: 6, clientes: 2 },   // era inbound_pago
+        { source: "WEB", mes: 6, clientes: 3 },        // era inbound_organico
+        { source: "CALL", mes: 6, clientes: 1 },       // era inbound_organico
+      ],
+      [],
+      JUN,
+    );
+    expect(out.canais.find((c) => c.id === "inbound_pago")).toBeUndefined();
+    expect(out.canais.find((c) => c.id === "inbound_organico")).toBeUndefined();
+    expect(out.canais.find((c) => c.id === "inbound")!.clientes).toBe(6);
+  });
+
+  it("CAC por contrato: contratos vêm do cup_contratos (contratosCanalMes), não dos deals", () => {
+    const out = agregarCacCanais(
+      [
+        { source: "UC_YWZVA2", mes: 6, clientes: 1 }, // outbound: 2 clientes (deals)
+        { source: "UC_YWZVA2", mes: 6, clientes: 1 },
+      ],
+      [{ chave: "cac_canal:outbound:time", mes: 6, valor: 8000 }],
+      JUN,
+      {},
+      { outbound: { 6: 4 } }, // 4 contratos ClickUp casados ao canal via cnpj
+    );
+    const outbound = out.canais.find((c) => c.id === "outbound")!;
+    expect(outbound.clientes).toBe(2);
+    expect(outbound.contratos).toBe(4);
+    expect(outbound.cacCliente).toBe(4000);  // 8000 / 2
+    expect(outbound.cacContrato).toBe(2000); // 8000 / 4
+    expect(out.geral.contratos).toBe(4);
+    expect(out.geral.cacContrato).toBe(2000);
+  });
+
+  it("contratosCanalMes soma os meses do período (multi-mês)", () => {
+    const out = agregarCacCanais(
+      [{ source: "UC_YWZVA2", mes: 5, clientes: 1 }, { source: "UC_YWZVA2", mes: 6, clientes: 1 }],
+      [],
+      MAI_JUN,
+      {},
+      { outbound: { 5: 3, 6: 2 } },
+    );
+    expect(out.canais.find((c) => c.id === "outbound")!.contratos).toBe(5);
+    expect(out.geral.contratos).toBe(5);
+  });
+
+  it("sem piso 1: canal com clientes>0 e contratos=0 (venda sem contrato no mês) → cacContrato null, cacCliente definido", () => {
+    // caso real: Social Selling jun/2026 — 1 deal ganho, 0 contratos criados no ClickUp
+    const out = agregarCacCanais(
+      [{ source: "UC_4VCKGM", mes: 6, clientes: 1 }],
+      [{ chave: "cac_canal:social_selling:anuncios_dist", mes: 6, valor: 3000 }],
+      JUN,
+      {},
+      {}, // nenhum contrato casado a social_selling
+    );
+    const ss = out.canais.find((c) => c.id === "social_selling")!;
+    expect(ss.clientes).toBe(1);
+    expect(ss.contratos).toBe(0);
+    expect(ss.cacCliente).toBe(3000);
+    expect(ss.cacContrato).toBeNull();
+  });
+
+  it("cacContrato null quando o canal não tem contratos", () => {
+    const out = agregarCacCanais([{ source: "UC_YWZVA2", mes: 6, clientes: 1 }], [], JUN);
+    expect(out.canais.find((c) => c.id === "outbound")!.cacContrato).toBeNull();
   });
 });
