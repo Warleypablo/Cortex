@@ -120,6 +120,14 @@ export interface ScorecardSeriesPorDimensao {
   /** Como `churnPontualPorProduto`, dimensão `motivo_cancelamento`. Alimenta "Churn Pontual —
      Motivos". */
   churnPontualPorMotivo: Record<string, ScorecardSerieDimPonto[]>;
+  /** Receita/Cabeça GERAL por mês (regime de CAIXA) — Onda F. Mesmo cálculo do card "Receita /
+     Cabeça" do CEO Dashboard (receita recebida em caixa ÷ headcount ativo), reusado no backend
+     via `receitaCabecaCaixaFromBp` em vez de uma nova query (ver server/routes/scorecard.ts:
+     `fetchReceitaCabecaGeralPorMes`). Série ÚNICA (sem dimensão). `null` (não 0) fora do ano do
+     BP2026 ou quando a razão não é calculável (headcount ausente/0) — mesmo padrão de
+     `leadTimePorProduto`. Alimenta "Receita / Cabeça" na Visão Geral e "Receita por Cabeça (mês)"
+     geral em Capacity. */
+  receitaCabecaGeralPorMes: ScorecardSerieDimPontoNullable[];
 }
 
 export interface ScorecardSeriesResponse {

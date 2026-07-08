@@ -86,7 +86,20 @@ export function montarSecoesCapacity(
 ): ScorecardSection[] {
   // /api/ceo-dashboard exige permissão de CEO (403 para os demais papéis; useCeoDashboard já
   // usa retry:false). Isolado: a linha mostra atual=null + aviso, sem derrubar a aba inteira.
-  const receitaCabecaValor = ceo.isError ? null : (ceo.kpis?.find((k) => k.key === "receita_cabeca")?.valor ?? null);
+  const receitaCabecaCeo = ceo.isError ? null : (ceo.kpis?.find((k) => k.key === "receita_cabeca")?.valor ?? null);
+
+  // Onda F: série mensal em regime de CAIXA (receitaCabecaGeralPorMes, novo campo de
+  // /api/scorecard/series — fetchReceitaCabecaGeralPorMes no backend, reusa o mesmo cálculo do
+  // CEO Dashboard). `atual` prioriza o CEO Dashboard; cai pro último ponto NÃO-nulo da série
+  // quando o CEO Dashboard não tiver o valor (loading OU sem permissão) — mesma lógica de
+  // SecaoVisaoGeral.tsx (montarSecoesVisaoGeral).
+  const receitaCabecaSerie: ScorecardSeriePonto[] = (series.data?.series.receitaCabecaGeralPorMes ?? []).map((p) => ({
+    month: p.month,
+    label: labelMesCurto(p.month),
+    valor: p.valor,
+  }));
+  const receitaCabecaUltimoPonto = [...receitaCabecaSerie].reverse().find((p) => p.valor != null)?.valor ?? null;
+  const receitaCabecaValor = receitaCabecaCeo ?? receitaCabecaUltimoPonto;
 
   const secaoReceitaCabeca: ScorecardSection = {
     id: "capacity-receita-cabeca",
@@ -95,11 +108,14 @@ export function montarSecoesCapacity(
       {
         key: "capacity_receita_cabeca",
         metrica: "Receita / Cabeça",
-        sub: ceo.isError ? "requer permissão CEO" : undefined,
+        // "requer permissão CEO" só quando NEM o CEO Dashboard NEM a série resolveram um valor —
+        // evita mostrar o aviso ao lado de um número real vindo da série.
+        sub: ceo.isError && receitaCabecaValor == null ? "requer permissão CEO" : undefined,
         atual: receitaCabecaValor,
         formato: "brl",
         // /api/scorecard/metas já devolve o override fixo (R$ 20.000, direction "up") p/ esta chave.
         metaKey: "receita_cabeca",
+        serie: receitaCabecaSerie.length > 0 ? receitaCabecaSerie : undefined,
         temporalidade: "mes",
       },
     ],

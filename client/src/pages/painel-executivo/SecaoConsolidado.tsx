@@ -105,7 +105,18 @@ export function SecaoConsolidado({ mes, modo }: { mes: string; modo: ScorecardMo
   const clientes = (clientesQ.data as { clientes: ClienteRow[] } | undefined)?.clientes ?? [];
   const estoque = estoqueQ.data as EstoqueOverview | undefined;
 
-  const secoesVisaoGeral = rm.data ? montarSecoesVisaoGeral(rm.data, ltvOverview, { isError: ceo.isError, kpis: ceoKpis }) : [];
+  // Onda F: mesmas fontes de série já buscadas nesta função para outras abas — evolucaoClientesQ
+  // (LT/LTV) e series (Capacity/Receita/Churn/Entregas/Performance) — reaproveitadas aqui sem
+  // novos hooks (evita duplicar chamadas de rede no Consolidado).
+  const secoesVisaoGeral = rm.data
+    ? montarSecoesVisaoGeral(
+        rm.data,
+        ltvOverview,
+        { isError: ceo.isError, kpis: ceoKpis },
+        evolucaoClientesQ.data?.serie,
+        series.data?.series.receitaCabecaGeralPorMes,
+      )
+    : [];
   const secoesReceita = rm.data
     ? montarSecoesReceita(rm.data, mes, { onDrill: abrirDrill }, {
         reconciliacaoTotal: reconciliacaoTotal.data,
