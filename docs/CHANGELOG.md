@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-08 | feat(bp2026): 'em cancelamento' conta como churn no pontual
+
+**O que foi feito:**
+- Contratos com status **`em cancelamento`** agora saem do estoque pontual e entram no churn — alinhando com o churn de MRR (que também não considera `em cancelamento` no MRR ativo).
+- O churn é reconhecido quando o contrato **entra** em cancelamento; ao efetivar (`cancelado/inativo`) não conta de novo (já saíra do estoque no mês anterior).
+- Removida a linha de decomposição "· Em cancelamento" (não é mais estoque).
+
+**Por que:**
+- Pedido do stakeholder: contar `em cancelamento` como churn, igual ao MRR.
+
+**Impacto (validado vs banco):**
+- Estoque diminui pouco (jun 2.090.519 → 2.057.034; ~0,3-1,7%/mês). A ponte continua fechando em todos os meses.
+- Churn muda de timing (abr 0 → -15.997; mai -152.302 → -135.305), mas o **YTD da taxa de churn mantém 3,9%** (neutro no agregado).
+- Propaga para o painel executivo (consome `pontual_churn`).
+
+**Arquivos alterados:**
+- `server/routes/bp2026.pontual.helpers.ts` - `em cancelamento` em `ESTOQUE_STATUS_EXCLUDE` + `CHURN_STATUS`; removido de `STATUS_DECOMP`.
+- `server/routes/bp2026.pontual.helpers.test.ts` - teste da nova régua (churn + ponte fecha) + ajuste do teste de `ehEstoquePontual`.
+
+---
+
 ## 2026-07-08 | feat(bp2026): linha Taxa de churn na aba Pontual
 
 **O que foi feito:**
