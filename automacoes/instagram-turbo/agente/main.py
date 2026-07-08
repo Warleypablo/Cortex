@@ -237,12 +237,10 @@ def plan_task(t: clickup.Task, *, force_now: bool = False) -> PlannedAction:
             )
             return plan
 
-    if pd.is_template_placeholder:
-        plan.skip_reason = "TURBO_xpto é placeholder do template — cardista esqueceu de renomear"
-        return plan
-    if not pd.turbo_slug:
-        plan.skip_reason = "descrição não contém TURBO_<slug>"
-        return plan
+    # NÃO barramos mais pelo slug da descrição (`TURBO_<x>`): ele vem podre do
+    # template (desatualizado/xpto) e a pasta é resolvida pelo NOME DO CARD
+    # (find_post_folder_by_card). Card sem conteúdo real simplesmente não acha
+    # pasta e cai em "não pronto" — fail-safe, sem publicar errado.
     if not mes:
         plan.skip_reason = "não consegui extrair mês do parent task"
         return plan
@@ -282,7 +280,7 @@ def plan_task(t: clickup.Task, *, force_now: bool = False) -> PlannedAction:
     if ctx["drive_folder"]:
         from agente import drive
         try:
-            post_folder = drive.find_post_folder(ctx["drive_folder"].id, pd.turbo_slug)
+            post_folder = drive.find_post_folder_by_card(ctx["drive_folder"].id, t.name)
             if post_folder:
                 plan.drive_folder_found = True
                 files = drive.list_folder(post_folder.id)
@@ -430,7 +428,7 @@ def render_plan(p: PlannedAction) -> str:
         if p.format_note:
             lines.append(f"   🎬 Formato: {p.format_note}")
     else:
-        lines.append(f"   📁 Drive: pasta {p.turbo_slug} NÃO encontrada no mês")
+        lines.append(f"   📁 Drive: nenhuma pasta do mês casou com o card «{p.task_name}» (ou ambígua)")
 
     if p.is_ready_to_publish:
         verb = "publicaria" if CONFIG.dry_run else "vai publicar"
