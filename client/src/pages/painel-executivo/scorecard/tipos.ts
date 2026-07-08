@@ -106,8 +106,10 @@ export interface ScorecardSeriesPorDimensao {
   /** Churn Pontual (Onda D2) — série ÚNICA `SUM(valorp)` por mês, bucketizada pela data do
      evento (`data_solicitacao_encerramento`), base = `cup_contratos` com `servico ILIKE
      '%entrega%'` e status de churn (ver `fetchChurnPontualPorMes` no backend). Zero-fill.
-     Alimenta a linha "Churn confirmado (R$)" de "Churn Pontual — Geral" — o `atual` continua
-     vindo do overview cohort-based de `/api/churn-pontorrente` (só a `serie` é nova). */
+     Alimenta a linha "Churn confirmado (R$)" de "Churn Pontual — Geral" — `atual` também vem
+     desta série (via `atualDaSerie`, ver logica.ts), reconciliando com o modo Evolução; cai de
+     volta no overview cohort-based de `/api/churn-pontorrente` só quando esta série não carregar
+     (loading/erro). */
   churnPontualPorMes: ScorecardSerieDimPonto[];
   /** Como `churnPontualPorMes`, quebrado por dimensão (ver `fetchChurnPontualPorDimensao`).
      Alimenta "Churn Pontual — Por produto". */

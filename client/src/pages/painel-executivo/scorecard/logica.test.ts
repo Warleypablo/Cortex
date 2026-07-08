@@ -3,6 +3,7 @@ import {
   calcStatus,
   deltaM1,
   formatValor,
+  atualDaSerie,
   linhasPorDimensao,
   linhasReceitaCabeca,
   serieOverviewLtLtv,
@@ -112,6 +113,42 @@ describe("formatValor", () => {
 
   it("undefined → travessão", () => {
     expect(formatValor(undefined, "pct")).toBe("—");
+  });
+});
+
+describe("atualDaSerie", () => {
+  it("mês exato presente na série → retorna o ponto exato", () => {
+    const serie = [{ month: "2026-05", valor: 100 }, { month: "2026-06", valor: 300 }];
+    expect(atualDaSerie(serie, "2026-06")).toBe(300);
+  });
+
+  it("mês ausente → usa o último ponto <= mes (defensivo)", () => {
+    const serie = [{ month: "2026-04", valor: 10 }, { month: "2026-05", valor: 20 }];
+    expect(atualDaSerie(serie, "2026-06")).toBe(20);
+  });
+
+  it("mês anterior a todos os pontos → null", () => {
+    const serie = [{ month: "2026-05", valor: 20 }];
+    expect(atualDaSerie(serie, "2025-12")).toBeNull();
+  });
+
+  it("não depende da ordem de entrada (ordena antes de buscar)", () => {
+    const serie = [{ month: "2026-06", valor: 300 }, { month: "2026-05", valor: 100 }];
+    expect(atualDaSerie(serie, "2026-06")).toBe(300);
+  });
+
+  it("ponto com valor null (ex: sem dado no mês) é propagado, não convertido em 0", () => {
+    const serie = [{ month: "2026-05", valor: 10 }, { month: "2026-06", valor: null }];
+    expect(atualDaSerie(serie, "2026-06")).toBeNull();
+  });
+
+  it("série vazia → null", () => {
+    expect(atualDaSerie([], "2026-06")).toBeNull();
+  });
+
+  it("undefined/null → null", () => {
+    expect(atualDaSerie(undefined, "2026-06")).toBeNull();
+    expect(atualDaSerie(null, "2026-06")).toBeNull();
   });
 });
 

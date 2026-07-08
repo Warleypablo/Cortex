@@ -21,7 +21,7 @@ import type {
   ScorecardResponsavelItem,
   ScorecardSeriesResponse,
 } from "./scorecard/tipos";
-import { linhasPorDimensao } from "./scorecard/logica";
+import { linhasPorDimensao, atualDaSerie } from "./scorecard/logica";
 import type { ChurnDetalhamento, ChurnProdutoMotivo, ChurnTaxaMensal, ChurnTaxaMensalRow, ChurnProdutoMotivoCelula, ReceitaChurnPonto, ReportsMensal } from "./tipos";
 import type { ChurnPontorrentePayload, DetalheRow as ChurnPontualDetalheRow, DimRow as ChurnPontualDimRow } from "@/components/churn-pontorrente/types";
 
@@ -214,13 +214,15 @@ export function montarSecoesChurn(
         {
           key: "churn_pontual_confirmado_brl",
           metrica: "Churn confirmado (R$)",
-          // `atual` continua vindo do overview cohort-based de /api/churn-pontorrente (filtra
-          // jornadas pelo MÊS DE INÍCIO da safra — ver applyFiltros em
-          // churnPontorrente.helpers.ts). A `serie` nova (Onda D2) é bucketizada pela DATA DO
-          // EVENTO de cancelamento — os dois não precisam reconciliar mês a mês, mesma
-          // tolerância já aceita em "Churn R$" do Recorrente-Geral (atual/serie de fontes
-          // diferentes).
-          atual: pontualOverview.valorpPerdido,
+          // `atual` vem do MESMO ponto (mês selecionado, ou último <= mes) da série
+          // `series.churnPontualPorMes` — bucketizada pela DATA DO EVENTO de cancelamento, a
+          // mesma população dos breakdowns abaixo (por produto/operador/squad/motivo), que já
+          // são event-based. Antes vinha do overview cohort-based de /api/churn-pontorrente
+          // (filtra pelo MÊS DE INÍCIO da safra — ver applyFiltros em
+          // churnPontorrente.helpers.ts), uma população DIFERENTE da série exibida no modo
+          // Evolução — por isso o número do modo foco não batia com a curva do modo evolução.
+          // Fallback ao overview cohort-based quando `series` não carregar (loading/erro).
+          atual: series ? atualDaSerie(series.series.churnPontualPorMes, mes) : pontualOverview.valorpPerdido,
           formato: "brl",
           serie: series ? serieUnicaComLabel(series.series.churnPontualPorMes) : undefined,
           temporalidade: "mes",

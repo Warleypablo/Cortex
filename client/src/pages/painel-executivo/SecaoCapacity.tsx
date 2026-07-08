@@ -239,30 +239,34 @@ export function montarSecoesCapacity(
       : [],
   };
 
-  const rankingContribuicao = (contribuicao.data?.ranking ?? [])
-    .slice()
-    .sort((a, b) => b.contribuicao - a.contribuicao);
+  const rankingContribuicao = contribuicao.data?.ranking ?? [];
   const serieContribPorSquadCalc = serieContribuicaoPorSquad(contribuicaoBulk.data);
-  const contribuicaoSquadRows: ScorecardRow[] = rankingContribuicao.map((item) => {
-    const serieSquad = encontrarSerieSquad(serieContribPorSquadCalc, item.squad);
-    const pontoSquad = serieSquad ? pontoContribuicaoNoMes(serieSquad, mes) : null;
-    const atual = pontoSquad ? pontoSquad.contribuicao : item.contribuicao;
-    // pontoSquad.margem pode ser null (receita<=0 no mês) — cai pro margem do ranking (sempre
-    // number, formatPercent abaixo não aceita null) em vez de mostrar "0%" ou quebrar o tipo.
-    const margem = pontoSquad?.margem ?? item.margem;
-    const serie: ScorecardSeriePonto[] | undefined = serieSquad
-      ? serieSquad.map((p) => ({ month: p.month, label: labelMesCurto(p.month), valor: p.contribuicao }))
-      : undefined;
-    return {
-      key: `capacity_contribuicao_squad_${slug(item.squad)}`,
-      metrica: item.squad,
-      sub: `Margem ${formatPercent(margem, 1)}`,
-      atual,
-      formato: "brl",
-      serie,
-      temporalidade: "mes",
-    };
-  });
+  const contribuicaoSquadRows: ScorecardRow[] = rankingContribuicao
+    .map((item): ScorecardRow => {
+      const serieSquad = encontrarSerieSquad(serieContribPorSquadCalc, item.squad);
+      const pontoSquad = serieSquad ? pontoContribuicaoNoMes(serieSquad, mes) : null;
+      const atual = pontoSquad ? pontoSquad.contribuicao : item.contribuicao;
+      // pontoSquad.margem pode ser null (receita<=0 no mês) — cai pro margem do ranking (sempre
+      // number, formatPercent abaixo não aceita null) em vez de mostrar "0%" ou quebrar o tipo.
+      const margem = pontoSquad?.margem ?? item.margem;
+      const serie: ScorecardSeriePonto[] | undefined = serieSquad
+        ? serieSquad.map((p) => ({ month: p.month, label: labelMesCurto(p.month), valor: p.contribuicao }))
+        : undefined;
+      return {
+        key: `capacity_contribuicao_squad_${slug(item.squad)}`,
+        metrica: item.squad,
+        sub: `Margem ${formatPercent(margem, 1)}`,
+        atual,
+        formato: "brl",
+        serie,
+        temporalidade: "mes",
+      };
+    })
+    // Ordena pelo VALOR EXIBIDO (`atual`, que prioriza o bulk reconciliado com a série — ver
+    // acima) — não pelo `contribuicao` bruto do ranking, que pode divergir do `atual` mostrado
+    // e deixar a lista fora de ordem (squad com bulk mais alto exibido abaixo de um com ranking
+    // mais alto, por exemplo).
+    .sort((a, b) => (b.atual ?? -Infinity) - (a.atual ?? -Infinity));
   const secaoContribuicaoSquad: ScorecardSection = {
     id: "capacity-contribuicao-squad",
     titulo: "Margem de Contribuição por squad (mês)",

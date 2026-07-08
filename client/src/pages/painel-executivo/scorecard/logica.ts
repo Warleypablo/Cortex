@@ -73,6 +73,22 @@ export interface SerieDimPonto {
   valor: number | null;
 }
 
+/**
+ * Ponto de uma série ÚNICA (sem dimensão) no mês selecionado — mesma regra de seleção usada por
+ * `linhasPorDimensao` abaixo (mês exato, senão o último ponto <= mes, senão null): garante que o
+ * `atual` de uma linha "geral" reconcilie com o último ponto que o modo Evolução mostra para a
+ * MESMA série, em vez de vir de uma fonte/população diferente (ex: overview cohort-based vs.
+ * série event-based, ou whitelist vs. blacklist canônica — ver usos em SecaoChurn.tsx/
+ * SecaoReceita.tsx). Quem chama decide o fallback quando a série inteira não estiver disponível
+ * (loading/erro): normalmente mantém o `atual` antigo (`series ? atualDaSerie(...) : atualAntigo`).
+ */
+export function atualDaSerie(serie: SerieDimPonto[] | undefined | null, mes: string): number | null {
+  if (!serie || serie.length === 0) return null;
+  const ordenados = [...serie].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
+  const ponto = ordenados.find((p) => p.month === mes) ?? [...ordenados].reverse().find((p) => p.month <= mes);
+  return ponto ? ponto.valor : null;
+}
+
 export interface LinhasPorDimensaoOpts {
   /** Monta o `key` estável da linha a partir do nome da dimensão (produto/operador/squad) —
      cada seção usa seu próprio `slug` + prefixo (ex: `churn_produto_${slug(dim)}`). */

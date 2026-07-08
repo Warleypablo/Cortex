@@ -17,6 +17,7 @@ import {
   type Bp2026PontualLinha,
 } from "./hooks";
 import { paramsParaMes, labelMes } from "./temporalidade";
+import { atualDaSerie } from "./scorecard/logica";
 import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
 import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes, ReportsMensal } from "./tipos";
 
@@ -233,14 +234,20 @@ export function montarSecoesReceita(
           // Onda D: `series.estoquePausadoPorMes` (snapshot de fim de mês de `cup_data_hist`,
           // mesma fonte/definição do estoque pontual) dá série mensal legítima — a evolução do
           // SALDO ao longo do tempo é uma leitura válida (diferente de um fluxo do mês, que não
-          // faria sentido comparar mês a mês da mesma forma). `atual` continua vindo do bp2026
-          // (fonte inalterada); só `serie`/`temporalidade` mudam quando `series` está disponível
-          // — ausente (loading/erro), cai de volta no snapshot sem série de antes desta Onda.
+          // faria sentido comparar mês a mês da mesma forma). `atual` agora vem do MESMO ponto
+          // desta série (mês selecionado, ou último <= mes), reconciliando com a curva do modo
+          // Evolução — antes vinha do bp2026 (fonte diferente, divergia materialmente). Cai de
+          // volta no bp2026 (`atual`/serie/temporalidade do snapshot) quando `series` não
+          // carregar (loading/erro).
           key: "receita_pontual_pausado",
           metrica: "Pausado (estoque)",
           ...bp2026PontualLinha(pontualLinhas, "pontual_status_pausado", mes),
           ...(series
-            ? { serie: serieSaldoEstoque(series.series.estoquePausadoPorMes), temporalidade: "mes" as const }
+            ? {
+                atual: atualDaSerie(series.series.estoquePausadoPorMes, mes),
+                serie: serieSaldoEstoque(series.series.estoquePausadoPorMes),
+                temporalidade: "mes" as const,
+              }
             : {}),
           formato: "brl",
         },
@@ -268,15 +275,19 @@ export function montarSecoesReceita(
         },
         {
           // Onda D: `series.estoquePontualEmAbertoPorMes` dá série mensal ao saldo (mesma fonte/
-          // definição de `reference_estoque_pontual`, snapshot de fim de mês de `cup_data_hist`)
-          // — a evolução do estoque em aberto ao longo do tempo é legítima, por isso a
-          // temporalidade muda de "snapshot" para "mes" quando `series` está disponível. `atual`
-          // continua vindo de `/api/reports/mensal` (fonte inalterada). Sem `series` (loading/
-          // erro), mantém o comportamento anterior (snapshot, sem série/meta/Δ M-1).
+          // definição de `reference_estoque_pontual`, snapshot de fim de mês de `cup_data_hist`
+          // — a definição CANÔNICA, blacklist, a mesma que bate com /api/estoque-pontual) — a
+          // evolução do estoque em aberto ao longo do tempo é legítima, por isso a temporalidade
+          // muda de "snapshot" para "mes" quando `series` está disponível. `atual` agora vem do
+          // MESMO ponto desta série (mês selecionado, ou último <= mes), reconciliando com a
+          // curva do modo Evolução — antes vinha de `/api/reports/mensal` (`p.emAberto.valor`,
+          // whitelist + override de Creators hardcoded), uma definição DIFERENTE que divergia
+          // materialmente. Fallback a `p.emAberto.valor` quando `series` não carregar (loading/
+          // erro).
           key: "receita_pontual_em_aberto",
           metrica: "Em aberto (estoque)",
           sub: `${p.emAberto.contratos} itens`,
-          atual: p.emAberto.valor,
+          atual: series ? atualDaSerie(series.series.estoquePontualEmAbertoPorMes, mes) : p.emAberto.valor,
           formato: "brl",
           serie: series ? serieSaldoEstoque(series.series.estoquePontualEmAbertoPorMes) : undefined,
           temporalidade: series ? "mes" : "snapshot",
