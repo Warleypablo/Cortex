@@ -1,6 +1,7 @@
 import type { Express } from "express";
 import type { IStorage } from "../storage";
 import { sql } from "drizzle-orm";
+import path from "path";
 
 export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
   // GEG (Gestão Estratégica de Gente) API routes
@@ -1268,5 +1269,18 @@ export function registerGEGRoutes(app: Express, db: any, storage: IStorage) {
       console.error("[api] Error fetching organograma:", error);
       res.status(500).json({ error: "Failed to fetch organograma" });
     }
+  });
+
+  // Modelo Operacional 2026 — HTML autocontido servido atrás do auth
+  // (fica em server/assets, fora do client/public, porque embute nomes/cargos de colaboradores)
+  app.get("/api/geg/organograma-modelo-2026", (_req, res) => {
+    // process.cwd() = raiz do repo tanto no dev (tsx) quanto no build (dist/index.js via npm start)
+    const file = path.resolve(process.cwd(), "server", "assets", "organograma-modelo-2026.html");
+    res.sendFile(file, (err) => {
+      if (err) {
+        console.error("[api] Error serving organograma modelo 2026:", err);
+        if (!res.headersSent) res.status(500).json({ error: "Failed to serve organograma" });
+      }
+    });
   });
 }
