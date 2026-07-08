@@ -1,12 +1,9 @@
-import { useState } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AlertTriangle } from "lucide-react";
 import { Scorecard, type ScorecardModo } from "./scorecard/Scorecard";
-import { DrillSheet } from "./DrillSheet";
 import {
   useReportsMensal,
-  useGestaoReceitaDetalhe,
   useScorecardMetas,
   useScorecardResponsaveis,
   useSalvarResponsaveis,
@@ -16,7 +13,6 @@ import {
   type Bp2026ReconciliacaoTotalResponse,
   type Bp2026PontualLinha,
 } from "./hooks";
-import { paramsParaMes, labelMes } from "./temporalidade";
 import { atualDaSerie } from "./scorecard/logica";
 import type { ScorecardSection, ScorecardSeriePonto, ScorecardResponsavelItem, ScorecardSeriesResponse } from "./scorecard/tipos";
 import type { ReceitaChurnPonto, VendasSeriePonto, CrosssellHistoricoPonto, EntregaProdutoMes, ReportsMensal } from "./tipos";
@@ -58,12 +54,10 @@ function serieSaldoEstoque(pontos: { month: string; valor: number }[] | undefine
 
 // Tipos válidos aceitos por /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts,
 // const TIPOS). "venda"/"churn" (soltos) NÃO existem — usar "venda_mrr"/"venda_pontual" e
-// "churn_motivo"/"churn_vendedor" (que exigem uma chave específica, não "total").
-
-export interface MontarSecoesReceitaExtras {
-  /** Abre o DrillSheet (estado fica no componente) — omitido = linha "Nova receita" sem drill. */
-  onDrill?: (tipo: string, chave: string) => void;
-}
+// "churn_motivo"/"churn_vendedor" (que exigem uma chave específica, não "total"). O tipo
+// "venda_mrr" também é servido por /api/scorecard/detalhe (delega para o mesmo `montarDetalhe`,
+// ver server/routes/scorecard.detalhe.ts) — é essa a rota usada pelo drill de `receita_mrr_nova`
+// abaixo, centralizado no Scorecard (drillParams), não mais um estado local desta seção.
 
 /** Fontes bp2026 (Onda B2) — opcionais: hooks isolados, ausência = linhas com "—" (degradação
    graciosa), nunca derruba o resto da seção. Ver useBp2026ReconciliacaoTotal/useBp2026PontualTotal
@@ -109,7 +103,6 @@ function bp2026PontualLinha(
 export function montarSecoesReceita(
   rm: ReportsMensal,
   mes: string,
-  extras: MontarSecoesReceitaExtras = {},
   bp2026: MontarSecoesReceitaBp2026 = {},
   series?: ScorecardSeriesResponse,
 ): ScorecardSection[] {
@@ -144,7 +137,7 @@ export function montarSecoesReceita(
           metaKey: "sales_mrr_new_target",
           serie: serieComLabel<VendasSeriePonto>(rm.contratosMes.vendasSeries, (r) => r.vendasMrr),
           temporalidade: "mes",
-          drill: extras.onDrill ? () => extras.onDrill!("venda_mrr", "mrr") : undefined,
+          drillParams: { tipo: "venda_mrr" },
         },
         {
           key: "receita_mrr_upsell",
@@ -332,15 +325,6 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
   // Onda D: série mensal dos saldos de estoque pontual (em aberto/pausado) — isolado, falha/
   // loading só faz `montarSecoesReceita` cair de volta no snapshot sem série (ver série lá).
   const series = useScorecardSeries(mes);
-  const [detalheParams, setDetalheParams] = useState<Record<string, string> | null>(null);
-  const detalhe = useGestaoReceitaDetalhe(detalheParams);
-  const [drillAberto, setDrillAberto] = useState(false);
-
-  function abrirDrill(tipo: string, chave: string) {
-    const { de, ate } = paramsParaMes(mes).deAte;
-    setDetalheParams({ de, ate, tipo, chave });
-    setDrillAberto(true);
-  }
 
   function onEditResponsavel(metricaKey: string, valor: string) {
     const atuais = responsaveis.data?.itens ?? [];
@@ -354,39 +338,19 @@ export function SecaoReceita({ mes, modo }: { mes: string; modo: ScorecardModo }
   if (rm.isError) return <Card className="border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/40"><CardContent className="flex items-center gap-2 py-4 text-sm text-red-700 dark:text-red-300"><AlertTriangle className="h-4 w-4" /> Falha ao carregar receita.</CardContent></Card>;
   if (rm.isLoading || !rm.data) return <div className="space-y-4">{Array.from({ length: 2 }).map((_, i) => <Skeleton key={i} className="h-56" />)}</div>;
 
-  // /api/gestao/receita/detalhe (server/routes/gestaoReceita.detalhe.ts, DetalheResult) não tem
-  // tipo compartilhado client/server — um único cast local evita repetir "as any" por linha
-  // (inclui `total`, usado pelo rodapé de auditabilidade do DrillSheet).
-  const detalheData = detalhe.data as { titulo?: string; subtitulo?: string; total?: number; grupos?: Record<string, unknown>[] } | undefined;
-  const grupos = detalheData?.grupos ?? [];
-
-  const secoes = montarSecoesReceita(rm.data, mes, { onDrill: abrirDrill }, {
+  const secoes = montarSecoesReceita(rm.data, mes, {
     reconciliacaoTotal: reconciliacaoTotal.data,
     pontualTotal: pontualTotal.data?.linhas,
   }, series.data);
 
   return (
-    <div className="space-y-4">
-      <Scorecard
-        secoes={secoes}
-        mes={mes}
-        modo={modo}
-        metas={metas.data?.metas ?? {}}
-        responsaveis={responsaveis.data?.itens ?? []}
-        onEditResponsavel={onEditResponsavel}
-      />
-
-      <DrillSheet
-        open={drillAberto}
-        onClose={() => setDrillAberto(false)}
-        titulo={detalheData?.titulo ?? "Detalhe"}
-        subtitulo={`${detalheData?.subtitulo ?? ""} · ${labelMes(mes)}`}
-        colunas={[{ chave: "titulo", label: "Grupo", tipo: "text" }, { chave: "total", label: "Valor", tipo: "brl" }]}
-        linhas={grupos}
-        carregando={detalhe.isLoading}
-        erro={detalhe.isError}
-        total={detalheData?.total}
-      />
-    </div>
+    <Scorecard
+      secoes={secoes}
+      mes={mes}
+      modo={modo}
+      metas={metas.data?.metas ?? {}}
+      responsaveis={responsaveis.data?.itens ?? []}
+      onEditResponsavel={onEditResponsavel}
+    />
   );
 }

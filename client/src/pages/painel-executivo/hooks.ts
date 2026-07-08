@@ -10,6 +10,7 @@ import type {
   ScorecardResponsaveisResponse,
   ScorecardResponsavelItem,
   ScorecardSeriesResponse,
+  DrillDetalhe,
 } from "./scorecard/tipos";
 
 const STALE = 5 * 60 * 1000;
@@ -81,6 +82,12 @@ export function useScorecardResponsaveis() {
 // (produto/operador/squad) do modo Evolução em SecaoChurn/SecaoEntregas/SecaoCapacity.
 export function useScorecardSeries(mes: string) {
   return useQuery<ScorecardSeriesResponse>({ queryKey: ["/api/scorecard/series", { mes }], enabled: !!mes, staleTime: STALE });
+}
+// Infra de drill genérico (Fase 1) — GET /api/scorecard/detalhe?tipo=&mes=&dim=&valor=. Estado
+// do drill (o quê/quando abrir) mora no Scorecard (scorecard/Scorecard.tsx), não em cada Secao* —
+// `params` null = drill fechado (`enabled` trava a query, mesmo padrão de useGestaoReceitaDetalhe).
+export function useScorecardDetalhe(params: { tipo: string; mes: string; dim?: string; valor?: string } | null) {
+  return useQuery<DrillDetalhe>({ queryKey: ["/api/scorecard/detalhe", params ?? {}], enabled: !!params, staleTime: STALE });
 }
 export function useSalvarResponsaveis() {
   return useMutation({

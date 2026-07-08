@@ -90,6 +90,7 @@ function linhasPorMotivo(produtoMotivo: ChurnProdutoMotivo | undefined): Scoreca
       atual: agg.mrr_perdido,
       formato: "brl",
       temporalidade: "mes",
+      drillParams: { tipo: "churn_recorrente", dim: "motivo", valor: motivo },
     }));
 }
 
@@ -126,6 +127,7 @@ function linhasPorProdutoPontual(detalhamento: ChurnPontualDetalheRow[] | undefi
       atual: agg.valorp,
       formato: "brl",
       temporalidade: "mes",
+      drillParams: { tipo: "churn_pontual", dim: "produto", valor: produto },
     }));
 }
 
@@ -144,6 +146,8 @@ function linhasPorDimPontual(rows: ChurnPontualDimRow[] | undefined, prefixo: st
       atual: r.valorp,
       formato: "brl",
       temporalidade: "mes",
+      // `prefixo` já é "motivo"/"operador"/"squad" — mesmo valor esperado por drillParams.dim.
+      drillParams: { tipo: "churn_pontual", dim: prefixo, valor: r.label },
     }));
 }
 
@@ -170,6 +174,7 @@ export function montarSecoesChurn(
     labelMes: labelMesCurto,
     top: 8,
     sub: (dim) => topMotivoPorProduto(dim, produtoMotivo?.celulas),
+    drillParams: (dim) => ({ tipo: "churn_recorrente", dim: "produto", valor: dim }),
   });
 
   const operadorRows: ScorecardRow[] = linhasPorDimensao(series?.series.churnPorOperador, mes, {
@@ -179,6 +184,7 @@ export function montarSecoesChurn(
     top: 6,
     // Dono automático (o próprio operador) — célula somente-leitura, não faz sentido reatribuir.
     responsavelAuto: true,
+    drillParams: (dim) => ({ tipo: "churn_recorrente", dim: "operador", valor: dim }),
   });
 
   // "Motivos" (Onda D): fonte única `series.churnPorMotivo` (mesma exclusões de
@@ -192,6 +198,7 @@ export function montarSecoesChurn(
         formato: "brl",
         labelMes: labelMesCurto,
         top: 8,
+        drillParams: (dim) => ({ tipo: "churn_recorrente", dim: "motivo", valor: dim }),
       })
     : linhasPorMotivo(produtoMotivo);
 
@@ -199,6 +206,7 @@ export function montarSecoesChurn(
     keyFn: (dim) => `churn_squad_${slug(dim)}`,
     formato: "brl",
     labelMes: labelMesCurto,
+    drillParams: (dim) => ({ tipo: "churn_recorrente", dim: "squad", valor: dim }),
   });
   // % do total (share entre as squads da própria série — mesma fonte do `atual`, não mistura
   // com `m.churn_por_squad`, que agora é uma fonte diferente/desalinhada desta série nova).
@@ -229,6 +237,7 @@ export function montarSecoesChurn(
           formato: "brl",
           serie: series ? serieUnicaComLabel(series.series.churnPontualPorMes) : undefined,
           temporalidade: "mes",
+          drillParams: { tipo: "churn_pontual" },
         },
         {
           key: "churn_pontual_drop_medio",
@@ -253,6 +262,7 @@ export function montarSecoesChurn(
         formato: "brl",
         labelMes: labelMesCurto,
         top: 8,
+        drillParams: (dim) => ({ tipo: "churn_pontual", dim: "produto", valor: dim }),
       })
     : linhasPorProdutoPontual(pontorrente?.detalhamento);
   const pontualMotivoRows = series
@@ -261,6 +271,7 @@ export function montarSecoesChurn(
         formato: "brl",
         labelMes: labelMesCurto,
         top: 8,
+        drillParams: (dim) => ({ tipo: "churn_pontual", dim: "motivo", valor: dim }),
       })
     : linhasPorDimPontual(pontorrente?.churnPorDimensao?.motivo, "motivo");
   const pontualOperadorRows = series
@@ -271,6 +282,7 @@ export function montarSecoesChurn(
         top: 8,
         // Dono automático (o próprio operador), mesmo padrão de `operadorRows` (Recorrente).
         responsavelAuto: true,
+        drillParams: (dim) => ({ tipo: "churn_pontual", dim: "operador", valor: dim }),
       })
     : linhasPorDimPontual(pontorrente?.churnPorDimensao?.responsavel, "operador");
   const pontualSquadRows = (
@@ -278,6 +290,7 @@ export function montarSecoesChurn(
       ? linhasPorDimensao(series.series.churnPontualPorSquad, mes, {
           keyFn: (dim) => `churn_pontual_squad_${slug(dim)}`,
           formato: "brl",
+          drillParams: (dim) => ({ tipo: "churn_pontual", dim: "squad", valor: dim }),
           labelMes: labelMesCurto,
           top: 8,
         })
@@ -299,6 +312,7 @@ export function montarSecoesChurn(
           metaKey: "churn_mrr_month",
           serie: serieComLabel<ReceitaChurnPonto>(rm?.turboMetrics.receitaChurnSeries, (r) => r.churnBrl),
           temporalidade: "mes",
+          drillParams: { tipo: "churn_recorrente" },
         },
         {
           key: "churn_geral_pct",
@@ -307,6 +321,7 @@ export function montarSecoesChurn(
           formato: "pct",
           serie: serieTaxaMensal(taxaMensal?.rows, (r) => r.taxa),
           temporalidade: "mes",
+          drillParams: { tipo: "churn_pct" },
         },
         {
           key: "churn_geral_contratos",

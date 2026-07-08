@@ -1,8 +1,10 @@
-import { Fragment } from "react";
+import { Fragment, useState } from "react";
 import { LineChart, Line } from "recharts";
 import { cn, formatPercent } from "@/lib/utils";
 import { calcStatus, calcAtingimento, calcYtd, deltaM1, formatValor, ANO_MIN_EVOLUCAO, type DeltaM1Result } from "./logica";
 import { CelulaResponsavel } from "./CelulaResponsavel";
+import { DrillSheet } from "../DrillSheet";
+import { useScorecardDetalhe } from "../hooks";
 import type {
   ScorecardSection,
   ScorecardRow,
@@ -11,6 +13,7 @@ import type {
   ScorecardDirection,
   ScorecardFormato,
   ScorecardResponsavelItem,
+  DrillParams,
 } from "./tipos";
 
 export type ScorecardModo = "foco" | "evolucao";
@@ -23,6 +26,16 @@ interface ScorecardProps {
   responsaveis: ScorecardResponsavelItem[];
   onEditResponsavel: (metricaKey: string, valor: string) => void;
 }
+
+/** Estado do drill aberto — `drillParams` da linha/célula clicada + o mês daquele ponto
+   (foco: o mês selecionado do painel; evolução: o mês da COLUNA clicada, que pode ser um mês
+   anterior ao selecionado). */
+interface DrillAberto extends DrillParams {
+  mes: string;
+}
+
+/** Dispara o drill (chamado pela linha em modo foco ou pela célula de mês em modo evolução). */
+type AbrirDrill = (params: DrillParams, mes: string) => void;
 
 const MESES_ABREV = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 function mesAbrev(mes: string): string {
@@ -78,25 +91,28 @@ function SecaoHeaderRow({ titulo, subtitulo, colSpan }: { titulo: string; subtit
 // ───────────────────────── modo "foco" ─────────────────────────
 
 function LinhaFoco({
-  row, meta, responsavelManual, onEditResponsavel,
+  row, meta, responsavelManual, onEditResponsavel, mes, onDrill,
 }: {
   row: ScorecardRow;
   meta?: ScorecardMeta;
   responsavelManual: string | null;
   onEditResponsavel: (metricaKey: string, valor: string) => void;
+  mes: string;
+  onDrill: AbrirDrill;
 }) {
   const isSnapshot = row.temporalidade === "snapshot";
   const status = isSnapshot ? null : calcStatus(row.atual, meta?.valor, meta?.direction ?? "up");
   const atingimento = isSnapshot ? null : calcAtingimento(row.atual, meta?.valor, meta?.direction ?? "up");
   const delta = isSnapshot ? null : deltaM1(row.serie);
   const favoravel = trendFavoravel(delta, meta?.direction);
+  const clicavel = !!row.drillParams;
 
   return (
     <tr
-      onClick={row.drill}
-      className={cn("group border-b border-border/60 last:border-0", row.drill && "cursor-pointer hover:bg-muted/40")}
+      onClick={clicavel ? () => onDrill(row.drillParams!, mes) : undefined}
+      className={cn("group border-b border-border/60 last:border-0", clicavel && "cursor-pointer hover:bg-muted/40")}
     >
-      <td className={cn("sticky left-0 z-10 bg-card px-4 py-3 text-left align-middle font-medium text-foreground", row.drill && "group-hover:bg-muted/40")}>
+      <td className={cn("sticky left-0 z-10 bg-card px-4 py-3 text-left align-middle font-medium text-foreground", clicavel && "group-hover:bg-muted/40")}>
         {row.metrica}
         {row.sub && <span className="mt-0.5 block text-xs font-normal text-muted-foreground">{row.sub}</span>}
       </td>
@@ -139,8 +155,8 @@ function LinhaFoco({
           label={isSnapshot ? "Snapshot" : status === "good" ? "No alvo" : status === "warn" ? "Atenção" : status === "bad" ? "Fora da meta" : "—"}
         />
       </td>
-      {/* stopPropagation: a linha inteira é clicável (drill) quando `row.drill` existe — sem
-         isso, escolher um responsável no <Select> também dispararia o drill-down. */}
+      {/* stopPropagation: a linha inteira é clicável (drill) quando `row.drillParams` existe —
+         sem isso, escolher um responsável no <Select> também dispararia o drill-down. */}
       <td className="px-4 py-3 text-left" onClick={(e) => e.stopPropagation()}>
         <CelulaResponsavel
           metricaKey={row.key}
@@ -154,13 +170,14 @@ function LinhaFoco({
 }
 
 function TabelaFoco({
-  secoes, mes, metas, responsaveisManuais, onEditResponsavel,
+  secoes, mes, metas, responsaveisManuais, onEditResponsavel, onDrill,
 }: {
   secoes: ScorecardSection[];
   mes: string;
   metas: Record<string, ScorecardMeta>;
   responsaveisManuais: Map<string, string | null>;
   onEditResponsavel: (metricaKey: string, valor: string) => void;
+  onDrill: AbrirDrill;
 }) {
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
@@ -187,6 +204,8 @@ function TabelaFoco({
                   meta={row.metaKey ? metas[row.metaKey] : undefined}
                   responsavelManual={responsaveisManuais.get(row.key) ?? null}
                   onEditResponsavel={onEditResponsavel}
+                  mes={mes}
+                  onDrill={onDrill}
                 />
               ))}
             </Fragment>
@@ -211,8 +230,12 @@ function truncarSerie(serie: ScorecardSeriePonto[], mes: string): ScorecardSerie
 /** Colunas de meses = a maior série (JÁ TRUNCADA no mês selecionado) entre todas as linhas de
    todas as seções (assume que compartilham a mesma janela mensal, como as métricas do
    relatório mensal). Truncar ANTES de comparar o tamanho garante que a coluna mais à direita
-   corresponda ao mês selecionado, não ao último mês absoluto da série mais longa. */
-function mesesGlobais(secoes: ScorecardSection[], mes: string): string[] {
+   corresponda ao mês selecionado, não ao último mês absoluto da série mais longa.
+   Devolve o PONTO inteiro (não só o `label`) — o modo Evolução precisa do `month` (YYYY-MM) de
+   cada coluna para resolver o drill de uma célula específica (ver `LinhaEvolucao`/`onDrill`
+   abaixo); pontos de séries antigas sem `month` deixam aquela coluna sem drill (undefined),
+   degradação graciosa. */
+function colunasEvolucao(secoes: ScorecardSection[], mes: string): ScorecardSeriePonto[] {
   let maiorSerie: ScorecardSeriePonto[] = [];
   for (const secao of secoes) {
     for (const row of secao.linhas) {
@@ -221,7 +244,7 @@ function mesesGlobais(secoes: ScorecardSection[], mes: string): string[] {
       if (truncada.length > maiorSerie.length) maiorSerie = truncada;
     }
   }
-  return maiorSerie.map((p) => p.label);
+  return maiorSerie;
 }
 
 /** Alinha a série da linha (que pode ser mais curta, ex. métrica nova) às colunas de mês
@@ -248,7 +271,19 @@ function Sparkline({ serie, favoravel }: { serie: ScorecardSeriePonto[]; favorav
   );
 }
 
-function LinhaEvolucao({ row, colunas, meta, mes }: { row: ScorecardRow; colunas: string[]; meta?: ScorecardMeta; mes: string }) {
+function LinhaEvolucao({
+  row, colunas, colunasMeses, meta, mes, onDrill,
+}: {
+  row: ScorecardRow;
+  colunas: string[];
+  /** Mês (YYYY-MM) de cada coluna, mesmo índice de `colunas` — usado para resolver o drill de
+     uma célula específica (pode ser `undefined` numa coluna cuja série de origem não trouxe
+     `month`, ver `colunasEvolucao`). */
+  colunasMeses: (string | undefined)[];
+  meta?: ScorecardMeta;
+  mes: string;
+  onDrill: AbrirDrill;
+}) {
   // "Snapshot" é um selo de TEMPORALIDADE (estoque medido num ponto no tempo, ex: estoque
   // pontual em aberto, LTV médio) — não um estado genérico para "linha sem série". Uma
   // métrica mensal (temporalidade "mes") que ainda não acumulou histórico é outra coisa:
@@ -283,17 +318,23 @@ function LinhaEvolucao({ row, colunas, meta, mes }: { row: ScorecardRow; colunas
           </div>
         </td>
       ) : (
-        valoresAlinhados(serieTruncada!, colunas.length).map((valor, i) => (
-          <td
-            key={i}
-            className={cn(
-              "px-3 py-3 text-right tabular-nums",
-              i === colunas.length - 1 ? "bg-accent font-semibold text-accent-foreground" : "text-foreground",
-            )}
-          >
-            {valor === null || valor === undefined ? "—" : formatValor(valor, row.formato)}
-          </td>
-        ))
+        valoresAlinhados(serieTruncada!, colunas.length).map((valor, i) => {
+          const mesColuna = colunasMeses[i];
+          const clicavel = !!row.drillParams && !!mesColuna;
+          return (
+            <td
+              key={i}
+              onClick={clicavel ? () => onDrill(row.drillParams!, mesColuna!) : undefined}
+              className={cn(
+                "px-3 py-3 text-right tabular-nums",
+                i === colunas.length - 1 ? "bg-accent font-semibold text-accent-foreground" : "text-foreground",
+                clicavel && "cursor-pointer hover:bg-muted/40",
+              )}
+            >
+              {valor === null || valor === undefined ? "—" : formatValor(valor, row.formato)}
+            </td>
+          );
+        })
       )}
       <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{formatMeta(meta, row.formato)}</td>
       <td className="px-3 py-3 text-right tabular-nums font-medium text-foreground">
@@ -306,12 +347,20 @@ function LinhaEvolucao({ row, colunas, meta, mes }: { row: ScorecardRow; colunas
   );
 }
 
-function TabelaEvolucao({ secoes, metas, mes }: { secoes: ScorecardSection[]; metas: Record<string, ScorecardMeta>; mes: string }) {
-  const meses = mesesGlobais(secoes, mes);
+function TabelaEvolucao({
+  secoes, metas, mes, onDrill,
+}: {
+  secoes: ScorecardSection[];
+  metas: Record<string, ScorecardMeta>;
+  mes: string;
+  onDrill: AbrirDrill;
+}) {
+  const pontosColunas = colunasEvolucao(secoes, mes);
   // Fallback ["Atual"]: quando NENHUMA linha de NENHUMA seção tem série (ex. seção 100%
   // snapshot), garante ao menos 1 coluna na "zona de meses" — sem isso, colSpan das linhas
   // (sempre >= 1) desalinharia com um header de 0 colunas de mês.
-  const colunas = meses.length > 0 ? meses : ["Atual"];
+  const colunas = pontosColunas.length > 0 ? pontosColunas.map((p) => p.label) : ["Atual"];
+  const colunasMeses = pontosColunas.length > 0 ? pontosColunas.map((p) => p.month) : [undefined];
   const totalCols = 1 + colunas.length + 3; // Métrica + colunas + Meta + YTD + Tend.
 
   return (
@@ -341,7 +390,15 @@ function TabelaEvolucao({ secoes, metas, mes }: { secoes: ScorecardSection[]; me
             <Fragment key={secao.id}>
               <SecaoHeaderRow titulo={secao.titulo} subtitulo={secao.subtitulo} colSpan={totalCols} />
               {secao.linhas.map((row) => (
-                <LinhaEvolucao key={row.key} row={row} colunas={colunas} meta={row.metaKey ? metas[row.metaKey] : undefined} mes={mes} />
+                <LinhaEvolucao
+                  key={row.key}
+                  row={row}
+                  colunas={colunas}
+                  colunasMeses={colunasMeses}
+                  meta={row.metaKey ? metas[row.metaKey] : undefined}
+                  mes={mes}
+                  onDrill={onDrill}
+                />
               ))}
             </Fragment>
           ))}
@@ -355,20 +412,52 @@ function TabelaEvolucao({ secoes, metas, mes }: { secoes: ScorecardSection[]; me
 
 /** Tabela central do Scorecard executivo — 2 modos:
    - "foco": leitura do fechamento do mês (Métrica | Atual | Δ M-1 | Meta | Status | Responsável).
-   - "evolucao": a mesma métrica mês a mês em colunas (tendência), sem Δ/Status/Responsável. */
-export function Scorecard({ secoes, mes, modo, metas, responsaveis, onEditResponsavel }: ScorecardProps) {
-  if (modo === "evolucao") {
-    return <TabelaEvolucao secoes={secoes} metas={metas} mes={mes} />;
-  }
+   - "evolucao": a mesma métrica mês a mês em colunas (tendência), sem Δ/Status/Responsável.
 
-  const responsaveisManuais = new Map(responsaveis.map((r) => [r.metrica_key, r.responsavel]));
-  return (
+   Infra de drill genérico (Fase 1): o estado do drill ABERTO mora AQUI, centralizado — nenhuma
+   `Secao*` guarda mais estado de drill próprio. Uma linha (foco) ou célula de mês (evolução)
+   com `row.drillParams` dispara `abrirDrill`, que popula `detalhe` e liga `useScorecardDetalhe`
+   (React Query busca `/api/scorecard/detalhe?tipo=&mes=&dim=&valor=`). Um único `DrillSheet` no
+   fim do componente é compartilhado por TODAS as seções/abas que usam este `Scorecard`. */
+export function Scorecard({ secoes, mes, modo, metas, responsaveis, onEditResponsavel }: ScorecardProps) {
+  const [detalhe, setDetalhe] = useState<DrillAberto | null>(null);
+  const detalheQuery = useScorecardDetalhe(detalhe ? { tipo: detalhe.tipo, mes: detalhe.mes, dim: detalhe.dim, valor: detalhe.valor } : null);
+  const detalheData = detalheQuery.data;
+
+  const abrirDrill: AbrirDrill = (params, mesDoPonto) => {
+    setDetalhe({ ...params, mes: mesDoPonto });
+  };
+
+  const conteudo = modo === "evolucao" ? (
+    <TabelaEvolucao secoes={secoes} metas={metas} mes={mes} onDrill={abrirDrill} />
+  ) : (
     <TabelaFoco
       secoes={secoes}
       mes={mes}
       metas={metas}
-      responsaveisManuais={responsaveisManuais}
+      responsaveisManuais={new Map(responsaveis.map((r) => [r.metrica_key, r.responsavel]))}
       onEditResponsavel={onEditResponsavel}
+      onDrill={abrirDrill}
     />
+  );
+
+  return (
+    <>
+      {conteudo}
+      <DrillSheet
+        open={detalhe !== null}
+        onClose={() => setDetalhe(null)}
+        // Fallback ao `titulo` declarado pela linha (drillParams.titulo) enquanto a resposta do
+        // backend não chega — o título definitivo (com dim/valor resolvidos) vem de `DrillDetalhe`.
+        titulo={detalheData?.titulo ?? detalhe?.titulo ?? "Detalhe"}
+        subtitulo={detalheData?.subtitulo}
+        colunas={detalheData?.colunas ?? []}
+        linhas={detalheData?.linhas ?? []}
+        carregando={detalheQuery.isLoading}
+        erro={detalheQuery.isError}
+        total={detalheData?.total}
+        formula={detalheData?.formula}
+      />
+    </>
   );
 }

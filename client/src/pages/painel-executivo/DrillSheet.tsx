@@ -12,6 +12,11 @@ interface DrillSheetProps {
      Quando informado, renderiza um rodapé somando a coluna numérica (tipo "brl") — fecha
      o loop de auditabilidade (soma dos grupos == total do card). Opcional/retrocompatível. */
   total?: number;
+  /** Fórmula/composição do drill (ex: "Churn % = Churn R$ ÷ MRR base") — quando informada,
+     renderiza um bloco de texto acima da tabela. Usada por drills de RAZÃO (ex: `churn_pct`),
+     onde a tabela lista os COMPONENTES em vez de itens somáveis (por isso `total` costuma vir
+     omitido nesses casos — ver DrillDetalhe no server/client). */
+  formula?: string;
 }
 
 function fmt(v: unknown, tipo?: DrillColuna["tipo"]): string {
@@ -22,7 +27,7 @@ function fmt(v: unknown, tipo?: DrillColuna["tipo"]): string {
   return String(v);
 }
 
-export function DrillSheet({ open, onClose, titulo, subtitulo, colunas, linhas, carregando, erro, total }: DrillSheetProps) {
+export function DrillSheet({ open, onClose, titulo, subtitulo, colunas, linhas, carregando, erro, total, formula }: DrillSheetProps) {
   return (
     <Sheet open={open} onOpenChange={(o) => { if (!o) onClose(); }}>
       <SheetContent side="right" className="w-[560px] sm:max-w-[560px] overflow-y-auto bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700">
@@ -33,6 +38,11 @@ export function DrillSheet({ open, onClose, titulo, subtitulo, colunas, linhas, 
         <div className="mt-4">
           {carregando && <div className="h-40 animate-pulse rounded-lg bg-gray-100 dark:bg-zinc-800" />}
           {erro && <div className="text-sm text-red-600 dark:text-red-400">Falha ao carregar o detalhe.</div>}
+          {!carregando && !erro && formula && (
+            <div className="mb-3 rounded-md bg-gray-50 px-3 py-2 text-sm text-gray-700 dark:bg-zinc-800 dark:text-zinc-300">
+              {formula}
+            </div>
+          )}
           {!carregando && !erro && (
             <div className="overflow-x-auto">
               <Table>
