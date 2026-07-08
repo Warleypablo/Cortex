@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-08 | feat(rh): adiciona cargo Account às opções de cargos
+
+**O que foi feito:**
+- Adicionado o cargo **"Account"** à lista de cargos disponíveis nos formulários de cadastro e edição de colaboradores (RH/Pessoas).
+
+**Por que:**
+- O RH precisava cadastrar/alterar colaboradores com o cargo Account e a opção não existia no dropdown.
+
+**Arquivos alterados:**
+- `server/routes/hr.ts` - novo item `Account` no array `defaultCargos` (fonte efetiva do endpoint `/api/rh/cargos`, já que a tabela `"Inhire".rh_cargos` não existe em local nem prod — endpoint usa o fallback).
+
+**Impacto arquitetural:** Nenhum. Sem colisão com Capacity (Black usa lista explícita `BLACK_ACCOUNTS` por nome, não cargo).
+
+---
+
 ## 2026-07-07 | feat(gestao-receita): CAC por canal conta contratos por cup_contratos (não Bitrix)
 
 **O que foi feito:**
