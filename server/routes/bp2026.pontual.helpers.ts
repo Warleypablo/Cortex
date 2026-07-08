@@ -365,6 +365,10 @@ export function montarLinhasPontual(
   const linhas: LinhaPontual[] = [
     mk("pontual_estoque_ini", "(=) Estoque inicial", "estoque", serieEstoqueIni, ponte[1]?.estoqueIni ?? null),
     mk("pontual_entrada", "(+) Entrada na foto", "fluxo", serieEntrada, sumYtd(serieEntrada), { nota: NOTA_ENTRADA }),
+    // Sub-linha de "Entrada na foto": contratos que estavam FORA do estoque no snapshot
+    // anterior (ex.: pausados) e voltaram — já somada dentro de pontual_entrada (p.venda),
+    // exposta aqui separadamente só para granularidade (não soma de novo na ponte).
+    mk("pontual_reativacao", "· Reativação", "fluxo", serieFluxo((p) => p.reativacao, 1), sumYtd(serieFluxo((p) => p.reativacao, 1))),
     mk("pontual_entrega", "(−) Entrega", "fluxo", serieFluxo((p) => p.entrega, -1), sumYtd(serieFluxo((p) => p.entrega, -1))),
     mk("pontual_taxa_entrega", "· Taxa de entrega", "fluxo", serieTaxaEntrega, ytdTaxaEntrega, { unidade: "pct", semDetalhe: true }),
     mk("pontual_churn", "(−) Churn", "fluxo", serieFluxo((p) => p.churn, -1), sumYtd(serieFluxo((p) => p.churn, -1))),
