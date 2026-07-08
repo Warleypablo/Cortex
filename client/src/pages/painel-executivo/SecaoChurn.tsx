@@ -319,6 +319,8 @@ export function montarSecoesChurn(
           metrica: "Churn %",
           atual: m.churn_percentual,
           formato: "pct",
+          // Régua fixa de 8% sobre a base MRR (ver aplicarMetaChurnBaseReal no backend).
+          metaKey: "churn_pct_month",
           serie: serieTaxaMensal(taxaMensal?.rows, (r) => r.taxa),
           temporalidade: "mes",
           drillParams: { tipo: "churn_pct" },

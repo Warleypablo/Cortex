@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { montarMetasScorecard } from "./scorecard";
+import { montarMetasScorecard, aplicarMetaChurnBaseReal } from "./scorecard";
 import { getMetricByKey } from "../okr2026/bp2026Targets";
 import { krs } from "../okr2026/okrRegistry";
 
@@ -75,5 +75,28 @@ describe("montarMetasScorecard", () => {
       origem: "override",
       label: "Receita por Cabeça",
     });
+  });
+});
+
+describe("aplicarMetaChurnBaseReal", () => {
+  it("com base real, sobrescreve churn_mrr_month (do BP) com 8% da base e publica churn_pct_month", () => {
+    const { metas } = montarMetasScorecard("2026-06");
+    expect(metas.churn_mrr_month.origem).toBe("bp"); // pré-condição: a meta deturpada do BP existe
+
+    aplicarMetaChurnBaseReal(metas, 1_030_229.3);
+
+    expect(metas.churn_mrr_month.valor).toBeCloseTo(82_418.34, 2);
+    expect(metas.churn_mrr_month.direction).toBe("down");
+    expect(metas.churn_mrr_month.origem).toBe("override");
+    expect(metas.churn_pct_month).toMatchObject({ valor: 8, unit: "PCT", direction: "down" });
+  });
+
+  it("sem base (null), REMOVE churn_mrr_month em vez de cair de volta na meta do BP, mas mantém a régua de 8%", () => {
+    const { metas } = montarMetasScorecard("2026-06");
+
+    aplicarMetaChurnBaseReal(metas, null);
+
+    expect(metas.churn_mrr_month).toBeUndefined();
+    expect(metas.churn_pct_month).toMatchObject({ valor: 8, unit: "PCT", direction: "down" });
   });
 });

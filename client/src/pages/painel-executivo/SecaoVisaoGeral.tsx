@@ -108,6 +108,10 @@ export function montarSecoesVisaoGeral(
           metrica: "Churn %",
           atual: churnPctAtual,
           formato: "pct",
+          // Régua fixa de 8% sobre a base MRR (ver aplicarMetaChurnBaseReal no backend). O atual
+          // desta série divide pelo MRR do fim do PRÓPRIO mês (não do anterior) — diferença de
+          // décimos, aceita para não divergir do gráfico Receita × Churn e do Reporte Mensal.
+          metaKey: "churn_pct_month",
           serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnPct),
           temporalidade: "mes",
           drillParams: { tipo: "churn_pct" },

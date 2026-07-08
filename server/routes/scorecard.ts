@@ -517,8 +517,75 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
   };
 }
 
+/**
+ * MRR ativo no último dia de fechamento do mês ANTERIOR a `mes` — a "base" sobre a qual a meta
+ * de churn é medida. Snapshot do dia 1 de `mes` em cup_data_hist (= estado final do mês
+ * anterior); fallback: último snapshot dentro do mês anterior. Mesma seleção da query "17b" de
+ * relatorioMensalSlides.ts (que já aplica essa regra no Reporte Mensal via
+ * turboMetrics.churnMetaMensal). null quando não há snapshot cobrindo o período (cup_data_hist
+ * só existe desde 17/nov/2025) ou a soma é 0.
+ */
+async function fetchMrrBaseFechamentoAnterior(mes: string): Promise<number | null> {
+  const dataStart = `${mes}-01`;
+  const mesAnterior = addMeses(mes, -1);
+
+  const result = await db.execute(sql`
+    WITH ultimo_snapshot_ant AS (
+      SELECT COALESCE(
+        (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${dataStart}::date LIMIT 1),
+        (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = ${mesAnterior})
+      ) as snap
+    )
+    SELECT
+      COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_total
+    FROM "Clickup".cup_data_hist h
+    JOIN ultimo_snapshot_ant us ON h.data_snapshot = us.snap
+    WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+      AND h.valorr IS NOT NULL
+  `);
+
+  const mrr = parseFloat((result.rows[0] as any)?.mrr_total);
+  return Number.isFinite(mrr) && mrr > 0 ? mrr : null;
+}
+
+/**
+ * Regra de negócio da meta de churn: até 8% da base REAL (MRR ativo no fechamento do mês
+ * anterior) — NÃO a linha churn_mrr_month do BP2026, que é 8% do MRR PLANEJADO. Quando o MRR
+ * real roda abaixo do plano, a meta do BP infla o churn "aceitável" e o farol mente (ex.
+ * jun/2026: meta BP R$ 151.966 sobre base planejada de ~R$ 1,9mi, quando a base real era
+ * ~R$ 1mi → meta real ~R$ 82k).
+ *
+ * Sobrescreve `churn_mrr_month` com 8% × base real e publica `churn_pct_month` (a régua fixa de
+ * 8%, que independe da base). Sem base disponível (null), REMOVE `churn_mrr_month`: melhor
+ * nenhuma meta do que a deturpada do BP.
+ */
+export function aplicarMetaChurnBaseReal(
+  metas: Record<string, ScorecardMeta>,
+  mrrBaseAnterior: number | null,
+): void {
+  metas.churn_pct_month = {
+    valor: 8,
+    unit: "PCT",
+    direction: "down",
+    origem: "override",
+    label: "Churn ≤ 8% da base (fechamento do mês anterior)",
+  };
+
+  if (mrrBaseAnterior !== null) {
+    metas.churn_mrr_month = {
+      valor: mrrBaseAnterior * 0.08,
+      unit: "BRL",
+      direction: "down",
+      origem: "override",
+      label: "Churn ≤ 8% da base (fechamento do mês anterior)",
+    };
+  } else {
+    delete metas.churn_mrr_month;
+  }
+}
+
 export function registerScorecardRoutes(app: Express) {
-  app.get("/api/scorecard/metas", isAuthenticated, (req, res) => {
+  app.get("/api/scorecard/metas", isAuthenticated, async (req, res) => {
     const mes = req.query.mes as string | undefined;
 
     if (!mes || !MES_REGEX.test(mes)) {
@@ -527,6 +594,17 @@ export function registerScorecardRoutes(app: Express) {
 
     try {
       const result = montarMetasScorecard(mes);
+
+      // Meta de churn dinâmica (8% da base real) — falha na query degrada para null
+      // (remove a meta em vez de derrubar o endpoint inteiro ou servir a meta errada do BP).
+      let mrrBaseAnterior: number | null = null;
+      try {
+        mrrBaseAnterior = await fetchMrrBaseFechamentoAnterior(mes);
+      } catch (error) {
+        console.error("[api] Error fetching MRR base para meta de churn:", error);
+      }
+      aplicarMetaChurnBaseReal(result.metas, mrrBaseAnterior);
+
       res.json(result);
     } catch (error) {
       console.error("[api] Error building scorecard metas:", error);
