@@ -238,28 +238,3 @@ export function useContribuicaoSquadBulk(mes: string) {
   });
 }
 
-// Geração de Caixa (regime de CAIXA) — GET /api/investors-report/geracao-caixa (server/
-// routes.ts:3662). Substitui, na Capacity, a antiga "Margem de Contribuição — Geral" (que somava
-// só custos DIRETOS/parciais): aqui é receita recebida − TODAS as despesas pagas da DFC (folha +
-// estrutura + impostos + sócios etc). Ignora `mes`/query params — o backend sempre devolve
-// jan..último mês FECHADO do ano CORRENTE (exclui o mês parcial), sem aceitar `?ano=` (mesmo
-// padrão "sem mes" de useLtLtvOverview/useEstoqueOverview acima).
-export interface GeracaoCaixaMes {
-  mes: string; // YYYY-MM
-  mesLabel: string;
-  receita: number;
-  despesa: number;
-  geracaoMes: number;
-  caixaAcumulado: number;
-}
-export interface GeracaoCaixaResponse {
-  ano: number;
-  series: GeracaoCaixaMes[];
-}
-export function useGeracaoCaixa() {
-  return useQuery<GeracaoCaixaResponse>({
-    queryKey: ["/api/investors-report/geracao-caixa"],
-    staleTime: STALE,
-    retry: false,
-  });
-}

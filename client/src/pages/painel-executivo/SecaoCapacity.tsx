@@ -6,18 +6,14 @@ import {
   useScorecardSeries,
   useContribuicaoSquadRanking,
   useContribuicaoSquadBulk,
-  useGeracaoCaixa,
   type ContribuicaoSquadRankingResponse,
   type ContribuicaoSquadBulkResponse,
-  type GeracaoCaixaResponse,
 } from "./hooks";
 import {
   linhasPorDimensao,
   linhasReceitaCabeca,
   serieContribuicaoPorSquad,
   pontoContribuicaoNoMes,
-  serieGeracaoCaixa,
-  pontoGeracaoCaixaNoMes,
   encontrarSerieSquad,
   ehSquadOff,
 } from "./scorecard/logica";
@@ -59,15 +55,6 @@ export interface MontarSecoesCapacityContribuicaoBulk {
   isError: boolean;
   data: ContribuicaoSquadBulkResponse | undefined;
 }
-/** Fonte da seção "Geração de Caixa (mês)" (GET /api/investors-report/geracao-caixa) — substitui
-   a antiga "Margem de Contribuição — Geral" (custos parciais/diretos) por receita recebida −
-   TODAS as despesas pagas da DFC. Falha/loading isolados: `pontoGeracaoCaixaNoMes` devolve null
-   → linhas mostram "—" em vez de derrubar a seção. */
-export interface MontarSecoesCapacityGeracaoCaixa {
-  isError: boolean;
-  data: GeracaoCaixaResponse | undefined;
-}
-
 /** Função pura: monta as seções de Capacity a partir dos payloads já resolvidos. Cada payload
    carrega o `isError` da query (além dos dados) porque o texto exibido distingue erro de
    loading (mesmo comportamento do componente original). Extraída de SecaoCapacity para reuso
@@ -81,7 +68,6 @@ export function montarSecoesCapacity(
   mes: string,
   contribuicao: MontarSecoesCapacityContribuicao,
   contribuicaoBulk: MontarSecoesCapacityContribuicaoBulk,
-  geracaoCaixa: MontarSecoesCapacityGeracaoCaixa,
 ): ScorecardSection[] {
   // Onda C2: Receita por Cabeça por squad/operador — (MRR ativo + entregas pontuais deploy) ÷
   // headcount, com série mensal real (mesma fonte de "MRR por squad/operador (evolução)" abaixo
@@ -126,82 +112,6 @@ export function montarSecoesCapacity(
     linhas: receitaCabecaOperadorRows,
   };
 
-  // Geração de Caixa (regime de CAIXA) — GET /api/investors-report/geracao-caixa. Substitui a
-  // antiga "Margem de Contribuição — Geral" (que somava só custos DIRETOS/parciais de squad, uma
-  // base que confundia o leitor): receita recebida − TODAS as despesas pagas da DFC (folha +
-  // estrutura + impostos + sócios etc), já fechada no backend. `pontoGeracaoCaixaNoMes` devolve
-  // null quando a série está vazia (loading/erro do hook) → linhas mostram "—" em vez de quebrar.
-  const serieGeracaoCaixaCalc = serieGeracaoCaixa(geracaoCaixa.data);
-  const pontoGeracaoCaixaAtual = pontoGeracaoCaixaNoMes(serieGeracaoCaixaCalc, mes);
-  const serieGeracaoCaixaMetrica = (
-    campo: "receita" | "despesa" | "geracaoMes" | "conversaoPct" | "caixaAcumulado",
-  ): ScorecardSeriePonto[] | undefined =>
-    serieGeracaoCaixaCalc.length > 0
-      ? serieGeracaoCaixaCalc.map((p) => ({ month: p.month, label: labelMesCurto(p.month), valor: p[campo] }))
-      : undefined;
-
-  const secaoGeracaoCaixa: ScorecardSection = {
-    id: "capacity-geracao-caixa",
-    titulo: "Geração de Caixa (mês)",
-    subtitulo: geracaoCaixa.isError
-      ? "falha ao carregar geração de caixa"
-      : !pontoGeracaoCaixaAtual
-        ? "carregando…"
-        : undefined,
-    linhas: [
-      {
-        key: "capacity_geracao_caixa_receita",
-        metrica: "Receita (caixa)",
-        atual: pontoGeracaoCaixaAtual?.receita ?? null,
-        formato: "brl",
-        serie: serieGeracaoCaixaMetrica("receita"),
-        temporalidade: "mes",
-        drillParams: { tipo: "geracao_caixa_receita" },
-      },
-      {
-        key: "capacity_geracao_caixa_despesa",
-        metrica: "(−) Despesas (DFC)",
-        sub: "todas as despesas pagas no mês (folha, estrutura, impostos, sócios)",
-        atual: pontoGeracaoCaixaAtual?.despesa ?? null,
-        formato: "brl",
-        serie: serieGeracaoCaixaMetrica("despesa"),
-        temporalidade: "mes",
-        drillParams: { tipo: "geracao_caixa_despesa" },
-      },
-      {
-        key: "capacity_geracao_caixa_liquida",
-        metrica: "(=) Geração de caixa",
-        atual: pontoGeracaoCaixaAtual?.geracaoMes ?? null,
-        formato: "brl",
-        serie: serieGeracaoCaixaMetrica("geracaoMes"),
-        temporalidade: "mes",
-        drillParams: { tipo: "geracao_liquida" },
-      },
-      {
-        key: "capacity_geracao_caixa_conversao",
-        metrica: "Conversão em caixa %",
-        atual: pontoGeracaoCaixaAtual?.conversaoPct ?? null,
-        formato: "pct",
-        serie: serieGeracaoCaixaMetrica("conversaoPct"),
-        temporalidade: "mes",
-        drillParams: { tipo: "conversao_caixa" },
-      },
-      {
-        key: "capacity_geracao_caixa_acumulado",
-        metrica: "Caixa acumulado (ano)",
-        atual: pontoGeracaoCaixaAtual?.caixaAcumulado ?? null,
-        formato: "brl",
-        serie: serieGeracaoCaixaMetrica("caixaAcumulado"),
-        temporalidade: "mes",
-        // Saldo acumulado (já é um total corrente) — YTD = último ponto, não soma dos meses.
-        ytdAgg: "ultimo",
-        // Sem drillParams de propósito (Fase 2C-i): é um ACUMULADO de `geracao_liquida` ao longo
-        // do ano (soma corrente), não uma composição do MÊS selecionado — não há uma "fórmula de
-        // 1 mês" auditável aqui sem reabrir toda a série. Fica sem drill.
-      },
-    ],
-  };
-
   // Onda C1→E: Margem de Contribuição por squad — `contribuicao` (GET
   // /api/contribuicao-squad/ranking) traz só o período do mês selecionado (sem série);
   // `contribuicaoBulk` (GET /api/contribuicao-squad/dfc/bulk?ano=YYYY, Onda E) traz os 12 meses
@@ -243,8 +153,8 @@ export function montarSecoesCapacity(
     id: "capacity-contribuicao-squad",
     titulo: "Margem de Contribuição por squad (mês)",
     // Por squad, não por operador — custo/operador no backend é heurístico e só funciona
-    // filtrando 1 pessoa por vez, inviável em lote. Base DIFERENTE da "Geração de Caixa" acima
-    // (custos DIRETOS do squad vs. TODAS as despesas pagas da DFC) — não reconciliam entre si.
+    // filtrando 1 pessoa por vez, inviável em lote. Base = custos DIRETOS do squad (não confundir
+    // com uma DFC completa de todas as despesas pagas).
     subtitulo: contribuicao.isError
       ? "falha ao carregar margem de contribuição"
       : contribuicaoSquadRows.length === 0
@@ -297,7 +207,6 @@ export function montarSecoesCapacity(
   return [
     secaoReceitaCabecaSquad,
     secaoReceitaCabecaOperador,
-    secaoGeracaoCaixa,
     secaoContribuicaoSquad,
     secaoMrrSquad,
     secaoMrrOperador,
@@ -310,7 +219,6 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
   const series = useScorecardSeries(mes);
   const contribuicao = useContribuicaoSquadRanking(mes);
   const contribuicaoBulk = useContribuicaoSquadBulk(mes);
-  const geracaoCaixa = useGeracaoCaixa();
   const metas = useScorecardMetas(mes);
   const responsaveis = useScorecardResponsaveis();
   const salvarResponsaveis = useSalvarResponsaveis();
@@ -329,7 +237,6 @@ export function SecaoCapacity({ mes, modo }: { mes: string; modo: ScorecardModo 
     mes,
     { isError: contribuicao.isError, data: contribuicao.data },
     { isError: contribuicaoBulk.isError, data: contribuicaoBulk.data },
-    { isError: geracaoCaixa.isError, data: geracaoCaixa.data },
   );
 
   return (
