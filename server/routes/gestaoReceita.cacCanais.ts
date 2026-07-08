@@ -39,9 +39,9 @@ export const CAC_CANAIS: CacCanalDef[] = [
   { id: "expansao", label: "Expansão de conta (Crossell)", sources: ["PARTNER", "UC_7WV0LW", "REPEAT_SALE"], itens: [{ id: "time", label: "Custo de time" }] },
 ];
 
-// 1 linha por deal ganho: source (→ canal) + mês (→ contagem de clientes). Contratos
-// NÃO vêm mais daqui — são contados do cup_contratos e entram via `contratosCanalMes`.
-export interface DealsSourceMes { source: string; mes: number; clientes: number }
+// 1 linha por deal ganho: source (→ canal) + mês (→ contagem de clientes) + valores
+// vendidos do deal (vrec/vpont → ROI). Contratos NÃO vêm daqui — cup_contratos.
+export interface DealsSourceMes { source: string; mes: number; clientes: number; vrec?: number; vpont?: number }
 // contratos do ClickUp já atribuídos a canal (via CNPJ do deal): canalId → mês → nº.
 export type ContratosCanalMes = Record<string, Record<number, number>>;
 export interface MetaMesRow { chave: string; mes: number; valor: number }
@@ -49,13 +49,14 @@ export interface MetaMesRow { chave: string; mes: number; valor: number }
 export type AutosPorMes = Partial<Record<"ads_spend", Record<number, number>>>;
 export interface CacCanalOut {
   id: string; label: string; clientes: number; contratos: number; custoTotal: number;
+  vendidoMrr: number; vendidoPontual: number;
   cacCliente: number | null; cacContrato: number | null;
   sources: string[]; // nomes legíveis dos sources do Bitrix mapeados neste canal (de-para exibido na UI)
   itens: { id: string; label: string; valor: number; fonte: "auto" | "manual" }[];
   incentivo?: { label: string; unit: number; qtd: number; total: number };
 }
 export interface CacCanaisOut {
-  geral: { cac: number | null; cacContrato: number | null; clientes: number; contratos: number; custoTotal: number };
+  geral: { cac: number | null; cacContrato: number | null; clientes: number; contratos: number; custoTotal: number; vendidoMrr: number; vendidoPontual: number };
   canais: CacCanalOut[];
 }
 
@@ -74,10 +75,14 @@ export function agregarCacCanais(
   for (const c of CAC_CANAIS) for (const s of c.sources) sourceToCanal[s] = c.id;
 
   const clientesCanalMes: Record<string, Record<number, number>> = {};
+  const vendidoCanalMes: Record<string, Record<number, { mrr: number; pont: number }>> = {};
   for (const d of deals) {
     const canal = sourceToCanal[d.source];
     if (!canal) continue; // sources fora do catálogo ficam fora da seção (nota na UI)
     (clientesCanalMes[canal] ??= {})[d.mes] = (clientesCanalMes[canal]?.[d.mes] || 0) + (Number(d.clientes) || 0);
+    const v = ((vendidoCanalMes[canal] ??= {})[d.mes] ??= { mrr: 0, pont: 0 });
+    v.mrr += Number(d.vrec) || 0;
+    v.pont += Number(d.vpont) || 0;
   }
   const metaMes: Record<string, Record<number, number>> = {};
   for (const m of metas) (metaMes[m.chave] ??= {})[m.mes] = Number(m.valor) || 0;
@@ -85,8 +90,11 @@ export function agregarCacCanais(
   const canais = CAC_CANAIS.map((def) => {
     const porMes = clientesCanalMes[def.id] || {};
     const porMesCont = contratosCanalMes[def.id] || {};
+    const porMesVend = vendidoCanalMes[def.id] || {};
     const clientes = mesesNums.reduce((a, m) => a + (porMes[m] || 0), 0);
     const contratos = mesesNums.reduce((a, m) => a + (porMesCont[m] || 0), 0);
+    const vendidoMrr = mesesNums.reduce((a, m) => a + (porMesVend[m]?.mrr || 0), 0);
+    const vendidoPontual = mesesNums.reduce((a, m) => a + (porMesVend[m]?.pont || 0), 0);
     const itens = def.itens.map((it) => {
       const auto = it.auto;
       return {
@@ -107,6 +115,7 @@ export function agregarCacCanais(
     const custoTotal = itens.reduce((a, i) => a + i.valor, 0) + (incentivo?.total || 0);
     return {
       id: def.id, label: def.label, clientes, contratos, custoTotal,
+      vendidoMrr, vendidoPontual,
       cacCliente: clientes > 0 ? Math.round(custoTotal / clientes) : null,
       cacContrato: contratos > 0 ? Math.round(custoTotal / contratos) : null,
       sources: def.sources.map(sourceLabel),
@@ -117,11 +126,14 @@ export function agregarCacCanais(
   const totClientes = canais.reduce((a, c) => a + c.clientes, 0);
   const totContratos = canais.reduce((a, c) => a + c.contratos, 0);
   const totCusto = canais.reduce((a, c) => a + c.custoTotal, 0);
+  const totVendMrr = canais.reduce((a, c) => a + c.vendidoMrr, 0);
+  const totVendPont = canais.reduce((a, c) => a + c.vendidoPontual, 0);
   return {
     geral: {
       cac: totClientes > 0 ? Math.round(totCusto / totClientes) : null,
       cacContrato: totContratos > 0 ? Math.round(totCusto / totContratos) : null,
       clientes: totClientes, contratos: totContratos, custoTotal: totCusto,
+      vendidoMrr: totVendMrr, vendidoPontual: totVendPont,
     },
     canais,
   };

@@ -176,4 +176,50 @@ describe("agregarCacCanais", () => {
     const out = agregarCacCanais([{ source: "UC_YWZVA2", mes: 6, clientes: 1 }], [], JUN);
     expect(out.canais.find((c) => c.id === "outbound")!.cacContrato).toBeNull();
   });
+
+  it("vendidoMrr/vendidoPontual: soma valores dos deals por canal", () => {
+    const out = agregarCacCanais(
+      [
+        { source: "WEBFORM", mes: 6, clientes: 1, vrec: 10000, vpont: 5000 },
+        { source: "ADVERTISING", mes: 6, clientes: 1, vrec: 2500, vpont: 0 },
+        { source: "UC_YWZVA2", mes: 6, clientes: 1, vrec: 0, vpont: 8000 },
+      ],
+      [],
+      JUN,
+    );
+    const inbound = out.canais.find((c) => c.id === "inbound")!;
+    const outbound = out.canais.find((c) => c.id === "outbound")!;
+    expect(inbound.vendidoMrr).toBe(12500);
+    expect(inbound.vendidoPontual).toBe(5000);
+    expect(outbound.vendidoMrr).toBe(0);
+    expect(outbound.vendidoPontual).toBe(8000);
+    expect(out.geral.vendidoMrr).toBe(12500);
+    expect(out.geral.vendidoPontual).toBe(13000);
+  });
+
+  it("vendido: multi-mês soma só os meses do range; source fora do catálogo fica fora", () => {
+    const out = agregarCacCanais(
+      [
+        { source: "WEBFORM", mes: 5, clientes: 1, vrec: 1000, vpont: 100 },
+        { source: "WEBFORM", mes: 6, clientes: 1, vrec: 2000, vpont: 200 },
+        { source: "WEBFORM", mes: 7, clientes: 1, vrec: 4000, vpont: 400 },
+        { source: "(não informado)", mes: 6, clientes: 1, vrec: 9999, vpont: 9999 },
+      ],
+      [],
+      MAI_JUN,
+    );
+    const inbound = out.canais.find((c) => c.id === "inbound")!;
+    expect(inbound.vendidoMrr).toBe(3000);
+    expect(inbound.vendidoPontual).toBe(300);
+    expect(out.geral.vendidoMrr).toBe(3000);
+    expect(out.geral.vendidoPontual).toBe(300);
+  });
+
+  it("deals sem vrec/vpont (retrocompat): clientes contam, vendido = 0", () => {
+    const out = agregarCacCanais([{ source: "WEBFORM", mes: 6, clientes: 2 }], [], JUN);
+    const inbound = out.canais.find((c) => c.id === "inbound")!;
+    expect(inbound.clientes).toBe(2);
+    expect(inbound.vendidoMrr).toBe(0);
+    expect(inbound.vendidoPontual).toBe(0);
+  });
 });
