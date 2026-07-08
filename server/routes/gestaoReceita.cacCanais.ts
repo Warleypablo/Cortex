@@ -4,27 +4,15 @@
 // cac_canal:<canal>:<item>) + itens automáticos (spend de ads das plataformas) +
 // incentivos automáticos por cliente (unitário editável via cac_canal_unit:<canal>,
 // default R$ 1.000). Clientes = deals ganhos Bitrix agrupados por source →
-// macro-canal. Não confundir com o card "CAC — custo de aquisição" (Conta Azul,
-// regime caixa): não batem por design.
+// macro-canal. CONTRATOS = contratos do ClickUp (cup_contratos, mesma régua/fonte do
+// card "137 contratos novos": MRR por linha + pontual dedup por jornada), atribuídos ao
+// canal via CNPJ do deal ganho do mês; contrato de cliente sem deal no mês fica de fora.
+// Não confundir com o card "CAC — custo de aquisição" (Conta Azul, regime caixa): não
+// batem por design.
 import { sql } from "drizzle-orm";
 import { sourceLabel } from "./bitrixSources";
-import { contarServicosPorSegmento } from "./bp2026.vendasProduto.helpers";
-import { parseServicosVendidos } from "../okr2026/servicosBitrix";
 
 const STAGE_GANHO = "Negócio Ganho";
-
-// nº de contratos do deal = serviços vendidos (mesma régua do BP: 1 serviço = 1
-// contrato, via contarServicosPorSegmento). Piso 1 por deal ganho: garante
-// contratos ≥ clientes (invariante CAC/contrato ≤ CAC/cliente) e nunca some um deal
-// — o CAC por canal conta clientes por deal ganho, inclusive os sem serviço/valor.
-export function contratosDoDeal(servicosVendidos: string | null | undefined, valorRec: number, valorPont: number): number {
-  const ids = parseServicosVendidos(servicosVendidos);
-  const { recorrente, pontual } = contarServicosPorSegmento({ id: 0, cnpjNorm: "", mes: 0, valorRec, valorPont, ids });
-  let n = 0;
-  recorrente.forEach((v) => { n += v; });
-  pontual.forEach((v) => { n += v; });
-  return n > 0 ? n : 1;
-}
 
 // contas de ads da própria Turbo (a agência gerencia contas de clientes também);
 // mesma régua do growthTimeseries.ts
@@ -51,9 +39,11 @@ export const CAC_CANAIS: CacCanalDef[] = [
   { id: "expansao", label: "Expansão de conta (Crossell)", sources: ["PARTNER", "UC_7WV0LW", "REPEAT_SALE"], itens: [{ id: "time", label: "Custo de time" }] },
 ];
 
-// contratos = serviços vendidos (régua do BP); opcional p/ testes que só exercitam
-// custo/clientes (ausente → 0). Em produção computeCacCanais sempre preenche.
-export interface DealsSourceMes { source: string; mes: number; clientes: number; contratos?: number }
+// 1 linha por deal ganho: source (→ canal) + mês (→ contagem de clientes). Contratos
+// NÃO vêm mais daqui — são contados do cup_contratos e entram via `contratosCanalMes`.
+export interface DealsSourceMes { source: string; mes: number; clientes: number }
+// contratos do ClickUp já atribuídos a canal (via CNPJ do deal): canalId → mês → nº.
+export type ContratosCanalMes = Record<string, Record<number, number>>;
 export interface MetaMesRow { chave: string; mes: number; valor: number }
 // autos: série mensal por chave de item automático (ex.: ads_spend → { 6: 123456 })
 export type AutosPorMes = Partial<Record<"ads_spend", Record<number, number>>>;
@@ -73,17 +63,21 @@ export interface CacCanaisOut {
 // clientes do mês) para range multi-mês somar certo mesmo se o unitário mudou no meio;
 // o campo `unit` retornado é o do primeiro mês do período (exibição).
 // Item com `auto` usa a série de `autos` e IGNORA override manual (não é editável).
-export function agregarCacCanais(deals: DealsSourceMes[], metas: MetaMesRow[], mesesNums: number[], autos: AutosPorMes = {}): CacCanaisOut {
+// `contratosCanalMes` (canalId → mês → nº) vem já atribuído a canal por computeCacCanais
+// a partir do cup_contratos. Sem piso 1 por deal: um canal pode ter clientes>0 e
+// contratos=0 (venda sem contrato operacional criado no mês) → cacContrato = null.
+export function agregarCacCanais(
+  deals: DealsSourceMes[], metas: MetaMesRow[], mesesNums: number[], autos: AutosPorMes = {},
+  contratosCanalMes: ContratosCanalMes = {},
+): CacCanaisOut {
   const sourceToCanal: Record<string, string> = {};
   for (const c of CAC_CANAIS) for (const s of c.sources) sourceToCanal[s] = c.id;
 
   const clientesCanalMes: Record<string, Record<number, number>> = {};
-  const contratosCanalMes: Record<string, Record<number, number>> = {};
   for (const d of deals) {
     const canal = sourceToCanal[d.source];
     if (!canal) continue; // sources fora do catálogo ficam fora da seção (nota na UI)
     (clientesCanalMes[canal] ??= {})[d.mes] = (clientesCanalMes[canal]?.[d.mes] || 0) + (Number(d.clientes) || 0);
-    (contratosCanalMes[canal] ??= {})[d.mes] = (contratosCanalMes[canal]?.[d.mes] || 0) + (Number(d.contratos) || 0);
   }
   const metaMes: Record<string, Record<number, number>> = {};
   for (const m of metas) (metaMes[m.chave] ??= {})[m.mes] = Number(m.valor) || 0;
@@ -215,18 +209,46 @@ export async function computeCacCanais(
   { dIni, dFim, ano, mesesNums }: { dIni: string; dFim: string; ano: number; mesesNums: number[] },
 ): Promise<CacCanaisOut> {
   const mesesInSql = sql.join(mesesNums.map((m) => sql`${m}`), sql`, `);
-  const [dealsRows, metasRows, adsSpend] = await Promise.all([
-    // uma linha por deal ganho (não agregado): precisamos de servicos_vendidos +
-    // valores p/ contar contratos em JS (régua do BP). agregarCacCanais soma por canal.
+  const [dealsRows, contratosRows, metasRows, adsSpend] = await Promise.all([
+    // uma linha por deal ganho: source (→ canal) + mês (→ clientes) + cnpj/data p/ montar
+    // o mapa cnpj→canal (desempate: deal ganho mais recente do período).
     db.execute(sql`
       SELECT COALESCE(NULLIF(source, ''), '(não informado)') AS source,
              EXTRACT(MONTH FROM data_fechamento)::int AS mes,
-             servicos_vendidos,
-             COALESCE(valor_recorrente::numeric, 0) AS vr,
-             COALESCE(valor_pontual::numeric, 0) AS vp
+             regexp_replace(COALESCE(cnpj, ''), '\\D', '', 'g') AS cnpj_norm,
+             data_fechamento
       FROM "Bitrix".crm_deal
       WHERE stage_name = ${STAGE_GANHO}
         AND data_fechamento >= ${dIni} AND data_fechamento < ${dFim}
+    `),
+    // contratos do ClickUp criados no período, por CNPJ+mês, mesma régua do card 137:
+    // MRR = 1 por linha com valorr>0; Pontual = dedup por jornada (id_task p/ Creators,
+    // id_subtask p/ os demais). Casado ao canal em JS via cnpj do deal.
+    db.execute(sql`
+      WITH base AS (
+        SELECT regexp_replace(COALESCE(cl.cnpj, ''), '\\D', '', 'g') AS cnpj_norm,
+               EXTRACT(MONTH FROM c.data_criado)::int AS mes,
+               c.id_task, c.id_subtask, c.valorr::numeric AS vr, c.valorp::numeric AS vp,
+               COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto
+        FROM "Clickup".cup_contratos c
+        JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+        WHERE c.data_criado >= ${dIni} AND c.data_criado < ${dFim}
+          AND LOWER(TRIM(c.status)) <> 'não usar'
+      ),
+      mrr AS (
+        SELECT cnpj_norm, mes, COUNT(*) AS c_mrr FROM base WHERE vr > 0 GROUP BY cnpj_norm, mes
+      ),
+      pont AS (
+        SELECT cnpj_norm, mes, COUNT(*) AS c_pont FROM (
+          SELECT DISTINCT cnpj_norm, mes, produto,
+                 CASE WHEN produto = 'Creators' THEN 'task:' || id_task ELSE 'sub:' || id_subtask END AS jornada
+          FROM base WHERE vp > 0
+        ) q GROUP BY cnpj_norm, mes
+      )
+      SELECT COALESCE(m.cnpj_norm, p.cnpj_norm) AS cnpj_norm,
+             COALESCE(m.mes, p.mes) AS mes,
+             COALESCE(m.c_mrr, 0) + COALESCE(p.c_pont, 0) AS contratos
+      FROM mrr m FULL JOIN pont p ON m.cnpj_norm = p.cnpj_norm AND m.mes = p.mes
     `),
     db.execute(sql`
       SELECT chave, mes, valor::numeric AS valor
@@ -236,13 +258,38 @@ export async function computeCacCanais(
     `),
     adsSpendPorMes(db, dIni, dFim),
   ]);
+
+  // mapa cnpj → canal (desempate: canal do deal ganho mais recente do período).
+  // data_fechamento é DATE → comparação lexicográfica de 'YYYY-MM-DD' é cronológica.
+  const sourceToCanal: Record<string, string> = {};
+  for (const c of CAC_CANAIS) for (const s of c.sources) sourceToCanal[s] = c.id;
+  const clientesDeals: DealsSourceMes[] = [];
+  const canalPorCnpj: Record<string, { canal: string; data: string }> = {};
+  for (const r of dealsRows.rows as any[]) {
+    clientesDeals.push({ source: r.source, mes: Number(r.mes), clientes: 1 });
+    const cnpj = String(r.cnpj_norm || "");
+    const canal = sourceToCanal[r.source];
+    if (!canal || cnpj.length < 11) continue;
+    const data = String(r.data_fechamento || "");
+    const cur = canalPorCnpj[cnpj];
+    if (!cur || data > cur.data) canalPorCnpj[cnpj] = { canal, data };
+  }
+
+  // contratos do cup_contratos → canal (via cnpj do deal) → por mês. Contrato de cliente
+  // sem deal ganho no período (cnpj fora do mapa) fica de fora da seção.
+  const contratosCanalMes: ContratosCanalMes = {};
+  for (const r of contratosRows.rows as any[]) {
+    const entry = canalPorCnpj[String(r.cnpj_norm || "")];
+    if (!entry) continue;
+    const mes = Number(r.mes);
+    (contratosCanalMes[entry.canal] ??= {})[mes] = (contratosCanalMes[entry.canal]?.[mes] || 0) + (Number(r.contratos) || 0);
+  }
+
   return agregarCacCanais(
-    (dealsRows.rows as any[]).map((r) => ({
-      source: r.source, mes: Number(r.mes), clientes: 1,
-      contratos: contratosDoDeal(r.servicos_vendidos, parseFloat(r.vr) || 0, parseFloat(r.vp) || 0),
-    })),
+    clientesDeals,
     (metasRows.rows as any[]).map((r) => ({ chave: r.chave, mes: Number(r.mes), valor: Number(r.valor) || 0 })),
     mesesNums,
     { ads_spend: adsSpend },
+    contratosCanalMes,
   );
 }

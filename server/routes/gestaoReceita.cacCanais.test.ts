@@ -1,6 +1,6 @@
 // server/routes/gestaoReceita.cacCanais.test.ts
 import { describe, expect, it } from "vitest";
-import { agregarCacCanais, CAC_CANAIS, contratosDoDeal } from "./gestaoReceita.cacCanais";
+import { agregarCacCanais, CAC_CANAIS } from "./gestaoReceita.cacCanais";
 
 const JUN = [6];
 const MAI_JUN = [5, 6];
@@ -124,41 +124,56 @@ describe("agregarCacCanais", () => {
     expect(out.canais.find((c) => c.id === "inbound")!.clientes).toBe(6);
   });
 
-  it("CAC por contrato: divide o custo pelo nº de contratos (serviços vendidos) do canal", () => {
+  it("CAC por contrato: contratos vêm do cup_contratos (contratosCanalMes), não dos deals", () => {
     const out = agregarCacCanais(
       [
-        { source: "UC_YWZVA2", mes: 6, clientes: 1, contratos: 3 }, // outbound: 1 deal, 3 serviços
-        { source: "UC_YWZVA2", mes: 6, clientes: 1, contratos: 1 },
+        { source: "UC_YWZVA2", mes: 6, clientes: 1 }, // outbound: 2 clientes (deals)
+        { source: "UC_YWZVA2", mes: 6, clientes: 1 },
       ],
       [{ chave: "cac_canal:outbound:time", mes: 6, valor: 8000 }],
       JUN,
+      {},
+      { outbound: { 6: 4 } }, // 4 contratos ClickUp casados ao canal via cnpj
     );
     const outbound = out.canais.find((c) => c.id === "outbound")!;
     expect(outbound.clientes).toBe(2);
     expect(outbound.contratos).toBe(4);
     expect(outbound.cacCliente).toBe(4000);  // 8000 / 2
-    expect(outbound.cacContrato).toBe(2000); // 8000 / 4 — sempre ≤ CAC/cliente
+    expect(outbound.cacContrato).toBe(2000); // 8000 / 4
     expect(out.geral.contratos).toBe(4);
     expect(out.geral.cacContrato).toBe(2000);
   });
 
-  it("cacContrato null quando o canal não tem contratos", () => {
-    const out = agregarCacCanais([{ source: "UC_YWZVA2", mes: 6, clientes: 0, contratos: 0 }], [], JUN);
-    expect(out.canais.find((c) => c.id === "outbound")!.cacContrato).toBeNull();
+  it("contratosCanalMes soma os meses do período (multi-mês)", () => {
+    const out = agregarCacCanais(
+      [{ source: "UC_YWZVA2", mes: 5, clientes: 1 }, { source: "UC_YWZVA2", mes: 6, clientes: 1 }],
+      [],
+      MAI_JUN,
+      {},
+      { outbound: { 5: 3, 6: 2 } },
+    );
+    expect(out.canais.find((c) => c.id === "outbound")!.contratos).toBe(5);
+    expect(out.geral.contratos).toBe(5);
   });
-});
 
-describe("contratosDoDeal (régua do BP: 1 serviço vendido = 1 contrato)", () => {
-  it("conta 1 por serviço vendido mapeado (deal com N serviços → N)", () => {
-    // 846=Performance(rec), 852=Creators(rec), 868=E-commerce(pont)
-    expect(contratosDoDeal("[846,852,868]", 5000, 2000)).toBe(3);
+  it("sem piso 1: canal com clientes>0 e contratos=0 (venda sem contrato no mês) → cacContrato null, cacCliente definido", () => {
+    // caso real: Social Selling jun/2026 — 1 deal ganho, 0 contratos criados no ClickUp
+    const out = agregarCacCanais(
+      [{ source: "UC_4VCKGM", mes: 6, clientes: 1 }],
+      [{ chave: "cac_canal:social_selling:anuncios_dist", mes: 6, valor: 3000 }],
+      JUN,
+      {},
+      {}, // nenhum contrato casado a social_selling
+    );
+    const ss = out.canais.find((c) => c.id === "social_selling")!;
+    expect(ss.clientes).toBe(1);
+    expect(ss.contratos).toBe(0);
+    expect(ss.cacCliente).toBe(3000);
+    expect(ss.cacContrato).toBeNull();
   });
-  it("conta repetições do mesmo segmento", () => {
-    expect(contratosDoDeal("[846,846]", 5000, 0)).toBe(2);
-  });
-  it("piso 1 para deal ganho sem serviço mapeado (com ou sem valor)", () => {
-    expect(contratosDoDeal(null, 5000, 0)).toBe(1);
-    expect(contratosDoDeal("[]", 0, 0)).toBe(1);
-    expect(contratosDoDeal("False", 0, 3000)).toBe(1);
+
+  it("cacContrato null quando o canal não tem contratos", () => {
+    const out = agregarCacCanais([{ source: "UC_YWZVA2", mes: 6, clientes: 1 }], [], JUN);
+    expect(out.canais.find((c) => c.id === "outbound")!.cacContrato).toBeNull();
   });
 });
