@@ -11,17 +11,28 @@ import type { DrillRef } from "./GestaoReceitaDetalhe";
 export interface CacCanalItem { id: string; label: string; valor: number; fonte: "auto" | "manual" }
 export interface CacCanalCard {
   id: string; label: string; clientes: number; contratos: number; custoTotal: number;
+  vendidoMrr: number; vendidoPontual: number;
   cacCliente: number | null; cacContrato: number | null;
   sources: string[];
   itens: CacCanalItem[];
   incentivo?: { label: string; unit: number; qtd: number; total: number };
 }
 export interface CacCanaisData {
-  geral: { cac: number | null; cacContrato: number | null; clientes: number; contratos: number; custoTotal: number };
+  geral: {
+    cac: number | null; cacContrato: number | null; clientes: number; contratos: number; custoTotal: number;
+    vendidoMrr: number; vendidoPontual: number;
+  };
   canais: CacCanalCard[];
 }
 
 type ModoCac = "cliente" | "contrato";
+
+// ROI como multiplicador ROAS (1 casa, vírgula BR). Custo 0 → null (UI exibe "—",
+// mantendo o valor vendido visível). Divide pelo custo VIVO p/ reagir à edição de metas.
+const roiX = (vendido: number, custo: number) =>
+  custo > 0
+    ? (vendido / custo).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 }) + "x"
+    : null;
 
 export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; metas: MetasCtx; onDrill: (dr: DrillRef) => void }) {
   // valores "ao vivo" durante a edição (mesma mecânica da tabela Custo da operação);
@@ -76,6 +87,16 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
         <div className="mt-3 text-3xl font-bold tabular-nums text-teal-700 dark:text-teal-400">{geralCac != null ? brl(geralCac) : "—"}</div>
         <div className="mt-0.5 text-[11px] font-semibold uppercase tracking-wide text-gray-500 dark:text-zinc-400">
           CAC geral · {intBR(geralDenom)} {ehContrato ? "contratos" : "clientes"}
+        </div>
+        <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-gray-600 dark:text-zinc-400">
+          <span>
+            ROI MRR <b className="tabular-nums text-gray-900 dark:text-white">{roiX(dados.geral.vendidoMrr, geralCusto) ?? "—"}</b>
+            {" · vendido "}<b className="tabular-nums text-gray-700 dark:text-zinc-300">{brl(dados.geral.vendidoMrr)}</b>
+          </span>
+          <span>
+            ROI Pontual <b className="tabular-nums text-gray-900 dark:text-white">{roiX(dados.geral.vendidoPontual, geralCusto) ?? "—"}</b>
+            {" · vendido "}<b className="tabular-nums text-gray-700 dark:text-zinc-300">{brl(dados.geral.vendidoPontual)}</b>
+          </span>
         </div>
       </SectionCard>
 
@@ -141,6 +162,19 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
                     Custo total <b className="tabular-nums text-gray-900 dark:text-white">{brl(custo)}</b>
                   </span>
                 </div>
+
+                <div className="mt-1 space-y-1 border-t border-gray-100 pt-2 text-sm dark:border-zinc-800">
+                  {([["ROI MRR", c.vendidoMrr], ["ROI Pontual", c.vendidoPontual]] as [string, number][]).map(([lbl, vendido]) => (
+                    <div key={lbl} className="flex items-center justify-between gap-2">
+                      <span className="text-gray-600 dark:text-zinc-400">
+                        {lbl} <b className="tabular-nums text-gray-900 dark:text-white">{roiX(vendido, custo) ?? "—"}</b>
+                      </span>
+                      <span className="text-gray-500 dark:text-zinc-400">
+                        vendido <b className="tabular-nums text-gray-700 dark:text-zinc-300">{brl(vendido)}</b>
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
           );
@@ -152,6 +186,9 @@ export function CacPorCanal({ dados, metas, onDrill }: { dados: CacCanaisData; m
         "Investimento em anúncios" (auto) = spend Meta + Google + TikTok + LinkedIn das contas da Turbo no período (competência, não caixa);
         incentivos por cliente também são automáticos. Não bate com o card "CAC — custo de aquisição" (Conta Azul, regime caixa) por design.
         <b> Por cliente</b> divide pelo nº de deals ganhos; <b>Por contrato</b> divide pelo nº de serviços vendidos (mesma régua do BP: 1 serviço = 1 contrato; um deal com N serviços conta N) — sempre ≤ o CAC por cliente.
+        <b> ROI MRR</b> = valor recorrente vendido ÷ custo total do canal; <b>ROI Pontual</b> = valor pontual vendido ÷ custo total.
+        Valores vendidos = deals ganhos do Bitrix (mesma fonte do card "Venda nova"); como deals com source fora dos 9 canais ficam de fora,
+        a soma dos canais pode ficar abaixo do card.
         Parceria ainda não tem source no CRM (clientes 0). Deals de sources fora dos 9 canais (ex.: sem origem) ficam fora desta seção.
       </Nota>
 
