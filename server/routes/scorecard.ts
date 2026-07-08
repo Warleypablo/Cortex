@@ -160,9 +160,14 @@ export interface SeriesScorecard {
   entregasPorSquad: Record<string, SeriePonto[]>;
   mrrPorSquad: Record<string, SeriePonto[]>;
   mrrPorOperador: Record<string, SeriePonto[]>;
-  /** Lead time médio de entrega (dias) por produto × mês — Onda5. Meses sem entrega ficam
-     `null` (não 0, ver `rowsParaSeriesNullFill`). */
+  /** Lead time MEDIANO de entrega (dias) por produto × mês — Onda5 (mediana desde 2026-07-08,
+     robusta a outlier em buckets pequenos, ver `reference_lead_time_produto_scorecard`). Meses
+     sem entrega ficam `null` (não 0, ver `rowsParaSeriesNullFill`). */
   leadTimePorProduto: Record<string, SeriePontoNullable[]>;
+  /** N de entregas (contagem) por produto × mês — par de `leadTimePorProduto`, para o frontend
+     exibir o tamanho da amostra ao lado da mediana (buckets de 1-2 entregas são ruído). Zero-fill
+     (mês sem entrega = 0). */
+  leadTimeNPorProduto: Record<string, SeriePonto[]>;
   /** Headcount ATIVO por squad ("Inhire".rh_pessoal) — Onda C2. NÃO é uma série mensal (é o
      headcount ATUAL, usado como denominador constante de "Receita por Cabeça por squad") — por
      isso é `Record<squad, number>` em vez de `Record<squad, SeriePonto[]>`. Chaveado pela MESMA
@@ -296,23 +301,36 @@ export async function fetchPessoasPorSquad(squadsMrr: string[]): Promise<Record<
   return pessoasPorSquad;
 }
 
+/** Linha de lead time por produto×mês: a MEDIANA de dias (`valor`) + o N de entregas da
+   amostra (`n`) — o frontend exibe o N ao lado, porque buckets de 1-2 entregas são ruído. */
+interface LeadTimeProdutoRow extends SerieRow {
+  n: number;
+}
+
 /**
- * Lead time médio de entrega (dias) por produto × mês, a partir de `cup_contratos`
- * (FLUXO — data de entrega). Mesma definição de lead time do relatório mensal
- * (`relatorioMensalSlides.ts`: `AVG(data_entrega - data_criado)::int`), mas granularizada
- * por mês (a fonte original agrega uma janela fixa de 6 meses, sem série).
+ * Lead time MEDIANO de entrega (dias) por produto × mês, a partir de `cup_contratos`
+ * (FLUXO — data de entrega). Auditoria 2026-07-08 (ver `reference_lead_time_produto_scorecard`):
+ * a média simples do relatório mensal (`relatorioMensalSlides.ts`: `AVG(data_entrega -
+ * data_criado)`) é FRÁGIL neste grão fino (produto×mês) — ~34% dos buckets têm N=1 e há outliers
+ * de até 465 dias, então um único ponto domina a média. Aqui, mais robusto:
+ * - MEDIANA (`PERCENTILE_CONT(0.5)`), imune a outlier;
+ * - filtro `data_entrega >= data_criado` (exclui ~2% de lead times NEGATIVOS — `data_criado` de
+ *   carga em lote, cujas datas fim-de-mês não são a criação real);
+ * - `COUNT(*)` como `n`, para o frontend mostrar o tamanho da amostra ao lado da mediana.
  */
-async function fetchLeadTimePorProduto(inicio: string, fim: string): Promise<SerieRow[]> {
+async function fetchLeadTimePorProduto(inicio: string, fim: string): Promise<LeadTimeProdutoRow[]> {
   const result = await db.execute(sql`
     SELECT TO_CHAR(data_entrega,'YYYY-MM') AS mes,
            COALESCE(NULLIF(TRIM(produto),''),'Sem produto') AS dim,
-           AVG(data_entrega - data_criado)::int AS valor
+           PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY (data_entrega - data_criado))::int AS valor,
+           COUNT(*)::int AS n
     FROM "Clickup".cup_contratos
     WHERE LOWER(TRIM(status))='entregue' AND data_entrega IS NOT NULL AND data_criado IS NOT NULL
+      AND data_entrega >= data_criado
       AND data_entrega >= ${inicio}::date AND data_entrega < ${fim}::date
     GROUP BY 1,2
   `);
-  return result.rows as unknown as SerieRow[];
+  return result.rows as unknown as LeadTimeProdutoRow[];
 }
 
 /**
@@ -507,6 +525,10 @@ export async function montarSeriesScorecard(mes: string): Promise<ScorecardSerie
         meses,
       ),
       leadTimePorProduto: rowsParaSeriesNullFill(leadTimeRows, meses),
+      leadTimeNPorProduto: rowsParaSeries(
+        leadTimeRows.map((r) => ({ mes: r.mes, dim: r.dim, valor: r.n })),
+        meses,
+      ),
       pessoasPorSquad,
       churnPontualPorMes: rowsParaSerieUnica(churnPontualMesRows, meses),
       churnPontualPorProduto: rowsParaSeries(churnPontualProdutoRows, meses),

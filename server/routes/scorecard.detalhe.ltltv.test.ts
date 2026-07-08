@@ -125,12 +125,13 @@ describe("montarLeadTimeDrillDetalhe", () => {
     { cliente: "Cliente B", produto: "Creators", dataCriado: "2026-05-01", dataEntrega: "2026-06-11", dias: 41 },
   ];
 
-  it("monta a lista + formula com média de dias, sem `total`", () => {
+  it("monta a lista + formula com mediana de dias, sem `total`", () => {
     const d = montarLeadTimeDrillDetalhe(entregas, "2026-06", "Creators");
     expect(d.total).toBeUndefined();
-    expect(d.formula).toBe("Lead time médio = 96.0 dias (2 entregas)");
+    expect(d.formula).toBe("Lead time mediano = 96.0 dias (2 entregas)");
     expect(d.titulo).toBe("Lead Time de Entrega — Produto: Creators");
-    expect(d.linhas).toEqual(entregas);
+    // n par (2 entregas) → ambas ficam na posição mediana
+    expect(d.linhas).toEqual(entregas.map((e) => ({ ...e, posicao: "◄ mediana" })));
   });
 
   it("sem produtoFiltro usa título genérico", () => {

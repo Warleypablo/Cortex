@@ -247,26 +247,29 @@ interface RawLeadTimeEntregaRow {
   dias: number | string;
 }
 
-/** Pura/testável sem banco. Sem `total` — é uma MÉDIA (dias), não uma soma auditável. */
+/** Pura/testável sem banco. Sem `total` — é uma MEDIANA (dias), não uma soma auditável. Mediana
+   (não média) para reconciliar com a série "Lead time por produto", que passou a usar
+   `PERCENTILE_CONT(0.5)` em 2026-07-08 (robusta a outlier em buckets pequenos, ver
+   `reference_lead_time_produto_scorecard`). Marca a(s) linha(s) na posição mediana com "◄". */
 export function montarLeadTimeDrillDetalhe(entregas: LeadTimeEntregaRow[], mes: string, produtoFiltro?: string): DrillDetalhe {
-  const media = calcularMedia(entregas.map((e) => e.dias));
+  const { mediana, indices } = calcularMedianaComIndices(entregas.map((e) => e.dias));
 
   return {
     titulo: produtoFiltro ? `Lead Time de Entrega — Produto: ${produtoFiltro}` : "Lead Time de Entrega — Todos os produtos",
     subtitulo: `${entregas.length} entrega${entregas.length === 1 ? "" : "s"} · ${mes}`,
-    formula: `Lead time médio = ${media.toFixed(1)} dias (${entregas.length} entregas)`,
+    formula: `Lead time mediano = ${mediana.toFixed(1)} dias (${entregas.length} entregas)`,
     colunas: [
       { chave: "cliente", label: "Cliente", tipo: "text" },
       { chave: "produto", label: "Produto", tipo: "text" },
       { chave: "dataCriado", label: "Criado em", tipo: "text" },
       { chave: "dataEntrega", label: "Entregue em", tipo: "text" },
       { chave: "dias", label: "Dias", tipo: "int" },
+      { chave: "posicao", label: "", tipo: "text" },
     ],
-    // `.map` (em vez de reusar `entregas` direto) — mantém `linhas` "fresh" (tipo objeto inferido
-    // do literal), atribuível a `DrillDetalhe.linhas: Record<string, unknown>[]`; a interface
-    // nomeada `LeadTimeEntregaRow[]` quebra essa atribuição (TS2322: falta index signature),
-    // mesma nota de `converterCrossSellDetalhe` em scorecard.detalhe.helpers.ts.
-    linhas: entregas.map((e) => ({ ...e })),
+    // `.map` marca a posição mediana (◄) sem mutar as entregas; `indices` referem-se a ESTE array
+    // (ordem da query, dias DESC). Objeto "fresh" também garante a atribuição a
+    // `DrillDetalhe.linhas: Record<string, unknown>[]` (a interface nomeada quebraria — TS2322).
+    linhas: entregas.map((e, i) => ({ ...e, posicao: indices.includes(i) ? "◄ mediana" : "" })),
   };
 }
 
@@ -285,6 +288,7 @@ export async function montarLeadTimeDetalhe(mes: string, produtoFiltro?: string)
     FROM "Clickup".cup_contratos ct
     LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = ct.id_task
     WHERE LOWER(TRIM(ct.status))='entregue' AND ct.data_entrega IS NOT NULL AND ct.data_criado IS NOT NULL
+      AND ct.data_entrega >= ct.data_criado
       AND ct.data_entrega >= ${inicio}::date AND ct.data_entrega < ${fim}::date
       ${filtroProduto}
     ORDER BY dias DESC

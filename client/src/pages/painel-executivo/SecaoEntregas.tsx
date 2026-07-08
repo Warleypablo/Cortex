@@ -17,7 +17,7 @@ import type {
   ScorecardResponsavelItem,
   ScorecardSeriesResponse,
 } from "./scorecard/tipos";
-import { linhasPorDimensao } from "./scorecard/logica";
+import { linhasPorDimensao, atualDaSerie } from "./scorecard/logica";
 import type { EntregaProdutoMes, ReportsMensal } from "./tipos";
 
 const MESES_ABREV = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -129,6 +129,11 @@ export function montarSecoesEntregas(
   // (ou o backend não devolveu a dimensão), cai no agregado antigo (`tempoMedioEntrega`,
   // janela 6m, sem série) — mesmo comportamento de antes desta Onda.
   const leadTimeSeries = series?.series.leadTimePorProduto;
+  // Par da série de lead time: N de entregas por produto×mês. O `sub` mostra o tamanho da amostra
+  // ao lado da mediana, porque buckets de 1-2 entregas são ruído (a mediana de 1 ponto É esse
+  // ponto). `atualDaSerie` usa a MESMA regra de seleção de mês de `linhasPorDimensao`, então o N
+  // exibido reconcilia com o valor da linha.
+  const leadTimeN = series?.series.leadTimeNPorProduto;
   const temSerieLeadTime = !!leadTimeSeries && Object.keys(leadTimeSeries).length > 0;
   const leadTimeRowsRaw: ScorecardRow[] =
     temSerieLeadTime
@@ -136,9 +141,12 @@ export function montarSecoesEntregas(
           keyFn: (dim) => `entregas_leadtime_${slug(dim)}`,
           formato: "int",
           labelMes: labelMesCurto,
-          sub: () => "dias",
+          sub: (dim) => {
+            const n = atualDaSerie(leadTimeN?.[dim] ?? null, mes);
+            return n != null ? `dias · ${n} ${n === 1 ? "entrega" : "entregas"}` : "dias";
+          },
           // Fase 2C-ii: lista as entregas individuais do mês (cliente, datas, dias) que compõem
-          // a média por produto — server/routes/scorecard.detalhe.ltltv.ts.
+          // a mediana por produto — server/routes/scorecard.detalhe.ltltv.ts.
           drillParams: (dim) => ({ tipo: "lead_time", dim: "produto", valor: dim }),
         })
       : [...p.tempoMedioEntrega]

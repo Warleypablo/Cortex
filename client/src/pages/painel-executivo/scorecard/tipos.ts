@@ -136,6 +136,9 @@ export interface ScorecardSeriesPorDimensao {
   mrrPorSquad: Record<string, ScorecardSerieDimPonto[]>;
   mrrPorOperador: Record<string, ScorecardSerieDimPonto[]>;
   leadTimePorProduto: Record<string, ScorecardSerieDimPontoNullable[]>;
+  /** N de entregas por produto × mês — par de leadTimePorProduto, para mostrar o tamanho da
+     amostra ao lado da mediana (buckets pequenos = ruído). Zero-fill. */
+  leadTimeNPorProduto: Record<string, ScorecardSerieDimPonto[]>;
   /** Headcount ATIVO por squad ("Inhire".rh_pessoal) — Onda C2. NÃO é série mensal (headcount
      ATUAL, denominador constante de "Receita por Cabeça por squad"). Chaveado pela MESMA forma
      (com emoji) usada em `mrrPorSquad` — ver `fetchPessoasPorSquad` no backend. */
