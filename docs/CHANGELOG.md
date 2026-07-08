@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-08 | feat(gestao-receita): ROI MRR e ROI Pontual por canal no CAC por canal
+
+**O que foi feito:**
+- Cada card da seção "CAC por canal" (aba Macro) ganhou **ROI MRR** e **ROI Pontual** (multiplicador, ex.: 1,8x) + valor vendido; card geral idem.
+- ROI = valor vendido ÷ custo total do canal; valores vendidos = `valor_recorrente`/`valor_pontual` dos deals ganhos do Bitrix (mesma fonte do card "Venda nova"), agregados por source → macro-canal.
+- ROI recalcula ao vivo na edição de metas (divide pelo custo vivo); custo 0 → "—"; independe do toggle Por cliente/Por contrato.
+
+**Por que:**
+- Pedido do stakeholder: ler o retorno de cada canal sobre o custo investido, separado em recorrente e pontual.
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.cacCanais.ts` - query de deals traz vrec/vpont; agregação acumula vendidoMrr/vendidoPontual por canal e no geral.
+- `server/routes/gestaoReceita.cacCanais.test.ts` - 3 testes novos (agregação, multi-mês/fora do catálogo, retrocompat).
+- `client/src/components/gestao/CacPorCanal.tsx` - bloco de ROI nos cards e no header + nota atualizada.
+
+**Impacto arquitetural:** Nenhum. Payload cresce 2 campos por canal; ROI calculado no frontend (custo vivo).
+
+**Verificação:** backend validado contra o banco local (jun/26): `geral.vendidoMrr=285.235` / `vendidoPontual=383.298`, idênticos ao cross-check SQL; ROI inbound 1,0x/1,6x, indique_ganhe 4,0x/15,0x, canais custo 0 → "—". 16 testes verdes; typecheck limpo.
+
+---
+
 ## 2026-07-08 | feat(rh): adiciona cargo Account às opções de cargos
 
 **O que foi feito:**
