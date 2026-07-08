@@ -122,36 +122,6 @@ export function montarSecoesEntregas(
     drillParams: (dim) => ({ tipo: "entregue", dim: "operador", valor: dim }),
   });
 
-  // Onda5: série mensal de lead time por produto (server/routes/scorecard.ts). Meses sem
-  // entrega vêm `null` (não 0 — ver rowsParaSeriesNullFill), então `atual`/`serie` já
-  // "não mentem" sem tratamento extra aqui (linhasPorDimensao e o resto da cadeia do
-  // Scorecard já são null-aware). Degradação graciosa: se `series` ainda não carregou/falhou
-  // (ou o backend não devolveu a dimensão), cai no agregado antigo (`tempoMedioEntrega`,
-  // janela 6m, sem série) — mesmo comportamento de antes desta Onda.
-  const leadTimeSeries = series?.series.leadTimePorProduto;
-  const temSerieLeadTime = !!leadTimeSeries && Object.keys(leadTimeSeries).length > 0;
-  const leadTimeRows: ScorecardRow[] =
-    temSerieLeadTime
-      ? linhasPorDimensao(leadTimeSeries!, mes, {
-          keyFn: (dim) => `entregas_leadtime_${slug(dim)}`,
-          formato: "int",
-          labelMes: labelMesCurto,
-          sub: () => "dias",
-          // Fase 2C-ii: lista as entregas individuais do mês (cliente, datas, dias) que compõem
-          // a média por produto — server/routes/scorecard.detalhe.ltltv.ts.
-          drillParams: (dim) => ({ tipo: "lead_time", dim: "produto", valor: dim }),
-        })
-      : [...p.tempoMedioEntrega]
-          .sort((a, b) => b.diasMedio - a.diasMedio)
-          .map((t) => ({
-            key: `entregas_leadtime_${slug(t.produto)}`,
-            metrica: t.produto,
-            sub: `dias · ${t.contratos} contratos`,
-            atual: t.diasMedio,
-            formato: "int",
-            temporalidade: "mes",
-          }));
-
   return [
     {
       id: "entregas-resumo",
@@ -223,13 +193,6 @@ export function montarSecoesEntregas(
           drillParams: { tipo: "entregue" },
         },
       ],
-    },
-    {
-      id: "entregas-leadtime",
-      // Título depende da fonte: série mensal (janela 12m, como as demais seções do modo
-      // Evolução) quando disponível; agregado antigo (janela 6m fixa, sem série) no fallback.
-      titulo: temSerieLeadTime ? "Lead time por produto" : "Lead time por produto (janela 6m)",
-      linhas: leadTimeRows,
     },
   ];
 }
