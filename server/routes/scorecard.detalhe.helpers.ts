@@ -13,7 +13,7 @@ import { db } from "../db";
 import { addMeses, limitesMes, ultimoDiaMes } from "./scorecard.helpers";
 import { storage } from "../storage";
 import { fetchSnapRows } from "./bp2026.reconciliacao";
-import { computeReconciliacao, type SnapRow } from "./bp2026.reconciliacao.helpers";
+import { computeReconciliacao, contratoEhEntregaPontual, type SnapRow } from "./bp2026.reconciliacao.helpers";
 import type { DrillColuna, DrillDetalhe } from "./scorecard.detalhe";
 
 /** Filtro `AND COALESCE(NULLIF(TRIM(<alias>.<coluna>),''),'Não Informado') = <valor>` — cópia
@@ -341,7 +341,10 @@ export function montarUpsellDownsellFromSnaps(
     const rec = computeReconciliacao(produto, prevRows, curRows);
     const componente = rec.componentes.find((c) => c.chave === bucket);
     if (!componente) return [];
-    return componente.contratos.map((mov) => ({ cliente: mov.cliente, contrato: mov.servico, produto, delta: mov.delta }));
+    // Exclui entregas pontuais ("Entrega X") que vazam pro pool de MRR — ver contratoEhEntregaPontual.
+    return componente.contratos
+      .filter((mov) => !contratoEhEntregaPontual(mov.servico))
+      .map((mov) => ({ cliente: mov.cliente, contrato: mov.servico, produto, delta: mov.delta }));
   });
 
   linhas.sort((a, b) => (bucket === "expansao" ? b.delta - a.delta : a.delta - b.delta));

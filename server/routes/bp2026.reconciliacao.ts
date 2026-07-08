@@ -2,7 +2,7 @@
 // Waterfall de reconciliação de MRR por produto×mês (snapshot M-1 -> M).
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
-import { computeReconciliacao, type SnapRow } from "./bp2026.reconciliacao.helpers";
+import { computeReconciliacao, contratoEhEntregaPontual, type SnapRow } from "./bp2026.reconciliacao.helpers";
 import { CASE_PRODUTO } from "./bp2026.revenue";
 import { abasPermitidas } from "../../shared/bp2026-tabs";
 import type { User } from "../auth/userDb";
@@ -157,8 +157,21 @@ export function registerBp2026ReconciliacaoRoutes(app: Express, db: any) {
         const rec = computeReconciliacao(produto, prevRows, curRows);
         const exp = rec.componentes.find((c) => c.chave === "expansao");
         const down = rec.componentes.find((c) => c.chave === "churn_downsell");
-        if (exp) { upsell += exp.valor; upsellContratos += exp.n; }
-        if (down) { downsell += down.valor; downsellContratos += down.n; }
+        // Exclui entregas pontuais ("Entrega X") que vazam pro pool de MRR recorrente — recomputa
+        // valor/n a partir dos contratos filtrados (comp.valor/comp.n vêm com tudo). Ver
+        // contratoEhEntregaPontual. Só o painel usa este endpoint; BP 2026 usa /reconciliacao por-produto.
+        if (exp) {
+          for (const m of exp.contratos) {
+            if (contratoEhEntregaPontual(m.servico)) continue;
+            upsell += m.delta; upsellContratos += 1;
+          }
+        }
+        if (down) {
+          for (const m of down.contratos) {
+            if (contratoEhEntregaPontual(m.servico)) continue;
+            downsell += m.delta; downsellContratos += 1;
+          }
+        }
       }
 
       res.json({ mes, upsell, upsellContratos, downsell, downsellContratos });

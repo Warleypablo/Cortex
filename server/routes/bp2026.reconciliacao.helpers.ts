@@ -4,6 +4,17 @@
 
 export const POOL_STATUS: readonly string[] = ["ativo", "onboarding", "triagem"];
 
+/** Contratos "Entrega X" (ex.: "Entrega 4 - Creators - Enterprise", "1 Entrega de Creators") são
+   entregas PONTUAIS/avulsas que vazam para o pool de MRR recorrente. Nas linhas de Upsell/Downsell
+   de MRR do Painel Executivo elas são excluídas de propósito — variação de valor de uma entrega
+   pontual não é expansão/redução de MRR RECORRENTE. Critério pedido pelo time = nome do contrato
+   (`servico`) contém "entrega" (case-insensitive). NÃO afeta a reconciliação por-produto do BP 2026
+   (`computeReconciliacao` roda intacta); o filtro é aplicado só nos agregadores do painel
+   (`/api/bp2026/reconciliacao-total` e `montarUpsellDownsellFromSnaps`). */
+export function contratoEhEntregaPontual(servico: string): boolean {
+  return servico.toLowerCase().includes("entrega");
+}
+
 export interface SnapRow {
   id_subtask: string;
   cliente: string;

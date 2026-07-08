@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-08 | fix(painel-executivo): Upsell/Downsell de MRR ignoram entregas pontuais ("Entrega")
+
+**O que foi feito:**
+- As linhas **Upsell** e **Downsell** do Painel Executivo (e o drawer de detalhamento) passam a **excluir contratos com "Entrega" no nome** (ex.: "Entrega 4 - Creators - Enterprise", "1 Entrega de Creators").
+- Novo helper compartilhado `contratoEhEntregaPontual(servico)` — critério = nome do contrato contém "entrega" (case-insensitive). Aplicado nos dois caminhos do painel: a **linha** (`/api/bp2026/reconciliacao-total`) e o **drawer** (`montarUpsellDownsellFromSnaps`).
+
+**Por que:**
+- Contratos "Entrega X" são entregas **pontuais/avulsas** que vazam para o pool de MRR recorrente (status ativo/onboarding/triagem). A variação de valor de uma entrega pontual **não é** expansão/redução de MRR **recorrente** — inflava as linhas de Upsell/Downsell do painel (no drawer de junho eram a maioria dos 13 contratos de downsell).
+
+**Escopo (importante):** o filtro é **só** nos agregadores do Painel Executivo. A reconciliação por-produto do BP 2026 (`/api/bp2026/reconciliacao` → `computeReconciliacao`) fica **intacta** — nenhum outro dashboard muda.
+
+**Arquivos alterados:**
+- `server/routes/bp2026.reconciliacao.helpers.ts` - helper `contratoEhEntregaPontual`.
+- `server/routes/bp2026.reconciliacao.ts` - filtro na linha (upsell + downsell) do `/reconciliacao-total`.
+- `server/routes/scorecard.detalhe.helpers.ts` - filtro no drawer (`montarUpsellDownsellFromSnaps`).
+- `server/routes/scorecard.detalhe.helpers.test.ts` - testes do filtro e do helper.
+
+---
+
 ## 2026-07-08 | feat(bp2026): churn pontual por data de cancelamento (alinha ao ClickUp)
 
 **O que foi feito:**

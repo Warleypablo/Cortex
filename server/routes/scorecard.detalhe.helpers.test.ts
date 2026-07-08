@@ -11,7 +11,7 @@ import {
   montarUpsellDownsellFromSnaps,
   converterContribuicaoSquadDetalhe,
 } from "./scorecard.detalhe.helpers";
-import type { SnapRow } from "./bp2026.reconciliacao.helpers";
+import { contratoEhEntregaPontual, type SnapRow } from "./bp2026.reconciliacao.helpers";
 
 describe("DIM_COLUNA_MRR_ATIVO / DIM_COLUNA_ENTREGUE", () => {
   it("mapeia squad/operador do MRR Ativo — operador usa 'responsavel' (mesmo padrão do Churn Pontual)", () => {
@@ -68,6 +68,55 @@ describe("montarUpsellDownsellFromSnaps", () => {
     const d = montarUpsellDownsellFromSnaps([], [], "expansao", "2026-06");
     expect(d.linhas).toEqual([]);
     expect(d.total).toBe(0);
+  });
+
+  // Entregas pontuais ("Entrega X") vazam pro pool de MRR mas NÃO são upsell/downsell recorrente —
+  // excluídas do drawer e do total (mesmo critério da linha em /api/bp2026/reconciliacao-total).
+  const prevEntrega: SnapRow[] = [
+    row("A", "ativo", "performance", 100, "Recorrente - Creators"),
+    row("E", "ativo", "creators", 100, "Entrega 4 - Creators - Enterprise"),
+  ];
+  const curEntrega: SnapRow[] = [
+    row("A", "ativo", "performance", 130, "Recorrente - Creators"), // expansão +30 (fica)
+    row("E", "ativo", "creators", 150, "Entrega 4 - Creators - Enterprise"), // expansão +50 (excluída)
+  ];
+
+  it("upsell exclui contratos com 'Entrega' no nome (só A entra, total sem os +50 da entrega)", () => {
+    const d = montarUpsellDownsellFromSnaps(prevEntrega, curEntrega, "expansao", "2026-06");
+    expect(d.linhas).toEqual([
+      { cliente: "cliente-A", contrato: "Recorrente - Creators", produto: "performance", delta: 30 },
+    ]);
+    expect(d.total).toBe(30);
+  });
+
+  it("downsell exclui contratos com 'Entrega' no nome", () => {
+    const prevD: SnapRow[] = [
+      row("A", "ativo", "performance", 100, "Recorrente - GC"),
+      row("E", "ativo", "creators", 100, "1 Entrega de Creators"),
+    ];
+    const curD: SnapRow[] = [
+      row("A", "ativo", "performance", 80, "Recorrente - GC"), // downsell -20 (fica)
+      row("E", "ativo", "creators", 60, "1 Entrega de Creators"), // downsell -40 (excluída)
+    ];
+    const d = montarUpsellDownsellFromSnaps(prevD, curD, "churn_downsell", "2026-06");
+    expect(d.linhas).toEqual([
+      { cliente: "cliente-A", contrato: "Recorrente - GC", produto: "performance", delta: -20 },
+    ]);
+    expect(d.total).toBe(-20);
+  });
+});
+
+describe("contratoEhEntregaPontual", () => {
+  it("detecta 'Entrega' em qualquer posição, case-insensitive", () => {
+    expect(contratoEhEntregaPontual("Entrega 4 - Creators - Enterprise")).toBe(true);
+    expect(contratoEhEntregaPontual("1 Entrega - Gestão de Comunidade - Starter")).toBe(true);
+    expect(contratoEhEntregaPontual("1 entrega de creators")).toBe(true);
+  });
+
+  it("não marca contratos recorrentes sem 'entrega' no nome", () => {
+    expect(contratoEhEntregaPontual("Creators Recorrente - Enterprise")).toBe(false);
+    expect(contratoEhEntregaPontual("Gestão de performance - Scale")).toBe(false);
+    expect(contratoEhEntregaPontual("")).toBe(false);
   });
 });
 
