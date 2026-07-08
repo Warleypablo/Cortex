@@ -12,6 +12,11 @@ describe("abasDaMetrica", () => {
     expect(abasDaMetrica("vendas_mrr_performance")).toEqual(["vendasProduto"]);
     expect(abasDaMetrica("mrr_performance")).toEqual(["revenue"]);
   });
+  it("churn total (R$ e %) pertencem ao revenue", () => {
+    expect(abasDaMetrica("churn_rs_total")).toEqual(["revenue"]);
+    expect(abasDaMetrica("churn_pct_total")).toEqual(["revenue"]);
+    expect(metricaPertenceAAba("churn_pct_total", "revenue")).toBe(true);
+  });
   it("pontual aparece em pontual E pontual-creators", () => {
     expect(abasDaMetrica("pontual_entrega")).toEqual(["pontual", "pontual-creators"]);
     expect(abasDaMetrica("pontual_squad:Alpha")).toEqual(["pontual", "pontual-creators"]);

@@ -37,7 +37,7 @@ function classificarPorPrefixo(m: string): Bp2026TabId | null {
     if (m === `mrr_${p}` || m === `contratos_${p}` || m === `aov_${p}` ||
         m === `churn_pct_${p}` || m === `churn_rs_${p}`) return "revenue";
   }
-  if (m === "churn_rs_total") return "revenue";
+  if (m === "churn_rs_total" || m === "churn_pct_total") return "revenue";
   return null;
 }
 

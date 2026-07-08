@@ -247,6 +247,7 @@ const TITULOS_SUBABAS: Record<string, string> = {
   churn_pct_performance: "Churn — Performance", churn_pct_creators: "Churn — Creators",
   churn_pct_social: "Churn — Social", churn_pct_gc: "Churn — Gestão de Comunidade",
   churn_pct_others: "Churn — Others",
+  churn_pct_total: "Churn % Total",
   churn_rs_total: "Churn R$ Total",
   churn_rs_performance: "Churn R$ — Performance", churn_rs_creators: "Churn R$ — Creators",
   churn_rs_social: "Churn R$ — Social", churn_rs_gc: "Churn R$ — Gestão de Comunidade",
@@ -746,6 +747,23 @@ export async function montarDetalheBp(
     ({ grupos, realizado } = await detSnapshot(db, mes, "performance", "contrato", "contagem"));
   } else if (metrica.startsWith("contratos_") && LINHAS_REVENUE.includes(metrica.slice(10) as any)) {
     ({ grupos, realizado } = await detSnapshot(db, mes, metrica.slice(10), "contrato", "contagem"));
+  } else if (metrica === "churn_pct_total") {
+    // Churn % Total: todos os produtos ÷ MRR ativo total no fim do mês anterior
+    const { resultado, somaRs } = await detChurn(db, mes, null);
+    grupos = resultado.grupos;
+    const denRes = await db.execute(sql`
+      WITH alvo AS (
+        SELECT MAX(data_snapshot::date) AS d FROM "Clickup".cup_data_hist
+        WHERE data_snapshot::date >= (make_date(${ANO}, ${mes}, 1) - INTERVAL '1 month')
+          AND data_snapshot::date < make_date(${ANO}, ${mes}, 1)
+      )
+      SELECT COALESCE(SUM(h.valorr::numeric), 0) AS mrr
+      FROM "Clickup".cup_data_hist h JOIN alvo a ON h.data_snapshot::date = a.d
+      WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+    `);
+    const den = parseFloat((denRes.rows[0] as any).mrr);
+    realizado = den ? somaRs / den : 0;
+    notaDinamica = `churn R$ ${Math.round(somaRs).toLocaleString("pt-BR")} ÷ MRR R$ ${Math.round(den).toLocaleString("pt-BR")} (fim do mês anterior)`;
   } else if (metrica.startsWith("churn_pct_")) {
     const linhaP = metrica.slice(10);
     const { resultado, somaRs } = await detChurn(db, mes, linhaP);

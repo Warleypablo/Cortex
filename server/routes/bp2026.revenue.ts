@@ -220,6 +220,46 @@ export async function montarRevenue({ db, orcado, vendasMrrPorMes, mesCorrente, 
     return { mes, orcado: orc, realizado: real, atingimento: calcAtingimento(orc, real) };
   });
   const vChurnTot = calcYtd(mesesChurnTotal, mesFechado, "fluxo");
+
+  // "Churn % Total" = Churn R$ Total do mês ÷ MRR Ativo do fim do mês ANTERIOR
+  // (mesma régua canônica do churn% por produto — assim o total reconcilia com as
+  // linhas "Churn — <produto>"). Orçado = Churn R$ orçado ÷ MRR orçado do MESMO mês,
+  // coerente com a derivação do Churn R$ Total orçado (pct × MRR = R$).
+  // Unshift ANTES do churn_rs_total p/ ficar logo ABAIXO dele no resultado (LIFO).
+  const mrrRealTot = (m: number) => LINHAS_SERVICO.reduce((a, { chave }) => a + (snap[chave]?.[m]?.mrr ?? 0), 0);
+  const mrrOrcTot = (m: number) => LINHAS_SERVICO.reduce((a, { chave }) => a + (orcado[`mrr_${chave}`]?.[m] ?? 0), 0);
+  const mesesChurnPctTotal: MesLinha[] = Array.from({ length: 12 }, (_, i) => {
+    const mes = i + 1;
+    const r = razao(mesesChurnTotal[i].realizado, mrrRealTot(mes - 1)); // base = fim do mês anterior (mes-1; jan → dez/2025)
+    const denOrc = mrrOrcTot(mes);
+    const o = denOrc ? mesesChurnTotal[i].orcado / denOrc : 0;
+    return { mes, orcado: o, realizado: r, atingimento: calcAtingimento(o, r) };
+  });
+  // YTD: taxa média mensal ponderada (Σ churn ÷ Σ base anterior); orçado idem sobre MRR orçado do mês
+  let churnPctTotYtd: { orcado: number; realizado: number | null } | undefined;
+  if (mesFechado > 0) {
+    let cReal = 0, dReal = 0, cOrc = 0, dOrc = 0;
+    for (let m = 1; m <= mesFechado; m++) {
+      cReal += mesesChurnTotal[m - 1].realizado ?? 0;
+      dReal += mrrRealTot(m - 1);
+      cOrc += mesesChurnTotal[m - 1].orcado;
+      dOrc += mrrOrcTot(m);
+    }
+    churnPctTotYtd = { orcado: dOrc ? cOrc / dOrc : 0, realizado: dReal ? cReal / dReal : null };
+  }
+  linhas.unshift({
+    metrica: "churn_pct_total",
+    titulo: "Churn % Total",
+    tipoAgregacao: "fluxo",
+    direcao: "menor_melhor",
+    unidade: "pct",
+    nota: "Churn R$ Total do mês ÷ MRR Ativo do fim do mês anterior (mesma régua do churn % por produto; base = fechamento anterior). Orçado = Churn R$ orçado ÷ MRR orçado do mesmo mês.",
+    meses: mesesChurnPctTotal,
+    ytd: mesFechado === 0
+      ? { orcado: 0, realizado: null, atingimento: null }
+      : { ...churnPctTotYtd!, atingimento: calcAtingimento(churnPctTotYtd!.orcado, churnPctTotYtd!.realizado) },
+  });
+
   linhas.unshift({
     metrica: "churn_rs_total",
     titulo: "Churn R$ Total",
