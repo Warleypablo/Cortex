@@ -42,25 +42,28 @@ import { startOfMonth, endOfMonth, format, parse, differenceInCalendarDays, subD
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DateRange } from "react-day-picker";
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Line } from "recharts";
+// FONTE ÚNICA do Aprofundado (compartilhada com o FCA em server/routes/fca.ts).
+// A UI apenas delega os builders daqui — não reimplementa a lógica, pra nunca divergir
+// do relatório. Ver shared/orcadoRealizado/aprofundado.ts.
+import {
+  calcPercentual, mergePrevRealizado,
+  buildFunnelMetrics,
+  buildMetaAdsMetrics as sharedBuildMetaAdsMetrics,
+  buildGoogleAdsMetrics as sharedBuildGoogleAdsMetrics,
+  buildTiktokAdsMetrics as sharedBuildTiktokAdsMetrics,
+  buildMqlMetrics as sharedBuildMqlMetrics,
+  buildNaoMqlMetrics as sharedBuildNaoMqlMetrics,
+  DEFAULT_ORCADO_META_ADS, DEFAULT_ORCADO_GOOGLE_ADS, DEFAULT_ORCADO_TIKTOK_ADS,
+  DEFAULT_ORCADO_MQL, DEFAULT_ORCADO_NAO_MQL,
+} from "@shared/orcadoRealizado/aprofundado";
+import type {
+  Metric, MetaAdsDetailMetrics, GoogleAdsDetailMetrics, TiktokAdsDetailMetrics,
+  PlatformFunnelData, MQLMetrics, NaoMQLMetrics,
+} from "@shared/orcadoRealizado/aprofundado";
 
 type MetricType = 'manual' | 'formula';
 
-interface Metric {
-  id: string;
-  name: string;
-  type: MetricType;
-  orcado: number | string | null;
-  realizado: number | string | null;
-  realizadoAnterior?: number | null;
-  percentual: number | null;
-  format: 'currency' | 'number' | 'percent';
-  isHeader?: boolean;
-  indent?: number;
-  emoji?: string;
-  // Aviso de qualidade do dado (ex: pixel do Meta sub-capturando). Quando presente,
-  // a linha mostra um ⚠️ com este texto em tooltip.
-  warning?: string;
-}
+// Metric é importado de @shared/orcadoRealizado/aprofundado (fonte única).
 
 interface MetricSection {
   title: string;
@@ -69,49 +72,7 @@ interface MetricSection {
   banner?: React.ReactNode;
 }
 
-interface MQLMetrics {
-  totalMqls: number;
-  reunioesAgendadas: number;
-  reunioesRealizadas: number;
-  novosClientes: number;
-  contratosAceleracao: number;
-  contratosImplantacao: number;
-  faturamentoAceleracao: number;
-  faturamentoImplantacao: number;
-  faturamentoAceleracaoTrafego: number;
-  faturamentoImplantacaoTrafego: number;
-  percReuniaoAgendada: number;
-  percNoShow: number;
-  taxaVendas: number;
-  txContratosRecorrentes: number;
-  txContratosImplantacao: number;
-  ticketMedioAceleracao: number;
-  ticketMedioImplantacao: number;
-  dealsGanhos: number;
-  contratosGanhos: number;
-}
-
-interface NaoMQLMetrics {
-  totalNaoMqls: number;
-  reunioesAgendadas: number;
-  reunioesRealizadas: number;
-  novosClientes: number;
-  contratosAceleracao: number;
-  contratosImplantacao: number;
-  faturamentoAceleracao: number;
-  faturamentoImplantacao: number;
-  faturamentoAceleracaoTrafego: number;
-  faturamentoImplantacaoTrafego: number;
-  percReuniaoAgendada: number;
-  percNoShow: number;
-  taxaVendas: number;
-  txContratosRecorrentes: number;
-  txContratosImplantacao: number;
-  ticketMedioAceleracao: number;
-  ticketMedioImplantacao: number;
-  dealsGanhos: number;
-  contratosGanhos: number;
-}
+// MQLMetrics e NaoMQLMetrics são importados de @shared/orcadoRealizado/aprofundado.
 
 interface AdsMetrics {
   investimento: number;
@@ -168,10 +129,7 @@ function getVarianceColor(percentual: number | null): string {
   return 'text-red-500';
 }
 
-function calcPercentual(orcado: number | null, realizado: number | null): number | null {
-  if (orcado === null || realizado === null || orcado === 0) return null;
-  return (realizado / orcado) * 100;
-}
+// calcPercentual é importado de @shared/orcadoRealizado/aprofundado (fonte única).
 
 // Cálculos de inteligência de meta
 function calcDesvioMeta(orcado: number | null, realizado: number | null, propDias: number): number | null {
@@ -349,40 +307,8 @@ async function exportOrcadoRealizadoXLSX(params: ExportParams) {
   XLSX.writeFile(wb, `OrcadoRealizado_${params.viewName}_${params.dateLabel}.xlsx`);
 }
 
-// Valores orçados default (fallback quando não há dados no banco)
-const DEFAULT_ORCADO_MQL = {
-  percReuniaoAgendada: 0.30,
-  reunioesAgendadas: 69,
-  reunioesRealizadas: 65,
-  percNoShow: 0.05,
-  taxaVendas: 0.30,
-  novosClientes: 19,
-  txContratosRecorrentes: 0.60,
-  txContratosImplantacao: 0.45,
-  contratosAceleracao: 11,
-  ticketMedioAceleracao: 4000,
-  faturamentoAceleracao: 44641,
-  contratosImplantacao: 8,
-  ticketMedioImplantacao: 8500,
-  faturamentoImplantacao: 71147,
-};
-
-const DEFAULT_ORCADO_NAO_MQL = {
-  percReuniaoAgendada: 0.14,
-  reunioesAgendadas: 152,
-  reunioesRealizadas: 144,
-  percNoShow: 0.05,
-  taxaVendas: 0.25,
-  novosClientes: 34,
-  txContratosRecorrentes: 0.65,
-  txContratosImplantacao: 0.45,
-  contratosAceleracao: 22,
-  ticketMedioAceleracao: 4000,
-  faturamentoAceleracao: 89193.34,
-  contratosImplantacao: 15,
-  ticketMedioImplantacao: 8500,
-  faturamentoImplantacao: 131217.12,
-};
+// Valores orçados default: DEFAULT_ORCADO_MQL e DEFAULT_ORCADO_NAO_MQL são importados
+// de @shared/orcadoRealizado/aprofundado (fonte única). Os demais seguem locais.
 
 const DEFAULT_ORCADO_ADS = {
   investimento: 95500,
@@ -403,32 +329,9 @@ const DEFAULT_ORCADO_ADS = {
   percMqls: 0,
 };
 
-// Platform-specific defaults for Aprofundado view
-const DEFAULT_ORCADO_META_ADS = {
-  investimento: 0, cpm: 0, ctr: 0, videoHook: 0, videoHold: 0, videoP75: 0, videoP100: 0,
-  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
-  // Funnel
-  leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
-  percRa: 0, percRaMql: 0, percRaNmql: 0,
-  percRr: 0, percRrMql: 0, percRrNmql: 0,
-  percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
-  negocioGanho: 0, leadTime: 0, aov: 0,
-  receita: 0, receitaPontual: 0, receitaRecorrente: 0,
-  cac: 0, cacUnico: 0, cacContrato: 0,
-};
-
-const DEFAULT_ORCADO_GOOGLE_ADS = {
-  investimento: 0, cpm: 0, ctr: 0,
-  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
-  // Funnel
-  leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
-  percRa: 0, percRaMql: 0, percRaNmql: 0,
-  percRr: 0, percRrMql: 0, percRrNmql: 0,
-  percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
-  negocioGanho: 0, leadTime: 0, aov: 0,
-  receita: 0, receitaPontual: 0, receitaRecorrente: 0,
-  cac: 0, cacUnico: 0, cacContrato: 0,
-};
+// Platform-specific defaults for Aprofundado view.
+// DEFAULT_ORCADO_META_ADS/GOOGLE_ADS/TIKTOK_ADS são importados de
+// @shared/orcadoRealizado/aprofundado (fonte única). Os orgânicos seguem locais.
 
 const DEFAULT_ORCADO_INSTAGRAM = {
   comecaramSeguir: 0, deixaramSeguir: 0, percPerdaSeguidores: 0,
@@ -490,18 +393,7 @@ const DEFAULT_ORCADO_TIKTOK = {
   cac: 0, cacUnico: 0, cacContrato: 0,
 };
 
-const DEFAULT_ORCADO_TIKTOK_ADS = {
-  investimento: 0, cpm: 0, ctr: 0, impressoes: 0, cliques: 0,
-  visualizacoesPagina: 0, sessoes: 0, taxaConversaoPagina: 0, connectRate: 0,
-  // Funnel
-  leads: 0, mqls: 0, cpl: 0, cpmql: 0, percMqls: 0,
-  percRa: 0, percRaMql: 0, percRaNmql: 0,
-  percRr: 0, percRrMql: 0, percRrNmql: 0,
-  percRrVendas: 0, percRrMqlVendas: 0, percRrNmqlVendas: 0,
-  negocioGanho: 0, leadTime: 0, aov: 0,
-  receita: 0, receitaPontual: 0, receitaRecorrente: 0,
-  cac: 0, cacUnico: 0, cacContrato: 0,
-};
+// DEFAULT_ORCADO_TIKTOK_ADS importado de @shared/orcadoRealizado/aprofundado (fonte única).
 
 const DEFAULT_ORCADO_LINKEDIN_ADS = {
   investimento: 0, cpm: 0, ctr: 0, impressoes: 0, cliques: 0,
@@ -656,16 +548,7 @@ const INVERTED_METRIC_IDS = new Set([
 ]);
 
 // Merge realizadoAnterior do array `prev` no array `cur` casando por id.
-function mergePrevRealizado(cur: Metric[], prev: Metric[]): Metric[] {
-  const prevMap = new Map<string, number | null>();
-  for (const m of prev) {
-    prevMap.set(m.id, typeof m.realizado === 'number' ? m.realizado : null);
-  }
-  return cur.map(m => ({
-    ...m,
-    realizadoAnterior: prevMap.has(m.id) ? prevMap.get(m.id)! : null,
-  }));
-}
+// mergePrevRealizado é importado de @shared/orcadoRealizado/aprofundado (fonte única).
 
 export default function GrowthOrcadoRealizado() {
   usePageTitle("Gestão de Metas");
@@ -1262,23 +1145,9 @@ export default function GrowthOrcadoRealizado() {
   });
 
   // ===== Platform-specific queries (only in aprofundado view) =====
-  interface MetaAdsDetailMetrics {
-    investimento: number; impressoes: number; alcance: number; frequencia: number;
-    cpm: number; ctr: number; ctrUnico?: number; videoHook: number; videoHold: number;
-    videoP75: number; videoP100: number; visualizacoesPagina: number;
-    sessoes: number;
-    // Base pixel Meta (landing_page_views) — usada em Connect Rate e Tx Conversão da Página,
-    // que devem ser calculadas a partir do Meta Ads, não do GA4.
-    connectRatePixel?: number; visualizacoesPaginaPixel?: number;
-  }
-
-  interface GoogleAdsDetailMetrics {
-    investimento: number; impressoes: number; cliques: number;
-    cpm: number; cpc: number; ctr: number;
-    visualizacoesPagina: number; connectRate: number;
-    conversoes: number; valorConversoes: number; custoConversao: number;
-    sessoes: number;
-  }
+  // MetaAdsDetailMetrics/GoogleAdsDetailMetrics/TiktokAdsDetailMetrics/PlatformFunnelData
+  // são importados de @shared/orcadoRealizado/aprofundado (fonte única). Os detalhes de
+  // canais orgânicos (IG/YT/TikTok/LinkedIn) seguem locais.
 
   interface InstagramDetailMetrics {
     postsPublicados: number;
@@ -1321,12 +1190,7 @@ export default function GrowthOrcadoRealizado() {
     sessoes?: number; visualizacoesPagina?: number; sessoesAvailable?: boolean;
   }
 
-  interface TiktokAdsDetailMetrics {
-    investimento: number; impressoes: number; cliques: number; conversoes: number;
-    cpm: number; ctr: number;
-    visualizacoesPagina: number; sessoes: number; connectRate: number;
-    hasConnection: boolean;
-  }
+  // TiktokAdsDetailMetrics importado de @shared/orcadoRealizado/aprofundado (fonte única).
 
   interface LinkedinAdsDetailMetrics {
     investimento: number; impressoes: number; cliques: number; conversoes: number;
@@ -1345,18 +1209,7 @@ export default function GrowthOrcadoRealizado() {
     sessoes?: number; visualizacoesPagina?: number; sessoesAvailable?: boolean;
   }
 
-  interface PlatformFunnelData {
-    leads: number; mqls: number; cpl: number | null; cpmql: number | null; percMqls: number;
-    ra: number; raMql: number; raNmql: number;
-    rr: number; rrMql: number; rrNmql: number;
-    percRa: number; percRaMql: number; percRaNmql: number;
-    percRr: number; percRrMql: number; percRrNmql: number;
-    percRrVendas: number; percRrMqlVendas: number; percRrNmqlVendas: number;
-    negocioGanho: number; leadTime: number | null; aov: number | null;
-    receita: number | null; receitaPontual: number | null; receitaRecorrente: number | null;
-    cac: number | null; cacUnico: number | null; cacContrato: number | null;
-    clientesUnicos: number; contratos: number;
-  }
+  // PlatformFunnelData importado de @shared/orcadoRealizado/aprofundado (fonte única).
 
   const needsPlatformData = activeSection === 'aprofundado' || selectedPlataformas.length > 0;
 
@@ -1568,192 +1421,9 @@ export default function GrowthOrcadoRealizado() {
     staleTime: 0,
   });
 
-  const buildMqlMetrics = (data: MQLMetrics, investimento: number | null = null): Metric[] => {
-    const invest = investimento ?? 0;
-    const raCount = data.reunioesAgendadas ?? 0;
-    const rrCount = data.reunioesRealizadas ?? 0;
-    const cpraMql = invest > 0 && raCount > 0 ? invest / raCount : null;
-    const cprrMql = invest > 0 && rrCount > 0 ? invest / rrCount : null;
-    return [
-      {
-        id: 'mql_ra_perc',
-        name: '%RA MQL',
-        type: 'manual',
-        orcado: ORCADO_MQL.percReuniaoAgendada,
-        realizado: data.percReuniaoAgendada ?? null,
-        percentual: calcPercentual(ORCADO_MQL.percReuniaoAgendada, data.percReuniaoAgendada),
-        format: 'percent'
-      },
-      {
-        id: 'mql_ra_num',
-        name: 'Nº RA MQL',
-        type: 'formula',
-        orcado: ORCADO_MQL.reunioesAgendadas,
-        realizado: data.reunioesAgendadas ?? 0,
-        percentual: calcPercentual(ORCADO_MQL.reunioesAgendadas, data.reunioesAgendadas),
-        format: 'number'
-      },
-      {
-        id: 'mql_cpra',
-        name: 'CPRA MQL',
-        type: 'formula',
-        orcado: (ORCADO_MQL as any).cpraMql ?? null,
-        realizado: cpraMql,
-        percentual: calcPercentual((ORCADO_MQL as any).cpraMql ?? null, cpraMql),
-        format: 'currency',
-      },
-      {
-        id: 'mql_rr_num',
-        name: 'Nº RR MQL',
-        type: 'formula',
-        orcado: ORCADO_MQL.reunioesRealizadas,
-        realizado: data.reunioesRealizadas ?? 0,
-        percentual: calcPercentual(ORCADO_MQL.reunioesRealizadas, data.reunioesRealizadas),
-        format: 'number'
-      },
-      {
-        id: 'mql_cprr',
-        name: 'CPRR MQL',
-        type: 'formula',
-        orcado: (ORCADO_MQL as any).cprrMql ?? null,
-        realizado: cprrMql,
-        percentual: calcPercentual((ORCADO_MQL as any).cprrMql ?? null, cprrMql),
-        format: 'currency',
-      },
-      {
-        id: 'mql_noshow',
-        name: '% No-show',
-        type: 'manual',
-        orcado: ORCADO_MQL.percNoShow,
-        realizado: data.percNoShow ?? null,
-        percentual: calcPercentual(ORCADO_MQL.percNoShow, data.percNoShow),
-        format: 'percent'
-      },
-      {
-        id: 'mql_rr_perc',
-        name: '%RR MQL',
-        type: 'formula',
-        orcado: ORCADO_MQL.percRr ?? null,
-        realizado: data.totalMqls > 0 ? data.reunioesRealizadas / data.totalMqls : null,
-        percentual: calcPercentual(ORCADO_MQL.percRr ?? null, data.totalMqls > 0 ? data.reunioesRealizadas / data.totalMqls : null),
-        format: 'percent'
-      },
-      {
-        id: 'mql_taxa_vendas',
-        name: 'RR→V% MQL',
-        type: 'manual', 
-        orcado: ORCADO_MQL.taxaVendas, 
-        realizado: data.taxaVendas ?? null, 
-        percentual: calcPercentual(ORCADO_MQL.taxaVendas, data.taxaVendas), 
-        format: 'percent' 
-      },
-      {
-        id: 'mql_novos_clientes',
-        name: 'Negócios Ganhos MQL',
-        type: 'formula',
-        orcado: ORCADO_MQL.novosClientes,
-        realizado: data.dealsGanhos ?? 0,
-        percentual: calcPercentual(ORCADO_MQL.novosClientes, data.dealsGanhos),
-        format: 'number'
-      },
-      {
-        id: 'mql_contratos_ganhos',
-        name: 'Contratos Ganhos MQL',
-        type: 'formula',
-        orcado: null,
-        realizado: data.contratosGanhos ?? 0,
-        percentual: null,
-        format: 'number'
-      },
-      {
-        id: 'mql_tx_recorrente', 
-        name: 'Tx de Contratos Recorrentes', 
-        type: 'manual', 
-        orcado: ORCADO_MQL.txContratosRecorrentes, 
-        realizado: data.txContratosRecorrentes ?? null, 
-        percentual: calcPercentual(ORCADO_MQL.txContratosRecorrentes, data.txContratosRecorrentes), 
-        format: 'percent' 
-      },
-      { 
-        id: 'mql_tx_implantacao', 
-        name: 'Tx de Contratos Implantação', 
-        type: 'manual', 
-        orcado: ORCADO_MQL.txContratosImplantacao, 
-        realizado: data.txContratosImplantacao ?? null, 
-        percentual: calcPercentual(ORCADO_MQL.txContratosImplantacao, data.txContratosImplantacao), 
-        format: 'percent' 
-      },
-      { 
-        id: 'mql_contratos_acel', 
-        name: 'Nº Novos Contratos Aceleração MQL', 
-        type: 'formula', 
-        orcado: ORCADO_MQL.contratosAceleracao, 
-        realizado: data.contratosAceleracao ?? 0, 
-        percentual: calcPercentual(ORCADO_MQL.contratosAceleracao, data.contratosAceleracao), 
-        format: 'number', 
-        emoji: '🏎️' 
-      },
-      { 
-        id: 'mql_ticket_acel', 
-        name: 'Ticket Médio Aceleração MQL', 
-        type: 'manual', 
-        orcado: ORCADO_MQL.ticketMedioAceleracao, 
-        realizado: data.ticketMedioAceleracao ?? null, 
-        percentual: calcPercentual(ORCADO_MQL.ticketMedioAceleracao, data.ticketMedioAceleracao), 
-        format: 'currency', 
-        emoji: '🏎️' 
-      },
-      { 
-        id: 'mql_fat_acel', 
-        name: 'Faturamento Aceleração (MRR novo) de MQL', 
-        type: 'formula', 
-        orcado: ORCADO_MQL.faturamentoAceleracao, 
-        realizado: data.faturamentoAceleracao ?? 0, 
-        percentual: calcPercentual(ORCADO_MQL.faturamentoAceleracao, data.faturamentoAceleracao), 
-        format: 'currency', 
-        emoji: '🏎️' 
-      },
-      { 
-        id: 'mql_contratos_impl', 
-        name: 'Nº Novos Contratos Implantação MQL', 
-        type: 'formula', 
-        orcado: ORCADO_MQL.contratosImplantacao, 
-        realizado: data.contratosImplantacao ?? 0, 
-        percentual: calcPercentual(ORCADO_MQL.contratosImplantacao, data.contratosImplantacao), 
-        format: 'number', 
-        emoji: '🔧' 
-      },
-      { 
-        id: 'mql_ticket_impl', 
-        name: 'Ticket Médio Implantação MQL', 
-        type: 'manual', 
-        orcado: ORCADO_MQL.ticketMedioImplantacao, 
-        realizado: data.ticketMedioImplantacao ?? null, 
-        percentual: calcPercentual(ORCADO_MQL.ticketMedioImplantacao, data.ticketMedioImplantacao), 
-        format: 'currency', 
-        emoji: '🔧' 
-      },
-      {
-        id: 'mql_fat_impl',
-        name: 'Faturamento Implantação MQL',
-        type: 'formula',
-        orcado: ORCADO_MQL.faturamentoImplantacao,
-        realizado: data.faturamentoImplantacao ?? 0,
-        percentual: calcPercentual(ORCADO_MQL.faturamentoImplantacao, data.faturamentoImplantacao),
-        format: 'currency',
-        emoji: '🔧'
-      },
-      {
-        id: 'mql_fat_total',
-        name: 'Faturamento Total MQL',
-        type: 'formula',
-        orcado: ORCADO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao,
-        realizado: (data.faturamentoAceleracao ?? 0) + (data.faturamentoImplantacao ?? 0),
-        percentual: calcPercentual(ORCADO_MQL.faturamentoAceleracao + ORCADO_MQL.faturamentoImplantacao, (data.faturamentoAceleracao ?? 0) + (data.faturamentoImplantacao ?? 0)),
-        format: 'currency'
-      },
-    ];
-  };
+  // buildMqlMetrics delega ao shared (fonte única), injetando o orçado do componente.
+  const buildMqlMetrics = (data: MQLMetrics, investimento: number | null = null): Metric[] =>
+    sharedBuildMqlMetrics(data, ORCADO_MQL, investimento);
 
   const mqlMetrics: Metric[] = useMemo(() => {
     const cur = buildMqlMetrics(mqlData || {} as MQLMetrics, adsData?.investimento ?? null);
@@ -1816,71 +1486,12 @@ export default function GrowthOrcadoRealizado() {
   // ===== Platform-specific metric builders for Aprofundado view =====
 
   // Helper: build lead/MQL metrics for a platform (rest of funnel comes from MQL/NMQL/Total sections)
-  const buildFunnelMetrics = (prefix: string, funnel: PlatformFunnelData | undefined, orcado: any, investimento: number | null, includeInvestimento = false): Metric[] => {
-    const f = funnel || {} as PlatformFunnelData;
-    const invest = investimento !== null && investimento > 0 ? investimento : 0;
-    const cpl = invest > 0 && (f.leads || 0) > 0 ? invest / f.leads : null;
-    const cpmql = invest > 0 && (f.mqls || 0) > 0 ? invest / f.mqls : null;
-    // CPRA e CPRR (e splits MQL/nMQL) NÃO entram aqui: são métricas de vendas e
-    // vivem nas seções VENDAS — MQL, VENDAS — não-MQL e Total. Mantê-las nos
-    // breakdowns por plataforma duplicava no lugar errado e dava R$ NaN nos
-    // canais orgânicos (sem investimento). Alinhado com o consolidado de Marketing.
-    // includeInvestimento: emite a linha de Investimento aqui (só p/ orgânicos —
-    // os pagos já têm a linha no topo). Garante as 6 métricas-padrão do Consolidado
-    // em TODA plataforma (Investimento · Leads · MQLs · CPL · CPMQL · % MQLs);
-    // sem verba, mostra R$ 0.
-    const investimentoRow: Metric[] = includeInvestimento ? [
-      { id: `${prefix}_investimento`, name: 'Investimento', type: 'manual', orcado: orcado.investimento ?? null, realizado: investimento ?? 0, percentual: calcPercentual(orcado.investimento ?? null, investimento), format: 'currency' },
-    ] : [];
-    return [
-      ...investimentoRow,
-      { id: `${prefix}_leads`, name: 'Leads', type: 'formula', orcado: orcado.leads, realizado: f.leads ?? 0, percentual: calcPercentual(orcado.leads, f.leads), format: 'number' },
-      { id: `${prefix}_mqls`, name: 'MQLs', type: 'formula', orcado: orcado.mqls, realizado: f.mqls ?? 0, percentual: calcPercentual(orcado.mqls, f.mqls), format: 'number' },
-      { id: `${prefix}_cpl`, name: 'CPL', type: 'formula', orcado: orcado.cpl, realizado: cpl, percentual: calcPercentual(orcado.cpl, cpl), format: 'currency' },
-      { id: `${prefix}_cpmql`, name: 'CPMQL', type: 'formula', orcado: orcado.cpmql, realizado: cpmql, percentual: calcPercentual(orcado.cpmql, cpmql), format: 'currency' },
-      { id: `${prefix}_percMqls`, name: '% MQLs', type: 'formula', orcado: orcado.percMqls, realizado: f.percMqls ?? null, percentual: calcPercentual(orcado.percMqls, f.percMqls), format: 'percent' },
-    ];
-  };
+  // buildFunnelMetrics é importado de @shared/orcadoRealizado/aprofundado (fonte única).
 
   // Meta Ads platform metrics
-  const buildMetaAdsMetrics = (
-    d: MetaAdsDetailMetrics,
-    funnel: PlatformFunnelData | undefined,
-  ): Metric[] => {
-    const O = ORCADO_META_ADS;
-    // Connect Rate e Tx Conversão da Página calculadas a partir do Meta Ads (pixel),
-    // não do GA4: Connect Rate = landing_page_views ÷ cliques de saída (connectRatePixel),
-    // Tx Conversão = Leads ÷ landing_page_views (pixel).
-    const lpvPixel = d.visualizacoesPaginaPixel ?? 0;
-    const taxaConversaoPagina = lpvPixel > 0 ? ((funnel?.leads ?? 0) / lpvPixel) : 0;
-    const sessoes = d.sessoes ?? 0;
-    const taxaConversaoPaginaSessoes = sessoes > 0 ? ((funnel?.leads ?? 0) / sessoes) : 0;
-    // Saúde do pixel: o landing_page_views do Meta deveria acompanhar as Sessões do
-    // GA4 (na conta toda fica ~67%). Quando cai muito abaixo disso com volume relevante,
-    // o pixel está sub-capturando (provável bug de instalação/tagueamento) e tanto o
-    // Connect Rate quanto a Tx Conversão por Visualização de Página ficam subestimados.
-    const pixelHealthRatio = sessoes > 0 ? lpvPixel / sessoes : null;
-    const pixelSubcaptura = sessoes >= 30 && pixelHealthRatio !== null && pixelHealthRatio < 0.4;
-    const pixelWarning = pixelSubcaptura
-      ? `Pixel do Meta sub-capturando: registrou ${lpvPixel} visualizações de página, mas o GA4 viu ${sessoes} sessões (${Math.round((pixelHealthRatio ?? 0) * 100)}% — o normal na conta é ~67%). Connect Rate e Tx Conversão por Visualização de Página estão subestimados; provável problema de instalação/tagueamento do pixel nessas campanhas.`
-      : undefined;
-    const topMetrics: Metric[] = [
-      { id: 'meta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
-      { id: 'meta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
-      { id: 'meta_ctr', name: 'CTR de saída', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
-      { id: 'meta_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: d.ctrUnico ?? null, percentual: null, format: 'percent' },
-      { id: 'meta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: lpvPixel, percentual: calcPercentual(O.visualizacoesPagina, lpvPixel), format: 'number', warning: pixelWarning },
-      { id: 'meta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      { id: 'meta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRatePixel ?? 0, percentual: calcPercentual(O.connectRate, d.connectRatePixel ?? null), format: 'percent', warning: pixelWarning },
-      { id: 'meta_taxaConversaoPagina', name: 'Tx Conversão da Página - Visualização de Página', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent', warning: pixelWarning },
-      { id: 'meta_taxaConversaoPagina_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? (funnel?.mqls ?? 0) / lpvPixel : 0, percentual: null, format: 'percent' },
-      { id: 'meta_taxaConversaoPagina_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: lpvPixel > 0 ? ((funnel?.leads ?? 0) - (funnel?.mqls ?? 0)) / lpvPixel : 0, percentual: null, format: 'percent' },
-      { id: 'meta_taxaConversaoPaginaSessoes', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: null, realizado: taxaConversaoPaginaSessoes, percentual: null, format: 'percent' },
-      { id: 'meta_taxaConversaoPaginaSessoes_mql', name: 'MQL', type: 'formula', indent: 1, orcado: null, realizado: sessoes > 0 ? (funnel?.mqls ?? 0) / sessoes : 0, percentual: null, format: 'percent' },
-      { id: 'meta_taxaConversaoPaginaSessoes_nmql', name: 'Não-MQL', type: 'formula', indent: 1, orcado: null, realizado: sessoes > 0 ? ((funnel?.leads ?? 0) - (funnel?.mqls ?? 0)) / sessoes : 0, percentual: null, format: 'percent' },
-    ];
-    return [...topMetrics, ...buildFunnelMetrics('meta', funnel, O, d.investimento ?? null)];
-  };
+  // buildMetaAdsMetrics delega ao shared (fonte única), injetando ORCADO_META_ADS.
+  const buildMetaAdsMetrics = (d: MetaAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] =>
+    sharedBuildMetaAdsMetrics(d, funnel, ORCADO_META_ADS);
 
   const metaAdsPlatformMetrics: Metric[] = useMemo(() => {
     const cur = buildMetaAdsMetrics(metaAdsDetailData || {} as MetaAdsDetailMetrics, funnelByPlatformData?.meta_ads);
@@ -1893,27 +1504,9 @@ export default function GrowthOrcadoRealizado() {
   }, [metaAdsDetailData, funnelByPlatformData, prevMetaAdsDetailData, prevFunnelByPlatformData, ORCADO_META_ADS]);
 
   // Google Ads platform metrics
-  const buildGoogleAdsMetrics = (
-    d: GoogleAdsDetailMetrics,
-    funnel: PlatformFunnelData | undefined,
-  ): Metric[] => {
-    const O = ORCADO_GOOGLE_ADS;
-    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / (d.sessoes ?? 1)) : 0;
-    const topMetrics: Metric[] = [
-      { id: 'gads_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
-      { id: 'gads_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
-      { id: 'gads_ctr', name: 'CTR de saída', type: 'manual', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
-      { id: 'gads_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
-      { id: 'gads_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
-      { id: 'gads_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      // Connect Rate segue removido do Aprofundado do Google (só o Meta tem pixel). A Tx
-      // Conversão da Página usa Visualizações de Página (Leads ÷ VdP), coerente com
-      // o Connect Rate do TikTok/LinkedIn e com o funil do Meta (que usa LPV do pixel).
-      { id: 'gads_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
-    ];
-    return [...topMetrics, ...buildFunnelMetrics('gads', funnel, O, d.investimento ?? null)];
-  };
+  // buildGoogleAdsMetrics delega ao shared (fonte única), injetando ORCADO_GOOGLE_ADS.
+  const buildGoogleAdsMetrics = (d: GoogleAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] =>
+    sharedBuildGoogleAdsMetrics(d, funnel, ORCADO_GOOGLE_ADS);
 
   const googleAdsPlatformMetrics: Metric[] = useMemo(() => {
     const cur = buildGoogleAdsMetrics(googleAdsDetailData || {} as GoogleAdsDetailMetrics, funnelByPlatformData?.google_ads);
@@ -2082,24 +1675,9 @@ export default function GrowthOrcadoRealizado() {
   }, [tiktokDetailData, funnelByPlatformData, prevTiktokDetailData, prevFunnelByPlatformData, ORCADO_TIKTOK]);
 
   // TikTok Ads platform metrics (mídia paga — lê tiktok.ad_metrics_daily via endpoint)
-  const buildTiktokAdsMetrics = (d: TiktokAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] => {
-    const O = ORCADO_TIKTOK_ADS;
-    const taxaConversaoPagina = (d.sessoes ?? 0) > 0
-      ? ((funnel?.leads ?? 0) / (d.sessoes ?? 1)) : 0;
-    const topMetrics: Metric[] = [
-      { id: 'tta_investimento', name: 'Investimento', type: 'manual', orcado: O.investimento, realizado: d.investimento ?? 0, percentual: calcPercentual(O.investimento, d.investimento), format: 'currency' },
-      { id: 'tta_cpm', name: 'CPM', type: 'formula', orcado: O.cpm, realizado: d.cpm ?? null, percentual: calcPercentual(O.cpm, d.cpm), format: 'currency' },
-      { id: 'tta_ctr', name: 'CTR de saída', type: 'formula', orcado: O.ctr, realizado: d.ctr ?? null, percentual: calcPercentual(O.ctr, d.ctr), format: 'percent' },
-      { id: 'tta_ctrUnico', name: 'CTR de saída único', type: 'formula', orcado: null, realizado: null, percentual: null, format: 'percent' },
-      { id: 'tta_visualizacoesPagina', name: 'Visualizações de Página', type: 'formula', orcado: O.visualizacoesPagina, realizado: d.visualizacoesPagina ?? 0, percentual: calcPercentual(O.visualizacoesPagina, d.visualizacoesPagina), format: 'number' },
-      { id: 'tta_sessoes', name: 'Sessões', type: 'formula', orcado: O.sessoes, realizado: d.sessoes ?? 0, percentual: calcPercentual(O.sessoes, d.sessoes), format: 'number' },
-      // Connect Rate NATIVO do TikTok (total_landing_page_view ÷ cliques) — same-source,
-      // ≤100%, mesmo conceito do pixel do Meta. Vis. de Página acima já é o LPV nativo.
-      { id: 'tta_connectRate', name: 'Connect Rate', type: 'formula', orcado: O.connectRate, realizado: d.connectRate ?? 0, percentual: calcPercentual(O.connectRate, d.connectRate ?? null), format: 'percent' },
-      { id: 'tta_taxaConversaoPagina', name: 'Tx Conversão da Página - Sessões', type: 'formula', orcado: O.taxaConversaoPagina, realizado: taxaConversaoPagina, percentual: calcPercentual(O.taxaConversaoPagina, taxaConversaoPagina), format: 'percent' },
-    ];
-    return [...topMetrics, ...buildFunnelMetrics('tta', funnel, O, d.investimento ?? null)];
-  };
+  // buildTiktokAdsMetrics delega ao shared (fonte única), injetando ORCADO_TIKTOK_ADS.
+  const buildTiktokAdsMetrics = (d: TiktokAdsDetailMetrics, funnel: PlatformFunnelData | undefined): Metric[] =>
+    sharedBuildTiktokAdsMetrics(d, funnel, ORCADO_TIKTOK_ADS);
 
   const tiktokAdsPlatformMetrics: Metric[] = useMemo(() => {
     const cur = buildTiktokAdsMetrics(tiktokAdsDetailData || {} as TiktokAdsDetailMetrics, funnelByPlatformData?.tiktok_ads);
@@ -2191,192 +1769,9 @@ export default function GrowthOrcadoRealizado() {
     { title: 'LinkedIn Ads', icon: <Megaphone className="w-5 h-5" />, metrics: linkedinAdsPlatformMetrics, banner: linkedinAdsBanner },
   ], [metaAdsPlatformMetrics, googleAdsPlatformMetrics, instagramPlatformMetrics, instagramBanner, youtubePlatformMetrics, youtubeBanner, linkedinPlatformMetrics, linkedinBanner, tiktokPlatformMetrics, tiktokBanner, tiktokAdsPlatformMetrics, tiktokAdsBanner, linkedinAdsPlatformMetrics, linkedinAdsBanner]);
 
-  const buildNaoMqlMetrics = (data: NaoMQLMetrics, investimento: number | null = null): Metric[] => {
-    const invest = investimento ?? 0;
-    const raCount = data.reunioesAgendadas ?? 0;
-    const rrCount = data.reunioesRealizadas ?? 0;
-    const cpraNmql = invest > 0 && raCount > 0 ? invest / raCount : null;
-    const cprrNmql = invest > 0 && rrCount > 0 ? invest / rrCount : null;
-    return [
-      {
-        id: 'nmql_ra_perc',
-        name: '%RA não-MQL',
-        type: 'manual',
-        orcado: ORCADO_NAO_MQL.percReuniaoAgendada,
-        realizado: data.percReuniaoAgendada ?? null,
-        percentual: calcPercentual(ORCADO_NAO_MQL.percReuniaoAgendada, data.percReuniaoAgendada),
-        format: 'percent'
-      },
-      {
-        id: 'nmql_ra_num',
-        name: 'Nº RA não-MQL',
-        type: 'formula',
-        orcado: ORCADO_NAO_MQL.reunioesAgendadas,
-        realizado: data.reunioesAgendadas ?? 0,
-        percentual: calcPercentual(ORCADO_NAO_MQL.reunioesAgendadas, data.reunioesAgendadas),
-        format: 'number'
-      },
-      {
-        id: 'nmql_cpra',
-        name: 'CPRA não-MQL',
-        type: 'formula',
-        orcado: (ORCADO_NAO_MQL as any).cpraNmql ?? null,
-        realizado: cpraNmql,
-        percentual: calcPercentual((ORCADO_NAO_MQL as any).cpraNmql ?? null, cpraNmql),
-        format: 'currency',
-      },
-      {
-        id: 'nmql_rr_num',
-        name: 'Nº RR não-MQL',
-        type: 'formula',
-        orcado: ORCADO_NAO_MQL.reunioesRealizadas,
-        realizado: data.reunioesRealizadas ?? 0,
-        percentual: calcPercentual(ORCADO_NAO_MQL.reunioesRealizadas, data.reunioesRealizadas),
-        format: 'number'
-      },
-      {
-        id: 'nmql_cprr',
-        name: 'CPRR não-MQL',
-        type: 'formula',
-        orcado: (ORCADO_NAO_MQL as any).cprrNmql ?? null,
-        realizado: cprrNmql,
-        percentual: calcPercentual((ORCADO_NAO_MQL as any).cprrNmql ?? null, cprrNmql),
-        format: 'currency',
-      },
-      {
-        id: 'nmql_noshow',
-        name: '% No-show',
-        type: 'manual',
-        orcado: ORCADO_NAO_MQL.percNoShow,
-        realizado: data.percNoShow ?? null,
-        percentual: calcPercentual(ORCADO_NAO_MQL.percNoShow, data.percNoShow),
-        format: 'percent'
-      },
-      {
-        id: 'nmql_rr_perc',
-        name: '%RR não-MQL',
-        type: 'formula',
-        orcado: ORCADO_NAO_MQL.percRr ?? null,
-        realizado: data.totalNaoMqls > 0 ? data.reunioesRealizadas / data.totalNaoMqls : null,
-        percentual: calcPercentual(ORCADO_NAO_MQL.percRr ?? null, data.totalNaoMqls > 0 ? data.reunioesRealizadas / data.totalNaoMqls : null),
-        format: 'percent'
-      },
-      {
-        id: 'nmql_taxa_vendas',
-        name: 'RR→V% não-MQL',
-        type: 'manual', 
-        orcado: ORCADO_NAO_MQL.taxaVendas, 
-        realizado: data.taxaVendas ?? null, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.taxaVendas, data.taxaVendas), 
-        format: 'percent' 
-      },
-      {
-        id: 'nmql_novos_clientes',
-        name: 'Negócios Ganhos não-MQL',
-        type: 'formula',
-        orcado: ORCADO_NAO_MQL.novosClientes,
-        realizado: data.dealsGanhos ?? 0,
-        percentual: calcPercentual(ORCADO_NAO_MQL.novosClientes, data.dealsGanhos),
-        format: 'number'
-      },
-      {
-        id: 'nmql_contratos_ganhos',
-        name: 'Contratos Ganhos não-MQL',
-        type: 'formula',
-        orcado: null,
-        realizado: data.contratosGanhos ?? 0,
-        percentual: null,
-        format: 'number'
-      },
-      {
-        id: 'nmql_tx_recorrente', 
-        name: 'Tx de Contratos Recorrentes', 
-        type: 'manual', 
-        orcado: ORCADO_NAO_MQL.txContratosRecorrentes, 
-        realizado: data.txContratosRecorrentes ?? null, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.txContratosRecorrentes, data.txContratosRecorrentes), 
-        format: 'percent' 
-      },
-      { 
-        id: 'nmql_tx_implantacao', 
-        name: 'Tx de Contratos Implantação', 
-        type: 'manual', 
-        orcado: ORCADO_NAO_MQL.txContratosImplantacao, 
-        realizado: data.txContratosImplantacao ?? null, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.txContratosImplantacao, data.txContratosImplantacao), 
-        format: 'percent' 
-      },
-      { 
-        id: 'nmql_contratos_acel', 
-        name: 'Nº Novos Contratos Aceleração não-MQL', 
-        type: 'formula', 
-        orcado: ORCADO_NAO_MQL.contratosAceleracao, 
-        realizado: data.contratosAceleracao ?? 0, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.contratosAceleracao, data.contratosAceleracao), 
-        format: 'number', 
-        emoji: '🏎️' 
-      },
-      { 
-        id: 'nmql_ticket_acel', 
-        name: 'Ticket Médio Aceleração não-MQL', 
-        type: 'manual', 
-        orcado: ORCADO_NAO_MQL.ticketMedioAceleracao, 
-        realizado: data.ticketMedioAceleracao ?? null, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.ticketMedioAceleracao, data.ticketMedioAceleracao), 
-        format: 'currency', 
-        emoji: '🏎️' 
-      },
-      { 
-        id: 'nmql_fat_acel', 
-        name: 'Faturamento Aceleração (MRR novo) de não-MQL', 
-        type: 'formula', 
-        orcado: ORCADO_NAO_MQL.faturamentoAceleracao, 
-        realizado: data.faturamentoAceleracao ?? 0, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.faturamentoAceleracao, data.faturamentoAceleracao), 
-        format: 'currency', 
-        emoji: '🏎️' 
-      },
-      { 
-        id: 'nmql_contratos_impl', 
-        name: 'Nº Novos Contratos Implantação não-MQL', 
-        type: 'formula', 
-        orcado: ORCADO_NAO_MQL.contratosImplantacao, 
-        realizado: data.contratosImplantacao ?? 0, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.contratosImplantacao, data.contratosImplantacao), 
-        format: 'number', 
-        emoji: '🔧' 
-      },
-      { 
-        id: 'nmql_ticket_impl', 
-        name: 'Ticket Médio Implantação não-MQL', 
-        type: 'manual', 
-        orcado: ORCADO_NAO_MQL.ticketMedioImplantacao, 
-        realizado: data.ticketMedioImplantacao ?? null, 
-        percentual: calcPercentual(ORCADO_NAO_MQL.ticketMedioImplantacao, data.ticketMedioImplantacao), 
-        format: 'currency', 
-        emoji: '🔧' 
-      },
-      {
-        id: 'nmql_fat_impl',
-        name: 'Faturamento Implantação não-MQL',
-        type: 'formula',
-        orcado: ORCADO_NAO_MQL.faturamentoImplantacao,
-        realizado: data.faturamentoImplantacao ?? 0,
-        percentual: calcPercentual(ORCADO_NAO_MQL.faturamentoImplantacao, data.faturamentoImplantacao),
-        format: 'currency',
-        emoji: '🔧'
-      },
-      {
-        id: 'nmql_fat_total',
-        name: 'Faturamento Total não-MQL',
-        type: 'formula',
-        orcado: ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoImplantacao,
-        realizado: (data.faturamentoAceleracao ?? 0) + (data.faturamentoImplantacao ?? 0),
-        percentual: calcPercentual(ORCADO_NAO_MQL.faturamentoAceleracao + ORCADO_NAO_MQL.faturamentoImplantacao, (data.faturamentoAceleracao ?? 0) + (data.faturamentoImplantacao ?? 0)),
-        format: 'currency'
-      },
-    ];
-  };
+  // buildNaoMqlMetrics delega ao shared (fonte única), injetando ORCADO_NAO_MQL.
+  const buildNaoMqlMetrics = (data: NaoMQLMetrics, investimento: number | null = null): Metric[] =>
+    sharedBuildNaoMqlMetrics(data, ORCADO_NAO_MQL, investimento);
 
   const naoMqlMetrics: Metric[] = useMemo(() => {
     const cur = buildNaoMqlMetrics(naoMqlData || {} as NaoMQLMetrics, adsData?.investimento ?? null);
