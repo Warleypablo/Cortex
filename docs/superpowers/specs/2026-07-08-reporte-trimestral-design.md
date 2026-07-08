@@ -27,7 +27,7 @@ novos de tendência. Não toca no endpoint mensal, que está em produção.
 | Comparação | **QoQ — vs trimestre anterior** (número + variação ▲/▼). YoY inviável hoje (histórico de snapshots só desde ~nov/2025) |
 | Gráficos de evolução | Séries deixam de ser **mês-a-mês** e passam a ser **por trimestre** (eixo X = Q1, Q2, Q3…) |
 | Como construir | **Endpoint dedicado** `server/routes/reportsTrimestral.ts` espelhando o mensal (não parametriza o mensal, não chama o mensal 3×) |
-| NPS | Foto do **último mês** do trimestre + série por trimestre |
+| NPS | **Reusa `SlideNPS` como está** (hardcoded — não há fonte de dados de NPS no banco; `NPS_DATA` é constante atualizada à mão) passando o label do trimestre. Sem série/QoQ de NPS |
 | Ranking Closers | Mantém (agregado no trimestre) |
 | Top Operadores | Corta (operacional) |
 | Highlights do trimestre | Fica para **v2** (depende de persistência/CRUD de slides custom) |
@@ -104,8 +104,9 @@ os meses fechados/decorridos e a foto usa o snapshot mais recente disponível.
 > `receitaChurnSeries`) precisam ser **re-agregadas por trimestre**, não apenas
 > fatiadas.
 
-**Ambiguidade resolvida — NPS:** foto do **último mês** do trimestre (mês
-fechado mais recente) + série por trimestre. Não é média dos 3 meses.
+**NPS (corrigido na investigação):** `SlideNPS` é hardcoded (constante
+`NPS_DATA` atualizada manualmente; não há tabela de NPS). Reusa-se o slide como
+está, passando apenas o label do trimestre. Não há foto/série/QoQ de NPS.
 
 **Robustez:** as seções rodam em paralelo com tolerância a falha — uma seção
 que falhar retorna `null`/vazio em vez de derrubar a resposta inteira
@@ -139,6 +140,7 @@ componentes de slide existentes renderizarem sem adaptação) **+** um bloco nov
   "techData":     { /* ... */ },
   "nps":          { /* foto do último mês + série por tri */ },
   "faturamentoYtd": { /* YTD até o fim do tri */ }
+  // NPS não entra no payload: SlideNPS é hardcoded, recebe só o label
 }
 ```
 
@@ -183,7 +185,7 @@ componentes de slide existentes renderizarem sem adaptação) **+** um bloco nov
 6. **Ranking Squads** `R` + **Squad individual × N** `R` (`SlideSquadSingle`, tri)
 7. **Pontual** `R` (`SlidePontual` tri)
 8. **Tech** `R` (`SlideAreaTech` tri)
-9. **NPS** `R` (foto do último mês + série por tri)
+9. **NPS** `R` (`SlideNPS` hardcoded, recebe o label do tri)
 10. **Financeiro YTD** `R` (YTD até o fim do tri)
 11. **Encerramento** `R`
 
