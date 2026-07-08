@@ -12,6 +12,7 @@ import { useUpload } from "@/hooks/use-upload";
 import SlideCapa from "./relatorio-mensal/SlideCapa";
 import SlideQRCode from "./relatorio-mensal/SlideQRCode";
 import SlideNovosAniversariantes from "./relatorio-mensal/SlideNovosAniversariantes";
+import SlidePromocoes from "./relatorio-mensal/SlidePromocoes";
 import SlideAniversarioEmpresa from "./relatorio-mensal/SlideAniversarioEmpresa";
 import SlideFaturamentoYtd from "./relatorio-mensal/SlideFaturamentoYtd";
 import SlideVendasYtd from "./relatorio-mensal/SlideVendasYtd";
@@ -98,6 +99,12 @@ function buildSlotArray(customSlides: CustomSlide[], squadDetails: SquadDetail[]
       }
     } else {
       slots.push({ type: "fixed", fixedIndex: i, name: FIXED_SLIDE_NAMES[i] });
+    }
+    // Promoções do Trimestre — logo após "Novos & Aniversários" (índice 2).
+    // fixedIndex 100 fica fora da faixa sequencial (0–24), então não desloca nenhum
+    // slide existente nem colide com o switch de renderFixedSlide.
+    if (i === 2) {
+      slots.push({ type: "fixed", fixedIndex: 100, name: "Promoções" });
     }
     // Tópicos Finais (princípios) — logo após o Turbo Store (índice 22).
     // Começa com a lista vazia (reveal 0) e cada avanço faz o próximo tópico surgir (0→6 = 7 slides).
@@ -317,6 +324,9 @@ export default function RelatorioMensal() {
       case 22: return <SlideTurboStore />;
       case 23: return <SlideFraseEncerramento />;
       case 24: return <SlideQRCode />;
+      // Índice fora da faixa sequencial (0–24): inserido manualmente no buildSlotArray,
+      // logo após "Novos & Aniversários", sem renumerar os slides existentes.
+      case 100: return <SlidePromocoes promocoes={data.promocoes} />;
       default: return null;
     }
   };

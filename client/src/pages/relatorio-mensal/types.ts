@@ -280,10 +280,16 @@ export interface TopOperadores {
   topEntregas: OperadorRanking[];
 }
 
+export interface Promocao {
+  nome: string;
+  fotoUrl: string | null;
+}
+
 export interface RelatorioMensalData {
   mesReferencia: string;
   mesLabel: string;
   mesDadosLabel: string;
+  promocoes: Promocao[];
   novosColaboradores: NovoColaborador[];
   aniversariantes: Aniversariante[];
   aniversariosEmpresa: AniversarioEmpresa[];
