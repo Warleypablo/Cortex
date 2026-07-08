@@ -1,6 +1,7 @@
 // server/routes/bp2026.pontual.helpers.ts
 // Ponte do estoque pontual via snapshot-diff de cup_data_hist (helpers puros).
-// Estoque pontual = valorp>0 e status fora da lista de exclusão. A ponte fecha:
+// Estoque pontual = valorp>0 e status fora da lista de exclusão (inclui "em cancelamento",
+// que conta como churn — alinhado ao MRR). A ponte fecha:
 // estoque_ini + venda − entrega − churn − deletados − saída_atípica + reajuste = estoque_fim.
 
 export interface RegPontual {
@@ -13,8 +14,12 @@ export interface RegPontual {
   produto?: string;             // produto do contrato no snapshot (p/ expandir linhas por produto)
 }
 
-const ESTOQUE_STATUS_EXCLUDE = new Set(["entregue", "cancelado/inativo", "não usar"]);
-const CHURN_STATUS = new Set(["cancelado/inativo", "não usar"]);
+// "em cancelamento" sai do estoque E conta como churn (alinhado ao churn de MRR, que
+// também não considera "em cancelamento" no MRR ativo). O churn é reconhecido quando o
+// contrato entra em cancelamento; ao efetivar (cancelado/inativo) não conta de novo,
+// pois já saíra do estoque no mês anterior.
+const ESTOQUE_STATUS_EXCLUDE = new Set(["entregue", "cancelado/inativo", "não usar", "em cancelamento"]);
+const CHURN_STATUS = new Set(["cancelado/inativo", "não usar", "em cancelamento"]);
 
 const ANO = 2026;
 
@@ -169,12 +174,13 @@ export function classificarPontePorSquad(
 // Limiar para esconder squads pequenos: < R$ 10K no mês corrente vão para "· Outros".
 export const SQUAD_MIN_EXIBIR = 10000;
 
+// "em cancelamento" saiu daqui: não é mais estoque (virou churn). Os demais status
+// compõem o estoque final; "· Outros status" (defensiva) captura qualquer novo status.
 export const STATUS_DECOMP = [
   { chave: "ativo", titulo: "· Em execução (ativo)" },
   { chave: "triagem", titulo: "· Triagem" },
   { chave: "pausado", titulo: "· Pausado" },
   { chave: "onboarding", titulo: "· Onboarding" },
-  { chave: "em cancelamento", titulo: "· Em cancelamento" },
 ] as const;
 
 export interface LinhaPontual {

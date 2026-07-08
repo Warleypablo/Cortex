@@ -114,7 +114,7 @@ const atual = [
 describe("ehEstoquePontual", () => {
   it("exige valorp>0 e status fora da lista de exclusão", () => {
     expect(ehEstoquePontual({ idSubtask: "x", valorp: 10, status: "ativo" })).toBe(true);
-    expect(ehEstoquePontual({ idSubtask: "x", valorp: 10, status: "em cancelamento" })).toBe(true);
+    expect(ehEstoquePontual({ idSubtask: "x", valorp: 10, status: "em cancelamento" })).toBe(false); // vira churn
     expect(ehEstoquePontual({ idSubtask: "x", valorp: 0, status: "ativo" })).toBe(false);
     expect(ehEstoquePontual({ idSubtask: "x", valorp: 10, status: "entregue" })).toBe(false);
     expect(ehEstoquePontual({ idSubtask: "x", valorp: 10, status: "cancelado/inativo" })).toBe(false);
@@ -174,6 +174,28 @@ describe("classificarPonte — sub-categorias da venda", () => {
     // H tem criadoYm 2025-11 (defasada) mas estava no snapshot anterior fora do estoque -> reativação
     expect(p.reativacao).toBe(400);
     expect(p.entradaDefasada).toBe(200); // só P, não H
+  });
+});
+
+describe("classificarPonte — 'em cancelamento' conta como churn (alinhado ao MRR)", () => {
+  const ant = [
+    { idSubtask: "A", valorp: 1000, status: "ativo" }, // vira em cancelamento -> churn
+    { idSubtask: "B", valorp: 500, status: "ativo" },  // permanece
+  ];
+  const atual = [
+    { idSubtask: "A", valorp: 1000, status: "em cancelamento" }, // churn (sai do estoque)
+    { idSubtask: "B", valorp: 500, status: "ativo" },            // permanece
+  ];
+  const p = classificarPonte(ant, atual, "2026-05");
+  it("ativo → em cancelamento entra no churn e sai do estoque final", () => {
+    expect(p.estoqueIni).toBe(1500);
+    expect(p.churn).toBe(1000);
+    expect(p.estoqueFim).toBe(500);
+    expect(p.estoqueIni - p.churn).toBe(p.estoqueFim); // ponte fecha
+  });
+  it("em cancelamento não aparece na decomposição do estoque", () => {
+    expect(decomporStatus(atual)["em cancelamento"]).toBeUndefined();
+    expect(decomporStatus(atual)["ativo"]).toBe(500);
   });
 });
 
