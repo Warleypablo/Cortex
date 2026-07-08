@@ -554,7 +554,10 @@ function AppLayout() {
       <SidebarProvider style={style as React.CSSProperties}>
         <div className="flex h-screen w-full">
           <AppSidebar />
-          <div className="flex flex-col flex-1 overflow-hidden">
+          {/* min-w-0: sem isso, um flex item tem min-width:auto e NÃO encolhe abaixo do
+             conteúdo — tabelas largas (ex: Scorecard, min-w-[760px]) estouram o layout e as
+             colunas são cortadas em vez de scrollar dentro do próprio overflow-x-auto. */}
+          <div className="flex min-w-0 flex-col flex-1 overflow-hidden">
             <TopBar />
             <main className="flex-1 overflow-auto">
               <Router />
