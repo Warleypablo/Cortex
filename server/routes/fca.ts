@@ -757,7 +757,11 @@ function montarLinhasV5(args: { media: any; mql: any; nmql: any; metas: { ma: an
   const sc = (v: any): number | null => { const n = numOr(v); return n == null ? null : n * fator7d; };
 
   const invest = numOr(media.investimento, 0)!;
-  const lpv = numOr(media.visualizacoesPagina, 0)!;
+  // Visualizações de Página: a UI (Aprofundado Meta, buildMetaAdsMetrics) usa a base do
+  // PIXEL (visualizacoesPaginaPixel), não o landing_page_views cru do Meta — é o que
+  // alimenta Connect Rate e Tx Conversão da Página. Fallback pra crua onde não há pixel
+  // (TikTok/Google via query nativa não trazem *Pixel).
+  const lpv = numOr(media.visualizacoesPaginaPixel ?? media.visualizacoesPagina, 0)!;
   const sess = numOr(media.sessoes, 0)!;
   const mqls = numOr(mql.totalMqls, 0)!;
   const nmqls = numOr(nmql.totalNaoMqls, 0)!;
@@ -775,7 +779,7 @@ function montarLinhasV5(args: { media: any; mql: any; nmql: any; metas: { ma: an
       { name: "CTR de saída", fmt: "percent", kind: "pct", r: numOr(media.ctr), o: numOr(m.ctr) },
       { name: "Visualizações de Página", fmt: "number", kind: "abs", r: lpv, o: sc(m.visualizacoesPagina) },
       { name: "Sessões", fmt: "number", kind: "abs", r: sess, o: sc(m.sessoes) },
-      { name: "Connect Rate", fmt: "percent", kind: "pct", r: numOr(media.connectRate), o: numOr(m.connectRate) },
+      { name: "Connect Rate", fmt: "percent", kind: "pct", r: numOr(media.connectRatePixel ?? media.connectRate), o: numOr(m.connectRate) },
       { name: "Tx Conversão da Página — Visualização de Página", fmt: "percent", kind: "pct", r: div(leads, lpv), o: numOr(m.taxaConversaoPagina) },
       { name: "MQL", fmt: "percent", kind: "pct", r: div(mqls, lpv), o: null, indent: true },
       { name: "Não-MQL", fmt: "percent", kind: "pct", r: div(nmqls, lpv), o: null, indent: true },
