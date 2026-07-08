@@ -4,7 +4,13 @@ import { sql } from "drizzle-orm";
 import Anthropic from "@anthropic-ai/sdk";
 import OpenAI from "openai";
 import { GoogleGenerativeAI } from "@google/generative-ai";
-import { renderAprofundadoImage, uploadFcaImage, type FcaSection } from "../fca/aprofundadoImage";
+import { renderAprofundadoImage, uploadFcaImage, type FcaSection, type FcaMetric } from "../fca/aprofundadoImage";
+import {
+  buildMetaAdsMetrics, buildGoogleAdsMetrics, buildTiktokAdsMetrics,
+  fcaKindInv,
+  DEFAULT_ORCADO_META_ADS, DEFAULT_ORCADO_GOOGLE_ADS, DEFAULT_ORCADO_TIKTOK_ADS,
+  type Metric, type PlatformFunnelData,
+} from "@shared/orcadoRealizado/aprofundado";
 
 const CLICKUP_API_KEY = process.env.CLICKUP_API_KEY!;
 const CLICKUP_FCA_LIST_ID = "901322140780";
@@ -703,12 +709,22 @@ async function updateTaskDescription(taskId: string, markdown: string) {
 
 // ===================== FCA v5 (imagem do Aprofundado + FATO/CAUSA/AÇÃO) =====================
 
-// Canal → endpoint de mídia do Aprofundado (null = sem endpoint dedicado, usa query nativa do FCA)
-// + utm_source pra atribuir as pré-vendas (PLATFORM_TO_UTM).
-const CANAL_APROFUNDADO: Record<string, { media: string | null; utm: string }> = {
-  metaAds: { media: "meta-ads", utm: "facebook" },
-  googleAds: { media: "google-ads", utm: "google" },
-  tiktokAds: { media: null, utm: "tiktok_ads" }, // TikTok não tem endpoint de mídia no Aprofundado → spend nativo, sem pixel
+// Canal → endpoint de mídia do Aprofundado + utm_source (atribuição das pré-vendas/funil)
+// + chave do funnel-by-platform (fonte de Leads/MQLs, IGUAL à tela) + orçado default.
+// Todos os 3 canais têm endpoint de mídia próprio (meta/google/tiktok-ads), então a
+// imagem é a MESMA que a aba Aprofundado mostra — sem query paralela divergente.
+const CANAL_APROFUNDADO: Record<string, { media: string; utm: string; funnelKey: string }> = {
+  metaAds: { media: "meta-ads", utm: "facebook", funnelKey: "meta_ads" },
+  googleAds: { media: "google-ads", utm: "google", funnelKey: "google_ads" },
+  tiktokAds: { media: "tiktok-ads", utm: "tiktok_ads", funnelKey: "tiktok_ads" },
+};
+
+// Default de orçado por canal (mesmos da UI). O real vem de getMetas().metricas, que é
+// o MESMO JSON que a tela mescla como budgetsData[segmento] → orçado idêntico por construção.
+const DEFAULT_ORCADO_BY_CANAL: Record<string, Record<string, number | null | undefined>> = {
+  metaAds: DEFAULT_ORCADO_META_ADS,
+  googleAds: DEFAULT_ORCADO_GOOGLE_ADS,
+  tiktokAds: DEFAULT_ORCADO_TIKTOK_ADS,
 };
 
 // Janela 7D rolling (últimos 7 dias fechados = ontem − 6 → ontem).
@@ -720,8 +736,10 @@ function periodo7D(now: Date) {
   return { de: fmtDate(de), ate: fmtDate(ate), mesRef, diasMes, dias: 7 };
 }
 
-// Puxa os MESMOS números da aba Aprofundado (self-call interno, FCA_API_TOKEN autoriza GET).
-async function fetchAprofundado(canal: string, funil: string, campaignLike: string, de: string, ate: string) {
+// Puxa os MESMOS payloads que a aba Aprofundado consome (self-call interno, FCA_API_TOKEN
+// autoriza GET). Mídia (detail), funnel-by-platform (Leads/MQLs — FONTE da tela), mql e
+// nao-mql — todos com os MESMOS params (funilNgc + utmSource) que a UI passa.
+async function fetchAprofundado(canal: string, funil: string, de: string, ate: string) {
   const port = process.env.PORT || "3000";
   const base = `http://127.0.0.1:${port}/api/growth/orcado-realizado`;
   const cfg = CANAL_APROFUNDADO[canal] || CANAL_APROFUNDADO.metaAds;
@@ -732,16 +750,14 @@ async function fetchAprofundado(canal: string, funil: string, campaignLike: stri
     if (!r.ok) throw new Error(`${u} → ${r.status}`);
     return r.json() as any;
   };
-  // Mídia: Meta/Google têm endpoint dedicado (trazem sessões/pixel). TikTok não tem →
-  // usa a query nativa do FCA (só spend/cpm/ctr; sem sessões/connect/LPV de pixel).
-  const mediaP = cfg.media
-    ? j(`${base}/${cfg.media}?${q}`)
-    : midiaRealizado(canal, campaignLike, { de, ate }).then((mr) => ({
-        investimento: mr.investimento, cpm: mr.cpm, ctr: mr.ctr,
-        visualizacoesPagina: mr.lpv, sessoes: 0, connectRate: null,
-      }));
-  const [media, mql, nmql] = await Promise.all([mediaP, j(`${base}/mql?${q}`), j(`${base}/nao-mql?${q}`)]);
-  return { media, mql, nmql };
+  const [media, funnelAll, mql, nmql] = await Promise.all([
+    j(`${base}/${cfg.media}?${q}`),
+    j(`${base}/funnel-by-platform?${q}`),
+    j(`${base}/mql?${q}`),
+    j(`${base}/nao-mql?${q}`),
+  ]);
+  const funnel = (funnelAll?.[cfg.funnelKey] || undefined) as PlatformFunnelData | undefined;
+  return { media, funnel, mql, nmql };
 }
 
 const numOr = (v: any, d: number | null = null): number | null =>
@@ -749,49 +765,49 @@ const numOr = (v: any, d: number | null = null): number | null =>
 const div = (a: number | null, b: number | null): number | null =>
   (a == null || b == null || b === 0) ? null : a / b;
 
-// Monta as seções/linhas idênticas ao Aprofundado (Meta), com quebras MQL/Não-MQL.
-// Orçado mensal das absolutas é escalado pra 7D (× dias/diasMes); taxas/percentuais não escalam.
-function montarLinhasV5(args: { media: any; mql: any; nmql: any; metas: { ma: any; mql: any; nmql: any }; fator7d: number }): FcaSection[] {
-  const { media, mql, nmql, metas, fator7d } = args;
-  const m = metas.ma || {}, mm = metas.mql || {}, mn = metas.nmql || {};
-  const sc = (v: any): number | null => { const n = numOr(v); return n == null ? null : n * fator7d; };
+// Metric (shape da tela) → FcaMetric (shape da imagem). r/o vêm 100% dos builders shared;
+// kind/inv são derivados por fcaKindInv (single-source, não diverge linha a linha).
+function metricToFca(m: Metric): FcaMetric {
+  const { kind, inv } = fcaKindInv(m);
+  return {
+    name: m.name,
+    fmt: m.format,
+    kind,
+    r: typeof m.realizado === "number" ? m.realizado : null,
+    o: typeof m.orcado === "number" ? m.orcado : null,
+    inv: inv || undefined,
+    indent: m.indent ? true : undefined,
+  };
+}
+
+// Monta as seções da imagem. A seção "Growth — Mídia" sai DIRETO dos builders shared
+// (buildMetaAdsMetrics/Google/TikTokAds) → IDÊNTICA à aba Aprofundado por construção.
+// Orçado é MENSAL (a meta do mês, como na tela) — sem escala pra 7D. Pré-vendas e
+// Resultado seguem curados (resumo de 3 linhas cada + agregação de vendas).
+function montarSecoesV5(args: {
+  canal: string;
+  media: any;
+  funnel: PlatformFunnelData | undefined;
+  mql: any; nmql: any;
+  orcadoAds: Record<string, number | null | undefined>;
+  metasMql: any; metasNmql: any;
+}): FcaSection[] {
+  const { canal, media, funnel, mql, nmql, orcadoAds, metasMql, metasNmql } = args;
+  const mm = metasMql || {}, mn = metasNmql || {};
+
+  const builder = canal === "googleAds" ? buildGoogleAdsMetrics
+    : canal === "tiktokAds" ? buildTiktokAdsMetrics
+    : buildMetaAdsMetrics;
+  const midia: FcaMetric[] = builder(media as any, funnel, orcadoAds).map(metricToFca);
 
   const invest = numOr(media.investimento, 0)!;
-  // Visualizações de Página: a UI (Aprofundado Meta, buildMetaAdsMetrics) usa a base do
-  // PIXEL (visualizacoesPaginaPixel), não o landing_page_views cru do Meta — é o que
-  // alimenta Connect Rate e Tx Conversão da Página. Fallback pra crua onde não há pixel
-  // (TikTok/Google via query nativa não trazem *Pixel).
-  const lpv = numOr(media.visualizacoesPaginaPixel ?? media.visualizacoesPagina, 0)!;
-  const sess = numOr(media.sessoes, 0)!;
-  const mqls = numOr(mql.totalMqls, 0)!;
-  const nmqls = numOr(nmql.totalNaoMqls, 0)!;
-  const leads = mqls + nmqls;
-
   const somaFat = (d: any) => (numOr(d.faturamentoAceleracao, 0)! + numOr(d.faturamentoImplantacao, 0)!);
   const negocios = numOr(mql.dealsGanhos, 0)! + numOr(nmql.dealsGanhos, 0)!;
   const contratos = numOr(mql.contratosGanhos, 0)! + numOr(nmql.contratosGanhos, 0)!;
   const fatTotal = somaFat(mql) + somaFat(nmql);
 
   return [
-    { title: "Growth — Mídia", metrics: [
-      { name: "Investimento", fmt: "currency", kind: "abs", r: invest, o: sc(m.investimento) },
-      { name: "CPM", fmt: "currency", kind: "rate", r: numOr(media.cpm), o: numOr(m.cpm), inv: true },
-      { name: "CTR de saída", fmt: "percent", kind: "pct", r: numOr(media.ctr), o: numOr(m.ctr) },
-      { name: "Visualizações de Página", fmt: "number", kind: "abs", r: lpv, o: sc(m.visualizacoesPagina) },
-      { name: "Sessões", fmt: "number", kind: "abs", r: sess, o: sc(m.sessoes) },
-      { name: "Connect Rate", fmt: "percent", kind: "pct", r: numOr(media.connectRatePixel ?? media.connectRate), o: numOr(m.connectRate) },
-      { name: "Tx Conversão da Página — Visualização de Página", fmt: "percent", kind: "pct", r: div(leads, lpv), o: numOr(m.taxaConversaoPagina) },
-      { name: "MQL", fmt: "percent", kind: "pct", r: div(mqls, lpv), o: null, indent: true },
-      { name: "Não-MQL", fmt: "percent", kind: "pct", r: div(nmqls, lpv), o: null, indent: true },
-      { name: "Tx Conversão da Página — Sessões", fmt: "percent", kind: "pct", r: div(leads, sess), o: null },
-      { name: "MQL", fmt: "percent", kind: "pct", r: div(mqls, sess), o: null, indent: true },
-      { name: "Não-MQL", fmt: "percent", kind: "pct", r: div(nmqls, sess), o: null, indent: true },
-      { name: "Leads", fmt: "number", kind: "abs", r: leads, o: sc(m.leads) },
-      { name: "CPL", fmt: "currency", kind: "rate", r: div(invest, leads), o: numOr(m.cpl), inv: true },
-      { name: "MQLs", fmt: "number", kind: "abs", r: mqls, o: sc(m.mqls) },
-      { name: "% MQLs", fmt: "percent", kind: "pct", r: div(mqls, leads), o: numOr(m.percMqls) },
-      { name: "CPMQL", fmt: "currency", kind: "rate", r: div(invest, mqls), o: numOr(m.cpmql), inv: true },
-    ]},
+    { title: "Growth — Mídia", metrics: midia },
     { title: "Pré-vendas — MQL", metrics: [
       { name: "%RA MQL", fmt: "percent", kind: "pct", r: numOr(mql.percReuniaoAgendada), o: numOr(mm.percReuniaoAgendada) },
       { name: "% No-show MQL", fmt: "percent", kind: "pct", r: numOr(mql.percNoShow), o: numOr(mm.percNoShow), inv: true },
@@ -815,7 +831,9 @@ function montarLinhasV5(args: { media: any; mql: any; nmql: any; metas: { ma: an
 
 const FCA_V5_SYSTEM = `Você é analista de Growth da Turbo Partners escrevendo a análise de um FCA (Fato, Causa, Ação) sobre a tabela Orçado × Realizado (Aprofundado) de um funil × canal, janela de 7 dias. A tabela (imagem) já está no relatório; você escreve SÓ a análise abaixo dela, em markdown PT-BR, direto, sem floreio.
 
-Regra de status (o que é 🔴): métrica normal fica 🔴 quando % Atingido < 80%; métrica de custo/no-show (invertida) fica 🔴 quando > 120% da meta.
+⚠️ PACING — leia antes de acusar qualquer 🔴: o REALIZADO é de 7 dias, mas o ORÇADO é a meta do MÊS INTEIRO. Então para métricas de VOLUME (absolutos: Investimento, Visualizações de Página, Sessões, Leads, MQLs, Negócios/Contratos, Faturamento), o esperado ao 7º dia é ~7/30 ≈ 23% do orçado. % Atingido de ~23% num absoluto é ESTAR NO RITMO, não é vermelho — NÃO trate volume abaixo de 100% como problema; só sinalize se estiver MUITO abaixo do pacing (ex.: <60% do esperado pró-rata, i.e. <~14% do mês). Já as métricas de TAXA e CUSTO (CPM, CPL, CPMQL, % MQLs, Connect Rate, Tx Conversão da Página, %RA, % No-show, RR→Venda) NÃO escalam com o tempo — compare direto com a meta.
+
+Regra de status (o que é 🔴): para TAXA/CUSTO, métrica normal fica 🔴 quando % Atingido < 80%; métrica de custo/no-show (invertida) fica 🔴 quando > 120% da meta. Para VOLUME, avalie contra o pacing (~23% aos 7 dias), não contra 100%.
 
 Estrutura EXATA (use estes headings):
 
@@ -883,18 +901,23 @@ async function callNarrativaLlm(system: string, user: string): Promise<{ text: s
   return null;
 }
 
-async function gerarNarrativaV5(sections: FcaSection[], ctx: { funil: string; canal: string; de: string; ate: string }): Promise<string> {
+async function gerarNarrativaV5(sections: FcaSection[], ctx: { funil: string; canal: string; de: string; ate: string; diasMes: number }): Promise<string> {
   // Resumo textual das linhas (nome · orçado · realizado · % atingido) pro modelo raciocinar.
+  // Absolutos ganham o pacing esperado (7/diasMes) pra o modelo não confundir volume com 🔴.
+  const pacingPct = Math.round((7 / ctx.diasMes) * 100);
   const resumo = sections.map(s => {
     const linhas = s.metrics.map(x => {
       const pct = (x.o && x.o !== 0 && x.r != null) ? Math.round((x.r / x.o) * 100) + "%" : "s/meta";
       const fr = x.r == null ? "—" : (x.fmt === "percent" ? (x.r * 100).toFixed(1) + "%" : x.fmt === "currency" ? "R$" + x.r.toFixed(2) : String(x.r));
       const fo = x.o == null ? "—" : (x.fmt === "percent" ? (x.o * 100).toFixed(1) + "%" : x.fmt === "currency" ? "R$" + x.o.toFixed(2) : String(x.o));
-      return `${x.indent ? "  " : ""}${x.name}: real=${fr} orçado=${fo} atingido=${pct}${x.inv ? " (menor é melhor)" : ""}`;
+      // Volume = orçado mensal → anota o esperado pró-rata pra 7 dias.
+      const pacing = (x.kind === "abs" && x.o && x.o !== 0)
+        ? ` [volume: esperado ~${pacingPct}% aos 7d]` : "";
+      return `${x.indent ? "  " : ""}${x.name}: real=${fr} orçado=${fo} atingido=${pct}${x.inv ? " (menor é melhor)" : ""}${pacing}`;
     }).join("\n");
     return `## ${s.title}\n${linhas}`;
   }).join("\n\n");
-  const user = `Funil ${ctx.funil} × ${ctx.canal}, 7 dias (${ctx.de} a ${ctx.ate}).\n\n${resumo}`;
+  const user = `Funil ${ctx.funil} × ${ctx.canal}, 7 dias (${ctx.de} a ${ctx.ate}). Orçado = meta do mês (~${ctx.diasMes} dias); pacing esperado de VOLUME aos 7 dias ≈ ${pacingPct}%.\n\n${resumo}`;
   const r = await callNarrativaLlm(FCA_V5_SYSTEM, user);
   if (r) {
     console.log(`[fca v5] narrativa gerada via ${r.provider}`);
@@ -942,28 +965,30 @@ export function registerFcaRoutes(app: Express) {
       // ===== FORMATO V5 (imagem do Aprofundado + FATO/CAUSA/AÇÃO, janela 7D) =====
       if (req.body?.formato === "v5") {
         const p7 = periodo7D(now);
-        const fator7d = p7.dias / p7.diasMes;
         const [mAds, mMql, mNmql] = await Promise.all([
           getMetas(funil, p7.mesRef, canalCfg.segmento),
           getMetas(funil, p7.mesRef, "mql"),
           getMetas(funil, p7.mesRef, "nao_mql"),
         ]);
-        const dados = await fetchAprofundado(canal, funil, campaignLike, p7.de, p7.ate);
-        const sections = montarLinhasV5({
-          media: dados.media, mql: dados.mql, nmql: dados.nmql,
-          metas: { ma: mAds.metricas, mql: mMql.metricas, nmql: mNmql.metricas },
-          fator7d,
+        const dados = await fetchAprofundado(canal, funil, p7.de, p7.ate);
+        // Orçado = meta MENSAL, mesclada como na tela ({...DEFAULT, ...budgets[segmento]}).
+        const orcadoAds = { ...(DEFAULT_ORCADO_BY_CANAL[canal] || DEFAULT_ORCADO_META_ADS), ...(mAds.metricas || {}) };
+        const sections = montarSecoesV5({
+          canal, media: dados.media, funnel: dados.funnel, mql: dados.mql, nmql: dados.nmql,
+          orcadoAds, metasMql: mMql.metricas, metasNmql: mNmql.metricas,
         });
         const canalLabel = CANAL_LABEL[canal] || canal;
         const png = await renderAprofundadoImage({
           titulo: `Orçado × Realizado — Aprofundado · ${funil} × ${canalLabel}`,
-          subtitulo: `Últimos 7 dias · ${fmtBR(p7.de)}–${fmtBR(p7.ate)}`,
-          sections, propDias: 1, diasMes: p7.dias, diasRestantes: 0,
+          subtitulo: `Realizado últimos 7 dias · ${fmtBR(p7.de)}–${fmtBR(p7.ate)} · Orçado = meta do mês`,
+          // Orçado é mensal: propDias=1 → % Atingido = realizado/meta-do-mês (pacing);
+          // Previsão As Is = realizado; Recálculo desligado (diasRestantes=0).
+          sections, propDias: 1, diasMes: p7.diasMes, diasRestantes: 0,
         });
-        const narrativa = await gerarNarrativaV5(sections, { funil, canal, de: p7.de, ate: p7.ate });
+        const narrativa = await gerarNarrativaV5(sections, { funil, canal, de: p7.de, ate: p7.ate, diasMes: p7.diasMes });
 
         if (!createTask) {
-          return res.json({ ok: true, formato: "v5", funil, canal, periodo: p7, narrativa, note: "createTask=false — imagem não anexada" });
+          return res.json({ ok: true, formato: "v5", funil, canal, periodo: p7, sections, narrativa, note: "createTask=false — imagem não anexada" });
         }
         const task = await criarTaskClickUp({
           funil, canal,
