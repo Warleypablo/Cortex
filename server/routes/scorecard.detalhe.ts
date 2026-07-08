@@ -49,6 +49,10 @@ export interface DrillDetalhe {
   /** Omitido para composições (ex: `churn_pct`) — soma dos componentes não é uma leitura útil
      (é uma razão, não um total). */
   total?: number;
+  /** Presente quando `total` NÃO é a soma de uma coluna "brl" (ex: `contratos_ativos`: `total` é
+     uma CONTAGEM de linhas) — diz ao DrillSheet o tipo certo para formatar `total` no rodapé.
+     Ver DrillColuna["tipo"]/DrillSheet.tsx (client). */
+  totalTipo?: DrillColuna["tipo"];
   /** Só presente em drills de COMPOSIÇÃO (ex: `churn_pct`) — texto exibido acima da tabela. */
   formula?: string;
 }
@@ -109,6 +113,11 @@ const COLUNAS_CHURN: DrillColuna[] = [
   { chave: "valor", label: "Valor", tipo: "brl" },
 ];
 
+/** Como `COLUNAS_CHURN`, + coluna "Abonado" (Sim/Não) — só usada pelo Churn Recorrente GERAL
+   (sem `dim`), que agora inclui abonados na soma (ver `montarChurnRecorrenteDetalhe`). A coluna
+   dá transparência: mostra QUAIS linhas são abonadas em vez de escondê-las silenciosamente. */
+const COLUNAS_CHURN_RECORRENTE: DrillColuna[] = [...COLUNAS_CHURN, { chave: "abonado", label: "Abonado", tipo: "text" }];
+
 interface ChurnDetalheRow {
   cliente: string | null;
   produto: string | null;
@@ -116,25 +125,36 @@ interface ChurnDetalheRow {
   operador: string | null;
   squad: string | null;
   valor: number | string;
+  /** Só preenchido pelo Churn Recorrente (`abonado`: "Sim"/"Não") — Churn Pontual não tem esse
+     conceito (cup_contratos não tem `abonar_churn`), reusa a mesma interface sem essa chave. */
+  abonado?: string;
 }
 
-/** Churn Recorrente — lista de contratos churnados no mês, mesma fonte/exclusões de
-   `fetchChurnPorDimensao`: `valor_r > 0`, `abonar_churn <> 'Sim'`, motivo fora dos 3 que não
-   contam como churn legítimo. `dim`/`valor` (opcionais) filtram um breakdown específico
-   (ex: clique em "Performance" na seção "Por produto"). */
+/** Churn Recorrente — lista de contratos churnados no mês.
+   SEM `dim` (GERAL): mesma fonte/exclusões do CARD "Churn R$" (`turboMetrics.churnMrr`,
+   `relatorioMensalSlides.ts` ~L428-434) — `valor_r > 0`, motivo fora dos 3 que não contam como
+   churn legítimo, mas SEM excluir abonados (o card soma TODOS, decisão de 2026-06-18 documentada
+   naquele arquivo). Antes este drill excluía abonados incondicionalmente e o total ficava ABAIXO
+   do card (ex.: R$146.177 vs R$150.174 em 2026-06) — fix: geral agora bate byte-a-byte com o
+   card; a coluna "Abonado" (Sim/Não) mantém a transparência de quais linhas são abonadas.
+   COM `dim` (breakdown por produto/operador/squad/motivo): CONTINUA excluindo abonados
+   (`abonar_churn <> 'Sim'`) — mesma fonte/exclusões de `fetchChurnPorDimensao` (scorecard.ts),
+   que também exclui; não mudar isso quebraria a reconciliação com aquelas séries. */
 export async function montarChurnRecorrenteDetalhe(mes: string, dim?: string, valor?: string): Promise<DrillDetalhe> {
   const { inicio, fim } = limitesMes(mes);
   const coluna = dim ? DIM_COLUNA_CHURN_RECORRENTE[dim] : undefined;
   const filtroDim = filtroDimSql("c", coluna, valor);
+  const filtroAbonado = dim ? sql`AND COALESCE(c.abonar_churn,'') <> 'Sim'` : sql``;
 
   const result = await db.execute(sql`
     SELECT cl.nome AS cliente, c.produto AS produto, c.motivo_cancelamento AS motivo,
-           c.responsavel_geral AS operador, c.squad AS squad, c.valor_r::numeric AS valor
+           c.responsavel_geral AS operador, c.squad AS squad, c.valor_r::numeric AS valor,
+           CASE WHEN COALESCE(c.abonar_churn,'') = 'Sim' THEN 'Sim' ELSE 'Não' END AS abonado
     FROM cortex_core.vw_cup_churn_ajustado c
     LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.parent_id
     WHERE c.valor_r > 0
       AND c.data_solicitacao_encerramento >= ${inicio}::date AND c.data_solicitacao_encerramento < ${fim}::date
-      AND COALESCE(c.abonar_churn,'') <> 'Sim'
+      ${filtroAbonado}
       AND COALESCE(c.motivo_cancelamento,'') NOT IN ('Inadimplente 1º Mês','Não começou','Erro na Venda')
       ${filtroDim}
     ORDER BY valor DESC
@@ -146,7 +166,7 @@ export async function montarChurnRecorrenteDetalhe(mes: string, dim?: string, va
   return {
     titulo: tituloComDim("Churn Recorrente", dim, valor),
     subtitulo: `${linhas.length} contrato${linhas.length === 1 ? "" : "s"} · ${mes}`,
-    colunas: COLUNAS_CHURN,
+    colunas: dim ? COLUNAS_CHURN : COLUNAS_CHURN_RECORRENTE,
     linhas,
     total,
   };

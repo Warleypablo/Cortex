@@ -12,7 +12,6 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { addMeses, limitesMes, ultimoDiaMes } from "./scorecard.helpers";
 import { storage } from "../storage";
-import { getCrosssellDealsDetail, type CrosssellDealsResult } from "../okr2026/metricsAdapter";
 import { fetchSnapRows } from "./bp2026.reconciliacao";
 import { computeReconciliacao, type SnapRow } from "./bp2026.reconciliacao.helpers";
 import type { DrillColuna, DrillDetalhe } from "./scorecard.detalhe";
@@ -241,9 +240,15 @@ export async function montarEstoqueDetalhe(mes: string, variante: "aberto" | "pa
 }
 
 // ---------------------------------------------------------------------------
-// cross_sell — deals de cross-sell que compõem o NRR do mês, mesma fonte/exclusões de
-// `getCrosssellDealsDetail` (server/okr2026/metricsAdapter.ts): "Bitrix".crm_deal,
-// source='PARTNER', cliente pré-existente (1º contrato antes do mês do fechamento).
+// cross_sell — TODOS os deals de cross-sell ganhos no mês, mesma fonte/filtro EXATO do card
+// (turboMetrics.crosssellMrr/crosssellPontual — relatorioMensalSlides.ts ~L450-459):
+// "Bitrix".crm_deal, stage_name='Negócio Ganho', source='PARTNER', por data_fechamento no mês.
+// Fix (auditoria 2026-07): antes delegava para `getCrosssellDealsDetail` (okr2026/metricsAdapter.ts,
+// função mantida — ainda usada por routes.ts), que filtra ADICIONALMENTE por cliente
+// PRÉ-EXISTENTE — subconjunto legítimo ali, mas SUB-CONTAVA este drill vs. o card (ex.:
+// R$132.396/17 deals do subconjunto vs. R$140.396/19 deals — TODOS os PARTNER — em 2026-06).
+// `total` = MRR + Pontual combinados (2 colunas "brl" — o DrillSheet soma cada uma
+// individualmente a partir de `linhas`, ver sua docstring de `total`).
 // ---------------------------------------------------------------------------
 
 const COLUNAS_CROSS_SELL: DrillColuna[] = [
@@ -254,39 +259,50 @@ const COLUNAS_CROSS_SELL: DrillColuna[] = [
   { chave: "valor_pontual", label: "Pontual", tipo: "brl" },
 ];
 
-/** Converte o `CrosssellDealsResult` já buscado no `DrillDetalhe` genérico — pura/testável sem
-   banco. `total` = MRR + Pontual combinados (soma de TODAS as colunas monetárias da tabela); ao
-   conectar o front, os cards "Vendas MRR — Cross-sell" e "Vendas Pontual — Cross-sell" (hoje 2
-   linhas separadas em SecaoReceita.tsx) devem comparar cada um com a subcoluna correspondente
-   (`valor_recorrente`/`valor_pontual`), não com este total combinado. */
-export function converterCrossSellDetalhe(data: CrosssellDealsResult, mes: string): DrillDetalhe {
-  // Sem anotação de tipo explícita de propósito — `linhas` precisa ficar "fresh" (tipo objeto
-  // inferido direto do literal) para ser atribuível a `DrillDetalhe.linhas: Record<string,
-  // unknown>[]`; anotar com uma interface nomeada (ex: `CrossSellLinha[]`) quebra essa
-  // atribuição (TS2322: falta index signature). Mesmo motivo em `montarUpsellDownsellFromSnaps`
-  // e `converterContribuicaoSquadDetalhe` abaixo.
-  const linhas = data.items.map((i) => ({
-    cliente: i.cliente,
-    deal: i.id,
-    closer: i.closer,
-    valor_recorrente: i.recorrente,
-    valor_pontual: i.pontual,
+interface CrossSellRow {
+  cliente: string | null;
+  deal: string;
+  closer: string | null;
+  valor_recorrente: number | string;
+  valor_pontual: number | string;
+}
+
+export async function montarCrossSellDetalhe(mes: string): Promise<DrillDetalhe> {
+  const { inicio, fim } = limitesMes(mes);
+
+  const result = await db.execute(sql`
+    WITH cliente_nome AS (
+      SELECT REGEXP_REPLACE(COALESCE(cnpj, ''), '[^0-9]', '', 'g') AS cnpj_norm, MAX(nome) AS nome
+      FROM "Clickup".cup_clientes WHERE COALESCE(cnpj, '') <> '' GROUP BY 1
+    )
+    SELECT
+      -- nome do ClickUp é mais limpo que o title (sem prefixos "[cross-sell]")
+      COALESCE(NULLIF(cn.nome, ''), NULLIF(d.company_name, ''), d.title, 'Sem nome') AS cliente,
+      d.id AS deal,
+      COALESCE(d.assigned_by_name, '—') AS closer,
+      COALESCE(d.valor_recorrente::numeric, 0) AS valor_recorrente,
+      COALESCE(d.valor_pontual::numeric, 0) AS valor_pontual
+    FROM "Bitrix".crm_deal d
+    LEFT JOIN cliente_nome cn ON REGEXP_REPLACE(COALESCE(d.cnpj, ''), '[^0-9]', '', 'g') = cn.cnpj_norm
+    WHERE d.stage_name = 'Negócio Ganho' AND d.source = 'PARTNER'
+      AND d.data_fechamento >= ${inicio}::date AND d.data_fechamento < ${fim}::date
+    ORDER BY d.valor_recorrente::numeric DESC, d.valor_pontual::numeric DESC
+  `);
+
+  const linhas = (result.rows as unknown as CrossSellRow[]).map((r) => ({
+    ...r,
+    valor_recorrente: Number(r.valor_recorrente) || 0,
+    valor_pontual: Number(r.valor_pontual) || 0,
   }));
+  const total = linhas.reduce((acc, r) => acc + (r.valor_recorrente as number) + (r.valor_pontual as number), 0);
 
   return {
     titulo: "Cross-sell (NRR)",
     subtitulo: `${linhas.length} deal${linhas.length === 1 ? "" : "s"} · ${mes}`,
     colunas: COLUNAS_CROSS_SELL,
     linhas,
-    total: data.total_recorrente + data.total_pontual,
+    total,
   };
-}
-
-export async function montarCrossSellDetalhe(mes: string): Promise<DrillDetalhe> {
-  const inicio = `${mes}-01`;
-  const fimInclusive = ultimoDiaMes(mes); // getCrosssellDealsDetail usa endDate INCLUSIVE (<=)
-  const data = await getCrosssellDealsDetail(inicio, fimInclusive);
-  return converterCrossSellDetalhe(data, mes);
 }
 
 // ---------------------------------------------------------------------------
@@ -464,6 +480,10 @@ export async function montarContratosAtivosDetalhe(): Promise<DrillDetalhe> {
       { chave: "ltv", label: "LTV", tipo: "brl" },
     ],
     linhas,
+    // `total` = CONTAGEM de contratos (int), não soma de MRR/LTV — mrr/ltv (2 colunas "brl") já
+    // são somadas individualmente pelo DrillSheet (ver sua docstring de `total`). `totalTipo:
+    // "int"` evita formatar esta contagem como moeda. Ainda LATENTE (não wired — ver nota acima).
     total: linhas.length,
+    totalTipo: "int",
   };
 }

@@ -1,17 +1,17 @@
 // server/routes/scorecard.detalhe.helpers.test.ts
 // Testes dos helpers PUROS da Fase 2A (sem banco) — os builders que fazem I/O (montar*Detalhe
-// que chamam `db.execute`/`storage`/`getCrosssellDealsDetail`) são validados por reconciliação
-// via psql (ver task-audit-fase2a-report.md), não aqui.
+// que chamam `db.execute`/`storage`) são validados por reconciliação via psql (ver
+// task-audit-fase2a-report.md / task-audit-fix-report.md), não aqui. `montarCrossSellDetalhe`
+// (fix 2026-07: lista TODOS os deals PARTNER do mês, sem mais depender de
+// `getCrosssellDealsDetail`/`CrosssellDealsResult`) é 100% db.execute — validado via psql.
 import { describe, it, expect } from "vitest";
 import {
   DIM_COLUNA_MRR_ATIVO,
   DIM_COLUNA_ENTREGUE,
-  converterCrossSellDetalhe,
   montarUpsellDownsellFromSnaps,
   converterContribuicaoSquadDetalhe,
 } from "./scorecard.detalhe.helpers";
 import type { SnapRow } from "./bp2026.reconciliacao.helpers";
-import type { CrosssellDealsResult } from "../okr2026/metricsAdapter";
 
 describe("DIM_COLUNA_MRR_ATIVO / DIM_COLUNA_ENTREGUE", () => {
   it("mapeia squad/operador do MRR Ativo — operador usa 'responsavel' (mesmo padrão do Churn Pontual)", () => {
@@ -20,37 +20,6 @@ describe("DIM_COLUNA_MRR_ATIVO / DIM_COLUNA_ENTREGUE", () => {
 
   it("mapeia produto/operador/squad do Entregue", () => {
     expect(DIM_COLUNA_ENTREGUE).toEqual({ produto: "produto", operador: "responsavel", squad: "squad" });
-  });
-});
-
-describe("converterCrossSellDetalhe", () => {
-  const data: CrosssellDealsResult = {
-    items: [
-      { id: "1", cliente: "Cliente A", closer: "Fulano", recorrente: 5000, pontual: 0, data_fechamento: "2026-06-10" },
-      { id: "2", cliente: "Cliente B", closer: "Beltrano", recorrente: 0, pontual: 3000, data_fechamento: "2026-06-15" },
-    ],
-    total_recorrente: 5000,
-    total_pontual: 3000,
-    count: 2,
-  };
-
-  it("converte items em linhas com cliente/deal/closer/valor_recorrente/valor_pontual", () => {
-    const d = converterCrossSellDetalhe(data, "2026-06");
-    expect(d.linhas).toEqual([
-      { cliente: "Cliente A", deal: "1", closer: "Fulano", valor_recorrente: 5000, valor_pontual: 0 },
-      { cliente: "Cliente B", deal: "2", closer: "Beltrano", valor_recorrente: 0, valor_pontual: 3000 },
-    ]);
-  });
-
-  it("total = recorrente + pontual combinados", () => {
-    const d = converterCrossSellDetalhe(data, "2026-06");
-    expect(d.total).toBe(8000);
-  });
-
-  it("sem deals → linhas vazias, total 0", () => {
-    const d = converterCrossSellDetalhe({ items: [], total_recorrente: 0, total_pontual: 0, count: 0 }, "2026-06");
-    expect(d.linhas).toEqual([]);
-    expect(d.total).toBe(0);
   });
 });
 

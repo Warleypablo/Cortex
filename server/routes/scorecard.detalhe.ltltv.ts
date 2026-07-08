@@ -337,8 +337,14 @@ const COLUNAS_CLIENTE_CONTRATOS = [
 
 /** Pura/testável sem banco. `total` = Σ MRR + Σ Pontual combinados — mesmo padrão de
    `converterCrossSellDetalhe` (scorecard.detalhe.helpers.ts): não reconcilia coluna a coluna (2
-   colunas "brl" somadas num único total), é o valor total do cliente somando as duas naturezas de
-   receita. */
+   colunas "brl", o DrillSheet soma cada uma individualmente a partir de `linhas` — ver sua
+   docstring de `total`), é o valor total do cliente somando as duas naturezas de receita.
+   IMPORTANTE: isso é "contratos ATUAIS do cliente" (soma de `valorr`/`valorp` vigentes), NÃO uma
+   auditoria do `ltvTotal`/LTV PROJETADO exibido no card que abre este drill (`atual: c.ltvTotal`
+   em SecaoLtLtv.tsx/SecaoPerformance.tsx) — `ltvTotal` vem de uma fórmula de projeção (LT ×
+   MRR, ver `fetchClientesLtLtv` acima) diferente da soma simples aqui. Os 2 números
+   DIVERGEM por desenho; este drill é só a lista de contratos do cliente para contexto, não uma
+   reconciliação do LTV projetado. */
 export function montarClienteContratosDrillDetalhe(
   contratos: ContratoClienteRow[],
   identificador: string,

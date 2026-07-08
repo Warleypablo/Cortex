@@ -219,11 +219,19 @@ export function montarSecoesReceita(
           // Fonte: /api/bp2026/pontual-total, metrica "pontual_churn" — contratos que saíram do
           // estoque pontual (ClickUp) por cancelamento no mês. Já vem negativo (mesma convenção
           // de sinal do bp2026: saída = redução do estoque).
+          //
+          // SEM drillParams de propósito (fix auditoria 2026-07): o drill genérico `churn_pontual`
+          // soma `valorp` POSITIVO de `cup_contratos` (fonte/sinal diferentes do waterfall
+          // bp2026), então nunca reconciliava com este `atual` (nem o valor nem o sinal batiam).
+          // A auditoria deste MESMO churn pontual já existe e BATE na aba Churn
+          // ("Churn confirmado (R$)", key `churn_pontual_confirmado_brl` em SecaoChurn.tsx, que
+          // usa `series.churnPontualPorMes` — a mesma população do drill `churn_pontual`). Não
+          // duplicar o drill aqui evita a divergência; ver reference_bp2026_venda_estoque_vs_receita_pontual
+          // para mais contexto sobre esta fonte (bp2026) ter ~1 mês de lag vs. o estoque ao vivo.
           key: "receita_pontual_churn",
           metrica: "Churn",
           ...bp2026PontualLinha(pontualLinhas, "pontual_churn", mes),
           formato: "brl",
-          drillParams: { tipo: "churn_pontual" },
         },
         {
           // "Pausado" aqui é um SALDO (estoque pontual atualmente em status pausado no fim do

@@ -33,6 +33,10 @@ export interface DrillDetalhe {
      `tipoCelula()` em DrillSheet.tsx. */
   linhas: Record<string, unknown>[];
   total?: number;
+  /** Presente quando `total` NÃO é a soma de uma coluna "brl" da tabela (ex: `contratos_ativos`:
+     `total` é uma CONTAGEM de contratos, não uma soma de MRR/LTV) — diz ao DrillSheet em qual
+     tipo formatar o `total` no rodapé, em vez de assumir moeda. Ver DrillSheet.tsx. */
+  totalTipo?: DrillColuna["tipo"];
   formula?: string;
 }
 

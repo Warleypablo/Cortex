@@ -456,6 +456,7 @@ export function Scorecard({ secoes, mes, modo, metas, responsaveis, onEditRespon
         carregando={detalheQuery.isLoading}
         erro={detalheQuery.isError}
         total={detalheData?.total}
+        totalTipo={detalheData?.totalTipo}
         formula={detalheData?.formula}
       />
     </>
