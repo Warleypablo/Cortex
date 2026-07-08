@@ -207,6 +207,14 @@ export function montarSecoesLtLtv(
           temporalidade: "mes",
           // Contagem de clientes ativos (estoque), não soma-se ao longo do ano.
           ytdAgg: "ultimo",
+          // Fase 2B (drill wiring): SEM propósito ligar `contratos_ativos` aqui — aquele drill
+          // filtra `is_ativo` (portfólio vivo, ~337 em 2026-06), enquanto `overview.totalRecorrentes`
+          // vem de `COUNT(*) FILTER (WHERE tipo_receita='recorrente')` SEM esse filtro (todo
+          // histórico de contratos recorrentes, incluindo já churnados — ~1560, ver
+          // server/routes/ltLtvChurn.ts:23 e a nota em montarContratosAtivosDetalhe,
+          // server/routes/scorecard.detalhe.helpers.ts). Os números não reconciliam — decidir
+          // numa fase futura se o card migra para a definição "ativos" (mais correta como
+          // portfólio atual) antes de ligar o drill.
         },
       ],
     },

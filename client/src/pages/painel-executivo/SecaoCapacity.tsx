@@ -154,6 +154,7 @@ export function montarSecoesCapacity(
         formato: "brl",
         serie: serieGeracaoCaixaMetrica("receita"),
         temporalidade: "mes",
+        drillParams: { tipo: "geracao_caixa_receita" },
       },
       {
         key: "capacity_geracao_caixa_despesa",
@@ -163,6 +164,7 @@ export function montarSecoesCapacity(
         formato: "brl",
         serie: serieGeracaoCaixaMetrica("despesa"),
         temporalidade: "mes",
+        drillParams: { tipo: "geracao_caixa_despesa" },
       },
       {
         key: "capacity_geracao_caixa_liquida",
@@ -221,6 +223,7 @@ export function montarSecoesCapacity(
         formato: "brl",
         serie,
         temporalidade: "mes",
+        drillParams: { tipo: "contribuicao_squad", valor: item.squad },
       };
     })
     .filter((row) => !ehSquadOff(row.metrica))
@@ -252,6 +255,7 @@ export function montarSecoesCapacity(
     labelMes: labelMesCurto,
     // MRR é estoque (saldo do squad no mês) — YTD = último ponto, não soma dos meses.
     ytdAgg: "ultimo",
+    drillParams: (dim) => ({ tipo: "mrr_ativo", dim: "squad", valor: dim }),
   }).filter((row) => !ehSquadOff(row.metrica));
   const mrrOperadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorOperador, mes, {
     keyFn: (dim) => `capacity_mrr_operador_${slug(dim)}`,
@@ -260,6 +264,7 @@ export function montarSecoesCapacity(
     top: 10,
     responsavelAuto: true,
     ytdAgg: "ultimo",
+    drillParams: (dim) => ({ tipo: "mrr_ativo", dim: "operador", valor: dim }),
   });
   const secaoMrrSquad: ScorecardSection = {
     id: "capacity-mrr-squad",

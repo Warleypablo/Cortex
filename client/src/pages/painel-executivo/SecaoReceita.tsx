@@ -122,12 +122,11 @@ export function montarSecoesReceita(
           atual: tm.mrrAtivo,
           formato: "brl",
           metaKey: "mrr_active",
-          // Estoque de MRR ativo (ClickUp/cup_data_hist) — venda_mrr é FLUXO (Bitrix) e não
-          // reconcilia com o estoque, por isso sem drill (mesma regra da v1 em cards).
           serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.mrr),
           temporalidade: "mes",
           // Estoque (saldo) — YTD = último ponto do ano, não a soma dos meses.
           ytdAgg: "ultimo",
+          drillParams: { tipo: "mrr_ativo" },
         },
         {
           key: "receita_mrr_nova",
@@ -149,6 +148,7 @@ export function montarSecoesReceita(
           atual: rec?.upsell ?? null,
           formato: "brl",
           temporalidade: "mes",
+          drillParams: { tipo: "upsell" },
         },
         {
           key: "receita_mrr_downsell",
@@ -158,6 +158,7 @@ export function montarSecoesReceita(
           atual: rec?.downsell ?? null,
           formato: "brl",
           temporalidade: "mes",
+          drillParams: { tipo: "downsell" },
         },
         {
           key: "receita_mrr_churn",
@@ -168,6 +169,7 @@ export function montarSecoesReceita(
           metaKey: "churn_mrr_month",
           serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnBrl),
           temporalidade: "mes",
+          drillParams: { tipo: "churn_recorrente" },
         },
         {
           key: "receita_mrr_pausado",
@@ -185,6 +187,7 @@ export function montarSecoesReceita(
           metaKey: "sales_mrr_monetization_target",
           serie: serieCrosssell(tm.crosssellHistorico, (r) => r.mrr),
           temporalidade: "mes",
+          drillParams: { tipo: "cross_sell" },
         },
       ],
     },
@@ -201,6 +204,7 @@ export function montarSecoesReceita(
           metaKey: "revenue_one_time",
           serie: serieComLabel<VendasSeriePonto>(rm.contratosMes.vendasSeries, (r) => r.vendasPontual),
           temporalidade: "mes",
+          drillParams: { tipo: "venda_pontual" },
         },
         {
           key: "receita_pontual_entregue",
@@ -209,6 +213,7 @@ export function montarSecoesReceita(
           formato: "brl",
           serie: serieComLabel<EntregaProdutoMes>(p.entregasPorProdutoMes, (r) => r.total),
           temporalidade: "mes",
+          drillParams: { tipo: "entregue" },
         },
         {
           // Fonte: /api/bp2026/pontual-total, metrica "pontual_churn" — contratos que saíram do
@@ -218,6 +223,7 @@ export function montarSecoesReceita(
           metrica: "Churn",
           ...bp2026PontualLinha(pontualLinhas, "pontual_churn", mes),
           formato: "brl",
+          drillParams: { tipo: "churn_pontual" },
         },
         {
           // "Pausado" aqui é um SALDO (estoque pontual atualmente em status pausado no fim do
@@ -247,6 +253,7 @@ export function montarSecoesReceita(
           formato: "brl",
           // Saldo de estoque (pausado no fim do mês) — YTD = último ponto, não soma.
           ytdAgg: "ultimo",
+          drillParams: { tipo: "estoque_pausado" },
         },
         {
           key: "receita_pontual_reativacao",
@@ -269,6 +276,7 @@ export function montarSecoesReceita(
           formato: "brl",
           serie: serieCrosssell(tm.crosssellHistorico, (r) => r.pontual),
           temporalidade: "mes",
+          drillParams: { tipo: "cross_sell" },
         },
         {
           // Onda D: `series.estoquePontualEmAbertoPorMes` dá série mensal ao saldo (mesma fonte/
@@ -290,6 +298,7 @@ export function montarSecoesReceita(
           temporalidade: series ? "mes" : "snapshot",
           // Saldo de estoque (em aberto no fim do mês) — YTD = último ponto, não soma.
           ytdAgg: "ultimo",
+          drillParams: { tipo: "estoque_aberto" },
         },
       ],
     },

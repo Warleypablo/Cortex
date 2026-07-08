@@ -70,6 +70,7 @@ export function montarSecoesPerformance(
     // Dono automático (o próprio operador) — célula somente-leitura, mesmo padrão de
     // operadorRows em SecaoChurn.tsx/SecaoEntregas.tsx.
     responsavelAuto: true,
+    drillParams: (dim) => ({ tipo: "mrr_ativo", dim: "operador", valor: dim }),
   });
 
   const squadRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorSquad, mes, {
@@ -77,6 +78,7 @@ export function montarSecoesPerformance(
     formato: "brl",
     labelMes: labelMesCurto,
     ytdAgg: "ultimo", // MRR é saldo → YTD = último mês (ver operadorRows acima)
+    drillParams: (dim) => ({ tipo: "mrr_ativo", dim: "squad", valor: dim }),
   }).filter((row) => !ehSquadOff(row.metrica));
 
   const clienteRows: ScorecardRow[] = topClientes.map((c) => ({

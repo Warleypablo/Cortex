@@ -80,6 +80,7 @@ export function montarSecoesVisaoGeral(
           temporalidade: "mes",
           // Estoque (saldo), não fluxo — YTD = último ponto do ano, não a soma dos meses.
           ytdAgg: "ultimo",
+          drillParams: { tipo: "mrr_ativo" },
         },
         {
           key: "visao_mrr_nova",
@@ -89,6 +90,7 @@ export function montarSecoesVisaoGeral(
           metaKey: "sales_mrr_new_target",
           serie: serieComLabel<VendasSeriePonto>(rm.contratosMes.vendasSeries, (r) => r.vendasMrr),
           temporalidade: "mes",
+          drillParams: { tipo: "venda_mrr" },
         },
         {
           key: "visao_churn_brl",
@@ -99,6 +101,7 @@ export function montarSecoesVisaoGeral(
           metaKey: "churn_mrr_month",
           serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnBrl),
           temporalidade: "mes",
+          drillParams: { tipo: "churn_recorrente" },
         },
         {
           key: "visao_churn_pct",
@@ -107,6 +110,7 @@ export function montarSecoesVisaoGeral(
           formato: "pct",
           serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.churnPct),
           temporalidade: "mes",
+          drillParams: { tipo: "churn_pct" },
         },
         {
           key: "visao_crosssell",
@@ -119,6 +123,7 @@ export function montarSecoesVisaoGeral(
           metaKey: "sales_mrr_monetization_target",
           serie: serieCrosssell(tm.crosssellHistorico),
           temporalidade: "mes",
+          drillParams: { tipo: "cross_sell" },
         },
         {
           key: "visao_entregas",
@@ -128,6 +133,7 @@ export function montarSecoesVisaoGeral(
           // Série real (Onda3) — mesma fonte usada em SecaoEntregas.tsx ("Entregue (R$)").
           serie: serieComLabel<EntregaProdutoMes>(p.entregasPorProdutoMes, (r) => r.total),
           temporalidade: "mes",
+          drillParams: { tipo: "entregue" },
         },
         {
           key: "visao_ltv_medio",
