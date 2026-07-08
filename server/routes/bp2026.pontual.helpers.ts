@@ -1,8 +1,11 @@
 // server/routes/bp2026.pontual.helpers.ts
 // Ponte do estoque pontual via snapshot-diff de cup_data_hist (helpers puros).
 // Estoque pontual = valorp>0 e status fora da lista de exclusão (inclui "em cancelamento",
-// que conta como churn — alinhado ao MRR). A ponte fecha:
-// estoque_ini + venda − entrega − churn − deletados − saída_atípica + reajuste = estoque_fim.
+// que conta como churn — alinhado ao MRR). A ponte interna (classificarPonte) fecha:
+// estoque_ini + venda − entrega − churn(snapshot) − deletados − saída_atípica + reajuste = estoque_fim.
+// ATENÇÃO: a LINHA exibida "(−) Churn" usa o churn por DATA DE CANCELAMENTO (ClickUp), não o
+// snapshot-diff — então a soma das linhas da ponte pode divergir do estoque final pelos
+// contratos criados+cancelados no mesmo mês (que nunca passaram pela foto do estoque).
 
 export interface RegPontual {
   idSubtask: string;
@@ -374,8 +377,8 @@ export function montarLinhasPontual(
   })();
   // Churn pontual por DATA DE CANCELAMENTO (fonte do ClickUp) — bate com o gráfico do
   // ClickUp e captura contratos que o snapshot-diff perde (criados+cancelados no mesmo mês).
-  // A linha "(−) Churn" da ponte segue snapshot-diff (para a ponte fechar); estas leituras
-  // usam a data de cancelamento (cup_contratos).
+  // É a fonte da linha "(−) Churn" e da "· Taxa de churn". O snapshot-diff (p.churn) segue
+  // computado em classificarPonte, mas NÃO é mais exibido como linha própria.
   const churnData = (m: number) => churnPorDataPorMes[m] ?? 0;
   const serieChurnData = Array.from({ length: 12 }, (_, i) => {
     const m = i + 1;
@@ -408,10 +411,12 @@ export function montarLinhasPontual(
     mk("pontual_reativacao", "· Reativação", "fluxo", serieFluxo((p) => p.reativacao, 1), sumYtd(serieFluxo((p) => p.reativacao, 1))),
     mk("pontual_entrega", "(−) Entrega", "fluxo", serieFluxo((p) => p.entrega, -1), sumYtd(serieFluxo((p) => p.entrega, -1))),
     mk("pontual_taxa_entrega", "· Taxa de entrega", "fluxo", serieTaxaEntrega, ytdTaxaEntrega, { unidade: "pct", semDetalhe: true }),
-    mk("pontual_churn", "(−) Churn", "fluxo", serieFluxo((p) => p.churn, -1), sumYtd(serieFluxo((p) => p.churn, -1)),
-      { nota: "Churn que saiu do estoque no mês (snapshot-diff) — usado na ponte do estoque. Pode ser menor que o ClickUp; ver '· Churn (data de cancelamento)'." }),
-    mk("pontual_churn_data", "· Churn (data de cancelamento)", "fluxo", serieChurnData, sumYtd(serieChurnData),
-      { nota: "Churn pontual por data de cancelamento (cup_contratos) — alinhado ao ClickUp. Inclui contratos criados e cancelados no mesmo mês, que o snapshot-diff não captura. Não entra na ponte.", semDetalhe: true }),
+    // (−) Churn = churn pontual por DATA DE CANCELAMENTO (cup_contratos), alinhado ao ClickUp.
+    // Não é mais o snapshot-diff da ponte: por isso a soma da ponte (estoque_ini + entrada −
+    // entrega − churn − …) pode divergir do estoque final pelos contratos criados E cancelados
+    // no mesmo mês (nunca passaram pela foto do estoque). Trade-off aceito para bater com o ClickUp.
+    mk("pontual_churn", "(−) Churn", "fluxo", serieChurnData, sumYtd(serieChurnData),
+      { nota: "Churn pontual por data de cancelamento (cup_contratos) — alinhado ao ClickUp. Inclui contratos criados e cancelados no mesmo mês, que o snapshot-diff não captura. Por usar a data de cancelamento (não o snapshot-diff da ponte), a soma da ponte pode divergir do estoque final por esses contratos de vida curta." }),
     mk("pontual_taxa_churn", "· Taxa de churn", "fluxo", serieTaxaChurn, ytdTaxaChurn,
       { unidade: "pct", semDetalhe: true, nota: "Churn por data de cancelamento ÷ estoque inicial (fim do mês anterior); coluna final = média ponderada." }),
     mk("pontual_deletados", "(−) Deletados", "fluxo", serieFluxo((p) => p.deletados, -1), sumYtd(serieFluxo((p) => p.deletados, -1))),

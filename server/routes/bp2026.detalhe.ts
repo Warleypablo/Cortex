@@ -392,6 +392,36 @@ async function detVendaPontualComercial(db: any, mes: number, produtoFiltro?: st
   return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
 }
 
+// Drill da linha "(−) Churn" pontual: contratos pontuais cancelados no mês por DATA DE
+// CANCELAMENTO (data_solicitacao_encerramento). Mesma fonte/filtro da série em montarPontual
+// (bp2026.pontual.ts) — reconcilia com a célula (NÃO é o snapshot-diff da ponte). Agrupa por
+// produto; realizado positivo (mesma convenção de sinal de detPontualMovimento).
+async function detPontualChurnData(db: any, mes: number, filtroCreators?: boolean): Promise<ResultadoDet> {
+  const result = await db.execute(sql`
+    SELECT COALESCE(NULLIF(TRIM(cl.nome), ''), '(sem cliente)') AS cliente,
+           COALESCE(NULLIF(TRIM(c.produto), ''), '(sem produto)') AS produto,
+           COALESCE(c.servico, '') AS servico,
+           COALESCE(c.status, '') AS status,
+           c.valorp::numeric AS valor,
+           c.data_solicitacao_encerramento::date::text AS data
+    FROM "Clickup".cup_contratos c
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = c.id_task
+    WHERE c.valorp::numeric > 0
+      AND LOWER(TRIM(c.status)) IN ('cancelado/inativo', 'em cancelamento', 'não usar')
+      AND EXTRACT(MONTH FROM c.data_solicitacao_encerramento)::int = ${mes}
+      AND c.data_solicitacao_encerramento >= ${`${ANO}-01-01`} AND c.data_solicitacao_encerramento < ${`${ANO + 1}-01-01`}
+    ORDER BY valor DESC
+  `);
+  const itens: ItemDetalhe[] = (result.rows as any[])
+    .filter((r) => !filtroCreators || r.produto.toLowerCase().includes("creators"))
+    .map((r) => ({
+      grupo: r.produto, nome: r.cliente,
+      detalhe: [r.servico, `status ${r.status}`].filter(Boolean).join(" · "),
+      data: r.data ?? null, valor: parseFloat(r.valor),
+    }));
+  return { grupos: agruparItens(itens, LIMITE_ITENS), realizado: itens.reduce((s, i) => s + i.valor, 0) };
+}
+
 // Venda do mês decomposta por estar (dentro=true) ou não (dentro=false) na foto do estoque
 // do fim do mês. Mesma régua de valor da venda comercial (cup_contratos) → soma exata.
 async function detVendaPorEstoque(db: any, mes: number, dentro: boolean, filtroCreators?: boolean): Promise<ResultadoDet> {
@@ -873,8 +903,11 @@ export async function montarDetalheBp(
     ({ grupos, realizado } = await detVendaPorEstoque(db, mes, false, filtroCreators));
   } else if (metrica === "pontual_entrada") {
     ({ grupos, realizado } = await detPontualMovimento(db, mes, CATS_ENTRADA, undefined, filtroCreators));
+  } else if (metrica === "pontual_churn") {
+    // Churn por data de cancelamento (cup_contratos) — reconcilia com a célula (não snapshot-diff).
+    ({ grupos, realizado } = await detPontualChurnData(db, mes, filtroCreators));
   } else if ([
-    "pontual_entrega", "pontual_churn", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste",
+    "pontual_entrega", "pontual_deletados", "pontual_saida_atipica", "pontual_reajuste",
   ].includes(metrica)) {
     ({ grupos, realizado } = await detPontualMovimento(db, mes, metrica.slice("pontual_".length) as CategoriaPonte, undefined, filtroCreators));
   } else if (metrica.startsWith("pontual_aging_")) {

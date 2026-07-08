@@ -276,14 +276,19 @@ describe("montarLinhasPontual", () => {
     expect(linhas.find((l) => l.metrica === "pontual_venda_mes")).toBeUndefined();
     expect(linhas.find((l) => l.metrica === "pontual_entrada_defasada")).toBeUndefined();
   });
-  it("movimento de estoque: entrada na foto (B) e ponte fecha (régua snapshot)", () => {
+  it("movimento de estoque: entrada na foto (B); (−) Churn usa DATA de cancelamento (não snapshot)", () => {
     expect(by("pontual_entrada").titulo).toBe("(+) Entrada na foto");
     expect(by("pontual_entrada").meses[0].realizado).toBe(700); // B (snapshot)
     expect(by("pontual_entrada").grupo).toBe(GRUPO_ESTOQUE);
+    // (−) Churn agora é o churn por DATA (400), não o snapshot-diff da ponte (300).
+    expect(by("pontual_churn").titulo).toBe("(−) Churn");
+    expect(by("pontual_churn").meses[0].realizado).toBe(-400);
+    // Por isso a soma das linhas da ponte NÃO fecha exatamente no estoque final: diverge pelo
+    // churn(data) − churn(snapshot) = 400 − 300 = 100 (contratos criados+cancelados no mesmo mês).
     const v = (m: string) => by(m).meses[0].realizado ?? 0;
     const total = v("pontual_estoque_ini") + v("pontual_entrada") + v("pontual_entrega")
       + v("pontual_churn") + v("pontual_deletados") + v("pontual_saida_atipica") + v("pontual_reajuste");
-    expect(total).toBe(by("pontual_estoque_fim").meses[0].realizado);
+    expect(total).toBe(by("pontual_estoque_fim").meses[0].realizado! - 100);
   });
   it("estoque inicial/final e sinais", () => {
     expect(by("pontual_estoque_ini").meses[0].realizado).toBe(2150);
@@ -300,13 +305,12 @@ describe("montarLinhasPontual", () => {
     expect(tc.meses[0].realizado).toBeCloseTo(400 / 2150, 6); // churn POR DATA (400) ÷ estoqueIni
     expect(tc.ytd.realizado).toBeCloseTo(400 / 2150, 6);      // Σchurn_data ÷ Σini (1 mês fechado)
   });
-  it("linha '· Churn (data de cancelamento)' = valor por data (negativo); ponte usa o snapshot", () => {
-    const cd = by("pontual_churn_data");
-    expect(cd.titulo).toBe("· Churn (data de cancelamento)");
-    expect(cd.meses[0].realizado).toBe(-400); // por data
-    expect(cd.grupo).toBe(GRUPO_ESTOQUE);
-    expect(cd.semDetalhe).toBe(true);
-    expect(by("pontual_churn").meses[0].realizado).toBe(-300); // ponte continua no snapshot-diff
+  it("não há mais linha separada '· Churn (data de cancelamento)' — virou a própria (−) Churn", () => {
+    expect(linhas.find((l) => l.metrica === "pontual_churn_data")).toBeUndefined();
+    const c = by("pontual_churn");
+    expect(c.titulo).toBe("(−) Churn");
+    expect(c.meses[0].realizado).toBe(-400); // por data de cancelamento (não o snapshot -300)
+    expect(c.grupo).toBe(GRUPO_ESTOQUE);
   });
   it("decomposição por status soma ao estoque final", () => {
     expect(by("pontual_status_ativo").meses[0].realizado).toBe(1100);
