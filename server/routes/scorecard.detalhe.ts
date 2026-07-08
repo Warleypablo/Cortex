@@ -1,5 +1,7 @@
 // server/routes/scorecard.detalhe.ts
-// Drill genérico do Scorecard executivo (Fase 1 — infra + piloto Churn) — GET
+// Drill genérico do Scorecard executivo (Fase 1 — infra + piloto Churn; Fase 2A — demais tipos
+// SOMÁVEIS: mrr_ativo, entregue, geração de caixa, estoque, cross-sell, upsell/downsell, venda
+// pontual, contribuição por squad, contratos ativos — ver server/routes/scorecard.detalhe.helpers.ts) — GET
 // /api/scorecard/detalhe?tipo=&mes=&dim=&valor=. Dado um {tipo, mes, dim?, valor?}, monta o
 // detalhe auditável (colunas + linhas + total) que alimenta o DrillSheet do painel
 // (client/src/pages/painel-executivo/scorecard/tipos.ts: DrillDetalhe).
@@ -12,8 +14,14 @@ import type { Express } from "express";
 import { isAuthenticated } from "../auth/middleware";
 import { db } from "../db";
 import { sql } from "drizzle-orm";
-import { addMeses } from "./scorecard.helpers";
+import { limitesMes } from "./scorecard.helpers";
 import { montarDetalhe as montarDetalheGestaoReceita } from "./gestaoReceita.detalhe";
+import * as fase2a from "./scorecard.detalhe.helpers";
+
+// Reexport p/ compatibilidade — `limitesMes` foi movida p/ scorecard.helpers.ts (Fase 2A) pra
+// permitir que `scorecard.detalhe.helpers.ts` a importe sem criar circular import com este
+// arquivo. `scorecard.detalhe.test.ts` continua importando daqui.
+export { limitesMes };
 
 const MES_REGEX = /^\d{4}-\d{2}$/;
 
@@ -33,12 +41,6 @@ export interface DrillDetalhe {
   total?: number;
   /** Só presente em drills de COMPOSIÇÃO (ex: `churn_pct`) — texto exibido acima da tabela. */
   formula?: string;
-}
-
-/** Limites [inicio, fim) do mês (YYYY-MM-DD) — mesmo padrão de `montarSeriesScorecard` em
-   scorecard.ts. */
-export function limitesMes(mes: string): { inicio: string; fim: string } {
-  return { inicio: `${mes}-01`, fim: `${addMeses(mes, 1)}-01` };
 }
 
 // ---------------------------------------------------------------------------
@@ -279,6 +281,15 @@ async function montarVendaMrrDetalhe(mes: string): Promise<DrillDetalhe> {
   return converterDetalheGestaoReceita(detalhe);
 }
 
+/** venda_pontual — Fase 2A, mesmo padrão de `montarVendaMrrDetalhe` trocando o tipo delegado
+   (`gestaoReceita.detalhe.ts` já implementa "venda_pontual": deals ganhos com valor_pontual > 0
+   no mês). */
+async function montarVendaPontualDetalhe(mes: string): Promise<DrillDetalhe> {
+  const { inicio, fim } = limitesMes(mes);
+  const detalhe = await montarDetalheGestaoReceita(db, { tipo: "venda_pontual", chave: "pontual", dIni: inicio, dFim: fim, label: mes });
+  return converterDetalheGestaoReceita(detalhe);
+}
+
 // ---------------------------------------------------------------------------
 // Dispatcher + rota
 // ---------------------------------------------------------------------------
@@ -290,9 +301,11 @@ export interface DetalheScorecardQuery {
   valor?: string;
 }
 
-/** Dispatcher por `tipo` — `null` quando o tipo não é suportado (rota devolve 400). Fase 1 só
-   implementa os tipos do piloto Churn + `venda_mrr` (migrado de SecaoReceita). Próximas fases:
-   demais seções do Scorecard (Entregas, Capacity, LT/LTV, Performance). */
+/** Dispatcher por `tipo` — `null` quando o tipo não é suportado (rota devolve 400). Fase 1
+   implementou o piloto Churn + `venda_mrr` (migrado de SecaoReceita). Fase 2A acrescenta os
+   demais tipos SOMÁVEIS (builders pesados vivem em `scorecard.detalhe.helpers.ts` — extraídos de
+   propósito p/ este arquivo não passar de 500 linhas, ver constraint da Fase 2A). Próximas fases:
+   Capacity/Performance (tipos ainda não somáveis/auditáveis por linha). */
 export async function montarDetalheScorecard(q: DetalheScorecardQuery): Promise<DrillDetalhe | null> {
   switch (q.tipo) {
     case "churn_recorrente":
@@ -303,6 +316,30 @@ export async function montarDetalheScorecard(q: DetalheScorecardQuery): Promise<
       return montarChurnPctDetalhe(q.mes);
     case "venda_mrr":
       return montarVendaMrrDetalhe(q.mes);
+    case "venda_pontual":
+      return montarVendaPontualDetalhe(q.mes);
+    case "mrr_ativo":
+      return fase2a.montarMrrAtivoDetalhe(q.mes, q.dim, q.valor);
+    case "entregue":
+      return fase2a.montarEntregueDetalhe(q.mes, q.dim, q.valor);
+    case "geracao_caixa_receita":
+      return fase2a.montarGeracaoCaixaDetalhe(q.mes, "RECEITA");
+    case "geracao_caixa_despesa":
+      return fase2a.montarGeracaoCaixaDetalhe(q.mes, "DESPESA");
+    case "estoque_aberto":
+      return fase2a.montarEstoqueDetalhe(q.mes, "aberto");
+    case "estoque_pausado":
+      return fase2a.montarEstoqueDetalhe(q.mes, "pausado");
+    case "cross_sell":
+      return fase2a.montarCrossSellDetalhe(q.mes);
+    case "upsell":
+      return fase2a.montarUpsellDownsellDetalhe(q.mes, "expansao");
+    case "downsell":
+      return fase2a.montarUpsellDownsellDetalhe(q.mes, "churn_downsell");
+    case "contribuicao_squad":
+      return fase2a.montarContribuicaoSquadDetalhe(q.mes, q.valor);
+    case "contratos_ativos":
+      return fase2a.montarContratosAtivosDetalhe();
     default:
       return null;
   }

@@ -47,6 +47,25 @@ export function listaMeses12(mesFim: string): string[] {
   return meses;
 }
 
+/** Limites [inicio, fim) do mês (YYYY-MM-DD) — usado por todo o dispatcher de detalhe do
+   Scorecard (`scorecard.detalhe.ts`/`scorecard.detalhe.helpers.ts`) para bucketizar por mês.
+   Vive aqui (não em `scorecard.detalhe.ts`) para os dois arquivos de detalhe poderem importá-la
+   sem criar um import circular entre eles; `scorecard.detalhe.ts` reexporta para manter
+   compatibilidade com o import existente em `scorecard.detalhe.test.ts`. */
+export function limitesMes(mes: string): { inicio: string; fim: string } {
+  return { inicio: `${mes}-01`, fim: `${addMeses(mes, 1)}-01` };
+}
+
+/** Último dia (YYYY-MM-DD) do mês — usado onde a fonte espera um intervalo INCLUSIVE de datas
+   (ex: `getCrosssellDealsDetail`, `getContribuicaoSquadDfc`) em vez do padrão [inicio, fim)
+   dos demais helpers. `Date.UTC` evita bugs de fuso horário (nunca usar `new Date(ano, mes, 0)`
+   sem UTC — depende do TZ do processo). */
+export function ultimoDiaMes(mes: string): string {
+  const [ano, mm] = mes.split("-").map(Number);
+  const d = new Date(Date.UTC(ano, mm, 0)); // dia 0 do mês seguinte = último dia deste mês
+  return d.toISOString().slice(0, 10);
+}
+
 /**
  * Agrupa linhas cruas {mes,dim,valor} em um Record<dim, pontos[]> com os 12 meses da
  * janela preenchidos (valor 0 onde não houver dado), na ordem cronológica de `meses`.
