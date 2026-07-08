@@ -32,6 +32,24 @@ export function calcStatus(
   return "bad";
 }
 
+/**
+ * Percentual de atingimento da meta, normalizado para que ≥100% signifique SEMPRE "meta batida"
+ * (independente da direção):
+ * - direction="up" (maior é melhor, ex. MRR/receita): atual/meta × 100.
+ * - direction="down" (menor é melhor, ex. churn): meta/atual × 100 (atingir = ficar ≤ meta).
+ * null se atual/meta ausentes ou o divisor for 0.
+ */
+export function calcAtingimento(
+  atual: number | null | undefined,
+  meta: number | null | undefined,
+  direction: ScorecardDirection,
+): number | null {
+  if (atual === null || atual === undefined || meta === null || meta === undefined) return null;
+  if (direction === "up") return meta === 0 ? null : (atual / meta) * 100;
+  // direction === "down"
+  return atual === 0 ? null : (meta / atual) * 100;
+}
+
 export interface DeltaM1Ponto {
   valor: number | null;
 }

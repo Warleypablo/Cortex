@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calcStatus,
+  calcAtingimento,
   calcYtd,
   deltaM1,
   formatValor,
@@ -667,5 +668,30 @@ describe("normalizarChaveSquad / encontrarSerieSquad", () => {
   it("encontrarSerieSquad: sem match → undefined", () => {
     const porSquad = { Squadra: [{ month: "2026-01", receita: 1, despesa: 0, contribuicao: 1, margem: 100 }] };
     expect(encontrarSerieSquad(porSquad, "Pulse")).toBeUndefined();
+  });
+});
+
+describe("calcAtingimento", () => {
+  it("up: atual/meta (abaixo da meta)", () => {
+    expect(calcAtingimento(1197868, 1688510, "up")).toBeCloseTo(70.94, 1);
+  });
+  it("up: acima da meta → > 100%", () => {
+    expect(calcAtingimento(285235, 220000, "up")).toBeCloseTo(129.65, 1);
+  });
+  it("down: churn dentro da meta (atual <= meta) → >= 100%", () => {
+    // churn atual menor que a meta = meta batida → meta/atual > 100%
+    expect(calcAtingimento(150174, 151966, "down")).toBeCloseTo(101.19, 1);
+  });
+  it("down: churn acima da meta → < 100%", () => {
+    expect(calcAtingimento(200000, 150000, "down")).toBeCloseTo(75, 1);
+  });
+  it("meta/atual ausente → null", () => {
+    expect(calcAtingimento(null, 100, "up")).toBeNull();
+    expect(calcAtingimento(100, null, "up")).toBeNull();
+    expect(calcAtingimento(100, undefined, "down")).toBeNull();
+  });
+  it("divisor 0 → null", () => {
+    expect(calcAtingimento(100, 0, "up")).toBeNull();
+    expect(calcAtingimento(0, 100, "down")).toBeNull();
   });
 });

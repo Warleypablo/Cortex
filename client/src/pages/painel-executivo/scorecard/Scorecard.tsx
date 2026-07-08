@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { LineChart, Line } from "recharts";
 import { cn, formatPercent } from "@/lib/utils";
-import { calcStatus, calcYtd, deltaM1, formatValor, ANO_MIN_EVOLUCAO, type DeltaM1Result } from "./logica";
+import { calcStatus, calcAtingimento, calcYtd, deltaM1, formatValor, ANO_MIN_EVOLUCAO, type DeltaM1Result } from "./logica";
 import { CelulaResponsavel } from "./CelulaResponsavel";
 import type {
   ScorecardSection,
@@ -87,6 +87,7 @@ function LinhaFoco({
 }) {
   const isSnapshot = row.temporalidade === "snapshot";
   const status = isSnapshot ? null : calcStatus(row.atual, meta?.valor, meta?.direction ?? "up");
+  const atingimento = isSnapshot ? null : calcAtingimento(row.atual, meta?.valor, meta?.direction ?? "up");
   const delta = isSnapshot ? null : deltaM1(row.serie);
   const favoravel = trendFavoravel(delta, meta?.direction);
 
@@ -116,6 +117,21 @@ function LinhaFoco({
       </td>
       <td className="px-4 py-3 text-right tabular-nums text-muted-foreground">
         {isSnapshot ? "—" : formatMeta(meta, row.formato)}
+      </td>
+      <td className="px-4 py-3 text-right tabular-nums">
+        {atingimento === null ? (
+          <span className="text-muted-foreground">—</span>
+        ) : (
+          <span className={cn(
+            "font-semibold",
+            status === "good" ? "text-emerald-600 dark:text-emerald-400"
+              : status === "warn" ? "text-amber-600 dark:text-amber-400"
+              : status === "bad" ? "text-rose-600 dark:text-rose-400"
+              : "text-foreground",
+          )}>
+            {formatPercent(atingimento, 0)}
+          </span>
+        )}
       </td>
       <td className="px-4 py-3 text-right">
         <StatusPill
@@ -155,6 +171,7 @@ function TabelaFoco({
             <th className="bg-accent px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-accent-foreground">Atual ({mesAbrev(mes)})</th>
             <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Δ M-1</th>
             <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Meta</th>
+            <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">% Meta</th>
             <th className="px-4 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Status</th>
             <th className="px-4 py-2.5 text-left text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Responsável</th>
           </tr>
@@ -162,7 +179,7 @@ function TabelaFoco({
         <tbody>
           {secoes.map((secao) => (
             <Fragment key={secao.id}>
-              <SecaoHeaderRow titulo={secao.titulo} subtitulo={secao.subtitulo} colSpan={6} />
+              <SecaoHeaderRow titulo={secao.titulo} subtitulo={secao.subtitulo} colSpan={7} />
               {secao.linhas.map((row) => (
                 <LinhaFoco
                   key={row.key}
