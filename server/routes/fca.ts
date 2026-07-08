@@ -931,9 +931,15 @@ export function registerFcaRoutes(app: Express) {
   app.get("/api/fca/health", (_req: Request, res: Response) => {
     res.json({
       ok: true,
-      version: "v3.16",
+      version: "v5.0",
       endpoint: "POST /api/fca/run",
-      params: { funil: "Creators|Ecommerce|CRM|Summit", canal: "metaAds|googleAds|tiktokAds", createTask: "bool" },
+      formatoDefault: "v5 (imagem do Aprofundado + FATO/CAUSA/AÇÃO, janela 7D)",
+      params: {
+        funil: "Creators|Ecommerce|CRM|Summit",
+        canal: "metaAds|googleAds|tiktokAds",
+        createTask: "bool",
+        legacy: "modo:'mensal' → tabela mensal antiga; formato:'legacy' → markdown semanal antigo",
+      },
       auth: "Authorization: Bearer <FCA_API_TOKEN>",
       funilSuportado: Object.keys(FUNIL_CFG),
       canalSuportado: Object.keys(CANAL_CFG),
@@ -948,6 +954,13 @@ export function registerFcaRoutes(app: Express) {
       const canal = (req.body?.canal || "metaAds") as string;
       const modo = req.body?.modo === "mensal" ? "mensal" : "weekly";
       const createTask = req.body?.createTask !== false;
+      // v5 (imagem do Aprofundado + FATO/CAUSA/AÇÃO, 7D) é o DEFAULT desde 08/07.
+      // Legacy (markdown antigo) só sob pedido explícito:
+      //   { modo: "mensal" }                → tabela mensal antiga
+      //   { formato: "legacy" | "weekly" }  → markdown semanal antigo
+      const legacy = modo === "mensal"
+        || req.body?.formato === "legacy"
+        || req.body?.formato === "weekly";
 
       const funilCfg = FUNIL_CFG[funil];
       if (!funilCfg) {
@@ -962,8 +975,8 @@ export function registerFcaRoutes(app: Express) {
       const fnlNgc = funilCfg.fnlNgc;
       const now = new Date();
 
-      // ===== FORMATO V5 (imagem do Aprofundado + FATO/CAUSA/AÇÃO, janela 7D) =====
-      if (req.body?.formato === "v5") {
+      // ===== FORMATO V5 (imagem do Aprofundado + FATO/CAUSA/AÇÃO, janela 7D) — DEFAULT =====
+      if (!legacy) {
         const p7 = periodo7D(now);
         const [mAds, mMql, mNmql] = await Promise.all([
           getMetas(funil, p7.mesRef, canalCfg.segmento),
