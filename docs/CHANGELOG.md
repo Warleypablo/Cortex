@@ -1,5 +1,27 @@
 # Changelog
 
+## 2026-07-08 | feat(bp2026): linha Churn % Total na aba Revenue
+
+**O que foi feito:**
+- Nova linha **Churn % Total** logo abaixo de "Churn R$ Total" na aba Revenue do BP 2026.
+- Cálculo: Churn R$ Total do mês ÷ MRR Ativo do fim do mês **anterior** (mesma régua canônica do churn % por produto que já existe na tabela, para o total reconciliar com as linhas "Churn — <produto>").
+- Orçado = Churn R$ orçado ÷ MRR orçado do mesmo mês (coerente com a derivação do Churn R$ Total orçado). YTD = Σ churn ÷ Σ base anterior (taxa média ponderada).
+- Drill próprio: lista os churns do mês agrupados por motivo + nota `churn R$ … ÷ MRR R$ … (fim do mês anterior)`.
+
+**Por que:**
+- Pedido do stakeholder: ler a taxa de churn mensal (não só o valor absoluto) na régua da tela.
+
+**Arquivos alterados:**
+- `server/routes/bp2026.revenue.ts` - monta a linha `churn_pct_total` (unshift antes do churn R$ total → fica abaixo dele).
+- `server/routes/bp2026.detalhe.ts` - título + handler de drill dedicado (evita cair no filtro de produto do `churn_pct_*`).
+- `server/routes/bp2026.catalogo.ts` - registra `churn_pct_total → revenue` (anti-spoof do drill) + teste.
+
+**Impacto arquitetural:** Nenhum. Frontend renderiza `pct` automaticamente (nenhuma mudança de UI necessária).
+
+**Verificação:** contra o banco local (jun/26): Churn % = 17,8% (183.662 ÷ 1.030.229 = MRR ativo de maio); todos os meses batem com o cálculo manual; ordem `mrr_ativo → churn_rs_total → churn_pct_total`; YTD 14,2%. 168 testes bp2026 verdes + typecheck limpo.
+
+---
+
 ## 2026-07-08 | feat(gestao-receita): ROI MRR e ROI Pontual por canal no CAC por canal
 
 **O que foi feito:**
