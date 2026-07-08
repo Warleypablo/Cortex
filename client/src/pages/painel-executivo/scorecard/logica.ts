@@ -104,6 +104,10 @@ export interface LinhasPorDimensaoOpts {
   sub?: (dim: string, atual: number | null) => string | undefined;
   /** Quando true, marca o dono automático da linha como a própria dimensão (ex: operador). */
   responsavelAuto?: boolean;
+  /** Propagado para `ScorecardRow.ytdAgg` de cada linha gerada — ex: "ultimo" para dimensões de
+     ESTOQUE (MRR por squad/operador), onde somar os meses no YTD não faz sentido. Omitido = usa
+     o default de `calcYtd` (por `formato`). */
+  ytdAgg?: "soma" | "ultimo" | "media";
 }
 
 /**
@@ -142,6 +146,7 @@ export function linhasPorDimensao(
     serie,
     temporalidade: "mes",
     responsavelAuto: opts.responsavelAuto ? dim : undefined,
+    ytdAgg: opts.ytdAgg,
   }));
 }
 
@@ -208,6 +213,9 @@ export function linhasReceitaCabeca(
     metaKey: "receita_cabeca",
     temporalidade: "mes",
     responsavelAuto: opts.responsavelAuto ? dim : undefined,
+    // Razão (receita ÷ headcount) medida a cada mês — YTD = último ponto, não soma. Esta função
+    // só serve para esta métrica (ver docstring acima), por isso hardcoded em vez de opt.
+    ytdAgg: "ultimo",
   }));
 }
 
@@ -464,6 +472,52 @@ export function pontoGeracaoCaixaNoMes(serie: GeracaoCaixaMesCalc[], mes: string
   if (serie.length === 0) return null;
   const ordenados = [...serie].sort((a, b) => (a.month < b.month ? -1 : a.month > b.month ? 1 : 0));
   return ordenados.find((p) => p.month === mes) ?? [...ordenados].reverse().find((p) => p.month <= mes) ?? null;
+}
+
+/** Ano de planejamento do painel — o modo Evolução (e a coluna YTD) exibem SÓ meses deste ano
+   (2026). Fonte única desta janela: reusada por `truncarSerie` em Scorecard.tsx e por `calcYtd`
+   abaixo, para que a janela YTD e a janela de colunas mensais NUNCA divirjam. */
+export const ANO_MIN_EVOLUCAO = "2026-01";
+
+/**
+ * Acumulado do ano (YTD) de uma linha do modo Evolução — janela jan/2026 até `mes` (mesma regra
+ * de `truncarSerie` em Scorecard.tsx: `month >= ANO_MIN_EVOLUCAO && month <= mes`), MAS pontos
+ * sem `month` são descartados aqui (diferente de `truncarSerie`, que os mantém como fallback para
+ * séries antigas sem essa info — sem `month` não há como saber se o ponto pertence ao ano YTD).
+ *
+ * Resolve o modo de acumulação: `ytdAgg` explícito da linha vence; senão o default depende do
+ * `formato` — "pct" acumula por MÉDIA (ex: churn % do ano não é a soma dos churns mensais),
+ * qualquer outro formato acumula por SOMA (fluxo: nova receita, churn R$, entregas etc.).
+ * "ultimo" (uso explícito, nunca default) pega o valor do ponto mais recente da janela — para
+ * linhas de ESTOQUE/saldo (MRR ativo, LTV médio, estoque pontual), onde somar os meses não faz
+ * sentido.
+ *
+ * Pontos com `valor` null/undefined são ignorados em qualquer modo. Janela vazia (sem pontos
+ * dentro do ano corrente até `mes`, ou nenhum ponto com `valor` válido) → null (UI mostra "—").
+ */
+export function calcYtd(
+  serie: ScorecardSeriePonto[] | undefined,
+  mes: string,
+  ytdAgg?: "soma" | "ultimo" | "media",
+  formato?: ScorecardFormato,
+): number | null {
+  if (!serie) return null;
+
+  const janela = serie.filter((p) => p.month && p.month >= ANO_MIN_EVOLUCAO && p.month <= mes);
+  if (janela.length === 0) return null;
+
+  const validos = janela.filter((p) => p.valor !== null && p.valor !== undefined) as { month?: string; valor: number }[];
+  if (validos.length === 0) return null;
+
+  const modo = ytdAgg ?? (formato === "pct" ? "media" : "soma");
+
+  if (modo === "ultimo") {
+    const ordenados = [...validos].sort((a, b) => (a.month! < b.month! ? -1 : a.month! > b.month! ? 1 : 0));
+    return ordenados[ordenados.length - 1].valor;
+  }
+
+  const soma = validos.reduce((acc, p) => acc + p.valor, 0);
+  return modo === "media" ? soma / validos.length : soma;
 }
 
 /** Formata um valor numérico conforme o formato do scorecard. null/undefined/NaN → "—". */

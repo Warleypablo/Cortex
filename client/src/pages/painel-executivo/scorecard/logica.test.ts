@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   calcStatus,
+  calcYtd,
   deltaM1,
   formatValor,
   atualDaSerie,
@@ -153,6 +154,68 @@ describe("atualDaSerie", () => {
   it("undefined/null → null", () => {
     expect(atualDaSerie(undefined, "2026-06")).toBeNull();
     expect(atualDaSerie(null, "2026-06")).toBeNull();
+  });
+});
+
+describe("calcYtd", () => {
+  it("fluxo (default 'soma' quando formato != pct): soma todos os pontos da janela", () => {
+    const serie = [
+      { month: "2026-01", label: "Jan", valor: 100 },
+      { month: "2026-02", label: "Fev", valor: 200 },
+      { month: "2026-03", label: "Mar", valor: 300 },
+    ];
+    expect(calcYtd(serie, "2026-03", undefined, "brl")).toBe(600);
+  });
+
+  it("estoque (ytdAgg='ultimo'): pega o valor do ponto mais recente da janela, não a soma", () => {
+    const serie = [
+      { month: "2026-01", label: "Jan", valor: 100 },
+      { month: "2026-02", label: "Fev", valor: 200 },
+      { month: "2026-03", label: "Mar", valor: 300 },
+    ];
+    expect(calcYtd(serie, "2026-03", "ultimo", "brl")).toBe(300);
+  });
+
+  it("percentual (default 'media' quando formato=pct): média dos pontos, não soma", () => {
+    const serie = [
+      { month: "2026-01", label: "Jan", valor: 10 },
+      { month: "2026-02", label: "Fev", valor: 20 },
+      { month: "2026-03", label: "Mar", valor: 30 },
+    ];
+    expect(calcYtd(serie, "2026-03", undefined, "pct")).toBe(20);
+  });
+
+  it("janela corta pontos de 2025 e posteriores ao mês selecionado", () => {
+    const serie = [
+      { month: "2025-12", label: "Dez/25", valor: 999 },
+      { month: "2026-01", label: "Jan", valor: 10 },
+      { month: "2026-02", label: "Fev", valor: 20 },
+      { month: "2026-03", label: "Mar", valor: 9999 }, // posterior ao mês selecionado
+    ];
+    expect(calcYtd(serie, "2026-02", undefined, "brl")).toBe(30);
+  });
+
+  it("série vazia ou undefined → null", () => {
+    expect(calcYtd([], "2026-06", undefined, "brl")).toBeNull();
+    expect(calcYtd(undefined, "2026-06", undefined, "brl")).toBeNull();
+  });
+
+  it("ytdAgg explícito vence o default por formato (ex: 'soma' num pct)", () => {
+    const serie = [
+      { month: "2026-01", label: "Jan", valor: 10 },
+      { month: "2026-02", label: "Fev", valor: 20 },
+    ];
+    expect(calcYtd(serie, "2026-02", "soma", "pct")).toBe(30);
+  });
+
+  it("ignora pontos sem `month` (não dá pra saber se pertencem ao ano YTD) e pontos com valor null", () => {
+    const serie = [
+      { month: "2026-01", label: "Jan", valor: 10 },
+      { label: "Sem mês", valor: 999 },
+      { month: "2026-02", label: "Fev", valor: null },
+      { month: "2026-03", label: "Mar", valor: 20 },
+    ];
+    expect(calcYtd(serie, "2026-03", "soma", "brl")).toBe(30);
   });
 });
 

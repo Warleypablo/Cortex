@@ -1,7 +1,7 @@
 import { Fragment } from "react";
 import { LineChart, Line } from "recharts";
 import { cn, formatPercent } from "@/lib/utils";
-import { calcStatus, deltaM1, formatValor, type DeltaM1Result } from "./logica";
+import { calcStatus, calcYtd, deltaM1, formatValor, ANO_MIN_EVOLUCAO, type DeltaM1Result } from "./logica";
 import { CelulaResponsavel } from "./CelulaResponsavel";
 import type {
   ScorecardSection,
@@ -182,11 +182,6 @@ function TabelaFoco({
 
 // ─────────────────────── modo "evolução" ───────────────────────
 
-/** Ano de planejamento do painel — o modo Evolução exibe SÓ meses deste ano (2026). Muitas
-   séries vêm 12 meses para trás (incluindo meses de 2025, quando o histórico começou em
-   nov/2025 e é parcial/ruído para a leitura executiva de 2026). */
-const ANO_MIN_EVOLUCAO = "2026-01";
-
 /** Trunca a série à janela do ano corrente (2026) até o mês SELECIONADO (`mes`): descarta pontos
    de meses POSTERIORES (a série costuma vir até o mês corrente real, mesmo quando o usuário
    escolhe um mês anterior) E pontos de anos anteriores a 2026. Pontos sem `month` (séries
@@ -249,6 +244,9 @@ function LinhaEvolucao({ row, colunas, meta, mes }: { row: ScorecardRow; colunas
   const semSerie = !serieTruncada || serieTruncada.length === 0;
   const delta = isSnapshot || semSerie ? null : deltaM1(serieTruncada);
   const favoravel = trendFavoravel(delta, meta?.direction);
+  // YTD (acumulado do ano) — calculado sobre a série INTEIRA (calcYtd já filtra a janela
+  // jan/ANO_MIN_EVOLUCAO..mes internamente, mesma regra de truncarSerie), não sobre `serieTruncada`.
+  const ytd = calcYtd(row.serie, mes, row.ytdAgg, row.formato);
 
   return (
     <tr className="border-b border-border/60 last:border-0 hover:bg-muted/40">
@@ -281,6 +279,9 @@ function LinhaEvolucao({ row, colunas, meta, mes }: { row: ScorecardRow; colunas
         ))
       )}
       <td className="px-3 py-3 text-right tabular-nums text-muted-foreground">{formatMeta(meta, row.formato)}</td>
+      <td className="px-3 py-3 text-right tabular-nums font-medium text-foreground">
+        {ytd === null ? <span className="text-muted-foreground">—</span> : formatValor(ytd, row.formato)}
+      </td>
       <td className="px-3 py-3 text-right">
         {isSnapshot || semSerie ? <span className="text-xs text-muted-foreground">—</span> : <Sparkline serie={serieTruncada!} favoravel={favoravel} />}
       </td>
@@ -294,7 +295,7 @@ function TabelaEvolucao({ secoes, metas, mes }: { secoes: ScorecardSection[]; me
   // snapshot), garante ao menos 1 coluna na "zona de meses" — sem isso, colSpan das linhas
   // (sempre >= 1) desalinharia com um header de 0 colunas de mês.
   const colunas = meses.length > 0 ? meses : ["Atual"];
-  const totalCols = 1 + colunas.length + 2; // Métrica + colunas + Meta + Tend.
+  const totalCols = 1 + colunas.length + 3; // Métrica + colunas + Meta + YTD + Tend.
 
   return (
     <div className="overflow-x-auto rounded-lg border border-border">
@@ -314,6 +315,7 @@ function TabelaEvolucao({ secoes, metas, mes }: { secoes: ScorecardSection[]; me
               </th>
             ))}
             <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Meta</th>
+            <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">YTD</th>
             <th className="px-3 py-2.5 text-right text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Tend.</th>
           </tr>
         </thead>

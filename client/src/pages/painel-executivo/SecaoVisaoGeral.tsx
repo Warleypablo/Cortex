@@ -112,6 +112,8 @@ export function montarSecoesVisaoGeral(
           metaKey: "mrr_active",
           serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.mrr),
           temporalidade: "mes",
+          // Estoque (saldo), não fluxo — YTD = último ponto do ano, não a soma dos meses.
+          ytdAgg: "ultimo",
         },
         {
           key: "visao_mrr_nova",
@@ -172,6 +174,8 @@ export function montarSecoesVisaoGeral(
           metaKey: "receita_cabeca",
           serie: receitaCabecaSerie.length > 0 ? receitaCabecaSerie : undefined,
           temporalidade: "mes",
+          // Razão (receita ÷ headcount) medida a cada mês, não fluxo acumulável.
+          ytdAgg: "ultimo",
         },
         {
           key: "visao_ltv_medio",
@@ -180,6 +184,8 @@ export function montarSecoesVisaoGeral(
           formato: "brl",
           serie: ltvMedioSerie.length > 0 ? ltvMedioSerie : undefined,
           temporalidade: "mes",
+          // Estoque (saldo médio da base), não fluxo.
+          ytdAgg: "ultimo",
         },
         {
           key: "visao_nps",

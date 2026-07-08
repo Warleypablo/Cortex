@@ -160,6 +160,8 @@ export function montarSecoesLtLtv(
           formato: "meses",
           serie: ltMedioSerie.length > 0 ? ltMedioSerie : undefined,
           temporalidade: "mes",
+          // Snapshot da base ativa (não fluxo) — YTD = último ponto do ano.
+          ytdAgg: "ultimo",
         },
         {
           key: "lt_ltv_lt_mediano",
@@ -168,6 +170,7 @@ export function montarSecoesLtLtv(
           formato: "meses",
           serie: ltMedianaSerie.length > 0 ? ltMedianaSerie : undefined,
           temporalidade: "mes",
+          ytdAgg: "ultimo",
         },
         {
           key: "lt_ltv_lt_medio_cancelado",
@@ -175,6 +178,7 @@ export function montarSecoesLtLtv(
           atual: overview.ltMedioCancelado,
           formato: "meses",
           temporalidade: "snapshot",
+          ytdAgg: "ultimo",
         },
         {
           key: "lt_ltv_ltv_medio_cliente",
@@ -183,6 +187,7 @@ export function montarSecoesLtLtv(
           formato: "brl",
           serie: ltvMedioSerie.length > 0 ? ltvMedioSerie : undefined,
           temporalidade: "mes",
+          ytdAgg: "ultimo",
         },
         {
           key: "lt_ltv_ltv_mediano_cliente",
@@ -191,6 +196,7 @@ export function montarSecoesLtLtv(
           formato: "brl",
           serie: ltvMedianaSerie.length > 0 ? ltvMedianaSerie : undefined,
           temporalidade: "mes",
+          ytdAgg: "ultimo",
         },
         {
           key: "lt_ltv_total_recorrentes",
@@ -199,6 +205,8 @@ export function montarSecoesLtLtv(
           formato: "int",
           serie: totalRecorrentesSerie.length > 0 ? totalRecorrentesSerie : undefined,
           temporalidade: "mes",
+          // Contagem de clientes ativos (estoque), não soma-se ao longo do ano.
+          ytdAgg: "ultimo",
         },
       ],
     },

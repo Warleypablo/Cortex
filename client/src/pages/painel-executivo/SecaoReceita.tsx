@@ -133,6 +133,8 @@ export function montarSecoesReceita(
           // reconcilia com o estoque, por isso sem drill (mesma regra da v1 em cards).
           serie: serieComLabel<ReceitaChurnPonto>(tm.receitaChurnSeries, (r) => r.mrr),
           temporalidade: "mes",
+          // Estoque (saldo) — YTD = último ponto do ano, não a soma dos meses.
+          ytdAgg: "ultimo",
         },
         {
           key: "receita_mrr_nova",
@@ -250,6 +252,8 @@ export function montarSecoesReceita(
               }
             : {}),
           formato: "brl",
+          // Saldo de estoque (pausado no fim do mês) — YTD = último ponto, não soma.
+          ytdAgg: "ultimo",
         },
         {
           key: "receita_pontual_reativacao",
@@ -291,6 +295,8 @@ export function montarSecoesReceita(
           formato: "brl",
           serie: series ? serieSaldoEstoque(series.series.estoquePontualEmAbertoPorMes) : undefined,
           temporalidade: series ? "mes" : "snapshot",
+          // Saldo de estoque (em aberto no fim do mês) — YTD = último ponto, não soma.
+          ytdAgg: "ultimo",
         },
       ],
     },

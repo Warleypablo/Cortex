@@ -25,6 +25,11 @@ export interface ScorecardRow {
   temporalidade: ScorecardTemporalidade;
   drill?: () => void;
   responsavelAuto?: string;
+  /** Modo de acumulação da coluna YTD (modo Evolução, ver `calcYtd` em logica.ts). Omitido =
+     default por `formato` ("pct" → "media", senão "soma"). Use "ultimo" para linhas de
+     ESTOQUE/saldo (ex: MRR ativo, LTV médio, estoque pontual) — somar os meses não faz sentido
+     para um saldo medido a cada mês. */
+  ytdAgg?: "soma" | "ultimo" | "media";
 }
 
 export interface ScorecardSection {

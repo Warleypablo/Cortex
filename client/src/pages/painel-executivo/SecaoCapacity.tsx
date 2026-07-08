@@ -130,6 +130,8 @@ export function montarSecoesCapacity(
         metaKey: "receita_cabeca",
         serie: receitaCabecaSerie.length > 0 ? receitaCabecaSerie : undefined,
         temporalidade: "mes",
+        // Razão (receita ÷ headcount) medida a cada mês — YTD = último ponto, não soma.
+        ytdAgg: "ultimo",
       },
     ],
   };
@@ -242,6 +244,8 @@ export function montarSecoesCapacity(
         formato: "brl",
         serie: serieGeracaoCaixaMetrica("caixaAcumulado"),
         temporalidade: "mes",
+        // Saldo acumulado (já é um total corrente) — YTD = último ponto, não soma dos meses.
+        ytdAgg: "ultimo",
       },
     ],
   };
@@ -304,6 +308,8 @@ export function montarSecoesCapacity(
     keyFn: (dim) => `capacity_mrr_squad_${slug(dim)}`,
     formato: "brl",
     labelMes: labelMesCurto,
+    // MRR é estoque (saldo do squad no mês) — YTD = último ponto, não soma dos meses.
+    ytdAgg: "ultimo",
   }).filter((row) => !ehSquadOff(row.metrica));
   const mrrOperadorRows: ScorecardRow[] = linhasPorDimensao(series.data?.series.mrrPorOperador, mes, {
     keyFn: (dim) => `capacity_mrr_operador_${slug(dim)}`,
@@ -311,6 +317,7 @@ export function montarSecoesCapacity(
     labelMes: labelMesCurto,
     top: 10,
     responsavelAuto: true,
+    ytdAgg: "ultimo",
   });
   const secaoMrrSquad: ScorecardSection = {
     id: "capacity-mrr-squad",
