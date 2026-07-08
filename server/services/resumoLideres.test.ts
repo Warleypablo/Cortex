@@ -13,8 +13,11 @@ const METRICAS: MetricasResumo = {
   mrrTotal: 1139573,
   mrrAtivo: 983497,
   entregaPontual: 15497,
+  estoquePontualInicioMes: 550000, // ilustrativo — base do % de churn pontual
   churnPontual: 5500,
   churnPontualAjustado: 5500,
+  churnPontualPct: (5500 / 550000) * 100, // 1,00%
+  churnPontualAjustadoPct: (5500 / 550000) * 100, // 1,00%
   mrrMesAnterior: 1197868,
   churnTotal: 19279,
   churnTotalPct: (19279 / 1197868) * 100, // 1,61%
@@ -36,8 +39,9 @@ MRR JULHO TOTAL: R$ 1.139.573,00
 MRR JULHO ATIVO: R$ 983.497,00
 Entrega Pontual JULHO: R$ 15.497,00
 
-Churn Pontual JULHO: R$ 5.500,00
-Churn Pontual JULHO (sem erro de venda, não começou e inadimplente 1 mês): R$ 5.500,00
+Churn Pontual JULHO: R$ 5.500,00 - *1,00%*
+Churn Pontual JULHO (sem erro de venda, não começou e inadimplente 1 mês): R$ 5.500,00 - *1,00%*
+(% sobre o estoque pontual em aberto no início do mês: R$ 550.000,00)
 
 MRR JUNHO: R$ 1.197.868,00
 

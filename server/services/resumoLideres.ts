@@ -16,9 +16,12 @@ export interface MetricasResumo {
   mrrTotal: number; // ativo + onboarding + triagem (live)
   mrrAtivo: number; // só status 'ativo' (live)
   entregaPontual: number; // valorp dos contratos que viraram 'entregue' no mês
+  estoquePontualInicioMes: number; // valorp em aberto no 1º snapshot do mês (fechamento do mês anterior) = base do % de churn pontual
   churnPontual: number; // valorp dos contratos pontuais com pedido de churn no mês
   churnPontualAjustado: number; // idem, sem os motivos operacionais
-  mrrMesAnterior: number; // snapshot do 1º do mês = fechamento do mês anterior (base dos %)
+  churnPontualPct: number; // 0-100 — churn pontual ÷ estoque pontual início do mês
+  churnPontualAjustadoPct: number; // 0-100 — churn pontual ajustado ÷ estoque pontual início do mês
+  mrrMesAnterior: number; // snapshot do 1º do mês = fechamento do mês anterior (base dos % de MRR)
   churnTotal: number; // valor_r bruto de cup_churn no mês
   churnTotalPct: number; // 0-100
   churnAjustado: number; // sem os motivos operacionais
@@ -78,8 +81,9 @@ MRR ${mes} TOTAL: ${formatarMoedaBR(m.mrrTotal)}
 MRR ${mes} ATIVO: ${formatarMoedaBR(m.mrrAtivo)}
 Entrega Pontual ${mes}: ${formatarMoedaBR(m.entregaPontual)}
 
-Churn Pontual ${mes}: ${formatarMoedaBR(m.churnPontual)}
-Churn Pontual ${mes} (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnPontualAjustado)}
+Churn Pontual ${mes}: ${formatarMoedaBR(m.churnPontual)} - *${formatarPercentBR(m.churnPontualPct)}*
+Churn Pontual ${mes} (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnPontualAjustado)} - *${formatarPercentBR(m.churnPontualAjustadoPct)}*
+(% sobre o estoque pontual em aberto no início do mês: ${formatarMoedaBR(m.estoquePontualInicioMes)})
 
 MRR ${mesAnterior}: ${formatarMoedaBR(m.mrrMesAnterior)}
 
@@ -199,8 +203,28 @@ async function getEntregaPontualMes(): Promise<number> {
   return parseFloat((result.rows[0] as any)?.total || "0");
 }
 
+async function getEstoquePontualInicioMes(): Promise<number> {
+  // Estoque pontual em aberto no 1º snapshot do mês (= fechamento do mês anterior).
+  // Base do % de churn pontual, análogo ao mrrMesAnterior usado no churn recorrente.
+  // Régua canônica de estoque pontual: valorp > 0 e status "em aberto" (exclui
+  // entregue / cancelado/inativo / não usar — 'cancelado/inativo' é um único valor).
+  const result = await db.execute(sql`
+    WITH primeiro_snapshot AS (
+      SELECT MIN(data_snapshot) AS d
+      FROM "Clickup".cup_data_hist
+      WHERE TO_CHAR(data_snapshot, 'YYYY-MM') = TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM')
+    )
+    SELECT COALESCE(SUM(valorp), 0) AS total
+    FROM "Clickup".cup_data_hist
+    WHERE data_snapshot = (SELECT d FROM primeiro_snapshot)
+      AND valorp > 0
+      AND status NOT IN ('entregue', 'cancelado/inativo', 'não usar')
+  `);
+  return parseFloat((result.rows[0] as any)?.total || "0");
+}
+
 export async function calcularMetricasResumo(): Promise<MetricasResumo> {
-  const [mrrTotal, mrrAtivo, mrrMesAnterior, breakdown, churn, churnPontual, entregaPontual] =
+  const [mrrTotal, mrrAtivo, mrrMesAnterior, breakdown, churn, churnPontual, entregaPontual, estoquePontualInicioMes] =
     await Promise.all([
       getMrrAtivo(), // ativo+onboarding+triagem (metricsAdapter)
       getMrrSoAtivo(),
@@ -209,6 +233,7 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
       getChurnMes(),
       getChurnPontualMes(),
       getEntregaPontualMes(),
+      getEstoquePontualInicioMes(),
     ]);
 
   // metricsAdapter engole erros retornando 0 — nunca enviar mensagem com métricas parciais
@@ -228,8 +253,12 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
     mrrTotal,
     mrrAtivo,
     entregaPontual,
+    estoquePontualInicioMes,
     churnPontual: churnPontual.total,
     churnPontualAjustado: churnPontual.ajustado,
+    churnPontualPct: estoquePontualInicioMes > 0 ? (churnPontual.total / estoquePontualInicioMes) * 100 : 0,
+    churnPontualAjustadoPct:
+      estoquePontualInicioMes > 0 ? (churnPontual.ajustado / estoquePontualInicioMes) * 100 : 0,
     mrrMesAnterior,
     churnTotal: churn.total,
     churnTotalPct: (churn.total / mrrMesAnterior) * 100,
