@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-07 | feat(gestao-receita): CAC por canal conta contratos por cup_contratos (não Bitrix)
+
+**O que foi feito:**
+- Na seção **"CAC por canal"** (aba Macro), o nº de **contratos** deixou de vir dos serviços vendidos do Bitrix (`crm_deal.servicos_vendidos`) e passou a vir do **ClickUp** (`cup_contratos`), com a **mesma régua/fonte do card "137 contratos novos"** (MRR = 1 por linha `valorr>0`; Pontual = dedup por jornada — `id_task` p/ Creators, `id_subtask` p/ os demais).
+- Cada contrato do ClickUp é atribuído ao canal via **CNPJ do deal ganho do mês** (`cup_contratos.id_task → cup_clientes.cnpj → crm_deal.cnpj`); desempate quando o CNPJ tem deals em mais de um canal = **canal do deal mais recente**.
+- **Clientes por canal permanecem inalterados** (deals ganhos Bitrix; 79 em jun/26). Contratos jun/26: **104 → 110** (só os contratos de clientes com deal ganho no mês; ~27 de clientes sem deal no mês ficam de fora, por design da abordagem).
+
+**Por que:**
+- Unificar a definição de "contrato" na tela: card macro e seção passam a usar a mesma fonte (ClickUp/operação), eliminando a divergência de fonte/data/régua que confundia a leitura (Bitrix 104 vs ClickUp 137).
+
+**Arquivos alterados:**
+- `server/routes/gestaoReceita.cacCanais.ts` - `computeCacCanais` ganha query aos `cup_contratos` (por CNPJ+mês, régua do card) + monta `canalPorCnpj` e `contratosCanalMes`; `agregarCacCanais` recebe `contratosCanalMes` (contratos não vêm mais do deal); removidos `contratosDoDeal`/`servicos_vendidos` (régua do BP permanece no BP).
+- `server/routes/gestaoReceita.cacCanais.test.ts` - contratos via `contratosCanalMes`; casos multi-mês e canal com clientes>0/contratos=0.
+- `docs/superpowers/specs/2026-07-07-cac-por-canal-cup-contratos-design.md` - spec do design.
+
+**Impacto arquitetural:** Frontend inalterado (payload mantém `contratos`/`cacContrato`). Some o invariante "contratos ≥ clientes" (piso 1 por deal): canal com venda mas sem contrato criado no mês → `cacContrato = null` (UI "—"), ex. Social Selling jun/26. Validado end-to-end contra prod (jun/26): 79 clientes / 110 contratos, distribuição por canal conferida.
+
+---
+
 ## 2026-07-07 | feat(gestao-receita): funde canal Inbound + toggle CAC por contrato no CAC por canal
 
 **O que foi feito:**
