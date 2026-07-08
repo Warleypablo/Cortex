@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-08 | feat(bp2026): churn pontual por data de cancelamento (alinha ao ClickUp)
+
+**O que foi feito:**
+- Nova linha **"· Churn (data de cancelamento)"** na aba Pontual (e Pontual · Creators), abaixo de "(−) Churn": churn pontual por `data_solicitacao_encerramento` de `cup_contratos` — bate com o gráfico do ClickUp.
+- A **"· Taxa de churn"** passou a usar essa fonte (churn por data ÷ estoque inicial). YTD subiu de 3,9% → **5,6%** (agora reflete o churn real).
+- A linha **"(−) Churn"** continua snapshot-diff, para a **ponte do estoque continuar fechando**.
+
+**Por que (diagnóstico):**
+- Nossa "(−) Churn" era snapshot-diff (só conta contrato que estava no estoque do snapshot anterior). Contratos **criados e cancelados no mesmo mês** (pontuais de vida curta) escapam do snapshot-diff. No acumulado jan–jun perdíamos **R$175.958 de R$458.971 (~38%)** — por isso a linha ficava menor que o ClickUp. Abril era o extremo (todos os R$79.770 de cancelamentos eram invisíveis à ponte).
+
+**Validado vs banco:** "· Churn (data)" bate com o ClickUp (mar -82.197, abr -79.770, mai -146.805, jun -126.702). Ponte segue fechando. Aba Creators idem.
+
+**Arquivos alterados:**
+- `server/routes/bp2026.pontual.ts` - query de churn por data de cancelamento (com filtro de produto p/ Creators).
+- `server/routes/bp2026.pontual.helpers.ts` - linha `pontual_churn_data` + Taxa de churn aponta p/ fonte por data.
+- `server/routes/bp2026.pontual.helpers.test.ts` - testes da nova linha e da taxa.
+
+---
+
 ## 2026-07-08 | feat(bp2026): 'em cancelamento' conta como churn no pontual
 
 **O que foi feito:**
