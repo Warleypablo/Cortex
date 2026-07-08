@@ -18,6 +18,7 @@ import json
 import re
 import subprocess
 import time
+import unicodedata
 import urllib.parse
 import urllib.request
 import urllib.error
@@ -343,6 +344,9 @@ def find_post_folder(parent_mes_folder_id: str, turbo_slug: str) -> DriveFile | 
     Lista todos os filhos da pasta do mês e compara nomes normalizados
     (NBSP/whitespace tolerados). Mais robusto que `find_folder_by_name`,
     que faz match exato e quebra com nomes "TURBO_x \\xa0".
+
+    LEGADO: casa pelo SLUG da descrição, que vem podre/desatualizado do
+    template e apontava pra pasta de OUTRO post. Use find_post_folder_by_card.
     """
     target = _normalize_folder_name(turbo_slug)
     for f in list_folder(parent_mes_folder_id):
@@ -353,7 +357,80 @@ def find_post_folder(parent_mes_folder_id: str, turbo_slug: str) -> DriveFile | 
     return None
 
 
+def _content_key(name: str) -> str:
+    """Chave de conteúdo pra casar pasta<->card: remove o prefixo 'TURBO_'
+    (e NBSP/espaços de borda), acentos e pontuação; devolve UPPER com espaços
+    simples. Ex.: 'TURBO_seucliente' -> 'SEUCLIENTE'; 'Seu cliente é o seu
+    maior redator' -> 'SEU CLIENTE E O SEU MAIOR REDATOR'.
+    """
+    n = name.replace("\xa0", " ")
+    n = re.sub(r"^\s*turbo[_\s]+", "", n, flags=re.IGNORECASE)   # tira prefixo TURBO_
+    n = unicodedata.normalize("NFD", n)
+    n = "".join(c for c in n if unicodedata.category(c) != "Mn")  # tira acentos
+    n = re.sub(r"[^\w\s]", "", n)                                 # tira pontuação
+    return re.sub(r"\s+", " ", n).strip().upper()
+
+
+def _pick_folder_for_card(card_name: str, folder_names: list[str]) -> str | None:
+    """Núcleo PURO (testável sem Drive): dado o nome do card e os nomes das
+    subpastas do mês, devolve o nome da pasta que casa — ou None se NENHUMA
+    ou se houver EMPATE (ambíguo).
+
+    Casa por `_content_key` com tolerância: igualdade, substring sem-espaço em
+    qualquer direção, ou o conjunto de palavras da pasta contido no do card
+    (as pastas têm um nome abreviado do começo do card: 'TURBO_seucliente'
+    p/ 'Seu cliente...'). Guarda de 5+ chars evita chave curta casar à toa.
+    Em múltiplos matches, escolhe a chave mais longa (mais específica); empate
+    no topo => ambíguo => None (fail-safe).
+    """
+    ck = _content_key(card_name)
+    ck_ns = ck.replace(" ", "")
+    if not ck_ns:
+        return None
+    cand: list[tuple[str, int]] = []
+    for name in folder_names:
+        fk = _content_key(name)
+        fk_ns = fk.replace(" ", "")
+        if len(fk_ns) < 5:
+            continue
+        if (fk == ck
+                or fk_ns in ck_ns or ck_ns in fk_ns
+                or set(fk.split()) <= set(ck.split())):
+            cand.append((name, len(fk_ns)))
+    if not cand:
+        return None
+    cand.sort(key=lambda x: -x[1])
+    if len(cand) > 1 and cand[0][1] == cand[1][1]:
+        return None
+    return cand[0][0]
+
+
+def find_post_folder_by_card(parent_mes_folder_id: str, card_name: str) -> DriveFile | None:
+    """Acha a subpasta do post casando pelo NOME DO CARD (fonte confiável do
+    calendário), NÃO pelo slug 'TURBO_<x>' da descrição.
+
+    Motivo: o slug vem copiado do template e desatualizado — apontava pra pasta
+    de OUTRO post e publicou conteúdo errado em 08/jul/2026 (card 'Seu cliente é
+    o seu maior redator' com slug 'TURBO_datassazonais' -> saiu o carrossel de
+    'Datas sazonais'). As pastas do mês têm nome de conteúdo derivado do card
+    ('TURBO_seucliente', 'TURBO_ News 1'), então casamos contra o nome do card.
+
+    FAIL-SAFE: None se nenhuma pasta casa OU se há ambiguidade — melhor não
+    publicar (e alertar) do que publicar o post errado.
+    """
+    folders = [f for f in list_folder(parent_mes_folder_id)
+               if f.mime_type == "application/vnd.google-apps.folder"]
+    picked = _pick_folder_for_card(card_name, [f.name for f in folders])
+    if picked is None:
+        return None
+    for f in folders:
+        if f.name == picked:
+            return f
+    return None
+
+
 _LEADING_NUM_RE = re.compile(r"(\d+)")
+_TRAILING_NUM_RE = re.compile(r"(\d+)\s*\.[^.]+$")  # número logo antes da extensão
 
 
 def _slide_sort_key(f: DriveFile) -> tuple[int, int, str]:
@@ -362,12 +439,16 @@ def _slide_sort_key(f: DriveFile) -> tuple[int, int, str]:
 
     Convenção do time: arquivos nomeados `1.png`, `2.png`, ..., `10.png`
     (ou `1.mp4`, `2.mp4`, ...), com prefixo opcional (`ritual 3.png`,
-    `CAPA 00.png`). Ordena pelo PRIMEIRO número encontrado no nome, o
-    que coloca `10` depois de `9` (e `CAPA 00` antes de `1`).
+    `CAPA 00.png`). O número do slide é o que vem IMEDIATAMENTE ANTES da
+    extensão — priorizamos ele para não deixar um número no MEIO do nome
+    sequestrar a ordenação: em `Você vai perder de 7x1 1.png`, o `7` do tema
+    "7x1" era pego como se fosse o índice, todos os slides empatavam no `7`
+    e caíam em ordem alfabética (1, 10, 2, 3, ...). Só se não houver número
+    antes da extensão é que caímos no primeiro número do nome.
 
     Fallback (sem número no nome) → vai pro fim, ordem alfabética.
     """
-    m = _LEADING_NUM_RE.search(f.name)
+    m = _TRAILING_NUM_RE.search(f.name) or _LEADING_NUM_RE.search(f.name)
     if m:
         return (0, int(m.group(1)), f.name.lower())
     return (1, 0, f.name.lower())
