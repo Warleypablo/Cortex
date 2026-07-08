@@ -84,9 +84,28 @@ export async function montarPontual({ db, mesCorrente, mesFechado, produtoLike }
     }
   }
 
+  // Churn pontual por DATA DE CANCELAMENTO (fonte do ClickUp): SUM(valorp) de contratos
+  // pontuais cancelados, por mês de data_solicitacao_encerramento. Estado atual de
+  // cup_contratos (não snapshot) — captura contratos criados+cancelados no mesmo mês, que
+  // o snapshot-diff da ponte perde. Mesmos status de churn da ponte (CHURN_STATUS).
+  const churnDataRes = await db.execute(sql`
+    SELECT EXTRACT(MONTH FROM data_solicitacao_encerramento)::int AS mes,
+           SUM(valorp::numeric) AS total
+    FROM "Clickup".cup_contratos
+    WHERE valorp::numeric > 0
+      AND LOWER(TRIM(status)) IN ('cancelado/inativo', 'em cancelamento', 'não usar')
+      AND data_solicitacao_encerramento >= '2026-01-01' AND data_solicitacao_encerramento < '2027-01-01'
+      ${filtroVenda}
+    GROUP BY 1
+  `);
+  const churnPorDataPorMes: Record<number, number> = {};
+  for (const row of churnDataRes.rows as any[]) {
+    churnPorDataPorMes[Number(row.mes)] = parseFloat(row.total);
+  }
+
   return montarLinhasPontual(
     porMes, mesCorrente, mesFechado,
     vendaComercialPorMes, vendaNoEstoquePorMes, vendaPorProdutoPorMes,
-    "squad",
+    "squad", churnPorDataPorMes,
   );
 }

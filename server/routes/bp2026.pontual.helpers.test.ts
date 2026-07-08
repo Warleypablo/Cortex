@@ -255,7 +255,8 @@ describe("montarLinhasPontual", () => {
   // venda comercial A=900 (valor atual); destes 650 estão no estoque, 250 fora. B (foto) = 700.
   const vendaComercial = { 1: 900 };
   const vendaNoEstoque = { 1: 650 };
-  const linhas = montarLinhasPontual(porMes, 1, 1, vendaComercial, vendaNoEstoque);
+  // churn por data de cancelamento (fonte ClickUp) = 400 em jan; snapshot-diff da ponte = 300
+  const linhas = montarLinhasPontual(porMes, 1, 1, vendaComercial, vendaNoEstoque, {}, "produto", { 1: 400 });
   const by = (m: string) => linhas.find((l) => l.metrica === m)!;
   const GRUPO_VENDA = "Venda Pontual (comercial)";
   const GRUPO_ESTOQUE = "Movimento do estoque (foto do ClickUp)";
@@ -290,14 +291,22 @@ describe("montarLinhasPontual", () => {
     expect(by("pontual_estoque_fim").meses[0].realizado).toBe(1800);
     expect(by("pontual_estoque_fim").destaque).toBe(true);
   });
-  it("Taxa de churn = churn ÷ estoque inicial (pct positiva), YTD ponderado", () => {
+  it("Taxa de churn usa o churn por DATA de cancelamento ÷ estoque inicial (não o snapshot)", () => {
     const tc = by("pontual_taxa_churn");
     expect(tc.titulo).toBe("· Taxa de churn");
     expect(tc.unidade).toBe("pct");
     expect(tc.grupo).toBe(GRUPO_ESTOQUE);
     expect(tc.semDetalhe).toBe(true);
-    expect(tc.meses[0].realizado).toBeCloseTo(300 / 2150, 6); // churn/estoqueIni
-    expect(tc.ytd.realizado).toBeCloseTo(300 / 2150, 6);       // Σchurn/Σini (1 mês fechado)
+    expect(tc.meses[0].realizado).toBeCloseTo(400 / 2150, 6); // churn POR DATA (400) ÷ estoqueIni
+    expect(tc.ytd.realizado).toBeCloseTo(400 / 2150, 6);      // Σchurn_data ÷ Σini (1 mês fechado)
+  });
+  it("linha '· Churn (data de cancelamento)' = valor por data (negativo); ponte usa o snapshot", () => {
+    const cd = by("pontual_churn_data");
+    expect(cd.titulo).toBe("· Churn (data de cancelamento)");
+    expect(cd.meses[0].realizado).toBe(-400); // por data
+    expect(cd.grupo).toBe(GRUPO_ESTOQUE);
+    expect(cd.semDetalhe).toBe(true);
+    expect(by("pontual_churn").meses[0].realizado).toBe(-300); // ponte continua no snapshot-diff
   });
   it("decomposição por status soma ao estoque final", () => {
     expect(by("pontual_status_ativo").meses[0].realizado).toBe(1100);

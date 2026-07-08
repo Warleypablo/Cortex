@@ -267,6 +267,11 @@ export function montarLinhasPontual(
   vendaNoEstoquePorMes: Record<number, number> = {},
   vendaPorProdutoPorMes: Record<number, Record<string, number>> = {},
   sublinhasPor: "produto" | "squad" = "produto",
+  // Churn pontual por DATA DE CANCELAMENTO (cup_contratos, fonte do ClickUp): SUM(valorp)
+  // de contratos cancelados por mês de data_solicitacao_encerramento. Usado na linha
+  // "· Churn (data de cancelamento)" e na "· Taxa de churn". NÃO entra na ponte (que é
+  // snapshot-diff); captura também contratos criados+cancelados no mesmo mês.
+  churnPorDataPorMes: Record<number, number> = {},
 ): LinhaPontual[] {
   const ponte: (PonteMes | null)[] = Array.from({ length: 13 }, () => null);
   const decomp: (Record<string, number> | null)[] = Array.from({ length: 13 }, () => null);
@@ -367,13 +372,21 @@ export function montarLinhasPontual(
     }
     return totalI > 0 ? totalE / totalI : null;
   })();
-  // Taxa de churn: churn do mês ÷ estoque inicial (= estoque do fim do mês anterior).
-  // Mesma régua da taxa de entrega e do churn % do MRR (base = fechamento anterior).
-  // YTD = Σ churn ÷ Σ estoque inicial (média mensal ponderada). Fração 0-1 p/ display pct.
+  // Churn pontual por DATA DE CANCELAMENTO (fonte do ClickUp) — bate com o gráfico do
+  // ClickUp e captura contratos que o snapshot-diff perde (criados+cancelados no mesmo mês).
+  // A linha "(−) Churn" da ponte segue snapshot-diff (para a ponte fechar); estas leituras
+  // usam a data de cancelamento (cup_contratos).
+  const churnData = (m: number) => churnPorDataPorMes[m] ?? 0;
+  const serieChurnData = Array.from({ length: 12 }, (_, i) => {
+    const m = i + 1;
+    return m <= mesCorrente ? -churnData(m) : null; // negativo, como saída
+  });
+  // Taxa de churn = churn por data de cancelamento ÷ estoque inicial (fim do mês anterior).
+  // YTD = Σ churn por data ÷ Σ estoque inicial (média mensal ponderada). Fração 0-1 p/ pct.
   const serieTaxaChurn = Array.from({ length: 12 }, (_, i) => {
     const m = i + 1; const p = ponte[m];
     if (!(m <= mesCorrente && p && p.estoqueIni > 0)) return null;
-    return p.churn / p.estoqueIni;
+    return churnData(m) / p.estoqueIni;
   });
   const ytdTaxaChurn = (() => {
     if (mesFechado === 0) return null;
@@ -381,7 +394,7 @@ export function montarLinhasPontual(
     for (let m = 1; m <= mesFechado; m++) {
       const p = ponte[m];
       if (!p || p.estoqueIni === 0) continue;
-      totalC += p.churn; totalI += p.estoqueIni;
+      totalC += churnData(m); totalI += p.estoqueIni;
     }
     return totalI > 0 ? totalC / totalI : null;
   })();
@@ -395,8 +408,12 @@ export function montarLinhasPontual(
     mk("pontual_reativacao", "· Reativação", "fluxo", serieFluxo((p) => p.reativacao, 1), sumYtd(serieFluxo((p) => p.reativacao, 1))),
     mk("pontual_entrega", "(−) Entrega", "fluxo", serieFluxo((p) => p.entrega, -1), sumYtd(serieFluxo((p) => p.entrega, -1))),
     mk("pontual_taxa_entrega", "· Taxa de entrega", "fluxo", serieTaxaEntrega, ytdTaxaEntrega, { unidade: "pct", semDetalhe: true }),
-    mk("pontual_churn", "(−) Churn", "fluxo", serieFluxo((p) => p.churn, -1), sumYtd(serieFluxo((p) => p.churn, -1))),
-    mk("pontual_taxa_churn", "· Taxa de churn", "fluxo", serieTaxaChurn, ytdTaxaChurn, { unidade: "pct", semDetalhe: true }),
+    mk("pontual_churn", "(−) Churn", "fluxo", serieFluxo((p) => p.churn, -1), sumYtd(serieFluxo((p) => p.churn, -1)),
+      { nota: "Churn que saiu do estoque no mês (snapshot-diff) — usado na ponte do estoque. Pode ser menor que o ClickUp; ver '· Churn (data de cancelamento)'." }),
+    mk("pontual_churn_data", "· Churn (data de cancelamento)", "fluxo", serieChurnData, sumYtd(serieChurnData),
+      { nota: "Churn pontual por data de cancelamento (cup_contratos) — alinhado ao ClickUp. Inclui contratos criados e cancelados no mesmo mês, que o snapshot-diff não captura. Não entra na ponte.", semDetalhe: true }),
+    mk("pontual_taxa_churn", "· Taxa de churn", "fluxo", serieTaxaChurn, ytdTaxaChurn,
+      { unidade: "pct", semDetalhe: true, nota: "Churn por data de cancelamento ÷ estoque inicial (fim do mês anterior); coluna final = média ponderada." }),
     mk("pontual_deletados", "(−) Deletados", "fluxo", serieFluxo((p) => p.deletados, -1), sumYtd(serieFluxo((p) => p.deletados, -1))),
     mk("pontual_saida_atipica", "(−) Saída atípica", "fluxo", serieFluxo((p) => p.saidaAtipica, -1), sumYtd(serieFluxo((p) => p.saidaAtipica, -1))),
     mk("pontual_reajuste", "(±) Reajuste de valor", "fluxo", serieFluxo((p) => p.reajuste, 1), sumYtd(serieFluxo((p) => p.reajuste, 1))),
