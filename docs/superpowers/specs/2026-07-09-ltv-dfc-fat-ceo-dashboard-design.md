@@ -28,6 +28,7 @@ Nota: NÃO é `valorr + valorp` cru — o recorrente precisa da dimensão tempo 
 Corte em **01/out/2025** (1º mês cheio do `caz_parcelas`; parcelas quitadas em 10–30/set/2025 são descartadas para não duplicar com o teórico de setembro).
 - Vida pré-corte (teórico): mesma régua do FAT, capada em 30/set/2025.
 - Vida pós-corte (real): `Σ valor_pago` das parcelas `tipo_evento='RECEITA'` com `data_quitacao >= 2025-10-01` e `< dia 1º do mês da célula` (teto de calendário exato, não o dia do snap), casadas via CNPJ.
+- **Decisão deliberada — sem filtro `status='QUITADO'`** (verificado em prod 2026-07-09): parcelas PENDENTE com `data_quitacao` têm `valor_pago=0` (não somam); RECEBIDO_PARCIAL (7 parcelas, R$ 31k) é caixa que entrou de fato e seria perdido com o filtro. `valor_pago + data_quitacao` é a régua de caixa fiel — não "corrigir" para `status='QUITADO'`.
 - Clientes ativos sem match CNPJ (~4% dos ativos): fallback = LTV FAT do cliente.
 
 Match CNPJ: `regexp_replace(cnpj, '\D', '', 'g')` nos dois lados + `LENGTH IN (11, 14)`; parcela↔cliente via `caz_parcelas.id_cliente::text = caz_clientes.ids`.
