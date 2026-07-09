@@ -176,6 +176,42 @@ export function receitaRecebidaFromBp(bp: {
   );
 }
 
+// Linha "Lucro" da matriz: o simples — Receita recebida (caixa) − Despesa Total —
+// para as três linhas da tabela fecharem entre si (Receita − Custos = Lucro).
+// NÃO é o EBITDA do BP (competência): difere por (caixa−faturado) + inadimplência
+// − impostos diretos − CAPEX. Decisão do Ichino em 2026-07-09.
+export function lucroCaixaLinha(
+  receitaTotal: BpLinha | undefined,
+  despesaTotal: BpLinha | undefined,
+  recebidoPorMes: Record<number, number> | undefined
+): BpLinha {
+  const rec = recebidoPorMes ?? {};
+  const despPorMes = new Map(
+    (despesaTotal?.meses ?? []).map((m) => [m.mes, { orcado: m.orcado, realizado: m.realizado }])
+  );
+  const meses = (receitaTotal?.meses ?? []).map((m) => {
+    const desp = despPorMes.get(m.mes);
+    const recebido = rec[m.mes];
+    const realizado = recebido != null && desp?.realizado != null ? recebido - desp.realizado : null;
+    const orcado = m.orcado - (desp?.orcado ?? 0);
+    const atingimento = realizado != null && orcado ? realizado / orcado : null;
+    return { mes: m.mes, orcado, realizado, atingimento };
+  });
+  return { metrica: "lucro_caixa", titulo: "Lucro", direcao: "maior_melhor", unidade: "brl", meses };
+}
+
+export function lucroCaixaFromBp(bp: {
+  metricasGerais?: BpLinha[];
+  receitaRecebidaCaixaPorMes?: Record<number, number>;
+}): BpLinha {
+  const metricas = bp.metricasGerais ?? [];
+  return lucroCaixaLinha(
+    metricas.find((l) => l.metrica === "receita_total"),
+    metricas.find((l) => l.metrica === "despesa_total"),
+    bp.receitaRecebidaCaixaPorMes
+  );
+}
+
 export interface CeoSources {
   bpLinhas: BpLinha[];
   bpMetricas: BpLinha[];

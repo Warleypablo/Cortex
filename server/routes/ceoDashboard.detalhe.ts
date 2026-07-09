@@ -3,10 +3,10 @@ import { sql } from "drizzle-orm";
 import { montarDetalheBp } from "./bp2026.detalhe";
 import { computarBpReceitas } from "./bp2026";
 import { storage } from "../storage";
-import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
+import { canAccessCeo, lucroCaixaFromBp, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
-  enpsRespostasToGrupos, grupoMargemBruta, receitaCabecaGrupos,
+  enpsRespostasToGrupos, receitaCabecaGrupos,
   recebidoCategoriasToGrupo, serieEvolucao, KPI_COMPONENTES,
   ltvAuditoriaToGrupos, ultimoDiaAnterior,
   type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao, type LtvAuditoriaRow,
@@ -16,7 +16,6 @@ import {
 // receita e receita_cabeca usam as linhas sintéticas de caixa (montadas à parte).
 const EVOLUCAO_FONTE: Record<string, { arr: "linhas" | "metricasGerais"; metrica: string }> = {
   custos: { arr: "metricasGerais", metrica: "despesa_total" },
-  lucro: { arr: "linhas", metrica: "ebitda" },
   caixa: { arr: "metricasGerais", metrica: "saldo_caixa" },
   cac: { arr: "linhas", metrica: "cac" },
   headcount: { arr: "metricasGerais", metrica: "colaboradores" },
@@ -38,7 +37,7 @@ async function recebidoPorCategoria(db: any, mesNum: number): Promise<Array<{ ca
 }
 
 const TITULOS: Record<string, string> = {
-  receita: "Receita", custos: "Custos & Despesas", lucro: "Lucro (EBITDA)",
+  receita: "Receita", custos: "Custos & Despesas", lucro: "Lucro",
   caixa: "Saldo de Caixa", inadimplencia: "Inadimplência Total", cac: "CAC",
   ltv_fat: "LTV FAT", ltv_dfc: "LTV DFC", headcount: "Headcount", enps: "E-NPS", receita_cabeca: "Receita / Cabeça",
 };
@@ -91,15 +90,14 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     const v = linhaValor(bp, "metricasGerais", "colaboradores", mesNum);
     base.orcado = v.orcado; base.realizado = v.realizado;
   } else if (kpi === "lucro") {
-    const mb = linhaValor(bp, "linhas", "margem_bruta", mesNum);
-    grupos.push(grupoMargemBruta(mb.realizado ?? 0));
-    for (const slug of ["cac", "sga", "bonus"]) {
-      const det = await montarDetalheBp(db, { metrica: slug, mes: mesNum });
-      grupos.push(achatarComponente(det, { sinal: "-", formato: "brl" }));
-    }
-    const eb = linhaValor(bp, "linhas", "ebitda", mesNum);
-    base.orcado = eb.orcado; base.realizado = eb.realizado;
-    nota = "EBITDA = Margem Bruta − CAC − SG&A − Bônus";
+    // O simples, fechando com a tabela: Lucro = Receita recebida (caixa) − Custos & Despesas.
+    grupos = [
+      { ...recebidoCategoriasToGrupo(await recebidoPorCategoria(db, mesNum)), sinal: "+" as const },
+      ...(await componentesGrupos(db, "custos", mesNum)),
+    ];
+    const m = lucroCaixaFromBp(bp).meses.find((x) => x.mes === mesNum);
+    base.orcado = m?.orcado ?? null; base.realizado = m?.realizado ?? null;
+    nota = "Lucro = Receita recebida no mês (caixa) − Custos & Despesas — a mesma conta das linhas da tabela. ≠ EBITDA do BP (competência), que exclui impostos diretos/CAPEX e desconta inadimplência.";
   } else if (kpi === "receita_cabeca") {
     // Numerador em regime de caixa (receita recebida / DFC), não o faturável (competência).
     const recebido = bp.receitaRecebidaCaixaPorMes?.[mesNum] ?? 0;
@@ -251,6 +249,8 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     evolucao = serieEvolucao(receitaRecebidaFromBp(bp), bp.mesFechado);
   } else if (kpi === "receita_cabeca") {
     evolucao = serieEvolucao(receitaCabecaCaixaFromBp(bp), bp.mesFechado);
+  } else if (kpi === "lucro") {
+    evolucao = serieEvolucao(lucroCaixaFromBp(bp), bp.mesFechado);
   } else if (EVOLUCAO_FONTE[kpi]) {
     const { arr, metrica } = EVOLUCAO_FONTE[kpi];
     evolucao = serieEvolucao((bp[arr] ?? []).find((l: any) => l.metrica === metrica), bp.mesFechado);

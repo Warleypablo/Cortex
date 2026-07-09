@@ -36,6 +36,7 @@ export interface CeoMatrizSources {
   // Linhas já reconstruídas em regime de caixa (recebido/DFC) — ver *FromBp helpers.
   receitaRecebida: BpLinha;
   receitaCabecaCaixa: BpLinha;
+  lucroCaixa: BpLinha; // Receita recebida − Despesa Total (fecha com as duas linhas acima)
   // Séries mensais sem meta (valor por mês; mês ausente → célula "—").
   inadimplenciaSeriePorMes: Record<number, number>; // por mês de vencimento
   ltvFatSeriePorMes: Record<number, number>; // LTV faturável mediano dos ativos (ClickUp: valorr × meses + pontual entregue)
@@ -87,7 +88,9 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
     { key: "receita", label: "Receita", unidade: "brl", direcao: "maior_melhor", semMeta: false,
       celulas: celulasDoBp(s.receitaRecebida, mesNum) },
     bpLinha(s.bpMetricas, "despesa_total", "custos", "Custos & Despesas", "menor_melhor", "brl"),
-    bpLinha(s.bpLinhas, "ebitda", "lucro", "Lucro (EBITDA)", "maior_melhor", "brl"),
+    { key: "lucro", label: "Lucro", unidade: "brl", direcao: "maior_melhor", semMeta: false,
+      nota: "Lucro = Receita − Custos & Despesas (as duas linhas acima; receita em regime de caixa). Meta = meta de receita − meta de custos. ≠ EBITDA do BP (competência).",
+      celulas: celulasDoBp(s.lucroCaixa, mesNum) },
     bpLinha(s.bpMetricas, "saldo_caixa", "caixa", "Saldo de Caixa", "maior_melhor", "brl"),
     { key: "inadimplencia", label: "Inadimplência Total", unidade: "brl", direcao: "menor_melhor",
       semMeta: true, nota: "Por mês de vencimento das parcelas em aberto.",

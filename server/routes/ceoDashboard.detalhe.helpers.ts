@@ -134,12 +134,6 @@ export function enpsRespostasToGrupos(
     .sort((a, b) => ordem.indexOf(a.titulo) - ordem.indexOf(b.titulo));
 }
 
-// Lucro: Margem Bruta (só-valor, +) e os componentes de custo drilláveis vêm no endpoint.
-export function grupoMargemBruta(valor: number): CeoGrupo {
-  return { titulo: "Margem Bruta", total: valor, sinal: "+", formato: "brl", itens: [],
-    itensOmitidos: undefined };
-}
-
 // Grupo do drill de Receita em regime de caixa: uma linha por categoria de recebimento.
 // Remove o código contábil do rótulo ("03.01.01 Receita de Serviços" → "Receita de Serviços").
 export function recebidoCategoriasToGrupo(

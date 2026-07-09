@@ -27,7 +27,8 @@ function baseSources(overrides: Partial<CeoMatrizSources> = {}): CeoMatrizSource
     mesFechado: 2, // março em andamento (parcial); fev é o último mês fechado
     receitaRecebida: linhaBp("receita_total", tresMeses(1000)),
     receitaCabecaCaixa: linhaBp("receita_cabeca", tresMeses(10)),
-    bpLinhas: [linhaBp("ebitda", tresMeses(500)), linhaBp("cac", tresMeses(200))],
+    bpLinhas: [linhaBp("cac", tresMeses(200))],
+    lucroCaixa: linhaBp("lucro_caixa", tresMeses(500)),
     bpMetricas: [
       linhaBp("despesa_total", tresMeses(300)),
       linhaBp("saldo_caixa", tresMeses(2000)),

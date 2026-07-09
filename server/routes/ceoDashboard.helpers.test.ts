@@ -9,6 +9,7 @@ import {
   receitaCabecaCaixaLinha,
   receitaCabecaCaixaFromBp,
   receitaRecebidaLinha,
+  lucroCaixaFromBp,
   type BpLinha,
 } from "./ceoDashboard.helpers";
 
@@ -201,5 +202,37 @@ describe("canAccessCeo", () => {
   it("bloqueia os demais", () => {
     expect(canAccessCeo({ role: "user", allowedRoutes: ["/outra"] })).toBe(false);
     expect(canAccessCeo(undefined)).toBe(false);
+  });
+});
+
+describe("lucroCaixaFromBp", () => {
+  const bp = {
+    metricasGerais: [
+      { metrica: "receita_total", direcao: "maior_melhor", unidade: "brl", meses: [
+        { mes: 1, orcado: 1000, realizado: 950, atingimento: 0.95 },
+        { mes: 2, orcado: 1000, realizado: 990, atingimento: 0.99 },
+        { mes: 3, orcado: 1200, realizado: null, atingimento: null },
+      ] },
+      { metrica: "despesa_total", direcao: "menor_melhor", unidade: "brl", meses: [
+        { mes: 1, orcado: 700, realizado: 600, atingimento: 600 / 700 },
+        { mes: 2, orcado: 700, realizado: null, atingimento: null },
+        { mes: 3, orcado: 800, realizado: 650, atingimento: 650 / 800 },
+      ] },
+    ] as BpLinha[],
+    receitaRecebidaCaixaPorMes: { 1: 900, 3: 1100 } as Record<number, number>,
+  };
+
+  it("o simples: realizado = recebido − despesa; meta = meta receita − meta despesa", () => {
+    const l = lucroCaixaFromBp(bp);
+    expect(l.meses[0]).toEqual({ mes: 1, orcado: 300, realizado: 300, atingimento: 1 });
+    // mês 3: recebido 1100 − despesa 650 = 450; meta 1200 − 800 = 400
+    expect(l.meses[2]).toEqual({ mes: 3, orcado: 400, realizado: 450, atingimento: 450 / 400 });
+  });
+
+  it("sem recebido OU sem despesa realizada → realizado null (não finge lucro)", () => {
+    const l = lucroCaixaFromBp(bp);
+    expect(l.meses[1].realizado).toBeNull(); // mês 2: tem recebido? não importa — despesa null
+    expect(l.meses[1].atingimento).toBeNull();
+    expect(l.meses[1].orcado).toBe(300); // meta segue visível
   });
 });
