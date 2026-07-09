@@ -27,8 +27,8 @@ function baseSources(overrides: Partial<CeoMatrizSources> = {}): CeoMatrizSource
     mesFechado: 2, // março em andamento (parcial); fev é o último mês fechado
     receitaRecebida: linhaBp("receita_total", tresMeses(1000)),
     receitaCabecaCaixa: linhaBp("receita_cabeca", tresMeses(10)),
-    bpLinhas: [linhaBp("cac", tresMeses(200))],
-    lucroCaixa: linhaBp("lucro_caixa", tresMeses(500)),
+    bpLinhas: [linhaBp("ebitda", tresMeses(500)), linhaBp("cac", tresMeses(200))],
+    geracaoCaixa: linhaBp("geracao_caixa", tresMeses(400)),
     bpMetricas: [
       linhaBp("despesa_total", tresMeses(300)),
       linhaBp("saldo_caixa", tresMeses(2000)),
@@ -56,12 +56,20 @@ describe("montarMatrizCeo", () => {
     expect(m.mesFechado).toBe(6); // colunas com mes > 6 (julho) são parciais
   });
 
-  it("expõe as 12 linhas na ordem dos cards (LTV FAT antes de LTV DFC)", () => {
+  it("expõe as 13 linhas na ordem dos cards (Geração de Caixa após o EBITDA)", () => {
     const m = montarMatrizCeo(baseSources());
     expect(m.linhas.map((l) => l.key)).toEqual([
-      "receita", "custos", "lucro", "caixa", "inadimplencia",
+      "receita", "custos", "lucro", "geracao_caixa", "caixa", "inadimplencia",
       "nps", "cac", "ltv_fat", "ltv_dfc", "headcount", "enps", "receita_cabeca",
     ]);
+  });
+
+  it("Geração de Caixa usa a linha sintética (realizado um-menos-o-outro; meta do BP)", () => {
+    const m = montarMatrizCeo(baseSources());
+    const gc = m.linhas.find((l) => l.key === "geracao_caixa")!;
+    expect(gc.label).toBe("Geração de Caixa");
+    expect(gc.semMeta).toBe(false);
+    expect(gc.celulas[0]).toEqual({ mes: 1, valor: 360, meta: 400, atingimentoPct: 90 });
   });
 
   it("transpõe uma linha do BP: realizado, meta e % por mês", () => {

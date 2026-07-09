@@ -176,38 +176,42 @@ export function receitaRecebidaFromBp(bp: {
   );
 }
 
-// Linha "Lucro" da matriz: o simples — Receita recebida (caixa) − Despesa Total —
-// para as três linhas da tabela fecharem entre si (Receita − Custos = Lucro).
-// NÃO é o EBITDA do BP (competência): difere por (caixa−faturado) + inadimplência
-// − impostos diretos − CAPEX. Decisão do Ichino em 2026-07-09.
-export function lucroCaixaLinha(
+// Linha "Geração de Caixa" da matriz: o simples — Receita recebida (caixa) − Despesa
+// Total — para fechar com as linhas Receita e Custos da tabela ("um menos o outro",
+// Ichino 2026-07-09). META segue PRECISAMENTE o BP: orçado da linha geracao_caixa
+// do DRE (EBITDA − impostos diretos − CAPEX), nunca meta derivada.
+export function geracaoCaixaLinha(
   receitaTotal: BpLinha | undefined,
   despesaTotal: BpLinha | undefined,
+  geracaoBp: BpLinha | undefined,
   recebidoPorMes: Record<number, number> | undefined
 ): BpLinha {
   const rec = recebidoPorMes ?? {};
   const despPorMes = new Map(
-    (despesaTotal?.meses ?? []).map((m) => [m.mes, { orcado: m.orcado, realizado: m.realizado }])
+    (despesaTotal?.meses ?? []).map((m) => [m.mes, m.realizado])
   );
+  const orcadoPorMes = new Map((geracaoBp?.meses ?? []).map((m) => [m.mes, m.orcado]));
   const meses = (receitaTotal?.meses ?? []).map((m) => {
-    const desp = despPorMes.get(m.mes);
+    const despesa = despPorMes.get(m.mes);
     const recebido = rec[m.mes];
-    const realizado = recebido != null && desp?.realizado != null ? recebido - desp.realizado : null;
-    const orcado = m.orcado - (desp?.orcado ?? 0);
+    const realizado = recebido != null && despesa != null ? recebido - despesa : null;
+    const orcado = orcadoPorMes.get(m.mes) ?? 0;
     const atingimento = realizado != null && orcado ? realizado / orcado : null;
     return { mes: m.mes, orcado, realizado, atingimento };
   });
-  return { metrica: "lucro_caixa", titulo: "Lucro", direcao: "maior_melhor", unidade: "brl", meses };
+  return { metrica: "geracao_caixa", titulo: "Geração de Caixa", direcao: "maior_melhor", unidade: "brl", meses };
 }
 
-export function lucroCaixaFromBp(bp: {
+export function geracaoCaixaFromBp(bp: {
+  linhas?: BpLinha[];
   metricasGerais?: BpLinha[];
   receitaRecebidaCaixaPorMes?: Record<number, number>;
 }): BpLinha {
   const metricas = bp.metricasGerais ?? [];
-  return lucroCaixaLinha(
+  return geracaoCaixaLinha(
     metricas.find((l) => l.metrica === "receita_total"),
     metricas.find((l) => l.metrica === "despesa_total"),
+    (bp.linhas ?? []).find((l) => l.metrica === "geracao_caixa"),
     bp.receitaRecebidaCaixaPorMes
   );
 }

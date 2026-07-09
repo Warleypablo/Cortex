@@ -9,7 +9,7 @@ import {
   receitaCabecaCaixaLinha,
   receitaCabecaCaixaFromBp,
   receitaRecebidaLinha,
-  lucroCaixaFromBp,
+  geracaoCaixaFromBp,
   type BpLinha,
 } from "./ceoDashboard.helpers";
 
@@ -205,8 +205,15 @@ describe("canAccessCeo", () => {
   });
 });
 
-describe("lucroCaixaFromBp", () => {
+describe("geracaoCaixaFromBp", () => {
   const bp = {
+    linhas: [
+      { metrica: "geracao_caixa", direcao: "maior_melhor", unidade: "brl", meses: [
+        { mes: 1, orcado: 250, realizado: 111, atingimento: null },
+        { mes: 2, orcado: 260, realizado: null, atingimento: null },
+        { mes: 3, orcado: 500, realizado: 222, atingimento: null },
+      ] },
+    ] as BpLinha[],
     metricasGerais: [
       { metrica: "receita_total", direcao: "maior_melhor", unidade: "brl", meses: [
         { mes: 1, orcado: 1000, realizado: 950, atingimento: 0.95 },
@@ -222,17 +229,18 @@ describe("lucroCaixaFromBp", () => {
     receitaRecebidaCaixaPorMes: { 1: 900, 3: 1100 } as Record<number, number>,
   };
 
-  it("o simples: realizado = recebido − despesa; meta = meta receita − meta despesa", () => {
-    const l = lucroCaixaFromBp(bp);
-    expect(l.meses[0]).toEqual({ mes: 1, orcado: 300, realizado: 300, atingimento: 1 });
-    // mês 3: recebido 1100 − despesa 650 = 450; meta 1200 − 800 = 400
-    expect(l.meses[2]).toEqual({ mes: 3, orcado: 400, realizado: 450, atingimento: 450 / 400 });
+  it("realizado = recebido − despesa (um menos o outro); meta = orçado geracao_caixa do BP", () => {
+    const l = geracaoCaixaFromBp(bp);
+    // mês 1: 900 − 600 = 300; meta = 250 (do BP, NÃO derivada)
+    expect(l.meses[0]).toEqual({ mes: 1, orcado: 250, realizado: 300, atingimento: 300 / 250 });
+    // mês 3: 1100 − 650 = 450; meta 500 do BP
+    expect(l.meses[2]).toEqual({ mes: 3, orcado: 500, realizado: 450, atingimento: 450 / 500 });
   });
 
-  it("sem recebido OU sem despesa realizada → realizado null (não finge lucro)", () => {
-    const l = lucroCaixaFromBp(bp);
-    expect(l.meses[1].realizado).toBeNull(); // mês 2: tem recebido? não importa — despesa null
+  it("sem recebido OU sem despesa realizada → realizado null (não finge resultado)", () => {
+    const l = geracaoCaixaFromBp(bp);
+    expect(l.meses[1].realizado).toBeNull(); // mês 2: despesa null
     expect(l.meses[1].atingimento).toBeNull();
-    expect(l.meses[1].orcado).toBe(300); // meta segue visível
+    expect(l.meses[1].orcado).toBe(260); // meta do BP segue visível
   });
 });
