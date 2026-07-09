@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useRelatorioTrimestral } from "./relatorio-trimestral/useRelatorioTrimestral";
 import { getTrimestreOptions, getDefaultTrimestre } from "./relatorio-trimestral/trimestre-options";
 import SlideCapaTrimestre from "./relatorio-trimestral/SlideCapaTrimestre";
+import SlideCapaSecao from "./relatorio-trimestral/SlideCapaSecao";
 import SlideMantra from "./relatorio-trimestral/SlideMantra";
 import SlideVendasTrimestre from "./relatorio-trimestral/SlideVendasTrimestre";
 import SlideVisaoTrimestre from "./relatorio-trimestral/SlideVisaoTrimestre";
@@ -24,6 +25,7 @@ const SLIDE_BASE_H = 720;
 
 type TrimSlot =
   | { type: "mantra" } | { type: "capa" } | { type: "visao" } | { type: "vendas" } | { type: "evolucao" }
+  | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" }
   | { type: "closers" } | { type: "turbo" } | { type: "squads-ranking" }
   | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "tech" }
   | { type: "nps" } | { type: "faturamento" } | { type: "encerramento" };
@@ -63,15 +65,21 @@ export default function RelatorioTrimestral() {
   const { data, isLoading, error } = useRelatorioTrimestral(selectedTri);
 
   const slots = useMemo<TrimSlot[]>(() => {
-    const base: TrimSlot[] = [
-      { type: "mantra" }, { type: "capa" }, { type: "visao" }, { type: "vendas" }, { type: "evolucao" },
-      { type: "closers" }, { type: "turbo" }, { type: "squads-ranking" },
+    // Abertura executiva → COMERCIAL → OPERAÇÃO → TECH → financeiro → ritual de fechamento
+    const abertura: TrimSlot[] = [
+      { type: "mantra" }, { type: "capa" }, { type: "visao" }, { type: "evolucao" },
+    ];
+    const comercial: TrimSlot[] = [
+      { type: "capa-comercial" }, { type: "vendas" }, { type: "closers" },
     ];
     const squads: TrimSlot[] = (data?.squadDetails ?? []).map((_, i) => ({ type: "squad", squadIndex: i }));
-    const tail: TrimSlot[] = [
-      { type: "pontual" }, { type: "tech" }, { type: "nps" }, { type: "faturamento" }, { type: "encerramento" },
+    const operacao: TrimSlot[] = [
+      { type: "capa-operacao" }, { type: "turbo" }, { type: "squads-ranking" }, ...squads,
+      { type: "pontual" }, { type: "nps" },
     ];
-    return [...base, ...squads, ...tail];
+    const tech: TrimSlot[] = [{ type: "capa-tech" }, { type: "tech" }];
+    const fechamento: TrimSlot[] = [{ type: "faturamento" }, { type: "encerramento" }];
+    return [...abertura, ...comercial, ...operacao, ...tech, ...fechamento];
   }, [data]);
   const totalSlides = slots.length;
 
@@ -133,6 +141,9 @@ export default function RelatorioTrimestral() {
     switch (slot.type) {
       case "mantra":       return <SlideMantra />;
       case "capa":         return <SlideCapaTrimestre data={data} />;
+      case "capa-comercial": return <SlideCapaSecao numero="01" titulo="Comercial" subtitulo="Contratos fechados · Ranking closers" accent="#38bdf8" accentSoft="rgba(56,189,248,0.12)" label={data.label} />;
+      case "capa-operacao":  return <SlideCapaSecao numero="02" titulo="Operação" subtitulo="Turbo Commerce · Squads · Pontual · NPS" accent="#34d399" accentSoft="rgba(52,211,153,0.12)" label={data.label} />;
+      case "capa-tech":      return <SlideCapaSecao numero="03" titulo="Tech" subtitulo="Projetos · Receita · Pipeline" accent="#a78bfa" accentSoft="rgba(167,139,250,0.12)" label={data.label} />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
       case "vendas":       return <SlideVendasTrimestre dados={data.contratosMes} label={data.label} qoqVendas={data.trend.qoq.vendas} />;
       case "evolucao":     return <SlideEvolucaoTrimestre trend={data.trend} />;
