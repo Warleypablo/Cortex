@@ -1,7 +1,7 @@
 import { Smile, TrendingUp, TrendingDown } from "lucide-react";
 import SlideLayout from "../relatorio-mensal/SlideLayout";
 import { SlideHeader, SecondaryCard } from "../relatorio-mensal/SlideComponents";
-import { ACCENT, entrance, GrowBar, DeckKeyframes } from "./deck-kit";
+import { ACCENT, entrance, entranceWith, GrowBar, DeckKeyframes } from "./deck-kit";
 import { useCountUp } from "./useCountUp";
 
 // Dados hardcoded — mesma fonte manual do SlideNPS do mensal; atualizar junto.
@@ -245,13 +245,13 @@ export default function SlideNpsTrimestre({ label }: { label: string }) {
         <div className="flex-1 grid grid-cols-5 gap-6 min-h-0">
           {/* ESQUERDA: gauges antes × depois + legenda de zonas */}
           <div className="col-span-3 flex flex-col justify-center gap-3 min-h-0">
-            <div {...entrance(240)} className="grid grid-cols-2 gap-5 items-center">
+            <div {...entranceWith(240, "grid grid-cols-2 gap-5 items-center")}>
               <NpsGaugeMini animatedScore={anteriorAnim} targetScore={anterior.score} caption="ANTES" decimals={2} dimmed />
               <NpsGaugeMini animatedScore={scoreAnim} targetScore={score} caption="DEPOIS" decimals={1} />
             </div>
 
             {/* Legenda das zonas — substitui os rótulos que não cabem no gauge pequeno */}
-            <div {...entrance(320)} className="flex items-center justify-center gap-4 flex-wrap">
+            <div {...entranceWith(320, "flex items-center justify-center gap-4 flex-wrap")}>
               {ZONAS.map((z) => (
                 <span key={z.label} className="flex items-center gap-1.5">
                   <span className="w-2.5 h-2.5 rounded-sm shrink-0" style={{ backgroundColor: z.color }} />
@@ -265,7 +265,7 @@ export default function SlideNpsTrimestre({ label }: { label: string }) {
 
           {/* DIREITA: distribuição + melhores clientes */}
           <div className="col-span-2 flex flex-col gap-3 min-h-0">
-            <div {...entrance(280)} className="shrink-0">
+            <div {...entranceWith(280, "shrink-0")}>
               <SecondaryCard className="px-4 py-3">
                 <p className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2.5">Distribuição de respostas</p>
                 <div className="flex flex-col gap-2">
@@ -309,7 +309,7 @@ export default function SlideNpsTrimestre({ label }: { label: string }) {
               </SecondaryCard>
             </div>
 
-            <div {...entrance(320)} className="shrink-0">
+            <div {...entranceWith(320, "shrink-0")}>
               <h3 className="text-base font-black text-white">Melhores Clientes</h3>
               <p className="text-[11px] text-zinc-500">Promotores com nota 10 no NPS</p>
             </div>

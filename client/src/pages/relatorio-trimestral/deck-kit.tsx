@@ -41,6 +41,21 @@ export function entrance(delayMs: number) {
   };
 }
 
+/**
+ * Props de entrada já MESCLADAS com className/style locais.
+ *
+ * ⚠️ Use isto em vez de `<div {...entrance(n)} className="...">`: o spread vem
+ * ANTES, então o className local sobrescreve o da animação e ela nunca roda
+ * (o mesmo vale para o style, que carrega o animationDelay).
+ */
+export function entranceWith(delayMs: number, className = "", style?: CSSProperties) {
+  const e = entrance(delayMs);
+  return {
+    className: `${e.className} ${className}`.trim(),
+    style: { ...e.style, ...style },
+  };
+}
+
 /** Badge de variação QoQ com cor semântica (betterDirection decide o que é verde). */
 export function QoqBadge({ q, sufixo = "QoQ" }: { q: Qoq; sufixo?: string }) {
   if (!q.anterior) return null;

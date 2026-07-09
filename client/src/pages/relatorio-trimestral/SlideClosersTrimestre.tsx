@@ -2,7 +2,7 @@ import { Trophy, Crown, Zap } from "lucide-react";
 import SlideLayout from "../relatorio-mensal/SlideLayout";
 import { SlideHeader, SecondaryCard } from "../relatorio-mensal/SlideComponents";
 import type { CloserRanking } from "../relatorio-mensal/types";
-import { ACCENT, fmtCompact, entrance, DeckKeyframes, GrowBar } from "./deck-kit";
+import { ACCENT, fmtCompact, entranceWith, DeckKeyframes, GrowBar } from "./deck-kit";
 import { useCountUp } from "./useCountUp";
 
 interface Props {
@@ -87,8 +87,7 @@ export default function SlideClosersTrimestre({ ranking, topPontual, label }: Pr
         {/* Coluna principal: pódio top 3 + demais closers */}
         <div className="flex-1 flex flex-col gap-4 min-h-0">
           <div
-            {...entrance(0)}
-            className={`flex justify-center gap-10 ${hasResto ? "items-end shrink-0" : "items-center flex-1"}`}
+            {...entranceWith(0, `flex justify-center gap-10 ${hasResto ? "items-end shrink-0" : "items-center flex-1"}`)}
           >
             {display.map(({ c, r }) => {
               if (!c) return null;
@@ -119,7 +118,7 @@ export default function SlideClosersTrimestre({ ranking, topPontual, label }: Pr
 
           {/* Demais closers: linhas compactas com GrowBar proporcional ao total obtido */}
           {hasResto && (
-            <div {...entrance(250)} className="flex-1 min-h-0">
+            <div {...entranceWith(250, "flex-1 min-h-0")}>
               <SecondaryCard className="px-5 py-3 h-full flex flex-col overflow-hidden" borderColor="#52525b">
                 <p className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 shrink-0">Demais closers</p>
                 <div className="flex-1 flex flex-col justify-center gap-2 min-h-0">
@@ -146,7 +145,7 @@ export default function SlideClosersTrimestre({ ranking, topPontual, label }: Pr
 
         {/* Destaque Pontual */}
         {topPontual && (
-          <div {...entrance(150)} className="shrink-0 flex" style={{ width: 240 }}>
+          <div {...entranceWith(150, "shrink-0 flex", { width: 240 })}>
             <SecondaryCard className="w-full flex flex-col items-center text-center px-6 py-7" borderColor={ACCENT.pontual}>
               <div className="flex items-center gap-2 mb-5">
                 <Zap className="h-4 w-4 text-purple-400" />

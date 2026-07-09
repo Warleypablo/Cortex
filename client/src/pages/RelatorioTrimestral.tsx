@@ -7,6 +7,7 @@ import { getTrimestreOptions, getDefaultTrimestre } from "./relatorio-trimestral
 import SlideCapaTrimestre from "./relatorio-trimestral/SlideCapaTrimestre";
 import SlideCapaSecao from "./relatorio-trimestral/SlideCapaSecao";
 import SlideMantra from "./relatorio-trimestral/SlideMantra";
+import SlideQrTrimestre from "./relatorio-trimestral/SlideQrTrimestre";
 import SlideVendasTrimestre from "./relatorio-trimestral/SlideVendasTrimestre";
 import SlideVisaoTrimestre from "./relatorio-trimestral/SlideVisaoTrimestre";
 import SlideClosersTrimestre from "./relatorio-trimestral/SlideClosersTrimestre";
@@ -25,11 +26,11 @@ const SLIDE_BASE_W = 1280;
 const SLIDE_BASE_H = 720;
 
 type TrimSlot =
-  | { type: "mantra" } | { type: "capa" } | { type: "visao" } | { type: "vendas" } | { type: "evolucao" }
+  | { type: "mantra" } | { type: "qr" } | { type: "capa" } | { type: "visao" } | { type: "vendas" } | { type: "evolucao" }
   | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" }
   | { type: "closers" } | { type: "sdrs" } | { type: "turbo" } | { type: "squads-ranking" }
   | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "tech" }
-  | { type: "nps" } | { type: "faturamento" } | { type: "encerramento" };
+  | { type: "nps" } | { type: "faturamento" } | { type: "encerramento" } | { type: "qa" };
 
 function useSlideScale(containerRef: React.RefObject<HTMLDivElement | null>, enabled: boolean, reservedHeight = 0) {
   const [scale, setScale] = useState(1);
@@ -66,9 +67,11 @@ export default function RelatorioTrimestral() {
   const { data, isLoading, error } = useRelatorioTrimestral(selectedTri);
 
   const slots = useMemo<TrimSlot[]>(() => {
-    // Abertura executiva → COMERCIAL → OPERAÇÃO → TECH → financeiro → ritual de fechamento
+    // Abertura executiva → COMERCIAL → OPERAÇÃO → TECH → financeiro → ritual de fechamento → Q&A
+    // O QR entra logo após o Mantra: a plateia escaneia cedo e manda perguntas
+    // durante o reporte; o slide de Q&A no fim é onde elas são respondidas.
     const abertura: TrimSlot[] = [
-      { type: "mantra" }, { type: "capa" }, { type: "visao" }, { type: "evolucao" },
+      { type: "mantra" }, { type: "qr" }, { type: "capa" }, { type: "visao" }, { type: "evolucao" },
     ];
     const comercial: TrimSlot[] = [
       { type: "capa-comercial" }, { type: "vendas" }, { type: "closers" }, { type: "sdrs" },
@@ -79,7 +82,7 @@ export default function RelatorioTrimestral() {
       { type: "pontual" }, { type: "nps" },
     ];
     const tech: TrimSlot[] = [{ type: "capa-tech" }, { type: "tech" }];
-    const fechamento: TrimSlot[] = [{ type: "faturamento" }, { type: "encerramento" }];
+    const fechamento: TrimSlot[] = [{ type: "faturamento" }, { type: "encerramento" }, { type: "qa" }];
     return [...abertura, ...comercial, ...operacao, ...tech, ...fechamento];
   }, [data]);
   const totalSlides = slots.length;
@@ -141,6 +144,7 @@ export default function RelatorioTrimestral() {
     if (!slot) return null;
     switch (slot.type) {
       case "mantra":       return <SlideMantra />;
+      case "qr":           return <SlideQrTrimestre variant="abertura" />;
       case "capa":         return <SlideCapaTrimestre data={data} />;
       case "capa-comercial": return <SlideCapaSecao numero="01" titulo="Comercial" subtitulo="Contratos fechados · Ranking closers" accent="#38bdf8" accentSoft="rgba(56,189,248,0.12)" label={data.label} />;
       case "capa-operacao":  return <SlideCapaSecao numero="02" titulo="Operação" subtitulo="Turbo Commerce · Squads · Pontual · NPS" accent="#34d399" accentSoft="rgba(52,211,153,0.12)" label={data.label} />;
@@ -158,6 +162,7 @@ export default function RelatorioTrimestral() {
       case "nps":          return <SlideNpsTrimestre label={data.label} />;
       case "faturamento":  return <SlideFaturavelTrimestre faturavel={data.faturavel} label={data.label} />;
       case "encerramento": return <SlideEncerramentoTrimestre label={data.label} />;
+      case "qa":           return <SlideQrTrimestre variant="qa" />;
       default:             return null;
     }
   };
