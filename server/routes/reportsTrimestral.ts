@@ -347,7 +347,116 @@ export function registerReportsTrimestralRoutes(app: Express) {
         retencoesValor: parseFloat(turboRetencoes.retencoes_valor) || 0,
       };
 
-      // TODO(Tasks 8-11): demais seções reais.
+      // Bloco contratosMes + rankingClosers + topPontual (Task 8): espelha as queries
+      // 5/6 (ranking closers + fotos) e 7/13d (contratos do período + pipeline breakdown)
+      // do relatorioMensalSlides.ts, re-janeladas para o trimestre inteiro (FLUXO).
+      // O ranking soma por closer no range do tri inteiro e o ORDER BY re-rankeia sobre
+      // essa janela completa — não concatena tops mensais. tmRecorrente/tmPontual são
+      // RATIO recalculado em JS a partir dos agregados do tri.
+      const [
+        rankingRows,
+        closerPhotosRows,
+        contratosRows,
+        pipelineBreakdownRows,
+      ] = await Promise.all([
+        // Espelha query 5 (ranking closers, deals ganhos) — FLUXO somado no tri.
+        db.execute(sql`
+          SELECT
+            c.nome as name,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as mrr_obtido,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as pontual_obtido,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric + COALESCE(SUM(d.valor_pontual), 0)::numeric as total_obtido,
+            COUNT(*)::int as negocios_ganhos
+          FROM "Bitrix".crm_deal d
+          JOIN "Bitrix".crm_closers c ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+          -- só os 7 closers ativos (ranking com fotos; sem bucket "Outros")
+          WHERE d.stage_name = 'Negócio Ganho' AND c.active = true
+            AND d.data_fechamento >= ${w.dataStart}::date
+            AND d.data_fechamento < ${w.dataEnd}::date
+          GROUP BY c.nome
+          ORDER BY mrr_obtido DESC
+        `),
+        // Espelha query 6 (fotos dos closers) — sem filtro de data.
+        db.execute(sql`
+          SELECT c.nome as name, a.picture
+          FROM "Bitrix".crm_closers c
+          LEFT JOIN cortex_core.auth_users a ON LOWER(TRIM(c.email)) = LOWER(TRIM(a.email))
+          WHERE c.email IS NOT NULL AND a.picture IS NOT NULL
+        `),
+        // Espelha query 7 (contratos do período: nº e receita recorrente/pontual) —
+        // FLUXO somado no tri.
+        db.execute(sql`
+          SELECT
+            COUNT(CASE WHEN COALESCE(d.valor_recorrente, 0) > 0 THEN 1 END)::int as contratos_recorrente,
+            COUNT(CASE WHEN COALESCE(d.valor_pontual, 0) > 0 THEN 1 END)::int as contratos_pontual,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as receita_recorrente,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as receita_pontual
+          FROM "Bitrix".crm_deal d
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.data_fechamento >= ${w.dataStart}::date
+            AND d.data_fechamento < ${w.dataEnd}::date
+        `),
+        // Espelha query 13d (pipeline breakdown Inbound/Outbound/Geral) — FLUXO no tri.
+        db.execute(sql`
+          SELECT
+            COALESCE(d.category_name, 'Outros') as pipeline,
+            COUNT(*)::int as contratos,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as receita_recorrente,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as receita_pontual
+          FROM "Bitrix".crm_deal d
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.data_fechamento >= ${w.dataStart}::date
+            AND d.data_fechamento < ${w.dataEnd}::date
+          GROUP BY d.category_name
+          ORDER BY receita_recorrente DESC
+        `),
+      ]);
+
+      const closerPhotoMap: Record<string, string> = {};
+      (closerPhotosRows.rows as any[]).forEach((row: any) => {
+        if (row.picture && row.name) closerPhotoMap[row.name] = row.picture;
+      });
+
+      const rankingClosers = (rankingRows.rows as any[]).map((row: any) => ({
+        name: row.name,
+        fotoUrl: closerPhotoMap[row.name] || null,
+        mrrObtido: parseFloat(row.mrr_obtido) || 0,
+        pontualObtido: parseFloat(row.pontual_obtido) || 0,
+        totalObtido: parseFloat(row.total_obtido) || 0,
+        negociosGanhos: parseInt(row.negocios_ganhos) || 0,
+      }));
+
+      // Top pontual (maior pontualObtido do ranking do tri, igual mensal).
+      const topPontual = [...rankingClosers].sort((a, b) => b.pontualObtido - a.pontualObtido)[0] || null;
+
+      const contratosRow = (contratosRows.rows as any[])[0] || {};
+      const totalRecorrente = parseFloat(contratosRow.receita_recorrente) || 0;
+      const totalPontual = parseFloat(contratosRow.receita_pontual) || 0;
+      const totalContratosRec = parseInt(contratosRow.contratos_recorrente) || 0;
+      const totalContratosPont = parseInt(contratosRow.contratos_pontual) || 0;
+      const numContratos = totalContratosRec + totalContratosPont;
+
+      const pipelineBreakdown = (pipelineBreakdownRows.rows as any[]).map((row: any) => ({
+        pipeline: row.pipeline,
+        contratos: parseInt(row.contratos) || 0,
+        receitaRecorrente: parseFloat(row.receita_recorrente) || 0,
+        receitaPontual: parseFloat(row.receita_pontual) || 0,
+      }));
+
+      const contratosMes = {
+        numContratos,
+        contratosRecorrente: totalContratosRec,
+        contratosPontual: totalContratosPont,
+        receitaRecorrente: totalRecorrente,
+        receitaPontual: totalPontual,
+        tmRecorrente: totalContratosRec > 0 ? totalRecorrente / totalContratosRec : 0,
+        tmPontual: totalContratosPont > 0 ? totalPontual / totalContratosPont : 0,
+        pipelineBreakdown,
+        // A evolução usa o bloco `trend`; a série mensal de vendas não é exibida no deck trimestral.
+        vendasSeries: [] as { month: string; label: string; vendasMrr: number; vendasPontual: number; numContratos: number }[],
+      };
+
+      // TODO(Tasks 9-11): demais seções reais.
       res.json({
         trimestre: w.trimestre,
         label: w.label,
@@ -355,9 +464,9 @@ export function registerReportsTrimestralRoutes(app: Express) {
         mesesComputados: w.mesesComputados,
         trend,
         turboMetrics,
-        contratosMes: emptyContratosMes(),
-        rankingClosers: [],
-        topPontual: null,
+        contratosMes,
+        rankingClosers,
+        topPontual,
         rankingSquads: [],
         squadDetails: [],
         pontualData: emptyPontualData(),
