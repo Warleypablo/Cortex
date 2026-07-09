@@ -20,8 +20,9 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
     if (mm) inadimplenciaSeriePorMes[parseInt(mm[1], 10)] = Number((e as any).valor) || 0;
   }
 
-  // 3) LTV médio dos ativos POR MÊS — reconstruído de snapshots diários (cup_data_hist),
-  // mesma régua da aba /lt-ltv-churn/evolucao-clientes (valorr×lt no snapshot + valorp, só ativos).
+  // 3) LTV MEDIANO dos ativos POR MÊS — reconstruído de snapshots diários (cup_data_hist),
+  // régua da aba /lt-ltv-churn (valorr×lt no snapshot + valorp, só ativos). Mediana (não média)
+  // p/ não ser distorcida por poucos clientes de ticket altíssimo (ex.: R$25k/mês → LTV R$214k).
   // Snapshot de referência = dia 1º do mês ou o 1º snapshot disponível dele.
   const ltvSeriePorMes: Record<number, number> = {};
   try {
@@ -44,7 +45,8 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
         WHERE sr.snap IS NOT NULL
         GROUP BY sr.m, h.id_task
       )
-      SELECT EXTRACT(MONTH FROM m)::int AS mes, ROUND(AVG(ltv) FILTER (WHERE ativo)::numeric,0) AS ltv
+      SELECT EXTRACT(MONTH FROM m)::int AS mes,
+        ROUND((PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY ltv) FILTER (WHERE ativo))::numeric,0) AS ltv
       FROM cli GROUP BY m ORDER BY m
     `);
     for (const r of ltvRows.rows ?? []) {
