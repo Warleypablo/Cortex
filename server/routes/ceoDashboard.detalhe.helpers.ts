@@ -131,15 +131,6 @@ export function enpsRespostasToGrupos(
     .sort((a, b) => ordem.indexOf(a.titulo) - ordem.indexOf(b.titulo));
 }
 
-export function ltvRowsToGrupos(
-  rows: Array<{ nome: string; ltv_total: number }>
-): CeoGrupo[] {
-  const itens: ItemDetalhe[] = rows.map((r) => ({
-    grupo: "Clientes (LTV)", nome: r.nome || "—", detalhe: "", data: null, valor: Number(r.ltv_total) || 0,
-  }));
-  return agruparItens(itens, LIMITE_ITENS).map((g) => ({ ...g, formato: "brl" as const }));
-}
-
 // Lucro: Margem Bruta (só-valor, +) e os componentes de custo drilláveis vêm no endpoint.
 export function grupoMargemBruta(valor: number): CeoGrupo {
   return { titulo: "Margem Bruta", total: valor, sinal: "+", formato: "brl", itens: [],
@@ -264,7 +255,7 @@ export function ltvAuditoriaToGrupos(
   const abaixo = ordenado.slice(centrais[centrais.length - 1] + 1);
   const grupos = [
     grupo(`Acima da mediana (${acima.length})`, acima, false),
-    grupo("Mediana", meio, true),
+    { ...grupo("Mediana", meio, true), total: mediana },
     grupo(`Abaixo da mediana (${abaixo.length})`, abaixo, false),
   ].filter((g) => g.itens.length > 0);
   return { grupos, mediana, nSemMatch: rows.filter((r) => !r.tem_match).length };

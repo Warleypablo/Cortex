@@ -185,7 +185,7 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
         GROUP BY cm.task_id
       )
       SELECT a.id_task,
-        COALESCE(c.nome, a.id_task) AS nome,
+        COALESCE((SELECT MIN(c2.nome) FROM "Clickup".cup_clientes c2 WHERE c2.task_id = a.id_task), a.id_task) AS nome,
         mt.task_id IS NOT NULL AS tem_match,
         a.valorr_snap, a.n_rec_snap, r.inicio_rec,
         ROUND(r.rec_full, 2) AS rec_full,
@@ -194,12 +194,11 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
         COALESCE(p.pont_pre, 0) AS pont_pre,
         COALESCE(pg.pago, 0) AS pago,
         COALESCE(pg.n_parcelas, 0) AS n_parcelas,
-        ROUND(r.rec_full + COALESCE(p.pont_full, 0), 2) AS ltv_fat,
-        ROUND(CASE WHEN mt.task_id IS NOT NULL
+        (r.rec_full + COALESCE(p.pont_full, 0)) AS ltv_fat,
+        (CASE WHEN mt.task_id IS NOT NULL
           THEN r.rec_pre + COALESCE(p.pont_pre, 0) + COALESCE(pg.pago, 0)
-          ELSE r.rec_full + COALESCE(p.pont_full, 0) END, 2) AS ltv_dfc
+          ELSE r.rec_full + COALESCE(p.pont_full, 0) END) AS ltv_dfc
       FROM ativos a
-      LEFT JOIN "Clickup".cup_clientes c ON c.task_id = a.id_task
       LEFT JOIN match_task mt ON mt.task_id = a.id_task
       LEFT JOIN rec_stats r ON r.id_task = a.id_task
       LEFT JOIN pont_stats p ON p.id_task = a.id_task
@@ -211,7 +210,7 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
       n_rec_snap: Number(x.n_rec_snap) || 0,
       // node-postgres devolve DATE como Date JS; normalizar para "YYYY-MM-DD".
       inicio_rec: x.inicio_rec instanceof Date
-        ? x.inicio_rec.toISOString().slice(0, 10)
+        ? `${x.inicio_rec.getFullYear()}-${String(x.inicio_rec.getMonth() + 1).padStart(2, "0")}-${String(x.inicio_rec.getDate()).padStart(2, "0")}`
         : x.inicio_rec ? String(x.inicio_rec).slice(0, 10) : null,
       rec_full: Number(x.rec_full) || 0,
       rec_pre: Number(x.rec_pre) || 0,
@@ -228,7 +227,7 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     const regua = kpi === "ltv_fat"
       ? "Régua FAT (faturável): Valor R × meses de vida até o snapshot + pontual entregue"
       : `Régua DFC (caixa): faturável teórico até 30/set/25 + pago real no Conta Azul via CNPJ (parcelas RECEITA quitadas até ${ultimoDiaAnterior(mesNum)})${aud.nSemMatch > 0 ? `; ${aud.nSemMatch} cliente${aud.nSemMatch === 1 ? "" : "s"} sem match CNPJ usa${aud.nSemMatch === 1 ? "" : "m"} a régua faturável` : ""}`;
-    nota = `Célula = MEDIANA de ${parsed.length} clientes ativos no snapshot de 01/${String(mesNum).padStart(2, "0")} (N par = média dos 2 centrais). ${regua}.`;
+    nota = `Célula = MEDIANA de ${parsed.length} clientes ativos no 1º snapshot de ${String(mesNum).padStart(2, "0")}/2026 (N par = média dos 2 centrais). ${regua}.`;
   } else if (kpi === "enps") {
     const respostas: any = await storage.getRhNpsRespostas();
     grupos = enpsRespostasToGrupos(respostas ?? []);

@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
-  enpsRespostasToGrupos, ltvRowsToGrupos, receitaCabecaGrupos, recebidoCategoriasToGrupo,
+  enpsRespostasToGrupos, receitaCabecaGrupos, recebidoCategoriasToGrupo,
   serieEvolucao, KPI_COMPONENTES,
   ltvAuditoriaToGrupos, ultimoDiaAnterior, type LtvAuditoriaRow,
 } from "./ceoDashboard.detalhe.helpers";
@@ -73,14 +73,6 @@ describe("enpsRespostasToGrupos", () => {
     expect(gs.map((g) => g.titulo)).toEqual(["Promotores", "Neutros", "Detratores"]);
     expect(gs.every((g) => g.formato === "num")).toBe(true);
     expect(gs[0].itens[0].detalhe).toContain("nota 10");
-  });
-});
-
-describe("ltvRowsToGrupos", () => {
-  it("um grupo de clientes por LTV, formato brl", () => {
-    const gs = ltvRowsToGrupos([{ nome: "Cliente Y", ltv_total: 28000 }]);
-    expect(gs[0].itens[0].valor).toBe(28000);
-    expect(gs[0].formato).toBe("brl");
   });
 });
 
@@ -177,6 +169,7 @@ describe("ltvAuditoriaToGrupos", () => {
     expect(r.mediana).toBe(25000);
     expect(r.grupos[1].itens).toHaveLength(2);
     expect(r.grupos[1].itens.map((i) => i.valor)).toEqual([30000, 20000]);
+    expect(r.grupos[1].total).toBe(25000); // total do grupo Mediana = a própria mediana, não a soma dos 2
   });
 
   it("rows vazio: sem grupos, mediana null", () => {
