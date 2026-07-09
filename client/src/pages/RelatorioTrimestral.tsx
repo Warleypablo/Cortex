@@ -12,7 +12,7 @@ import SlideVisaoTrimestre from "./relatorio-trimestral/SlideVisaoTrimestre";
 import SlideClosersTrimestre from "./relatorio-trimestral/SlideClosersTrimestre";
 import SlideSdrsTrimestre from "./relatorio-trimestral/SlideSdrsTrimestre";
 import SlideTurboTrimestre from "./relatorio-trimestral/SlideTurboTrimestre";
-import SlideSquadsRankingTrimestre from "./relatorio-trimestral/SlideSquadsRankingTrimestre";
+import SlideOperadoresSquadTrimestre from "./relatorio-trimestral/SlideOperadoresSquadTrimestre";
 import SlideSquadTrimestre from "./relatorio-trimestral/SlideSquadTrimestre";
 import SlidePontualTrimestre from "./relatorio-trimestral/SlidePontualTrimestre";
 import SlideTechTrimestre from "./relatorio-trimestral/SlideTechTrimestre";
@@ -151,7 +151,7 @@ export default function RelatorioTrimestral() {
       case "closers":      return <SlideClosersTrimestre ranking={data.rankingClosers} topPontual={data.topPontual} label={data.label} />;
       case "sdrs":         return <SlideSdrsTrimestre ranking={data.rankingSDRs} topReunioes={data.topReunioes} label={data.label} />;
       case "turbo":        return <SlideTurboTrimestre metrics={data.turboMetrics} label={data.label} />;
-      case "squads-ranking": return <SlideSquadsRankingTrimestre ranking={data.rankingSquads} label={data.label} />;
+      case "squads-ranking": return <SlideOperadoresSquadTrimestre squads={data.operadoresPorSquad} label={data.label} />;
       case "squad":        return <SlideSquadTrimestre details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.label} />;
       case "pontual":      return <SlidePontualTrimestre pontualData={data.pontualData} label={data.label} />;
       case "tech":         return <SlideTechTrimestre techData={data.techData} label={data.label} />;

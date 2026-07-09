@@ -41,6 +41,22 @@ export interface Faturavel {
   porMes: FaturavelMes[];
 }
 
+// Top 3 operadores (responsável) de cada squad no trimestre, por MRR sob gestão
+// (foto do fim do tri). numOperadores = total de operadores da squad com MRR > 0.
+export interface OperadorSquad {
+  nome: string;
+  mrr: number;
+  fotoUrl: string | null;
+  cargo: string | null;
+}
+
+export interface SquadOperadores {
+  squad: string;
+  totalMrr: number;
+  numOperadores: number;
+  operadores: OperadorSquad[];
+}
+
 export interface RelatorioTrimestralData {
   trimestre: string;
   label: string;
@@ -56,6 +72,7 @@ export interface RelatorioTrimestralData {
   topReunioes: TopReunioes | null;
   rankingSquads: SquadRanking[];
   squadDetails: SquadDetail[];
+  operadoresPorSquad: SquadOperadores[];
   pontualData: PontualData;
   techData: TechSlideData;
   faturavel: Faturavel;
