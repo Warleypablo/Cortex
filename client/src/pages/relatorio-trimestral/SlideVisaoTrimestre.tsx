@@ -209,7 +209,7 @@ export default function SlideVisaoTrimestre({ data }: { data: RelatorioTrimestra
             delayMs={200}
           />
         </div>
-        <div className="grid grid-cols-3 gap-4 flex-[2] min-h-0">
+        <div className="grid grid-cols-4 gap-4 flex-[2] min-h-0">
           <InfoTile
             label="Churn % (média mensal)"
             valor={churnPctMedia}
@@ -218,18 +218,25 @@ export default function SlideVisaoTrimestre({ data }: { data: RelatorioTrimestra
             delayMs={350}
           />
           <InfoTile
-            label="Clientes ativos"
-            valor={data.turboMetrics.clientesAtivos}
+            label="Clientes recorrentes ativos"
+            valor={data.ticketsCliente.recorrente.clientes}
             formatar={(v) => String(Math.round(v))}
-            sub="foto do fim do trimestre"
-            delayMs={450}
+            sub="com contrato recorrente · foto do fim do tri"
+            delayMs={430}
           />
           <InfoTile
-            label="Ticket médio por cliente"
-            valor={data.turboMetrics.ticketMedioCliente}
+            label="Ticket médio recorrente"
+            valor={data.ticketsCliente.recorrente.ticketMedio}
             formatar={formatBRL}
-            sub="MRR ÷ clientes ativos"
-            delayMs={550}
+            sub={`MRR ÷ ${data.ticketsCliente.recorrente.clientes} clientes recorrentes ativos`}
+            delayMs={510}
+          />
+          <InfoTile
+            label="Ticket médio pontual"
+            valor={data.ticketsCliente.pontual.ticketMedio}
+            formatar={formatBRL}
+            sub={`receita pontual ÷ ${data.ticketsCliente.pontual.clientes} clientes atendidos no tri`}
+            delayMs={590}
           />
         </div>
       </div>

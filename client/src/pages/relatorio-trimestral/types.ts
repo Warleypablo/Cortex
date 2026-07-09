@@ -11,12 +11,26 @@ export interface TrendData {
   qoq: { mrr: Qoq; vendas: Qoq; churn: Qoq };
 }
 
+// Tickets médios por CLIENTE, mesma régua nos dois lados:
+// recorrente = MRR (foto fim do tri) ÷ clientes recorrentes ativos;
+// pontual = receita pontual do tri ÷ clientes distintos atendidos no tri.
+export interface TicketCliente {
+  ticketMedio: number;
+  clientes: number;
+}
+
+export interface TicketsCliente {
+  recorrente: TicketCliente;
+  pontual: TicketCliente;
+}
+
 export interface RelatorioTrimestralData {
   trimestre: string;
   label: string;
   parcial: boolean;
   mesesComputados: string[];
   trend: TrendData;
+  ticketsCliente: TicketsCliente;
   turboMetrics: TurboMetrics;
   contratosMes: ContratosMes;
   rankingClosers: CloserRanking[];

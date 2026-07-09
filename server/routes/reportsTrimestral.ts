@@ -211,7 +211,11 @@ export function registerReportsTrimestralRoutes(app: Express) {
             COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_ativo,
             COALESCE(AVG(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as ticket_medio_contrato,
             COUNT(*)::int as contratos_ativos,
-            COUNT(DISTINCT h.id_task)::int as clientes_ativos
+            COUNT(DISTINCT h.id_task)::int as clientes_ativos,
+            -- Clientes com contrato RECORRENTE ativo (valorr > 0) — denominador do
+            -- ticket médio recorrente. clientes_ativos (acima) inclui clientes cujo
+            -- snapshot só tem linhas com valorr = 0 e diluiria o ticket.
+            COUNT(DISTINCT h.id_task) FILTER (WHERE h.valorr::numeric > 0)::int as clientes_rec_ativos
           FROM "Clickup".cup_data_hist h
           JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
           WHERE h.status IN ('ativo', 'onboarding', 'triagem')
@@ -268,9 +272,13 @@ export function registerReportsTrimestralRoutes(app: Express) {
             AND d.data_fechamento < ${w.dataEnd}::date
         `),
         // Espelha query 13 (faturamento pontual, cup_contratos.data_entrega) — FLUXO no tri.
+        // clientes_pontuais: clientes distintos ATENDIDOS no tri (id_task = task do
+        // cliente; ver reference_estoque_pontual) — denominador do ticket médio pontual
+        // por cliente, mesma régua do recorrente (receita ÷ clientes).
         db.execute(sql`
           SELECT
-            COALESCE(SUM(valorp::numeric), 0) as faturamento_pontual
+            COALESCE(SUM(valorp::numeric), 0) as faturamento_pontual,
+            COUNT(DISTINCT id_task)::int as clientes_pontuais
           FROM "Clickup".cup_contratos
           WHERE data_entrega >= ${w.dataStart}::date
             AND data_entrega < ${w.dataEnd}::date
@@ -313,8 +321,10 @@ export function registerReportsTrimestralRoutes(app: Express) {
       const turboMetrics = {
         mrrAtivo: parseFloat(turboMrr.mrr_ativo) || 0,
         ticketMedioContrato: parseFloat(turboMrr.ticket_medio_contrato) || 0,
-        ticketMedioCliente: (parseInt(turboMrr.clientes_ativos) || 0) > 0
-          ? (parseFloat(turboMrr.mrr_ativo) || 0) / (parseInt(turboMrr.clientes_ativos) || 1)
+        // Ticket recorrente = MRR ÷ clientes com contrato RECORRENTE ativo (não a
+        // base geral, que inclui clientes só-pontual e diluía o número).
+        ticketMedioCliente: (parseInt(turboMrr.clientes_rec_ativos) || 0) > 0
+          ? (parseFloat(turboMrr.mrr_ativo) || 0) / (parseInt(turboMrr.clientes_rec_ativos) || 1)
           : 0,
         clientesAtivos: parseInt(turboMrr.clientes_ativos) || 0,
         contratosAtivos: parseInt(turboMrr.contratos_ativos) || 0,
@@ -1147,12 +1157,29 @@ export function registerReportsTrimestralRoutes(app: Express) {
         dfcRecebimentoMensal,
       };
 
+      // Tickets médios por CLIENTE, mesma régua nos dois lados:
+      // recorrente = MRR (foto fim do tri) ÷ clientes recorrentes ativos (foto);
+      // pontual   = receita pontual do tri ÷ clientes distintos atendidos no tri.
+      const clientesRecAtivos = parseInt(turboMrr.clientes_rec_ativos) || 0;
+      const clientesPontuais = parseInt(turboFat.clientes_pontuais) || 0;
+      const ticketsCliente = {
+        recorrente: {
+          ticketMedio: clientesRecAtivos > 0 ? (parseFloat(turboMrr.mrr_ativo) || 0) / clientesRecAtivos : 0,
+          clientes: clientesRecAtivos,
+        },
+        pontual: {
+          ticketMedio: clientesPontuais > 0 ? (parseFloat(turboFat.faturamento_pontual) || 0) / clientesPontuais : 0,
+          clientes: clientesPontuais,
+        },
+      };
+
       res.json({
         trimestre: w.trimestre,
         label: w.label,
         parcial: w.parcial,
         mesesComputados: w.mesesComputados,
         trend,
+        ticketsCliente,
         turboMetrics,
         contratosMes,
         rankingClosers,
