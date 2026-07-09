@@ -14,6 +14,7 @@ interface DetalheResponse {
   kpi: string; titulo: string; mes: number; unidade: "brl" | "int";
   orcado: number | null; realizado: number | null; atingimentoPct: number | null;
   grupos: GrupoDet[]; evolucao?: PontoEvolucao[]; nota?: string;
+  media?: number | null; // auditoria de LTV: média dos mesmos clientes (comparativo mediana × média)
 }
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -25,6 +26,45 @@ const TOM_ACENTO: Record<string, { texto: string; barra: string; chip: string }>
   vermelho: { texto: "text-rose-600 dark:text-rose-400", barra: "bg-rose-500", chip: "bg-rose-50 text-rose-700 dark:bg-rose-950/60 dark:text-rose-300" },
   neutro: { texto: "text-orange-600 dark:text-orange-400", barra: "bg-orange-500", chip: "bg-orange-50 text-orange-700 dark:bg-orange-950/60 dark:text-orange-300" },
 };
+
+// Comparativo mediana × média (auditoria de LTV): barras proporcionais + leitura do gap.
+// A distância entre as duas conta a história dos outliers — por isso a célula usa mediana.
+function MedianaVsMedia({ mediana, media, unidade, corMediana }: {
+  mediana: number; media: number; unidade: "brl" | "int"; corMediana: string;
+}) {
+  const max = Math.max(mediana, media);
+  const gapPct = Math.round((media / mediana - 1) * 100);
+  const legenda = Math.abs(media / mediana - 1) <= 0.02
+    ? "Média e mediana próximas: base equilibrada, sem outliers relevantes."
+    : media > mediana
+      ? "Média acima da mediana: poucos clientes grandes puxam a média para cima."
+      : "Média abaixo da mediana: muitos clientes pequenos puxam a média para baixo.";
+  const barras = [
+    { label: "Mediana", valor: mediana, cor: corMediana, gap: null as string | null },
+    { label: "Média", valor: media, cor: "bg-gray-300 dark:bg-zinc-600",
+      gap: gapPct !== 0 ? `${gapPct > 0 ? "+" : ""}${gapPct}%` : null },
+  ];
+  return (
+    <div className="mt-4 space-y-1.5">
+      {barras.map((b) => (
+        <div key={b.label} className="flex items-center gap-2 text-xs">
+          <span className="w-14 shrink-0 text-gray-500 dark:text-zinc-400">{b.label}</span>
+          <div className="h-2 flex-1 rounded-full bg-gray-100 dark:bg-zinc-800 overflow-hidden">
+            <div className={`h-full rounded-full ${b.cor} transition-all`}
+              style={{ width: `${Math.max(4, (b.valor / max) * 100)}%` }} />
+          </div>
+          <span className="w-20 shrink-0 text-right tabular-nums text-gray-900 dark:text-white">
+            {formatValor(b.valor, unidade)}
+          </span>
+          <span className="w-10 shrink-0 text-right tabular-nums text-gray-400 dark:text-zinc-500">
+            {b.gap ?? ""}
+          </span>
+        </div>
+      ))}
+      <p className="pt-0.5 text-[11px] leading-snug text-gray-400 dark:text-zinc-500">{legenda}</p>
+    </div>
+  );
+}
 
 function Grupos({ data }: { data: DetalheResponse }) {
   if (data.grupos.length === 0) {
@@ -122,6 +162,9 @@ export function CeoKpiDetail({ kpiKey, mes, tom = "neutro", onClose }: { kpiKey:
                     Meta {formatValor(data.orcado, data.unidade)}
                   </p>
                 </>
+              )}
+              {data.media != null && data.realizado != null && data.realizado > 0 && (
+                <MedianaVsMedia mediana={data.realizado} media={data.media} unidade={data.unidade} corMediana={acento.barra} />
               )}
             </div>
           )}

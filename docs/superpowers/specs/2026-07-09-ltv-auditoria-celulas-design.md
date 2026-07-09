@@ -31,6 +31,10 @@ Ao clicar na célula de LTV (FAT ou DFC) do mês M:
 - **Endpoint** `ceoDashboard.detalhe.ts`: os dois branches usam a mesma query (o `mes` já chega no request); montam grupos conforme o kpi; `base.realizado = mediana`.
 - **Frontend: zero mudança** — o drawer genérico (`CeoKpiDetail`) já renderiza grupos/subtexto/nota.
 
+## Mediana × média (adendo 2026-07-09, aprovado por Ichino)
+
+O header do drawer ganha um comparativo visual **mediana × média**: duas barras horizontais proporcionais (mediana na cor de acento do drawer, média em cinza), valores exatos à direita, gap % na linha da média e uma legenda que interpreta o gap ("média acima da mediana: poucos clientes grandes puxam a média para cima" / "abaixo…" / "próximas: base equilibrada", corte de ±2%). A média é calculada no helper sobre os MESMOS clientes listados (`media` no retorno de `ltvAuditoriaToGrupos` e campo opcional `media` no `CeoDetalheResponse`) — só a auditoria de LTV preenche; os demais KPIs não renderizam o bloco. Componente `MedianaVsMedia` em `CeoKpiDetail.tsx`. Validado: gaps reais de +23% a +46% (jan/jun, FAT/DFC).
+
 ## Trade-off assumido
 
 O ranking "foto de hoje" deixa de existir no drill (a auditoria do mês o substitui; o ranking do mês é visível nos grupos ordenados). Se fizer falta, vira uma aba no futuro.

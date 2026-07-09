@@ -172,8 +172,15 @@ describe("ltvAuditoriaToGrupos", () => {
     expect(r.grupos[1].total).toBe(25000); // total do grupo Mediana = a própria mediana, não a soma dos 2
   });
 
-  it("rows vazio: sem grupos, mediana null", () => {
-    expect(ltvAuditoriaToGrupos([], "ltv_fat", 6)).toEqual({ grupos: [], mediana: null, nSemMatch: 0 });
+  it("rows vazio: sem grupos, mediana e média null", () => {
+    expect(ltvAuditoriaToGrupos([], "ltv_fat", 6)).toEqual({ grupos: [], mediana: null, media: null, nSemMatch: 0 });
+  });
+
+  it("média sobre os mesmos clientes; outlier separa média da mediana", () => {
+    const rows = [row({ ltv_fat: 100000 }), row({ ltv_fat: 20000 }), row({ ltv_fat: 10000 })];
+    const r = ltvAuditoriaToGrupos(rows, "ltv_fat", 6);
+    expect(r.mediana).toBe(20000);
+    expect(r.media).toBe(43333); // (100000+20000+10000)/3 — outlier puxa a média p/ cima
   });
 
   it("FAT: detalhe decompõe recorrente (single e multi contrato) e pontual", () => {
