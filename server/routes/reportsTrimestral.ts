@@ -677,13 +677,25 @@ export function registerReportsTrimestralRoutes(app: Express) {
           WHERE h.status IN ('ativo', 'onboarding', 'triagem')
             AND h.valorr IS NOT NULL
         `),
-        // Top 3 operadores (responsavel) por squad no snapshot de w.fotoDate, por MRR
-        // por FATURAMENTO = MRR ativo (snapshot fim do tri) + pontual entregue no tri.
-        // Espelha o padrão de foto do "Top Operadores" do mensal (Q24a/24b, ~L1042-1165)
-        // com match flexível ClickUp×rh_pessoal, mas particionado por squad (ROW_NUMBER).
-        // O pontual (cup_contratos) é somado por operador no tri e atribuído à squad do
-        // operador no snapshot de MRR (join por nome) — evita divergência de rótulo de
-        // squad entre as duas tabelas; operador em 2 squads é caso raro.
+        // Top 3 operadores (responsavel) por squad, por FATURAMENTO = MRR ativo
+        // (snapshot fim do tri) + pontual entregue no tri.
+        //
+        // ⚠️ Cada operador entra em UMA squad só — a "principal", onde tem mais MRR
+        // (desempate: mais pontual, depois nome da squad) — e leva a sua produção
+        // TOTAL do trimestre. Isso é deliberado: 11 operadores aparecem em >1 squad no
+        // snapshot (e 23 pares operador×squad têm MRR 0, tipicamente contratos antigos
+        // sem valorr). A versão anterior agrupava o pontual só por nome e dava LEFT JOIN
+        // por nome, o que REPLICAVA o pontual do operador em toda squad onde ele tivesse
+        // linha de MRR — a Debora Mund aparecia no Olimpo (R$187k) e no Pulse (R$142k,
+        // faturamento 100% duplicado), inflando o total do Pulse.
+        //
+        // A alternativa (atribuir o pontual pela squad do CONTRATO) descartaria trabalho
+        // real: a Lara Grobério é do Pulse mas entregou R$67k sob "Aura (OFF)", squad
+        // desativada que não aparece no deck. Como o slide compara operadores DENTRO da
+        // squad, a produção total do operador é a régua certa.
+        // Efeito colateral aceito: squad_total = soma da produção dos operadores da
+        // squad, que pode diferir do faturamento da squad quando alguém entrega para
+        // uma squad OFF (Pulse) — Tech e Olimpo batem exatamente.
         db.execute(sql`
           WITH ultimo_snapshot AS (
             SELECT COALESCE(
@@ -692,7 +704,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
             ) as snap
           ),
           mrr_por_resp AS (
-            SELECT h.squad, h.responsavel AS nome,
+            SELECT TRIM(h.squad) AS squad, TRIM(h.responsavel) AS nome,
               COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) AS mrr
             FROM "Clickup".cup_data_hist h
             JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
@@ -700,10 +712,10 @@ export function registerReportsTrimestralRoutes(app: Express) {
               AND h.valorr IS NOT NULL
               AND h.responsavel IS NOT NULL AND TRIM(h.responsavel) != ''
               AND h.squad IS NOT NULL AND TRIM(h.squad) != ''
-            GROUP BY h.squad, h.responsavel
+            GROUP BY TRIM(h.squad), TRIM(h.responsavel)
           ),
           pontual_por_resp AS (
-            SELECT responsavel AS nome,
+            SELECT TRIM(squad) AS squad, TRIM(responsavel) AS nome,
               COALESCE(SUM(valorp::numeric), 0) AS pontual
             FROM "Clickup".cup_contratos
             WHERE LOWER(TRIM(status)) = 'entregue'
@@ -711,14 +723,33 @@ export function registerReportsTrimestralRoutes(app: Express) {
               AND data_entrega < ${w.dataEnd}::date
               AND valorp IS NOT NULL AND valorp::numeric > 0
               AND responsavel IS NOT NULL AND TRIM(responsavel) != ''
-            GROUP BY responsavel
+              AND squad IS NOT NULL AND TRIM(squad) != ''
+            GROUP BY TRIM(squad), TRIM(responsavel)
+          ),
+          -- Um par (squad, operador) por linha, cobrindo os dois lados (o operador pode
+          -- ter só pontual numa squad, sem MRR).
+          pares AS (
+            SELECT COALESCE(m.squad, p.squad) AS squad, COALESCE(m.nome, p.nome) AS nome,
+              COALESCE(m.mrr, 0) AS mrr, COALESCE(p.pontual, 0) AS pontual
+            FROM mrr_por_resp m
+            FULL OUTER JOIN pontual_por_resp p
+              ON LOWER(m.squad) = LOWER(p.squad) AND LOWER(m.nome) = LOWER(p.nome)
+          ),
+          -- Squad principal do operador: onde ele tem mais MRR.
+          principal AS (
+            SELECT DISTINCT ON (LOWER(nome)) LOWER(nome) AS nome_key, nome, squad
+            FROM pares
+            ORDER BY LOWER(nome), mrr DESC, pontual DESC, squad
+          ),
+          -- Produção total do operador no tri (somada sobre todas as squads).
+          totais AS (
+            SELECT LOWER(nome) AS nome_key, SUM(mrr) AS mrr, SUM(pontual) AS pontual
+            FROM pares GROUP BY LOWER(nome)
           ),
           por_resp AS (
-            SELECT m.squad, m.nome, m.mrr,
-              COALESCE(p.pontual, 0) AS pontual,
-              m.mrr + COALESCE(p.pontual, 0) AS faturamento
-            FROM mrr_por_resp m
-            LEFT JOIN pontual_por_resp p ON LOWER(TRIM(m.nome)) = LOWER(TRIM(p.nome))
+            SELECT pr.squad, pr.nome, t.mrr, t.pontual, t.mrr + t.pontual AS faturamento
+            FROM principal pr
+            JOIN totais t ON t.nome_key = pr.nome_key
           ),
           ranked AS (
             SELECT *,
