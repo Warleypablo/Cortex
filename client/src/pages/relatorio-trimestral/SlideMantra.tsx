@@ -21,11 +21,68 @@ const LINHAS: Trecho[][] = [
 export default function SlideMantra() {
   return (
     <div className="w-full h-full relative overflow-hidden flex flex-col" style={{ backgroundColor: "#05060f" }}>
-      {/* Aurora central discreta */}
+      {/* Animações ambiente (contínuas) deste slide */}
+      <style>{`
+        @keyframes mantraLogoScan {
+          0%   { transform: translateX(-130%) skewX(-12deg); }
+          70%  { transform: translateX(360%) skewX(-12deg); }
+          100% { transform: translateX(360%) skewX(-12deg); }
+        }
+        @keyframes mantraAuroraPulse {
+          0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
+          50%      { opacity: 1;   transform: translate(-50%, -50%) scale(1.12); }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .mantra-scan-beam { animation: none !important; opacity: 0 !important; }
+          .mantra-aurora    { animation: none !important; }
+        }
+      `}</style>
+
+      {/* Aurora central com respiração lenta */}
       <div
-        className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[70%] h-[80%] rounded-full pointer-events-none"
-        style={{ background: "radial-gradient(circle, rgba(16,185,129,0.09), transparent 60%)", filter: "blur(50px)" }}
+        className="mantra-aurora absolute top-1/2 left-1/2 w-[70%] h-[80%] rounded-full pointer-events-none"
+        style={{
+          background: "radial-gradient(circle, rgba(16,185,129,0.09), transparent 60%)",
+          filter: "blur(50px)",
+          transform: "translate(-50%, -50%)",
+          animation: "mantraAuroraPulse 9s ease-in-out infinite",
+        }}
       />
+
+      {/* Logo Turbo gigante ao fundo, riscada continuamente por um feixe de luz.
+          A logo (PNG) vira máscara: o feixe só aparece dentro do desenho dela. */}
+      <div aria-hidden className="absolute inset-0 flex items-center justify-center pointer-events-none">
+        <div
+          className="relative overflow-hidden"
+          style={{
+            width: "72%",
+            height: "56%",
+            WebkitMaskImage: `url(${turboLogo})`,
+            maskImage: `url(${turboLogo})`,
+            WebkitMaskRepeat: "no-repeat",
+            maskRepeat: "no-repeat",
+            WebkitMaskSize: "contain",
+            maskSize: "contain",
+            WebkitMaskPosition: "center",
+            maskPosition: "center",
+          }}
+        >
+          {/* Silhueta base, quase imperceptível */}
+          <div className="absolute inset-0" style={{ backgroundColor: "rgba(255,255,255,0.05)" }} />
+          {/* Feixe gradiente que varre a logo em loop */}
+          <div
+            className="mantra-scan-beam absolute top-0 bottom-0 left-0"
+            style={{
+              width: "42%",
+              background:
+                "linear-gradient(100deg, transparent, rgba(52,211,153,0.55) 40%, rgba(56,189,248,0.55) 60%, transparent)",
+              filter: "blur(5px)",
+              animation: "mantraLogoScan 4.6s ease-in-out infinite",
+            }}
+          />
+        </div>
+      </div>
+
       {/* Aspas fantasma de fundo */}
       <span
         aria-hidden
