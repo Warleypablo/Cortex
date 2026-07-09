@@ -56,44 +56,6 @@ export function aggregateTrend(
   };
 }
 
-// Defaults zero-preenchidos: os slides reusados renderizam sem quebrar até a
-// task da seção substituir por dados reais.
-function emptyTurboMetrics() {
-  return {
-    mrrAtivo: 0, ticketMedioContrato: 0, ticketMedioCliente: 0,
-    clientesAtivos: 0, contratosAtivos: 0, clientesTotais: 0, contratosTotais: 0,
-    mrrAdicionado: 0, churnMrr: 0, churnCount: 0, pausadosMrr: 0, pausadosCount: 0,
-    crosssellMrr: 0, crosssellPontual: 0, crosssellContratos: 0, crosssellHistorico: [],
-    cxcsSolicitacoes: 0, faturamentoPontual: 0, pontualCommerceQtr: 0, churnMetaMensal: 0,
-    receitaChurnSeries: [], retencoesSolicitacoesCount: 0, retencoesSolicitacoesValor: 0,
-    retencoesCount: 0, retencoesValor: 0,
-  };
-}
-function emptyContratosMes() {
-  return {
-    numContratos: 0, contratosRecorrente: 0, contratosPontual: 0,
-    receitaRecorrente: 0, receitaPontual: 0, tmRecorrente: 0, tmPontual: 0,
-    pipelineBreakdown: [], vendasSeries: [],
-  };
-}
-function emptyPontualData() {
-  return {
-    emAberto: { valor: 0, contratos: 0, porServico: [] },
-    aquisicao: { valor: 0, contratos: 0 },
-    entregasMes: { porSquad: [], total: 0 },
-    variacaoEstoque: { entrou: 0, saiu: 0, delta: 0 },
-    entregasPorProdutoMes: [], tempoMedioEntrega: [],
-  };
-}
-function emptyTechData(label: string) {
-  return {
-    kpis: { entregues: 0, valorEntregues: 0, tempoMedio: 0, adicionados: 0, valorAdicionados: 0 },
-    mesLabel: label, entregasPorTipo: [], receitaPorTipo: [], emAbertoPorTipo: [], pipeline: [],
-  };
-}
-function emptyFaturamentoYtd() {
-  return { faturamentoBrutoYtd: 0, inadimplenciaYtd: 0, impostoYtd: 0, dfcRecebimentoMensal: [] };
-}
 
 export function registerReportsTrimestralRoutes(app: Express) {
   app.get("/api/reports/trimestral", async (req, res) => {

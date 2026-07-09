@@ -128,7 +128,7 @@ export default function RelatorioTrimestral() {
     const slot = slots[currentSlide];
     if (!slot) return null;
     switch (slot.type) {
-      case "capa":         return <SlideCapa mesLabel={data.label} />;
+      case "capa":         return <SlideCapa mesLabel={data.label} titulo="Reporte Trimestral" />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
       case "vendas":       return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.label} />;
       case "evolucao":     return <SlideEvolucaoTrimestre trend={data.trend} />;
