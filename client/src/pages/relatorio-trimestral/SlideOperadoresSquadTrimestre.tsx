@@ -84,6 +84,11 @@ function SquadCard({ sq, delayMs }: { sq: SquadOperadores; delayMs: number }) {
           <p className="text-lg font-black text-white truncate flex-1">{name}</p>
           <div className="text-right shrink-0">
             <p className="text-sm font-black text-emerald-400 tabular-nums">{fmtCompact(sq.totalFaturamento)}</p>
+            {/* Composição do total, mesma régua das linhas de operador */}
+            <p className="text-[10px] tabular-nums whitespace-nowrap leading-tight">
+              <span className="text-emerald-400/80">MRR {fmtCompact(sq.totalMrr)}</span>
+              {sq.totalPontual > 0 && <span className="text-purple-400/80"> · Pont {fmtCompact(sq.totalPontual)}</span>}
+            </p>
             <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{sq.numOperadores} operadores</p>
           </div>
         </div>

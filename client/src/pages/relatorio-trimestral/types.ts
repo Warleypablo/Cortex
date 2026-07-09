@@ -58,6 +58,10 @@ export interface OperadorSquad {
 export interface SquadOperadores {
   squad: string;
   totalFaturamento: number;
+  // Quebra do total: recorrente (MRR ativo) × pontual entregue no tri.
+  // totalMrr + totalPontual === totalFaturamento.
+  totalMrr: number;
+  totalPontual: number;
   numOperadores: number;
   operadores: OperadorSquad[];
 }

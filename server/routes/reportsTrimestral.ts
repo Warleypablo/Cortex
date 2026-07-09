@@ -835,12 +835,15 @@ export function registerReportsTrimestralRoutes(app: Express) {
             SELECT *,
               ROW_NUMBER() OVER (PARTITION BY squad ORDER BY faturamento DESC) AS rn,
               SUM(faturamento) OVER (PARTITION BY squad) AS squad_total,
+              SUM(mrr) OVER (PARTITION BY squad) AS squad_total_mrr,
+              SUM(pontual) OVER (PARTITION BY squad) AS squad_total_pontual,
               COUNT(*) OVER (PARTITION BY squad) AS squad_operadores
             FROM por_resp
             WHERE faturamento > 0
           )
           SELECT r.squad, r.nome, r.mrr, r.pontual, r.faturamento, r.rn::int AS rn,
-                 r.squad_total, r.squad_operadores::int AS squad_operadores,
+                 r.squad_total, r.squad_total_mrr, r.squad_total_pontual,
+                 r.squad_operadores::int AS squad_operadores,
                  p.foto AS "fotoUrl", p.cargo
           FROM ranked r
           LEFT JOIN LATERAL (
@@ -915,12 +918,15 @@ export function registerReportsTrimestralRoutes(app: Express) {
             SELECT *,
               ROW_NUMBER() OVER (ORDER BY faturamento DESC) AS rn,
               SUM(faturamento) OVER () AS squad_total,
+              SUM(mrr) OVER () AS squad_total_mrr,
+              SUM(pontual) OVER () AS squad_total_pontual,
               COUNT(*) OVER () AS squad_operadores
             FROM combined
             WHERE faturamento > 0
           )
           SELECT r.nome, r.mrr, r.pontual, r.faturamento, r.rn::int AS rn,
-                 r.squad_total, r.squad_operadores::int AS squad_operadores,
+                 r.squad_total, r.squad_total_mrr, r.squad_total_pontual,
+                 r.squad_operadores::int AS squad_operadores,
                  p.foto AS "fotoUrl", p.cargo
           FROM ranked r
           LEFT JOIN LATERAL (
@@ -1235,6 +1241,8 @@ export function registerReportsTrimestralRoutes(app: Express) {
       const operadoresMap = new Map<string, {
         squad: string;
         totalFaturamento: number;
+        totalMrr: number;
+        totalPontual: number;
         numOperadores: number;
         operadores: { nome: string; faturamento: number; mrr: number; pontual: number; fotoUrl: string | null; cargo: string | null }[];
       }>();
@@ -1247,6 +1255,9 @@ export function registerReportsTrimestralRoutes(app: Express) {
           entry = {
             squad: row.squad,
             totalFaturamento: parseFloat(row.squad_total) || 0,
+            // Quebra do total: recorrente (MRR ativo) x pontual entregue no tri.
+            totalMrr: parseFloat(row.squad_total_mrr) || 0,
+            totalPontual: parseFloat(row.squad_total_pontual) || 0,
             numOperadores: parseInt(row.squad_operadores) || 0,
             operadores: [],
           };
@@ -1269,6 +1280,8 @@ export function registerReportsTrimestralRoutes(app: Express) {
         operadoresMap.set("black", {
           squad: "🐑 Black",
           totalFaturamento: parseFloat(accountsRowsArr[0].squad_total) || 0,
+          totalMrr: parseFloat(accountsRowsArr[0].squad_total_mrr) || 0,
+          totalPontual: parseFloat(accountsRowsArr[0].squad_total_pontual) || 0,
           numOperadores: parseInt(accountsRowsArr[0].squad_operadores) || 0,
           operadores: accountsRowsArr.map((row) => ({
             nome: row.nome,
