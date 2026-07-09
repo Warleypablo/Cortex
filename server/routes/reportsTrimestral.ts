@@ -703,28 +703,46 @@ export function registerReportsTrimestralRoutes(app: Express) {
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
             ) as snap
           ),
+          -- A coluna responsavel aceita vários nomes separados por ';' (ex.: "Breno
+          -- Carmo; Davi Ferraz", "Lara Grobério; Julia Manhães"). Sem tratar, a string
+          -- inteira vira um "operador" fantasma no ranking e rouba o faturamento dos
+          -- dois. Aqui o valor é RATEADO em partes iguais entre os responsáveis
+          -- não-vazios, o que conserva os totais por squad. Um ';' solto no fim
+          -- ("Breno Carmo;") vira n=1, sem rateio.
           mrr_por_resp AS (
-            SELECT TRIM(h.squad) AS squad, TRIM(h.responsavel) AS nome,
-              COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) AS mrr
+            SELECT TRIM(h.squad) AS squad, r.nome AS nome,
+              COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric / r.n END), 0) AS mrr
             FROM "Clickup".cup_data_hist h
             JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
+            CROSS JOIN LATERAL (
+              SELECT TRIM(p) AS nome,
+                (SELECT COUNT(*) FROM unnest(string_to_array(h.responsavel, ';')) q WHERE TRIM(q) != '') AS n
+              FROM unnest(string_to_array(h.responsavel, ';')) AS p
+              WHERE TRIM(p) != ''
+            ) r
             WHERE h.status IN ('ativo', 'onboarding', 'triagem')
               AND h.valorr IS NOT NULL
               AND h.responsavel IS NOT NULL AND TRIM(h.responsavel) != ''
               AND h.squad IS NOT NULL AND TRIM(h.squad) != ''
-            GROUP BY TRIM(h.squad), TRIM(h.responsavel)
+            GROUP BY TRIM(h.squad), r.nome
           ),
           pontual_por_resp AS (
-            SELECT TRIM(squad) AS squad, TRIM(responsavel) AS nome,
-              COALESCE(SUM(valorp::numeric), 0) AS pontual
-            FROM "Clickup".cup_contratos
-            WHERE LOWER(TRIM(status)) = 'entregue'
-              AND data_entrega >= ${w.dataStart}::date
-              AND data_entrega < ${w.dataEnd}::date
-              AND valorp IS NOT NULL AND valorp::numeric > 0
-              AND responsavel IS NOT NULL AND TRIM(responsavel) != ''
-              AND squad IS NOT NULL AND TRIM(squad) != ''
-            GROUP BY TRIM(squad), TRIM(responsavel)
+            SELECT TRIM(c.squad) AS squad, r.nome AS nome,
+              COALESCE(SUM(c.valorp::numeric / r.n), 0) AS pontual
+            FROM "Clickup".cup_contratos c
+            CROSS JOIN LATERAL (
+              SELECT TRIM(p) AS nome,
+                (SELECT COUNT(*) FROM unnest(string_to_array(c.responsavel, ';')) q WHERE TRIM(q) != '') AS n
+              FROM unnest(string_to_array(c.responsavel, ';')) AS p
+              WHERE TRIM(p) != ''
+            ) r
+            WHERE LOWER(TRIM(c.status)) = 'entregue'
+              AND c.data_entrega >= ${w.dataStart}::date
+              AND c.data_entrega < ${w.dataEnd}::date
+              AND c.valorp IS NOT NULL AND c.valorp::numeric > 0
+              AND c.responsavel IS NOT NULL AND TRIM(c.responsavel) != ''
+              AND c.squad IS NOT NULL AND TRIM(c.squad) != ''
+            GROUP BY TRIM(c.squad), r.nome
           ),
           -- Um par (squad, operador) por linha, cobrindo os dois lados (o operador pode
           -- ter só pontual numa squad, sem MRR).
