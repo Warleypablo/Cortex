@@ -90,12 +90,6 @@ export function registerReportsTrimestralRoutes(app: Express) {
               (${w.dataStart}::date - INTERVAL '18 months')::date as range_start,
               ${w.dataEnd}::date as range_end
           ),
-          month_series AS (
-            SELECT TO_CHAR(generate_series(dr.range_start, dr.range_end - INTERVAL '1 day', '1 month'), 'YYYY-MM') as month,
-                   generate_series(dr.range_start, dr.range_end - INTERVAL '1 day', '1 month')::date as month_start,
-                   (generate_series(dr.range_start, dr.range_end - INTERVAL '1 day', '1 month') + INTERVAL '1 month')::date as next_month_start
-            FROM date_range dr
-          ),
           monthly_snapshots AS (
             SELECT
               TO_CHAR(m.month_start, 'YYYY-MM') as month,
@@ -129,13 +123,27 @@ export function registerReportsTrimestralRoutes(app: Express) {
               AND data_solicitacao_encerramento < dr.range_end
               AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
             GROUP BY TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM')
+          ),
+          pontual_mensal AS (
+            SELECT
+              TO_CHAR(data_entrega, 'YYYY-MM') as month,
+              COALESCE(SUM(valorp::numeric), 0) as pontual
+            FROM "Clickup".cup_contratos, date_range dr
+            WHERE data_entrega IS NOT NULL
+              AND data_entrega >= dr.range_start
+              AND data_entrega < dr.range_end
+              AND valorp IS NOT NULL AND valorp::numeric > 0
+              AND LOWER(TRIM(status)) = 'entregue'
+            GROUP BY TO_CHAR(data_entrega, 'YYYY-MM')
           )
           SELECT
             m.month,
             m.mrr,
-            COALESCE(c.churn_brl, 0) as churn_brl
+            COALESCE(c.churn_brl, 0) as churn_brl,
+            COALESCE(p.pontual, 0) as pontual
           FROM mrr_mensal m
           LEFT JOIN churn_mensal c ON m.month = c.month
+          LEFT JOIN pontual_mensal p ON m.month = p.month
           ORDER BY m.month
         `),
       ]);
@@ -301,8 +309,10 @@ export function registerReportsTrimestralRoutes(app: Express) {
         // Não usados no subconjunto de slides do trimestral (ver section-rewindow-guidance.md).
         pontualCommerceQtr: 0,
         churnMetaMensal: 0,
-        // Série mês a mês não usada no deck trimestral (evolução usa `trend`).
-        receitaChurnSeries: [] as { month: string; label: string; mrr: number; pontual: number; churnBrl: number; churnCount: number; churnPct: number; churnPctBase: number | null }[],
+        // Série mês a mês (3 pontos do tri) — alimenta o gráfico "Faturamento x Churn" e a
+        // mini-série "MRR Ativo" do SlideTurboMetrics.tsx reaproveitado do mensal. Preenchida
+        // abaixo (ADENDO), após mrrChurnRows já trazer `pontual` por mês.
+        receitaChurnSeries: [] as { month: string; label: string; mrr: number; pontual: number; churnBrl: number; churnPct: number }[],
         retencoesSolicitacoesCount: parseInt(turboRetencoes.solicitacoes_count) || 0,
         retencoesSolicitacoesValor: parseFloat(turboRetencoes.solicitacoes_valor) || 0,
         retencoesCount: parseInt(turboRetencoes.retencoes_count) || 0,
@@ -658,6 +668,38 @@ export function registerReportsTrimestralRoutes(app: Express) {
       // turboMetrics (os demais foram calculados na Task 7 e não são tocados aqui).
       const mrrTotalInicioTri = parseFloat((mrrAnteriorTotalRows.rows as any[])[0]?.mrr_total) || 0;
       turboMetrics.churnMetaMensal = mrrTotalInicioTri * 0.08 * w.mesesComputados.length;
+
+      // ADENDO (fix): receitaChurnSeries com os 3 meses do tri (w.meses) — alimenta o
+      // gráfico "Faturamento x Churn" e a mini-série "MRR Ativo" do SlideTurboMetrics.tsx
+      // reaproveitado do mensal (senão ficam em branco no deck trimestral). Reaproveita as
+      // linhas já buscadas por mrrChurnRows (agora com `pontual` também no SELECT); meses
+      // sem linha (ex.: mês corrente ainda sem snapshot de fechamento) entram zerados.
+      const MESES_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      const mrrChurnPontualPorMes = new Map<string, { mrr: number; pontual: number; churnBrl: number }>(
+        (mrrChurnRows.rows as any[]).map((r) => [
+          r.month as string,
+          {
+            mrr: parseFloat(r.mrr) || 0,
+            pontual: parseFloat(r.pontual) || 0,
+            churnBrl: parseFloat(r.churn_brl) || 0,
+          },
+        ]),
+      );
+      turboMetrics.receitaChurnSeries = w.meses.map((month) => {
+        const row = mrrChurnPontualPorMes.get(month);
+        const mrr = row?.mrr || 0;
+        const pontual = row?.pontual || 0;
+        const churnBrl = row?.churnBrl || 0;
+        const monthNum = parseInt(month.split("-")[1], 10) - 1;
+        return {
+          month,
+          label: MESES_SHORT[monthNum] || month,
+          mrr,
+          pontual,
+          churnBrl,
+          churnPct: mrr > 0 ? Math.round((churnBrl / mrr) * 1000) / 10 : 0,
+        };
+      });
 
       // Bloco pontualData (Task 10): espelha as queries 29-33 (em aberto por
       // serviço, aquisição, entregas por squad, entregas por produto × mês e
