@@ -189,14 +189,172 @@ export function registerReportsTrimestralRoutes(app: Express) {
       }));
       const trend = aggregateTrend(vendasPorMes, mrrChurnPorMes, w);
 
-      // TODO(Tasks 6-11): demais seções reais.
+      // Bloco turboMetrics (Task 7): espelha as queries 9-13/18 de turboMetrics do
+      // relatorioMensalSlides.ts, re-janeladas para o trimestre. Foto em w.fotoDate
+      // p/ MRR ativo/clientes/contratos (ativos e totais); soma no range do tri p/
+      // churn/cross-sell/faturamento pontual/retenções (fluxo); ratios recalculados em JS.
+      const [
+        turboMrrRows,
+        turboClientesRows,
+        turboChurnRows,
+        turboCxcsRows,
+        turboFatRows,
+        turboRetencoesRows,
+        mrrAdicionadoRows,
+      ] = await Promise.all([
+        // Espelha query 9 (MRR ativo + ticket médio) — FOTO em w.fotoDate, fallback ao
+        // snapshot mais recente ≤ fotoDate.
+        db.execute(sql`
+          WITH ultimo_snapshot AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${w.fotoDate}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
+            ) as snap
+          )
+          SELECT
+            COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_ativo,
+            COALESCE(AVG(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as ticket_medio_contrato,
+            COUNT(*)::int as contratos_ativos,
+            COUNT(DISTINCT h.id_task)::int as clientes_ativos
+          FROM "Clickup".cup_data_hist h
+          JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND h.valorr IS NOT NULL
+        `),
+        // Espelha query 10 (clientes/contratos totais) — FOTO em w.fotoDate.
+        db.execute(sql`
+          WITH ultimo_snapshot AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${w.fotoDate}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
+            ) as snap
+          )
+          SELECT
+            COUNT(DISTINCT h.id_task)::int as clientes_totais,
+            COUNT(*)::int as contratos_totais
+          FROM "Clickup".cup_data_hist h
+          JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
+        `),
+        // Espelha query 11: churn (cup_churn ajustado) somado no range do tri (FLUXO);
+        // pausados via cup_contratos (tabela de estado atual, sem histórico de snapshot)
+        // como estado ATUAL — FOTO — em vez de fluxo por data_pausa no mês.
+        db.execute(sql`
+          WITH churn_data AS (
+            SELECT
+              COALESCE(SUM(valor_r), 0)::numeric as churn_mrr,
+              COUNT(*)::int as churn_count
+            FROM cortex_core.vw_cup_churn_ajustado
+            WHERE data_solicitacao_encerramento IS NOT NULL
+              AND data_solicitacao_encerramento >= ${w.dataStart}::date
+              AND data_solicitacao_encerramento < ${w.dataEnd}::date
+              AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+          ),
+          pausados_data AS (
+            SELECT
+              COALESCE(SUM(COALESCE(valorr::numeric, 0)), 0) as pausados_mrr,
+              COUNT(*)::int as pausados_count
+            FROM "Clickup".cup_contratos
+            WHERE LOWER(status) = 'pausado'
+          )
+          SELECT c.churn_mrr, c.churn_count, p.pausados_mrr, p.pausados_count
+          FROM churn_data c, pausados_data p
+        `),
+        // Espelha query 12 (cross-sell, source PARTNER) — FLUXO somado no tri.
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as crosssell_mrr,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as crosssell_pontual,
+            COUNT(*)::int as solicitacoes
+          FROM "Bitrix".crm_deal d
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.source = 'PARTNER'
+            AND d.data_fechamento >= ${w.dataStart}::date
+            AND d.data_fechamento < ${w.dataEnd}::date
+        `),
+        // Espelha query 13 (faturamento pontual, cup_contratos.data_entrega) — FLUXO no tri.
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(valorp::numeric), 0) as faturamento_pontual
+          FROM "Clickup".cup_contratos
+          WHERE data_entrega >= ${w.dataStart}::date
+            AND data_entrega < ${w.dataEnd}::date
+            AND valorp IS NOT NULL
+            AND valorp::numeric > 0
+        `),
+        // Espelha query 13b/turboRetencoesResult (retenções CXCS) — FLUXO no tri.
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int as solicitacoes_count,
+            COALESCE(SUM(valor_r), 0)::numeric as solicitacoes_valor,
+            COUNT(CASE WHEN reteve = 'Sim' THEN 1 END)::int as retencoes_count,
+            COALESCE(SUM(CASE WHEN reteve = 'Sim' THEN valor_r ELSE 0 END), 0)::numeric as retencoes_valor
+          FROM cortex_core.vw_cup_churn_ajustado
+          WHERE data_solicitacao_encerramento IS NOT NULL
+            AND data_solicitacao_encerramento >= ${w.dataStart}::date
+            AND data_solicitacao_encerramento < ${w.dataEnd}::date
+            AND COALESCE(motivo_cancelamento, '') NOT IN ('Inadimplente 1º Mês', 'Não começou', 'Erro na Venda')
+        `),
+        // Espelha o componente "receita_recorrente" da query 7 (deals ganhos) — FLUXO no
+        // tri. Alimenta turboMetrics.mrrAdicionado (mesma fonte do mensal: `totalRecorrente`).
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as receita_recorrente
+          FROM "Bitrix".crm_deal d
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.data_fechamento >= ${w.dataStart}::date
+            AND d.data_fechamento < ${w.dataEnd}::date
+        `),
+      ]);
+
+      const turboMrr = (turboMrrRows.rows as any[])[0] || {};
+      const turboClientes = (turboClientesRows.rows as any[])[0] || {};
+      const turboChurn = (turboChurnRows.rows as any[])[0] || {};
+      const turboCxcs = (turboCxcsRows.rows as any[])[0] || {};
+      const turboFat = (turboFatRows.rows as any[])[0] || {};
+      const turboRetencoes = (turboRetencoesRows.rows as any[])[0] || {};
+      const mrrAdicionado = parseFloat((mrrAdicionadoRows.rows as any[])[0]?.receita_recorrente) || 0;
+
+      const turboMetrics = {
+        mrrAtivo: parseFloat(turboMrr.mrr_ativo) || 0,
+        ticketMedioContrato: parseFloat(turboMrr.ticket_medio_contrato) || 0,
+        ticketMedioCliente: (parseInt(turboMrr.clientes_ativos) || 0) > 0
+          ? (parseFloat(turboMrr.mrr_ativo) || 0) / (parseInt(turboMrr.clientes_ativos) || 1)
+          : 0,
+        clientesAtivos: parseInt(turboMrr.clientes_ativos) || 0,
+        contratosAtivos: parseInt(turboMrr.contratos_ativos) || 0,
+        clientesTotais: parseInt(turboClientes.clientes_totais) || 0,
+        contratosTotais: parseInt(turboClientes.contratos_totais) || 0,
+        mrrAdicionado,
+        churnMrr: parseFloat(turboChurn.churn_mrr) || 0,
+        churnCount: parseInt(turboChurn.churn_count) || 0,
+        pausadosMrr: parseFloat(turboChurn.pausados_mrr) || 0,
+        pausadosCount: parseInt(turboChurn.pausados_count) || 0,
+        crosssellMrr: parseFloat(turboCxcs.crosssell_mrr) || 0,
+        crosssellPontual: parseFloat(turboCxcs.crosssell_pontual) || 0,
+        crosssellContratos: parseInt(turboCxcs.solicitacoes) || 0,
+        // Histórico mensal de cross-sell não é usado no deck trimestral (evolução usa `trend`).
+        crosssellHistorico: [] as { mes: string; mrr: number; pontual: number }[],
+        cxcsSolicitacoes: parseInt(turboCxcs.solicitacoes) || 0,
+        faturamentoPontual: parseFloat(turboFat.faturamento_pontual) || 0,
+        // Não usados no subconjunto de slides do trimestral (ver section-rewindow-guidance.md).
+        pontualCommerceQtr: 0,
+        churnMetaMensal: 0,
+        // Série mês a mês não usada no deck trimestral (evolução usa `trend`).
+        receitaChurnSeries: [] as { month: string; label: string; mrr: number; pontual: number; churnBrl: number; churnCount: number; churnPct: number; churnPctBase: number | null }[],
+        retencoesSolicitacoesCount: parseInt(turboRetencoes.solicitacoes_count) || 0,
+        retencoesSolicitacoesValor: parseFloat(turboRetencoes.solicitacoes_valor) || 0,
+        retencoesCount: parseInt(turboRetencoes.retencoes_count) || 0,
+        retencoesValor: parseFloat(turboRetencoes.retencoes_valor) || 0,
+      };
+
+      // TODO(Tasks 8-11): demais seções reais.
       res.json({
         trimestre: w.trimestre,
         label: w.label,
         parcial: w.parcial,
         mesesComputados: w.mesesComputados,
         trend,
-        turboMetrics: emptyTurboMetrics(),
+        turboMetrics,
         contratosMes: emptyContratosMes(),
         rankingClosers: [],
         topPontual: null,
