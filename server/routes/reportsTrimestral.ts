@@ -456,7 +456,248 @@ export function registerReportsTrimestralRoutes(app: Express) {
         vendasSeries: [] as { month: string; label: string; vendasMrr: number; vendasPontual: number; numContratos: number }[],
       };
 
-      // TODO(Tasks 9-11): demais seções reais.
+      // Bloco squads (Task 9): espelha as queries 15/16/16b/17/17b (ranking squads,
+      // churn por squad + lista de clientes, pontual entregue por squad, MRR por
+      // squad no início do tri e MRR total no início do tri) do
+      // relatorioMensalSlides.ts, re-janeladas para o trimestre. Q15/Q17/Q17b são
+      // FOTO (snapshot em w.fotoDate / w.dataStart); Q16/Q16b são FLUXO (soma no
+      // range do tri, mantendo a distinção abonado/total); os ratios por squad
+      // (churnPct, ticketMedio, nrrBrl, nrrPct, evolucaoMrr) são RATIO recalculados
+      // em JS a partir dos agregados do tri, igual à montagem do mensal (~L1526-1566).
+      const [
+        rankingSquadsRows,
+        churnSquadsRows,
+        pontualEntregueSquadRows,
+        mrrAnteriorSquadsRows,
+        mrrAnteriorTotalRows,
+      ] = await Promise.all([
+        // Espelha query 15 (ranking squads por MRR + Pontual) — FOTO em w.fotoDate,
+        // fallback ao snapshot mais recente ≤ fotoDate.
+        db.execute(sql`
+          WITH ultimo_snapshot AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${w.fotoDate}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
+            ) as snap
+          )
+          SELECT
+            h.squad,
+            COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr,
+            COALESCE(SUM(CASE WHEN COALESCE(h.valorp, '0')::numeric > 0 THEN h.valorp::numeric END), 0) as pontual,
+            COUNT(*)::int as contratos,
+            COUNT(DISTINCT h.id_task)::int as clientes
+          FROM "Clickup".cup_data_hist h
+          JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND h.valorr IS NOT NULL
+            AND h.squad IS NOT NULL
+            AND TRIM(h.squad) != ''
+          GROUP BY h.squad
+          ORDER BY (
+            COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) +
+            COALESCE(SUM(CASE WHEN COALESCE(h.valorp, '0')::numeric > 0 THEN h.valorp::numeric END), 0)
+          ) DESC
+        `),
+        // Espelha query 16 (churn por squad + lista de clientes) — FLUXO somado no
+        // tri. Sem a reclassificação manual CHURN_SQUAD_OVERRIDE (tabela mensal
+        // privada em relatorioMensalSlides.ts, não exportada); usa v.squad puro.
+        db.execute(sql`
+          SELECT
+            v.squad as squad,
+            COALESCE(SUM(v.valor_r), 0)::numeric as churn_total_brl,
+            COUNT(*)::int as churn_total_count,
+            COALESCE(SUM(v.valor_r) FILTER (WHERE COALESCE(v.abonar_churn, '') != 'Sim'), 0)::numeric as churn_brl,
+            (COUNT(*) FILTER (WHERE COALESCE(v.abonar_churn, '') != 'Sim'))::int as churn_count,
+            COALESCE(
+              json_agg(
+                json_build_object(
+                  'nome', COALESCE(cl.nome, v.nome),
+                  'valor', COALESCE(v.valor_r, 0),
+                  'abonado', COALESCE(v.abonar_churn, '') = 'Sim'
+                )
+                ORDER BY v.valor_r DESC NULLS LAST
+              ) FILTER (WHERE COALESCE(v.valor_r, 0) > 0),
+              '[]'::json
+            ) as clientes
+          FROM cortex_core.vw_cup_churn_ajustado v
+          LEFT JOIN "Clickup".cup_clientes cl ON v.parent_id = cl.task_id
+          WHERE v.data_solicitacao_encerramento IS NOT NULL
+            AND v.data_solicitacao_encerramento >= ${w.dataStart}::date
+            AND v.data_solicitacao_encerramento < ${w.dataEnd}::date
+            AND v.squad IS NOT NULL
+            AND TRIM(v.squad) != ''
+          GROUP BY 1
+        `),
+        // Espelha query 16b (pontual entregue no tri por squad) — FLUXO somado no tri.
+        db.execute(sql`
+          SELECT
+            squad,
+            COALESCE(SUM(valorp::numeric), 0)::numeric as pontual
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(TRIM(status)) = 'entregue'
+            AND data_entrega >= ${w.dataStart}::date
+            AND data_entrega < ${w.dataEnd}::date
+            AND COALESCE(valorp, 0) > 0
+            AND squad IS NOT NULL
+            AND TRIM(squad) != ''
+          GROUP BY squad
+        `),
+        // Espelha query 17 (MRR por squad no início do período) — FOTO em
+        // w.dataStart (snapshot do 1º dia do tri = fim do tri anterior), fallback
+        // ao snapshot mais recente ≤ dataStart.
+        db.execute(sql`
+          WITH ultimo_snapshot_ant AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${w.dataStart}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.dataStart}::date)
+            ) as snap
+          )
+          SELECT
+            h.squad,
+            COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr
+          FROM "Clickup".cup_data_hist h
+          JOIN ultimo_snapshot_ant us ON h.data_snapshot = us.snap
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND h.valorr IS NOT NULL
+            AND h.squad IS NOT NULL
+            AND TRIM(h.squad) != ''
+          GROUP BY h.squad
+        `),
+        // Espelha query 17b (MRR total no início do período, p/ meta de churn = 8%
+        // do MRR ativo — ADENDO churnMetaMensal) — FOTO em w.dataStart, mesmo
+        // fallback e mesmo filtro de status do Q9/Q15, sem agrupar por squad.
+        db.execute(sql`
+          WITH ultimo_snapshot_ant AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${w.dataStart}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.dataStart}::date)
+            ) as snap
+          )
+          SELECT
+            COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr_total
+          FROM "Clickup".cup_data_hist h
+          JOIN ultimo_snapshot_ant us ON h.data_snapshot = us.snap
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND h.valorr IS NOT NULL
+        `),
+      ]);
+
+      // Normaliza nome de squad p/ casar fontes diferentes (emoji, sufixo "(OFF)",
+      // caixa) — igual ao mensal (relatorioMensalSlides.ts ~L1464).
+      const normalizeSquadName = (s: string): string =>
+        (s || "").replace(/^[^A-Za-z]+/, "").replace(/\s*\(OFF\)\s*$/i, "").trim().toLowerCase();
+
+      // Pontual entregue no tri por squad (substitui o "pontual" do snapshot, que é backlog em aberto)
+      const pontualEntregueBySquad: Record<string, number> = {};
+      (pontualEntregueSquadRows.rows as any[]).forEach((row: any) => {
+        const key = normalizeSquadName(row.squad);
+        pontualEntregueBySquad[key] = (pontualEntregueBySquad[key] || 0) + (parseFloat(row.pontual) || 0);
+      });
+
+      // Ranking squads — ordena por (mrr + pontual entregue no tri) desc, igual ao mensal.
+      const rankingSquads = (rankingSquadsRows.rows as any[])
+        .map((row: any) => {
+          const mrr = parseFloat(row.mrr) || 0;
+          const pontual = pontualEntregueBySquad[normalizeSquadName(row.squad)] || 0;
+          return {
+            squad: row.squad,
+            mrr,
+            pontual,
+            contratos: parseInt(row.contratos) || 0,
+            clientes: parseInt(row.clientes) || 0,
+            _total: mrr + pontual,
+          };
+        })
+        .sort((a, b) => b._total - a._total)
+        .map(({ _total, ...rest }, i) => ({ ...rest, posicao: i + 1 }));
+
+      // Churn por squad no tri (soma), mantendo a distinção abonado (churn_brl/count)
+      // vs total (churn_total_brl/count) — igual ao mensal (~L1493-1513).
+      const churnBySquad: Record<string, { brl: number; count: number; totalBrl: number; totalCount: number; clientes: any[] }> = {};
+      (churnSquadsRows.rows as any[]).forEach((row: any) => {
+        const key = normalizeSquadName(row.squad);
+        const prev = churnBySquad[key];
+        const cur = {
+          brl: parseFloat(row.churn_brl) || 0,
+          count: parseInt(row.churn_count) || 0,
+          totalBrl: parseFloat(row.churn_total_brl) || 0,
+          totalCount: parseInt(row.churn_total_count) || 0,
+          clientes: Array.isArray(row.clientes) ? row.clientes : [],
+        };
+        churnBySquad[key] = prev
+          ? {
+              brl: prev.brl + cur.brl,
+              count: prev.count + cur.count,
+              totalBrl: prev.totalBrl + cur.totalBrl,
+              totalCount: prev.totalCount + cur.totalCount,
+              clientes: [...prev.clientes, ...cur.clientes],
+            }
+          : cur;
+      });
+
+      const mrrAnteriorBySquad: Record<string, number> = {};
+      (mrrAnteriorSquadsRows.rows as any[]).forEach((row: any) => {
+        const key = normalizeSquadName(row.squad);
+        mrrAnteriorBySquad[key] = (mrrAnteriorBySquad[key] || 0) + (parseFloat(row.mrr) || 0);
+      });
+
+      // Squads ocultos do slide "Detalhes por Squad" (não impacta ranking nem
+      // totais) — mesma lista do mensal (relatorioMensalSlides.ts ~L1522).
+      const SQUADS_OCULTOS_DETALHES = new Set(["comercial", "makers", "turbo interno", "squad x"]);
+
+      const squadDetails = (rankingSquadsRows.rows as any[])
+        .filter((row: any) => !SQUADS_OCULTOS_DETALHES.has(normalizeSquadName(row.squad)))
+        .map((row: any) => {
+          const mrr = parseFloat(row.mrr) || 0;
+          const pontual = pontualEntregueBySquad[normalizeSquadName(row.squad)] || 0; // pontual entregue no tri (não em aberto)
+          const contratos = parseInt(row.contratos) || 0;
+          const clientes = parseInt(row.clientes) || 0;
+          const churn = churnBySquad[normalizeSquadName(row.squad)] || { brl: 0, count: 0, totalBrl: 0, totalCount: 0, clientes: [] };
+          const mrrAnt = mrrAnteriorBySquad[normalizeSquadName(row.squad)] || 0;
+          const ticketMedio = contratos > 0 ? mrr / contratos : 0;
+          // Churn % = churn do tri / MRR no início do tri. Squad novo (sem base no
+          // início do tri): usa o MRR do próprio tri como base — igual ao mensal.
+          const churnBase = mrrAnt > 0 ? mrrAnt : mrr;
+          const churnPct = churnBase > 0 ? (churn.brl / churnBase) * 100 : 0;
+          const churnTotalPct = churnBase > 0 ? (churn.totalBrl / churnBase) * 100 : 0;
+          // VENDAS_EXPANSAO_POR_MES (vendas de expansão/abatimento NRR) é uma tabela
+          // manual privada do mensal em relatorioMensalSlides.ts, não exportada, e
+          // hoje só tem entrada p/ um único mês (2026-05) — sem equivalente
+          // trimestral. vendasMes/expansaoNrr ficam 0, igual ao comportamento do
+          // mensal p/ meses sem entrada na tabela; nrrBrl/nrrPct seguem a mesma
+          // fórmula (nrrBrl = churn s/ abonados − abatimento).
+          const vendasMes = 0;
+          const expansaoNrr = 0;
+          const nrrBrl = churn.brl - expansaoNrr;
+          const nrrPct = churnBase > 0 ? (nrrBrl / churnBase) * 100 : 0;
+
+          return {
+            squad: row.squad,
+            mrr,
+            pontual,
+            ticketMedio: Math.round(ticketMedio),
+            clientes,
+            churnPct: Math.round(churnPct * 10) / 10,
+            churnBrl: churn.brl,
+            churnTotalPct: Math.round(churnTotalPct * 10) / 10,
+            churnTotalBrl: churn.totalBrl,
+            churnClientes: [...churn.clientes].sort((a, b) => (b.valor || 0) - (a.valor || 0)),
+            vendasMes,
+            expansaoNrr,
+            nrrBrl,
+            nrrPct: Math.round(nrrPct * 10) / 10,
+            mrrBase: churnBase,
+            evolucaoMrr: mrr - mrrAnt,
+          };
+        });
+
+      // ADENDO (Task 9): churnMetaMensal = MRR total no início do tri × 8% — espelha
+      // o mensal Q17b (mrrAnteriorTotalResult). Atualiza SÓ este campo de
+      // turboMetrics (os demais foram calculados na Task 7 e não são tocados aqui).
+      const mrrTotalInicioTri = parseFloat((mrrAnteriorTotalRows.rows as any[])[0]?.mrr_total) || 0;
+      turboMetrics.churnMetaMensal = mrrTotalInicioTri * 0.08;
+
+      // TODO(Tasks 10-11): demais seções reais.
       res.json({
         trimestre: w.trimestre,
         label: w.label,
@@ -467,8 +708,8 @@ export function registerReportsTrimestralRoutes(app: Express) {
         contratosMes,
         rankingClosers,
         topPontual,
-        rankingSquads: [],
-        squadDetails: [],
+        rankingSquads,
+        squadDetails,
         pontualData: emptyPontualData(),
         techData: emptyTechData(w.label),
         faturamentoYtd: emptyFaturamentoYtd(),
