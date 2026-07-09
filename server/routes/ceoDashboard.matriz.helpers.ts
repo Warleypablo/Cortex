@@ -16,7 +16,7 @@ export interface CeoMatrizLinha {
   label: string;
   unidade: CeoUnidade;
   direcao: CeoDirecao;
-  semMeta: boolean; // inadimplência, ltv, enps, nps
+  semMeta: boolean; // inadimplência, ltv_fat, ltv_dfc, enps, nps
   nota?: string;
   celulas: CeoMatrizCelula[]; // uma por mês, alinhada a `meses`
 }
@@ -38,7 +38,8 @@ export interface CeoMatrizSources {
   receitaCabecaCaixa: BpLinha;
   // Séries mensais sem meta (valor por mês; mês ausente → célula "—").
   inadimplenciaSeriePorMes: Record<number, number>; // por mês de vencimento
-  ltvSeriePorMes: Record<number, number>; // LTV médio dos ativos por mês (snapshots)
+  ltvFatSeriePorMes: Record<number, number>; // LTV faturável mediano dos ativos (ClickUp: valorr × meses + pontual entregue)
+  ltvDfcSeriePorMes: Record<number, number>; // LTV caixa mediano dos ativos (pago real Conta Azul + teórico pré-out/2025)
   enpsSeriePorMes: Record<number, number>; // NPS interno por mês da pesquisa (gap em meses sem onda)
 }
 
@@ -94,9 +95,12 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
     { key: "nps", label: "NPS Clientes", unidade: "score", direcao: "maior_melhor", semMeta: true,
       nota: "Sem fonte de dados de NPS de clientes ainda.", celulas: celulasDaSerie({}, mesNum) },
     bpLinha(s.bpLinhas, "cac", "cac", "CAC", "menor_melhor", "brl"),
-    { key: "ltv", label: "LTV", unidade: "brl", direcao: "maior_melhor", semMeta: true,
-      nota: "LTV recorrente mediano dos clientes ativos no mês (só recorrência: valorr × meses de vida, sem pontual; mediana, robusta a outliers).",
-      celulas: celulasDaSerie(s.ltvSeriePorMes, mesNum) },
+    { key: "ltv_fat", label: "LTV FAT", unidade: "brl", direcao: "maior_melhor", semMeta: true,
+      nota: "LTV faturável mediano dos clientes ativos no mês (ClickUp): Valor R × meses de vida + pontual entregue.",
+      celulas: celulasDaSerie(s.ltvFatSeriePorMes, mesNum) },
+    { key: "ltv_dfc", label: "LTV DFC", unidade: "brl", direcao: "maior_melhor", semMeta: true,
+      nota: "LTV caixa mediano dos clientes ativos no mês: pago real no Conta Azul desde out/2025 + faturável teórico antes disso (sem CNPJ casado, usa o faturável).",
+      celulas: celulasDaSerie(s.ltvDfcSeriePorMes, mesNum) },
     bpLinha(s.bpMetricas, "colaboradores", "headcount", "Headcount", "menor_melhor", "int"),
     { key: "enps", label: "E-NPS", unidade: "score", direcao: "maior_melhor", semMeta: true,
       nota: "NPS interno por mês da pesquisa; meses sem onda de pesquisa ficam vazios.",

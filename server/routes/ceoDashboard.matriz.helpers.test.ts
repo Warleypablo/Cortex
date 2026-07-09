@@ -34,7 +34,8 @@ function baseSources(overrides: Partial<CeoMatrizSources> = {}): CeoMatrizSource
       linhaBp("colaboradores", tresMeses(100)),
     ],
     inadimplenciaSeriePorMes: { 1: 5000, 2: 7000 },
-    ltvSeriePorMes: { 1: 12000, 2: 13000, 3: 14000 },
+    ltvFatSeriePorMes: { 1: 12000, 2: 13000, 3: 14000 },
+    ltvDfcSeriePorMes: { 1: 11000, 2: 13500 }, // mês 3 sem dado → gap (célula null)
     enpsSeriePorMes: { 2: 73 }, // só o mês 2 tem pesquisa (jan/mar sem onda)
     ...overrides,
   };
@@ -54,11 +55,11 @@ describe("montarMatrizCeo", () => {
     expect(m.mesFechado).toBe(6); // colunas com mes > 6 (julho) são parciais
   });
 
-  it("expõe as 11 linhas na ordem dos cards", () => {
+  it("expõe as 12 linhas na ordem dos cards (LTV FAT antes de LTV DFC)", () => {
     const m = montarMatrizCeo(baseSources());
     expect(m.linhas.map((l) => l.key)).toEqual([
       "receita", "custos", "lucro", "caixa", "inadimplencia",
-      "nps", "cac", "ltv", "headcount", "enps", "receita_cabeca",
+      "nps", "cac", "ltv_fat", "ltv_dfc", "headcount", "enps", "receita_cabeca",
     ]);
   });
 
@@ -92,11 +93,17 @@ describe("montarMatrizCeo", () => {
     expect(inad.celulas[2]).toEqual({ mes: 3, valor: null, meta: null, atingimentoPct: null });
   });
 
-  it("LTV usa série mensal (uma célula por mês, sem meta)", () => {
+  it("LTV FAT e LTV DFC usam séries mensais próprias, sem meta", () => {
     const m = montarMatrizCeo(baseSources({ mesNum: 3 }));
-    const ltv = m.linhas.find((l) => l.key === "ltv")!;
-    expect(ltv.semMeta).toBe(true);
-    expect(ltv.celulas.map((c) => c.valor)).toEqual([12000, 13000, 14000]);
+    const fat = m.linhas.find((l) => l.key === "ltv_fat")!;
+    expect(fat.label).toBe("LTV FAT");
+    expect(fat.semMeta).toBe(true);
+    expect(fat.celulas.map((c) => c.valor)).toEqual([12000, 13000, 14000]);
+    const dfc = m.linhas.find((l) => l.key === "ltv_dfc")!;
+    expect(dfc.label).toBe("LTV DFC");
+    expect(dfc.semMeta).toBe(true);
+    // mês 3 sem dado na série → gap (null), não zero
+    expect(dfc.celulas.map((c) => c.valor)).toEqual([11000, 13500, null]);
   });
 
   it("E-NPS usa série mensal, com gap onde não houve pesquisa", () => {
