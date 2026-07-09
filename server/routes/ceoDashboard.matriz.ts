@@ -20,9 +20,9 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
     if (mm) inadimplenciaSeriePorMes[parseInt(mm[1], 10)] = Number((e as any).valor) || 0;
   }
 
-  // 3) LTV MEDIANO dos ativos POR MÊS — reconstruído de snapshots diários (cup_data_hist),
-  // régua da aba /lt-ltv-churn (valorr×lt no snapshot + valorp, só ativos). Mediana (não média)
-  // p/ não ser distorcida por poucos clientes de ticket altíssimo (ex.: R$25k/mês → LTV R$214k).
+  // 3) LTV MEDIANO recorrente dos ativos POR MÊS — reconstruído de snapshots diários (cup_data_hist).
+  // SÓ a parte recorrente: valorr × meses de vida (snap − data_inicio); NÃO soma o pontual (valorp).
+  // Mediana (não média) p/ não distorcer por clientes de ticket altíssimo. Só ativos (valorr>0).
   // Snapshot de referência = dia 1º do mês ou o 1º snapshot disponível dele.
   const ltvSeriePorMes: Record<number, number> = {};
   try {
@@ -39,8 +39,7 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
       cli AS (
         SELECT sr.m, h.id_task,
           BOOL_OR(h.status IN ('ativo','onboarding','triagem') AND h.valorr>0) AS ativo,
-          COALESCE(SUM(h.valorr*(sr.snap-h.data_inicio)::numeric/30.44) FILTER (WHERE h.valorr>0 AND sr.snap>=h.data_inicio),0)
-            + COALESCE(SUM(h.valorp) FILTER (WHERE h.valorp>0),0) AS ltv
+          COALESCE(SUM(h.valorr*(sr.snap-h.data_inicio)::numeric/30.44) FILTER (WHERE h.valorr>0 AND sr.snap>=h.data_inicio),0) AS ltv
         FROM snap_ref sr JOIN "Clickup".cup_data_hist h ON h.data_snapshot=sr.snap
         WHERE sr.snap IS NOT NULL
         GROUP BY sr.m, h.id_task

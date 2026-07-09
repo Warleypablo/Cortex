@@ -95,7 +95,7 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
       nota: "Sem fonte de dados de NPS de clientes ainda.", celulas: celulasDaSerie({}, mesNum) },
     bpLinha(s.bpLinhas, "cac", "cac", "CAC", "menor_melhor", "brl"),
     { key: "ltv", label: "LTV", unidade: "brl", direcao: "maior_melhor", semMeta: true,
-      nota: "LTV mediano dos clientes ativos no mês (reconstruído de snapshots diários; mediana é robusta a outliers de ticket alto).",
+      nota: "LTV recorrente mediano dos clientes ativos no mês (só recorrência: valorr × meses de vida, sem pontual; mediana, robusta a outliers).",
       celulas: celulasDaSerie(s.ltvSeriePorMes, mesNum) },
     bpLinha(s.bpMetricas, "colaboradores", "headcount", "Headcount", "menor_melhor", "int"),
     { key: "enps", label: "E-NPS", unidade: "score", direcao: "maior_melhor", semMeta: true,
