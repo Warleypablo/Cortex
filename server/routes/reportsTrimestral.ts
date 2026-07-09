@@ -47,7 +47,11 @@ export function aggregateTrend(
   });
 
   return {
-    series,
+    // Exclui trimestres sem snapshot de MRR (foto = 0) para não derrubar a linha
+    // do gráfico a zero em trimestres anteriores ao início do cup_data_hist.
+    // O qoq acima já foi calculado sobre a série COMPLETA (atual/anterior por
+    // window.trimestre / window.prev.trimestre), então o filtro abaixo não afeta o QoQ.
+    series: series.filter((s) => s.mrr > 0),
     qoq: {
       mrr: mk((p) => p.mrr, "up"),
       vendas: mk((p) => p.vendas, "up"),
@@ -700,7 +704,11 @@ export function registerReportsTrimestralRoutes(app: Express) {
           pontual: b.pontual,
           churnBrl: b.churnBrl,
           churnPct: b.mrr > 0 ? Math.round((b.churnBrl / b.mrr) * 1000) / 10 : 0,
-        }));
+        }))
+        // Descarta trimestres sem snapshot de MRR (foto = 0), mesma régua do
+        // aggregateTrend acima — mantém o gráfico "Faturamento x Churn" consistente
+        // com o gráfico "Evolução por Trimestre".
+        .filter((s) => s.mrr > 0);
 
       // Bloco pontualData (Task 10): espelha as queries 29-33 (em aberto por
       // serviço, aquisição, entregas por squad, entregas por produto × mês e
