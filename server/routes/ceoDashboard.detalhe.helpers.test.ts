@@ -3,6 +3,7 @@ import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
   enpsRespostasToGrupos, ltvRowsToGrupos, receitaCabecaGrupos, recebidoCategoriasToGrupo,
   serieEvolucao, KPI_COMPONENTES,
+  ltvAuditoriaToGrupos, ultimoDiaAnterior, type LtvAuditoriaRow,
 } from "./ceoDashboard.detalhe.helpers";
 import type { DetalheBpResult } from "./bp2026.detalhe";
 
@@ -146,5 +147,64 @@ describe("KPI_COMPONENTES", () => {
     expect(KPI_COMPONENTES.custos.every((c) => c.sinal === "-")).toBe(true);
     const inad = KPI_COMPONENTES.receita.find((c) => c.slug === "inadimplencia");
     expect(inad?.sinal).toBe("-");
+  });
+});
+
+describe("ltvAuditoriaToGrupos", () => {
+  const row = (over: Partial<LtvAuditoriaRow>): LtvAuditoriaRow => ({
+    nome: "Cliente", tem_match: true, valorr_snap: 5000, n_rec_snap: 1,
+    inicio_rec: "2025-07-30", rec_full: 50000, rec_pre: 10000,
+    pont_full: 0, pont_pre: 0, pago: 40000, n_parcelas: 8,
+    ltv_fat: 50000, ltv_dfc: 50000, ...over,
+  });
+
+  it("N ímpar: mediana = valor central; grupos particionam todos os clientes", () => {
+    const rows = [row({ nome: "A", ltv_fat: 30000 }), row({ nome: "B", ltv_fat: 20000 }), row({ nome: "C", ltv_fat: 10000 })];
+    const r = ltvAuditoriaToGrupos(rows, "ltv_fat", 6);
+    expect(r.mediana).toBe(20000);
+    expect(r.grupos.map((g) => g.titulo)).toEqual(["Acima da mediana (1)", "Mediana", "Abaixo da mediana (1)"]);
+    expect(r.grupos[1].itens[0].nome).toBe("B");
+    expect(r.grupos[1].aberto).toBe(true);
+    expect(r.grupos[0].aberto).toBe(false);
+    expect(r.grupos[0].total).toBe(30000);
+    const totalItens = r.grupos.reduce((s, g) => s + g.itens.length, 0);
+    expect(totalItens).toBe(3); // todos os clientes aparecem, sem corte
+  });
+
+  it("N par: mediana = média dos 2 centrais; grupo Mediana tem os 2", () => {
+    const rows = [row({ ltv_dfc: 40000 }), row({ ltv_dfc: 30000 }), row({ ltv_dfc: 20000 }), row({ ltv_dfc: 10000 })];
+    const r = ltvAuditoriaToGrupos(rows, "ltv_dfc", 6);
+    expect(r.mediana).toBe(25000);
+    expect(r.grupos[1].itens).toHaveLength(2);
+    expect(r.grupos[1].itens.map((i) => i.valor)).toEqual([30000, 20000]);
+  });
+
+  it("rows vazio: sem grupos, mediana null", () => {
+    expect(ltvAuditoriaToGrupos([], "ltv_fat", 6)).toEqual({ grupos: [], mediana: null, nSemMatch: 0 });
+  });
+
+  it("FAT: detalhe decompõe recorrente (single e multi contrato) e pontual", () => {
+    const single = ltvAuditoriaToGrupos([row({ rec_full: 70300, ltv_fat: 73300, pont_full: 3000 })], "ltv_fat", 6);
+    expect(single.grupos[0].itens[0].detalhe).toBe("recorrente R$ 70,3k (R$ 5.000/mês desde 30/07/25) + pontual entregue R$ 3,0k");
+    const multi = ltvAuditoriaToGrupos([row({ n_rec_snap: 2, valorr_snap: 7200, pont_full: 0 })], "ltv_fat", 6);
+    expect(multi.grupos[0].itens[0].detalhe).toBe("recorrente R$ 50,0k (2 contratos, R$ 7.200/mês)");
+  });
+
+  it("DFC: match com teórico+pago; nascido pós-corte só pago; pago zero; sem match → faturável", () => {
+    const cheio = ltvAuditoriaToGrupos([row({ rec_pre: 28100, pont_pre: 0, pago: 35200, n_parcelas: 18 })], "ltv_dfc", 6);
+    expect(cheio.grupos[0].itens[0].detalhe).toBe("teórico pré-out/25 R$ 28,1k + pago real R$ 35,2k (18 parcelas até 31/05)");
+    const novo = ltvAuditoriaToGrupos([row({ rec_pre: 0, pont_pre: 0, pago: 14100, n_parcelas: 9 })], "ltv_dfc", 7);
+    expect(novo.grupos[0].itens[0].detalhe).toBe("pago real R$ 14,1k (9 parcelas até 30/06)");
+    const zero = ltvAuditoriaToGrupos([row({ rec_pre: 0, pont_pre: 0, pago: 0, n_parcelas: 0 })], "ltv_dfc", 6);
+    expect(zero.grupos[0].itens[0].detalhe).toBe("sem pagamento registrado até 31/05");
+    const sem = ltvAuditoriaToGrupos([row({ tem_match: false, rec_full: 30500, pont_full: 0 })], "ltv_dfc", 6);
+    expect(sem.grupos[0].itens[0].detalhe).toBe("sem match CNPJ → régua faturável: recorrente R$ 30,5k");
+    expect(sem.nSemMatch).toBe(1);
+  });
+
+  it("ultimoDiaAnterior cobre viradas de mês", () => {
+    expect(ultimoDiaAnterior(1)).toBe("31/12");
+    expect(ultimoDiaAnterior(3)).toBe("28/02");
+    expect(ultimoDiaAnterior(7)).toBe("30/06");
   });
 });

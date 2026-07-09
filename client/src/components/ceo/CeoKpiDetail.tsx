@@ -9,7 +9,7 @@ const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
   "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
 interface ItemDet { nome: string; detalhe: string; data: string | null; valor: number; url?: string }
-interface GrupoDet { titulo: string; total: number; sinal?: "+" | "-"; formato: "brl" | "num"; itens: ItemDet[]; itensOmitidos?: { qtd: number; valor: number } }
+interface GrupoDet { titulo: string; total: number; sinal?: "+" | "-"; formato: "brl" | "num"; itens: ItemDet[]; itensOmitidos?: { qtd: number; valor: number }; aberto?: boolean }
 interface DetalheResponse {
   kpi: string; titulo: string; mes: number; unidade: "brl" | "int";
   orcado: number | null; realizado: number | null; atingimentoPct: number | null;
@@ -38,7 +38,7 @@ function Grupos({ data }: { data: DetalheResponse }) {
           : brl.format(g.total);
         const prefixo = g.sinal ? `${g.sinal} ` : "";
         return (
-          <details key={g.titulo} open={data.grupos.length <= 4} className="rounded-lg border border-gray-200 dark:border-zinc-700 overflow-hidden">
+          <details key={g.titulo} open={g.aberto ?? data.grupos.length <= 4} className="rounded-lg border border-gray-200 dark:border-zinc-700 overflow-hidden">
             <summary className="flex cursor-pointer items-center justify-between px-3 py-2.5 text-sm font-semibold text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-zinc-800/50 transition-colors">
               <span>{prefixo}{g.titulo}</span>
               <span className="tabular-nums">{totalDisplay}</span>

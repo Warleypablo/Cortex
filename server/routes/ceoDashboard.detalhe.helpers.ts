@@ -6,6 +6,7 @@ export const LIMITE_ITENS = 50;
 export interface CeoGrupo extends GrupoDetalhe {
   sinal?: "+" | "-";
   formato: "brl" | "num";
+  aberto?: boolean; // controla o <details> do drawer; ausente = regra padrão do front
 }
 
 // Um ponto da série de evolução mensal (realizado vs meta) exibida no gráfico do drawer.
@@ -169,4 +170,102 @@ export function receitaCabecaGrupos(receita: number, headcount: number): { grupo
     ],
     nota: `Receita recebida ÷ Headcount = ${formatBRL(receita)} ÷ ${headcount} = ${formatBRL(rc)}`,
   };
+}
+
+// ---- Auditoria das células de LTV (FAT/DFC) ----
+// Uma linha por cliente ativo no snapshot do mês (query de auditoria mensal).
+export interface LtvAuditoriaRow {
+  nome: string;
+  tem_match: boolean;
+  valorr_snap: number;
+  n_rec_snap: number;
+  inicio_rec: string | null; // "YYYY-MM-DD"
+  rec_full: number;
+  rec_pre: number;
+  pont_full: number;
+  pont_pre: number;
+  pago: number;
+  n_parcelas: number;
+  ltv_fat: number;
+  ltv_dfc: number;
+}
+
+const fmtBrlCompacto = (v: number): string =>
+  Math.abs(v) >= 1000
+    ? `R$ ${(v / 1000).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}k`
+    : `R$ ${Math.round(v).toLocaleString("pt-BR")}`;
+
+const fmtPorMes = (v: number): string => `R$ ${Math.round(v).toLocaleString("pt-BR")}/mês`;
+
+const fmtDataCurta = (iso: string | null): string | null => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso ?? "");
+  return m ? `${m[3]}/${m[2]}/${m[1].slice(2)}` : null;
+};
+
+// Último dia do mês ANTERIOR à célula (o pago real conta até a ENTRADA do mês).
+export function ultimoDiaAnterior(mesNum: number): string {
+  const d = new Date(2026, mesNum - 1, 0); // dia 0 = último dia do mês anterior
+  return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}`;
+}
+
+function detalheFat(r: LtvAuditoriaRow): string {
+  const desde = fmtDataCurta(r.inicio_rec);
+  const ctx = r.n_rec_snap > 1
+    ? ` (${r.n_rec_snap} contratos, ${fmtPorMes(r.valorr_snap)})`
+    : desde ? ` (${fmtPorMes(r.valorr_snap)} desde ${desde})` : ` (${fmtPorMes(r.valorr_snap)})`;
+  const rec = `recorrente ${fmtBrlCompacto(r.rec_full)}${ctx}`;
+  return r.pont_full > 0 ? `${rec} + pontual entregue ${fmtBrlCompacto(r.pont_full)}` : rec;
+}
+
+function detalheDfc(r: LtvAuditoriaRow, ateDia: string): string {
+  if (!r.tem_match) {
+    const pont = r.pont_full > 0 ? ` + pontual ${fmtBrlCompacto(r.pont_full)}` : "";
+    return `sem match CNPJ → régua faturável: recorrente ${fmtBrlCompacto(r.rec_full)}${pont}`;
+  }
+  const teorico = r.rec_pre + r.pont_pre;
+  const pagoTxt = r.pago > 0
+    ? `pago real ${fmtBrlCompacto(r.pago)} (${r.n_parcelas} parcela${r.n_parcelas === 1 ? "" : "s"} até ${ateDia})`
+    : `sem pagamento registrado até ${ateDia}`;
+  return teorico > 0 ? `teórico pré-out/25 ${fmtBrlCompacto(teorico)} + ${pagoTxt}` : pagoTxt;
+}
+
+// Particiona os clientes do mês em acima/mediana/abaixo e compõe a decomposição
+// de cada um. A mediana daqui é a MESMA régua da célula (PERCENTILE_CONT 0.5 =
+// valor central; N par = média dos 2 centrais) — reconciliação por construção.
+export function ltvAuditoriaToGrupos(
+  rows: LtvAuditoriaRow[],
+  kpi: "ltv_fat" | "ltv_dfc",
+  mesNum: number
+): { grupos: CeoGrupo[]; mediana: number | null; nSemMatch: number } {
+  const ateDia = ultimoDiaAnterior(mesNum);
+  const valorDe = (r: LtvAuditoriaRow) => (kpi === "ltv_fat" ? r.ltv_fat : r.ltv_dfc);
+  const ordenado = [...rows].sort((a, b) => valorDe(b) - valorDe(a));
+  const n = ordenado.length;
+  if (n === 0) return { grupos: [], mediana: null, nSemMatch: 0 };
+
+  // Índices centrais na ordenação desc (mesmos da asc, por simetria do meio).
+  const centrais = n % 2 === 1 ? [(n - 1) / 2] : [n / 2 - 1, n / 2];
+  const mediana = Math.round(centrais.reduce((s, i) => s + valorDe(ordenado[i]), 0) / centrais.length);
+
+  const toItem = (r: LtvAuditoriaRow) => ({
+    nome: r.nome || "—",
+    detalhe: kpi === "ltv_fat" ? detalheFat(r) : detalheDfc(r, ateDia),
+    data: null,
+    valor: Math.round(valorDe(r)),
+  });
+  const grupo = (titulo: string, slice: LtvAuditoriaRow[], aberto: boolean): CeoGrupo => ({
+    titulo, formato: "brl", aberto,
+    total: Math.round(slice.reduce((s, r) => s + valorDe(r), 0)),
+    itens: slice.map(toItem),
+  });
+
+  const acima = ordenado.slice(0, centrais[0]);
+  const meio = centrais.map((i) => ordenado[i]);
+  const abaixo = ordenado.slice(centrais[centrais.length - 1] + 1);
+  const grupos = [
+    grupo(`Acima da mediana (${acima.length})`, acima, false),
+    grupo("Mediana", meio, true),
+    grupo(`Abaixo da mediana (${abaixo.length})`, abaixo, false),
+  ].filter((g) => g.itens.length > 0);
+  return { grupos, mediana, nSemMatch: rows.filter((r) => !r.tem_match).length };
 }
