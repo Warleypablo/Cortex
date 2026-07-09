@@ -695,7 +695,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
       // o mensal Q17b (mrrAnteriorTotalResult). Atualiza SÓ este campo de
       // turboMetrics (os demais foram calculados na Task 7 e não são tocados aqui).
       const mrrTotalInicioTri = parseFloat((mrrAnteriorTotalRows.rows as any[])[0]?.mrr_total) || 0;
-      turboMetrics.churnMetaMensal = mrrTotalInicioTri * 0.08;
+      turboMetrics.churnMetaMensal = mrrTotalInicioTri * 0.08 * w.mesesComputados.length;
 
       // TODO(Tasks 10-11): demais seções reais.
       res.json({
