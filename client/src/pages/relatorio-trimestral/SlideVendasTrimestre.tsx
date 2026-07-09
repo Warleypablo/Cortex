@@ -22,7 +22,7 @@ function QoqBadge({ q }: { q: Qoq }) {
   const positivo = pct >= 0;
   const bom = q.betterDirection === "up" ? positivo : !positivo;
   return (
-    <span className={`text-xs font-bold tabular-nums rounded-full px-2 py-0.5 ${bom ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
+    <span className={`text-sm font-bold tabular-nums rounded-full px-3 py-1 ${bom ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"}`}>
       {positivo ? "▲" : "▼"} {Math.abs(pct).toFixed(1).replace(".", ",")}% QoQ
     </span>
   );
@@ -35,11 +35,11 @@ function entrance(delayMs: number) {
   };
 }
 
-function StatInline({ label, valor, cor = "text-white" }: { label: string; valor: string; cor?: string }) {
+function SubStat({ label, valor }: { label: string; valor: string }) {
   return (
-    <div className="flex-1">
-      <p className="text-[10px] text-zinc-500 uppercase tracking-widest">{label}</p>
-      <p className={`text-2xl font-black ${cor} mt-0.5`}>{valor}</p>
+    <div className="flex-1 text-center">
+      <p className="text-[11px] text-zinc-500 uppercase tracking-widest">{label}</p>
+      <p className="text-3xl font-black text-white mt-1">{valor}</p>
     </div>
   );
 }
@@ -58,15 +58,8 @@ export default function SlideVendasTrimestre({
 
   const totalContratosAnim = useCountUp(dados.numContratos, 750, 150);
   const receitaTotalAnim = useCountUp(receitaTotal, 750, 150);
-  const recReceitaAnim = useCountUp(dados.receitaRecorrente, 750, 350);
-  const pontReceitaAnim = useCountUp(dados.receitaPontual, 750, 450);
-
-  // Pipelines ordenados por receita total; top 6 preenchem o bloco inferior
-  const pipelines = [...(dados.pipelineBreakdown ?? [])]
-    .map((p) => ({ ...p, total: p.receitaRecorrente + p.receitaPontual }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, 6);
-  const maxPipeline = Math.max(...pipelines.map((p) => p.total), 1);
+  const recReceitaAnim = useCountUp(dados.receitaRecorrente, 750, 400);
+  const pontReceitaAnim = useCountUp(dados.receitaPontual, 750, 500);
 
   return (
     <SlideLayout section="commerce" padding="28px 36px">
@@ -76,109 +69,74 @@ export default function SlideVendasTrimestre({
       `}</style>
       <SlideHeader icon={BarChart3} iconColor="text-cyan-400" title={`Contratos Fechados — ${label}`} gradientColor="#06b6d4" />
 
-      <div className="flex-1 flex flex-col gap-4 min-h-0">
-        {/* Hero: totais + barra de proporção animada */}
-        <div {...entrance(0)}>
-          <SecondaryCard className="px-6 py-4">
-            <div className="flex items-center justify-between mb-3">
+      <div className="flex-1 flex flex-col gap-5 min-h-0">
+        {/* Hero: totais do trimestre + proporção Recorrente × Pontual */}
+        <div className={`${entrance(0).className} flex-[2] min-h-0 flex`} style={entrance(0).style}>
+          <SecondaryCard className="px-8 py-6 w-full flex flex-col justify-center">
+            <div className="flex items-end justify-between mb-5">
               <div>
-                <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Total de contratos</p>
-                <p className="text-4xl font-black text-white">{Math.round(totalContratosAnim)}</p>
+                <p className="text-xs text-zinc-500 uppercase tracking-[0.25em]">Total de contratos</p>
+                <p className="text-7xl font-black text-white leading-none mt-2">{Math.round(totalContratosAnim)}</p>
               </div>
               <div className="text-right">
-                <p className="text-[10px] text-zinc-500 uppercase tracking-widest">Receita total</p>
-                <p className="text-4xl font-black bg-gradient-to-r from-emerald-300 to-cyan-400 bg-clip-text text-transparent">
+                <p className="text-xs text-zinc-500 uppercase tracking-[0.25em]">Receita total</p>
+                <p className="text-7xl font-black leading-none mt-2 bg-gradient-to-r from-emerald-300 to-cyan-400 bg-clip-text text-transparent">
                   {fmtCompact(receitaTotalAnim)}
                 </p>
               </div>
             </div>
-            {/* Proporção Recorrente × Pontual (cresce na entrada) */}
-            <div className="h-3 rounded-full overflow-hidden flex bg-white/[0.04] vendas-grow" style={{ transformOrigin: "left", animation: "vendasGrowX 700ms ease-out 250ms both" }}>
+            <div
+              className="h-4 rounded-full overflow-hidden flex bg-white/[0.04] vendas-grow"
+              style={{ transformOrigin: "left", animation: "vendasGrowX 700ms ease-out 250ms both" }}
+            >
               <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400" style={{ width: `${pctRec}%` }} />
               <div className="h-full bg-gradient-to-r from-violet-500 to-purple-400 flex-1" />
             </div>
-            <div className="flex items-center justify-between mt-2">
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <span className="w-2 h-2 rounded-full bg-emerald-400" /> Recorrente {pctRec.toFixed(0)}%
+            <div className="flex items-center justify-between mt-3">
+              <span className="flex items-center gap-2 text-sm text-zinc-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" /> Recorrente {pctRec.toFixed(0)}%
               </span>
-              <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                <span className="w-2 h-2 rounded-full bg-purple-400" /> Pontual {(100 - pctRec).toFixed(0)}%
+              <span className="flex items-center gap-2 text-sm text-zinc-400">
+                <span className="w-2.5 h-2.5 rounded-full bg-purple-400" /> Pontual {(100 - pctRec).toFixed(0)}%
               </span>
             </div>
           </SecondaryCard>
         </div>
 
-        {/* Recorrente × Pontual: stats em linha, compactos */}
-        <div className="grid grid-cols-2 gap-4">
-          <div {...entrance(150)}>
-            <SecondaryCard className="px-6 py-4 h-full" borderColor="#34d399">
-              <div className="flex items-center justify-between mb-3">
-                <span className="flex items-center gap-1.5 text-xs font-bold text-emerald-400 uppercase tracking-widest">
-                  <TrendingUp className="h-3.5 w-3.5" /> Recorrente (MRR)
+        {/* Recorrente × Pontual: os dois protagonistas, receita como hero de cada card */}
+        <div className="grid grid-cols-2 gap-5 flex-[3] min-h-0">
+          <div className={`${entrance(200).className} min-h-0 flex`} style={entrance(200).style}>
+            <SecondaryCard className="px-8 py-6 w-full flex flex-col justify-center" borderColor="#34d399">
+              <div className="flex items-center justify-between mb-4">
+                <span className="flex items-center gap-2 text-sm font-bold text-emerald-400 uppercase tracking-widest">
+                  <TrendingUp className="h-4 w-4" /> Recorrente (MRR)
                 </span>
                 <QoqBadge q={qoqVendas} />
               </div>
-              <div className="flex gap-4">
-                <StatInline label="Contratos" valor={String(dados.contratosRecorrente)} />
-                <StatInline label="Receita" valor={fmtCompact(recReceitaAnim)} cor="text-emerald-400" />
-                <StatInline label="Ticket médio" valor={fmtCompact(dados.tmRecorrente)} />
+              <p className="text-6xl font-black text-emerald-400 leading-none text-center my-4">{fmtCompact(recReceitaAnim)}</p>
+              <p className="text-xs text-zinc-500 uppercase tracking-widest text-center mb-5">Receita no trimestre</p>
+              <div className="flex gap-4 border-t border-white/[0.06] pt-5">
+                <SubStat label="Contratos" valor={String(dados.contratosRecorrente)} />
+                <div className="w-px bg-white/[0.06]" />
+                <SubStat label="Ticket médio" valor={fmtCompact(dados.tmRecorrente)} />
               </div>
             </SecondaryCard>
           </div>
-          <div {...entrance(250)}>
-            <SecondaryCard className="px-6 py-4 h-full" borderColor="#a855f7">
-              <span className="flex items-center gap-1.5 text-xs font-bold text-purple-400 uppercase tracking-widest mb-3">
-                <Zap className="h-3.5 w-3.5" /> Pontual
+          <div className={`${entrance(300).className} min-h-0 flex`} style={entrance(300).style}>
+            <SecondaryCard className="px-8 py-6 w-full flex flex-col justify-center" borderColor="#a855f7">
+              <span className="flex items-center gap-2 text-sm font-bold text-purple-400 uppercase tracking-widest mb-4">
+                <Zap className="h-4 w-4" /> Pontual
               </span>
-              <div className="flex gap-4">
-                <StatInline label="Contratos" valor={String(dados.contratosPontual)} />
-                <StatInline label="Receita" valor={fmtCompact(pontReceitaAnim)} cor="text-purple-400" />
-                <StatInline label="Ticket médio" valor={fmtCompact(dados.tmPontual)} />
+              <p className="text-6xl font-black text-purple-400 leading-none text-center my-4">{fmtCompact(pontReceitaAnim)}</p>
+              <p className="text-xs text-zinc-500 uppercase tracking-widest text-center mb-5">Receita no trimestre</p>
+              <div className="flex gap-4 border-t border-white/[0.06] pt-5">
+                <SubStat label="Contratos" valor={String(dados.contratosPontual)} />
+                <div className="w-px bg-white/[0.06]" />
+                <SubStat label="Ticket médio" valor={fmtCompact(dados.tmPontual)} />
               </div>
             </SecondaryCard>
           </div>
         </div>
-
-        {/* Por pipeline: barras horizontais empilhadas (recorrente + pontual) */}
-        {pipelines.length > 0 && (
-          <div {...entrance(350)} >
-            <SecondaryCard className="px-6 py-4 flex-1 flex flex-col">
-              <div className="flex items-center justify-between mb-3">
-                <p className="text-xs font-bold text-zinc-300 uppercase tracking-widest">Por pipeline</p>
-                <div className="flex items-center gap-4">
-                  <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400" /> Recorrente
-                  </span>
-                  <span className="flex items-center gap-1.5 text-xs text-zinc-400">
-                    <span className="w-2 h-2 rounded-full bg-purple-400" /> Pontual
-                  </span>
-                </div>
-              </div>
-              <div className="flex-1 flex flex-col justify-center gap-2.5">
-                {pipelines.map((p, i) => (
-                  <div key={p.pipeline} className="flex items-center gap-3">
-                    <span className="w-44 text-xs text-zinc-400 truncate text-right shrink-0" title={p.pipeline}>{p.pipeline}</span>
-                    <div className="flex-1 h-5 rounded-md overflow-hidden flex bg-white/[0.03]">
-                      <div
-                        className="h-full flex vendas-grow"
-                        style={{
-                          width: `${(p.total / maxPipeline) * 100}%`,
-                          transformOrigin: "left",
-                          animation: `vendasGrowX 600ms ease-out ${450 + i * 80}ms both`,
-                        }}
-                      >
-                        <div className="h-full bg-emerald-500/80" style={{ width: `${p.total > 0 ? (p.receitaRecorrente / p.total) * 100 : 0}%` }} />
-                        <div className="h-full bg-purple-500/80 flex-1" />
-                      </div>
-                    </div>
-                    <span className="w-20 text-xs font-bold text-white text-right shrink-0 tabular-nums">{fmtCompact(p.total)}</span>
-                    <span className="w-16 text-[11px] text-zinc-500 text-right shrink-0 tabular-nums">{p.contratos} ctr</span>
-                  </div>
-                ))}
-              </div>
-            </SecondaryCard>
-          </div>
-        )}
       </div>
     </SlideLayout>
   );
