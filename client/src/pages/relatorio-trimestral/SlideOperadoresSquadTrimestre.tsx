@@ -51,10 +51,14 @@ function OperadorRow({ op, pos }: { op: OperadorSquad; pos: number }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className={`font-bold text-white truncate ${pos === 0 ? "text-sm" : "text-xs"}`}>{firstName(op.nome)}</p>
-        {op.cargo && <p className="text-[10px] text-zinc-500 truncate">{op.cargo}</p>}
+        {/* Composição do faturamento: MRR (recorrente) + Pontual entregue */}
+        <p className="text-[10px] text-zinc-500 truncate tabular-nums">
+          <span className="text-emerald-400/80">MRR {fmtCompact(op.mrr)}</span>
+          {op.pontual > 0 && <span className="text-purple-400/80"> · Pont {fmtCompact(op.pontual)}</span>}
+        </p>
       </div>
       <span className={`font-black text-emerald-400 tabular-nums shrink-0 ${pos === 0 ? "text-lg" : "text-sm"}`}>
-        {fmtCompact(op.mrr)}
+        {fmtCompact(op.faturamento)}
       </span>
     </div>
   );
@@ -71,7 +75,7 @@ function SquadCard({ sq, delayMs }: { sq: SquadOperadores; delayMs: number }) {
             : <span className="w-2.5 h-2.5 rounded-full bg-emerald-400" />}
           <p className="text-lg font-black text-white truncate flex-1">{name}</p>
           <div className="text-right shrink-0">
-            <p className="text-sm font-black text-emerald-400 tabular-nums">{fmtCompact(sq.totalMrr)}</p>
+            <p className="text-sm font-black text-emerald-400 tabular-nums">{fmtCompact(sq.totalFaturamento)}</p>
             <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{sq.numOperadores} operadores</p>
           </div>
         </div>
@@ -97,7 +101,7 @@ export default function SlideOperadoresSquadTrimestre({ squads, label }: { squad
 
   return (
     <SlideLayout section="commerce" padding="28px 36px">
-      <SlideHeader icon={Trophy} iconColor="text-emerald-400" title={`Operadores por Squad — ${label}`} gradientColor="#10b981" subtitle="Top 3 por MRR sob gestão" />
+      <SlideHeader icon={Trophy} iconColor="text-emerald-400" title={`Operadores por Squad — ${label}`} gradientColor="#10b981" subtitle="Top 3 por faturamento (MRR + pontual entregue)" />
       <div className="flex-1 grid grid-cols-3 gap-5 min-h-0" style={{ gridAutoRows: "1fr" }}>
         {squads.map((sq, i) => <SquadCard key={sq.squad} sq={sq} delayMs={i * 90} />)}
       </div>

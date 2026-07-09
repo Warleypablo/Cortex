@@ -659,9 +659,12 @@ export function registerReportsTrimestralRoutes(app: Express) {
             AND h.valorr IS NOT NULL
         `),
         // Top 3 operadores (responsavel) por squad no snapshot de w.fotoDate, por MRR
-        // ativo sob responsabilidade. Espelha o padrão de foto do "Top Operadores" do
-        // mensal (Q24a, ~L1042) com match flexível ClickUp×rh_pessoal, mas particionado
-        // por squad (ROW_NUMBER) para pegar os 3 de cada.
+        // por FATURAMENTO = MRR ativo (snapshot fim do tri) + pontual entregue no tri.
+        // Espelha o padrão de foto do "Top Operadores" do mensal (Q24a/24b, ~L1042-1165)
+        // com match flexível ClickUp×rh_pessoal, mas particionado por squad (ROW_NUMBER).
+        // O pontual (cup_contratos) é somado por operador no tri e atribuído à squad do
+        // operador no snapshot de MRR (join por nome) — evita divergência de rótulo de
+        // squad entre as duas tabelas; operador em 2 squads é caso raro.
         db.execute(sql`
           WITH ultimo_snapshot AS (
             SELECT COALESCE(
@@ -669,7 +672,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
             ) as snap
           ),
-          por_resp AS (
+          mrr_por_resp AS (
             SELECT h.squad, h.responsavel AS nome,
               COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) AS mrr
             FROM "Clickup".cup_data_hist h
@@ -680,15 +683,34 @@ export function registerReportsTrimestralRoutes(app: Express) {
               AND h.squad IS NOT NULL AND TRIM(h.squad) != ''
             GROUP BY h.squad, h.responsavel
           ),
+          pontual_por_resp AS (
+            SELECT responsavel AS nome,
+              COALESCE(SUM(valorp::numeric), 0) AS pontual
+            FROM "Clickup".cup_contratos
+            WHERE LOWER(TRIM(status)) = 'entregue'
+              AND data_entrega >= ${w.dataStart}::date
+              AND data_entrega < ${w.dataEnd}::date
+              AND valorp IS NOT NULL AND valorp::numeric > 0
+              AND responsavel IS NOT NULL AND TRIM(responsavel) != ''
+            GROUP BY responsavel
+          ),
+          por_resp AS (
+            SELECT m.squad, m.nome, m.mrr,
+              COALESCE(p.pontual, 0) AS pontual,
+              m.mrr + COALESCE(p.pontual, 0) AS faturamento
+            FROM mrr_por_resp m
+            LEFT JOIN pontual_por_resp p ON LOWER(TRIM(m.nome)) = LOWER(TRIM(p.nome))
+          ),
           ranked AS (
             SELECT *,
-              ROW_NUMBER() OVER (PARTITION BY squad ORDER BY mrr DESC) AS rn,
-              SUM(mrr) OVER (PARTITION BY squad) AS squad_total,
+              ROW_NUMBER() OVER (PARTITION BY squad ORDER BY faturamento DESC) AS rn,
+              SUM(faturamento) OVER (PARTITION BY squad) AS squad_total,
               COUNT(*) OVER (PARTITION BY squad) AS squad_operadores
             FROM por_resp
-            WHERE mrr > 0
+            WHERE faturamento > 0
           )
-          SELECT r.squad, r.nome, r.mrr, r.rn::int AS rn, r.squad_total, r.squad_operadores::int AS squad_operadores,
+          SELECT r.squad, r.nome, r.mrr, r.pontual, r.faturamento, r.rn::int AS rn,
+                 r.squad_total, r.squad_operadores::int AS squad_operadores,
                  p.foto AS "fotoUrl", p.cargo
           FROM ranked r
           LEFT JOIN LATERAL (
@@ -839,9 +861,9 @@ export function registerReportsTrimestralRoutes(app: Express) {
       // (SQUADS_OCULTOS_DETALHES + "(OFF)") e mantém as squads de maior MRR total.
       const operadoresMap = new Map<string, {
         squad: string;
-        totalMrr: number;
+        totalFaturamento: number;
         numOperadores: number;
-        operadores: { nome: string; mrr: number; fotoUrl: string | null; cargo: string | null }[];
+        operadores: { nome: string; faturamento: number; mrr: number; pontual: number; fotoUrl: string | null; cargo: string | null }[];
       }>();
       for (const row of operadoresPorSquadRows.rows as any[]) {
         const norm = normalizeSquadName(row.squad);
@@ -851,7 +873,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         if (!entry) {
           entry = {
             squad: row.squad,
-            totalMrr: parseFloat(row.squad_total) || 0,
+            totalFaturamento: parseFloat(row.squad_total) || 0,
             numOperadores: parseInt(row.squad_operadores) || 0,
             operadores: [],
           };
@@ -859,13 +881,15 @@ export function registerReportsTrimestralRoutes(app: Express) {
         }
         entry.operadores.push({
           nome: row.nome,
+          faturamento: parseFloat(row.faturamento) || 0,
           mrr: parseFloat(row.mrr) || 0,
+          pontual: parseFloat(row.pontual) || 0,
           fotoUrl: (row.fotoUrl as string) || null,
           cargo: (row.cargo as string) || null,
         });
       }
       const operadoresPorSquad = Array.from(operadoresMap.values())
-        .sort((a, b) => b.totalMrr - a.totalMrr)
+        .sort((a, b) => b.totalFaturamento - a.totalFaturamento)
         .slice(0, 6);
 
       // Meta de churn do tri = Σ (8% × MRR do fim do mês ANTERIOR) para cada mês
