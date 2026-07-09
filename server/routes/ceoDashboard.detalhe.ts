@@ -3,11 +3,11 @@ import { sql } from "drizzle-orm";
 import { montarDetalheBp } from "./bp2026.detalhe";
 import { computarBpReceitas } from "./bp2026";
 import { storage } from "../storage";
-import { canAccessCeo, geracaoCaixaFromBp, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
+import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
   enpsRespostasToGrupos, grupoMargemBruta, receitaCabecaGrupos,
-  recebidoCategoriasToGrupo, serieEvolucao, KPI_COMPONENTES,
+  recebidoCategoriasToGrupo, pagoCategoriasToGrupo, serieEvolucao, KPI_COMPONENTES,
   ltvAuditoriaToGrupos, ultimoDiaAnterior,
   type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao, type LtvAuditoriaRow,
 } from "./ceoDashboard.detalhe.helpers";
@@ -17,6 +17,7 @@ import {
 const EVOLUCAO_FONTE: Record<string, { arr: "linhas" | "metricasGerais"; metrica: string }> = {
   custos: { arr: "metricasGerais", metrica: "despesa_total" },
   lucro: { arr: "linhas", metrica: "ebitda" },
+  geracao_caixa: { arr: "linhas", metrica: "dfc_real" },
   caixa: { arr: "metricasGerais", metrica: "saldo_caixa" },
   cac: { arr: "linhas", metrica: "cac" },
   headcount: { arr: "metricasGerais", metrica: "colaboradores" },
@@ -32,6 +33,21 @@ async function recebidoPorCategoria(db: any, mesNum: number): Promise<Array<{ ca
            SUM(COALESCE(valor_pago::numeric, 0)) AS valor
     FROM "Conta Azul".caz_parcelas
     WHERE tipo_evento = 'RECEITA' AND status = 'QUITADO'
+      AND data_quitacao >= ${ini}::date AND data_quitacao < ${fim}::date
+    GROUP BY 1 ORDER BY SUM(COALESCE(valor_pago::numeric, 0)) DESC`);
+  return (r.rows ?? []).map((x: any) => ({ categoria: String(x.categoria), valor: Number(x.valor) || 0 }));
+}
+
+// Saídas de caixa por categoria no mês (parcelas de DESPESA quitadas por data_quitacao).
+// Espelho da recebidoPorCategoria — juntas reconstroem o fluxo da DFC (dfc_real do BP).
+async function pagoPorCategoria(db: any, mesNum: number): Promise<Array<{ categoria: string; valor: number }>> {
+  const ini = `2026-${String(mesNum).padStart(2, "0")}-01`;
+  const fim = mesNum >= 12 ? "2027-01-01" : `2026-${String(mesNum + 1).padStart(2, "0")}-01`;
+  const r: any = await db.execute(sql`
+    SELECT COALESCE(categoria_nome, '(sem categoria)') AS categoria,
+           SUM(COALESCE(valor_pago::numeric, 0)) AS valor
+    FROM "Conta Azul".caz_parcelas
+    WHERE tipo_evento = 'DESPESA' AND status = 'QUITADO'
       AND data_quitacao >= ${ini}::date AND data_quitacao < ${fim}::date
     GROUP BY 1 ORDER BY SUM(COALESCE(valor_pago::numeric, 0)) DESC`);
   return (r.rows ?? []).map((x: any) => ({ categoria: String(x.categoria), valor: Number(x.valor) || 0 }));
@@ -101,14 +117,14 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     base.orcado = eb.orcado; base.realizado = eb.realizado;
     nota = "EBITDA = Margem Bruta − CAC − SG&A − Bônus (competência, régua do BP).";
   } else if (kpi === "geracao_caixa") {
-    // O simples, fechando com a tabela: Receita recebida (caixa) − Custos & Despesas.
+    // DFC do mês: entradas − saídas quitadas (caixa nos dois lados) — mesma linha dfc_real do BP.
     grupos = [
       { ...recebidoCategoriasToGrupo(await recebidoPorCategoria(db, mesNum)), sinal: "+" as const },
-      ...(await componentesGrupos(db, "custos", mesNum)),
+      { ...pagoCategoriasToGrupo(await pagoPorCategoria(db, mesNum)), sinal: "-" as const },
     ];
-    const m = geracaoCaixaFromBp(bp).meses.find((x) => x.mes === mesNum);
-    base.orcado = m?.orcado ?? null; base.realizado = m?.realizado ?? null;
-    nota = "Geração de Caixa = Receita recebida no mês (caixa) − Custos & Despesas — a mesma conta das linhas da tabela. Meta = geração de caixa orçada no BP.";
+    const v = linhaValor(bp, "linhas", "dfc_real", mesNum);
+    base.orcado = v.orcado; base.realizado = v.realizado;
+    nota = "Geração de Caixa (DFC) = entradas − saídas quitadas no mês (regime de caixa nos dois lados). Meta = geração de caixa orçada no BP. ≠ Receita − Custos da tabela: lá os custos são competência (DRE).";
   } else if (kpi === "receita_cabeca") {
     // Numerador em regime de caixa (receita recebida / DFC), não o faturável (competência).
     const recebido = bp.receitaRecebidaCaixaPorMes?.[mesNum] ?? 0;
@@ -260,8 +276,6 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     evolucao = serieEvolucao(receitaRecebidaFromBp(bp), bp.mesFechado);
   } else if (kpi === "receita_cabeca") {
     evolucao = serieEvolucao(receitaCabecaCaixaFromBp(bp), bp.mesFechado);
-  } else if (kpi === "geracao_caixa") {
-    evolucao = serieEvolucao(geracaoCaixaFromBp(bp), bp.mesFechado);
   } else if (EVOLUCAO_FONTE[kpi]) {
     const { arr, metrica } = EVOLUCAO_FONTE[kpi];
     evolucao = serieEvolucao((bp[arr] ?? []).find((l: any) => l.metrica === metrica), bp.mesFechado);

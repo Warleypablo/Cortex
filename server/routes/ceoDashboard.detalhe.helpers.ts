@@ -140,19 +140,22 @@ export function grupoMargemBruta(valor: number): CeoGrupo {
     itensOmitidos: undefined };
 }
 
-// Grupo do drill de Receita em regime de caixa: uma linha por categoria de recebimento.
+// Grupo de fluxo de caixa por categoria (entradas ou saídas quitadas).
 // Remove o código contábil do rótulo ("03.01.01 Receita de Serviços" → "Receita de Serviços").
-export function recebidoCategoriasToGrupo(
-  rows: Array<{ categoria: string; valor: number }>
-): CeoGrupo {
+function categoriasToGrupo(rows: Array<{ categoria: string; valor: number }>, titulo: string): CeoGrupo {
   const limpar = (c: string) => c.replace(/^[\d.\s]+/, "").trim() || c;
   const itens: ItemDetalhe[] = rows.map((r) => ({
-    grupo: "Receita Recebida", nome: limpar(r.categoria), detalhe: "", data: null, valor: Number(r.valor) || 0,
+    grupo: titulo, nome: limpar(r.categoria), detalhe: "", data: null, valor: Number(r.valor) || 0,
   }));
-  return {
-    titulo: "Receita Recebida (regime de caixa · DFC)", formato: "brl",
-    total: itens.reduce((s, i) => s + i.valor, 0), itens,
-  };
+  return { titulo, formato: "brl", total: itens.reduce((s, i) => s + i.valor, 0), itens };
+}
+
+export function recebidoCategoriasToGrupo(rows: Array<{ categoria: string; valor: number }>): CeoGrupo {
+  return categoriasToGrupo(rows, "Receita Recebida (regime de caixa · DFC)");
+}
+
+export function pagoCategoriasToGrupo(rows: Array<{ categoria: string; valor: number }>): CeoGrupo {
+  return categoriasToGrupo(rows, "Saídas de Caixa (despesas quitadas)");
 }
 
 export function receitaCabecaGrupos(receita: number, headcount: number): { grupos: CeoGrupo[]; nota: string } {

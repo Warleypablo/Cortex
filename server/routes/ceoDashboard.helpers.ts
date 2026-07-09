@@ -176,45 +176,6 @@ export function receitaRecebidaFromBp(bp: {
   );
 }
 
-// Linha "Geração de Caixa" da matriz: o simples — Receita recebida (caixa) − Despesa
-// Total — para fechar com as linhas Receita e Custos da tabela ("um menos o outro",
-// Ichino 2026-07-09). META segue PRECISAMENTE o BP: orçado da linha geracao_caixa
-// do DRE (EBITDA − impostos diretos − CAPEX), nunca meta derivada.
-export function geracaoCaixaLinha(
-  receitaTotal: BpLinha | undefined,
-  despesaTotal: BpLinha | undefined,
-  geracaoBp: BpLinha | undefined,
-  recebidoPorMes: Record<number, number> | undefined
-): BpLinha {
-  const rec = recebidoPorMes ?? {};
-  const despPorMes = new Map(
-    (despesaTotal?.meses ?? []).map((m) => [m.mes, m.realizado])
-  );
-  const orcadoPorMes = new Map((geracaoBp?.meses ?? []).map((m) => [m.mes, m.orcado]));
-  const meses = (receitaTotal?.meses ?? []).map((m) => {
-    const despesa = despPorMes.get(m.mes);
-    const recebido = rec[m.mes];
-    const realizado = recebido != null && despesa != null ? recebido - despesa : null;
-    const orcado = orcadoPorMes.get(m.mes) ?? 0;
-    const atingimento = realizado != null && orcado ? realizado / orcado : null;
-    return { mes: m.mes, orcado, realizado, atingimento };
-  });
-  return { metrica: "geracao_caixa", titulo: "Geração de Caixa", direcao: "maior_melhor", unidade: "brl", meses };
-}
-
-export function geracaoCaixaFromBp(bp: {
-  linhas?: BpLinha[];
-  metricasGerais?: BpLinha[];
-  receitaRecebidaCaixaPorMes?: Record<number, number>;
-}): BpLinha {
-  const metricas = bp.metricasGerais ?? [];
-  return geracaoCaixaLinha(
-    metricas.find((l) => l.metrica === "receita_total"),
-    metricas.find((l) => l.metrica === "despesa_total"),
-    (bp.linhas ?? []).find((l) => l.metrica === "geracao_caixa"),
-    bp.receitaRecebidaCaixaPorMes
-  );
-}
 
 export interface CeoSources {
   bpLinhas: BpLinha[];

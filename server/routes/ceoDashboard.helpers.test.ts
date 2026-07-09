@@ -9,7 +9,6 @@ import {
   receitaCabecaCaixaLinha,
   receitaCabecaCaixaFromBp,
   receitaRecebidaLinha,
-  geracaoCaixaFromBp,
   type BpLinha,
 } from "./ceoDashboard.helpers";
 
@@ -202,45 +201,5 @@ describe("canAccessCeo", () => {
   it("bloqueia os demais", () => {
     expect(canAccessCeo({ role: "user", allowedRoutes: ["/outra"] })).toBe(false);
     expect(canAccessCeo(undefined)).toBe(false);
-  });
-});
-
-describe("geracaoCaixaFromBp", () => {
-  const bp = {
-    linhas: [
-      { metrica: "geracao_caixa", direcao: "maior_melhor", unidade: "brl", meses: [
-        { mes: 1, orcado: 250, realizado: 111, atingimento: null },
-        { mes: 2, orcado: 260, realizado: null, atingimento: null },
-        { mes: 3, orcado: 500, realizado: 222, atingimento: null },
-      ] },
-    ] as BpLinha[],
-    metricasGerais: [
-      { metrica: "receita_total", direcao: "maior_melhor", unidade: "brl", meses: [
-        { mes: 1, orcado: 1000, realizado: 950, atingimento: 0.95 },
-        { mes: 2, orcado: 1000, realizado: 990, atingimento: 0.99 },
-        { mes: 3, orcado: 1200, realizado: null, atingimento: null },
-      ] },
-      { metrica: "despesa_total", direcao: "menor_melhor", unidade: "brl", meses: [
-        { mes: 1, orcado: 700, realizado: 600, atingimento: 600 / 700 },
-        { mes: 2, orcado: 700, realizado: null, atingimento: null },
-        { mes: 3, orcado: 800, realizado: 650, atingimento: 650 / 800 },
-      ] },
-    ] as BpLinha[],
-    receitaRecebidaCaixaPorMes: { 1: 900, 3: 1100 } as Record<number, number>,
-  };
-
-  it("realizado = recebido − despesa (um menos o outro); meta = orçado geracao_caixa do BP", () => {
-    const l = geracaoCaixaFromBp(bp);
-    // mês 1: 900 − 600 = 300; meta = 250 (do BP, NÃO derivada)
-    expect(l.meses[0]).toEqual({ mes: 1, orcado: 250, realizado: 300, atingimento: 300 / 250 });
-    // mês 3: 1100 − 650 = 450; meta 500 do BP
-    expect(l.meses[2]).toEqual({ mes: 3, orcado: 500, realizado: 450, atingimento: 450 / 500 });
-  });
-
-  it("sem recebido OU sem despesa realizada → realizado null (não finge resultado)", () => {
-    const l = geracaoCaixaFromBp(bp);
-    expect(l.meses[1].realizado).toBeNull(); // mês 2: despesa null
-    expect(l.meses[1].atingimento).toBeNull();
-    expect(l.meses[1].orcado).toBe(260); // meta do BP segue visível
   });
 });

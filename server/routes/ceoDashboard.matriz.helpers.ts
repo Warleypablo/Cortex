@@ -36,7 +36,6 @@ export interface CeoMatrizSources {
   // Linhas já reconstruídas em regime de caixa (recebido/DFC) — ver *FromBp helpers.
   receitaRecebida: BpLinha;
   receitaCabecaCaixa: BpLinha;
-  geracaoCaixa: BpLinha; // Receita recebida − Despesa Total; meta = orçado geracao_caixa do BP
   // Séries mensais sem meta (valor por mês; mês ausente → célula "—").
   inadimplenciaSeriePorMes: Record<number, number>; // por mês de vencimento
   ltvFatSeriePorMes: Record<number, number>; // LTV faturável mediano dos ativos (ClickUp: valorr × meses + pontual entregue)
@@ -90,8 +89,8 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
     bpLinha(s.bpMetricas, "despesa_total", "custos", "Custos & Despesas", "menor_melhor", "brl"),
     bpLinha(s.bpLinhas, "ebitda", "lucro", "Lucro (EBITDA)", "maior_melhor", "brl"),
     { key: "geracao_caixa", label: "Geração de Caixa", unidade: "brl", direcao: "maior_melhor", semMeta: false,
-      nota: "Geração de Caixa = Receita − Custos & Despesas (as duas linhas acima; receita em regime de caixa). Meta = geração de caixa orçada no BP (EBITDA − impostos diretos − CAPEX).",
-      celulas: celulasDoBp(s.geracaoCaixa, mesNum) },
+      nota: "Geração de Caixa (DFC) = entradas − saídas quitadas no mês (caixa dos dois lados) — a linha Fluxo de Caixa do BP. Meta = geração de caixa orçada no BP. ≠ Receita − Custos da tabela (lá os custos são competência).",
+      celulas: celulasDoBp(find(s.bpLinhas, "dfc_real"), mesNum) },
     bpLinha(s.bpMetricas, "saldo_caixa", "caixa", "Saldo de Caixa", "maior_melhor", "brl"),
     { key: "inadimplencia", label: "Inadimplência Total", unidade: "brl", direcao: "menor_melhor",
       semMeta: true, nota: "Por mês de vencimento das parcelas em aberto.",

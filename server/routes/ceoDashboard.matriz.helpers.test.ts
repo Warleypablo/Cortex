@@ -27,8 +27,7 @@ function baseSources(overrides: Partial<CeoMatrizSources> = {}): CeoMatrizSource
     mesFechado: 2, // março em andamento (parcial); fev é o último mês fechado
     receitaRecebida: linhaBp("receita_total", tresMeses(1000)),
     receitaCabecaCaixa: linhaBp("receita_cabeca", tresMeses(10)),
-    bpLinhas: [linhaBp("ebitda", tresMeses(500)), linhaBp("cac", tresMeses(200))],
-    geracaoCaixa: linhaBp("geracao_caixa", tresMeses(400)),
+    bpLinhas: [linhaBp("ebitda", tresMeses(500)), linhaBp("cac", tresMeses(200)), linhaBp("dfc_real", tresMeses(400))],
     bpMetricas: [
       linhaBp("despesa_total", tresMeses(300)),
       linhaBp("saldo_caixa", tresMeses(2000)),
@@ -64,7 +63,7 @@ describe("montarMatrizCeo", () => {
     ]);
   });
 
-  it("Geração de Caixa usa a linha sintética (realizado um-menos-o-outro; meta do BP)", () => {
+  it("Geração de Caixa usa a linha dfc_real do BP (DFC real; meta = geração orçada)", () => {
     const m = montarMatrizCeo(baseSources());
     const gc = m.linhas.find((l) => l.key === "geracao_caixa")!;
     expect(gc.label).toBe("Geração de Caixa");

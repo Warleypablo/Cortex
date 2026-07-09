@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { computarBpReceitas } from "./bp2026";
 import { storage } from "../storage";
-import { canAccessCeo, geracaoCaixaFromBp, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
+import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
 import { montarMatrizCeo, type CeoMatrizResponse } from "./ceoDashboard.matriz.helpers";
 
 // Matriz mês a mês do CEO Dashboard: mesma fonte dos cards (computarBpReceitas +
@@ -161,7 +161,6 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
     bpMetricas: bp.metricasGerais ?? [],
     receitaRecebida: receitaRecebidaFromBp(bp),
     receitaCabecaCaixa: receitaCabecaCaixaFromBp(bp),
-    geracaoCaixa: geracaoCaixaFromBp(bp),
     inadimplenciaSeriePorMes,
     ltvFatSeriePorMes,
     ltvDfcSeriePorMes,
