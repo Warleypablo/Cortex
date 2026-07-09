@@ -718,11 +718,21 @@ export function registerReportsTrimestralRoutes(app: Express) {
           };
         });
 
-      // ADENDO (Task 9): churnMetaMensal = MRR total no início do tri × 8% — espelha
-      // o mensal Q17b (mrrAnteriorTotalResult). Atualiza SÓ este campo de
-      // turboMetrics (os demais foram calculados na Task 7 e não são tocados aqui).
+      // Meta de churn do tri = Σ (8% × MRR do fim do mês ANTERIOR) para cada mês
+      // computado do trimestre — mesma régua do mensal, aplicada mês a mês (a base
+      // acompanha a evolução do MRR; não é 8% × base fixa do início × nº de meses).
+      // As fotos mensais vêm de mrrChurnPorMes (query do trend, lookback 18 meses).
+      // Fallback p/ mês-base sem snapshot: MRR total no início do tri (Q17b).
       const mrrTotalInicioTri = parseFloat((mrrAnteriorTotalRows.rows as any[])[0]?.mrr_total) || 0;
-      turboMetrics.churnMetaMensal = mrrTotalInicioTri * 0.08 * w.mesesComputados.length;
+      const mrrFimDoMes = new Map(mrrChurnPorMes.map((r) => [r.month, r.mrr]));
+      const mesAnterior = (m: string): string => {
+        const [a, mm] = m.split("-").map(Number);
+        return mm === 1 ? `${a - 1}-12` : `${a}-${String(mm - 1).padStart(2, "0")}`;
+      };
+      turboMetrics.churnMetaMensal = w.mesesComputados.reduce(
+        (acc, m) => acc + (mrrFimDoMes.get(mesAnterior(m)) || mrrTotalInicioTri) * 0.08,
+        0,
+      );
 
       // ADENDO (fix): receitaChurnSeries por TRIMESTRE (não mais por mês) — alimenta o
       // gráfico "Faturamento x Churn" e a mini-série "MRR Ativo" do SlideTurboMetrics.tsx
