@@ -139,7 +139,7 @@ export function CeoMatrizTabela({
       <p className="px-1 text-[11px] text-gray-400 dark:text-zinc-500">
         Cor pela régua do BP (verde ≥100% · âmbar ≥80% · vermelho &lt;80%). <span className="text-amber-500">*</span> mês em
         andamento (parcial). Inadimplência por mês de vencimento; LTV = média dos ativos por mês (snapshots); E-NPS por onda de
-        pesquisa (meses sem pesquisa ficam vazios); LTV = mediana dos clientes ativos por mês. Clique numa célula para o detalhamento do mês.
+        pesquisa (meses sem pesquisa ficam vazios); LTV = mediana recorrente dos clientes ativos (só recorrência, sem pontual). Clique numa célula para o detalhamento do mês.
       </p>
     </div>
   );
