@@ -1,5 +1,26 @@
 # Changelog
 
+## 2026-07-09 | feat(ads): lote "5 - Creators Summit - Camila/Jaque + Quebra de Objeções" (TP1799-1818) — 1º lote single-format via API
+
+**O que foi feito:**
+- **Biblioteca:** 20 criativos cadastrados (TP1799-1818): Camila h1-4, Jaque h1-4, Quebra de Objeções CAIXA 01-06 × CTA 01/02. **single-format** — 1 vídeo 9x16 por criativo (corte "Editado" vertical), diferente dos lotes anteriores que vinham pareados 9x16+4x5.
+- **Upload:** 20 vídeos (~1.9GB) baixados do Drive e subidos via `metaUploadVideo` chunked em 10,4min, 0 falhas. Título no Meta = `${base}_9x16`.
+- **Meta:** 4 conjuntos novos na camp `[TP] [Vendas] [CBO] [Quente] [Summit] - Teste de criativos` (`120251818147660450`): **18 [Camila]** (`120252946752660450`, 4 ads), **19 [Jaque]** (`120252946929760450`, 4 ads), **20 [Quebra de Objeções] CTA 01** (`120252946955780450`, 6 ads), **21 CTA 02** (`120252946996450450`, 6 ads). Config+copy/link/UTM/pixel clonados do conjunto 12 Empresário. **TUDO PAUSED — conjuntos E ads.**
+- Scripts do lote (`subir-summit-cjo-{planilha,upload,ads}.ts`) + inventário compartilhado (`summit-cjo.data.ts`), DRY por padrão e idempotentes.
+
+**Dois aprendizados (gotchas) do dia, resolvidos:**
+- **Drive 404 no download:** as pastas novas (Camila/Jaque/quebra de objeções, num Drive Compartilhado) NÃO estavam compartilhadas com a conta de serviço que o script usa pra baixar (`report-job-sa@auto-report-turbo.iam.gserviceaccount.com`) → 404 nos 20. Lotes anteriores já vinham com o robô liberado; estes não. Fix: compartilhar as pastas-mãe (`Criativos - UGC` e `TURBO_quebradeobjecoes`) como Leitor com o robô. Não há API/MCP pra setar permissão — foi manual.
+- **Criativo single-video:** um `asset_feed_spec` "pelado" (1 vídeo, sem `asset_customization_rules`) a Meta trata como **Dynamic Creative** e recusa em conjunto não-dinâmico (`code=100 Dynamic Creative ads can only be created under Dynamic Creative Ad Sets`). Fix: usar `object_story_spec.video_data` clássico + `image_url` (thumbnail via `getVideoThumbnail`), mesmo padrão da produção (`creator.ts`).
+
+**Por que:**
+- Caio pediu a subida completa das 4 pastas do Drive na camp de teste CBO do Summit. É o 1º lote 100% single-format e valida esse caminho pro futuro pipeline automático.
+
+**Arquivos alterados:**
+- `scripts/ads/summit-cjo.data.ts` - inventário compartilhado dos 20 criativos + estrutura dos 4 conjuntos (novo)
+- `scripts/ads/subir-summit-cjo-{planilha,upload,ads}.ts` - os 3 passos do lote (novos)
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLI avulsos (tsx), DRY por padrão, idempotentes.
+
 ## 2026-07-07 | feat(ads): lote "4 - Creators Summit - Creator" (TP1793-1798) — planilha + upload via API + ads na camp Teste de criativos Summit
 
 **O que foi feito:**
