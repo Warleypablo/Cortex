@@ -34,8 +34,8 @@ function baseSources(overrides: Partial<CeoMatrizSources> = {}): CeoMatrizSource
       linhaBp("colaboradores", tresMeses(100)),
     ],
     inadimplenciaSeriePorMes: { 1: 5000, 2: 7000 },
-    ltvAtual: 15000,
-    enpsAtual: 73,
+    ltvSeriePorMes: { 1: 12000, 2: 13000, 3: 14000 },
+    enpsSeriePorMes: { 2: 73 }, // só o mês 2 tem pesquisa (jan/mar sem onda)
     ...overrides,
   };
 }
@@ -92,16 +92,19 @@ describe("montarMatrizCeo", () => {
     expect(inad.celulas[2]).toEqual({ mes: 3, valor: null, meta: null, atingimentoPct: null });
   });
 
-  it("LTV e E-NPS aparecem só na última coluna (foto atual)", () => {
+  it("LTV usa série mensal (uma célula por mês, sem meta)", () => {
     const m = montarMatrizCeo(baseSources({ mesNum: 3 }));
     const ltv = m.linhas.find((l) => l.key === "ltv")!;
     expect(ltv.semMeta).toBe(true);
-    expect(ltv.nota).toMatch(/foto atual/i);
-    expect(ltv.celulas.map((c) => c.valor)).toEqual([null, null, 15000]);
+    expect(ltv.celulas.map((c) => c.valor)).toEqual([12000, 13000, 14000]);
+  });
 
+  it("E-NPS usa série mensal, com gap onde não houve pesquisa", () => {
+    const m = montarMatrizCeo(baseSources({ mesNum: 3 }));
     const enps = m.linhas.find((l) => l.key === "enps")!;
     expect(enps.unidade).toBe("score");
-    expect(enps.celulas.map((c) => c.valor)).toEqual([null, null, 73]);
+    // mês 1 e 3 sem onda de pesquisa → gap (null), não zero
+    expect(enps.celulas.map((c) => c.valor)).toEqual([null, 73, null]);
   });
 
   it("NPS fica todo nulo (em breve)", () => {

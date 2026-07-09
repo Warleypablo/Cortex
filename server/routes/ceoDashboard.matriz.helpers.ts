@@ -36,11 +36,10 @@ export interface CeoMatrizSources {
   // Linhas já reconstruídas em regime de caixa (recebido/DFC) — ver *FromBp helpers.
   receitaRecebida: BpLinha;
   receitaCabecaCaixa: BpLinha;
-  // Inadimplência: série mensal por mês de vencimento (só 2026), sem meta.
-  inadimplenciaSeriePorMes: Record<number, number>;
-  // Foto atual (snapshot, sem histórico mensal).
-  ltvAtual: number | null;
-  enpsAtual: number | null;
+  // Séries mensais sem meta (valor por mês; mês ausente → célula "—").
+  inadimplenciaSeriePorMes: Record<number, number>; // por mês de vencimento
+  ltvSeriePorMes: Record<number, number>; // LTV médio dos ativos por mês (snapshots)
+  enpsSeriePorMes: Record<number, number>; // NPS interno por mês da pesquisa (gap em meses sem onda)
 }
 
 const MESES_LABEL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -73,18 +72,6 @@ function celulasDaSerie(seriePorMes: Record<number, number>, mesNum: number): Ce
   return out;
 }
 
-// Foto atual (ltv, enps): valor só na última coluna; demais null.
-// nps ("em breve") usa valor=null → todas as células ficam nulas.
-function celulasFotoAtual(valor: number | null, mesNum: number): CeoMatrizCelula[] {
-  const out: CeoMatrizCelula[] = [];
-  for (let mes = 1; mes <= mesNum; mes++) {
-    out.push({ mes, valor: mes === mesNum ? valor : null, meta: null, atingimentoPct: null });
-  }
-  return out;
-}
-
-const NOTA_FOTO_ATUAL = "Foto atual — sem histórico mensal; valor exibido só na coluna mais recente.";
-
 export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
   const mesNum = s.mesNum;
   const find = (arr: BpLinha[], metrica: string) => arr.find((l) => l.metrica === metrica);
@@ -105,13 +92,15 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
       semMeta: true, nota: "Por mês de vencimento das parcelas em aberto.",
       celulas: celulasDaSerie(s.inadimplenciaSeriePorMes, mesNum) },
     { key: "nps", label: "NPS Clientes", unidade: "score", direcao: "maior_melhor", semMeta: true,
-      nota: "Sem fonte de dados de NPS de clientes ainda.", celulas: celulasFotoAtual(null, mesNum) },
+      nota: "Sem fonte de dados de NPS de clientes ainda.", celulas: celulasDaSerie({}, mesNum) },
     bpLinha(s.bpLinhas, "cac", "cac", "CAC", "menor_melhor", "brl"),
     { key: "ltv", label: "LTV", unidade: "brl", direcao: "maior_melhor", semMeta: true,
-      nota: NOTA_FOTO_ATUAL, celulas: celulasFotoAtual(s.ltvAtual, mesNum) },
+      nota: "LTV médio dos contratos ativos no mês (reconstruído de snapshots diários; régua da aba de evolução, ≠ foto atual da view).",
+      celulas: celulasDaSerie(s.ltvSeriePorMes, mesNum) },
     bpLinha(s.bpMetricas, "colaboradores", "headcount", "Headcount", "menor_melhor", "int"),
     { key: "enps", label: "E-NPS", unidade: "score", direcao: "maior_melhor", semMeta: true,
-      nota: NOTA_FOTO_ATUAL, celulas: celulasFotoAtual(s.enpsAtual, mesNum) },
+      nota: "NPS interno por mês da pesquisa; meses sem onda de pesquisa ficam vazios.",
+      celulas: celulasDaSerie(s.enpsSeriePorMes, mesNum) },
     { key: "receita_cabeca", label: "Receita / Cabeça", unidade: "brl", direcao: "maior_melhor",
       semMeta: false, celulas: celulasDoBp(s.receitaCabecaCaixa, mesNum) },
   ];

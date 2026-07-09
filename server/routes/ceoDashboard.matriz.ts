@@ -20,25 +20,63 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
     if (mm) inadimplenciaSeriePorMes[parseInt(mm[1], 10)] = Number((e as any).valor) || 0;
   }
 
-  // 3) LTV médio por cliente (mesma régua do card) — foto atual, sem histórico.
-  const ltvRows: any = await db.execute(sql`
-    SELECT ROUND(AVG(ltv_total)::numeric, 0) AS ltv FROM (
-      SELECT id_task,
-        SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv_total
-      FROM cortex_core.vw_lt_contratos
-      GROUP BY id_task
-    ) t
-  `);
-  const ltvNum = Number(ltvRows.rows?.[0]?.ltv);
-  const ltvAtual = Number.isNaN(ltvNum) ? null : ltvNum;
-
-  // 4) E-NPS (empresa) — foto atual, sem histórico.
-  let enpsAtual: number | null = null;
+  // 3) LTV médio dos ativos POR MÊS — reconstruído de snapshots diários (cup_data_hist),
+  // mesma régua da aba /lt-ltv-churn/evolucao-clientes (valorr×lt no snapshot + valorp, só ativos).
+  // Snapshot de referência = dia 1º do mês ou o 1º snapshot disponível dele.
+  const ltvSeriePorMes: Record<number, number> = {};
   try {
-    const npsDash: any = await storage.getRhNpsDashboard();
-    enpsAtual = npsDash?.empresa?.nps ?? null;
-  } catch {
-    enpsAtual = null;
+    const ltvRows: any = await db.execute(sql`
+      WITH meses AS (
+        SELECT generate_series('2026-01-01'::date, make_date(2026, ${mesNum}, 1), '1 month')::date m
+      ),
+      snap_ref AS (
+        SELECT meses.m, COALESCE(
+          (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = meses.m LIMIT 1),
+          (SELECT MIN(data_snapshot) FROM "Clickup".cup_data_hist WHERE date_trunc('month',data_snapshot)=meses.m)
+        ) snap FROM meses
+      ),
+      cli AS (
+        SELECT sr.m, h.id_task,
+          BOOL_OR(h.status IN ('ativo','onboarding','triagem') AND h.valorr>0) AS ativo,
+          COALESCE(SUM(h.valorr*(sr.snap-h.data_inicio)::numeric/30.44) FILTER (WHERE h.valorr>0 AND sr.snap>=h.data_inicio),0)
+            + COALESCE(SUM(h.valorp) FILTER (WHERE h.valorp>0),0) AS ltv
+        FROM snap_ref sr JOIN "Clickup".cup_data_hist h ON h.data_snapshot=sr.snap
+        WHERE sr.snap IS NOT NULL
+        GROUP BY sr.m, h.id_task
+      )
+      SELECT EXTRACT(MONTH FROM m)::int AS mes, ROUND(AVG(ltv) FILTER (WHERE ativo)::numeric,0) AS ltv
+      FROM cli GROUP BY m ORDER BY m
+    `);
+    for (const r of ltvRows.rows ?? []) {
+      const v = Number((r as any).ltv);
+      if ((r as any).mes != null && !Number.isNaN(v)) ltvSeriePorMes[Number((r as any).mes)] = v;
+    }
+  } catch (e) {
+    console.error("[api] CEO matriz — falha na série de LTV:", e);
+  }
+
+  // 4) E-NPS (empresa) POR MÊS — NPS de cada onda de pesquisa ("Inhire".rh_nps, mes_referencia).
+  // Régua: promotor score≥9, detrator ≤6; NPS = (promo−detra)/respondentes*100. Meses sem onda → ausente (gap).
+  const enpsSeriePorMes: Record<number, number> = {};
+  try {
+    const enpsRows: any = await db.execute(sql`
+      SELECT split_part(mes_referencia,'-',2)::int AS mes,
+        ROUND(
+          (COUNT(*) FILTER (WHERE score_empresa >= 9) - COUNT(*) FILTER (WHERE score_empresa <= 6))::numeric
+          / NULLIF(COUNT(*) FILTER (WHERE score_empresa IS NOT NULL), 0) * 100
+        ) AS nps
+      FROM "Inhire".rh_nps
+      WHERE mes_referencia LIKE '2026-%'
+      GROUP BY mes_referencia
+    `);
+    for (const r of enpsRows.rows ?? []) {
+      const v = Number((r as any).nps);
+      if ((r as any).mes != null && (r as any).nps != null && !Number.isNaN(v)) {
+        enpsSeriePorMes[Number((r as any).mes)] = v;
+      }
+    }
+  } catch (e) {
+    console.error("[api] CEO matriz — falha na série de E-NPS:", e);
   }
 
   return montarMatrizCeo({
@@ -49,8 +87,8 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
     receitaRecebida: receitaRecebidaFromBp(bp),
     receitaCabecaCaixa: receitaCabecaCaixaFromBp(bp),
     inadimplenciaSeriePorMes,
-    ltvAtual,
-    enpsAtual,
+    ltvSeriePorMes,
+    enpsSeriePorMes,
   });
 }
 
