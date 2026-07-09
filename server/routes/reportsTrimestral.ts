@@ -6,7 +6,7 @@ import { getTechTrimestral } from "../lib/techDash";
 
 interface VendasMesInput { month: string; vendasMrr: number }
 interface MrrChurnMesInput { month: string; mrr: number; churnBrl: number }
-export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number }
+export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number; metaMrr: number | null }
 export interface Qoq { atual: number; anterior: number; betterDirection: "up" | "down" }
 
 // ─── Espelhos das tabelas manuais do mensal (relatorioMensalSlides.ts L15-41) ───
@@ -42,6 +42,11 @@ export function aggregateTrend(
   vendasPorMes: VendasMesInput[],
   mrrChurnPorMes: MrrChurnMesInput[],
   window: QuarterWindow,
+  // Meta de MRR ativo do BP, por mês ("YYYY-MM" → valor). Como o MRR do trimestre é
+  // a FOTO do último mês, a meta do trimestre é a meta daquele mesmo mês. Meses sem
+  // meta (ex.: 2025, fora do BP 2026) resultam em metaMrr = null e a linha de meta
+  // simplesmente não é desenhada ali.
+  metasMrrPorMes: Record<string, number> = {},
 ): { series: TrendPoint[]; qoq: { mrr: Qoq; vendas: Qoq; churn: Qoq } } {
   // Acumula por trimestre: vendas e churn somam; mrr guarda a foto do ÚLTIMO mês (maior "YYYY-MM").
   const acc = new Map<string, { label: string; vendas: number; churn: number; mrrMonth: string; mrr: number }>();
@@ -59,7 +64,10 @@ export function aggregateTrend(
 
   const series: TrendPoint[] = Array.from(acc.entries())
     .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0))
-    .map(([q, b]) => ({ q, label: b.label, mrr: b.mrr, vendas: b.vendas, churn: b.churn }));
+    .map(([q, b]) => ({
+      q, label: b.label, mrr: b.mrr, vendas: b.vendas, churn: b.churn,
+      metaMrr: metasMrrPorMes[b.mrrMonth] ?? null,
+    }));
 
   const atual = series.find((s) => s.q === window.trimestre);
   const anterior = series.find((s) => s.q === window.prev.trimestre);
@@ -97,7 +105,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
       // de série mensal já validadas em produção no relatorioMensalSlides.ts
       // (vendasSeriesResult e receitaChurnResult), com o lookback estendido para
       // ~18 meses terminando em w.dataEnd, e agrega os meses em trimestres em JS.
-      const [vendasRows, mrrChurnRows] = await Promise.all([
+      const [vendasRows, mrrChurnRows, metaMrrRows] = await Promise.all([
         // Espelha vendasSeriesResult (query 27 do mensal)
         db.execute(sql`
           SELECT
@@ -173,7 +181,24 @@ export function registerReportsTrimestralRoutes(app: Express) {
           LEFT JOIN pontual_mensal p ON m.month = p.month
           ORDER BY m.month
         `),
+        // Meta de MRR ativo do BP 2026 (linha de meta do gráfico "Evolução por
+        // Trimestre"). A tabela guarda só o mês (1..12) — é exclusiva de 2026.
+        db.execute(sql`
+          SELECT mes, valor
+          FROM cortex_core.bp2026_orcado
+          WHERE metrica = 'mrr_ativo'
+          ORDER BY mes
+        `),
       ]);
+
+      // "YYYY-MM" → meta de MRR. bp2026_orcado não tem coluna de ano: é o BP de 2026.
+      const metasMrrPorMes: Record<string, number> = {};
+      for (const r of metaMrrRows.rows as any[]) {
+        const mes = parseInt(r.mes, 10);
+        const valor = parseFloat(r.valor);
+        if (!Number.isFinite(mes) || !Number.isFinite(valor)) continue;
+        metasMrrPorMes[`2026-${String(mes).padStart(2, "0")}`] = valor;
+      }
 
       const vendasPorMes = (vendasRows.rows as any[]).map((r) => ({
         month: r.month as string,
@@ -184,7 +209,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         mrr: parseFloat(r.mrr) || 0,
         churnBrl: parseFloat(r.churn_brl) || 0,
       }));
-      const trend = aggregateTrend(vendasPorMes, mrrChurnPorMes, w);
+      const trend = aggregateTrend(vendasPorMes, mrrChurnPorMes, w, metasMrrPorMes);
 
       // Bloco turboMetrics (Task 7): espelha as queries 9-13/18 de turboMetrics do
       // relatorioMensalSlides.ts, re-janeladas para o trimestre. Foto em w.fotoDate

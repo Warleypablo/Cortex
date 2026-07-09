@@ -21,9 +21,16 @@ function LegendDot({ color, label }: { color: string; label: string }) {
 
 const TOOLTIP_STYLE = { background: "#18181b", border: "1px solid #3f3f46", borderRadius: 8, color: "#fff", fontSize: 12 };
 
+const META_COLOR = "#fbbf24"; // amber — meta do BP, distinta do MRR realizado (emerald)
+
 export default function SlideEvolucaoTrimestre({ trend }: { trend: TrendData }) {
-  const data = trend.series.map((s) => ({ label: s.label, mrr: s.mrr, vendas: s.vendas, churn: s.churn }));
+  const data = trend.series.map((s) => ({
+    label: s.label, mrr: s.mrr, vendas: s.vendas, churn: s.churn, metaMrr: s.metaMrr,
+  }));
   const lastIdx = data.length - 1;
+  // Trimestres fora do BP 2026 (ex.: Q4 2025) vêm com metaMrr null: a linha só é
+  // desenhada onde há meta, e a legenda só aparece se existir alguma.
+  const temMeta = data.some((d) => d.metaMrr != null);
   return (
     <SlideLayout section="commerce" padding="28px 36px">
       <SlideHeader icon={Activity} iconColor="text-sky-400" title="Evolução por Trimestre" gradientColor="#0ea5e9" />
@@ -32,7 +39,10 @@ export default function SlideEvolucaoTrimestre({ trend }: { trend: TrendData }) 
         <div className="flex flex-col min-h-0 animate-in fade-in slide-in-from-bottom-3 duration-500 motion-reduce:animate-none" style={{ animationFillMode: "both" }}>
           <div className="flex items-center justify-between mb-2">
             <p className="text-sm font-bold text-zinc-300">MRR — foto no fim de cada trimestre</p>
-            <LegendDot color="#34d399" label="MRR" />
+            <div className="flex items-center gap-4">
+              <LegendDot color="#34d399" label="MRR" />
+              {temMeta && <LegendDot color={META_COLOR} label="Meta (BP)" />}
+            </div>
           </div>
           <div className="flex-1 min-h-0">
             <ResponsiveContainer width="100%" height="100%">
@@ -46,11 +56,29 @@ export default function SlideEvolucaoTrimestre({ trend }: { trend: TrendData }) 
                 <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                 <XAxis dataKey="label" stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={{ stroke: "#3f3f46" }} />
                 <YAxis stroke="#a1a1aa" fontSize={11} tickFormatter={fmtK} tickLine={false} axisLine={false} width={48} />
-                <Tooltip contentStyle={TOOLTIP_STYLE} formatter={(v: number) => [fmtK(v), "MRR"]} />
+                <Tooltip
+                  contentStyle={TOOLTIP_STYLE}
+                  formatter={(v: number, name: string) => [fmtK(v), name === "metaMrr" ? "Meta (BP)" : "MRR"]}
+                />
                 <Area type="monotone" dataKey="mrr" stroke="none" fill="url(#mrrGradient)" animationDuration={900} />
+                {/* Meta do BP: tracejada, sem área. connectNulls=false para não ligar
+                    por cima dos trimestres sem meta (Q4 2025). */}
+                <Line
+                  type="monotone"
+                  dataKey="metaMrr"
+                  name="metaMrr"
+                  stroke={META_COLOR}
+                  strokeWidth={2}
+                  strokeDasharray="6 4"
+                  connectNulls={false}
+                  animationDuration={900}
+                  dot={{ r: 3, fill: META_COLOR, stroke: "#09090b", strokeWidth: 1.5 }}
+                  activeDot={{ r: 5 }}
+                />
                 <Line
                   type="monotone"
                   dataKey="mrr"
+                  name="mrr"
                   stroke="#34d399"
                   strokeWidth={2.5}
                   animationDuration={900}

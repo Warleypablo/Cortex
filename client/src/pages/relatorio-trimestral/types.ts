@@ -3,7 +3,9 @@ import type {
   SquadRanking, SquadDetail, PontualData,
 } from "../relatorio-mensal/types";
 
-export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number }
+// metaMrr = meta de MRR ativo do BP 2026 no mês da foto do trimestre; null quando o
+// trimestre está fora do BP (ex.: Q4 2025) — a linha de meta não é desenhada ali.
+export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number; metaMrr: number | null }
 export interface Qoq { atual: number; anterior: number; betterDirection: "up" | "down" }
 
 export interface TrendData {

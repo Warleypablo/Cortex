@@ -34,4 +34,26 @@ describe("aggregateTrend", () => {
     expect(qoq.churn.betterDirection).toBe("down");
     expect(qoq.mrr.betterDirection).toBe("up");
   });
+
+  it("metaMrr é null quando nenhuma meta é passada", () => {
+    expect(series.every((s) => s.metaMrr === null)).toBe(true);
+  });
+});
+
+describe("aggregateTrend — meta de MRR", () => {
+  const w = buildQuarterWindow("2026-Q2", new Date(2026, 6, 8));
+
+  it("usa a meta do MÊS DA FOTO (último mês do tri), não a soma nem a média", () => {
+    const metas = { "2026-01": 10, "2026-02": 20, "2026-03": 1368637, "2026-06": 1688510 };
+    const { series } = aggregateTrend(vendas, mrrChurn, w, metas);
+    expect(series.find((s) => s.q === "2026-Q1")!.metaMrr).toBe(1368637); // meta de mar
+    expect(series.find((s) => s.q === "2026-Q2")!.metaMrr).toBe(1688510); // meta de jun
+  });
+
+  it("trimestre sem meta no BP fica com metaMrr null (não zero)", () => {
+    // Só Q2 tem meta: o Q1 não deve virar 0, senão a linha do gráfico despenca.
+    const { series } = aggregateTrend(vendas, mrrChurn, w, { "2026-06": 1688510 });
+    expect(series.find((s) => s.q === "2026-Q1")!.metaMrr).toBeNull();
+    expect(series.find((s) => s.q === "2026-Q2")!.metaMrr).toBe(1688510);
+  });
 });
