@@ -64,10 +64,18 @@ function OperadorRow({ op, pos }: { op: OperadorSquad; pos: number }) {
   );
 }
 
+// Largura de 1/3 da linha descontando os 2 gaps (gap-5 = 1.25rem). Com flex-wrap +
+// justify-center, uma última linha incompleta (ex.: 5 squads = 3 + 2) fica centrada
+// em vez de deixar buraco à direita, como aconteceria numa grid de 3 colunas.
+const CARD_BASIS = "calc((100% - 2.5rem) / 3)";
+
 function SquadCard({ sq, delayMs }: { sq: SquadOperadores; delayMs: number }) {
   const { emoji, name } = parseSquadName(sq.squad);
   return (
-    <div className={entrance(delayMs).className} style={entrance(delayMs).style}>
+    <div
+      className={`${entrance(delayMs).className} min-w-0`}
+      style={{ ...entrance(delayMs).style, flexBasis: CARD_BASIS }}
+    >
       <SecondaryCard className="px-5 py-4 h-full flex flex-col" borderColor="#34d399">
         <div className="flex items-center gap-2.5 mb-3 shrink-0">
           {emoji
@@ -102,7 +110,7 @@ export default function SlideOperadoresSquadTrimestre({ squads, label }: { squad
   return (
     <SlideLayout section="commerce" padding="28px 36px">
       <SlideHeader icon={Trophy} iconColor="text-emerald-400" title={`Operadores por Squad — ${label}`} gradientColor="#10b981" subtitle="Top 3 por faturamento (MRR + pontual entregue)" />
-      <div className="flex-1 grid grid-cols-3 gap-5 min-h-0" style={{ gridAutoRows: "1fr" }}>
+      <div className="flex-1 flex flex-wrap justify-center gap-5 min-h-0" style={{ alignContent: "stretch" }}>
         {squads.map((sq, i) => <SquadCard key={sq.squad} sq={sq} delayMs={i * 90} />)}
       </div>
     </SlideLayout>

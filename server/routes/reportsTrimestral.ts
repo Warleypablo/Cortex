@@ -900,9 +900,12 @@ export function registerReportsTrimestralRoutes(app: Express) {
         mrrAnteriorBySquad[key] = (mrrAnteriorBySquad[key] || 0) + (parseFloat(row.mrr) || 0);
       });
 
-      // Squads ocultos do slide "Detalhes por Squad" (não impacta ranking nem
-      // totais) — mesma lista do mensal (relatorioMensalSlides.ts ~L1522).
-      const SQUADS_OCULTOS_DETALHES = new Set(["comercial", "makers", "turbo interno", "squad x"]);
+      // Squads ocultos dos slides por squad ("Detalhes por Squad" e "Operadores por
+      // Squad") — não impacta ranking nem totais (o MRR/pontual da squad continua
+      // somando nos agregados). Base é a lista do mensal (relatorioMensalSlides.ts
+      // ~L1522) + "selva", inativa desde 2026-07 (decisão do Ichino): DIVERGE do
+      // mensal de propósito; ao reativar a Selva, basta remover a chave abaixo.
+      const SQUADS_OCULTOS_DETALHES = new Set(["comercial", "makers", "turbo interno", "squad x", "selva"]);
 
       // Expansão (vendas/abatimento NRR) somada nos meses do trimestre, por squad
       // normalizada — espelho da tabela manual do mensal (ver topo do arquivo).
