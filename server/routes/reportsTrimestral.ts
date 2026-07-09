@@ -669,37 +669,38 @@ export function registerReportsTrimestralRoutes(app: Express) {
       const mrrTotalInicioTri = parseFloat((mrrAnteriorTotalRows.rows as any[])[0]?.mrr_total) || 0;
       turboMetrics.churnMetaMensal = mrrTotalInicioTri * 0.08 * w.mesesComputados.length;
 
-      // ADENDO (fix): receitaChurnSeries com os 3 meses do tri (w.meses) — alimenta o
+      // ADENDO (fix): receitaChurnSeries por TRIMESTRE (não mais por mês) — alimenta o
       // gráfico "Faturamento x Churn" e a mini-série "MRR Ativo" do SlideTurboMetrics.tsx
-      // reaproveitado do mensal (senão ficam em branco no deck trimestral). Reaproveita as
-      // linhas já buscadas por mrrChurnRows (agora com `pontual` também no SELECT); meses
-      // sem linha (ex.: mês corrente ainda sem snapshot de fechamento) entram zerados.
-      const MESES_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-      const mrrChurnPontualPorMes = new Map<string, { mrr: number; pontual: number; churnBrl: number }>(
-        (mrrChurnRows.rows as any[]).map((r) => [
-          r.month as string,
-          {
-            mrr: parseFloat(r.mrr) || 0,
-            pontual: parseFloat(r.pontual) || 0,
-            churnBrl: parseFloat(r.churn_brl) || 0,
-          },
-        ]),
-      );
-      turboMetrics.receitaChurnSeries = w.meses.map((month) => {
-        const row = mrrChurnPontualPorMes.get(month);
-        const mrr = row?.mrr || 0;
-        const pontual = row?.pontual || 0;
-        const churnBrl = row?.churnBrl || 0;
-        const monthNum = parseInt(month.split("-")[1], 10) - 1;
-        return {
-          month,
-          label: MESES_SHORT[monthNum] || month,
-          mrr,
-          pontual,
-          churnBrl,
-          churnPct: mrr > 0 ? Math.round((churnBrl / mrr) * 1000) / 10 : 0,
-        };
-      });
+      // reaproveitado do mensal, agora com eixo X mostrando Q1/Q2/... em vez dos 3 meses
+      // do trimestre. Agrega as MESMAS linhas mensais já buscadas por mrrChurnRows (que
+      // cobrem ~18 meses de lookback terminando em w.dataEnd, gerando ~5-6 trimestres):
+      // mrr = foto do ÚLTIMO mês do trimestre (maior "YYYY-MM"); pontual/churnBrl = soma
+      // dos meses do trimestre; churnPct recalculado a partir dos agregados do tri.
+      const quarterOfMonth = (m: string): number => Math.floor((parseInt(m.split("-")[1], 10) - 1) / 3) + 1;
+      const receitaChurnByQuarter = new Map<string, { ano: number; quarter: number; mrrMonth: string; mrr: number; pontual: number; churnBrl: number }>();
+      for (const r of mrrChurnRows.rows as any[]) {
+        const month = r.month as string;
+        const ano = parseInt(month.split("-")[0], 10);
+        const quarter = quarterOfMonth(month);
+        const key = `${ano}-Q${quarter}`;
+        if (!receitaChurnByQuarter.has(key)) {
+          receitaChurnByQuarter.set(key, { ano, quarter, mrrMonth: "", mrr: 0, pontual: 0, churnBrl: 0 });
+        }
+        const bucket = receitaChurnByQuarter.get(key)!;
+        bucket.pontual += parseFloat(r.pontual) || 0;
+        bucket.churnBrl += parseFloat(r.churn_brl) || 0;
+        if (month >= bucket.mrrMonth) { bucket.mrrMonth = month; bucket.mrr = parseFloat(r.mrr) || 0; }
+      }
+      turboMetrics.receitaChurnSeries = Array.from(receitaChurnByQuarter.values())
+        .sort((a, b) => (a.ano - b.ano) || (a.quarter - b.quarter))
+        .map((b) => ({
+          month: `${b.ano}-Q${b.quarter}`,
+          label: `Q${b.quarter} ${String(b.ano).slice(2)}`,
+          mrr: b.mrr,
+          pontual: b.pontual,
+          churnBrl: b.churnBrl,
+          churnPct: b.mrr > 0 ? Math.round((b.churnBrl / b.mrr) * 1000) / 10 : 0,
+        }));
 
       // Bloco pontualData (Task 10): espelha as queries 29-33 (em aberto por
       // serviço, aquisição, entregas por squad, entregas por produto × mês e

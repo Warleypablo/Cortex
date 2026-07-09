@@ -7,6 +7,7 @@ import { SlideHeader, ChartCard, SecondaryCard } from "./SlideComponents";
 interface Props {
   metrics: TurboMetrics;
   mesLabel: string;
+  chartMode?: "month" | "quarter";
 }
 
 const MESES_ALL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -81,7 +82,7 @@ function ChartTooltipContent({ active, payload, label }: any) {
   );
 }
 
-export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
+export default function SlideTurboMetrics({ metrics, mesLabel, chartMode = "month" }: Props) {
   const faturamentoPontual = metrics.faturamentoPontual;
   const faturamentoTotal = metrics.mrrAtivo + faturamentoPontual;
   const faturamentoVariavel = 0;
@@ -92,24 +93,36 @@ export default function SlideTurboMetrics({ metrics, mesLabel }: Props) {
   // Extract year from mesLabel (e.g. "Fevereiro 2026" -> 2026)
   const reportYear = parseInt(mesLabel.split(" ").pop() || "0");
 
-  // Build chart data: only months from the report year
-  const chartData = MESES_ALL.map((label, i) => {
-    const found = metrics.receitaChurnSeries?.find(s => {
-      const [y, m] = s.month.split("-").map(Number);
-      return y === reportYear && m === i + 1;
-    });
-    const mrr = found?.mrr || 0;
-    const pontual = found?.pontual || 0;
-    return {
-      label,
-      mrr,
-      pontual,
-      churnBrl: found?.churnBrl || 0,
-      churnPct: found?.churnPct || 0,
-      total: mrr + pontual,
-      hasData: !!found && (mrr > 0 || pontual > 0),
-    };
-  });
+  // Build chart data: only months from the report year (or, in "quarter" mode,
+  // one point per quarter — used by the Reporte Trimestral so the x-axis shows
+  // Q1/Q2/... instead of the 3 months of the quarter).
+  const chartData = chartMode === "quarter"
+    ? (metrics.receitaChurnSeries ?? []).map(s => ({
+        label: s.label,
+        mrr: s.mrr,
+        pontual: s.pontual,
+        churnBrl: s.churnBrl,
+        churnPct: s.churnPct,
+        total: s.mrr + s.pontual,
+        hasData: s.mrr > 0 || s.pontual > 0,
+      }))
+    : MESES_ALL.map((label, i) => {
+        const found = metrics.receitaChurnSeries?.find(s => {
+          const [y, m] = s.month.split("-").map(Number);
+          return y === reportYear && m === i + 1;
+        });
+        const mrr = found?.mrr || 0;
+        const pontual = found?.pontual || 0;
+        return {
+          label,
+          mrr,
+          pontual,
+          churnBrl: found?.churnBrl || 0,
+          churnPct: found?.churnPct || 0,
+          total: mrr + pontual,
+          hasData: !!found && (mrr > 0 || pontual > 0),
+        };
+      });
 
   return (
     <SlideLayout section="commerce" padding="24px 32px">

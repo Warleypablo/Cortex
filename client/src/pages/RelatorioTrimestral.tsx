@@ -133,7 +133,7 @@ export default function RelatorioTrimestral() {
       case "vendas":       return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.label} />;
       case "evolucao":     return <SlideEvolucaoTrimestre trend={data.trend} />;
       case "closers":      return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
-      case "turbo":        return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.label} />;
+      case "turbo":        return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.label} chartMode="quarter" />;
       case "squads-ranking": return <SlideRankingSquads ranking={data.rankingSquads} />;
       case "squad":        return <SlideSquadSingle details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.label} />;
       case "pontual":      return <SlidePontual pontualData={data.pontualData} mesLabel={data.label} />;
