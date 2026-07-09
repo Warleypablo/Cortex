@@ -51,10 +51,11 @@ function OperadorRow({ op, pos }: { op: OperadorSquad; pos: number }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className={`font-bold text-white truncate ${pos === 0 ? "text-sm" : "text-xs"}`}>{firstName(op.nome)}</p>
-        {/* Composição do faturamento: MRR (recorrente) + Pontual entregue */}
+        {/* Composição do faturamento: MRR (recorrente) + Pontual entregue. Ambas sempre
+            visíveis, para o valor à direita ler como a soma das duas. */}
         <p className="text-[10px] text-zinc-500 truncate tabular-nums">
           <span className="text-emerald-400/80">MRR {fmtCompact(op.mrr)}</span>
-          {op.pontual > 0 && <span className="text-purple-400/80"> · Pont {fmtCompact(op.pontual)}</span>}
+          <span className="text-purple-400/80"> · Pont {fmtCompact(op.pontual)}</span>
         </p>
       </div>
       <span className={`font-black text-emerald-400 tabular-nums shrink-0 ${pos === 0 ? "text-lg" : "text-sm"}`}>
@@ -84,10 +85,12 @@ function SquadCard({ sq, delayMs }: { sq: SquadOperadores; delayMs: number }) {
           <p className="text-lg font-black text-white truncate flex-1">{name}</p>
           <div className="text-right shrink-0">
             <p className="text-sm font-black text-emerald-400 tabular-nums">{fmtCompact(sq.totalFaturamento)}</p>
-            {/* Composição do total, mesma régua das linhas de operador */}
+            {/* Composição do total, mesma régua das linhas de operador. As duas parcelas
+                aparecem SEMPRE (mesmo zeradas): escondendo o pontual, a linha virava só
+                "MRR R$ 557k" e parecia que o total tinha sumido. Zero é informação. */}
             <p className="text-[10px] tabular-nums whitespace-nowrap leading-tight">
               <span className="text-emerald-400/80">MRR {fmtCompact(sq.totalMrr)}</span>
-              {sq.totalPontual > 0 && <span className="text-purple-400/80"> · Pont {fmtCompact(sq.totalPontual)}</span>}
+              <span className="text-purple-400/80"> · Pont {fmtCompact(sq.totalPontual)}</span>
             </p>
             <p className="text-[9px] text-zinc-500 uppercase tracking-wider">{sq.numOperadores} operadores</p>
           </div>
