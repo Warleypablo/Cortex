@@ -54,8 +54,9 @@ export default function SlideClosersTrimestre({ ranking, topPontual, label }: Pr
       ? [{ c: top3[1], r: 1 }, { c: top3[0], r: 0 }]
       : top3.map((c, i) => ({ c, r: i }));
 
-  const fotoPx = [104, 82, 74];
-  const podiumH = [112, 78, 56];
+  // Compacto o bastante p/ pódio + 4 linhas de "demais closers" caberem nos 720px
+  const fotoPx = [86, 70, 62];
+  const podiumH = [84, 58, 42];
 
   // Count-up do MRR obtido — hooks sempre chamados na mesma ordem (fallback 0 se não houver closer)
   const mrr0 = useCountUp(top3[0]?.mrrObtido ?? 0, 750, 200);
@@ -96,20 +97,20 @@ export default function SlideClosersTrimestre({ ranking, topPontual, label }: Pr
               const originalIdx = top3.indexOf(c);
               return (
                 <div key={c.name} className="flex flex-col items-center" style={{ width: isFirst ? 172 : 140 }}>
-                  {isFirst && <Crown className="text-amber-400 mb-1.5" style={{ width: 30, height: 30 }} />}
-                  <div className="rounded-full flex items-center justify-center mb-2.5" style={{ padding: 3, border: `3px solid ${col.ring}` }}>
+                  {isFirst && <Crown className="text-amber-400 mb-1" style={{ width: 24, height: 24 }} />}
+                  <div className="rounded-full flex items-center justify-center mb-2" style={{ padding: 3, border: `3px solid ${col.ring}` }}>
                     <Avatar nome={c.name} url={c.fotoUrl} px={fotoPx[r]} grad={col.grad} />
                   </div>
-                  <p className={`font-bold text-center truncate max-w-full ${isFirst ? "text-lg" : "text-sm"}`}>{firstName(c.name)}</p>
-                  <p className={`font-black mt-0.5 tabular-nums ${isFirst ? "text-3xl" : "text-xl"} ${col.text}`}>
+                  <p className={`font-bold text-center truncate max-w-full ${isFirst ? "text-base" : "text-sm"}`}>{firstName(c.name)}</p>
+                  <p className={`font-black mt-0.5 tabular-nums ${isFirst ? "text-2xl" : "text-lg"} ${col.text}`}>
                     {fmtCompact(mrrAnim[originalIdx])}
                   </p>
-                  <p className="text-[11px] text-zinc-500 mt-0.5 mb-3">{c.negociosGanhos} negócios</p>
+                  <p className="text-[11px] text-zinc-500 mt-0.5 mb-2">{c.negociosGanhos} negócios</p>
                   <div
                     className={`w-full rounded-t-xl bg-gradient-to-b ${col.block} flex items-center justify-center`}
                     style={{ height: podiumH[r], borderTop: `2px solid ${col.ring}` }}
                   >
-                    <span className={`text-3xl font-black ${col.text}`}>{r + 1}º</span>
+                    <span className={`text-2xl font-black ${col.text}`}>{r + 1}º</span>
                   </div>
                 </div>
               );

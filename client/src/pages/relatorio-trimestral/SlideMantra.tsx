@@ -130,7 +130,8 @@ export default function SlideMantra() {
           style={{ animationDelay: "900ms", animationFillMode: "both" }}
         >
           <div className="h-px w-10 bg-gradient-to-r from-emerald-400 to-cyan-400" />
-          <p className="text-sm font-bold text-zinc-400 tracking-[0.25em] uppercase">UZK</p>
+          {/* Mesma atribuição do slide de encerramento (padrão do reporte oficial) */}
+          <p className="text-sm font-bold text-zinc-400 tracking-[0.25em] uppercase">— Queiroz, Musso</p>
         </div>
       </div>
     </div>

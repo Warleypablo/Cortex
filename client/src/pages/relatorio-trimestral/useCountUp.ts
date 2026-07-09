@@ -14,6 +14,7 @@ export function useCountUp(target: number, durationMs = 800, delayMs = 0): numbe
       setValue(target);
       return;
     }
+    let done = false;
     let start: number | null = null;
     const tick = (t: number) => {
       if (start === null) start = t;
@@ -26,10 +27,17 @@ export function useCountUp(target: number, durationMs = 800, delayMs = 0): numbe
       const eased = 1 - Math.pow(2, -10 * p); // easeOutExpo
       setValue(p >= 1 ? target : target * eased);
       if (p < 1) raf.current = requestAnimationFrame(tick);
+      else done = true;
     };
     raf.current = requestAnimationFrame(tick);
+    // Rede de segurança: rAF é suspenso em abas em background (e o valor ficaria
+    // preso em 0). Após o tempo total, crava o valor final incondicionalmente.
+    const safety = window.setTimeout(() => {
+      if (!done) setValue(target);
+    }, delayMs + durationMs + 150);
     return () => {
       if (raf.current) cancelAnimationFrame(raf.current);
+      window.clearTimeout(safety);
     };
   }, [target, durationMs, delayMs]);
 

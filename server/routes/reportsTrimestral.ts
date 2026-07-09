@@ -8,6 +8,28 @@ interface MrrChurnMesInput { month: string; mrr: number; churnBrl: number }
 export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number }
 export interface Qoq { atual: number; anterior: number; betterDirection: "up" | "down" }
 
+// ─── Espelhos das tabelas manuais do mensal (relatorioMensalSlides.ts L15-41) ───
+// As originais são privadas (não exportadas) e o mensal não pode ser tocado.
+// ⚠️ ATUALIZAR JUNTO ao editar as tabelas no relatorioMensalSlides.ts.
+// Auditoria Q2-2026 (2026-07-09): sem estes overrides o NRR de Pulse ficava
+// sub-avaliado em 3,6% do churn da squad e o da Selva em 2,7% — material (>2%).
+
+// Vendas de expansão por mês×squad (chaves normalizadas via normalizeSquadName).
+// O trimestral SOMA as entradas dos meses do trimestre.
+const VENDAS_EXPANSAO_POR_MES_ESPELHO: Record<string, Record<string, { vendas: number; abatimento: number }>> = {
+  "2026-05": {
+    selva: { vendas: 9000, abatimento: 9000 / 5 },
+    squadra: { vendas: 8000, abatimento: 8000 / 5 },
+    pulse: { vendas: 4497, abatimento: 4497 },
+  },
+};
+
+// Reclassificação manual de churn por squad (task_id da subtask → squad destino),
+// aplicada quando o mês do override cai dentro do trimestre.
+const CHURN_SQUAD_OVERRIDE_ESPELHO: Record<string, { taskId: string; squadDestino: string }[]> = {
+  "2026-05": [{ taskId: "86a78223q", squadDestino: "🐑 Black" }],
+};
+
 function mesToQuarter(month: string): { q: string; label: string; ano: number; quarter: number } {
   const [anoStr, mStr] = month.split("-");
   const ano = parseInt(anoStr, 10);
@@ -475,11 +497,20 @@ export function registerReportsTrimestralRoutes(app: Express) {
           ) DESC
         `),
         // Espelha query 16 (churn por squad + lista de clientes) — FLUXO somado no
-        // tri. Sem a reclassificação manual CHURN_SQUAD_OVERRIDE (tabela mensal
-        // privada em relatorioMensalSlides.ts, não exportada); usa v.squad puro.
+        // tri, COM a reclassificação manual dos meses do trimestre
+        // (CHURN_SQUAD_OVERRIDE_ESPELHO — mesma técnica do mensal: CASE no SELECT,
+        // GROUP BY posicional).
         db.execute(sql`
           SELECT
-            v.squad as squad,
+            ${(() => {
+              const overrides = w.meses.flatMap((m) => CHURN_SQUAD_OVERRIDE_ESPELHO[m] ?? []);
+              return overrides.length > 0
+                ? sql`CASE ${sql.join(
+                    overrides.map((o) => sql`WHEN v.task_id = ${o.taskId} THEN ${o.squadDestino}`),
+                    sql` `,
+                  )} ELSE v.squad END`
+                : sql`v.squad`;
+            })()} as squad,
             COALESCE(SUM(v.valor_r), 0)::numeric as churn_total_brl,
             COUNT(*)::int as churn_total_count,
             COALESCE(SUM(v.valor_r) FILTER (WHERE COALESCE(v.abonar_churn, '') != 'Sim'), 0)::numeric as churn_brl,
@@ -621,6 +652,18 @@ export function registerReportsTrimestralRoutes(app: Express) {
       // totais) — mesma lista do mensal (relatorioMensalSlides.ts ~L1522).
       const SQUADS_OCULTOS_DETALHES = new Set(["comercial", "makers", "turbo interno", "squad x"]);
 
+      // Expansão (vendas/abatimento NRR) somada nos meses do trimestre, por squad
+      // normalizada — espelho da tabela manual do mensal (ver topo do arquivo).
+      const expansaoTri: Record<string, { vendas: number; abatimento: number }> = {};
+      for (const mes of w.meses) {
+        const porSquad = VENDAS_EXPANSAO_POR_MES_ESPELHO[mes];
+        if (!porSquad) continue;
+        for (const [sq, v] of Object.entries(porSquad)) {
+          const cur = expansaoTri[sq] ?? { vendas: 0, abatimento: 0 };
+          expansaoTri[sq] = { vendas: cur.vendas + v.vendas, abatimento: cur.abatimento + v.abatimento };
+        }
+      }
+
       const squadDetails = (rankingSquadsRows.rows as any[])
         .filter((row: any) => !SQUADS_OCULTOS_DETALHES.has(normalizeSquadName(row.squad)))
         .map((row: any) => {
@@ -636,14 +679,12 @@ export function registerReportsTrimestralRoutes(app: Express) {
           const churnBase = mrrAnt > 0 ? mrrAnt : mrr;
           const churnPct = churnBase > 0 ? (churn.brl / churnBase) * 100 : 0;
           const churnTotalPct = churnBase > 0 ? (churn.totalBrl / churnBase) * 100 : 0;
-          // VENDAS_EXPANSAO_POR_MES (vendas de expansão/abatimento NRR) é uma tabela
-          // manual privada do mensal em relatorioMensalSlides.ts, não exportada, e
-          // hoje só tem entrada p/ um único mês (2026-05) — sem equivalente
-          // trimestral. vendasMes/expansaoNrr ficam 0, igual ao comportamento do
-          // mensal p/ meses sem entrada na tabela; nrrBrl/nrrPct seguem a mesma
-          // fórmula (nrrBrl = churn s/ abonados − abatimento).
-          const vendasMes = 0;
-          const expansaoNrr = 0;
+          // Expansão do trimestre (soma dos meses com entrada na tabela-espelho);
+          // squads sem entrada ficam 0 — mesmo comportamento do mensal.
+          // nrrBrl = churn s/ abonados − abatimento (fórmula idêntica ao mensal).
+          const expansao = expansaoTri[normalizeSquadName(row.squad)] ?? { vendas: 0, abatimento: 0 };
+          const vendasMes = expansao.vendas;
+          const expansaoNrr = expansao.abatimento;
           const nrrBrl = churn.brl - expansaoNrr;
           const nrrPct = churnBase > 0 ? (nrrBrl / churnBase) * 100 : 0;
 
