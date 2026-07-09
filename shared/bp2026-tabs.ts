@@ -27,3 +27,16 @@ export function abasPermitidas(
   const set = new Set(allowedBpTabs ?? []);
   return BP2026_TAB_IDS.filter((id) => set.has(id));
 }
+
+export const BP2026_ROUTE = "/bp-2026";
+
+// Liberar uma aba precisa, sozinho, dar acesso à página do BP — senão o usuário
+// bate no AccessDenied da rota (que exige a permissão `fin.dre`, ampla demais,
+// pois também libera /dashboard/dre). Os dados continuam filtrados por aba no
+// backend, então abrir a página não concede nada além das abas liberadas.
+export function podeAcessarBp2026(
+  role: string | null | undefined,
+  allowedBpTabs: string[] | null | undefined,
+): boolean {
+  return abasPermitidas(role, allowedBpTabs).length > 0;
+}

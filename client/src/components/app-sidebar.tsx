@@ -27,6 +27,7 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { NAV_CONFIG, permissionsToRoutes } from "@shared/nav-config";
+import { BP2026_ROUTE, podeAcessarBp2026 } from "@shared/bp2026-tabs";
 import { cn } from "@/lib/utils";
 
 interface User {
@@ -38,6 +39,7 @@ interface User {
   createdAt: string;
   role: 'admin' | 'user';
   allowedRoutes: string[];
+  allowedBpTabs?: string[];
 }
 
 const ICONS: Record<string, any> = {
@@ -97,6 +99,7 @@ export function AppSidebar() {
     if (!user) return false;
     if (user.role === 'admin') return true;
     if (PUBLIC_SIDEBAR_ROUTES.includes(url)) return true;
+    if (url === BP2026_ROUTE && podeAcessarBp2026(user.role, user.allowedBpTabs)) return true;
 
     if (permissionKey && user.allowedRoutes) {
       if (user.allowedRoutes.includes(permissionKey)) return true;

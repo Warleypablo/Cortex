@@ -60,7 +60,7 @@ export default function BP2026() {
   const { data: creatorsData } = useQuery<CreatorsPontualResponse>({
     queryKey: ["/api/bp2026/pontual-creators"],
   });
-  const { user } = useAuth();
+  const { user, hasAccess } = useAuth();
   const abas = abasPermitidas(user?.role, user?.allowedBpTabs);
   const podeVer = (id: string) => abas.includes(id as any);
 
@@ -97,12 +97,14 @@ export default function BP2026() {
             Bloco de receitas · orçado fechado em dezembro/2025 · realizado ao vivo
           </p>
         </div>
-        <Link href="/bp-2026/copilot">
-          <Button className="gap-2 bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0">
-            <Bot className="w-4 h-4" />
-            BP Copilot
-          </Button>
-        </Link>
+        {hasAccess("/bp-2026/copilot") && (
+          <Link href="/bp-2026/copilot">
+            <Button className="gap-2 bg-blue-600 hover:bg-blue-700 text-white flex-shrink-0">
+              <Bot className="w-4 h-4" />
+              BP Copilot
+            </Button>
+          </Link>
+        )}
       </div>
       {abas.length === 0 && (
         <div className="p-4 text-sm text-gray-600 dark:text-zinc-400">

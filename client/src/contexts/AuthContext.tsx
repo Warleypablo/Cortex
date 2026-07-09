@@ -1,6 +1,7 @@
 import { createContext, useContext, ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { PERMISSION_TO_ROUTES } from "@shared/nav-config";
+import { BP2026_ROUTE, podeAcessarBp2026 } from "@shared/bp2026-tabs";
 
 export interface User {
   id: string;
@@ -40,6 +41,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!user) return false;
     if (user.role === 'admin') return true;
     if (PUBLIC_ROUTES.includes(path)) return true;
+    if (path === BP2026_ROUTE && podeAcessarBp2026(user.role, user.allowedBpTabs)) return true;
     if (user.allowedRoutes?.includes(path)) return true;
     for (const perm of (user.allowedRoutes ?? [])) {
       if (PERMISSION_TO_ROUTES[perm]?.includes(path)) return true;
