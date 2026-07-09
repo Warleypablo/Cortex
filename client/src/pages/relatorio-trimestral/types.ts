@@ -1,6 +1,6 @@
 import type {
   TurboMetrics, ContratosMes, CloserRanking, SquadRanking, SquadDetail,
-  PontualData, TechSlideData, FaturamentoYtdData,
+  PontualData, TechSlideData,
 } from "../relatorio-mensal/types";
 
 export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number }
@@ -24,6 +24,23 @@ export interface TicketsCliente {
   pontual: TicketCliente;
 }
 
+// Faturável do trimestre (sem Conta Azul): Σ MRR ativo (foto do fim de cada mês
+// do tri) + pontual entregue no tri.
+export interface FaturavelMes {
+  month: string;
+  label: string;
+  mrr: number;
+  pontual: number;
+  total: number;
+}
+
+export interface Faturavel {
+  mrrSoma: number;
+  pontualEntregue: number;
+  total: number;
+  porMes: FaturavelMes[];
+}
+
 export interface RelatorioTrimestralData {
   trimestre: string;
   label: string;
@@ -39,5 +56,5 @@ export interface RelatorioTrimestralData {
   squadDetails: SquadDetail[];
   pontualData: PontualData;
   techData: TechSlideData;
-  faturamentoYtd: FaturamentoYtdData;
+  faturavel: Faturavel;
 }

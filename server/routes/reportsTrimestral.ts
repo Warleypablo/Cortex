@@ -1114,57 +1114,24 @@ export function registerReportsTrimestralRoutes(app: Express) {
         pipeline: techPipeline,
       };
 
-      // Bloco faturamentoYtd (Task 11): espelha as queries de Faturamento Bruto
-      // YTD + Inadimplência YTD e Imposto/DFC Recebimento mensal do
-      // relatorioMensalSlides.ts (~L1017-1040). YTD = início do ano do tri
-      // (`${w.ano}-01-01`) até o fim do tri (`w.dataEnd`), fechando a janela
-      // "YTD" no fim do trimestre em vez de no mês de dados.
-      const [faturamentoYtdRows, dfcRecebimentoYtdRows] = await Promise.all([
-        // Espelha "Faturamento Bruto YTD + Inadimplência YTD" — YTD até w.dataEnd.
-        db.execute(sql`
-          SELECT
-            COALESCE(SUM(valor_bruto::numeric), 0) AS faturamento_bruto_ytd,
-            COALESCE(SUM(CASE WHEN nao_pago::numeric > 0 THEN nao_pago::numeric ELSE 0 END), 0) AS inadimplencia_ytd
-          FROM "Conta Azul".caz_parcelas
-          WHERE tipo_evento = 'RECEITA'
-            AND data_vencimento >= ${`${w.ano}-01-01`}::date
-            AND data_vencimento < ${w.dataEnd}::date
-        `),
-        // Espelha "Imposto sobre Receita YTD + DFC Recebimento mensal" — YTD até w.dataEnd.
-        db.execute(sql`
-          SELECT
-            TO_CHAR(data_quitacao::date, 'YYYY-MM') AS month,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' AND categoria_nome LIKE '05.05%' THEN valor_pago::numeric ELSE 0 END), 0) AS imposto,
-            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) AS recebido
-          FROM "Conta Azul".caz_parcelas
-          WHERE status = 'QUITADO'
-            AND data_quitacao::date >= ${`${w.ano}-01-01`}::date
-            AND data_quitacao::date < ${w.dataEnd}::date
-          GROUP BY TO_CHAR(data_quitacao::date, 'YYYY-MM')
-          ORDER BY month
-        `),
-      ]);
-
-      const ytdRow = (faturamentoYtdRows.rows as any[])[0] || {};
-      const faturamentoBrutoYtd = parseFloat(ytdRow.faturamento_bruto_ytd) || 0;
-      const inadimplenciaYtd = parseFloat(ytdRow.inadimplencia_ytd) || 0;
-
-      let impostoYtd = 0;
-      const dfcRecebimentoMensal = (dfcRecebimentoYtdRows.rows as any[]).map((row: any) => {
-        const m = parseInt(row.month.split("-")[1]) - 1;
-        impostoYtd += parseFloat(row.imposto) || 0;
-        return {
-          month: row.month as string,
-          label: MESES_SHORT_TECH[m] || row.month,
-          recebido: parseFloat(row.recebido) || 0,
-        };
-      });
-
-      const faturamentoYtd = {
-        faturamentoBrutoYtd,
-        inadimplenciaYtd,
-        impostoYtd,
-        dfcRecebimentoMensal,
+      // Faturável do trimestre (decisão 2026-07-09: sem Conta Azul, sem
+      // inadimplência/impostos): Σ MRR ativo (foto do fim de cada mês computado
+      // do tri) + pontual entregue no tri. Fontes operacionais — cup_data_hist
+      // (MRR) e cup_contratos (entregas) — reaproveitando as linhas mensais que
+      // a query do trend já busca (mrrChurnRows: month/mrr/pontual).
+      const faturavelPorMes = (mrrChurnRows.rows as any[])
+        .filter((r: any) => w.mesesComputados.includes(r.month))
+        .map((r: any) => {
+          const m = parseInt(r.month.split("-")[1]) - 1;
+          const mrr = parseFloat(r.mrr) || 0;
+          const pontual = parseFloat(r.pontual) || 0;
+          return { month: r.month as string, label: MESES_SHORT_TECH[m] || r.month, mrr, pontual, total: mrr + pontual };
+        });
+      const faturavel = {
+        mrrSoma: faturavelPorMes.reduce((a, r) => a + r.mrr, 0),
+        pontualEntregue: faturavelPorMes.reduce((a, r) => a + r.pontual, 0),
+        total: faturavelPorMes.reduce((a, r) => a + r.total, 0),
+        porMes: faturavelPorMes,
       };
 
       // Tickets médios por CLIENTE, mesma régua nos dois lados:
@@ -1198,7 +1165,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         squadDetails,
         pontualData,
         techData,
-        faturamentoYtd,
+        faturavel,
       });
     } catch (error: any) {
       console.error("[reports/trimestral] Error:", error?.message || error);

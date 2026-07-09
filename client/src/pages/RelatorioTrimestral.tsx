@@ -16,7 +16,7 @@ import SlideSquadTrimestre from "./relatorio-trimestral/SlideSquadTrimestre";
 import SlidePontualTrimestre from "./relatorio-trimestral/SlidePontualTrimestre";
 import SlideTechTrimestre from "./relatorio-trimestral/SlideTechTrimestre";
 import SlideNpsTrimestre from "./relatorio-trimestral/SlideNpsTrimestre";
-import SlideFaturamentoTrimestre from "./relatorio-trimestral/SlideFaturamentoTrimestre";
+import SlideFaturavelTrimestre from "./relatorio-trimestral/SlideFaturavelTrimestre";
 import SlideEncerramentoTrimestre from "./relatorio-trimestral/SlideEncerramentoTrimestre";
 import SlideEvolucaoTrimestre from "./relatorio-trimestral/SlideEvolucaoTrimestre";
 
@@ -154,7 +154,7 @@ export default function RelatorioTrimestral() {
       case "pontual":      return <SlidePontualTrimestre pontualData={data.pontualData} label={data.label} />;
       case "tech":         return <SlideTechTrimestre techData={data.techData} label={data.label} />;
       case "nps":          return <SlideNpsTrimestre label={data.label} />;
-      case "faturamento":  return <SlideFaturamentoTrimestre data={data.faturamentoYtd} label={data.label} ano={parseInt(data.trimestre.split("-Q")[0], 10)} />;
+      case "faturamento":  return <SlideFaturavelTrimestre faturavel={data.faturavel} label={data.label} />;
       case "encerramento": return <SlideEncerramentoTrimestre label={data.label} />;
       default:             return null;
     }
