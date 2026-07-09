@@ -697,7 +697,189 @@ export function registerReportsTrimestralRoutes(app: Express) {
       const mrrTotalInicioTri = parseFloat((mrrAnteriorTotalRows.rows as any[])[0]?.mrr_total) || 0;
       turboMetrics.churnMetaMensal = mrrTotalInicioTri * 0.08 * w.mesesComputados.length;
 
-      // TODO(Tasks 10-11): demais seções reais.
+      // Bloco pontualData (Task 10): espelha as queries 29-33 (em aberto por
+      // serviço, aquisição, entregas por squad, entregas por produto × mês e
+      // tempo médio de entrega) do relatorioMensalSlides.ts, re-janeladas para
+      // o trimestre. Q29 é dateless no mensal (filtro só por status, sem
+      // range de data) — reflete o estado ATUAL do estoque (FOTO "estado
+      // corrente", igual ao mensal, sem amarrar a nenhuma data da janela); as
+      // demais (Q30/Q31/Q32/Q33) são FLUXO somado no range do tri
+      // (w.dataStart..w.dataEnd). variacaoEstoque é derivado em JS a partir de
+      // aquisição − entregas do tri, igual à montagem do mensal (~L1720-1724),
+      // que também já é fluxo (não delta de snapshot).
+      const [
+        pontualEmAbertoRows,
+        pontualAquisicaoRows,
+        pontualEntregasSquadRows,
+        pontualEntregasProdutoMesRows,
+        pontualTempoMedioRows,
+      ] = await Promise.all([
+        // Espelha query 29 (em aberto por serviço) — estado ATUAL, sem filtro
+        // de data (mesma query do mensal, dateless).
+        db.execute(sql`
+          SELECT
+            CASE
+              WHEN LOWER(servico) LIKE '%creators%' THEN 'Creators'
+              ELSE COALESCE(NULLIF(TRIM(servico), ''), 'Sem serviço')
+            END as servico,
+            COUNT(*)::int as contratos,
+            COALESCE(SUM(valorp::numeric), 0) as valor
+          FROM "Clickup".cup_contratos
+          WHERE valorp IS NOT NULL AND valorp::numeric > 0
+            AND LOWER(TRIM(status)) IN ('ativo','triagem','onboarding','em cancelamento','pausado')
+          GROUP BY
+            CASE
+              WHEN LOWER(servico) LIKE '%creators%' THEN 'Creators'
+              ELSE COALESCE(NULLIF(TRIM(servico), ''), 'Sem serviço')
+            END
+          ORDER BY valor DESC
+        `),
+        // Espelha query 30 (aquisição pontual: contratos criados com valorp >
+        // 0) — FLUXO somado no tri.
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int as contratos,
+            COALESCE(SUM(valorp::numeric), 0) as valor
+          FROM "Clickup".cup_contratos
+          WHERE valorp IS NOT NULL AND valorp::numeric > 0
+            AND data_criado >= ${w.dataStart}::date
+            AND data_criado < ${w.dataEnd}::date
+        `),
+        // Espelha query 31 (entregas por squad) — FLUXO somado no tri.
+        db.execute(sql`
+          SELECT
+            COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad') as squad,
+            COUNT(*)::int as contratos,
+            COALESCE(SUM(valorp::numeric), 0) as valor
+          FROM "Clickup".cup_contratos
+          WHERE valorp IS NOT NULL AND valorp::numeric > 0
+            AND LOWER(TRIM(status)) = 'entregue'
+            AND data_entrega >= ${w.dataStart}::date
+            AND data_entrega < ${w.dataEnd}::date
+          GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
+          ORDER BY valor DESC
+        `),
+        // Espelha query 32 (entregas por produto × mês) — troca o
+        // EXTRACT(YEAR)=ano do mensal (cobre o ano inteiro) pelo range
+        // w.dataStart..w.dataEnd, restringindo aos meses do tri (w.meses).
+        db.execute(sql`
+          SELECT
+            TO_CHAR(data_entrega, 'YYYY-MM') as month,
+            COALESCE(NULLIF(TRIM(produto), ''), 'Sem produto') as produto,
+            COALESCE(SUM(valorp::numeric), 0) as valor
+          FROM "Clickup".cup_contratos
+          WHERE valorp IS NOT NULL AND valorp::numeric > 0
+            AND LOWER(TRIM(status)) = 'entregue'
+            AND data_entrega >= ${w.dataStart}::date
+            AND data_entrega < ${w.dataEnd}::date
+          GROUP BY TO_CHAR(data_entrega, 'YYYY-MM'), COALESCE(NULLIF(TRIM(produto), ''), 'Sem produto')
+          ORDER BY month, valor DESC
+        `),
+        // Espelha query 33 (tempo médio de entrega por produto) — troca a
+        // janela "últimos 6 meses antes do mês do relatório" do mensal por
+        // w.dataStart..w.dataEnd, recalculando sobre as entregas do TRIMESTRE.
+        db.execute(sql`
+          SELECT
+            COALESCE(NULLIF(TRIM(produto), ''), 'Sem produto') as produto,
+            COUNT(*)::int as contratos,
+            AVG(data_entrega - data_criado)::int as dias_medio
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(TRIM(status)) = 'entregue'
+            AND data_entrega IS NOT NULL
+            AND data_criado IS NOT NULL
+            AND data_entrega >= ${w.dataStart}::date
+            AND data_entrega < ${w.dataEnd}::date
+          GROUP BY COALESCE(NULLIF(TRIM(produto), ''), 'Sem produto')
+          HAVING COUNT(*) >= 2
+          ORDER BY dias_medio ASC
+        `),
+      ]);
+
+      // Override manual: "Creators" em aberto corrigido devido a duplicação
+      // nas entregas parceladas — mesmo valor validado do mensal
+      // (relatorioMensalSlides.ts ~L1651). Como Q29 é dateless (estado
+      // atual), o número não varia por trimestre.
+      const CREATORS_OVERRIDE_VALOR = 711406;
+      const emAbertoPorServico = (pontualEmAbertoRows.rows as any[])
+        .map((row: any) => ({
+          servico: row.servico,
+          valor: row.servico === 'Creators'
+            ? CREATORS_OVERRIDE_VALOR
+            : (parseFloat(row.valor) || 0),
+          contratos: parseInt(row.contratos) || 0,
+        }))
+        .sort((a, b) => b.valor - a.valor);
+      const emAbertoTotalValor = emAbertoPorServico.reduce((s, r) => s + r.valor, 0);
+      const emAbertoTotalContratos = emAbertoPorServico.reduce((s, r) => s + r.contratos, 0);
+
+      const aquisicaoRow = (pontualAquisicaoRows.rows as any[])[0] || {};
+      const aquisicaoValor = parseFloat(aquisicaoRow.valor) || 0;
+      const aquisicaoContratos = parseInt(aquisicaoRow.contratos) || 0;
+
+      const entregasPorSquad = (pontualEntregasSquadRows.rows as any[]).map((row: any) => ({
+        squad: row.squad,
+        valor: parseFloat(row.valor) || 0,
+        contratos: parseInt(row.contratos) || 0,
+      }));
+      const entregasSquadTotal = entregasPorSquad.reduce((s, r) => s + r.valor, 0);
+
+      // Agrupar entregas por produto x mês em { month, label, produtos: {...}, total },
+      // igual ao mensal (relatorioMensalSlides.ts ~L1678-1698).
+      const MESES_SHORT_PONTUAL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      const entregasProdutoMesMap = new Map<string, { label: string; produtos: Record<string, number>; total: number }>();
+      for (const row of pontualEntregasProdutoMesRows.rows as any[]) {
+        const month = row.month as string;
+        const produto = row.produto as string;
+        const valor = parseFloat(row.valor) || 0;
+        if (!entregasProdutoMesMap.has(month)) {
+          const mNum = parseInt(month.split("-")[1]) - 1;
+          entregasProdutoMesMap.set(month, {
+            label: MESES_SHORT_PONTUAL[mNum] || month,
+            produtos: {},
+            total: 0,
+          });
+        }
+        const entry = entregasProdutoMesMap.get(month)!;
+        entry.produtos[produto] = (entry.produtos[produto] || 0) + valor;
+        entry.total += valor;
+      }
+      const entregasPorProdutoMes = Array.from(entregasProdutoMesMap.entries())
+        .sort(([a], [b]) => a.localeCompare(b))
+        .map(([month, data]) => ({ month, ...data }));
+
+      const tempoMedioEntrega = (pontualTempoMedioRows.rows as any[]).map((row: any) => ({
+        produto: row.produto,
+        diasMedio: parseInt(row.dias_medio) || 0,
+        contratos: parseInt(row.contratos) || 0,
+      }));
+
+      const pontualData = {
+        emAberto: {
+          valor: emAbertoTotalValor,
+          contratos: emAbertoTotalContratos,
+          porServico: emAbertoPorServico,
+        },
+        aquisicao: {
+          valor: aquisicaoValor,
+          contratos: aquisicaoContratos,
+        },
+        entregasMes: {
+          porSquad: entregasPorSquad,
+          total: entregasSquadTotal,
+        },
+        // Segue a mesma lógica do mensal: fluxo (entrou = aquisição, saiu =
+        // entregas) na janela do tri — o mensal não usa delta de snapshot p/
+        // este cálculo (relatorioMensalSlides.ts ~L1720-1724).
+        variacaoEstoque: {
+          entrou: aquisicaoValor,
+          saiu: entregasSquadTotal,
+          delta: aquisicaoValor - entregasSquadTotal,
+        },
+        entregasPorProdutoMes,
+        tempoMedioEntrega,
+      };
+
+      // TODO(Task 11): demais seções reais.
       res.json({
         trimestre: w.trimestre,
         label: w.label,
@@ -710,7 +892,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         topPontual,
         rankingSquads,
         squadDetails,
-        pontualData: emptyPontualData(),
+        pontualData,
         techData: emptyTechData(w.label),
         faturamentoYtd: emptyFaturamentoYtd(),
       });
