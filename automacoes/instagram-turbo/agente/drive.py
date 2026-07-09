@@ -454,6 +454,23 @@ def _slide_sort_key(f: DriveFile) -> tuple[int, int, str]:
     return (1, 0, f.name.lower())
 
 
+_STORY_RE = re.compile(r"\bstor(y|ys|ies)\b", re.IGNORECASE)
+
+
+def _is_story_asset(name: str) -> bool:
+    """True se o arquivo é a versão STORIES do post (9x16). O time sobe stories
+    MANUALMENTE no Instagram Stories, então o publicador de FEED deve ignorá-los
+    — senão eles entram no carrossel do feed (caso real 09/jul/2026: a pasta
+    'TURBO_asolucao' tinha 7 slides de feed + 7 de 'A SOLUÇÃO - stories N.png',
+    dando 14 assets intercalados, acima do limite de 10 do IG).
+
+    Match por PALAVRA (`\\bstor(y|ys|ies)\\b`) pra pegar 'stories'/'story' como
+    tag no nome ('... - stories 3.png') sem falso-positivo em 'história' /
+    'storytelling' (onde 'stor' está no meio de outra palavra).
+    """
+    return bool(_STORY_RE.search(name))
+
+
 def classify_assets(files: list[DriveFile]) -> tuple[str, list[DriveFile]]:
     """
     Retorna (tipo_post, assets_ordenados).
@@ -464,10 +481,14 @@ def classify_assets(files: list[DriveFile]) -> tuple[str, list[DriveFile]]:
       - 1 imagem isolada         → single
       - 2+ arquivos (qualquer    → carousel, ordenado pelo número no nome
         mix de imagem e vídeo)     (Meta Graph aceita carousel misto)
+
+    Arquivos de STORIES (ver _is_story_asset) são IGNORADOS — o feed só leva a
+    versão de feed; stories vão manualmente pro Instagram Stories.
     """
     media = [
         f for f in files
-        if f.mime_type.startswith("image/") or f.mime_type.startswith("video/")
+        if (f.mime_type.startswith("image/") or f.mime_type.startswith("video/"))
+        and not _is_story_asset(f.name)
     ]
     media.sort(key=_slide_sort_key)
 
