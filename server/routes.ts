@@ -60,6 +60,7 @@ import { registerComercialRoutes } from "./routes/comercial";
 import { registerGestaoReceitaRoutes } from "./routes/gestaoReceita";
 import { registerFechamentoSemanalRoutes } from "./routes/fechamentoSemanal";
 import { registerReportsSemanalRoutes } from "./routes/reportsSemanal";
+import { registerReportsTrimestralRoutes } from "./routes/reportsTrimestral";
 import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
 import { registerScorecardRoutes } from "./routes/scorecard";
@@ -8554,6 +8555,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Reporte Semanal - 4 KPIs de desempenho semanal
   registerReportsSemanalRoutes(app);
+
+  // Reporte Trimestral - variante trimestral do reporte mensal
+  registerReportsTrimestralRoutes(app);
 
   // Cross-Sell Management - registered from separate file
   registerCrossSellRoutes(app);

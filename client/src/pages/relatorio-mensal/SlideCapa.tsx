@@ -3,9 +3,10 @@ import SlideLayout from "./SlideLayout";
 
 interface Props {
   mesLabel: string;
+  titulo?: string;
 }
 
-export default function SlideCapa({ mesLabel }: Props) {
+export default function SlideCapa({ mesLabel, titulo = "Reporte Mensal" }: Props) {
   return (
     <SlideLayout section="intro" showLogo={false} padding="48px">
       <div className="flex-1 flex flex-col items-center justify-center gap-8 max-w-3xl mx-auto text-center">
@@ -14,7 +15,7 @@ export default function SlideCapa({ mesLabel }: Props) {
         <div className="space-y-2">
           <h1 className="text-4xl font-black tracking-tight">
             <span className="bg-gradient-to-r from-violet-400 via-indigo-300 to-cyan-400 bg-clip-text text-transparent">
-              Reporte Mensal
+              {titulo}
             </span>
           </h1>
           <p className="text-xl text-zinc-400">{mesLabel}</p>

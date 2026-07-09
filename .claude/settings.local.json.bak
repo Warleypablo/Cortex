@@ -57,18 +57,5 @@
       "Bash(git -C /Users/ichino/Documents/Turbo/Cortex commit -m ':*)",
       "Bash(git -C /Users/ichino/Documents/Turbo/Cortex push)"
     ]
-  },
-  "hooks": {
-    "PreToolUse": [
-      {
-        "matcher": "Bash",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "cmd=$(jq -r '.tool_input.command // \"\"'); if printf %s \"$cmd\" | grep -qE '(^|[;&|(])[[:space:]]*git[[:space:]]+stash' && ! printf %s \"$cmd\" | grep -qE 'git[[:space:]]+stash[[:space:]]+(list|show)'; then printf %s '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"git stash de escrita (push/pop/apply/drop/clear/--include-untracked) BLOQUEADO neste repo: o stash stack e global e compartilhado entre worktrees e sessoes concorrentes (ja corrompeu trabalho de outras sessoes). Para baseline de tsc use: npm run check 2>&1 | grep <prefixo>. (git stash list/show sao permitidos.)\"}}'; fi; exit 0"
-          }
-        ]
-      }
-    ]
   }
 }
