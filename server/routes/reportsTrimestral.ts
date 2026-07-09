@@ -736,11 +736,13 @@ export function registerReportsTrimestralRoutes(app: Express) {
           WHERE r.rn <= 3
           ORDER BY r.squad_total DESC, r.rn
         `),
-        // Squad Black = ACCOUNTS (gerentes de conta). O responsavel de entrega não
-        // reflete a carteira: o gerente é o `cs_responsavel`, o mesmo em TODOS os
-        // contratos abaixo dos clientes dele. Faturamento do account = MRR (snapshot,
-        // por cs_responsavel) + pontual entregue no tri (cup_contratos, por
-        // cs_responsavel). Top 3 por faturamento; total = carteira toda dos accounts.
+        // Squad Black = ACCOUNTS (gestores de conta). O responsavel de entrega e o
+        // cs_responsavel (CX) não refletem a carteira: o gestor é o `responsavel_geral`
+        // do CLIENTE (cup_clientes.task_id), o mesmo para TODOS os contratos abaixo do
+        // cliente dele. Faturamento do account = MRR (snapshot dos contratos ativos dos
+        // clientes dele) + pontual entregue no tri (contratos dos clientes dele). Mapeia
+        // cliente→gestor por cup_clientes.responsavel_geral e soma cup_data_hist
+        // (id_task = task_id do cliente) e cup_contratos. Top 3 por faturamento.
         db.execute(sql`
           WITH ultimo_snapshot AS (
             SELECT COALESCE(
@@ -748,26 +750,32 @@ export function registerReportsTrimestralRoutes(app: Express) {
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
             ) as snap
           ),
+          cliente_gestor AS (
+            SELECT task_id, MIN(responsavel_geral) AS nome
+            FROM "Clickup".cup_clientes
+            WHERE responsavel_geral IS NOT NULL AND TRIM(responsavel_geral) != '' AND task_id IS NOT NULL
+            GROUP BY task_id
+          ),
           mrr_por_cs AS (
-            SELECT h.cs_responsavel AS nome,
+            SELECT g.nome,
               COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) AS mrr
             FROM "Clickup".cup_data_hist h
             JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
+            JOIN cliente_gestor g ON h.id_task = g.task_id
             WHERE h.status IN ('ativo', 'onboarding', 'triagem')
               AND h.valorr IS NOT NULL
-              AND h.cs_responsavel IS NOT NULL AND TRIM(h.cs_responsavel) != ''
-            GROUP BY h.cs_responsavel
+            GROUP BY g.nome
           ),
           pontual_por_cs AS (
-            SELECT cs_responsavel AS nome,
-              COALESCE(SUM(valorp::numeric), 0) AS pontual
-            FROM "Clickup".cup_contratos
-            WHERE LOWER(TRIM(status)) = 'entregue'
-              AND data_entrega >= ${w.dataStart}::date
-              AND data_entrega < ${w.dataEnd}::date
-              AND valorp IS NOT NULL AND valorp::numeric > 0
-              AND cs_responsavel IS NOT NULL AND TRIM(cs_responsavel) != ''
-            GROUP BY cs_responsavel
+            SELECT g.nome,
+              COALESCE(SUM(ct.valorp::numeric), 0) AS pontual
+            FROM "Clickup".cup_contratos ct
+            JOIN cliente_gestor g ON ct.id_task = g.task_id
+            WHERE LOWER(TRIM(ct.status)) = 'entregue'
+              AND ct.data_entrega >= ${w.dataStart}::date
+              AND ct.data_entrega < ${w.dataEnd}::date
+              AND ct.valorp IS NOT NULL AND ct.valorp::numeric > 0
+            GROUP BY g.nome
           ),
           combined AS (
             SELECT COALESCE(m.nome, p.nome) AS nome,
