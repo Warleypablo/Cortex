@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import type { CSSProperties, ReactNode } from "react";
 import type { Qoq } from "./types";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -81,16 +81,19 @@ export function GrowBar({
   delayMs,
   children,
   className = "",
+  style,
 }: {
   widthPct: number;
   delayMs: number;
   children?: ReactNode;
   className?: string;
+  style?: CSSProperties;
 }) {
   return (
     <div
       className={`deck-grow h-full flex ${className}`}
       style={{
+        ...style,
         width: `${Math.max(Math.min(widthPct, 100), 0)}%`,
         transformOrigin: "left",
         animation: `deckGrowX 600ms ease-out ${delayMs}ms both`,

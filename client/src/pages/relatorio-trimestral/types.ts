@@ -1,6 +1,6 @@
 import type {
   TurboMetrics, ContratosMes, CloserRanking, SdrRanking, TopReunioes,
-  SquadRanking, SquadDetail, PontualData, TechSlideData,
+  SquadRanking, SquadDetail, PontualData,
 } from "../relatorio-mensal/types";
 
 export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number }
@@ -60,6 +60,29 @@ export interface SquadOperadores {
   operadores: OperadorSquad[];
 }
 
+// Área Tech: dados vêm do dashboard tech-dash.pages.dev (fonte correta, gerada
+// direto do ClickUp). Espelha server/lib/techDash.ts → TechTrimestralData.
+export interface TechAccount { nome: string; projetos: number; valor: number }
+export interface TechMesEntrega { month: string; label: string; valor: number; projetos: number }
+export interface TechMesMrr { month: string; label: string; mrr: number; contratos: number }
+export interface TechTrimestralData {
+  fonte: string;
+  geradoEm: string | null;
+  disponivel: boolean;
+  meta: number;
+  entregue: number;
+  atingimento: number;
+  projetos: number;
+  ticketMedio: number;
+  mrrUltimoMes: number;
+  mrrUltimoMesLabel: string;
+  contratosAtivos: number;
+  entregasTri: number | null;
+  entregasPorMes: TechMesEntrega[];
+  mrrPorMes: TechMesMrr[];
+  topAccounts: TechAccount[];
+}
+
 export interface RelatorioTrimestralData {
   trimestre: string;
   label: string;
@@ -77,6 +100,6 @@ export interface RelatorioTrimestralData {
   squadDetails: SquadDetail[];
   operadoresPorSquad: SquadOperadores[];
   pontualData: PontualData;
-  techData: TechSlideData;
+  techData: TechTrimestralData;
   faturavel: Faturavel;
 }
