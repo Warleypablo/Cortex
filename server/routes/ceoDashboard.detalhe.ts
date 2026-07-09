@@ -39,7 +39,7 @@ async function recebidoPorCategoria(db: any, mesNum: number): Promise<Array<{ ca
 const TITULOS: Record<string, string> = {
   receita: "Receita", custos: "Custos & Despesas", lucro: "Lucro (EBITDA)",
   caixa: "Saldo de Caixa", inadimplencia: "Inadimplência Total", cac: "CAC",
-  ltv: "LTV", headcount: "Headcount", enps: "E-NPS", receita_cabeca: "Receita / Cabeça",
+  ltv_fat: "LTV FAT", ltv_dfc: "LTV DFC", headcount: "Headcount", enps: "E-NPS", receita_cabeca: "Receita / Cabeça",
 };
 
 function linhaValor(bp: any, arr: "linhas" | "metricasGerais", metrica: string, mesNum: number): { orcado: number | null; realizado: number | null } {
@@ -118,15 +118,77 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     grupos = inadClientesToGrupos(res.clientes ?? []);
     const resumo = await storage.getInadimplenciaResumo();
     base.realizado = resumo.totalInadimplente ?? null;
-  } else if (kpi === "ltv") {
+  } else if (kpi === "ltv_fat") {
+    // LTV faturável por cliente (foto de hoje): valorr × meses de vida + pontual entregue.
     const rows: any = await db.execute(sql`
-      SELECT COALESCE(c.nome, t.id_task) AS nome, t.ltv_total FROM (
-        SELECT id_task, SUM(COALESCE(ltv_recorrente,0)) + SUM(COALESCE(valorp,0)) AS ltv_total
+      WITH rec AS (
+        SELECT id_task, SUM(COALESCE(ltv_recorrente, 0)) AS rec
         FROM cortex_core.vw_lt_contratos GROUP BY id_task
-      ) t LEFT JOIN "Clickup".cup_clientes c ON c.task_id = t.id_task
-      ORDER BY t.ltv_total DESC NULLS LAST LIMIT 200`);
+      ),
+      pont AS (
+        SELECT id_task, SUM(valorp) AS pontual FROM "Clickup".cup_contratos
+        WHERE valorp > 0 AND (valorr IS NULL OR valorr = 0) AND status = 'entregue'
+        GROUP BY id_task
+      )
+      SELECT COALESCE(c.nome, r.id_task) AS nome,
+             ROUND(r.rec + COALESCE(p.pontual, 0), 2) AS ltv_total
+      FROM rec r
+      LEFT JOIN pont p ON p.id_task = r.id_task
+      LEFT JOIN "Clickup".cup_clientes c ON c.task_id = r.id_task
+      ORDER BY 2 DESC NULLS LAST LIMIT 200`);
     grupos = ltvRowsToGrupos(rows.rows ?? []);
-    nota = "O card mostra a MÉDIA de LTV por cliente; abaixo, o LTV de cada cliente.";
+    nota = "LTV faturável (ClickUp): Valor R × meses de vida + pontual entregue. Ranking = foto de hoje; a célula da matriz é a mediana dos ativos no mês.";
+  } else if (kpi === "ltv_dfc") {
+    // LTV caixa por cliente (foto de hoje): teórico até 30/set/2025 + pago real Conta Azul; sem match → faturável.
+    const rows: any = await db.execute(sql`
+      WITH click_norm AS MATERIALIZED (
+        SELECT cl.task_id, regexp_replace(cl.cnpj::text, '\\D', '', 'g') AS cnpj_norm
+        FROM "Clickup".cup_clientes cl
+        WHERE LENGTH(regexp_replace(cl.cnpj::text, '\\D', '', 'g')) IN (11, 14)
+      ),
+      caz_norm AS MATERIALIZED (
+        SELECT c.ids, regexp_replace(c.cnpj::text, '\\D', '', 'g') AS cnpj_norm
+        FROM "Conta Azul".caz_clientes c
+        WHERE LENGTH(regexp_replace(c.cnpj::text, '\\D', '', 'g')) IN (11, 14)
+      ),
+      caz_map AS MATERIALIZED (
+        SELECT DISTINCT k.task_id, z.ids
+        FROM click_norm k JOIN caz_norm z USING (cnpj_norm)
+      ),
+      rec AS MATERIALIZED (
+        SELECT v.id_task,
+          SUM(COALESCE(v.ltv_recorrente, 0)) AS rec_full,
+          COALESCE(SUM(v.valorr * GREATEST((LEAST(COALESCE(v.data_fim, DATE '2025-09-30'), DATE '2025-09-30') - v.data_inicio)::numeric, 0) / 30.44)
+            FILTER (WHERE v.tipo_receita = 'recorrente' AND v.data_inicio IS NOT NULL), 0) AS rec_pre
+        FROM cortex_core.vw_lt_contratos v GROUP BY v.id_task
+      ),
+      pont AS MATERIALIZED (
+        SELECT co.id_task,
+          SUM(co.valorp) AS pont_full,
+          COALESCE(SUM(co.valorp) FILTER (WHERE COALESCE(co.data_entrega, co.data_criado) < DATE '2025-10-01'), 0) AS pont_pre
+        FROM "Clickup".cup_contratos co
+        WHERE co.valorp > 0 AND (co.valorr IS NULL OR co.valorr = 0) AND co.status = 'entregue'
+        GROUP BY co.id_task
+      ),
+      pago AS MATERIALIZED (
+        SELECT cm.task_id, SUM(pa.valor_pago) AS pago
+        FROM caz_map cm
+        JOIN "Conta Azul".caz_parcelas pa ON pa.id_cliente::text = cm.ids
+        WHERE pa.tipo_evento = 'RECEITA' AND pa.data_quitacao >= DATE '2025-10-01'
+        GROUP BY cm.task_id
+      )
+      SELECT COALESCE(c.nome, r.id_task) AS nome,
+        ROUND(CASE WHEN mt.task_id IS NOT NULL
+          THEN r.rec_pre + COALESCE(p.pont_pre, 0) + COALESCE(pg.pago, 0)
+          ELSE r.rec_full + COALESCE(p.pont_full, 0) END, 2) AS ltv_total
+      FROM rec r
+      LEFT JOIN pont p ON p.id_task = r.id_task
+      LEFT JOIN (SELECT DISTINCT task_id FROM caz_map) mt ON mt.task_id = r.id_task
+      LEFT JOIN pago pg ON pg.task_id = r.id_task
+      LEFT JOIN "Clickup".cup_clientes c ON c.task_id = r.id_task
+      ORDER BY 2 DESC NULLS LAST LIMIT 200`);
+    grupos = ltvRowsToGrupos(rows.rows ?? []);
+    nota = "LTV caixa: pago real no Conta Azul (desde out/2025, via CNPJ) + faturável teórico antes disso. Ranking = foto de hoje; a célula da matriz é a mediana dos ativos no mês.";
   } else if (kpi === "enps") {
     const respostas: any = await storage.getRhNpsRespostas();
     grupos = enpsRespostasToGrupos(respostas ?? []);
@@ -158,7 +220,7 @@ export function registerCeoDashboardDetalheRoutes(app: Express, db: any) {
     try {
       if (!canAccessCeo(req.user)) return res.status(403).json({ error: "Acesso restrito ao CEO Dashboard" });
       const kpi = typeof req.query.kpi === "string" ? req.query.kpi : "";
-      const KPIS_VALIDOS = ["receita","custos","lucro","caixa","inadimplencia","cac","ltv","headcount","enps","receita_cabeca"];
+      const KPIS_VALIDOS = ["receita","custos","lucro","caixa","inadimplencia","cac","ltv_fat","ltv_dfc","headcount","enps","receita_cabeca"];
       if (!kpi || kpi === "nps" || !KPIS_VALIDOS.includes(kpi)) return res.status(400).json({ error: "kpi inválido" });
       const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
       const payload = await buildCeoDetalhe(db, kpi, mes);
