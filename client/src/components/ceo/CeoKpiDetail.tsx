@@ -42,9 +42,15 @@ function MedianaVsMedia({ mediana, media, soma, n, unidade, corMediana }: {
     : media > mediana
       ? "Média acima da mediana: poucos clientes grandes puxam a média para cima."
       : "Média abaixo da mediana: muitos clientes pequenos puxam a média para baixo.";
-  // A conta aberta dos dois números, com os valores reais do mês.
-  const calculo = soma != null && n != null && n > 0
-    ? `Mediana = ${n % 2 === 1 ? `cliente central (${(n + 1) / 2}º de ${n})` : `média do ${n / 2}º e ${n / 2 + 1}º de ${n}`} · Média = ${formatValor(soma, unidade)} ÷ ${n} clientes`
+  // A conta aberta dos dois números, com os valores reais do mês — cada parcela
+  // é conferível nos grupos listados abaixo (a soma ≈ soma dos totais dos grupos).
+  const calcMediana = n != null && n > 0
+    ? (n % 2 === 1
+      ? `Mediana ${formatValor(mediana, unidade)} = LTV do cliente central (${(n + 1) / 2}º de ${n}) — está no grupo “Mediana”`
+      : `Mediana ${formatValor(mediana, unidade)} = média do ${n / 2}º e ${n / 2 + 1}º cliente de ${n} — estão no grupo “Mediana”`)
+    : null;
+  const calcMedia = soma != null && n != null && n > 0
+    ? `Média ${formatValor(media, unidade)} = ${formatValor(soma, unidade)} (soma dos ${n} LTVs listados) ÷ ${n}`
     : null;
   const barras = [
     { label: "Mediana", valor: mediana, cor: corMediana, gap: null as string | null },
@@ -68,8 +74,11 @@ function MedianaVsMedia({ mediana, media, soma, n, unidade, corMediana }: {
           </span>
         </div>
       ))}
-      {calculo && (
-        <p className="pt-0.5 text-[11px] leading-snug tabular-nums text-gray-500 dark:text-zinc-400">{calculo}</p>
+      {(calcMediana || calcMedia) && (
+        <div className="pt-0.5 space-y-0.5">
+          {calcMediana && <p className="text-[11px] leading-snug tabular-nums text-gray-500 dark:text-zinc-400">{calcMediana}</p>}
+          {calcMedia && <p className="text-[11px] leading-snug tabular-nums text-gray-500 dark:text-zinc-400">{calcMedia}</p>}
+        </div>
       )}
       <p className="text-[11px] leading-snug text-gray-400 dark:text-zinc-500">{legenda}</p>
     </div>
