@@ -737,13 +737,15 @@ export function registerReportsTrimestralRoutes(app: Express) {
           WHERE r.rn <= 3
           ORDER BY r.squad_total DESC, r.rn
         `),
-        // Squad Black = ACCOUNTS (gestores de conta). O responsavel de entrega e o
-        // cs_responsavel (CX) não refletem a carteira: o gestor é o `responsavel_geral`
-        // do CLIENTE (cup_clientes.task_id), o mesmo para TODOS os contratos abaixo do
-        // cliente dele. Faturamento do account = MRR (snapshot dos contratos ativos dos
-        // clientes dele) + pontual entregue no tri (contratos dos clientes dele). Mapeia
-        // cliente→gestor por cup_clientes.responsavel_geral e soma cup_data_hist
-        // (id_task = task_id do cliente) e cup_contratos. Top 3 por faturamento.
+        // Squad Black = ACCOUNTS (time "Black Sheep" no RH, setor Commerce). A coluna
+        // que identifica o account do CLIENTE é `cup_clientes.responsavel_geral` — mas
+        // ela mistura líderes de TODOS os squads (Rodrigo Padrao, Pedro Paulo/Pulse,
+        // Eduardo Galvão…), então NÃO basta rankeá-la: restringimos ao roster de
+        // accounts (rh_pessoal.squad='Black Sheep', Ativo), casando cada nome de
+        // responsavel_geral (1º nome + sobrenome ∈ tokens do nome no RH; responsavel_geral
+        // usa nome curto "Aline Souza" vs RH "Aline de Carvalho de Souza"). Faturamento
+        // do account = MRR (snapshot dos contratos ativos dos clientes dele) + pontual
+        // entregue no tri. Top 3 por faturamento. (cs_responsavel é CX, não account.)
         db.execute(sql`
           WITH ultimo_snapshot AS (
             SELECT COALESCE(
@@ -751,10 +753,27 @@ export function registerReportsTrimestralRoutes(app: Express) {
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
             ) as snap
           ),
-          cliente_gestor AS (
-            SELECT task_id, MIN(responsavel_geral) AS nome
-            FROM "Clickup".cup_clientes
-            WHERE responsavel_geral IS NOT NULL AND TRIM(responsavel_geral) != '' AND task_id IS NOT NULL
+          accounts AS (
+            SELECT DISTINCT
+              LOWER(split_part(TRIM(nome), ' ', 1)) AS first_tok,
+              string_to_array(LOWER(TRIM(nome)), ' ') AS toks
+            FROM "Inhire".rh_pessoal
+            WHERE squad = 'Black Sheep' AND status = 'Ativo'
+              AND nome IS NOT NULL AND TRIM(nome) != ''
+          ),
+          cliente_account AS (
+            SELECT task_id, MIN(nome) AS nome
+            FROM (
+              SELECT c.task_id, TRIM(rg.nome) AS nome
+              FROM "Clickup".cup_clientes c,
+                   LATERAL regexp_split_to_table(c.responsavel_geral, ';') AS rg(nome)
+              WHERE c.task_id IS NOT NULL AND TRIM(rg.nome) != ''
+                AND EXISTS (
+                  SELECT 1 FROM accounts a
+                  WHERE a.first_tok = LOWER(split_part(TRIM(rg.nome), ' ', 1))
+                    AND LOWER(regexp_replace(TRIM(rg.nome), '^.* ', '')) = ANY(a.toks)
+                )
+            ) x
             GROUP BY task_id
           ),
           mrr_por_cs AS (
@@ -762,7 +781,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
               COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) AS mrr
             FROM "Clickup".cup_data_hist h
             JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
-            JOIN cliente_gestor g ON h.id_task = g.task_id
+            JOIN cliente_account g ON h.id_task = g.task_id
             WHERE h.status IN ('ativo', 'onboarding', 'triagem')
               AND h.valorr IS NOT NULL
             GROUP BY g.nome
@@ -771,7 +790,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
             SELECT g.nome,
               COALESCE(SUM(ct.valorp::numeric), 0) AS pontual
             FROM "Clickup".cup_contratos ct
-            JOIN cliente_gestor g ON ct.id_task = g.task_id
+            JOIN cliente_account g ON ct.id_task = g.task_id
             WHERE LOWER(TRIM(ct.status)) = 'entregue'
               AND ct.data_entrega >= ${w.dataStart}::date
               AND ct.data_entrega < ${w.dataEnd}::date
@@ -973,8 +992,9 @@ export function registerReportsTrimestralRoutes(app: Express) {
           cargo: (row.cargo as string) || null,
         });
       }
-      // Black = accounts: sobrescreve o card com os gerentes de conta (cs_responsavel)
-      // e a carteira toda, em vez do responsavel de entrega (que não reflete a squad).
+      // Black = accounts: sobrescreve o card com o roster "Black Sheep" (accounts) e a
+      // carteira toda (via responsavel_geral restrito ao roster), em vez do responsavel
+      // de entrega/CX (que não refletem a squad de accounts).
       const accountsRowsArr = accountsRows.rows as any[];
       if (accountsRowsArr.length > 0) {
         operadoresMap.set("black", {
