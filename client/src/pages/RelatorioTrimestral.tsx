@@ -6,6 +6,7 @@ import { useRelatorioTrimestral } from "./relatorio-trimestral/useRelatorioTrime
 import { getTrimestreOptions, getDefaultTrimestre } from "./relatorio-trimestral/trimestre-options";
 import SlideCapaTrimestre from "./relatorio-trimestral/SlideCapaTrimestre";
 import SlideMantra from "./relatorio-trimestral/SlideMantra";
+import SlideVendasTrimestre from "./relatorio-trimestral/SlideVendasTrimestre";
 import SlideRankingClosers from "./relatorio-mensal/SlideRankingClosers";
 import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
 import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
@@ -14,7 +15,6 @@ import SlidePontual from "./relatorio-mensal/SlidePontual";
 import SlideAreaTech from "./relatorio-mensal/SlideAreaTech";
 import SlideNPS from "./relatorio-mensal/SlideNPS";
 import SlideFaturamentoYtd from "./relatorio-mensal/SlideFaturamentoYtd";
-import SlideGraficoContratos from "./relatorio-mensal/SlideGraficoContratos";
 import SlideFraseEncerramento from "./relatorio-mensal/SlideFraseEncerramento";
 import SlideVisaoTrimestre from "./relatorio-trimestral/SlideVisaoTrimestre";
 import SlideEvolucaoTrimestre from "./relatorio-trimestral/SlideEvolucaoTrimestre";
@@ -134,7 +134,7 @@ export default function RelatorioTrimestral() {
       case "mantra":       return <SlideMantra />;
       case "capa":         return <SlideCapaTrimestre data={data} />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
-      case "vendas":       return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.label} />;
+      case "vendas":       return <SlideVendasTrimestre dados={data.contratosMes} label={data.label} qoqVendas={data.trend.qoq.vendas} />;
       case "evolucao":     return <SlideEvolucaoTrimestre trend={data.trend} />;
       case "closers":      return <SlideRankingClosers ranking={data.rankingClosers} topPontual={data.topPontual} />;
       case "turbo":        return <SlideTurboMetrics metrics={data.turboMetrics} mesLabel={data.label} chartMode="quarter" />;
