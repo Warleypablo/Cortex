@@ -539,6 +539,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         mrrAnteriorSquadsRows,
         mrrAnteriorTotalRows,
         operadoresPorSquadRows,
+        accountsRows,
       ] = await Promise.all([
         // Espelha query 15 (ranking squads por MRR + Pontual) — FOTO em w.fotoDate,
         // fallback ao snapshot mais recente ≤ fotoDate.
@@ -735,6 +736,81 @@ export function registerReportsTrimestralRoutes(app: Express) {
           WHERE r.rn <= 3
           ORDER BY r.squad_total DESC, r.rn
         `),
+        // Squad Black = ACCOUNTS (gerentes de conta). O responsavel de entrega não
+        // reflete a carteira: o gerente é o `cs_responsavel`, o mesmo em TODOS os
+        // contratos abaixo dos clientes dele. Faturamento do account = MRR (snapshot,
+        // por cs_responsavel) + pontual entregue no tri (cup_contratos, por
+        // cs_responsavel). Top 3 por faturamento; total = carteira toda dos accounts.
+        db.execute(sql`
+          WITH ultimo_snapshot AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${w.fotoDate}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
+            ) as snap
+          ),
+          mrr_por_cs AS (
+            SELECT h.cs_responsavel AS nome,
+              COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) AS mrr
+            FROM "Clickup".cup_data_hist h
+            JOIN ultimo_snapshot us ON h.data_snapshot = us.snap
+            WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+              AND h.valorr IS NOT NULL
+              AND h.cs_responsavel IS NOT NULL AND TRIM(h.cs_responsavel) != ''
+            GROUP BY h.cs_responsavel
+          ),
+          pontual_por_cs AS (
+            SELECT cs_responsavel AS nome,
+              COALESCE(SUM(valorp::numeric), 0) AS pontual
+            FROM "Clickup".cup_contratos
+            WHERE LOWER(TRIM(status)) = 'entregue'
+              AND data_entrega >= ${w.dataStart}::date
+              AND data_entrega < ${w.dataEnd}::date
+              AND valorp IS NOT NULL AND valorp::numeric > 0
+              AND cs_responsavel IS NOT NULL AND TRIM(cs_responsavel) != ''
+            GROUP BY cs_responsavel
+          ),
+          combined AS (
+            SELECT COALESCE(m.nome, p.nome) AS nome,
+              COALESCE(m.mrr, 0) AS mrr,
+              COALESCE(p.pontual, 0) AS pontual,
+              COALESCE(m.mrr, 0) + COALESCE(p.pontual, 0) AS faturamento
+            FROM mrr_por_cs m
+            FULL OUTER JOIN pontual_por_cs p ON LOWER(TRIM(m.nome)) = LOWER(TRIM(p.nome))
+          ),
+          ranked AS (
+            SELECT *,
+              ROW_NUMBER() OVER (ORDER BY faturamento DESC) AS rn,
+              SUM(faturamento) OVER () AS squad_total,
+              COUNT(*) OVER () AS squad_operadores
+            FROM combined
+            WHERE faturamento > 0
+          )
+          SELECT r.nome, r.mrr, r.pontual, r.faturamento, r.rn::int AS rn,
+                 r.squad_total, r.squad_operadores::int AS squad_operadores,
+                 p.foto AS "fotoUrl", p.cargo
+          FROM ranked r
+          LEFT JOIN LATERAL (
+            SELECT rp.cargo,
+              COALESCE(NULLIF(a_id.picture, ''), NULLIF(a_turbo.picture, ''), NULLIF(a_pessoal.picture, '')) AS foto
+            FROM "Inhire".rh_pessoal rp
+            LEFT JOIN cortex_core.auth_users a_id ON rp.user_id IS NOT NULL AND rp.user_id = a_id.id
+            LEFT JOIN cortex_core.auth_users a_turbo ON rp.email_turbo IS NOT NULL AND LOWER(TRIM(rp.email_turbo)) = LOWER(TRIM(a_turbo.email))
+            LEFT JOIN cortex_core.auth_users a_pessoal ON rp.email_pessoal IS NOT NULL AND LOWER(TRIM(rp.email_pessoal)) = LOWER(TRIM(a_pessoal.email))
+            WHERE rp.status = 'Ativo'
+              AND (
+                LOWER(TRIM(rp.nome)) = LOWER(TRIM(r.nome))
+                OR (
+                  split_part(LOWER(TRIM(rp.nome)), ' ', 1) = split_part(LOWER(TRIM(r.nome)), ' ', 1)
+                  AND regexp_replace(LOWER(TRIM(r.nome)), '^.* ', '') = ANY(string_to_array(LOWER(TRIM(rp.nome)), ' '))
+                )
+              )
+            ORDER BY (LOWER(TRIM(rp.nome)) = LOWER(TRIM(r.nome))) DESC,
+                     (COALESCE(NULLIF(a_id.picture, ''), NULLIF(a_turbo.picture, ''), NULLIF(a_pessoal.picture, '')) IS NOT NULL) DESC
+            LIMIT 1
+          ) p ON true
+          WHERE r.rn <= 3
+          ORDER BY r.faturamento DESC
+        `),
       ]);
 
       // Normaliza nome de squad p/ casar fontes diferentes (emoji, sufixo "(OFF)",
@@ -888,6 +964,25 @@ export function registerReportsTrimestralRoutes(app: Express) {
           cargo: (row.cargo as string) || null,
         });
       }
+      // Black = accounts: sobrescreve o card com os gerentes de conta (cs_responsavel)
+      // e a carteira toda, em vez do responsavel de entrega (que não reflete a squad).
+      const accountsRowsArr = accountsRows.rows as any[];
+      if (accountsRowsArr.length > 0) {
+        operadoresMap.set("black", {
+          squad: "🐑 Black",
+          totalFaturamento: parseFloat(accountsRowsArr[0].squad_total) || 0,
+          numOperadores: parseInt(accountsRowsArr[0].squad_operadores) || 0,
+          operadores: accountsRowsArr.map((row) => ({
+            nome: row.nome,
+            faturamento: parseFloat(row.faturamento) || 0,
+            mrr: parseFloat(row.mrr) || 0,
+            pontual: parseFloat(row.pontual) || 0,
+            fotoUrl: (row.fotoUrl as string) || null,
+            cargo: (row.cargo as string) || null,
+          })),
+        });
+      }
+
       const operadoresPorSquad = Array.from(operadoresMap.values())
         .sort((a, b) => b.totalFaturamento - a.totalFaturamento)
         .slice(0, 6);
