@@ -1,6 +1,6 @@
 import type {
-  TurboMetrics, ContratosMes, CloserRanking, SquadRanking, SquadDetail,
-  PontualData, TechSlideData,
+  TurboMetrics, ContratosMes, CloserRanking, SdrRanking, TopReunioes,
+  SquadRanking, SquadDetail, PontualData, TechSlideData,
 } from "../relatorio-mensal/types";
 
 export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number }
@@ -52,6 +52,8 @@ export interface RelatorioTrimestralData {
   contratosMes: ContratosMes;
   rankingClosers: CloserRanking[];
   topPontual: CloserRanking | null;
+  rankingSDRs: SdrRanking[];
+  topReunioes: TopReunioes | null;
   rankingSquads: SquadRanking[];
   squadDetails: SquadDetail[];
   pontualData: PontualData;

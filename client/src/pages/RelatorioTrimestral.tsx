@@ -10,6 +10,7 @@ import SlideMantra from "./relatorio-trimestral/SlideMantra";
 import SlideVendasTrimestre from "./relatorio-trimestral/SlideVendasTrimestre";
 import SlideVisaoTrimestre from "./relatorio-trimestral/SlideVisaoTrimestre";
 import SlideClosersTrimestre from "./relatorio-trimestral/SlideClosersTrimestre";
+import SlideSdrsTrimestre from "./relatorio-trimestral/SlideSdrsTrimestre";
 import SlideTurboTrimestre from "./relatorio-trimestral/SlideTurboTrimestre";
 import SlideSquadsRankingTrimestre from "./relatorio-trimestral/SlideSquadsRankingTrimestre";
 import SlideSquadTrimestre from "./relatorio-trimestral/SlideSquadTrimestre";
@@ -26,7 +27,7 @@ const SLIDE_BASE_H = 720;
 type TrimSlot =
   | { type: "mantra" } | { type: "capa" } | { type: "visao" } | { type: "vendas" } | { type: "evolucao" }
   | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" }
-  | { type: "closers" } | { type: "turbo" } | { type: "squads-ranking" }
+  | { type: "closers" } | { type: "sdrs" } | { type: "turbo" } | { type: "squads-ranking" }
   | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "tech" }
   | { type: "nps" } | { type: "faturamento" } | { type: "encerramento" };
 
@@ -70,7 +71,7 @@ export default function RelatorioTrimestral() {
       { type: "mantra" }, { type: "capa" }, { type: "visao" }, { type: "evolucao" },
     ];
     const comercial: TrimSlot[] = [
-      { type: "capa-comercial" }, { type: "vendas" }, { type: "closers" },
+      { type: "capa-comercial" }, { type: "vendas" }, { type: "closers" }, { type: "sdrs" },
     ];
     const squads: TrimSlot[] = (data?.squadDetails ?? []).map((_, i) => ({ type: "squad", squadIndex: i }));
     const operacao: TrimSlot[] = [
@@ -148,6 +149,7 @@ export default function RelatorioTrimestral() {
       case "vendas":       return <SlideVendasTrimestre dados={data.contratosMes} label={data.label} qoqVendas={data.trend.qoq.vendas} />;
       case "evolucao":     return <SlideEvolucaoTrimestre trend={data.trend} />;
       case "closers":      return <SlideClosersTrimestre ranking={data.rankingClosers} topPontual={data.topPontual} label={data.label} />;
+      case "sdrs":         return <SlideSdrsTrimestre ranking={data.rankingSDRs} topReunioes={data.topReunioes} label={data.label} />;
       case "turbo":        return <SlideTurboTrimestre metrics={data.turboMetrics} label={data.label} />;
       case "squads-ranking": return <SlideSquadsRankingTrimestre ranking={data.rankingSquads} label={data.label} />;
       case "squad":        return <SlideSquadTrimestre details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.label} />;

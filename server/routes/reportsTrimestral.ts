@@ -366,6 +366,9 @@ export function registerReportsTrimestralRoutes(app: Express) {
         closerPhotosRows,
         contratosRows,
         pipelineBreakdownRows,
+        sdrRankingRows,
+        sdrPhotosRows,
+        sdrReunioesRows,
       ] = await Promise.all([
         // Espelha query 5 (ranking closers, deals ganhos) — FLUXO somado no tri.
         db.execute(sql`
@@ -418,6 +421,43 @@ export function registerReportsTrimestralRoutes(app: Express) {
           GROUP BY d.category_name
           ORDER BY receita_recorrente DESC
         `),
+        // Espelha query 6b (ranking SDRs, deals ganhos por SDR) — FLUXO somado no tri.
+        db.execute(sql`
+          SELECT
+            u.nome as name,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric as mrr_gerado,
+            COALESCE(SUM(d.valor_pontual), 0)::numeric as pontual_gerado,
+            COALESCE(SUM(d.valor_recorrente), 0)::numeric + COALESCE(SUM(d.valor_pontual), 0)::numeric as total_gerado,
+            COUNT(*)::int as negocios_ganhos
+          FROM "Bitrix".crm_deal d
+          JOIN "Bitrix".crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+          WHERE d.stage_name = 'Negócio Ganho'
+            AND d.data_fechamento >= ${w.dataStart}::date
+            AND d.data_fechamento < ${w.dataEnd}::date
+          GROUP BY u.nome
+          ORDER BY mrr_gerado DESC
+        `),
+        // Espelha query 6c (fotos dos SDRs) — sem filtro de data.
+        db.execute(sql`
+          SELECT u.nome as name, a.picture
+          FROM "Bitrix".crm_users u
+          LEFT JOIN cortex_core.auth_users a ON LOWER(TRIM(u.email)) = LOWER(TRIM(a.email))
+          WHERE u.email IS NOT NULL AND a.picture IS NOT NULL
+        `),
+        // Espelha query 6d (top SDR por reuniões realizadas) — FLUXO no tri, LIMIT 1.
+        db.execute(sql`
+          SELECT
+            u.nome as name,
+            COUNT(*)::int as reunioes
+          FROM "Bitrix".crm_deal d
+          JOIN "Bitrix".crm_users u ON CASE WHEN d.sdr ~ '^[0-9]+$' THEN d.sdr::integer ELSE NULL END = u.id
+          WHERE d.data_reuniao_realizada IS NOT NULL
+            AND d.data_reuniao_realizada >= ${w.dataStart}::date
+            AND d.data_reuniao_realizada < ${w.dataEnd}::date
+          GROUP BY u.nome
+          ORDER BY reunioes DESC
+          LIMIT 1
+        `),
       ]);
 
       const closerPhotoMap: Record<string, string> = {};
@@ -433,6 +473,26 @@ export function registerReportsTrimestralRoutes(app: Express) {
         totalObtido: parseFloat(row.total_obtido) || 0,
         negociosGanhos: parseInt(row.negocios_ganhos) || 0,
       }));
+
+      // Ranking SDRs + top reuniões (espelha mensal ~L1332-1354) — FLUXO no tri.
+      const sdrPhotoMap: Record<string, string> = {};
+      (sdrPhotosRows.rows as any[]).forEach((row: any) => {
+        if (row.picture && row.name) sdrPhotoMap[row.name] = row.picture;
+      });
+      const rankingSDRs = (sdrRankingRows.rows as any[]).map((row: any) => ({
+        name: row.name,
+        fotoUrl: sdrPhotoMap[row.name] || null,
+        mrrGerado: parseFloat(row.mrr_gerado) || 0,
+        pontualGerado: parseFloat(row.pontual_gerado) || 0,
+        totalGerado: parseFloat(row.total_gerado) || 0,
+        negociosGanhos: parseInt(row.negocios_ganhos) || 0,
+      }));
+      const topReunioesRow = (sdrReunioesRows.rows as any[])[0];
+      const topReunioes = topReunioesRow ? {
+        name: topReunioesRow.name,
+        fotoUrl: sdrPhotoMap[topReunioesRow.name] || null,
+        reunioes: parseInt(topReunioesRow.reunioes) || 0,
+      } : null;
 
       // Top pontual (maior pontualObtido do ranking do tri, igual mensal).
       const topPontual = [...rankingClosers].sort((a, b) => b.pontualObtido - a.pontualObtido)[0] || null;
@@ -1161,6 +1221,8 @@ export function registerReportsTrimestralRoutes(app: Express) {
         contratosMes,
         rankingClosers,
         topPontual,
+        rankingSDRs,
+        topReunioes,
         rankingSquads,
         squadDetails,
         pontualData,
