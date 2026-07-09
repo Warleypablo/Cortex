@@ -54,6 +54,7 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
       caz_norm AS MATERIALIZED (
         SELECT c.ids, regexp_replace(c.cnpj::text, '\\D', '', 'g') AS cnpj_norm
         FROM "Conta Azul".caz_clientes c
+        WHERE LENGTH(regexp_replace(c.cnpj::text, '\\D', '', 'g')) IN (11, 14)
       ),
       caz_map AS MATERIALIZED (
         SELECT DISTINCT k.task_id, z.ids
