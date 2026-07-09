@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useRelatorioTrimestral } from "./relatorio-trimestral/useRelatorioTrimestral";
 import { getTrimestreOptions, getDefaultTrimestre } from "./relatorio-trimestral/trimestre-options";
-import SlideCapa from "./relatorio-mensal/SlideCapa";
+import SlideCapaTrimestre from "./relatorio-trimestral/SlideCapaTrimestre";
 import SlideRankingClosers from "./relatorio-mensal/SlideRankingClosers";
 import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
 import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
@@ -130,7 +130,7 @@ export default function RelatorioTrimestral() {
     const slot = slots[currentSlide];
     if (!slot) return null;
     switch (slot.type) {
-      case "capa":         return <SlideCapa mesLabel={data.label} titulo="Reporte Trimestral" />;
+      case "capa":         return <SlideCapaTrimestre data={data} />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
       case "vendas":       return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.label} />;
       case "evolucao":     return <SlideEvolucaoTrimestre trend={data.trend} />;
@@ -155,9 +155,18 @@ export default function RelatorioTrimestral() {
           if (e.clientX - rect.left < rect.width * 0.3) setCurrentSlide((s) => Math.max(s - 1, 0));
           else setCurrentSlide((s) => Math.min(s + 1, totalSlides - 1));
         }}>
-        <div ref={slideRef} className="overflow-hidden"
+        <div ref={slideRef} className="overflow-hidden relative"
           style={{ width: SLIDE_BASE_W, height: SLIDE_BASE_H, transform: `scale(${presentationScale})`, transformOrigin: "center center" }}>
-          {renderSlide()}
+          {/* key remonta o slide a cada troca → transição de entrada */}
+          <div key={`${selectedTri}-${currentSlide}`} className="w-full h-full animate-in fade-in slide-in-from-right-4 duration-300 motion-reduce:animate-none">
+            {renderSlide()}
+          </div>
+          {!isExporting && (
+            <div
+              className="absolute bottom-0 left-0 h-[3px] bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-300 z-20"
+              style={{ width: `${((currentSlide + 1) / Math.max(totalSlides, 1)) * 100}%` }}
+            />
+          )}
         </div>
         <div className="absolute bottom-0 left-0 right-0 opacity-0 hover:opacity-100 transition-opacity">
           <div className="flex items-center justify-center gap-3 py-3 bg-gradient-to-t from-black/80 to-transparent">
@@ -212,7 +221,16 @@ export default function RelatorioTrimestral() {
           <>
             <div ref={slideRef} className="rounded-xl overflow-hidden shadow-2xl border border-zinc-800 relative"
               style={{ width: SLIDE_BASE_W, height: SLIDE_BASE_H, transform: `scale(${editorScale})`, transformOrigin: "center center" }}>
-              {renderSlide()}
+              {/* key remonta o slide a cada troca → transição de entrada */}
+              <div key={`${selectedTri}-${currentSlide}`} className="w-full h-full animate-in fade-in slide-in-from-right-4 duration-300 motion-reduce:animate-none">
+                {renderSlide()}
+              </div>
+              {!isExporting && (
+                <div
+                  className="absolute bottom-0 left-0 h-[3px] bg-gradient-to-r from-emerald-400 to-cyan-400 transition-all duration-300 z-20"
+                  style={{ width: `${((currentSlide + 1) / Math.max(totalSlides, 1)) * 100}%` }}
+                />
+              )}
             </div>
             <div className="flex items-center gap-4 mt-4">
               <Button variant="ghost" size="icon" onClick={() => setCurrentSlide((s) => Math.max(s - 1, 0))} disabled={currentSlide === 0}>

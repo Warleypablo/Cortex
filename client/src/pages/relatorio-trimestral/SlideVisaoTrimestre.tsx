@@ -2,6 +2,7 @@ import { TrendingUp } from "lucide-react";
 import SlideLayout from "../relatorio-mensal/SlideLayout";
 import { SlideHeader, SecondaryCard } from "../relatorio-mensal/SlideComponents";
 import type { RelatorioTrimestralData, Qoq, TrendPoint } from "./types";
+import { useCountUp } from "./useCountUp";
 
 function formatBRL(v: number): string {
   return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(v);
@@ -115,11 +116,13 @@ function HeroTile({
   delayMs?: number;
 }) {
   const anim = tileAnim(delayMs);
+  // Count-up sincronizado com a entrada do card (termina antes do screenshot do PDF)
+  const valorAnimado = useCountUp(q.atual, 750, delayMs + 200);
   return (
     <div className={anim.className} style={anim.style}>
       <SecondaryCard className="p-5 flex flex-col min-h-0 h-full" borderColor={accent}>
         <p className="text-[11px] text-zinc-500 uppercase tracking-widest">{label}</p>
-        <p className={`${hero ? "text-5xl" : "text-4xl"} font-black text-white mt-1.5`}>{formatBRL(q.atual)}</p>
+        <p className={`${hero ? "text-5xl" : "text-4xl"} font-black text-white mt-1.5`}>{formatBRL(valorAnimado)}</p>
         <div className="flex items-center gap-2 mt-2">
           <VariacaoBadge q={q} />
           <span className="text-xs text-zinc-500">
@@ -132,13 +135,26 @@ function HeroTile({
   );
 }
 
-function InfoTile({ label, valor, sub, delayMs = 0 }: { label: string; valor: string; sub: string; delayMs?: number }) {
+function InfoTile({
+  label,
+  valor,
+  formatar,
+  sub,
+  delayMs = 0,
+}: {
+  label: string;
+  valor: number;
+  formatar: (v: number) => string;
+  sub: string;
+  delayMs?: number;
+}) {
   const anim = tileAnim(delayMs);
+  const valorAnimado = useCountUp(valor, 750, delayMs + 200);
   return (
     <div className={anim.className} style={anim.style}>
       <SecondaryCard className="p-5 flex flex-col justify-center h-full">
         <p className="text-[11px] text-zinc-500 uppercase tracking-widest">{label}</p>
-        <p className="text-4xl font-black text-white mt-1.5">{valor}</p>
+        <p className="text-4xl font-black text-white mt-1.5">{formatar(valorAnimado)}</p>
         <span className="text-xs text-zinc-500 mt-2">{sub}</span>
       </SecondaryCard>
     </div>
@@ -196,19 +212,22 @@ export default function SlideVisaoTrimestre({ data }: { data: RelatorioTrimestra
         <div className="grid grid-cols-3 gap-4 flex-[2] min-h-0">
           <InfoTile
             label="Churn % (média mensal)"
-            valor={`${churnPctMedia.toFixed(1).replace(".", ",")}%`}
+            valor={churnPctMedia}
+            formatar={(v) => `${v.toFixed(1).replace(".", ",")}%`}
             sub={`média dos ${nMeses} meses do tri · churn ÷ MRR ativo`}
             delayMs={350}
           />
           <InfoTile
             label="Clientes ativos"
-            valor={String(data.turboMetrics.clientesAtivos)}
+            valor={data.turboMetrics.clientesAtivos}
+            formatar={(v) => String(Math.round(v))}
             sub="foto do fim do trimestre"
             delayMs={450}
           />
           <InfoTile
             label="Ticket médio por cliente"
-            valor={formatBRL(data.turboMetrics.ticketMedioCliente)}
+            valor={data.turboMetrics.ticketMedioCliente}
+            formatar={formatBRL}
             sub="MRR ÷ clientes ativos"
             delayMs={550}
           />
