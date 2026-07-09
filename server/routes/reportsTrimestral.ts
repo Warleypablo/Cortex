@@ -31,6 +31,42 @@ const CHURN_SQUAD_OVERRIDE_ESPELHO: Record<string, { taskId: string; squadDestin
   "2026-05": [{ taskId: "86a78223q", squadDestino: "🐑 Black" }],
 };
 
+// ─── CTEs do squad Black = ACCOUNTS (reusadas em 2 queries) ───
+// `accounts`        = roster do time de accounts (RH: squad "Black Sheep", ativos).
+// `cliente_account` = mapa cliente → account, via cup_clientes.responsavel_geral.
+//
+// responsavel_geral é a coluna do "dono" do cliente, mas mistura líderes de TODOS os
+// squads (Pedro Paulo/Pulse, Glauber/Selva, Eduardo Galvão…) — por isso casamos cada
+// nome contra o roster do RH. Os nomes divergem: responsavel_geral usa nome curto
+// ("Aline Souza") e o RH o completo ("Aline de Carvalho de Souza"), então o match é
+// 1º nome + sobrenome ∈ tokens do nome no RH. Também há clientes co-geridos, com
+// nomes separados por ';'.
+const ACCOUNTS_CTES = sql`
+  accounts AS (
+    SELECT DISTINCT
+      LOWER(split_part(TRIM(nome), ' ', 1)) AS first_tok,
+      string_to_array(LOWER(TRIM(nome)), ' ') AS toks
+    FROM "Inhire".rh_pessoal
+    WHERE squad = 'Black Sheep' AND status = 'Ativo'
+      AND nome IS NOT NULL AND TRIM(nome) != ''
+  ),
+  cliente_account AS (
+    SELECT task_id, MIN(nome) AS nome
+    FROM (
+      SELECT c.task_id, TRIM(rg.nome) AS nome
+      FROM "Clickup".cup_clientes c,
+           LATERAL regexp_split_to_table(c.responsavel_geral, ';') AS rg(nome)
+      WHERE c.task_id IS NOT NULL AND TRIM(rg.nome) != ''
+        AND EXISTS (
+          SELECT 1 FROM accounts a
+          WHERE a.first_tok = LOWER(split_part(TRIM(rg.nome), ' ', 1))
+            AND LOWER(regexp_replace(TRIM(rg.nome), '^.* ', '')) = ANY(a.toks)
+        )
+    ) x
+    GROUP BY task_id
+  )
+`;
+
 function mesToQuarter(month: string): { q: string; label: string; ano: number; quarter: number } {
   const [anoStr, mStr] = month.split("-");
   const ano = parseInt(anoStr, 10);
@@ -567,6 +603,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         mrrAnteriorTotalRows,
         operadoresPorSquadRows,
         accountsRows,
+        blackCarteiraRows,
       ] = await Promise.all([
         // Espelha query 15 (ranking squads por MRR + Pontual) — FOTO em w.fotoDate,
         // fallback ao snapshot mais recente ≤ fotoDate.
@@ -844,29 +881,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
               (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
             ) as snap
           ),
-          accounts AS (
-            SELECT DISTINCT
-              LOWER(split_part(TRIM(nome), ' ', 1)) AS first_tok,
-              string_to_array(LOWER(TRIM(nome)), ' ') AS toks
-            FROM "Inhire".rh_pessoal
-            WHERE squad = 'Black Sheep' AND status = 'Ativo'
-              AND nome IS NOT NULL AND TRIM(nome) != ''
-          ),
-          cliente_account AS (
-            SELECT task_id, MIN(nome) AS nome
-            FROM (
-              SELECT c.task_id, TRIM(rg.nome) AS nome
-              FROM "Clickup".cup_clientes c,
-                   LATERAL regexp_split_to_table(c.responsavel_geral, ';') AS rg(nome)
-              WHERE c.task_id IS NOT NULL AND TRIM(rg.nome) != ''
-                AND EXISTS (
-                  SELECT 1 FROM accounts a
-                  WHERE a.first_tok = LOWER(split_part(TRIM(rg.nome), ' ', 1))
-                    AND LOWER(regexp_replace(TRIM(rg.nome), '^.* ', '')) = ANY(a.toks)
-                )
-            ) x
-            GROUP BY task_id
-          ),
+          ${ACCOUNTS_CTES},
           mrr_por_cs AS (
             SELECT g.nome,
               COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) AS mrr
@@ -929,6 +944,95 @@ export function registerReportsTrimestralRoutes(app: Express) {
           ) p ON true
           WHERE r.rn <= 3
           ORDER BY r.faturamento DESC
+        `),
+        // Slide "Squad em Destaque" do Black: o Black é a camada de ACCOUNTS, não uma
+        // squad de entrega. Suas métricas são a CARTEIRA dos accounts — todos os
+        // contratos abaixo dos clientes deles — e não os contratos com squad = Black
+        // (que são só 2, R$9k). Mesma fonte do card "Operadores por Squad".
+        // ⚠️ Por construção isso SOBREPÕE as squads de entrega: um contrato do cliente
+        // da Aline entregue pelo Squadra conta no MRR do Black E no do Squadra. É o
+        // esperado — são lentes ortogonais (quem gere a conta × quem entrega).
+        db.execute(sql`
+          WITH ${ACCOUNTS_CTES},
+          snap_fim AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${w.fotoDate}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
+            ) AS d
+          ),
+          snap_ini AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${w.dataStart}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.dataStart}::date)
+            ) AS d
+          ),
+          mrr_fim AS (
+            SELECT COALESCE(SUM(h.valorr::numeric), 0) AS mrr,
+              COUNT(*)::int AS contratos,
+              COUNT(DISTINCT h.id_task)::int AS clientes
+            FROM "Clickup".cup_data_hist h
+            JOIN snap_fim s ON h.data_snapshot = s.d
+            JOIN cliente_account g ON h.id_task = g.task_id
+            WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+              AND h.valorr IS NOT NULL AND h.valorr::numeric > 0
+          ),
+          mrr_ini AS (
+            SELECT COALESCE(SUM(h.valorr::numeric), 0) AS mrr
+            FROM "Clickup".cup_data_hist h
+            JOIN snap_ini s ON h.data_snapshot = s.d
+            JOIN cliente_account g ON h.id_task = g.task_id
+            WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+              AND h.valorr IS NOT NULL AND h.valorr::numeric > 0
+          ),
+          pont_atual AS (
+            SELECT COALESCE(SUM(ct.valorp::numeric), 0) AS pontual
+            FROM "Clickup".cup_contratos ct
+            JOIN cliente_account g ON ct.id_task = g.task_id
+            WHERE LOWER(TRIM(ct.status)) = 'entregue'
+              AND ct.data_entrega >= ${w.dataStart}::date
+              AND ct.data_entrega < ${w.dataEnd}::date
+              AND COALESCE(ct.valorp, 0) > 0
+          ),
+          pont_prev AS (
+            SELECT COALESCE(SUM(ct.valorp::numeric), 0) AS pontual
+            FROM "Clickup".cup_contratos ct
+            JOIN cliente_account g ON ct.id_task = g.task_id
+            WHERE LOWER(TRIM(ct.status)) = 'entregue'
+              AND ct.data_entrega >= ${w.prev.dataStart}::date
+              AND ct.data_entrega < ${w.prev.dataEnd}::date
+              AND COALESCE(ct.valorp, 0) > 0
+          ),
+          churn_carteira AS (
+            SELECT
+              COALESCE(SUM(v.valor_r), 0)::numeric AS churn_total_brl,
+              COUNT(*)::int AS churn_total_count,
+              COALESCE(SUM(v.valor_r) FILTER (WHERE COALESCE(v.abonar_churn, '') != 'Sim'), 0)::numeric AS churn_brl,
+              (COUNT(*) FILTER (WHERE COALESCE(v.abonar_churn, '') != 'Sim'))::int AS churn_count,
+              COALESCE(
+                json_agg(
+                  json_build_object(
+                    'nome', COALESCE(cl.nome, v.nome),
+                    'valor', COALESCE(v.valor_r, 0),
+                    'abonado', COALESCE(v.abonar_churn, '') = 'Sim'
+                  )
+                  ORDER BY v.valor_r DESC NULLS LAST
+                ) FILTER (WHERE COALESCE(v.valor_r, 0) > 0),
+                '[]'::json
+              ) AS clientes
+            FROM cortex_core.vw_cup_churn_ajustado v
+            JOIN cliente_account g ON v.parent_id = g.task_id
+            LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = v.parent_id
+            WHERE v.data_solicitacao_encerramento IS NOT NULL
+              AND v.data_solicitacao_encerramento >= ${w.dataStart}::date
+              AND v.data_solicitacao_encerramento < ${w.dataEnd}::date
+          )
+          SELECT
+            f.mrr, f.contratos, f.clientes,
+            i.mrr AS mrr_anterior,
+            pa.pontual, pp.pontual AS pontual_anterior,
+            c.churn_total_brl, c.churn_total_count, c.churn_brl, c.churn_count,
+            c.clientes AS churn_clientes
+          FROM mrr_fim f, mrr_ini i, pont_atual pa, pont_prev pp, churn_carteira c
         `),
       ]);
 
@@ -1019,6 +1123,10 @@ export function registerReportsTrimestralRoutes(app: Express) {
 
       const squadDetails = (rankingSquadsRows.rows as any[])
         .filter((row: any) => !SQUADS_OCULTOS_DETALHES.has(normalizeSquadName(row.squad)))
+        // Squads desativadas ("Aura (OFF)", "Aurea (OFF)"…) não rendem slide: o
+        // normalizeSquadName remove o sufixo, então elas escapavam do Set de ocultos.
+        // O slide de operadores já filtrava assim; aqui faltava.
+        .filter((row: any) => !/\(off\)/i.test(row.squad || ""))
         .map((row: any) => {
           const mrr = parseFloat(row.mrr) || 0;
           const pontual = pontualEntregueBySquad[normalizeSquadName(row.squad)] || 0; // pontual entregue no tri (não em aberto)
@@ -1074,6 +1182,52 @@ export function registerReportsTrimestralRoutes(app: Express) {
             evolucaoMrr: mrr - mrrAnt,
           };
         });
+
+      // Black = ACCOUNTS: substitui as métricas do slide pela CARTEIRA dos accounts
+      // (todos os contratos abaixo dos clientes deles), igual ao card "Operadores por
+      // Squad". Os contratos com squad = "🐑 Black" são apenas 2 (R$9k) e não
+      // representam o time. Ratios (ticket, churn %, NRR) são recalculados sobre a
+      // base da carteira para não misturar numerador de uma lente com denominador de
+      // outra. A expansão do espelho, se houver, continua valendo.
+      const blackIdx = squadDetails.findIndex((d: any) => normalizeSquadName(d.squad) === "black");
+      const blackRow = (blackCarteiraRows.rows as any[])[0];
+      if (blackIdx >= 0 && blackRow) {
+        const bMrr = parseFloat(blackRow.mrr) || 0;
+        const bMrrAnt = parseFloat(blackRow.mrr_anterior) || 0;
+        const bPontual = parseFloat(blackRow.pontual) || 0;
+        const bPontualAnt = parseFloat(blackRow.pontual_anterior) || 0;
+        const bContratos = parseInt(blackRow.contratos) || 0;
+        const bClientes = parseInt(blackRow.clientes) || 0;
+        const bChurnBrl = parseFloat(blackRow.churn_brl) || 0;
+        const bChurnTotalBrl = parseFloat(blackRow.churn_total_brl) || 0;
+        const bChurnClientes = (blackRow.churn_clientes as any[]) ?? [];
+        const bBase = bMrrAnt > 0 ? bMrrAnt : bMrr;
+        const bExpansao = expansaoTri["black"] ?? { vendas: 0, abatimento: 0 };
+        const bNrrBrl = bChurnBrl - bExpansao.abatimento;
+
+        squadDetails[blackIdx] = {
+          squad: squadDetails[blackIdx].squad,
+          mrr: bMrr,
+          pontual: bPontual,
+          evolucao: [
+            { q: w.prev.trimestre, label: w.prev.label, mrr: bMrrAnt, pontual: bPontualAnt, total: bMrrAnt + bPontualAnt },
+            { q: w.trimestre, label: w.label, mrr: bMrr, pontual: bPontual, total: bMrr + bPontual },
+          ],
+          ticketMedio: bContratos > 0 ? Math.round(bMrr / bContratos) : 0,
+          clientes: bClientes,
+          churnPct: bBase > 0 ? Math.round((bChurnBrl / bBase) * 1000) / 10 : 0,
+          churnBrl: bChurnBrl,
+          churnTotalPct: bBase > 0 ? Math.round((bChurnTotalBrl / bBase) * 1000) / 10 : 0,
+          churnTotalBrl: bChurnTotalBrl,
+          churnClientes: [...bChurnClientes].sort((a, b) => (b.valor || 0) - (a.valor || 0)),
+          vendasMes: bExpansao.vendas,
+          expansaoNrr: bExpansao.abatimento,
+          nrrBrl: bNrrBrl,
+          nrrPct: bBase > 0 ? Math.round((bNrrBrl / bBase) * 1000) / 10 : 0,
+          mrrBase: bBase,
+          evolucaoMrr: bMrr - bMrrAnt,
+        };
+      }
 
       // Top 3 operadores por squad (slide "Operadores por Squad"). Agrupa as rows já
       // vindas ordenadas (squad_total DESC, rn), exclui squads não-operacionais
