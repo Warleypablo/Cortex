@@ -5,12 +5,29 @@ import type {
 
 // metaMrr = meta de MRR ativo do BP 2026 no mês da foto do trimestre; null quando o
 // trimestre está fora do BP (ex.: Q4 2025) — a linha de meta não é desenhada ali.
-export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number; metaMrr: number | null }
+//
+// Trilha do PONTUAL: pontual = receita entregue no tri (fluxo) · pontualContratos =
+// nº de entregas · vendasPontual = aquisição no tri (fluxo) · estoquePontual = fila
+// em aberto na foto do fim do tri (null sem snapshot).
+export interface TrendPoint {
+  q: string; label: string;
+  mrr: number; vendas: number; churn: number; metaMrr: number | null;
+  pontual: number; pontualContratos: number; vendasPontual: number; estoquePontual: number | null;
+}
 export interface Qoq { atual: number; anterior: number; betterDirection: "up" | "down" }
 
 export interface TrendData {
   series: TrendPoint[];
-  qoq: { mrr: Qoq; vendas: Qoq; churn: Qoq };
+  qoq: {
+    mrr: Qoq; vendas: Qoq; churn: Qoq;
+    pontualReceita: Qoq; pontualVendas: Qoq; pontualEstoque: Qoq;
+  };
+}
+
+// Apoio do slide "Visão do Trimestre — Pontual".
+export interface VisaoPontual {
+  tempoMedioEntregaDias: number;
+  amostraEntregas: number;
 }
 
 // Tickets médios por CLIENTE, mesma régua nos dois lados:
@@ -121,6 +138,7 @@ export interface RelatorioTrimestralData {
   squadDetails: SquadDetailTri[];
   operadoresPorSquad: SquadOperadores[];
   pontualData: PontualData;
+  visaoPontual: VisaoPontual;
   techData: TechTrimestralData;
   faturavel: Faturavel;
 }

@@ -10,6 +10,7 @@ import SlideMantra from "./relatorio-trimestral/SlideMantra";
 import SlideQrTrimestre from "./relatorio-trimestral/SlideQrTrimestre";
 import SlideVendasTrimestre from "./relatorio-trimestral/SlideVendasTrimestre";
 import SlideVisaoTrimestre from "./relatorio-trimestral/SlideVisaoTrimestre";
+import SlideVisaoPontualTrimestre from "./relatorio-trimestral/SlideVisaoPontualTrimestre";
 import SlideClosersTrimestre from "./relatorio-trimestral/SlideClosersTrimestre";
 import SlideSdrsTrimestre from "./relatorio-trimestral/SlideSdrsTrimestre";
 import SlideTurboTrimestre from "./relatorio-trimestral/SlideTurboTrimestre";
@@ -26,7 +27,7 @@ const SLIDE_BASE_W = 1280;
 const SLIDE_BASE_H = 720;
 
 type TrimSlot =
-  | { type: "mantra" } | { type: "qr" } | { type: "capa" } | { type: "visao" } | { type: "vendas" } | { type: "evolucao" }
+  | { type: "mantra" } | { type: "qr" } | { type: "capa" } | { type: "visao" } | { type: "visao-pontual" } | { type: "vendas" } | { type: "evolucao" }
   | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" }
   | { type: "closers" } | { type: "sdrs" } | { type: "turbo" } | { type: "squads-ranking" }
   | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "tech" }
@@ -71,7 +72,7 @@ export default function RelatorioTrimestral() {
     // O QR entra logo após o Mantra: a plateia escaneia cedo e manda perguntas
     // durante o reporte; o slide de Q&A no fim é onde elas são respondidas.
     const abertura: TrimSlot[] = [
-      { type: "mantra" }, { type: "qr" }, { type: "capa" }, { type: "visao" }, { type: "evolucao" },
+      { type: "mantra" }, { type: "qr" }, { type: "capa" }, { type: "visao" }, { type: "visao-pontual" }, { type: "evolucao" },
     ];
     const comercial: TrimSlot[] = [
       { type: "capa-comercial" }, { type: "vendas" }, { type: "closers" }, { type: "sdrs" },
@@ -150,6 +151,7 @@ export default function RelatorioTrimestral() {
       case "capa-operacao":  return <SlideCapaSecao numero="02" titulo="Operação" subtitulo="Turbo Commerce · Squads · Pontual · NPS" accent="#34d399" accentSoft="rgba(52,211,153,0.12)" label={data.label} />;
       case "capa-tech":      return <SlideCapaSecao numero="03" titulo="Tech" subtitulo="Projetos · Receita · Pipeline" accent="#a78bfa" accentSoft="rgba(167,139,250,0.12)" label={data.label} />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
+      case "visao-pontual": return <SlideVisaoPontualTrimestre data={data} />;
       case "vendas":       return <SlideVendasTrimestre dados={data.contratosMes} label={data.label} qoqVendas={data.trend.qoq.vendas} />;
       case "evolucao":     return <SlideEvolucaoTrimestre trend={data.trend} />;
       case "closers":      return <SlideClosersTrimestre ranking={data.rankingClosers} topPontual={data.topPontual} label={data.label} />;

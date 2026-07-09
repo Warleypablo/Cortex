@@ -4,9 +4,21 @@ import { db } from "../db";
 import { buildQuarterWindow, type QuarterWindow } from "./reportsTrimestral.window";
 import { getTechTrimestral } from "../lib/techDash";
 
-interface VendasMesInput { month: string; vendasMrr: number }
-interface MrrChurnMesInput { month: string; mrr: number; churnBrl: number }
-export interface TrendPoint { q: string; label: string; mrr: number; vendas: number; churn: number; metaMrr: number | null }
+interface VendasMesInput { month: string; vendasMrr: number; vendasPontual?: number }
+interface MrrChurnMesInput { month: string; mrr: number; churnBrl: number; pontual?: number; pontualContratos?: number }
+export interface TrendPoint {
+  q: string; label: string;
+  mrr: number; vendas: number; churn: number; metaMrr: number | null;
+  // Trilha do PONTUAL (slide "Visão do Trimestre — Pontual"):
+  // pontual        = receita entregue no tri (FLUXO, cup_contratos.data_entrega)
+  // pontualContratos = nº de contratos entregues no tri
+  // vendasPontual  = aquisição no tri (FLUXO, contratos criados com valorp > 0)
+  // estoquePontual = fila em aberto na FOTO do fim do tri (null se não há snapshot)
+  pontual: number;
+  pontualContratos: number;
+  vendasPontual: number;
+  estoquePontual: number | null;
+}
 export interface Qoq { atual: number; anterior: number; betterDirection: "up" | "down" }
 
 // ─── Espelhos das tabelas manuais do mensal (relatorioMensalSlides.ts L15-41) ───
@@ -83,19 +95,46 @@ export function aggregateTrend(
   // meta (ex.: 2025, fora do BP 2026) resultam em metaMrr = null e a linha de meta
   // simplesmente não é desenhada ali.
   metasMrrPorMes: Record<string, number> = {},
-): { series: TrendPoint[]; qoq: { mrr: Qoq; vendas: Qoq; churn: Qoq } } {
-  // Acumula por trimestre: vendas e churn somam; mrr guarda a foto do ÚLTIMO mês (maior "YYYY-MM").
-  const acc = new Map<string, { label: string; vendas: number; churn: number; mrrMonth: string; mrr: number }>();
+  // Estoque pontual em aberto na FOTO do fim de cada trimestre ("YYYY-Qn" → valor).
+  // É o único ponto do trend que não vem de série mensal (é snapshot, não fluxo).
+  estoquePontualPorTri: Record<string, number> = {},
+): {
+  series: TrendPoint[];
+  qoq: {
+    mrr: Qoq; vendas: Qoq; churn: Qoq;
+    pontualReceita: Qoq; pontualVendas: Qoq; pontualEstoque: Qoq;
+  };
+} {
+  // Acumula por trimestre: vendas, churn e pontual somam; mrr guarda a foto do ÚLTIMO mês.
+  const acc = new Map<string, {
+    label: string; vendas: number; churn: number; mrrMonth: string; mrr: number;
+    pontual: number; pontualContratos: number; vendasPontual: number;
+  }>();
   const ensure = (month: string) => {
     const { q, label } = mesToQuarter(month);
-    if (!acc.has(q)) acc.set(q, { label, vendas: 0, churn: 0, mrrMonth: "", mrr: 0 });
+    if (!acc.has(q)) {
+      acc.set(q, { label, vendas: 0, churn: 0, mrrMonth: "", mrr: 0, pontual: 0, pontualContratos: 0, vendasPontual: 0 });
+    }
     return acc.get(q)!;
   };
-  for (const v of vendasPorMes) ensure(v.month).vendas += v.vendasMrr || 0;
+  for (const v of vendasPorMes) {
+    const bucket = ensure(v.month);
+    bucket.vendas += v.vendasMrr || 0;
+    bucket.vendasPontual += v.vendasPontual || 0;
+  }
   for (const m of mrrChurnPorMes) {
     const bucket = ensure(m.month);
     bucket.churn += m.churnBrl || 0;
-    if (m.month >= bucket.mrrMonth) { bucket.mrrMonth = m.month; bucket.mrr = m.mrr || 0; }
+    bucket.pontual += m.pontual || 0;
+    bucket.pontualContratos += m.pontualContratos || 0;
+    // Foto do MRR = último mês do tri COM MRR positivo. O ">0" importa: a série
+    // mensal passou a incluir meses sem snapshot (mrr 0) para não encurtar churn e
+    // receita pontual; sem esse guarda, um mês final sem snapshot zeraria o MRR do
+    // trimestre e o derrubaria da série inteira.
+    if ((m.mrr || 0) > 0 && m.month >= bucket.mrrMonth) {
+      bucket.mrrMonth = m.month;
+      bucket.mrr = m.mrr;
+    }
   }
 
   const series: TrendPoint[] = Array.from(acc.entries())
@@ -103,6 +142,10 @@ export function aggregateTrend(
     .map(([q, b]) => ({
       q, label: b.label, mrr: b.mrr, vendas: b.vendas, churn: b.churn,
       metaMrr: metasMrrPorMes[b.mrrMonth] ?? null,
+      pontual: b.pontual,
+      pontualContratos: b.pontualContratos,
+      vendasPontual: b.vendasPontual,
+      estoquePontual: estoquePontualPorTri[q] ?? null,
     }));
 
   const atual = series.find((s) => s.q === window.trimestre);
@@ -123,6 +166,11 @@ export function aggregateTrend(
       mrr: mk((p) => p.mrr, "up"),
       vendas: mk((p) => p.vendas, "up"),
       churn: mk((p) => p.churn, "down"),
+      pontualReceita: mk((p) => p.pontual, "up"),
+      pontualVendas: mk((p) => p.vendasPontual, "up"),
+      // Estoque é a FILA a entregar: crescer não é vitória. Com lead time de ~68
+      // dias, backlog subindo é dívida de entrega — por isso "down" é o bom.
+      pontualEstoque: mk((p) => p.estoquePontual ?? 0, "down"),
     },
   };
 }
@@ -141,7 +189,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
       // de série mensal já validadas em produção no relatorioMensalSlides.ts
       // (vendasSeriesResult e receitaChurnResult), com o lookback estendido para
       // ~18 meses terminando em w.dataEnd, e agrega os meses em trimestres em JS.
-      const [vendasRows, mrrChurnRows, metaMrrRows] = await Promise.all([
+      const [vendasRows, mrrChurnRows, metaMrrRows, vendasPontualRows, estoquePontualRows, tempoEntregaRows] = await Promise.all([
         // Espelha vendasSeriesResult (query 27 do mensal)
         db.execute(sql`
           SELECT
@@ -198,7 +246,8 @@ export function registerReportsTrimestralRoutes(app: Express) {
           pontual_mensal AS (
             SELECT
               TO_CHAR(data_entrega, 'YYYY-MM') as month,
-              COALESCE(SUM(valorp::numeric), 0) as pontual
+              COALESCE(SUM(valorp::numeric), 0) as pontual,
+              COUNT(*)::int as pontual_contratos
             FROM "Clickup".cup_contratos, date_range dr
             WHERE data_entrega IS NOT NULL
               AND data_entrega >= dr.range_start
@@ -206,16 +255,28 @@ export function registerReportsTrimestralRoutes(app: Express) {
               AND valorp IS NOT NULL AND valorp::numeric > 0
               AND LOWER(TRIM(status)) = 'entregue'
             GROUP BY TO_CHAR(data_entrega, 'YYYY-MM')
+          ),
+          -- Espinha de meses = união das três fontes. Antes o FROM era mrr_mensal, que
+          -- só tem meses COM snapshot (cup_data_hist começa em 17/nov/2025): out/2025
+          -- caía fora e a barra do Q4 2025 saía 28% curta no churn e na receita pontual.
+          -- O mrr de um mês sem snapshot fica 0, e como o bucket do trimestre guarda a
+          -- foto do ÚLTIMO mês, isso não contamina o MRR do tri.
+          meses AS (
+            SELECT month FROM mrr_mensal
+            UNION SELECT month FROM churn_mensal
+            UNION SELECT month FROM pontual_mensal
           )
           SELECT
-            m.month,
-            m.mrr,
+            ms.month,
+            COALESCE(m.mrr, 0) as mrr,
             COALESCE(c.churn_brl, 0) as churn_brl,
-            COALESCE(p.pontual, 0) as pontual
-          FROM mrr_mensal m
-          LEFT JOIN churn_mensal c ON m.month = c.month
-          LEFT JOIN pontual_mensal p ON m.month = p.month
-          ORDER BY m.month
+            COALESCE(p.pontual, 0) as pontual,
+            COALESCE(p.pontual_contratos, 0) as pontual_contratos
+          FROM meses ms
+          LEFT JOIN mrr_mensal m ON m.month = ms.month
+          LEFT JOIN churn_mensal c ON c.month = ms.month
+          LEFT JOIN pontual_mensal p ON p.month = ms.month
+          ORDER BY ms.month
         `),
         // Meta de MRR ativo do BP 2026 (linha de meta do gráfico "Evolução por
         // Trimestre"). A tabela guarda só o mês (1..12) — é exclusiva de 2026.
@@ -224,6 +285,74 @@ export function registerReportsTrimestralRoutes(app: Express) {
           FROM cortex_core.bp2026_orcado
           WHERE metrica = 'mrr_ativo'
           ORDER BY mes
+        `),
+        // Vendas PONTUAIS por mês (aquisição): contratos criados com valorp > 0.
+        // Mesmo lookback de ~18 meses das outras séries. Espelha a régua do bloco
+        // pontualData.aquisicao, só que serializado por mês.
+        db.execute(sql`
+          WITH date_range AS (
+            SELECT ${w.dataEnd}::date - interval '18 months' as range_start,
+                   ${w.dataEnd}::date as range_end
+          )
+          SELECT
+            TO_CHAR(data_criado, 'YYYY-MM') as month,
+            COALESCE(SUM(valorp::numeric), 0)::numeric as vendas_pontual
+          FROM "Clickup".cup_contratos, date_range dr
+          WHERE data_criado IS NOT NULL
+            AND data_criado >= dr.range_start
+            AND data_criado < dr.range_end
+            AND valorp IS NOT NULL AND valorp::numeric > 0
+          GROUP BY TO_CHAR(data_criado, 'YYYY-MM')
+          ORDER BY month
+        `),
+        // Estoque pontual em aberto na FOTO do fim de cada trimestre. generate_series
+        // dá os primeiros dias de trimestre (= fim EXCLUSIVO do anterior); o snapshot
+        // é o do dia, com fallback para o mais recente ≤ ele. Trimestres anteriores ao
+        // início do cup_data_hist (17/nov/2025) ficam sem snapshot e são descartados.
+        // Mesmo filtro de status do bloco "em aberto" do slide Pontual.
+        db.execute(sql`
+          WITH fins AS (
+            SELECT (generate_series(
+              date_trunc('quarter', ${w.dataEnd}::date - interval '18 months'),
+              ${w.dataEnd}::date,
+              interval '3 months'
+            ))::date AS fim
+          ),
+          snaps AS (
+            SELECT f.fim,
+              COALESCE(
+                (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = f.fim LIMIT 1),
+                (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= f.fim)
+              ) AS snap
+            FROM fins f
+          )
+          SELECT
+            EXTRACT(YEAR FROM (s.fim - interval '1 day'))::int || '-Q' ||
+              EXTRACT(QUARTER FROM (s.fim - interval '1 day'))::int AS tri,
+            COALESCE(SUM(h.valorp::numeric), 0)::numeric AS estoque
+          FROM snaps s
+          LEFT JOIN "Clickup".cup_data_hist h
+            ON h.data_snapshot = s.snap
+           AND h.valorp IS NOT NULL AND h.valorp::numeric > 0
+           AND LOWER(TRIM(h.status)) IN ('ativo','triagem','onboarding','em cancelamento','pausado')
+          WHERE s.snap IS NOT NULL
+          GROUP BY 1, s.fim
+          ORDER BY s.fim
+        `),
+        // Tempo médio de entrega dos contratos pontuais entregues no tri (dias).
+        // Exclui data_entrega < data_criado: são erros de carga (5 casos no Q1/2026),
+        // não entregas instantâneas — incluí-los puxaria a média para baixo.
+        db.execute(sql`
+          SELECT
+            COALESCE(AVG(data_entrega - data_criado), 0)::numeric as dias,
+            COUNT(*)::int as amostra
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(TRIM(status)) = 'entregue'
+            AND valorp IS NOT NULL AND valorp::numeric > 0
+            AND data_entrega >= ${w.dataStart}::date
+            AND data_entrega < ${w.dataEnd}::date
+            AND data_criado IS NOT NULL
+            AND data_entrega >= data_criado
         `),
       ]);
 
@@ -236,16 +365,48 @@ export function registerReportsTrimestralRoutes(app: Express) {
         metasMrrPorMes[`2026-${String(mes).padStart(2, "0")}`] = valor;
       }
 
-      const vendasPorMes = (vendasRows.rows as any[]).map((r) => ({
-        month: r.month as string,
-        vendasMrr: parseFloat(r.vendas_mrr) || 0,
+      // "YYYY-MM" → vendas pontuais (aquisição), para casar com a série de vendas MRR.
+      const vendasPontualPorMes: Record<string, number> = {};
+      for (const r of vendasPontualRows.rows as any[]) {
+        vendasPontualPorMes[r.month as string] = parseFloat(r.vendas_pontual) || 0;
+      }
+      // "YYYY-Qn" → estoque pontual em aberto na foto do fim do trimestre.
+      const estoquePontualPorTri: Record<string, number> = {};
+      for (const r of estoquePontualRows.rows as any[]) {
+        estoquePontualPorTri[r.tri as string] = parseFloat(r.estoque) || 0;
+      }
+
+      // A série de vendas MRR (Bitrix) e a de vendas pontuais (ClickUp) têm meses
+      // diferentes: união das duas, para nenhum mês sumir do trimestre.
+      const mesesVendas = Array.from(new Set([
+        ...(vendasRows.rows as any[]).map((r) => r.month as string),
+        ...Object.keys(vendasPontualPorMes),
+      ]));
+      const vendasMrrPorMes: Record<string, number> = {};
+      for (const r of vendasRows.rows as any[]) {
+        vendasMrrPorMes[r.month as string] = parseFloat(r.vendas_mrr) || 0;
+      }
+      const vendasPorMes = mesesVendas.map((month) => ({
+        month,
+        vendasMrr: vendasMrrPorMes[month] ?? 0,
+        vendasPontual: vendasPontualPorMes[month] ?? 0,
       }));
+
       const mrrChurnPorMes = (mrrChurnRows.rows as any[]).map((r) => ({
         month: r.month as string,
         mrr: parseFloat(r.mrr) || 0,
         churnBrl: parseFloat(r.churn_brl) || 0,
+        pontual: parseFloat(r.pontual) || 0,
+        pontualContratos: parseInt(r.pontual_contratos) || 0,
       }));
-      const trend = aggregateTrend(vendasPorMes, mrrChurnPorMes, w, metasMrrPorMes);
+      const trend = aggregateTrend(vendasPorMes, mrrChurnPorMes, w, metasMrrPorMes, estoquePontualPorTri);
+
+      // Métricas de apoio do slide "Visão do Trimestre — Pontual".
+      const tempoEntrega = (tempoEntregaRows.rows as any[])[0] || {};
+      const visaoPontual = {
+        tempoMedioEntregaDias: parseFloat(tempoEntrega.dias) || 0,
+        amostraEntregas: parseInt(tempoEntrega.amostra) || 0,
+      };
 
       // Bloco turboMetrics (Task 7): espelha as queries 9-13/18 de turboMetrics do
       // relatorioMensalSlides.ts, re-janeladas para o trimestre. Foto em w.fotoDate
@@ -1595,6 +1756,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         squadDetails,
         operadoresPorSquad,
         pontualData,
+        visaoPontual,
         techData,
         faturavel,
       });
