@@ -174,7 +174,9 @@ export default function SlideSquadTrimestre({ details, mesLabel }: Props) {
   const evolAnim = useCountUp(Math.abs(hero.evolucaoMrr), 750, countUpDelay + 20);
   const vendasAnim = useCountUp(hero.vendasMes ?? 0, 750, countUpDelay + 20);
 
-  const listaClientes = [...churnClientes].sort((a, b) => b.valor - a.valor).slice(0, 6);
+  // 4 itens + linha "+N outros" é o que cabe no card sem cortar linha ao meio
+  // (o bloco divide altura com Churn/NRR; validado visualmente no deck Q2-2026).
+  const listaClientes = [...churnClientes].sort((a, b) => b.valor - a.valor).slice(0, 4);
   const restantes = churnClientes.length - listaClientes.length;
 
   return (

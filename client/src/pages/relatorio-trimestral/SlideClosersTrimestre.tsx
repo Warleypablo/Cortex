@@ -55,8 +55,8 @@ export default function SlideClosersTrimestre({ ranking, topPontual, label }: Pr
       : top3.map((c, i) => ({ c, r: i }));
 
   // Compacto o bastante p/ pódio + 4 linhas de "demais closers" caberem nos 720px
-  const fotoPx = [86, 70, 62];
-  const podiumH = [84, 58, 42];
+  const fotoPx = [76, 64, 56];
+  const podiumH = [60, 44, 32];
 
   // Count-up do MRR obtido — hooks sempre chamados na mesma ordem (fallback 0 se não houver closer)
   const mrr0 = useCountUp(top3[0]?.mrrObtido ?? 0, 750, 200);
@@ -105,7 +105,7 @@ export default function SlideClosersTrimestre({ ranking, topPontual, label }: Pr
                   <p className={`font-black mt-0.5 tabular-nums ${isFirst ? "text-2xl" : "text-lg"} ${col.text}`}>
                     {fmtCompact(mrrAnim[originalIdx])}
                   </p>
-                  <p className="text-[11px] text-zinc-500 mt-0.5 mb-2">{c.negociosGanhos} negócios</p>
+                  <p className="text-[10px] text-zinc-500 mt-0.5 mb-1.5">{c.negociosGanhos} negócios</p>
                   <div
                     className={`w-full rounded-t-xl bg-gradient-to-b ${col.block} flex items-center justify-center`}
                     style={{ height: podiumH[r], borderTop: `2px solid ${col.ring}` }}
@@ -120,15 +120,15 @@ export default function SlideClosersTrimestre({ ranking, topPontual, label }: Pr
           {/* Demais closers: linhas compactas com GrowBar proporcional ao total obtido */}
           {hasResto && (
             <div {...entrance(250)} className="flex-1 min-h-0">
-              <SecondaryCard className="px-5 py-3.5 h-full flex flex-col" borderColor="#52525b">
-                <p className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2.5 shrink-0">Demais closers</p>
-                <div className="flex-1 flex flex-col justify-center gap-2.5 min-h-0">
+              <SecondaryCard className="px-5 py-3 h-full flex flex-col overflow-hidden" borderColor="#52525b">
+                <p className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 shrink-0">Demais closers</p>
+                <div className="flex-1 flex flex-col justify-center gap-2 min-h-0">
                   {resto.map((c, i) => {
                     const pct = (c.totalObtido / maxTotal) * 100;
                     return (
                       <div key={c.name} className="flex items-center gap-3">
                         <span className="w-4 text-xs font-bold text-zinc-500 text-right shrink-0">{i + 4}</span>
-                        <Avatar nome={c.name} url={c.fotoUrl} px={26} grad="from-sky-500 to-sky-700" />
+                        <Avatar nome={c.name} url={c.fotoUrl} px={22} grad="from-sky-500 to-sky-700" />
                         <span className="w-32 text-xs text-zinc-300 truncate shrink-0" title={c.name}>{firstName(c.name)}</span>
                         <div className="flex-1 h-4 rounded-md overflow-hidden bg-white/[0.03]">
                           <GrowBar widthPct={pct} delayMs={300 + i * 70} className="bg-gradient-to-r from-sky-500/80 to-sky-400/60 rounded-md" />
