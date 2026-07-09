@@ -110,7 +110,9 @@ export default function RelatorioTrimestral() {
       const prev = currentSlide;
       for (let i = 0; i < totalSlides; i++) {
         setCurrentSlide(i);
-        await new Promise((r) => setTimeout(r, 400));
+        // 1200ms: espera as animações de entrada (stagger ~1s no Visão do Trimestre)
+        // terminarem antes do screenshot — senão o PDF captura tiles semi-transparentes.
+        await new Promise((r) => setTimeout(r, 1200));
         const canvas = await html2canvas(slideRef.current!, { scale: 2, useCORS: true, backgroundColor: "#09090b", logging: false });
         if (i > 0) pdf.addPage();
         const imgH = pageW * (canvas.height / canvas.width);

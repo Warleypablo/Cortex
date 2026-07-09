@@ -43,14 +43,17 @@ function VariacaoBadge({ q }: { q: Qoq }) {
 }
 
 // Sparkline de barras por trimestre: anteriores apagados (zinc), o atual na cor da métrica.
+// Barras entram em cascata (fade + sobe) após o card aparecer.
 function QuarterSparkline({
   series,
   getValue,
   accent,
+  baseDelay = 0,
 }: {
   series: TrendPoint[];
   getValue: (p: TrendPoint) => number;
   accent: string;
+  baseDelay?: number;
 }) {
   if (series.length < 2) return null;
   const max = Math.max(...series.map(getValue));
@@ -65,8 +68,14 @@ function QuarterSparkline({
         return (
           <div key={p.q} className="flex flex-col items-center flex-1 min-w-0" title={`${p.label}: ${fmtCompact(v)}`}>
             <div
-              className="w-full rounded-t-sm"
-              style={{ height: h, backgroundColor: isCurrent ? accent : "#3f3f46", opacity: isCurrent ? 1 : 0.8 }}
+              className="w-full rounded-t-sm animate-in fade-in slide-in-from-bottom-3 duration-300 motion-reduce:animate-none"
+              style={{
+                height: h,
+                backgroundColor: isCurrent ? accent : "#3f3f46",
+                opacity: isCurrent ? 1 : 0.8,
+                animationDelay: `${baseDelay + i * 60}ms`,
+                animationFillMode: "both",
+              }}
             />
             <span className={`text-[9px] mt-1 leading-none ${isCurrent ? "text-zinc-300 font-bold" : "text-zinc-600"}`}>
               {p.label}
@@ -78,6 +87,14 @@ function QuarterSparkline({
   );
 }
 
+// Entrada em stagger: cada tile aparece (fade + sobe) com um atraso incremental.
+function tileAnim(delayMs: number) {
+  return {
+    className: "animate-in fade-in slide-in-from-bottom-4 duration-500 motion-reduce:animate-none",
+    style: { animationDelay: `${delayMs}ms`, animationFillMode: "both" as const },
+  };
+}
+
 function HeroTile({
   label,
   q,
@@ -86,6 +103,7 @@ function HeroTile({
   series,
   getValue,
   hero = false,
+  delayMs = 0,
 }: {
   label: string;
   q: Qoq;
@@ -94,29 +112,36 @@ function HeroTile({
   series: TrendPoint[];
   getValue: (p: TrendPoint) => number;
   hero?: boolean;
+  delayMs?: number;
 }) {
+  const anim = tileAnim(delayMs);
   return (
-    <SecondaryCard className="p-5 flex flex-col min-h-0" borderColor={accent}>
-      <p className="text-[11px] text-zinc-500 uppercase tracking-widest">{label}</p>
-      <p className={`${hero ? "text-5xl" : "text-4xl"} font-black text-white mt-1.5`}>{formatBRL(q.atual)}</p>
-      <div className="flex items-center gap-2 mt-2">
-        <VariacaoBadge q={q} />
-        <span className="text-xs text-zinc-500">
-          vs {vsLabel} · {fmtCompact(q.anterior)}
-        </span>
-      </div>
-      <QuarterSparkline series={series} getValue={getValue} accent={accent} />
-    </SecondaryCard>
+    <div className={anim.className} style={anim.style}>
+      <SecondaryCard className="p-5 flex flex-col min-h-0 h-full" borderColor={accent}>
+        <p className="text-[11px] text-zinc-500 uppercase tracking-widest">{label}</p>
+        <p className={`${hero ? "text-5xl" : "text-4xl"} font-black text-white mt-1.5`}>{formatBRL(q.atual)}</p>
+        <div className="flex items-center gap-2 mt-2">
+          <VariacaoBadge q={q} />
+          <span className="text-xs text-zinc-500">
+            vs {vsLabel} · {fmtCompact(q.anterior)}
+          </span>
+        </div>
+        <QuarterSparkline series={series} getValue={getValue} accent={accent} baseDelay={delayMs + 350} />
+      </SecondaryCard>
+    </div>
   );
 }
 
-function InfoTile({ label, valor, sub }: { label: string; valor: string; sub: string }) {
+function InfoTile({ label, valor, sub, delayMs = 0 }: { label: string; valor: string; sub: string; delayMs?: number }) {
+  const anim = tileAnim(delayMs);
   return (
-    <SecondaryCard className="p-5 flex flex-col justify-center">
-      <p className="text-[11px] text-zinc-500 uppercase tracking-widest">{label}</p>
-      <p className="text-4xl font-black text-white mt-1.5">{valor}</p>
-      <span className="text-xs text-zinc-500 mt-2">{sub}</span>
-    </SecondaryCard>
+    <div className={anim.className} style={anim.style}>
+      <SecondaryCard className="p-5 flex flex-col justify-center h-full">
+        <p className="text-[11px] text-zinc-500 uppercase tracking-widest">{label}</p>
+        <p className="text-4xl font-black text-white mt-1.5">{valor}</p>
+        <span className="text-xs text-zinc-500 mt-2">{sub}</span>
+      </SecondaryCard>
+    </div>
   );
 }
 
@@ -147,6 +172,7 @@ export default function SlideVisaoTrimestre({ data }: { data: RelatorioTrimestra
             series={series}
             getValue={(p) => p.mrr}
             hero
+            delayMs={0}
           />
           <HeroTile
             label="Vendas (recorrente)"
@@ -155,6 +181,7 @@ export default function SlideVisaoTrimestre({ data }: { data: RelatorioTrimestra
             accent="#38bdf8"
             series={series}
             getValue={(p) => p.vendas}
+            delayMs={100}
           />
           <HeroTile
             label="Churn (R$ no trimestre)"
@@ -163,6 +190,7 @@ export default function SlideVisaoTrimestre({ data }: { data: RelatorioTrimestra
             accent="#f87171"
             series={series}
             getValue={(p) => p.churn}
+            delayMs={200}
           />
         </div>
         <div className="grid grid-cols-3 gap-4 flex-[2] min-h-0">
@@ -170,16 +198,19 @@ export default function SlideVisaoTrimestre({ data }: { data: RelatorioTrimestra
             label="Churn % (média mensal)"
             valor={`${churnPctMedia.toFixed(1).replace(".", ",")}%`}
             sub={`média dos ${nMeses} meses do tri · churn ÷ MRR ativo`}
+            delayMs={350}
           />
           <InfoTile
             label="Clientes ativos"
             valor={String(data.turboMetrics.clientesAtivos)}
             sub="foto do fim do trimestre"
+            delayMs={450}
           />
           <InfoTile
             label="Ticket médio por cliente"
             valor={formatBRL(data.turboMetrics.ticketMedioCliente)}
             sub="MRR ÷ clientes ativos"
+            delayMs={550}
           />
         </div>
       </div>
