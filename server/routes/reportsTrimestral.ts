@@ -879,7 +879,220 @@ export function registerReportsTrimestralRoutes(app: Express) {
         tempoMedioEntrega,
       };
 
-      // TODO(Task 11): demais seções reais.
+      // Bloco techData (Task 11): espelha as queries 18/18b/19/20/20b (tech KPIs
+      // entregues/adicionados, projetos por tipo/mês, em aberto por tipo e
+      // pipeline por status) do relatorioMensalSlides.ts, re-janeladas para o
+      // trimestre. Q18/Q18b são FLUXO somado no range do tri (a AVG de
+      // tempoMedio já é recalculada "de graça" pela query, pois é uma AVG única
+      // sobre as linhas do range, não soma de médias mensais — RATIO natural);
+      // Q19 mantém o grão mês a mês, restrito aos meses do tri; Q20/Q20b são
+      // dateless no mensal (estado atual do backlog tech) e permanecem assim
+      // (FOTO / estado corrente).
+      const [
+        techKpisEntreguesRows,
+        techKpisAdicionadosRows,
+        techEntregasPorTipoRows,
+        techEmAbertoRows,
+        techPipelineRows,
+      ] = await Promise.all([
+        // Espelha query 18 (tech entregues no período, ambas tabelas) — FLUXO
+        // somado no tri. tempoMedio é recalculado pela própria AVG sobre o range.
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int as entregues,
+            COALESCE(SUM(valor_p), 0)::numeric as valor_entregues,
+            COALESCE(AVG(COALESCE(data_entregue, lancamento) - data_criada), 0)::numeric as tempo_medio
+          FROM (
+            SELECT data_entregue, lancamento, valor_p, data_criada FROM "Clickup".cup_projetos_tech_fechados
+            UNION ALL
+            SELECT data_entregue, lancamento, valor_p, data_criada FROM "Clickup".cup_projetos_tech
+          ) combined
+          WHERE COALESCE(data_entregue, lancamento) >= ${w.dataStart}::date
+            AND COALESCE(data_entregue, lancamento) < ${w.dataEnd}::date
+        `),
+        // Espelha query 18b (tech adicionados no período, ambas tabelas) —
+        // FLUXO somado no tri.
+        db.execute(sql`
+          SELECT
+            COUNT(*)::int as adicionados,
+            COALESCE(SUM(valor_p), 0)::numeric as valor_adicionados
+          FROM (
+            SELECT valor_p, data_criada FROM "Clickup".cup_projetos_tech
+            UNION ALL
+            SELECT valor_p, data_criada FROM "Clickup".cup_projetos_tech_fechados
+          ) combined
+          WHERE data_criada >= ${w.dataStart}::date
+            AND data_criada < ${w.dataEnd}::date
+        `),
+        // Espelha query 19 (projetos por tipo/mês, ambas tabelas) — mantém o
+        // grão mês a mês, trocando o lookback de 12 meses do mensal pelo range
+        // do tri (naturalmente restringe aos meses do tri, w.meses).
+        db.execute(sql`
+          SELECT
+            TO_CHAR(COALESCE(data_entregue, lancamento), 'YYYY-MM') as month,
+            COALESCE(TRIM(tipo), 'Outros') as tipo,
+            COUNT(*)::int as entregas,
+            COALESCE(SUM(valor_p), 0)::numeric as receita
+          FROM (
+            SELECT data_entregue, lancamento, tipo, valor_p FROM "Clickup".cup_projetos_tech_fechados
+            UNION ALL
+            SELECT data_entregue, lancamento, tipo, valor_p FROM "Clickup".cup_projetos_tech
+          ) combined
+          WHERE COALESCE(data_entregue, lancamento) IS NOT NULL
+            AND COALESCE(data_entregue, lancamento) >= ${w.dataStart}::date
+            AND COALESCE(data_entregue, lancamento) < ${w.dataEnd}::date
+          GROUP BY TO_CHAR(COALESCE(data_entregue, lancamento), 'YYYY-MM'), TRIM(tipo)
+          ORDER BY month, tipo
+        `),
+        // Espelha query 20 (projetos em aberto por tipo) — dateless no mensal
+        // (estado ATUAL do backlog tech); mantém sem filtro de data (FOTO /
+        // estado corrente), igual ao mensal.
+        db.execute(sql`
+          SELECT
+            COALESCE(TRIM(tipo), 'Outros') as tipo,
+            COUNT(*)::int as quantidade,
+            COALESCE(SUM(valor_p), 0)::numeric as valor
+          FROM "Clickup".cup_projetos_tech
+          GROUP BY TRIM(tipo)
+          ORDER BY valor DESC
+        `),
+        // Espelha query 20b (pipeline tech por status) — dateless no mensal
+        // (estado ATUAL); mantém sem filtro de data.
+        db.execute(sql`
+          SELECT
+            COALESCE(TRIM(status_projeto), 'Sem Status') as status,
+            COUNT(*)::int as quantidade
+          FROM "Clickup".cup_projetos_tech
+          GROUP BY TRIM(status_projeto)
+          ORDER BY quantidade DESC
+        `),
+      ]);
+
+      const techKpisEntregues = (techKpisEntreguesRows.rows as any[])[0] || {};
+      const techKpisAdicionados = (techKpisAdicionadosRows.rows as any[])[0] || {};
+
+      const techKpis = {
+        entregues: parseInt(techKpisEntregues.entregues) || 0,
+        valorEntregues: parseFloat(techKpisEntregues.valor_entregues) || 0,
+        tempoMedio: Math.round(parseFloat(techKpisEntregues.tempo_medio) || 0),
+        adicionados: parseInt(techKpisAdicionados.adicionados) || 0,
+        valorAdicionados: parseFloat(techKpisAdicionados.valor_adicionados) || 0,
+      };
+
+      // Pivot entregas por tipo/mês para Recharts, igual ao mensal
+      // (relatorioMensalSlides.ts ~L1580-1614), restrito aos meses do tri (w.meses).
+      const MESES_SHORT_TECH = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
+      const allTiposTech = new Set<string>();
+      const entregasByMonthTech: Record<string, Record<string, number>> = {};
+      const receitaByMonthTech: Record<string, Record<string, number>> = {};
+      (techEntregasPorTipoRows.rows as any[]).forEach((row: any) => {
+        const tipo = row.tipo || "Outros";
+        allTiposTech.add(tipo);
+        if (!entregasByMonthTech[row.month]) entregasByMonthTech[row.month] = {};
+        if (!receitaByMonthTech[row.month]) receitaByMonthTech[row.month] = {};
+        entregasByMonthTech[row.month][tipo] = parseInt(row.entregas) || 0;
+        receitaByMonthTech[row.month][tipo] = parseFloat(row.receita) || 0;
+      });
+      const tiposListTech = Array.from(allTiposTech);
+
+      const techEntregasPorTipo = w.meses.map((month) => {
+        const mNum = parseInt(month.split("-")[1]) - 1;
+        const entry: Record<string, any> = { month, label: MESES_SHORT_TECH[mNum] || month };
+        tiposListTech.forEach((t) => { entry[t] = entregasByMonthTech[month]?.[t] || 0; });
+        return entry;
+      });
+      const techReceitaPorTipo = w.meses.map((month) => {
+        const mNum = parseInt(month.split("-")[1]) - 1;
+        const entry: Record<string, any> = { month, label: MESES_SHORT_TECH[mNum] || month };
+        tiposListTech.forEach((t) => { entry[t] = receitaByMonthTech[month]?.[t] || 0; });
+        return entry;
+      });
+
+      const techEmAbertoPorTipo = (techEmAbertoRows.rows as any[]).map((row: any) => ({
+        tipo: row.tipo || "Outros",
+        quantidade: parseInt(row.quantidade) || 0,
+        valor: parseFloat(row.valor) || 0,
+      }));
+
+      // Ordem natural do pipeline tech, igual ao mensal (~L1622-1638).
+      const PIPELINE_ORDER = [
+        'não iniciado', 'kickoff', 'pronto p/ design', 'design', 'design review',
+        'pronto p/ dev', 'dev', 'dev review', 'pronto para lançar', 'bloqueado',
+      ];
+      const pipelineRaw = (techPipelineRows.rows as any[]).map((row: any) => ({
+        status: row.status,
+        quantidade: parseInt(row.quantidade) || 0,
+      }));
+      const techPipeline = pipelineRaw
+        .filter((p: any) => p.status !== 'pausado')
+        .sort((a: any, b: any) => {
+          const ia = PIPELINE_ORDER.indexOf(a.status);
+          const ib = PIPELINE_ORDER.indexOf(b.status);
+          return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+        });
+
+      const techData = {
+        kpis: techKpis,
+        mesLabel: w.label,
+        entregasPorTipo: techEntregasPorTipo,
+        receitaPorTipo: techReceitaPorTipo,
+        emAbertoPorTipo: techEmAbertoPorTipo,
+        pipeline: techPipeline,
+      };
+
+      // Bloco faturamentoYtd (Task 11): espelha as queries de Faturamento Bruto
+      // YTD + Inadimplência YTD e Imposto/DFC Recebimento mensal do
+      // relatorioMensalSlides.ts (~L1017-1040). YTD = início do ano do tri
+      // (`${w.ano}-01-01`) até o fim do tri (`w.dataEnd`), fechando a janela
+      // "YTD" no fim do trimestre em vez de no mês de dados.
+      const [faturamentoYtdRows, dfcRecebimentoYtdRows] = await Promise.all([
+        // Espelha "Faturamento Bruto YTD + Inadimplência YTD" — YTD até w.dataEnd.
+        db.execute(sql`
+          SELECT
+            COALESCE(SUM(valor_bruto::numeric), 0) AS faturamento_bruto_ytd,
+            COALESCE(SUM(CASE WHEN nao_pago::numeric > 0 THEN nao_pago::numeric ELSE 0 END), 0) AS inadimplencia_ytd
+          FROM "Conta Azul".caz_parcelas
+          WHERE tipo_evento = 'RECEITA'
+            AND data_vencimento >= ${`${w.ano}-01-01`}::date
+            AND data_vencimento < ${w.dataEnd}::date
+        `),
+        // Espelha "Imposto sobre Receita YTD + DFC Recebimento mensal" — YTD até w.dataEnd.
+        db.execute(sql`
+          SELECT
+            TO_CHAR(data_quitacao::date, 'YYYY-MM') AS month,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'DESPESA' AND categoria_nome LIKE '05.05%' THEN valor_pago::numeric ELSE 0 END), 0) AS imposto,
+            COALESCE(SUM(CASE WHEN tipo_evento = 'RECEITA' THEN valor_pago::numeric ELSE 0 END), 0) AS recebido
+          FROM "Conta Azul".caz_parcelas
+          WHERE status = 'QUITADO'
+            AND data_quitacao::date >= ${`${w.ano}-01-01`}::date
+            AND data_quitacao::date < ${w.dataEnd}::date
+          GROUP BY TO_CHAR(data_quitacao::date, 'YYYY-MM')
+          ORDER BY month
+        `),
+      ]);
+
+      const ytdRow = (faturamentoYtdRows.rows as any[])[0] || {};
+      const faturamentoBrutoYtd = parseFloat(ytdRow.faturamento_bruto_ytd) || 0;
+      const inadimplenciaYtd = parseFloat(ytdRow.inadimplencia_ytd) || 0;
+
+      let impostoYtd = 0;
+      const dfcRecebimentoMensal = (dfcRecebimentoYtdRows.rows as any[]).map((row: any) => {
+        const m = parseInt(row.month.split("-")[1]) - 1;
+        impostoYtd += parseFloat(row.imposto) || 0;
+        return {
+          month: row.month as string,
+          label: MESES_SHORT_TECH[m] || row.month,
+          recebido: parseFloat(row.recebido) || 0,
+        };
+      });
+
+      const faturamentoYtd = {
+        faturamentoBrutoYtd,
+        inadimplenciaYtd,
+        impostoYtd,
+        dfcRecebimentoMensal,
+      };
+
       res.json({
         trimestre: w.trimestre,
         label: w.label,
@@ -893,8 +1106,8 @@ export function registerReportsTrimestralRoutes(app: Express) {
         rankingSquads,
         squadDetails,
         pontualData,
-        techData: emptyTechData(w.label),
-        faturamentoYtd: emptyFaturamentoYtd(),
+        techData,
+        faturamentoYtd,
       });
     } catch (error: any) {
       console.error("[reports/trimestral] Error:", error?.message || error);
