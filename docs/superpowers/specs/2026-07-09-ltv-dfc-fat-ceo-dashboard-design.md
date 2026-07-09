@@ -77,6 +77,7 @@ Alternativas descartadas: view no banco (exige migração local+prod sem outro c
 - Clientes da carga de migração (dez/2024) têm `data_criado` da carga → fatia teórica subestima a vida real dos legados.
 - O DFC soma tudo que o CNPJ pagou (mesmo receita sem contrato no ClickUp) — intencional: é o caixa do cliente.
 - ~8% da receita paga de 2026 não casa via CNPJ (placeholders SEM-DOC etc.) → esses clientes usam fallback FAT.
+- ~21 contratos recorrentes encerrados sem `data_fim` (entregue/cancelado sem data) contam vida até o snapshot no FAT da matriz, mas zeram no drill (view dá LT nulo) — divergência negligível na mediana, herdada do SQL de referência.
 
 ## Testes
 - Unit (helpers): montagem das duas linhas a partir das séries (seguir `ceoDashboard.matriz.helpers.test.ts`).
