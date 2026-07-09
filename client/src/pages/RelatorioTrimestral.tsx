@@ -5,6 +5,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { useRelatorioTrimestral } from "./relatorio-trimestral/useRelatorioTrimestral";
 import { getTrimestreOptions, getDefaultTrimestre } from "./relatorio-trimestral/trimestre-options";
 import SlideCapaTrimestre from "./relatorio-trimestral/SlideCapaTrimestre";
+import SlideMantra from "./relatorio-trimestral/SlideMantra";
 import SlideRankingClosers from "./relatorio-mensal/SlideRankingClosers";
 import SlideTurboMetrics from "./relatorio-mensal/SlideTurboMetrics";
 import SlideRankingSquads from "./relatorio-mensal/SlideRankingSquads";
@@ -22,7 +23,7 @@ const SLIDE_BASE_W = 1280;
 const SLIDE_BASE_H = 720;
 
 type TrimSlot =
-  | { type: "capa" } | { type: "visao" } | { type: "vendas" } | { type: "evolucao" }
+  | { type: "mantra" } | { type: "capa" } | { type: "visao" } | { type: "vendas" } | { type: "evolucao" }
   | { type: "closers" } | { type: "turbo" } | { type: "squads-ranking" }
   | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "tech" }
   | { type: "nps" } | { type: "faturamento" } | { type: "encerramento" };
@@ -63,7 +64,7 @@ export default function RelatorioTrimestral() {
 
   const slots = useMemo<TrimSlot[]>(() => {
     const base: TrimSlot[] = [
-      { type: "capa" }, { type: "visao" }, { type: "vendas" }, { type: "evolucao" },
+      { type: "mantra" }, { type: "capa" }, { type: "visao" }, { type: "vendas" }, { type: "evolucao" },
       { type: "closers" }, { type: "turbo" }, { type: "squads-ranking" },
     ];
     const squads: TrimSlot[] = (data?.squadDetails ?? []).map((_, i) => ({ type: "squad", squadIndex: i }));
@@ -130,6 +131,7 @@ export default function RelatorioTrimestral() {
     const slot = slots[currentSlide];
     if (!slot) return null;
     switch (slot.type) {
+      case "mantra":       return <SlideMantra />;
       case "capa":         return <SlideCapaTrimestre data={data} />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
       case "vendas":       return <SlideGraficoContratos dados={data.contratosMes} mesLabel={data.label} />;
