@@ -67,6 +67,8 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
   let grupos: CeoGrupo[] = [];
   let nota: string | undefined;
   let media: number | null | undefined; // só a auditoria de LTV preenche (mediana × média)
+  let somaLtv: number | null | undefined; // numerador da média (auditoria de LTV)
+  let nClientes: number | null | undefined; // população da auditoria de LTV
 
   if (kpi === "receita") {
     // Regime de caixa: header = recebido (DFC); breakdown por categoria de recebimento.
@@ -226,6 +228,8 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     grupos = aud.grupos;
     base.realizado = aud.mediana;
     media = aud.media;
+    somaLtv = aud.soma;
+    nClientes = parsed.length;
     const regua = kpi === "ltv_fat"
       ? "Régua FAT (faturável): Valor R × meses de vida até o snapshot + pontual entregue"
       : `Régua DFC (caixa): faturável teórico até 30/set/25 + pago real no Conta Azul via CNPJ (parcelas RECEITA quitadas até ${ultimoDiaAnterior(mesNum)})${aud.nSemMatch > 0 ? `; ${aud.nSemMatch} cliente${aud.nSemMatch === 1 ? "" : "s"} sem match CNPJ usa${aud.nSemMatch === 1 ? "" : "m"} a régua faturável` : ""}`;
@@ -253,7 +257,7 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
   }
   if (evolucao && evolucao.length < 2) evolucao = undefined; // 1 ponto não é evolução
 
-  return { ...base, atingimentoPct, grupos, evolucao, nota, media };
+  return { ...base, atingimentoPct, grupos, evolucao, nota, media, somaLtv, nClientes };
 }
 
 export function registerCeoDashboardDetalheRoutes(app: Express, db: any) {

@@ -24,6 +24,8 @@ export interface CeoDetalheResponse {
   evolucao?: PontoEvolucao[];
   nota?: string;
   media?: number | null; // média dos mesmos clientes da auditoria (LTV) — comparativo mediana × média
+  somaLtv?: number | null; // soma dos LTVs da auditoria — numerador da média (média = somaLtv ÷ nClientes)
+  nClientes?: number | null; // população da auditoria (denominador da média; N da mediana)
 }
 
 // Extrai a série mensal (jan→mês fechado) de uma linha do BP para o gráfico de evolução.
@@ -228,18 +230,20 @@ export function ltvAuditoriaToGrupos(
   rows: LtvAuditoriaRow[],
   kpi: "ltv_fat" | "ltv_dfc",
   mesNum: number
-): { grupos: CeoGrupo[]; mediana: number | null; media: number | null; nSemMatch: number } {
+): { grupos: CeoGrupo[]; mediana: number | null; media: number | null; soma: number | null; nSemMatch: number } {
   const ateDia = ultimoDiaAnterior(mesNum);
   const valorDe = (r: LtvAuditoriaRow) => (kpi === "ltv_fat" ? r.ltv_fat : r.ltv_dfc);
   const ordenado = [...rows].sort((a, b) => valorDe(b) - valorDe(a));
   const n = ordenado.length;
-  if (n === 0) return { grupos: [], mediana: null, media: null, nSemMatch: 0 };
+  if (n === 0) return { grupos: [], mediana: null, media: null, soma: null, nSemMatch: 0 };
 
   // Índices centrais na ordenação desc (mesmos da asc, por simetria do meio).
   const centrais = n % 2 === 1 ? [(n - 1) / 2] : [n / 2 - 1, n / 2];
   const mediana = Math.round(centrais.reduce((s, i) => s + valorDe(ordenado[i]), 0) / centrais.length);
   // Média sobre os MESMOS clientes exibidos — o gap p/ a mediana revela outliers.
-  const media = Math.round(ordenado.reduce((s, r) => s + valorDe(r), 0) / n);
+  // A soma sai junto p/ o front mostrar a conta (média = soma ÷ n) de forma auditável.
+  const soma = Math.round(ordenado.reduce((s, r) => s + valorDe(r), 0));
+  const media = Math.round(soma / n);
 
   const toItem = (r: LtvAuditoriaRow) => ({
     nome: r.nome || "—",
@@ -261,5 +265,5 @@ export function ltvAuditoriaToGrupos(
     { ...grupo("Mediana", meio, true), total: mediana },
     grupo(`Abaixo da mediana (${abaixo.length})`, abaixo, false),
   ].filter((g) => g.itens.length > 0);
-  return { grupos, mediana, media, nSemMatch: rows.filter((r) => !r.tem_match).length };
+  return { grupos, mediana, media, soma, nSemMatch: rows.filter((r) => !r.tem_match).length };
 }

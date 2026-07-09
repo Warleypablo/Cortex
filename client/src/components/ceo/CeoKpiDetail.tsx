@@ -15,6 +15,8 @@ interface DetalheResponse {
   orcado: number | null; realizado: number | null; atingimentoPct: number | null;
   grupos: GrupoDet[]; evolucao?: PontoEvolucao[]; nota?: string;
   media?: number | null; // auditoria de LTV: média dos mesmos clientes (comparativo mediana × média)
+  somaLtv?: number | null; // numerador da média (soma dos LTVs listados)
+  nClientes?: number | null; // população da auditoria (denominador da média; N da mediana)
 }
 
 const brl = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
@@ -29,8 +31,9 @@ const TOM_ACENTO: Record<string, { texto: string; barra: string; chip: string }>
 
 // Comparativo mediana × média (auditoria de LTV): barras proporcionais + leitura do gap.
 // A distância entre as duas conta a história dos outliers — por isso a célula usa mediana.
-function MedianaVsMedia({ mediana, media, unidade, corMediana }: {
-  mediana: number; media: number; unidade: "brl" | "int"; corMediana: string;
+function MedianaVsMedia({ mediana, media, soma, n, unidade, corMediana }: {
+  mediana: number; media: number; soma?: number | null; n?: number | null;
+  unidade: "brl" | "int"; corMediana: string;
 }) {
   const max = Math.max(mediana, media);
   const gapPct = Math.round((media / mediana - 1) * 100);
@@ -39,6 +42,10 @@ function MedianaVsMedia({ mediana, media, unidade, corMediana }: {
     : media > mediana
       ? "Média acima da mediana: poucos clientes grandes puxam a média para cima."
       : "Média abaixo da mediana: muitos clientes pequenos puxam a média para baixo.";
+  // A conta aberta dos dois números, com os valores reais do mês.
+  const calculo = soma != null && n != null && n > 0
+    ? `Mediana = ${n % 2 === 1 ? `cliente central (${(n + 1) / 2}º de ${n})` : `média do ${n / 2}º e ${n / 2 + 1}º de ${n}`} · Média = ${formatValor(soma, unidade)} ÷ ${n} clientes`
+    : null;
   const barras = [
     { label: "Mediana", valor: mediana, cor: corMediana, gap: null as string | null },
     { label: "Média", valor: media, cor: "bg-gray-300 dark:bg-zinc-600",
@@ -61,7 +68,10 @@ function MedianaVsMedia({ mediana, media, unidade, corMediana }: {
           </span>
         </div>
       ))}
-      <p className="pt-0.5 text-[11px] leading-snug text-gray-400 dark:text-zinc-500">{legenda}</p>
+      {calculo && (
+        <p className="pt-0.5 text-[11px] leading-snug tabular-nums text-gray-500 dark:text-zinc-400">{calculo}</p>
+      )}
+      <p className="text-[11px] leading-snug text-gray-400 dark:text-zinc-500">{legenda}</p>
     </div>
   );
 }
@@ -164,7 +174,7 @@ export function CeoKpiDetail({ kpiKey, mes, tom = "neutro", onClose }: { kpiKey:
                 </>
               )}
               {data.media != null && data.realizado != null && data.realizado > 0 && (
-                <MedianaVsMedia mediana={data.realizado} media={data.media} unidade={data.unidade} corMediana={acento.barra} />
+                <MedianaVsMedia mediana={data.realizado} media={data.media} soma={data.somaLtv} n={data.nClientes} unidade={data.unidade} corMediana={acento.barra} />
               )}
             </div>
           )}
