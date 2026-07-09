@@ -537,6 +537,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         rankingSquadsRows,
         churnSquadsRows,
         pontualEntregueSquadRows,
+        pontualEntregueSquadPrevRows,
         mrrAnteriorSquadsRows,
         mrrAnteriorTotalRows,
         operadoresPorSquadRows,
@@ -617,6 +618,22 @@ export function registerReportsTrimestralRoutes(app: Express) {
           WHERE LOWER(TRIM(status)) = 'entregue'
             AND data_entrega >= ${w.dataStart}::date
             AND data_entrega < ${w.dataEnd}::date
+            AND COALESCE(valorp, 0) > 0
+            AND squad IS NOT NULL
+            AND TRIM(squad) != ''
+          GROUP BY squad
+        `),
+        // Mesma query 16b, re-janelada para o trimestre ANTERIOR — alimenta o chart
+        // "Evolução do faturamento" (QoQ) do slide por squad. O MRR do tri anterior
+        // já vem de graça na Q17 (foto do 1º dia do tri = fim do tri anterior).
+        db.execute(sql`
+          SELECT
+            squad,
+            COALESCE(SUM(valorp::numeric), 0)::numeric as pontual
+          FROM "Clickup".cup_contratos
+          WHERE LOWER(TRIM(status)) = 'entregue'
+            AND data_entrega >= ${w.prev.dataStart}::date
+            AND data_entrega < ${w.prev.dataEnd}::date
             AND COALESCE(valorp, 0) > 0
             AND squad IS NOT NULL
             AND TRIM(squad) != ''
@@ -853,6 +870,13 @@ export function registerReportsTrimestralRoutes(app: Express) {
         pontualEntregueBySquad[key] = (pontualEntregueBySquad[key] || 0) + (parseFloat(row.pontual) || 0);
       });
 
+      // Pontual entregue no tri ANTERIOR (para o chart de evolução QoQ por squad).
+      const pontualEntreguePrevBySquad: Record<string, number> = {};
+      (pontualEntregueSquadPrevRows.rows as any[]).forEach((row: any) => {
+        const key = normalizeSquadName(row.squad);
+        pontualEntreguePrevBySquad[key] = (pontualEntreguePrevBySquad[key] || 0) + (parseFloat(row.pontual) || 0);
+      });
+
       // Ranking squads — ordena por (mrr + pontual entregue no tri) desc, igual ao mensal.
       const rankingSquads = (rankingSquadsRows.rows as any[])
         .map((row: any) => {
@@ -943,10 +967,24 @@ export function registerReportsTrimestralRoutes(app: Express) {
           const nrrBrl = churn.brl - expansaoNrr;
           const nrrPct = churnBase > 0 ? (nrrBrl / churnBase) * 100 : 0;
 
+          // Evolução do faturamento QoQ (chart do slide): faturamento = MRR (FOTO do
+          // fim do tri) + pontual entregue (FLUXO do tri) — mesma régua do card
+          // "Faturamento Total". O ponto anterior usa mrrAnt (foto do 1º dia do tri
+          // atual = fim do tri anterior) e o pontual entregue no tri anterior.
+          // ⚠️ cup_data_hist só tem snapshots desde 17/nov/2025: para trimestres cujo
+          // início antecede isso, mrrAnt cai para 0 e o ponto anterior fica só com o
+          // pontual.
+          const pontualAnt = pontualEntreguePrevBySquad[normalizeSquadName(row.squad)] || 0;
+          const evolucao = [
+            { q: w.prev.trimestre, label: w.prev.label, mrr: mrrAnt, pontual: pontualAnt, total: mrrAnt + pontualAnt },
+            { q: w.trimestre, label: w.label, mrr, pontual, total: mrr + pontual },
+          ];
+
           return {
             squad: row.squad,
             mrr,
             pontual,
+            evolucao,
             ticketMedio: Math.round(ticketMedio),
             clientes,
             churnPct: Math.round(churnPct * 10) / 10,

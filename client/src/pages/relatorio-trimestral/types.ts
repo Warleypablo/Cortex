@@ -60,6 +60,21 @@ export interface SquadOperadores {
   operadores: OperadorSquad[];
 }
 
+// Evolução do faturamento QoQ por squad (chart do slide "Squad em Destaque").
+// faturamento = MRR (foto do fim do tri) + pontual entregue (fluxo do tri).
+export interface SquadEvolucaoPonto {
+  q: string;      // "2026-Q1"
+  label: string;  // "Q1 2026"
+  mrr: number;
+  pontual: number;
+  total: number;
+}
+
+// SquadDetail do mensal + a evolução QoQ, exclusiva do trimestral.
+export interface SquadDetailTri extends SquadDetail {
+  evolucao: SquadEvolucaoPonto[];
+}
+
 // Área Tech: dados vêm do dashboard tech-dash.pages.dev (fonte correta, gerada
 // direto do ClickUp). Espelha server/lib/techDash.ts → TechTrimestralData.
 export interface TechAccount { nome: string; projetos: number; valor: number }
@@ -97,7 +112,7 @@ export interface RelatorioTrimestralData {
   rankingSDRs: SdrRanking[];
   topReunioes: TopReunioes | null;
   rankingSquads: SquadRanking[];
-  squadDetails: SquadDetail[];
+  squadDetails: SquadDetailTri[];
   operadoresPorSquad: SquadOperadores[];
   pontualData: PontualData;
   techData: TechTrimestralData;

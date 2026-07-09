@@ -1,13 +1,17 @@
 import type { LucideIcon } from "lucide-react";
-import { LayoutGrid, Activity, Sparkles, Ticket, Users, DollarSign, TrendingUp, TrendingDown, Coins, AlertTriangle } from "lucide-react";
+import { LayoutGrid, Activity, Sparkles, Ticket, Users, DollarSign, TrendingUp, TrendingDown, Coins, AlertTriangle, BarChart3 } from "lucide-react";
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LabelList,
+} from "recharts";
 import SlideLayout from "../relatorio-mensal/SlideLayout";
 import { SlideHeader } from "../relatorio-mensal/SlideComponents";
-import type { ChurnCliente, SquadDetail } from "../relatorio-mensal/types";
-import { ACCENT, entrance, DeckKeyframes } from "./deck-kit";
+import type { ChurnCliente } from "../relatorio-mensal/types";
+import type { SquadDetailTri } from "./types";
+import { ACCENT, entrance, DeckKeyframes, fmtK, LegendDot, TOOLTIP_STYLE } from "./deck-kit";
 import { useCountUp } from "./useCountUp";
 
 interface Props {
-  details: SquadDetail[];
+  details: SquadDetailTri[];
   mesLabel: string;
 }
 
@@ -77,7 +81,7 @@ function StatCard({
   );
 }
 
-function MiniSquadCard({ sq, delayMs }: { sq: SquadDetail; delayMs: number }) {
+function MiniSquadCard({ sq, delayMs }: { sq: SquadDetailTri; delayMs: number }) {
   const { emoji, name } = parseSquadName(sq.squad);
   const color = getColor(name);
   const e = entrance(delayMs);
@@ -128,6 +132,88 @@ function ChurnCard({
       <div className="h-1 rounded-full bg-white/5 overflow-hidden mt-0.5">
         <div className="h-full rounded-full" style={{ width: `${Math.min(Math.max(pct, 0) * 5, 100)}%`, background: color }} />
       </div>
+    </div>
+  );
+}
+
+/**
+ * Evolução do faturamento QoQ da squad: barras empilhadas MRR + Pontual, com o
+ * total rotulado no topo e um badge de variação. Preenche o espaço livre da coluna
+ * esquerda do hero. Animação das barras desligada — o card já entra com o hero e o
+ * export em PDF captura estático.
+ */
+function EvolucaoFaturamentoCard({ evolucao }: { evolucao: SquadDetailTri["evolucao"] }) {
+  const pontos = evolucao ?? [];
+  const anterior = pontos[0];
+  const atual = pontos[pontos.length - 1];
+  const temDados = pontos.length >= 2 && (anterior.total > 0 || atual.total > 0);
+
+  // Variação QoQ só faz sentido com base > 0 (tri anterior sem snapshot → mrr 0).
+  // Squad nova (base ínfima) estoura o percentual (ex.: Olimpo +10.205%): acima de
+  // 1000% mostramos o multiplicador, que se lê muito melhor ("103,1×").
+  const ratio = anterior?.total > 0 ? atual.total / anterior.total : null;
+  const deltaPct = ratio !== null ? (ratio - 1) * 100 : null;
+  const up = (deltaPct ?? 0) >= 0;
+  const deltaLabel =
+    deltaPct === null
+      ? null
+      : Math.abs(deltaPct) >= 1000
+        ? `${ratio!.toFixed(1).replace(".", ",")}× QoQ`
+        : `${up ? "+" : "−"}${Math.abs(deltaPct).toFixed(1).replace(".", ",")}% QoQ`;
+
+  return (
+    <div className="flex-1 min-h-0 rounded-xl bg-white/[0.03] border border-white/5 p-3 flex flex-col">
+      <div className="flex items-center justify-between gap-2 mb-1.5 shrink-0">
+        <div className="flex items-center gap-1.5 min-w-0">
+          <BarChart3 className="h-3 w-3 shrink-0 text-zinc-500" />
+          <p className="text-[9px] text-zinc-500 uppercase tracking-wider whitespace-nowrap">Evolução do faturamento</p>
+        </div>
+        <div className="flex items-center gap-2.5 shrink-0">
+          <LegendDot color={ACCENT.mrr} label="MRR" />
+          <LegendDot color={ACCENT.pontual} label="Pontual" />
+          {deltaLabel && (
+            <span
+              className={`text-[10px] font-bold rounded-full px-2 py-0.5 tabular-nums whitespace-nowrap ${
+                up ? "text-emerald-400 bg-emerald-500/10" : "text-red-400 bg-red-500/10"
+              }`}
+            >
+              {deltaLabel}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {!temDados ? (
+        <div className="flex-1 flex items-center justify-center">
+          <p className="text-xs text-zinc-600 italic">Sem histórico de faturamento para comparar</p>
+        </div>
+      ) : (
+        <div className="flex-1 min-h-0">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={pontos} margin={{ top: 20, right: 8, bottom: 0, left: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
+              <XAxis dataKey="label" stroke="#a1a1aa" fontSize={11} tickLine={false} axisLine={{ stroke: "#3f3f46" }} />
+              <YAxis stroke="#a1a1aa" fontSize={9} tickFormatter={fmtK} tickLine={false} axisLine={false} width={34} />
+              <Tooltip
+                contentStyle={TOOLTIP_STYLE}
+                cursor={{ fill: "rgba(255,255,255,0.04)" }}
+                formatter={(v: any, n: any) => [fmtBRL(Number(v)), n === "mrr" ? "MRR" : "Pontual"]}
+              />
+              <Bar dataKey="mrr" stackId="fat" fill={ACCENT.mrr} maxBarSize={64} isAnimationActive={false} />
+              <Bar dataKey="pontual" stackId="fat" fill={ACCENT.pontual} maxBarSize={64} radius={[5, 5, 0, 0]} isAnimationActive={false}>
+                <LabelList
+                  dataKey="total"
+                  position="top"
+                  formatter={(v: any) => fmtBRL(Number(v))}
+                  fill="#e4e4e7"
+                  fontSize={11}
+                  fontWeight={700}
+                />
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
     </div>
   );
 }
@@ -233,13 +319,13 @@ export default function SlideSquadTrimestre({ details, mesLabel }: Props) {
           <div className="flex-1 grid grid-cols-[3fr_2fr] gap-4 p-4 min-h-0">
             {/* Coluna esquerda: MRR/Pontual/Ticket/Clientes + Faturamento/Evolução/Vendas */}
             <div className="flex flex-col gap-3 min-h-0">
-              <div className="grid grid-cols-4 gap-3">
+              <div className="grid grid-cols-4 gap-3 shrink-0">
                 <StatCard icon={Activity} label="MRR" value={fmtBRL(mrrAnim)} hero />
                 <StatCard icon={Sparkles} label="Pontual" value={fmtBRL(pontualAnim)} hero />
                 <StatCard icon={Ticket} label="Ticket médio" value={fmtBRL(ticketAnim)} hero />
                 <StatCard icon={Users} label="Clientes" value={String(Math.round(clientesAnim))} hero />
               </div>
-              <div className="grid grid-cols-3 gap-3">
+              <div className="grid grid-cols-3 gap-3 shrink-0">
                 <StatCard icon={DollarSign} label="Faturamento Total" value={fmtBRL(faturamentoAnim)} />
                 <StatCard
                   icon={evolUp ? TrendingUp : TrendingDown}
@@ -249,6 +335,9 @@ export default function SlideSquadTrimestre({ details, mesLabel }: Props) {
                 />
                 <StatCard icon={Coins} label="Total de Vendas" value={fmtBRL(vendasAnim)} />
               </div>
+
+              {/* Preenche o espaço livre: evolução do faturamento (MRR + pontual) QoQ */}
+              <EvolucaoFaturamentoCard evolucao={hero.evolucao} />
             </div>
 
             {/* Coluna direita: churn total, churn s/ abonados, NRR e lista de churn */}
