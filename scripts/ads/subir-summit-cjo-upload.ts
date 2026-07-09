@@ -1,0 +1,107 @@
+/**
+ * Passo 2/3 — Sobe pro Gerenciador os 20 vídeos do lote
+ * "5 - Creators Summit - Camila/Jaque + Quebra de Objeções" (single-format 9x16).
+ * Download do Drive → metaUploadVideo (chunked). Título no Meta = `${base}_9x16`.
+ * IDEMPOTENTE: descobre por nome EXATO o que já existe e pula. Backoff de 5min p/ rate limit.
+ *
+ *   npx tsx scripts/ads/subir-summit-cjo-upload.ts        # DRY (só mostra o plano)
+ *   npx tsx scripts/ads/subir-summit-cjo-upload.ts --go   # baixa e sobe de verdade
+ */
+import "dotenv/config";
+import { getDriveClient } from "../../server/autoreport/credentials";
+import { metaGet, metaUploadVideo, metaBatch } from "../../server/services/adsCreation/metaApi";
+import { withBackoff, normName } from "../../server/services/adsCreation/lotUploader";
+import { ALL_ITEMS, LOTE, metaTitle } from "./summit-cjo.data";
+
+const ACC = process.env.META_DEFAULT_AD_ACCOUNT_ID!;
+const go = process.argv.includes("--go");
+const RL_MAX_RETRIES = 24; // 24 × 5min = 2h de teto p/ atravessar janela de rate limit
+
+async function downloadDrive(fileId: string): Promise<Buffer> {
+  const drive = getDriveClient();
+  const res = await drive.files.get(
+    { fileId, alt: "media", supportsAllDrives: true },
+    { responseType: "arraybuffer" },
+  );
+  return Buffer.from(res.data as ArrayBuffer);
+}
+
+(async () => {
+  if (!ACC) throw new Error("META_DEFAULT_AD_ACCOUNT_ID não setado");
+  const t0 = Date.now();
+  const elapsed = () => `${((Date.now() - t0) / 60000).toFixed(1)}min`;
+
+  // títulos-alvo (nome EXATO no Gerenciador)
+  const want = new Map<string, (typeof ALL_ITEMS)[number]>();
+  for (const it of ALL_ITEMS) want.set(normName(metaTitle(it.base)), it);
+
+  // 1) descobre o que já existe no Gerenciador (idempotência / retomada), com early-exit
+  console.log(`Lote "${LOTE}" · ${ALL_ITEMS.length} vídeos single-format · conta ${ACC}`);
+  console.log(`Descobrindo o que já existe no Gerenciador...`);
+  const found = new Set<string>();
+  let url: string | null = `${ACC}/advideos`;
+  let params: Record<string, string> | undefined = { fields: "id,title", limit: "200" };
+  let pages = 0;
+  for (; url && pages < 40; pages++) {
+    const res: any = await withBackoff("GET advideos", () => metaGet(url!, params), {
+      max: RL_MAX_RETRIES,
+      log: (m) => console.log(`   ${m}`),
+    });
+    for (const v of res.data ?? []) {
+      const k = normName(v.title ?? "");
+      if (k && want.has(k)) found.add(k);
+    }
+    if (found.size >= want.size) { pages++; break; }
+    const after = res.paging?.cursors?.after;
+    if (after && res.data?.length) params = { fields: "id,title", limit: "200", after }; else url = null;
+  }
+  console.log(`(advideos: ${pages} página(s) · já existem ${found.size}/${want.size})`);
+
+  const toUpload = ALL_ITEMS.filter((it) => !found.has(normName(metaTitle(it.base))));
+  for (const it of ALL_ITEMS) if (found.has(normName(metaTitle(it.base)))) console.log(`  ↻ já existe: ${metaTitle(it.base)}`);
+  console.log(`\nA subir: ${toUpload.length}/${ALL_ITEMS.length} vídeos · modo: ${go ? "🔴 SUBIR" : "DRY (não sobe)"}`);
+  if (!go) { console.log("(DRY) Rode com --go pra subir."); process.exit(0); }
+  if (!toUpload.length) { console.log("Nada a subir — todos já estão no Gerenciador."); process.exit(0); }
+
+  // 2) download → upload, um por vez
+  const uploaded: { title: string; videoId: string }[] = [];
+  const failed: string[] = [];
+  for (let i = 0; i < toUpload.length; i++) {
+    const it = toUpload[i];
+    const title = metaTitle(it.base);
+    try {
+      console.log(`\n[${i + 1}/${toUpload.length}] ⬇️  ${title} (drive ${it.driveId.slice(0, 8)}…) — ${elapsed()}`);
+      const buffer = await downloadDrive(it.driveId);
+      console.log(`   ${(buffer.length / 1024 / 1024).toFixed(1)}MB baixados · ⬆️  subindo...`);
+      const videoId = await withBackoff(`upload ${title}`, () => metaUploadVideo(ACC, `${title}.mp4`, buffer), {
+        max: RL_MAX_RETRIES,
+        log: (m) => console.log(`   ${m}`),
+      });
+      uploaded.push({ title, videoId });
+      console.log(`   ✅ video_id=${videoId}`);
+    } catch (e) {
+      failed.push(`${title}: ${e instanceof Error ? e.message : e}`);
+      console.log(`   ⛔ FALHOU: ${e instanceof Error ? e.message : e}`);
+    }
+  }
+
+  // 3) status final em 1 batch (sem poll individual pra poupar quota)
+  if (uploaded.length) {
+    try {
+      const res = await withBackoff("batch status", () =>
+        metaBatch(uploaded.map((u) => ({ method: "GET" as const, relative_url: `${u.videoId}?fields=id,status` }))),
+      );
+      console.log(`\nStatus dos vídeos subidos nesse run:`);
+      res.forEach((r: any, i: number) => {
+        const body = typeof r?.body === "string" ? JSON.parse(r.body) : r?.body;
+        console.log(`  ${uploaded[i].title} → ${body?.status?.video_status ?? JSON.stringify(body?.status) ?? "?"}`);
+      });
+    } catch (e) {
+      console.log(`(status batch falhou — sem drama, o Gerenciador processa sozinho: ${e instanceof Error ? e.message : e})`);
+    }
+  }
+
+  console.log(`\nResumo: ${uploaded.length} subido(s) · ${failed.length} falha(s) · total ${elapsed()}`);
+  if (failed.length) { console.log(failed.map((f) => `  ⛔ ${f}`).join("\n")); process.exit(1); }
+  process.exit(0);
+})().catch((e) => { console.error("ERRO:", e instanceof Error ? e.message : e); process.exit(1); });
