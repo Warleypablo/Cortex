@@ -138,8 +138,8 @@ export function CeoMatrizTabela({
       </div>
       <p className="px-1 text-[11px] text-gray-400 dark:text-zinc-500">
         Cor pela régua do BP (verde ≥100% · âmbar ≥80% · vermelho &lt;80%). <span className="text-amber-500">*</span> mês em
-        andamento (parcial). Inadimplência por mês de vencimento; LTV = média dos ativos por mês (snapshots); E-NPS por onda de
-        pesquisa (meses sem pesquisa ficam vazios); LTV = mediana recorrente dos clientes ativos (só recorrência, sem pontual). Clique numa célula para o detalhamento do mês.
+        andamento (parcial). Inadimplência por mês de vencimento; LTV FAT = faturável mediano dos ativos (ClickUp: Valor R × meses + pontual entregue);
+        LTV DFC = caixa mediano (pago real no Conta Azul desde out/25 + faturável antes); E-NPS por onda de pesquisa (meses sem pesquisa ficam vazios). Clique numa célula para o detalhamento do mês.
       </p>
     </div>
   );
