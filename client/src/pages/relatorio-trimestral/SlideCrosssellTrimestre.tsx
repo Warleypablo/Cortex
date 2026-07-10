@@ -11,6 +11,21 @@ import { useCountUp } from "./useCountUp";
 type Negocio = { cliente: string; cx: string; mapeamento: string; rec: number; pont: number };
 
 const NEGOCIOS: Negocio[] = [
+  // Abril/2026 (planilha: coluna "Fonte" → CX, coluna "Operação" → mapeamento)
+  { cliente: "Awe", cx: "Zon", mapeamento: "Vinicius", rec: 0, pont: 6800 },
+  { cliente: "Wave", cx: "Zon", mapeamento: "Ismael", rec: 0, pont: 15000 },
+  { cliente: "EA", cx: "Zon", mapeamento: "Vinicius", rec: 0, pont: 1400 },
+  { cliente: "Vitacora", cx: "Zon", mapeamento: "Andrey", rec: 0, pont: 6000 },
+  { cliente: "Clickcannabis", cx: "Zon", mapeamento: "Robertinho", rec: 15000, pont: 0 },
+  { cliente: "Repeat", cx: "Robertinho", mapeamento: "—", rec: 2000, pont: 16000 },
+  { cliente: "Lab Genisis", cx: "Fabio", mapeamento: "—", rec: 4000, pont: 3000 },
+  { cliente: "It's Lit", cx: "Zon", mapeamento: "—", rec: 2500, pont: 0 },
+  { cliente: "Neophase (abr)", cx: "Zon", mapeamento: "—", rec: 0, pont: 5000 },
+  { cliente: "Umeda engenharia", cx: "João", mapeamento: "—", rec: 2500, pont: 0 },
+  { cliente: "Star Beauty", cx: "Zon", mapeamento: "Gabriel Taufner", rec: 0, pont: 9000 },
+  { cliente: "Balmo", cx: "Zon", mapeamento: "Teto", rec: 2997, pont: 0 },
+  { cliente: "Wonderlev", cx: "Zon", mapeamento: "—", rec: 0, pont: 5500 },
+  { cliente: "Haux", cx: "Zon", mapeamento: "Gabriel Taufner", rec: 0, pont: 15000 },
   // Maio/2026
   { cliente: "Glulac", cx: "Cazé", mapeamento: "Gabriel Taufner", rec: 0, pont: 9000 },
   { cliente: "Latam Fit", cx: "Iasmyn", mapeamento: "Lara e Iasmyn", rec: 1997, pont: 0 },
