@@ -6,6 +6,7 @@ import { getTechTrimestral } from "../lib/techDash";
 import { getTechPipeline, warmTechPipeline } from "../lib/techPipeline";
 import { buildFaturado, type FaturadoRow } from "./reportsTrimestral.faturado";
 import { buildCrosssell, type CrosssellDealRow } from "./reportsTrimestral.crosssell";
+import { churnMensalPonderadoPct } from "./reportsTrimestral.churn";
 
 interface VendasMesInput { month: string; vendasMrr: number; vendasPontual?: number }
 interface MrrChurnMesInput { month: string; mrr: number; churnBrl: number; pontual?: number; pontualContratos?: number }
@@ -771,6 +772,13 @@ export function registerReportsTrimestralRoutes(app: Express) {
       // range do tri, mantendo a distinção abonado/total); os ratios por squad
       // (churnPct, ticketMedio, nrrBrl, nrrPct, evolucaoMrr) são RATIO recalculados
       // em JS a partir dos agregados do tri, igual à montagem do mensal (~L1526-1566).
+      //
+      // Denominador do churn médio mensal (ver reportsTrimestral.churn.ts): 1º dia de
+      // cada mês COMPUTADO do tri. Em tri parcial só entram meses decorridos — não faz
+      // sentido somar a base de um mês futuro que ainda não teve churn. Reusado pela
+      // query nova de bases mensais por squad E pela CTE do Black (carteira).
+      const inicioMeses = (w.mesesComputados.length ? w.mesesComputados : w.meses).map((m) => `${m}-01`);
+      const inicioMesesSql = sql.join(inicioMeses.map((d) => sql`${d}::date`), sql`, `);
       const [
         rankingSquadsRows,
         churnSquadsRows,
@@ -781,6 +789,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         operadoresPorSquadRows,
         accountsRows,
         blackCarteiraRows,
+        mrrBasesMensaisSquadsRows,
       ] = await Promise.all([
         // Espelha query 15 (ranking squads por MRR + Pontual) — FOTO em w.fotoDate,
         // fallback ao snapshot mais recente ≤ fotoDate.
@@ -1167,6 +1176,27 @@ export function registerReportsTrimestralRoutes(app: Express) {
             WHERE h.status IN ('ativo', 'onboarding', 'triagem')
               AND h.valorr IS NOT NULL AND h.valorr::numeric > 0
           ),
+          -- Σ das bases mensais da CARTEIRA do Black: MRR nos snapshots do 1º dia de
+          -- cada mês computado do tri (denominador do churn médio mensal ponderado,
+          -- mesma régua das demais squads). Sem GROUP BY: soma todos os meses × carteira.
+          mes_starts_b AS (
+            SELECT unnest(ARRAY[${inicioMesesSql}]) AS mstart
+          ),
+          snaps_b AS (
+            SELECT mb.mstart, COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = mb.mstart LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= mb.mstart)
+            ) AS d
+            FROM mes_starts_b mb
+          ),
+          mrr_bases_mensais AS (
+            SELECT COALESCE(SUM(h.valorr::numeric), 0) AS base_mensal
+            FROM snaps_b sb
+            JOIN "Clickup".cup_data_hist h ON h.data_snapshot = sb.d
+            JOIN cliente_account g ON h.id_task = g.task_id
+            WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+              AND h.valorr IS NOT NULL AND h.valorr::numeric > 0
+          ),
           pont_atual AS (
             SELECT COALESCE(SUM(ct.valorp::numeric), 0) AS pontual
             FROM "Clickup".cup_contratos ct
@@ -1212,10 +1242,36 @@ export function registerReportsTrimestralRoutes(app: Express) {
           SELECT
             f.mrr, f.contratos, f.clientes,
             i.mrr AS mrr_anterior,
+            bm.base_mensal,
             pa.pontual, pp.pontual AS pontual_anterior,
             c.churn_total_brl, c.churn_total_count, c.churn_brl, c.churn_count,
             c.clientes AS churn_clientes
-          FROM mrr_fim f, mrr_ini i, pont_atual pa, pont_prev pp, churn_carteira c
+          FROM mrr_fim f, mrr_ini i, mrr_bases_mensais bm, pont_atual pa, pont_prev pp, churn_carteira c
+        `),
+        // Bases mensais por squad — denominador do churn médio mensal ponderado
+        // (reportsTrimestral.churn.ts). MRR no snapshot do 1º dia de cada mês
+        // computado do tri, uma linha por squad×mês (somadas em JS). FOTO por mês;
+        // cada mês contribui a sua base mesmo se dois meses caírem no mesmo snapshot.
+        db.execute(sql`
+          WITH month_starts AS (
+            SELECT unnest(ARRAY[${inicioMesesSql}]) AS mstart
+          ),
+          snaps AS (
+            SELECT ms.mstart, COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ms.mstart LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ms.mstart)
+            ) AS snap
+            FROM month_starts ms
+          )
+          SELECT h.squad, s.mstart,
+            COALESCE(SUM(CASE WHEN h.valorr::numeric > 0 THEN h.valorr::numeric END), 0) as mrr
+          FROM snaps s
+          JOIN "Clickup".cup_data_hist h ON h.data_snapshot = s.snap
+          WHERE h.status IN ('ativo', 'onboarding', 'triagem')
+            AND h.valorr IS NOT NULL
+            AND h.squad IS NOT NULL
+            AND TRIM(h.squad) != ''
+          GROUP BY h.squad, s.mstart
         `),
       ]);
 
@@ -1285,6 +1341,15 @@ export function registerReportsTrimestralRoutes(app: Express) {
         mrrAnteriorBySquad[key] = (mrrAnteriorBySquad[key] || 0) + (parseFloat(row.mrr) || 0);
       });
 
+      // Σ das bases mensais por squad (MRR no início de cada mês computado do tri) —
+      // denominador do churn médio mensal ponderado. Uma linha por squad×mês; somamos
+      // aqui para que cada mês contribua a sua base.
+      const basesMensaisBySquad: Record<string, number> = {};
+      (mrrBasesMensaisSquadsRows.rows as any[]).forEach((row: any) => {
+        const key = normalizeSquadName(row.squad);
+        basesMensaisBySquad[key] = (basesMensaisBySquad[key] || 0) + (parseFloat(row.mrr) || 0);
+      });
+
       // Squads ocultos dos slides por squad ("Detalhes por Squad" e "Operadores por
       // Squad") — não impacta ranking nem totais (o MRR/pontual da squad continua
       // somando nos agregados). Base é a lista do mensal (relatorioMensalSlides.ts
@@ -1318,11 +1383,15 @@ export function registerReportsTrimestralRoutes(app: Express) {
           const churn = churnBySquad[normalizeSquadName(row.squad)] || { brl: 0, count: 0, totalBrl: 0, totalCount: 0, clientes: [] };
           const mrrAnt = mrrAnteriorBySquad[normalizeSquadName(row.squad)] || 0;
           const ticketMedio = contratos > 0 ? mrr / contratos : 0;
-          // Churn % = churn do tri / MRR no início do tri. Squad novo (sem base no
-          // início do tri): usa o MRR do próprio tri como base — igual ao mensal.
-          const churnBase = mrrAnt > 0 ? mrrAnt : mrr;
-          const churnPct = churnBase > 0 ? (churn.brl / churnBase) * 100 : 0;
-          const churnTotalPct = churnBase > 0 ? (churn.totalBrl / churnBase) * 100 : 0;
+          // Churn médio mensal (TAXA MENSAL ponderada, ver reportsTrimestral.churn.ts):
+          // Σ churn do tri / Σ das bases mensais (MRR no início de cada mês computado).
+          // Difere do mensal DE PROPÓSITO — lá a base é o MRR do início do mês; aqui
+          // somamos as bases dos meses do tri p/ ler o churn na escala mensal (não como
+          // acumulado sobre a base do 1º dia, que inflava squads que cresceram no tri).
+          // Fallbacks: MRR do início do tri (mrrAnt) e, por fim, MRR atual (squad sem
+          // snapshot no início dos meses).
+          const basesMensais = basesMensaisBySquad[normalizeSquadName(row.squad)] || 0;
+          const churnBase = basesMensais > 0 ? basesMensais : (mrrAnt > 0 ? mrrAnt : mrr);
           // Expansão do trimestre (soma dos meses com entrada na tabela-espelho);
           // squads sem entrada ficam 0 — mesmo comportamento do mensal.
           // nrrBrl = churn s/ abonados − abatimento (fórmula idêntica ao mensal).
@@ -1330,7 +1399,6 @@ export function registerReportsTrimestralRoutes(app: Express) {
           const vendasMes = expansao.vendas;
           const expansaoNrr = expansao.abatimento;
           const nrrBrl = churn.brl - expansaoNrr;
-          const nrrPct = churnBase > 0 ? (nrrBrl / churnBase) * 100 : 0;
 
           // Evolução do faturamento QoQ (chart do slide): faturamento = MRR (FOTO do
           // fim do tri) + pontual entregue (FLUXO do tri) — mesma régua do card
@@ -1352,15 +1420,15 @@ export function registerReportsTrimestralRoutes(app: Express) {
             evolucao,
             ticketMedio: Math.round(ticketMedio),
             clientes,
-            churnPct: Math.round(churnPct * 10) / 10,
+            churnPct: churnMensalPonderadoPct(churn.brl, churnBase),
             churnBrl: churn.brl,
-            churnTotalPct: Math.round(churnTotalPct * 10) / 10,
+            churnTotalPct: churnMensalPonderadoPct(churn.totalBrl, churnBase),
             churnTotalBrl: churn.totalBrl,
             churnClientes: [...churn.clientes].sort((a, b) => (b.valor || 0) - (a.valor || 0)),
             vendasMes,
             expansaoNrr,
             nrrBrl,
-            nrrPct: Math.round(nrrPct * 10) / 10,
+            nrrPct: churnMensalPonderadoPct(nrrBrl, churnBase),
             mrrBase: churnBase,
             evolucaoMrr: mrr - mrrAnt,
           };
@@ -1384,7 +1452,10 @@ export function registerReportsTrimestralRoutes(app: Express) {
         const bChurnBrl = parseFloat(blackRow.churn_brl) || 0;
         const bChurnTotalBrl = parseFloat(blackRow.churn_total_brl) || 0;
         const bChurnClientes = (blackRow.churn_clientes as any[]) ?? [];
-        const bBase = bMrrAnt > 0 ? bMrrAnt : bMrr;
+        // Base do churn médio mensal = Σ das bases mensais da carteira (mesma régua
+        // das demais squads). Fallbacks: MRR início do tri (bMrrAnt) e MRR atual.
+        const bBaseMensal = parseFloat(blackRow.base_mensal) || 0;
+        const bBase = bBaseMensal > 0 ? bBaseMensal : (bMrrAnt > 0 ? bMrrAnt : bMrr);
         const bExpansao = expansaoTri["black"] ?? { vendas: 0, abatimento: 0 };
         const bNrrBrl = bChurnBrl - bExpansao.abatimento;
 
@@ -1398,15 +1469,15 @@ export function registerReportsTrimestralRoutes(app: Express) {
           ],
           ticketMedio: bContratos > 0 ? Math.round(bMrr / bContratos) : 0,
           clientes: bClientes,
-          churnPct: bBase > 0 ? Math.round((bChurnBrl / bBase) * 1000) / 10 : 0,
+          churnPct: churnMensalPonderadoPct(bChurnBrl, bBase),
           churnBrl: bChurnBrl,
-          churnTotalPct: bBase > 0 ? Math.round((bChurnTotalBrl / bBase) * 1000) / 10 : 0,
+          churnTotalPct: churnMensalPonderadoPct(bChurnTotalBrl, bBase),
           churnTotalBrl: bChurnTotalBrl,
           churnClientes: [...bChurnClientes].sort((a, b) => (b.valor || 0) - (a.valor || 0)),
           vendasMes: bExpansao.vendas,
           expansaoNrr: bExpansao.abatimento,
           nrrBrl: bNrrBrl,
-          nrrPct: bBase > 0 ? Math.round((bNrrBrl / bBase) * 1000) / 10 : 0,
+          nrrPct: churnMensalPonderadoPct(bNrrBrl, bBase),
           mrrBase: bBase,
           evolucaoMrr: bMrr - bMrrAnt,
         };

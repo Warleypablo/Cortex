@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-10 | feat(reporte-trimestral): churn do slide de squad vira taxa MENSAL média
+
+**O que foi feito:**
+- No slide **Squad em Destaque**, os 3 cards de churn (**Churn Total**, **Churn s/ Abonados** e **NRR/churn líquido**) deixam de mostrar o acumulado do trimestre e passam a mostrar a **taxa mensal média** — com um `/mês` discreto ao lado do %.
+- Pulse Q2/2026: Churn Total **85,2% → 29,4%/mês**, s/ Abonados **66,2% → 22,9%/mês**. Black: **41,0% → 12,6%/mês**.
+
+**Por que:**
+- A régua antiga (Σ churn do tri ÷ MRR do 1º dia) inflava squads que cresceram no período — a Pulse "perdia 85%" quando o churn mensal médio dela era ~29%. O número não era comparável com a meta de ~8%/mês usada no resto.
+
+**Fórmula (ponderada pela base, decisão do Ichino):**
+- `taxa mensal = Σ churn do tri ÷ Σ (MRR no início de cada mês computado)`. Se cada mês teve r% de churn, o resultado é r% (não o acumulado). O **numerador não mudou** — só o denominador trocou da base do 1º dia para a soma das bases mensais. O R$ ao lado continua sendo o **total churnado no tri**.
+
+**Escopo:** apenas o slide de squad (Pulse, Black e demais). O Black recalcula sobre a carteira dos accounts avaliada nos mesmos snapshots de início de mês.
+
+**Arquivos alterados:**
+- `server/routes/reportsTrimestral.churn.ts` + `.test.ts` - função pura `churnMensalPonderadoPct` (6 testes; um trava o 507.593 → 29,4% da Pulse).
+- `server/routes/reportsTrimestral.ts` - query nova das bases mensais por squad + CTE de bases mensais na query do Black; troca do denominador.
+- `client/src/pages/relatorio-trimestral/SlideSquadTrimestre.tsx` - `/mês` nos 3 cards.
+
 ## 2026-07-10 | feat(reporte-trimestral): slide "Cross-sell" (por CX e por produto)
 
 **O que foi feito:**

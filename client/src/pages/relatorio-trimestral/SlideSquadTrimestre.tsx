@@ -126,6 +126,7 @@ function ChurnCard({
       <div className="flex items-baseline gap-1.5">
         <p className="text-lg font-black tabular-nums" style={{ color }}>
           {pct.toFixed(1).replace(".", ",")}%
+          <span className="text-[9px] font-normal text-zinc-500 ml-0.5">/mês</span>
         </p>
         <p className="text-[10px] text-zinc-600 tabular-nums">{fmtBRL(brl)}</p>
       </div>
@@ -358,6 +359,7 @@ export default function SlideSquadTrimestre({ details, mesLabel }: Props) {
                   <p className="text-[9px] text-zinc-500 uppercase tracking-wider">NRR</p>
                   <p className="text-lg font-black tabular-nums" style={{ color: nrrPositivo ? ACCENT.mrr : ACCENT.churn }}>
                     {nrrPct.toFixed(1).replace(".", ",")}%
+                    <span className="text-[9px] font-normal text-zinc-500 ml-0.5">/mês</span>
                     <span className="text-[10px] text-zinc-600 ml-1.5 font-normal">{fmtBRL(nrrBrl)}</span>
                   </p>
                 </div>
