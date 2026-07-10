@@ -20,8 +20,20 @@ export default function SlideVisaoPontualTrimestre({ data }: { data: RelatorioTr
   const contratosEntregues = atual?.pontualContratos ?? 0;
   const { tempoMedioEntregaDias, amostraEntregas } = data.visaoPontual;
 
+  // "Vendas (pontual)" = o que o comercial FECHOU no Bitrix (deals ganhos pontuais),
+  // mesmo número do card Pontual do "Contratos Fechados". Decisão Ichino (2026-07-10):
+  // NÃO usar a aquisição do ClickUp (`vendasPontual`, que era maior — R$ 2,15M).
+  // Sobrescreve só o ponto do tri atual na série; o histórico (Q4/Q1) segue do ClickUp
+  // (não temos o Bitrix por trimestre), então o QoQ deste card fica oculto p/ não
+  // comparar fontes diferentes.
+  const vendasPontualBitrix = data.contratosMes.receitaPontual;
+  const seriesVendas = series.map((p) =>
+    p.q === data.trimestre ? { ...p, vendasPontual: vendasPontualBitrix } : p,
+  );
+  const qoqVendasBitrix = { atual: vendasPontualBitrix, anterior: 0, betterDirection: "up" as const };
+
   // Quanto entrou a mais do que saiu: o quanto a fila cresceu por vendas no tri.
-  const saldoFila = qoq.pontualVendas.atual - qoq.pontualReceita.atual;
+  const saldoFila = vendasPontualBitrix - qoq.pontualReceita.atual;
 
   return (
     <SlideLayout section="commerce" padding="28px 36px">
@@ -46,10 +58,10 @@ export default function SlideVisaoPontualTrimestre({ data }: { data: RelatorioTr
           />
           <HeroTile
             label="Vendas (pontual)"
-            q={qoq.pontualVendas}
+            q={qoqVendasBitrix}
             vsLabel={vsLabel}
             accent="#38bdf8"
-            series={series}
+            series={seriesVendas}
             getValue={(p) => p.vendasPontual}
             delayMs={100}
           />
