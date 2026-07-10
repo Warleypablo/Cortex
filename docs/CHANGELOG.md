@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-10 | feat(ads): lote "Cliente Novo x Base" (Lucas, CRM) TP1825-1842 — PARCIAL/PAUSADO (throttle de upload dev-tier)
+
+**O que foi feito:**
+- **Biblioteca:** 18 criativos PAREADOS cadastrados (TP1825-1842): Lucas, 2 bodies × 9 hooks (b1/b2 h1-9), bases `CRM_ClienteNovo_Lucas_b{b}h{h}` (9x16 primário + 4x5 na observação).
+- **Upload:** só **11/36 vídeos** subiram (~150MB cada). Os 25 restantes falharam com **throttle SOFT de upload** da Meta (`"There was a problem uploading your video"` / Request Timeout — NÃO é o 80004). A conta dev-tier apanhou dos lotes do dia (Ismael/João + esse) e 36 vídeos de uma vez estourou; insistir piora (passada 1 = 11 ok, passada 2 = 0).
+- **Meta:** NADA criado ainda (0 conjuntos/0 ads). A trava `totalAds` do script de ads impede criar lote incompleto.
+- **Scripts:** `crm-clientenovo.data.ts` + `subir-crm-clientenovo-{planilha,upload,ads}.ts` (pareado, split b1/b2 × h01-05/h06-09, CBO-safe, idempotentes).
+
+**Plano (padrão CRM Recompra):** campanha CBO teste CRM `120252008224000450` (existente, PAUSED), 4 conjuntos, 18 ads pareados, copy clonada do irmão 151, tudo PAUSED.
+
+**Runbook pra retomar (quando a cota de upload esfriar):** (1) `subir-crm-clientenovo-upload.ts --go` (completa os 25 → 36/36); (2) `subir-crm-clientenovo-ads.ts` DRY→`--go`.
+
+**Por que:** Caio pediu a subida do lote CRM Lucas; PAUSADO a pedido dele até a cota de upload da Meta resetar.
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLI avulsos (tsx), idempotentes.
+
 ## 2026-07-10 | feat(ads): lote "Captação Creators - Ismael/João" (TP1819-1824) — campanha CBO NOVA + 6 ads single-format via API
 
 **O que foi feito:**
