@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-09 | feat(reporte-trimestral): seção "Premiações" no fecho do deck
+
+**O que foi feito:**
+- Nova seção **04 · Premiações** no `/reports/trimestral`, com capa + 4 slides de tópico: **Colaborador Turbinado**, **Guardiões da Cultura**, **Destaques · Colaboradores** e **Destaques · Líderes**.
+- Entra **depois de Faturamento e antes do Encerramento** — o Q&A segue como último slide, que é pra onde o QR da abertura aponta.
+- Accent âmbar (`#fbbf24`), distinto de Comercial (azul), Operação (verde) e Tech (roxo).
+
+**Por que:**
+- O deck fechava direto nos números. A seção celebra o time antes do ritual de encerramento.
+
+**Escopo (importante):** os slides **não exibem os premiados** — são slides de tópico, e os nomes são citados no palco. Não há tabela, endpoint nem CRUD de premiações; nada foi tocado em `server/routes/reportsTrimestral.ts`.
+
+**Arquivos alterados:**
+- `client/src/pages/relatorio-trimestral/SlidePremiacaoTrimestre.tsx` - componente novo, reusado 4×; `subtitulo` é opcional (sem ele, o título centraliza sozinho).
+- `client/src/pages/RelatorioTrimestral.tsx` - constante `PREMIACOES`, slots `capa-premiacoes`/`premiacao`, capa reusando `SlideCapaSecao`.
+- `docs/superpowers/specs/2026-07-09-premiacoes-trimestral-design.md` - spec.
+
+Deck: 28 -> 33 slides.
+
 ## 2026-07-08 | fix(painel-executivo): Upsell/Downsell de MRR ignoram entregas pontuais ("Entrega")
 
 **O que foi feito:**

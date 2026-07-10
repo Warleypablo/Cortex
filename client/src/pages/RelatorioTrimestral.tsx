@@ -23,16 +23,27 @@ import SlideNpsTrimestre from "./relatorio-trimestral/SlideNpsTrimestre";
 import SlideFaturavelTrimestre from "./relatorio-trimestral/SlideFaturavelTrimestre";
 import SlideEncerramentoTrimestre from "./relatorio-trimestral/SlideEncerramentoTrimestre";
 import SlideEvolucaoTrimestre from "./relatorio-trimestral/SlideEvolucaoTrimestre";
+import SlidePremiacaoTrimestre from "./relatorio-trimestral/SlidePremiacaoTrimestre";
 
 const SLIDE_BASE_W = 1280;
 const SLIDE_BASE_H = 720;
 
+// Slides de tópico da seção Premiações: só a categoria — os nomes dos premiados
+// são citados no palco, não vão para a tela.
+const PREMIACOES: ReadonlyArray<{ titulo: string; subtitulo?: string }> = [
+  { titulo: "Colaborador Turbinado" },
+  { titulo: "Guardiões da Cultura" },
+  { titulo: "Destaques", subtitulo: "Colaboradores" },
+  { titulo: "Destaques", subtitulo: "Líderes" },
+];
+
 type TrimSlot =
   | { type: "mantra" } | { type: "qr" } | { type: "capa" } | { type: "visao" } | { type: "visao-pontual" } | { type: "vendas" } | { type: "evolucao" }
-  | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" }
+  | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" } | { type: "capa-premiacoes" }
   | { type: "closers" } | { type: "sdrs" } | { type: "turbo" } | { type: "squads-ranking" }
   | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "tech" } | { type: "tech-pipeline" }
-  | { type: "nps" } | { type: "faturamento" } | { type: "encerramento" } | { type: "qa" };
+  | { type: "nps" } | { type: "faturamento" } | { type: "premiacao"; premiacaoIndex: number }
+  | { type: "encerramento" } | { type: "qa" };
 
 function useSlideScale(containerRef: React.RefObject<HTMLDivElement | null>, enabled: boolean, reservedHeight = 0) {
   const [scale, setScale] = useState(1);
@@ -84,7 +95,15 @@ export default function RelatorioTrimestral() {
       { type: "pontual" }, { type: "nps" },
     ];
     const tech: TrimSlot[] = [{ type: "capa-tech" }, { type: "tech" }, { type: "tech-pipeline" }];
-    const fechamento: TrimSlot[] = [{ type: "faturamento" }, { type: "encerramento" }, { type: "qa" }];
+    // Premiações celebram o time depois que os números fecham, e antes do ritual
+    // de encerramento — o Q&A segue por último, que é pra onde o QR da abertura aponta.
+    const premiacoes: TrimSlot[] = [
+      { type: "capa-premiacoes" },
+      ...PREMIACOES.map((_, i): TrimSlot => ({ type: "premiacao", premiacaoIndex: i })),
+    ];
+    const fechamento: TrimSlot[] = [
+      { type: "faturamento" }, ...premiacoes, { type: "encerramento" }, { type: "qa" },
+    ];
     return [...abertura, ...comercial, ...operacao, ...tech, ...fechamento];
   }, [data]);
   const totalSlides = slots.length;
@@ -151,6 +170,7 @@ export default function RelatorioTrimestral() {
       case "capa-comercial": return <SlideCapaSecao numero="01" titulo="Comercial" subtitulo="Contratos fechados · Ranking closers" accent="#38bdf8" accentSoft="rgba(56,189,248,0.12)" label={data.label} />;
       case "capa-operacao":  return <SlideCapaSecao numero="02" titulo="Operação" subtitulo="Turbo Commerce · Squads · Pontual · NPS" accent="#34d399" accentSoft="rgba(52,211,153,0.12)" label={data.label} />;
       case "capa-tech":      return <SlideCapaSecao numero="03" titulo="Tech" subtitulo="Projetos · Receita · Pipeline" accent="#a78bfa" accentSoft="rgba(167,139,250,0.12)" label={data.label} />;
+      case "capa-premiacoes": return <SlideCapaSecao numero="04" titulo="Premiações" subtitulo="Colaborador Turbinado · Guardiões da Cultura · Destaques" accent="#fbbf24" accentSoft="rgba(251,191,36,0.12)" label={data.label} />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
       case "visao-pontual": return <SlideVisaoPontualTrimestre data={data} />;
       case "vendas":       return <SlideVendasTrimestre dados={data.contratosMes} label={data.label} qoqVendas={data.trend.qoq.vendas} />;
@@ -165,6 +185,11 @@ export default function RelatorioTrimestral() {
       case "tech-pipeline": return <SlideTechPipelineTrimestre pipeline={data.techPipeline} label={data.label} />;
       case "nps":          return <SlideNpsTrimestre label={data.label} />;
       case "faturamento":  return <SlideFaturavelTrimestre faturavel={data.faturavel} label={data.label} />;
+      case "premiacao": {
+        const p = PREMIACOES[slot.premiacaoIndex];
+        if (!p) return null;
+        return <SlidePremiacaoTrimestre titulo={p.titulo} subtitulo={p.subtitulo} indice={slot.premiacaoIndex + 1} total={PREMIACOES.length} label={data.label} />;
+      }
       case "encerramento": return <SlideEncerramentoTrimestre label={data.label} />;
       case "qa":           return <SlideQrTrimestre variant="qa" />;
       default:             return null;
