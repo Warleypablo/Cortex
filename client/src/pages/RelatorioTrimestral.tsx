@@ -15,7 +15,7 @@ import SlideClosersTrimestre from "./relatorio-trimestral/SlideClosersTrimestre"
 import SlideSdrsTrimestre from "./relatorio-trimestral/SlideSdrsTrimestre";
 import SlideTurboTrimestre from "./relatorio-trimestral/SlideTurboTrimestre";
 import SlideOperadoresSquadTrimestre from "./relatorio-trimestral/SlideOperadoresSquadTrimestre";
-import SlideSquadTrimestre from "./relatorio-trimestral/SlideSquadTrimestre";
+import SlideSquadsConsolidadoTrimestre from "./relatorio-trimestral/SlideSquadsConsolidadoTrimestre";
 import SlidePontualTrimestre from "./relatorio-trimestral/SlidePontualTrimestre";
 import SlideTechTrimestre from "./relatorio-trimestral/SlideTechTrimestre";
 import SlideTechPipelineTrimestre from "./relatorio-trimestral/SlideTechPipelineTrimestre";
@@ -42,7 +42,7 @@ type TrimSlot =
   | { type: "mantra" } | { type: "qr" } | { type: "capa" } | { type: "visao" } | { type: "visao-pontual" } | { type: "vendas" } | { type: "evolucao" }
   | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" } | { type: "capa-premiacoes" }
   | { type: "closers" } | { type: "sdrs" } | { type: "turbo" } | { type: "squads-ranking" }
-  | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "crosssell" }
+  | { type: "squads-consolidado" } | { type: "pontual" } | { type: "crosssell" }
   | { type: "tech" } | { type: "tech-pipeline" }
   | { type: "nps" } | { type: "faturamento" } | { type: "premiacao"; premiacaoIndex: number }
   | { type: "encerramento" } | { type: "qa" };
@@ -91,11 +91,12 @@ export default function RelatorioTrimestral() {
     const comercial: TrimSlot[] = [
       { type: "capa-comercial" }, { type: "vendas" }, { type: "closers" }, { type: "sdrs" },
     ];
-    const squads: TrimSlot[] = (data?.squadDetails ?? []).map((_, i) => ({ type: "squad", squadIndex: i }));
     // Cross-sell é expansão na base, tocada pelo CX — mora na Operação, entre o
     // pontual (o que foi entregue) e o NPS (como o cliente reagiu).
+    // "squads-consolidado" = tabela leaderboard com todas as squads num slide só
+    // (substituiu os antigos slides "Squad em Destaque" um-a-um).
     const operacao: TrimSlot[] = [
-      { type: "capa-operacao" }, { type: "turbo" }, { type: "squads-ranking" }, ...squads,
+      { type: "capa-operacao" }, { type: "turbo" }, { type: "squads-ranking" }, { type: "squads-consolidado" },
       { type: "pontual" }, { type: "crosssell" }, { type: "nps" },
     ];
     const tech: TrimSlot[] = [{ type: "capa-tech" }, { type: "tech" }, { type: "tech-pipeline" }];
@@ -183,7 +184,7 @@ export default function RelatorioTrimestral() {
       case "sdrs":         return <SlideSdrsTrimestre ranking={data.rankingSDRs} topReunioes={data.topReunioes} label={data.label} />;
       case "turbo":        return <SlideTurboTrimestre metrics={data.turboMetrics} label={data.label} />;
       case "squads-ranking": return <SlideOperadoresSquadTrimestre squads={data.operadoresPorSquad} label={data.label} />;
-      case "squad":        return <SlideSquadTrimestre details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.label} />;
+      case "squads-consolidado": return <SlideSquadsConsolidadoTrimestre details={data.squadDetails} label={data.label} />;
       case "pontual":      return <SlidePontualTrimestre pontualData={data.pontualData} label={data.label} />;
       case "crosssell":    return <SlideCrosssellTrimestre crosssell={data.crosssell} label={data.label} />;
       case "tech":         return <SlideTechTrimestre techData={data.techData} label={data.label} />;

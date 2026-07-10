@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-10 | feat(reporte-trimestral): slide único "Performance por Squad" (leaderboard)
+
+**O que foi feito:**
+- Os 5 slides "Squad em Destaque" (um por squad, revelação progressiva) são **substituídos por 1 slide único** — uma tabela leaderboard com todas as squads de uma vez.
+- Colunas: **Faturamento** (MRR+Pontual, com barra sutil atrás da linha), MRR, Pontual, Ticket, Clientes, **Churn/mês**, **NRR/mês**. Ordenado por faturamento desc. Rodapé com o total do grupo (só métricas aditivas). Título muda para **"Performance por Squad"**.
+- Churn/NRR já vêm como **taxa mensal média** (do commit anterior) — só migraram dos cards individuais pra tabela.
+
+**Por que:** passar 5 slides de squad um a um era longo; a tabela comparativa é mais rápida de ler e comparar lado a lado no board. Líquido: **−4 slides**.
+
+**Arquivos:**
+- `client/src/pages/relatorio-trimestral/SlideSquadsConsolidadoTrimestre.tsx` - novo (tabela).
+- `client/src/pages/relatorio-trimestral/squad-kit.ts` - novo; helpers compartilhados (`SQUAD_COLORS`, `parseSquadName`, `getColor`, `fmtBRL`) extraídos do `SlideSquadTrimestre`.
+- `client/src/pages/RelatorioTrimestral.tsx` - troca o slot `squad×N` pelo `squads-consolidado`.
+- `SlideSquadTrimestre.tsx` mantido no disco (fora do deck, reversível), agora consumindo o `squad-kit`.
+
 ## 2026-07-10 | feat(reporte-trimestral): churn do slide de squad vira taxa MENSAL média
 
 **O que foi feito:**
