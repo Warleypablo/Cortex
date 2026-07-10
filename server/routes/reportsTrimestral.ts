@@ -1566,7 +1566,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         pontualEmAbertoRows,
         pontualAquisicaoRows,
         pontualEntregasSquadRows,
-        pontualEntregasProdutoMesRows,
+        pontualEntregasProdutoTriRows,
         pontualTempoMedioRows,
       ] = await Promise.all([
         // Espelha query 29 (em aberto por serviço) — estado ATUAL, sem filtro
@@ -1614,21 +1614,22 @@ export function registerReportsTrimestralRoutes(app: Express) {
           GROUP BY COALESCE(NULLIF(TRIM(squad), ''), 'Sem Squad')
           ORDER BY valor DESC
         `),
-        // Espelha query 32 (entregas por produto × mês) — troca o
-        // EXTRACT(YEAR)=ano do mensal (cobre o ano inteiro) pelo range
-        // w.dataStart..w.dataEnd, restringindo aos meses do tri (w.meses).
+        // Entregas por produto × TRIMESTRE do ano (decisão 2026-07-09: o eixo era
+        // mês-a-mês dentro do tri e passou a ser trimestre-a-trimestre, para o
+        // slide comparar Q1 vs Q2). Cobre do 1º de janeiro até w.dataEnd
+        // (exclusivo), então um deck de Q2 não enxerga o Q3.
         db.execute(sql`
           SELECT
-            TO_CHAR(data_entrega, 'YYYY-MM') as month,
+            EXTRACT(QUARTER FROM data_entrega)::int as quarter,
             COALESCE(NULLIF(TRIM(produto), ''), 'Sem produto') as produto,
             COALESCE(SUM(valorp::numeric), 0) as valor
           FROM "Clickup".cup_contratos
           WHERE valorp IS NOT NULL AND valorp::numeric > 0
             AND LOWER(TRIM(status)) = 'entregue'
-            AND data_entrega >= ${w.dataStart}::date
+            AND data_entrega >= ${`${w.ano}-01-01`}::date
             AND data_entrega < ${w.dataEnd}::date
-          GROUP BY TO_CHAR(data_entrega, 'YYYY-MM'), COALESCE(NULLIF(TRIM(produto), ''), 'Sem produto')
-          ORDER BY month, valor DESC
+          GROUP BY 1, COALESCE(NULLIF(TRIM(produto), ''), 'Sem produto')
+          ORDER BY quarter, valor DESC
         `),
         // Espelha query 33 (tempo médio de entrega por produto) — troca a
         // janela "últimos 6 meses antes do mês do relatório" do mensal por
@@ -1678,29 +1679,33 @@ export function registerReportsTrimestralRoutes(app: Express) {
       }));
       const entregasSquadTotal = entregasPorSquad.reduce((s, r) => s + r.valor, 0);
 
-      // Agrupar entregas por produto x mês em { month, label, produtos: {...}, total },
-      // igual ao mensal (relatorioMensalSlides.ts ~L1678-1698).
-      const MESES_SHORT_PONTUAL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-      const entregasProdutoMesMap = new Map<string, { label: string; produtos: Record<string, number>; total: number }>();
-      for (const row of pontualEntregasProdutoMesRows.rows as any[]) {
-        const month = row.month as string;
+      // Agrupar entregas por produto × trimestre do ano em
+      // { quarter, label: "Q1", produtos: {...}, total, parcial }.
+      // Trimestres sem entrega entram zerados, para não deslocar o eixo.
+      const quarterCorrente = Math.floor(new Date().getMonth() / 3) + 1;
+      const anoCorrente = new Date().getFullYear();
+      const entregasProdutoTriMap = new Map<number, { produtos: Record<string, number>; total: number }>();
+      for (const row of pontualEntregasProdutoTriRows.rows as any[]) {
+        const quarter = Number(row.quarter);
         const produto = row.produto as string;
         const valor = parseFloat(row.valor) || 0;
-        if (!entregasProdutoMesMap.has(month)) {
-          const mNum = parseInt(month.split("-")[1]) - 1;
-          entregasProdutoMesMap.set(month, {
-            label: MESES_SHORT_PONTUAL[mNum] || month,
-            produtos: {},
-            total: 0,
-          });
+        if (!entregasProdutoTriMap.has(quarter)) {
+          entregasProdutoTriMap.set(quarter, { produtos: {}, total: 0 });
         }
-        const entry = entregasProdutoMesMap.get(month)!;
+        const entry = entregasProdutoTriMap.get(quarter)!;
         entry.produtos[produto] = (entry.produtos[produto] || 0) + valor;
         entry.total += valor;
       }
-      const entregasPorProdutoMes = Array.from(entregasProdutoMesMap.entries())
-        .sort(([a], [b]) => a.localeCompare(b))
-        .map(([month, data]) => ({ month, ...data }));
+      const entregasPorProdutoTri = Array.from({ length: w.quarter }, (_, i) => i + 1).map((q) => {
+        const data = entregasProdutoTriMap.get(q) ?? { produtos: {}, total: 0 };
+        return {
+          quarter: q,
+          label: `Q${q}`,
+          produtos: data.produtos,
+          total: data.total,
+          parcial: w.ano === anoCorrente && q === quarterCorrente,
+        };
+      });
 
       const tempoMedioEntrega = (pontualTempoMedioRows.rows as any[]).map((row: any) => ({
         produto: row.produto,
@@ -1730,7 +1735,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
           saiu: entregasSquadTotal,
           delta: aquisicaoValor - entregasSquadTotal,
         },
-        entregasPorProdutoMes,
+        entregasPorProdutoTri,
         tempoMedioEntrega,
       };
 

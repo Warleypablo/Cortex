@@ -3,6 +3,19 @@ import type {
   SquadRanking, SquadDetail, PontualData,
 } from "../relatorio-mensal/types";
 
+// No deck trimestral as entregas por produto são agrupadas por TRIMESTRE do ano
+// (Q1..Qn), não mês a mês — o mensal segue com `entregasPorProdutoMes` intacto.
+export interface EntregaProdutoTri {
+  quarter: number;
+  label: string;                      // "Q1"
+  produtos: Record<string, number>;
+  total: number;
+  parcial: boolean;                   // trimestre em andamento
+}
+
+export type PontualDataTrimestral =
+  Omit<PontualData, "entregasPorProdutoMes"> & { entregasPorProdutoTri: EntregaProdutoTri[] };
+
 // metaMrr = meta de MRR ativo do BP 2026 no mês da foto do trimestre; null quando o
 // trimestre está fora do BP (ex.: Q4 2025) — a linha de meta não é desenhada ali.
 //
@@ -176,7 +189,7 @@ export interface RelatorioTrimestralData {
   rankingSquads: SquadRanking[];
   squadDetails: SquadDetailTri[];
   operadoresPorSquad: SquadOperadores[];
-  pontualData: PontualData;
+  pontualData: PontualDataTrimestral;
   visaoPontual: VisaoPontual;
   techData: TechTrimestralData;
   techPipeline: TechPipelineData;

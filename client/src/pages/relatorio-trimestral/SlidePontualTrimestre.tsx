@@ -3,13 +3,47 @@ import type { LucideIcon } from "lucide-react";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 import SlideLayout from "../relatorio-mensal/SlideLayout";
 import { SlideHeader, SecondaryCard, ChartCard } from "../relatorio-mensal/SlideComponents";
-import type { PontualData } from "../relatorio-mensal/types";
+import type { PontualDataTrimestral, EntregaProdutoTri } from "./types";
 import { ACCENT, fmtCompact, fmtK, entrance, LegendDot, DeckKeyframes, GrowBar, TOOLTIP_STYLE } from "./deck-kit";
 import { useCountUp } from "./useCountUp";
 
 interface Props {
-  pontualData: PontualData;
+  pontualData: PontualDataTrimestral;
   label: string;
+}
+
+/**
+ * Rótulo no topo da pilha: total entregue no trimestre e, do 2º em diante, a
+ * variação contra o trimestre anterior (delta em R$ + %).
+ *
+ * `content` e não `formatter`: no Recharts 2.x o formatter recebe só o valor,
+ * sem o índice necessário para alcançar a barra anterior.
+ */
+function TopoBarraEntregas({ trimestres, ...props }: any) {
+  const { x, y, width, index } = props;
+  const t = trimestres[index] as EntregaProdutoTri | undefined;
+  if (!t || typeof x !== "number") return null;
+
+  const anterior = index > 0 ? (trimestres[index - 1] as EntregaProdutoTri) : null;
+  const delta = anterior ? t.total - anterior.total : 0;
+  const temDelta = !!anterior && anterior.total > 0;
+  const pctDelta = temDelta ? (delta / anterior.total) * 100 : 0;
+  const subiu = delta >= 0;
+  const cx = x + width / 2;
+
+  return (
+    <g>
+      <text x={cx} y={y - (temDelta ? 24 : 7)} textAnchor="middle" fill="#e4e4e7" fontSize={12} fontWeight={700}>
+        {fmtCompact(t.total)}
+      </text>
+      {temDelta && (
+        <text x={cx} y={y - 7} textAnchor="middle" fill={subiu ? ACCENT.mrr : ACCENT.churn} fontSize={11} fontWeight={700}>
+          {subiu ? "▲" : "▼"} {fmtCompact(Math.abs(delta))} · {subiu ? "+" : "−"}
+          {Math.abs(pctDelta).toFixed(1).replace(".", ",")}%
+        </text>
+      )}
+    </g>
+  );
 }
 
 // Paleta de produtos derivada dos ACCENTs do deck (máx 4 produtos + "Outros")
@@ -41,7 +75,7 @@ function HeroStat({
 }
 
 export default function SlidePontualTrimestre({ pontualData, label }: Props) {
-  const { emAberto, aquisicao, entregasMes, variacaoEstoque, entregasPorProdutoMes, tempoMedioEntrega } = pontualData;
+  const { emAberto, aquisicao, entregasMes, variacaoEstoque, entregasPorProdutoTri, tempoMedioEntrega } = pontualData;
 
   const isCrescimento = variacaoEstoque.delta >= 0;
   const totalContratosEntregues = (entregasMes.porSquad ?? []).reduce((acc, s) => acc + s.contratos, 0);
@@ -56,10 +90,11 @@ export default function SlidePontualTrimestre({ pontualData, label }: Props) {
   const topServicos = [...(emAberto.porServico ?? [])].sort((a, b) => b.valor - a.valor).slice(0, 8);
   const maxServicoValor = Math.max(...topServicos.map((s) => s.valor), 1);
 
-  // Entregas por produto × mês (stacked) — top 4 produtos do trimestre + Outros
+  // Entregas por produto × trimestre do ano (stacked) — top 4 produtos do ano + Outros
+  const trimestres = entregasPorProdutoTri ?? [];
   const produtoTotais = new Map<string, number>();
-  for (const m of entregasPorProdutoMes ?? []) {
-    for (const [prod, val] of Object.entries(m.produtos ?? {})) {
+  for (const t of trimestres) {
+    for (const [prod, val] of Object.entries(t.produtos ?? {})) {
       produtoTotais.set(prod, (produtoTotais.get(prod) ?? 0) + val);
     }
   }
@@ -69,10 +104,14 @@ export default function SlidePontualTrimestre({ pontualData, label }: Props) {
     .map(([p]) => p);
   const topProdutosSet = new Set(topProdutos);
 
-  const chartData = (entregasPorProdutoMes ?? []).map((m) => {
-    const row: Record<string, number | string> = { label: m.label, total: m.total, Outros: 0 };
+  const chartData = trimestres.map((t) => {
+    const row: Record<string, number | string> = {
+      label: t.parcial ? `${t.label} *` : t.label,
+      total: t.total,
+      Outros: 0,
+    };
     for (const p of topProdutos) row[p] = 0;
-    for (const [prod, val] of Object.entries(m.produtos ?? {})) {
+    for (const [prod, val] of Object.entries(t.produtos ?? {})) {
       if (topProdutosSet.has(prod)) row[prod] = (row[prod] as number) + val;
       else row.Outros = (row.Outros as number) + val;
     }
@@ -193,14 +232,14 @@ export default function SlidePontualTrimestre({ pontualData, label }: Props) {
           </div>
 
           <div className={`${rightEntrance.className} col-span-3 flex flex-col min-h-0`} style={rightEntrance.style}>
-            <ChartCard title="Entregas por produto no trimestre" className="flex-1">
+            <ChartCard title="Entregas por produto por trimestre" className="flex-1">
               {chartData.length === 0 ? (
                 <p className="text-xs text-zinc-600 italic">Sem entregas no período</p>
               ) : (
                 <>
                   <div className="flex-1 min-h-0">
                     <ResponsiveContainer width="100%" height="100%">
-                      <BarChart data={chartData} margin={{ top: 10, right: 12, left: 0, bottom: 0 }}>
+                      <BarChart data={chartData} margin={{ top: 38, right: 12, left: 0, bottom: 0 }}>
                         <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                         <XAxis
                           dataKey="label"
@@ -224,11 +263,16 @@ export default function SlidePontualTrimestre({ pontualData, label }: Props) {
                               dataKey={prod}
                               name={prod}
                               stackId="a"
-                              maxBarSize={24}
+                              maxBarSize={56}
                               fill={PRODUTO_COLORS[idx]}
                               fillOpacity={prod === "Outros" ? 0.6 : 0.85}
                               animationDuration={700}
-                              {...(isLast ? { radius: [4, 4, 0, 0] as [number, number, number, number] } : {})}
+                              {...(isLast
+                                ? {
+                                    radius: [4, 4, 0, 0] as [number, number, number, number],
+                                    label: (p: any) => <TopoBarraEntregas {...p} trimestres={trimestres} />,
+                                  }
+                                : {})}
                             />
                           );
                         })}
