@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-10 | fix(reporte-trimestral): estoque pontual em aberto bate entre os dois slides
+
+**Bug:** o "estoque em aberto" divergia entre o slide **Pontual** (R$ 1,68M) e o slide **Visão do Trimestre — Pontual** (R$ 2,09M), sendo a mesma métrica.
+
+**Causa raiz (duas somadas):**
+1. **Temporalidade:** o slide Pontual (`pontualData.emAberto`, query 29) lia o estado ATUAL de `cup_contratos` (hoje, já dentro do Q3); o slide Visão (`estoquePontualPorTri`) lia o snapshot `cup_data_hist` do **fim do tri**.
+2. **Override do Creators:** o slide Pontual aplicava um override manual (R$711k, "corrige duplicação de parcelas") que o slide Visão não aplicava.
+
+**Decisão (Ichino):** foto do **fim do tri** nos dois, com **valorp bruto** — cada entrega parcelada do Creators conta com seu valor (é a fila real a entregar); sem override, sem dedup. O override (711k) era um valor manual "de hoje" que nem generalizava pra série (inflava o Q4/2025, onde não havia parcelamento).
+
+**Correção:** a query 29 passa a ler o snapshot de `w.fotoDate` com o mesmo filtro de status do `estoquePontualPorTri`, e o override do Creators sai. Os dois slides agora batem ao centavo (Q2: **R$ 2.090.519**). Diverge do mensal de propósito (lá a Q29 é dateless).
+
+**Nota:** o card "variação de estoque" do slide Pontual (+R$649k) continua sendo FLUXO (aquisição − entregas), lente diferente do delta-de-foto (+R$310k / +17,5%) do slide Visão — não foi alterado.
+
+**Arquivo:** `server/routes/reportsTrimestral.ts` (query `pontualEmAbertoRows` + remoção do `CREATORS_OVERRIDE_VALOR`).
+
 ## 2026-07-10 | feat(reporte-trimestral): slide único "Performance por Squad" (leaderboard)
 
 **O que foi feito:**

@@ -1641,23 +1641,35 @@ export function registerReportsTrimestralRoutes(app: Express) {
         pontualEntregasProdutoTriRows,
         pontualTempoMedioRows,
       ] = await Promise.all([
-        // Espelha query 29 (em aberto por serviço) — estado ATUAL, sem filtro
-        // de data (mesma query do mensal, dateless).
+        // Em aberto por serviço na FOTO do fim do tri (snapshot cup_data_hist em
+        // w.fotoDate). DIVERGE do mensal DE PROPÓSITO (lá a Q29 é dateless / estado
+        // atual): num reporte de Q2 fechado o estado de hoje já mistura o Q3. Usar o
+        // mesmo snapshot + mesmo filtro do estoquePontualPorTri (série do slide Visão)
+        // garante que o "estoque em aberto" bate ao centavo entre os dois slides.
+        // valorp BRUTO (cada entrega parcelada do Creators conta com seu valor — é a
+        // fila real a entregar; decisão do Ichino 2026-07-10, sem override/dedup).
         db.execute(sql`
+          WITH estoque_snapshot AS (
+            SELECT COALESCE(
+              (SELECT data_snapshot FROM "Clickup".cup_data_hist WHERE data_snapshot = ${w.fotoDate}::date LIMIT 1),
+              (SELECT MAX(data_snapshot) FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${w.fotoDate}::date)
+            ) as snap
+          )
           SELECT
             CASE
-              WHEN LOWER(servico) LIKE '%creators%' THEN 'Creators'
-              ELSE COALESCE(NULLIF(TRIM(servico), ''), 'Sem serviço')
+              WHEN LOWER(h.servico) LIKE '%creators%' THEN 'Creators'
+              ELSE COALESCE(NULLIF(TRIM(h.servico), ''), 'Sem serviço')
             END as servico,
             COUNT(*)::int as contratos,
-            COALESCE(SUM(valorp::numeric), 0) as valor
-          FROM "Clickup".cup_contratos
-          WHERE valorp IS NOT NULL AND valorp::numeric > 0
-            AND LOWER(TRIM(status)) IN ('ativo','triagem','onboarding','em cancelamento','pausado')
+            COALESCE(SUM(h.valorp::numeric), 0) as valor
+          FROM "Clickup".cup_data_hist h
+          JOIN estoque_snapshot es ON h.data_snapshot = es.snap
+          WHERE h.valorp IS NOT NULL AND h.valorp::numeric > 0
+            AND LOWER(TRIM(h.status)) IN ('ativo','triagem','onboarding','em cancelamento','pausado')
           GROUP BY
             CASE
-              WHEN LOWER(servico) LIKE '%creators%' THEN 'Creators'
-              ELSE COALESCE(NULLIF(TRIM(servico), ''), 'Sem serviço')
+              WHEN LOWER(h.servico) LIKE '%creators%' THEN 'Creators'
+              ELSE COALESCE(NULLIF(TRIM(h.servico), ''), 'Sem serviço')
             END
           ORDER BY valor DESC
         `),
@@ -1723,17 +1735,14 @@ export function registerReportsTrimestralRoutes(app: Express) {
         `),
       ]);
 
-      // Override manual: "Creators" em aberto corrigido devido a duplicação
-      // nas entregas parceladas — mesmo valor validado do mensal
-      // (relatorioMensalSlides.ts ~L1651). Como Q29 é dateless (estado
-      // atual), o número não varia por trimestre.
-      const CREATORS_OVERRIDE_VALOR = 711406;
+      // valorp BRUTO da foto do fim do tri, sem override do Creators: cada entrega
+      // parcelada conta com seu valor (é a fila real a entregar). Assim o total bate
+      // ao centavo com o estoquePontualPorTri (slide "Visão do Trimestre — Pontual"),
+      // que soma o mesmo snapshot. Decisão do Ichino 2026-07-10.
       const emAbertoPorServico = (pontualEmAbertoRows.rows as any[])
         .map((row: any) => ({
           servico: row.servico,
-          valor: row.servico === 'Creators'
-            ? CREATORS_OVERRIDE_VALOR
-            : (parseFloat(row.valor) || 0),
+          valor: parseFloat(row.valor) || 0,
           contratos: parseInt(row.contratos) || 0,
         }))
         .sort((a, b) => b.valor - a.valor);
