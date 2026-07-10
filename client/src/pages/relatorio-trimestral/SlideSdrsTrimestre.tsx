@@ -2,7 +2,7 @@ import { Headset, Crown, CalendarCheck } from "lucide-react";
 import SlideLayout from "../relatorio-mensal/SlideLayout";
 import { SlideHeader, SecondaryCard } from "../relatorio-mensal/SlideComponents";
 import type { SdrRanking, TopReunioes } from "../relatorio-mensal/types";
-import { fmtCompact, entranceWith, DeckKeyframes, GrowBar } from "./deck-kit";
+import { fmtCompact, entranceWith, DeckKeyframes } from "./deck-kit";
 import { useCountUp } from "./useCountUp";
 
 interface Props {
@@ -43,9 +43,7 @@ function Avatar({ nome, url, px, grad }: { nome: string; url: string | null; px:
 }
 
 export default function SlideSdrsTrimestre({ ranking, topReunioes, label }: Props) {
-  const top3 = ranking.slice(0, 3);
-  const resto = ranking.slice(3, 7);
-  const hasResto = resto.length > 0;
+  const top3 = ranking.slice(0, 3); // só o pódio — apenas top 3 (decisão Ichino 2026-07-10)
 
   // Display: 2º | 1º | 3º (mesma convenção do pódio)
   const display = top3.length >= 3
@@ -54,8 +52,8 @@ export default function SlideSdrsTrimestre({ ranking, topReunioes, label }: Prop
       ? [{ c: top3[1], r: 1 }, { c: top3[0], r: 0 }]
       : top3.map((c, i) => ({ c, r: i }));
 
-  const fotoPx = [76, 64, 56];
-  const podiumH = [60, 44, 32];
+  const fotoPx = [88, 72, 64];
+  const podiumH = [72, 52, 38];
 
   // Count-up do MRR gerado — hooks sempre na mesma ordem (fallback 0)
   const mrr0 = useCountUp(top3[0]?.mrrGerado ?? 0, 750, 200);
@@ -63,8 +61,6 @@ export default function SlideSdrsTrimestre({ ranking, topReunioes, label }: Prop
   const mrr2 = useCountUp(top3[2]?.mrrGerado ?? 0, 750, 400);
   const mrrAnim = [mrr0, mrr1, mrr2];
   const reunioesAnim = useCountUp(topReunioes?.reunioes ?? 0, 750, 350);
-
-  const maxTotal = Math.max(...ranking.map((c) => c.totalGerado), 1);
 
   if (ranking.length === 0) {
     return (
@@ -83,11 +79,9 @@ export default function SlideSdrsTrimestre({ ranking, topReunioes, label }: Prop
       <SlideHeader icon={Headset} iconColor="text-sky-400" title={`Ranking SDRs — ${label}`} gradientColor="#38bdf8" />
 
       <div className="flex-1 flex gap-6 min-h-0">
-        {/* Coluna principal: pódio top 3 (MRR gerado) + demais SDRs */}
+        {/* Coluna principal: só o pódio top 3 (MRR gerado) */}
         <div className="flex-1 flex flex-col gap-4 min-h-0">
-          <div
-            {...entranceWith(0, `flex justify-center gap-10 ${hasResto ? "items-end shrink-0" : "items-center flex-1"}`)}
-          >
+          <div {...entranceWith(0, "flex justify-center gap-10 items-center flex-1")}>
             {display.map(({ c, r }) => {
               if (!c) return null;
               const col = PODIUM_COLORS[r];
@@ -114,32 +108,6 @@ export default function SlideSdrsTrimestre({ ranking, topReunioes, label }: Prop
               );
             })}
           </div>
-
-          {/* Demais SDRs: linhas compactas com GrowBar proporcional ao total gerado */}
-          {hasResto && (
-            <div {...entranceWith(250, "flex-1 min-h-0")}>
-              <SecondaryCard className="px-5 py-3 h-full flex flex-col overflow-hidden" borderColor="#52525b">
-                <p className="text-xs font-bold text-zinc-300 uppercase tracking-widest mb-2 shrink-0">Demais SDRs</p>
-                <div className="flex-1 flex flex-col justify-center gap-2 min-h-0">
-                  {resto.map((c, i) => {
-                    const pct = (c.totalGerado / maxTotal) * 100;
-                    return (
-                      <div key={c.name} className="flex items-center gap-3">
-                        <span className="w-4 text-xs font-bold text-zinc-500 text-right shrink-0">{i + 4}</span>
-                        <Avatar nome={c.name} url={c.fotoUrl} px={22} grad="from-sky-500 to-sky-700" />
-                        <span className="w-32 text-xs text-zinc-300 truncate shrink-0" title={c.name}>{firstName(c.name)}</span>
-                        <div className="flex-1 h-4 rounded-md overflow-hidden bg-white/[0.03]">
-                          <GrowBar widthPct={pct} delayMs={300 + i * 70} className="bg-gradient-to-r from-sky-500/80 to-sky-400/60 rounded-md" />
-                        </div>
-                        <span className="w-16 text-xs font-bold text-white text-right shrink-0 tabular-nums">{fmtCompact(c.totalGerado)}</span>
-                        <span className="w-16 text-[10px] text-zinc-500 text-right shrink-0 tabular-nums">{c.negociosGanhos} neg.</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              </SecondaryCard>
-            </div>
-          )}
         </div>
 
         {/* Destaque Reuniões */}
