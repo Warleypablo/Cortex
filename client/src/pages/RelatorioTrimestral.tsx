@@ -23,6 +23,8 @@ import SlideTechTrimestre from "./relatorio-trimestral/SlideTechTrimestre";
 import SlideTechPipelineTrimestre from "./relatorio-trimestral/SlideTechPipelineTrimestre";
 import SlideNpsTrimestre from "./relatorio-trimestral/SlideNpsTrimestre";
 import SlideFaturadoTrimestre from "./relatorio-trimestral/SlideFaturadoTrimestre";
+import SlideReceitaAnualTrimestre from "./relatorio-trimestral/SlideReceitaAnualTrimestre";
+import SlideBrandTrimestre, { BRAND_SLIDES } from "./relatorio-trimestral/SlideBrandTrimestre";
 import SlideEncerramentoTrimestre from "./relatorio-trimestral/SlideEncerramentoTrimestre";
 import SlideEvolucaoTrimestre from "./relatorio-trimestral/SlideEvolucaoTrimestre";
 import SlidePremiacaoTrimestre from "./relatorio-trimestral/SlidePremiacaoTrimestre";
@@ -46,7 +48,7 @@ type TrimSlot =
   | { type: "closers" } | { type: "sdrs" } | { type: "turbo" } | { type: "squads-ranking" }
   | { type: "squads-consolidado" } | { type: "pontual" } | { type: "crosssell" }
   | { type: "tech" } | { type: "tech-pipeline" }
-  | { type: "nps" } | { type: "faturamento" } | { type: "premiacao"; premiacaoIndex: number }
+  | { type: "nps" } | { type: "faturamento" } | { type: "receita-anual" } | { type: "brand"; brandIndex: number } | { type: "premiacao"; premiacaoIndex: number }
   | { type: "encerramento" } | { type: "qa" };
 
 function useSlideScale(containerRef: React.RefObject<HTMLDivElement | null>, enabled: boolean, reservedHeight = 0) {
@@ -109,7 +111,9 @@ export default function RelatorioTrimestral() {
       ...PREMIACOES.map((_, i): TrimSlot => ({ type: "premiacao", premiacaoIndex: i })),
     ];
     const fechamento: TrimSlot[] = [
-      { type: "faturamento" }, ...premiacoes, { type: "encerramento" }, { type: "qa" },
+      { type: "faturamento" }, { type: "receita-anual" },
+      ...BRAND_SLIDES.map((_, i): TrimSlot => ({ type: "brand", brandIndex: i })),
+      ...premiacoes, { type: "encerramento" }, { type: "qa" },
     ];
     return [...abertura, ...comercial, ...operacao, ...tech, ...fechamento];
   }, [data]);
@@ -195,6 +199,8 @@ export default function RelatorioTrimestral() {
       case "tech-pipeline": return <SlideTechPipelineTrimestre pipeline={data.techPipeline} label={data.label} />;
       case "nps":          return <SlideNpsTrimestre label={data.label} />;
       case "faturamento":  return <SlideFaturadoTrimestre faturado={data.faturado} label={data.label} />;
+      case "receita-anual": return <SlideReceitaAnualTrimestre />;
+      case "brand":        return <SlideBrandTrimestre spec={BRAND_SLIDES[slot.brandIndex]} />;
       case "premiacao": {
         const p = PREMIACOES[slot.premiacaoIndex];
         if (!p) return null;
