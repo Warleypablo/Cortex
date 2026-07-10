@@ -182,7 +182,7 @@ export default function RelatorioTrimestral() {
       case "capa-premiacoes": return <SlideCapaSecao numero="04" titulo="Premiações" subtitulo="Guardiões da Cultura · Destaques · Colaborador Turbinado" accent="#fbbf24" accentSoft="rgba(251,191,36,0.12)" label={data.label} />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
       case "visao-pontual": return <SlideVisaoPontualTrimestre data={data} />;
-      case "vendas":       return <SlideVendasTrimestre dados={data.contratosMes} label={data.label} qoqVendas={data.trend.qoq.vendas} vendaPontual={data.pontualData.aquisicao} qoqPontual={data.trend.qoq.pontualVendas} />;
+      case "vendas":       return <SlideVendasTrimestre dados={data.contratosMes} label={data.label} qoqVendas={data.trend.qoq.vendas} />;
       case "evolucao":     return <SlideEvolucaoTrimestre trend={data.trend} />;
       case "closers":      return <SlideClosersTrimestre ranking={data.rankingClosers} topPontual={data.topPontual} label={data.label} />;
       case "sdrs":         return <SlideSdrsTrimestre ranking={data.rankingSDRs} topReunioes={data.topReunioes} label={data.label} />;
