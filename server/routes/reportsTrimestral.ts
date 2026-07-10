@@ -4,6 +4,7 @@ import { db } from "../db";
 import { buildQuarterWindow, type QuarterWindow } from "./reportsTrimestral.window";
 import { getTechTrimestral } from "../lib/techDash";
 import { getTechPipeline, warmTechPipeline } from "../lib/techPipeline";
+import { buildFaturado, type FaturadoRow } from "./reportsTrimestral.faturado";
 
 interface VendasMesInput { month: string; vendasMrr: number; vendasPontual?: number }
 interface MrrChurnMesInput { month: string; mrr: number; churnBrl: number; pontual?: number; pontualContratos?: number }
@@ -1746,26 +1747,27 @@ export function registerReportsTrimestralRoutes(app: Express) {
         getTechPipeline(w.ano, w.quarter),
       ]);
 
-      // Faturável do trimestre (decisão 2026-07-09: sem Conta Azul, sem
-      // inadimplência/impostos): Σ MRR ativo (foto do fim de cada mês computado
-      // do tri) + pontual entregue no tri. Fontes operacionais — cup_data_hist
-      // (MRR) e cup_contratos (entregas) — reaproveitando as linhas mensais que
-      // a query do trend já busca (mrrChurnRows: month/mrr/pontual).
-      const MESES_SHORT = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
-      const faturavelPorMes = (mrrChurnRows.rows as any[])
-        .filter((r: any) => w.mesesComputados.includes(r.month))
-        .map((r: any) => {
-          const m = parseInt(r.month.split("-")[1]) - 1;
-          const mrr = parseFloat(r.mrr) || 0;
-          const pontual = parseFloat(r.pontual) || 0;
-          return { month: r.month as string, label: MESES_SHORT[m] || r.month, mrr, pontual, total: mrr + pontual };
-        });
-      const faturavel = {
-        mrrSoma: faturavelPorMes.reduce((a, r) => a + r.mrr, 0),
-        pontualEntregue: faturavelPorMes.reduce((a, r) => a + r.pontual, 0),
-        total: faturavelPorMes.reduce((a, r) => a + r.total, 0),
-        porMes: faturavelPorMes,
-      };
+      // Faturado do trimestre (decisão 2026-07-09, substitui o antigo "Faturável"
+      // que vinha do ClickUp): leitura contábil do Conta Azul —
+      //   faturável (valor_bruto) − inadimplência (ATRASADO/PERDIDO) = faturado (valor_pago)
+      // Fonte é caz_parcelas e NÃO caz_receber: esta não sincroniza a TURBO FILIAL.
+      // Sem filtro de empresa — o número é do grupo inteiro.
+      // dataEnd é exclusivo, então um deck de Q2 não enxerga o Q3.
+      const faturadoRows = await db.execute(sql`
+        SELECT
+          EXTRACT(QUARTER FROM data_vencimento)::int AS quarter,
+          COALESCE(SUM(valor_bruto), 0)::numeric AS faturavel,
+          COALESCE(SUM(valor_pago), 0)::numeric AS faturado,
+          COALESCE(SUM(CASE WHEN status IN ('ATRASADO','PERDIDO')
+                            THEN valor_bruto - valor_pago ELSE 0 END), 0)::numeric AS inadimplencia
+        FROM "Conta Azul".caz_parcelas
+        WHERE UPPER(tipo_evento) = 'RECEITA'
+          AND data_vencimento >= ${`${w.ano}-01-01`}::date
+          AND data_vencimento < ${w.dataEnd}::date
+        GROUP BY 1
+        ORDER BY 1
+      `);
+      const faturado = buildFaturado(faturadoRows.rows as unknown as FaturadoRow[], w.ano, w.quarter, new Date());
 
       // Tickets médios por CLIENTE, mesma régua nos dois lados:
       // recorrente = MRR (foto fim do tri) ÷ clientes recorrentes ativos (foto);
@@ -1803,7 +1805,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         visaoPontual,
         techData,
         techPipeline,
-        faturavel,
+        faturado,
       });
     } catch (error: any) {
       console.error("[reports/trimestral] Error:", error?.message || error);

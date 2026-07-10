@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-09 | feat(reporte-trimestral): slide "Faturado" (Conta Azul) substitui o "Faturável"
+
+**O que foi feito:**
+- O slide **Faturável** (fonte ClickUp: MRR ativo + pontual entregue) **sai** e dá lugar ao slide **Faturado**, com leitura contábil do Conta Azul: `faturável (bruto) − inadimplência (atrasado/perdido) = faturado (recebido)`.
+- Barras por trimestre do ano (faturado + inadimplência empilhados = faturável) e barra de progresso da **meta anual de R$25M**, com marcador do ritmo esperado do ano.
+- `META_FATURAMENTO_2026` sai de `useTvLeaderboardData.ts` para `shared/metas.ts` — vivia duplicada.
+
+**Por que:**
+- O número antigo ignorava inadimplência e vinha de fonte operacional. A meta de 25MM é medida sobre caixa recebido.
+
+**Decisões:** faturado = `valor_pago` (caixa), **não** `bruto − inadimplência` — entre os dois há `RENEGOCIADO` + `RECEBIDO_PARCIAL` (R$82k no H1/26), dinheiro que não entrou e não é calote. Fonte é `caz_parcelas` (não `caz_receber`, que não traz a TURBO FILIAL), **sem filtro de empresa** (grupo inteiro). Q1/26 R$3.995.537 · Q2/26 R$4.446.563 · YTD 33,8% da meta com 52% do ano decorrido.
+
+**Perda consciente:** o split MRR vs Pontual por mês não existe no Conta Azul — o deck já tem slides dedicados de Pontual e MRR/Churn.
+
+**Arquivos alterados:**
+- `server/routes/reportsTrimestral.faturado.ts` + `.test.ts` - helper `buildFaturado` (8 testes).
+- `server/routes/reportsTrimestral.ts` - query agregada por trimestre; payload `faturavel` → `faturado`.
+- `client/src/pages/relatorio-trimestral/SlideFaturadoTrimestre.tsx` - novo; `SlideFaturavelTrimestre.tsx` deletado.
+- `shared/metas.ts` - meta compartilhada.
+
 ## 2026-07-09 | feat(reporte-trimestral): seção "Premiações" no fecho do deck
 
 **O que foi feito:**

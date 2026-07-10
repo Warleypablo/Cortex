@@ -54,21 +54,26 @@ export interface TicketsCliente {
   pontual: TicketCliente;
 }
 
-// Faturável do trimestre (sem Conta Azul): Σ MRR ativo (foto do fim de cada mês
-// do tri) + pontual entregue no tri.
-export interface FaturavelMes {
-  month: string;
-  label: string;
-  mrr: number;
-  pontual: number;
-  total: number;
+// Leitura contábil do Conta Azul (caz_parcelas, grupo inteiro):
+//   faturável (bruto) − inadimplência (atrasado/perdido) = faturado (caixa recebido)
+export interface FaturadoTri {
+  quarter: number;
+  label: string;         // "Q1"
+  faturavel: number;
+  inadimplencia: number;
+  faturado: number;
+  parcial: boolean;      // trimestre em andamento
 }
 
-export interface Faturavel {
-  mrrSoma: number;
-  pontualEntregue: number;
-  total: number;
-  porMes: FaturavelMes[];
+export interface Faturado {
+  ano: number;
+  trimestres: FaturadoTri[];
+  atual: FaturadoTri | null;
+  ytdFaturado: number;
+  meta: number | null;            // null fora de 2026
+  pctMeta: number | null;
+  pctAnoDecorrido: number | null; // ritmo esperado do ano
+  coberturaParcial: boolean;      // caz_parcelas só começa em out/2025
 }
 
 // Top 3 operadores (responsável) de cada squad no trimestre, por FATURAMENTO =
@@ -175,5 +180,5 @@ export interface RelatorioTrimestralData {
   visaoPontual: VisaoPontual;
   techData: TechTrimestralData;
   techPipeline: TechPipelineData;
-  faturavel: Faturavel;
+  faturado: Faturado;
 }

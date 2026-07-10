@@ -9,8 +9,8 @@ import type {
   BadgePessoa,
 } from '@/components/tv-leaderboard/types';
 import { getSquadColor } from '@/lib/squadColors';
+import { META_FATURAMENTO_2026 } from '@shared/metas';
 
-const META_FATURAMENTO_2026 = 25_000_000;
 const STALE_MS = 5 * 60 * 1000;
 
 // ---------- helpers de data ----------

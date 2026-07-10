@@ -20,7 +20,7 @@ import SlidePontualTrimestre from "./relatorio-trimestral/SlidePontualTrimestre"
 import SlideTechTrimestre from "./relatorio-trimestral/SlideTechTrimestre";
 import SlideTechPipelineTrimestre from "./relatorio-trimestral/SlideTechPipelineTrimestre";
 import SlideNpsTrimestre from "./relatorio-trimestral/SlideNpsTrimestre";
-import SlideFaturavelTrimestre from "./relatorio-trimestral/SlideFaturavelTrimestre";
+import SlideFaturadoTrimestre from "./relatorio-trimestral/SlideFaturadoTrimestre";
 import SlideEncerramentoTrimestre from "./relatorio-trimestral/SlideEncerramentoTrimestre";
 import SlideEvolucaoTrimestre from "./relatorio-trimestral/SlideEvolucaoTrimestre";
 import SlidePremiacaoTrimestre from "./relatorio-trimestral/SlidePremiacaoTrimestre";
@@ -184,7 +184,7 @@ export default function RelatorioTrimestral() {
       case "tech":         return <SlideTechTrimestre techData={data.techData} label={data.label} />;
       case "tech-pipeline": return <SlideTechPipelineTrimestre pipeline={data.techPipeline} label={data.label} />;
       case "nps":          return <SlideNpsTrimestre label={data.label} />;
-      case "faturamento":  return <SlideFaturavelTrimestre faturavel={data.faturavel} label={data.label} />;
+      case "faturamento":  return <SlideFaturadoTrimestre faturado={data.faturado} label={data.label} />;
       case "premiacao": {
         const p = PREMIACOES[slot.premiacaoIndex];
         if (!p) return null;
