@@ -67,6 +67,25 @@ export interface TicketsCliente {
   pontual: TicketCliente;
 }
 
+// Cross-sell: deals PARTNER ganhos no tri para clientes pré-existentes (régua do NRR).
+// O eixo secundário é PRODUTO — a coluna "Mapeamento" da planilha não existe no banco.
+export interface CrosssellRanking {
+  nome: string;
+  deals: number;
+  recorrente: number;
+  pontual: number;
+  total: number;
+}
+
+export interface Crosssell {
+  totalDeals: number;
+  recorrente: number;
+  pontual: number;
+  total: number;
+  porCx: CrosssellRanking[];
+  porProduto: CrosssellRanking[];
+}
+
 // Leitura contábil do Conta Azul (caz_parcelas, grupo inteiro):
 //   faturável (bruto) − inadimplência (atrasado/perdido) = faturado (caixa recebido)
 export interface FaturadoTri {
@@ -194,4 +213,5 @@ export interface RelatorioTrimestralData {
   techData: TechTrimestralData;
   techPipeline: TechPipelineData;
   faturado: Faturado;
+  crosssell: Crosssell;
 }

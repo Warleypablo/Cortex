@@ -24,6 +24,7 @@ import SlideFaturadoTrimestre from "./relatorio-trimestral/SlideFaturadoTrimestr
 import SlideEncerramentoTrimestre from "./relatorio-trimestral/SlideEncerramentoTrimestre";
 import SlideEvolucaoTrimestre from "./relatorio-trimestral/SlideEvolucaoTrimestre";
 import SlidePremiacaoTrimestre from "./relatorio-trimestral/SlidePremiacaoTrimestre";
+import SlideCrosssellTrimestre from "./relatorio-trimestral/SlideCrosssellTrimestre";
 
 const SLIDE_BASE_W = 1280;
 const SLIDE_BASE_H = 720;
@@ -41,7 +42,8 @@ type TrimSlot =
   | { type: "mantra" } | { type: "qr" } | { type: "capa" } | { type: "visao" } | { type: "visao-pontual" } | { type: "vendas" } | { type: "evolucao" }
   | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" } | { type: "capa-premiacoes" }
   | { type: "closers" } | { type: "sdrs" } | { type: "turbo" } | { type: "squads-ranking" }
-  | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "tech" } | { type: "tech-pipeline" }
+  | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "crosssell" }
+  | { type: "tech" } | { type: "tech-pipeline" }
   | { type: "nps" } | { type: "faturamento" } | { type: "premiacao"; premiacaoIndex: number }
   | { type: "encerramento" } | { type: "qa" };
 
@@ -90,9 +92,11 @@ export default function RelatorioTrimestral() {
       { type: "capa-comercial" }, { type: "vendas" }, { type: "closers" }, { type: "sdrs" },
     ];
     const squads: TrimSlot[] = (data?.squadDetails ?? []).map((_, i) => ({ type: "squad", squadIndex: i }));
+    // Cross-sell é expansão na base, tocada pelo CX — mora na Operação, entre o
+    // pontual (o que foi entregue) e o NPS (como o cliente reagiu).
     const operacao: TrimSlot[] = [
       { type: "capa-operacao" }, { type: "turbo" }, { type: "squads-ranking" }, ...squads,
-      { type: "pontual" }, { type: "nps" },
+      { type: "pontual" }, { type: "crosssell" }, { type: "nps" },
     ];
     const tech: TrimSlot[] = [{ type: "capa-tech" }, { type: "tech" }, { type: "tech-pipeline" }];
     // Premiações celebram o time depois que os números fecham, e antes do ritual
@@ -168,7 +172,7 @@ export default function RelatorioTrimestral() {
       case "qr":           return <SlideQrTrimestre variant="abertura" />;
       case "capa":         return <SlideCapaTrimestre data={data} />;
       case "capa-comercial": return <SlideCapaSecao numero="01" titulo="Comercial" subtitulo="Contratos fechados · Ranking closers" accent="#38bdf8" accentSoft="rgba(56,189,248,0.12)" label={data.label} />;
-      case "capa-operacao":  return <SlideCapaSecao numero="02" titulo="Operação" subtitulo="Turbo Commerce · Squads · Pontual · NPS" accent="#34d399" accentSoft="rgba(52,211,153,0.12)" label={data.label} />;
+      case "capa-operacao":  return <SlideCapaSecao numero="02" titulo="Operação" subtitulo="Turbo Commerce · Squads · Pontual · Cross-sell · NPS" accent="#34d399" accentSoft="rgba(52,211,153,0.12)" label={data.label} />;
       case "capa-tech":      return <SlideCapaSecao numero="03" titulo="Tech" subtitulo="Projetos · Receita · Pipeline" accent="#a78bfa" accentSoft="rgba(167,139,250,0.12)" label={data.label} />;
       case "capa-premiacoes": return <SlideCapaSecao numero="04" titulo="Premiações" subtitulo="Guardiões da Cultura · Destaques · Colaborador Turbinado" accent="#fbbf24" accentSoft="rgba(251,191,36,0.12)" label={data.label} />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
@@ -181,6 +185,7 @@ export default function RelatorioTrimestral() {
       case "squads-ranking": return <SlideOperadoresSquadTrimestre squads={data.operadoresPorSquad} label={data.label} />;
       case "squad":        return <SlideSquadTrimestre details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.label} />;
       case "pontual":      return <SlidePontualTrimestre pontualData={data.pontualData} label={data.label} />;
+      case "crosssell":    return <SlideCrosssellTrimestre crosssell={data.crosssell} label={data.label} />;
       case "tech":         return <SlideTechTrimestre techData={data.techData} label={data.label} />;
       case "tech-pipeline": return <SlideTechPipelineTrimestre pipeline={data.techPipeline} label={data.label} />;
       case "nps":          return <SlideNpsTrimestre label={data.label} />;

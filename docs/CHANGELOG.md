@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-10 | feat(reporte-trimestral): slide "Cross-sell" (por CX e por produto)
+
+**O que foi feito:**
+- Novo slide **Cross-sell** na seção Operação (entre Pontual e NPS): total do trimestre, split recorrente/pontual, nº de deals, e dois rankings — **por CX** e **por produto**.
+- Q2/2026: 42 deals, R$ 121.729 recorrente + R$ 162.355 pontual = **R$ 284.084**.
+
+**Universo:** deals `Negócio Ganho` + `source='PARTNER'` fechados no tri, restritos a **clientes pré-existentes** (1º contrato no ClickUp anterior ao mês do fechamento) — mesma régua do drawer de NRR, então as duas telas contam a mesma coisa. PARTNER puro daria 50 deals/R$325k; a régua exclui 8 deals de cliente novo no mês.
+
+**Fontes:** CX vem de `cup_contratos.cs_responsavel` casado por CNPJ normalizado (94% de cobertura). Produto vem de `crm_deal.servicos_vendidos` via o de-para canônico `SERVICOS_BITRIX`.
+
+**Decisão (importante):** a coluna **"Mapeamento"** da planilha de cross-sell **não existe em nenhuma tabela nossa**. `cortex_core.crosssell_negocios_ganhos` (que tem `cx_responsavel` + `operacao[]`) contém **1 linha** em local e prod. `crm_deal` não tem o campo; `cup_clientes.responsavel` devolve os mesmos nomes do CX (redundante) e `responsavel_geral` devolve líderes. Ichino optou por trocar o eixo por **produto**.
+
+**Arquivos alterados:**
+- `server/routes/reportsTrimestral.crosssell.ts` + `.test.ts` - `buildCrosssell` (10 testes; um garante que a soma por produto fecha com o total).
+- `server/routes/reportsTrimestral.ts` - query dos deals + bloco `crosssell` no payload.
+- `client/src/pages/relatorio-trimestral/SlideCrosssellTrimestre.tsx` - novo.
+
+Deck: 33 -> 34 slides.
+
 ## 2026-07-09 | feat(reporte-trimestral): slide "Faturado" (Conta Azul) substitui o "Faturável"
 
 **O que foi feito:**

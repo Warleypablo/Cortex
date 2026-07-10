@@ -5,6 +5,7 @@ import { buildQuarterWindow, type QuarterWindow } from "./reportsTrimestral.wind
 import { getTechTrimestral } from "../lib/techDash";
 import { getTechPipeline, warmTechPipeline } from "../lib/techPipeline";
 import { buildFaturado, type FaturadoRow } from "./reportsTrimestral.faturado";
+import { buildCrosssell, type CrosssellDealRow } from "./reportsTrimestral.crosssell";
 
 interface VendasMesInput { month: string; vendasMrr: number; vendasPontual?: number }
 interface MrrChurnMesInput { month: string; mrr: number; churnBrl: number; pontual?: number; pontualContratos?: number }
@@ -1774,6 +1775,38 @@ export function registerReportsTrimestralRoutes(app: Express) {
       `);
       const faturado = buildFaturado(faturadoRows.rows as unknown as FaturadoRow[], w.ano, w.quarter, new Date());
 
+      // Cross-sell do trimestre: deals PARTNER ganhos para clientes PRÉ-EXISTENTES
+      // (1º contrato no ClickUp anterior ao mês do fechamento) — mesma régua do
+      // drawer de NRR. O CX vem de cup_contratos.cs_responsavel, casado por CNPJ
+      // normalizado; o produto sai de servicos_vendidos no buildCrosssell.
+      const crosssellRows = await db.execute(sql`
+        WITH cx AS (
+          SELECT regexp_replace(COALESCE(cl.cnpj, ''), '[^0-9]', '', 'g') AS cnpj_n,
+                 MAX(co.cs_responsavel) AS cx
+          FROM "Clickup".cup_clientes cl
+          JOIN "Clickup".cup_contratos co ON co.id_task = cl.task_id
+          GROUP BY 1
+        )
+        SELECT c.cx, d.valor_recorrente, d.valor_pontual, d.servicos_vendidos
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN cx c ON c.cnpj_n = regexp_replace(COALESCE(d.cnpj, ''), '[^0-9]', '', 'g')
+        WHERE d.stage_name = 'Negócio Ganho'
+          AND d.source = 'PARTNER'
+          AND d.data_fechamento >= ${w.dataStart}::date
+          AND d.data_fechamento < ${w.dataEnd}::date
+          AND EXISTS (
+            SELECT 1
+            FROM "Clickup".cup_clientes cl
+            JOIN "Clickup".cup_contratos co ON co.id_task = cl.task_id
+            WHERE regexp_replace(COALESCE(cl.cnpj, ''), '[^0-9]', '', 'g')
+                = regexp_replace(COALESCE(d.cnpj, ''), '[^0-9]', '', 'g')
+              AND regexp_replace(COALESCE(d.cnpj, ''), '[^0-9]', '', 'g') <> ''
+            GROUP BY cl.id
+            HAVING MIN(co.data_inicio) < date_trunc('month', d.data_fechamento)
+          )
+      `);
+      const crosssell = buildCrosssell(crosssellRows.rows as unknown as CrosssellDealRow[]);
+
       // Tickets médios por CLIENTE, mesma régua nos dois lados:
       // recorrente = MRR (foto fim do tri) ÷ clientes recorrentes ativos (foto);
       // pontual   = receita pontual do tri ÷ clientes distintos atendidos no tri.
@@ -1811,6 +1844,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         techData,
         techPipeline,
         faturado,
+        crosssell,
       });
     } catch (error: any) {
       console.error("[reports/trimestral] Error:", error?.message || error);
