@@ -3,7 +3,7 @@
 ## 2026-07-09 | feat(reporte-trimestral): seção "Premiações" no fecho do deck
 
 **O que foi feito:**
-- Nova seção **04 · Premiações** no `/reports/trimestral`, com capa + 4 slides de tópico: **Colaborador Turbinado**, **Guardiões da Cultura**, **Destaques · Colaboradores** e **Destaques · Líderes**.
+- Nova seção **04 · Premiações** no `/reports/trimestral`, com capa + 4 slides de tópico, nesta ordem: **Guardiões da Cultura**, **Destaques · Colaboradores**, **Destaques · Líderes** e **Colaborador Turbinado** (que fecha, como prêmio de maior peso).
 - Entra **depois de Faturamento e antes do Encerramento** — o Q&A segue como último slide, que é pra onde o QR da abertura aponta.
 - Accent âmbar (`#fbbf24`), distinto de Comercial (azul), Operação (verde) e Tech (roxo).
 

@@ -41,15 +41,18 @@ banco.
 
 | # | Título | Subtítulo |
 |---|--------|-----------|
-| 1 | Colaborador Turbinado | — |
-| 2 | Guardiões da Cultura | — |
-| 3 | Destaques | Colaboradores |
-| 4 | Destaques | Líderes |
+| 1 | Guardiões da Cultura | — |
+| 2 | Destaques | Colaboradores |
+| 3 | Destaques | Líderes |
+| 4 | Colaborador Turbinado | — |
 
-O subtítulo dos dois "Destaques" sai da própria nomenclatura da premiação. Os
-dois primeiros ficam sem subtítulo por decisão explícita: não há informação real
-a colocar, e texto de efeito foi rejeitado. Quando `subtitulo` é omitido, o
-título centraliza sozinho no slide.
+A ordem é deliberada: **Colaborador Turbinado fecha a seção**, como prêmio de
+maior peso.
+
+O subtítulo dos dois "Destaques" sai da própria nomenclatura da premiação.
+"Guardiões da Cultura" e "Colaborador Turbinado" ficam sem subtítulo por decisão
+explícita: não há informação real a colocar, e texto de efeito foi rejeitado.
+Quando `subtitulo` é omitido, o título centraliza sozinho no slide.
 
 ## Arquitetura
 
@@ -91,10 +94,10 @@ Uma constante de módulo descreve as quatro premiações:
 
 ```ts
 const PREMIACOES = [
-  { titulo: "Colaborador Turbinado" },
   { titulo: "Guardiões da Cultura" },
   { titulo: "Destaques", subtitulo: "Colaboradores" },
   { titulo: "Destaques", subtitulo: "Líderes" },
+  { titulo: "Colaborador Turbinado" },
 ] as const;
 ```
 

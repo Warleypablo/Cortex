@@ -31,10 +31,10 @@ const SLIDE_BASE_H = 720;
 // Slides de tópico da seção Premiações: só a categoria — os nomes dos premiados
 // são citados no palco, não vão para a tela.
 const PREMIACOES: ReadonlyArray<{ titulo: string; subtitulo?: string }> = [
-  { titulo: "Colaborador Turbinado" },
   { titulo: "Guardiões da Cultura" },
   { titulo: "Destaques", subtitulo: "Colaboradores" },
   { titulo: "Destaques", subtitulo: "Líderes" },
+  { titulo: "Colaborador Turbinado" },
 ];
 
 type TrimSlot =
@@ -170,7 +170,7 @@ export default function RelatorioTrimestral() {
       case "capa-comercial": return <SlideCapaSecao numero="01" titulo="Comercial" subtitulo="Contratos fechados · Ranking closers" accent="#38bdf8" accentSoft="rgba(56,189,248,0.12)" label={data.label} />;
       case "capa-operacao":  return <SlideCapaSecao numero="02" titulo="Operação" subtitulo="Turbo Commerce · Squads · Pontual · NPS" accent="#34d399" accentSoft="rgba(52,211,153,0.12)" label={data.label} />;
       case "capa-tech":      return <SlideCapaSecao numero="03" titulo="Tech" subtitulo="Projetos · Receita · Pipeline" accent="#a78bfa" accentSoft="rgba(167,139,250,0.12)" label={data.label} />;
-      case "capa-premiacoes": return <SlideCapaSecao numero="04" titulo="Premiações" subtitulo="Colaborador Turbinado · Guardiões da Cultura · Destaques" accent="#fbbf24" accentSoft="rgba(251,191,36,0.12)" label={data.label} />;
+      case "capa-premiacoes": return <SlideCapaSecao numero="04" titulo="Premiações" subtitulo="Guardiões da Cultura · Destaques · Colaborador Turbinado" accent="#fbbf24" accentSoft="rgba(251,191,36,0.12)" label={data.label} />;
       case "visao":        return <SlideVisaoTrimestre data={data} />;
       case "visao-pontual": return <SlideVisaoPontualTrimestre data={data} />;
       case "vendas":       return <SlideVendasTrimestre dados={data.contratosMes} label={data.label} qoqVendas={data.trend.qoq.vendas} />;
