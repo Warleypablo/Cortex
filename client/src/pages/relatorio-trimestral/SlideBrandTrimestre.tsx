@@ -163,17 +163,17 @@ export default function SlideBrandTrimestre({ spec }: { spec: BrandSpec }) {
 
   // tabela
   return (
-    <SlideLayout section={spec.section} padding="44px 72px">
+    <SlideLayout section={spec.section} padding="32px 72px">
       <div className="flex-1 flex flex-col items-center justify-center min-h-0">
-        <h1 {...entrance(0)} className="font-black text-white tracking-tight text-center" style={{ fontSize: 46 }}>{spec.title}</h1>
-        {spec.subtitle && <p {...entrance(60)} className="text-zinc-400 font-semibold mt-2 mb-8" style={{ fontSize: 20 }}>{spec.subtitle}</p>}
-        {!spec.subtitle && <div className="mb-8" />}
+        <h1 {...entrance(0)} className="font-black text-white tracking-tight text-center" style={{ fontSize: 40 }}>{spec.title}</h1>
+        {spec.subtitle && <p {...entrance(60)} className="text-zinc-400 font-semibold mt-1.5 mb-5" style={{ fontSize: 18 }}>{spec.subtitle}</p>}
+        {!spec.subtitle && <div className="mb-5" />}
         <div {...entrance(120)} className="w-full max-w-[900px] rounded-2xl overflow-hidden border border-white/10">
-          <table className="w-full text-left" style={{ fontSize: 24 }}>
+          <table className="w-full text-left" style={{ fontSize: 21 }}>
             <thead>
               <tr className="bg-white/[0.06]">
                 {spec.cols.map((c, i) => (
-                  <th key={c} className={`px-7 py-4 font-bold uppercase tracking-wider text-zinc-300 ${i > 0 ? "text-right" : ""}`} style={{ fontSize: 15 }}>{c}</th>
+                  <th key={c} className={`px-7 py-2.5 font-bold uppercase tracking-wider text-zinc-300 ${i > 0 ? "text-right" : ""}`} style={{ fontSize: 14 }}>{c}</th>
                 ))}
               </tr>
             </thead>
@@ -185,7 +185,7 @@ export default function SlideBrandTrimestre({ spec }: { spec: BrandSpec }) {
                     {row.map((cell, ci) => (
                       <td
                         key={ci}
-                        className={`px-7 py-3.5 tabular-nums ${ci === 0 ? "font-bold" : "text-right font-semibold"}`}
+                        className={`px-7 py-2.5 tabular-nums ${ci === 0 ? "font-bold" : "text-right font-semibold"}`}
                         style={{ color: ci === 0 ? (hot ? spec.accent : "#fff") : hot ? spec.accent : "#e4e4e7" }}
                       >
                         {cell}
