@@ -496,7 +496,7 @@ VALUES %s
 batch_size = 1000
 total_processed = 0
 
-print("Apagando todos os registros da tabela...")
+print("Apagando registros do Bitrix (preservando deals do Synapse)...")
 db_start = time.time()
 
 try:
@@ -504,9 +504,15 @@ try:
     conn.commit()
     print("  Coluna servicos_vendidos garantida.")
 
-    cur.execute("""TRUNCATE TABLE "Bitrix".crm_deal""")
+    # Não usar TRUNCATE: os deals do Synapse (source='SYNAPSE', com synapse_id)
+    # convivem nesta tabela e NÃO vêm do Bitrix — o TRUNCATE os apagaria a cada
+    # rodada. IS DISTINCT FROM trata source NULL como valor comparável (há ~402
+    # deals do Bitrix com source NULL); um "source <> 'SYNAPSE'" simples os deixaria
+    # órfãos e o re-INSERT quebraria por duplicate key (id é PK).
+    cur.execute("""DELETE FROM "Bitrix".crm_deal WHERE source IS DISTINCT FROM 'SYNAPSE'""")
+    deleted = cur.rowcount
     conn.commit()
-    print("  Tabela truncada com sucesso.")
+    print(f"  {deleted} registros do Bitrix apagados (deals do Synapse preservados).")
 
     print(f"Iniciando inserção no banco de dados em lotes de {batch_size}...")
     for i in range(0, len(rows), batch_size):
