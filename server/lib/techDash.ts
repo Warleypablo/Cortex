@@ -27,12 +27,18 @@ interface TechDashQuarter {
   averageTicket: number;
   topAccounts: { assignee: string; totalProjects: number; totalValorP: number }[];
 }
+interface TechDashProject {
+  id: string; // clickup task id
+  name: string;
+  valorP: number;
+}
 interface TechDashMonth {
   year: number;
   month: number; // 0-indexado (Janeiro = 0)
   label: string;
   count: number;
   totalValorP: number;
+  projects?: TechDashProject[];
 }
 interface TechDashRecorrenciaMes {
   year: number;
@@ -158,6 +164,21 @@ function emptyTechData(fonte: string, geradoEm: string | null): TechTrimestralDa
     mrrUltimoMes: 0, mrrUltimoMesLabel: "", contratosAtivos: 0, entregasTri: null,
     entregasPorMes: [], mrrPorMes: [], topAccounts: [],
   };
+}
+
+/**
+ * IDs das tasks do ClickUp dos projetos ENTREGUES no trimestre, na ordem em que o
+ * tech-dash os lista. Base do painel "Tempo por Status" (ver lib/techPipeline.ts).
+ * Lista vazia quando o tech-dash não cobre o ano/trimestre.
+ */
+export async function getProjetoIdsDoTrimestre(ano: number, quarter: number): Promise<string[]> {
+  const home = await fetchHome();
+  if (home.year !== ano) return [];
+  const inQuarter = (month0: number) => Math.floor(month0 / 3) + 1 === quarter;
+  return home.months
+    .filter((m) => m.year === ano && inQuarter(m.month))
+    .flatMap((m) => (m.projects ?? []).map((p) => p.id))
+    .filter(Boolean);
 }
 
 /**

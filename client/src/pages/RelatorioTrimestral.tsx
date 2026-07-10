@@ -18,6 +18,7 @@ import SlideOperadoresSquadTrimestre from "./relatorio-trimestral/SlideOperadore
 import SlideSquadTrimestre from "./relatorio-trimestral/SlideSquadTrimestre";
 import SlidePontualTrimestre from "./relatorio-trimestral/SlidePontualTrimestre";
 import SlideTechTrimestre from "./relatorio-trimestral/SlideTechTrimestre";
+import SlideTechPipelineTrimestre from "./relatorio-trimestral/SlideTechPipelineTrimestre";
 import SlideNpsTrimestre from "./relatorio-trimestral/SlideNpsTrimestre";
 import SlideFaturavelTrimestre from "./relatorio-trimestral/SlideFaturavelTrimestre";
 import SlideEncerramentoTrimestre from "./relatorio-trimestral/SlideEncerramentoTrimestre";
@@ -30,7 +31,7 @@ type TrimSlot =
   | { type: "mantra" } | { type: "qr" } | { type: "capa" } | { type: "visao" } | { type: "visao-pontual" } | { type: "vendas" } | { type: "evolucao" }
   | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" }
   | { type: "closers" } | { type: "sdrs" } | { type: "turbo" } | { type: "squads-ranking" }
-  | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "tech" }
+  | { type: "squad"; squadIndex: number } | { type: "pontual" } | { type: "tech" } | { type: "tech-pipeline" }
   | { type: "nps" } | { type: "faturamento" } | { type: "encerramento" } | { type: "qa" };
 
 function useSlideScale(containerRef: React.RefObject<HTMLDivElement | null>, enabled: boolean, reservedHeight = 0) {
@@ -82,7 +83,7 @@ export default function RelatorioTrimestral() {
       { type: "capa-operacao" }, { type: "turbo" }, { type: "squads-ranking" }, ...squads,
       { type: "pontual" }, { type: "nps" },
     ];
-    const tech: TrimSlot[] = [{ type: "capa-tech" }, { type: "tech" }];
+    const tech: TrimSlot[] = [{ type: "capa-tech" }, { type: "tech" }, { type: "tech-pipeline" }];
     const fechamento: TrimSlot[] = [{ type: "faturamento" }, { type: "encerramento" }, { type: "qa" }];
     return [...abertura, ...comercial, ...operacao, ...tech, ...fechamento];
   }, [data]);
@@ -161,6 +162,7 @@ export default function RelatorioTrimestral() {
       case "squad":        return <SlideSquadTrimestre details={data.squadDetails.slice(0, slot.squadIndex + 1)} mesLabel={data.label} />;
       case "pontual":      return <SlidePontualTrimestre pontualData={data.pontualData} label={data.label} />;
       case "tech":         return <SlideTechTrimestre techData={data.techData} label={data.label} />;
+      case "tech-pipeline": return <SlideTechPipelineTrimestre pipeline={data.techPipeline} label={data.label} />;
       case "nps":          return <SlideNpsTrimestre label={data.label} />;
       case "faturamento":  return <SlideFaturavelTrimestre faturavel={data.faturavel} label={data.label} />;
       case "encerramento": return <SlideEncerramentoTrimestre label={data.label} />;

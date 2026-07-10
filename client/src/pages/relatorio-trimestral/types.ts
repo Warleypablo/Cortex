@@ -132,6 +132,29 @@ export interface TechTrimestralData {
   topAccounts: TechAccount[];
 }
 
+// Painel "Tempo por Status" dos Projetos Tech. Espelha server/lib/techPipeline.ts.
+// dias de um status = média sobre TODOS os projetos do tri (status pulado conta 0).
+export interface TechPipelineStatus { status: string; label: string; color: string; dias: number }
+export interface TechPipelineTipo {
+  tipo: string;
+  projetos: number;
+  dias: number;
+  prazoDiasUteis: number | null;
+  dentroDoPrazo: boolean | null;
+}
+export interface TechPipelineData {
+  disponivel: boolean;
+  fonte: string;
+  projetos: number;
+  tipos: number;
+  tempoMedioDias: number;
+  tempoMedianoDias: number;
+  statusMaisLento: string;
+  porStatus: TechPipelineStatus[];
+  porTipo: TechPipelineTipo[];
+  noPrazo: { projetos: number; total: number; pct: number; meta: number };
+}
+
 export interface RelatorioTrimestralData {
   trimestre: string;
   label: string;
@@ -151,5 +174,6 @@ export interface RelatorioTrimestralData {
   pontualData: PontualData;
   visaoPontual: VisaoPontual;
   techData: TechTrimestralData;
+  techPipeline: TechPipelineData;
   faturavel: Faturavel;
 }

@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { db } from "../db";
 import { buildQuarterWindow, type QuarterWindow } from "./reportsTrimestral.window";
 import { getTechTrimestral } from "../lib/techDash";
+import { getTechPipeline, warmTechPipeline } from "../lib/techPipeline";
 
 interface VendasMesInput { month: string; vendasMrr: number; vendasPontual?: number }
 interface MrrChurnMesInput { month: string; mrr: number; churnBrl: number; pontual?: number; pontualContratos?: number }
@@ -177,6 +178,17 @@ export function aggregateTrend(
 
 
 export function registerReportsTrimestralRoutes(app: Express) {
+  // Aquece o painel de pipeline (ClickUp, ~20s) do trimestre corrente e do anterior,
+  // em background: quando alguém abrir o deck, o cache já está quente.
+  {
+    const hoje = new Date();
+    const q = Math.floor(hoje.getMonth() / 3) + 1;
+    const ano = hoje.getFullYear();
+    warmTechPipeline(ano, q);
+    if (q === 1) warmTechPipeline(ano - 1, 4);
+    else warmTechPipeline(ano, q - 1);
+  }
+
   app.get("/api/reports/trimestral", async (req, res) => {
     try {
       const trimestre = req.query.trimestre as string;
@@ -1727,7 +1739,12 @@ export function registerReportsTrimestralRoutes(app: Express) {
       // zerado, Abr/Mai subcontados) — decisão 2026-07-09 (Ichino: "esses dados
       // são os corretos"). getTechTrimestral busca o JSON estático do tech-dash
       // (cache em memória + fallback embutido) e mapeia o trimestre pedido.
-      const techData = await getTechTrimestral(w.ano, w.quarter);
+      // techPipeline: painel "Tempo por Status" (ClickUp). Em paralelo, pois nao
+      // dependem um do outro; ambos degradam para `disponivel: false` se a fonte cair.
+      const [techData, techPipeline] = await Promise.all([
+        getTechTrimestral(w.ano, w.quarter),
+        getTechPipeline(w.ano, w.quarter),
+      ]);
 
       // Faturável do trimestre (decisão 2026-07-09: sem Conta Azul, sem
       // inadimplência/impostos): Σ MRR ativo (foto do fim de cada mês computado
@@ -1785,6 +1802,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
         pontualData,
         visaoPontual,
         techData,
+        techPipeline,
         faturavel,
       });
     } catch (error: any) {
