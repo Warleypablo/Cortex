@@ -18,6 +18,39 @@ function pct(v: number): string {
   return `${v.toFixed(1).replace(".", ",")}%`;
 }
 
+/**
+ * Rótulo no topo da pilha: faturável do trimestre e, do 2º em diante, a variação
+ * do FATURADO contra o trimestre anterior (delta em R$ + %).
+ *
+ * É `content` e não `formatter` de propósito: no Recharts 2.x o formatter recebe
+ * apenas o valor — sem índice não há como alcançar a linha e comparar com a anterior.
+ */
+function TopoBarra({ trimestres, ...props }: any) {
+  const { x, y, width, index } = props;
+  const t = trimestres[index];
+  if (!t || typeof x !== "number") return null;
+
+  const anterior = index > 0 ? trimestres[index - 1] : null;
+  const delta = anterior ? t.faturado - anterior.faturado : 0;
+  const temDelta = !!anterior && anterior.faturado > 0;
+  const pctDelta = temDelta ? (delta / anterior.faturado) * 100 : 0;
+  const subiu = delta >= 0;
+  const cx = x + width / 2;
+
+  return (
+    <g>
+      <text x={cx} y={y - (temDelta ? 26 : 8)} textAnchor="middle" fill="#e4e4e7" fontSize={13} fontWeight={700}>
+        {fmtCompact(t.faturavel)}
+      </text>
+      {temDelta && (
+        <text x={cx} y={y - 8} textAnchor="middle" fill={subiu ? ACCENT.mrr : ACCENT.churn} fontSize={12} fontWeight={700}>
+          {subiu ? "▲" : "▼"} {fmtCompact(Math.abs(delta))} · {subiu ? "+" : "−"}{pct(Math.abs(pctDelta))}
+        </text>
+      )}
+    </g>
+  );
+}
+
 export default function SlideFaturadoTrimestre({ faturado, label }: { faturado: Faturado; label: string }) {
   const atual = faturado.atual;
   const faturadoAnim = useCountUp(atual?.faturado ?? 0, 800, 200);
@@ -74,7 +107,7 @@ export default function SlideFaturadoTrimestre({ faturado, label }: { faturado: 
               </div>
               <div className="flex-1 min-h-0">
                 <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={faturado.trimestres} margin={{ top: 20, right: 16, bottom: 4, left: 8 }}>
+                  <BarChart data={faturado.trimestres} margin={{ top: 40, right: 16, bottom: 4, left: 8 }}>
                     <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                     <XAxis
                       dataKey="label"
@@ -101,16 +134,7 @@ export default function SlideFaturadoTrimestre({ faturado, label }: { faturado: 
                       radius={[4, 4, 0, 0]}
                       maxBarSize={72}
                       animationDuration={900}
-                      label={{
-                        position: "top",
-                        fill: "#e4e4e7",
-                        fontSize: 12,
-                        fontWeight: 700,
-                        formatter: (_v: number, _n: unknown, props: any) => {
-                          const row = faturado.trimestres[props?.index ?? -1];
-                          return row ? fmtCompact(row.faturavel) : "";
-                        },
-                      }}
+                      label={(props: any) => <TopoBarra {...props} trimestres={faturado.trimestres} />}
                     >
                       {faturado.trimestres.map((t, i) => (
                         <Cell key={i} fill={ACCENT.amber} fillOpacity={t.parcial ? 0.45 : i === lastIdx ? 1 : 0.65} />
