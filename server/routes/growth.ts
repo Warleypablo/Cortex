@@ -320,7 +320,7 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
     FROM "Bitrix".crm_deal d
     WHERE d.created_at >= '${startDate}'::date AND d.created_at <= '${endDate}'::date + INTERVAL '1 day'
       AND (LOWER(COALESCE(d.utm_source, '')) LIKE '%google%' OR LOWER(COALESCE(d.utm_source, '')) LIKE '%gads%' OR LOWER(COALESCE(d.utm_source, '')) LIKE '%adwords%')
-      AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+      AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
     GROUP BY d.utm_campaign, d.utm_term
   `));
 
@@ -643,7 +643,7 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       AND d.utm_content IS NOT NULL AND d.utm_content != ''
       AND LOWER(COALESCE(d.utm_source, '')) LIKE '%tiktok%'
       AND LOWER(COALESCE(d.utm_medium, '')) = 'paid'
-      AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+      AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
     GROUP BY d.utm_content
   `));
 
@@ -1740,7 +1740,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.utm_content IS NOT NULL
           AND d.utm_content != ''
           AND d.created_at >= ${startDate}::date AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
-          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
         GROUP BY d.utm_content
       `);
 
@@ -1785,7 +1785,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             AND stage_name = 'Negócio Ganho'
             AND data_fechamento IS NOT NULL
             AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
-            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
           GROUP BY utm_content, COALESCE(company_name, contact_name, title)
         ) sub
         GROUP BY utm_content
@@ -2133,7 +2133,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           FROM "Bitrix".crm_deal
           WHERE utm_content IS NOT NULL AND utm_content != ''
             AND created_at >= ${sd}::date AND created_at <= ${ed}::date + INTERVAL '1 day'
-            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
           GROUP BY utm_content
         `);
         const filteredDeals = (allDealsResult.rows as any[]).filter((r: any) => adIdSet.has(String(r.ad_id)));
@@ -2185,7 +2185,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       // Condições MQL e filtro de source (mantidos do funil)
       const MQL_COND = `(mql::text = '1' OR LOWER(mql::text) = 'true')`;
       const NMQL_COND = `NOT (mql::text = '1' OR LOWER(mql::text) = 'true')`;
-      const SRC_FILTER = `source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')`;
+      const SRC_FILTER = `source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')`;
 
       // Hierarquia: medium → source → campaign → term → content.
       // medium e source são classificados (Constituição UTM, ver constantes no topo);
@@ -2999,7 +2999,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         : sql`COUNT(*)`;
 
       // Filtro inbound: apenas deals de fontes inbound
-      const inboundFilter = sql`AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')`;
+      const inboundFilter = sql`AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')`;
 
       // Stages que indicam que o deal chegou em Reunião Agendada ou além
       const STAGES_RM_PLUS = [
@@ -3198,7 +3198,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         : sql`COUNT(*)`;
 
       // Filtro inbound: apenas deals de fontes inbound
-      const inboundFilter = sql`AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')`;
+      const inboundFilter = sql`AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')`;
 
       // Stages que indicam que o deal chegou em Reunião Agendada ou além
       const STAGES_RM_PLUS = [
@@ -3366,7 +3366,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_reuniao_realizada IS NOT NULL
           AND d.data_reuniao_realizada::date >= ${startDate}::date
           AND d.data_reuniao_realizada::date <= ${endDate}::date
-          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
         GROUP BY 1, 2
         ORDER BY 1, 2
       `);
@@ -3702,7 +3702,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM "Bitrix".crm_deal d
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
-          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
           ${funilFilter}
           ${utmSourceFilter}
       `);
@@ -3722,7 +3722,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_reuniao_agendada IS NOT NULL
           AND d.data_reuniao_agendada::date >= ${startDate}::date
           AND d.data_reuniao_agendada::date <= ${endDate}::date
-          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
           ${funilFilter}
           ${utmSourceFilter}
       `);
@@ -3735,7 +3735,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_reuniao_realizada IS NOT NULL
           AND d.data_reuniao_realizada::date >= ${startDate}::date
           AND d.data_reuniao_realizada::date <= ${endDate}::date
-          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
           ${funilFilter}
           ${utmSourceFilter}
       `);
@@ -4274,7 +4274,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           FROM "Bitrix".crm_deal
           WHERE created_at >= '${startDate}'::date
             AND created_at <= '${endDate}'::date + INTERVAL '1 day'
-            AND source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM')
+            AND source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM','SYNAPSE')
             AND ${igOrigemMatchFilter}
           GROUP BY origem
         `));
@@ -4290,7 +4290,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           WHERE data_fechamento >= '${startDate}'::date
             AND data_fechamento <= '${endDate}'::date
             AND stage_name = 'Negócio Ganho'
-            AND source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM')
+            AND source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM','SYNAPSE')
             AND ${igOrigemMatchFilter}
           GROUP BY origem
         `));
@@ -4995,7 +4995,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(CASE WHEN data_reuniao_realizada IS NOT NULL AND ${NMQL_COND} THEN 1 ELSE 0 END) as rr_nmql
         FROM "Bitrix".crm_deal
         WHERE created_at >= '${startDate}'::date AND created_at <= '${endDate}'::date + INTERVAL '1 day'
-          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
           ${funilFilterSql}
           ${utmSourceFilterSql}
         GROUP BY platform
@@ -5018,7 +5018,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         FROM "Bitrix".crm_deal
         WHERE data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
           AND stage_name = 'Negócio Ganho'
-          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
           ${funilFilterSql}
           ${utmSourceFilterSql}
         GROUP BY platform
@@ -5037,7 +5037,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           WHERE stage_name = 'Negócio Ganho'
             AND data_fechamento IS NOT NULL
             AND data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
-            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
             ${funilFilterSql}
             ${utmSourceFilterSql}
           GROUP BY platform, cliente
@@ -5143,7 +5143,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WHERE d.data_reuniao_realizada IS NOT NULL
           AND d.data_reuniao_realizada::date >= ${startDate}::date
           AND d.data_reuniao_realizada::date <= ${endDate}::date
-          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          AND d.source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
         GROUP BY 1, 2, u.nome, u.id
         ORDER BY 1, 2, u.nome
       `);
@@ -5269,7 +5269,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                    THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as valor_vendas
         FROM "Bitrix".crm_deal
         WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
-          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+          AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
           ${utmFilter}
           ${campaignFilter}
       `);
@@ -5310,7 +5310,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
                  SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls
           FROM "Bitrix".crm_deal
           WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
-            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
             ${utmFilter}
             ${campaignFilter}
           GROUP BY 1
@@ -5321,7 +5321,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           WHERE data_reuniao_agendada IS NOT NULL
             AND data_reuniao_agendada::date >= ${startDate}::date
             AND data_reuniao_agendada::date <= ${endDate}::date
-            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
             ${utmFilter}
             ${campaignFilter}
           GROUP BY 1
@@ -5332,7 +5332,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           WHERE data_reuniao_realizada IS NOT NULL
             AND data_reuniao_realizada::date >= ${startDate}::date
             AND data_reuniao_realizada::date <= ${endDate}::date
-            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
             ${utmFilter}
             ${campaignFilter}
           GROUP BY 1
@@ -5344,7 +5344,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             AND data_fechamento IS NOT NULL
             AND data_fechamento >= ${startDate}::date
             AND data_fechamento <= ${endDate}::date
-            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM')
+            AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')
             ${utmFilter}
             ${campaignFilter}
           GROUP BY 1
