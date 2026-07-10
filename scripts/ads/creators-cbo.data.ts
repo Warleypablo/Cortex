@@ -96,9 +96,23 @@ export const URL_TAGS =
  * Copy é por FUNIL. Ismael e João são o mesmo funil (captação Creators), então por padrão
  * compartilham a MESMA copy (COPY). Se quiser copy diferente por creator, preencha COPY_ISMAEL / COPY_JOAO.
  */
-export const COPY = ""; // ← PREENCHER (copy compartilhada dos 6 ads)
-export const COPY_ISMAEL = ""; // ← opcional (override só do Ismael); vazio = usa COPY
-export const COPY_JOAO = ""; // ← opcional (override só do João); vazio = usa COPY
+export const COPY = ""; // copy é POR CREATOR neste lote (o Doc tem legenda distinta) → ver COPY_ISMAEL / COPY_JOAO
+export const COPY_ISMAEL = `Você já imaginou fazer uma renda extra gravando vídeos pelo celular?
+Cada vez mais marcas estão procurando homens reais, que transmitam confiança e falem de forma natural, para criar conteúdos autênticos.
+E é exatamente isso que a Turbo Partners faz.
+Conectamos creators a grandes marcas que precisam de vídeos no estilo UGC, enquanto cuidamos de todo o processo: roteiro, direcionamento, edição e contato com as marcas.
+Você recebe os produtos em casa e só precisa gravar os vídeos com o seu celular.
+Ao entrar para nossa base de creators, você pode receber oportunidades de campanhas, trabalhar com grandes marcas e transformar seu jeito de se comunicar em uma renda extra.
+Quer fazer parte?
+👉 Clique em "Saiba Mais", preencha o formulário e cadastre-se para participar das próximas oportunidades da Turbo Partners.`;
+export const COPY_JOAO = `Você já percebeu que as marcas estão trocando comerciais perfeitos por pessoas reais?
+Cada vez mais empresas procuram creators comuns para gravar conteúdos autênticos usando apenas o celular.
+E é exatamente isso que a Turbo Partners faz.
+Conectamos creators a grandes marcas que precisam de vídeos no estilo UGC, enquanto cuidamos de todo o processo: roteiro, direcionamento, edição e contato com as marcas.
+Você só precisa gravar com o seu celular.
+Ao entrar para nossa base de creators, você pode receber oportunidades de campanhas, produtos de marcas parceiras e transformar isso em uma renda extra.
+Quer fazer parte?
+👉 Clique em "Saiba Mais", preencha o formulário e cadastre-se para participar das próximas oportunidades da Turbo Partners.`;
 
 export function resolveCopy(persona: string): string {
   if (persona === "Ismael" && COPY_ISMAEL.trim()) return COPY_ISMAEL;

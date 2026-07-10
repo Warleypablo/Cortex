@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-10 | feat(ads): lote "Captação Creators - Ismael/João" (TP1819-1824) — campanha CBO NOVA + 6 ads single-format via API
+
+**O que foi feito:**
+- **Biblioteca:** 6 criativos cadastrados (TP1819-1824): Ismael h1-3, João h1-3. single-format (1 vídeo 9x16 por criativo).
+- **Upload:** 6 vídeos (~62-88MB cada) baixados do Drive e subidos via `metaUploadVideo` chunked em 3,7min, 0 falhas. Título no Meta = `${base}_9x16`.
+- **Meta:** campanha CBO **NOVA** `[TP] [Leads] [CBO] [Teste] [Creators] - Captação Ismael/João` (`120252987708910450`), OUTCOME_LEADS, **R$30/dia (orçamento na CAMPANHA — CBO)**, config/otimização/pixel (`1375902709765726`) clonados do conjunto-irmão Broad Creators (`120252947833910450`). 2 conjuntos: **1 [Ismael]** (`120252987709480450`, 3 ads) + **2 [João]** (`120252987735860450`, 3 ads). Link `creators-turbo.lovable.app`, CTA LEARN_MORE. **TUDO PAUSED — campanha, conjuntos E ads.**
+- **Copy POR CREATOR:** o Doc trazia legenda distinta por creator (Ismael 40-50 / João 25-35) → preenchidas em `COPY_ISMAEL` / `COPY_JOAO` (não a copy compartilhada). Ads single-video usam `object_story_spec.video_data` clássico (evita rejeição de Dynamic Creative).
+
+**Por que:**
+- O lote estava "engatilhado" (commit `be3d2d54`) travado só na copy; Caio mandou o Doc e liberou. 1º uso do caminho full-auto (Drive→upload→**campanha nova**) numa CBO single-format.
+
+**Arquivos alterados:**
+- `scripts/ads/creators-cbo.data.ts` - copy preenchida (`COPY_ISMAEL` / `COPY_JOAO`)
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLI avulsos (tsx), idempotentes.
+
 ## 2026-07-09 | feat(ads): lote "5 - Creators Summit - Camila/Jaque + Quebra de Objeções" (TP1799-1818) — 1º lote single-format via API
 
 **O que foi feito:**
