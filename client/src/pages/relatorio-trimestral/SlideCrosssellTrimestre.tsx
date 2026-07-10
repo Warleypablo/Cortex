@@ -147,7 +147,9 @@ export default function SlideCrosssellTrimestre({ crosssell: _crosssell, label }
   const recAnim = useCountUp(totalRec, 750, 300);
   const pontAnim = useCountUp(totalPont, 750, 400);
 
-  const porCx = agregar("cx").slice(0, 6);
+  // Zon e Robertinho vieram da planilha de abril (fonte/vendedor, não CX real) — fora do ranking Por CX.
+  const CX_EXCLUIDOS = new Set(["Zon", "Robertinho"]);
+  const porCx = agregar("cx").filter((l) => !CX_EXCLUIDOS.has(l.nome)).slice(0, 6);
   const porMapeamento = agregar("mapeamento").slice(0, 6);
 
   return (
