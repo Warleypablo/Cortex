@@ -8,6 +8,8 @@ import SlideCapaTrimestre from "./relatorio-trimestral/SlideCapaTrimestre";
 import SlideCapaSecao from "./relatorio-trimestral/SlideCapaSecao";
 import SlideMantra from "./relatorio-trimestral/SlideMantra";
 import SlideQrTrimestre from "./relatorio-trimestral/SlideQrTrimestre";
+import SlideNovosAniversariantesTrimestre from "./relatorio-trimestral/SlideNovosAniversariantesTrimestre";
+import SlideAniversarioEmpresaTrimestre from "./relatorio-trimestral/SlideAniversarioEmpresaTrimestre";
 import SlideVendasTrimestre from "./relatorio-trimestral/SlideVendasTrimestre";
 import SlideVisaoTrimestre from "./relatorio-trimestral/SlideVisaoTrimestre";
 import SlideVisaoPontualTrimestre from "./relatorio-trimestral/SlideVisaoPontualTrimestre";
@@ -39,7 +41,7 @@ const PREMIACOES: ReadonlyArray<{ titulo: string; subtitulo?: string }> = [
 ];
 
 type TrimSlot =
-  | { type: "mantra" } | { type: "qr" } | { type: "capa" } | { type: "visao" } | { type: "visao-pontual" } | { type: "vendas" } | { type: "evolucao" }
+  | { type: "mantra" } | { type: "qr" } | { type: "novos-aniversarios" } | { type: "aniversario-empresa" } | { type: "capa" } | { type: "visao" } | { type: "visao-pontual" } | { type: "vendas" } | { type: "evolucao" }
   | { type: "capa-comercial" } | { type: "capa-operacao" } | { type: "capa-tech" } | { type: "capa-premiacoes" }
   | { type: "closers" } | { type: "sdrs" } | { type: "turbo" } | { type: "squads-ranking" }
   | { type: "squads-consolidado" } | { type: "pontual" } | { type: "crosssell" }
@@ -86,7 +88,7 @@ export default function RelatorioTrimestral() {
     // O QR entra logo após o Mantra: a plateia escaneia cedo e manda perguntas
     // durante o reporte; o slide de Q&A no fim é onde elas são respondidas.
     const abertura: TrimSlot[] = [
-      { type: "mantra" }, { type: "qr" }, { type: "capa" }, { type: "visao" }, { type: "visao-pontual" }, { type: "evolucao" },
+      { type: "mantra" }, { type: "qr" }, { type: "novos-aniversarios" }, { type: "aniversario-empresa" }, { type: "capa" }, { type: "visao" }, { type: "visao-pontual" }, { type: "evolucao" },
     ];
     const comercial: TrimSlot[] = [
       { type: "capa-comercial" }, { type: "vendas" }, { type: "closers" }, { type: "sdrs" },
@@ -171,6 +173,8 @@ export default function RelatorioTrimestral() {
     switch (slot.type) {
       case "mantra":       return <SlideMantra />;
       case "qr":           return <SlideQrTrimestre variant="abertura" />;
+      case "novos-aniversarios": return <SlideNovosAniversariantesTrimestre novos={data.pessoas.novos} aniversariantes={data.pessoas.aniversariantes} mesLabel={data.pessoas.mesLabel} />;
+      case "aniversario-empresa": return <SlideAniversarioEmpresaTrimestre aniversarios={data.pessoas.aniversariosEmpresa} mesLabel={data.pessoas.mesLabel} />;
       case "capa":         return <SlideCapaTrimestre data={data} />;
       case "capa-comercial": return <SlideCapaSecao numero="01" titulo="Comercial" subtitulo="Contratos fechados · Ranking closers" accent="#38bdf8" accentSoft="rgba(56,189,248,0.12)" label={data.label} />;
       case "capa-operacao":  return <SlideCapaSecao numero="02" titulo="Operação" subtitulo="Turbo Commerce · Squads · Pontual · Cross-sell · NPS" accent="#34d399" accentSoft="rgba(52,211,153,0.12)" label={data.label} />;

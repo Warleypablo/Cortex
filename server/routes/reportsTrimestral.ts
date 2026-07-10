@@ -47,6 +47,17 @@ const CHURN_SQUAD_OVERRIDE_ESPELHO: Record<string, { taskId: string; squadDestin
   "2026-05": [{ taskId: "86a78223q", squadDestino: "🐑 Black" }],
 };
 
+const MESES_PT = [
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
+];
+
+// Aniversário de empresa do deck trimestral: curadoria explícita (só quem estiver aqui
+// aparece no slide). A régua natural — admissão no mês de apresentação — traria também
+// Victor Peixoto (C-Level), Karoline (G&G) e Matheus Pin (UIUX), que não entram por
+// decisão do Ichino (2026-07-10). Tokens casados por lower(nome) LIKE '%token%'.
+const ANIVERSARIO_EMPRESA_WHITELIST = ["folador", "scalfoni"];
+
 // ─── CTEs do squad Black = ACCOUNTS (reusadas em 2 queries) ───
 // `accounts`        = roster do time de accounts (RH: squad "Black Sheep", ativos).
 // `cliente_account` = mapa cliente → account, via cup_clientes.responsavel_geral.
@@ -1903,11 +1914,73 @@ export function registerReportsTrimestralRoutes(app: Express) {
         },
       };
 
+      // ── Bloco pessoas (slides de gente da abertura) ──────────────────────────
+      // Espelha as queries 1-3 do mensal (relatorioMensalSlides.ts L258-316),
+      // re-janeladas para o trimestre:
+      //   • Novos Colaboradores  → admitidos no ÚLTIMO mês do fechamento do tri
+      //     (jun p/ Q2), análogo ao "mês de dados" do mensal.
+      //   • Aniversários do Mês (vida) → aniversário no MÊS DE APRESENTAÇÃO
+      //     (1º mês após o tri; jul p/ Q2), igual à régua nextMesDados do mensal.
+      //   • Aniversário de Empresa → admissão no mês de apresentação + WHITELIST
+      //     (só Folador + Scalfoni; ver ANIVERSARIO_EMPRESA_WHITELIST).
+      const mesApr = Number(w.dataEnd.slice(5, 7)); // mês de apresentação (1º após o tri)
+      const anoApr = Number(w.dataEnd.slice(0, 4));
+      const ultimoMesTri = w.startMonth + 2;        // último mês do trimestre
+      const pessoasMesLabel = `${MESES_PT[mesApr - 1]} ${anoApr}`;
+      const empresaWhitelistCond = sql.join(
+        ANIVERSARIO_EMPRESA_WHITELIST.map((t) => sql`lower(r.nome) LIKE ${`%${t}%`}`),
+        sql` OR `,
+      );
+      // Foto: user_id → email_turbo → email_pessoal em cortex_core.auth_users (mesma
+      // cascata do mensal). Reutilizado nas 3 queries.
+      const fotoJoins = sql`
+        LEFT JOIN cortex_core.auth_users a_id ON r.user_id IS NOT NULL AND r.user_id = a_id.id
+        LEFT JOIN cortex_core.auth_users a_turbo ON r.email_turbo IS NOT NULL AND LOWER(TRIM(r.email_turbo)) = LOWER(TRIM(a_turbo.email))
+        LEFT JOIN cortex_core.auth_users a_pessoal ON r.email_pessoal IS NOT NULL AND LOWER(TRIM(r.email_pessoal)) = LOWER(TRIM(a_pessoal.email))`;
+      const fotoCol = sql`COALESCE(NULLIF(a_id.picture, ''), NULLIF(a_turbo.picture, ''), NULLIF(a_pessoal.picture, '')) as "fotoUrl"`;
+
+      const [novosRows, aniversariantesRows, aniversarioEmpresaRows] = await Promise.all([
+        db.execute(sql`
+          SELECT r.id, r.nome, r.cargo, r.squad, r.admissao::text, ${fotoCol}
+          FROM "Inhire".rh_pessoal r ${fotoJoins}
+          WHERE EXTRACT(MONTH FROM r.admissao) = ${ultimoMesTri}
+            AND EXTRACT(YEAR FROM r.admissao) = ${w.ano}
+            AND r.status = 'Ativo'
+          ORDER BY r.admissao
+        `),
+        db.execute(sql`
+          SELECT r.id, r.nome, r.cargo, r.squad, r.aniversario::text,
+                 EXTRACT(DAY FROM r.aniversario)::int as dia, ${fotoCol}
+          FROM "Inhire".rh_pessoal r ${fotoJoins}
+          WHERE EXTRACT(MONTH FROM r.aniversario) = ${mesApr}
+            AND r.status = 'Ativo'
+          ORDER BY EXTRACT(DAY FROM r.aniversario)
+        `),
+        db.execute(sql`
+          SELECT r.id, r.nome, r.cargo, r.squad, r.admissao::text,
+                 (${anoApr} - EXTRACT(YEAR FROM r.admissao))::int as "anosDeEmpresa", ${fotoCol}
+          FROM "Inhire".rh_pessoal r ${fotoJoins}
+          WHERE EXTRACT(MONTH FROM r.admissao) = ${mesApr}
+            AND r.status = 'Ativo'
+            AND r.admissao IS NOT NULL
+            AND EXTRACT(YEAR FROM r.admissao) < ${anoApr}
+            AND (${empresaWhitelistCond})
+          ORDER BY EXTRACT(DAY FROM r.admissao)
+        `),
+      ]);
+      const pessoas = {
+        mesLabel: pessoasMesLabel,
+        novos: novosRows.rows,
+        aniversariantes: aniversariantesRows.rows,
+        aniversariosEmpresa: aniversarioEmpresaRows.rows,
+      };
+
       res.json({
         trimestre: w.trimestre,
         label: w.label,
         parcial: w.parcial,
         mesesComputados: w.mesesComputados,
+        pessoas,
         trend,
         ticketsCliente,
         turboMetrics,

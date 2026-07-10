@@ -1,7 +1,18 @@
 import type {
   TurboMetrics, ReceitaChurnMes, ContratosMes, CloserRanking, SdrRanking, TopReunioes,
   SquadRanking, SquadDetail, PontualData,
+  NovoColaborador, Aniversariante, AniversarioEmpresa,
 } from "../relatorio-mensal/types";
+
+// Slides de gente da abertura do deck (Novos + Aniversários do mês; Aniversário de
+// empresa). Reaproveita os tipos de colaborador do mensal. mesLabel = mês de
+// apresentação ("Julho 2026" p/ Q2).
+export interface PessoasTrimestral {
+  mesLabel: string;
+  novos: NovoColaborador[];
+  aniversariantes: Aniversariante[];
+  aniversariosEmpresa: AniversarioEmpresa[];
+}
 
 // No deck trimestral as entregas por produto são agrupadas por TRIMESTRE do ano
 // (Q1..Qn), não mês a mês — o mensal segue com `entregasPorProdutoMes` intacto.
@@ -197,6 +208,7 @@ export interface RelatorioTrimestralData {
   label: string;
   parcial: boolean;
   mesesComputados: string[];
+  pessoas: PessoasTrimestral;
   trend: TrendData;
   ticketsCliente: TicketsCliente;
   turboMetrics: TurboMetricsTri;

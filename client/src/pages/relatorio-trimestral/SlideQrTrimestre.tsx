@@ -9,11 +9,11 @@ import { entranceWith, DeckKeyframes } from "./deck-kit";
 //     perguntas enquanto o reporte roda.
 //   • variant="qa" — último slide: o momento de responder.
 //
-// ⚠️ O QR ainda não chegou. Quando chegar, salve em `client/src/assets/qr-qa.png`,
-// descomente o import abaixo e aponte QR_SRC para ele. É o único ponto de troca.
+// QR do Q3 (2026-07-10): a plateia escaneia p/ enviar perguntas. Mesma imagem nos dois
+// usos (abertura + Q&A). Ponto único de troca — só trocar o asset e reapontar aqui.
 // ─────────────────────────────────────────────────────────────────────────────
-// import qrCode from "@assets/qr-qa.png";
-const QR_SRC: string | null = null;
+import qrCode from "@assets/qr-qa.png";
+const QR_SRC: string | null = qrCode;
 
 const ACCENT = "#22d3ee";
 
