@@ -1,6 +1,8 @@
 import { Activity, Users, TrendingUp, TrendingDown, Pause, CreditCard, Target, RefreshCcw } from "lucide-react";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
-import type { TurboMetrics } from "../relatorio-mensal/types";
+import {
+  ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList,
+} from "recharts";
+import type { TurboMetricsTri } from "./types";
 import SlideLayout from "../relatorio-mensal/SlideLayout";
 import { SlideHeader, SecondaryCard, ChartCard } from "../relatorio-mensal/SlideComponents";
 import { ACCENT, fmtCompact, fmtK, entrance, LegendDot, TOOLTIP_STYLE } from "./deck-kit";
@@ -24,7 +26,10 @@ function ChartTooltipContent({ active, payload, label }: any) {
       <p className="font-bold text-white mb-1.5">{label}</p>
       <div className="border-b border-zinc-700 pb-1 mb-1.5 flex justify-between gap-3">
         <span className="text-zinc-400">Total (MRR+Pontual):</span>
-        <span className="font-bold text-cyan-300">{fmtCompact(data.total)}</span>
+        <span className="font-bold text-cyan-300">
+          {fmtCompact(data.total)}
+          {data.deltaLabel && <span className="text-[11px] text-zinc-400 ml-1.5">({data.deltaLabel})</span>}
+        </span>
       </div>
       <div className="space-y-0.5">
         <div className="flex justify-between gap-3">
@@ -43,12 +48,23 @@ function ChartTooltipContent({ active, payload, label }: any) {
           <span style={{ color: ACCENT.churn }}>Churn %:</span>
           <span style={{ color: ACCENT.churn }}>{data.churnPct}%</span>
         </div>
+        {data.metaChurn != null && (
+          <div className="flex justify-between gap-3 border-t border-zinc-700 pt-1 mt-1">
+            <span style={{ color: ACCENT.amber }}>Meta churn:</span>
+            <span style={{ color: ACCENT.amber }}>
+              {fmtCompact(data.metaChurn)}
+              <span className="text-[11px] text-zinc-400 ml-1.5">
+                ({data.churnBrl > data.metaChurn ? "acima" : "dentro"})
+              </span>
+            </span>
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
-export default function SlideTurboTrimestre({ metrics, label }: { metrics: TurboMetrics; label: string }) {
+export default function SlideTurboTrimestre({ metrics, label }: { metrics: TurboMetricsTri; label: string }) {
   const faturamentoTotal = metrics.mrrAtivo + metrics.faturamentoPontual;
 
   // Cards em linha (delay 0 → count-up +200ms, brief)
@@ -68,15 +84,32 @@ export default function SlideTurboTrimestre({ metrics, label }: { metrics: Turbo
   const metaChurnAnim = useCountUp(metrics.churnMetaMensal, 750, 550);
   const realizadoChurnAnim = useCountUp(metrics.churnMrr, 750, 550);
 
-  const chartData = (metrics.receitaChurnSeries ?? []).map((s) => ({
-    label: s.label,
-    mrr: s.mrr,
-    pontual: s.pontual,
-    churnBrl: s.churnBrl,
-    churnPct: s.churnPct,
-    total: s.mrr + s.pontual,
-  }));
+  // Delta de crescimento entre trimestres, sobre o TOTAL (MRR + pontual). O primeiro
+  // trimestre da série não tem base de comparação e fica sem rótulo.
+  // `deltaAnchor` é uma barra transparente de altura 0 empilhada no topo, só para
+  // ancorar o LabelList: o Recharts não renderiza LabelList numa <Bar> que tem <Cell>
+  // como filhos, e as Cells são o que apaga os trimestres anteriores.
+  const serie = metrics.receitaChurnSeries ?? [];
+  const chartData = serie.map((s, i) => {
+    const total = s.mrr + s.pontual;
+    const anterior = i > 0 ? serie[i - 1].mrr + serie[i - 1].pontual : 0;
+    const deltaPct = i > 0 && anterior > 0 ? ((total - anterior) / anterior) * 100 : null;
+    return {
+      label: s.label,
+      mrr: s.mrr,
+      pontual: s.pontual,
+      churnBrl: s.churnBrl,
+      churnPct: s.churnPct,
+      metaChurn: s.metaChurn,
+      total,
+      deltaAnchor: 0,
+      deltaLabel: deltaPct === null
+        ? ""
+        : `${deltaPct >= 0 ? "+" : "−"}${Math.abs(deltaPct).toFixed(1).replace(".", ",")}%`,
+    };
+  });
   const lastIdx = chartData.length - 1;
+  const temMetaChurn = chartData.some((d) => d.metaChurn != null);
 
   const churnPctVsMeta = metrics.churnMetaMensal > 0 ? Math.round((metrics.churnMrr / metrics.churnMetaMensal) * 100) : null;
   const churnAcimaDaMeta = metrics.churnMrr > metrics.churnMetaMensal;
@@ -198,6 +231,7 @@ export default function SlideTurboTrimestre({ metrics, label }: { metrics: Turbo
                   <LegendDot color={ACCENT.mrr} label="MRR" />
                   <LegendDot color={ACCENT.pontual} label="Pontual" />
                   <LegendDot color={ACCENT.churn} label="Churn" />
+                  {temMetaChurn && <LegendDot color={ACCENT.amber} label="Meta churn" />}
                 </div>
               </div>
               {chartData.length === 0 ? (
@@ -207,7 +241,7 @@ export default function SlideTurboTrimestre({ metrics, label }: { metrics: Turbo
               ) : (
                 <div className="flex-1 min-h-0">
                   <ResponsiveContainer width="100%" height="100%">
-                    <BarChart data={chartData} margin={{ top: 8, right: 12, bottom: 4, left: 0 }} barGap={4}>
+                    <ComposedChart data={chartData} margin={{ top: 24, right: 12, bottom: 4, left: 0 }} barGap={4}>
                       <CartesianGrid strokeDasharray="3 3" stroke="#27272a" vertical={false} />
                       <XAxis dataKey="label" stroke="#a1a1aa" fontSize={12} tickLine={false} axisLine={{ stroke: "#3f3f46" }} />
                       <YAxis stroke="#a1a1aa" fontSize={10} tickFormatter={fmtK} tickLine={false} axisLine={false} width={44} />
@@ -222,12 +256,37 @@ export default function SlideTurboTrimestre({ metrics, label }: { metrics: Turbo
                           <Cell key={i} fill={ACCENT.pontual} fillOpacity={i === lastIdx ? 1 : 0.55} />
                         ))}
                       </Bar>
+                      {/* Âncora invisível no topo da pilha: carrega o delta QoQ do total */}
+                      <Bar dataKey="deltaAnchor" stackId="rec" fill="transparent" maxBarSize={28} isAnimationActive={false} legendType="none">
+                        <LabelList
+                          dataKey="deltaLabel"
+                          position="top"
+                          fill="#e4e4e7"
+                          fontSize={11}
+                          fontWeight={700}
+                        />
+                      </Bar>
                       <Bar dataKey="churnBrl" name="Churn" maxBarSize={28} radius={[4, 4, 0, 0]} animationDuration={900}>
                         {chartData.map((_, i) => (
                           <Cell key={i} fill={ACCENT.churn} fillOpacity={i === lastIdx ? 1 : 0.55} />
                         ))}
                       </Bar>
-                    </BarChart>
+                      {/* Meta de churn do tri (8% do MRR do mês anterior, somado nos meses).
+                          connectNulls=false: trimestres sem mês-base ficam sem ponto. */}
+                      {temMetaChurn && (
+                        <Line
+                          dataKey="metaChurn"
+                          name="Meta churn"
+                          stroke={ACCENT.amber}
+                          strokeWidth={2}
+                          strokeDasharray="6 4"
+                          connectNulls={false}
+                          dot={{ r: 3, fill: ACCENT.amber, stroke: "#09090b", strokeWidth: 1.5 }}
+                          activeDot={{ r: 5 }}
+                          isAnimationActive={false}
+                        />
+                      )}
+                    </ComposedChart>
                   </ResponsiveContainer>
                 </div>
               )}

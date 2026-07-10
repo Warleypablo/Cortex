@@ -1,5 +1,5 @@
 import type {
-  TurboMetrics, ContratosMes, CloserRanking, SdrRanking, TopReunioes,
+  TurboMetrics, ReceitaChurnMes, ContratosMes, CloserRanking, SdrRanking, TopReunioes,
   SquadRanking, SquadDetail, PontualData,
 } from "../relatorio-mensal/types";
 
@@ -28,6 +28,17 @@ export interface TrendData {
 export interface VisaoPontual {
   tempoMedioEntregaDias: number;
   amostraEntregas: number;
+}
+
+// Série do gráfico "MRR + Pontual × Churn por trimestre" (slide Turbo), com a meta
+// de churn do tri. metaChurn = Σ (8% × MRR do fim do mês anterior) dos meses do tri;
+// null quando algum mês-base não tem snapshot — a linha não é desenhada ali.
+export interface ReceitaChurnTri extends ReceitaChurnMes {
+  metaChurn: number | null;
+}
+
+export interface TurboMetricsTri extends Omit<TurboMetrics, "receitaChurnSeries"> {
+  receitaChurnSeries: ReceitaChurnTri[];
 }
 
 // Tickets médios por CLIENTE, mesma régua nos dois lados:
@@ -128,7 +139,7 @@ export interface RelatorioTrimestralData {
   mesesComputados: string[];
   trend: TrendData;
   ticketsCliente: TicketsCliente;
-  turboMetrics: TurboMetrics;
+  turboMetrics: TurboMetricsTri;
   contratosMes: ContratosMes;
   rankingClosers: CloserRanking[];
   topPontual: CloserRanking | null;

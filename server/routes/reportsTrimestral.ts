@@ -571,7 +571,9 @@ export function registerReportsTrimestralRoutes(app: Express) {
         // Série mês a mês (3 pontos do tri) — alimenta o gráfico "Faturamento x Churn" e a
         // mini-série "MRR Ativo" do SlideTurboMetrics.tsx reaproveitado do mensal. Preenchida
         // abaixo (ADENDO), após mrrChurnRows já trazer `pontual` por mês.
-        receitaChurnSeries: [] as { month: string; label: string; mrr: number; pontual: number; churnBrl: number; churnPct: number }[],
+        // metaChurn: meta do trimestre (Σ 8% × MRR do fim do mês anterior); null quando
+        // algum mês-base não tem snapshot — a linha de meta não é desenhada ali.
+        receitaChurnSeries: [] as { month: string; label: string; mrr: number; pontual: number; churnBrl: number; churnPct: number; metaChurn: number | null }[],
         retencoesSolicitacoesCount: parseInt(turboRetencoes.solicitacoes_count) || 0,
         retencoesSolicitacoesValor: parseFloat(turboRetencoes.solicitacoes_valor) || 0,
         retencoesCount: parseInt(turboRetencoes.retencoes_count) || 0,
@@ -1483,30 +1485,55 @@ export function registerReportsTrimestralRoutes(app: Express) {
       // mrr = foto do ÚLTIMO mês do trimestre (maior "YYYY-MM"); pontual/churnBrl = soma
       // dos meses do trimestre; churnPct recalculado a partir dos agregados do tri.
       const quarterOfMonth = (m: string): number => Math.floor((parseInt(m.split("-")[1], 10) - 1) / 3) + 1;
-      const receitaChurnByQuarter = new Map<string, { ano: number; quarter: number; mrrMonth: string; mrr: number; pontual: number; churnBrl: number }>();
+      const receitaChurnByQuarter = new Map<string, { ano: number; quarter: number; mrrMonth: string; mrr: number; pontual: number; churnBrl: number; meses: string[] }>();
       for (const r of mrrChurnRows.rows as any[]) {
         const month = r.month as string;
         const ano = parseInt(month.split("-")[0], 10);
         const quarter = quarterOfMonth(month);
         const key = `${ano}-Q${quarter}`;
         if (!receitaChurnByQuarter.has(key)) {
-          receitaChurnByQuarter.set(key, { ano, quarter, mrrMonth: "", mrr: 0, pontual: 0, churnBrl: 0 });
+          receitaChurnByQuarter.set(key, { ano, quarter, mrrMonth: "", mrr: 0, pontual: 0, churnBrl: 0, meses: [] });
         }
         const bucket = receitaChurnByQuarter.get(key)!;
+        bucket.meses.push(month);
         bucket.pontual += parseFloat(r.pontual) || 0;
         bucket.churnBrl += parseFloat(r.churn_brl) || 0;
-        if (month >= bucket.mrrMonth) { bucket.mrrMonth = month; bucket.mrr = parseFloat(r.mrr) || 0; }
+        // Mesma régua do aggregateTrend: foto do último mês COM mrr > 0.
+        const mrrDoMes = parseFloat(r.mrr) || 0;
+        if (mrrDoMes > 0 && month >= bucket.mrrMonth) { bucket.mrrMonth = month; bucket.mrr = mrrDoMes; }
       }
+
+      // Meta de churn de um trimestre HISTÓRICO: mesma régua do card (Σ 8% × MRR do
+      // fim do mês anterior), mas sem o fallback do tri corrente. Se qualquer mês-base
+      // não tem snapshot (ex.: set/out 2025, antes do cup_data_hist), a meta do tri é
+      // null e a linha simplesmente não passa por ali — melhor um furo do que um ponto
+      // artificialmente baixo.
+      const metaChurnDoTri = (meses: string[]): number | null => {
+        let total = 0;
+        for (const m of meses) {
+          const base = mrrFimDoMes.get(mesAnterior(m)) ?? 0;
+          if (base <= 0) return null;
+          total += base * 0.08;
+        }
+        return total;
+      };
+
       turboMetrics.receitaChurnSeries = Array.from(receitaChurnByQuarter.values())
         .sort((a, b) => (a.ano - b.ano) || (a.quarter - b.quarter))
-        .map((b) => ({
-          month: `${b.ano}-Q${b.quarter}`,
-          label: `Q${b.quarter} ${String(b.ano).slice(2)}`,
-          mrr: b.mrr,
-          pontual: b.pontual,
-          churnBrl: b.churnBrl,
-          churnPct: b.mrr > 0 ? Math.round((b.churnBrl / b.mrr) * 1000) / 10 : 0,
-        }))
+        .map((b) => {
+          const key = `${b.ano}-Q${b.quarter}`;
+          return {
+            month: key,
+            label: `Q${b.quarter} ${String(b.ano).slice(2)}`,
+            mrr: b.mrr,
+            pontual: b.pontual,
+            churnBrl: b.churnBrl,
+            churnPct: b.mrr > 0 ? Math.round((b.churnBrl / b.mrr) * 1000) / 10 : 0,
+            // O tri corrente usa o valor do card (que tem fallback), para a linha e o
+            // card "Meta churn" nunca mostrarem números diferentes.
+            metaChurn: key === w.trimestre ? turboMetrics.churnMetaMensal : metaChurnDoTri(b.meses),
+          };
+        })
         // Descarta trimestres sem snapshot de MRR (foto = 0), mesma régua do
         // aggregateTrend acima — mantém o gráfico "Faturamento x Churn" consistente
         // com o gráfico "Evolução por Trimestre".
