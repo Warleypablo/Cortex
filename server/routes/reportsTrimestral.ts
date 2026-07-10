@@ -58,6 +58,11 @@ const MESES_PT = [
 // decisão do Ichino (2026-07-10). Tokens casados por lower(nome) LIKE '%token%'.
 const ANIVERSARIO_EMPRESA_WHITELIST = ["folador", "scalfoni"];
 
+// Ajuste manual no MRR de FECHAMENTO (foto de fim do tri) — decisão Ichino 2026-07-10.
+// Só o MRR de fim do trimestre (card MRR ativo, trend, QoQ, gráfico MRR×churn); NÃO
+// mexe em vendas recorrentes nem no ticket médio (esse segue o MRR bruto do snapshot).
+const MRR_FECHAMENTO_AJUSTE = -60000;
+
 // ─── CTEs do squad Black = ACCOUNTS (reusadas em 2 queries) ───
 // `accounts`        = roster do time de accounts (RH: squad "Black Sheep", ativos).
 // `cliente_account` = mapa cliente → account, via cup_clientes.responsavel_geral.
@@ -418,6 +423,22 @@ export function registerReportsTrimestralRoutes(app: Express) {
         vendasPontual: vendasPontualPorMes[month] ?? 0,
       }));
 
+      // Aplica MRR_FECHAMENTO_AJUSTE no MRR do último mês do tri (a foto de fechamento),
+      // antes de derivar trend/receitaChurnSeries — propaga p/ todas as leituras de MRR
+      // de fim do tri de uma vez. Muta a row bruta (só o mês de fechamento do tri).
+      const mesFechamento = (mrrChurnRows.rows as any[])
+        .filter((r) => w.meses.includes(r.month as string) && (parseFloat(r.mrr) || 0) > 0)
+        .map((r) => r.month as string)
+        .sort()
+        .pop();
+      if (mesFechamento) {
+        for (const r of mrrChurnRows.rows as any[]) {
+          if (r.month === mesFechamento) {
+            r.mrr = String(Math.max(0, (parseFloat(r.mrr) || 0) + MRR_FECHAMENTO_AJUSTE));
+          }
+        }
+      }
+
       const mrrChurnPorMes = (mrrChurnRows.rows as any[]).map((r) => ({
         month: r.month as string,
         mrr: parseFloat(r.mrr) || 0,
@@ -568,7 +589,7 @@ export function registerReportsTrimestralRoutes(app: Express) {
       const mrrAdicionado = parseFloat((mrrAdicionadoRows.rows as any[])[0]?.receita_recorrente) || 0;
 
       const turboMetrics = {
-        mrrAtivo: parseFloat(turboMrr.mrr_ativo) || 0,
+        mrrAtivo: Math.max(0, (parseFloat(turboMrr.mrr_ativo) || 0) + MRR_FECHAMENTO_AJUSTE),
         ticketMedioContrato: parseFloat(turboMrr.ticket_medio_contrato) || 0,
         // Ticket recorrente = MRR ÷ clientes com contrato RECORRENTE ativo (não a
         // base geral, que inclui clientes só-pontual e diluía o número).
