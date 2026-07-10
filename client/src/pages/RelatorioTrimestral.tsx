@@ -113,9 +113,10 @@ export default function RelatorioTrimestral() {
     const fechamento: TrimSlot[] = [
       { type: "faturamento" }, { type: "receita-anual" },
       ...BRAND_SLIDES.map((_, i): TrimSlot => ({ type: "brand", brandIndex: i })),
-      ...premiacoes, { type: "encerramento" }, { type: "qa" },
+      { type: "encerramento" }, { type: "qa" },
     ];
-    return [...abertura, ...comercial, ...operacao, ...tech, ...fechamento];
+    // Premiações vêm logo após o último slide de Tech (decisão Ichino 2026-07-10).
+    return [...abertura, ...comercial, ...operacao, ...tech, ...premiacoes, ...fechamento];
   }, [data]);
   const totalSlides = slots.length;
 
