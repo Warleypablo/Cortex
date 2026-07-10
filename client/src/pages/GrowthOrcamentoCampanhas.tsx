@@ -29,7 +29,7 @@ const PLATFORM_LABELS: Record<Platform, string> = {
   tiktok: "TikTok",
   linkedin: "LinkedIn",
 };
-// Ordem de exibição das plataformas dentro de cada etapa.
+// Ordem de exibição das plataformas dentro de cada produto.
 const PLATFORM_ORDER: Platform[] = ["meta", "google", "tiktok", "linkedin"];
 // Cor de FUNDO (leve) aplicada às linhas da plataforma + cor do ícone.
 const PLATFORM_STYLES: Record<Platform, { row: string; icon: string }> = {
@@ -50,27 +50,8 @@ const TAG_LABELS: Record<CampaignTag, string> = { inbound: "Inbound", evento: "E
 const POOLS: CampaignTag[] = ["inbound", "evento", "creators_summit"];
 const NO_TAG = "__none__"; // sentinela p/ "Sem tag" no Select (Radix não aceita value vazio)
 
-// Etapas do funil. Manter em sincronia com CAMPAIGN_STAGES no backend.
-type CampaignStage = "descoberta" | "relacionamento" | "conversao" | "remarketing" | "institucional";
-const STAGE_OPTIONS: { value: CampaignStage; label: string }[] = [
-  { value: "descoberta", label: "Descoberta" },
-  { value: "relacionamento", label: "Relacionamento" },
-  { value: "conversao", label: "Conversão" },
-  { value: "remarketing", label: "Remarketing" },
-  { value: "institucional", label: "Institucional" },
-];
-const STAGE_LABELS: Record<CampaignStage, string> = {
-  descoberta: "Descoberta",
-  relacionamento: "Relacionamento",
-  conversao: "Conversão",
-  remarketing: "Remarketing",
-  institucional: "Institucional",
-};
-const STAGE_ORDER: CampaignStage[] = STAGE_OPTIONS.map((o) => o.value);
-const NO_STAGE = "__none__";
-
-// Produtos. Manter em sincronia com CAMPAIGN_PRODUCTS no backend. Novo nível
-// de planejamento entre Etapa e Canal.
+// Produtos. Manter em sincronia com CAMPAIGN_PRODUCTS no backend. Nível raiz
+// de planejamento (o pai é o total do pool); o Canal pendura embaixo.
 type CampaignProduct = "creators" | "turbo" | "comunidade" | "crm" | "summit";
 const PRODUCT_OPTIONS: { value: CampaignProduct; label: string }[] = [
   { value: "creators", label: "Creators" },
@@ -91,7 +72,7 @@ const NO_PRODUCT = "__none__";
 
 // Níveis plantáveis na árvore de metas (budget_plan_node). Manter em
 // sincronia com LEVEL_TYPES no backend.
-type LevelType = "stage" | "product" | "platform";
+type LevelType = "product" | "platform";
 
 // Abas de filtro no topo. "sem-tag" lista campanhas ainda não classificadas.
 type TabValue = "todas" | CampaignTag | "sem-tag";
@@ -111,7 +92,7 @@ interface PoolPlan {
   total: number | null;
 }
 
-// Um nó da árvore de metas (stage/product/platform) dentro de um pool/mês.
+// Um nó da árvore de metas (product/platform) dentro de um pool/mês.
 // parentKey = "" na raiz (pai é o total do pool); senão "type:key|type:key...".
 interface PlanNode {
   pool: CampaignTag;
@@ -142,7 +123,6 @@ interface Campanha {
   projecaoAsIs: number;
   isDelivering: boolean;
   tag: CampaignTag | null;
-  stage: CampaignStage | null;
   produto: CampaignProduct | null;
 }
 
@@ -227,7 +207,7 @@ function resolvePlanTree(nodes: PlanNode[], poolTotal: number | null): Map<strin
 }
 
 // Soma dos valores resolvidos dos filhos diretos de `ownPath` dentre `nodes`
-// (usado pro indicador "fecha 100%" de Etapa/Produto). null se nenhum filho
+// (usado pro indicador "fecha 100%" de Produto). null se nenhum filho
 // tem alvo definido.
 function directChildrenSum(nodes: { parentKey: string; levelType: LevelType; levelKey: string }[], resolved: Map<string, number | null>, ownPath: string): number | null {
   let sum = 0;
@@ -305,38 +285,6 @@ function TagSelect({ platform, campaignId, value, onSaved, canEdit }: {
       <SelectContent>
         <SelectItem value={NO_TAG}><span className="text-muted-foreground">Sem grupo</span></SelectItem>
         {TAG_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
-      </SelectContent>
-    </Select>
-  );
-}
-
-// ---- Select de etapa por campanha ----
-function StageSelect({ platform, campaignId, value, onSaved, canEdit }: {
-  platform: Platform; campaignId: string; value: CampaignStage | null; onSaved: () => void; canEdit: boolean;
-}) {
-  const { toast } = useToast();
-  if (!canEdit) {
-    return value
-      ? <Badge variant="outline" className="text-xs">{STAGE_LABELS[value]}</Badge>
-      : <span className="text-muted-foreground text-xs">—</span>;
-  }
-  const handleChange = async (next: string) => {
-    const stage = next === NO_STAGE ? null : next;
-    try {
-      await apiRequest("PUT", "/api/growth/orcamento-campanhas/stage", { platform, campaignId, stage });
-      onSaved();
-    } catch (err) {
-      toast({ title: "Erro ao salvar etapa", description: String(err), variant: "destructive" });
-    }
-  };
-  return (
-    <Select value={value ?? NO_STAGE} onValueChange={handleChange}>
-      <SelectTrigger className="h-7 w-[150px] text-xs" data-testid={`select-stage-${platform}-${campaignId}`}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value={NO_STAGE}><span className="text-muted-foreground">Sem etapa</span></SelectItem>
-        {STAGE_OPTIONS.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
       </SelectContent>
     </Select>
   );
@@ -426,7 +374,7 @@ function PoolTotalInput({ pool, month, value, onSaved, canEdit }: {
   );
 }
 
-// ---- Editor do alvo de um nó da árvore (híbrido % / R$) — Etapa/Produto/Canal ----
+// ---- Editor do alvo de um nó da árvore (híbrido % / R$) — Produto/Canal ----
 function LevelTargetInput({ pool, month, levelType, levelKey, parentKey, plan, resolvedParentBrl, onSaved, canEdit }: {
   pool: CampaignTag; month: string; levelType: LevelType; levelKey: string; parentKey: string;
   plan: PlanNode | undefined; resolvedParentBrl: number | null; onSaved: () => void; canEdit: boolean;
@@ -584,12 +532,12 @@ function CampaignTargetInput({ pool, month, platform, campaignId, plan, resolved
   );
 }
 
-interface StageSums {
+interface RowSums {
   daily: number;
   projecao: number;
   investido: number;
 }
-function sumStage(rows: Campanha[]): StageSums {
+function sumRows(rows: Campanha[]): RowSums {
   let daily = 0, projecao = 0, investido = 0;
   for (const c of rows) {
     daily += c.isActive ? c.dailyBudgetAtual : 0;
@@ -599,11 +547,11 @@ function sumStage(rows: Campanha[]): StageSums {
   return { daily, projecao, investido };
 }
 
-const COLSPAN = 10;
+const COLSPAN = 9;
 
-// Níveis da árvore de agrupamento/planejamento, em ordem: Etapa → Produto →
-// Canal. Campanha é o caso-base da recursão (depth === LEVELS.length),
-// tratado à parte em renderCampaignRow.
+// Níveis da árvore de agrupamento/planejamento, em ordem: Produto → Canal.
+// Campanha é o caso-base da recursão (depth === LEVELS.length), tratado à
+// parte em renderCampaignRow.
 interface LevelDef {
   type: LevelType;
   groupKey: (c: Campanha) => string;
@@ -612,7 +560,6 @@ interface LevelDef {
   hasNone: boolean;
 }
 const LEVELS: LevelDef[] = [
-  { type: "stage", groupKey: (c) => c.stage ?? "none", order: STAGE_ORDER, labels: STAGE_LABELS, hasNone: true },
   { type: "product", groupKey: (c) => c.produto ?? "none", order: PRODUCT_ORDER, labels: PRODUCT_LABELS, hasNone: true },
   { type: "platform", groupKey: (c) => c.platform, order: PLATFORM_ORDER, labels: PLATFORM_LABELS, hasNone: false },
 ];
@@ -620,7 +567,7 @@ const LEVELS: LevelDef[] = [
 export default function GrowthOrcamentoCampanhas() {
   useSetPageInfo(
     "Orçamento por Campanha",
-    "Planejamento por etapa, produto e canal — Meta, Google, TikTok e LinkedIn",
+    "Planejamento por produto e canal — Meta, Google, TikTok e LinkedIn",
   );
 
   const { user } = useAuth();
@@ -635,7 +582,7 @@ export default function GrowthOrcamentoCampanhas() {
   const [month, setMonth] = useState<string>(defaultMonth);
   const [activeTab, setActiveTab] = useState<TabValue>("todas");
   // Nós expandidos (chave = path completo do nó, só relevante no nível Canal).
-  // Padrão: fechado — Etapa/Produto ficam sempre abertos.
+  // Padrão: fechado — Produto fica sempre aberto.
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const toggleNode = (key: string) =>
     setExpanded((prev) => {
@@ -761,19 +708,19 @@ export default function GrowthOrcamentoCampanhas() {
     return map;
   }, [data, poolForTab]);
 
-  const totals = useMemo(() => sumStage(filteredCampanhas), [filteredCampanhas]);
+  const totals = useMemo(() => sumRows(filteredCampanhas), [filteredCampanhas]);
 
   // Fechamento do plano (só faz sentido num pool único): soma dos alvos de
-  // etapa vs total do pool. Continua igual a antes — a árvore por nível tem
-  // seu próprio badge "fecha 100%" no cabeçalho de cada Etapa/Produto.
+  // produto vs total do pool. A árvore por nível tem seu próprio badge
+  // "fecha 100%" no cabeçalho de cada Produto.
   const closing = useMemo(() => {
     if (!poolForTab) return null;
     const p = plans[poolForTab];
     const total = p?.total ?? null;
     const resolved = resolvedByPool.get(poolForTab);
     let sumTargets = 0;
-    for (const stage of STAGE_ORDER) {
-      const v = resolved?.get(nodePath("", "stage", stage));
+    for (const produto of PRODUCT_ORDER) {
+      const v = resolved?.get(nodePath("", "product", produto));
       if (v != null) sumTargets += v;
     }
     return { total, sumTargets, diff: (total ?? 0) - sumTargets };
@@ -808,8 +755,7 @@ export default function GrowthOrcamentoCampanhas() {
   };
 
   // Badge "fecha 100%" / "resta X" / "passou X" — reconciliação genérica entre
-  // a meta de um nó e a soma dos filhos diretos dele (Etapa vs Produtos,
-  // Produto vs Canais).
+  // a meta de um nó e a soma dos filhos diretos dele (Produto vs Canais).
   const renderClosingBadge = (ownResolved: number | null, childrenSum: number | null) => {
     if (ownResolved == null || childrenSum == null) return null;
     const diff = ownResolved - childrenSum;
@@ -835,7 +781,6 @@ export default function GrowthOrcamentoCampanhas() {
           </div>
         </TableCell>
         <TableCell><TagSelect platform={c.platform} campaignId={c.campaignId} value={c.tag} onSaved={invalidate} canEdit={canEdit} /></TableCell>
-        <TableCell><StageSelect platform={c.platform} campaignId={c.campaignId} value={c.stage} onSaved={invalidate} canEdit={canEdit} /></TableCell>
         <TableCell><ProdutoSelect platform={c.platform} campaignId={c.campaignId} value={c.produto} onSaved={invalidate} canEdit={canEdit} /></TableCell>
         <TableCell className="text-right">
           {poolForTab ? (
@@ -858,7 +803,7 @@ export default function GrowthOrcamentoCampanhas() {
     );
   };
 
-  // Recursão única pra Etapa → Produto → Canal → Campanha. depth indexa
+  // Recursão única pra Produto → Canal → Campanha. depth indexa
   // LEVELS; ao chegar em LEVELS.length, cai no caso-base (linhas de campanha).
   // parentKey é o path do nó pai ("" na raiz); resolvedParentBrl é o valor já
   // resolvido do pai, usado tanto pra %/R$ do LevelTargetInput quanto pra
@@ -884,14 +829,14 @@ export default function GrowthOrcamentoCampanhas() {
       const ownResolved = path ? getResolved(path) : null;
       if (groupRows.length === 0 && ownResolved == null) continue;
 
-      const s = sumStage(groupRows);
+      const s = sumRows(groupRows);
       // Mesmo pra bucket "none" usa nodePath() — senão o path vira encoding
-      // inválido (ex.: "|stage:none" em vez de "stage:none" na raiz), que
+      // inválido (ex.: "|product:none" em vez de "product:none" na raiz), que
       // nunca resolve como pai de um filho real.
       const nodeKey = path ?? nodePath(parentKey, level.type, "none");
       const isCollapsible = level.type === "platform"; // Canal — único nível que precisa de clique
       const isOpen = !isCollapsible || expanded.has(nodeKey);
-      const label = isNone ? (depth === 0 ? "Sem etapa" : "Sem produto") : level.labels[key];
+      const label = isNone ? "Sem produto" : level.labels[key];
       const plan = !isNone ? planForPoolTab(level.type, key, parentKey) : undefined;
       const childPath = path ?? nodeKey;
 
@@ -905,7 +850,7 @@ export default function GrowthOrcamentoCampanhas() {
             onClick={() => toggleNode(nodeKey)}
             data-testid={`platform-subheader-${nodeKey}`}
           >
-            <TableCell colSpan={4} className="py-1.5 pl-10">
+            <TableCell colSpan={3} className="py-1.5 pl-10">
               <span className="flex items-center gap-1.5 text-xs">
                 {isOpen
                   ? <ChevronDown className="w-3.5 h-3.5 shrink-0" />
@@ -938,7 +883,7 @@ export default function GrowthOrcamentoCampanhas() {
         continue;
       }
 
-      // Etapa (depth 0) e Produto (depth 1) — cabeçalho maior, sempre expandido.
+      // Produto (depth 0) — cabeçalho maior, sempre expandido.
       const childrenSum = path ? directChildrenSum(nodesForTab, resolvedForTab, path) : null;
       elements.push(
         <TableRow
@@ -946,7 +891,7 @@ export default function GrowthOrcamentoCampanhas() {
           className={cn("font-bold", depth === 0 ? "bg-muted" : "bg-muted/60")}
           data-testid={`group-header-${nodeKey}`}
         >
-          <TableCell colSpan={4} className={cn("py-2.5", depth === 1 && "pl-6")}>
+          <TableCell colSpan={3} className={cn("py-2.5", depth === 1 && "pl-6")}>
             <div className="flex items-center gap-2 flex-wrap">
               <span className={cn("uppercase tracking-wide", depth === 0 ? "text-sm" : "text-xs")}>{label}</span>
               <span className="opacity-50 text-xs font-normal">({groupRows.length})</span>
@@ -1043,10 +988,10 @@ export default function GrowthOrcamentoCampanhas() {
             {closing && closing.total != null && (
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 {closing.sumTargets === 0 ? (
-                  <span>Defina o alvo de cada etapa abaixo para distribuir o total.</span>
+                  <span>Defina o alvo de cada produto abaixo para distribuir o total.</span>
                 ) : (
                   <>
-                    <span>Distribuído entre etapas:</span>
+                    <span>Distribuído entre produtos:</span>
                     <span className="font-mono text-foreground">{formatCurrency(closing.sumTargets)}</span>
                     <span>de {formatCurrency(closing.total)}</span>
                     {Math.abs(closing.diff) < 0.5 ? (
@@ -1074,9 +1019,8 @@ export default function GrowthOrcamentoCampanhas() {
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Etapa / Campanha</TableHead>
+                  <TableHead>Produto / Campanha</TableHead>
                   <TableHead>Grupo</TableHead>
-                  <TableHead>Etapa</TableHead>
                   <TableHead>Produto</TableHead>
                   <TableHead className="text-right">Planejado</TableHead>
                   <TableHead className="text-right">Orç. Diário (Atual)</TableHead>
@@ -1098,7 +1042,7 @@ export default function GrowthOrcamentoCampanhas() {
                 )}
 
                 <TableRow className="bg-muted font-semibold border-t-2 border-foreground/20">
-                  <TableCell colSpan={4}>TOTAL</TableCell>
+                  <TableCell colSpan={3}>TOTAL</TableCell>
                   <TableCell className="text-right font-mono">{poolTotalForTab != null ? formatCurrency(poolTotalForTab) : "—"}</TableCell>
                   <TableCell className="text-right font-mono">{formatCurrency(totals.daily)}</TableCell>
                   <TableCell className={cn("text-right font-mono", projecaoColor(totals.projecao, poolTotalForTab))}>{formatCurrency(totals.projecao)}</TableCell>
