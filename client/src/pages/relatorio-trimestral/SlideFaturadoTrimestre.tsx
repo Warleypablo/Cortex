@@ -42,7 +42,6 @@ export default function SlideFaturadoTrimestre({ faturado, label }: { faturado: 
               <p className="text-6xl font-black leading-none mt-2 bg-gradient-to-r from-emerald-300 to-cyan-400 bg-clip-text text-transparent">
                 {fmtCompact(faturadoAnim)}
               </p>
-              <p className="text-xs text-zinc-500 mt-2">recebido de fato — Conta Azul</p>
             </SecondaryCard>
 
             <div className="grid grid-cols-2 gap-4 shrink-0">
