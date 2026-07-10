@@ -48,18 +48,29 @@ export default function SlideVendasTrimestre({
   dados,
   label,
   qoqVendas,
+  vendaPontual,
+  qoqPontual,
 }: {
   dados: ContratosMes;
   label: string;
   qoqVendas: Qoq;
+  vendaPontual: { valor: number; contratos: number };
+  qoqPontual: Qoq;
 }) {
-  const receitaTotal = dados.receitaRecorrente + dados.receitaPontual;
+  // O pontual vem do ClickUp (aquisição no tri: cup_contratos criados com valorp), não do
+  // Bitrix (deals ganhos). O Bitrix só enxerga o pontual que virou deal no CRM e subestima
+  // — o resto do deck (Visão Pontual, slide Pontual) já mede pelo ClickUp. O recorrente
+  // segue do Bitrix (deals ganhos recorrentes); o hero soma as duas fontes.
+  const pontualContratos = vendaPontual.contratos;
+  const tmPontual = pontualContratos > 0 ? vendaPontual.valor / pontualContratos : 0;
+  const numContratos = dados.contratosRecorrente + pontualContratos;
+  const receitaTotal = dados.receitaRecorrente + vendaPontual.valor;
   const pctRec = receitaTotal > 0 ? (dados.receitaRecorrente / receitaTotal) * 100 : 0;
 
-  const totalContratosAnim = useCountUp(dados.numContratos, 750, 150);
+  const totalContratosAnim = useCountUp(numContratos, 750, 150);
   const receitaTotalAnim = useCountUp(receitaTotal, 750, 150);
   const recReceitaAnim = useCountUp(dados.receitaRecorrente, 750, 400);
-  const pontReceitaAnim = useCountUp(dados.receitaPontual, 750, 500);
+  const pontReceitaAnim = useCountUp(vendaPontual.valor, 750, 500);
 
   return (
     <SlideLayout section="commerce" padding="28px 36px">
@@ -124,15 +135,18 @@ export default function SlideVendasTrimestre({
           </div>
           <div className={`${entrance(300).className} min-h-0 flex`} style={entrance(300).style}>
             <SecondaryCard className="px-8 py-6 w-full flex flex-col justify-center" borderColor="#a855f7">
-              <span className="flex items-center gap-2 text-sm font-bold text-purple-400 uppercase tracking-widest mb-4">
-                <Zap className="h-4 w-4" /> Pontual
-              </span>
+              <div className="flex items-center justify-between mb-4">
+                <span className="flex items-center gap-2 text-sm font-bold text-purple-400 uppercase tracking-widest">
+                  <Zap className="h-4 w-4" /> Pontual
+                </span>
+                <QoqBadge q={qoqPontual} />
+              </div>
               <p className="text-6xl font-black text-purple-400 leading-none text-center my-4">{fmtCompact(pontReceitaAnim)}</p>
-              <p className="text-xs text-zinc-500 uppercase tracking-widest text-center mb-5">Receita no trimestre</p>
+              <p className="text-xs text-zinc-500 uppercase tracking-widest text-center mb-5">Vendido no trimestre</p>
               <div className="flex gap-4 border-t border-white/[0.06] pt-5">
-                <SubStat label="Contratos" valor={String(dados.contratosPontual)} />
+                <SubStat label="Contratos" valor={String(pontualContratos)} />
                 <div className="w-px bg-white/[0.06]" />
-                <SubStat label="Ticket médio" valor={fmtCompact(dados.tmPontual)} />
+                <SubStat label="Ticket médio" valor={fmtCompact(tmPontual)} />
               </div>
             </SecondaryCard>
           </div>
