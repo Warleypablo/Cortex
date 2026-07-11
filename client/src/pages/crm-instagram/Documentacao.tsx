@@ -5,8 +5,8 @@ export default function Documentacao() {
         <h2 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Como funciona o CRM Instagram</h2>
         <p>
           Esta aba transforma o engajamento do Instagram da Turbo em um pipeline de social selling:
-          captura quem comenta, manda DM (e, em breve, quem curte), prioriza os mais quentes por um
-          lead score e leva as boas oportunidades para o Bitrix.
+          captura quem comenta, manda DM, curte e segue (curtidas/seguidores via HikerAPI), prioriza
+          os mais quentes por um lead score e leva as boas oportunidades para o Bitrix.
         </p>
       </section>
 
@@ -110,69 +110,88 @@ export default function Documentacao() {
         </p>
       </section>
 
-      {/* ── Decisão pendente: scraping (curtidas + seguidores) ── */}
-      <section className="rounded-lg border border-dashed border-amber-300 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/20 p-4">
+      {/* ── Curtidas & Seguidores via HikerAPI (custo + descobertas) ── */}
+      <section className="rounded-lg border border-emerald-300 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-950/20 p-4">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-xs font-semibold uppercase tracking-wide text-amber-700 dark:text-amber-300">
-            Decisão pendente
+          <span className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-300">
+            Curtidas &amp; Seguidores — via HikerAPI
           </span>
-          <span className="text-xs text-gray-500 dark:text-zinc-400">capturar curtidas e seguidores</span>
+          <span className="text-xs text-gray-500 dark:text-zinc-400">atualizado jul/2026</span>
         </div>
         <p className="mb-3">
-          Curtidas e seguidores não vêm da API oficial. Pra trazer esses leads, usamos uma ferramenta
-          externa que <strong>cobra por consulta</strong> — como um táxi: cada vez que a gente vai buscar
-          os dados, paga a corrida. Por isso, <strong>quanto mais vezes consultamos, mais caro fica</strong>.
-          A frequência que escolhermos define o custo do mês.
+          Curtidas e seguidores não vêm da API oficial — dependem de uma ferramenta externa que{" "}
+          <strong>cobra por consulta</strong> (como um táxi: paga a corrida a cada busca). Trocamos o
+          fornecedor: em vez do Apify, passamos a usar a <strong>HikerAPI</strong>, que faz{" "}
+          <strong>o mesmo trabalho por ~1/280 do preço</strong> e <strong>sem mensalidade</strong> (é
+          pré-pago; só paga o que usar). Com isso, o custo dos dois sinais juntos cabe em{" "}
+          <strong className="text-emerald-700 dark:text-emerald-300">menos de US$1 por mês</strong>.
         </p>
 
-        <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">❤️ Curtidas</p>
+        {/* Descobertas */}
+        <div className="rounded border border-emerald-200 dark:border-emerald-900 bg-white/60 dark:bg-zinc-900/40 p-3 mb-4 text-xs">
+          <p className="font-semibold text-gray-900 dark:text-white mb-1">O que descobrimos (olhando o banco)</p>
+          <ul className="list-disc pl-4 space-y-1 text-gray-600 dark:text-zinc-400">
+            <li>O garimpo hoje é <strong>100% DM</strong> (~534 pessoas). Curtida/comentário estão zerados: o robô antigo (Apify) <strong>nunca chegou a rodar</strong> em produção.</li>
+            <li>Dessas ~534, <strong>só 1 avançou</strong> de estágio e <strong>nenhuma virou negócio</strong>. Ou seja: o gargalo é <strong>trabalhar a fila</strong>, não falta de gente entrando.</li>
+            <li>Por isso o plano é <strong>ligar curtidas primeiro</strong> (custa centavos) e medir se convertem, <strong>antes</strong> de investir em seguidores.</li>
+            <li>A conta já está criada e o token validado — falta só <strong>colocar saldo</strong> (~US$10 cobrem mais de um ano).</li>
+          </ul>
+        </div>
+
+        <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">❤️ Curtidas — quanto custa buscar</p>
         <p className="mb-2 text-xs text-gray-500 dark:text-zinc-400">
-          Buscamos quem curtiu os posts recentes. Buscar com mais frequência deixa a informação mais
-          fresca, mas custa mais.
+          Cada busca lê quem curtiu os ~12 posts recentes. Dá pra buscar <strong>todo dia</strong> sem
+          pesar no bolso.
         </p>
-        <div className="overflow-hidden rounded border border-amber-200 dark:border-amber-900 text-xs mb-4">
+        <div className="overflow-hidden rounded border border-emerald-200 dark:border-emerald-900 text-xs mb-4">
           <table className="w-full">
-            <thead className="bg-amber-100/60 dark:bg-amber-950/40 text-gray-600 dark:text-zinc-400">
-              <tr><th className="text-left p-2 font-medium">Frequência</th><th className="text-left p-2 font-medium">Você sabe das curtidas</th><th className="text-right p-2 font-medium">Custo/mês</th></tr>
+            <thead className="bg-emerald-100/60 dark:bg-emerald-950/40 text-gray-600 dark:text-zinc-400">
+              <tr><th className="text-left p-2 font-medium">Período (buscando todo dia)</th><th className="text-left p-2 font-medium">Buscas</th><th className="text-right p-2 font-medium">Custo</th></tr>
             </thead>
             <tbody className="text-gray-700 dark:text-zinc-300">
-              <tr className="border-t border-amber-200 dark:border-amber-900"><td className="p-2">1x por mês</td><td className="p-2">com até ~1 mês de atraso</td><td className="p-2 text-right">~$15</td></tr>
-              <tr className="border-t border-amber-200 dark:border-amber-900"><td className="p-2">1x por semana</td><td className="p-2">com até ~1 semana</td><td className="p-2 text-right">~$20</td></tr>
-              <tr className="border-t border-amber-200 dark:border-amber-900"><td className="p-2">Todo dia</td><td className="p-2">quase em tempo real</td><td className="p-2 text-right">~$100</td></tr>
+              <tr className="border-t border-emerald-200 dark:border-emerald-900"><td className="p-2">Por dia</td><td className="p-2">1</td><td className="p-2 text-right">~US$ 0,01</td></tr>
+              <tr className="border-t border-emerald-200 dark:border-emerald-900"><td className="p-2">Por semana</td><td className="p-2">7</td><td className="p-2 text-right">~US$ 0,10</td></tr>
+              <tr className="border-t border-emerald-200 dark:border-emerald-900"><td className="p-2">Por mês</td><td className="p-2">30</td><td className="p-2 text-right">~US$ 0,45</td></tr>
             </tbody>
           </table>
         </div>
 
-        <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">👥 Seguidores</p>
+        <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">👥 Seguidores — quanto custa buscar</p>
         <p className="mb-2 text-xs text-gray-500 dark:text-zinc-400">
-          Cada busca lê a lista inteira (~50 mil) de uma vez — então cada busca custa ~$130, não importa
-          quantos sejam novos. Aqui a frequência é o que pesa de verdade.
+          Não relemos os ~50 mil seguidores antigos toda vez (isso que era caro). Cada busca olha só os{" "}
+          <strong>~500 seguidores mais recentes</strong> — que é onde estão os novos. Fica praticamente de graça.
         </p>
-        <div className="overflow-hidden rounded border border-amber-200 dark:border-amber-900 text-xs mb-4">
+        <div className="overflow-hidden rounded border border-emerald-200 dark:border-emerald-900 text-xs mb-2">
           <table className="w-full">
-            <thead className="bg-amber-100/60 dark:bg-amber-950/40 text-gray-600 dark:text-zinc-400">
-              <tr><th className="text-left p-2 font-medium">Frequência</th><th className="text-left p-2 font-medium">Você sabe de seguidor novo</th><th className="text-right p-2 font-medium">Custo/mês</th></tr>
+            <thead className="bg-emerald-100/60 dark:bg-emerald-950/40 text-gray-600 dark:text-zinc-400">
+              <tr><th className="text-left p-2 font-medium">Período (buscando todo dia)</th><th className="text-left p-2 font-medium">Buscas</th><th className="text-right p-2 font-medium">Custo</th></tr>
             </thead>
             <tbody className="text-gray-700 dark:text-zinc-300">
-              <tr className="border-t border-amber-200 dark:border-amber-900"><td className="p-2">1x por mês</td><td className="p-2">com até ~1 mês de atraso</td><td className="p-2 text-right">~$130</td></tr>
-              <tr className="border-t border-amber-200 dark:border-amber-900"><td className="p-2">1x por semana</td><td className="p-2">com até ~1 semana</td><td className="p-2 text-right">~$520</td></tr>
-              <tr className="border-t border-amber-200 dark:border-amber-900"><td className="p-2">Todo dia</td><td className="p-2">no mesmo dia</td><td className="p-2 text-right">~$3.900 (inviável)</td></tr>
+              <tr className="border-t border-emerald-200 dark:border-emerald-900"><td className="p-2">Por dia</td><td className="p-2">1</td><td className="p-2 text-right">~US$ 0,003</td></tr>
+              <tr className="border-t border-emerald-200 dark:border-emerald-900"><td className="p-2">Por semana</td><td className="p-2">7</td><td className="p-2 text-right">~US$ 0,02</td></tr>
+              <tr className="border-t border-emerald-200 dark:border-emerald-900"><td className="p-2">Por mês</td><td className="p-2">30</td><td className="p-2 text-right">~US$ 0,09</td></tr>
             </tbody>
           </table>
         </div>
+        <p className="mb-4 text-xs text-gray-500 dark:text-zinc-400">
+          Se um dia quisermos a <strong>lista inteira dos 50 mil</strong> (varredura completa, uma vez),
+          custa <strong>~US$ 0,30 por varredura</strong> — mas isso não é necessário pra pegar quem
+          seguiu de agora em diante.
+        </p>
 
-        <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Total — onde queremos chegar</p>
+        <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Total — os dois, todo dia</p>
         <p className="mb-3 text-xs text-gray-500 dark:text-zinc-400">
-          Recomendação inicial: <strong className="text-gray-700 dark:text-zinc-300">curtidas 1x por semana + seguidores 1x por mês ≈ $150/mês</strong>.
-          Começar só com curtidas custa ~$49/mês (o piso é o plano da ferramenta).
-          <span className="block mt-1">(valores estimados, baseados em ~50 mil seguidores e ~14 posts/semana; confirmamos na 1ª busca real.)</span>
+          Curtidas + seguidores buscando <strong>todo dia</strong> ={" "}
+          <strong className="text-emerald-700 dark:text-emerald-300">~US$ 0,55/mês</strong> (~US$ 7/ano).
+          Pra comparar, o mesmo no fornecedor antigo (Apify) passava de <strong>US$ 390/mês</strong>.
+          <span className="block mt-1">(estimativas sobre ~50 mil seguidores e ~50 posts/mês; a 1ª busca real confirma.)</span>
         </p>
 
         <p className="text-xs text-gray-500 dark:text-zinc-400">
-          <strong className="text-gray-700 dark:text-zinc-300">O que precisa ser decidido com o Lucas:</strong>{" "}
-          (1) de quanto em quanto tempo buscar as curtidas; (2) de quanto em quanto tempo buscar os
-          seguidores; (3) se mostramos todos os 50 mil seguidores na ferramenta ou só os que começarem a
-          seguir de agora em diante.
+          <strong className="text-gray-700 dark:text-zinc-300">O que ainda depende de decisão:</strong>{" "}
+          (1) <strong>colocar saldo</strong> na HikerAPI (~US$10) pra ligar as curtidas; (2) o{" "}
+          <strong>sinal verde do jurídico (LGPD)</strong> antes de ligar os <strong>seguidores</strong> —
+          é dado de gente que não consentiu, então seguidores fica desligado até isso.
         </p>
       </section>
 
@@ -187,12 +206,13 @@ export default function Documentacao() {
           <li>Card de detalhe do lead na Qualificação (sempre visível) + busca compacta e filtros (estágio/tag).</li>
           <li>Tab Lead Scoring (modelo aditivo, sliders, decay, bônus de intenção e recorrência).</li>
           <li>Auto-criação no Bitrix (Responsável + SDR) e blocklist de tags.</li>
-          <li>Ingestão de curtidas via Apify (likes scraper) — código pronto, aguardando token/config.</li>
+          <li>Ingestão de <strong>curtidas e seguidores via HikerAPI</strong> — código pronto (cliente + job diário + botões de sync), ~280× mais barato que o Apify; token validado.</li>
         </ul>
 
         <p className="text-xs font-semibold uppercase tracking-wide text-blue-600 dark:text-blue-400 mb-1">Em andamento</p>
         <ul className="list-disc pl-5 space-y-1 mb-3">
           <li><strong>Deploy</strong> do módulo em produção.</li>
+          <li><strong>Ligar as curtidas:</strong> falta só <strong>colocar saldo na HikerAPI</strong> (~US$10) — o teste real dispara na hora.</li>
         </ul>
 
         <p className="text-xs font-semibold uppercase tracking-wide text-amber-600 dark:text-amber-400 mb-1">Pendente</p>
@@ -201,11 +221,10 @@ export default function Documentacao() {
           <li><strong>Backfill do @handle dos leads de DM</strong> — via API de mensagens do IG; fecha o dedup. Pega carona na reconexão.</li>
           <li><strong>Confirmar acessos</strong> dos SDRs em prod e validar os pesos padrão do scoring.</li>
           <li>
-            <strong>Captura de curtidas/seguidores (scraping):</strong>
-            <ul className="list-disc pl-5 mt-1 space-y-0.5">
-              <li><strong>1º — Decisão (com o Lucas):</strong> frequência e custo (ver bloco "Decisão pendente" acima). <span className="text-amber-600 dark:text-amber-400">⏳ aguardando</span></li>
-              <li><strong>2º — Criar e executar:</strong> ligar a captura, validar a 1ª busca e ativar o scraping recorrente.</li>
-            </ul>
+            <strong>Piloto de curtidas:</strong> com saldo, ligar e medir por 2–4 semanas se curtidor vira oportunidade (o token no <code>.env</code>/Render já ativa o job diário sozinho).
+          </li>
+          <li>
+            <strong>Seguidores:</strong> só ligar após <strong>parecer jurídico (LGPD)</strong> — é dado de quem não consentiu. Fica desligado por padrão (flag <code>HIKERAPI_FOLLOWERS_ENABLED</code>).
           </li>
         </ul>
       </section>
