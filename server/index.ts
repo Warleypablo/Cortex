@@ -912,6 +912,28 @@ app.use((req, res, next) => {
     console.log("[crm-instagram-apify] Scheduled daily (likes scraper)");
   }
 
+  // CRM Instagram — ingestão via HikerAPI (curtidas + seguidores). ~280× mais barato
+  // que o Apify. No-op sem HIKERAPI_TOKEN. Seguidores extra-gated (LGPD) por
+  // HIKERAPI_FOLLOWERS_ENABLED — ver crmInstagramHikerIngest.ts.
+  if (process.env.HIKERAPI_TOKEN) {
+    const runCrmIgHikerJob = async () => {
+      try {
+        const { ingestHikerLikers, ingestHikerFollowers } = await import("./services/crmInstagramHikerIngest");
+        await ingestHikerLikers();
+        if (process.env.HIKERAPI_FOLLOWERS_ENABLED === "true") {
+          await ingestHikerFollowers();
+        }
+      } catch (e: any) {
+        console.error("[crm-instagram-hiker] erro:", e.message);
+      }
+    };
+    setTimeout(() => runCrmIgHikerJob(), 7 * 60 * 1000); // 7min após boot (depois do Apify)
+    setInterval(() => runCrmIgHikerJob(), 24 * 60 * 60 * 1000); // 1x/dia
+    console.log(
+      `[crm-instagram-hiker] Scheduled daily (likes${process.env.HIKERAPI_FOLLOWERS_ENABLED === "true" ? " + followers" : ""})`,
+    );
+  }
+
   // GHL tags snapshot diário às 00:10
   const scheduleNextGhlTagsSnapshot = () => {
     const now = new Date();

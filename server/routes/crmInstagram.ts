@@ -487,4 +487,34 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
     }
   });
 
+  // HikerAPI — curtidas (roda com HIKERAPI_TOKEN). Substitui o Apify a ~1/280 do custo.
+  app.post("/api/crm-instagram/hiker/sync-likers", async (req, res) => {
+    try {
+      if (!canEditScoring(req.user)) {
+        return res.status(403).json({ message: "Sem permissão para rodar a sincronização." });
+      }
+      const { ingestHikerLikers } = await import("../services/crmInstagramHikerIngest");
+      const postLimit = Number.isFinite(req.body?.postLimit) ? Number(req.body.postLimit) : undefined;
+      const result = await ingestHikerLikers({ postLimit });
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
+  // HikerAPI — seguidores (extra-gated por HIKERAPI_FOLLOWERS_ENABLED; LGPD).
+  app.post("/api/crm-instagram/hiker/sync-followers", async (req, res) => {
+    try {
+      if (!canEditScoring(req.user)) {
+        return res.status(403).json({ message: "Sem permissão para rodar a sincronização." });
+      }
+      const { ingestHikerFollowers } = await import("../services/crmInstagramHikerIngest");
+      const maxToScan = Number.isFinite(req.body?.maxToScan) ? Number(req.body.maxToScan) : undefined;
+      const result = await ingestHikerFollowers({ maxToScan });
+      res.status(result.ok ? 200 : 400).json(result);
+    } catch (err: any) {
+      res.status(500).json({ message: err.message });
+    }
+  });
+
 }
