@@ -155,6 +155,14 @@ export default function Documentacao() {
             </tbody>
           </table>
         </div>
+        <p className="mb-4 text-xs text-gray-500 dark:text-zinc-400">
+          <strong className="text-amber-700 dark:text-amber-400">Nota:</strong> a ferramenta devolve{" "}
+          <strong>até ~200 curtidores por post</strong> (sem "próxima página"). Como nossos posts têm em
+          média <strong>~160 curtidas</strong>, na maioria pegamos <strong>todo mundo</strong>; só nos
+          posts virais (&gt;200 curtidas, ~10% deles) ficamos com os ~200 principais. Isso não muda o
+          custo — cada post custa o mesmo — só limita a completude nos posts grandes (o que é de sobra
+          pro objetivo de achar leads).
+        </p>
 
         <p className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">👥 Seguidores — quanto custa buscar</p>
         <p className="mb-2 text-xs text-gray-500 dark:text-zinc-400">
