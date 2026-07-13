@@ -525,6 +525,29 @@ export const rhNpsConfig = inhireSchema.table("rh_nps_config", {
 export type RhNpsConfig = typeof rhNpsConfig.$inferSelect;
 export type InsertRhNpsConfig = typeof rhNpsConfig.$inferInsert;
 
+// ===== DISC — Perfil comportamental =====
+export const rhDiscResultados = inhireSchema.table("rh_disc_resultados", {
+  id: serial("id").primaryKey(),
+  userId: varchar("user_id", { length: 100 }).notNull(),
+  colaboradorId: integer("colaborador_id"),
+  respostas: jsonb("respostas").notNull(),
+  scoreD: integer("score_d").notNull(),
+  scoreI: integer("score_i").notNull(),
+  scoreS: integer("score_s").notNull(),
+  scoreC: integer("score_c").notNull(),
+  perfilDominante: varchar("perfil_dominante", { length: 1 }).notNull(),
+  perfilSecundario: varchar("perfil_secundario", { length: 1 }).notNull(),
+  criadoEm: timestamp("criado_em").defaultNow(),
+});
+
+export type RhDiscResultado = typeof rhDiscResultados.$inferSelect;
+export type InsertRhDisc = typeof rhDiscResultados.$inferInsert;
+
+export const insertRhDiscSchema = createInsertSchema(rhDiscResultados).omit({
+  id: true,
+  criadoEm: true,
+});
+
 export type FluxoCaixaItem = {
   dataVencimento: Date;
   tipoEvento: string;
