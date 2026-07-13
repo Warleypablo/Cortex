@@ -25,6 +25,7 @@ function ultimoPorUsuarioSQL() {
       r.criado_em      AS "criadoEm",
       p.nome           AS "nome",
       p.squad          AS "squad",
+      p.setor          AS "setor",
       u.name           AS "userName",
       u.picture        AS "foto"
     FROM "Inhire".rh_disc_resultados r
@@ -112,6 +113,7 @@ export function registerDiscRoutes(app: Express, db: any) {
         nome: r.nome ?? r.userName ?? "—",
         foto: r.foto ?? null,
         squad: r.squad ?? null,
+        setor: r.setor ?? null,
         dominante: r.dominante,
         secundario: r.secundario,
         criadoEm: r.criadoEm,

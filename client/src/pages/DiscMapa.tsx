@@ -18,6 +18,7 @@ interface MapaItem {
   nome: string;
   foto: string | null;
   squad: string | null;
+  setor: string | null;
   dominante: Fator;
   secundario: Fator;
   criadoEm: string;
@@ -35,6 +36,7 @@ export default function DiscMapa() {
   const { setPageInfo } = usePageInfo();
   usePageTitle("Mapa DISC do Time");
   const [fSquad, setFSquad] = useState<string>("todos");
+  const [fSetor, setFSetor] = useState<string>("todos");
   const [fPerfil, setFPerfil] = useState<string>("todos");
   const [detalhe, setDetalhe] = useState<string | null>(null); // userId
 
@@ -59,13 +61,20 @@ export default function DiscMapa() {
     return Array.from(s).sort();
   }, [data]);
 
+  const setores = useMemo(() => {
+    const s = new Set<string>();
+    data?.feitos.forEach((f) => f.setor && s.add(f.setor));
+    return Array.from(s).sort();
+  }, [data]);
+
   const filtrados = useMemo(() => {
     return (data?.feitos ?? []).filter(
       (f) =>
+        (fSetor === "todos" || f.setor === fSetor) &&
         (fSquad === "todos" || f.squad === fSquad) &&
         (fPerfil === "todos" || f.dominante === fPerfil),
     );
-  }, [data, fSquad, fPerfil]);
+  }, [data, fSetor, fSquad, fPerfil]);
 
   if (isLoading) {
     return (
@@ -105,6 +114,13 @@ export default function DiscMapa() {
 
       {/* Filtros */}
       <div className="flex flex-wrap gap-3">
+        <Select value={fSetor} onValueChange={setFSetor}>
+          <SelectTrigger className="w-48"><SelectValue placeholder="Área" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="todos">Todas as áreas</SelectItem>
+            {setores.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+          </SelectContent>
+        </Select>
         <Select value={fSquad} onValueChange={setFSquad}>
           <SelectTrigger className="w-48"><SelectValue placeholder="Squad" /></SelectTrigger>
           <SelectContent>
@@ -133,6 +149,7 @@ export default function DiscMapa() {
             <TableHeader>
               <TableRow>
                 <TableHead>Colaborador</TableHead>
+                <TableHead>Área</TableHead>
                 <TableHead>Squad</TableHead>
                 <TableHead>Perfil</TableHead>
                 <TableHead>Data</TableHead>
@@ -155,6 +172,7 @@ export default function DiscMapa() {
                       <span className="text-gray-900 dark:text-white">{f.nome}</span>
                     </div>
                   </TableCell>
+                  <TableCell className="text-gray-600 dark:text-zinc-400">{f.setor ?? "—"}</TableCell>
                   <TableCell className="text-gray-600 dark:text-zinc-400">{f.squad ?? "—"}</TableCell>
                   <TableCell>
                     <Badge style={{ backgroundColor: FATOR_COR[f.dominante], color: "white" }}>
