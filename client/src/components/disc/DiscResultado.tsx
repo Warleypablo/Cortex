@@ -102,9 +102,29 @@ export default function DiscResultado({ data }: { data: DiscResultadoData }) {
               {modo === "barras" ? (
                 <BarChart data={chartData} layout="vertical" margin={{ left: 20, right: 20 }}>
                   <CartesianGrid strokeDasharray="3 3" className="stroke-gray-200 dark:stroke-zinc-700" />
-                  <XAxis type="number" domain={[0, 100]} unit="%" tick={{ fontSize: 12 }} />
-                  <YAxis type="category" dataKey="label" width={100} tick={{ fontSize: 12 }} />
-                  <Tooltip formatter={(v: number) => `${v}%`} />
+                  <XAxis
+                    type="number"
+                    domain={[0, 100]}
+                    unit="%"
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                  />
+                  <YAxis
+                    type="category"
+                    dataKey="label"
+                    width={100}
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                  />
+                  <Tooltip
+                    formatter={(v: number) => `${v}%`}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      color: "hsl(var(--card-foreground))",
+                      borderRadius: "8px",
+                    }}
+                  />
                   <Bar dataKey="valor" radius={[0, 4, 4, 0]}>
                     {chartData.map((d) => (
                       <Cell key={d.fator} fill={d.cor} />
@@ -114,10 +134,26 @@ export default function DiscResultado({ data }: { data: DiscResultadoData }) {
               ) : (
                 <RadarChart data={chartData}>
                   <PolarGrid className="stroke-gray-200 dark:stroke-zinc-700" />
-                  <PolarAngleAxis dataKey="label" tick={{ fontSize: 12 }} />
-                  <PolarRadiusAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
+                  <PolarAngleAxis
+                    dataKey="label"
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fontSize: 12, fill: "hsl(var(--muted-foreground))" }}
+                  />
+                  <PolarRadiusAxis
+                    domain={[0, 100]}
+                    stroke="hsl(var(--muted-foreground))"
+                    tick={{ fontSize: 10, fill: "hsl(var(--muted-foreground))" }}
+                  />
                   <Radar dataKey="valor" stroke="#6366f1" fill="#6366f1" fillOpacity={0.4} />
-                  <Tooltip formatter={(v: number) => `${v}%`} />
+                  <Tooltip
+                    formatter={(v: number) => `${v}%`}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--card))",
+                      border: "1px solid hsl(var(--border))",
+                      color: "hsl(var(--card-foreground))",
+                      borderRadius: "8px",
+                    }}
+                  />
                 </RadarChart>
               )}
             </ResponsiveContainer>
