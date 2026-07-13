@@ -93,7 +93,7 @@ export function AppSidebar() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/favorites"] }),
   });
 
-  const PUBLIC_SIDEBAR_ROUTES = ['/rh/nps/responder'];
+  const PUBLIC_SIDEBAR_ROUTES = ['/rh/nps/responder', '/gg/disc', '/gg/disc/mapa'];
 
   const hasAccess = (url: string, permissionKey?: string) => {
     if (!user) return false;
