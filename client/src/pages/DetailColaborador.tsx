@@ -52,6 +52,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { queryClient, apiRequest } from "@/lib/queryClient";
 import { useToast } from "@/hooks/use-toast";
 import { useIsColaboradoresRestrito } from "@/hooks/useIsColaboradoresRestrito";
+import DiscMiniCard from "@/components/disc/DiscMiniCard";
 
 // Map old nivel format (with "X " prefix) to new format (without prefix)
 function mapNivelToNew(nivel: string | null): string {
@@ -6327,6 +6328,7 @@ export default function DetailColaborador() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               <HealthCard colaboradorId={colaboradorId} />
               <EnpsCard colaboradorId={colaboradorId} />
+              <DiscMiniCard colaboradorId={Number(colaboradorId)} />
               <PdiCard colaboradorId={colaboradorId} />
               <OneOnOneCard colaboradorId={colaboradorId} />
               <ComentariosCard colaboradorId={colaboradorId} />
