@@ -41,7 +41,7 @@ type CampaignProduct = (typeof CAMPAIGN_PRODUCTS)[number];
 // Níveis plantáveis na árvore de metas (budget_plan_node). platform reaproveita
 // os valores de PLATFORMS (Canal não precisa de classificação própria — já é
 // um fato intrínseco da campanha).
-const LEVEL_TYPES = ["stage", "product", "platform"] as const;
+const LEVEL_TYPES = ["product", "platform"] as const;
 type LevelType = (typeof LEVEL_TYPES)[number];
 
 // Remove a linha de campaign_tags se tag/stage/produto ficaram todos vazios.
@@ -57,22 +57,14 @@ async function deleteCampaignTagsRowIfEmpty(db: any, platform: string, campaignI
 }
 
 // Valida que parentKey é exatamente o path canônico de um ancestral real pro
-// levelType dado (stage=raiz, product=sob uma stage válida, platform=sob uma
-// stage+product válidos). Além de rejeitar lixo, isso impede estruturalmente
-// ciclos: o formato de parentKey é sempre mais raso que o do próprio nó, nunca
-// pode apontar pra si mesmo ou pra um descendente.
+// levelType dado (product=raiz, pai é o total do pool; platform=sob um product
+// válido). Além de rejeitar lixo, isso impede estruturalmente ciclos: o formato
+// de parentKey é sempre mais raso que o do próprio nó, nunca pode apontar pra si
+// mesmo ou pra um descendente.
 function isValidParentKey(levelType: LevelType, parentKey: string): boolean {
-  if (levelType === "stage") return parentKey === "";
-  if (levelType === "product") {
-    return (CAMPAIGN_STAGES as readonly string[]).some((s) => parentKey === `stage:${s}`);
-  }
-  // platform
-  for (const s of CAMPAIGN_STAGES) {
-    for (const p of CAMPAIGN_PRODUCTS) {
-      if (parentKey === `stage:${s}|product:${p}`) return true;
-    }
-  }
-  return false;
+  if (levelType === "product") return parentKey === "";
+  // platform: sob um product válido
+  return (CAMPAIGN_PRODUCTS as readonly string[]).some((p) => parentKey === `product:${p}`);
 }
 
 type PlanUnit = "pct" | "brl";
@@ -772,7 +764,6 @@ export function registerOrcamentoCampanhasRoutes(app: Express, db: any) {
         return res.status(400).json({ error: `levelType must be one of: ${LEVEL_TYPES.join(", ")}` });
       }
       const levelKeyEnum: Record<LevelType, readonly string[]> = {
-        stage: CAMPAIGN_STAGES,
         product: CAMPAIGN_PRODUCTS,
         platform: PLATFORMS,
       };

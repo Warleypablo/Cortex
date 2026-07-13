@@ -830,16 +830,10 @@ export async function initializeSysSchema(): Promise<void> {
       )
     `);
     await db.execute(sql`CREATE INDEX IF NOT EXISTS idx_budget_plan_node_month ON cortex_core.budget_plan_node(month)`);
-    // Seed único e idempotente a partir de budget_stage_plan (dado legado
-    // vira nós de nível 'stage' na raiz da árvore). ON CONFLICT DO NOTHING
-    // garante que só popula na primeira vez; budget_stage_plan continua
-    // intocada como rede de segurança de rollback.
-    await db.execute(sql`
-      INSERT INTO cortex_core.budget_plan_node (pool, month, level_type, level_key, parent_key, value, unit, updated_at, updated_by)
-      SELECT pool, month, 'stage', stage, '', value, unit, updated_at, updated_by
-      FROM cortex_core.budget_stage_plan
-      ON CONFLICT (pool, month, level_type, level_key, parent_key) DO NOTHING
-    `);
+    // Sem seed a partir de budget_stage_plan: o nível 'stage' foi removido do
+    // modelo (agora Produto → Canal). budget_stage_plan fica intocada como rede
+    // de rollback; a limpeza de nós antigos pendurados em stage é feita uma vez
+    // via scripts/reset_budget_plan_node_produto_canal.sql.
 
     // Meta travada por campanha individual (qualquer plataforma, inclusive
     // TikTok/LinkedIn — campaign_monthly_budget só cobre Meta/Google e fica
