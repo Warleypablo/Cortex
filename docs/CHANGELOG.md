@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-13 | feat(ads): CONCLUI lote CRM "Cliente Novo x Base" (Lucas, TP1825-1842) — 4 conjuntos + 18 ads PAUSED
+
+**O que foi feito:**
+- Retomado quando a rede do ambiente voltou (07-10→07-12 estava caindo com `fetch failed`). Upload completou **36/36 vídeos** em passadas idempotentes; adicionei **retry por vídeo** no upload p/ a flakiness ("There was a problem uploading your video"). `b2h9_4x5` subiu 2× (vídeo "processing" não aparece no índice `/advideos` → re-upload); duplicata resolvida por id determinístico.
+- **Meta:** 4 conjuntos criados na campanha CBO CRM `120252008224000450` (existente, PAUSED): **159** [b1 h01-05, 5 ads], **160** `120253070383810450` [b1 h06-09, 4], **161** `120253070647620450` [b2 h01-05, 5], **162** `120253070664840450` [b2 h06-09, 4] — **18 ads pareados 9x16+4x5, TUDO PAUSED.** Copy/config clonados do irmão 151.
+- **Fix:** o targeting clonado tinha `instagram_positions` com `explore_home` SEM `explore` → POST /adsets 400 code=100; `fixTargeting` adiciona `explore` (mesmo gotcha do lote Summit Empresário; o template `subir-lote-ads.ts` não tinha esse fix). Conta bateu 124% de cota no meio — backoff segurou e completou.
+
+**Por que:** conclusão do lote CRM Lucas que ficou parcial em 07-10 (throttle de upload do dev-tier).
+
+**Arquivos alterados:**
+- `scripts/ads/subir-crm-clientenovo-upload.ts` - retry por vídeo (erro transiente de upload)
+- `scripts/ads/subir-crm-clientenovo-ads.ts` - `fixTargeting` (par explore/explore_home)
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLI avulsos (tsx), idempotentes.
+
 ## 2026-07-10 | feat(ads): lote "Cliente Novo x Base" (Lucas, CRM) TP1825-1842 — PARCIAL/PAUSADO (throttle de upload dev-tier)
 
 **O que foi feito:**

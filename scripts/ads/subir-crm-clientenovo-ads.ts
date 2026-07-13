@@ -27,6 +27,14 @@ const nnOf = (name: string) => { const m = /^\s*\[?(\d{1,4})\]?\s*-/.exec(name ?
 
 type Ad = PairedAdSpec & { body: number; hook: number };
 
+// Meta exige `explore` junto de `explore_home`. Garante o par no targeting clonado (senão POST /adsets 400 code=100).
+function fixTargeting(t: any) {
+  if (!t) return t;
+  const ig: string[] | undefined = Array.isArray(t.instagram_positions) ? [...t.instagram_positions] : undefined;
+  if (ig && ig.includes("explore_home") && !ig.includes("explore")) ig.push("explore");
+  return { ...t, ...(ig ? { instagram_positions: ig } : {}) };
+}
+
 (async () => {
   if (!ACC) throw new Error("META_DEFAULT_AD_ACCOUNT_ID não setado");
 
@@ -115,7 +123,7 @@ type Ad = PairedAdSpec & { body: number; hook: number };
       const created = await withBackoff(`create conj ${c.g.key}`, () => metaPostForm(`${ACC}/adsets`, {
         name: c.name, campaign_id: CAMPAIGN,
         optimization_goal: cfg.optimization_goal, billing_event: cfg.billing_event,
-        promoted_object: cfg.promoted_object, attribution_spec: cfg.attribution_spec, targeting: cfg.targeting,
+        promoted_object: cfg.promoted_object, attribution_spec: cfg.attribution_spec, targeting: fixTargeting(cfg.targeting),
         ...(cfg.destination_type && cfg.destination_type !== "UNDEFINED" ? { destination_type: cfg.destination_type } : {}),
         status: "PAUSED",
       }));

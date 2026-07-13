@@ -16,6 +16,9 @@ import { PAIRS, LOTE, metaTitle9, metaTitle4 } from "./crm-clientenovo.data";
 const ACC = process.env.META_DEFAULT_AD_ACCOUNT_ID!;
 const go = process.argv.includes("--go");
 const RL_MAX_RETRIES = 24; // 24 × 5min = 2h de teto
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+// erro flaky/transiente de upload de vídeo (não é rate-limit): vale re-tentar com o MESMO buffer (sem re-baixar)
+const isTransientUpload = (e: unknown) => /problem uploading your video|request timeout|timed out|ETIMEDOUT|ECONNRESET|socket hang up/i.test(e instanceof Error ? e.message : String(e));
 
 // achata os 36 vídeos (9x16 + 4x5 por par)
 const ITEMS = PAIRS.flatMap((p) => [
@@ -65,8 +68,17 @@ async function downloadDrive(fileId: string): Promise<Buffer> {
       console.log(`\n[${i + 1}/${toUpload.length}] ⬇️  ${it.title} (drive ${it.driveId.slice(0, 8)}…) — ${elapsed()}`);
       const buffer = await downloadDrive(it.driveId);
       console.log(`   ${(buffer.length / 1024 / 1024).toFixed(1)}MB baixados · ⬆️  subindo...`);
-      const videoId = await withBackoff(`upload ${it.title}`, () => metaUploadVideo(ACC, `${it.title}.mp4`, buffer), { max: RL_MAX_RETRIES, log: (m) => console.log(`   ${m}`) });
-      uploaded.push({ title: it.title, videoId });
+      let videoId: string | undefined;
+      for (let attempt = 1; attempt <= 3; attempt++) {
+        try {
+          videoId = await withBackoff(`upload ${it.title}`, () => metaUploadVideo(ACC, `${it.title}.mp4`, buffer), { max: RL_MAX_RETRIES, log: (m) => console.log(`   ${m}`) });
+          break;
+        } catch (e) {
+          if (attempt < 3 && isTransientUpload(e)) { console.log(`   ⏳ upload flaky — retry ${attempt}/2 em 12s (${(e instanceof Error ? e.message : String(e)).slice(0, 50)})`); await sleep(12000); continue; }
+          throw e;
+        }
+      }
+      uploaded.push({ title: it.title, videoId: videoId! });
       console.log(`   ✅ video_id=${videoId}`);
     } catch (e) {
       failed.push(`${it.title}: ${e instanceof Error ? e.message : e}`);
