@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-13 | feat(ads): lote "Areia Movediça" (Victor Peixoto, TP1843-1854) — 3 conjuntos + 12 ads single-format PAUSED
+
+**O que foi feito:**
+- **Biblioteca:** 12 criativos single-format (TP1843-1854), persona Peixoto, hooks 1-12, funil Creators.
+- **Upload:** 12 vídeos (~220MB cada) via API — MUITO flaky (vídeos grandes, ~7 passadas idempotentes com retry por vídeo; o h12 resistiu ~6× até subir). Fechou 12/12.
+- **Meta:** 3 conjuntos na campanha de teste CBO Creators `120249141209100450` (existente, PAUSED): **174** `120253080726800450` [h01-05, 5 ads], **175** `120253080746030450` [h06-10, 5], **176** `120253080758610450` [h11-12, 2] — **12 ads single-video, TUDO PAUSED.** Copy clonada do irmão 173 (`120252947833910450`, Creators UGC "A Turbo entrega os anúncios UGCs...", link `/creators/`) — a pedido do Caio ("aproveita a copy dos que já estão no Gerenciador").
+- Scripts com o mesmo padrão single-format do Ismael/João + `fixTargeting` (par explore/explore_home) + retry no upload.
+
+**Por que:** Caio pediu a subida do lote Areia Movediça (Victor); a task estava "complete" no ClickUp mas os ads nunca tinham subido.
+
+**Arquivos alterados:**
+- `scripts/ads/areia-movedica.data.ts` (novo) + `subir-areia-movedica-{planilha,upload,ads}.ts` (novos)
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLI avulsos (tsx), idempotentes.
+
 ## 2026-07-13 | feat(ads): CONCLUI lote CRM "Cliente Novo x Base" (Lucas, TP1825-1842) — 4 conjuntos + 18 ads PAUSED
 
 **O que foi feito:**
