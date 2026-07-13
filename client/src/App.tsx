@@ -69,6 +69,7 @@ const ChatAtendimento = lazyWithRetry(() => import("@/pages/ChatAtendimento"));
 const VisaoGeral = lazyWithRetry(() => import("@/pages/VisaoGeral"));
 const DashboardGeG = lazyWithRetry(() => import("@/pages/DashboardGeG"));
 const DiscTeste = lazyWithRetry(() => import("@/pages/DiscTeste"));
+const DiscMapa = lazyWithRetry(() => import("@/pages/DiscMapa"));
 const CalendarioFerias = lazyWithRetry(() => import("@/pages/CalendarioFerias"));
 const Organograma = lazyWithRetry(() => import("@/pages/Organograma"));
 const ChurnDetalhamento = lazyWithRetry(() => import("@/pages/ChurnDetalhamento"));
@@ -386,6 +387,7 @@ function ProtectedRouter() {
       <Route path="/rh/pesquisas">{() => <ProtectedRoute path="/rh/pesquisas" component={PesquisasGG} />}</Route>
       <Route path="/rh/nps/responder">{() => <ProtectedRoute path="/rh/nps/responder" component={NpsPesquisa} />}</Route>
       <Route path="/gg/disc">{() => <ProtectedRoute path="/gg/disc" component={DiscTeste} />}</Route>
+      <Route path="/gg/disc/mapa">{() => <ProtectedRoute path="/gg/disc/mapa" component={DiscMapa} />}</Route>
       <Route path="/gg/calendario-ferias">{() => <ProtectedRoute path="/gg/calendario-ferias" component={CalendarioFerias} />}</Route>
       <Route path="/gg/organograma">{() => <ProtectedRoute path="/gg/organograma" component={Organograma} />}</Route>
 
