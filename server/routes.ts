@@ -23,6 +23,7 @@ import * as path from "path";
 import * as fs from "fs";
 import { registerAcessosRoutes } from "./routes/acessos";
 import { registerHRRoutes } from "./routes/hr";
+import { registerDiscRoutes } from "./routes/disc";
 import { registerGrowthRoutes } from "./routes/growth";
 import { registerOrcamentoCampanhasRoutes } from "./routes/orcamentoCampanhas";
 import { registerGrowthTimeseriesRoutes } from "./routes/growthTimeseries";
@@ -8431,6 +8432,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // HR Module - registered from separate file
   registerHRRoutes(app, db, storage);
+
+  // G&G — Teste DISC (perfil comportamental)
+  registerDiscRoutes(app, db);
 
   // Growth Module - registered from separate file
   registerGrowthRoutes(app, db, storage);
