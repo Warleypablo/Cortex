@@ -114,6 +114,7 @@ export const PERMISSION_KEYS = {
     PATRIMONIO: 'gg.patrimonio',
     CALENDARIO_FERIAS: 'gg.calendario_ferias',
     ORGANOGRAMA: 'gg.organograma',
+    DISC: 'gg.disc',
   },
   // Social (Makers)
   SOCIAL: {
@@ -575,6 +576,8 @@ export const NAV_CONFIG = {
       { title: 'Recrutamento', url: '/dashboard/recrutamento', icon: 'UserPlus', permissionKey: PERMISSION_KEYS.GG.RECRUTAMENTO },
       { title: 'Pesquisas', url: '/rh/pesquisas', icon: 'BarChart2', permissionKey: PERMISSION_KEYS.GG.PESQUISAS },
       { title: 'Patrimônio', url: '/patrimonio', icon: 'Building2', permissionKey: PERMISSION_KEYS.GG.PATRIMONIO },
+      { title: 'Perfil Comportamental (DISC)', url: '/gg/disc', icon: 'Brain', permissionKey: PERMISSION_KEYS.GG.DISC },
+      { title: 'Mapa DISC do Time', url: '/gg/disc/mapa', icon: 'UsersRound', permissionKey: PERMISSION_KEYS.GG.DISC },
       { title: 'Calendário de Férias', url: '/gg/calendario-ferias', icon: 'CalendarDays', permissionKey: PERMISSION_KEYS.GG.CALENDARIO_FERIAS },
       { title: 'Organograma', url: '/gg/organograma', icon: 'GitBranch', permissionKey: PERMISSION_KEYS.GG.ORGANOGRAMA },
     ],
