@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 import { montarDetalheBp } from "./bp2026.detalhe";
 import { computarBpReceitas } from "./bp2026";
 import { storage } from "../storage";
-import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
+import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp, type BpLinha } from "./ceoDashboard.helpers";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
   enpsRespostasToGrupos, grupoMargemBruta, receitaCabecaGrupos, formatBRL, LIMITE_ITENS,
@@ -12,6 +12,8 @@ import {
   type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao, type LtvAuditoriaRow,
 } from "./ceoDashboard.detalhe.helpers";
 import { SERVICOS_BITRIX, parseServicosVendidos } from "../okr2026/servicosBitrix";
+import { carregarMovimentoQueries, montarMovimentoReceita, type MovimentoReceita } from "./ceoDashboard.movimentoReceita";
+import { getCrosssellDealsDetail } from "../okr2026/metricsAdapter";
 
 // Sub-linhas comerciais que compõem o CAC total (mesmos títulos da aba CAC do BP) —
 // usadas para expandir a caixa "CAC total" no drill de CAC por cliente/contrato.
@@ -93,11 +95,85 @@ async function dealsGanhosDoMes(
   }));
 }
 
+// Deals ganhos do mês com valor recorrente OU pontual (conforme campo), p/ os drills de venda.
+async function dealsVendaDoMes(
+  db: any, mesNum: number, campo: "valor_recorrente" | "valor_pontual"
+): Promise<Array<{ nome: string; detalhe: string; data: string | null; valor: number }>> {
+  const col = campo === "valor_recorrente" ? sql`d.valor_recorrente` : sql`d.valor_pontual`;
+  const r: any = await db.execute(sql`
+    SELECT COALESCE(NULLIF(d.company_name,''), d.title, '(sem nome)') AS nome,
+           COALESCE(NULLIF(TRIM(c.nome), ''), d.assigned_by_name, '') AS closer,
+           d.data_fechamento::date::text AS data,
+           COALESCE(${col}::numeric, 0) AS valor
+    FROM "Bitrix".crm_deal d
+    LEFT JOIN "Bitrix".crm_closers c
+      ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+    WHERE d.stage_name='Negócio Ganho'
+      AND EXTRACT(YEAR FROM d.data_fechamento)=2026 AND EXTRACT(MONTH FROM d.data_fechamento)=${mesNum}
+      AND COALESCE(${col}::numeric,0) > 0
+    ORDER BY COALESCE(${col}::numeric,0) DESC`);
+  return (r.rows ?? []).map((x: any) => ({
+    nome: String(x.nome), detalhe: x.closer ? `closer ${x.closer}` : "",
+    data: x.data ? String(x.data) : null, valor: Number(x.valor) || 0,
+  }));
+}
+
+// Contratos recorrentes que deram churn no mês (mesma régua de churn_mes: vw_cup_churn_ajustado).
+async function churnMrrDoMes(db: any, mesNum: number): Promise<Array<{ nome: string; detalhe: string; data: string | null; valor: number }>> {
+  const r: any = await db.execute(sql`
+    SELECT COALESCE(NULLIF(nome,''), '(sem nome)') AS nome,
+           COALESCE(responsavel_geral, '') AS resp,
+           data_solicitacao_encerramento::date::text AS data,
+           valor_r::numeric AS valor
+    FROM cortex_core.vw_cup_churn_ajustado
+    WHERE valor_r > 0 AND data_solicitacao_encerramento IS NOT NULL
+      AND EXTRACT(YEAR FROM data_solicitacao_encerramento)=2026
+      AND EXTRACT(MONTH FROM data_solicitacao_encerramento)=${mesNum}
+    ORDER BY valor_r::numeric DESC`);
+  return (r.rows ?? []).map((x: any) => ({
+    nome: String(x.nome), detalhe: x.resp ? String(x.resp) : "",
+    data: x.data ? String(x.data) : null, valor: Number(x.valor) || 0,
+  }));
+}
+
+// Contratos pontuais cancelados no mês por data de cancelamento (régua de pontual_churn).
+async function churnPontualDoMes(db: any, mesNum: number): Promise<Array<{ nome: string; detalhe: string; data: string | null; valor: number }>> {
+  const r: any = await db.execute(sql`
+    SELECT COALESCE(NULLIF(cl.nome,''), '(sem nome)') AS nome,
+           COALESCE(co.status,'') AS status,
+           co.data_solicitacao_encerramento::date::text AS data,
+           co.valorp::numeric AS valor
+    FROM "Clickup".cup_contratos co
+    LEFT JOIN "Clickup".cup_clientes cl ON co.id_task = cl.task_id
+    WHERE co.valorp::numeric > 0
+      AND LOWER(TRIM(co.status)) IN ('cancelado/inativo','em cancelamento','não usar')
+      AND EXTRACT(YEAR FROM co.data_solicitacao_encerramento)=2026
+      AND EXTRACT(MONTH FROM co.data_solicitacao_encerramento)=${mesNum}
+    ORDER BY co.valorp::numeric DESC`);
+  return (r.rows ?? []).map((x: any) => ({
+    nome: String(x.nome), detalhe: x.status ? String(x.status) : "",
+    data: x.data ? String(x.data) : null, valor: Number(x.valor) || 0,
+  }));
+}
+
+// Converte itens simples num grupo do drawer (total = soma, cap LIMITE_ITENS).
+function itensParaGrupo(titulo: string, itens: Array<{ nome: string; detalhe: string; data: string | null; valor: number }>, totalAutoritativo: number): CeoGrupo {
+  const cap = itens.slice(0, LIMITE_ITENS);
+  const omit = itens.slice(LIMITE_ITENS);
+  return {
+    titulo, formato: "brl", total: totalAutoritativo, aberto: true,
+    itens: cap.map((it) => ({ nome: it.nome, detalhe: it.detalhe, data: it.data, valor: it.valor })),
+    itensOmitidos: omit.length ? { qtd: omit.length, valor: omit.reduce((s, i) => s + i.valor, 0) } : undefined,
+  };
+}
+
 const TITULOS: Record<string, string> = {
   receita: "Receita", custos: "Custos & Despesas", lucro: "Lucro (EBITDA)", geracao_caixa: "Geração de Caixa",
   caixa: "Saldo de Caixa", inadimplencia: "Inadimplência Total", cac: "CAC",
   cac_por_cliente: "CAC por cliente", cac_por_contrato: "CAC por contrato",
   ltv_fat: "LTV FAT", ltv_dfc: "LTV DFC", headcount: "Headcount", enps: "E-NPS", receita_cabeca: "Receita / Cabeça",
+  venda_mrr: "Venda MRR", churn_mrr: "Churn MRR", cross_mrr: "Venda de Cross-sell/Upsell MRR", nrr: "NRR",
+  venda_pontual: "Venda Pontual", churn_pontual: "Churn Pontual", cross_pontual: "Venda de Cross-sell/Upsell Pontual", nrr_pontual: "NRR Pontual",
 };
 
 function linhaValor(bp: any, arr: "linhas" | "metricasGerais", metrica: string, mesNum: number): { orcado: number | null; realizado: number | null } {
@@ -126,6 +202,9 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
   let media: number | null | undefined; // só a auditoria de LTV preenche (mediana × média)
   let somaLtv: number | null | undefined; // numerador da média (auditoria de LTV)
   let nClientes: number | null | undefined; // população da auditoria de LTV
+  let linhaMovParaEvolucao: BpLinha | undefined; // linha do movimento usada no branch MOV_KEYS, p/ reusar na série de evolução
+
+  const MOV_KEYS = ["venda_mrr","churn_mrr","cross_mrr","nrr","venda_pontual","churn_pontual","cross_pontual","nrr_pontual"];
 
   if (kpi === "receita") {
     // Regime de caixa: header = recebido (DFC); breakdown por categoria de recebimento.
@@ -367,6 +446,60 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     const respostas: any = await storage.getRhNpsRespostas();
     grupos = enpsRespostasToGrupos(respostas ?? []);
     nota = "E-NPS (empresa) — todas as respostas disponíveis.";
+  } else if (MOV_KEYS.includes(kpi)) {
+    const findLinha = (arr: any[], metrica: string) => (arr ?? []).find((l: any) => l.metrica === metrica);
+    const queries = await carregarMovimentoQueries(db);
+    const mov: MovimentoReceita = montarMovimentoReceita({
+      vendasMrr: findLinha(bp.metricasGerais, "vendas_mrr"),
+      churnMes: findLinha(bp.metricasGerais, "churn_mes"),
+      vendasPontual: findLinha(bp.metricasGerais, "vendas_pontual"),
+      pontualChurn: findLinha(bp.pontual, "pontual_churn"),
+      pontualEstoqueIni: findLinha(bp.pontual, "pontual_estoque_ini"),
+      queries, mesNum,
+    });
+    const linhaKpi: Record<string, BpLinha> = {
+      venda_mrr: mov.linhas.vendaMrr, churn_mrr: mov.linhas.churnMrr, cross_mrr: mov.linhas.crossMrr, nrr: mov.linhas.nrr,
+      venda_pontual: mov.linhas.vendaPontual, churn_pontual: mov.linhas.churnPontual, cross_pontual: mov.linhas.crossPontual, nrr_pontual: mov.linhas.nrrPontual,
+    };
+    const linha = linhaKpi[kpi];
+    linhaMovParaEvolucao = linha;
+    const mesData = linha.meses.find((m) => m.mes === mesNum);
+    base.realizado = mesData?.realizado ?? null;
+    base.orcado = mesData?.orcado || null;
+    const ehPct = kpi === "nrr" || kpi === "nrr_pontual";
+    // unidade do detalhe (afeta o header/gráfico); o cast é seguro pois estendemos o tipo.
+    (base as any).unidade = ehPct ? "pct" : "brl";
+
+    const ini = `2026-${String(mesNum).padStart(2, "0")}-01`;
+    const fim = mesNum >= 12 ? "2026-12-31" : `2026-${String(mesNum).padStart(2, "0")}-${new Date(2026, mesNum, 0).getDate()}`;
+
+    if (kpi === "venda_mrr") {
+      grupos = [itensParaGrupo("Deals recorrentes ganhos no mês", await dealsVendaDoMes(db, mesNum, "valor_recorrente"), base.realizado ?? 0)];
+    } else if (kpi === "venda_pontual") {
+      grupos = [itensParaGrupo("Deals pontuais ganhos no mês", await dealsVendaDoMes(db, mesNum, "valor_pontual"), base.realizado ?? 0)];
+    } else if (kpi === "churn_mrr") {
+      grupos = [itensParaGrupo("Contratos recorrentes cancelados no mês", await churnMrrDoMes(db, mesNum), base.realizado ?? 0)];
+    } else if (kpi === "churn_pontual") {
+      grupos = [itensParaGrupo("Contratos pontuais cancelados no mês", await churnPontualDoMes(db, mesNum), base.realizado ?? 0)];
+    } else if (kpi === "cross_mrr" || kpi === "cross_pontual") {
+      const det = await getCrosssellDealsDetail(ini, fim);
+      const itens = det.items
+        .map((d) => ({ nome: d.cliente, detalhe: d.closer ? `closer ${d.closer}` : "", data: d.data_fechamento, valor: kpi === "cross_mrr" ? d.recorrente : d.pontual }))
+        .filter((it) => it.valor > 0);
+      grupos = [itensParaGrupo("Deals de cross-sell/upsell no mês", itens, base.realizado ?? 0)];
+    } else { // nrr | nrr_pontual — decomposição da erosão
+      const ing = mov.ingredientes;
+      const base_ = ehPct && kpi === "nrr" ? ing.mrrInicioPorMes[mesNum] ?? 0 : ing.estoquePontIniPorMes[mesNum] ?? 0;
+      const churn_ = kpi === "nrr" ? ing.churnMrrPorMes[mesNum] ?? 0 : ing.churnPontualPorMes[mesNum] ?? 0;
+      const cross_ = kpi === "nrr" ? ing.crossMrrPorMes[mesNum] ?? 0 : ing.crossPontPorMes[mesNum] ?? 0;
+      grupos = [
+        { titulo: kpi === "nrr" ? "MRR do início do mês (base)" : "Estoque pontual inicial (base)", total: base_, formato: "brl", itens: [], aberto: true },
+        { titulo: "Churn no mês", total: churn_, formato: "brl", sinal: "-", itens: [] },
+        { titulo: "Cross-sell/Upsell no mês", total: cross_, formato: "brl", sinal: "+", itens: [] },
+      ];
+      const pct = base_ > 0 ? ((churn_ - cross_) / base_ * 100) : null;
+      nota = `NRR (erosão) = (Churn ${formatBRL(churn_)} − Cross-sell ${formatBRL(cross_)}) ÷ base ${formatBRL(base_)} = ${pct == null ? "—" : pct.toFixed(1) + "%"}. Menor é melhor.`;
+    }
   } else {
     throw new Error("kpi inválido");
   }
@@ -383,6 +516,8 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
   } else if (EVOLUCAO_FONTE[kpi]) {
     const { arr, metrica } = EVOLUCAO_FONTE[kpi];
     evolucao = serieEvolucao((bp[arr] ?? []).find((l: any) => l.metrica === metrica), bp.mesFechado);
+  } else if (linhaMovParaEvolucao) {
+    evolucao = serieEvolucao(linhaMovParaEvolucao, bp.mesFechado);
   }
   if (evolucao && evolucao.length < 2) evolucao = undefined; // 1 ponto não é evolução
 
@@ -394,7 +529,8 @@ export function registerCeoDashboardDetalheRoutes(app: Express, db: any) {
     try {
       if (!canAccessCeo(req.user)) return res.status(403).json({ error: "Acesso restrito ao CEO Dashboard" });
       const kpi = typeof req.query.kpi === "string" ? req.query.kpi : "";
-      const KPIS_VALIDOS = ["receita","custos","lucro","geracao_caixa","caixa","inadimplencia","cac","cac_por_cliente","cac_por_contrato","ltv_fat","ltv_dfc","headcount","enps","receita_cabeca"];
+      const KPIS_VALIDOS = ["receita","custos","lucro","geracao_caixa","caixa","inadimplencia","cac","cac_por_cliente","cac_por_contrato","ltv_fat","ltv_dfc","headcount","enps","receita_cabeca",
+        "venda_mrr","churn_mrr","cross_mrr","nrr","venda_pontual","churn_pontual","cross_pontual","nrr_pontual"];
       if (!kpi || kpi === "nps" || !KPIS_VALIDOS.includes(kpi)) return res.status(400).json({ error: "kpi inválido" });
       const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
       const payload = await buildCeoDetalhe(db, kpi, mes);

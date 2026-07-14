@@ -16,7 +16,7 @@ export interface CeoDetalheResponse {
   kpi: string;
   titulo: string;
   mes: number;
-  unidade: "brl" | "int";
+  unidade: "brl" | "int" | "pct";
   orcado: number | null;
   realizado: number | null;
   atingimentoPct: number | null;
