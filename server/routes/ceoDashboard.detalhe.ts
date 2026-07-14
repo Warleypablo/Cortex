@@ -6,20 +6,30 @@ import { storage } from "../storage";
 import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
-  enpsRespostasToGrupos, grupoMargemBruta, receitaCabecaGrupos,
+  enpsRespostasToGrupos, grupoMargemBruta, receitaCabecaGrupos, formatBRL, LIMITE_ITENS,
   recebidoCategoriasToGrupo, pagoCategoriasToGrupo, serieEvolucao, KPI_COMPONENTES,
   ltvAuditoriaToGrupos, ultimoDiaAnterior,
   type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao, type LtvAuditoriaRow,
 } from "./ceoDashboard.detalhe.helpers";
+import { SERVICOS_BITRIX, parseServicosVendidos } from "../okr2026/servicosBitrix";
+
+// Sub-linhas comerciais que compõem o CAC total (mesmos títulos da aba CAC do BP) —
+// usadas para expandir a caixa "CAC total" no drill de CAC por cliente/contrato.
+const SUB_CAC_METRICAS = [
+  "cac_pre_vendas", "cac_vendas", "cac_gerencia", "cac_comissoes", "cac_growth",
+  "cac_ads", "cac_eventos", "cac_brindes", "cac_viagens", "cac_outras_sub",
+];
 
 // Fonte da série mensal (realizado vs meta) por KPI — só os que têm evolução no BP.
 // receita e receita_cabeca usam as linhas sintéticas de caixa (montadas à parte).
-const EVOLUCAO_FONTE: Record<string, { arr: "linhas" | "metricasGerais"; metrica: string }> = {
+const EVOLUCAO_FONTE: Record<string, { arr: "linhas" | "metricasGerais" | "cacDetalhe"; metrica: string }> = {
   custos: { arr: "metricasGerais", metrica: "despesa_total" },
   lucro: { arr: "linhas", metrica: "ebitda" },
   geracao_caixa: { arr: "linhas", metrica: "dfc_real" },
   caixa: { arr: "metricasGerais", metrica: "saldo_caixa" },
   cac: { arr: "linhas", metrica: "cac" },
+  cac_por_cliente: { arr: "cacDetalhe", metrica: "cac_por_cliente" },
+  cac_por_contrato: { arr: "cacDetalhe", metrica: "cac_por_contrato" },
   headcount: { arr: "metricasGerais", metrica: "colaboradores" },
 };
 
@@ -53,9 +63,40 @@ async function pagoPorCategoria(db: any, mesNum: number): Promise<Array<{ catego
   return (r.rows ?? []).map((x: any) => ({ categoria: String(x.categoria), valor: Number(x.valor) || 0 }));
 }
 
+// Deals ganhos no Bitrix no mês — mesmo filtro de ganhosPorMes/serviços do BP:
+// stage ganho + (MRR ou pontual > 0), por data_fechamento. Traz servicos_vendidos
+// p/ expandir a caixa do denominador (deals para "cliente", serviços para "contrato").
+async function dealsGanhosDoMes(
+  db: any, mesNum: number
+): Promise<Array<{ title: string; closer: string; data: string | null; ids: number[]; montante: number }>> {
+  const r: any = await db.execute(sql`
+    SELECT COALESCE(d.title, '(sem título)') AS title,
+           COALESCE(NULLIF(TRIM(c.nome), ''), '') AS closer,
+           d.data_fechamento::date::text AS data,
+           d.servicos_vendidos,
+           COALESCE(d.valor_recorrente::numeric, 0) AS vr,
+           COALESCE(d.valor_pontual::numeric, 0) AS vp
+    FROM "Bitrix".crm_deal d
+    LEFT JOIN "Bitrix".crm_closers c
+      ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+    WHERE d.stage_name = 'Negócio Ganho'
+      AND EXTRACT(YEAR FROM d.data_fechamento) = 2026
+      AND EXTRACT(MONTH FROM d.data_fechamento) = ${mesNum}
+      AND (COALESCE(d.valor_recorrente::numeric, 0) > 0 OR COALESCE(d.valor_pontual::numeric, 0) > 0)
+    ORDER BY (COALESCE(d.valor_recorrente::numeric, 0) + COALESCE(d.valor_pontual::numeric, 0)) DESC`);
+  return (r.rows ?? []).map((x: any) => ({
+    title: String(x.title),
+    closer: String(x.closer || ""),
+    data: x.data ? String(x.data) : null,
+    ids: parseServicosVendidos(x.servicos_vendidos),
+    montante: (Number(x.vr) || 0) + (Number(x.vp) || 0),
+  }));
+}
+
 const TITULOS: Record<string, string> = {
   receita: "Receita", custos: "Custos & Despesas", lucro: "Lucro (EBITDA)", geracao_caixa: "Geração de Caixa",
   caixa: "Saldo de Caixa", inadimplencia: "Inadimplência Total", cac: "CAC",
+  cac_por_cliente: "CAC por cliente", cac_por_contrato: "CAC por contrato",
   ltv_fat: "LTV FAT", ltv_dfc: "LTV DFC", headcount: "Headcount", enps: "E-NPS", receita_cabeca: "Receita / Cabeça",
 };
 
@@ -101,6 +142,69 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     const det = await montarDetalheBp(db, { metrica: "cac", mes: mesNum });
     grupos = mapDetalheBpGrupos(det, { formato: "brl", sinal: "-" });
     base.orcado = det.orcado; base.realizado = det.realizado;
+  } else if (kpi === "cac_por_cliente" || kpi === "cac_por_contrato") {
+    // Razão de eficiência: CAC total do mês ÷ denominador (deals ganhos | serviços vendidos).
+    // DUAS caixas expansíveis: (1) CAC total → sub-linhas comerciais; (2) denominador → itens do Bitrix.
+    const det = await montarDetalheBp(db, { metrica: "cac", mes: mesNum });
+    const cacTotal = det.realizado ?? 0;
+    // denominador autoritativo = o mesmo do BP (reconcilia com a célula clicada).
+    const den = kpi === "cac_por_cliente"
+      ? (bp.cacDenominadores?.deals?.[mesNum] ?? 0)
+      : (bp.cacDenominadores?.servicos?.[mesNum] ?? 0);
+
+    // Caixa 1: CAC total → sub-linhas (Growth, ADs, Vendas…); soma = CAC total.
+    const cacItens = (bp.cacDetalhe ?? [])
+      .filter((l: any) => SUB_CAC_METRICAS.includes(l.metrica))
+      .map((l: any) => ({
+        nome: l.titulo, detalhe: "", data: null as string | null,
+        valor: l.meses?.find((m: any) => m.mes === mesNum)?.realizado ?? 0,
+      }))
+      .filter((it: any) => it.valor !== 0)
+      .sort((a: any, b: any) => b.valor - a.valor);
+    const grupoCac: CeoGrupo = {
+      titulo: "CAC total do mês (regime de caixa)", total: cacTotal, formato: "brl",
+      itens: cacItens, aberto: true,
+    };
+
+    // Caixa 2: denominador → deals ganhos (cliente) ou serviços vendidos (contrato).
+    const deals = await dealsGanhosDoMes(db, mesNum);
+    let denItens: Array<{ nome: string; detalhe: string; data: string | null; valor: number }>;
+    let tituloDen: string;
+    if (kpi === "cac_por_cliente") {
+      tituloDen = "Deals ganhos (Bitrix)";
+      denItens = deals.map((d) => ({
+        nome: d.title,
+        detalhe: [d.closer ? `closer ${d.closer}` : "", d.montante > 0 ? formatBRL(d.montante) : ""].filter(Boolean).join(" · "),
+        data: d.data, valor: 0,
+      }));
+    } else {
+      // 1 item por serviço vendido; deal sem serviço mapeado conta 1 (piso, régua do BP) → soma = den.
+      tituloDen = "Serviços vendidos (Bitrix)";
+      denItens = [];
+      for (const d of deals) {
+        const contexto = d.closer ? `${d.title} · closer ${d.closer}` : d.title;
+        const mapeados = d.ids.filter((id) => SERVICOS_BITRIX[id]);
+        if (mapeados.length) {
+          for (const id of mapeados) denItens.push({ nome: SERVICOS_BITRIX[id].nome, detalhe: contexto, data: d.data, valor: 0 });
+        } else {
+          denItens.push({ nome: "(serviço não mapeado)", detalhe: contexto, data: d.data, valor: 0 });
+        }
+      }
+    }
+    const capped = denItens.slice(0, LIMITE_ITENS);
+    const omit = Math.max(0, den - capped.length); // total exibido = den (reconcilia com a célula)
+    const grupoDen: CeoGrupo = {
+      titulo: tituloDen, total: den, formato: "num", itens: capped,
+      itensOmitidos: omit > 0 ? { qtd: omit, valor: 0 } : undefined, aberto: false,
+    };
+
+    grupos = [grupoCac, grupoDen];
+    const razao = den ? cacTotal / den : 0;
+    nota = `CAC total ÷ ${tituloDen.charAt(0).toLowerCase()}${tituloDen.slice(1)} = ${formatBRL(cacTotal)} ÷ ${den} = ${formatBRL(razao)}`;
+    // Header (orçado/realizado) = a própria razão do BP → reconcilia com a célula clicada.
+    const linha = (bp.cacDetalhe ?? []).find((l: any) => l.metrica === kpi);
+    const m = linha?.meses?.find((x: any) => x.mes === mesNum);
+    base.orcado = m?.orcado ?? null; base.realizado = m?.realizado ?? null;
   } else if (kpi === "headcount") {
     const det = await montarDetalheBp(db, { metrica: "colaboradores", mes: mesNum });
     grupos = mapDetalheBpGrupos(det, { formato: "num" });
@@ -290,7 +394,7 @@ export function registerCeoDashboardDetalheRoutes(app: Express, db: any) {
     try {
       if (!canAccessCeo(req.user)) return res.status(403).json({ error: "Acesso restrito ao CEO Dashboard" });
       const kpi = typeof req.query.kpi === "string" ? req.query.kpi : "";
-      const KPIS_VALIDOS = ["receita","custos","lucro","geracao_caixa","caixa","inadimplencia","cac","ltv_fat","ltv_dfc","headcount","enps","receita_cabeca"];
+      const KPIS_VALIDOS = ["receita","custos","lucro","geracao_caixa","caixa","inadimplencia","cac","cac_por_cliente","cac_por_contrato","ltv_fat","ltv_dfc","headcount","enps","receita_cabeca"];
       if (!kpi || kpi === "nps" || !KPIS_VALIDOS.includes(kpi)) return res.status(400).json({ error: "kpi inválido" });
       const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
       const payload = await buildCeoDetalhe(db, kpi, mes);

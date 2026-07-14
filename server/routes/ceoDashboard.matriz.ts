@@ -165,6 +165,9 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
     ltvFatSeriePorMes,
     ltvDfcSeriePorMes,
     enpsSeriePorMes,
+    // Eficiência de aquisição já pronta no BP (mesma régua da aba CAC do BP 2026).
+    cacPorClienteLinha: (bp.cacDetalhe ?? []).find((l: any) => l.metrica === "cac_por_cliente"),
+    cacPorContratoLinha: (bp.cacDetalhe ?? []).find((l: any) => l.metrica === "cac_por_contrato"),
   });
 }
 
