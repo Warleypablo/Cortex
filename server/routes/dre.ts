@@ -71,6 +71,9 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
         ? sql` AND p.empresa = ${empresa}`
         : sql``;
 
+      // DRE em regime de COMPETÊNCIA: o mês vem de data_competencia, o valor é o cheio
+      // faturado (valor_bruto) e não há filtro de status — reconhece parcelas pendentes,
+      // atrasadas e de competência futura, independente do pagamento.
       const result = await db.execute(sql`
         WITH categorias_expandidas AS (
           SELECT DISTINCT ON (p.id, REGEXP_REPLACE(TRIM(cat.categoria), '\s+', ' ', 'g'))
@@ -78,12 +81,11 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
             REGEXP_REPLACE(TRIM(cat.categoria), '\s+', ' ', 'g') AS categoria_nome,
             p.tipo_evento,
             p.empresa,
-            EXTRACT(MONTH FROM p.data_quitacao::date)::int AS mes,
-            COALESCE(p.valor_pago::numeric, 0) AS valor
+            EXTRACT(MONTH FROM p.data_competencia::date)::int AS mes,
+            COALESCE(p.valor_bruto::numeric, 0) AS valor
           FROM "Conta Azul".caz_parcelas p,
                regexp_split_to_table(p.categoria_nome, ';') AS cat(categoria)
-          WHERE p.status = 'QUITADO'
-            AND EXTRACT(YEAR FROM p.data_quitacao::date) = ${ano}
+          WHERE EXTRACT(YEAR FROM p.data_competencia::date) = ${ano}
             ${empresaFilter}
             AND p.categoria_nome IS NOT NULL
             AND p.categoria_nome != ''
@@ -166,14 +168,13 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
             REGEXP_REPLACE(TRIM(cat.categoria), '\s+', ' ', 'g') AS categoria_nome,
             p.tipo_evento,
             p.empresa,
-            EXTRACT(MONTH FROM p.data_quitacao::date)::int AS mes,
+            EXTRACT(MONTH FROM p.data_competencia::date)::int AS mes,
             COALESCE(p.valor_bruto::numeric, 0) AS valor_bruto,
             COALESCE(c.nome, c.empresa, 'Não identificado') AS fornecedor
           FROM "Conta Azul".caz_parcelas p
           LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = COALESCE(c.ids, c.id::text),
                regexp_split_to_table(p.categoria_nome, ';') AS cat(categoria)
-          WHERE p.status = 'QUITADO'
-            AND EXTRACT(YEAR FROM p.data_quitacao::date) = ${ano}
+          WHERE EXTRACT(YEAR FROM p.data_competencia::date) = ${ano}
             ${empresaFilter}
             AND p.categoria_nome IS NOT NULL
             AND p.categoria_nome != ''

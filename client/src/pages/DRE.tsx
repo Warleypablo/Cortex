@@ -861,7 +861,7 @@ export default function DRE() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-gray-900 dark:text-white">
             Demonstração do Resultado do Exercício — {ano}
-            <span className="text-xs font-normal text-gray-500 dark:text-zinc-400 ml-2">(Regime de Caixa)</span>
+            <span className="text-xs font-normal text-gray-500 dark:text-zinc-400 ml-2">(Regime de Competência)</span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">

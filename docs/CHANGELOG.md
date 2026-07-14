@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-14 | feat(dre): DRE passa a usar data de competência
+
+**O que foi feito:**
+- A DRE deixou de ser por regime de caixa e passou a usar **competência** como base: as duas queries (principal + fornecedores) do `/api/financeiro/dre` usam `data_competencia` para o mês/ano, `valor_bruto` como valor e não filtram por `status` — reconhecem o faturado, incluindo parcelas pendentes, atrasadas e de competência futura.
+- Título fixo atualizado para "(Regime de Competência)".
+- (Uma iteração intermediária chegou a ter um seletor Caixa/Competência, mas foi removida a pedido: a DRE é sempre competência.)
+
+**Por que:**
+- O que interessa é o resultado pelo mês de reconhecimento (faturamento), não pela data de pagamento. A coluna `data_competencia` já existe 100% preenchida na `caz_parcelas`, permitindo competência real (não proxy por vencimento).
+
+**Arquivos alterados:**
+- `server/routes/dre.ts` - queries fixadas em `data_competencia` + `valor_bruto`, sem filtro de status.
+- `client/src/pages/DRE.tsx` - título fixo "Regime de Competência"; barra de filtros sem seletor de regime.
+- `docs/superpowers/specs/2026-07-14-dre-regime-competencia-design.md` - spec de design da feature.
+
+**Impacto arquitetural:** Nenhum. Muda a base temporal/valor da DRE; nenhuma mudança estrutural.
+
+---
+
 ## 2026-07-10 | fix(reporte-trimestral): estoque pontual em aberto bate entre os dois slides
 
 **Bug:** o "estoque em aberto" divergia entre o slide **Pontual** (R$ 1,68M) e o slide **Visão do Trimestre — Pontual** (R$ 2,09M), sendo a mesma métrica.
