@@ -1,21 +1,21 @@
 # Changelog
 
-## 2026-07-14 | feat(dre): filtro de regime Caixa/Competência na DRE
+## 2026-07-14 | feat(dre): DRE passa a usar data de competência
 
 **O que foi feito:**
-- Novo seletor "Regime" (Caixa / Competência) na barra de filtros da DRE, default Caixa.
-- Endpoint `/api/financeiro/dre` passou a aceitar o param `regime`. Em competência, as duas queries (principal + fornecedores) usam `data_competencia` para o mês/ano, `valor_bruto` como valor e removem o filtro `status = 'QUITADO'` (reconhece o faturado, incluindo pendentes/atrasados/futuros). O modo caixa permanece idêntico ao anterior.
-- Título da DRE deixou de ser fixo "(Regime de Caixa)" e passa a refletir o regime selecionado.
+- A DRE deixou de ser por regime de caixa e passou a usar **competência** como base: as duas queries (principal + fornecedores) do `/api/financeiro/dre` usam `data_competencia` para o mês/ano, `valor_bruto` como valor e não filtram por `status` — reconhecem o faturado, incluindo parcelas pendentes, atrasadas e de competência futura.
+- Título fixo atualizado para "(Regime de Competência)".
+- (Uma iteração intermediária chegou a ter um seletor Caixa/Competência, mas foi removida a pedido: a DRE é sempre competência.)
 
 **Por que:**
-- A DRE só mostrava resultado por caixa (quando o dinheiro entrou/saiu). Competência permite ver o resultado pelo mês de reconhecimento (faturamento), aproveitando a coluna `data_competencia` que já existe 100% preenchida na `caz_parcelas`.
+- O que interessa é o resultado pelo mês de reconhecimento (faturamento), não pela data de pagamento. A coluna `data_competencia` já existe 100% preenchida na `caz_parcelas`, permitindo competência real (não proxy por vencimento).
 
 **Arquivos alterados:**
-- `server/routes/dre.ts` - fragmentos SQL condicionais por regime nas duas queries; `regime` na resposta.
-- `client/src/pages/DRE.tsx` - state `regime`, entrada na queryKey/URL, `<Select>` de Regime e título dinâmico.
+- `server/routes/dre.ts` - queries fixadas em `data_competencia` + `valor_bruto`, sem filtro de status.
+- `client/src/pages/DRE.tsx` - título fixo "Regime de Competência"; barra de filtros sem seletor de regime.
 - `docs/superpowers/specs/2026-07-14-dre-regime-competencia-design.md` - spec de design da feature.
 
-**Impacto arquitetural:** Nenhum. Mudança aditiva; o comportamento default (caixa) é preservado byte-a-byte.
+**Impacto arquitetural:** Nenhum. Muda a base temporal/valor da DRE; nenhuma mudança estrutural.
 
 ---
 
