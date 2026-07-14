@@ -34,7 +34,7 @@ export interface MetricasResumo {
   netChurnPct: number; // 0-100
   churnBrutoSemAbono: number; // valor_r do mês, todos os motivos, exceto abonar_churn='Sim'
   churnBrutoSemAbonoPct: number; // 0-100
-  nrrBruto: number; // churnBrutoSemAbono - crossTotal
+  nrrBruto: number; // churnTotal - crossTotal (bruto = churn TOTAL da empresa, inclui abonados)
   nrrBrutoPct: number; // 0-100
 }
 
@@ -107,8 +107,8 @@ Net Churn = Churn Ajustado − Cross Total
 % = ${formatarMoedaBR(m.netChurn)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
 = *${formatarPercentBR(m.netChurnPct)}*
 
-NRR Bruto = Churn s/ abonos − Cross Total
-= ${formatarMoedaBR(m.churnBrutoSemAbono)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.nrrBruto)}*
+NRR Bruto = Churn Total − Cross Total
+= ${formatarMoedaBR(m.churnTotal)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.nrrBruto)}*
 % = ${formatarMoedaBR(m.nrrBruto)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
 = *${formatarPercentBR(m.nrrBrutoPct)}*
 
@@ -273,7 +273,9 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
   const crossPAmortizado = crossP / 5;
   const crossTotal = crossR + crossPAmortizado;
   const netChurn = churn.ajustado - crossTotal;
-  const nrrBruto = churn.brutoSemAbono - crossTotal;
+  // NRR Bruto = churn TOTAL da empresa (inclui abonados) − cross. "Bruto" = sem
+  // nenhum recorte; a linha "sem abonos" acima segue só informativa (não alimenta o NRR).
+  const nrrBruto = churn.total - crossTotal;
 
   return {
     mrrTotal,
