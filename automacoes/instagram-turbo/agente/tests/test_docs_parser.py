@@ -157,6 +157,15 @@ def run():
     print("\n=== formatação da legenda ===")
     test_legenda_preserva_paragrafos()
 
+    print("\n=== placeholder bold não corta seção ===")
+    test_placeholder_bold_nao_corta_secao()
+
+    print("\n=== CAPA/CTA não rouba legenda (bug 2) ===")
+    test_capa_cta_nao_rouba_legenda()
+
+    print("\n=== match por similaridade/Dice (bug 1) ===")
+    test_match_variacao_redacao_dice()
+
     print("\n🎉 Todos os testes passaram.")
 
 
@@ -285,7 +294,83 @@ def test_placeholder_bold_nao_corta_secao():
     _assert(leg3 == "", "post sem legenda não rouba a legenda do vizinho")
 
 
+def test_capa_cta_nao_rouba_legenda():
+    # Regressão do card "Conheça nossas vagas em aberto" (13-14/jul/2026): posts
+    # montados como TÍTULO → CAPA → CTA → LEGENDA. "**CAPA**" (bold UPPER, 1
+    # palavra) virava post-fantasma e ROUBAVA a LEGENDA — o post real ficava com
+    # legenda vazia e o agente se recusava a publicar. No Doc de julho havia 8
+    # seções "CAPA" engolindo legenda. Fix: CAPA entrou nos rótulos internos.
+    doc = (
+        "**CONHEÇA NOSSAS VAGAS**\n"
+        "Chaiane, refazer a parte visual.\n"
+        "**CAPA**\n"
+        "CONHEÇA NOSSAS VAGAS EM ABERTO\n"
+        "**CTA**\n"
+        'Comente "VAGAS" e receba o link.\n'
+        "**LEGENDA**\n"
+        "Estamos crescendo. Novas oportunidades para quem sonha grande!\n"
+        "**TURBO NEWS**\n"
+        "**LEGENDA**\n"
+        "Notícias da semana.\n"
+    )
+    leg, hdr = find_legenda_for_task(doc, "Conheça nossas vagas em aberto")
+    _assert(hdr == "CONHEÇA NOSSAS VAGAS", "CAPA/CTA não viram post novo; header do card casa")
+    _assert("Estamos crescendo" in leg, "legenda do post real veio (não ficou presa na CAPA)")
+    _assert("Notícias da semana" not in leg, "legenda não vaza pro post seguinte")
+    # o post seguinte (TURBO NEWS) continua sendo seção própria
+    leg2, hdr2 = find_legenda_for_task(doc, "Turbo News")
+    _assert(hdr2 == "TURBO NEWS", "post seguinte à CAPA continua seção própria")
+    _assert(leg2 == "Notícias da semana.", "legenda do TURBO NEWS intacta")
+
+    # CAPA de 1 palavra é interna, mas título de post de 2+ palavras começando por
+    # outra coisa continua sendo header normal (não afetamos títulos curtos reais).
+    doc2 = "**GEO IA**\n**LEGENDA**\nO que é GEO. #turbopartners\n"
+    _leg, _hdr = find_legenda_for_task(doc2, "GEO IA")
+    _assert(_hdr == "GEO IA", "título curto legítimo (GEO IA) não vira interno")
+
+
+def test_match_variacao_redacao_dice():
+    # Regressão do post de 14/jul/2026 ("...hidratação"): o TÍTULO do card e o
+    # HEADER do Doc têm a MESMA ideia mas 2 palavras trocadas ("é para" no card vs
+    # "era pra" no Doc). Exato/substring/sem-espaço/multiconjunto exigem as mesmas
+    # palavras e falham; o match por SIMILARIDADE (Dice) pega. A legenda (429
+    # chars) estava no Doc mas ficava inacessível → post não saía.
+    doc = (
+        "**VOCÊ ACHA QUE A PAUSA PARA HIDRATAÇÃO ERA PRA PROTEGER OS ATLETAS?**\n"
+        "**IMG 1**\nTe enganaram direitinho...\n"
+        "**LEGENDA**\n"
+        "No marketing, atenção é um dos ativos mais valiosos. #turbopartners\n"
+        "**PRÓXIMO POST**\n"
+    )
+    leg, hdr = find_legenda_for_task(
+        doc, "Você acha que a pausa para hidratação é para proteger os atletas?"
+    )
+    _assert(
+        hdr == "VOCÊ ACHA QUE A PAUSA PARA HIDRATAÇÃO ERA PRA PROTEGER OS ATLETAS?",
+        "Dice pega variação de redação (é para / era pra)",
+    )
+    _assert("No marketing" in leg, "legenda do post veio certa via Dice")
+
+    # GUARDA 1: título totalmente diferente (só palavras comuns) NÃO casa — Dice
+    # baixo. Melhor legenda faltando do que legenda ERRADA.
+    leg2, hdr2 = find_legenda_for_task(
+        doc, "Um guia completo sobre tráfego pago para iniciantes"
+    )
+    _assert(hdr2 is None, "título sem palavras-chave em comum → não casa (Dice baixo)")
+
+    # GUARDA 2: dois headers parecidos e ambíguos (empate perto do topo) → ABORTA,
+    # não chuta. Card quase-igual aos dois → margem < 0.15 → None.
+    doc_amb = (
+        "**AS 5 MELHORES ESTRATEGIAS DE MARKETING DIGITAL PARA 2026**\n"
+        "**LEGENDA**\nLista A.\n"
+        "**AS 7 MELHORES ESTRATEGIAS DE MARKETING DIGITAL PARA 2026**\n"
+        "**LEGENDA**\nLista B.\n"
+    )
+    leg3, hdr3 = find_legenda_for_task(
+        doc_amb, "As melhores estrategias de marketing digital para 2026"
+    )
+    _assert(hdr3 is None, "empate ambíguo entre dois headers → aborta (não chuta legenda)")
+
+
 if __name__ == "__main__":
     run()
-    test_legenda_preserva_paragrafos()
-    test_placeholder_bold_nao_corta_secao()

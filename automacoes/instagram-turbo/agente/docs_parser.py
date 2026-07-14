@@ -32,9 +32,15 @@ from dataclasses import dataclass
 
 
 # Primeiras palavras que identificam headers INTERNOS de seção (não são títulos de post)
+# CAPA/CTA/HOOK/BODY rotulam blocos de texto DENTRO de um post (a estrutura
+# "TÍTULO → CAPA → CTA → LEGENDA" que a Esther usa). Sem CAPA aqui, "**CAPA**"
+# virava um post-fantasma e roubava a LEGENDA do post real (8 casos no Doc de
+# julho/2026 — "Conheça nossas vagas" ficou com legenda vazia). Confirmado que
+# nenhum post é TITULADO "CAPA"; títulos curtos legítimos (TURBO NEWS, GEO IA)
+# não são afetados.
 _INTERNAL_FIRST_WORDS = frozenset({
     "IMG", "LEGENDA", "TELA", "SLIDE", "CENA", "CASE",
-    "HOOK", "BODY", "CTA", "STORY", "REELS", "LIVE", "CARROSSEL",
+    "HOOK", "BODY", "CTA", "CAPA", "STORY", "REELS", "LIVE", "CARROSSEL",
 })
 
 _LEGENDA_MARKER = re.compile(r"^\s*\**\s*LEGENDA\s*\**\s*$", re.IGNORECASE | re.MULTILINE)
@@ -287,4 +293,48 @@ def find_legenda_for_task(doc_content: str, task_name: str) -> tuple[str, str | 
         if reordered:
             best = max(reordered, key=lambda s: len(s.header_normalized))
             return best.legenda, best.header
+
+    # Última tolerância (a mais frouxa): SIMILARIDADE de palavras (coeficiente de
+    # Dice). Pega VARIAÇÃO DE REDAÇÃO entre o título do card e o header do Doc que
+    # os tiers acima (exato/substring/sem-espaço/multiconjunto) não pegam porque
+    # exigem as MESMAS palavras. Caso real (14/07/2026): card "...hidratação É PARA
+    # proteger os atletas" vs Doc "...hidratação ERA PRA proteger os atletas" — a
+    # legenda (429 chars) estava no Doc mas ficava inacessível → post não saía.
+    # DELIBERADAMENTE ESTRITO, porque colar a legenda ERRADA num post é PIOR do que
+    # legenda faltando:
+    #   - só para título com 5+ palavras (título curto colide fácil por acaso);
+    #   - Dice ≥ 0.82 (headers quase idênticos);
+    #   - vencedor ÚNICO e DESTACADO (margem ≥ 0.15 sobre o 2º lugar) — se dois
+    #     headers empatam perto do topo, ABORTA (retorna vazio) em vez de chutar.
+    if len(target_words) >= 5:
+        tset = set(target_words)
+
+        # Tokens com DÍGITO ("7X1", "2026", "5") são DISTINTIVOS: se um título tem
+        # e o outro não, quase sempre são posts diferentes (ex.: "...perder DE 7X1
+        # pro Instagram" vs "...perder pro Instagram" — sem o 7x1 é outro post; ou
+        # "5 melhores" vs "7 melhores"). Sem esta guarda, o Dice casaria por causa
+        # das muitas palavras comuns e colaria a legenda ERRADA. Exigimos que o
+        # conjunto de tokens-com-dígito seja IDÊNTICO nos dois.
+        def _digit_tokens(words: set[str]) -> set[str]:
+            return {w for w in words if any(c.isdigit() for c in w)}
+
+        tdig = _digit_tokens(tset)
+
+        def _dice(sec: ParsedSection) -> float:
+            hset = set(sec.header_normalized.split())
+            if not hset:
+                return 0.0
+            if _digit_tokens(hset) != tdig:
+                return 0.0
+            inter = len(tset & hset)
+            return 2 * inter / (len(tset) + len(hset))
+
+        scored = sorted(
+            ((_dice(s), s) for s in sections), key=lambda x: x[0], reverse=True
+        )
+        if scored and scored[0][0] >= 0.82:
+            unico = len(scored) == 1 or (scored[0][0] - scored[1][0]) >= 0.15
+            if unico:
+                return scored[0][1].legenda, scored[0][1].header
+
     return "", None
