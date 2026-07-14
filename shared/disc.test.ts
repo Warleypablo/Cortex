@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { DISC_PERGUNTAS, DISC_ARQUETIPOS, computeDiscResult, FATORES, type Fator } from "./disc";
+import { DISC_PERGUNTAS, DISC_ARQUETIPOS, computeDiscResult, cargoTemAcessoMapaDisc, FATORES, type Fator } from "./disc";
 
 describe("DISC_PERGUNTAS (banco)", () => {
   it("tem exatamente 40 perguntas", () => {
@@ -83,5 +83,28 @@ describe("computeDiscResult", () => {
     expect(r.scoreC).toBe(40);
     expect(r.percentuais.C).toBe(100);
     expect(r.dominante).toBe("C");
+  });
+});
+
+describe("cargoTemAcessoMapaDisc", () => {
+  it("libera Líder de Squad e C-Level", () => {
+    expect(cargoTemAcessoMapaDisc("Líder de Squad")).toBe(true);
+    expect(cargoTemAcessoMapaDisc("C-Level")).toBe(true);
+  });
+
+  it("ignora espaços em volta", () => {
+    expect(cargoTemAcessoMapaDisc("  Líder de Squad  ")).toBe(true);
+  });
+
+  it("bloqueia outros cargos e valores vazios", () => {
+    expect(cargoTemAcessoMapaDisc("Designer")).toBe(false);
+    expect(cargoTemAcessoMapaDisc("Account")).toBe(false);
+    expect(cargoTemAcessoMapaDisc(null)).toBe(false);
+    expect(cargoTemAcessoMapaDisc(undefined)).toBe(false);
+    expect(cargoTemAcessoMapaDisc("")).toBe(false);
+  });
+
+  it("é sensível a maiúsculas/minúsculas (match exato do RH)", () => {
+    expect(cargoTemAcessoMapaDisc("líder de squad")).toBe(false);
   });
 });

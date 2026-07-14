@@ -28,6 +28,7 @@ import { useLocation, Link } from "wouter";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { NAV_CONFIG, permissionsToRoutes } from "@shared/nav-config";
 import { BP2026_ROUTE, podeAcessarBp2026 } from "@shared/bp2026-tabs";
+import { cargoTemAcessoMapaDisc } from "@shared/disc";
 import { cn } from "@/lib/utils";
 
 interface User {
@@ -40,6 +41,7 @@ interface User {
   role: 'admin' | 'user';
   allowedRoutes: string[];
   allowedBpTabs?: string[];
+  cargo?: string | null;
 }
 
 const ICONS: Record<string, any> = {
@@ -93,12 +95,14 @@ export function AppSidebar() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["/api/favorites"] }),
   });
 
-  const PUBLIC_SIDEBAR_ROUTES = ['/rh/nps/responder', '/gg/disc', '/gg/disc/mapa'];
+  // Mapa DISC (/gg/disc/mapa) sai daqui: é restrito por cargo (ver hasAccess abaixo).
+  const PUBLIC_SIDEBAR_ROUTES = ['/rh/nps/responder', '/gg/disc'];
 
   const hasAccess = (url: string, permissionKey?: string) => {
     if (!user) return false;
     if (user.role === 'admin') return true;
     if (PUBLIC_SIDEBAR_ROUTES.includes(url)) return true;
+    if (url === '/gg/disc/mapa' && cargoTemAcessoMapaDisc(user.cargo)) return true;
     if (url === BP2026_ROUTE && podeAcessarBp2026(user.role, user.allowedBpTabs)) return true;
 
     if (permissionKey && user.allowedRoutes) {

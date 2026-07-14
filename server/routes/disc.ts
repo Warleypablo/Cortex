@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { computeDiscResult, FATORES, type Fator } from "@shared/disc";
+import { computeDiscResult, cargoTemAcessoMapaDisc, FATORES, type Fator } from "@shared/disc";
 
 const respostasSchema = z.object({
   respostas: z
@@ -104,8 +104,18 @@ export function registerDiscRoutes(app: Express, db: any) {
   });
 
   // GET — mapa do time: distribuição + quem fez + quem falta.
+  // Restrito: admins, cargos de liderança (CARGOS_MAPA_DISC) ou liberação manual
+  // via allowed_routes. O teste em si (/gg/disc) segue aberto a todo logado.
   app.get("/api/gg/disc/mapa", async (req, res) => {
     try {
+      const user = req.user as any;
+      if (!user?.id) return res.status(401).json({ error: "Não autenticado" });
+      const podeVer =
+        user.role === "admin" ||
+        cargoTemAcessoMapaDisc(user.cargo) ||
+        (Array.isArray(user.allowedRoutes) && user.allowedRoutes.includes("/gg/disc/mapa"));
+      if (!podeVer) return res.status(403).json({ error: "Sem acesso ao Mapa DISC" });
+
       const feitosRes = await db.execute(ultimoPorUsuarioSQL());
       const feitos = feitosRes.rows.map((r: any) => ({
         userId: r.userId,
