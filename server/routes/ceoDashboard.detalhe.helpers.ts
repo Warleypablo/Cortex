@@ -169,21 +169,6 @@ export function receitaCabecaGrupos(receita: number, headcount: number): { grupo
   };
 }
 
-// Composição de uma razão de CAC (CAC total ÷ deals ganhos | serviços vendidos).
-// Numerador = CAC total do mês (regime de caixa); denominador = contagem do Bitrix.
-export function cacRazaoGrupos(
-  cacTotal: number, denominador: number, tituloDen: string
-): { grupos: CeoGrupo[]; nota: string } {
-  const razao = denominador ? cacTotal / denominador : 0;
-  return {
-    grupos: [
-      { titulo: "CAC total do mês (regime de caixa)", total: cacTotal, formato: "brl", itens: [] },
-      { titulo: tituloDen, total: denominador, formato: "num", itens: [] },
-    ],
-    nota: `CAC total ÷ ${tituloDen.charAt(0).toLowerCase()}${tituloDen.slice(1)} = ${formatBRL(cacTotal)} ÷ ${denominador} = ${formatBRL(razao)}`,
-  };
-}
-
 // ---- Auditoria das células de LTV (FAT/DFC) ----
 // Uma linha por cliente ativo no snapshot do mês (query de auditoria mensal).
 export interface LtvAuditoriaRow {
