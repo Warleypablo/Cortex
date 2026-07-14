@@ -155,6 +155,7 @@ export function CeoMatrizTabela({
         Cor pela régua do BP (verde ≥100% · âmbar ≥80% · vermelho &lt;80%). <span className="text-amber-500">*</span> mês em
         andamento (parcial). Inadimplência por mês de vencimento; LTV FAT = faturável mediano dos ativos (ClickUp: Valor R × meses + pontual entregue);
         LTV DFC = caixa mediano (pago real no Conta Azul desde out/25 + faturável antes); E-NPS por onda de pesquisa (meses sem pesquisa ficam vazios). Clique numa célula para o detalhamento do mês.
+        Movimento de Receita (MRR e Pontual): venda, churn e cross-sell/upsell; NRR = erosão (churn − cross-sell) ÷ base, menor é melhor.
       </p>
     </div>
   );

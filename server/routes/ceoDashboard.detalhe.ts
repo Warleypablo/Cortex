@@ -479,17 +479,19 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
       grupos = [itensParaGrupo("Deals pontuais ganhos no mês", await dealsVendaDoMes(db, mesNum, "valor_pontual"), base.realizado ?? 0)];
     } else if (kpi === "churn_mrr") {
       grupos = [itensParaGrupo("Contratos recorrentes cancelados no mês", await churnMrrDoMes(db, mesNum), base.realizado ?? 0)];
+      nota = "Total = churn do mês (régua da célula). A lista detalha os contratos recorrentes cancelados no mês por data de encerramento — pode não somar exatamente o total.";
     } else if (kpi === "churn_pontual") {
       grupos = [itensParaGrupo("Contratos pontuais cancelados no mês", await churnPontualDoMes(db, mesNum), base.realizado ?? 0)];
+      nota = "Total = churn pontual do mês (régua da célula). A lista detalha os contratos pontuais cancelados no mês por data de encerramento — pode não somar exatamente o total.";
     } else if (kpi === "cross_mrr" || kpi === "cross_pontual") {
       const det = await getCrosssellDealsDetail(ini, fim);
       const itens = det.items
-        .map((d) => ({ nome: d.cliente, detalhe: d.closer ? `closer ${d.closer}` : "", data: d.data_fechamento, valor: kpi === "cross_mrr" ? d.recorrente : d.pontual }))
+        .map((d) => ({ nome: d.cliente, detalhe: d.closer && d.closer !== "—" ? `closer ${d.closer}` : "", data: d.data_fechamento, valor: kpi === "cross_mrr" ? d.recorrente : d.pontual }))
         .filter((it) => it.valor > 0);
       grupos = [itensParaGrupo("Deals de cross-sell/upsell no mês", itens, base.realizado ?? 0)];
     } else { // nrr | nrr_pontual — decomposição da erosão
       const ing = mov.ingredientes;
-      const base_ = ehPct && kpi === "nrr" ? ing.mrrInicioPorMes[mesNum] ?? 0 : ing.estoquePontIniPorMes[mesNum] ?? 0;
+      const base_ = kpi === "nrr" ? ing.mrrInicioPorMes[mesNum] ?? 0 : ing.estoquePontIniPorMes[mesNum] ?? 0;
       const churn_ = kpi === "nrr" ? ing.churnMrrPorMes[mesNum] ?? 0 : ing.churnPontualPorMes[mesNum] ?? 0;
       const cross_ = kpi === "nrr" ? ing.crossMrrPorMes[mesNum] ?? 0 : ing.crossPontPorMes[mesNum] ?? 0;
       grupos = [
@@ -518,6 +520,10 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     evolucao = serieEvolucao((bp[arr] ?? []).find((l: any) => l.metrica === metrica), bp.mesFechado);
   } else if (linhaMovParaEvolucao) {
     evolucao = serieEvolucao(linhaMovParaEvolucao, bp.mesFechado);
+    // Os 5 KPIs de movimento "semMeta" carregam um orcado:0 fake (BpLinha.meses.orcado não é
+    // nullable); zerar aqui faria o gráfico desenhar uma linha de "Meta 0" espúria (0 != null).
+    const SEM_META_MOV = new Set(["cross_mrr", "nrr", "churn_pontual", "cross_pontual", "nrr_pontual"]);
+    if (SEM_META_MOV.has(kpi)) evolucao = evolucao.map((p) => ({ ...p, orcado: null }));
   }
   if (evolucao && evolucao.length < 2) evolucao = undefined; // 1 ponto não é evolução
 

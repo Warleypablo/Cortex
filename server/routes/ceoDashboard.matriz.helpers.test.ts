@@ -210,4 +210,12 @@ describe("montarMatrizCeo — bloco movimento de receita", () => {
     expect(res.linhas.find((l) => l.key === "nrr")!.semMeta).toBe(true);
     expect(res.linhas.find((l) => l.key === "venda_mrr")!.semMeta).toBe(false);
   });
+
+  it("transpõe o valor e a unidade das linhas de movimento (nrr = pct)", () => {
+    const res = montarMatrizCeo(sourcesBase);
+    const nrr = res.linhas.find((l) => l.key === "nrr")!;
+    expect(nrr.unidade).toBe("pct");
+    expect(nrr.celulas[0].valor).toBe(0.6);
+    expect(nrr.direcao).toBe("menor_melhor");
+  });
 });
