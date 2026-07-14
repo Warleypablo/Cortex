@@ -29,6 +29,12 @@ const METRICAS: MetricasResumo = {
   crossTotal: 1260,
   netChurn: 15022, // churnAjustado - crossTotal
   netChurnPct: (15022 / 1197868) * 100, // 1,25%
+  // Campos de abono ilustrativos (a mensagem real de 02/07 ainda não trazia esta régua):
+  // abono suposto R$ 1.500 → bruto s/ abonos = churnTotal 19.279 − 1.500 = 17.779
+  churnBrutoSemAbono: 17779, // todos os motivos, exceto abonar_churn='Sim'
+  churnBrutoSemAbonoPct: (17779 / 1197868) * 100, // 1,48%
+  nrrBruto: 16519, // churnBrutoSemAbono - crossTotal
+  nrrBrutoPct: (16519 / 1197868) * 100, // 1,38%
 };
 
 const MENSAGEM_ESPERADA = `Boa NOITE líderes!!!
@@ -47,6 +53,8 @@ MRR JUNHO: R$ 1.197.868,00
 
 Churn MRR TOTAL: R$ 19.279,00 - *1,61%*
 Churn MRR (sem erro de venda, não começou e inadimplente 1 mês): R$ 16.282,00 - *1,36%*
+Churn MRR sem abonos: R$ 17.779,00 - *1,48%*
+(abonado no mês: R$ 1.500,00)
 
 Cross R: ZERO
 Cross P: R$ 6.300,00 / 5 = R$ 1.260,00
@@ -56,6 +64,11 @@ Net Churn = Churn Ajustado − Cross Total
 = R$ 16.282,00 − R$ 1.260,00 = *R$ 15.022,00*
 % = R$ 15.022,00 ÷ MRR JUNHO (R$ 1.197.868,00)
 = *1,25%*
+
+NRR Bruto = Churn s/ abonos − Cross Total
+= R$ 17.779,00 − R$ 1.260,00 = *R$ 16.519,00*
+% = R$ 16.519,00 ÷ MRR JUNHO (R$ 1.197.868,00)
+= *1,38%*
 
 
 estamos de 👀`;
