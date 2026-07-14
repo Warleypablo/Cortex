@@ -1,6 +1,6 @@
 import { db } from "../db";
 import { authUsers } from "@shared/schema";
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 export interface User {
   id: string;
@@ -13,6 +13,10 @@ export interface User {
   allowedRoutes: string[];
   allowedBpTabs: string[];
   department: 'admin' | 'comercial' | 'financeiro' | 'operacao' | null;
+  // Cargo do colaborador (rh_pessoal.cargo), casado por email. Resolvido sob demanda
+  // em findUserById e cacheado junto ao user. `undefined` = ainda não resolvido;
+  // `null` = sem correspondência no RH. Usado para gatear o Mapa DISC por cargo.
+  cargo?: string | null;
 }
 
 const USER_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -425,22 +429,52 @@ export async function getAllUsers(): Promise<User[]> {
   }
 }
 
+// Busca o cargo do colaborador em rh_pessoal pelo email de login (email_turbo).
+// Prioriza registro ativo com cargo preenchido. Nunca lança — falha vira null.
+async function fetchCargoByEmail(email: string | null | undefined): Promise<string | null> {
+  if (!email) return null;
+  try {
+    const r: any = await db.execute(sql`
+      SELECT cargo
+      FROM "Inhire".rh_pessoal
+      WHERE LOWER(email_turbo) = LOWER(${email})
+        AND (status IS NULL OR LOWER(status) = 'ativo')
+      ORDER BY (cargo IS NULL) ASC
+      LIMIT 1
+    `);
+    const row = r.rows?.[0] as { cargo: string | null } | undefined;
+    return row?.cargo ?? null;
+  } catch (error) {
+    console.error("Erro ao buscar cargo do colaborador:", error);
+    return null;
+  }
+}
+
+// Garante que user.cargo esteja resolvido (undefined = ainda não buscado). Mantém o
+// objeto cacheado atualizado para que req.user.cargo esteja sempre disponível.
+async function ensureCargo(user: User): Promise<User> {
+  if (user.cargo !== undefined) return user;
+  user.cargo = await fetchCargoByEmail(user.email);
+  setCachedUser(user);
+  return user;
+}
+
 export async function findUserById(id: string): Promise<User | null> {
   try {
     const cached = getCachedUser(id);
-    if (cached) return cached;
-    
+    if (cached) return await ensureCargo(cached);
+
     const result = await db
       .select()
       .from(authUsers)
       .where(eq(authUsers.id, id))
       .limit(1);
-    
+
     if (result.length === 0) return null;
-    
+
     const user = dbUserToUser(result[0]);
     setCachedUser(user);
-    return user;
+    return await ensureCargo(user);
   } catch (error) {
     console.error("Erro ao buscar usuário por id:", error);
     return null;

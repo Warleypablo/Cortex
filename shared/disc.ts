@@ -184,6 +184,16 @@ export interface DiscResultado {
   secundario: Fator;
 }
 
+// Cargos (rh_pessoal.cargo) que enxergam o Mapa DISC do time.
+// Fonte da verdade única — usada no gate do front (AuthContext/sidebar) e do back (API).
+// Admins têm bypass e liberações pontuais continuam via allowed_routes.
+export const CARGOS_MAPA_DISC = ["Líder de Squad", "C-Level"] as const;
+
+export function cargoTemAcessoMapaDisc(cargo: string | null | undefined): boolean {
+  if (!cargo) return false;
+  return (CARGOS_MAPA_DISC as readonly string[]).includes(cargo.trim());
+}
+
 export function computeDiscResult(respostas: Fator[]): DiscResultado {
   const cont: Record<Fator, number> = { D: 0, I: 0, S: 0, C: 0 };
   for (const f of respostas) {

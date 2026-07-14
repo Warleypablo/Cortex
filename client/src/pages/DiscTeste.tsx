@@ -5,6 +5,7 @@ import { Loader2, Brain, ArrowRight, Map } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { usePageInfo } from "@/contexts/PageContext";
+import { useAuth } from "@/contexts/AuthContext";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { useToast } from "@/hooks/use-toast";
 import { apiRequest } from "@/lib/queryClient";
@@ -18,6 +19,8 @@ export default function DiscTeste() {
   const { setPageInfo } = usePageInfo();
   usePageTitle("Perfil Comportamental (DISC)");
   const { toast } = useToast();
+  const { hasAccess } = useAuth();
+  const podeVerMapa = hasAccess("/gg/disc/mapa");
 
   const [etapa, setEtapa] = useState<Etapa>("intro");
   const [resultado, setResultado] = useState<DiscResultadoData | null>(null);
@@ -93,11 +96,13 @@ export default function DiscTeste() {
               <Button onClick={() => setEtapa("teste")} data-testid="disc-iniciar">
                 Começar teste <ArrowRight className="ml-1 h-4 w-4" />
               </Button>
-              <Link href="/gg/disc/mapa">
-                <Button variant="outline">
-                  <Map className="mr-1 h-4 w-4" /> Ver mapa do time
-                </Button>
-              </Link>
+              {podeVerMapa && (
+                <Link href="/gg/disc/mapa">
+                  <Button variant="outline">
+                    <Map className="mr-1 h-4 w-4" /> Ver mapa do time
+                  </Button>
+                </Link>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -122,9 +127,11 @@ export default function DiscTeste() {
               <Button variant="outline" onClick={() => { setResultado(null); setEtapa("teste"); }}>
                 Refazer teste
               </Button>
-              <Link href="/gg/disc/mapa">
-                <Button variant="ghost"><Map className="mr-1 h-4 w-4" /> Mapa do time</Button>
-              </Link>
+              {podeVerMapa && (
+                <Link href="/gg/disc/mapa">
+                  <Button variant="ghost"><Map className="mr-1 h-4 w-4" /> Mapa do time</Button>
+                </Link>
+              )}
             </div>
           </div>
           <DiscResultado data={resultado} />
