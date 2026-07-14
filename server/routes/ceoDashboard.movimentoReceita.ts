@@ -2,7 +2,7 @@
 // Fonte única do bloco "Movimento de Receita" do CEO Dashboard.
 // Reusa 5 linhas de computarBpReceitas (vendas_mrr, churn_mes, vendas_pontual,
 // pontual_churn, pontual_estoque_ini) e adiciona só 2 queries: cross-sell por mês
-// e MRR-início por mês. A régua das 8 métricas (inclusive NRR = erosão) vive na
+// e MRR-início por mês. A régua das 8 métricas (inclusive Churn % bruto) vive na
 // função pura montarMovimentoReceita — testável sem IO.
 import { sql } from "drizzle-orm";
 import type { BpLinha } from "./ceoDashboard.helpers";
@@ -83,8 +83,8 @@ export interface MovimentoIngredientes {
 }
 export interface MovimentoReceita {
   linhas: {
-    vendaMrr: BpLinha; churnMrr: BpLinha; crossMrr: BpLinha; nrr: BpLinha;
-    vendaPontual: BpLinha; churnPontual: BpLinha; crossPontual: BpLinha; nrrPontual: BpLinha;
+    vendaMrr: BpLinha; churnMrr: BpLinha; crossMrr: BpLinha; churnPct: BpLinha;
+    vendaPontual: BpLinha; churnPontual: BpLinha; crossPontual: BpLinha; churnPctPontual: BpLinha;
   };
   ingredientes: MovimentoIngredientes;
 }
@@ -113,12 +113,12 @@ function linhaDeSerie(metrica: string, unidade: "brl" | "pct", seriePorMes: Reco
   return { metrica, unidade, meses };
 }
 
-// Erosão do NRR: (churn − cross) / base × 100. Base 0/ausente → null.
-function serieNrr(churn: Record<number, number>, cross: Record<number, number>, base: Record<number, number>, mesNum: number): Record<number, number | null> {
+// Churn %: churn / base × 100 (base = fechamento do mês anterior). Base 0/ausente → null.
+function serieChurnPct(churn: Record<number, number>, base: Record<number, number>, mesNum: number): Record<number, number | null> {
   const out: Record<number, number | null> = {};
   for (let mes = 1; mes <= mesNum; mes++) {
     const b = base[mes];
-    out[mes] = b && b > 0 ? ((churn[mes] ?? 0) - (cross[mes] ?? 0)) / b * 100 : null;
+    out[mes] = b && b > 0 ? (churn[mes] ?? 0) / b * 100 : null;
   }
   return out;
 }
@@ -129,8 +129,8 @@ export function montarMovimentoReceita(input: MovimentoInput): MovimentoReceita 
   const churnPontualPorMes = realizadoPorMes(input.pontualChurn, Math.abs);  // negativo → positivo
   const estoquePontIniPorMes = realizadoPorMes(input.pontualEstoqueIni);
 
-  const nrrPorMes = serieNrr(churnMrrPorMes, queries.crossMrrPorMes, queries.mrrInicioPorMes, mesNum);
-  const nrrPontualPorMes = serieNrr(churnPontualPorMes, queries.crossPontPorMes, estoquePontIniPorMes, mesNum);
+  const churnPctPorMes = serieChurnPct(churnMrrPorMes, queries.mrrInicioPorMes, mesNum);
+  const churnPctPontualPorMes = serieChurnPct(churnPontualPorMes, estoquePontIniPorMes, mesNum);
 
   // Linha vazia como fallback quando o BP não trouxe a métrica.
   const vazia = (metrica: string): BpLinha => ({ metrica, meses: [] });
@@ -140,11 +140,11 @@ export function montarMovimentoReceita(input: MovimentoInput): MovimentoReceita 
       vendaMrr: input.vendasMrr ?? vazia("vendas_mrr"),
       churnMrr: input.churnMes ?? vazia("churn_mes"),
       crossMrr: linhaDeSerie("cross_mrr", "brl", queries.crossMrrPorMes, mesNum),
-      nrr: linhaDeSerie("nrr", "pct", nrrPorMes, mesNum),
+      churnPct: linhaDeSerie("churn_pct", "pct", churnPctPorMes, mesNum),
       vendaPontual: input.vendasPontual ?? vazia("vendas_pontual"),
       churnPontual: linhaDeSerie("churn_pontual", "brl", churnPontualPorMes, mesNum),
       crossPontual: linhaDeSerie("cross_pontual", "brl", queries.crossPontPorMes, mesNum),
-      nrrPontual: linhaDeSerie("nrr_pontual", "pct", nrrPontualPorMes, mesNum),
+      churnPctPontual: linhaDeSerie("churn_pct_pontual", "pct", churnPctPontualPorMes, mesNum),
     },
     ingredientes: {
       mrrInicioPorMes: queries.mrrInicioPorMes,

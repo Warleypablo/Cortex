@@ -179,11 +179,11 @@ describe("montarMatrizCeo — bloco movimento de receita", () => {
     vendaMrr: linhaMov("vendas_mrr", "brl", [120, 90]),
     churnMrr: linhaMov("churn_mes", "brl", [10, 20]),
     crossMrr: linhaMov("cross_mrr", "brl", [4, 6]),
-    nrr: linhaMov("nrr", "pct", [0.6, 0.7]),
+    churnPct: linhaMov("churn_pct", "pct", [0.6, 0.7]),
     vendaPontual: linhaMov("vendas_pontual", "brl", [60, 40]),
     churnPontual: linhaMov("churn_pontual", "brl", [5, 8]),
     crossPontual: linhaMov("cross_pontual", "brl", [1, 2]),
-    nrrPontual: linhaMov("nrr_pontual", "pct", [2, 2.4]),
+    churnPctPontual: linhaMov("churn_pct_pontual", "pct", [2, 2.4]),
   };
   // sources mínimo — reusa o fixture base do arquivo (mesNum precisa cobrir 2 meses) + movimento.
   const sourcesBase: CeoMatrizSources = { ...baseSources({ mesNum: 2, mesFechado: 2 }), movimento };
@@ -193,8 +193,8 @@ describe("montarMatrizCeo — bloco movimento de receita", () => {
     const keys = res.linhas.map((l) => l.key);
     const idx = keys.indexOf("mov_secao_mrr");
     expect(idx).toBeGreaterThan(-1);
-    expect(keys.slice(idx, idx + 5)).toEqual(["mov_secao_mrr", "venda_mrr", "churn_mrr", "cross_mrr", "nrr"]);
-    expect(keys.slice(idx + 5, idx + 10)).toEqual(["mov_secao_pontual", "venda_pontual", "churn_pontual", "cross_pontual", "nrr_pontual"]);
+    expect(keys.slice(idx, idx + 5)).toEqual(["mov_secao_mrr", "venda_mrr", "churn_mrr", "cross_mrr", "churn_pct"]);
+    expect(keys.slice(idx + 5, idx + 10)).toEqual(["mov_secao_pontual", "venda_pontual", "churn_pontual", "cross_pontual", "churn_pct_pontual"]);
   });
 
   it("linha de seção tem tipo 'secao' e sem células", () => {
@@ -204,18 +204,19 @@ describe("montarMatrizCeo — bloco movimento de receita", () => {
     expect(secao.celulas).toHaveLength(0);
   });
 
-  it("cross-sell e NRR entram semMeta; venda/churn MRR não", () => {
+  it("cross-sell e Churn % entram semMeta; venda/churn MRR não", () => {
     const res = montarMatrizCeo(sourcesBase);
     expect(res.linhas.find((l) => l.key === "cross_mrr")!.semMeta).toBe(true);
-    expect(res.linhas.find((l) => l.key === "nrr")!.semMeta).toBe(true);
+    expect(res.linhas.find((l) => l.key === "churn_pct")!.semMeta).toBe(true);
     expect(res.linhas.find((l) => l.key === "venda_mrr")!.semMeta).toBe(false);
   });
 
-  it("transpõe o valor e a unidade das linhas de movimento (nrr = pct)", () => {
+  it("transpõe o valor e a unidade das linhas de movimento (churn_pct = pct, com faixasTom)", () => {
     const res = montarMatrizCeo(sourcesBase);
-    const nrr = res.linhas.find((l) => l.key === "nrr")!;
-    expect(nrr.unidade).toBe("pct");
-    expect(nrr.celulas[0].valor).toBe(0.6);
-    expect(nrr.direcao).toBe("menor_melhor");
+    const churnPct = res.linhas.find((l) => l.key === "churn_pct")!;
+    expect(churnPct.unidade).toBe("pct");
+    expect(churnPct.celulas[0].valor).toBe(0.6);
+    expect(churnPct.direcao).toBe("menor_melhor");
+    expect(churnPct.faixasTom).toEqual({ ambar: 7, vermelho: 9 });
   });
 });

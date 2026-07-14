@@ -1,4 +1,4 @@
-import { atingimentoTom, formatCompacto, formatValor, type CeoUnidade, type CeoDirecao } from "./ceoFormat";
+import { atingimentoTom, tomPorFaixa, formatCompacto, formatValor, type CeoUnidade, type CeoDirecao } from "./ceoFormat";
 
 // Espelha CeoMatrizResponse do servidor (server/routes/ceoDashboard.matriz.helpers.ts).
 export interface CeoMatrizCelula {
@@ -15,6 +15,7 @@ export interface CeoMatrizLinha {
   direcao: CeoDirecao;
   semMeta: boolean;
   semCompacto?: boolean; // valor cheio (R$ 4.290) em vez de compacto (R$ 4K)
+  faixasTom?: { ambar: number; vermelho: number };
   nota?: string;
   celulas: CeoMatrizCelula[];
 }
@@ -103,9 +104,11 @@ export function CeoMatrizTabela({
                   </th>
                   {linha.celulas.map((cel) => {
                     const temValor = cel.valor !== null;
-                    const tomKey = linha.semMeta ? "neutro" : atingimentoTom(cel.atingimentoPct, linha.direcao);
+                    const tomKey = linha.faixasTom
+                      ? tomPorFaixa(cel.valor, linha.faixasTom)
+                      : linha.semMeta ? "neutro" : atingimentoTom(cel.atingimentoPct, linha.direcao);
                     const clicavel = temValor && !emBreve;
-                    const corValor = linha.semMeta ? "text-gray-900 dark:text-white" : TOM_TEXTO[tomKey];
+                    const corValor = linha.semMeta && !linha.faixasTom ? "text-gray-900 dark:text-white" : TOM_TEXTO[tomKey];
                     const title = temValor
                       ? `${formatValor(cel.valor, linha.unidade)}${cel.meta != null ? ` · meta ${formatValor(cel.meta, linha.unidade)}` : ""}`
                       : undefined;
@@ -155,7 +158,7 @@ export function CeoMatrizTabela({
         Cor pela régua do BP (verde ≥100% · âmbar ≥80% · vermelho &lt;80%). <span className="text-amber-500">*</span> mês em
         andamento (parcial). Inadimplência por mês de vencimento; LTV FAT = faturável mediano dos ativos (ClickUp: Valor R × meses + pontual entregue);
         LTV DFC = caixa mediano (pago real no Conta Azul desde out/25 + faturável antes); E-NPS por onda de pesquisa (meses sem pesquisa ficam vazios). Clique numa célula para o detalhamento do mês.
-        Movimento de Receita (MRR e Pontual): venda, churn e cross-sell/upsell; NRR = erosão (churn − cross-sell) ÷ base, menor é melhor.
+        Movimento de Receita (MRR e Pontual): venda, churn e cross-sell/upsell; Churn % (MRR e Pontual) = churn ÷ base do fechamento anterior; verde &lt;7%, âmbar 7–9%, vermelho &gt;9%.
       </p>
     </div>
   );

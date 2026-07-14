@@ -172,8 +172,8 @@ const TITULOS: Record<string, string> = {
   caixa: "Saldo de Caixa", inadimplencia: "Inadimplência Total", cac: "CAC",
   cac_por_cliente: "CAC por cliente", cac_por_contrato: "CAC por contrato",
   ltv_fat: "LTV FAT", ltv_dfc: "LTV DFC", headcount: "Headcount", enps: "E-NPS", receita_cabeca: "Receita / Cabeça",
-  venda_mrr: "Venda MRR", churn_mrr: "Churn MRR", cross_mrr: "Venda de Cross-sell/Upsell MRR", nrr: "NRR",
-  venda_pontual: "Venda Pontual", churn_pontual: "Churn Pontual", cross_pontual: "Venda de Cross-sell/Upsell Pontual", nrr_pontual: "NRR Pontual",
+  venda_mrr: "Venda MRR", churn_mrr: "Churn MRR", cross_mrr: "Venda de Cross-sell/Upsell MRR", churn_pct: "Churn % MRR",
+  venda_pontual: "Venda Pontual", churn_pontual: "Churn Pontual", cross_pontual: "Venda de Cross-sell/Upsell Pontual", churn_pct_pontual: "Churn % Pontual",
 };
 
 function linhaValor(bp: any, arr: "linhas" | "metricasGerais", metrica: string, mesNum: number): { orcado: number | null; realizado: number | null } {
@@ -204,7 +204,7 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
   let nClientes: number | null | undefined; // população da auditoria de LTV
   let linhaMovParaEvolucao: BpLinha | undefined; // linha do movimento usada no branch MOV_KEYS, p/ reusar na série de evolução
 
-  const MOV_KEYS = ["venda_mrr","churn_mrr","cross_mrr","nrr","venda_pontual","churn_pontual","cross_pontual","nrr_pontual"];
+  const MOV_KEYS = ["venda_mrr","churn_mrr","cross_mrr","churn_pct","venda_pontual","churn_pontual","cross_pontual","churn_pct_pontual"];
 
   if (kpi === "receita") {
     // Regime de caixa: header = recebido (DFC); breakdown por categoria de recebimento.
@@ -458,15 +458,15 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
       queries, mesNum,
     });
     const linhaKpi: Record<string, BpLinha> = {
-      venda_mrr: mov.linhas.vendaMrr, churn_mrr: mov.linhas.churnMrr, cross_mrr: mov.linhas.crossMrr, nrr: mov.linhas.nrr,
-      venda_pontual: mov.linhas.vendaPontual, churn_pontual: mov.linhas.churnPontual, cross_pontual: mov.linhas.crossPontual, nrr_pontual: mov.linhas.nrrPontual,
+      venda_mrr: mov.linhas.vendaMrr, churn_mrr: mov.linhas.churnMrr, cross_mrr: mov.linhas.crossMrr, churn_pct: mov.linhas.churnPct,
+      venda_pontual: mov.linhas.vendaPontual, churn_pontual: mov.linhas.churnPontual, cross_pontual: mov.linhas.crossPontual, churn_pct_pontual: mov.linhas.churnPctPontual,
     };
     const linha = linhaKpi[kpi];
     linhaMovParaEvolucao = linha;
     const mesData = linha.meses.find((m) => m.mes === mesNum);
     base.realizado = mesData?.realizado ?? null;
     base.orcado = mesData?.orcado || null;
-    const ehPct = kpi === "nrr" || kpi === "nrr_pontual";
+    const ehPct = kpi === "churn_pct" || kpi === "churn_pct_pontual";
     // unidade do detalhe (afeta o header/gráfico); o cast é seguro pois estendemos o tipo.
     (base as any).unidade = ehPct ? "pct" : "brl";
 
@@ -489,18 +489,16 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
         .map((d) => ({ nome: d.cliente, detalhe: d.closer && d.closer !== "—" ? `closer ${d.closer}` : "", data: d.data_fechamento, valor: kpi === "cross_mrr" ? d.recorrente : d.pontual }))
         .filter((it) => it.valor > 0);
       grupos = [itensParaGrupo("Deals de cross-sell/upsell no mês", itens, base.realizado ?? 0)];
-    } else { // nrr | nrr_pontual — decomposição da erosão
+    } else { // churn_pct | churn_pct_pontual — decomposição do churn %
       const ing = mov.ingredientes;
-      const base_ = kpi === "nrr" ? ing.mrrInicioPorMes[mesNum] ?? 0 : ing.estoquePontIniPorMes[mesNum] ?? 0;
-      const churn_ = kpi === "nrr" ? ing.churnMrrPorMes[mesNum] ?? 0 : ing.churnPontualPorMes[mesNum] ?? 0;
-      const cross_ = kpi === "nrr" ? ing.crossMrrPorMes[mesNum] ?? 0 : ing.crossPontPorMes[mesNum] ?? 0;
+      const base_ = kpi === "churn_pct" ? ing.mrrInicioPorMes[mesNum] ?? 0 : ing.estoquePontIniPorMes[mesNum] ?? 0;
+      const churn_ = kpi === "churn_pct" ? ing.churnMrrPorMes[mesNum] ?? 0 : ing.churnPontualPorMes[mesNum] ?? 0;
       grupos = [
-        { titulo: kpi === "nrr" ? "MRR do início do mês (base)" : "Estoque pontual inicial (base)", total: base_, formato: "brl", itens: [], aberto: true },
-        { titulo: "Churn no mês", total: churn_, formato: "brl", sinal: "-", itens: [] },
-        { titulo: "Cross-sell/Upsell no mês", total: cross_, formato: "brl", sinal: "+", itens: [] },
+        { titulo: kpi === "churn_pct" ? "MRR do fechamento do mês anterior (base)" : "Estoque pontual inicial (base)", total: base_, formato: "brl", itens: [], aberto: true },
+        { titulo: "Churn do mês", total: churn_, formato: "brl", sinal: "-", itens: [] },
       ];
-      const pct = base_ > 0 ? ((churn_ - cross_) / base_ * 100) : null;
-      nota = `NRR (erosão) = (Churn ${formatBRL(churn_)} − Cross-sell ${formatBRL(cross_)}) ÷ base ${formatBRL(base_)} = ${pct == null ? "—" : pct.toFixed(1) + "%"}. Menor é melhor.`;
+      const pct = base_ > 0 ? (churn_ / base_ * 100) : null;
+      nota = `Churn % = Churn ${formatBRL(churn_)} ÷ base ${formatBRL(base_)} = ${pct == null ? "—" : pct.toFixed(1) + "%"}. Verde <7%, âmbar 7–9%, vermelho >9%.`;
     }
   } else {
     throw new Error("kpi inválido");
@@ -522,7 +520,7 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     evolucao = serieEvolucao(linhaMovParaEvolucao, bp.mesFechado);
     // Os 5 KPIs de movimento "semMeta" carregam um orcado:0 fake (BpLinha.meses.orcado não é
     // nullable); zerar aqui faria o gráfico desenhar uma linha de "Meta 0" espúria (0 != null).
-    const SEM_META_MOV = new Set(["cross_mrr", "nrr", "churn_pontual", "cross_pontual", "nrr_pontual"]);
+    const SEM_META_MOV = new Set(["cross_mrr", "churn_pct", "churn_pontual", "cross_pontual", "churn_pct_pontual"]);
     if (SEM_META_MOV.has(kpi)) evolucao = evolucao.map((p) => ({ ...p, orcado: null }));
   }
   if (evolucao && evolucao.length < 2) evolucao = undefined; // 1 ponto não é evolução
@@ -536,7 +534,7 @@ export function registerCeoDashboardDetalheRoutes(app: Express, db: any) {
       if (!canAccessCeo(req.user)) return res.status(403).json({ error: "Acesso restrito ao CEO Dashboard" });
       const kpi = typeof req.query.kpi === "string" ? req.query.kpi : "";
       const KPIS_VALIDOS = ["receita","custos","lucro","geracao_caixa","caixa","inadimplencia","cac","cac_por_cliente","cac_por_contrato","ltv_fat","ltv_dfc","headcount","enps","receita_cabeca",
-        "venda_mrr","churn_mrr","cross_mrr","nrr","venda_pontual","churn_pontual","cross_pontual","nrr_pontual"];
+        "venda_mrr","churn_mrr","cross_mrr","churn_pct","venda_pontual","churn_pontual","cross_pontual","churn_pct_pontual"];
       if (!kpi || kpi === "nps" || !KPIS_VALIDOS.includes(kpi)) return res.status(400).json({ error: "kpi inválido" });
       const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
       const payload = await buildCeoDetalhe(db, kpi, mes);

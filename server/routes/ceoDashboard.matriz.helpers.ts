@@ -20,6 +20,7 @@ export interface CeoMatrizLinha {
   direcao: CeoDirecao;
   semMeta: boolean; // inadimplência, ltv_fat, ltv_dfc, enps, nps
   semCompacto?: boolean; // valor cheio (R$ 4.290) em vez de compacto (R$ 4K) — p/ razões na casa dos milhares
+  faixasTom?: { ambar: number; vermelho: number }; // cor por valor da célula (ex.: churn %), independente de meta
   nota?: string;
   celulas: CeoMatrizCelula[]; // uma por mês, alinhada a `meses`
 }
@@ -96,9 +97,10 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
   });
   const movLinha = (
     linha: BpLinha | undefined, key: string, label: string,
-    direcao: CeoDirecao, unidade: CeoUnidade, semMeta: boolean, nota?: string
+    direcao: CeoDirecao, unidade: CeoUnidade, semMeta: boolean, nota?: string,
+    faixasTom?: { ambar: number; vermelho: number }
   ): CeoMatrizLinha => ({
-    key, label, unidade, direcao, semMeta, nota, celulas: celulasDoBp(linha, mesNum),
+    key, label, unidade, direcao, semMeta, nota, faixasTom, celulas: celulasDoBp(linha, mesNum),
   });
 
   const linhas: CeoMatrizLinha[] = [
@@ -140,16 +142,18 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
       movLinha(s.movimento.churnMrr, "churn_mrr", "Churn MRR", "menor_melhor", "brl", false),
       movLinha(s.movimento.crossMrr, "cross_mrr", "Venda de Cross-sell/Upsell MRR", "maior_melhor", "brl", true,
         "Deals de cross-sell/upsell recorrente (source PARTNER, cliente pré-existente). Sem meta no BP."),
-      movLinha(s.movimento.nrr, "nrr", "NRR", "menor_melhor", "pct", true,
-        "Erosão líquida da base recorrente = (Churn − Cross-sell) ÷ MRR do início do mês. Menor é melhor; sem meta no BP."),
+      movLinha(s.movimento.churnPct, "churn_pct", "Churn % MRR", "menor_melhor", "pct", true,
+        "Churn recorrente do mês ÷ MRR do fechamento do mês anterior. Verde <7%, âmbar 7–9%, vermelho >9%.",
+        { ambar: 7, vermelho: 9 }),
       secao("mov_secao_pontual", "Movimento de Receita — Pontual"),
       movLinha(s.movimento.vendaPontual, "venda_pontual", "Venda Pontual", "maior_melhor", "brl", false),
       movLinha(s.movimento.churnPontual, "churn_pontual", "Churn Pontual", "menor_melhor", "brl", true,
         "Churn pontual por data de cancelamento (cup_contratos). Sem meta no BP."),
       movLinha(s.movimento.crossPontual, "cross_pontual", "Venda de Cross-sell/Upsell Pontual", "maior_melhor", "brl", true,
         "Parte pontual dos deals de cross-sell/upsell. Sem meta no BP."),
-      movLinha(s.movimento.nrrPontual, "nrr_pontual", "NRR Pontual", "menor_melhor", "pct", true,
-        "Erosão do estoque pontual = (Churn pontual − Cross-sell pontual) ÷ estoque pontual inicial. Menor é melhor; sem meta no BP."),
+      movLinha(s.movimento.churnPctPontual, "churn_pct_pontual", "Churn % Pontual", "menor_melhor", "pct", true,
+        "Churn pontual do mês ÷ estoque pontual inicial. Verde <7%, âmbar 7–9%, vermelho >9%.",
+        { ambar: 7, vermelho: 9 }),
     ] : []),
   ];
 
