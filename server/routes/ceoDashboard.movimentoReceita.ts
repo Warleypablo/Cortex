@@ -72,3 +72,87 @@ export async function carregarMovimentoQueries(db: any): Promise<MovimentoQuerie
 
   return { crossMrrPorMes, crossPontPorMes, mrrInicioPorMes };
 }
+
+export interface MovimentoIngredientes {
+  mrrInicioPorMes: Record<number, number>;
+  estoquePontIniPorMes: Record<number, number>;
+  crossMrrPorMes: Record<number, number>;
+  crossPontPorMes: Record<number, number>;
+  churnMrrPorMes: Record<number, number>;
+  churnPontualPorMes: Record<number, number>;
+}
+export interface MovimentoReceita {
+  linhas: {
+    vendaMrr: BpLinha; churnMrr: BpLinha; crossMrr: BpLinha; nrr: BpLinha;
+    vendaPontual: BpLinha; churnPontual: BpLinha; crossPontual: BpLinha; nrrPontual: BpLinha;
+  };
+  ingredientes: MovimentoIngredientes;
+}
+export interface MovimentoInput {
+  vendasMrr?: BpLinha; churnMes?: BpLinha; vendasPontual?: BpLinha;
+  pontualChurn?: BpLinha; pontualEstoqueIni?: BpLinha;
+  queries: MovimentoQueries; mesNum: number;
+}
+
+// Extrai Record<mes, number> do realizado de uma BpLinha (aplica transform opcional).
+function realizadoPorMes(linha: BpLinha | undefined, transform: (v: number) => number = (v) => v): Record<number, number> {
+  const out: Record<number, number> = {};
+  for (const m of linha?.meses ?? []) {
+    if (m.realizado != null) out[m.mes] = transform(m.realizado);
+  }
+  return out;
+}
+
+// Constrói uma BpLinha de série própria (sem meta): orcado 0, atingimento null.
+function linhaDeSerie(metrica: string, unidade: "brl" | "pct", seriePorMes: Record<number, number | null>, mesNum: number): BpLinha {
+  const meses = [];
+  for (let mes = 1; mes <= mesNum; mes++) {
+    const v = seriePorMes[mes];
+    meses.push({ mes, orcado: 0, realizado: v ?? null, atingimento: null });
+  }
+  return { metrica, unidade, meses };
+}
+
+// Erosão do NRR: (churn − cross) / base × 100. Base 0/ausente → null.
+function serieNrr(churn: Record<number, number>, cross: Record<number, number>, base: Record<number, number>, mesNum: number): Record<number, number | null> {
+  const out: Record<number, number | null> = {};
+  for (let mes = 1; mes <= mesNum; mes++) {
+    const b = base[mes];
+    out[mes] = b && b > 0 ? ((churn[mes] ?? 0) - (cross[mes] ?? 0)) / b * 100 : null;
+  }
+  return out;
+}
+
+export function montarMovimentoReceita(input: MovimentoInput): MovimentoReceita {
+  const { queries, mesNum } = input;
+  const churnMrrPorMes = realizadoPorMes(input.churnMes);                    // já positivo
+  const churnPontualPorMes = realizadoPorMes(input.pontualChurn, Math.abs);  // negativo → positivo
+  const estoquePontIniPorMes = realizadoPorMes(input.pontualEstoqueIni);
+
+  const nrrPorMes = serieNrr(churnMrrPorMes, queries.crossMrrPorMes, queries.mrrInicioPorMes, mesNum);
+  const nrrPontualPorMes = serieNrr(churnPontualPorMes, queries.crossPontPorMes, estoquePontIniPorMes, mesNum);
+
+  // Linha vazia como fallback quando o BP não trouxe a métrica.
+  const vazia = (metrica: string): BpLinha => ({ metrica, meses: [] });
+
+  return {
+    linhas: {
+      vendaMrr: input.vendasMrr ?? vazia("vendas_mrr"),
+      churnMrr: input.churnMes ?? vazia("churn_mes"),
+      crossMrr: linhaDeSerie("cross_mrr", "brl", queries.crossMrrPorMes, mesNum),
+      nrr: linhaDeSerie("nrr", "pct", nrrPorMes, mesNum),
+      vendaPontual: input.vendasPontual ?? vazia("vendas_pontual"),
+      churnPontual: linhaDeSerie("churn_pontual", "brl", churnPontualPorMes, mesNum),
+      crossPontual: linhaDeSerie("cross_pontual", "brl", queries.crossPontPorMes, mesNum),
+      nrrPontual: linhaDeSerie("nrr_pontual", "pct", nrrPontualPorMes, mesNum),
+    },
+    ingredientes: {
+      mrrInicioPorMes: queries.mrrInicioPorMes,
+      estoquePontIniPorMes,
+      crossMrrPorMes: queries.crossMrrPorMes,
+      crossPontPorMes: queries.crossPontPorMes,
+      churnMrrPorMes,
+      churnPontualPorMes,
+    },
+  };
+}
