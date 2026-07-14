@@ -169,3 +169,45 @@ describe("montarMatrizCeo", () => {
     }
   });
 });
+
+function linhaMov(metrica: string, unidade: "brl" | "pct", realizados: Array<number | null>): BpLinha {
+  return { metrica, unidade, meses: realizados.map((r, i) => ({ mes: i + 1, orcado: 0, realizado: r, atingimento: null })) };
+}
+
+describe("montarMatrizCeo — bloco movimento de receita", () => {
+  const movimento = {
+    vendaMrr: linhaMov("vendas_mrr", "brl", [120, 90]),
+    churnMrr: linhaMov("churn_mes", "brl", [10, 20]),
+    crossMrr: linhaMov("cross_mrr", "brl", [4, 6]),
+    nrr: linhaMov("nrr", "pct", [0.6, 0.7]),
+    vendaPontual: linhaMov("vendas_pontual", "brl", [60, 40]),
+    churnPontual: linhaMov("churn_pontual", "brl", [5, 8]),
+    crossPontual: linhaMov("cross_pontual", "brl", [1, 2]),
+    nrrPontual: linhaMov("nrr_pontual", "pct", [2, 2.4]),
+  };
+  // sources mínimo — reusa o fixture base do arquivo (mesNum precisa cobrir 2 meses) + movimento.
+  const sourcesBase: CeoMatrizSources = { ...baseSources({ mesNum: 2, mesFechado: 2 }), movimento };
+
+  it("adiciona 2 seções + 8 linhas de dado na ordem correta", () => {
+    const res = montarMatrizCeo(sourcesBase);
+    const keys = res.linhas.map((l) => l.key);
+    const idx = keys.indexOf("mov_secao_mrr");
+    expect(idx).toBeGreaterThan(-1);
+    expect(keys.slice(idx, idx + 5)).toEqual(["mov_secao_mrr", "venda_mrr", "churn_mrr", "cross_mrr", "nrr"]);
+    expect(keys.slice(idx + 5, idx + 10)).toEqual(["mov_secao_pontual", "venda_pontual", "churn_pontual", "cross_pontual", "nrr_pontual"]);
+  });
+
+  it("linha de seção tem tipo 'secao' e sem células", () => {
+    const res = montarMatrizCeo(sourcesBase);
+    const secao = res.linhas.find((l) => l.key === "mov_secao_mrr")!;
+    expect(secao.tipo).toBe("secao");
+    expect(secao.celulas).toHaveLength(0);
+  });
+
+  it("cross-sell e NRR entram semMeta; venda/churn MRR não", () => {
+    const res = montarMatrizCeo(sourcesBase);
+    expect(res.linhas.find((l) => l.key === "cross_mrr")!.semMeta).toBe(true);
+    expect(res.linhas.find((l) => l.key === "nrr")!.semMeta).toBe(true);
+    expect(res.linhas.find((l) => l.key === "venda_mrr")!.semMeta).toBe(false);
+  });
+});

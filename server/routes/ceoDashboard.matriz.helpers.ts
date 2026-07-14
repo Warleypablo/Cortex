@@ -3,6 +3,7 @@
 // indicador × mês. Fonte única com os cards → mesmos números.
 
 import type { BpLinha, CeoUnidade, CeoDirecao } from "./ceoDashboard.helpers";
+import type { MovimentoReceita } from "./ceoDashboard.movimentoReceita";
 
 export interface CeoMatrizCelula {
   mes: number;
@@ -13,6 +14,7 @@ export interface CeoMatrizCelula {
 
 export interface CeoMatrizLinha {
   key: string;
+  tipo?: "secao" | "dado"; // "secao" = linha de cabeçalho de agrupamento (sem células)
   label: string;
   unidade: CeoUnidade;
   direcao: CeoDirecao;
@@ -46,6 +48,7 @@ export interface CeoMatrizSources {
   // Trazem meses[] com orçado/realizado/atingimento (mesmo formato das linhas do BP) → têm meta.
   cacPorClienteLinha?: BpLinha; // CAC total ÷ deals ganhos no Bitrix
   cacPorContratoLinha?: BpLinha; // CAC total ÷ serviços vendidos no Bitrix
+  movimento?: MovimentoReceita["linhas"]; // as 8 linhas do bloco de movimento de receita (opcional)
 }
 
 const MESES_LABEL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -88,6 +91,16 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
     key, label, unidade, direcao, semMeta: false, celulas: celulasDoBp(find(arr, metrica), mesNum),
   });
 
+  const secao = (key: string, label: string): CeoMatrizLinha => ({
+    key, label, tipo: "secao", unidade: "brl", direcao: "neutro", semMeta: true, celulas: [],
+  });
+  const movLinha = (
+    linha: BpLinha | undefined, key: string, label: string,
+    direcao: CeoDirecao, unidade: CeoUnidade, semMeta: boolean, nota?: string
+  ): CeoMatrizLinha => ({
+    key, label, unidade, direcao, semMeta, nota, celulas: celulasDoBp(linha, mesNum),
+  });
+
   const linhas: CeoMatrizLinha[] = [
     { key: "receita", label: "Receita", unidade: "brl", direcao: "maior_melhor", semMeta: false,
       celulas: celulasDoBp(s.receitaRecebida, mesNum) },
@@ -121,6 +134,23 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
       celulas: celulasDaSerie(s.enpsSeriePorMes, mesNum) },
     { key: "receita_cabeca", label: "Receita / Cabeça", unidade: "brl", direcao: "maior_melhor",
       semMeta: false, celulas: celulasDoBp(s.receitaCabecaCaixa, mesNum) },
+    ...(s.movimento ? [
+      secao("mov_secao_mrr", "Movimento de Receita — Recorrente (MRR)"),
+      movLinha(s.movimento.vendaMrr, "venda_mrr", "Venda MRR", "maior_melhor", "brl", false),
+      movLinha(s.movimento.churnMrr, "churn_mrr", "Churn MRR", "menor_melhor", "brl", false),
+      movLinha(s.movimento.crossMrr, "cross_mrr", "Venda de Cross-sell/Upsell MRR", "maior_melhor", "brl", true,
+        "Deals de cross-sell/upsell recorrente (source PARTNER, cliente pré-existente). Sem meta no BP."),
+      movLinha(s.movimento.nrr, "nrr", "NRR", "menor_melhor", "pct", true,
+        "Erosão líquida da base recorrente = (Churn − Cross-sell) ÷ MRR do início do mês. Menor é melhor; sem meta no BP."),
+      secao("mov_secao_pontual", "Movimento de Receita — Pontual"),
+      movLinha(s.movimento.vendaPontual, "venda_pontual", "Venda Pontual", "maior_melhor", "brl", false),
+      movLinha(s.movimento.churnPontual, "churn_pontual", "Churn Pontual", "menor_melhor", "brl", true,
+        "Churn pontual por data de cancelamento (cup_contratos). Sem meta no BP."),
+      movLinha(s.movimento.crossPontual, "cross_pontual", "Venda de Cross-sell/Upsell Pontual", "maior_melhor", "brl", true,
+        "Parte pontual dos deals de cross-sell/upsell. Sem meta no BP."),
+      movLinha(s.movimento.nrrPontual, "nrr_pontual", "NRR Pontual", "menor_melhor", "pct", true,
+        "Erosão do estoque pontual = (Churn pontual − Cross-sell pontual) ÷ estoque pontual inicial. Menor é melhor; sem meta no BP."),
+    ] : []),
   ];
 
   const meses = Array.from({ length: mesNum }, (_, i) => ({ mes: i + 1, label: MESES_LABEL[i] }));
