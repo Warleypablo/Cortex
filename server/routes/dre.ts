@@ -66,10 +66,17 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
     try {
       const ano = parseInt(req.query.ano as string) || new Date().getFullYear();
       const empresa = (req.query.empresa as string) || 'todas';
+      const regime = (req.query.regime as string) === 'competencia' ? 'competencia' : 'caixa';
 
       const empresaFilter = empresa !== 'todas'
         ? sql` AND p.empresa = ${empresa}`
         : sql``;
+
+      // Regime de Caixa: mês por data_quitacao, valor efetivamente pago, só parcelas quitadas.
+      // Regime de Competência: mês por data_competencia, valor cheio faturado, todos os status.
+      const dataCol = regime === 'competencia' ? sql`p.data_competencia` : sql`p.data_quitacao`;
+      const valorPrincipal = regime === 'competencia' ? sql`p.valor_bruto` : sql`p.valor_pago`;
+      const statusFilter = regime === 'competencia' ? sql`` : sql` AND p.status = 'QUITADO'`;
 
       const result = await db.execute(sql`
         WITH categorias_expandidas AS (
@@ -78,12 +85,12 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
             REGEXP_REPLACE(TRIM(cat.categoria), '\s+', ' ', 'g') AS categoria_nome,
             p.tipo_evento,
             p.empresa,
-            EXTRACT(MONTH FROM p.data_quitacao::date)::int AS mes,
-            COALESCE(p.valor_pago::numeric, 0) AS valor
+            EXTRACT(MONTH FROM ${dataCol}::date)::int AS mes,
+            COALESCE(${valorPrincipal}::numeric, 0) AS valor
           FROM "Conta Azul".caz_parcelas p,
                regexp_split_to_table(p.categoria_nome, ';') AS cat(categoria)
-          WHERE p.status = 'QUITADO'
-            AND EXTRACT(YEAR FROM p.data_quitacao::date) = ${ano}
+          WHERE EXTRACT(YEAR FROM ${dataCol}::date) = ${ano}
+            ${statusFilter}
             ${empresaFilter}
             AND p.categoria_nome IS NOT NULL
             AND p.categoria_nome != ''
@@ -166,14 +173,14 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
             REGEXP_REPLACE(TRIM(cat.categoria), '\s+', ' ', 'g') AS categoria_nome,
             p.tipo_evento,
             p.empresa,
-            EXTRACT(MONTH FROM p.data_quitacao::date)::int AS mes,
+            EXTRACT(MONTH FROM ${dataCol}::date)::int AS mes,
             COALESCE(p.valor_bruto::numeric, 0) AS valor_bruto,
             COALESCE(c.nome, c.empresa, 'Não identificado') AS fornecedor
           FROM "Conta Azul".caz_parcelas p
           LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = COALESCE(c.ids, c.id::text),
                regexp_split_to_table(p.categoria_nome, ';') AS cat(categoria)
-          WHERE p.status = 'QUITADO'
-            AND EXTRACT(YEAR FROM p.data_quitacao::date) = ${ano}
+          WHERE EXTRACT(YEAR FROM ${dataCol}::date) = ${ano}
+            ${statusFilter}
             ${empresaFilter}
             AND p.categoria_nome IS NOT NULL
             AND p.categoria_nome != ''
@@ -289,9 +296,10 @@ export function registerDRERoutes(app: Express, db: any, storage: IStorage) {
         }
       }
 
-      const response: DREResponse & { empresas: string[]; mesesComDados: string[] } = {
+      const response: DREResponse & { empresas: string[]; mesesComDados: string[]; regime: string } = {
         ano,
         empresa,
+        regime,
         linhas,
         parentCategories,
         subtotais,

@@ -266,11 +266,12 @@ export default function DRE() {
   const [expandedChildren, setExpandedChildren] = useState<Set<string>>(new Set());
   const [showAV, setShowAV] = useState<boolean>(false);
   const [viewMode, setViewMode] = useState<"agrupada" | "expandida">("agrupada");
+  const [regime, setRegime] = useState<"caixa" | "competencia">("caixa");
 
   const { data, isLoading } = useQuery<DREData>({
-    queryKey: ["/api/financeiro/dre", ano, empresa],
+    queryKey: ["/api/financeiro/dre", ano, empresa, regime],
     queryFn: async () => {
-      const res = await fetch(`/api/financeiro/dre?ano=${ano}&empresa=${empresa}`);
+      const res = await fetch(`/api/financeiro/dre?ano=${ano}&empresa=${empresa}&regime=${regime}`);
       if (!res.ok) throw new Error("Failed to fetch DRE");
       return res.json();
     },
@@ -805,6 +806,20 @@ export default function DRE() {
               </Select>
             </div>
 
+            {/* Regime selector */}
+            <div className="flex items-center gap-2">
+              <Label className="text-sm text-gray-600 dark:text-zinc-400">Regime:</Label>
+              <Select value={regime} onValueChange={(v) => setRegime(v as "caixa" | "competencia")}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="caixa">Caixa</SelectItem>
+                  <SelectItem value="competencia">Competência</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
             {/* View mode selector */}
             <div className="flex items-center gap-2">
               <Label className="text-sm text-gray-600 dark:text-zinc-400">Visão:</Label>
@@ -861,7 +876,9 @@ export default function DRE() {
         <CardHeader className="pb-2">
           <CardTitle className="text-lg text-gray-900 dark:text-white">
             Demonstração do Resultado do Exercício — {ano}
-            <span className="text-xs font-normal text-gray-500 dark:text-zinc-400 ml-2">(Regime de Caixa)</span>
+            <span className="text-xs font-normal text-gray-500 dark:text-zinc-400 ml-2">
+              (Regime de {regime === "competencia" ? "Competência" : "Caixa"})
+            </span>
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
