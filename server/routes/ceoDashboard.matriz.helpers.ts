@@ -17,6 +17,7 @@ export interface CeoMatrizLinha {
   unidade: CeoUnidade;
   direcao: CeoDirecao;
   semMeta: boolean; // inadimplência, ltv_fat, ltv_dfc, enps, nps
+  semCompacto?: boolean; // valor cheio (R$ 4.290) em vez de compacto (R$ 4K) — p/ razões na casa dos milhares
   nota?: string;
   celulas: CeoMatrizCelula[]; // uma por mês, alinhada a `meses`
 }
@@ -102,10 +103,10 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
     { key: "nps", label: "NPS Clientes", unidade: "score", direcao: "maior_melhor", semMeta: true,
       nota: "Sem fonte de dados de NPS de clientes ainda.", celulas: celulasDaSerie({}, mesNum) },
     bpLinha(s.bpLinhas, "cac", "cac", "CAC", "menor_melhor", "brl"),
-    { key: "cac_por_cliente", label: "CAC por cliente", unidade: "brl", direcao: "menor_melhor", semMeta: false,
+    { key: "cac_por_cliente", label: "CAC por cliente", unidade: "brl", direcao: "menor_melhor", semMeta: false, semCompacto: true,
       nota: "CAC total do mês ÷ deals ganhos no Bitrix (proxy de clientes adquiridos). Mesma régua da aba CAC do BP 2026.",
       celulas: celulasDoBp(s.cacPorClienteLinha, mesNum) },
-    { key: "cac_por_contrato", label: "CAC por contrato", unidade: "brl", direcao: "menor_melhor", semMeta: false,
+    { key: "cac_por_contrato", label: "CAC por contrato", unidade: "brl", direcao: "menor_melhor", semMeta: false, semCompacto: true,
       nota: "CAC total do mês ÷ serviços vendidos no Bitrix (campo servicos_vendidos: cada serviço = 1 contrato). Mesma régua da aba CAC do BP 2026.",
       celulas: celulasDoBp(s.cacPorContratoLinha, mesNum) },
     { key: "ltv_fat", label: "LTV FAT", unidade: "brl", direcao: "maior_melhor", semMeta: true,

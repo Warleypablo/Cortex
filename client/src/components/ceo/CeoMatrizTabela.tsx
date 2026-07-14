@@ -13,6 +13,7 @@ export interface CeoMatrizLinha {
   unidade: CeoUnidade;
   direcao: CeoDirecao;
   semMeta: boolean;
+  semCompacto?: boolean; // valor cheio (R$ 4.290) em vez de compacto (R$ 4K)
   nota?: string;
   celulas: CeoMatrizCelula[];
 }
@@ -117,7 +118,7 @@ export function CeoMatrizTabela({
                       >
                         {temValor ? (
                           <div className="flex flex-col items-end leading-tight">
-                            <span className={`font-semibold ${corValor}`}>{formatCompacto(cel.valor, linha.unidade)}</span>
+                            <span className={`font-semibold ${corValor}`}>{(linha.semCompacto ? formatValor : formatCompacto)(cel.valor, linha.unidade)}</span>
                             {cel.atingimentoPct !== null && (
                               <span className="text-[10px] text-gray-400 dark:text-zinc-500">
                                 {Math.round(cel.atingimentoPct)}% meta
