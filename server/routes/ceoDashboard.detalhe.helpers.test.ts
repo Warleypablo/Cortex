@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
-  enpsRespostasToGrupos, receitaCabecaGrupos, cacRazaoGrupos, recebidoCategoriasToGrupo,
+  enpsRespostasToGrupos, receitaCabecaGrupos, recebidoCategoriasToGrupo,
   serieEvolucao, KPI_COMPONENTES,
   ltvAuditoriaToGrupos, ultimoDiaAnterior, type LtvAuditoriaRow,
 } from "./ceoDashboard.detalhe.helpers";
@@ -85,23 +85,6 @@ describe("receitaCabecaGrupos", () => {
     expect(r.grupos[1].total).toBe(112);
     expect(r.nota).toContain("Receita recebida");
     expect(r.nota).toContain("÷ 112");
-  });
-});
-
-describe("cacRazaoGrupos", () => {
-  it("dois grupos só-valor (CAC total brl, denominador num) + nota da fórmula", () => {
-    const r = cacRazaoGrupos(334622, 78, "Deals ganhos (Bitrix)");
-    expect(r.grupos.map((g) => g.formato)).toEqual(["brl", "num"]);
-    expect(r.grupos[0].titulo).toContain("CAC total");
-    expect(r.grupos[0].total).toBe(334622);
-    expect(r.grupos[1].titulo).toBe("Deals ganhos (Bitrix)");
-    expect(r.grupos[1].total).toBe(78);
-    expect(r.nota).toContain("÷ 78"); // razão = 334622 / 78 ≈ R$ 4.290 (formatação com nbsp — não asserto o R$)
-  });
-  it("denominador zero não divide por zero (razão = 0)", () => {
-    const r = cacRazaoGrupos(100000, 0, "Serviços vendidos (Bitrix)");
-    expect(r.grupos[1].total).toBe(0);
-    expect(r.nota).toContain("÷ 0");
   });
 });
 
