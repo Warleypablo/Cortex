@@ -58,6 +58,7 @@ export default function DiscMapa() {
   const squads = useMemo(() => {
     const s = new Set<string>();
     data?.feitos.forEach((f) => f.squad && s.add(f.squad));
+    data?.pendentes.forEach((p) => p.squad && s.add(p.squad));
     return Array.from(s).sort();
   }, [data]);
 
@@ -75,6 +76,13 @@ export default function DiscMapa() {
         (fPerfil === "todos" || f.dominante === fPerfil),
     );
   }, [data, fSetor, fSquad, fPerfil]);
+
+  // Pendentes só têm squad (não têm setor/perfil), então respeitam apenas o filtro de squad.
+  const pendentesFiltrados = useMemo(() => {
+    return (data?.pendentes ?? []).filter(
+      (p) => fSquad === "todos" || p.squad === fSquad,
+    );
+  }, [data, fSquad]);
 
   if (isLoading) {
     return (
@@ -193,14 +201,14 @@ export default function DiscMapa() {
       </Card>
 
       {/* Pendentes */}
-      {(data?.pendentes.length ?? 0) > 0 && (
+      {pendentesFiltrados.length > 0 && (
         <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
           <CardHeader><CardTitle className="text-base text-gray-900 dark:text-white">
-            Ainda não fizeram ({data?.pendentes.length})
+            Ainda não fizeram ({pendentesFiltrados.length})
           </CardTitle></CardHeader>
           <CardContent>
             <div className="flex flex-wrap gap-2">
-              {data?.pendentes.map((p) => (
+              {pendentesFiltrados.map((p) => (
                 <Badge key={p.colaboradorId} variant="outline" className="text-gray-600 dark:text-zinc-300">
                   {p.nome}{p.squad ? ` · ${p.squad}` : ""}
                 </Badge>
