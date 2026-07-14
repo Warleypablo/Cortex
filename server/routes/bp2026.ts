@@ -576,6 +576,14 @@ export async function computarBpReceitas(db: any): Promise<any> {
         // Receita efetivamente recebida por mês (entradas de RECEITA quitadas, base de caixa da DFC).
         // Campo bruto (não é aba do BP) — consumido pelo CEO Dashboard p/ a Receita/Cabeça em regime de caixa.
         receitaRecebidaCaixaPorMes: faturamentoCaixaPorMes,
+        // Denominadores das razões de CAC por mês (deals ganhos, serviços vendidos no Bitrix) —
+        // consumidos pelo drill de composição do CEO Dashboard (CAC por cliente/contrato).
+        cacDenominadores: {
+          deals: ganhosPorMes,
+          servicos: Object.fromEntries(
+            servicosVendidosTotalPorMes.map((v, i) => [i + 1, v ?? 0]),
+          ) as Record<number, number>,
+        },
         linhas: anexarInfo(linhas.map((l) => ({
           ...l,
           ytd: (() => {

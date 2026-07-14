@@ -6,7 +6,7 @@ import { storage } from "../storage";
 import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
 import {
   achatarComponente, mapDetalheBpGrupos, bancosToGrupo, inadClientesToGrupos,
-  enpsRespostasToGrupos, grupoMargemBruta, receitaCabecaGrupos,
+  enpsRespostasToGrupos, grupoMargemBruta, receitaCabecaGrupos, cacRazaoGrupos,
   recebidoCategoriasToGrupo, pagoCategoriasToGrupo, serieEvolucao, KPI_COMPONENTES,
   ltvAuditoriaToGrupos, ultimoDiaAnterior,
   type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao, type LtvAuditoriaRow,
@@ -14,12 +14,14 @@ import {
 
 // Fonte da série mensal (realizado vs meta) por KPI — só os que têm evolução no BP.
 // receita e receita_cabeca usam as linhas sintéticas de caixa (montadas à parte).
-const EVOLUCAO_FONTE: Record<string, { arr: "linhas" | "metricasGerais"; metrica: string }> = {
+const EVOLUCAO_FONTE: Record<string, { arr: "linhas" | "metricasGerais" | "cacDetalhe"; metrica: string }> = {
   custos: { arr: "metricasGerais", metrica: "despesa_total" },
   lucro: { arr: "linhas", metrica: "ebitda" },
   geracao_caixa: { arr: "linhas", metrica: "dfc_real" },
   caixa: { arr: "metricasGerais", metrica: "saldo_caixa" },
   cac: { arr: "linhas", metrica: "cac" },
+  cac_por_cliente: { arr: "cacDetalhe", metrica: "cac_por_cliente" },
+  cac_por_contrato: { arr: "cacDetalhe", metrica: "cac_por_contrato" },
   headcount: { arr: "metricasGerais", metrica: "colaboradores" },
 };
 
@@ -56,6 +58,7 @@ async function pagoPorCategoria(db: any, mesNum: number): Promise<Array<{ catego
 const TITULOS: Record<string, string> = {
   receita: "Receita", custos: "Custos & Despesas", lucro: "Lucro (EBITDA)", geracao_caixa: "Geração de Caixa",
   caixa: "Saldo de Caixa", inadimplencia: "Inadimplência Total", cac: "CAC",
+  cac_por_cliente: "CAC por cliente", cac_por_contrato: "CAC por contrato",
   ltv_fat: "LTV FAT", ltv_dfc: "LTV DFC", headcount: "Headcount", enps: "E-NPS", receita_cabeca: "Receita / Cabeça",
 };
 
@@ -101,6 +104,21 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     const det = await montarDetalheBp(db, { metrica: "cac", mes: mesNum });
     grupos = mapDetalheBpGrupos(det, { formato: "brl", sinal: "-" });
     base.orcado = det.orcado; base.realizado = det.realizado;
+  } else if (kpi === "cac_por_cliente" || kpi === "cac_por_contrato") {
+    // Razão de eficiência: CAC total do mês ÷ denominador (deals ganhos | serviços vendidos).
+    // Numerador = mesma linha CAC do painel; denominador vem do BP (bp.cacDenominadores).
+    const det = await montarDetalheBp(db, { metrica: "cac", mes: mesNum });
+    const cacTotal = det.realizado ?? 0;
+    const den = kpi === "cac_por_cliente"
+      ? (bp.cacDenominadores?.deals?.[mesNum] ?? 0)
+      : (bp.cacDenominadores?.servicos?.[mesNum] ?? 0);
+    const tituloDen = kpi === "cac_por_cliente" ? "Deals ganhos (Bitrix)" : "Serviços vendidos (Bitrix)";
+    const rz = cacRazaoGrupos(cacTotal, den, tituloDen);
+    grupos = rz.grupos; nota = rz.nota;
+    // Header (orçado/realizado) = a própria razão do BP → reconcilia com a célula clicada.
+    const linha = (bp.cacDetalhe ?? []).find((l: any) => l.metrica === kpi);
+    const m = linha?.meses?.find((x: any) => x.mes === mesNum);
+    base.orcado = m?.orcado ?? null; base.realizado = m?.realizado ?? null;
   } else if (kpi === "headcount") {
     const det = await montarDetalheBp(db, { metrica: "colaboradores", mes: mesNum });
     grupos = mapDetalheBpGrupos(det, { formato: "num" });
@@ -290,7 +308,7 @@ export function registerCeoDashboardDetalheRoutes(app: Express, db: any) {
     try {
       if (!canAccessCeo(req.user)) return res.status(403).json({ error: "Acesso restrito ao CEO Dashboard" });
       const kpi = typeof req.query.kpi === "string" ? req.query.kpi : "";
-      const KPIS_VALIDOS = ["receita","custos","lucro","geracao_caixa","caixa","inadimplencia","cac","ltv_fat","ltv_dfc","headcount","enps","receita_cabeca"];
+      const KPIS_VALIDOS = ["receita","custos","lucro","geracao_caixa","caixa","inadimplencia","cac","cac_por_cliente","cac_por_contrato","ltv_fat","ltv_dfc","headcount","enps","receita_cabeca"];
       if (!kpi || kpi === "nps" || !KPIS_VALIDOS.includes(kpi)) return res.status(400).json({ error: "kpi inválido" });
       const mes = typeof req.query.mes === "string" ? req.query.mes : undefined;
       const payload = await buildCeoDetalhe(db, kpi, mes);

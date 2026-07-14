@@ -37,6 +37,9 @@ function baseSources(overrides: Partial<CeoMatrizSources> = {}): CeoMatrizSource
     ltvFatSeriePorMes: { 1: 12000, 2: 13000, 3: 14000 },
     ltvDfcSeriePorMes: { 1: 11000, 2: 13500 }, // mês 3 sem dado → gap (célula null)
     enpsSeriePorMes: { 2: 73 }, // só o mês 2 tem pesquisa (jan/mar sem onda)
+    // realizado explícito (inteiros) p/ evitar ruído de float na asserção
+    cacPorClienteLinha: linhaBp("cac_por_cliente", [[1, 4000, 3600], [2, 4000, 4400], [3, 4000, null]]), // CAC ÷ deals ganhos
+    cacPorContratoLinha: linhaBp("cac_por_contrato", [[1, 3000, 2700], [2, 3000, 3300], [3, 3000, null]]), // CAC ÷ serviços vendidos
     ...overrides,
   };
 }
@@ -55,12 +58,32 @@ describe("montarMatrizCeo", () => {
     expect(m.mesFechado).toBe(6); // colunas com mes > 6 (julho) são parciais
   });
 
-  it("expõe as 13 linhas na ordem dos cards (Geração de Caixa após o EBITDA)", () => {
+  it("expõe as 15 linhas na ordem dos cards (CAC por cliente/contrato logo após o CAC)", () => {
     const m = montarMatrizCeo(baseSources());
     expect(m.linhas.map((l) => l.key)).toEqual([
       "receita", "custos", "lucro", "geracao_caixa", "caixa", "inadimplencia",
-      "nps", "cac", "ltv_fat", "ltv_dfc", "headcount", "enps", "receita_cabeca",
+      "nps", "cac", "cac_por_cliente", "cac_por_contrato", "ltv_fat", "ltv_dfc",
+      "headcount", "enps", "receita_cabeca",
     ]);
+  });
+
+  it("CAC por cliente e por contrato transpõem a linha do BP com meta (menor = melhor)", () => {
+    const m = montarMatrizCeo(baseSources());
+    const cli = m.linhas.find((l) => l.key === "cac_por_cliente")!;
+    expect(cli.label).toBe("CAC por cliente");
+    expect(cli.semMeta).toBe(false); // herda o orçado do BP → mostra "% meta"
+    expect(cli.direcao).toBe("menor_melhor");
+    expect(cli.celulas[0]).toEqual({ mes: 1, valor: 3600, meta: 4000, atingimentoPct: 90 });
+    expect(cli.celulas[2]).toEqual({ mes: 3, valor: null, meta: 4000, atingimentoPct: null });
+    const con = m.linhas.find((l) => l.key === "cac_por_contrato")!;
+    expect(con.label).toBe("CAC por contrato");
+    expect(con.celulas[1]).toEqual({ mes: 2, valor: 3300, meta: 3000, atingimentoPct: 110 });
+  });
+
+  it("CAC por cliente/contrato sem linha do BP degradam para células vazias (—)", () => {
+    const m = montarMatrizCeo(baseSources({ cacPorClienteLinha: undefined, cacPorContratoLinha: undefined }));
+    const cli = m.linhas.find((l) => l.key === "cac_por_cliente")!;
+    expect(cli.celulas.every((c) => c.valor === null && c.meta === null)).toBe(true);
   });
 
   it("Geração de Caixa usa a linha dfc_real do BP (DFC real; meta = geração orçada)", () => {
