@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-14 | feat(resumo-lideres): Net Churn com cálculo 100% explícito
+
+**O que foi feito:**
+- A última linha da mensagem diária de líderes (WhatsApp) deixou de ser `Net Churn: R$ X - *Y%*` e passou a **mostrar a conta por extenso**, em bloco inline:
+  - `Net Churn = Churn Ajustado − Cross Total`
+  - `= R$ 16.282,00 − R$ 1.260,00 = *R$ 15.022,00*`
+  - `% = R$ 15.022,00 ÷ MRR JUNHO (R$ 1.197.868,00) = *1,25%*`
+- Sem toque no cálculo: usa campos já existentes em `MetricasResumo` (`churnAjustado`, `crossTotal`, `netChurn`, `mrrMesAnterior`, `netChurnPct`). Mudança **exclusivamente de apresentação**.
+
+**Por que:**
+- Pedido dos líderes: "Detalhar última linha de Net Churn — Exibir o cálculo de maneira 100% Clara". Os componentes (Churn Ajustado, Cross Total) já apareciam espalhados na mensagem, mas a subtração e a base do % (MRR do mês anterior) não estavam escritas na própria linha — o leitor tinha que garimpar. Agora a aritmética é auto-explicativa.
+
+**Arquivos alterados:**
+- `server/services/resumoLideres.ts` - `formatarMensagemResumo` monta o bloco inline do Net Churn.
+- `server/services/resumoLideres.test.ts` - `MENSAGEM_ESPERADA` atualizada para o novo formato (10 testes verdes).
+
+**Impacto arquitetural:** Nenhum. Só o texto da mensagem muda.
+
+---
+
 ## 2026-07-14 | feat(dre): DRE passa a usar data de competência
 
 **O que foi feito:**

@@ -52,7 +52,10 @@ Cross R: ZERO
 Cross P: R$ 6.300,00 / 5 = R$ 1.260,00
 Total: R$ 1.260,00
 
-Net Churn: R$ 15.022,00 - *1,25%*
+Net Churn = Churn Ajustado − Cross Total
+= R$ 16.282,00 − R$ 1.260,00 = *R$ 15.022,00*
+% = R$ 15.022,00 ÷ MRR JUNHO (R$ 1.197.868,00)
+= *1,25%*
 
 
 estamos de 👀`;

@@ -94,7 +94,10 @@ Cross R: ${crossRTexto}
 Cross P: ${crossPTexto}
 Total: ${formatarMoedaBR(m.crossTotal)}
 
-Net Churn: ${formatarMoedaBR(m.netChurn)} - *${formatarPercentBR(m.netChurnPct)}*
+Net Churn = Churn Ajustado − Cross Total
+= ${formatarMoedaBR(m.churnAjustado)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.netChurn)}*
+% = ${formatarMoedaBR(m.netChurn)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
+= *${formatarPercentBR(m.netChurnPct)}*
 
 
 estamos de 👀`;
