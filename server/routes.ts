@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
-import { storage } from "./storage";
+import { storage, excluiTransferenciaIntragrupoCond } from "./storage";
 import { insertPatrimonioSchema, updateContratoSchema, pageViews } from "@shared/schema";
 import authRoutes from "./auth/routes";
 import { isAuthenticated } from "./auth/middleware";
@@ -2657,6 +2657,7 @@ Estruture sua resposta em:
             WHERE p.tipo_evento = 'RECEITA'
               AND p.status NOT IN ('PERDIDO')
               AND p.data_vencimento::date BETWEEN '${dataInicio}'::date AND '${dataFim}'::date
+              AND ${excluiTransferenciaIntragrupoCond('p.categoria_nome')}
               ${contaFinanceiraFilterP}
             GROUP BY p.data_vencimento::date
           ),
@@ -2668,6 +2669,7 @@ Estruture sua resposta em:
             WHERE tipo_evento = 'DESPESA'
               AND status NOT IN ('PERDIDO')
               AND data_vencimento::date BETWEEN '${dataInicio}'::date AND '${dataFim}'::date
+              AND ${excluiTransferenciaIntragrupoCond()}
               ${contaFinanceiraFilter}
             GROUP BY data_vencimento::date
           )

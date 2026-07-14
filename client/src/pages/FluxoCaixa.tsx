@@ -387,7 +387,7 @@ export default function FluxoCaixa() {
               <HeroMetric
                 label={viewMode === 'diario' ? 'Saldo Projetado (Fim do Mês)' : 'Saldo Projetado (Fim do Ano)'}
                 value={formatCurrency(insightsPeriodo?.saldoFinalPeriodo || 0)}
-                subtitle="Saldo atual + entradas previstas − saídas previstas para o período selecionado."
+                subtitle="Saldo atual + valores a receber em aberto (−10% de inadimplência esperada) − valores a pagar em aberto. Não recontabiliza o que já foi realizado no período."
               />
             </>
           )}

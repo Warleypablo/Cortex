@@ -1353,6 +1353,28 @@ function normalizeCode(code: string): string {
   return parts.map(part => part.padStart(2, '0')).join('.');
 }
 
+/**
+ * Condição SQL que exclui transferências intragrupo — dinheiro que apenas circula
+ * entre empresas do grupo (ex.: filial → matriz) e não representa entrada/saída real
+ * de caixa consolidado. São duas categorias espelhadas no Conta Azul:
+ *   - 04.02.06 Transferência entre empresas (RECEITA)
+ *   - 07.01.02 Transferência entre Empresas (DESPESA)
+ * NÃO inclui "07.01.01 Transferência dos Sócios" (dividendos/distribuição = saída
+ * real de caixa). Retorna a condição SEM o "AND" inicial para uso flexível.
+ * @param coluna nome/alias da coluna de categoria (ex.: 'categoria_nome' ou 'p.categoria_nome')
+ */
+export function excluiTransferenciaIntragrupoCond(coluna: string = 'categoria_nome'): string {
+  return `COALESCE(${coluna}, '') NOT LIKE '%04.02.06%' AND COALESCE(${coluna}, '') NOT LIKE '%07.01.02%'`;
+}
+
+/**
+ * Taxa de inadimplência esperada aplicada às entradas a receber no cálculo do Saldo
+ * Projetado (fim do período) da tela de Fluxo de Caixa. Reflete que, historicamente,
+ * nem tudo o que está previsto para receber cai efetivamente no caixa até o fechamento.
+ * Ajustável conforme a régua de inadimplência do grupo.
+ */
+export const TAXA_INADIMPLENCIA_PROJECAO = 0.10;
+
 const CATEGORIA_NOMES_PADRAO: Record<string, string> = {
   // Nível 1 - Conforme padrão Conta Azul
   '03': 'Receitas Operacionais',
@@ -3212,9 +3234,14 @@ export class DbStorage implements IStorage {
   }
 
   async getSaldoAtualBancos(): Promise<SaldoBancos> {
+    // Somente contas ATIVAS — alinhado ao card "Saldo Atual" (getFluxoCaixaInsightsPeriodo).
+    // Sem o filtro, contas desativadas no Conta Azul (versões antigas com saldo residual,
+    // ex.: "Inter (Aplicações)" e "Bradesco" antigos) inflavam a âncora do gráfico e
+    // divergiam do saldo real. `ativo` é boolean na tabela física.
     const result = await db.execute(sql`
       SELECT COALESCE(SUM(balance::numeric), 0) as saldo_total
       FROM ${schema.cazBancos}
+      WHERE ativo = true
     `);
     
     const row = result.rows[0] as any;
@@ -3404,6 +3431,7 @@ export class DbStorage implements IStorage {
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND status NOT IN ('PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+          AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
           ${contaFilter}
         GROUP BY data_vencimento::date
       ),
@@ -3417,6 +3445,7 @@ export class DbStorage implements IStorage {
           AND status = 'QUITADO'
           AND data_quitacao IS NOT NULL
           AND data_quitacao::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+          AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
           ${contaFilter}
         GROUP BY data_quitacao::date
       )
@@ -3507,6 +3536,7 @@ export class DbStorage implements IStorage {
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND status NOT IN ('PERDIDO')
           AND data_vencimento::date BETWEEN '${ano}-01-01'::date AND '${ano}-12-31'::date
+          AND ${excluiTransferenciaIntragrupoCond()}
         GROUP BY date_trunc('month', data_vencimento)::date
       )
       SELECT
@@ -3557,6 +3587,7 @@ export class DbStorage implements IStorage {
       WHERE p.data_vencimento::date = '${data}'::date
         AND p.status NOT IN ('PERDIDO')
         AND p.valor_bruto::numeric > 0
+        AND ${excluiTransferenciaIntragrupoCond('p.categoria_nome')}
       ORDER BY p.tipo_evento DESC, p.valor_bruto::numeric DESC
     `));
     
@@ -3642,9 +3673,10 @@ export class DbStorage implements IStorage {
         WHERE tipo_evento IN ('RECEITA', 'DESPESA')
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+          AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
         GROUP BY data_vencimento::date
       )
-      SELECT 
+      SELECT
         TO_CHAR(d.data, 'YYYY-MM-DD') as data,
         COALESCE(dt.entradas, 0) as entradas,
         COALESCE(dt.saidas, 0) as saidas
@@ -3789,17 +3821,24 @@ export class DbStorage implements IStorage {
           SUM(CASE WHEN tipo_evento = 'DESPESA' THEN
             CASE WHEN status = 'QUITADO' THEN (COALESCE(valor_pago::numeric, 0) - COALESCE(desconto::numeric, 0))
             ELSE valor_bruto::numeric END
-          ELSE 0 END) as saidas_periodo
+          ELSE 0 END) as saidas_periodo,
+          -- Somente o que ainda está EM ABERTO (não quitado) — base do Saldo Projetado.
+          -- As parcelas já quitadas do mês já estão refletidas no saldo dos bancos;
+          -- somá-las de novo contaria o realizado em dobro.
+          SUM(CASE WHEN tipo_evento = 'RECEITA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as entradas_em_aberto,
+          SUM(CASE WHEN tipo_evento = 'DESPESA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as saidas_em_aberto
         FROM "Conta Azul".caz_parcelas
         WHERE status != 'PERDIDO'
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+          AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
       ),
       vencidos AS (
-        SELECT 
+        SELECT
           SUM(CASE WHEN tipo_evento = 'RECEITA' AND status = 'ATRASADO' THEN valor_bruto::numeric ELSE 0 END) as entradas_vencidas,
           SUM(CASE WHEN tipo_evento = 'DESPESA' AND status NOT IN ('QUITADO', 'PERDIDO') THEN valor_bruto::numeric ELSE 0 END) as saidas_vencidas
         FROM "Conta Azul".caz_parcelas
         WHERE data_vencimento < CURRENT_DATE
+          AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
       ),
       maior_entrada AS (
         SELECT 
@@ -3811,6 +3850,7 @@ export class DbStorage implements IStorage {
         WHERE tipo_evento = 'RECEITA'
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+          AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
         ORDER BY valor_bruto::numeric DESC
         LIMIT 1
       ),
@@ -3824,6 +3864,7 @@ export class DbStorage implements IStorage {
         WHERE tipo_evento = 'DESPESA'
           AND status NOT IN ('QUITADO', 'PERDIDO')
           AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+          AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
         ORDER BY valor_bruto::numeric DESC
         LIMIT 1
       ),
@@ -3866,10 +3907,12 @@ export class DbStorage implements IStorage {
         ORDER BY valor DESC
         LIMIT 10
       )
-      SELECT 
+      SELECT
         sb.saldo_total,
         COALESCE(p.entradas_periodo, 0) as entradas_periodo,
         COALESCE(p.saidas_periodo, 0) as saidas_periodo,
+        COALESCE(p.entradas_em_aberto, 0) as entradas_em_aberto,
+        COALESCE(p.saidas_em_aberto, 0) as saidas_em_aberto,
         COALESCE(v.entradas_vencidas, 0) as entradas_vencidas,
         COALESCE(v.saidas_vencidas, 0) as saidas_vencidas,
         me.valor as maior_entrada_valor,
@@ -3891,7 +3934,14 @@ export class DbStorage implements IStorage {
     const saldoAtual = parseFloat(row?.saldo_total || '0');
     const entradasPeriodo = parseFloat(row?.entradas_periodo || '0');
     const saidasPeriodo = parseFloat(row?.saidas_periodo || '0');
-    const saldoFinalPeriodo = saldoAtual + entradasPeriodo - saidasPeriodo;
+
+    // Saldo Projetado (fim do período): parte do saldo atual (que já embute tudo o que
+    // foi realizado no mês) e projeta APENAS o que ainda está em aberto — evitando contar
+    // em dobro as parcelas já quitadas. Sobre as entradas a receber aplica-se uma taxa de
+    // inadimplência esperada (nem tudo previsto é efetivamente recebido no fechamento).
+    const entradasEmAberto = parseFloat(row?.entradas_em_aberto || '0');
+    const saidasEmAberto = parseFloat(row?.saidas_em_aberto || '0');
+    const saldoFinalPeriodo = saldoAtual + entradasEmAberto * (1 - TAXA_INADIMPLENCIA_PROJECAO) - saidasEmAberto;
 
     const topEntradasResult = await db.execute(sql`
       SELECT 
@@ -3903,6 +3953,7 @@ export class DbStorage implements IStorage {
       WHERE tipo_evento = 'RECEITA'
         AND status NOT IN ('QUITADO', 'PERDIDO')
         AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
       ORDER BY valor_bruto::numeric DESC
       LIMIT 5
     `);
@@ -3917,6 +3968,7 @@ export class DbStorage implements IStorage {
       WHERE tipo_evento = 'DESPESA'
         AND status NOT IN ('QUITADO', 'PERDIDO')
         AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
+        AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
       ORDER BY valor_bruto::numeric DESC
       LIMIT 5
     `);
@@ -3930,6 +3982,7 @@ export class DbStorage implements IStorage {
       WHERE status NOT IN ('QUITADO', 'PERDIDO')
         AND data_vencimento::date BETWEEN ${dataInicio}::date AND ${dataFim}::date
         AND tipo_evento IN ('RECEITA', 'DESPESA')
+        AND ${sql.raw(excluiTransferenciaIntragrupoCond())}
       GROUP BY categoria_nome, tipo_evento
       ORDER BY valor DESC
       LIMIT 10
@@ -4751,6 +4804,10 @@ export class DbStorage implements IStorage {
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
     
     const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status = 'QUITADO'"];
+
+    // Excluir transferências intragrupo (filial <-> matriz) — dinheiro que só circula
+    // entre empresas do grupo, não é caixa real da DFC consolidada.
+    whereClauses.push(excluiTransferenciaIntragrupoCond('p.categoria_nome'));
 
     // Filtrar por empresa se especificado
     if (empresa && empresa !== 'todas') {
