@@ -47,3 +47,11 @@ export function atingimentoTom(
   if (efetivo >= 80) return "ambar";
   return "vermelho";
 }
+
+// Cor por limiar fixo de valor (ex.: churn %): > vermelho → vermelho; > ambar → âmbar; senão verde.
+export function tomPorFaixa(valor: number | null, faixas: { ambar: number; vermelho: number }): "verde" | "ambar" | "vermelho" | "neutro" {
+  if (valor === null || valor === undefined || Number.isNaN(valor)) return "neutro";
+  if (valor > faixas.vermelho) return "vermelho";
+  if (valor > faixas.ambar) return "ambar";
+  return "verde";
+}

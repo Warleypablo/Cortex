@@ -4,6 +4,7 @@ import { computarBpReceitas } from "./bp2026";
 import { storage } from "../storage";
 import { canAccessCeo, parseMesNum, receitaCabecaCaixaFromBp, receitaRecebidaFromBp } from "./ceoDashboard.helpers";
 import { montarMatrizCeo, type CeoMatrizResponse } from "./ceoDashboard.matriz.helpers";
+import { carregarMovimentoQueries, montarMovimentoReceita } from "./ceoDashboard.movimentoReceita";
 
 // Matriz mês a mês do CEO Dashboard: mesma fonte dos cards (computarBpReceitas +
 // fontes próprias), transposta para indicador × mês (jan → mês pedido).
@@ -154,6 +155,23 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
     console.error("[api] CEO matriz — falha na série de E-NPS:", e);
   }
 
+  // 5) Movimento de Receita (8 métricas): reusa linhas do BP + 2 queries próprias.
+  const findLinha = (arr: any[], metrica: string) => (arr ?? []).find((l: any) => l.metrica === metrica);
+  let movimento: ReturnType<typeof montarMovimentoReceita>["linhas"] | undefined;
+  try {
+    const queries = await carregarMovimentoQueries(db);
+    movimento = montarMovimentoReceita({
+      vendasMrr: findLinha(bp.metricasGerais, "vendas_mrr"),
+      churnMes: findLinha(bp.metricasGerais, "churn_mes"),
+      vendasPontual: findLinha(bp.metricasGerais, "vendas_pontual"),
+      pontualChurn: findLinha(bp.pontual, "pontual_churn"),
+      pontualEstoqueIni: findLinha(bp.pontual, "pontual_estoque_ini"),
+      queries, mesNum,
+    }).linhas;
+  } catch (e) {
+    console.error("[api] CEO matriz — falha ao montar movimento de receita:", e);
+  }
+
   return montarMatrizCeo({
     mesNum,
     mesFechado: bp.mesFechado ?? mesNum,
@@ -168,6 +186,7 @@ export async function buildCeoMatriz(db: any, ate?: string): Promise<CeoMatrizRe
     // Eficiência de aquisição já pronta no BP (mesma régua da aba CAC do BP 2026).
     cacPorClienteLinha: (bp.cacDetalhe ?? []).find((l: any) => l.metrica === "cac_por_cliente"),
     cacPorContratoLinha: (bp.cacDetalhe ?? []).find((l: any) => l.metrica === "cac_por_contrato"),
+    movimento,
   });
 }
 
