@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-14 | feat(dre): filtro de regime Caixa/Competência na DRE
+
+**O que foi feito:**
+- Novo seletor "Regime" (Caixa / Competência) na barra de filtros da DRE, default Caixa.
+- Endpoint `/api/financeiro/dre` passou a aceitar o param `regime`. Em competência, as duas queries (principal + fornecedores) usam `data_competencia` para o mês/ano, `valor_bruto` como valor e removem o filtro `status = 'QUITADO'` (reconhece o faturado, incluindo pendentes/atrasados/futuros). O modo caixa permanece idêntico ao anterior.
+- Título da DRE deixou de ser fixo "(Regime de Caixa)" e passa a refletir o regime selecionado.
+
+**Por que:**
+- A DRE só mostrava resultado por caixa (quando o dinheiro entrou/saiu). Competência permite ver o resultado pelo mês de reconhecimento (faturamento), aproveitando a coluna `data_competencia` que já existe 100% preenchida na `caz_parcelas`.
+
+**Arquivos alterados:**
+- `server/routes/dre.ts` - fragmentos SQL condicionais por regime nas duas queries; `regime` na resposta.
+- `client/src/pages/DRE.tsx` - state `regime`, entrada na queryKey/URL, `<Select>` de Regime e título dinâmico.
+- `docs/superpowers/specs/2026-07-14-dre-regime-competencia-design.md` - spec de design da feature.
+
+**Impacto arquitetural:** Nenhum. Mudança aditiva; o comportamento default (caixa) é preservado byte-a-byte.
+
+---
+
 ## 2026-07-10 | fix(reporte-trimestral): estoque pontual em aberto bate entre os dois slides
 
 **Bug:** o "estoque em aberto" divergia entre o slide **Pontual** (R$ 1,68M) e o slide **Visão do Trimestre — Pontual** (R$ 2,09M), sendo a mesma métrica.
