@@ -32,6 +32,10 @@ export interface MetricasResumo {
   crossTotal: number; // crossR + crossPAmortizado
   netChurn: number; // churnAjustado - crossTotal
   netChurnPct: number; // 0-100
+  churnBrutoSemAbono: number; // valor_r do mês, todos os motivos, exceto abonar_churn='Sim'
+  churnBrutoSemAbonoPct: number; // 0-100
+  nrrBruto: number; // churnBrutoSemAbono - crossTotal
+  nrrBrutoPct: number; // 0-100
 }
 
 // Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real)
@@ -89,6 +93,7 @@ MRR ${mesAnterior}: ${formatarMoedaBR(m.mrrMesAnterior)}
 
 Churn MRR TOTAL: ${formatarMoedaBR(m.churnTotal)} - *${formatarPercentBR(m.churnTotalPct)}*
 Churn MRR (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnAjustado)} - *${formatarPercentBR(m.churnAjustadoPct)}*
+Churn MRR bruto (sem abonos): ${formatarMoedaBR(m.churnBrutoSemAbono)} - *${formatarPercentBR(m.churnBrutoSemAbonoPct)}*
 
 Cross R: ${crossRTexto}
 Cross P: ${crossPTexto}
@@ -98,6 +103,11 @@ Net Churn = Churn Ajustado − Cross Total
 = ${formatarMoedaBR(m.churnAjustado)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.netChurn)}*
 % = ${formatarMoedaBR(m.netChurn)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
 = *${formatarPercentBR(m.netChurnPct)}*
+
+NRR Bruto = Churn Bruto s/ abonos − Cross Total
+= ${formatarMoedaBR(m.churnBrutoSemAbono)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.nrrBruto)}*
+% = ${formatarMoedaBR(m.nrrBruto)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
+= *${formatarPercentBR(m.nrrBrutoPct)}*
 
 
 estamos de 👀`;
@@ -151,21 +161,30 @@ async function getMrrSoAtivo(): Promise<number> {
   return parseFloat((result.rows[0] as any)?.mrr || "0");
 }
 
-async function getChurnMes(): Promise<{ total: number; ajustado: number }> {
+async function getChurnMes(): Promise<{ total: number; ajustado: number; brutoSemAbono: number }> {
   // Churn BRUTO (inclui abonados) por data do pedido; "ajustado" exclui os
-  // motivos operacionais (erro de venda / não começou / inadimplente 1º mês)
+  // motivos operacionais (erro de venda / não começou / inadimplente 1º mês);
+  // "brutoSemAbono" mantém todos os motivos mas exclui os abonados (abonar_churn='Sim').
+  // Abono e os 3 motivos NÃO são o mesmo conjunto — ver spec 2026-07-14.
   const result = await db.execute(sql`
     SELECT
       COALESCE(SUM(valor_r), 0) AS total,
       COALESCE(SUM(valor_r) FILTER (
         WHERE COALESCE(motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}
-      ), 0) AS ajustado
+      ), 0) AS ajustado,
+      COALESCE(SUM(valor_r) FILTER (
+        WHERE COALESCE(abonar_churn, '') <> 'Sim'
+      ), 0) AS bruto_sem_abono
     FROM "Clickup".cup_churn
     WHERE data_solicitacao_encerramento >= date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo'))::date
       AND data_solicitacao_encerramento < (date_trunc('month', (NOW() AT TIME ZONE 'America/Sao_Paulo')) + interval '1 month')::date
   `);
   const row = result.rows[0] as any;
-  return { total: parseFloat(row?.total || "0"), ajustado: parseFloat(row?.ajustado || "0") };
+  return {
+    total: parseFloat(row?.total || "0"),
+    ajustado: parseFloat(row?.ajustado || "0"),
+    brutoSemAbono: parseFloat(row?.bruto_sem_abono || "0"),
+  };
 }
 
 async function getChurnPontualMes(): Promise<{ total: number; ajustado: number }> {
@@ -251,6 +270,7 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
   const crossPAmortizado = crossP / 5;
   const crossTotal = crossR + crossPAmortizado;
   const netChurn = churn.ajustado - crossTotal;
+  const nrrBruto = churn.brutoSemAbono - crossTotal;
 
   return {
     mrrTotal,
@@ -273,6 +293,10 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
     crossTotal,
     netChurn,
     netChurnPct: (netChurn / mrrMesAnterior) * 100,
+    churnBrutoSemAbono: churn.brutoSemAbono,
+    churnBrutoSemAbonoPct: (churn.brutoSemAbono / mrrMesAnterior) * 100,
+    nrrBruto,
+    nrrBrutoPct: (nrrBruto / mrrMesAnterior) * 100,
   };
 }
 
