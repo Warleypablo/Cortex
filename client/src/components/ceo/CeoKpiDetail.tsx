@@ -11,7 +11,7 @@ const MESES = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
 interface ItemDet { nome: string; detalhe: string; data: string | null; valor: number; url?: string }
 interface GrupoDet { titulo: string; total: number; sinal?: "+" | "-"; formato: "brl" | "num"; itens: ItemDet[]; itensOmitidos?: { qtd: number; valor: number }; aberto?: boolean }
 interface DetalheResponse {
-  kpi: string; titulo: string; mes: number; unidade: "brl" | "int";
+  kpi: string; titulo: string; mes: number; unidade: "brl" | "int" | "pct";
   orcado: number | null; realizado: number | null; atingimentoPct: number | null;
   grupos: GrupoDet[]; evolucao?: PontoEvolucao[]; nota?: string;
   media?: number | null; // auditoria de LTV: média dos mesmos clientes (comparativo mediana × média)
@@ -33,7 +33,7 @@ const TOM_ACENTO: Record<string, { texto: string; barra: string; chip: string }>
 // A distância entre as duas conta a história dos outliers — por isso a célula usa mediana.
 function MedianaVsMedia({ mediana, media, soma, n, unidade, corMediana }: {
   mediana: number; media: number; soma?: number | null; n?: number | null;
-  unidade: "brl" | "int"; corMediana: string;
+  unidade: "brl" | "int" | "pct"; corMediana: string;
 }) {
   const max = Math.max(mediana, media);
   const gapPct = Math.round((media / mediana - 1) * 100);
