@@ -9,6 +9,7 @@ export interface CeoMatrizCelula {
 }
 export interface CeoMatrizLinha {
   key: string;
+  tipo?: "secao" | "dado";
   label: string;
   unidade: CeoUnidade;
   direcao: CeoDirecao;
@@ -67,6 +68,19 @@ export function CeoMatrizTabela({
           </thead>
           <tbody>
             {data.linhas.map((linha) => {
+              if (linha.tipo === "secao") {
+                return (
+                  <tr key={linha.key} className="border-b border-gray-200 dark:border-zinc-800 bg-gray-50/70 dark:bg-zinc-800/40">
+                    <th
+                      scope="colgroup"
+                      colSpan={data.meses.length + 1}
+                      className={`${STICKY} !bg-gray-50 dark:!bg-zinc-800/40 px-4 py-2 text-left text-[11px] font-semibold uppercase tracking-[0.12em] text-gray-500 dark:text-zinc-400`}
+                    >
+                      {linha.label}
+                    </th>
+                  </tr>
+                );
+              }
               const emBreve = linha.key === "nps";
               return (
                 <tr
