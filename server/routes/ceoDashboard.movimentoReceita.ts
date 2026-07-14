@@ -83,8 +83,8 @@ export interface MovimentoIngredientes {
 }
 export interface MovimentoReceita {
   linhas: {
-    vendaMrr: BpLinha; churnMrr: BpLinha; crossMrr: BpLinha; churnPct: BpLinha;
-    vendaPontual: BpLinha; churnPontual: BpLinha; crossPontual: BpLinha; churnPctPontual: BpLinha;
+    vendaMrr: BpLinha; churnMrr: BpLinha; crossMrr: BpLinha; churnPct: BpLinha; nrr: BpLinha;
+    vendaPontual: BpLinha; churnPontual: BpLinha; crossPontual: BpLinha; churnPctPontual: BpLinha; nrrPontual: BpLinha;
   };
   ingredientes: MovimentoIngredientes;
 }
@@ -123,6 +123,16 @@ function serieChurnPct(churn: Record<number, number>, base: Record<number, numbe
   return out;
 }
 
+// Erosão do NRR: (churn − cross) / base × 100. Base 0/ausente → null.
+function serieNrr(churn: Record<number, number>, cross: Record<number, number>, base: Record<number, number>, mesNum: number): Record<number, number | null> {
+  const out: Record<number, number | null> = {};
+  for (let mes = 1; mes <= mesNum; mes++) {
+    const b = base[mes];
+    out[mes] = b && b > 0 ? ((churn[mes] ?? 0) - (cross[mes] ?? 0)) / b * 100 : null;
+  }
+  return out;
+}
+
 export function montarMovimentoReceita(input: MovimentoInput): MovimentoReceita {
   const { queries, mesNum } = input;
   const churnMrrPorMes = realizadoPorMes(input.churnMes);                    // já positivo
@@ -131,6 +141,8 @@ export function montarMovimentoReceita(input: MovimentoInput): MovimentoReceita 
 
   const churnPctPorMes = serieChurnPct(churnMrrPorMes, queries.mrrInicioPorMes, mesNum);
   const churnPctPontualPorMes = serieChurnPct(churnPontualPorMes, estoquePontIniPorMes, mesNum);
+  const nrrPorMes = serieNrr(churnMrrPorMes, queries.crossMrrPorMes, queries.mrrInicioPorMes, mesNum);
+  const nrrPontualPorMes = serieNrr(churnPontualPorMes, queries.crossPontPorMes, estoquePontIniPorMes, mesNum);
 
   // Linha vazia como fallback quando o BP não trouxe a métrica.
   const vazia = (metrica: string): BpLinha => ({ metrica, meses: [] });
@@ -141,10 +153,12 @@ export function montarMovimentoReceita(input: MovimentoInput): MovimentoReceita 
       churnMrr: input.churnMes ?? vazia("churn_mes"),
       crossMrr: linhaDeSerie("cross_mrr", "brl", queries.crossMrrPorMes, mesNum),
       churnPct: linhaDeSerie("churn_pct", "pct", churnPctPorMes, mesNum),
+      nrr: linhaDeSerie("nrr", "pct", nrrPorMes, mesNum),
       vendaPontual: input.vendasPontual ?? vazia("vendas_pontual"),
       churnPontual: linhaDeSerie("churn_pontual", "brl", churnPontualPorMes, mesNum),
       crossPontual: linhaDeSerie("cross_pontual", "brl", queries.crossPontPorMes, mesNum),
       churnPctPontual: linhaDeSerie("churn_pct_pontual", "pct", churnPctPontualPorMes, mesNum),
+      nrrPontual: linhaDeSerie("nrr_pontual", "pct", nrrPontualPorMes, mesNum),
     },
     ingredientes: {
       mrrInicioPorMes: queries.mrrInicioPorMes,

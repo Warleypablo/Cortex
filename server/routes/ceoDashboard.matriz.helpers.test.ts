@@ -180,21 +180,23 @@ describe("montarMatrizCeo — bloco movimento de receita", () => {
     churnMrr: linhaMov("churn_mes", "brl", [10, 20]),
     crossMrr: linhaMov("cross_mrr", "brl", [4, 6]),
     churnPct: linhaMov("churn_pct", "pct", [0.6, 0.7]),
+    nrr: linhaMov("nrr", "pct", [0.6, 0.7]),
     vendaPontual: linhaMov("vendas_pontual", "brl", [60, 40]),
     churnPontual: linhaMov("churn_pontual", "brl", [5, 8]),
     crossPontual: linhaMov("cross_pontual", "brl", [1, 2]),
     churnPctPontual: linhaMov("churn_pct_pontual", "pct", [2, 2.4]),
+    nrrPontual: linhaMov("nrr_pontual", "pct", [2, 2.4]),
   };
   // sources mínimo — reusa o fixture base do arquivo (mesNum precisa cobrir 2 meses) + movimento.
   const sourcesBase: CeoMatrizSources = { ...baseSources({ mesNum: 2, mesFechado: 2 }), movimento };
 
-  it("adiciona 2 seções + 8 linhas de dado na ordem correta", () => {
+  it("adiciona 2 seções + 10 linhas de dado na ordem correta", () => {
     const res = montarMatrizCeo(sourcesBase);
     const keys = res.linhas.map((l) => l.key);
     const idx = keys.indexOf("mov_secao_mrr");
     expect(idx).toBeGreaterThan(-1);
-    expect(keys.slice(idx, idx + 5)).toEqual(["mov_secao_mrr", "venda_mrr", "churn_mrr", "cross_mrr", "churn_pct"]);
-    expect(keys.slice(idx + 5, idx + 10)).toEqual(["mov_secao_pontual", "venda_pontual", "churn_pontual", "cross_pontual", "churn_pct_pontual"]);
+    expect(keys.slice(idx, idx + 6)).toEqual(["mov_secao_mrr", "venda_mrr", "churn_mrr", "cross_mrr", "churn_pct", "nrr"]);
+    expect(keys.slice(idx + 6, idx + 12)).toEqual(["mov_secao_pontual", "venda_pontual", "churn_pontual", "cross_pontual", "churn_pct_pontual", "nrr_pontual"]);
   });
 
   it("linha de seção tem tipo 'secao' e sem células", () => {
@@ -218,5 +220,18 @@ describe("montarMatrizCeo — bloco movimento de receita", () => {
     expect(churnPct.celulas[0].valor).toBe(0.6);
     expect(churnPct.direcao).toBe("menor_melhor");
     expect(churnPct.faixasTom).toEqual({ ambar: 7, vermelho: 9 });
+  });
+
+  it("NRR entra semMeta e neutro (sem faixasTom), coexistindo com Churn %", () => {
+    const res = montarMatrizCeo(sourcesBase);
+    const nrr = res.linhas.find((l) => l.key === "nrr")!;
+    expect(nrr.semMeta).toBe(true);
+    expect(nrr.faixasTom).toBeUndefined();
+    expect(nrr.unidade).toBe("pct");
+    expect(nrr.celulas[0].valor).toBe(0.6);
+    expect(nrr.direcao).toBe("menor_melhor");
+    // Churn % continua presente e colorido (não foi removido/renomeado).
+    expect(res.linhas.find((l) => l.key === "churn_pct")).toBeDefined();
+    expect(res.linhas.find((l) => l.key === "churn_pct")!.faixasTom).toEqual({ ambar: 7, vermelho: 9 });
   });
 });

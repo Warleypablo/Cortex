@@ -49,7 +49,7 @@ export interface CeoMatrizSources {
   // Trazem meses[] com orçado/realizado/atingimento (mesmo formato das linhas do BP) → têm meta.
   cacPorClienteLinha?: BpLinha; // CAC total ÷ deals ganhos no Bitrix
   cacPorContratoLinha?: BpLinha; // CAC total ÷ serviços vendidos no Bitrix
-  movimento?: MovimentoReceita["linhas"]; // as 8 linhas do bloco de movimento de receita (opcional)
+  movimento?: MovimentoReceita["linhas"]; // as 10 linhas do bloco de movimento de receita (opcional)
 }
 
 const MESES_LABEL = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
@@ -145,6 +145,8 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
       movLinha(s.movimento.churnPct, "churn_pct", "Churn % MRR", "menor_melhor", "pct", true,
         "Churn recorrente do mês ÷ MRR do fechamento do mês anterior. Verde <7%, âmbar 7–9%, vermelho >9%.",
         { ambar: 7, vermelho: 9 }),
+      movLinha(s.movimento.nrr, "nrr", "NRR", "menor_melhor", "pct", true,
+        "Erosão líquida = (Churn − Cross-sell) ÷ MRR do fechamento anterior. Menor é melhor; sem meta."),
       secao("mov_secao_pontual", "Movimento de Receita — Pontual"),
       movLinha(s.movimento.vendaPontual, "venda_pontual", "Venda Pontual", "maior_melhor", "brl", false),
       movLinha(s.movimento.churnPontual, "churn_pontual", "Churn Pontual", "menor_melhor", "brl", true,
@@ -154,6 +156,8 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
       movLinha(s.movimento.churnPctPontual, "churn_pct_pontual", "Churn % Pontual", "menor_melhor", "pct", true,
         "Churn pontual do mês ÷ estoque pontual inicial. Verde <7%, âmbar 7–9%, vermelho >9%.",
         { ambar: 7, vermelho: 9 }),
+      movLinha(s.movimento.nrrPontual, "nrr_pontual", "NRR Pontual", "menor_melhor", "pct", true,
+        "Erosão do estoque pontual = (Churn − Cross-sell) ÷ estoque pontual inicial. Menor é melhor; sem meta."),
     ] : []),
   ];
 
