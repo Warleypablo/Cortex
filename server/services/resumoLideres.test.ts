@@ -53,7 +53,8 @@ MRR JUNHO: R$ 1.197.868,00
 
 Churn MRR TOTAL: R$ 19.279,00 - *1,61%*
 Churn MRR (sem erro de venda, não começou e inadimplente 1 mês): R$ 16.282,00 - *1,36%*
-Churn MRR bruto (sem abonos): R$ 17.779,00 - *1,48%*
+Churn MRR sem abonos: R$ 17.779,00 - *1,48%*
+(abonado no mês: R$ 1.500,00)
 
 Cross R: ZERO
 Cross P: R$ 6.300,00 / 5 = R$ 1.260,00
@@ -64,7 +65,7 @@ Net Churn = Churn Ajustado − Cross Total
 % = R$ 15.022,00 ÷ MRR JUNHO (R$ 1.197.868,00)
 = *1,25%*
 
-NRR Bruto = Churn Bruto s/ abonos − Cross Total
+NRR Bruto = Churn s/ abonos − Cross Total
 = R$ 17.779,00 − R$ 1.260,00 = *R$ 16.519,00*
 % = R$ 16.519,00 ÷ MRR JUNHO (R$ 1.197.868,00)
 = *1,38%*

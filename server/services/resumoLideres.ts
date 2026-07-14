@@ -76,6 +76,8 @@ export function formatarMensagemResumo(
     m.crossP > 0
       ? `${formatarMoedaBR(m.crossP)} / 5 = ${formatarMoedaBR(m.crossPAmortizado)}`
       : "ZERO";
+  // Valor abonado no mês = churn total − churn sem abonos (deriva dos dois campos)
+  const churnAbonado = m.churnTotal - m.churnBrutoSemAbono;
 
   return `${saudacao(agora.hora)} líderes!!!
 Atualizações sobre nossas métricas principais, dia *${agora.dataFmt}, ${agora.horaFmt}*.
@@ -93,7 +95,8 @@ MRR ${mesAnterior}: ${formatarMoedaBR(m.mrrMesAnterior)}
 
 Churn MRR TOTAL: ${formatarMoedaBR(m.churnTotal)} - *${formatarPercentBR(m.churnTotalPct)}*
 Churn MRR (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnAjustado)} - *${formatarPercentBR(m.churnAjustadoPct)}*
-Churn MRR bruto (sem abonos): ${formatarMoedaBR(m.churnBrutoSemAbono)} - *${formatarPercentBR(m.churnBrutoSemAbonoPct)}*
+Churn MRR sem abonos: ${formatarMoedaBR(m.churnBrutoSemAbono)} - *${formatarPercentBR(m.churnBrutoSemAbonoPct)}*
+(abonado no mês: ${formatarMoedaBR(churnAbonado)})
 
 Cross R: ${crossRTexto}
 Cross P: ${crossPTexto}
@@ -104,7 +107,7 @@ Net Churn = Churn Ajustado − Cross Total
 % = ${formatarMoedaBR(m.netChurn)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
 = *${formatarPercentBR(m.netChurnPct)}*
 
-NRR Bruto = Churn Bruto s/ abonos − Cross Total
+NRR Bruto = Churn s/ abonos − Cross Total
 = ${formatarMoedaBR(m.churnBrutoSemAbono)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.nrrBruto)}*
 % = ${formatarMoedaBR(m.nrrBruto)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
 = *${formatarPercentBR(m.nrrBrutoPct)}*

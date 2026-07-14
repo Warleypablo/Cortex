@@ -71,13 +71,23 @@ jun/jul quase coincidem). Métrica traz informação nova. (*jul parcial no banc
 
 ## Mudanças na mensagem (layout)
 
-Bloco de churn recorrente — adicionar a 3ª linha logo após o Ajustado:
+Bloco de churn recorrente — adicionar a 3ª linha logo após o Ajustado, com a
+**anotação do valor abonado** logo abaixo:
 
 ```
 Churn MRR TOTAL: R$ 186.662,00 - *X,XX%*
 Churn MRR (sem erro de venda, não começou e inadimplente 1 mês): R$ 150.174,00 - *X,XX%*
-Churn MRR bruto (sem abonos): R$ 146.177,00 - *X,XX%*        ← NOVA LINHA
+Churn MRR sem abonos: R$ 146.177,00 - *X,XX%*               ← NOVA LINHA
+(abonado no mês: R$ ...)                                    ← anotação
 ```
+
+**Por que a anotação:** as réguas "Ajustado" (sem os 3 motivos) e "sem abonos"
+removem conjuntos que, na Turbo, se sobrepõem muito — abonar um churn ≈ marcá-lo
+como erro de venda / não começou. Em meses como julho/2026 os dois recortes calham
+de ser o mesmo conjunto e as linhas exibem o mesmo número (35.523). A anotação
+`(abonado no mês: R$ total − sem_abonos)` ancora a linha no contraste correto
+(Total − abonos) e dá significado próprio à linha mesmo quando ela coincide com o
+Ajustado. O valor abonado é derivado (`churnTotal − churnBrutoSemAbono`), sem query nova.
 
 Após o bloco do Net Churn — adicionar o bloco do NRR Bruto:
 
