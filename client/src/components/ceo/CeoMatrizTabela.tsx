@@ -159,6 +159,7 @@ export function CeoMatrizTabela({
         andamento (parcial). Inadimplência por mês de vencimento; LTV FAT = faturável mediano dos ativos (ClickUp: Valor R × meses + pontual entregue);
         LTV DFC = caixa mediano (pago real no Conta Azul desde out/25 + faturável antes); E-NPS por onda de pesquisa (meses sem pesquisa ficam vazios). Clique numa célula para o detalhamento do mês.
         Movimento de Receita (MRR e Pontual): venda, churn e cross-sell/upsell; Churn % (MRR e Pontual) = churn ÷ base do fechamento anterior; verde &lt;7%, âmbar 7–9%, vermelho &gt;9%.
+        NRR = erosão (churn − cross-sell) ÷ base, menor é melhor.
       </p>
     </div>
   );

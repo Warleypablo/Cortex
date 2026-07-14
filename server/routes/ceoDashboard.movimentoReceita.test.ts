@@ -52,6 +52,25 @@ describe("montarMovimentoReceita", () => {
     expect(r.linhas.churnPct.meses[0].realizado).toBeNull();
   });
 
+  it("NRR (erosão) = (churn − cross) / base × 100, coexiste com Churn %", () => {
+    const r = montarMovimentoReceita(base);
+    // mês 1: (10−4) / 1000 × 100 = 0.6 ; mês 2: (20−6) / 2000 × 100 = 0.7
+    expect(r.linhas.nrr.meses[0].realizado).toBeCloseTo(0.6, 5);
+    expect(r.linhas.nrr.meses[1].realizado).toBeCloseTo(0.7, 5);
+    expect(r.linhas.nrr.unidade).toBe("pct");
+    // Churn % continua existindo e correto (não removido).
+    expect(r.linhas.churnPct.meses[0].realizado).toBeCloseTo(1.0, 5);
+  });
+
+  it("NRR Pontual = (churn_pont_abs − cross_pont) / estoque_ini × 100", () => {
+    const r = montarMovimentoReceita(base);
+    // mês 1: (5−1) / 200 × 100 = 2.0 ; mês 2: (8−2) / 250 × 100 = 2.4
+    expect(r.linhas.nrrPontual.meses[0].realizado).toBeCloseTo(2.0, 5);
+    expect(r.linhas.nrrPontual.meses[1].realizado).toBeCloseTo(2.4, 5);
+    // Churn % Pontual continua existindo e correto (não removido).
+    expect(r.linhas.churnPctPontual.meses[0].realizado).toBeCloseTo(2.5, 5);
+  });
+
   it("churn pontual é normalizado para positivo", () => {
     const r = montarMovimentoReceita(base);
     expect(r.linhas.churnPontual.meses[0].realizado).toBe(5);
