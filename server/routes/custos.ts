@@ -82,4 +82,130 @@ export function registerCustosRoutes(app: Express, db: any) {
       res.status(500).json({ error: "Failed to list pessoas" });
     }
   });
+
+  // ---- Assinaturas ----
+  app.get("/api/custos/assinaturas", async (_req, res) => {
+    try {
+      const r = await db.execute(sql`
+        SELECT a.*, COALESCE(
+          json_agg(json_build_object('id', p.id, 'nome', p.nome)) FILTER (WHERE p.id IS NOT NULL),
+          '[]'
+        ) AS usuarios
+        FROM cortex_core.custo_assinaturas a
+        LEFT JOIN cortex_core.custo_assinatura_usuarios au ON au.assinatura_id = a.id
+        LEFT JOIN "Inhire".rh_pessoal p ON p.id = au.pessoa_id
+        GROUP BY a.id
+        ORDER BY a.status ASC, a.fornecedor ASC, a.plano ASC
+      `);
+      res.json(r.rows.map((row: any) => ({
+        id: row.id,
+        fornecedor: row.fornecedor,
+        plano: row.plano,
+        valor: parseFloat(row.valor) || 0,
+        moeda: row.moeda,
+        ciclo: row.ciclo,
+        dataAssinatura: row.data_assinatura,
+        dataCancelamento: row.data_cancelamento,
+        status: row.status,
+        responsavelPessoaId: row.responsavel_pessoa_id,
+        projeto: row.projeto,
+        observacoes: row.observacoes,
+        usuarios: row.usuarios,
+      })));
+    } catch (error) {
+      console.error("[custos] assinaturas list:", error);
+      res.status(500).json({ error: "Failed to list assinaturas" });
+    }
+  });
+
+  app.post("/api/custos/assinaturas", isAdmin, async (req, res) => {
+    try {
+      const b = req.body || {};
+      if (!b.fornecedor || !b.plano || !b.dataAssinatura) {
+        return res.status(400).json({ error: "fornecedor, plano e dataAssinatura são obrigatórios" });
+      }
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.custo_assinaturas
+          (fornecedor, plano, valor, moeda, ciclo, data_assinatura, data_cancelamento, status, responsavel_pessoa_id, projeto, observacoes)
+        VALUES
+          (${b.fornecedor}, ${b.plano}, ${b.valor || 0}, ${b.moeda || "USD"}, ${b.ciclo || "mensal"},
+           ${b.dataAssinatura}, ${b.dataCancelamento || null}, ${b.status || "ativo"},
+           ${b.responsavelPessoaId || null}, ${b.projeto || "Geral"}, ${b.observacoes || null})
+        RETURNING id
+      `);
+      const id = (result.rows[0] as any).id;
+      const usuarios: number[] = Array.isArray(b.usuarios) ? b.usuarios : [];
+      for (const pid of usuarios) {
+        await db.execute(sql`
+          INSERT INTO cortex_core.custo_assinatura_usuarios (assinatura_id, pessoa_id)
+          VALUES (${id}, ${pid}) ON CONFLICT DO NOTHING
+        `);
+      }
+      res.status(201).json({ id });
+    } catch (error) {
+      console.error("[custos] assinatura create:", error);
+      res.status(500).json({ error: "Failed to create assinatura" });
+    }
+  });
+
+  app.put("/api/custos/assinaturas/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const b = req.body || {};
+      const result = await db.execute(sql`
+        UPDATE cortex_core.custo_assinaturas SET
+          fornecedor = COALESCE(${b.fornecedor}, fornecedor),
+          plano = COALESCE(${b.plano}, plano),
+          valor = COALESCE(${b.valor}, valor),
+          moeda = COALESCE(${b.moeda}, moeda),
+          ciclo = COALESCE(${b.ciclo}, ciclo),
+          data_assinatura = COALESCE(${b.dataAssinatura}, data_assinatura),
+          data_cancelamento = ${b.dataCancelamento === undefined ? sql`data_cancelamento` : b.dataCancelamento},
+          status = COALESCE(${b.status}, status),
+          responsavel_pessoa_id = ${b.responsavelPessoaId === undefined ? sql`responsavel_pessoa_id` : b.responsavelPessoaId},
+          projeto = COALESCE(${b.projeto}, projeto),
+          observacoes = ${b.observacoes === undefined ? sql`observacoes` : b.observacoes},
+          updated_at = NOW()
+        WHERE id = ${id} RETURNING id
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Assinatura not found" });
+      res.json({ id });
+    } catch (error) {
+      console.error("[custos] assinatura update:", error);
+      res.status(500).json({ error: "Failed to update assinatura" });
+    }
+  });
+
+  app.delete("/api/custos/assinaturas/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const result = await db.execute(sql`
+        DELETE FROM cortex_core.custo_assinaturas WHERE id = ${id} RETURNING id
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Assinatura not found" });
+      res.status(204).send();
+    } catch (error) {
+      console.error("[custos] assinatura delete:", error);
+      res.status(500).json({ error: "Failed to delete assinatura" });
+    }
+  });
+
+  // Substitui a lista de usuários (pessoas do RH) de uma assinatura
+  app.put("/api/custos/assinaturas/:id/usuarios", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const usuarios: number[] = Array.isArray(req.body?.usuarios) ? req.body.usuarios : [];
+      await db.execute(sql`DELETE FROM cortex_core.custo_assinatura_usuarios WHERE assinatura_id = ${id}`);
+      for (const pid of usuarios) {
+        await db.execute(sql`
+          INSERT INTO cortex_core.custo_assinatura_usuarios (assinatura_id, pessoa_id)
+          VALUES (${id}, ${pid}) ON CONFLICT DO NOTHING
+        `);
+      }
+      res.json({ id, usuarios });
+    } catch (error) {
+      console.error("[custos] assinatura usuarios:", error);
+      res.status(500).json({ error: "Failed to set usuarios" });
+    }
+  });
 }
