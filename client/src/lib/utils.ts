@@ -82,6 +82,16 @@ export function formatCurrencyNoDecimals(value: number): string {
   }).format(value);
 }
 
+export function formatCurrencyUSD(value: number): string {
+  if (value === null || value === undefined || isNaN(value)) return '$0';
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 0,
+  }).format(value);
+}
+
 /**
  * Formats a number as compact Brazilian currency (K, M, B).
  */
