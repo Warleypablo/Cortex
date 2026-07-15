@@ -186,6 +186,7 @@ const EstoquePontual = lazyWithRetry(() => import("@/pages/EstoquePontual"));
 const CreatorsPontual = lazyWithRetry(() => import("@/pages/CreatorsPontual"));
 const CreatorsConversao = lazyWithRetry(() => import("@/pages/CreatorsConversao"));
 const CeoDashboard = lazyWithRetry(() => import("@/pages/CeoDashboard"));
+const CentralCustos = lazyWithRetry(() => import("@/pages/CentralCustos"));
 
 // Error boundary to catch silent crashes in the portal.
 // The lazyWithRetry wrapper handles the first auto-reload attempt at the
@@ -482,6 +483,7 @@ function ProtectedRouter() {
       <Route path="/admin/kpi">{() => <ProtectedRoute path="/admin/kpi" component={AdminOverrides} />}</Route>
       <Route path="/admin/uso">{() => <ProtectedRoute path="/admin/uso" component={AdminUsageLog} />}</Route>
       <Route path="/admin/test-workflow">{() => <ProtectedRoute path="/admin/test-workflow" component={TestWorkflow} />}</Route>
+      <Route path="/central-custos">{() => <ProtectedRoute path="/central-custos" component={CentralCustos} />}</Route>
 
       {/* Homepage - Dashboard baseado no perfil do usuário (placed at end to avoid shadowing other routes) */}
       <Route path="/">{() => (

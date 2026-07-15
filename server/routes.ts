@@ -40,6 +40,7 @@ import { registerCapacityRoutes } from "./routes/capacity";
 import { registerDRERoutes } from "./routes/dre";
 import { registerMixReceitaRoutes } from "./routes/mixReceita";
 import { registerMetasRoutes } from "./routes/metas";
+import { registerCustosRoutes } from "./routes/custos";
 import { registerContratosRoutes } from "./routes/contratos";
 import { registerTechRoutes } from "./routes/tech";
 import { registerTechHubRoutes } from "./routes/tech-hub";
@@ -8502,6 +8503,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Metas & Notifications Module - registered from separate file
   await registerMetasRoutes(app, db, storage);
+
+  // Central de Custos de IA
+  registerCustosRoutes(app, db);
 
   // Tech Module - registered from separate file
   registerTechRoutes(app, db, storage);

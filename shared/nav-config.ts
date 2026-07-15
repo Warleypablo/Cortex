@@ -149,6 +149,7 @@ export const PERMISSION_KEYS = {
     AVISOS: 'admin.avisos',
     USO: 'admin.uso',
     RESUMO_LIDERES: 'admin.resumo_lideres',
+    CENTRAL_CUSTOS: 'admin.central_custos',
   },
 } as const;
 
@@ -232,6 +233,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/okr-2026': PERMISSION_KEYS.ADMIN.OKR_2026,
   '/ceo-dashboard': PERMISSION_KEYS.ADMIN.CEO_DASHBOARD,
   '/admin/resumo-lideres': PERMISSION_KEYS.ADMIN.RESUMO_LIDERES,
+  '/central-custos': PERMISSION_KEYS.ADMIN.CENTRAL_CUSTOS,
   // Financeiro
   '/dashboard/dfc': PERMISSION_KEYS.FIN.DFC,
   '/dashboard/fluxo-caixa': PERMISSION_KEYS.FIN.FLUXO_CAIXA,
@@ -619,6 +621,7 @@ export const NAV_CONFIG = {
       { title: 'Avisos', url: '/admin/avisos', icon: 'Megaphone', permissionKey: PERMISSION_KEYS.ADMIN.AVISOS },
       { title: 'Resumo dos Líderes', url: '/admin/resumo-lideres', icon: 'Send', permissionKey: PERMISSION_KEYS.ADMIN.RESUMO_LIDERES },
       { title: 'Uso do Sistema', url: '/admin/uso', icon: 'Activity', permissionKey: PERMISSION_KEYS.ADMIN.USO },
+      { title: 'Central de Custos', url: '/central-custos', icon: 'DollarSign', permissionKey: PERMISSION_KEYS.ADMIN.CENTRAL_CUSTOS },
     ],
   },
 };
@@ -804,4 +807,5 @@ export const PERMISSION_LABELS: Record<string, string> = {
   [PERMISSION_KEYS.FIN.TURBOZAP]: 'TurboZap',
   [PERMISSION_KEYS.FIN.DRE]: 'DRE',
   [PERMISSION_KEYS.ADMIN.USUARIOS]: 'Administração',
+  [PERMISSION_KEYS.ADMIN.CENTRAL_CUSTOS]: 'Central de Custos',
 };
