@@ -43,6 +43,9 @@ describe("custoMensalRecorrente", () => {
   it("fora da janela retorna 0", () => {
     expect(custoMensalRecorrente({ valor: 100, ciclo: "mensal", dataInicio: "2026-09-01", dataFim: null, status: "ativo" }, "2026-07")).toBe(0);
   });
+  it("limite inferior: mês igual ao mês de início já conta valor cheio", () => {
+    expect(custoMensalRecorrente({ valor: 200, ciclo: "mensal", dataInicio: "2026-07-01", dataFim: null, status: "ativo" }, "2026-07")).toBe(200);
+  });
 });
 
 describe("converter", () => {
@@ -54,6 +57,9 @@ describe("converter", () => {
   });
   it("taxa 0 não quebra (USD estimado 0)", () => {
     expect(converter(55, "BRL", 0)).toEqual({ valorUSD: 0, valorBRL: 55 });
+  });
+  it("USD → BRL com taxa 0 não quebra (BRL estimado 0)", () => {
+    expect(converter(10, "USD", 0)).toEqual({ valorUSD: 10, valorBRL: 0 });
   });
 });
 
