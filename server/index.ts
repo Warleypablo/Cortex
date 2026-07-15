@@ -6,7 +6,7 @@ import passport from "passport";
 import { registerRoutes } from "./routes";
 import { setupVite, serveStatic, log } from "./vite";
 import { configurePassport, logOAuthSetupInstructions } from "./auth/config";
-import { pool as dbPool } from "./db";
+import { pool as dbPool, db } from "./db";
 import { initializePgTrgmExtension, initializeNotificationsTable, initializeSystemFieldOptionsTable, initializeNotificationRulesTable, initializeOnboardingTables, initializeCatalogTables, initializeSystemFieldsTable, initializeSysSchema, initializeDashboardTables, seedDefaultDashboardViews, initializeTurboEventosTable, initializeRhPagamentosTable, initializeRhPesquisasTables, initializeRhComentariosTables, initializeDfcSnapshotsTable, initializeSalesGoalsTable, initializeGestaoReceitaMetasTable, initializeScorecardResponsaveisTable, initializeCupDataHistTable, createPerformanceIndexes, initializeBpSnapshotsTable, seedBpSnapshotJaneiro2026, initializeRhNpsTable, initializeRhNpsConfigTable, initializeClientCredentialsTable, initializeChamadosTables, seedChamadoCategories, initializeNotasFiscaisTable, initializeCapacityTable, initializeCapacityMetasTable, initializeContratoTemplatesTable, initializePredictionsTable, initializeMetricRulesetsTables, migrateMetricRulesetsContext, initializeItemAliasMapTable, initializeSaldoDiarioSnapshotsTable, initializeBroadcastLeadEventsTable, initializeBroadcastClassificationTable, initializeBroadcastPlanTable, initializeMetaActionsLogTable, initializeCrmInstagramTables, initializeContentPublishTables, initializeShortLinksTables } from "./db";
 import { registerObjectStorageRoutes } from "./replit_integrations/object_storage";
 import { initTurbodashTable } from "./services/turbodash";
@@ -189,6 +189,46 @@ app.use((req, res, next) => {
   app.use('/api/meta/actions', metaActionsRouter);
 
   const server = await registerRoutes(app);
+
+  // ===== Central de Custos de IA — jobs de sync =====
+  const runCustosCambioJob = async () => {
+    try {
+      const { syncCambioMesAtual } = await import("./services/custos/cambio");
+      const taxa = await syncCambioMesAtual(db);
+      (globalThis as any).__custosCambioStatus = { lastSync: new Date().toISOString(), taxa, status: "success" };
+    } catch (err: any) {
+      (globalThis as any).__custosCambioStatus = { lastSync: new Date().toISOString(), status: "error", error: err.message };
+    }
+  };
+  const runCustosGcpJob = async () => {
+    try {
+      const { syncGcpBilling } = await import("./services/custos/gcpBillingSync");
+      const out = await syncGcpBilling(db);
+      (globalThis as any).__custosGcpStatus = { lastSync: new Date().toISOString(), ...out, status: "success" };
+    } catch (err: any) {
+      (globalThis as any).__custosGcpStatus = { lastSync: new Date().toISOString(), status: "error", error: err.message };
+    }
+  };
+  const runCustosAnthropicJob = async () => {
+    try {
+      const { syncAnthropicCost } = await import("./services/custos/anthropicCostSync");
+      const out = await syncAnthropicCost(db);
+      (globalThis as any).__custosAnthropicStatus = { lastSync: new Date().toISOString(), ...out, status: "success" };
+    } catch (err: any) {
+      (globalThis as any).__custosAnthropicStatus = { lastSync: new Date().toISOString(), status: "error", error: err.message };
+    }
+  };
+
+  // Câmbio: 1x/dia (barato, mantém o mês corrente atualizado)
+  setTimeout(() => runCustosCambioJob(), 3 * 60 * 1000);
+  setInterval(() => runCustosCambioJob(), 24 * 60 * 60 * 1000);
+  // GCP billing: 1x/dia (billing export tem latência de horas; não adianta rodar mais)
+  setTimeout(() => runCustosGcpJob(), 5 * 60 * 1000);
+  setInterval(() => runCustosGcpJob(), 24 * 60 * 60 * 1000);
+  // Anthropic cost report: 1x/dia
+  setTimeout(() => runCustosAnthropicJob(), 7 * 60 * 1000);
+  setInterval(() => runCustosAnthropicJob(), 24 * 60 * 60 * 1000);
+  console.log("[custos-jobs] Scheduled cambio/gcp/anthropic — daily");
 
   // Job automático para criar snapshot diário de contratos
   async function createDailySnapshot() {
