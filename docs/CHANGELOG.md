@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-15 | chore(server): remove sync automático horário de deals do Bitrix
+
+**O que foi feito:**
+- Removido o job agendado (`setInterval`/`setTimeout`, 1h) que chamava `syncBitrixDeals` no boot do server, em `server/index.ts`.
+- Ajustado comentário do job de UTM do Bitrix que referenciava o refresh de deals removido.
+
+**Por que:**
+- Solicitado remover o ETL automático horário de deals do Bitrix. O espelho completo do `crm_deal` continua sendo carregado pelo processo externo ~diário; o script `scripts/sync-bitrix-deals.ts` permanece disponível para execução manual.
+
+**Arquivos alterados:**
+- `server/index.ts` — removido o bloco do `bitrix-deals-sync-job` (refresh incremental do funil a cada 1h) e ajuste de comentário no job de UTM.
+
+**Impacto arquitetural:** Nenhum na estrutura; efeito é operacional — o funil de broadcast deixa de ter refresh incremental horário in-repo (só atualiza nas cargas do processo externo diário). Vale a partir do próximo restart/deploy do server. Os demais jobs de Bitrix (UTM 1h, motivo de perda 6h, contatos 24h) seguem ativos.
+
+---
+
 ## 2026-07-14 | feat(resumo-lideres): Net Churn com cálculo 100% explícito
 
 **O que foi feito:**
