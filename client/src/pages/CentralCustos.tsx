@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { KpisCustos, type ResumoMes } from "@/components/custos/KpisCustos";
 import { EvolucaoCustos } from "@/components/custos/EvolucaoCustos";
+import { AbaAssinaturas } from "@/components/custos/AbaAssinaturas";
 
 function ultimosMeses(n: number): string[] {
   const out: string[] = [];
@@ -86,7 +87,7 @@ export default function CentralCustos() {
             <TabsTrigger value="anthropic" data-testid="tab-anthropic">API Anthropic</TabsTrigger>
             <TabsTrigger value="synapse" data-testid="tab-synapse">Synapse</TabsTrigger>
           </TabsList>
-          <TabsContent value="assinaturas"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
+          <TabsContent value="assinaturas"><AbaAssinaturas moeda={moeda} /></TabsContent>
           <TabsContent value="ferramentas"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
           <TabsContent value="gcp"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
           <TabsContent value="anthropic"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
