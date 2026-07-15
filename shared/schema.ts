@@ -4270,3 +4270,89 @@ export const resumoLideresEnvios = cortexCoreSchema.table("resumo_lideres_envios
   erro: text("erro"),
   criadoEm: timestamp("criado_em").defaultNow(),
 });
+
+// ============ Central de Custos de IA ============
+export const custoAssinaturas = cortexCoreSchema.table("custo_assinaturas", {
+  id: serial("id").primaryKey(),
+  fornecedor: varchar("fornecedor", { length: 80 }).notNull(),
+  plano: varchar("plano", { length: 120 }).notNull(),
+  valor: decimal("valor", { precision: 18, scale: 2 }).notNull().default("0"),
+  moeda: varchar("moeda", { length: 3 }).notNull().default("USD"),
+  ciclo: varchar("ciclo", { length: 10 }).notNull().default("mensal"),
+  dataAssinatura: date("data_assinatura").notNull(),
+  dataCancelamento: date("data_cancelamento"),
+  status: varchar("status", { length: 10 }).notNull().default("ativo"),
+  responsavelPessoaId: integer("responsavel_pessoa_id"),
+  projeto: varchar("projeto", { length: 20 }).notNull().default("Geral"),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type CustoAssinatura = typeof custoAssinaturas.$inferSelect;
+export type InsertCustoAssinatura = typeof custoAssinaturas.$inferInsert;
+
+export const custoAssinaturaUsuarios = cortexCoreSchema.table("custo_assinatura_usuarios", {
+  id: serial("id").primaryKey(),
+  assinaturaId: integer("assinatura_id").notNull(),
+  pessoaId: integer("pessoa_id").notNull(),
+});
+
+export const custoItensManuais = cortexCoreSchema.table("custo_itens_manuais", {
+  id: serial("id").primaryKey(),
+  descricao: varchar("descricao", { length: 160 }).notNull(),
+  fornecedor: varchar("fornecedor", { length: 80 }),
+  categoria: varchar("categoria", { length: 40 }),
+  valor: decimal("valor", { precision: 18, scale: 2 }).notNull().default("0"),
+  moeda: varchar("moeda", { length: 3 }).notNull().default("USD"),
+  ciclo: varchar("ciclo", { length: 10 }).notNull().default("mensal"),
+  dataInicio: date("data_inicio").notNull(),
+  dataFim: date("data_fim"),
+  status: varchar("status", { length: 10 }).notNull().default("ativo"),
+  projeto: varchar("projeto", { length: 20 }).notNull().default("Geral"),
+  responsavelPessoaId: integer("responsavel_pessoa_id"),
+  observacoes: text("observacoes"),
+  createdAt: timestamp("created_at").defaultNow(),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type CustoItemManual = typeof custoItensManuais.$inferSelect;
+export type InsertCustoItemManual = typeof custoItensManuais.$inferInsert;
+
+export const custoGcpDiario = cortexCoreSchema.table("custo_gcp_diario", {
+  id: serial("id").primaryKey(),
+  data: date("data").notNull(),
+  gcpProjectId: varchar("gcp_project_id", { length: 120 }).notNull(),
+  servico: varchar("servico", { length: 120 }).notNull(),
+  custo: decimal("custo", { precision: 18, scale: 4 }).notNull().default("0"),
+  moeda: varchar("moeda", { length: 3 }).notNull().default("USD"),
+  projetoInterno: varchar("projeto_interno", { length: 20 }).notNull().default("Geral"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+});
+export type CustoGcpDiario = typeof custoGcpDiario.$inferSelect;
+
+export const custoAnthropicDiario = cortexCoreSchema.table("custo_anthropic_diario", {
+  id: serial("id").primaryKey(),
+  data: date("data").notNull(),
+  workspace: varchar("workspace", { length: 120 }).notNull().default(""),
+  modelo: varchar("modelo", { length: 80 }).notNull().default(""),
+  custoUsd: decimal("custo_usd", { precision: 18, scale: 4 }).notNull().default("0"),
+  tokensInput: bigint("tokens_input", { mode: "number" }),
+  tokensOutput: bigint("tokens_output", { mode: "number" }),
+  projetoInterno: varchar("projeto_interno", { length: 20 }).notNull().default("Geral"),
+  syncedAt: timestamp("synced_at").defaultNow(),
+});
+export type CustoAnthropicDiario = typeof custoAnthropicDiario.$inferSelect;
+
+export const custoGcpProjetoMap = cortexCoreSchema.table("custo_gcp_projeto_map", {
+  id: serial("id").primaryKey(),
+  gcpProjectId: varchar("gcp_project_id", { length: 120 }).notNull(),
+  projetoInterno: varchar("projeto_interno", { length: 20 }).notNull().default("Geral"),
+});
+
+export const custoCambioMensal = cortexCoreSchema.table("custo_cambio_mensal", {
+  id: serial("id").primaryKey(),
+  anoMes: varchar("ano_mes", { length: 7 }).notNull(),
+  taxaUsdBrl: decimal("taxa_usd_brl", { precision: 10, scale: 4 }).notNull(),
+  fonte: varchar("fonte", { length: 10 }).notNull().default("auto"),
+  updatedAt: timestamp("updated_at").defaultNow(),
+});
+export type CustoCambioMensal = typeof custoCambioMensal.$inferSelect;
