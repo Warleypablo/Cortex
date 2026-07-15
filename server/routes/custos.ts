@@ -309,13 +309,14 @@ export function registerCustosRoutes(app: Express, db: any) {
     try {
       const mes = (req.query.mes as string) || mesAtualBR();
       const r = await db.execute(sql`
-        SELECT gcp_project_id, projeto_interno, servico, SUM(custo) AS custo, moeda
+        SELECT id, data, gcp_project_id, projeto_interno, servico, custo, moeda
         FROM cortex_core.custo_gcp_diario
         WHERE to_char(data, 'YYYY-MM') = ${mes}
-        GROUP BY gcp_project_id, projeto_interno, servico, moeda
-        ORDER BY custo DESC
+        ORDER BY data DESC, custo DESC
       `);
       res.json(r.rows.map((row: any) => ({
+        id: row.id,
+        data: row.data,
         gcpProjectId: row.gcp_project_id,
         projetoInterno: row.projeto_interno,
         servico: row.servico,
@@ -325,6 +326,40 @@ export function registerCustosRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[custos] gcp detail:", error);
       res.status(500).json({ error: "Failed to fetch gcp detail" });
+    }
+  });
+
+  // Lançamento manual de custo GCP (enquanto o sync automático não está ligado)
+  app.post("/api/custos/gcp", isAdmin, async (req, res) => {
+    try {
+      const b = req.body || {};
+      const mes = (b.mes as string) || mesAtualBR();
+      const data = b.data || `${mes}-01`;
+      if (!b.servico || b.custo === undefined || b.custo === null) {
+        return res.status(400).json({ error: "servico e custo são obrigatórios" });
+      }
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.custo_gcp_diario (data, gcp_project_id, servico, custo, moeda, projeto_interno, synced_at)
+        VALUES (${data}, ${b.gcpProjectId || "(manual)"}, ${b.servico}, ${b.custo || 0}, ${b.moeda || "USD"}, ${b.projetoInterno || "Geral"}, NOW())
+        ON CONFLICT (data, gcp_project_id, servico) DO UPDATE SET
+          custo = EXCLUDED.custo, moeda = EXCLUDED.moeda, projeto_interno = EXCLUDED.projeto_interno, synced_at = NOW()
+        RETURNING id
+      `);
+      res.status(201).json({ id: (result.rows[0] as any).id });
+    } catch (error) {
+      console.error("[custos] gcp manual create:", error);
+      res.status(500).json({ error: "Failed to create gcp entry" });
+    }
+  });
+
+  app.delete("/api/custos/gcp/:id", isAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`DELETE FROM cortex_core.custo_gcp_diario WHERE id = ${parseInt(req.params.id)} RETURNING id`);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Not found" });
+      res.status(204).send();
+    } catch (error) {
+      console.error("[custos] gcp delete:", error);
+      res.status(500).json({ error: "Failed to delete gcp entry" });
     }
   });
 
@@ -374,23 +409,58 @@ export function registerCustosRoutes(app: Express, db: any) {
     try {
       const mes = (req.query.mes as string) || mesAtualBR();
       const r = await db.execute(sql`
-        SELECT workspace, projeto_interno, SUM(custo_usd) AS custo,
-               SUM(COALESCE(tokens_input,0)) AS tokens_input, SUM(COALESCE(tokens_output,0)) AS tokens_output
+        SELECT id, data, workspace, projeto_interno, custo_usd,
+               COALESCE(tokens_input,0) AS tokens_input, COALESCE(tokens_output,0) AS tokens_output
         FROM cortex_core.custo_anthropic_diario
         WHERE to_char(data, 'YYYY-MM') = ${mes}
-        GROUP BY workspace, projeto_interno
-        ORDER BY custo DESC
+        ORDER BY data DESC, custo_usd DESC
       `);
       res.json(r.rows.map((row: any) => ({
+        id: row.id,
+        data: row.data,
         workspace: row.workspace,
         projetoInterno: row.projeto_interno,
-        custoUsd: parseFloat(row.custo) || 0,
+        custoUsd: parseFloat(row.custo_usd) || 0,
         tokensInput: parseInt(row.tokens_input) || 0,
         tokensOutput: parseInt(row.tokens_output) || 0,
       })));
     } catch (error) {
       console.error("[custos] anthropic detail:", error);
       res.status(500).json({ error: "Failed to fetch anthropic detail" });
+    }
+  });
+
+  // Lançamento manual de custo da API Anthropic (enquanto o sync automático não está ligado)
+  app.post("/api/custos/anthropic", isAdmin, async (req, res) => {
+    try {
+      const b = req.body || {};
+      const mes = (b.mes as string) || mesAtualBR();
+      const data = b.data || `${mes}-01`;
+      if (b.custoUsd === undefined || b.custoUsd === null) {
+        return res.status(400).json({ error: "custoUsd é obrigatório" });
+      }
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.custo_anthropic_diario (data, workspace, modelo, custo_usd, projeto_interno, synced_at)
+        VALUES (${data}, ${b.workspace || "(manual)"}, '', ${b.custoUsd || 0}, ${b.projetoInterno || "Geral"}, NOW())
+        ON CONFLICT (data, workspace, modelo) DO UPDATE SET
+          custo_usd = EXCLUDED.custo_usd, projeto_interno = EXCLUDED.projeto_interno, synced_at = NOW()
+        RETURNING id
+      `);
+      res.status(201).json({ id: (result.rows[0] as any).id });
+    } catch (error) {
+      console.error("[custos] anthropic manual create:", error);
+      res.status(500).json({ error: "Failed to create anthropic entry" });
+    }
+  });
+
+  app.delete("/api/custos/anthropic/:id", isAdmin, async (req, res) => {
+    try {
+      const result = await db.execute(sql`DELETE FROM cortex_core.custo_anthropic_diario WHERE id = ${parseInt(req.params.id)} RETURNING id`);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Not found" });
+      res.status(204).send();
+    } catch (error) {
+      console.error("[custos] anthropic delete:", error);
+      res.status(500).json({ error: "Failed to delete anthropic entry" });
     }
   });
 
