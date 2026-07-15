@@ -1,5 +1,14 @@
 import { sql } from "drizzle-orm";
 
+/** Mês corrente 'YYYY-MM' no fuso America/Sao_Paulo (o server roda em UTC). */
+export function mesAtualBR(): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Sao_Paulo",
+    year: "numeric",
+    month: "2-digit",
+  }).format(new Date());
+}
+
 /** Busca a cotação USD→BRL atual na AwesomeAPI (sem key). */
 export async function buscarTaxaAwesomeAPI(): Promise<number> {
   const res = await fetch("https://economia.awesomeapi.com.br/last/USD-BRL");
@@ -47,12 +56,12 @@ export async function getTaxaMes(db: any, anoMes: string): Promise<{ taxa: numbe
 
 /** Atualiza a taxa do mês corrente com a cotação atual, exceto se o mês estiver marcado como 'manual'. */
 export async function syncCambioMesAtual(db: any): Promise<number> {
-  const anoMes = new Date().toISOString().slice(0, 7);
+  const anoMes = mesAtualBR();
   const existing = await db.execute(sql`
     SELECT fonte FROM cortex_core.custo_cambio_mensal WHERE ano_mes = ${anoMes}
   `);
   if (existing.rows.length && existing.rows[0].fonte === "manual") {
-    return parseFloat((await getTaxaMes(db, anoMes)).taxa.toString());
+    return (await getTaxaMes(db, anoMes)).taxa;
   }
   const taxa = await buscarTaxaAwesomeAPI();
   await upsertTaxaMes(db, anoMes, taxa, "auto");
