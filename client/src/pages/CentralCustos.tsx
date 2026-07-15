@@ -8,6 +8,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { KpisCustos, type ResumoMes } from "@/components/custos/KpisCustos";
 import { EvolucaoCustos } from "@/components/custos/EvolucaoCustos";
 import { AbaAssinaturas } from "@/components/custos/AbaAssinaturas";
+import { AbaItens } from "@/components/custos/AbaItens";
 
 function ultimosMeses(n: number): string[] {
   const out: string[] = [];
@@ -88,7 +89,7 @@ export default function CentralCustos() {
             <TabsTrigger value="synapse" data-testid="tab-synapse">Synapse</TabsTrigger>
           </TabsList>
           <TabsContent value="assinaturas"><AbaAssinaturas moeda={moeda} /></TabsContent>
-          <TabsContent value="ferramentas"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
+          <TabsContent value="ferramentas"><AbaItens moeda={moeda} /></TabsContent>
           <TabsContent value="gcp"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
           <TabsContent value="anthropic"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
           <TabsContent value="synapse"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
