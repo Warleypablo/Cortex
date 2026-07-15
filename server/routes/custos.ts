@@ -208,4 +208,97 @@ export function registerCustosRoutes(app: Express, db: any) {
       res.status(500).json({ error: "Failed to set usuarios" });
     }
   });
+
+  // ---- Itens manuais / ferramentas ----
+  app.get("/api/custos/itens", async (_req, res) => {
+    try {
+      const r = await db.execute(sql`
+        SELECT * FROM cortex_core.custo_itens_manuais
+        ORDER BY status ASC, projeto ASC, descricao ASC
+      `);
+      res.json(r.rows.map((row: any) => ({
+        id: row.id,
+        descricao: row.descricao,
+        fornecedor: row.fornecedor,
+        categoria: row.categoria,
+        valor: parseFloat(row.valor) || 0,
+        moeda: row.moeda,
+        ciclo: row.ciclo,
+        dataInicio: row.data_inicio,
+        dataFim: row.data_fim,
+        status: row.status,
+        projeto: row.projeto,
+        responsavelPessoaId: row.responsavel_pessoa_id,
+        observacoes: row.observacoes,
+      })));
+    } catch (error) {
+      console.error("[custos] itens list:", error);
+      res.status(500).json({ error: "Failed to list itens" });
+    }
+  });
+
+  app.post("/api/custos/itens", isAdmin, async (req, res) => {
+    try {
+      const b = req.body || {};
+      if (!b.descricao || !b.dataInicio) {
+        return res.status(400).json({ error: "descricao e dataInicio são obrigatórios" });
+      }
+      const result = await db.execute(sql`
+        INSERT INTO cortex_core.custo_itens_manuais
+          (descricao, fornecedor, categoria, valor, moeda, ciclo, data_inicio, data_fim, status, projeto, responsavel_pessoa_id, observacoes)
+        VALUES
+          (${b.descricao}, ${b.fornecedor || null}, ${b.categoria || null}, ${b.valor || 0}, ${b.moeda || "USD"},
+           ${b.ciclo || "mensal"}, ${b.dataInicio}, ${b.dataFim || null}, ${b.status || "ativo"},
+           ${b.projeto || "Geral"}, ${b.responsavelPessoaId || null}, ${b.observacoes || null})
+        RETURNING id
+      `);
+      res.status(201).json({ id: (result.rows[0] as any).id });
+    } catch (error) {
+      console.error("[custos] item create:", error);
+      res.status(500).json({ error: "Failed to create item" });
+    }
+  });
+
+  app.put("/api/custos/itens/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const b = req.body || {};
+      const result = await db.execute(sql`
+        UPDATE cortex_core.custo_itens_manuais SET
+          descricao = COALESCE(${b.descricao}, descricao),
+          fornecedor = ${b.fornecedor === undefined ? sql`fornecedor` : b.fornecedor},
+          categoria = ${b.categoria === undefined ? sql`categoria` : b.categoria},
+          valor = COALESCE(${b.valor}, valor),
+          moeda = COALESCE(${b.moeda}, moeda),
+          ciclo = COALESCE(${b.ciclo}, ciclo),
+          data_inicio = COALESCE(${b.dataInicio}, data_inicio),
+          data_fim = ${b.dataFim === undefined ? sql`data_fim` : b.dataFim},
+          status = COALESCE(${b.status}, status),
+          projeto = COALESCE(${b.projeto}, projeto),
+          responsavel_pessoa_id = ${b.responsavelPessoaId === undefined ? sql`responsavel_pessoa_id` : b.responsavelPessoaId},
+          observacoes = ${b.observacoes === undefined ? sql`observacoes` : b.observacoes},
+          updated_at = NOW()
+        WHERE id = ${id} RETURNING id
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Item not found" });
+      res.json({ id });
+    } catch (error) {
+      console.error("[custos] item update:", error);
+      res.status(500).json({ error: "Failed to update item" });
+    }
+  });
+
+  app.delete("/api/custos/itens/:id", isAdmin, async (req, res) => {
+    try {
+      const id = parseInt(req.params.id);
+      const result = await db.execute(sql`
+        DELETE FROM cortex_core.custo_itens_manuais WHERE id = ${id} RETURNING id
+      `);
+      if (result.rows.length === 0) return res.status(404).json({ error: "Item not found" });
+      res.status(204).send();
+    } catch (error) {
+      console.error("[custos] item delete:", error);
+      res.status(500).json({ error: "Failed to delete item" });
+    }
+  });
 }
