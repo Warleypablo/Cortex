@@ -2,6 +2,7 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { consolidarMes, evolucao } from "../services/custos/consolidacao";
 import { upsertTaxaMes, mesAtualBR } from "../services/custos/cambio";
+import { syncGcpBilling } from "../services/custos/gcpBillingSync";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== "admin") {
@@ -299,6 +300,71 @@ export function registerCustosRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[custos] item delete:", error);
       res.status(500).json({ error: "Failed to delete item" });
+    }
+  });
+
+  // ---- GCP ----
+  app.get("/api/custos/gcp", async (req, res) => {
+    try {
+      const mes = (req.query.mes as string) || new Date().toISOString().slice(0, 7);
+      const r = await db.execute(sql`
+        SELECT gcp_project_id, projeto_interno, servico, SUM(custo) AS custo, moeda
+        FROM cortex_core.custo_gcp_diario
+        WHERE to_char(data, 'YYYY-MM') = ${mes}
+        GROUP BY gcp_project_id, projeto_interno, servico, moeda
+        ORDER BY custo DESC
+      `);
+      res.json(r.rows.map((row: any) => ({
+        gcpProjectId: row.gcp_project_id,
+        projetoInterno: row.projeto_interno,
+        servico: row.servico,
+        custo: parseFloat(row.custo) || 0,
+        moeda: row.moeda,
+      })));
+    } catch (error) {
+      console.error("[custos] gcp detail:", error);
+      res.status(500).json({ error: "Failed to fetch gcp detail" });
+    }
+  });
+
+  app.post("/api/custos/gcp/sync", isAdmin, async (req, res) => {
+    try {
+      const dias = req.body?.dias ? parseInt(req.body.dias) : undefined;
+      const out = await syncGcpBilling(db, dias);
+      res.json({ ok: true, ...out });
+    } catch (error: any) {
+      console.error("[custos] gcp sync:", error);
+      res.status(500).json({ error: error.message || "Failed to sync gcp" });
+    }
+  });
+
+  app.get("/api/custos/gcp/mapa", async (_req, res) => {
+    try {
+      const r = await db.execute(sql`SELECT gcp_project_id, projeto_interno FROM cortex_core.custo_gcp_projeto_map ORDER BY gcp_project_id`);
+      res.json(r.rows.map((row: any) => ({ gcpProjectId: row.gcp_project_id, projetoInterno: row.projeto_interno })));
+    } catch (error) {
+      console.error("[custos] gcp mapa list:", error);
+      res.status(500).json({ error: "Failed to list mapa" });
+    }
+  });
+
+  app.put("/api/custos/gcp/mapa/:projectId", isAdmin, async (req, res) => {
+    try {
+      const projectId = req.params.projectId;
+      const projetoInterno = req.body?.projetoInterno || "Geral";
+      await db.execute(sql`
+        INSERT INTO cortex_core.custo_gcp_projeto_map (gcp_project_id, projeto_interno)
+        VALUES (${projectId}, ${projetoInterno})
+        ON CONFLICT (gcp_project_id) DO UPDATE SET projeto_interno = EXCLUDED.projeto_interno
+      `);
+      // Reatribui as linhas já sincronizadas desse projeto
+      await db.execute(sql`
+        UPDATE cortex_core.custo_gcp_diario SET projeto_interno = ${projetoInterno} WHERE gcp_project_id = ${projectId}
+      `);
+      res.json({ gcpProjectId: projectId, projetoInterno });
+    } catch (error) {
+      console.error("[custos] gcp mapa put:", error);
+      res.status(500).json({ error: "Failed to set mapa" });
     }
   });
 }
