@@ -9,6 +9,9 @@ import { KpisCustos, type ResumoMes } from "@/components/custos/KpisCustos";
 import { EvolucaoCustos } from "@/components/custos/EvolucaoCustos";
 import { AbaAssinaturas } from "@/components/custos/AbaAssinaturas";
 import { AbaItens } from "@/components/custos/AbaItens";
+import { AbaGcp } from "@/components/custos/AbaGcp";
+import { AbaAnthropic } from "@/components/custos/AbaAnthropic";
+import { AbaSynapse } from "@/components/custos/AbaSynapse";
 
 function ultimosMeses(n: number): string[] {
   const out: string[] = [];
@@ -90,9 +93,9 @@ export default function CentralCustos() {
           </TabsList>
           <TabsContent value="assinaturas"><AbaAssinaturas moeda={moeda} /></TabsContent>
           <TabsContent value="ferramentas"><AbaItens moeda={moeda} /></TabsContent>
-          <TabsContent value="gcp"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
-          <TabsContent value="anthropic"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
-          <TabsContent value="synapse"><div className="p-6 text-gray-500 dark:text-zinc-400">Em breve.</div></TabsContent>
+          <TabsContent value="gcp"><AbaGcp mes={mes} moeda={moeda} /></TabsContent>
+          <TabsContent value="anthropic"><AbaAnthropic mes={mes} moeda={moeda} /></TabsContent>
+          <TabsContent value="synapse"><AbaSynapse mes={mes} moeda={moeda} /></TabsContent>
         </Tabs>
       </div>
     </div>
