@@ -55,7 +55,7 @@ export function AbaAssinaturas({ moeda }: { moeda: "BRL" | "USD" }) {
   function payload() {
     return {
       fornecedor: form.fornecedor, plano: form.plano, valor: Number(form.valor), moeda: form.moeda,
-      ciclo: form.ciclo, dataAssinatura: form.dataAssinatura, dataCancelamento: form.dataCancelamento || null,
+      ciclo: form.ciclo, dataAssinatura: form.dataAssinatura, dataCancelamento: form.status === "ativo" ? null : (form.dataCancelamento || null),
       status: form.status, responsavelPessoaId: form.responsavelPessoaId ? Number(form.responsavelPessoaId) : null,
       projeto: form.projeto, observacoes: form.observacoes || null, usuarios: form.usuarios,
     };

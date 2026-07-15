@@ -46,7 +46,7 @@ export function AbaItens({ moeda }: { moeda: "BRL" | "USD" }) {
     return {
       descricao: form.descricao, fornecedor: form.fornecedor || null, categoria: form.categoria || null,
       valor: Number(form.valor), moeda: form.moeda, ciclo: form.ciclo, dataInicio: form.dataInicio,
-      dataFim: form.dataFim || null, status: form.status, projeto: form.projeto, observacoes: form.observacoes || null,
+      dataFim: form.status === "ativo" ? null : (form.dataFim || null), status: form.status, projeto: form.projeto, observacoes: form.observacoes || null,
     };
   }
 

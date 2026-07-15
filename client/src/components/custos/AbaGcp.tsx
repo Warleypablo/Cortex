@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { RefreshCw } from "lucide-react";
-import { formatCurrencyNoDecimals } from "@/lib/utils";
+import { formatCurrencyNoDecimals, formatCurrencyUSD } from "@/lib/utils";
 
 interface LinhaGcp { gcpProjectId: string; projetoInterno: string; servico: string; custo: number; moeda: string; }
 
@@ -45,7 +45,7 @@ export function AbaGcp({ mes }: { mes: string; moeda: "BRL" | "USD" }) {
                   <TableCell className="font-mono text-xs">{l.gcpProjectId}</TableCell>
                   <TableCell><Badge variant={l.projetoInterno === "Synapse" ? "default" : "secondary"}>{l.projetoInterno}</Badge></TableCell>
                   <TableCell>{l.servico}</TableCell>
-                  <TableCell className="text-right">{formatCurrencyNoDecimals(l.custo)}<span className="text-xs text-gray-400"> {l.moeda}</span></TableCell>
+                  <TableCell className="text-right">{l.moeda === "USD" ? formatCurrencyUSD(l.custo) : formatCurrencyNoDecimals(l.custo)}<span className="text-xs text-gray-400"> {l.moeda}</span></TableCell>
                 </TableRow>
               ))}
               {linhas.length === 0 && (

@@ -48,7 +48,7 @@ export async function consolidarMes(db: any, mes: string): Promise<ResumoMes> {
   `);
   for (const r of assinaturas.rows as any[]) {
     const custo = custoMensalRecorrente(
-      { valor: parseFloat(r.valor), ciclo: r.ciclo, dataInicio: r.data_assinatura, dataFim: r.data_cancelamento, status: r.status },
+      { valor: parseFloat(r.valor) || 0, ciclo: r.ciclo, dataInicio: r.data_assinatura, dataFim: r.data_cancelamento, status: r.status },
       mes,
     );
     if (custo <= 0) continue;
@@ -64,7 +64,7 @@ export async function consolidarMes(db: any, mes: string): Promise<ResumoMes> {
   `);
   for (const r of itens.rows as any[]) {
     const custo = custoMensalRecorrente(
-      { valor: parseFloat(r.valor), ciclo: r.ciclo, dataInicio: r.data_inicio, dataFim: r.data_fim, status: r.status },
+      { valor: parseFloat(r.valor) || 0, ciclo: r.ciclo, dataInicio: r.data_inicio, dataFim: r.data_fim, status: r.status },
       mes,
     );
     if (custo <= 0) continue;
@@ -82,8 +82,9 @@ export async function consolidarMes(db: any, mes: string): Promise<ResumoMes> {
   `);
   for (const r of gcp.rows as any[]) {
     const moeda = asMoeda(r.moeda);
-    const { valorUSD, valorBRL } = converter(parseFloat(r.custo), moeda, taxa);
-    linhas.push({ pilar: "gcp", fornecedor: "Google Cloud", projeto: asProjeto(r.projeto_interno), moeda, valorOriginal: parseFloat(r.custo), valorUSD, valorBRL });
+    const custoRaw = parseFloat(r.custo) || 0;
+    const { valorUSD, valorBRL } = converter(custoRaw, moeda, taxa);
+    linhas.push({ pilar: "gcp", fornecedor: "Google Cloud", projeto: asProjeto(r.projeto_interno), moeda, valorOriginal: custoRaw, valorUSD, valorBRL });
   }
 
   // Anthropic API (pilar 'anthropic') — soma do mês por workspace/projeto (sempre USD)
@@ -94,8 +95,9 @@ export async function consolidarMes(db: any, mes: string): Promise<ResumoMes> {
     GROUP BY workspace, projeto_interno
   `);
   for (const r of anthropic.rows as any[]) {
-    const { valorUSD, valorBRL } = converter(parseFloat(r.custo), "USD", taxa);
-    linhas.push({ pilar: "anthropic", fornecedor: "Anthropic API", projeto: asProjeto(r.projeto_interno), moeda: "USD", valorOriginal: parseFloat(r.custo), valorUSD, valorBRL });
+    const custoRaw = parseFloat(r.custo) || 0;
+    const { valorUSD, valorBRL } = converter(custoRaw, "USD", taxa);
+    linhas.push({ pilar: "anthropic", fornecedor: "Anthropic API", projeto: asProjeto(r.projeto_interno), moeda: "USD", valorOriginal: custoRaw, valorUSD, valorBRL });
   }
 
   return {
