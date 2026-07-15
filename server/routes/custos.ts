@@ -3,6 +3,7 @@ import { sql } from "drizzle-orm";
 import { consolidarMes, evolucao } from "../services/custos/consolidacao";
 import { upsertTaxaMes, mesAtualBR } from "../services/custos/cambio";
 import { syncGcpBilling } from "../services/custos/gcpBillingSync";
+import { syncAnthropicCost } from "../services/custos/anthropicCostSync";
 
 function isAdmin(req: any, res: any, next: any) {
   if (!req.user || req.user.role !== "admin") {
@@ -306,7 +307,7 @@ export function registerCustosRoutes(app: Express, db: any) {
   // ---- GCP ----
   app.get("/api/custos/gcp", async (req, res) => {
     try {
-      const mes = (req.query.mes as string) || new Date().toISOString().slice(0, 7);
+      const mes = (req.query.mes as string) || mesAtualBR();
       const r = await db.execute(sql`
         SELECT gcp_project_id, projeto_interno, servico, SUM(custo) AS custo, moeda
         FROM cortex_core.custo_gcp_diario
@@ -365,6 +366,42 @@ export function registerCustosRoutes(app: Express, db: any) {
     } catch (error) {
       console.error("[custos] gcp mapa put:", error);
       res.status(500).json({ error: "Failed to set mapa" });
+    }
+  });
+
+  // ---- Anthropic API ----
+  app.get("/api/custos/anthropic", async (req, res) => {
+    try {
+      const mes = (req.query.mes as string) || mesAtualBR();
+      const r = await db.execute(sql`
+        SELECT workspace, projeto_interno, SUM(custo_usd) AS custo,
+               SUM(COALESCE(tokens_input,0)) AS tokens_input, SUM(COALESCE(tokens_output,0)) AS tokens_output
+        FROM cortex_core.custo_anthropic_diario
+        WHERE to_char(data, 'YYYY-MM') = ${mes}
+        GROUP BY workspace, projeto_interno
+        ORDER BY custo DESC
+      `);
+      res.json(r.rows.map((row: any) => ({
+        workspace: row.workspace,
+        projetoInterno: row.projeto_interno,
+        custoUsd: parseFloat(row.custo) || 0,
+        tokensInput: parseInt(row.tokens_input) || 0,
+        tokensOutput: parseInt(row.tokens_output) || 0,
+      })));
+    } catch (error) {
+      console.error("[custos] anthropic detail:", error);
+      res.status(500).json({ error: "Failed to fetch anthropic detail" });
+    }
+  });
+
+  app.post("/api/custos/anthropic/sync", isAdmin, async (req, res) => {
+    try {
+      const dias = req.body?.dias ? parseInt(req.body.dias) : undefined;
+      const out = await syncAnthropicCost(db, dias);
+      res.json({ ok: true, ...out });
+    } catch (error: any) {
+      console.error("[custos] anthropic sync:", error);
+      res.status(500).json({ error: error.message || "Failed to sync anthropic" });
     }
   });
 }
