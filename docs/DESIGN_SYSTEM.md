@@ -2,8 +2,6 @@
 
 > Fonte da verdade visual da plataforma **Turbo Cortex** (uso interno Turbo Partners).
 > Este documento é gerado a partir do **código real** (`client/src/index.css`, `tailwind.config.ts`, `components/ui/*`), não de intenções de design. Ao construir uma tela nova, siga este guia.
->
-> ⚠️ O arquivo legado `design_guidelines.md` (raiz) está **desatualizado** (descreve paleta azul antiga + Chart.js). **Ignore-o.** Esta é a referência vigente.
 
 ---
 
@@ -21,7 +19,6 @@
 | **Animação** | `framer-motion` + `tailwindcss-animate` |
 | **Variantes** | `class-variance-authority` (CVA) |
 | **Merge de classes** | `cn()` = `twMerge(clsx(...))` — de `@/lib/utils` |
-| **Theme-color (mobile)** | `#f97316` (laranja Turbo) |
 
 ### Aliases de import (`components.json`)
 ```
