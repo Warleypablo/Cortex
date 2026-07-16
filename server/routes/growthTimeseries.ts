@@ -127,11 +127,12 @@ export function registerGrowthTimeseriesRoutes(app: Express, db: any) {
 
       // Inbound filter
       const inboundFilter = sql`AND d.source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM')`;
-      // MQL: a migração p/ Synapse (2026-07) moveu o flag de qualificação do campo
-      // `mql` (legado Bitrix, furado no histórico jan–jun) para `bx_lead_prequalificado`
-      // ('1' = MQL). Ver [[project_synapse_bitrix_growth_gap]].
-      const mqlCond = sql`(d.bx_lead_prequalificado::text = '1')`;
-      const naoMqlCond = sql`(d.bx_lead_prequalificado IS NULL OR d.bx_lead_prequalificado::text <> '1')`;
+      // Régua de MQL pós-migração Synapse: Creators usa a regra NATIVA do Synapse
+      // (campo `mql`) a partir de 2026-07; os demais produtos e todo o histórico
+      // seguem no legado `bx_lead_prequalificado`. O nativo só qualifica Creators.
+      // Ver [[project_synapse_bitrix_growth_gap]].
+      const mqlCond = sql`(CASE WHEN d.servicos_necessidade ILIKE '%Creators%' AND d.created_at >= '2026-07-01' THEN d.mql::text = '1' ELSE d.bx_lead_prequalificado::text = '1' END)`;
+      const naoMqlCond = sql`NOT (CASE WHEN d.servicos_necessidade ILIKE '%Creators%' AND d.created_at >= '2026-07-01' THEN d.mql::text = '1' ELSE d.bx_lead_prequalificado::text = '1' END)`;
 
       // ---- Queries executadas em paralelo ----
       const [metaAdsMonthly, bitrixCreatedMonthly, bitrixRrMqlMonthly, bitrixRrNaoMqlMonthly, bitrixGanhosMqlMonthly, bitrixGanhosNaoMqlMonthly, budgetsRows] = await Promise.all([
