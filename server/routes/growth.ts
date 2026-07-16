@@ -5,7 +5,7 @@ import { format } from "date-fns";
 import { getLinktreeMetrics } from "../services/linktreeGa4";
 import { getSessionsByPlatform, getGa4SourceMediumDiagnostic } from "../services/ga4Sessions";
 import { UTM_SOURCES_BY_MEDIUM, UTM_SOURCE_LABELS, type UtmMedium } from "@shared/utm-vocabulary";
-import { classificarProdutoCampanha, bucketForFnlNgc, expandFunilValues, FNL_NGC_BUCKET_ORDER } from "@shared/produtos";
+import { classificarProdutoCampanha, expandFunilValues, bucketForServico, expandServicoValues, SERVICOS_BUCKET_ORDER } from "@shared/produtos";
 
 // Account ID interno da Turbo Partners - usado para filtrar apenas dados internos
 const TURBO_PARTNERS_ACCOUNT_ID = 'act_1331413260627780';
@@ -210,6 +210,35 @@ function buildPlatformFilterSql(utmValues: string[]) {
   return sql`AND (${sql.join(expressions, sql` OR `)})`;
 }
 
+// Filtro SQL de PRODUTO por `servicos_necessidade` (Synapse) — substitui o fnl_ngc
+// esvaziado na migração 2026-07. Campo MULTIVALOR → match por SUBSTRING (ILIKE %v%).
+// `funilValues` são os buckets selecionados no dropdown (+ "(Vazio)" p/ sem produto).
+function buildServicoFilter(funilValues: string[], alias = 'd') {
+  if (funilValues.length === 0) return sql``;
+  const hasVazio = funilValues.includes('(Vazio)');
+  const real = expandServicoValues(funilValues.filter(v => v !== '(Vazio)'));
+  const col = sql.raw(`${alias}.servicos_necessidade`);
+  const match = () => sql.join(real.map(v => sql`${col} ILIKE ${'%' + v + '%'}`), sql` OR `);
+  const vazio = sql`${col} IS NULL OR ${col} = ''`;
+  if (hasVazio && real.length > 0) return sql`AND (${match()} OR ${vazio})`;
+  if (hasVazio) return sql`AND (${vazio})`;
+  return sql`AND (${match()})`;
+}
+
+// Versão string-cru do filtro de produto (p/ endpoints que montam SQL via sql.raw,
+// ex.: /funnel-by-platform). Coluna sem alias. Escapa aspas simples.
+function buildServicoFilterSqlRaw(funilValues: string[]) {
+  if (funilValues.length === 0) return '';
+  const esc = (v: string) => v.replace(/'/g, "''");
+  const hasVazio = funilValues.includes('(Vazio)');
+  const real = expandServicoValues(funilValues.filter(v => v !== '(Vazio)'));
+  const match = real.map(v => `servicos_necessidade ILIKE '%${esc(v)}%'`).join(' OR ');
+  const vazio = `servicos_necessidade IS NULL OR servicos_necessidade = ''`;
+  if (hasVazio && real.length > 0) return `AND (${match} OR ${vazio})`;
+  if (hasVazio) return `AND (${vazio})`;
+  return `AND (${match})`;
+}
+
 // Resolve os campaign_id (Meta) cujas campanhas casam com o funil selecionado.
 // Usado para filtrar sessões do GA4 por ID — o sessionCampaignName do GA4 guarda o ID
 // numérico da campanha (utm_campaign={{campaign.id}}), não o nome com a tag [Funil].
@@ -270,8 +299,8 @@ const addCrm = (a: CrmAcc, b: CrmAcc) => {
  * frontend (anúncio → conjunto → campanha → conta) reconstroem os totais corretamente.
  */
 export async function buildGoogleCriativos(db: any, startDate: string, endDate: string): Promise<any[]> {
-  const MQL = `(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
-  const NMQL = `NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+  const MQL = `(d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true')`;
+  const NMQL = `NOT (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true')`;
 
   // 1. Anúncios + métricas nativas agregadas no período + nomes de ad group/campanha.
   const adsRes = await db.execute(sql`
@@ -556,8 +585,8 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
  * a query lança e o endpoint trata como "TikTok indisponível".
  */
 export async function buildTiktokCriativos(db: any, startDate: string, endDate: string): Promise<any[]> {
-  const MQL = `(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
-  const NMQL = `NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+  const MQL = `(d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true')`;
+  const NMQL = `NOT (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true')`;
 
   // 1. Anúncios + métricas nativas agregadas no período + nome do ad group.
   // Só tabelas do schema controlado por esta feature (tiktok.ads/ad_groups/ad_insights_daily).
@@ -1296,7 +1325,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           DATE(created_at) as data,
           COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
           COUNT(*) as leads,
-          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls
+          SUM(CASE WHEN bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true' THEN 1 ELSE 0 END) as mqls
         FROM "Bitrix".crm_deal
         WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
         GROUP BY DATE(created_at), COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
@@ -1358,7 +1387,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SELECT 
             COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
             COUNT(*) as leads,
-            SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls
+            SUM(CASE WHEN bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true' THEN 1 ELSE 0 END) as mqls
           FROM "Bitrix".crm_deal
           WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
             ${canalFilterSQL}
@@ -1368,9 +1397,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SELECT 
             COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros') as canal,
             SUM(CASE WHEN stage_name IN ('Reunião Marcada', 'RM', 'Agendado', 'Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho') 
-                     AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rm,
+                     AND (bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as rm,
             SUM(CASE WHEN stage_name IN ('Reunião Realizada', 'RR', 'Realizado', 'Negócio Ganho') 
-                     AND (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) as rr
+                     AND (bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as rr
           FROM "Bitrix".crm_deal
           WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
             ${canalFilterSQL}
@@ -1384,7 +1413,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           FROM "Bitrix".crm_deal
           WHERE stage_name = 'Negócio Ganho'
             AND data_fechamento >= ${startDate}::date AND data_fechamento <= ${endDate}::date
-            AND (mql::text = '1' OR LOWER(mql::text) = 'true')
+            AND (bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true')
             ${canalFilterSQL}
           GROUP BY COALESCE(NULLIF(TRIM(utm_source), ''), 'Outros')
         )
@@ -1542,7 +1571,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           utm_campaign,
           utm_content,
           stage_name,
-          mql::text as mql,
+          bx_lead_prequalificado::text as mql,
           created_at,
           data_fechamento,
           COALESCE(valor_pontual, 0) as valor_pontual,
@@ -1708,19 +1737,19 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         SELECT
           d.utm_content as ad_id,
           COUNT(*) as leads,
-          SUM(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
-          SUM(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as nmqls,
+          SUM(CASE WHEN d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN NOT (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as nmqls,
           SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL THEN 1 ELSE 0 END) as rm,
-          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rm_mql,
-          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rm_nmql,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as rm_mql,
+          SUM(CASE WHEN d.data_reuniao_agendada IS NOT NULL AND NOT (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as rm_nmql,
           SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL THEN 1 ELSE 0 END) as rr,
-          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rr_mql,
-          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as rr_nmql,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as rr_mql,
+          SUM(CASE WHEN d.data_reuniao_realizada IS NOT NULL AND NOT (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as rr_nmql,
           SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN 1 ELSE 0 END) as vendas,
           SUM(CASE WHEN d.stage_name = 'Negócio Ganho'
-              AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_mql,
+              AND (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as vendas_mql,
           SUM(CASE WHEN d.stage_name = 'Negócio Ganho'
-              AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as vendas_nmql,
+              AND NOT (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as vendas_nmql,
           COUNT(DISTINCT CASE WHEN d.stage_name = 'Negócio Ganho'
               THEN COALESCE(d.company_name, d.contact_name, d.title) END) as clientes_unicos,
           NULL::numeric as min_lead_time,
@@ -1732,9 +1761,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           ELSE 0 END) as contratos,
           SUM(CASE WHEN dmp.motivo_perda IN ('Dropshipping', 'Nicho Black', 'Agencia de Marketing', 'Infoproduto', 'Afiliado', 'Fake') THEN 1 ELSE 0 END) as descartados,
           SUM(CASE WHEN dmp.motivo_perda IN ('Dropshipping', 'Nicho Black', 'Agencia de Marketing', 'Infoproduto', 'Afiliado', 'Fake')
-              AND (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as descartados_mql,
+              AND (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as descartados_mql,
           SUM(CASE WHEN dmp.motivo_perda IN ('Dropshipping', 'Nicho Black', 'Agencia de Marketing', 'Infoproduto', 'Afiliado', 'Fake')
-              AND NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 ELSE 0 END) as descartados_nmql
+              AND NOT (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) as descartados_nmql
         FROM "Bitrix".crm_deal d
         LEFT JOIN cortex_core.deal_motivo_perda dmp ON dmp.deal_id = d.id
         WHERE d.utm_content IS NOT NULL
@@ -2126,7 +2155,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SELECT
             utm_content as ad_id,
             COUNT(*) as leads,
-            SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+            SUM(CASE WHEN bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true' THEN 1 ELSE 0 END) as mqls,
             COUNT(DISTINCT CASE WHEN stage_name = 'Negócio Ganho'
                 THEN COALESCE(company_name, contact_name, title) END) as clientes_unicos,
             SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) + COALESCE(valor_recorrente, 0) ELSE 0 END) as receita_total
@@ -2183,8 +2212,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       }
 
       // Condições MQL e filtro de source (mantidos do funil)
-      const MQL_COND = `(mql::text = '1' OR LOWER(mql::text) = 'true')`;
-      const NMQL_COND = `NOT (mql::text = '1' OR LOWER(mql::text) = 'true')`;
+      const MQL_COND = `(bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true')`;
+      const NMQL_COND = `NOT (bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true')`;
       const SRC_FILTER = `source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')`;
 
       // Hierarquia: medium → source → campaign → term → content.
@@ -2922,20 +2951,23 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
   // Growth - Orçado x Realizado - Valores distintos de fnl_ngc (funil) com atividade
   app.get("/api/growth/orcado-realizado/funis", async (req, res) => {
     try {
-      // Allowlist por bucket canônico (ver FNL_NGC_BUCKETS / bucketForFnlNgc).
-      // Classifica cada valor real de fnl_ngc no seu bucket e devolve só os buckets
-      // que existem, em ordem fixa. Creator Summit é escondido (outra iniciativa).
+      // PRODUTO agora vem de servicos_necessidade (Synapse), que é MULTIVALOR
+      // ("Creators, Gestão de Performance"). unnest(split ',') extrai cada serviço
+      // individual; bucketForServico classifica cada um. Devolve só os buckets
+      // presentes, em ordem fixa. (fnl_ngc foi esvaziado na migração 2026-07.)
       const result = await db.execute(sql`
-        SELECT DISTINCT fnl_ngc
-        FROM "Bitrix".crm_deal
-        WHERE fnl_ngc IS NOT NULL AND fnl_ngc != ''
+        SELECT DISTINCT TRIM(s) AS servico
+        FROM "Bitrix".crm_deal,
+             LATERAL unnest(string_to_array(servicos_necessidade, ',')) AS s
+        WHERE servicos_necessidade IS NOT NULL AND servicos_necessidade != ''
       `);
       const present = new Set<string>();
       for (const row of result.rows as any[]) {
-        const bucket = bucketForFnlNgc(row.fnl_ngc as string);
+        const bucket = bucketForServico(row.servico as string);
         if (bucket) present.add(bucket);
       }
-      const funis = FNL_NGC_BUCKET_ORDER.filter((b) => present.has(b));
+      const funis = SERVICOS_BUCKET_ORDER.filter((b) => present.has(b));
+      if (present.has("Outros")) funis.push("Outros");
       funis.unshift("(Vazio)");
       res.json(funis);
     } catch (error) {
@@ -2961,16 +2993,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
       const hasVazio = funilValues.includes('(Vazio)');
       const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
-      let funilFilter = sql``;
-      if (funilValues.length > 0) {
-        if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
-        } else if (hasVazio) {
-          funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
-        } else {
-          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
-        }
-      }
+      // Produto (servicos_necessidade). realFunilValues acima segue p/ o filtro de
+      // GASTO por nome de campanha (Track 1), que continua casando por label.
+      const funilFilter = buildServicoFilter(funilValues);
 
       // UTM Source filter — usa buildPlatformFilterSql pra incluir Contato IG / Social Selling
       // quando 'instagram' for selecionado (consistente com PLATFORM_CASE_SQL_BASIC).
@@ -2993,7 +3018,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
-      const mqlCondition = sql`(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
+      const mqlCondition = sql`(d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true')`;
       const countExpr = contagem === 'contrato'
         ? sql.raw(`SUM(${prodCountExpr})`)
         : sql`COUNT(*)`;
@@ -3160,16 +3185,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const funilValues = funilNgcRaw ? funilNgcRaw.split(',').map(v => decodeURIComponent(v).trim()).filter(Boolean) : [];
       const hasVazio = funilValues.includes('(Vazio)');
       const realFunilValues = expandFunilValues(funilValues.filter(v => v !== '(Vazio)'));
-      let funilFilter = sql``;
-      if (funilValues.length > 0) {
-        if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
-        } else if (hasVazio) {
-          funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
-        } else {
-          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
-        }
-      }
+      // Produto (servicos_necessidade). realFunilValues acima segue p/ o filtro de
+      // GASTO por nome de campanha (Track 1), que continua casando por label.
+      const funilFilter = buildServicoFilter(funilValues);
 
       // UTM Source filter — usa buildPlatformFilterSql pra incluir Contato IG / Social Selling
       // quando 'instagram' for selecionado (consistente com PLATFORM_CASE_SQL_BASIC).
@@ -3192,7 +3210,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' AND COALESCE(valor_pontual, 0) > 0 THEN 1 END)");
 
-      const naoMqlCondition = sql`(d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')`;
+      const naoMqlCondition = sql`(d.bx_lead_prequalificado::text IS NULL OR d.bx_lead_prequalificado::text = '' OR d.bx_lead_prequalificado::text = '0' OR LOWER(d.bx_lead_prequalificado::text) = 'false')`;
       const countExpr = contagem === 'contrato'
         ? sql.raw(`SUM(${prodCountExpr})`)
         : sql`COUNT(*)`;
@@ -3357,9 +3375,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           EXTRACT(ISOYEAR FROM d.data_reuniao_realizada::date)::int as ano,
           EXTRACT(WEEK FROM d.data_reuniao_realizada::date)::int as semana_num,
           TO_CHAR(MIN(d.data_reuniao_realizada::date), 'Mon') as mes_label,
-          COUNT(CASE WHEN (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
+          COUNT(CASE WHEN (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true')
             THEN 1 END) as rr_mql,
-          COUNT(CASE WHEN (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
+          COUNT(CASE WHEN (d.bx_lead_prequalificado::text IS NULL OR d.bx_lead_prequalificado::text = '' OR d.bx_lead_prequalificado::text = '0' OR LOWER(d.bx_lead_prequalificado::text) = 'false')
             THEN 1 END) as rr_nao_mql,
           COUNT(*) as rr_total
         FROM "Bitrix".crm_deal d
@@ -3667,16 +3685,9 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       // Query Leads e MQLs do Bitrix (tráfego pago)
       const contagem = (req.query.contagem as string) || 'contrato';
-      let funilFilter = sql``;
-      if (funilValues.length > 0) {
-        if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
-        } else if (hasVazio) {
-          funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
-        } else {
-          funilFilter = sql`AND (${sql.join(realFunilValues.map(v => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
-        }
-      }
+      // Produto (servicos_necessidade). realFunilValues acima segue p/ o filtro de
+      // GASTO por nome de campanha (Track 1), que continua casando por label.
+      const funilFilter = buildServicoFilter(funilValues);
 
       // Leads e MQLs em Ads são sempre COUNT (não dependem de contagem contrato/cliente)
 
@@ -3698,7 +3709,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const leadsResult = await db.execute(sql`
         SELECT
           COUNT(*) as total_leads,
-          COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as total_mqls
+          COUNT(CASE WHEN d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true' THEN 1 END) as total_mqls
         FROM "Bitrix".crm_deal d
         WHERE d.created_at >= ${startDate}::date
           AND d.created_at <= ${endDate}::date + INTERVAL '1 day'
@@ -3716,8 +3727,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const raResult = await db.execute(sql`
         SELECT
           COUNT(*) as total_ra,
-          COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as ra_mql,
-          COUNT(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 END) as ra_nmql
+          COUNT(CASE WHEN d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true' THEN 1 END) as ra_mql,
+          COUNT(CASE WHEN NOT (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 END) as ra_nmql
         FROM "Bitrix".crm_deal d
         WHERE d.data_reuniao_agendada IS NOT NULL
           AND d.data_reuniao_agendada::date >= ${startDate}::date
@@ -3729,8 +3740,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const rrResult = await db.execute(sql`
         SELECT
           COUNT(*) as total_rr,
-          COUNT(CASE WHEN d.mql::text = '1' OR LOWER(d.mql::text) = 'true' THEN 1 END) as rr_mql,
-          COUNT(CASE WHEN NOT (d.mql::text = '1' OR LOWER(d.mql::text) = 'true') THEN 1 END) as rr_nmql
+          COUNT(CASE WHEN d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true' THEN 1 END) as rr_mql,
+          COUNT(CASE WHEN NOT (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true') THEN 1 END) as rr_nmql
         FROM "Bitrix".crm_deal d
         WHERE d.data_reuniao_realizada IS NOT NULL
           AND d.data_reuniao_realizada::date >= ${startDate}::date
@@ -4270,7 +4281,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SELECT
             ${igOrigemExpr} AS origem,
             COUNT(*) AS leads,
-            SUM(CASE WHEN (mql::text = '1' OR LOWER(mql::text) = 'true') THEN 1 ELSE 0 END) AS mqls
+            SUM(CASE WHEN (bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true') THEN 1 ELSE 0 END) AS mqls
           FROM "Bitrix".crm_deal
           WHERE created_at >= '${startDate}'::date
             AND created_at <= '${endDate}'::date + INTERVAL '1 day'
@@ -4926,18 +4937,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
 
       const escapeSql = (v: string) => v.replace(/'/g, "''");
 
-      let funilFilterSql = '';
-      if (funilValues.length > 0) {
-        if (hasVazio && realFunilValues.length > 0) {
-          const conds = realFunilValues.map(v => `fnl_ngc ILIKE '${escapeSql(v)}'`).join(' OR ');
-          funilFilterSql = `AND (${conds} OR fnl_ngc IS NULL OR fnl_ngc = '')`;
-        } else if (hasVazio) {
-          funilFilterSql = `AND (fnl_ngc IS NULL OR fnl_ngc = '')`;
-        } else {
-          const conds = realFunilValues.map(v => `fnl_ngc ILIKE '${escapeSql(v)}'`).join(' OR ');
-          funilFilterSql = `AND (${conds})`;
-        }
-      }
+      // Produto por servicos_necessidade (Synapse). realFunilValues segue p/ o gasto.
+      const funilFilterSql = buildServicoFilterSqlRaw(funilValues);
 
       let utmSourceFilterSql = '';
       if (utmValues.length > 0) {
@@ -4973,8 +4974,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
             'confecção de proposta', 'em negociação', 'aguardado os dados',
             'aguardando assinatura', 'subir/ajustar cobrança',
             'proposta enviada', 'negócio ganho', 'negócio perdido'`;
-      const MQL_COND = `(mql::text = '1' OR LOWER(mql::text) = 'true')`;
-      const NMQL_COND = `NOT (mql::text = '1' OR LOWER(mql::text) = 'true')`;
+      const MQL_COND = `(bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true')`;
+      const NMQL_COND = `NOT (bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true')`;
 
       // Janela temporal por métrica (alinhada com /mql e /nao-mql do top card):
       //   - Leads, MQLs, RA, RR → created_at no período (lead entrou no funil em X)
@@ -5129,10 +5130,10 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           TO_CHAR(MIN(d.data_reuniao_realizada::date), 'Mon') AS mes_label,
           u.nome AS sdr_name,
           u.id AS sdr_id,
-          COUNT(CASE WHEN (d.mql::text = '1' OR LOWER(d.mql::text) = 'true')
+          COUNT(CASE WHEN (d.bx_lead_prequalificado::text = '1' OR LOWER(d.bx_lead_prequalificado::text) = 'true')
             AND d.stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
               'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) AS rr_mql,
-          COUNT(CASE WHEN (d.mql::text IS NULL OR d.mql::text = '' OR d.mql::text = '0' OR LOWER(d.mql::text) = 'false')
+          COUNT(CASE WHEN (d.bx_lead_prequalificado::text IS NULL OR d.bx_lead_prequalificado::text = '' OR d.bx_lead_prequalificado::text = '0' OR LOWER(d.bx_lead_prequalificado::text) = 'false')
             AND d.stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
               'Proposta Enviada', 'Negócio Ganho', 'Negócio Perdido') THEN 1 END) AS rr_nao_mql,
           COUNT(CASE WHEN d.stage_name IN ('Reunião Realizada', 'RR - Reunião Realizada',
@@ -5250,7 +5251,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
       const crmResult = await db.execute(sql`
         SELECT
           COUNT(*) as leads,
-          SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls,
+          SUM(CASE WHEN bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true' THEN 1 ELSE 0 END) as mqls,
           SUM(CASE WHEN data_reuniao_agendada IS NOT NULL
                    AND data_reuniao_agendada::date >= ${startDate}::date
                    AND data_reuniao_agendada::date <= ${endDate}::date
@@ -5307,7 +5308,7 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         WITH leads_m AS (
           SELECT TO_CHAR(created_at, 'YYYY-MM') as month,
                  COUNT(*) as leads,
-                 SUM(CASE WHEN mql::text = '1' OR LOWER(mql::text) = 'true' THEN 1 ELSE 0 END) as mqls
+                 SUM(CASE WHEN bx_lead_prequalificado::text = '1' OR LOWER(bx_lead_prequalificado::text) = 'true' THEN 1 ELSE 0 END) as mqls
           FROM "Bitrix".crm_deal
           WHERE created_at >= ${startDate}::date AND created_at <= ${endDate}::date + INTERVAL '1 day'
             AND source IN ('CALL', 'EMAIL', 'WEB', 'ADVERTISING', 'TRADE_SHOW', 'WEBFORM', 'OTHER', 'UC_4VCKGM', 'SYNAPSE')

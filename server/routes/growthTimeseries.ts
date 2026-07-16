@@ -1,6 +1,6 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
-import { expandFunilValues } from "@shared/produtos";
+import { expandFunilValues, expandServicoValues } from "@shared/produtos";
 
 const TURBO_PARTNERS_ACCOUNT_ID = "act_1331413260627780";
 const TURBO_TIKTOK_ADVERTISER_IDS = ["7065303755092131842"];
@@ -70,14 +70,19 @@ export function registerGrowthTimeseriesRoutes(app: Express, db: any) {
       const hasVazio = funilValues.includes("(Vazio)");
       const realFunilValues = expandFunilValues(funilValues.filter((v) => v !== "(Vazio)"));
 
+      // Produto por servicos_necessidade (Synapse, multivalor → ILIKE %v%); fnl_ngc
+      // foi esvaziado na migração 2026-07. realFunilValues acima segue p/ o gasto (campanha).
+      const realServicoValues = expandServicoValues(funilValues.filter((v) => v !== "(Vazio)"));
       let funilFilter = sql``;
       if (funilValues.length > 0) {
-        if (hasVazio && realFunilValues.length > 0) {
-          funilFilter = sql`AND (${sql.join(realFunilValues.map((v) => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)} OR d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+        const match = sql.join(realServicoValues.map((v) => sql`d.servicos_necessidade ILIKE ${"%" + v + "%"}`), sql` OR `);
+        const vazio = sql`d.servicos_necessidade IS NULL OR d.servicos_necessidade = ''`;
+        if (hasVazio && realServicoValues.length > 0) {
+          funilFilter = sql`AND (${match} OR ${vazio})`;
         } else if (hasVazio) {
-          funilFilter = sql`AND (d.fnl_ngc IS NULL OR d.fnl_ngc = '')`;
+          funilFilter = sql`AND (${vazio})`;
         } else {
-          funilFilter = sql`AND (${sql.join(realFunilValues.map((v) => sql`d.fnl_ngc ILIKE ${v}`), sql` OR `)})`;
+          funilFilter = sql`AND (${match})`;
         }
       }
 
@@ -122,8 +127,11 @@ export function registerGrowthTimeseriesRoutes(app: Express, db: any) {
 
       // Inbound filter
       const inboundFilter = sql`AND d.source IN ('CALL','EMAIL','WEB','ADVERTISING','TRADE_SHOW','WEBFORM','OTHER','UC_4VCKGM')`;
-      const mqlCond = sql`(d.mql::text = '1' OR LOWER(d.mql::text) = 'true')`;
-      const naoMqlCond = sql`(d.mql IS NULL OR (d.mql::text <> '1' AND LOWER(d.mql::text) <> 'true'))`;
+      // MQL: a migração p/ Synapse (2026-07) moveu o flag de qualificação do campo
+      // `mql` (legado Bitrix, furado no histórico jan–jun) para `bx_lead_prequalificado`
+      // ('1' = MQL). Ver [[project_synapse_bitrix_growth_gap]].
+      const mqlCond = sql`(d.bx_lead_prequalificado::text = '1')`;
+      const naoMqlCond = sql`(d.bx_lead_prequalificado IS NULL OR d.bx_lead_prequalificado::text <> '1')`;
 
       // ---- Queries executadas em paralelo ----
       const [metaAdsMonthly, bitrixCreatedMonthly, bitrixRrMqlMonthly, bitrixRrNaoMqlMonthly, bitrixGanhosMqlMonthly, bitrixGanhosNaoMqlMonthly, budgetsRows] = await Promise.all([

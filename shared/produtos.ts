@@ -91,6 +91,52 @@ export function expandFunilValues(values: string[]): string[] {
   return expanded;
 }
 
+// ---- servicos_necessidade (Synapse): fonte de PRODUTO desde a migração 2026-07 ----
+// A migração p/ Synapse esvaziou fnl_ngc; a linha de produto passou a viver em
+// crm_deal.servicos_necessidade, que é MULTIVALOR ("Creators, Gestão de Performance").
+// Por isso a classificação é por SUBSTRING (não igualdade). Mapa BUCKET → substrings
+// (case-insensitive) que, se presentes no valor, colocam o deal naquele bucket.
+export const SERVICOS_BUCKETS: Record<string, string[]> = {
+  Creators: ["Creators"],
+  Performance: ["Performance"],
+  "Social Media": ["Social Media"],
+  "Gestão de Comunidade": ["Comunidade"],
+  Ecommerce: ["Ecommerce", "E-commerce"],
+  CRM: ["CRM"],
+  "Landing Page": ["Landing"],
+  Broadcast: ["Broadcast"],
+};
+
+// Ordem de exibição no dropdown (sem "(Vazio)", tratado à parte nos endpoints).
+export const SERVICOS_BUCKET_ORDER = [
+  "Creators", "Performance", "Social Media", "Gestão de Comunidade",
+  "Ecommerce", "CRM", "Landing Page", "Broadcast",
+];
+
+/** Classifica um serviço individual (uma parte do multivalor) no seu bucket, ou Outros. */
+export function bucketForServico(raw: string): string | null {
+  const lower = raw.trim().toLowerCase();
+  if (!lower) return null;
+  for (const label of SERVICOS_BUCKET_ORDER) {
+    if (SERVICOS_BUCKETS[label].some((x) => lower.includes(x.toLowerCase()))) return label;
+  }
+  return PRODUTO_OUTROS;
+}
+
+/**
+ * Expande os buckets selecionados nas SUBSTRINGS reais p/ o ILIKE. Bucket desconhecido
+ * (ex.: "Outros" ou um valor cru) passa direto.
+ */
+export function expandServicoValues(values: string[]): string[] {
+  const expanded: string[] = [];
+  for (const v of values) {
+    const key = Object.keys(SERVICOS_BUCKETS).find((k) => k.toLowerCase() === v.toLowerCase());
+    if (key) expanded.push(...SERVICOS_BUCKETS[key]);
+    else expanded.push(v);
+  }
+  return expanded;
+}
+
 // ---- Creator Summit (pipeline de EVENTOS, categoria 10 do Bitrix) ----
 // Funil próprio (Cadastro → Negócio Ganho), separado do inbound de propósito —
 // por isso bucketForFnlNgc() devolve null pra "creator summit". O dashboard
