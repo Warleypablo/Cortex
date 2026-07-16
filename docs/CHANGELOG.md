@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-16 | feat(ads): scripts pareados GENÉRICOS + lote "UGC x Anúncios Tradicionais - Victor" (TP1855-1874) — 4 conjuntos + 20 ads PAUSED
+
+**O que foi feito:**
+- **Novo: scripts pareados genéricos** `subir-pareado-{planilha,upload,ads}.ts` que recebem `--data <lote>.data.ts` (em vez de duplicar por lote). Trazem retry por vídeo no upload + `fixTargeting` (par explore/explore_home). Reutilizáveis pra qualquer lote pareado 9x16+4x5.
+- **UGC Victor:** 20 pares (b1/b2 × h1-10), funil Creators. Upload 40/40 (~110MB), 0 falhas, 35,8min. **4 conjuntos (9-12)** na camp QUENTE Creators `120252335029070450` (irmã dos lotes Esther/Lucas UGC), 20 ads pareados, copy clonada do irmão Esther (conjunto 1 `120252808697040450`). **TUDO PAUSED.**
+- Data files: `ugc-victor.data.ts` + `crm-victor.data.ts` (CRM Victor com upload em andamento — arquivos de 400MB).
+
+**Por que:** os 2 batches do Victor que faltavam (UGC Tradicionais + CRM Cliente Novo). Caio mandou as pastas.
+
+**Arquivos alterados:** `scripts/ads/subir-pareado-{planilha,upload,ads}.ts` + `ugc-victor.data.ts` + `crm-victor.data.ts` (novos).
+
+**Impacto arquitetural:** scripts CLI genéricos reutilizáveis (passo na direção da automação); nenhum runtime.
+
 ## 2026-07-13 | feat(ads): lote "Areia Movediça" (Victor Peixoto, TP1843-1854) — 3 conjuntos + 12 ads single-format PAUSED
 
 **O que foi feito:**
