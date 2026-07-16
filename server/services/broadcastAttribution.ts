@@ -125,11 +125,18 @@ export async function attributeBroadcastReplies(opts: {
   }
   const normToBitrix = new Map<string, { contactId: number; dealId: number | null }>();
   if (norms.size > 0) {
+    // Deal por contact_id OU por nome normalizado: a migração "Synapse" (09/07/2026)
+    // recriou crm_deal com contact_id NULO em todos os deals — o nome do contato é o
+    // único vínculo que sobrou. O match por id fica na frente pra voltar a valer
+    // sozinho se o pipeline repopular contact_id.
     const bx = await pool.query(
       `SELECT DISTINCT ON (ct.phone_normalized)
               ct.phone_normalized, ct.id AS contact_id, d.id AS deal_id
        FROM "Bitrix".crm_contact ct
-       LEFT JOIN "Bitrix".crm_deal d ON d.contact_id = ct.id
+       LEFT JOIN "Bitrix".crm_deal d
+         ON d.contact_id = ct.id
+         OR (ct.name IS NOT NULL AND TRIM(ct.name) <> ''
+             AND LOWER(TRIM(d.contact_name)) = LOWER(TRIM(ct.name)))
        WHERE ct.phone_normalized = ANY($1::text[])
        ORDER BY ct.phone_normalized, d.date_create DESC NULLS LAST`,
       [Array.from(norms)],
