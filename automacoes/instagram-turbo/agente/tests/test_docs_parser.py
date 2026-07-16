@@ -166,7 +166,52 @@ def run():
     print("\n=== match por similaridade/Dice (bug 1) ===")
     test_match_variacao_redacao_dice()
 
+    print("\n=== header curto no MEIO não sequestra (bug 3) ===")
+    test_header_curto_meio_nao_sequestra()
+
     print("\n🎉 Todos os testes passaram.")
+
+
+def test_header_curto_meio_nao_sequestra():
+    # Regressão do card «Será que qualquer creator serve pra sua marca?»
+    # (16/jul/2026): o Doc tinha um header curto "CREATOR" (1 palavra) E o header
+    # certo "SERÁ QUE QUALQUER CREATOR SERVE PARA SUA MARCA?" (difere do card só
+    # por PRA/PARA). O tier de substring casava "CREATOR" (⊂ nome do card) e
+    # colava a legenda ERRADA, disparando ANTES do Dice. Fix: na direção
+    # header⊂card, exigir PREFIXO (não substring do meio) — tanto no tier de
+    # substring quanto no sem-espaço. Aí o Dice pega o header certo.
+    doc = (
+        "**CREATOR**\n**LEGENDA**\nLegenda errada do post curto.\n"
+        "**SERÁ QUE QUALQUER CREATOR SERVE PARA SUA MARCA?**\n"
+        "**LEGENDA**\nNem sempre o creator com mais seguidores gera resultado. #turbopartners\n"
+        "**PRÓXIMO POST**\n"
+    )
+    leg, hdr = find_legenda_for_task(doc, "Será que qualquer creator serve pra sua marca?")
+    _assert(hdr == "SERÁ QUE QUALQUER CREATOR SERVE PARA SUA MARCA?",
+            f"header longo certo (não o 'CREATOR' curto do meio) — veio {hdr!r}")
+    _assert("Nem sempre o creator" in leg, "legenda do post certo")
+    _assert("errada" not in leg, "NÃO pegou a legenda do header curto 'CREATOR'")
+
+    # O caso legítimo de PREFIXO continua casando (header é prefixo do card):
+    doc2 = (
+        "**GUIA RÁPIDO**\n**LEGENDA**\nComo otimizar seu perfil. #turbopartners\n"
+        "**OUTRO POST**\n**LEGENDA**\nOutro.\n"
+    )
+    leg2, hdr2 = find_legenda_for_task(doc2, "Guia Rápido: otimize seu perfil em 5 passos")
+    _assert(hdr2 == "GUIA RÁPIDO", f"prefixo legítimo ainda casa (veio {hdr2!r})")
+    _assert("otimizar seu perfil" in leg2, "legenda do prefixo veio certa")
+
+    # Sem-espaço: 'CREATORS' NÃO casa dentro de '...CREATORSERVE...' (CREATOR+Serve)
+    doc3 = (
+        "**CREATORS**\n**LEGENDA**\nLegenda dos creators (errada).\n"
+        "**QUALQUER CREATOR SERVE PARA SUA MARCA HOJE**\n"
+        "**LEGENDA**\nAlinhamento entre marca e creator. #turbopartners\n"
+        "**FIM**\n"
+    )
+    leg3, hdr3 = find_legenda_for_task(doc3, "Qualquer creator serve pra sua marca hoje")
+    _assert(hdr3 == "QUALQUER CREATOR SERVE PARA SUA MARCA HOJE",
+            f"sem-espaço não deixa 'CREATORS' sequestrar (veio {hdr3!r})")
+    _assert("Alinhamento" in leg3, "legenda certa via Dice, não a dos CREATORS")
 
 
 def test_match_ordem_palavras_trocada():

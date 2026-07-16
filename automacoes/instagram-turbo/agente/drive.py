@@ -371,22 +371,23 @@ def _content_key(name: str) -> str:
     return re.sub(r"\s+", " ", n).strip().upper()
 
 
-def _pick_folder_for_card(card_name: str, folder_names: list[str]) -> str | None:
-    """Núcleo PURO (testável sem Drive): dado o nome do card e os nomes das
-    subpastas do mês, devolve o nome da pasta que casa — ou None se NENHUMA
-    ou se houver EMPATE (ambíguo).
+def _matching_folder_names(card_name: str, folder_names: list[str]) -> list[str]:
+    """Núcleo PURO: nomes de pasta que casam o card, TODOS empatados no topo.
 
     Casa por `_content_key` com tolerância: igualdade, substring sem-espaço em
     qualquer direção, ou o conjunto de palavras da pasta contido no do card
     (as pastas têm um nome abreviado do começo do card: 'TURBO_seucliente'
     p/ 'Seu cliente...'). Guarda de 5+ chars evita chave curta casar à toa.
-    Em múltiplos matches, escolhe a chave mais longa (mais específica); empate
-    no topo => ambíguo => None (fail-safe).
+    Em múltiplos matches, mantém só os de chave mais longa (mais específica).
+
+    Retorna [] se nenhuma casa, [nome] se há um vencedor claro, ou [n1, n2, ...]
+    quando há empate no topo (ex.: duas pastas 'TURBO_marketinge' idênticas) —
+    o desempate por conteúdo fica com quem tem acesso ao Drive (find_post_...).
     """
     ck = _content_key(card_name)
     ck_ns = ck.replace(" ", "")
     if not ck_ns:
-        return None
+        return []
     cand: list[tuple[str, int]] = []
     for name in folder_names:
         fk = _content_key(name)
@@ -398,11 +399,19 @@ def _pick_folder_for_card(card_name: str, folder_names: list[str]) -> str | None
                 or set(fk.split()) <= set(ck.split())):
             cand.append((name, len(fk_ns)))
     if not cand:
-        return None
-    cand.sort(key=lambda x: -x[1])
-    if len(cand) > 1 and cand[0][1] == cand[1][1]:
-        return None
-    return cand[0][0]
+        return []
+    top = max(c[1] for c in cand)
+    return [name for name, score in cand if score == top]
+
+
+def _pick_folder_for_card(card_name: str, folder_names: list[str]) -> str | None:
+    """Compat: um vencedor único, ou None se nenhuma casa OU empate (ambíguo).
+
+    Fail-safe puro (sem olhar conteúdo da pasta). O desempate por presença de
+    ativo é feito em `find_post_folder_by_card` (que tem acesso ao Drive).
+    """
+    names = _matching_folder_names(card_name, folder_names)
+    return names[0] if len(names) == 1 else None
 
 
 def find_post_folder_by_card(parent_mes_folder_id: str, card_name: str) -> DriveFile | None:
@@ -420,13 +429,30 @@ def find_post_folder_by_card(parent_mes_folder_id: str, card_name: str) -> Drive
     """
     folders = [f for f in list_folder(parent_mes_folder_id)
                if f.mime_type == "application/vnd.google-apps.folder"]
-    picked = _pick_folder_for_card(card_name, [f.name for f in folders])
-    if picked is None:
+    # NÃO indexar por nome: duas pastas podem ter o MESMO nome (ex.: duas
+    # 'TURBO_marketinge' iguais) e um dict por nome colapsaria as duas numa só.
+    matched_names = set(_matching_folder_names(card_name, [f.name for f in folders]))
+    matched = [f for f in folders if f.name in matched_names]
+    return _resolve_folder_tie(
+        matched,
+        lambda f: classify_assets(list_folder(f.id))[0] != "empty",
+    )
+
+
+def _resolve_folder_tie(matched: list, has_assets) -> "DriveFile | None":
+    """Núcleo PURO do desempate (testável sem Drive). `has_assets(folder)->bool`.
+
+    Nenhuma casa → None. Uma → ela. Múltiplas pastas casam (nomes IGUAIS ou
+    chaves empatadas): antes o código desistia (fail-safe), mas o caso comum é
+    UMA vazia + UMA com os ativos — sem ambiguidade real. Fica só com as que têm
+    ativo publicável; um único não-vazio → é ele. Zero (todas vazias) ou 2+ com
+    conteúdo → aí sim é ambíguo → None (fail-safe, não publica errado)."""
+    if not matched:
         return None
-    for f in folders:
-        if f.name == picked:
-            return f
-    return None
+    if len(matched) == 1:
+        return matched[0]
+    with_assets = [f for f in matched if has_assets(f)]
+    return with_assets[0] if len(with_assets) == 1 else None
 
 
 _LEADING_NUM_RE = re.compile(r"(\d+)")

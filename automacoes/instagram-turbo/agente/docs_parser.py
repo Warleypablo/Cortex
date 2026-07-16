@@ -252,9 +252,21 @@ def find_legenda_for_task(doc_content: str, task_name: str) -> tuple[str, str | 
     #    (header do Doc é um prefixo/abreviação do nome da task)
     #  - task "Justin bieber" vs header "JUSTIN KARAOKE" (task é prefixo)
     # Preferimos o header mais longo (mais específico) em caso de múltiplos.
+    # Direção 1 (target ⊂ header): o nome do card INTEIRO aparece dentro de um
+    #   header maior — seguro, o card é a coisa específica.
+    # Direção 2 (header ⊂ target): o header é parte do card. AQUI o header tem que
+    #   ser PREFIXO do card (fronteira de palavra), não substring do meio — senão
+    #   um header curto de 1 palavra ("CREATOR") sequestra cards longos que contêm
+    #   essa palavra no MEIO ("Será que qualquer CREATOR serve...") e cola legenda
+    #   ERRADA; o header certo (só difere por PRA/PARA) cai no tier de similaridade
+    #   logo abaixo. Prefixo preserva o caso real "GUIA RÁPIDO" ⊂ "Guia Rápido:...".
     candidates = [
         s for s in sections
-        if target and (target in s.header_normalized or s.header_normalized in target)
+        if target and s.header_normalized and (
+            target in s.header_normalized
+            or s.header_normalized == target
+            or target.startswith(s.header_normalized + " ")
+        )
     ]
     if candidates:
         best = max(candidates, key=lambda s: len(s.header_normalized))
@@ -268,7 +280,15 @@ def find_legenda_for_task(doc_content: str, task_name: str) -> tuple[str, str | 
             return s.header_normalized.replace(" ", "")
         loose = [s for s in sections if ns(s) == target_ns]
         if not loose:
-            loose = [s for s in sections if ns(s) and (target_ns in ns(s) or ns(s) in target_ns)]
+            # Mesma disciplina do tier de substring: o header MENOR só casa se for
+            # PREFIXO do card (target_ns.startswith), não substring do meio — senão
+            # 'CREATORS' casa dentro de '...QUALQUERCREATORSERVE...' (CREATOR+Serve)
+            # e cola legenda errada. A direção card⊂header (card num header maior)
+            # segue liberada.
+            loose = [
+                s for s in sections
+                if ns(s) and (target_ns in ns(s) or target_ns.startswith(ns(s)))
+            ]
         if loose:
             best = max(loose, key=lambda s: len(s.header_normalized))
             return best.legenda, best.header
