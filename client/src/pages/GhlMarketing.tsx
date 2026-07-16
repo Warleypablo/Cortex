@@ -782,9 +782,10 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
   { key: "cac", label: "CAC" },
 ];
 
-// Metas mensais do broadcast: meta vs realizado. Ancorado no mês corrente (ou no
-// mês mais recente com metas), INDEPENDENTE do período selecionado no topo — o
-// card fica visível em qualquer range. Realizado = summary do dia 1º até agora.
+// Metas mensais do broadcast: meta vs realizado. As metas vêm do mês corrente (ou
+// do mês mais recente com metas); o realizado segue o período selecionado no topo.
+// Metas de contagem (opt-outs/reuniões/vendas) são do mês inteiro — em ranges curtos,
+// o realizado do período é comparado direto com a meta cheia (progresso do mês).
 const GOAL_DEFS: Record<string, { label: string; realizado: (wa: any, fnl: any) => number | null; fmt: (n: number) => string }> = {
   abertura_pct:   { label: "Abertura",            realizado: (wa) => wa?.leitura_pct ?? null,                                                      fmt: (n) => `${n.toFixed(1)}%` },
   resposta_pct:   { label: "Taxa de resposta",    realizado: (wa, fnl) => (wa?.total && fnl ? +(100 * fnl.responderam / wa.total).toFixed(1) : null), fmt: (n) => `${n.toFixed(1)}%` },
@@ -795,25 +796,20 @@ const GOAL_DEFS: Record<string, { label: string; realizado: (wa: any, fnl: any) 
 };
 const GOAL_ORDER = ["abertura_pct", "resposta_pct", "positivas_pct", "opt_outs", "reuniao_direta", "vendas"];
 
-function MetasDoMes() {
+function MetasDoMes({ from, to }: { from: string; to: string }) {
   const goalsQ = useQuery<{ month: string | null; goals: Array<{ metric_key: string; target: number; comparator: string; unit: string }> }>({
     queryKey: ["/api/ghl/goals"],
     queryFn: () => fetchJson(`/api/ghl/goals`),
   });
   const month = goalsQ.data?.month ?? null; // "YYYY-MM-01" do mês com metas
-  // [1º do mês, 1º do mês seguinte) — aritmética em string pra não escorregar de fuso
-  const nextMonth = useMemo(() => {
-    if (!month) return null;
-    const [y, m] = month.slice(0, 7).split("-").map(Number);
-    return m === 12 ? `${y + 1}-01-01` : `${y}-${String(m + 1).padStart(2, "0")}-01`;
-  }, [month]);
+  // Realizado segue o período selecionado no topo. Mesma queryKey do resumo executivo
+  // acima → compartilha o cache do React Query, sem request duplicado.
   const sumQ = useQuery<{
     whatsapp: { total: number; leitura_pct: number | null };
     funil: { responderam: number; positivas: number; opt_out: number; reuniao_direta: number; venda: number };
   }>({
-    queryKey: ["/api/ghl/broadcasts/summary", "metas-mes", month],
-    queryFn: () => fetchJson(`/api/ghl/broadcasts/summary?from=${month}&to=${nextMonth}`),
-    enabled: !!month,
+    queryKey: ["/api/ghl/broadcasts/summary", from, to],
+    queryFn: () => fetchJson(`/api/ghl/broadcasts/summary?from=${from}&to=${to}`),
   });
   const goals = goalsQ.data?.goals ?? [];
   if (!month || goals.length === 0) return null;
@@ -851,7 +847,7 @@ function MetasDoMes() {
           })}
         </div>
         <p className="text-[11px] text-muted-foreground mt-2">
-          Realizado de {mesLabel} (do dia 1º até agora) vs. metas do mês — independente do período selecionado acima.
+          Realizado no período selecionado acima vs. metas de {mesLabel}. Opt-outs, reuniões e vendas são metas do mês inteiro — em períodos curtos, leia como progresso do mês.
         </p>
       </CardContent>
     </Card>
@@ -983,8 +979,8 @@ function BibliotecaTab({ from, to }: { from: string; to: string }) {
           info="Custo de aquisição: investimento do período ÷ vendas atribuídas." />
       </div>
 
-      {/* Metas do mês: sempre visível — ancorado no mês corrente, não no range */}
-      <MetasDoMes />
+      {/* Metas do mês: metas do mês corrente; realizado segue o período selecionado */}
+      <MetasDoMes from={from} to={to} />
 
       {/* Evolução do período (2/3) + Gastos (1/3) */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
