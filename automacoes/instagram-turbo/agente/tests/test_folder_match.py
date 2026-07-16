@@ -10,7 +10,9 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent))
 
-from agente.drive import _content_key, _pick_folder_for_card
+from agente.drive import (
+    _content_key, _pick_folder_for_card, _matching_folder_names, _resolve_folder_tie,
+)
 
 
 def _assert(cond, msg):
@@ -73,7 +75,44 @@ def run():
     _assert(_pick_folder_for_card("Ana e o mar", ["TURBO_ana"]) is None,
             "chave curta (<5 chars) não casa")
 
+    print("\n=== pasta duplicada: desempate por ATIVO (16/jul/2026) ===")
+    test_pasta_duplicada_desempata_por_ativo()
+
     print("\n🎉 Todos os testes do matcher passaram.")
+
+
+def test_pasta_duplicada_desempata_por_ativo():
+    # Regressão do card «Marketing é...» (16/jul/2026): existiam DUAS pastas
+    # 'TURBO_marketinge' no mês, uma VAZIA e uma com os 5 ativos. O código antigo
+    # via empate de chave e desistia (fail-safe) → post não saía. Pior: um dict
+    # por nome colapsava as duas pastas de nome idêntico numa só (a vazia vencia).
+    # Agora: nomes que casam vêm TODOS; desempata por presença de ativo.
+
+    # 1) o núcleo de nomes: duas pastas de nome idêntico → ambas voltam
+    names = _matching_folder_names("Marketing é...", ["TURBO_marketinge", "TURBO_marketinge"])
+    _assert(names == ["TURBO_marketinge", "TURBO_marketinge"],
+            f"nomes idênticos casam AMBOS (veio {names!r})")
+
+    # 2) desempate PURO por ativo (has_assets injetado; sem Drive)
+    class F:  # stand-in de DriveFile
+        def __init__(self, id, empty): self.id, self.empty = id, empty
+    vazia, cheia = F("VAZIA", True), F("CHEIA", False)
+    has_assets = lambda f: not f.empty
+
+    got = _resolve_folder_tie([vazia, cheia], has_assets)
+    _assert(got is cheia, "duas pastas, uma vazia + uma cheia → escolhe a CHEIA")
+    got2 = _resolve_folder_tie([cheia], has_assets)
+    _assert(got2 is cheia, "uma pasta só → ela (mesmo caminho)")
+    _assert(_resolve_folder_tie([], has_assets) is None, "nenhuma → None")
+
+    # 3) fail-safe preservado: 2+ com conteúdo → ambíguo de verdade → None
+    cheia2 = F("CHEIA2", False)
+    _assert(_resolve_folder_tie([cheia, cheia2], has_assets) is None,
+            "2 pastas COM conteúdo → ambíguo real → None (não chuta)")
+    # todas vazias → None (nada pra postar)
+    vazia2 = F("VAZIA2", True)
+    _assert(_resolve_folder_tie([vazia, vazia2], has_assets) is None,
+            "todas vazias → None")
 
 
 def test_folder_match_por_nome():

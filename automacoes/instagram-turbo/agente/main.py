@@ -254,21 +254,30 @@ def plan_task(t: clickup.Task, *, force_now: bool = False) -> PlannedAction:
         return plan
 
     # Legenda: prioriza o Doc linkado no campo "Copy:" do próprio card
-    # (caption_doc_id lê o markdown_description). O Doc mensal "SOCIAL MEDIA
-    # TURBO [MÊS]" vira só fallback — cada card aponta seu Doc de copy, que
-    # pode ter abas por mês, então a busca por header (find_legenda_for_task)
-    # roda sobre o texto de todas as abas concatenadas.
-    doc_text = ctx["doc_text"]
+    # (caption_doc_id lê o markdown_description), com FALLBACK pro Doc mensal
+    # "SOCIAL MEDIA TURBO [MÊS]". O fallback é essencial: o link "Copy:" do card
+    # às vezes aponta pro Doc ERRADO (ex.: card "Será que qualquer creator..."
+    # linkava o Doc do Creator Summit, mas a copy estava no Doc mensal) — sem
+    # cair no mensal, a legenda vinha vazia e o post não saía. Ordem: tenta o Doc
+    # do card; se não achou header lá, tenta o mensal e fica com o que casar.
+    from agente import drive
+    card_doc_text = ""
     try:
         cap_doc_id = clickup.caption_doc_id(t.id)
         if cap_doc_id:
-            from agente import drive
-            doc_text = drive.get_doc_text(cap_doc_id)
+            card_doc_text = drive.get_doc_text(cap_doc_id)
     except Exception:  # noqa: BLE001
-        pass  # 403/ausente → cai pro Doc mensal (ctx["doc_text"])
+        pass  # 403/ausente → usa só o Doc mensal
 
-    if doc_text:
-        leg, hdr = docs_parser.find_legenda_for_task(doc_text, t.name)
+    leg, hdr = ("", None)
+    for source_doc in (card_doc_text, ctx["doc_text"]):
+        if not source_doc:
+            continue
+        leg, hdr = docs_parser.find_legenda_for_task(source_doc, t.name)
+        if leg:
+            break  # achou legenda não-vazia → para (Doc do card tem prioridade)
+
+    if hdr is not None or leg:
         plan.matched_header = hdr
         plan.legenda_text = leg
         plan.legenda_len = len(leg)
