@@ -19,6 +19,7 @@ import { PADROES_COPY_KEYS, PADROES_COPY_LABEL, PADROES_COPY_TESE } from "@share
 import { format, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, LineChart, Line, CartesianGrid, Legend, ScatterChart, Scatter, ZAxis, Cell } from "recharts";
+import { Tooltip as UiTooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import { avaliarPerformance, CLASSIFICACAO_TAILWIND, CLASSIFICACAO_LABEL, BENCHMARKS_TURBO, type Classificacao } from "@shared/ghl-broadcast/benchmarks";
 import FunilTab from "@/components/FunilBroadcast";
@@ -91,7 +92,12 @@ function StatCard({ label, value, hint, info }: { label: string; value: string |
         <div className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-1">
           {label}
           {info && (
-            <span title={info} className="cursor-help text-muted-foreground/60 normal-case" aria-label="como é calculado">ⓘ</span>
+            <UiTooltip>
+              <TooltipTrigger asChild>
+                <button type="button" className="cursor-help text-muted-foreground/60 normal-case" aria-label="como é calculado">ⓘ</button>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs normal-case tracking-normal">{info}</TooltipContent>
+            </UiTooltip>
           )}
         </div>
         <div className="mt-1 text-2xl font-semibold">{value}</div>

@@ -27,6 +27,7 @@ import { Loader2, Trophy, TrendingUp, AlertTriangle, Sparkles, Layers, Plus, Inb
 // faixas de faturamento). A contagem de Contatos se sobrepõe a elas (review #12).
 const isBaseGuardaChuva = (base: string) => /-\s*Todos$/i.test(base);
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tooltip as UiTooltip, TooltipTrigger, TooltipContent } from "@/components/ui/tooltip";
 import { compatibilidadePadroes, compatibilidadeOfertas, type NivelCompat } from "@shared/ghl-broadcast/matriz-validacao";
 import { PADROES_COPY_LABEL, type PadraoKey } from "@shared/ghl-broadcast/types";
 import { BASES_DISPONIVEIS } from "@shared/ghl-broadcast/base-tag-map";
@@ -285,13 +286,28 @@ export default function BasesInteligencia({ from, to }: { from: string; to: stri
             <TableHeader>
               <TableRow>
                 <TableHead>Base</TableHead>
-                <TableHead className="text-right" title="Contatos atuais na base. As bases '- Todos' (⧉) são guarda-chuva e INCLUEM as sub-bases (MQLs, faixas de faturamento) — há sobreposição nesta coluna.">Contatos ⓘ</TableHead>
+                <TableHead className="text-right">
+                  <UiTooltip>
+                    <TooltipTrigger asChild><span className="cursor-help">Contatos ⓘ</span></TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs">Contatos atuais na base. As bases '- Todos' (⧉) são guarda-chuva e INCLUEM as sub-bases (MQLs, faixas de faturamento) — há sobreposição nesta coluna.</TooltipContent>
+                  </UiTooltip>
+                </TableHead>
                 <TableHead className="text-right">Leads 7d</TableHead>
-                <TableHead className="text-right" title="Cada disparo é atribuído à base MAIS ESPECÍFICA que ele atingiu — Disparos, Reuniões e Ganhos NÃO se sobrepõem entre bases (diferente de Contatos).">Disparos ⓘ</TableHead>
+                <TableHead className="text-right">
+                  <UiTooltip>
+                    <TooltipTrigger asChild><span className="cursor-help">Disparos ⓘ</span></TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs">Cada disparo é atribuído à base MAIS ESPECÍFICA que ele atingiu — Disparos, Reuniões e Ganhos NÃO se sobrepõem entre bases (diferente de Contatos).</TooltipContent>
+                  </UiTooltip>
+                </TableHead>
                 <TableHead className="text-right">Entrega</TableHead>
                 <TableHead className="text-right">Abertura</TableHead>
                 <TableHead className="text-right">Reun.</TableHead>
-                <TableHead className="text-right" title="Negócios ganhos atribuídos (venda após resposta)">Ganhos</TableHead>
+                <TableHead className="text-right">
+                  <UiTooltip>
+                    <TooltipTrigger asChild><span className="cursor-help">Ganhos</span></TooltipTrigger>
+                    <TooltipContent side="top" className="max-w-xs text-xs">Negócios ganhos atribuídos (venda após resposta)</TooltipContent>
+                  </UiTooltip>
+                </TableHead>
                 <TableHead className="text-right">Custo/reun.</TableHead>
               </TableRow>
             </TableHeader>
