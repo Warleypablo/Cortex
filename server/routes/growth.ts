@@ -343,8 +343,8 @@ export async function buildGoogleCriativos(db: any, startDate: string, endDate: 
       SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) ELSE 0 END) AS valor_pontual,
       SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_recorrente, 0) ELSE 0 END) AS valor_recorrente,
       SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN
-        CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1
-        ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END
+        CASE WHEN d.servicos_necessidade IS NULL OR d.servicos_necessidade = '' THEN 1
+        ELSE COALESCE(array_length(string_to_array(d.servicos_necessidade, ','), 1), 1) END
       ELSE 0 END) AS contratos
     FROM "Bitrix".crm_deal d
     WHERE d.created_at >= '${startDate}'::date AND d.created_at <= '${endDate}'::date + INTERVAL '1 day'
@@ -664,8 +664,8 @@ export async function buildTiktokCriativos(db: any, startDate: string, endDate: 
       SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) ELSE 0 END) AS valor_pontual,
       SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_recorrente, 0) ELSE 0 END) AS valor_recorrente,
       SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN
-        CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1
-        ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END
+        CASE WHEN d.servicos_necessidade IS NULL OR d.servicos_necessidade = '' THEN 1
+        ELSE COALESCE(array_length(string_to_array(d.servicos_necessidade, ','), 1), 1) END
       ELSE 0 END) AS contratos
     FROM "Bitrix".crm_deal d
     WHERE d.created_at >= '${startDate}'::date AND d.created_at <= '${endDate}'::date + INTERVAL '1 day'
@@ -1756,8 +1756,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_pontual, 0) ELSE 0 END) as valor_pontual,
           SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN COALESCE(d.valor_recorrente, 0) ELSE 0 END) as valor_recorrente,
           SUM(CASE WHEN d.stage_name = 'Negócio Ganho' THEN
-            CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1
-            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END
+            CASE WHEN d.servicos_necessidade IS NULL OR d.servicos_necessidade = '' THEN 1
+            ELSE COALESCE(array_length(string_to_array(d.servicos_necessidade, ','), 1), 1) END
           ELSE 0 END) as contratos,
           SUM(CASE WHEN dmp.motivo_perda IN ('Dropshipping', 'Nicho Black', 'Agencia de Marketing', 'Infoproduto', 'Afiliado', 'Fake') THEN 1 ELSE 0 END) as descartados,
           SUM(CASE WHEN dmp.motivo_perda IN ('Dropshipping', 'Nicho Black', 'Agencia de Marketing', 'Infoproduto', 'Afiliado', 'Fake')
@@ -2252,8 +2252,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           COUNT(DISTINCT COALESCE(company_name, contact_name, title)) as clientes_unicos,
           SUM(COALESCE(valor_pontual, 0)) as receita_pontual,
           SUM(COALESCE(valor_recorrente, 0)) as receita_recorrente,
-          SUM(CASE WHEN produtos IS NULL OR produtos = '' OR produtos = '[]' THEN 1
-            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(produtos, '[', ''), ']', ''), ','), 1), 1) END) as contratos
+          SUM(CASE WHEN servicos_necessidade IS NULL OR servicos_necessidade = '' THEN 1
+            ELSE COALESCE(array_length(string_to_array(servicos_necessidade, ','), 1), 1) END) as contratos
         FROM "Bitrix".crm_deal
         WHERE data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
           AND stage_name = 'Negócio Ganho'
@@ -3006,8 +3006,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         utmSourceFilter = buildPlatformFilterSql(utmValues);
       }
 
-      // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
-      const prodCountExpr = "CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1 ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END";
+      // SQL fragments: cliente = conta cada deal; contrato = conta serviços de servicos_necessidade (Synapse)
+      const prodCountExpr = "CASE WHEN d.servicos_necessidade IS NULL OR d.servicos_necessidade = '' THEN 1 ELSE COALESCE(array_length(string_to_array(d.servicos_necessidade, ','), 1), 1) END";
       const countNovos = contagem === 'contrato'
         ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END)");
@@ -3198,8 +3198,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
         utmSourceFilter = buildPlatformFilterSql(utmValues);
       }
 
-      // SQL fragments: cliente = conta cada deal; contrato = conta produtos da coluna produtos
-      const prodCountExpr = "CASE WHEN d.produtos IS NULL OR d.produtos = '' OR d.produtos = '[]' THEN 1 ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(d.produtos, '[', ''), ']', ''), ','), 1), 1) END";
+      // SQL fragments: cliente = conta cada deal; contrato = conta serviços de servicos_necessidade (Synapse)
+      const prodCountExpr = "CASE WHEN d.servicos_necessidade IS NULL OR d.servicos_necessidade = '' THEN 1 ELSE COALESCE(array_length(string_to_array(d.servicos_necessidade, ','), 1), 1) END";
       const countNovos = contagem === 'contrato'
         ? sql.raw(`SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN ${prodCountExpr} ELSE 0 END)`)
         : sql.raw("COUNT(CASE WHEN stage_name = 'Negócio Ganho' THEN 1 END)");
@@ -5013,8 +5013,8 @@ export function registerGrowthRoutes(app: Express, db: any, storage: IStorage) {
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_pontual, 0) ELSE 0 END) as receita_pontual,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN COALESCE(valor_recorrente, 0) ELSE 0 END) as receita_recorrente,
           SUM(CASE WHEN stage_name = 'Negócio Ganho' THEN
-            CASE WHEN produtos IS NULL OR produtos = '' OR produtos = '[]' THEN 1
-            ELSE COALESCE(array_length(string_to_array(REPLACE(REPLACE(produtos, '[', ''), ']', ''), ','), 1), 1) END
+            CASE WHEN servicos_necessidade IS NULL OR servicos_necessidade = '' THEN 1
+            ELSE COALESCE(array_length(string_to_array(servicos_necessidade, ','), 1), 1) END
           ELSE 0 END) as contratos
         FROM "Bitrix".crm_deal
         WHERE data_fechamento >= '${startDate}'::date AND data_fechamento <= '${endDate}'::date
