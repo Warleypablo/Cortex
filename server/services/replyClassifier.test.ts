@@ -41,6 +41,26 @@ describe("classificarPorRegra", () => {
     expect(classificarPorRegra("bora", "Digite bora que te mando o link.")?.sentiment).toBe("positiva");
   });
 
+  it("keyword do CTA com pontuação/acento diferente ainda é positiva", () => {
+    const cta = 'Responde "UGC" que a gente mostra como funciona! 🎬';
+    expect(classificarPorRegra("Ugc!", cta)?.sentiment).toBe("positiva");
+    expect(classificarPorRegra("ugc.", cta)?.sentiment).toBe("positiva");
+    const ctaAcento = 'Quer garantir sua vaga? Responda "REUNIÃO" aqui.';
+    expect(classificarPorRegra("reuniao", ctaAcento)?.sentiment).toBe("positiva");
+  });
+
+  it("eco PARCIAL da keyword entre aspas (1 caractere faltando) → positiva", () => {
+    const cta = 'Responde "UGC" que a gente mostra como funciona!';
+    expect(classificarPorRegra("GC", cta)?.sentiment).toBe("positiva");
+    // faltando mais que 1 caractere não dispara a regra (vai pra IA)
+    const ctaDiag = 'Responde "DIAGNÓSTICO" que a gente faz uma ligação!';
+    expect(classificarPorRegra("di", ctaDiag)).toBeNull();
+  });
+
+  it("keyword entre aspas sem verbo de CTA no corpo não dispara a regra", () => {
+    expect(classificarPorRegra("GC", 'A sigla "UGC" está na moda.')).toBeNull();
+  });
+
   it("sem broadcast de contexto, token ambíguo continua null (vai pra IA)", () => {
     expect(classificarPorRegra("UGC")).toBeNull();
   });
