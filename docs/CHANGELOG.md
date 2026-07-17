@@ -1,5 +1,25 @@
 # Changelog
 
+## 2026-07-17 | feat(dfc): filtro de regime (quitado x competência) e filtro de categorias
+
+**O que foi feito:**
+- Toggle "Quitado / Competência" no header da DFC: quitado mantém o comportamento atual (status QUITADO, valor_pago − desconto, mês por data_quitacao); competência segue o padrão já validado no DRE (todos os status, valor_bruto, mês por data_competencia)
+- MultiSelect de categorias no header: filtra a hierarquia inteira (tabela, KPIs e gráficos) no backend; o dropdown lista as categorias disponíveis no período/regime antes do filtro, então não encolhe ao selecionar
+- Ajuste de conciliação (plug de R$ 10k em mai/26) passa a ser injetado apenas no regime quitado e sem filtro de categorias ativo
+- Novos params `regime` e `categorias` validados em `/api/dfc` e repassados também a `/api/dfc/analyze` e `/api/dfc/chat`
+
+**Por que:**
+- O financeiro precisava enxergar a DFC também por competência (o que foi faturado no mês, pago ou não) e conseguir isolar categorias específicas nas análises
+
+**Arquivos alterados:**
+- `server/storage.ts` - `getDfc` ganhou params `regime` e `categorias`; query alterna coluna de data/valor por regime; response inclui lista `categorias`
+- `server/routes.ts` - validação e repasse dos novos params nas 3 rotas do DFC
+- `client/src/pages/DashboardDFC.tsx` - toggle de regime, MultiSelect de categorias e novos params na query e no chat
+
+**Impacto arquitetural:** Nenhum — extensão retrocompatível do endpoint existente (sem regime = quitado, comportamento idêntico ao anterior)
+
+---
+
 ## 2026-07-15 | chore(server): remove sync automático horário de deals do Bitrix
 
 **O que foi feito:**
