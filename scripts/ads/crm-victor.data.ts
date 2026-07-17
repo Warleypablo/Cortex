@@ -46,10 +46,12 @@ export const NN_FLOOR = 0;
 
 export interface Group { key: string; body: 1 | 2; hookMin: number; hookMax: number; ctaLabel: string; matchToken: string; }
 export const GROUPS: Group[] = [
-  { key: "b1_h01_05", body: 1, hookMin: 1, hookMax: 5, ctaLabel: "c1", matchToken: `${TEMA} - h01 a h05 | b1` },
-  { key: "b1_h06_11", body: 1, hookMin: 6, hookMax: 11, ctaLabel: "c1", matchToken: `${TEMA} - h06 a h11 | b1` },
-  { key: "b2_h01_05", body: 2, hookMin: 1, hookMax: 5, ctaLabel: "c1", matchToken: `${TEMA} - h01 a h05 | b2` },
-  { key: "b2_h06_11", body: 2, hookMin: 6, hookMax: 11, ctaLabel: "c1", matchToken: `${TEMA} - h06 a h11 | b2` },
+  // ⚠️ matchToken PRECISA incluir a persona: sem `[${PERSONA}]` os grupos h01-05 do Victor
+  // casavam com os conjuntos do LUCAS (mesmo tema/faixa) e os ads iam pro conjunto errado.
+  { key: "b1_h01_05", body: 1, hookMin: 1, hookMax: 5, ctaLabel: "c1", matchToken: `[${PERSONA}] - ${TEMA} - h01 a h05 | b1` },
+  { key: "b1_h06_11", body: 1, hookMin: 6, hookMax: 11, ctaLabel: "c1", matchToken: `[${PERSONA}] - ${TEMA} - h06 a h11 | b1` },
+  { key: "b2_h01_05", body: 2, hookMin: 1, hookMax: 5, ctaLabel: "c1", matchToken: `[${PERSONA}] - ${TEMA} - h01 a h05 | b2` },
+  { key: "b2_h06_11", body: 2, hookMin: 6, hookMax: 11, ctaLabel: "c1", matchToken: `[${PERSONA}] - ${TEMA} - h06 a h11 | b2` },
 ];
 export const conjName = (nn: number, g: Group): string => {
   const hlabel = `h${String(g.hookMin).padStart(2, "0")} a h${String(g.hookMax).padStart(2, "0")}`;

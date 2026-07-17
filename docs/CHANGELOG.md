@@ -1,5 +1,18 @@
 # Changelog
 
+## 2026-07-17 | feat(ads): lote "Cliente Novo x Base - Victor" (TP1875-1896) — 4 conjuntos + 22 ads PAUSED (+ fix matchToken)
+
+**O que foi feito:**
+- **Upload:** 44/44 vídeos (⚠️ os 9x16 do body1 eram monstros de 376-435MB) — precisou de cota fresca (dia seguinte) + várias passadas idempotentes; fechou sem falha na passada final.
+- **Meta:** 4 conjuntos na camp CBO teste CRM `120252008224000450`: **163** [b1 h06-11], **164** [b2 h06-11], **165** [b1 h01-05], **166** [b2 h01-05] — **22 ads pareados, TUDO PAUSED.** Copy clonada do irmão 151.
+- **🐛 Bug pego e corrigido:** o `matchToken` dos GROUPS não incluía a persona → os grupos **h01-05 do Victor casaram com os conjuntos do LUCAS** (mesmo tema "Cliente Novo x Base" + mesma faixa/body) e 10 ads do Victor foram criados DENTRO dos conjuntos 159/161 do Lucas. Fix: `matchToken` agora inclui `[${PERSONA}]`; os 10 ads mal-colocados foram deletados e recriados nos conjuntos próprios do Victor (165/166). Lição pro `subir-pareado`: matchToken de idempotência SEMPRE precisa da persona quando o tema/faixa se repete entre personas.
+
+**Por que:** 2º batch do Victor pendente (o 1º foi o UGC Tradicionais). Zera os pendentes do Victor.
+
+**Arquivos alterados:** `scripts/ads/crm-victor.data.ts` (matchToken com persona).
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLI.
+
 ## 2026-07-16 | feat(ads): scripts pareados GENÉRICOS + lote "UGC x Anúncios Tradicionais - Victor" (TP1855-1874) — 4 conjuntos + 20 ads PAUSED
 
 **O que foi feito:**
