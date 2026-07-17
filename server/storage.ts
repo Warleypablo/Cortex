@@ -4994,6 +4994,20 @@ export class DbStorage implements IStorage {
       .map(([id, nome]) => ({ id, nome }))
       .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 
+    // Pais de nível XX.YY do plano de contas que agrupam folhas presentes — para o filtro hierárquico
+    // (parcelas são lançadas nas folhas; sem isso, agregadores como "04.02 Recebimento de
+    // Empréstimos" aparecem na tabela mas não existem no dropdown)
+    const paisNomes = new Map<string, string>();
+    for (const row of categoriasReais.rows) {
+      const m = ((row.nome as string) || '').trim().match(/^(\d{2}\.\d{2})\s+(.+)$/);
+      if (m) paisNomes.set(m[1], m[2]);
+    }
+    const folhaIds = Array.from(categoriasDisponiveis.keys());
+    (result as any).categoriasPais = Array.from(paisNomes.entries())
+      .filter(([id]) => !categoriasDisponiveis.has(id) && folhaIds.some(f => f.startsWith(id + '.')))
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
+
     return result;
   }
 

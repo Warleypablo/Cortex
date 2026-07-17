@@ -84,15 +84,45 @@ export default function DashboardDFC() {
   // Assim categorias novas de outro período/regime já entram marcadas.
   const [categoriasExcluidas, setCategoriasExcluidas] = useState<string[]>([]);
   const [todasCategorias, setTodasCategorias] = useState<{ id: string; nome: string }[]>([]);
+  // Agregadores XX.YY do plano de contas (ex.: "04.02 Recebimento de Empréstimos"):
+  // aparecem no dropdown como grupo; desmarcar um pai desmarca todas as suas folhas
+  const [categoriasPais, setCategoriasPais] = useState<{ id: string; nome: string }[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
   
   const filterDataInicio = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
   const filterDataFim = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
 
-  const categoriasSelecionadas = useMemo(
+  const folhasSelecionadas = useMemo(
     () => todasCategorias.filter(c => !categoriasExcluidas.includes(c.id)).map(c => c.id),
     [todasCategorias, categoriasExcluidas]
   );
+
+  const filhasDe = (paiId: string) =>
+    todasCategorias.filter(c => c.id.startsWith(paiId + '.')).map(c => c.id);
+
+  // Seleção mostrada no dropdown: folhas + pais cujas filhas estão todas marcadas
+  const categoriasSelecionadas = useMemo(() => {
+    const folhasSet = new Set(folhasSelecionadas);
+    const paisSel = categoriasPais
+      .filter(p => {
+        const filhas = filhasDe(p.id);
+        return filhas.length > 0 && filhas.every(f => folhasSet.has(f));
+      })
+      .map(p => p.id);
+    return [...folhasSelecionadas, ...paisSel];
+  }, [folhasSelecionadas, categoriasPais, todasCategorias]);
+
+  const categoriaOptions = useMemo(() => {
+    const paiIds = new Set(categoriasPais.map(p => p.id));
+    return [
+      ...categoriasPais.map(p => ({ value: p.id, label: `${p.id} ${p.nome}` })),
+      ...todasCategorias.map(c => {
+        const paiId = c.id.split('.').slice(0, 2).join('.');
+        const indent = paiIds.has(paiId) && paiId !== c.id ? '   ' : '';
+        return { value: c.id, label: `${indent}${c.id} ${c.nome}` };
+      }),
+    ].sort((a, b) => a.value.localeCompare(b.value, undefined, { numeric: true }));
+  }, [categoriasPais, todasCategorias]);
 
   const handleCategoriasChange = (novaSelecao: string[]) => {
     // Limpar tudo (X do trigger ou desmarcar o último item) = voltar ao padrão: todas visíveis
@@ -100,7 +130,24 @@ export default function DashboardDFC() {
       setCategoriasExcluidas([]);
       return;
     }
-    setCategoriasExcluidas(todasCategorias.filter(c => !novaSelecao.includes(c.id)).map(c => c.id));
+    const prev = new Set(categoriasSelecionadas);
+    const nova = new Set(novaSelecao);
+    const toggled = [
+      ...Array.from(prev).filter(v => !nova.has(v)),
+      ...Array.from(nova).filter(v => !prev.has(v)),
+    ];
+    const folhasSet = new Set(folhasSelecionadas);
+    for (const id of toggled) {
+      const adicionado = nova.has(id);
+      const alvo = categoriasPais.some(p => p.id === id) ? filhasDe(id) : [id];
+      alvo.forEach(f => (adicionado ? folhasSet.add(f) : folhasSet.delete(f)));
+    }
+    // Desmarcar tudo não tem uso (DFC vazia) — volta ao padrão
+    if (folhasSet.size === 0) {
+      setCategoriasExcluidas([]);
+      return;
+    }
+    setCategoriasExcluidas(todasCategorias.filter(c => !folhasSet.has(c.id)).map(c => c.id));
   };
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -118,7 +165,7 @@ export default function DashboardDFC() {
         dataFim: filterDataFim || undefined,
         empresa: empresa !== "todas" ? empresa : undefined,
         regime,
-        categorias: categoriasExcluidas.length > 0 ? categoriasSelecionadas : undefined,
+        categorias: categoriasExcluidas.length > 0 ? folhasSelecionadas : undefined,
       });
       return response.json();
     },
@@ -167,7 +214,7 @@ export default function DashboardDFC() {
     "Compare receitas e despesas dos últimos meses",
   ];
 
-  const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse & { empresas?: string[]; categorias?: { id: string; nome: string }[] }>({
+  const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse & { empresas?: string[]; categorias?: { id: string; nome: string }[]; categoriasPais?: { id: string; nome: string }[] }>({
     queryKey: ["/api/dfc", filterDataInicio, filterDataFim, empresa, regime, categoriasExcluidas.join(",")],
     queryFn: async () => {
       const params = new URLSearchParams();
@@ -175,8 +222,8 @@ export default function DashboardDFC() {
       if (filterDataFim) params.append("dataFim", filterDataFim);
       if (empresa && empresa !== "todas") params.append("empresa", empresa);
       if (regime !== "quitado") params.append("regime", regime);
-      if (categoriasExcluidas.length > 0 && categoriasSelecionadas.length > 0) {
-        params.append("categorias", categoriasSelecionadas.join(","));
+      if (categoriasExcluidas.length > 0 && folhasSelecionadas.length > 0) {
+        params.append("categorias", folhasSelecionadas.join(","));
       }
 
       const res = await fetch(`/api/dfc?${params.toString()}`, { cache: "no-store" });
@@ -191,6 +238,7 @@ export default function DashboardDFC() {
   // Mantém a lista de categorias estável entre refetches (o response traz a lista completa do período/regime)
   useEffect(() => {
     if (dfcData?.categorias) setTodasCategorias(dfcData.categorias);
+    if (dfcData?.categoriasPais) setCategoriasPais(dfcData.categoriasPais);
   }, [dfcData]);
 
   const toggleExpand = (nodeId: string) => {
@@ -462,7 +510,7 @@ export default function DashboardDFC() {
             {/* Filtro de categorias (todas marcadas por padrão; desmarcar exclui da DFC) */}
             <MultiSelect
               className="w-[240px]"
-              options={todasCategorias.map(c => ({ value: c.id, label: `${c.id} ${c.nome}` }))}
+              options={categoriaOptions}
               selected={categoriasSelecionadas}
               onChange={handleCategoriasChange}
               placeholder="Todas as categorias"
