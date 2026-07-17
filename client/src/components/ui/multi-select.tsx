@@ -26,6 +26,8 @@ interface MultiSelectProps {
   emptyText?: string;
   searchPlaceholder?: string;
   className?: string;
+  /** Quando definido e todos os itens estão selecionados, o trigger mostra este texto (sem badge nem X) */
+  allSelectedLabel?: string;
 }
 
 export function MultiSelect({
@@ -36,6 +38,7 @@ export function MultiSelect({
   emptyText = "Nenhum item encontrado",
   searchPlaceholder = "Buscar...",
   className,
+  allSelectedLabel,
 }: MultiSelectProps) {
   const [open, setOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
@@ -68,6 +71,10 @@ export function MultiSelect({
     return found ? found.label : value;
   };
 
+  const allSelected = allSelectedLabel !== undefined
+    && normalizedOptions.length > 0
+    && selected.length === normalizedOptions.length;
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -84,6 +91,8 @@ export function MultiSelect({
           <div className="flex flex-nowrap gap-1 flex-1 overflow-hidden">
             {selected.length === 0 ? (
               <span className="text-muted-foreground">{placeholder}</span>
+            ) : allSelected ? (
+              <span className="text-muted-foreground">{allSelectedLabel}</span>
             ) : selected.length === 1 ? (
               <Badge
                 variant="secondary"
@@ -119,7 +128,7 @@ export function MultiSelect({
             )}
           </div>
           <div className="flex items-center gap-1 ml-2">
-            {selected.length > 0 && (
+            {selected.length > 0 && !allSelected && (
               <span
                 onClick={handleClearAll}
                 className="rounded-full outline-none hover:bg-accent p-1 cursor-pointer inline-flex items-center justify-center"

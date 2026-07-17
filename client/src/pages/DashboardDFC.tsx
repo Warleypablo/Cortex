@@ -1,4 +1,4 @@
-import { useState, useMemo, Fragment } from "react";
+import { useState, useMemo, useEffect, Fragment } from "react";
 import { useQuery, useMutation } from "@tanstack/react-query";
 import { formatDecimal, formatPercent, formatCurrencyNoDecimals, formatCurrencyCompact, cn } from "@/lib/utils";
 import { useTheme } from "@/components/ThemeProvider";
@@ -80,11 +80,28 @@ export default function DashboardDFC() {
   });
   const [empresa, setEmpresa] = useState<string>("todas");
   const [regime, setRegime] = useState<"quitado" | "competencia">("quitado");
-  const [categoriasSel, setCategoriasSel] = useState<string[]>([]);
+  // Filtro por exclusão: tudo vem selecionado por padrão; guarda-se o que foi DESmarcado.
+  // Assim categorias novas de outro período/regime já entram marcadas.
+  const [categoriasExcluidas, setCategoriasExcluidas] = useState<string[]>([]);
+  const [todasCategorias, setTodasCategorias] = useState<{ id: string; nome: string }[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
   
   const filterDataInicio = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
   const filterDataFim = dateRange?.to ? format(dateRange.to, 'yyyy-MM-dd') : '';
+
+  const categoriasSelecionadas = useMemo(
+    () => todasCategorias.filter(c => !categoriasExcluidas.includes(c.id)).map(c => c.id),
+    [todasCategorias, categoriasExcluidas]
+  );
+
+  const handleCategoriasChange = (novaSelecao: string[]) => {
+    // Limpar tudo (X do trigger ou desmarcar o último item) = voltar ao padrão: todas visíveis
+    if (novaSelecao.length === 0) {
+      setCategoriasExcluidas([]);
+      return;
+    }
+    setCategoriasExcluidas(todasCategorias.filter(c => !novaSelecao.includes(c.id)).map(c => c.id));
+  };
   const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
   const [chatInput, setChatInput] = useState("");
@@ -101,7 +118,7 @@ export default function DashboardDFC() {
         dataFim: filterDataFim || undefined,
         empresa: empresa !== "todas" ? empresa : undefined,
         regime,
-        categorias: categoriasSel.length > 0 ? categoriasSel : undefined,
+        categorias: categoriasExcluidas.length > 0 ? categoriasSelecionadas : undefined,
       });
       return response.json();
     },
@@ -151,14 +168,16 @@ export default function DashboardDFC() {
   ];
 
   const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse & { empresas?: string[]; categorias?: { id: string; nome: string }[] }>({
-    queryKey: ["/api/dfc", filterDataInicio, filterDataFim, empresa, regime, categoriasSel.join(",")],
+    queryKey: ["/api/dfc", filterDataInicio, filterDataFim, empresa, regime, categoriasExcluidas.join(",")],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filterDataInicio) params.append("dataInicio", filterDataInicio);
       if (filterDataFim) params.append("dataFim", filterDataFim);
       if (empresa && empresa !== "todas") params.append("empresa", empresa);
       if (regime !== "quitado") params.append("regime", regime);
-      if (categoriasSel.length > 0) params.append("categorias", categoriasSel.join(","));
+      if (categoriasExcluidas.length > 0 && categoriasSelecionadas.length > 0) {
+        params.append("categorias", categoriasSelecionadas.join(","));
+      }
 
       const res = await fetch(`/api/dfc?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch DFC data");
@@ -168,6 +187,11 @@ export default function DashboardDFC() {
     refetchOnMount: true,
     refetchOnWindowFocus: true,
   });
+
+  // Mantém a lista de categorias estável entre refetches (o response traz a lista completa do período/regime)
+  useEffect(() => {
+    if (dfcData?.categorias) setTodasCategorias(dfcData.categorias);
+  }, [dfcData]);
 
   const toggleExpand = (nodeId: string) => {
     setExpanded(prev => {
@@ -435,13 +459,14 @@ export default function DashboardDFC() {
                 Competência
               </Button>
             </div>
-            {/* Filtro de categorias */}
+            {/* Filtro de categorias (todas marcadas por padrão; desmarcar exclui da DFC) */}
             <MultiSelect
               className="w-[240px]"
-              options={(dfcData?.categorias ?? []).map(c => ({ value: c.id, label: `${c.id} ${c.nome}` }))}
-              selected={categoriasSel}
-              onChange={setCategoriasSel}
+              options={todasCategorias.map(c => ({ value: c.id, label: `${c.id} ${c.nome}` }))}
+              selected={categoriasSelecionadas}
+              onChange={handleCategoriasChange}
               placeholder="Todas as categorias"
+              allSelectedLabel="Todas as categorias"
               searchPlaceholder="Buscar categoria..."
               emptyText="Nenhuma categoria encontrada"
             />
