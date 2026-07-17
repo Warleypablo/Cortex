@@ -2389,7 +2389,7 @@ async function postTagRequest(req: Request, res: Response) {
 // Alvos por mês × métrica. O "realizado" é calculado no front a partir do
 // /broadcasts/summary — aqui só guardamos e servimos os alvos.
 
-const BROADCAST_GOAL_METRICS = ["abertura_pct", "resposta_pct", "positivas_pct", "opt_outs", "reuniao_direta", "vendas"];
+const BROADCAST_GOAL_METRICS = ["abertura_pct", "resposta_pct", "positivas_pct", "opt_out_pct", "opt_outs", "reuniao_direta", "vendas"];
 
 async function ensureBroadcastGoalsTable() {
   await db.execute(sql`
