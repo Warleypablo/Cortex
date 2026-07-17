@@ -27,6 +27,7 @@ import {
   RotateCcw
 } from "lucide-react";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { MultiSelect } from "@/components/ui/multi-select";
 import { DateRangePicker } from "@/components/ui/date-range-picker";
 import type { DateRange } from "react-day-picker";
 import { format, startOfYear } from "date-fns";
@@ -78,6 +79,8 @@ export default function DashboardDFC() {
     to: undefined
   });
   const [empresa, setEmpresa] = useState<string>("todas");
+  const [regime, setRegime] = useState<"quitado" | "competencia">("quitado");
+  const [categoriasSel, setCategoriasSel] = useState<string[]>([]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set(['RECEITAS', 'DESPESAS']));
   
   const filterDataInicio = dateRange?.from ? format(dateRange.from, 'yyyy-MM-dd') : '';
@@ -97,6 +100,8 @@ export default function DashboardDFC() {
         dataInicio: filterDataInicio || undefined,
         dataFim: filterDataFim || undefined,
         empresa: empresa !== "todas" ? empresa : undefined,
+        regime,
+        categorias: categoriasSel.length > 0 ? categoriasSel : undefined,
       });
       return response.json();
     },
@@ -145,13 +150,15 @@ export default function DashboardDFC() {
     "Compare receitas e despesas dos últimos meses",
   ];
 
-  const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse & { empresas?: string[] }>({
-    queryKey: ["/api/dfc", filterDataInicio, filterDataFim, empresa],
+  const { data: dfcData, isLoading } = useQuery<DfcHierarchicalResponse & { empresas?: string[]; categorias?: { id: string; nome: string }[] }>({
+    queryKey: ["/api/dfc", filterDataInicio, filterDataFim, empresa, regime, categoriasSel.join(",")],
     queryFn: async () => {
       const params = new URLSearchParams();
       if (filterDataInicio) params.append("dataInicio", filterDataInicio);
       if (filterDataFim) params.append("dataFim", filterDataFim);
       if (empresa && empresa !== "todas") params.append("empresa", empresa);
+      if (regime !== "quitado") params.append("regime", regime);
+      if (categoriasSel.length > 0) params.append("categorias", categoriasSel.join(","));
 
       const res = await fetch(`/api/dfc?${params.toString()}`, { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to fetch DFC data");
@@ -407,6 +414,37 @@ export default function DashboardDFC() {
           <div className="flex items-center gap-4">
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Toggle de regime: quitado (caixa) x competência */}
+            <div className="flex items-center gap-2 bg-muted/50 rounded-lg p-1" data-testid="toggle-regime">
+              <Button
+                variant={regime === "quitado" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setRegime("quitado")}
+                className="h-8"
+                data-testid="button-regime-quitado"
+              >
+                Quitado
+              </Button>
+              <Button
+                variant={regime === "competencia" ? "secondary" : "ghost"}
+                size="sm"
+                onClick={() => setRegime("competencia")}
+                className="h-8"
+                data-testid="button-regime-competencia"
+              >
+                Competência
+              </Button>
+            </div>
+            {/* Filtro de categorias */}
+            <MultiSelect
+              className="w-[240px]"
+              options={(dfcData?.categorias ?? []).map(c => ({ value: c.id, label: `${c.id} ${c.nome}` }))}
+              selected={categoriasSel}
+              onChange={setCategoriasSel}
+              placeholder="Todas as categorias"
+              searchPlaceholder="Buscar categoria..."
+              emptyText="Nenhuma categoria encontrada"
+            />
             {/* Filtro de empresa */}
             <Select value={empresa} onValueChange={setEmpresa}>
               <SelectTrigger className="w-[200px]">

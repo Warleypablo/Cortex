@@ -208,7 +208,7 @@ export interface IStorage {
   getChurnPorServico(filters?: { servicos?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorServico[]>;
   getChurnPorResponsavel(filters?: { servicos?: string[]; squads?: string[]; colaboradores?: string[]; mesInicio?: string; mesFim?: string }): Promise<import("@shared/schema").ChurnPorResponsavel[]>;
   getTopClientesByLTV(limit?: number): Promise<{ nome: string; ltv: number; ltMeses: number; servicos: string }[]>;
-  getDfc(dataInicio?: string, dataFim?: string, empresa?: string): Promise<DfcHierarchicalResponse>;
+  getDfc(dataInicio?: string, dataFim?: string, empresa?: string, regime?: string, categorias?: string[]): Promise<DfcHierarchicalResponse>;
   getGegMetricas(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any>;
   getGegEvolucaoHeadcount(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any>;
   getGegAdmissoesDemissoes(periodo: string, squad: string, setor: string, nivel: string, cargo: string, dataInicio?: string, dataFim?: string): Promise<any>;
@@ -4722,7 +4722,13 @@ export class DbStorage implements IStorage {
     }));
   }
 
-  async getDfc(dataInicio?: string, dataFim?: string, empresa?: string): Promise<DfcHierarchicalResponse> {
+  async getDfc(dataInicio?: string, dataFim?: string, empresa?: string, regime?: string, categorias?: string[]): Promise<DfcHierarchicalResponse> {
+    // Regime "quitado" (caixa): parcelas QUITADAS, valor_pago - desconto, mês por data_quitacao.
+    // Regime "competencia": todos os status, valor_bruto, mês por data_competencia (mesmo padrão do DRE).
+    const isCompetencia = regime === 'competencia';
+    const dateCol = isCompetencia ? 'p.data_competencia' : 'p.data_quitacao';
+    const categoriasFiltro = categorias && categorias.length > 0 ? new Set(categorias) : null;
+
     // Buscar nomes reais das categorias da tabela caz_categorias
     // IMPORTANTE: O campo 'nome' contém CÓDIGO + DESCRIÇÃO juntos, ex: "06.10 Despesas Administrativas"
     const categoriasReais = await db.execute(sql.raw(`
@@ -4750,7 +4756,10 @@ export class DbStorage implements IStorage {
     
     console.log(`[DFC] Carregadas ${categoriaNamesMap.size} categorias da tabela caz_categorias`);
     
-    const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')", "p.status = 'QUITADO'"];
+    const whereClauses: string[] = ["p.tipo_evento IN ('RECEITA', 'DESPESA')"];
+    if (!isCompetencia) {
+      whereClauses.push("p.status = 'QUITADO'");
+    }
 
     // Filtrar por empresa se especificado
     if (empresa && empresa !== 'todas') {
@@ -4770,39 +4779,44 @@ export class DbStorage implements IStorage {
     const dataInicioHistorico = dataInicioDate.toISOString().split('T')[0];
     const dataInicioQuery = dataInicioHistorico >= dataMinima ? dataInicioHistorico : dataMinima;
 
-    // Filtrar EXCLUSIVAMENTE pela data de quitação (com range estendido)
-    whereClauses.push(`p.data_quitacao >= '${dataInicioQuery}'`);
+    // Filtrar EXCLUSIVAMENTE pela data do regime (quitação ou competência), com range estendido
+    whereClauses.push(`${dateCol} >= '${dataInicioQuery}'`);
 
     if (dataFim) {
-      whereClauses.push(`p.data_quitacao <= '${dataFim}'`);
+      whereClauses.push(`${dateCol} <= '${dataFim}'`);
     }
-    
+
     const whereClause = whereClauses.join(' AND ');
-    
+
+    const valorExpr = isCompetencia
+      ? 'COALESCE(p.valor_bruto::numeric, 0)'
+      : '(COALESCE(p.valor_pago::numeric, 0) - COALESCE(p.desconto::numeric, 0))';
+
     const parcelas = await db.execute(sql.raw(`
       SELECT
         p.id,
         p.status,
         p.descricao,
-        (COALESCE(p.valor_pago::numeric, 0) - COALESCE(p.desconto::numeric, 0)) as valor_pago,
+        ${valorExpr} as valor_base,
         p.valor_liquido,
         p.metodo_pagamento,
         p.categoria_id,
         p.categoria_nome,
         p.valor_categoria,
-        p.data_quitacao,
+        ${dateCol}::date::text as data_ref,
         p.tipo_evento,
         COALESCE(c.nome, c.empresa, 'Não identificado') as fornecedor
       FROM "Conta Azul".caz_parcelas p
       LEFT JOIN "Conta Azul".caz_clientes c ON p.id_cliente::text = COALESCE(c.ids, c.id::text)
       WHERE ${whereClause}
-      ORDER BY p.data_quitacao
+      ORDER BY ${dateCol}
     `));
 
     const dfcMap = new Map<string, Map<string, number>>();
     const parcelasByCategory = new Map<string, DfcParcela[]>();
     const mesesSet = new Set<string>();
     const parcelaIdsProcessadas = new Set<number>();
+    const categoriasDisponiveis = new Map<string, string>();
     let totalValorProcessado = 0;
 
     console.log(`[DFC DEBUG] Total parcelas retornadas da query: ${parcelas.rows.length}`);
@@ -4813,7 +4827,7 @@ export class DbStorage implements IStorage {
       const valorCategorias = (row.valor_categoria as string || '').split(';').map(s => s.trim()).filter(Boolean);
       const tipoEvento = row.tipo_evento as string || '';
       const tipoEventoNormalized = (tipoEvento || '').toUpperCase().trim();
-      const valorPagoRaw = parseFloat(row.valor_pago as string || '0');
+      const valorPagoRaw = parseFloat(row.valor_base as string || '0');
       const valorBase = Number.isFinite(valorPagoRaw) ? valorPagoRaw : 0;
 
       if (categoriaNomes.length === 0) {
@@ -4821,9 +4835,8 @@ export class DbStorage implements IStorage {
         categoriaNomes = [`${fallbackPrefix} Outros`];
       }
 
-      const dataQuitacao = new Date(row.data_quitacao as string);
-      const mes = dataQuitacao.toISOString().substring(0, 7);
-      mesesSet.add(mes);
+      const dataQuitacao = new Date(row.data_ref as string);
+      const mes = (row.data_ref as string).substring(0, 7);
 
       // Calcular a soma total dos valores de categoria para rateio proporcional
       const somaValorCategorias = valorCategorias.reduce((acc, v) => acc + parseFloat(v || '0'), 0);
@@ -4869,15 +4882,26 @@ export class DbStorage implements IStorage {
           continue;
         }
 
+        // Registrar toda categoria vista no período (antes do filtro) para popular o dropdown
+        if (!categoriasDisponiveis.has(categoriaId)) {
+          categoriasDisponiveis.set(categoriaId, categoriaNome);
+        }
+
+        // Filtro de categorias selecionadas pelo usuário
+        if (categoriasFiltro && !categoriasFiltro.has(categoriaId)) {
+          continue;
+        }
+
         const key = `${categoriaId}|${categoriaNome}`;
-        
+
         if (!dfcMap.has(key)) {
           dfcMap.set(key, new Map());
         }
-        
+
         const categoriaMap = dfcMap.get(key)!;
         const currentValue = categoriaMap.get(mes) || 0;
         categoriaMap.set(mes, currentValue + valor);
+        mesesSet.add(mes);
         totalValorProcessado += valor;
 
         if (!parcelasByCategory.has(key)) {
@@ -4926,7 +4950,8 @@ export class DbStorage implements IStorage {
       label: 'Ajuste de conciliação (não conciliado)',
       categoriaId: '09', // fora do plano de contas real (05/06/07/08) → vira linha própria sob DESPESAS
     };
-    if (AJUSTE_CONCILIACAO.ativo) {
+    // Plug de caixa: só faz sentido no regime quitado e sem filtro de categorias ativo
+    if (AJUSTE_CONCILIACAO.ativo && !isCompetencia && !categoriasFiltro) {
       console.warn(
         `[DFC] ⚠️ Injetando AJUSTE DE CONCILIAÇÃO ARTIFICIAL de R$ ${AJUSTE_CONCILIACAO.valor.toLocaleString('pt-BR')} ` +
         `em DESPESAS / ${AJUSTE_CONCILIACAO.mes} (linha "${AJUSTE_CONCILIACAO.label}"). ` +
@@ -4963,6 +4988,11 @@ export class DbStorage implements IStorage {
       ORDER BY empresa
     `));
     (result as any).empresas = empresasResult.rows.map((r: any) => r.empresa as string);
+
+    // Categorias disponíveis no período/regime (sem aplicar o filtro de categorias) para o dropdown
+    (result as any).categorias = Array.from(categoriasDisponiveis.entries())
+      .map(([id, nome]) => ({ id, nome }))
+      .sort((a, b) => a.id.localeCompare(b.id, undefined, { numeric: true }));
 
     return result;
   }

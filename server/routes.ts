@@ -5706,6 +5706,8 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
       const dataInicio = req.query.dataInicio as string | undefined;
       const dataFim = req.query.dataFim as string | undefined;
       const empresa = req.query.empresa as string | undefined;
+      const regime = (req.query.regime as string | undefined) || 'quitado';
+      const categoriasParam = req.query.categorias as string | undefined;
 
       if (dataInicio && !/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) {
         return res.status(400).json({ error: "Invalid dataInicio parameter. Expected format: YYYY-MM-DD" });
@@ -5715,7 +5717,15 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return res.status(400).json({ error: "Invalid dataFim parameter. Expected format: YYYY-MM-DD" });
       }
 
-      const dfcData = await storage.getDfc(dataInicio, dataFim, empresa);
+      if (regime !== 'quitado' && regime !== 'competencia') {
+        return res.status(400).json({ error: "Invalid regime parameter. Expected: quitado | competencia" });
+      }
+
+      const categorias = categoriasParam
+        ? categoriasParam.split(',').map(c => c.trim()).filter(c => /^[\d.]+$/.test(c))
+        : undefined;
+
+      const dfcData = await storage.getDfc(dataInicio, dataFim, empresa, regime, categorias);
       res.json(dfcData);
     } catch (error) {
       console.error("[api] Error fetching DFC data:", error);
@@ -5725,7 +5735,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   app.post("/api/dfc/analyze", async (req, res) => {
     try {
-      const { dataInicio, dataFim, empresa } = req.body;
+      const { dataInicio, dataFim, empresa, regime, categorias } = req.body;
 
       if (dataInicio && !/^\d{4}-\d{2}-\d{2}$/.test(dataInicio)) {
         return res.status(400).json({ error: "Invalid dataInicio parameter. Expected format: YYYY-MM-DD" });
@@ -5735,7 +5745,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return res.status(400).json({ error: "Invalid dataFim parameter. Expected format: YYYY-MM-DD" });
       }
 
-      const dfcData = await storage.getDfc(dataInicio, dataFim, empresa);
+      const regimeSeguro = regime === 'competencia' ? 'competencia' : 'quitado';
+      const categoriasSeguras = Array.isArray(categorias)
+        ? categorias.filter((c: unknown): c is string => typeof c === 'string' && /^[\d.]+$/.test(c))
+        : undefined;
+
+      const dfcData = await storage.getDfc(dataInicio, dataFim, empresa, regimeSeguro, categoriasSeguras);
       
       if (!dfcData.nodes || dfcData.nodes.length === 0) {
         return res.status(400).json({ error: "Não há dados suficientes para análise no período selecionado" });
@@ -5751,7 +5766,7 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   app.post("/api/dfc/chat", async (req, res) => {
     try {
-      const { pergunta, historico, dataInicio, dataFim, empresa } = req.body;
+      const { pergunta, historico, dataInicio, dataFim, empresa, regime, categorias } = req.body;
 
       if (!pergunta || typeof pergunta !== 'string' || pergunta.trim().length === 0) {
         return res.status(400).json({ error: "Pergunta é obrigatória" });
@@ -5765,7 +5780,12 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
         return res.status(400).json({ error: "Invalid dataFim parameter. Expected format: YYYY-MM-DD" });
       }
 
-      const dfcData = await storage.getDfc(dataInicio, dataFim, empresa);
+      const regimeSeguro = regime === 'competencia' ? 'competencia' : 'quitado';
+      const categoriasSeguras = Array.isArray(categorias)
+        ? categorias.filter((c: unknown): c is string => typeof c === 'string' && /^[\d.]+$/.test(c))
+        : undefined;
+
+      const dfcData = await storage.getDfc(dataInicio, dataFim, empresa, regimeSeguro, categoriasSeguras);
       
       if (!dfcData.nodes || dfcData.nodes.length === 0) {
         return res.json({ 
