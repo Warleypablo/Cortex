@@ -13,12 +13,17 @@
  *   DOTENV_CONFIG_PATH=.env npx tsx -r dotenv/config scripts/reclassify-broadcast-sentiment.ts           # dry-run
  *   DOTENV_CONFIG_PATH=.env npx tsx -r dotenv/config scripts/reclassify-broadcast-sentiment.ts --apply    # grava
  *   ... --from=2026-06-01 --to=2026-06-30                                                                 # janela opcional
+ *   ... --ia                                                                                              # ambíguas passam de novo pela IA (custa tokens)
+ *
+ * --ia: onde a regra não decide (null), chama classificarResposta (IA com o prompt
+ * atual) em vez de manter 'neutra'. Use com janela (--from/--to) pra limitar custo.
  */
 
 import { pool } from "../server/db";
-import { classificarPorRegra } from "../server/services/replyClassifier";
+import { classificarPorRegra, classificarResposta } from "../server/services/replyClassifier";
 
 const APPLY = process.argv.includes("--apply");
+const USE_IA = process.argv.includes("--ia");
 const arg = (k: string) => process.argv.find((a) => a.startsWith(`--${k}=`))?.split("=")[1];
 const FROM = arg("from");
 const TO = arg("to");
@@ -43,10 +48,14 @@ async function main() {
   const flips: Record<string, number> = {};
   let changed = 0;
   for (const r of rows as any[]) {
-    const cls = classificarPorRegra(r.reply_body || "", r.origem_body);
+    let cls = classificarPorRegra(r.reply_body || "", r.origem_body);
+    if (!cls && USE_IA) {
+      cls = await classificarResposta(r.reply_body || "", r.origem_body);
+    }
     if (!cls || cls.sentiment === "neutra") continue;
     flips[cls.sentiment] = (flips[cls.sentiment] ?? 0) + 1;
     changed++;
+    if (USE_IA) console.log(`  ${JSON.stringify(r.reply_body)} → ${cls.sentiment} (${cls.fonte}: ${cls.motivo})`);
     if (APPLY) {
       await pool.query(
         `UPDATE cortex_core.broadcast_lead_events
