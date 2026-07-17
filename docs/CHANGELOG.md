@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-17 | feat(dfc): agregadores XX.YY no filtro de categorias (desmarca o grupo todo)
+
+**O que foi feito:**
+- O seletor de categorias da DFC agora inclui os agregadores de nível XX.YY do plano de contas (ex.: "04.02 Recebimento de Empréstimos"), acima das suas folhas indentadas
+- Desmarcar um agregador desmarca todas as subcategorias dele; ele aparece marcado quando todas as filhas estão marcadas
+- Backend passa a devolver `categoriasPais` (só os XX.YY que agrupam folhas presentes no período); o filtro em si continua recebendo folhas por igualdade
+
+**Por que:**
+- Parcelas são lançadas nas folhas, então grupos visíveis na tabela (como "04.02 Recebimento de Empréstimos") não existiam no seletor — impossível desmarcar o grupo sem conhecer os nomes das folhas
+
+**Arquivos alterados:**
+- `server/storage.ts` - `getDfc` devolve `categoriasPais` reaproveitando a query de `caz_categorias`
+- `client/src/pages/DashboardDFC.tsx` - options hierárquicas, seleção derivada com pais, toggle em grupo
+
+**Impacto arquitetural:** Nenhum
+
+---
+
 ## 2026-07-17 | feat(dfc): categorias vêm todas selecionadas por padrão (filtro por exclusão)
 
 **O que foi feito:**
