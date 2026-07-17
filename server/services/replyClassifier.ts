@@ -159,19 +159,45 @@ const CTA_VERBS = [
   "me manda", "me envie", "me responde", "responde aqui",
 ];
 
+/** minúsculas + sem acento, pra comparar "DIAGNÓSTICO" com "diagnostico". */
+function normalizar(s: string): string {
+  return s.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+/** Tira pontuação/emoji das bordas ("Ugc!" → "ugc"), preservando o miolo.
+ *  Pós-normalizar, as letras PT viram ASCII, então a classe simples basta. */
+function limparToken(s: string): string {
+  return normalizar(s).replace(/^[^a-z0-9]+|[^a-z0-9]+$/g, "").trim();
+}
+
 /**
  * Reply curta que ecoa a palavra-chave pedida no CTA do disparo → interesse.
- * Ex.: disparo diz "responda UGC pra receber" e o lead responde "UGC".
- * Só dispara pra token curto (1-2 palavras) precedido de um verbo de CTA no corpo.
+ * Ex.: disparo diz 'Responde "UGC" que a gente mostra' e o lead responde
+ * "UGC", "Ugc!" ou até "GC" (eco parcial, faltando 1 letra).
+ * Só dispara pra token curto (1-2 palavras) e exige verbo de CTA no corpo.
  */
 function respondeuPalavraChaveDoCTA(replyLower: string, broadcastBody?: string | null): boolean {
   if (!broadcastBody) return false;
-  const token = replyLower.trim();
+  const token = limparToken(replyLower);
   if (token.length < 2 || token.length > 25 || token.split(/\s+/).length > 2) return false;
   const esc = token.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const corpo = broadcastBody.toLowerCase();
+  const corpo = normalizar(broadcastBody);
   // verbo de CTA seguido (em até ~20 chars) do token exato como palavra
-  return CTA_VERBS.some((v) => new RegExp(`${v}\\b[^.!?\\n]{0,20}\\b${esc}\\b`, "i").test(corpo));
+  if (CTA_VERBS.some((v) => new RegExp(`${v}\\b[^.!?\\n]{0,20}\\b${esc}\\b`, "i").test(corpo))) {
+    return true;
+  }
+  // Palavra-chave entre aspas na copy ('Responde "UGC" que...'): aceita eco
+  // exato ou parcial com no máximo 1 caractere faltando (lead digita "GC").
+  if (!CTA_VERBS.some((v) => corpo.includes(v))) return false;
+  const reAspas = /["“”'']([^"“”''\n]{2,25})["“”'']/g;
+  let m: RegExpExecArray | null;
+  while ((m = reAspas.exec(corpo)) !== null) {
+    const kw = limparToken(m[1]);
+    if (kw.length >= 2 && (kw === token || (kw.includes(token) && token.length >= kw.length - 1))) {
+      return true;
+    }
+  }
+  return false;
 }
 
 /** Camada 1: regra. Retorna null quando o texto é ambíguo e precisa da IA. */
@@ -210,7 +236,7 @@ Responda APENAS um JSON válido, sem texto antes ou depois:
 { "sentiment": "positiva" | "negativa" | "neutra" | "opt_out", "motivo": "<frase curta>" }
 
 Critérios (leia com atenção):
-- "positiva": demonstra interesse REAL na oferta, faz pergunta sobre o serviço, quer conversar/agendar, pede mais info. Ex.: "quero saber mais", "podemos marcar?", "como funciona o serviço de vocês?". TAMBÉM é positiva quando o CTA da mensagem original pede pra responder uma palavra/expressão específica e a resposta é exatamente essa palavra (ex.: CTA "responda UGC" e a resposta é "UGC").
+- "positiva": demonstra interesse REAL na oferta, faz pergunta sobre o serviço, quer conversar/agendar, pede mais info. Ex.: "quero saber mais", "podemos marcar?", "como funciona o serviço de vocês?". TAMBÉM é positiva quando o CTA da mensagem original pede pra responder uma palavra/expressão específica e a resposta é essa palavra — MESMO com erro de digitação, pontuação ou incompleta (ex.: CTA 'responda "UGC"' e a resposta é "UGC", "Ugc!" ou "GC"). TAMBÉM é positiva a resposta curta que CONSENTE com o que a mensagem pediu (ex.: mensagem pede pra ligar/mandar material e a resposta é "pode", "pode sim", "claro, manda").
 - "negativa": recusa, desinteresse, irritação ou RECLAMAÇÃO. Ex.: "não tenho interesse", "péssima empresa", "que saco", "isso é spam".
 - "opt_out": pede pra parar de receber / ser excluído. Ex.: "me exclua", "para de mandar", "sair da lista".
 - "neutra": NÃO é uma resposta genuína de interesse. Inclui:
