@@ -1,5 +1,24 @@
 # Changelog
 
+## 2026-07-17 | feat(dfc): categorias vêm todas selecionadas por padrão (filtro por exclusão)
+
+**O que foi feito:**
+- O filtro de categorias da DFC agora abre com todas as categorias marcadas; desmarcar uma exclui a categoria da análise (modelo pedido pelo usuário)
+- Internamente o estado guarda as exclusões, então categorias novas de outro período/regime já entram marcadas e a request continua enxuta
+- Limpar a seleção (X ou desmarcar o último item) volta ao padrão (todas visíveis)
+- `MultiSelect` ganhou prop opcional `allSelectedLabel` (aditiva, não afeta as outras 6 telas que o usam)
+
+**Por que:**
+- O modelo mental do financeiro é "tudo entra por padrão, eu tiro o que não quero ver" — o inverso do filtro por inclusão original
+
+**Arquivos alterados:**
+- `client/src/pages/DashboardDFC.tsx` - estado por exclusão, seleção derivada, sync da lista de categorias
+- `client/src/components/ui/multi-select.tsx` - prop opcional `allSelectedLabel`
+
+**Impacto arquitetural:** Nenhum — backend intocado (segue recebendo a lista de inclusão)
+
+---
+
 ## 2026-07-17 | feat(dfc): filtro de regime (quitado x competência) e filtro de categorias
 
 **O que foi feito:**
