@@ -784,17 +784,20 @@ const SORT_OPTIONS: { key: SortKey; label: string }[] = [
 
 // Metas mensais do broadcast: meta vs realizado. As metas vêm do mês corrente (ou
 // do mês mais recente com metas); o realizado segue o período selecionado no topo.
-// Metas de contagem (opt-outs/reuniões/vendas) são do mês inteiro — em ranges curtos,
+// Metas de contagem (reuniões/vendas) são do mês inteiro — em ranges curtos,
 // o realizado do período é comparado direto com a meta cheia (progresso do mês).
+// opt_outs (contagem fixa) foi substituída por opt_out_pct (% dos enviados) em
+// jul/2026; a chave antiga fica pra renderizar meses históricos.
 const GOAL_DEFS: Record<string, { label: string; realizado: (wa: any, fnl: any) => number | null; fmt: (n: number) => string }> = {
   abertura_pct:   { label: "Abertura",            realizado: (wa) => wa?.leitura_pct ?? null,                                                      fmt: (n) => `${n.toFixed(1)}%` },
   resposta_pct:   { label: "Taxa de resposta",    realizado: (wa, fnl) => (wa?.total && fnl ? +(100 * fnl.responderam / wa.total).toFixed(1) : null), fmt: (n) => `${n.toFixed(1)}%` },
   positivas_pct:  { label: "Respostas positivas", realizado: (_wa, fnl) => (fnl?.responderam ? +(100 * fnl.positivas / fnl.responderam).toFixed(0) : null), fmt: (n) => `${n.toFixed(0)}%` },
+  opt_out_pct:    { label: "Opt-out",             realizado: (wa, fnl) => (wa?.total && fnl ? +(100 * fnl.opt_out / wa.total).toFixed(2) : null),  fmt: (n) => `${n.toFixed(2)}%` },
   opt_outs:       { label: "Opt-outs",            realizado: (_wa, fnl) => fnl?.opt_out ?? null,                                                   fmt: (n) => fmtInt(n) },
   reuniao_direta: { label: "Reuniões diretas",    realizado: (_wa, fnl) => fnl?.reuniao_direta ?? null,                                            fmt: (n) => fmtInt(n) },
   vendas:         { label: "Vendas",              realizado: (_wa, fnl) => fnl?.venda ?? null,                                                     fmt: (n) => fmtInt(n) },
 };
-const GOAL_ORDER = ["abertura_pct", "resposta_pct", "positivas_pct", "opt_outs", "reuniao_direta", "vendas"];
+const GOAL_ORDER = ["abertura_pct", "resposta_pct", "positivas_pct", "opt_out_pct", "opt_outs", "reuniao_direta", "vendas"];
 
 function MetasDoMes({ from, to }: { from: string; to: string }) {
   const goalsQ = useQuery<{ month: string | null; goals: Array<{ metric_key: string; target: number; comparator: string; unit: string }> }>({
@@ -847,7 +850,7 @@ function MetasDoMes({ from, to }: { from: string; to: string }) {
           })}
         </div>
         <p className="text-[11px] text-muted-foreground mt-2">
-          Realizado no período selecionado acima vs. metas de {mesLabel}. Opt-outs, reuniões e vendas são metas do mês inteiro — em períodos curtos, leia como progresso do mês.
+          Realizado no período selecionado acima vs. metas de {mesLabel}. Reuniões e vendas são metas do mês inteiro — em períodos curtos, leia como progresso do mês. Opt-out é % sobre os enviados do período.
         </p>
       </CardContent>
     </Card>
