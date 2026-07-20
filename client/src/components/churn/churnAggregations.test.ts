@@ -6,9 +6,10 @@ import {
   agregarPorResponsavel,
   ordenarPorTaxaDeChurn,
   montarChartDataChurnHistorico,
+  agregarForecast,
 } from "./churnAggregations";
 import type { ChurnContract } from "./types";
-import type { HistoricoChurnResponse, MesSerieChurn } from "./churnAggregations";
+import type { HistoricoChurnResponse, MesSerieChurn, ForecastContrato } from "./churnAggregations";
 
 /** Constrói um ChurnContract mínimo; só os campos do teste importam. */
 function contrato(over: Partial<ChurnContract>): ChurnContract {
@@ -367,5 +368,68 @@ describe("montarChartDataChurnHistorico", () => {
     const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 0, 15));
     expect(linhas[0].meta).toBe(Math.round(1930000 * 0.08));
     expect(linhas[0].mrrBase).toBe(1930000);
+  });
+});
+
+function fc(over: Partial<ForecastContrato>): ForecastContrato {
+  return {
+    contrato_id: "c1", cliente: "Cliente", servico: "S", valorr: 0, valorp: 0,
+    status: "ativo", status_conta: null, status_cancelamento: null,
+    possibilidade_retencao: null, responsavel: null, contexto_risco: null,
+    risco_score: null, risco_tier: null, ...over,
+  };
+}
+
+describe("agregarForecast", () => {
+  it("soma MRR e pontual exposto", () => {
+    const r = agregarForecast([
+      fc({ valorr: 3000, valorp: 0 }),
+      fc({ contrato_id: "c2", valorr: 2000, valorp: 500 }),
+    ]);
+    expect(r.mrr_exposto).toBe(5000);
+    expect(r.pontual_exposto).toBe(500);
+  });
+
+  it("conta clientes distintos — um cliente com 2 contratos conta 1", () => {
+    const r = agregarForecast([
+      fc({ contrato_id: "c1", cliente: "Polpa Brasil", valorr: 297 }),
+      fc({ contrato_id: "c2", cliente: "Polpa Brasil", valorr: 297 }),
+      fc({ contrato_id: "c3", cliente: "Gloryful", valorr: 2997 }),
+    ]);
+    expect(r.total_contratos).toBe(3);
+    expect(r.total_clientes).toBe(2);
+  });
+
+  it("agrupa por tier e joga contratos sem score no bucket 'Sem score'", () => {
+    const r = agregarForecast([
+      fc({ risco_tier: "critico", valorr: 1000 }),
+      fc({ contrato_id: "c2", risco_tier: "critico", valorr: 500 }),
+      fc({ contrato_id: "c3", risco_tier: null, valorr: 200 }),
+    ]);
+    const critico = r.por_tier.find((t) => t.tier === "critico")!;
+    const semScore = r.por_tier.find((t) => t.tier === "Sem score")!;
+    expect(critico.contratos).toBe(2);
+    expect(critico.mrr).toBe(1500);
+    expect(semScore.contratos).toBe(1);
+    expect(semScore.mrr).toBe(200);
+  });
+
+  it("agrupa por status de retenção, com bucket 'Sem status' para vazio", () => {
+    const r = agregarForecast([
+      fc({ status_cancelamento: "Em negociação", valorr: 1000 }),
+      fc({ contrato_id: "c2", status_cancelamento: null, valorr: 300 }),
+    ]);
+    const emNeg = r.por_status_retencao.find((s) => s.status === "Em negociação")!;
+    const semStatus = r.por_status_retencao.find((s) => s.status === "Sem status")!;
+    expect(emNeg.contratos).toBe(1);
+    expect(semStatus.contratos).toBe(1);
+  });
+
+  it("lista vazia retorna zeros sem quebrar", () => {
+    const r = agregarForecast([]);
+    expect(r).toEqual({
+      total_contratos: 0, total_clientes: 0, mrr_exposto: 0, pontual_exposto: 0,
+      por_tier: [], por_status_retencao: [],
+    });
   });
 });

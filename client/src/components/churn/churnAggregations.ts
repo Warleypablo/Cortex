@@ -227,3 +227,57 @@ export function agregarPorResponsavel(
 
   return linhas;
 }
+
+export interface ForecastMetricas {
+  total_contratos: number;
+  total_clientes: number;
+  mrr_exposto: number;
+  pontual_exposto: number;
+  por_tier: Array<{ tier: string; contratos: number; mrr: number }>;
+  por_status_retencao: Array<{ status: string; contratos: number; mrr: number }>;
+}
+
+/**
+ * Agrega a população de forecast. Contratos sem score de ML (pausados) caem no
+ * bucket "Sem score"; sem status de cancelamento, no bucket "Sem status". Um
+ * cliente com vários contratos conta 1 em total_clientes mas N em total_contratos.
+ */
+export function agregarForecast(contratos: ForecastContrato[]): ForecastMetricas {
+  const clientes = new Set<string>();
+  const tierMap = new Map<string, { contratos: number; mrr: number }>();
+  const statusMap = new Map<string, { contratos: number; mrr: number }>();
+  let mrr_exposto = 0;
+  let pontual_exposto = 0;
+
+  for (const c of contratos) {
+    const mrr = Number(c.valorr) || 0;
+    mrr_exposto += mrr;
+    pontual_exposto += Number(c.valorp) || 0;
+    clientes.add(c.cliente);
+
+    const tier = c.risco_tier ?? "Sem score";
+    const t = tierMap.get(tier) ?? { contratos: 0, mrr: 0 };
+    t.contratos += 1;
+    t.mrr += mrr;
+    tierMap.set(tier, t);
+
+    const status = c.status_cancelamento ?? "Sem status";
+    const s = statusMap.get(status) ?? { contratos: 0, mrr: 0 };
+    s.contratos += 1;
+    s.mrr += mrr;
+    statusMap.set(status, s);
+  }
+
+  return {
+    total_contratos: contratos.length,
+    total_clientes: clientes.size,
+    mrr_exposto,
+    pontual_exposto,
+    por_tier: Array.from(tierMap.entries())
+      .map(([tier, v]) => ({ tier, ...v }))
+      .sort((a, b) => b.mrr - a.mrr),
+    por_status_retencao: Array.from(statusMap.entries())
+      .map(([status, v]) => ({ status, ...v }))
+      .sort((a, b) => b.mrr - a.mrr),
+  };
+}
