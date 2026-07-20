@@ -9,6 +9,8 @@ export interface ChurnContract {
   cs_responsavel: string;
   vendedor: string;
   valorr: number;
+  /** Receita pontual do contrato (cup_contratos.valorp). 0 quando ausente. */
+  valorp: number;
   data_inicio: string;
   data_encerramento: string | null;
   data_pausa: string | null;

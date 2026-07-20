@@ -4954,6 +4954,7 @@ Estruture sua resposta em:
           c.equipe,
           c.tipo_negocio,
           c.valor_r,
+          ct.valorp,
           c.data_criado,
           c.data_primeiro_pagamento,
           c.data_inicio_projeto,
@@ -4973,6 +4974,11 @@ Estruture sua resposta em:
           c.abonar_churn
         FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
+        LEFT JOIN LATERAL (
+          SELECT MAX(x.valorp::numeric) AS valorp
+          FROM "Clickup".cup_contratos x
+          WHERE x.id_subtask = c.task_id
+        ) ct ON TRUE
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           -- Churn BRUTO total (decisão 2026-06-30): NÃO descontamos mais "venda que nunca
           -- virou base" (Inadimplente 1º Mês / Não começou / Erro na Venda). Esta tela agora
@@ -4986,6 +4992,7 @@ Estruture sua resposta em:
       const allContratos = churnResult.rows.map((row: any) => {
         const ltValue = row.lt ? Math.abs(parseFloat(row.lt)) : 0;
         const valorr = Number(row.valor_r) || 0;
+        const valorp = Number(row.valorp) || 0;
         const tipo = 'churn' as const;
         const motivo = row.motivo_cancelamento || 'Não especificado';
         // Abonado = flag manual de gestão. Os motivos "nunca virou base" já foram
@@ -5003,6 +5010,7 @@ Estruture sua resposta em:
           cs_responsavel: row.cs_responsavel || 'Não especificado',
           vendedor: row.vendedor || 'Não especificado',
           valorr: valorr,
+          valorp: valorp,
           data_inicio: row.data_inicio_projeto,
           data_encerramento: row.data_solicitacao_encerramento,
           data_pausa: null,
