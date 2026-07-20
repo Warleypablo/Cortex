@@ -30,8 +30,10 @@ interface HistoricoResponse {
 }
 
 // Paleta por motivo (ordem = volume desc). "Outros"/"Não especificado" ficam cinza.
+// Âmbar (#d97706 / #fbbf24) é reservado à série "Pontual" (ver pontualColor) —
+// não reintroduzir aqui para não colidir com a barra sólida de Pontual.
 const MOTIVO_COLORS = [
-  "#dc2626", "#2563eb", "#d97706", "#059669", "#7c3aed",
+  "#dc2626", "#2563eb", "#0d9488", "#059669", "#7c3aed",
   "#0891b2", "#db2777", "#65a30d", "#ea580c", "#4f46e5",
   "#0284c7", "#ca8a04", "#16a34a", "#e11d48",
 ];
