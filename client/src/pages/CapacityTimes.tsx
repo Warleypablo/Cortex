@@ -178,7 +178,9 @@ function StatCards({ cards }: { cards: { label: string; value: string; tone?: st
 
 // ── Tabelas ──
 
-function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void; campo?: "cs" | "geral" }) {
+// semCapContratos: Black não tem meta de contratos (a meta migrou para clientes),
+// então as colunas dessa régua saem em vez de exibir "—" em toda a coluna.
+function ComercialTable({ rows, onSelect, campo, semCapContratos }: { rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void; campo?: "cs" | "geral"; semCapContratos?: boolean }) {
   if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Ninguém neste grupo ainda (popula automaticamente pelo cargo no RH).</p>;
   const teamMrr = sum(rows.map((r) => r.mrr_atual));
   return (
@@ -193,13 +195,13 @@ function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSel
             <TableHead className={th("text-right")} title="MRR / contas ativas">Ticket Médio</TableHead>
             <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
             <TableHead className={th("text-right")}>Contratos</TableHead>
-            <TableHead className={th("text-right")}>Cap. Contratos</TableHead>
-            <TableHead className={th("text-right")}>Δ Contratos</TableHead>
+            {!semCapContratos && <TableHead className={th("text-right")}>Cap. Contratos</TableHead>}
+            {!semCapContratos && <TableHead className={th("text-right")}>Δ Contratos</TableHead>}
             <TableHead className={th("text-right")} title="Clientes distintos da carteira">Clientes</TableHead>
             <TableHead className={th("text-right")} title="Meta de clientes configurada na aba Configurar">Cap. Clientes</TableHead>
             <TableHead className={th("text-right")}>Δ Clientes</TableHead>
             <TableHead className={th("text-right")} title="MRR Atual / Cap. FAT">% FAT</TableHead>
-            <TableHead className={th("text-right")} title="Contas ativas / Cap. Contratos">% Contratos</TableHead>
+            {!semCapContratos && <TableHead className={th("text-right")} title="Contas ativas / Cap. Contratos">% Contratos</TableHead>}
             <TableHead className={th("text-right")} title="Clientes / Cap. Clientes">% Clientes</TableHead>
           </TableRow>
         </TableHeader>
@@ -221,13 +223,13 @@ function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSel
               <TableCell className={td("text-right")}>{moneyOrDash(ticket(r.mrr_atual, r.contas_ativas))}</TableCell>
               <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(r.mrr_atual, teamMrr))}</TableCell>
               <TableCell className={td("text-right")}>{r.contas_ativas}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_contas)}</TableCell>
-              <TableCell className={cn("text-right", r.dif_contas === null ? "text-gray-400 dark:text-zinc-500" : r.dif_contas < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_contas)}</TableCell>
+              {!semCapContratos && <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_contas)}</TableCell>}
+              {!semCapContratos && <TableCell className={cn("text-right", r.dif_contas === null ? "text-gray-400 dark:text-zinc-500" : r.dif_contas < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_contas)}</TableCell>}
               <TableCell className={td("text-right")}>{r.clientes}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_clientes)}</TableCell>
               <TableCell className={cn("text-right", r.dif_clientes === null ? "text-gray-400 dark:text-zinc-500" : r.dif_clientes < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_clientes)}</TableCell>
               <TableCell className="text-right"><UtilBar pct={r.util_mrr_pct} /></TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_contas_pct} /></TableCell>
+              {!semCapContratos && <TableCell className="text-right"><UtilBar pct={r.util_contas_pct} /></TableCell>}
               <TableCell className="text-right"><UtilBar pct={r.util_clientes_pct} /></TableCell>
             </TableRow>
           ))}
@@ -288,7 +290,7 @@ function SelvaTable({ rows, onSelect }: { rows: SelvaRow[]; onSelect: (s: Drawer
 
 // ── Conteúdo das abas ──
 
-function ComercialTab({ title, rows, onSelect, campo }: { title: string; rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void; campo?: "cs" | "geral" }) {
+function ComercialTab({ title, rows, onSelect, campo, semCapContratos }: { title: string; rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void; campo?: "cs" | "geral"; semCapContratos?: boolean }) {
   const totMrr = sum(rows.map((r) => r.mrr_atual));
   const totContas = sum(rows.map((r) => r.contas_ativas));
   const riscoPct = pct(sum(rows.map((r) => r.mrr_cancelamento)), totMrr);
@@ -302,7 +304,8 @@ function ComercialTab({ title, rows, onSelect, campo }: { title: string; rows: C
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totContas)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
     { label: "Capacity FAT (média)", value: pctText(mediaMrr), tone: utilColor(mediaMrr) },
-    { label: "Capacity Contratos (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
+    // Sem meta de contratos (Black), o card viria sempre "—".
+    ...(semCapContratos ? [] : [{ label: "Capacity Contratos (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) }]),
     { label: "Capacity Clientes (média)", value: pctText(mediaClientes), tone: utilColor(mediaClientes) },
   ];
   return (
@@ -310,7 +313,7 @@ function ComercialTab({ title, rows, onSelect, campo }: { title: string; rows: C
       <StatCards cards={cards} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader><CardTitle className="text-gray-900 dark:text-white">{title}</CardTitle></CardHeader>
-        <CardContent><ComercialTable rows={rows} onSelect={onSelect} campo={campo} /></CardContent>
+        <CardContent><ComercialTable rows={rows} onSelect={onSelect} campo={campo} semCapContratos={semCapContratos} /></CardContent>
       </Card>
     </div>
   );
@@ -612,7 +615,7 @@ export default function CapacityTimes() {
             <Overview teams={teams} />
           </TabsContent>
           <TabsContent value="selva"><SelvaTab rows={selva} metaContas={metaContas} onSelect={setSelecao} /></TabsContent>
-          <TabsContent value="black"><ComercialTab title="Black — Accounts" rows={black} onSelect={setSelecao} campo="geral" /></TabsContent>
+          <TabsContent value="black"><ComercialTab title="Black — Accounts" rows={black} onSelect={setSelecao} campo="geral" semCapContratos /></TabsContent>
           <TabsContent value="squadra"><ComercialTab title="Squadra — GPs" rows={squadra} onSelect={setSelecao} /></TabsContent>
           <TabsContent value="cxcs"><ComercialTab title="CXCS — Customer Success" rows={cxcs} onSelect={setSelecao} campo="cs" /></TabsContent>
           {squads.map((s) => (
