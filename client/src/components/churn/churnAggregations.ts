@@ -33,6 +33,31 @@ export function formatPct(fracao: number, casas = 1): string {
   return `${(fracao * 100).toFixed(casas).replace(".", ",")}%`;
 }
 
+/**
+ * Ordena itens de churn por taxa (squad/pessoa) para o ranking do
+ * ChurnPorDimensao: primeiro quem tem base (percentual não-nulo, do maior
+ * para o menor), depois quem não tem (ordenado por MRR perdido).
+ *
+ * `noBase` é derivado do MESMO `percentual` que o backend já calculou sobre
+ * a soma das bases de todos os meses do range — nunca do `mrr_ativo` isolado
+ * do primeiro mês. Um item pode ter `mrr_ativo === 0` (sem carteira no 1º
+ * mês) e ainda assim ter `percentual` calculável (carteira nos meses
+ * seguintes do range); nesse caso `noBase` é false e a taxa real é exibida.
+ */
+export function ordenarPorTaxaDeChurn<
+  T extends { label: string; mrr_perdido: number; percentual: number | null },
+>(itens: T[]): Array<T & { noBase: boolean }> {
+  const comBase = itens.filter(i => i.percentual !== null);
+  const semBase = itens.filter(i => i.percentual === null && i.mrr_perdido > 0);
+
+  const ordenado = [
+    ...comBase.sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1)),
+    ...semBase.sort((a, b) => b.mrr_perdido - a.mrr_perdido),
+  ];
+
+  return ordenado.map(i => ({ ...i, noBase: i.percentual === null }));
+}
+
 export const NAO_ESPECIFICADO = "Não especificado";
 
 export interface LinhaResponsavel {

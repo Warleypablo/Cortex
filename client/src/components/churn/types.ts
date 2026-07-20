@@ -39,7 +39,8 @@ export interface ChurnPorSquad {
   squad: string;
   mrr_ativo: number;
   mrr_perdido: number;
-  percentual: number;
+  /** null quando o squad não tem carteira no range — exibir "—"/"s/ base", nunca 0%. */
+  percentual: number | null;
 }
 
 export interface ChurnPorPessoa {

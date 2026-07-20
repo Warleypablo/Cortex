@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { somarValoresDrawer, pctDaBase, formatPct, agregarPorResponsavel } from "./churnAggregations";
+import { somarValoresDrawer, pctDaBase, formatPct, agregarPorResponsavel, ordenarPorTaxaDeChurn } from "./churnAggregations";
 import type { ChurnContract } from "./types";
 
 /** Constrói um ChurnContract mínimo; só os campos do teste importam. */
@@ -177,5 +177,55 @@ describe("agregarPorResponsavel", () => {
 
   it("retorna lista vazia para entrada vazia", () => {
     expect(agregarPorResponsavel([], base)).toEqual([]);
+  });
+});
+
+describe("ordenarPorTaxaDeChurn", () => {
+  it("ordena quem tem base (percentual não-nulo) do maior para o menor", () => {
+    const r = ordenarPorTaxaDeChurn([
+      { label: "A", mrr_perdido: 100, percentual: 5 },
+      { label: "B", mrr_perdido: 100, percentual: 20 },
+      { label: "C", mrr_perdido: 100, percentual: 10 },
+    ]);
+    expect(r.map((i) => i.label)).toEqual(["B", "C", "A"]);
+    expect(r.every((i) => i.noBase === false)).toBe(true);
+  });
+
+  it("coloca quem não tem base (percentual null) depois de quem tem, ordenado por MRR perdido", () => {
+    const r = ordenarPorTaxaDeChurn([
+      { label: "SemBase1", mrr_perdido: 500, percentual: null },
+      { label: "ComBase", mrr_perdido: 100, percentual: 5 },
+      { label: "SemBase2", mrr_perdido: 1000, percentual: null },
+    ]);
+    expect(r.map((i) => i.label)).toEqual(["ComBase", "SemBase2", "SemBase1"]);
+    expect(r.map((i) => i.noBase)).toEqual([false, true, true]);
+  });
+
+  it("descarta quem não tem base e não perdeu MRR (nada a mostrar)", () => {
+    const r = ordenarPorTaxaDeChurn([
+      { label: "Nada", mrr_perdido: 0, percentual: null },
+      { label: "ComBase", mrr_perdido: 100, percentual: 5 },
+    ]);
+    expect(r.map((i) => i.label)).toEqual(["ComBase"]);
+  });
+
+  it("regressão: item com mrr_ativo do 1º mês zerado mas percentual calculável não é noBase", () => {
+    // Caso real medido em prod: operador sem carteira no 1º mês do range mas
+    // com carteira (e churn) nos meses seguintes — mrr_ativo=0, percentual
+    // calculável sobre a soma do range. noBase deve seguir o percentual, não
+    // o mrr_ativo isolado do 1º mês.
+    const r = ordenarPorTaxaDeChurn([
+      { label: "José Neto", mrr_ativo: 0, mrr_perdido: 12000, percentual: 7.3 },
+      { label: "Com carteira desde o início", mrr_ativo: 50000, mrr_perdido: 5000, percentual: 10 },
+    ]);
+    const joseNeto = r.find((i) => i.label === "José Neto")!;
+    expect(joseNeto.noBase).toBe(false);
+    expect(joseNeto.percentual).toBe(7.3);
+    // Entra no ranking por percentual (comBase), não é jogado ao fim.
+    expect(r.map((i) => i.label)).toEqual(["Com carteira desde o início", "José Neto"]);
+  });
+
+  it("retorna lista vazia para entrada vazia", () => {
+    expect(ordenarPorTaxaDeChurn([])).toEqual([]);
   });
 });

@@ -5189,8 +5189,13 @@ Estruture sua resposta em:
         squad: squadName,
         mrr_ativo: mrrAtivoPorSquad[squadName] || 0,
         mrr_perdido: mrrPerdidoPorSquad[squadName] || 0,
-        percentual: (somaMrrBasesPorSquad[squadName] || 0) > 0 ? ((mrrPerdidoPorSquad[squadName] || 0) / (somaMrrBasesPorSquad[squadName] || 1)) * 100 : 0,
-      })).sort((a, b) => b.percentual - a.percentual);
+        // null quando não há base no range (mesmo critério de churnPorPessoa
+        // abaixo): exibir "s/ base" no front, nunca 0% — squad sem carteira
+        // nos meses do range não tem taxa calculável.
+        percentual: (somaMrrBasesPorSquad[squadName] || 0) > 0
+          ? ((mrrPerdidoPorSquad[squadName] || 0) / somaMrrBasesPorSquad[squadName]) * 100
+          : null,
+      })).sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1));
 
       // ATENÇÃO: "responsavel" aqui é o OPERADOR da subtask, não o líder da conta.
       // cup_churn.responsavel_geral tem nome enganoso — seu conteúdo bate com

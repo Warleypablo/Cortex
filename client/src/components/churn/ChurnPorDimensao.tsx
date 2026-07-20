@@ -2,6 +2,7 @@ import React, { useState, useMemo } from "react";
 import { type ChurnContract, type ChurnPorSquad, type ChurnPorPessoa } from "@/components/churn/types";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { severityBarClass } from "@/components/churn/severity";
+import { ordenarPorTaxaDeChurn } from "@/components/churn/churnAggregations";
 
 // "cluster" foi removido em 2026-07-20: o dado está 100% vazio na origem
 // (cup_churn, cup_clientes e cortex_core.clientes), e enriquecer via
@@ -49,9 +50,10 @@ interface RateItem {
   label: string;
   mrr_ativo: number;
   mrr_perdido: number;
-  /** null quando não há carteira no snapshot — exibir "—", nunca 0%. */
+  /** null quando não há carteira na soma do range — exibir "—", nunca 0%. */
   percentual: number | null;
-  noBase: boolean; // mrr_ativo === 0
+  /** Deriva de `percentual === null` — mesma base do denominador do percentual (soma do range), nunca do mrr_ativo isolado do 1º mês. */
+  noBase: boolean;
   contratos: ChurnContract[]; // subset from contracts for drill
 }
 
@@ -134,21 +136,18 @@ export function ChurnPorDimensao({
       ? backendArray.filter(i => !SQUADS_IRRELEVANTES.includes(i.label.trim().toLowerCase()))
       : backendArray;
 
-    const withBase = filtered.filter(i => i.mrr_ativo > 0);
-    const noBase = filtered.filter(i => i.mrr_ativo === 0 && i.mrr_perdido > 0);
-
-    const sorted = [
-      // percentual null fica no fim do grupo com base — nunca tratado como 0%.
-      ...withBase.sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1)),
-      ...noBase.sort((a, b) => b.mrr_perdido - a.mrr_perdido),
-    ];
+    // noBase deriva de percentual === null (soma das bases do range, mesmo
+    // denominador do cálculo do próprio percentual) — nunca de mrr_ativo, que
+    // é só a base do primeiro mês e pode ser 0 mesmo com carteira (e taxa
+    // calculável) nos meses seguintes do range.
+    const sorted = ordenarPorTaxaDeChurn(filtered);
 
     return sorted.map(i => ({
       label: i.label,
       mrr_ativo: i.mrr_ativo,
       mrr_perdido: i.mrr_perdido,
       percentual: i.percentual,
-      noBase: i.mrr_ativo === 0,
+      noBase: i.noBase,
       contratos: drillMap[i.label] ?? [],
     }));
   }, [contratos, dimensao, churnPorSquad, churnPorPessoa]);
