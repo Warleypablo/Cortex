@@ -306,12 +306,12 @@ export default function SlideSquadTrimestre({ details, mesLabel }: Props) {
             <div className="flex flex-col gap-2.5 min-h-0">
               <div className="grid grid-cols-2 gap-2.5">
                 <ChurnCard
-                  label="Churn Total"
+                  label="Churn Bruto"
                   pct={hero.churnTotalPct ?? hero.churnPct}
                   brl={hero.churnTotalBrl ?? hero.churnBrl}
                   clientes={churnClientes}
                 />
-                <ChurnCard label="Churn s/ Abonados" pct={hero.churnPct} brl={hero.churnBrl} clientes={churnSemAbonados} />
+                <ChurnCard label="Churn Ajustado" pct={hero.churnPct} brl={hero.churnBrl} clientes={churnSemAbonados} />
               </div>
 
               {/* NRR */}

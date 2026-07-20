@@ -271,7 +271,7 @@ export default function ChurnDetalhamento() {
   }, [filteredMetricas.mrr_perdido, somaMrrBases, mrrBaseReal]);
 
   // ── KPIs do topo (FIXOS — independem do toggle de abono) ────────────────────
-  // Os cards Churn Total / Churn s/ Abonados / NRR são SEMPRE sobre a população
+  // Os cards Churn Bruto / Churn Ajustado / NRR são SEMPRE sobre a população
   // do período (só filtrada por data). O toggle "Todos/Não abonados/Abonados"
   // filtra apenas a tabela e os gráficos abaixo.
   const heroContratos = useMemo(() => {

@@ -146,8 +146,8 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
           const expansaoNrr = sq.expansaoNrr ?? 0;
           // NRR = churn s/ abonados − abatimento da expansão; sempre exibido, mesmo sem expansão no mês
           const churnCards = [
-            { label: "Churn Total", labelCompact: "Churn Total", pct: sq.churnTotalPct ?? sq.churnPct, brl: sq.churnTotalBrl ?? sq.churnBrl, clientes: churnClientes, expansao: 0, spanCompact: false },
-            { label: "Churn s/ Abonados", labelCompact: "S/ Abono", pct: sq.churnPct, brl: sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado), expansao: 0, spanCompact: false },
+            { label: "Churn Bruto", labelCompact: "Churn Bruto", pct: sq.churnTotalPct ?? sq.churnPct, brl: sq.churnTotalBrl ?? sq.churnBrl, clientes: churnClientes, expansao: 0, spanCompact: false },
+            { label: "Churn Ajustado", labelCompact: "Ajustado", pct: sq.churnPct, brl: sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado), expansao: 0, spanCompact: false },
             // spanCompact: no compact (3 colunas) o NRR fecha a última linha ocupando 2 células
             { label: "NRR", labelCompact: "NRR", pct: sq.nrrPct ?? sq.churnPct, brl: sq.nrrBrl ?? sq.churnBrl, clientes: churnClientes.filter((c) => !c.abonado), expansao: expansaoNrr, spanCompact: true },
           ];
@@ -278,7 +278,7 @@ export default function SlideSquadSingle({ details, mesLabel }: Props) {
                 {/* Total de Vendas (expansão do mês) abre a linha dos churns */}
                 {vendasCard}
 
-                {/* Churn Total, Churn s/ Abonados (coluna abonar_churn) e NRR */}
+                {/* Churn Bruto, Churn Ajustado (coluna abonar_churn) e NRR */}
                 {churnCards.map((card) => {
                   const cardColor = card.pct >= 8 ? "#ef4444" : "#22c55e";
                   return (
