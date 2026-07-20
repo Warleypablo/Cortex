@@ -49,3 +49,8 @@ export const SELVA_BLOQUEADA = false;
 // Capacity de contas (clientes) por Account na Black. Default; pode ser
 // sobrescrito por pessoa via cap_clientes em cortex_core.capacity_metas (aba Configurar).
 export const CAP_CONTAS_ACCOUNT = 25;
+
+// Capacity de clientes por GP na Squadra. Default no código (e não UPDATE no banco)
+// porque só 8 dos 14 GPs têm registro em capacity_metas — assim todos entram com meta,
+// inclusive GPs novos. Override por pessoa continua valendo pela aba Configurar.
+export const CAP_CLIENTES_SQUADRA = 25;

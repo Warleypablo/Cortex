@@ -2,7 +2,7 @@ import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
 import { toComercialRow, toSelvaRow, toCsRow, finalizeSquad, type CapacityTimesResponse, type SquadGroup } from "./capacityTimes.helpers";
-import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS, CAP_CONTAS_ACCOUNT } from "../../shared/capacityGrupos";
+import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS, CAP_CONTAS_ACCOUNT, CAP_CLIENTES_SQUADRA } from "../../shared/capacityGrupos";
 
 // Tabela de referência: nível do Gestor de Performance → metas
 const GESTOR_LEVELS: Record<string, { mrr_alvo: number; ticket_alvo: number }> = {
@@ -212,7 +212,9 @@ export function registerCapacityRoutes(app: Express, db: any) {
           COALESCE(a.mrr_ativo, 0)         AS mrr_ativo,
           COALESCE(a.mrr_onboarding, 0)    AS mrr_onboarding,
           COALESCE(a.mrr_cancelamento, 0)  AS mrr_cancelamento,
-          cap.cap_mrr, cap.cap_contas, cap.cap_clientes
+          cap.cap_mrr, cap.cap_contas,
+          -- Squadra tem meta padrão de clientes; a Selva só tem se for configurada.
+          COALESCE(cap.cap_clientes, CASE WHEN p.grupo = 'squadra' THEN ${CAP_CLIENTES_SQUADRA}::int END) AS cap_clientes
         FROM pessoas p
         LEFT JOIN agg a ON a.pessoa = p.nome
         LEFT JOIN LATERAL (
