@@ -2535,6 +2535,12 @@ export async function initializeCapacityMetasTable(): Promise<void> {
         UNIQUE(match_responsavel, categoria)
       )
     `);
+    // Meta de clientes distintos (régua separada da de contratos). Idempotente:
+    // roda em todo boot, cria a coluna onde ainda não existe (local e prod).
+    await db.execute(sql`
+      ALTER TABLE cortex_core.capacity_metas
+      ADD COLUMN IF NOT EXISTS cap_clientes INTEGER
+    `);
     console.log('[database] capacity_metas table initialized');
   } catch (error) {
     console.error('[database] Error initializing capacity_metas table:', error);

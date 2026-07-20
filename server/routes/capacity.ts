@@ -35,6 +35,7 @@ const capacityMetaSchema = z.object({
   cap_mrr: z.number().nonnegative().nullable(),
   cap_pontual: z.number().int().nonnegative().nullable(),
   cap_contas: z.number().int().nonnegative().nullable(),
+  cap_clientes: z.number().int().nonnegative().nullable(),
   ordem: z.number().int().nonnegative().default(0),
   ativo: z.boolean().default(true),
 });
@@ -458,6 +459,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
       cap_mrr: numOrNull(r.cap_mrr),
       cap_pontual: numOrNull(r.cap_pontual),
       cap_contas: numOrNull(r.cap_contas),
+      cap_clientes: numOrNull(r.cap_clientes),
       ordem: Number(r.ordem),
       ativo: Boolean(r.ativo),
     };
@@ -468,7 +470,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
     try {
       const result = await db.execute(sql`
         SELECT id, nome, match_responsavel, categoria,
-               cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem, ativo
+               cap_recorrente, cap_mrr, cap_pontual, cap_contas, cap_clientes, ordem, ativo
         FROM cortex_core.capacity_metas
         ORDER BY ordem, nome
       `);
@@ -515,9 +517,9 @@ export function registerCapacityRoutes(app: Express, db: any) {
     try {
       const result = await db.execute(sql`
         INSERT INTO cortex_core.capacity_metas
-          (nome, match_responsavel, categoria, cap_recorrente, cap_mrr, cap_pontual, cap_contas, ordem, ativo)
+          (nome, match_responsavel, categoria, cap_recorrente, cap_mrr, cap_pontual, cap_contas, cap_clientes, ordem, ativo)
         VALUES (${m.nome}, ${m.match_responsavel}, ${m.categoria}, ${m.cap_recorrente},
-                ${m.cap_mrr}, ${m.cap_pontual}, ${m.cap_contas}, ${m.ordem}, ${m.ativo})
+                ${m.cap_mrr}, ${m.cap_pontual}, ${m.cap_contas}, ${m.cap_clientes}, ${m.ordem}, ${m.ativo})
         RETURNING id
       `);
       res.status(201).json({ id: Number((result.rows[0] as any).id) });
@@ -545,6 +547,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
           nome = ${m.nome}, match_responsavel = ${m.match_responsavel}, categoria = ${m.categoria},
           cap_recorrente = ${m.cap_recorrente}, cap_mrr = ${m.cap_mrr},
           cap_pontual = ${m.cap_pontual}, cap_contas = ${m.cap_contas},
+          cap_clientes = ${m.cap_clientes},
           ordem = ${m.ordem}, ativo = ${m.ativo}, atualizado_em = NOW()
         WHERE id = ${id}
         RETURNING id
