@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-20 | feat(ads): lotes Creators "Super Produção" (Ichino) + "Bastidores Variação Hook3" (Ana) — conjuntos 177/178 + 8 ads PAUSED
+
+**O que foi feito:**
+- **Super Produção - Ichino Novos:** `super-producao-ichino.data.ts` — 1 body × 3 hooks pareados = 6 vídeos (~594-601MB). Biblioteca TP1904-1906. Upload 6/6, 0 falhas (25min). **Conjunto novo 177** `120253263045220450` na camp Creators CBO Broad Teste `120249141209100450`, 3 ads pareados PAUSED. Copy/config clonados do irmão 68 `120251592122250450` (copy Creators UGC real, link `/creators/`).
+- **Bastidores Variação Hook3 - Ana Novos:** `bastidores-variacao-ana.data.ts` — 1 body × 5 hooks pareados = 10 vídeos (~104MB). Biblioteca TP1907-1911. Upload 10/10, 0 falhas (8min). **Conjunto novo 178** `120253263052350450` na mesma camp, 5 ads pareados PAUSED. Copy/config clonados do irmão 148 `120251810662130450`. matchToken "Bastidores Variação Hook3" distinto do 148 ("Bastidores") pra não casar com o existente.
+- Ambos funil Creators (não Comunidade — árvore Drive `01 - Vídeos › 30 - Super Produção / 36 - Bastidores`, temas que já têm conjunto na camp Creators). Placement confirmado com o Caio (AskUserQuestion: novos conjuntos). Copy é a real do funil (irmãos), link `/creators/` já existe → NÃO precisa reapontar.
+
+**Por que:** novos hooks de temas Creators já validados; usa o `subir-pareado-ads.ts` genérico (campanha+irmão existentes).
+
+**Arquivos alterados:** `scripts/ads/super-producao-ichino.data.ts` (novo), `scripts/ads/bastidores-variacao-ana.data.ts` (novo).
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLI. ⚠️ Conta chegou a ~69% de quota (dev-tier) com a paginação de descoberta + uploads do dia; rate-limits momentâneos absorvidos pelo withBackoff (um run de background foi morto durante espera, re-run idempotente resolveu sem duplicar).
+
+---
+
 ## 2026-07-20 | feat(ads): funil Gestão de Comunidade — 2º lote "Estratégia Peculiar" (Lucas, TP1900-1903) — conjunto 2 + 4 ads PAUSED
 
 **O que foi feito:**
