@@ -15,6 +15,7 @@ import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { RitmoDiario } from "@/components/churn/RitmoDiario";
 import { ChurnHistoricoMensal } from "@/components/churn/ChurnHistoricoMensal";
 import { ChurnPorDimensao } from "@/components/churn/ChurnPorDimensao";
+import { ChurnForecast } from "@/components/churn/ChurnForecast";
 
 import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -431,6 +432,9 @@ export default function ChurnDetalhamento() {
           onNrrClick={() => setNrrDrillOpen(true)}
         />
       )}
+
+      {/* Forecast Churn — indicador antecedente, foto do agora */}
+      <ChurnForecast />
 
       {/* Ritmo Diário — série por dia do período */}
       {!isLoading && (
