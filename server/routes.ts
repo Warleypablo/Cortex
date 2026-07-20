@@ -4931,6 +4931,7 @@ Estruture sua resposta em:
         SELECT
           ct.id_subtask                   AS contrato_id,
           cl.nome                         AS cliente,
+          cl.cnpj,
           ct.servico,
           COALESCE(ct.valorr::numeric, 0) AS valorr,
           COALESCE(ct.valorp::numeric, 0) AS valorp,
@@ -4963,6 +4964,7 @@ Estruture sua resposta em:
       const contratos = (result.rows as any[]).map((r) => ({
         contrato_id: String(r.contrato_id),
         cliente: r.cliente || "Cliente não identificado",
+        cnpj: r.cnpj || null,
         servico: r.servico || "—",
         valorr: Number(r.valorr) || 0,
         valorp: Number(r.valorp) || 0,

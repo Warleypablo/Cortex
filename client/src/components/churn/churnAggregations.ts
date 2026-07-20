@@ -3,6 +3,7 @@ import { type ChurnContract } from "./types";
 export interface ForecastContrato {
   contrato_id: string;
   cliente: string;
+  cnpj: string | null;
   servico: string;
   valorr: number;
   valorp: number;
@@ -241,6 +242,12 @@ export interface ForecastMetricas {
  * Agrega a população de forecast. Contratos sem score de ML (pausados) caem no
  * bucket "Sem score"; sem status de cancelamento, no bucket "Sem status". Um
  * cliente com vários contratos conta 1 em total_clientes mas N em total_contratos.
+ *
+ * A contagem de clientes distintos usa CNPJ normalizado como chave estável
+ * (nome colide entre clientes diferentes e o fallback "Cliente não
+ * identificado" colapsaria todos os órfãos de JOIN em 1). Contratos sem
+ * CNPJ usam o próprio `contrato_id` como chave — cada órfão conta como um
+ * cliente separado, nunca fundido com outro.
  */
 export function agregarForecast(contratos: ForecastContrato[]): ForecastMetricas {
   const clientes = new Set<string>();
@@ -253,7 +260,8 @@ export function agregarForecast(contratos: ForecastContrato[]): ForecastMetricas
     const mrr = Number(c.valorr) || 0;
     mrr_exposto += mrr;
     pontual_exposto += Number(c.valorp) || 0;
-    clientes.add(c.cliente);
+    const chaveCliente = (c.cnpj && c.cnpj.replace(/\D/g, "")) || c.contrato_id;
+    clientes.add(chaveCliente);
 
     const tier = c.risco_tier ?? "Sem score";
     const t = tierMap.get(tier) ?? { contratos: 0, mrr: 0 };

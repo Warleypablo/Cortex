@@ -373,7 +373,7 @@ describe("montarChartDataChurnHistorico", () => {
 
 function fc(over: Partial<ForecastContrato>): ForecastContrato {
   return {
-    contrato_id: "c1", cliente: "Cliente", servico: "S", valorr: 0, valorp: 0,
+    contrato_id: "c1", cliente: "Cliente", cnpj: null, servico: "S", valorr: 0, valorp: 0,
     status: "ativo", status_conta: null, status_cancelamento: null,
     possibilidade_retencao: null, responsavel: null, contexto_risco: null,
     risco_score: null, risco_tier: null, ...over,
@@ -392,11 +392,22 @@ describe("agregarForecast", () => {
 
   it("conta clientes distintos — um cliente com 2 contratos conta 1", () => {
     const r = agregarForecast([
-      fc({ contrato_id: "c1", cliente: "Polpa Brasil", valorr: 297 }),
-      fc({ contrato_id: "c2", cliente: "Polpa Brasil", valorr: 297 }),
-      fc({ contrato_id: "c3", cliente: "Gloryful", valorr: 2997 }),
+      fc({ contrato_id: "c1", cliente: "Polpa Brasil", cnpj: "11111111000111", valorr: 297 }),
+      fc({ contrato_id: "c2", cliente: "Polpa Brasil", cnpj: "11111111000111", valorr: 297 }),
+      fc({ contrato_id: "c3", cliente: "Gloryful", cnpj: "22222222000122", valorr: 2997 }),
     ]);
     expect(r.total_contratos).toBe(3);
+    expect(r.total_clientes).toBe(2);
+  });
+
+  it("órfãos de JOIN sem CNPJ e mesmo nome não colapsam — contam como clientes separados", () => {
+    // Contratos sem CNPJ caem no fallback "Cliente não identificado" no nome,
+    // mas a contagem usa contrato_id como chave estável — cada órfão conta 1.
+    const r = agregarForecast([
+      fc({ contrato_id: "c1", cliente: "Cliente não identificado", cnpj: null, valorr: 100 }),
+      fc({ contrato_id: "c2", cliente: "Cliente não identificado", cnpj: null, valorr: 200 }),
+    ]);
+    expect(r.total_contratos).toBe(2);
     expect(r.total_clientes).toBe(2);
   });
 
@@ -422,7 +433,9 @@ describe("agregarForecast", () => {
     const emNeg = r.por_status_retencao.find((s) => s.status === "Em negociação")!;
     const semStatus = r.por_status_retencao.find((s) => s.status === "Sem status")!;
     expect(emNeg.contratos).toBe(1);
+    expect(emNeg.mrr).toBe(1000);
     expect(semStatus.contratos).toBe(1);
+    expect(semStatus.mrr).toBe(300);
   });
 
   it("lista vazia retorna zeros sem quebrar", () => {
