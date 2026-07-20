@@ -1,49 +1,87 @@
 // Resumo diário de métricas para líderes via WhatsApp.
-// Spec: docs/superpowers/specs/2026-07-02-resumo-lideres-whatsapp-design.md
-// Modelo v2 (2026-07-03): MRR total×ativo, churn pontual, churn com/sem motivos
-// operacionais, net churn sobre o churn ajustado. Cross R×P = campos do Bitrix.
+// Spec: docs/superpowers/specs/2026-07-20-resumo-lideres-novo-modelo-design.md
+// Modelo v3 (2026-07-20): mensagem em blocos temáticos com emojis. Três réguas
+// mudaram — cross sell (MRR+Pontual) sem a amortização ÷5 do pontual; net churn
+// (ajustado e bruto) subtrai só o cross sell de MRR (crossR), não o crossTotal;
+// MRR Ativo passou a ser triagem + onboarding + ativo (status "ativo" isolado
+// virou carteiraAtivo). Specs anteriores: 2026-07-02 (v2), 2026-07-14 (NRR Bruto).
 
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import {
-  getMrrAtivo,
   getMrrInicioMes,
   getVendasMrrBreakdown,
+  getVendasNovasBreakdown,
 } from "../okr2026/metricsAdapter";
 import { enviarMensagemWhatsApp } from "./turbozap";
 
 export interface MetricasResumo {
-  mrrTotal: number; // ativo + onboarding + triagem (live)
-  mrrAtivo: number; // só status 'ativo' (live)
+  // Novas vendas (Bitrix, aquisição pura — sem cross sell e sem upsell)
+  mrrAdicionado: number;
+  pontualVendido: number;
+  // Carteira MRR (cup_contratos ao vivo)
+  carteiraTriagemOnboarding: number; // status 'triagem' + 'onboarding'
+  carteiraAtivo: number; // status 'ativo'
+  carteiraEmCancelamento: number; // status 'em cancelamento'
+  mrrAtivo: number; // triagem + onboarding + ativo
+  mrrOperando: number; // mrrAtivo + em cancelamento
   entregaPontual: number; // valorp dos contratos que viraram 'entregue' no mês
-  estoquePontualInicioMes: number; // valorp em aberto no 1º snapshot do mês (fechamento do mês anterior) = base do % de churn pontual
-  churnPontual: number; // valorp dos contratos pontuais com pedido de churn no mês
-  churnPontualAjustado: number; // idem, sem os motivos operacionais
-  churnPontualPct: number; // 0-100 — churn pontual ÷ estoque pontual início do mês
-  churnPontualAjustadoPct: number; // 0-100 — churn pontual ajustado ÷ estoque pontual início do mês
-  mrrMesAnterior: number; // snapshot do 1º do mês = fechamento do mês anterior (base dos % de MRR)
+  // Bases dos percentuais
+  mrrMesAnterior: number; // 1º snapshot do mês = fechamento do mês anterior
+  estoquePontualInicioMes: number; // valorp em aberto no 1º snapshot do mês
+  // Churn
   churnTotal: number; // valor_r bruto de cup_churn no mês
   churnTotalPct: number; // 0-100
   churnAjustado: number; // sem os motivos operacionais
   churnAjustadoPct: number; // 0-100
+  churnPontual: number; // valorp dos contratos pontuais com pedido de churn no mês
+  churnPontualPct: number; // 0-100
+  churnPontualAjustado: number; // idem, sem os motivos operacionais
+  churnPontualAjustadoPct: number; // 0-100
+  // Cross sell (valores cheios — sem amortização desde a v3)
   crossR: number;
   crossP: number;
-  crossPAmortizado: number; // crossP / 5
-  crossTotal: number; // crossR + crossPAmortizado
-  netChurn: number; // churnAjustado - crossTotal
+  crossTotal: number; // crossR + crossP
+  // Net churn (subtrai apenas o cross sell de MRR)
+  netChurn: number; // churnAjustado - crossR
   netChurnPct: number; // 0-100
-  churnBrutoSemAbono: number; // valor_r do mês, todos os motivos, exceto abonar_churn='Sim'
-  churnBrutoSemAbonoPct: number; // 0-100
-  nrrBruto: number; // churnTotal - crossTotal (bruto = churn TOTAL da empresa, inclui abonados)
-  nrrBrutoPct: number; // 0-100
+  netChurnBruto: number; // churnTotal - crossR
+  netChurnBrutoPct: number; // 0-100
+  // Calculado e exposto em /preview, mas não exibido no texto v3
+  churnBrutoSemAbono: number;
+  churnBrutoSemAbonoPct: number;
+  // true quando getVendasMrrBreakdown falhou e devolveu zeros no catch — o
+  // Cross Sell (e portanto o Net Churn) fica subestimado/inflado sem aviso.
+  crossIndisponivel: boolean;
+  // true quando getVendasNovasBreakdown falhou e devolveu zeros no catch —
+  // mrrAdicionado/pontualVendido saem como um mês real sem vendas, sem aviso.
+  vendasIndisponivel: boolean;
+  // true quando mrrMesAnterior destoa >40% de mrrAtivo — sinal de snapshot
+  // parcial/corrompido na base de comparação (já ocorreu em produção). Com
+  // essa base errada, os cinco percentuais de MRR inflam sem aviso.
+  baseSuspeita: boolean;
 }
 
 // Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real)
 const MOTIVOS_EXCLUIDOS = sql`('Erro na Venda', 'Não começou', 'Inadimplente 1º Mês')`;
 
+// Tolerância da sanity check da base de comparação (mrrMesAnterior vs mrrAtivo):
+// ±40%. Já houve snapshot parcial em produção por falha de pipeline por duas
+// semanas — sem esse guard rail os 5 percentuais de MRR inflam em silêncio.
+const TOLERANCIA_BASE_COMPARACAO = 0.4;
+
+// Strings de status usadas no filtro de carteira MRR (getCarteiraMrr). Espelham
+// os valores exatos da coluna `status` em "Clickup".cup_contratos — mudar
+// qualquer uma delas muda os números da mensagem (ex.: renomear
+// STATUS_EM_CANCELAMENTO para "em_cancelamento" faz o filtro parar de casar
+// linhas e a mensagem passar a exibir "🟠 Em Cancelamento: R$ 0,00" em silêncio).
+export const STATUS_ATIVO = "ativo";
+export const STATUS_TRIAGEM_ONBOARDING = ["triagem", "onboarding"];
+export const STATUS_EM_CANCELAMENTO = "em cancelamento";
+
 const MESES = [
-  "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
-  "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO",
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
 export function formatarMoedaBR(valor: number): string {
@@ -60,9 +98,9 @@ export function formatarPercentBR(valor: number): string {
 }
 
 function saudacao(hora: number): string {
-  if (hora < 12) return "Bom DIA";
-  if (hora < 18) return "Boa TARDE";
-  return "Boa NOITE";
+  if (hora < 12) return "🌞 Bom dia";
+  if (hora < 18) return "☀️ Boa tarde";
+  return "🌙 Boa noite";
 }
 
 export function formatarMensagemResumo(
@@ -71,49 +109,106 @@ export function formatarMensagemResumo(
 ): string {
   const mes = MESES[agora.mes - 1];
   const mesAnterior = MESES[(agora.mes + 10) % 12];
-  const crossRTexto = m.crossR > 0 ? formatarMoedaBR(m.crossR) : "ZERO";
-  const crossPTexto =
-    m.crossP > 0
-      ? `${formatarMoedaBR(m.crossP)} / 5 = ${formatarMoedaBR(m.crossPAmortizado)}`
-      : "ZERO";
-  // Valor abonado no mês = churn total − churn sem abonos (deriva dos dois campos)
-  const churnAbonado = m.churnTotal - m.churnBrutoSemAbono;
 
-  return `${saudacao(agora.hora)} líderes!!!
-Atualizações sobre nossas métricas principais, dia *${agora.dataFmt}, ${agora.horaFmt}*.
+  // Bloco de avisos (rodapé, antes do 👀): cross sell primeiro, vendas novas
+  // depois, base de comparação suspeita por último — mesmo padrão para as
+  // três classes de falha silenciosa de query/dados.
+  const avisos: string[] = [];
+  if (m.crossIndisponivel) {
+    avisos.push("⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.");
+  }
+  if (m.vendasIndisponivel) {
+    avisos.push(
+      "⚠️ Vendas novas indisponíveis nesta apuração — MRR Adicionado e Pontual Vendido estão zerados por falha de apuração, não por ausência de vendas.",
+    );
+  }
+  if (m.baseSuspeita) {
+    avisos.push(
+      "⚠️ Base de comparação suspeita — o MRR do mês anterior destoa da carteira atual; os percentuais podem estar distorcidos.",
+    );
+  }
+  const blocoAvisos = avisos.length > 0 ? avisos.join("\n") + "\n\n" : "";
 
+  return `${saudacao(agora.hora)}, líderes!
 
-MRR ${mes} TOTAL: ${formatarMoedaBR(m.mrrTotal)}
-MRR ${mes} ATIVO: ${formatarMoedaBR(m.mrrAtivo)}
-Entrega Pontual ${mes}: ${formatarMoedaBR(m.entregaPontual)}
+Atualização das principais métricas
+${agora.dataFmt} • ${agora.horaFmt}
 
-Churn Pontual ${mes}: ${formatarMoedaBR(m.churnPontual)} - *${formatarPercentBR(m.churnPontualPct)}*
-Churn Pontual ${mes} (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnPontualAjustado)} - *${formatarPercentBR(m.churnPontualAjustadoPct)}*
-(% sobre o estoque pontual em aberto no início do mês: ${formatarMoedaBR(m.estoquePontualInicioMes)})
+━━━━━━━━━━━━━━━
 
-MRR ${mesAnterior}: ${formatarMoedaBR(m.mrrMesAnterior)}
+💰 Receita (${mes})
 
-Churn MRR TOTAL: ${formatarMoedaBR(m.churnTotal)} - *${formatarPercentBR(m.churnTotalPct)}*
-Churn MRR (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnAjustado)} - *${formatarPercentBR(m.churnAjustadoPct)}*
-Churn MRR sem abonos: ${formatarMoedaBR(m.churnBrutoSemAbono)} - *${formatarPercentBR(m.churnBrutoSemAbonoPct)}*
-(abonado no mês: ${formatarMoedaBR(churnAbonado)})
+Novas Vendas
+📈 MRR Adicionado: ${formatarMoedaBR(m.mrrAdicionado)}
+📦 Pontual Vendido: ${formatarMoedaBR(m.pontualVendido)}
 
-Cross R: ${crossRTexto}
-Cross P: ${crossPTexto}
-Total: ${formatarMoedaBR(m.crossTotal)}
+📌 Considera vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido entram nesta linha, por não ser possível classificá-los.
 
-Net Churn = Churn Ajustado − Cross Total
-= ${formatarMoedaBR(m.churnAjustado)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.netChurn)}*
-% = ${formatarMoedaBR(m.netChurn)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
-= *${formatarPercentBR(m.netChurnPct)}*
+Carteira MRR
+🟡 Triagem / Onboarding: ${formatarMoedaBR(m.carteiraTriagemOnboarding)}
+🟢 Ativo: ${formatarMoedaBR(m.carteiraAtivo)}
+🟠 Em Cancelamento: ${formatarMoedaBR(m.carteiraEmCancelamento)}
 
-NRR Bruto = Churn Total − Cross Total
-= ${formatarMoedaBR(m.churnTotal)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.nrrBruto)}*
-% = ${formatarMoedaBR(m.nrrBruto)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
-= *${formatarPercentBR(m.nrrBrutoPct)}*
+📌 MRR Ativo: ${formatarMoedaBR(m.mrrAtivo)}
+🚀 MRR Operando: ${formatarMoedaBR(m.mrrOperando)}
 
+📦 Entrega Pontual: ${formatarMoedaBR(m.entregaPontual)}
 
-estamos de 👀`;
+📌 MRR Base ${mesAnterior}: ${formatarMoedaBR(m.mrrMesAnterior)}
+
+💡 Legenda
+• MRR Ativo: Triagem + Onboarding + Ativo.
+• MRR Operando: Triagem + Onboarding + Ativo + Em Cancelamento.
+
+━━━━━━━━━━━━━━━
+
+📉 Churn
+
+💰 MRR
+🔴 Total: ${formatarMoedaBR(m.churnTotal)} (${formatarPercentBR(m.churnTotalPct)})
+🟢 Ajustado: ${formatarMoedaBR(m.churnAjustado)} (${formatarPercentBR(m.churnAjustadoPct)})
+
+📦 Pontual
+🔴 Total: ${formatarMoedaBR(m.churnPontual)} (${formatarPercentBR(m.churnPontualPct)})
+🟢 Ajustado: ${formatarMoedaBR(m.churnPontualAjustado)} (${formatarPercentBR(m.churnPontualAjustadoPct)})
+
+━━━━━━━━━━━━━━━
+
+🔄 Cross Sell
+
+💰 MRR: ${formatarMoedaBR(m.crossR)}
+📦 Pontual: ${formatarMoedaBR(m.crossP)}
+
+🏆 Total: ${formatarMoedaBR(m.crossTotal)}
+
+━━━━━━━━━━━━━━━
+
+🎯 Net Churn (MRR)
+
+🟢 Ajustado
+
+Churn Ajustado: ${formatarMoedaBR(m.churnAjustado)}
+➖ Cross Sell: ${formatarMoedaBR(m.crossR)}
+🟰 ${formatarMoedaBR(m.netChurn)} (${formatarPercentBR(m.netChurnPct)})
+
+🔴 Bruto
+
+Churn Total: ${formatarMoedaBR(m.churnTotal)}
+➖ Cross Sell: ${formatarMoedaBR(m.crossR)}
+🟰 ${formatarMoedaBR(m.netChurnBruto)} (${formatarPercentBR(m.netChurnBrutoPct)})
+
+━━━━━━━━━━━━━━━
+
+💡 Disclaimers
+
+• MRR Adicionado e Pontual Vendido consideram vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido não são classificáveis e entram nessas linhas.
+• Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de até 1 mês.
+• O percentual do Churn Pontual é calculado sobre o estoque pontual em aberto no início do mês (${formatarMoedaBR(m.estoquePontualInicioMes)}).
+• Net Churn = Churn − Cross Sell de MRR.
+• MRR Ativo = Triagem + Onboarding + Ativo.
+• MRR Operando = Triagem + Onboarding + Ativo + Em Cancelamento.
+
+${blocoAvisos}👀 Seguimos acompanhando diariamente os indicadores e atuando rapidamente sobre os principais desvios.`;
 }
 
 export function agoraSaoPaulo(date: Date = new Date()): {
@@ -155,13 +250,36 @@ export function agoraSaoPaulo(date: Date = new Date()): {
 // Cálculo das métricas (mês corrente em America/Sao_Paulo)
 // ============================================
 
-async function getMrrSoAtivo(): Promise<number> {
+interface CarteiraMrr {
+  ativo: number;              // status 'ativo'
+  triagemOnboarding: number;  // status 'triagem' + 'onboarding'
+  emCancelamento: number;     // status 'em cancelamento'
+}
+
+/**
+ * Carteira MRR ao vivo, nos três recortes crus do modelo v3, em uma query só.
+ * mrrAtivo/mrrOperando são derivados a partir destes em `derivarMetricas` (pura).
+ * 'pausado', 'entregue', 'excluído', 'não usar' e 'cancelado/inativo' ficam
+ * fora de todos os recortes — ver spec 2026-07-20.
+ */
+async function getCarteiraMrr(): Promise<CarteiraMrr> {
+  const statusTriagemOnboarding = sql.join(
+    STATUS_TRIAGEM_ONBOARDING.map((s) => sql`${s}`),
+    sql`, `,
+  );
   const result = await db.execute(sql`
-    SELECT COALESCE(SUM(valorr), 0) AS mrr
+    SELECT
+      COALESCE(SUM(valorr) FILTER (WHERE status = ${STATUS_ATIVO}), 0) AS ativo,
+      COALESCE(SUM(valorr) FILTER (WHERE status IN (${statusTriagemOnboarding})), 0) AS triagem_onboarding,
+      COALESCE(SUM(valorr) FILTER (WHERE status = ${STATUS_EM_CANCELAMENTO}), 0) AS em_cancelamento
     FROM "Clickup".cup_contratos
-    WHERE status = 'ativo'
   `);
-  return parseFloat((result.rows[0] as any)?.mrr || "0");
+  const row = result.rows[0] as any;
+  return {
+    ativo: parseFloat(row?.ativo || "0"),
+    triagemOnboarding: parseFloat(row?.triagem_onboarding || "0"),
+    emCancelamento: parseFloat(row?.em_cancelamento || "0"),
+  };
 }
 
 async function getChurnMes(): Promise<{ total: number; ajustado: number; brutoSemAbono: number }> {
@@ -228,6 +346,60 @@ async function getEntregaPontualMes(): Promise<number> {
   return parseFloat((result.rows[0] as any)?.total || "0");
 }
 
+// Chaves usadas em metric_actual_overrides_monthly para o override manual de
+// Cross Sell — ver getCrossOverrideMesAtual.
+const METRIC_KEY_CROSS_R = "resumo_lideres_cross_r";
+const METRIC_KEY_CROSS_P = "resumo_lideres_cross_p";
+
+interface CrossOverride {
+  r: number | null;
+  p: number | null;
+}
+
+/**
+ * Override manual de Cross Sell (R e P) do mês corrente, lido de
+ * metric_actual_overrides_monthly (tabela existente, reutilizada — sem
+ * migration nova). A régua automática do Bitrix (source='PARTNER' + cliente
+ * pré-existente) não pega cross sell de verdade: há um único deal PARTNER em
+ * toda a base de produção. Até isso ser corrigido na origem, o cliente
+ * informa os valores manualmente por essa tabela. Filtra por mês corrente em
+ * America/Sao_Paulo (mesmo padrão de getEntregaPontualMes/
+ * getEstoquePontualInicioMes) para que um override de julho nunca valha em
+ * agosto. Tolerante a falha: se a tabela não existir ou a query falhar,
+ * devolve "sem override" (null, null) — a mensagem nunca deve deixar de sair
+ * por causa disso.
+ */
+async function getCrossOverrideMesAtual(): Promise<CrossOverride> {
+  try {
+    const result = await db.execute(sql`
+      SELECT metric_key, actual_value
+      FROM cortex_core.metric_actual_overrides_monthly
+      WHERE metric_key IN (${METRIC_KEY_CROSS_R}, ${METRIC_KEY_CROSS_P})
+        AND month = TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM')
+        AND dimension_key IS NULL
+      ORDER BY updated_at DESC NULLS LAST
+    `);
+    // NaN não é null, então passaria pelo `??` e viraria "R$ NaN" na mensagem
+    // sem disparar nenhum aviso — descartar aqui é o que mantém o fallback.
+    const numeroOuNull = (v: unknown): number | null => {
+      const n = parseFloat(String(v));
+      return Number.isFinite(n) ? n : null;
+    };
+    const override: CrossOverride = { r: null, p: null };
+    for (const row of (result.rows ?? []) as any[]) {
+      if (row.metric_key === METRIC_KEY_CROSS_R && override.r === null) {
+        override.r = numeroOuNull(row.actual_value);
+      } else if (row.metric_key === METRIC_KEY_CROSS_P && override.p === null) {
+        override.p = numeroOuNull(row.actual_value);
+      }
+    }
+    return override;
+  } catch (err: any) {
+    console.error("[resumo-lideres] Falha ao ler override de Cross Sell:", err.message);
+    return { r: null, p: null };
+  }
+}
+
 async function getEstoquePontualInicioMes(): Promise<number> {
   // Estoque pontual em aberto no 1º snapshot do mês (= fechamento do mês anterior).
   // Base do % de churn pontual, análogo ao mrrMesAnterior usado no churn recorrente.
@@ -248,61 +420,126 @@ async function getEstoquePontualInicioMes(): Promise<number> {
   return parseFloat((result.rows[0] as any)?.total || "0");
 }
 
-export async function calcularMetricasResumo(): Promise<MetricasResumo> {
-  const [mrrTotal, mrrAtivo, mrrMesAnterior, breakdown, churn, churnPontual, entregaPontual, estoquePontualInicioMes] =
-    await Promise.all([
-      getMrrAtivo(), // ativo+onboarding+triagem (metricsAdapter)
-      getMrrSoAtivo(),
-      getMrrInicioMes(),
-      getVendasMrrBreakdown(),
-      getChurnMes(),
-      getChurnPontualMes(),
-      getEntregaPontualMes(),
-      getEstoquePontualInicioMes(),
-    ]);
+/**
+ * Deriva as métricas expostas na mensagem a partir das entradas cruas das 6
+ * queries de `calcularMetricasResumo`. Pura (sem I/O) para poder testar as
+ * fórmulas — cross sell sem amortização, net churn sobre o cross de MRR,
+ * carteiraAtivo vs mrrAtivo — sem precisar mockar o banco.
+ */
+export function derivarMetricas(entrada: {
+  carteira: CarteiraMrr;
+  mrrMesAnterior: number;
+  estoquePontualInicioMes: number;
+  entregaPontual: number;
+  vendasNovas: { mrr: number; pontual: number; erro?: boolean };
+  breakdown: { crosssell: number; crosssell_pontual: number; erro?: boolean };
+  churn: { total: number; ajustado: number; brutoSemAbono: number };
+  churnPontual: { total: number; ajustado: number };
+  // Override manual de Cross Sell (metric_actual_overrides_monthly), lido em
+  // calcularMetricasResumo. Cada métrica é independente: quem não tem
+  // override para o mês passa null e o valor do Bitrix prevalece.
+  crossOverride?: { r: number | null; p: number | null };
+}): MetricasResumo {
+  const { carteira, mrrMesAnterior, estoquePontualInicioMes, entregaPontual, vendasNovas, breakdown, churn, churnPontual } =
+    entrada;
 
-  // metricsAdapter engole erros retornando 0 — nunca enviar mensagem com métricas parciais
-  if (mrrTotal <= 0 || mrrMesAnterior <= 0) {
+  const overrideR = entrada.crossOverride?.r ?? null;
+  const overrideP = entrada.crossOverride?.p ?? null;
+
+  // Cross sell efetivo: override manual quando existir para o mês, senão o
+  // valor apurado do Bitrix — por métrica, independentemente.
+  const crossR = overrideR ?? breakdown.crosssell;
+  const crossP = overrideP ?? breakdown.crosssell_pontual;
+  const crossTotal = crossR + crossP;
+  const netChurn = churn.ajustado - crossR;
+  const netChurnBruto = churn.total - crossR;
+  const mrrAtivo = carteira.ativo + carteira.triagemOnboarding;
+  const mrrOperando = mrrAtivo + carteira.emCancelamento;
+
+  return {
+    mrrAdicionado: vendasNovas.mrr,
+    pontualVendido: vendasNovas.pontual,
+    carteiraTriagemOnboarding: carteira.triagemOnboarding,
+    carteiraAtivo: carteira.ativo,
+    carteiraEmCancelamento: carteira.emCancelamento,
+    mrrAtivo,
+    mrrOperando,
+    entregaPontual,
+    mrrMesAnterior,
+    estoquePontualInicioMes,
+    churnTotal: churn.total,
+    churnTotalPct: mrrMesAnterior > 0 ? (churn.total / mrrMesAnterior) * 100 : 0,
+    churnAjustado: churn.ajustado,
+    churnAjustadoPct: mrrMesAnterior > 0 ? (churn.ajustado / mrrMesAnterior) * 100 : 0,
+    churnPontual: churnPontual.total,
+    churnPontualPct: estoquePontualInicioMes > 0 ? (churnPontual.total / estoquePontualInicioMes) * 100 : 0,
+    churnPontualAjustado: churnPontual.ajustado,
+    churnPontualAjustadoPct: estoquePontualInicioMes > 0 ? (churnPontual.ajustado / estoquePontualInicioMes) * 100 : 0,
+    crossR,
+    crossP,
+    crossTotal,
+    netChurn,
+    netChurnPct: mrrMesAnterior > 0 ? (netChurn / mrrMesAnterior) * 100 : 0,
+    netChurnBruto,
+    netChurnBrutoPct: mrrMesAnterior > 0 ? (netChurnBruto / mrrMesAnterior) * 100 : 0,
+    churnBrutoSemAbono: churn.brutoSemAbono,
+    churnBrutoSemAbonoPct: mrrMesAnterior > 0 ? (churn.brutoSemAbono / mrrMesAnterior) * 100 : 0,
+    // Só é "indisponível" se o Bitrix falhou E o override não cobre os dois
+    // valores — se o número foi informado à mão, não está indisponível,
+    // mesmo com a query do Bitrix quebrada.
+    crossIndisponivel: breakdown.erro === true && !(overrideR !== null && overrideP !== null),
+    vendasIndisponivel: vendasNovas.erro === true,
+    baseSuspeita:
+      mrrMesAnterior < mrrAtivo * (1 - TOLERANCIA_BASE_COMPARACAO) ||
+      mrrMesAnterior > mrrAtivo * (1 + TOLERANCIA_BASE_COMPARACAO),
+  };
+}
+
+export async function calcularMetricasResumo(): Promise<MetricasResumo> {
+  const [
+    carteira,
+    mrrMesAnterior,
+    vendasNovas,
+    breakdown,
+    churn,
+    churnPontual,
+    entregaPontual,
+    estoquePontualInicioMes,
+    crossOverride,
+  ] = await Promise.all([
+    getCarteiraMrr(),
+    getMrrInicioMes(),
+    getVendasNovasBreakdown(),
+    getVendasMrrBreakdown(),
+    getChurnMes(),
+    getChurnPontualMes(),
+    getEntregaPontualMes(),
+    getEstoquePontualInicioMes(),
+    getCrossOverrideMesAtual(),
+  ]);
+
+  const metricas = derivarMetricas({
+    carteira,
+    mrrMesAnterior,
+    estoquePontualInicioMes,
+    entregaPontual,
+    vendasNovas,
+    breakdown,
+    churn,
+    churnPontual,
+    crossOverride,
+  });
+
+  // getMrrInicioMes (metricsAdapter) engole erros retornando 0; sem base de MRR a
+  // mensagem seria enganosa, então abortamos. As métricas de venda podem ser
+  // legitimamente zero.
+  if (metricas.mrrAtivo <= 0 || mrrMesAnterior <= 0) {
     throw new Error(
-      `Métricas base inválidas (mrrTotal=${mrrTotal}, mrrMesAnterior=${mrrMesAnterior}) — envio abortado`,
+      `Métricas de MRR inválidas (mrrAtivo=${metricas.mrrAtivo}, mrrMesAnterior=${mrrMesAnterior}) — envio abortado`,
     );
   }
 
-  const crossR = breakdown.crosssell;
-  const crossP = breakdown.crosssell_pontual;
-  const crossPAmortizado = crossP / 5;
-  const crossTotal = crossR + crossPAmortizado;
-  const netChurn = churn.ajustado - crossTotal;
-  // NRR Bruto = churn TOTAL da empresa (inclui abonados) − cross. "Bruto" = sem
-  // nenhum recorte; a linha "sem abonos" acima segue só informativa (não alimenta o NRR).
-  const nrrBruto = churn.total - crossTotal;
-
-  return {
-    mrrTotal,
-    mrrAtivo,
-    entregaPontual,
-    estoquePontualInicioMes,
-    churnPontual: churnPontual.total,
-    churnPontualAjustado: churnPontual.ajustado,
-    churnPontualPct: estoquePontualInicioMes > 0 ? (churnPontual.total / estoquePontualInicioMes) * 100 : 0,
-    churnPontualAjustadoPct:
-      estoquePontualInicioMes > 0 ? (churnPontual.ajustado / estoquePontualInicioMes) * 100 : 0,
-    mrrMesAnterior,
-    churnTotal: churn.total,
-    churnTotalPct: (churn.total / mrrMesAnterior) * 100,
-    churnAjustado: churn.ajustado,
-    churnAjustadoPct: (churn.ajustado / mrrMesAnterior) * 100,
-    crossR,
-    crossP,
-    crossPAmortizado,
-    crossTotal,
-    netChurn,
-    netChurnPct: (netChurn / mrrMesAnterior) * 100,
-    churnBrutoSemAbono: churn.brutoSemAbono,
-    churnBrutoSemAbonoPct: (churn.brutoSemAbono / mrrMesAnterior) * 100,
-    nrrBruto,
-    nrrBrutoPct: (nrrBruto / mrrMesAnterior) * 100,
-  };
+  return metricas;
 }
 
 // ============================================

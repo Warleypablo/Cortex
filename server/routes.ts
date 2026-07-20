@@ -4954,6 +4954,7 @@ Estruture sua resposta em:
           c.equipe,
           c.tipo_negocio,
           c.valor_r,
+          ct.valorp,
           c.data_criado,
           c.data_primeiro_pagamento,
           c.data_inicio_projeto,
@@ -4973,6 +4974,11 @@ Estruture sua resposta em:
           c.abonar_churn
         FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN "Clickup".cup_clientes cl ON c.parent_id = cl.task_id
+        LEFT JOIN LATERAL (
+          SELECT MAX(x.valorp::numeric) AS valorp
+          FROM "Clickup".cup_contratos x
+          WHERE x.id_subtask = c.task_id
+        ) ct ON TRUE
         WHERE c.data_solicitacao_encerramento IS NOT NULL
           -- Churn BRUTO total (decisão 2026-06-30): NÃO descontamos mais "venda que nunca
           -- virou base" (Inadimplente 1º Mês / Não começou / Erro na Venda). Esta tela agora
@@ -4986,6 +4992,7 @@ Estruture sua resposta em:
       const allContratos = churnResult.rows.map((row: any) => {
         const ltValue = row.lt ? Math.abs(parseFloat(row.lt)) : 0;
         const valorr = Number(row.valor_r) || 0;
+        const valorp = Number(row.valorp) || 0;
         const tipo = 'churn' as const;
         const motivo = row.motivo_cancelamento || 'Não especificado';
         // Abonado = flag manual de gestão. Os motivos "nunca virou base" já foram
@@ -5003,6 +5010,7 @@ Estruture sua resposta em:
           cs_responsavel: row.cs_responsavel || 'Não especificado',
           vendedor: row.vendedor || 'Não especificado',
           valorr: valorr,
+          valorp: valorp,
           data_inicio: row.data_inicio_projeto,
           data_encerramento: row.data_solicitacao_encerramento,
           data_pausa: null,
@@ -5181,9 +5189,19 @@ Estruture sua resposta em:
         squad: squadName,
         mrr_ativo: mrrAtivoPorSquad[squadName] || 0,
         mrr_perdido: mrrPerdidoPorSquad[squadName] || 0,
-        percentual: (somaMrrBasesPorSquad[squadName] || 0) > 0 ? ((mrrPerdidoPorSquad[squadName] || 0) / (somaMrrBasesPorSquad[squadName] || 1)) * 100 : 0,
-      })).sort((a, b) => b.percentual - a.percentual);
+        // null quando não há base no range (mesmo critério de churnPorPessoa
+        // abaixo): exibir "s/ base" no front, nunca 0% — squad sem carteira
+        // nos meses do range não tem taxa calculável.
+        percentual: (somaMrrBasesPorSquad[squadName] || 0) > 0
+          ? ((mrrPerdidoPorSquad[squadName] || 0) / somaMrrBasesPorSquad[squadName]) * 100
+          : null,
+      })).sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1));
 
+      // ATENÇÃO: "responsavel" aqui é o OPERADOR da subtask, não o líder da conta.
+      // cup_churn.responsavel_geral tem nome enganoso — seu conteúdo bate com
+      // cup_contratos.responsavel em 51/52 casos e com cup_clientes.responsavel_geral
+      // em 0/52. O denominador (cup_data_hist.responsavel) é a mesma dimensão.
+      // NÃO trocar por cup_clientes.responsavel_geral: quebraria o cálculo.
       // Churn por pessoa (responsavel)
       const somaMrrBasesPorPessoa: Record<string, number> = {};
       for (const mesData of Object.values(mrrBasePorMes)) {
@@ -5210,10 +5228,14 @@ Estruture sua resposta em:
         pessoa,
         mrr_ativo: mrrBasesPrimeiroPorPessoa[pessoa] || 0,
         mrr_perdido: mrrPerdidoPorPessoa[pessoa] || 0,
+        // null quando não há carteira no snapshot: exibir "—", nunca 0%.
+        // Antes isto retornava 0 e mostrava 0% para churn real — atingia 4,11%
+        // do MRR perdido de julho/2026 (operador com única linha em triagem,
+        // valorr = 0, portanto base zero).
         percentual: (somaMrrBasesPorPessoa[pessoa] || 0) > 0
           ? ((mrrPerdidoPorPessoa[pessoa] || 0) / somaMrrBasesPorPessoa[pessoa]) * 100
-          : 0,
-      })).sort((a, b) => b.percentual - a.percentual);
+          : null,
+      })).sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1));
 
       // Retention curve
       const contratosComLifetime = allContratos.filter((c: any) => c.lifetime_meses >= 0);
@@ -5315,6 +5337,10 @@ Estruture sua resposta em:
             Object.entries(mrrBasePorMes).map(([mes, data]) => [mes, data.total])
           ),
           soma_mrr_bases: somaMrrBases,
+          // Carteira por operador, somada nos meses do range. Denominador do
+          // churn% por responsável nos drawers: MRR perdido no recorte ÷ carteira
+          // total da pessoa ("quanto da carteira do X foi perdido em Performance").
+          soma_mrr_bases_por_pessoa: somaMrrBasesPorPessoa,
           // Churn abonado separado
           total_abonado: totalAbonado,
           mrr_abonado: mrrAbonado,
