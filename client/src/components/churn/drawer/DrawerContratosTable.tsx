@@ -41,8 +41,14 @@ export function DrawerContratosTable({
             <th className="text-left py-2 pr-3 font-medium text-gray-600 dark:text-zinc-400 whitespace-nowrap">
               Cliente
             </th>
+            <th className="text-left py-2 pr-3 font-medium text-gray-600 dark:text-zinc-400 whitespace-nowrap">
+              Responsável
+            </th>
             <th className="text-right py-2 pr-3 font-medium text-gray-600 dark:text-zinc-400 whitespace-nowrap">
               MRR
+            </th>
+            <th className="text-right py-2 pr-3 font-medium text-gray-600 dark:text-zinc-400 whitespace-nowrap">
+              Pontual
             </th>
             <th className="text-left py-2 pr-3 font-medium text-gray-600 dark:text-zinc-400 whitespace-nowrap">
               Motivo
@@ -70,8 +76,29 @@ export function DrawerContratosTable({
                 <td className="py-2 pr-3 text-gray-900 dark:text-white font-medium max-w-[160px] truncate">
                   {c.cliente_nome}
                 </td>
+                <td
+                  className="py-2 pr-3 text-gray-600 dark:text-zinc-400 max-w-[130px] truncate"
+                  title={c.responsavel || undefined}
+                >
+                  {c.responsavel && c.responsavel !== "Não especificado" ? (
+                    c.responsavel
+                  ) : (
+                    <span className="text-gray-400 dark:text-zinc-600">—</span>
+                  )}
+                </td>
                 <td className="py-2 pr-3 text-right font-semibold text-red-600 dark:text-red-400 whitespace-nowrap">
-                  {formatCurrency(c.valorr)}
+                  {c.valorr ? (
+                    formatCurrency(c.valorr)
+                  ) : (
+                    <span className="font-normal text-gray-400 dark:text-zinc-600">—</span>
+                  )}
+                </td>
+                <td className="py-2 pr-3 text-right font-semibold text-amber-600 dark:text-amber-400 whitespace-nowrap">
+                  {c.valorp ? (
+                    formatCurrency(c.valorp)
+                  ) : (
+                    <span className="font-normal text-gray-400 dark:text-zinc-600">—</span>
+                  )}
                 </td>
                 <td className="py-2 pr-3 text-gray-600 dark:text-zinc-400 max-w-[160px]">
                   {c.motivo_cancelamento ? (
