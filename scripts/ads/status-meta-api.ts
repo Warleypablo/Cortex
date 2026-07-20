@@ -42,7 +42,7 @@ const ACC = process.env.META_DEFAULT_AD_ACCOUNT_ID!;
         for (const e of arr) {
           const max = Math.max(e.call_count ?? 0, e.total_cputime ?? 0, e.total_time ?? 0);
           const bar = "█".repeat(Math.round(max / 5)).padEnd(20, "░");
-          console.log(`  ${accId} ${e.type ? `[${e.type}] ` : ""}${bar} ${max}%  (call=${e.call_count} cpu=${e.total_cputime} time=${e.total_time})  liberar em ${e.estimated_time_to_regain_access ?? 0}min`);
+          console.log(`  ${accId} ${e.type ? `[${e.type}] ` : ""}${bar} ${max}%  (call=${e.call_count} cpu=${e.total_cputime} time=${e.total_time})  liberar em ${e.estimated_time_to_regain_access ?? 0}min${e.ads_api_access_tier ? ` · tier=${e.ads_api_access_tier}` : ""}`);
         }
       }
     } catch { console.log(`  (raw) ${h}`); }
