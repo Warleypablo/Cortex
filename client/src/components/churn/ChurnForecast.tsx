@@ -19,7 +19,7 @@ function formatDataCurta(iso: string | null): string {
 }
 
 export function ChurnForecast(): JSX.Element | null {
-  const { data, isLoading } = useQuery<ForecastResponse>({
+  const { data, isLoading, isError } = useQuery<ForecastResponse>({
     queryKey: ["/api/analytics/churn-forecast"],
     queryFn: async () => {
       const res = await fetch("/api/analytics/churn-forecast");
@@ -41,13 +41,27 @@ export function ChurnForecast(): JSX.Element | null {
     );
   }
 
+  if (isError) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-5">
+        <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+          <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400" />
+          Forecast de Churn
+        </p>
+        <p className="text-sm text-muted-foreground mt-2">
+          Não foi possível carregar o forecast. Tente recarregar a página.
+        </p>
+      </div>
+    );
+  }
+
   return (
     <div className="rounded-xl border border-border bg-card p-5 space-y-4">
       {/* Cabeçalho + faixa de valor exposto */}
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div>
           <p className="text-sm font-semibold text-foreground flex items-center gap-1.5">
-            <AlertTriangle className="w-4 h-4 text-amber-500" />
+            <AlertTriangle className="w-4 h-4 text-amber-500 dark:text-amber-400" />
             Forecast de Churn
           </p>
           <p className="text-xs text-muted-foreground">
@@ -112,7 +126,7 @@ export function ChurnForecast(): JSX.Element | null {
                       className={`border-b border-gray-100 dark:border-zinc-800 ${temContexto ? "cursor-pointer hover:bg-gray-50 dark:hover:bg-zinc-800/50" : ""} transition-colors`}
                       onClick={() => temContexto && setExpandido(isOpen ? null : c.contrato_id)}
                     >
-                      <td className="py-2 pr-3 text-gray-400">
+                      <td className="py-2 pr-3 text-gray-400 dark:text-zinc-600">
                         {temContexto ? (isOpen ? <ChevronDown className="w-3.5 h-3.5" /> : <ChevronRight className="w-3.5 h-3.5" />) : null}
                       </td>
                       <td className="py-2 pr-3 text-gray-900 dark:text-white font-medium max-w-[180px] truncate" title={c.cliente}>
