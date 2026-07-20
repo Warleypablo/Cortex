@@ -1,5 +1,77 @@
 import { type ChurnContract } from "./types";
 
+const MESES_PT_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+
+export interface MesSerieChurn {
+  mes: string; // "YYYY-MM"
+  total: number;
+  pontual: number;
+  logos: number;
+  porMotivo: Record<string, number>;
+}
+
+export interface HistoricoChurnResponse {
+  series: MesSerieChurn[];
+  motivos: string[]; // ordenados por volume desc
+  ano: number;
+  filterAbono: "todos" | "abonados" | "nao_abonados";
+  mrrBasePorMes: Record<string, number>; // "YYYY-MM" -> MRR ativo real do mês
+  /** Falso quando a cobertura do dado pontual no ano é baixa demais. */
+  pontualDisponivel?: boolean;
+}
+
+/** Uma linha (mês) do gráfico de Histórico de Churn Mensal. Chaves extras = valor por motivo. */
+export type LinhaChartChurnHistorico = Record<string, number | string | boolean>;
+
+/**
+ * Monta as linhas do gráfico de Histórico de Churn Mensal: um mês por linha,
+ * de janeiro até o mês corrente (se `ano` bater com o ano de `referencia`) ou
+ * até dezembro, com total/pontual/meta/porMotivo já resolvidos.
+ *
+ * `referencia` é recebida como parâmetro em vez de a função chamar `new
+ * Date()` internamente — decide tanto o corte do eixo (quantos meses
+ * desenhar) quanto qual mês ganha o `*` de "mês em curso", e sem isso o
+ * resultado muda a cada dia que o teste roda.
+ */
+export function montarChartDataChurnHistorico(
+  data: HistoricoChurnResponse | undefined,
+  motivos: string[],
+  metaPct: number,
+  ano: number,
+  referencia: Date,
+): LinhaChartChurnHistorico[] {
+  const ultimoMes = ano === referencia.getFullYear() ? referencia.getMonth() + 1 : 12;
+  const porMes: Record<string, MesSerieChurn> = {};
+  (data?.series ?? []).forEach((s) => { porMes[s.mes] = s; });
+
+  const linhas: LinhaChartChurnHistorico[] = [];
+  for (let m = 1; m <= ultimoMes; m++) {
+    const mesKey = `${ano}-${String(m).padStart(2, "0")}`;
+    const serie = porMes[mesKey];
+    // Meta = % fixo do MRR real (ativo) daquele mês. Sem base (mês sem snapshot
+    // ainda), mrrBaseMes cai pra 0 e a meta some junto — a linha continua sendo
+    // gerada, só sem meta a comparar.
+    const mrrBaseMes = data?.mrrBasePorMes?.[mesKey] ?? 0;
+    const isMesCorrente = ano === referencia.getFullYear() && m === referencia.getMonth() + 1;
+    const row: LinhaChartChurnHistorico = {
+      mes: mesKey,
+      mesLabel: isMesCorrente ? `${MESES_PT_CURTO[m - 1]}*` : MESES_PT_CURTO[m - 1],
+      total: serie ? Math.round(serie.total) : 0,
+      // Sempre número, nunca undefined: mês sem linha de pontual (serie ausente)
+      // ou sem pontual algum (serie.pontual ausente/0) caem no mesmo 0.
+      pontual: serie ? Math.round(serie.pontual ?? 0) : 0,
+      meta: Math.round(mrrBaseMes * metaPct),
+      mrrBase: mrrBaseMes,
+      isMesCorrente,
+    };
+    motivos.forEach((motivo) => {
+      row[motivo] = serie ? Math.round(serie.porMotivo[motivo] ?? 0) : 0;
+    });
+    linhas.push(row);
+  }
+  return linhas;
+}
+
 /**
  * Soma MRR e pontual de um recorte de contratos, independentemente.
  * Ajustes manuais entram com valor negativo e são preservados de propósito —

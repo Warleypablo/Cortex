@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
-import { pctDaBase, formatPct } from "./churnAggregations";
+import { pctDaBase, formatPct, montarChartDataChurnHistorico, type HistoricoChurnResponse } from "./churnAggregations";
 import {
   ComposedChart, Bar, Line,
   XAxis, YAxis, Tooltip, Legend,
@@ -11,23 +11,7 @@ import {
 
 type FilterAbono = "todos" | "abonados" | "nao_abonados";
 
-interface MesSerie {
-  mes: string; // "YYYY-MM"
-  total: number;
-  pontual: number;
-  logos: number;
-  porMotivo: Record<string, number>;
-}
-
-interface HistoricoResponse {
-  series: MesSerie[];
-  motivos: string[]; // ordenados por volume desc
-  ano: number;
-  filterAbono: FilterAbono;
-  mrrBasePorMes: Record<string, number>; // "YYYY-MM" -> MRR ativo real do mês
-  /** Falso quando a cobertura do dado pontual no ano é baixa demais (< 10% das linhas). */
-  pontualDisponivel?: boolean;
-}
+type HistoricoResponse = HistoricoChurnResponse;
 
 // Paleta por motivo (ordem = volume desc). "Outros"/"Não especificado" ficam cinza.
 // Âmbar (#d97706 / #fbbf24) é reservado à série "Pontual" (ver pontualColor) —
@@ -38,8 +22,6 @@ const MOTIVO_COLORS = [
   "#0284c7", "#ca8a04", "#16a34a", "#e11d48",
 ];
 const COR_OUTROS = "#9ca3af";
-
-const MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 function corDoMotivo(motivo: string, index: number): string {
   if (motivo === "Outros" || motivo === "Não especificado") return COR_OUTROS;
@@ -71,35 +53,10 @@ export function ChurnHistoricoMensal({
   const motivos = data?.motivos ?? [];
 
   // Gera meses de janeiro até o mês atual (se ano corrente) ou dezembro, garantindo eixo contínuo.
-  const chartData = useMemo(() => {
-    const hoje = new Date();
-    const ultimoMes = ano === hoje.getFullYear() ? hoje.getMonth() + 1 : 12;
-    const porMes: Record<string, MesSerie> = {};
-    (data?.series ?? []).forEach((s) => { porMes[s.mes] = s; });
-
-    const linhas: Array<Record<string, number | string | boolean>> = [];
-    for (let m = 1; m <= ultimoMes; m++) {
-      const mesKey = `${ano}-${String(m).padStart(2, "0")}`;
-      const serie = porMes[mesKey];
-      // Meta = % fixo do MRR real (ativo) daquele mês
-      const mrrBaseMes = data?.mrrBasePorMes?.[mesKey] ?? 0;
-      const isMesCorrente = ano === hoje.getFullYear() && m === hoje.getMonth() + 1;
-      const row: Record<string, number | string | boolean> = {
-        mes: mesKey,
-        mesLabel: isMesCorrente ? `${MESES_PT[m - 1]}*` : MESES_PT[m - 1],
-        total: serie ? Math.round(serie.total) : 0,
-        pontual: serie ? Math.round(serie.pontual ?? 0) : 0,
-        meta: Math.round(mrrBaseMes * metaPct),
-        mrrBase: mrrBaseMes,
-        isMesCorrente,
-      };
-      motivos.forEach((motivo) => {
-        row[motivo] = serie ? Math.round(serie.porMotivo[motivo] ?? 0) : 0;
-      });
-      linhas.push(row);
-    }
-    return linhas;
-  }, [data, motivos, metaPct, ano]);
+  const chartData = useMemo(
+    () => montarChartDataChurnHistorico(data, motivos, metaPct, ano, new Date()),
+    [data, motivos, metaPct, ano],
+  );
 
   const axisColor = isDark ? "#e5e7eb" : "#374151";
   const gridColor = isDark ? "#3f3f46" : "#e5e7eb";
@@ -190,7 +147,7 @@ export function ChurnHistoricoMensal({
             {filterAbono === "nao_abonados" && " · sem abonados"}
             {filterAbono === "abonados" && " · só abonados"}
             {" · * mês em curso"}
-            {data && !data.pontualDisponivel && " · sem dado de churn pontual neste ano"}
+            {data?.pontualDisponivel === false && " · sem dado de churn pontual neste ano"}
           </p>
         </div>
       </div>

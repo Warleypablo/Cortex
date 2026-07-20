@@ -1,6 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { somarValoresDrawer, pctDaBase, formatPct, agregarPorResponsavel, ordenarPorTaxaDeChurn } from "./churnAggregations";
+import {
+  somarValoresDrawer,
+  pctDaBase,
+  formatPct,
+  agregarPorResponsavel,
+  ordenarPorTaxaDeChurn,
+  montarChartDataChurnHistorico,
+} from "./churnAggregations";
 import type { ChurnContract } from "./types";
+import type { HistoricoChurnResponse } from "./churnAggregations";
 
 /** Constrói um ChurnContract mínimo; só os campos do teste importam. */
 function contrato(over: Partial<ChurnContract>): ChurnContract {
@@ -261,5 +269,100 @@ describe("ordenarPorTaxaDeChurn", () => {
 
   it("retorna lista vazia para entrada vazia", () => {
     expect(ordenarPorTaxaDeChurn([])).toEqual([]);
+  });
+});
+
+describe("montarChartDataChurnHistorico", () => {
+  /** Constrói uma HistoricoChurnResponse mínima; só os campos do teste importam. */
+  function historico(over: Partial<HistoricoChurnResponse> = {}): HistoricoChurnResponse {
+    return {
+      series: [],
+      motivos: [],
+      ano: 2026,
+      filterAbono: "todos",
+      mrrBasePorMes: {},
+      ...over,
+    };
+  }
+
+  it("mês sem pontual gera pontual: 0, nunca undefined", () => {
+    const data = historico({
+      series: [{ mes: "2026-01", total: 1000, pontual: 0, logos: 2, porMotivo: {} }],
+    });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 0, 15));
+    expect(linhas[0].pontual).toBe(0);
+    expect(linhas[0].pontual).not.toBeUndefined();
+  });
+
+  it("mês sem nenhuma linha de churn (série ausente no response) também gera pontual: 0", () => {
+    const data = historico({ series: [] });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 0, 15));
+    expect(linhas[0].pontual).toBe(0);
+    expect(linhas[0].total).toBe(0);
+  });
+
+  it("o * do mês corrente é aplicado ao mês certo e só a ele", () => {
+    const data = historico();
+    // Referência em 10/jul/2026 — ano do gráfico bate com o ano da referência.
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 6, 10));
+
+    expect(linhas).toHaveLength(7); // jan..jul: eixo corta no mês corrente
+    const comAsterisco = linhas.filter((l) => String(l.mesLabel).endsWith("*"));
+    expect(comAsterisco).toHaveLength(1);
+    expect(comAsterisco[0].mes).toBe("2026-07");
+    expect(comAsterisco[0].mesLabel).toBe("jul*");
+    expect(comAsterisco[0].isMesCorrente).toBe(true);
+
+    linhas
+      .filter((l) => l.mes !== "2026-07")
+      .forEach((l) => {
+        expect(l.isMesCorrente).toBe(false);
+        expect(String(l.mesLabel).endsWith("*")).toBe(false);
+      });
+  });
+
+  it("ano do gráfico diferente do ano de referência: sem mês corrente, eixo vai até dezembro", () => {
+    const data = historico({ ano: 2025 });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2025, new Date(2026, 6, 10));
+    expect(linhas).toHaveLength(12);
+    expect(linhas.every((l) => l.isMesCorrente === false)).toBe(true);
+    expect(linhas.every((l) => !String(l.mesLabel).endsWith("*"))).toBe(true);
+  });
+
+  it("fallback sem base de MRR no mês: a linha é gerada mesmo assim, com meta: 0", () => {
+    const data = historico({
+      series: [{ mes: "2026-03", total: 5000, pontual: 0, logos: 1, porMotivo: {} }],
+      mrrBasePorMes: {}, // nenhum mês tem base de MRR
+    });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 2, 15));
+    const marco = linhas.find((l) => l.mes === "2026-03")!;
+    expect(marco).toBeDefined();
+    expect(marco.total).toBe(5000);
+    expect(marco.meta).toBe(0);
+    expect(marco.mrrBase).toBe(0);
+  });
+
+  it("resolve valor por motivo, 0 quando o mês não tem o motivo", () => {
+    const data = historico({
+      series: [
+        { mes: "2026-01", total: 1000, pontual: 0, logos: 1, porMotivo: { "Preço": 1000 } },
+      ],
+    });
+    const linhas = montarChartDataChurnHistorico(
+      data,
+      ["Preço", "Insatisfação"],
+      0.08,
+      2026,
+      new Date(2026, 0, 15),
+    );
+    expect(linhas[0]["Preço"]).toBe(1000);
+    expect(linhas[0]["Insatisfação"]).toBe(0);
+  });
+
+  it("calcula a meta como % da base de MRR do mês quando ela existe", () => {
+    const data = historico({ mrrBasePorMes: { "2026-01": 1930000 } });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 0, 15));
+    expect(linhas[0].meta).toBe(Math.round(1930000 * 0.08));
+    expect(linhas[0].mrrBase).toBe(1930000);
   });
 });
