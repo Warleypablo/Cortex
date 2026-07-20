@@ -164,6 +164,41 @@ async function getMrrSoAtivo(): Promise<number> {
   return parseFloat((result.rows[0] as any)?.mrr || "0");
 }
 
+interface CarteiraMrr {
+  ativo: number;              // status 'ativo'
+  triagemOnboarding: number;  // status 'triagem' + 'onboarding'
+  emCancelamento: number;     // status 'em cancelamento'
+  mrrAtivo: number;           // triagem + onboarding + ativo
+  mrrOperando: number;        // mrrAtivo + em cancelamento
+}
+
+/**
+ * Carteira MRR ao vivo, nos quatro recortes do modelo v3, em uma query só.
+ * 'pausado', 'entregue', 'excluído', 'não usar' e 'cancelado/inativo' ficam
+ * fora de todos os recortes — ver spec 2026-07-20.
+ */
+async function getCarteiraMrr(): Promise<CarteiraMrr> {
+  const result = await db.execute(sql`
+    SELECT
+      COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS ativo,
+      COALESCE(SUM(valorr) FILTER (WHERE status IN ('triagem', 'onboarding')), 0) AS triagem_onboarding,
+      COALESCE(SUM(valorr) FILTER (WHERE status = 'em cancelamento'), 0) AS em_cancelamento
+    FROM "Clickup".cup_contratos
+  `);
+  const row = result.rows[0] as any;
+  const ativo = parseFloat(row?.ativo || "0");
+  const triagemOnboarding = parseFloat(row?.triagem_onboarding || "0");
+  const emCancelamento = parseFloat(row?.em_cancelamento || "0");
+  const mrrAtivo = ativo + triagemOnboarding;
+  return {
+    ativo,
+    triagemOnboarding,
+    emCancelamento,
+    mrrAtivo,
+    mrrOperando: mrrAtivo + emCancelamento,
+  };
+}
+
 async function getChurnMes(): Promise<{ total: number; ajustado: number; brutoSemAbono: number }> {
   // Churn BRUTO (inclui abonados) por data do pedido; "ajustado" exclui os
   // motivos operacionais (erro de venda / não começou / inadimplente 1º mês);

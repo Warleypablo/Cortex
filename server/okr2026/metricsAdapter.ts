@@ -780,6 +780,63 @@ export async function getCrosssellMrr(): Promise<number> {
   return breakdown.crosssell;
 }
 
+export interface VendasNovasBreakdown {
+  mrr: number;
+  pontual: number;
+}
+
+/**
+ * Vendas NOVAS do período = deals ganhos de CNPJ sem contrato anterior ao mês do
+ * fechamento (aquisição pura). Exclui cross-sell E upsell por construção: qualquer
+ * venda para cliente pré-existente fica de fora.
+ * Espelha a CTE cliente_inicio de buildVendasMrrQuery, invertendo o critério.
+ */
+export async function getVendasNovasBreakdown(
+  startDate?: string,
+  endDate?: string,
+): Promise<VendasNovasBreakdown> {
+  const dateFilter = (startDate && endDate)
+    ? sql`d.data_fechamento >= ${startDate}::date AND d.data_fechamento <= ${endDate}::date`
+    : sql`TO_CHAR(d.data_fechamento, 'YYYY-MM') = TO_CHAR(NOW(), 'YYYY-MM')`;
+
+  try {
+    const result = await db.execute(sql`
+      WITH cliente_inicio AS (
+        SELECT REGEXP_REPLACE(COALESCE(c.cnpj, ''), '[^0-9]', '', 'g') AS cnpj_norm,
+               MIN(ct.data_inicio)::date AS primeiro_contrato
+        FROM "Clickup".cup_clientes c
+        JOIN "Clickup".cup_contratos ct ON ct.id_task = c.task_id
+        WHERE COALESCE(c.cnpj, '') <> ''
+        GROUP BY 1
+      ),
+      deals AS (
+        SELECT
+          d.valor_recorrente::numeric AS rec,
+          d.valor_pontual::numeric AS pont,
+          (ci.primeiro_contrato IS NULL
+            OR ci.primeiro_contrato >= date_trunc('month', d.data_fechamento)::date) AS is_novo
+        FROM "Bitrix".crm_deal d
+        LEFT JOIN cliente_inicio ci
+          ON REGEXP_REPLACE(COALESCE(d.cnpj, ''), '[^0-9]', '', 'g') = ci.cnpj_norm
+        WHERE d.stage_name = 'Negócio Ganho'
+          AND d.data_fechamento IS NOT NULL
+          AND ${dateFilter}
+      )
+      SELECT
+        COALESCE(SUM(rec) FILTER (WHERE is_novo), 0) AS mrr,
+        COALESCE(SUM(pont) FILTER (WHERE is_novo), 0) AS pontual
+      FROM deals`);
+    const row = result.rows[0] as any;
+    return {
+      mrr: parseFloat(row?.mrr || "0"),
+      pontual: parseFloat(row?.pontual || "0"),
+    };
+  } catch (error) {
+    console.error("[OKR] Error fetching Vendas Novas Breakdown:", error);
+    return { mrr: 0, pontual: 0 };
+  }
+}
+
 export interface CrosssellDealItem {
   id: string;
   cliente: string;
