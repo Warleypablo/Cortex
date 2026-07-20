@@ -16,7 +16,7 @@ import type { CapacityMeta, ResponsavelOption } from "./CapacityMetasConfig";
 
 // Labels amigáveis para as categorias comerciais; operacionais usam o próprio nome.
 export const CATEGORIA_LABELS: Record<string, string> = {
-  vendedor: "Selva (vendedor)",
+  vendedor: "Selva (Designer)",
   account: "Accounts (account)",
   gestor: "Squadra (gestor)",
   Black: "Black (Accounts)",
