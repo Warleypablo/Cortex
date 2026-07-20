@@ -22,6 +22,7 @@ export interface CapacityMeta {
   cap_mrr: number | null;
   cap_pontual: number | null;
   cap_contas: number | null;
+  cap_clientes: number | null;
   ordem: number;
   ativo: boolean;
 }
@@ -93,6 +94,7 @@ export function CapacityMetasConfig() {
               <TableHead className="text-right">Cap. FAT ($)</TableHead>
               <TableHead className="text-right">Cap. Pont.</TableHead>
               <TableHead className="text-right">Cap. Contas</TableHead>
+              <TableHead className="text-right">Cap. Clientes</TableHead>
               <TableHead className="text-center">Ativo</TableHead>
               <TableHead className="text-right">Ações</TableHead>
             </TableRow>
@@ -109,6 +111,7 @@ export function CapacityMetasConfig() {
                 <TableCell className="text-right">{fmtCap(m.cap_mrr)}</TableCell>
                 <TableCell className="text-right">{fmtCap(m.cap_pontual)}</TableCell>
                 <TableCell className="text-right">{fmtCap(m.cap_contas)}</TableCell>
+                <TableCell className="text-right">{fmtCap(m.cap_clientes)}</TableCell>
                 <TableCell className="text-center">
                   <Switch
                     checked={m.ativo}

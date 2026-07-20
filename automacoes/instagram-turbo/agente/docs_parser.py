@@ -45,6 +45,11 @@ _INTERNAL_FIRST_WORDS = frozenset({
 
 _LEGENDA_MARKER = re.compile(r"^\s*\**\s*LEGENDA\s*\**\s*$", re.IGNORECASE | re.MULTILINE)
 
+# URL crua na legenda (link de referência que o copywriter deixa no Doc e que
+# NÃO deve ir pro caption). \S+ vai até o próximo espaço/quebra — pega a URL mesmo
+# grudada em texto ("SUMMIT10https://...") e a pontuação/word-joiner do fim.
+_URL_RE = re.compile(r"https?://\S+")
+
 
 def _strip_bold(s: str) -> str:
     """Remove ** ao redor (markdown)."""
@@ -134,6 +139,39 @@ def _sanitize_line_for_text(line: str) -> str:
     return re.sub(r"\*+", "", line)
 
 
+def _join_orphan_bold_markers(lines: list[str]) -> list[str]:
+    """
+    Cola um marcador de bold "órfão" (linha que é só `**`) na linha seguinte.
+
+    O export do Google Docs às vezes quebra o `**` de ABERTURA de um header pra
+    uma linha própria, deixando o texto na linha de baixo:
+
+        **CONTAGEM REGRESSIVA**
+        **                       ← `**` de abertura sozinho
+        15 DIAS ANTES**          ← header REAL, mas `_is_post_header` exige a
+                                   linha começar com `**` e ignorava este
+
+    Sem isso o header "15 DIAS ANTES" era invisível: a seção inteira (com a
+    LEGENDA) era absorvida pelo header anterior ("CONTAGEM REGRESSIVA") e o card
+    "15 DIAS" caía em "sem match de header" (legenda vazia → agente não postava).
+    Juntar o `**` órfão reconstrói `**15 DIAS ANTES**`, que o detector reconhece.
+    Marcadores órfãos consecutivos acumulam (`****...`), e `_strip_bold` remove o
+    excesso — inofensivo. Um `**` órfão no fim do doc vira uma linha `**` solta
+    (não vira header).
+    """
+    out: list[str] = []
+    pending = ""
+    for ln in lines:
+        if ln.strip() == "**":
+            pending += "**"
+            continue
+        out.append(pending + ln)
+        pending = ""
+    if pending:
+        out.append(pending)
+    return out
+
+
 @dataclass
 class ParsedSection:
     header: str          # como aparece no doc (UPPER)
@@ -154,7 +192,7 @@ def parse_doc(content: str) -> list[ParsedSection]:
     # nbsp → space
     content = content.replace("\xa0", " ")
 
-    lines = content.splitlines()
+    lines = _join_orphan_bold_markers(content.splitlines())
     sections: list[ParsedSection] = []
 
     # Primeiro passe: acha índices das linhas que são headers de post.
@@ -208,6 +246,16 @@ def parse_doc(content: str) -> list[ParsedSection]:
             legenda_text = _sanitize_line_for_text(after)
             # \x0b = quebra "soft" (Shift+Enter) na exportação do Docs → vira \n
             legenda_text = legenda_text.replace("\x0b", "\n")
+            # Remove URLs cruas (http/https) da legenda: o copywriter deixa links
+            # de REFERÊNCIA no Doc (ex.: "cupom: SUMMIT10https://tiktok.com/@.../video/..."
+            # colado no cupom) e eles vazavam pro caption. Em legenda de IG/TikTok
+            # URL não é clicável (a convenção é "link na bio"), então tirar é seguro.
+            # \S+ come até o próximo espaço/quebra (pega a URL grudada em texto e a
+            # pontuação/word-joiner que às vezes vem junto). Depois normaliza os
+            # espaços que a remoção deixa (2+ espaços → 1, espaço antes de quebra).
+            legenda_text = _URL_RE.sub("", legenda_text)
+            legenda_text = re.sub(r"[ \t]{2,}", " ", legenda_text)
+            legenda_text = re.sub(r"[ \t]+\n", "\n", legenda_text)
             # Linha em branco é SEPARAÇÃO DE PARÁGRAFO — vai pro Instagram como
             # está no Doc. Só descartamos linhas de ruído visual (----, ====, •••)
             # e espaços penduradas no fim de cada linha.

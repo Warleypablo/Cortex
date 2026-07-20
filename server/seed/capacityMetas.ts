@@ -23,11 +23,10 @@ export const CAPACITY_METAS_SEED: CapacityMetaSeed[] = [
   { nome: "Mariana Dalto", match_responsavel: "Mariana Dalto",      categoria: "Pulse", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 6 },
   { nome: "Lara Grobério", match_responsavel: "Lara Grobério",      categoria: "Pulse", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 7 },
   { nome: "Julia Manhães", match_responsavel: "Julia Manhães",      categoria: "Pulse", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 8 },
-
-  // ── Squad Olimpo (operacional) ──
-  { nome: "Debora",        match_responsavel: "Debora Mund",        categoria: "Olimpo", cap_recorrente: 25, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 9 },
-  { nome: "Larissa",       match_responsavel: "Larissa Farias",     categoria: "Olimpo", cap_recorrente: 25, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 10 },
-  { nome: "Ana",           match_responsavel: "Ana Clara Cordeiro", categoria: "Olimpo", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 11 },
+  // Olimpo foi descontinuada (2026-07-20) — colaboradores migrados para Pulse
+  { nome: "Debora",        match_responsavel: "Debora Mund",        categoria: "Pulse", cap_recorrente: 25, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 9 },
+  { nome: "Larissa",       match_responsavel: "Larissa Farias",     categoria: "Pulse", cap_recorrente: 25, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 10 },
+  { nome: "Ana",           match_responsavel: "Ana Clara Cordeiro", categoria: "Pulse", cap_recorrente: 20, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 11 },
 
   // ── Vendedores / Closers ──
   { nome: "Gabriel Taufner", match_responsavel: "Gabriel Taufner", categoria: "vendedor", cap_recorrente: null, cap_mrr: 107510,    cap_pontual: null, cap_contas: 30, ordem: 12 },

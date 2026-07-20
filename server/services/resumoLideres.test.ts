@@ -460,6 +460,102 @@ describe("derivarMetricas", () => {
       expect(Number.isFinite(pct)).toBe(true);
     }
   });
+
+  // Override manual de Cross Sell (metric_actual_overrides_monthly), lido em
+  // calcularMetricasResumo e injetado aqui como `crossOverride: { r, p }` —
+  // I/O fica fora de derivarMetricas, só a decisão de qual valor prevalece.
+  // Enquanto a régua automática do Bitrix não pega cross sell de verdade (só
+  // 1 deal PARTNER em produção), o cliente informa R e/ou P manualmente; cada
+  // métrica é independente (uma pode vir do override e a outra do Bitrix).
+  describe("crossOverride (override manual de Cross Sell)", () => {
+    it("sem crossOverride (campo ausente): crossR/crossP vêm do Bitrix, idêntico ao comportamento atual", () => {
+      const r = derivarMetricas(ENTRADA_BASE);
+      expect(r.crossR).toBe(5997);
+      expect(r.crossP).toBe(10300);
+      expect(r).toEqual(METRICAS);
+    });
+
+    it("crossOverride explícito { r: null, p: null }: mesmo resultado de não ter override", () => {
+      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: null, p: null } });
+      expect(r).toEqual(METRICAS);
+    });
+
+    it("override só do recorrente (R): crossR vem do override, crossP continua do Bitrix", () => {
+      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: 50000, p: null } });
+      expect(r.crossR).toBe(50000);
+      expect(r.crossP).toBe(10300); // Bitrix, não mexeu
+    });
+
+    it("override só do pontual (P): crossP vem do override, crossR continua do Bitrix", () => {
+      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: null, p: 20000 } });
+      expect(r.crossP).toBe(20000);
+      expect(r.crossR).toBe(5997); // Bitrix, não mexeu
+    });
+
+    it("override dos dois: R e P vêm ambos do override", () => {
+      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: 50000, p: 20000 } });
+      expect(r.crossR).toBe(50000);
+      expect(r.crossP).toBe(20000);
+    });
+
+    it("override de ZERO prevalece sobre o Bitrix (não cai no fallback)", () => {
+      // Zero é um valor legítimo: mês sem cross sell nenhum. Com `||` no lugar
+      // de `??` na precedência, estes valores cairiam no Bitrix (5997/10300) e
+      // a mensagem mostraria um cross sell que não existe.
+      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: 0, p: 0 } });
+      expect(r.crossR).toBe(0);
+      expect(r.crossP).toBe(0);
+      expect(r.crossTotal).toBe(0);
+      expect(r.netChurn).toBe(43314); // churnAjustado inteiro, sem desconto
+    });
+
+    it("crossTotal, netChurn e netChurnBruto são calculados sobre os valores efetivos (override), não sobre os do Bitrix", () => {
+      // Valores do override (50000/20000) bem distintos dos do Bitrix
+      // (5997/10300) — se algum cálculo usar o valor errado a asserção falha.
+      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: 50000, p: 20000 } });
+      expect(r.crossTotal).toBe(70000); // 50000 + 20000
+      expect(r.crossTotal).not.toBe(16297); // valor com Bitrix (régua antiga)
+      expect(r.netChurn).toBe(43314 - 50000); // churnAjustado - crossR efetivo
+      expect(r.netChurn).not.toBe(37317); // netChurn calculado com crossR do Bitrix
+      expect(r.netChurnBruto).toBe(67030 - 50000); // churnTotal - crossR efetivo
+      expect(r.netChurnBruto).not.toBe(61033); // netChurnBruto calculado com crossR do Bitrix
+    });
+
+    it("crossIndisponivel false quando o Bitrix falhou mas o override cobre R e P", () => {
+      const r = derivarMetricas({
+        ...ENTRADA_BASE,
+        breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
+        crossOverride: { r: 50000, p: 20000 },
+      });
+      expect(r.crossIndisponivel).toBe(false);
+    });
+
+    it("crossIndisponivel true quando o Bitrix falhou e o override cobre só R", () => {
+      const r = derivarMetricas({
+        ...ENTRADA_BASE,
+        breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
+        crossOverride: { r: 50000, p: null },
+      });
+      expect(r.crossIndisponivel).toBe(true);
+    });
+
+    it("crossIndisponivel true quando o Bitrix falhou e o override cobre só P", () => {
+      const r = derivarMetricas({
+        ...ENTRADA_BASE,
+        breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
+        crossOverride: { r: null, p: 20000 },
+      });
+      expect(r.crossIndisponivel).toBe(true);
+    });
+
+    it("crossIndisponivel continua true quando o Bitrix falhou e não há override nenhum (comportamento atual preservado)", () => {
+      const r = derivarMetricas({
+        ...ENTRADA_BASE,
+        breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
+      });
+      expect(r.crossIndisponivel).toBe(true);
+    });
+  });
 });
 
 // Strings de status do filtro SQL de getCarteiraMrr (item de regra de negócio,
@@ -509,6 +605,59 @@ describe("calcularMetricasResumo — guard rail de MRR inválido", () => {
     mockGetMrrInicioMes.mockResolvedValue(1000000);
     mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
     await expect(calcularMetricasResumo()).resolves.toBeDefined();
+  });
+});
+
+// Leitura do override de Cross Sell (I/O, dentro de calcularMetricasResumo).
+// Ordem das chamadas de db.execute em calcularMetricasResumo: 1) getCarteiraMrr,
+// 2) getChurnMes, 3) getChurnPontualMes, 4) getEntregaPontualMes,
+// 5) getEstoquePontualInicioMes, 6) leitura do override de Cross Sell (última
+// do Promise.all). getMrrInicioMes/getVendasNovasBreakdown/getVendasMrrBreakdown
+// não usam db.execute — são mockadas via metricsAdapter.
+describe("calcularMetricasResumo — override de Cross Sell (leitura por mês)", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockExecute.mockResolvedValue({ rows: [{}] });
+    mockGetVendasNovasBreakdown.mockResolvedValue({ mrr: 0, pontual: 0 });
+    // crosssell/crosssell_pontual do Bitrix — bem distintos de qualquer valor
+    // de override usado abaixo, para que uma troca indevida falhe o teste.
+    mockGetVendasMrrBreakdown.mockResolvedValue({ total: 0, novo: 0, crosssell: 5997, crosssell_pontual: 10300 });
+    mockGetMrrInicioMes.mockResolvedValue(1000000);
+    // 1ª chamada de db.execute é sempre getCarteiraMrr — mrrAtivo > 0 pro guard rail não abortar
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+  });
+
+  it("a query do override filtra por mês corrente via TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM'), não por mês fixo", async () => {
+    await calcularMetricasResumo();
+    const call = mockExecute.mock.calls[5][0] as any; // 6ª chamada = override
+    const texto = call.queryChunks
+      .map((c: any) => (typeof c === "string" ? c : c.value.join("")))
+      .join("");
+    expect(texto).toContain("metric_actual_overrides_monthly");
+    expect(texto).toContain("TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM')");
+    expect(call.queryChunks).toContain("resumo_lideres_cross_r");
+    expect(call.queryChunks).toContain("resumo_lideres_cross_p");
+  });
+
+  it("sem linha retornada pela query (ex.: só existe override de um mês diferente do atual, filtrado fora pelo WHERE month=...) — usa o valor do Bitrix", async () => {
+    // mockExecute default (rows:[{}]) já cobre a 6ª chamada: simula a query
+    // real não achando nenhuma linha para o mês corrente.
+    const m = await calcularMetricasResumo();
+    expect(m.crossR).toBe(5997); // Bitrix, sem override aplicado
+    expect(m.crossP).toBe(10300); // Bitrix, sem override aplicado
+  });
+
+  it("com linha de override do mês corrente para R: aplica no crossR e mantém crossP do Bitrix", async () => {
+    mockExecute.mockResolvedValueOnce({ rows: [{}] }); // getChurnMes
+    mockExecute.mockResolvedValueOnce({ rows: [{}] }); // getChurnPontualMes
+    mockExecute.mockResolvedValueOnce({ rows: [{}] }); // getEntregaPontualMes
+    mockExecute.mockResolvedValueOnce({ rows: [{}] }); // getEstoquePontualInicioMes
+    mockExecute.mockResolvedValueOnce({
+      rows: [{ metric_key: "resumo_lideres_cross_r", actual_value: "77777" }],
+    }); // override do mês corrente
+    const m = await calcularMetricasResumo();
+    expect(m.crossR).toBe(77777);
+    expect(m.crossP).toBe(10300); // Bitrix, não tinha override de P
   });
 });
 

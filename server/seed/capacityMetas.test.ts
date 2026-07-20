@@ -1,5 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { COMMERCIAL_CATEGORIAS } from "../routes/capacityTimes.helpers";
+
+// Categorias comerciais: régua por faturamento (cap_mrr) + contas (cap_contas).
+// As demais são squads operacionais, medidos por cap_recorrente.
+// Antes vinha de capacityTimes.helpers, que deixou de exportar a constante —
+// o import morto zerava o Set e invertia o teste para todas as categorias.
+const COMMERCIAL_CATEGORIAS = ["vendedor", "account", "gestor"];
 
 const mockExecute = vi.hoisted(() => vi.fn());
 vi.mock("../db", () => ({ db: { execute: mockExecute } }));
@@ -11,9 +16,9 @@ beforeEach(() => vi.clearAllMocks());
 describe("CAPACITY_METAS_SEED", () => {
   it("tem a contagem esperada por categoria", () => {
     const byCat = (c: string) => CAPACITY_METAS_SEED.filter((m) => m.categoria === c).length;
-    expect(byCat("Pulse")).toBe(8); // inclui 3 ex-Aura migrados (Aura descontinuada)
+    expect(byCat("Pulse")).toBe(11); // inclui 3 ex-Aura + 3 ex-Olimpo (ambas descontinuadas)
     expect(byCat("Aura")).toBe(0);
-    expect(byCat("Olimpo")).toBe(3);
+    expect(byCat("Olimpo")).toBe(0);
     expect(byCat("vendedor")).toBe(6);
     expect(byCat("account")).toBe(4);
     expect(byCat("gestor")).toBe(7);

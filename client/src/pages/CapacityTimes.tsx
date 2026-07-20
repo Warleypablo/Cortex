@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { OperadorDrawer, type DrawerSelecao } from "@/components/capacity-times/OperadorDrawer";
 import { CapacityMetasConfig } from "@/components/capacity-times/CapacityMetasConfig";
@@ -9,10 +9,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Gauge, AlertTriangle, TrendingDown, Lock } from "lucide-react";
+import { Gauge, Lock } from "lucide-react";
 import { SELVA_BLOQUEADA } from "@shared/capacityGrupos";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
 // Black / Squadra: carteira via responsavel (régua MRR + contas).
@@ -22,17 +22,30 @@ interface ComercialRow {
   mrr_atual: number; mrr_ativo: number; mrr_onboarding: number; mrr_cancelamento: number;
   cap_mrr: number | null; dif_mrr: number | null;
   contas_ativas: number; cap_contas: number | null; dif_contas: number | null;
+  contratos: number; contratos_rec: number; contratos_pont: number;
+  clientes: number;
+  clientes_rec: number;
+  clientes_pont: number;
+  cap_clientes: number | null;
+  dif_clientes: number | null;
   util_mrr_pct: number | null;
   util_contas_pct: number | null;
-  util_pct: number | null;
+  util_clientes_pct: number | null;
 }
 // Selva: designers, carteira via responsável da subtask (régua por faturamento rec + pontual).
 interface SelvaRow {
   nome: string;
   contas: number;
+  contratos: number; contratos_rec: number; contratos_pont: number;
   fat_recorrente: number; fat_pontual: number; faturamento: number;
   ticket_medio: number | null;
   cap_fat: number | null;
+  clientes: number;
+  clientes_rec: number;
+  clientes_pont: number;
+  cap_clientes: number | null;
+  dif_clientes: number | null;
+  util_clientes_pct: number | null;
   util_pct: number | null;
 }
 // Squads de comunicação (Pulse, Olimpo): CS via capacity_metas.
@@ -40,13 +53,19 @@ interface SelvaRow {
 interface CsRow {
   nome: string;
   op_recorrente: number; cap_contratos: number | null;
+  contratos: number; contratos_rec: number; contratos_pont: number;
   op_pontual: number;
   op_total: number;
   mrr_operando: number; mrr_ativo: number; mrr_onboarding: number; mrr_cancelamento: number;
   cap_fat: number | null;
+  clientes: number;
+  clientes_rec: number;
+  clientes_pont: number;
+  cap_clientes: number | null;
+  dif_clientes: number | null;
   util_fat_pct: number | null;
   util_contas_pct: number | null;
-  util_pct: number | null;
+  util_clientes_pct: number | null;
 }
 interface SquadGroup {
   squad: string;
@@ -85,7 +104,6 @@ function utilBarColor(pct: number | null): string {
   return "bg-green-500";
 }
 const COLOR_MRR = "#3b82f6";
-const COLOR_CONTAS = "#a855f7";
 function pctText(pct: number | null): string {
   return pct === null ? "—" : `${pct}%`;
 }
@@ -151,7 +169,10 @@ function td(extra = "") { return cn("text-gray-900 dark:text-white", extra); }
 
 function StatCards({ cards }: { cards: { label: string; value: string; tone?: string }[] }) {
   return (
-    <div className={cn("grid grid-cols-2 sm:grid-cols-3 gap-3", cards.length >= 7 ? "lg:grid-cols-7" : "lg:grid-cols-6")}>
+    <div className={cn(
+      "grid grid-cols-2 sm:grid-cols-3 gap-3",
+      cards.length >= 8 ? "lg:grid-cols-8" : cards.length >= 7 ? "lg:grid-cols-7" : "lg:grid-cols-6",
+    )}>
       {cards.map((c) => (
         <Card key={c.label} className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
           <CardContent className="pt-4 pb-4">
@@ -164,90 +185,81 @@ function StatCards({ cards }: { cards: { label: string; value: string; tone?: st
   );
 }
 
-function AlertCard({ title, icon, tone, people, empty }: {
-  title: string; icon: ReactNode; tone: "red" | "green"; people: { nome: string; util_pct: number | null }[]; empty: string;
+// ── Tabela única: todas as abas seguem o mesmo padrão (o da Squadra) ──
+
+// Forma normalizada que as três origens (Comercial, Selva, CS) mapeiam.
+interface Linha {
+  nome: string;
+  match?: string;
+  fat: number;
+  fatAtivo: number; fatOnboarding: number; fatCancelamento: number;
+  capFat: number | null; difFat: number | null;
+  contratos: number; contratosRec: number; contratosPont: number;
+  clientes: number; clientesRec: number; clientesPont: number;
+  capClientes: number | null; difClientes: number | null;
+  utilFat: number | null; utilClientes: number | null;
+}
+
+function deltaTone(v: number | null): string {
+  if (v === null) return "text-gray-400 dark:text-zinc-500";
+  return v < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400";
+}
+
+function CapacityTable({ linhas, onSelect, campo, vazio }: {
+  linhas: Linha[]; onSelect: (s: DrawerSelecao) => void; campo?: "cs" | "geral"; vazio: string;
 }) {
-  const chip = tone === "red"
-    ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-    : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
-  return (
-    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2 text-gray-700 dark:text-zinc-300">{icon}{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {people.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-zinc-500">{empty}</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {people.map((p) => (
-              <span key={p.nome} className={cn("px-2 py-1 rounded-full text-xs font-medium", chip)}>
-                {p.nome} · {pctText(p.util_pct)}
-              </span>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function Alerts({ people }: { people: { nome: string; util_pct: number | null }[] }) {
-  const over = people.filter((p) => p.util_pct !== null && p.util_pct >= 90).sort((a, b) => (b.util_pct as number) - (a.util_pct as number));
-  const idle = people.filter((p) => p.util_pct !== null && p.util_pct < 60).sort((a, b) => (a.util_pct as number) - (b.util_pct as number));
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <AlertCard title="Sobrecarregados (≥90%)" icon={<AlertTriangle className="h-4 w-4 text-red-500" />} tone="red" people={over} empty="Ninguém acima de 90%." />
-      <AlertCard title="Com folga (<60%)" icon={<TrendingDown className="h-4 w-4 text-green-500" />} tone="green" people={idle} empty="Ninguém abaixo de 60%." />
-    </div>
-  );
-}
-
-// ── Tabelas ──
-
-function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void; campo?: "cs" | "geral" }) {
-  if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Ninguém neste grupo ainda (popula automaticamente pelo cargo no RH).</p>;
-  const teamMrr = sum(rows.map((r) => r.mrr_atual));
+  if (!linhas.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">{vazio}</p>;
+  const fatTime = sum(linhas.map((l) => l.fat));
   return (
     <div className="overflow-x-auto">
       <Table>
         <TableHeader>
           <TableRow className="border-gray-200 dark:border-zinc-700">
             <TableHead className={th()}>Nome</TableHead>
-            <TableHead className={th("text-right")}>MRR Atual</TableHead>
-            <TableHead className={th("text-right")} title="Cap. Faturamento ($) configurada na aba Configurar">Cap. FAT ($)</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento recorrente + pontual da carteira">Faturamento (R+P)</TableHead>
+            <TableHead className={th("text-right")} title="Cap. Faturamento ($)">Cap. FAT ($)</TableHead>
             <TableHead className={th("text-right")}>Δ FAT</TableHead>
-            <TableHead className={th("text-right")} title="MRR / contas ativas">Ticket Médio</TableHead>
-            <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
-            <TableHead className={th("text-right")}>Contratos</TableHead>
-            <TableHead className={th("text-right")}>Cap. Contratos</TableHead>
-            <TableHead className={th("text-right")}>Δ Contratos</TableHead>
-            <TableHead className={th("text-right")} title="MRR Atual / Cap. FAT">% FAT</TableHead>
-            <TableHead className={th("text-right")} title="Contas ativas / Cap. Contratos">% Contratos</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento / contratos">Ticket Médio</TableHead>
+            <TableHead className={th("text-right")} title="Participação no faturamento do time">% Time</TableHead>
+            <TableHead className={th("text-right")} title="Contratos distintos (recorrente ou pontual)">Contratos</TableHead>
+            <TableHead className={th("text-right")} title="Contratos recorrentes">Contratos Rec.</TableHead>
+            <TableHead className={th("text-right")} title="Contratos pontuais">Contratos Pont.</TableHead>
+            <TableHead className={th("text-right")} title="Clientes distintos (recorrente ou pontual)">Clientes</TableHead>
+            <TableHead className={th("text-right")} title="Clientes com contrato recorrente">Clientes Rec.</TableHead>
+            <TableHead className={th("text-right")} title="Clientes com contrato pontual">Clientes Pont.</TableHead>
+            <TableHead className={th("text-right")} title="Meta de clientes configurada na aba Configurar">Cap. Clientes</TableHead>
+            <TableHead className={th("text-right")}>Δ Clientes</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento / Cap. FAT">% FAT</TableHead>
+            <TableHead className={th("text-right")} title="Clientes / Cap. Clientes">% Clientes</TableHead>
           </TableRow>
         </TableHeader>
         <TableBody>
-          {rows.map((r, i) => (
-            <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
+          {linhas.map((l, i) => (
+            <TableRow key={`${l.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
               <TableCell
                 className={cn(td("font-medium"), "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline")}
-                onClick={() => onSelect({ label: r.nome, nome: r.match ?? r.nome, campo })}
+                onClick={() => onSelect({ label: l.nome, nome: l.match ?? l.nome, campo })}
               >
-                {r.nome}
+                {l.nome}
               </TableCell>
               <TableCell className={td("text-right")}>
-                {formatCurrency(r.mrr_atual)}
-                <MrrStatusBar ativo={r.mrr_ativo} onboarding={r.mrr_onboarding} cancelamento={r.mrr_cancelamento} />
+                {formatCurrency(l.fat)}
+                <MrrStatusBar ativo={l.fatAtivo} onboarding={l.fatOnboarding} cancelamento={l.fatCancelamento} />
               </TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_mrr)}</TableCell>
-              <TableCell className={cn("text-right", r.dif_mrr === null ? "text-gray-400 dark:text-zinc-500" : r.dif_mrr < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{r.dif_mrr === null ? "—" : formatCurrency(r.dif_mrr)}</TableCell>
-              <TableCell className={td("text-right")}>{moneyOrDash(ticket(r.mrr_atual, r.contas_ativas))}</TableCell>
-              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(r.mrr_atual, teamMrr))}</TableCell>
-              <TableCell className={td("text-right")}>{r.contas_ativas}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_contas)}</TableCell>
-              <TableCell className={cn("text-right", r.dif_contas === null ? "text-gray-400 dark:text-zinc-500" : r.dif_contas < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_contas)}</TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_mrr_pct} /></TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_contas_pct} /></TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(l.capFat)}</TableCell>
+              <TableCell className={cn("text-right", deltaTone(l.difFat))}>{l.difFat === null ? "—" : formatCurrency(l.difFat)}</TableCell>
+              <TableCell className={td("text-right")}>{moneyOrDash(ticket(l.fat, l.contratos))}</TableCell>
+              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(l.fat, fatTime))}</TableCell>
+              <TableCell className={td("text-right")}>{l.contratos}</TableCell>
+              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{l.contratosRec}</TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{l.contratosPont}</TableCell>
+              <TableCell className={td("text-right")}>{l.clientes}</TableCell>
+              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{l.clientesRec}</TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{l.clientesPont}</TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(l.capClientes)}</TableCell>
+              <TableCell className={cn("text-right", deltaTone(l.difClientes))}>{numOrDash(l.difClientes)}</TableCell>
+              <TableCell className="text-right"><UtilBar pct={l.utilFat} /></TableCell>
+              <TableCell className="text-right"><UtilBar pct={l.utilClientes} /></TableCell>
             </TableRow>
           ))}
         </TableBody>
@@ -256,45 +268,39 @@ function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSel
   );
 }
 
-function SelvaTable({ rows, onSelect }: { rows: SelvaRow[]; onSelect: (s: DrawerSelecao) => void }) {
-  if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Nenhum designer ativo encontrado no RH.</p>;
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-gray-200 dark:border-zinc-700">
-            <TableHead className={th()}>Designer</TableHead>
-            <TableHead className={th("text-right")} title="Contas onde o designer é responsável na subtask">Contas</TableHead>
-            <TableHead className={th("text-right")} title="Faturamento recorrente + pontual da carteira">Faturamento (Rec+Pont)</TableHead>
-            <TableHead className={th("text-right")} title="Faturamento recorrente (MRR)">Recorrente</TableHead>
-            <TableHead className={th("text-right")} title="Faturamento pontual">Pontual</TableHead>
-            <TableHead className={th("text-right")} title="Faturamento / contas">Ticket Médio</TableHead>
-            <TableHead className={th("text-right")} title="Ticket Médio × meta de contas por designer">Cap. (R$)</TableHead>
-            <TableHead className={th("text-right")} title="Faturamento / Cap.">% Ocupação</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((r, i) => (
-            <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
-              <TableCell
-                className={cn(td("font-medium"), "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline")}
-                onClick={() => onSelect({ label: r.nome, nome: r.nome })}
-              >
-                {r.nome}
-              </TableCell>
-              <TableCell className={td("text-right")}>{r.contas}</TableCell>
-              <TableCell className={td("text-right")}>{formatCurrency(r.faturamento)}</TableCell>
-              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{formatCurrency(r.fat_recorrente)}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{formatCurrency(r.fat_pontual)}</TableCell>
-              <TableCell className={td("text-right")}>{moneyOrDash(r.ticket_medio)}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_fat)}</TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_pct} /></TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
-    </div>
-  );
+// Mapeadores para a forma normalizada.
+function deComercial(r: ComercialRow): Linha {
+  return {
+    nome: r.nome, match: r.match, fat: r.mrr_atual,
+    fatAtivo: r.mrr_ativo, fatOnboarding: r.mrr_onboarding, fatCancelamento: r.mrr_cancelamento,
+    capFat: r.cap_mrr, difFat: r.dif_mrr,
+    contratos: r.contratos, contratosRec: r.contratos_rec, contratosPont: r.contratos_pont,
+    clientes: r.clientes, clientesRec: r.clientes_rec, clientesPont: r.clientes_pont,
+    capClientes: r.cap_clientes, difClientes: r.dif_clientes,
+    utilFat: r.util_mrr_pct, utilClientes: r.util_clientes_pct,
+  };
+}
+function deSelva(r: SelvaRow): Linha {
+  return {
+    nome: r.nome, fat: r.faturamento,
+    fatAtivo: 0, fatOnboarding: 0, fatCancelamento: 0, // Selva não quebra faturamento por status
+    capFat: r.cap_fat, difFat: r.cap_fat === null ? null : r.cap_fat - r.faturamento,
+    contratos: r.contratos, contratosRec: r.contratos_rec, contratosPont: r.contratos_pont,
+    clientes: r.clientes, clientesRec: r.clientes_rec, clientesPont: r.clientes_pont,
+    capClientes: r.cap_clientes, difClientes: r.dif_clientes,
+    utilFat: r.util_pct, utilClientes: r.util_clientes_pct,
+  };
+}
+function deCs(r: CsRow): Linha {
+  return {
+    nome: r.nome, fat: r.mrr_operando,
+    fatAtivo: r.mrr_ativo, fatOnboarding: r.mrr_onboarding, fatCancelamento: r.mrr_cancelamento,
+    capFat: r.cap_fat, difFat: r.cap_fat === null ? null : r.cap_fat - r.mrr_operando,
+    contratos: r.contratos, contratosRec: r.contratos_rec, contratosPont: r.contratos_pont,
+    clientes: r.clientes, clientesRec: r.clientes_rec, clientesPont: r.clientes_pont,
+    capClientes: r.cap_clientes, difClientes: r.dif_clientes,
+    utilFat: r.util_fat_pct, utilClientes: r.util_clientes_pct,
+  };
 }
 
 // ── Conteúdo das abas ──
@@ -304,23 +310,22 @@ function ComercialTab({ title, rows, onSelect, campo }: { title: string; rows: C
   const totContas = sum(rows.map((r) => r.contas_ativas));
   const riscoPct = pct(sum(rows.map((r) => r.mrr_cancelamento)), totMrr);
   const mediaMrr = avgOf(rows.map((r) => r.util_mrr_pct));
-  const mediaContas = avgOf(rows.map((r) => r.util_contas_pct));
+  const mediaClientes = avgOf(rows.map((r) => r.util_clientes_pct));
   const cards = [
     { label: "Pessoas", value: String(rows.length) },
     { label: "Contas (total)", value: String(totContas) },
-    { label: "MRR Atual", value: formatCurrency(totMrr) },
+    { label: "Faturamento (R+P)", value: formatCurrency(totMrr) },
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totContas)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
     { label: "Capacity FAT (média)", value: pctText(mediaMrr), tone: utilColor(mediaMrr) },
-    { label: "Capacity Contratos (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
+    { label: "Capacity Clientes (média)", value: pctText(mediaClientes), tone: utilColor(mediaClientes) },
   ];
   return (
     <div className="space-y-4">
       <StatCards cards={cards} />
-      <Alerts people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader><CardTitle className="text-gray-900 dark:text-white">{title}</CardTitle></CardHeader>
-        <CardContent><ComercialTable rows={rows} onSelect={onSelect} campo={campo} /></CardContent>
+        <CardContent><CapacityTable linhas={rows.map(deComercial)} onSelect={onSelect} campo={campo} vazio="Ninguém neste grupo ainda (popula automaticamente pelo cargo no RH)." /></CardContent>
       </Card>
     </div>
   );
@@ -333,6 +338,7 @@ function SelvaTab({ rows, metaContas, onSelect }: { rows: SelvaRow[]; metaContas
   const totContas = sum(rows.map((r) => r.contas));
   const comCarteira = rows.filter((r) => r.contas > 0).length;
   const mediaOcup = avgOf(rows.map((r) => r.util_pct));
+  const mediaClientes = avgOf(rows.map((r) => r.util_clientes_pct));
   const cards = [
     { label: "Designers", value: String(rows.length) },
     { label: "Com carteira", value: `${comCarteira} / ${rows.length}` },
@@ -340,11 +346,11 @@ function SelvaTab({ rows, metaContas, onSelect }: { rows: SelvaRow[]; metaContas
     { label: "Recorrente / Pontual", value: `${formatCurrency(totRec)} · ${formatCurrency(totPont)}` },
     { label: "Ticket médio", value: moneyOrDash(ticket(totFaturamento, totContas)) },
     { label: "Ocupação média", value: pctText(mediaOcup), tone: utilColor(mediaOcup) },
+    { label: "Capacity Clientes (média)", value: pctText(mediaClientes), tone: utilColor(mediaClientes) },
   ];
   return (
     <div className="space-y-4">
       <StatCards cards={cards} />
-      <Alerts people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader>
           <CardTitle className="text-gray-900 dark:text-white">Selva — Designers</CardTitle>
@@ -353,83 +359,8 @@ function SelvaTab({ rows, metaContas, onSelect }: { rows: SelvaRow[]; metaContas
             Cap. (R$) = Ticket Médio da carteira × {metaContas} contas/designer
           </p>
         </CardHeader>
-        <CardContent><SelvaTable rows={rows} onSelect={onSelect} /></CardContent>
+        <CardContent><CapacityTable linhas={rows.map(deSelva)} onSelect={onSelect} vazio="Nenhum designer ativo encontrado no RH." /></CardContent>
       </Card>
-    </div>
-  );
-}
-
-function UtilChart({ people }: { people: { nome: string; util_fat_pct: number | null; util_contas_pct: number | null }[] }) {
-  const data = people
-    .filter((p) => p.util_fat_pct !== null || p.util_contas_pct !== null)
-    .map((p) => ({ nome: p.nome, fat: p.util_fat_pct, contas: p.util_contas_pct }))
-    .sort((a, b) => (b.fat ?? b.contas ?? 0) - (a.fat ?? a.contas ?? 0));
-  if (!data.length) return null;
-  return (
-    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-      <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-700 dark:text-zinc-300">Utilização por pessoa — FAT × Contas</CardTitle></CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={Math.max(200, data.length * 44)}>
-          <BarChart data={data} layout="vertical" margin={{ left: 90, right: 30 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
-            <XAxis type="number" domain={[0, "auto"]} tick={{ fill: "#9ca3af", fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
-            <YAxis type="category" dataKey="nome" width={110} tick={{ fill: "#9ca3af", fontSize: 12 }} />
-            <Tooltip formatter={(v: number, name: string) => [`${v}%`, name]} contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="fat" name="Capacity FAT" fill={COLOR_MRR} radius={[0, 4, 4, 0]} maxBarSize={14} />
-            <Bar dataKey="contas" name="Capacity Contratos" fill={COLOR_CONTAS} radius={[0, 4, 4, 0]} maxBarSize={14} />
-          </BarChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  );
-}
-
-function CsTable({ rows, onSelect }: { rows: CsRow[]; onSelect: (s: DrawerSelecao) => void }) {
-  if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Nenhuma pessoa neste time.</p>;
-  const teamMrr = sum(rows.map((r) => r.mrr_operando));
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow className="border-gray-200 dark:border-zinc-700">
-            <TableHead className={th()}>Nome</TableHead>
-            <TableHead className={th("text-right")}>Recorrente</TableHead>
-            <TableHead className={th("text-right")} title="Capacity de contratos">Cap. Contratos</TableHead>
-            <TableHead className={th("text-right")}>Pontual</TableHead>
-            <TableHead className={th("text-right")}>MRR Operando</TableHead>
-            <TableHead className={th("text-right")} title="MRR recorrente / contas recorrentes">Ticket Médio</TableHead>
-            <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
-            <TableHead className={th("text-right")} title="Ticket médio da equipe × capacity de contratos">Cap. FAT ($)</TableHead>
-            <TableHead className={th("text-right")} title="MRR Operando / Cap. FAT">% FAT</TableHead>
-            <TableHead className={th("text-right")} title="Contas recorrentes / capacity de contratos">% Contratos</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {rows.map((r, i) => (
-            <TableRow key={`${r.nome}-${i}`} className="border-gray-200 dark:border-zinc-700">
-              <TableCell
-                className={cn(td("font-medium"), "cursor-pointer hover:text-blue-600 dark:hover:text-blue-400 hover:underline")}
-                onClick={() => onSelect({ label: r.nome, nome: r.nome })}
-              >
-                {r.nome}
-              </TableCell>
-              <TableCell className={td("text-right")}>{r.op_recorrente}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_contratos)}</TableCell>
-              <TableCell className={td("text-right")}>{r.op_pontual}</TableCell>
-              <TableCell className={td("text-right")}>
-                {formatCurrency(r.mrr_operando)}
-                <MrrStatusBar ativo={r.mrr_ativo} onboarding={r.mrr_onboarding} cancelamento={r.mrr_cancelamento} />
-              </TableCell>
-              <TableCell className={td("text-right")}>{moneyOrDash(ticket(r.mrr_operando, r.op_recorrente))}</TableCell>
-              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(r.mrr_operando, teamMrr))}</TableCell>
-              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{moneyOrDash(r.cap_fat)}</TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_fat_pct} /></TableCell>
-              <TableCell className="text-right"><UtilBar pct={r.util_contas_pct} /></TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
     </div>
   );
 }
@@ -441,7 +372,7 @@ function SquadTab({ group, onSelect }: { group: SquadGroup; onSelect: (s: Drawer
   const totCancel = sum(rows.map((r) => r.mrr_cancelamento));
   const riscoPct = pct(totCancel, totMrr);
   const mediaFat = avgOf(rows.map((r) => r.util_fat_pct));
-  const mediaContas = avgOf(rows.map((r) => r.util_contas_pct));
+  const mediaClientes = avgOf(rows.map((r) => r.util_clientes_pct));
   const cards = [
     { label: "Pessoas", value: String(rows.length) },
     { label: "Recorrente (op / cap)", value: `${totRec} / ${sum(rows.map((r) => r.cap_contratos))}` },
@@ -449,16 +380,14 @@ function SquadTab({ group, onSelect }: { group: SquadGroup; onSelect: (s: Drawer
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totRec)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
     { label: "Capacity FAT (média)", value: pctText(mediaFat), tone: utilColor(mediaFat) },
-    { label: "Capacity Contratos (média)", value: pctText(mediaContas), tone: utilColor(mediaContas) },
+    { label: "Capacity Clientes (média)", value: pctText(mediaClientes), tone: utilColor(mediaClientes) },
   ];
   return (
     <div className="space-y-4">
       <StatCards cards={cards} />
-      <Alerts people={rows} />
-      <UtilChart people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader><CardTitle className="text-gray-900 dark:text-white">Squad {group.squad}</CardTitle></CardHeader>
-        <CardContent><CsTable rows={rows} onSelect={onSelect} /></CardContent>
+        <CardContent><CapacityTable linhas={rows.map(deCs)} onSelect={onSelect} vazio="Nenhuma pessoa neste time." /></CardContent>
       </Card>
     </div>
   );

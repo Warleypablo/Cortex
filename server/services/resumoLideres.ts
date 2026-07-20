@@ -346,6 +346,60 @@ async function getEntregaPontualMes(): Promise<number> {
   return parseFloat((result.rows[0] as any)?.total || "0");
 }
 
+// Chaves usadas em metric_actual_overrides_monthly para o override manual de
+// Cross Sell — ver getCrossOverrideMesAtual.
+const METRIC_KEY_CROSS_R = "resumo_lideres_cross_r";
+const METRIC_KEY_CROSS_P = "resumo_lideres_cross_p";
+
+interface CrossOverride {
+  r: number | null;
+  p: number | null;
+}
+
+/**
+ * Override manual de Cross Sell (R e P) do mês corrente, lido de
+ * metric_actual_overrides_monthly (tabela existente, reutilizada — sem
+ * migration nova). A régua automática do Bitrix (source='PARTNER' + cliente
+ * pré-existente) não pega cross sell de verdade: há um único deal PARTNER em
+ * toda a base de produção. Até isso ser corrigido na origem, o cliente
+ * informa os valores manualmente por essa tabela. Filtra por mês corrente em
+ * America/Sao_Paulo (mesmo padrão de getEntregaPontualMes/
+ * getEstoquePontualInicioMes) para que um override de julho nunca valha em
+ * agosto. Tolerante a falha: se a tabela não existir ou a query falhar,
+ * devolve "sem override" (null, null) — a mensagem nunca deve deixar de sair
+ * por causa disso.
+ */
+async function getCrossOverrideMesAtual(): Promise<CrossOverride> {
+  try {
+    const result = await db.execute(sql`
+      SELECT metric_key, actual_value
+      FROM cortex_core.metric_actual_overrides_monthly
+      WHERE metric_key IN (${METRIC_KEY_CROSS_R}, ${METRIC_KEY_CROSS_P})
+        AND month = TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM')
+        AND dimension_key IS NULL
+      ORDER BY updated_at DESC NULLS LAST
+    `);
+    // NaN não é null, então passaria pelo `??` e viraria "R$ NaN" na mensagem
+    // sem disparar nenhum aviso — descartar aqui é o que mantém o fallback.
+    const numeroOuNull = (v: unknown): number | null => {
+      const n = parseFloat(String(v));
+      return Number.isFinite(n) ? n : null;
+    };
+    const override: CrossOverride = { r: null, p: null };
+    for (const row of (result.rows ?? []) as any[]) {
+      if (row.metric_key === METRIC_KEY_CROSS_R && override.r === null) {
+        override.r = numeroOuNull(row.actual_value);
+      } else if (row.metric_key === METRIC_KEY_CROSS_P && override.p === null) {
+        override.p = numeroOuNull(row.actual_value);
+      }
+    }
+    return override;
+  } catch (err: any) {
+    console.error("[resumo-lideres] Falha ao ler override de Cross Sell:", err.message);
+    return { r: null, p: null };
+  }
+}
+
 async function getEstoquePontualInicioMes(): Promise<number> {
   // Estoque pontual em aberto no 1º snapshot do mês (= fechamento do mês anterior).
   // Base do % de churn pontual, análogo ao mrrMesAnterior usado no churn recorrente.
@@ -381,12 +435,21 @@ export function derivarMetricas(entrada: {
   breakdown: { crosssell: number; crosssell_pontual: number; erro?: boolean };
   churn: { total: number; ajustado: number; brutoSemAbono: number };
   churnPontual: { total: number; ajustado: number };
+  // Override manual de Cross Sell (metric_actual_overrides_monthly), lido em
+  // calcularMetricasResumo. Cada métrica é independente: quem não tem
+  // override para o mês passa null e o valor do Bitrix prevalece.
+  crossOverride?: { r: number | null; p: number | null };
 }): MetricasResumo {
   const { carteira, mrrMesAnterior, estoquePontualInicioMes, entregaPontual, vendasNovas, breakdown, churn, churnPontual } =
     entrada;
 
-  const crossR = breakdown.crosssell;
-  const crossP = breakdown.crosssell_pontual;
+  const overrideR = entrada.crossOverride?.r ?? null;
+  const overrideP = entrada.crossOverride?.p ?? null;
+
+  // Cross sell efetivo: override manual quando existir para o mês, senão o
+  // valor apurado do Bitrix — por métrica, independentemente.
+  const crossR = overrideR ?? breakdown.crosssell;
+  const crossP = overrideP ?? breakdown.crosssell_pontual;
   const crossTotal = crossR + crossP;
   const netChurn = churn.ajustado - crossR;
   const netChurnBruto = churn.total - crossR;
@@ -421,7 +484,10 @@ export function derivarMetricas(entrada: {
     netChurnBrutoPct: mrrMesAnterior > 0 ? (netChurnBruto / mrrMesAnterior) * 100 : 0,
     churnBrutoSemAbono: churn.brutoSemAbono,
     churnBrutoSemAbonoPct: mrrMesAnterior > 0 ? (churn.brutoSemAbono / mrrMesAnterior) * 100 : 0,
-    crossIndisponivel: breakdown.erro === true,
+    // Só é "indisponível" se o Bitrix falhou E o override não cobre os dois
+    // valores — se o número foi informado à mão, não está indisponível,
+    // mesmo com a query do Bitrix quebrada.
+    crossIndisponivel: breakdown.erro === true && !(overrideR !== null && overrideP !== null),
     vendasIndisponivel: vendasNovas.erro === true,
     baseSuspeita:
       mrrMesAnterior < mrrAtivo * (1 - TOLERANCIA_BASE_COMPARACAO) ||
@@ -430,17 +496,27 @@ export function derivarMetricas(entrada: {
 }
 
 export async function calcularMetricasResumo(): Promise<MetricasResumo> {
-  const [carteira, mrrMesAnterior, vendasNovas, breakdown, churn, churnPontual, entregaPontual, estoquePontualInicioMes] =
-    await Promise.all([
-      getCarteiraMrr(),
-      getMrrInicioMes(),
-      getVendasNovasBreakdown(),
-      getVendasMrrBreakdown(),
-      getChurnMes(),
-      getChurnPontualMes(),
-      getEntregaPontualMes(),
-      getEstoquePontualInicioMes(),
-    ]);
+  const [
+    carteira,
+    mrrMesAnterior,
+    vendasNovas,
+    breakdown,
+    churn,
+    churnPontual,
+    entregaPontual,
+    estoquePontualInicioMes,
+    crossOverride,
+  ] = await Promise.all([
+    getCarteiraMrr(),
+    getMrrInicioMes(),
+    getVendasNovasBreakdown(),
+    getVendasMrrBreakdown(),
+    getChurnMes(),
+    getChurnPontualMes(),
+    getEntregaPontualMes(),
+    getEstoquePontualInicioMes(),
+    getCrossOverrideMesAtual(),
+  ]);
 
   const metricas = derivarMetricas({
     carteira,
@@ -451,6 +527,7 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
     breakdown,
     churn,
     churnPontual,
+    crossOverride,
   });
 
   // getMrrInicioMes (metricsAdapter) engole erros retornando 0; sem base de MRR a
