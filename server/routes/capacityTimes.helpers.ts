@@ -37,9 +37,12 @@ export interface ComercialRow {
   contas_ativas: number;
   cap_contas: number | null;
   dif_contas: number | null;
+  clientes: number; // clientes distintos da carteira
+  cap_clientes: number | null;
+  dif_clientes: number | null;
   util_mrr_pct: number | null; // mrr_atual / cap_mrr
   util_contas_pct: number | null; // contas_ativas / cap_contas
-  util_pct: number | null; // legado p/ alertas: igual a util_mrr_pct
+  util_clientes_pct: number | null; // clientes / cap_clientes
 }
 
 export function toComercialRow(raw: any): ComercialRow {
@@ -47,6 +50,8 @@ export function toComercialRow(raw: any): ComercialRow {
   const cap_mrr = numOrNull(raw.cap_mrr);
   const contas_ativas = num(raw.contas_rec ?? raw.contas_ativas);
   const cap_contas = numOrNull(raw.cap_contas);
+  const clientes = num(raw.clientes_rec ?? raw.clientes);
+  const cap_clientes = numOrNull(raw.cap_clientes);
   const util_mrr_pct = utilPct(mrr_atual, cap_mrr);
   return {
     nome: String(raw.nome),
@@ -60,10 +65,12 @@ export function toComercialRow(raw: any): ComercialRow {
     contas_ativas,
     cap_contas,
     dif_contas: diff(cap_contas, contas_ativas),
+    clientes,
+    cap_clientes,
+    dif_clientes: diff(cap_clientes, clientes),
     util_mrr_pct,
     util_contas_pct: utilPct(contas_ativas, cap_contas),
-    // Legado p/ alertas: usa MRR quando há cap de MRR; senão cai p/ contas (ex.: Black).
-    util_pct: util_mrr_pct ?? utilPct(contas_ativas, cap_contas),
+    util_clientes_pct: utilPct(clientes, cap_clientes),
   };
 }
 
@@ -77,6 +84,10 @@ export interface SelvaRow {
   faturamento: number; // rec + pont
   ticket_medio: number | null; // faturamento / contas
   cap_fat: number | null; // ticket_medio * meta_contas_designer
+  clientes: number;
+  cap_clientes: number | null;
+  dif_clientes: number | null;
+  util_clientes_pct: number | null;
   util_pct: number | null; // faturamento / cap_fat
 }
 
@@ -87,6 +98,8 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
   const faturamento = fat_recorrente + fat_pontual;
   const ticket_medio = contas > 0 ? faturamento / contas : null;
   const cap_fat = ticket_medio !== null ? ticket_medio * metaContasDesigner : null;
+  const clientes = num(raw.clientes_total);
+  const cap_clientes = numOrNull(raw.cap_clientes);
   return {
     nome: String(raw.nome),
     contas,
@@ -95,6 +108,10 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
     faturamento,
     ticket_medio,
     cap_fat,
+    clientes,
+    cap_clientes,
+    dif_clientes: diff(cap_clientes, clientes),
+    util_clientes_pct: utilPct(clientes, cap_clientes),
     util_pct: utilPct(faturamento, cap_fat),
   };
 }
@@ -105,6 +122,9 @@ export interface CsRow {
   nome: string;
   op_recorrente: number;
   cap_contratos: number | null; // capacity de contratos (cap_contas, fallback cap_recorrente)
+  clientes: number;
+  cap_clientes: number | null;
+  dif_clientes: number | null;
   op_pontual: number;
   op_total: number;
   mrr_operando: number;
@@ -114,7 +134,7 @@ export interface CsRow {
   cap_fat: number | null; // ticket médio da equipe × capacity de contratos (preenchido no route)
   util_fat_pct: number | null; // mrr_operando / cap_fat
   util_contas_pct: number | null; // op_recorrente / cap_contratos
-  util_pct: number | null; // legado p/ alertas = util_fat_pct
+  util_clientes_pct: number | null; // clientes / cap_clientes
 }
 
 export interface SquadGroup {
@@ -128,10 +148,15 @@ export function toCsRow(raw: any): CsRow {
   const op_total = op_recorrente + op_pontual;
   const cap_contratos = numOrNull(raw.cap_contratos);
   const mrr_operando = num(raw.mrr_operando);
+  const clientes = num(raw.clientes_rec);
+  const cap_clientes = numOrNull(raw.cap_clientes);
   return {
     nome: String(raw.nome),
     op_recorrente,
     cap_contratos,
+    clientes,
+    cap_clientes,
+    dif_clientes: diff(cap_clientes, clientes),
     op_pontual,
     op_total,
     mrr_operando,
@@ -141,7 +166,7 @@ export function toCsRow(raw: any): CsRow {
     cap_fat: null,
     util_fat_pct: null,
     util_contas_pct: utilPct(op_recorrente, cap_contratos),
-    util_pct: null,
+    util_clientes_pct: utilPct(clientes, cap_clientes),
   };
 }
 
@@ -153,7 +178,6 @@ export function finalizeSquad(group: SquadGroup): void {
   for (const r of group.rows) {
     r.cap_fat = r.cap_contratos !== null ? Math.round(ticketMedio * r.cap_contratos) : null;
     r.util_fat_pct = utilPct(r.mrr_operando, r.cap_fat);
-    r.util_pct = r.util_fat_pct;
   }
 }
 
