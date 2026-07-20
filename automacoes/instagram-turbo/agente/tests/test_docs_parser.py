@@ -169,7 +169,44 @@ def run():
     print("\n=== header curto no MEIO não sequestra (bug 3) ===")
     test_header_curto_meio_nao_sequestra()
 
+    print("\n=== URL de referência não vaza pra legenda (bug 4) ===")
+    test_url_nao_vaza_na_legenda()
+
     print("\n🎉 Todos os testes passaram.")
+
+
+def test_url_nao_vaza_na_legenda():
+    # Regressão do reel Creator Summit (17/jul/2026): o copywriter deixou um link
+    # de REFERÊNCIA colado no cupom na seção LEGENDA do Doc
+    # ("cupom: SUMMIT10https://www.tiktok.com/@.../video/7408...") e a URL vazou
+    # pro caption publicado. Em legenda de IG/TikTok URL não é clicável — remover.
+    doc = (
+        "**COM QUEM COMPARTILHAR A EXPERIÊNCIA**\n"
+        "**LEGENDA**\n"
+        "Aproveite 10% OFF com o cupom: SUMMIT10https://www.tiktok.com/@atleticaibmecbh/"
+        "video/7408223384271670534?q=video%20previa&t=1776279342395.\n"
+        "\n"
+        "🔗 Clique no link da bio. #creatorsummites\n"
+        "**FIM**\n"
+    )
+    leg, _ = find_legenda_for_task(doc, "Com quem compartilhar a experiência")
+    _assert("http" not in leg, f"URL removida da legenda (veio {leg!r})")
+    _assert("tiktok.com" not in leg, "domínio da URL removido")
+    _assert("SUMMIT10" in leg, "cupom SUMMIT10 preservado (não come o texto antes da URL)")
+    _assert("Clique no link da bio" in leg, "CTA depois da URL preservado")
+    _assert("#creatorsummites" in leg, "hashtag preservada")
+    _assert("SUMMIT10\n" in leg or "SUMMIT10 \n" in leg or leg.rstrip().endswith("#creatorsummites"),
+            "quebra de parágrafo mantida após remover a URL")
+
+    # URL no MEIO do texto (com espaços em volta) → some sem deixar espaço duplo
+    doc2 = (
+        "**POST**\n**LEGENDA**\n"
+        "Veja mais em https://exemplo.com/x aqui embaixo. #turbo\n**FIM**\n"
+    )
+    leg2, _ = find_legenda_for_task(doc2, "Post")
+    _assert("http" not in leg2, "URL do meio removida")
+    _assert("  " not in leg2, f"sem espaço duplo onde a URL saiu (veio {leg2!r})")
+    _assert("Veja mais em aqui embaixo." in leg2, "texto em volta preservado, 1 espaço")
 
 
 def test_header_curto_meio_nao_sequestra():

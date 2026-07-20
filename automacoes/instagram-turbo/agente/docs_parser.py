@@ -45,6 +45,11 @@ _INTERNAL_FIRST_WORDS = frozenset({
 
 _LEGENDA_MARKER = re.compile(r"^\s*\**\s*LEGENDA\s*\**\s*$", re.IGNORECASE | re.MULTILINE)
 
+# URL crua na legenda (link de referência que o copywriter deixa no Doc e que
+# NÃO deve ir pro caption). \S+ vai até o próximo espaço/quebra — pega a URL mesmo
+# grudada em texto ("SUMMIT10https://...") e a pontuação/word-joiner do fim.
+_URL_RE = re.compile(r"https?://\S+")
+
 
 def _strip_bold(s: str) -> str:
     """Remove ** ao redor (markdown)."""
@@ -208,6 +213,16 @@ def parse_doc(content: str) -> list[ParsedSection]:
             legenda_text = _sanitize_line_for_text(after)
             # \x0b = quebra "soft" (Shift+Enter) na exportação do Docs → vira \n
             legenda_text = legenda_text.replace("\x0b", "\n")
+            # Remove URLs cruas (http/https) da legenda: o copywriter deixa links
+            # de REFERÊNCIA no Doc (ex.: "cupom: SUMMIT10https://tiktok.com/@.../video/..."
+            # colado no cupom) e eles vazavam pro caption. Em legenda de IG/TikTok
+            # URL não é clicável (a convenção é "link na bio"), então tirar é seguro.
+            # \S+ come até o próximo espaço/quebra (pega a URL grudada em texto e a
+            # pontuação/word-joiner que às vezes vem junto). Depois normaliza os
+            # espaços que a remoção deixa (2+ espaços → 1, espaço antes de quebra).
+            legenda_text = _URL_RE.sub("", legenda_text)
+            legenda_text = re.sub(r"[ \t]{2,}", " ", legenda_text)
+            legenda_text = re.sub(r"[ \t]+\n", "\n", legenda_text)
             # Linha em branco é SEPARAÇÃO DE PARÁGRAFO — vai pro Instagram como
             # está no Doc. Só descartamos linhas de ruído visual (----, ====, •••)
             # e espaços penduradas no fim de cada linha.
