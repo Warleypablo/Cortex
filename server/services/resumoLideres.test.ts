@@ -8,70 +8,119 @@ import {
   type MetricasResumo,
 } from "./resumoLideres";
 
-// Números da mensagem real de 02/07 19h (base % = MRR junho R$ 1.197.868)
+// Números do modelo de referência de 18/07 (base % de MRR = MRR junho R$ 1.137.868;
+// base % pontual = estoque pontual em aberto no início do mês R$ 2.090.519,35).
 const METRICAS: MetricasResumo = {
-  mrrTotal: 1139573,
-  mrrAtivo: 983497,
-  entregaPontual: 15497,
-  estoquePontualInicioMes: 550000, // ilustrativo — base do % de churn pontual
-  churnPontual: 5500,
-  churnPontualAjustado: 5500,
-  churnPontualPct: (5500 / 550000) * 100, // 1,00%
-  churnPontualAjustadoPct: (5500 / 550000) * 100, // 1,00%
-  mrrMesAnterior: 1197868,
-  churnTotal: 19279,
-  churnTotalPct: (19279 / 1197868) * 100, // 1,61%
-  churnAjustado: 16282,
-  churnAjustadoPct: (16282 / 1197868) * 100, // 1,36%
-  crossR: 0,
-  crossP: 6300,
-  crossPAmortizado: 1260,
-  crossTotal: 1260,
-  netChurn: 15022, // churnAjustado - crossTotal
-  netChurnPct: (15022 / 1197868) * 100, // 1,25%
-  // Campos de abono ilustrativos (a mensagem real de 02/07 ainda não trazia esta régua):
-  // abono suposto R$ 1.500 → bruto s/ abonos = churnTotal 19.279 − 1.500 = 17.779
-  churnBrutoSemAbono: 17779, // todos os motivos, exceto abonar_churn='Sim'
-  churnBrutoSemAbonoPct: (17779 / 1197868) * 100, // 1,48%
-  nrrBruto: 18019, // churnTotal - crossTotal (bruto = churn TOTAL, inclui abonados)
-  nrrBrutoPct: (18019 / 1197868) * 100, // 1,50%
+  mrrAdicionado: 42310,
+  pontualVendido: 118500,
+  carteiraTriagemOnboarding: 150789.28,
+  carteiraAtivo: 1069598,
+  carteiraEmCancelamento: 96805,
+  mrrAtivo: 1220387.28,
+  mrrOperando: 1317192.28,
+  entregaPontual: 169293.45,
+  mrrMesAnterior: 1137868,
+  estoquePontualInicioMes: 2090519.35,
+  churnTotal: 67030,
+  churnTotalPct: (67030 / 1137868) * 100, // 5,89%
+  churnAjustado: 43314,
+  churnAjustadoPct: (43314 / 1137868) * 100, // 3,81%
+  churnPontual: 171272,
+  churnPontualPct: (171272 / 2090519.35) * 100, // 8,19%
+  churnPontualAjustado: 91973,
+  churnPontualAjustadoPct: (91973 / 2090519.35) * 100, // 4,40%
+  crossR: 5997,
+  crossP: 10300,
+  crossTotal: 16297, // sem amortização
+  netChurn: 37317, // churnAjustado − crossR
+  netChurnPct: (37317 / 1137868) * 100, // 3,28%
+  netChurnBruto: 61033, // churnTotal − crossR
+  netChurnBrutoPct: (61033 / 1137868) * 100, // 5,36%
+  // Calculado mas não exibido na v3 (mantido para o payload de /preview)
+  churnBrutoSemAbono: 55000,
+  churnBrutoSemAbonoPct: (55000 / 1137868) * 100,
 };
 
-const MENSAGEM_ESPERADA = `Boa NOITE líderes!!!
-Atualizações sobre nossas métricas principais, dia *02/07, 19h*.
+const MENSAGEM_ESPERADA = `☀️ Boa tarde, líderes!
 
+Atualização das principais métricas
+18/07 • 13h
 
-MRR JULHO TOTAL: R$ 1.139.573,00
-MRR JULHO ATIVO: R$ 983.497,00
-Entrega Pontual JULHO: R$ 15.497,00
+━━━━━━━━━━━━━━━
 
-Churn Pontual JULHO: R$ 5.500,00 - *1,00%*
-Churn Pontual JULHO (sem erro de venda, não começou e inadimplente 1 mês): R$ 5.500,00 - *1,00%*
-(% sobre o estoque pontual em aberto no início do mês: R$ 550.000,00)
+💰 Receita (Julho)
 
-MRR JUNHO: R$ 1.197.868,00
+Novas Vendas
+📈 MRR Adicionado: R$ 42.310,00
+📦 Pontual Vendido: R$ 118.500,00
 
-Churn MRR TOTAL: R$ 19.279,00 - *1,61%*
-Churn MRR (sem erro de venda, não começou e inadimplente 1 mês): R$ 16.282,00 - *1,36%*
-Churn MRR sem abonos: R$ 17.779,00 - *1,48%*
-(abonado no mês: R$ 1.500,00)
+📌 Considera apenas vendas novas (sem Cross Sell e Upsell).
 
-Cross R: ZERO
-Cross P: R$ 6.300,00 / 5 = R$ 1.260,00
-Total: R$ 1.260,00
+Carteira MRR
+🟡 Triagem / Onboarding: R$ 150.789,28
+🟢 Ativo: R$ 1.069.598,00
+🟠 Em Cancelamento: R$ 96.805,00
 
-Net Churn = Churn Ajustado − Cross Total
-= R$ 16.282,00 − R$ 1.260,00 = *R$ 15.022,00*
-% = R$ 15.022,00 ÷ MRR JUNHO (R$ 1.197.868,00)
-= *1,25%*
+📌 MRR Ativo: R$ 1.220.387,28
+🚀 MRR Operando: R$ 1.317.192,28
 
-NRR Bruto = Churn Total − Cross Total
-= R$ 19.279,00 − R$ 1.260,00 = *R$ 18.019,00*
-% = R$ 18.019,00 ÷ MRR JUNHO (R$ 1.197.868,00)
-= *1,50%*
+📦 Entrega Pontual: R$ 169.293,45
 
+📌 MRR Base Junho: R$ 1.137.868,00
 
-estamos de 👀`;
+💡 Legenda
+• MRR Ativo: Triagem + Onboarding + Ativo.
+• MRR Operando: Todos os status, exceto Pausado e Cancelado.
+
+━━━━━━━━━━━━━━━
+
+📉 Churn
+
+💰 MRR
+🔴 Total: R$ 67.030,00 (5,89%)
+🟢 Ajustado: R$ 43.314,00 (3,81%)
+
+📦 Pontual
+🔴 Total: R$ 171.272,00 (8,19%)
+🟢 Ajustado: R$ 91.973,00 (4,40%)
+
+━━━━━━━━━━━━━━━
+
+🔄 Cross Sell
+
+💰 MRR: R$ 5.997,00
+📦 Pontual: R$ 10.300,00
+
+🏆 Total: R$ 16.297,00
+
+━━━━━━━━━━━━━━━
+
+🎯 Net Churn (MRR)
+
+🟢 Ajustado
+
+Churn Ajustado: R$ 43.314,00
+➖ Cross Sell: R$ 5.997,00
+🟰 R$ 37.317,00 (3,28%)
+
+🔴 Bruto
+
+Churn Total: R$ 67.030,00
+➖ Cross Sell: R$ 5.997,00
+🟰 R$ 61.033,00 (5,36%)
+
+━━━━━━━━━━━━━━━
+
+💡 Disclaimers
+
+• MRR Adicionado e Pontual Vendido consideram apenas vendas novas, sem Cross Sell e Upsell.
+• Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de até 1 mês.
+• O percentual do Churn Pontual é calculado sobre o estoque pontual em aberto no início do mês (R$ 2.090.519,35).
+• Net Churn = Churn − Cross Sell.
+• MRR Ativo = Triagem + Onboarding + Ativo.
+• MRR Operando = Todos os status, exceto Pausado e Cancelado.
+
+👀 Seguimos acompanhando diariamente os indicadores e atuando rapidamente sobre os principais desvios.`;
 
 describe("formatarMoedaBR", () => {
   it("formata inteiro com milhares e 2 casas", () => {
@@ -84,42 +133,51 @@ describe("formatarMoedaBR", () => {
 
 describe("formatarPercentBR", () => {
   it("2 casas exatas, sem arredondar para inteiro", () => {
-    expect(formatarPercentBR((19279 / 1197868) * 100)).toBe("1,61%");
-    expect(formatarPercentBR((16282 / 1197868) * 100)).toBe("1,36%");
-    expect(formatarPercentBR((15022 / 1197868) * 100)).toBe("1,25%");
+    expect(formatarPercentBR((67030 / 1137868) * 100)).toBe("5,89%");
+    expect(formatarPercentBR((37317 / 1137868) * 100)).toBe("3,28%");
+    expect(formatarPercentBR((171272 / 2090519.35) * 100)).toBe("8,19%");
   });
 });
 
 describe("formatarMensagemResumo", () => {
-  it("reproduz a mensagem modelo de 02/07 19h exatamente", () => {
+  it("reproduz o modelo v3 de 18/07 13h exatamente", () => {
     const msg = formatarMensagemResumo(METRICAS, {
-      dataFmt: "02/07",
-      horaFmt: "19h",
-      hora: 19,
+      dataFmt: "18/07",
+      horaFmt: "13h",
+      hora: 13,
       mes: 7,
     });
     expect(msg).toBe(MENSAGEM_ESPERADA);
   });
 
-  it("saudação dinâmica: manhã = Bom DIA, tarde = Boa TARDE", () => {
-    const manha = formatarMensagemResumo(METRICAS, { dataFmt: "03/07", horaFmt: "10h", hora: 10, mes: 7 });
-    expect(manha.startsWith("Bom DIA líderes!!!")).toBe(true);
-    const tarde = formatarMensagemResumo(METRICAS, { dataFmt: "03/07", horaFmt: "15h", hora: 15, mes: 7 });
-    expect(tarde.startsWith("Boa TARDE líderes!!!")).toBe(true);
+  it("saudação por faixa horária, com emoji", () => {
+    const manha = formatarMensagemResumo(METRICAS, { dataFmt: "18/07", horaFmt: "9h", hora: 9, mes: 7 });
+    expect(manha.startsWith("🌞 Bom dia, líderes!")).toBe(true);
+    const tarde = formatarMensagemResumo(METRICAS, { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 });
+    expect(tarde.startsWith("☀️ Boa tarde, líderes!")).toBe(true);
+    const noite = formatarMensagemResumo(METRICAS, { dataFmt: "18/07", horaFmt: "20h", hora: 20, mes: 7 });
+    expect(noite.startsWith("🌙 Boa noite, líderes!")).toBe(true);
   });
 
-  it("cross zerado dos dois lados vira ZERO sem fórmula", () => {
+  it("cross sell zerado sai formatado, não como ZERO", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossR: 0, crossP: 0, crossPAmortizado: 0, crossTotal: 0 },
-      { dataFmt: "03/07", horaFmt: "10h", hora: 10, mes: 7 },
+      { ...METRICAS, crossR: 0, crossP: 0, crossTotal: 0 },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
-    expect(msg).toContain("Cross R: ZERO\nCross P: ZERO\nTotal: R$ 0,00");
+    expect(msg).toContain("💰 MRR: R$ 0,00\n📦 Pontual: R$ 0,00");
+    expect(msg).not.toContain("ZERO");
   });
 
-  it("virada de ano: mês anterior de janeiro é DEZEMBRO", () => {
-    const msg = formatarMensagemResumo(METRICAS, { dataFmt: "05/01", horaFmt: "10h", hora: 10, mes: 1 });
-    expect(msg).toContain("MRR JANEIRO TOTAL:");
-    expect(msg).toContain("MRR DEZEMBRO: R$ 1.197.868,00");
+  it("não exibe a régua de abonos", () => {
+    const msg = formatarMensagemResumo(METRICAS, { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 });
+    expect(msg).not.toContain("sem abonos");
+    expect(msg).not.toContain("abonado no mês");
+  });
+
+  it("virada de ano: mês base de janeiro é Dezembro", () => {
+    const msg = formatarMensagemResumo(METRICAS, { dataFmt: "05/01", horaFmt: "9h", hora: 9, mes: 1 });
+    expect(msg).toContain("💰 Receita (Janeiro)");
+    expect(msg).toContain("📌 MRR Base Dezembro: R$ 1.137.868,00");
   });
 });
 

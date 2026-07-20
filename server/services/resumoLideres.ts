@@ -6,44 +6,55 @@
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import {
-  getMrrAtivo,
   getMrrInicioMes,
   getVendasMrrBreakdown,
+  getVendasNovasBreakdown,
 } from "../okr2026/metricsAdapter";
 import { enviarMensagemWhatsApp } from "./turbozap";
 
 export interface MetricasResumo {
-  mrrTotal: number; // ativo + onboarding + triagem (live)
-  mrrAtivo: number; // só status 'ativo' (live)
+  // Novas vendas (Bitrix, aquisição pura — sem cross sell e sem upsell)
+  mrrAdicionado: number;
+  pontualVendido: number;
+  // Carteira MRR (cup_contratos ao vivo)
+  carteiraTriagemOnboarding: number; // status 'triagem' + 'onboarding'
+  carteiraAtivo: number; // status 'ativo'
+  carteiraEmCancelamento: number; // status 'em cancelamento'
+  mrrAtivo: number; // triagem + onboarding + ativo
+  mrrOperando: number; // mrrAtivo + em cancelamento
   entregaPontual: number; // valorp dos contratos que viraram 'entregue' no mês
-  estoquePontualInicioMes: number; // valorp em aberto no 1º snapshot do mês (fechamento do mês anterior) = base do % de churn pontual
-  churnPontual: number; // valorp dos contratos pontuais com pedido de churn no mês
-  churnPontualAjustado: number; // idem, sem os motivos operacionais
-  churnPontualPct: number; // 0-100 — churn pontual ÷ estoque pontual início do mês
-  churnPontualAjustadoPct: number; // 0-100 — churn pontual ajustado ÷ estoque pontual início do mês
-  mrrMesAnterior: number; // snapshot do 1º do mês = fechamento do mês anterior (base dos % de MRR)
+  // Bases dos percentuais
+  mrrMesAnterior: number; // 1º snapshot do mês = fechamento do mês anterior
+  estoquePontualInicioMes: number; // valorp em aberto no 1º snapshot do mês
+  // Churn
   churnTotal: number; // valor_r bruto de cup_churn no mês
   churnTotalPct: number; // 0-100
   churnAjustado: number; // sem os motivos operacionais
   churnAjustadoPct: number; // 0-100
+  churnPontual: number; // valorp dos contratos pontuais com pedido de churn no mês
+  churnPontualPct: number; // 0-100
+  churnPontualAjustado: number; // idem, sem os motivos operacionais
+  churnPontualAjustadoPct: number; // 0-100
+  // Cross sell (valores cheios — sem amortização desde a v3)
   crossR: number;
   crossP: number;
-  crossPAmortizado: number; // crossP / 5
-  crossTotal: number; // crossR + crossPAmortizado
-  netChurn: number; // churnAjustado - crossTotal
+  crossTotal: number; // crossR + crossP
+  // Net churn (subtrai apenas o cross sell de MRR)
+  netChurn: number; // churnAjustado - crossR
   netChurnPct: number; // 0-100
-  churnBrutoSemAbono: number; // valor_r do mês, todos os motivos, exceto abonar_churn='Sim'
-  churnBrutoSemAbonoPct: number; // 0-100
-  nrrBruto: number; // churnTotal - crossTotal (bruto = churn TOTAL da empresa, inclui abonados)
-  nrrBrutoPct: number; // 0-100
+  netChurnBruto: number; // churnTotal - crossR
+  netChurnBrutoPct: number; // 0-100
+  // Calculado e exposto em /preview, mas não exibido no texto v3
+  churnBrutoSemAbono: number;
+  churnBrutoSemAbonoPct: number;
 }
 
 // Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real)
 const MOTIVOS_EXCLUIDOS = sql`('Erro na Venda', 'Não começou', 'Inadimplente 1º Mês')`;
 
 const MESES = [
-  "JANEIRO", "FEVEREIRO", "MARÇO", "ABRIL", "MAIO", "JUNHO",
-  "JULHO", "AGOSTO", "SETEMBRO", "OUTUBRO", "NOVEMBRO", "DEZEMBRO",
+  "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
+  "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro",
 ];
 
 export function formatarMoedaBR(valor: number): string {
@@ -60,9 +71,9 @@ export function formatarPercentBR(valor: number): string {
 }
 
 function saudacao(hora: number): string {
-  if (hora < 12) return "Bom DIA";
-  if (hora < 18) return "Boa TARDE";
-  return "Boa NOITE";
+  if (hora < 12) return "🌞 Bom dia";
+  if (hora < 18) return "☀️ Boa tarde";
+  return "🌙 Boa noite";
 }
 
 export function formatarMensagemResumo(
@@ -71,49 +82,87 @@ export function formatarMensagemResumo(
 ): string {
   const mes = MESES[agora.mes - 1];
   const mesAnterior = MESES[(agora.mes + 10) % 12];
-  const crossRTexto = m.crossR > 0 ? formatarMoedaBR(m.crossR) : "ZERO";
-  const crossPTexto =
-    m.crossP > 0
-      ? `${formatarMoedaBR(m.crossP)} / 5 = ${formatarMoedaBR(m.crossPAmortizado)}`
-      : "ZERO";
-  // Valor abonado no mês = churn total − churn sem abonos (deriva dos dois campos)
-  const churnAbonado = m.churnTotal - m.churnBrutoSemAbono;
 
-  return `${saudacao(agora.hora)} líderes!!!
-Atualizações sobre nossas métricas principais, dia *${agora.dataFmt}, ${agora.horaFmt}*.
+  return `${saudacao(agora.hora)}, líderes!
 
+Atualização das principais métricas
+${agora.dataFmt} • ${agora.horaFmt}
 
-MRR ${mes} TOTAL: ${formatarMoedaBR(m.mrrTotal)}
-MRR ${mes} ATIVO: ${formatarMoedaBR(m.mrrAtivo)}
-Entrega Pontual ${mes}: ${formatarMoedaBR(m.entregaPontual)}
+━━━━━━━━━━━━━━━
 
-Churn Pontual ${mes}: ${formatarMoedaBR(m.churnPontual)} - *${formatarPercentBR(m.churnPontualPct)}*
-Churn Pontual ${mes} (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnPontualAjustado)} - *${formatarPercentBR(m.churnPontualAjustadoPct)}*
-(% sobre o estoque pontual em aberto no início do mês: ${formatarMoedaBR(m.estoquePontualInicioMes)})
+💰 Receita (${mes})
 
-MRR ${mesAnterior}: ${formatarMoedaBR(m.mrrMesAnterior)}
+Novas Vendas
+📈 MRR Adicionado: ${formatarMoedaBR(m.mrrAdicionado)}
+📦 Pontual Vendido: ${formatarMoedaBR(m.pontualVendido)}
 
-Churn MRR TOTAL: ${formatarMoedaBR(m.churnTotal)} - *${formatarPercentBR(m.churnTotalPct)}*
-Churn MRR (sem erro de venda, não começou e inadimplente 1 mês): ${formatarMoedaBR(m.churnAjustado)} - *${formatarPercentBR(m.churnAjustadoPct)}*
-Churn MRR sem abonos: ${formatarMoedaBR(m.churnBrutoSemAbono)} - *${formatarPercentBR(m.churnBrutoSemAbonoPct)}*
-(abonado no mês: ${formatarMoedaBR(churnAbonado)})
+📌 Considera apenas vendas novas (sem Cross Sell e Upsell).
 
-Cross R: ${crossRTexto}
-Cross P: ${crossPTexto}
-Total: ${formatarMoedaBR(m.crossTotal)}
+Carteira MRR
+🟡 Triagem / Onboarding: ${formatarMoedaBR(m.carteiraTriagemOnboarding)}
+🟢 Ativo: ${formatarMoedaBR(m.carteiraAtivo)}
+🟠 Em Cancelamento: ${formatarMoedaBR(m.carteiraEmCancelamento)}
 
-Net Churn = Churn Ajustado − Cross Total
-= ${formatarMoedaBR(m.churnAjustado)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.netChurn)}*
-% = ${formatarMoedaBR(m.netChurn)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
-= *${formatarPercentBR(m.netChurnPct)}*
+📌 MRR Ativo: ${formatarMoedaBR(m.mrrAtivo)}
+🚀 MRR Operando: ${formatarMoedaBR(m.mrrOperando)}
 
-NRR Bruto = Churn Total − Cross Total
-= ${formatarMoedaBR(m.churnTotal)} − ${formatarMoedaBR(m.crossTotal)} = *${formatarMoedaBR(m.nrrBruto)}*
-% = ${formatarMoedaBR(m.nrrBruto)} ÷ MRR ${mesAnterior} (${formatarMoedaBR(m.mrrMesAnterior)})
-= *${formatarPercentBR(m.nrrBrutoPct)}*
+📦 Entrega Pontual: ${formatarMoedaBR(m.entregaPontual)}
 
+📌 MRR Base ${mesAnterior}: ${formatarMoedaBR(m.mrrMesAnterior)}
 
-estamos de 👀`;
+💡 Legenda
+• MRR Ativo: Triagem + Onboarding + Ativo.
+• MRR Operando: Todos os status, exceto Pausado e Cancelado.
+
+━━━━━━━━━━━━━━━
+
+📉 Churn
+
+💰 MRR
+🔴 Total: ${formatarMoedaBR(m.churnTotal)} (${formatarPercentBR(m.churnTotalPct)})
+🟢 Ajustado: ${formatarMoedaBR(m.churnAjustado)} (${formatarPercentBR(m.churnAjustadoPct)})
+
+📦 Pontual
+🔴 Total: ${formatarMoedaBR(m.churnPontual)} (${formatarPercentBR(m.churnPontualPct)})
+🟢 Ajustado: ${formatarMoedaBR(m.churnPontualAjustado)} (${formatarPercentBR(m.churnPontualAjustadoPct)})
+
+━━━━━━━━━━━━━━━
+
+🔄 Cross Sell
+
+💰 MRR: ${formatarMoedaBR(m.crossR)}
+📦 Pontual: ${formatarMoedaBR(m.crossP)}
+
+🏆 Total: ${formatarMoedaBR(m.crossTotal)}
+
+━━━━━━━━━━━━━━━
+
+🎯 Net Churn (MRR)
+
+🟢 Ajustado
+
+Churn Ajustado: ${formatarMoedaBR(m.churnAjustado)}
+➖ Cross Sell: ${formatarMoedaBR(m.crossR)}
+🟰 ${formatarMoedaBR(m.netChurn)} (${formatarPercentBR(m.netChurnPct)})
+
+🔴 Bruto
+
+Churn Total: ${formatarMoedaBR(m.churnTotal)}
+➖ Cross Sell: ${formatarMoedaBR(m.crossR)}
+🟰 ${formatarMoedaBR(m.netChurnBruto)} (${formatarPercentBR(m.netChurnBrutoPct)})
+
+━━━━━━━━━━━━━━━
+
+💡 Disclaimers
+
+• MRR Adicionado e Pontual Vendido consideram apenas vendas novas, sem Cross Sell e Upsell.
+• Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de até 1 mês.
+• O percentual do Churn Pontual é calculado sobre o estoque pontual em aberto no início do mês (${formatarMoedaBR(m.estoquePontualInicioMes)}).
+• Net Churn = Churn − Cross Sell.
+• MRR Ativo = Triagem + Onboarding + Ativo.
+• MRR Operando = Todos os status, exceto Pausado e Cancelado.
+
+👀 Seguimos acompanhando diariamente os indicadores e atuando rapidamente sobre os principais desvios.`;
 }
 
 export function agoraSaoPaulo(date: Date = new Date()): {
@@ -154,15 +203,6 @@ export function agoraSaoPaulo(date: Date = new Date()): {
 // ============================================
 // Cálculo das métricas (mês corrente em America/Sao_Paulo)
 // ============================================
-
-async function getMrrSoAtivo(): Promise<number> {
-  const result = await db.execute(sql`
-    SELECT COALESCE(SUM(valorr), 0) AS mrr
-    FROM "Clickup".cup_contratos
-    WHERE status = 'ativo'
-  `);
-  return parseFloat((result.rows[0] as any)?.mrr || "0");
-}
 
 interface CarteiraMrr {
   ativo: number;              // status 'ativo'
@@ -284,11 +324,11 @@ async function getEstoquePontualInicioMes(): Promise<number> {
 }
 
 export async function calcularMetricasResumo(): Promise<MetricasResumo> {
-  const [mrrTotal, mrrAtivo, mrrMesAnterior, breakdown, churn, churnPontual, entregaPontual, estoquePontualInicioMes] =
+  const [carteira, mrrMesAnterior, vendasNovas, breakdown, churn, churnPontual, entregaPontual, estoquePontualInicioMes] =
     await Promise.all([
-      getMrrAtivo(), // ativo+onboarding+triagem (metricsAdapter)
-      getMrrSoAtivo(),
+      getCarteiraMrr(),
       getMrrInicioMes(),
+      getVendasNovasBreakdown(),
       getVendasMrrBreakdown(),
       getChurnMes(),
       getChurnPontualMes(),
@@ -296,47 +336,48 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
       getEstoquePontualInicioMes(),
     ]);
 
-  // metricsAdapter engole erros retornando 0 — nunca enviar mensagem com métricas parciais
-  if (mrrTotal <= 0 || mrrMesAnterior <= 0) {
+  // O metricsAdapter engole erros retornando 0; sem base de MRR a mensagem seria
+  // enganosa, então abortamos. As métricas de venda podem ser legitimamente zero.
+  if (carteira.mrrAtivo <= 0 || mrrMesAnterior <= 0) {
     throw new Error(
-      `Métricas base inválidas (mrrTotal=${mrrTotal}, mrrMesAnterior=${mrrMesAnterior}) — envio abortado`,
+      `Métricas de MRR inválidas (mrrAtivo=${carteira.mrrAtivo}, mrrMesAnterior=${mrrMesAnterior}) — envio abortado`,
     );
   }
 
   const crossR = breakdown.crosssell;
   const crossP = breakdown.crosssell_pontual;
-  const crossPAmortizado = crossP / 5;
-  const crossTotal = crossR + crossPAmortizado;
-  const netChurn = churn.ajustado - crossTotal;
-  // NRR Bruto = churn TOTAL da empresa (inclui abonados) − cross. "Bruto" = sem
-  // nenhum recorte; a linha "sem abonos" acima segue só informativa (não alimenta o NRR).
-  const nrrBruto = churn.total - crossTotal;
+  const crossTotal = crossR + crossP;
+  const netChurn = churn.ajustado - crossR;
+  const netChurnBruto = churn.total - crossR;
 
   return {
-    mrrTotal,
-    mrrAtivo,
+    mrrAdicionado: vendasNovas.mrr,
+    pontualVendido: vendasNovas.pontual,
+    carteiraTriagemOnboarding: carteira.triagemOnboarding,
+    carteiraAtivo: carteira.ativo,
+    carteiraEmCancelamento: carteira.emCancelamento,
+    mrrAtivo: carteira.mrrAtivo,
+    mrrOperando: carteira.mrrOperando,
     entregaPontual,
-    estoquePontualInicioMes,
-    churnPontual: churnPontual.total,
-    churnPontualAjustado: churnPontual.ajustado,
-    churnPontualPct: estoquePontualInicioMes > 0 ? (churnPontual.total / estoquePontualInicioMes) * 100 : 0,
-    churnPontualAjustadoPct:
-      estoquePontualInicioMes > 0 ? (churnPontual.ajustado / estoquePontualInicioMes) * 100 : 0,
     mrrMesAnterior,
+    estoquePontualInicioMes,
     churnTotal: churn.total,
     churnTotalPct: (churn.total / mrrMesAnterior) * 100,
     churnAjustado: churn.ajustado,
     churnAjustadoPct: (churn.ajustado / mrrMesAnterior) * 100,
+    churnPontual: churnPontual.total,
+    churnPontualPct: estoquePontualInicioMes > 0 ? (churnPontual.total / estoquePontualInicioMes) * 100 : 0,
+    churnPontualAjustado: churnPontual.ajustado,
+    churnPontualAjustadoPct: estoquePontualInicioMes > 0 ? (churnPontual.ajustado / estoquePontualInicioMes) * 100 : 0,
     crossR,
     crossP,
-    crossPAmortizado,
     crossTotal,
     netChurn,
     netChurnPct: (netChurn / mrrMesAnterior) * 100,
+    netChurnBruto,
+    netChurnBrutoPct: (netChurnBruto / mrrMesAnterior) * 100,
     churnBrutoSemAbono: churn.brutoSemAbono,
     churnBrutoSemAbonoPct: (churn.brutoSemAbono / mrrMesAnterior) * 100,
-    nrrBruto,
-    nrrBrutoPct: (nrrBruto / mrrMesAnterior) * 100,
   };
 }
 
