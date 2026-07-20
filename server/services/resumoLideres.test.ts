@@ -40,6 +40,7 @@ const METRICAS: MetricasResumo = {
   // Calculado mas não exibido na v3 (mantido para o payload de /preview)
   churnBrutoSemAbono: 55000,
   churnBrutoSemAbonoPct: (55000 / 1137868) * 100,
+  crossIndisponivel: false,
 };
 
 const MENSAGEM_ESPERADA = `☀️ Boa tarde, líderes!
@@ -71,7 +72,7 @@ Carteira MRR
 
 💡 Legenda
 • MRR Ativo: Triagem + Onboarding + Ativo.
-• MRR Operando: Todos os status, exceto Pausado e Cancelado.
+• MRR Operando: Triagem + Onboarding + Ativo + Em Cancelamento.
 
 ━━━━━━━━━━━━━━━
 
@@ -117,9 +118,9 @@ Churn Total: R$ 67.030,00
 • MRR Adicionado e Pontual Vendido consideram apenas vendas novas, sem Cross Sell e Upsell.
 • Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de até 1 mês.
 • O percentual do Churn Pontual é calculado sobre o estoque pontual em aberto no início do mês (R$ 2.090.519,35).
-• Net Churn = Churn − Cross Sell.
+• Net Churn = Churn − Cross Sell de MRR.
 • MRR Ativo = Triagem + Onboarding + Ativo.
-• MRR Operando = Todos os status, exceto Pausado e Cancelado.
+• MRR Operando = Triagem + Onboarding + Ativo + Em Cancelamento.
 
 👀 Seguimos acompanhando diariamente os indicadores e atuando rapidamente sobre os principais desvios.`;
 
@@ -179,6 +180,25 @@ describe("formatarMensagemResumo", () => {
     const msg = formatarMensagemResumo(METRICAS, { dataFmt: "05/01", horaFmt: "9h", hora: 9, mes: 1 });
     expect(msg).toContain("💰 Receita (Janeiro)");
     expect(msg).toContain("📌 MRR Base Dezembro: R$ 1.137.868,00");
+  });
+
+  it("crossIndisponivel true: mensagem traz o aviso, antes da linha 👀", () => {
+    const msg = formatarMensagemResumo(
+      { ...METRICAS, crossIndisponivel: true },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
+    );
+    const aviso = "⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.";
+    expect(msg).toContain(aviso);
+    expect(msg.indexOf(aviso)).toBeLessThan(msg.indexOf("👀 Seguimos"));
+  });
+
+  it("crossIndisponivel false: mensagem não menciona indisponibilidade", () => {
+    const msg = formatarMensagemResumo(
+      { ...METRICAS, crossIndisponivel: false },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
+    );
+    expect(msg).not.toContain("indisponível");
+    expect(msg).not.toContain("⚠️");
   });
 });
 
@@ -267,6 +287,17 @@ describe("derivarMetricas", () => {
     expect(r.churnPontualAjustadoPct).toBe(0);
     expect(Number.isNaN(r.churnPontualPct)).toBe(false);
     expect(Number.isNaN(r.churnPontualAjustadoPct)).toBe(false);
+  });
+
+  it("breakdown com erro:true produz crossIndisponivel:true; sem o campo produz false", () => {
+    const comErro = derivarMetricas({
+      ...ENTRADA_BASE,
+      breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
+    });
+    expect(comErro.crossIndisponivel).toBe(true);
+
+    const semErro = derivarMetricas(ENTRADA_BASE);
+    expect(semErro.crossIndisponivel).toBe(false);
   });
 });
 

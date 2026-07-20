@@ -711,6 +711,7 @@ export interface VendasMrrBreakdown {
   novo: number;
   crosssell: number;
   crosssell_pontual: number;
+  erro?: boolean;
 }
 
 function buildVendasMrrQuery(startDate?: string, endDate?: string) {
@@ -766,7 +767,7 @@ export async function getVendasMrrBreakdown(startDate?: string, endDate?: string
     };
   } catch (error) {
     console.error("[OKR] Error fetching Vendas MRR Breakdown:", error);
-    return { total: 0, novo: 0, crosssell: 0, crosssell_pontual: 0 };
+    return { total: 0, novo: 0, crosssell: 0, crosssell_pontual: 0, erro: true };
   }
 }
 

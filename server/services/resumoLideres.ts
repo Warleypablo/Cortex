@@ -50,6 +50,9 @@ export interface MetricasResumo {
   // Calculado e exposto em /preview, mas não exibido no texto v3
   churnBrutoSemAbono: number;
   churnBrutoSemAbonoPct: number;
+  // true quando getVendasMrrBreakdown falhou e devolveu zeros no catch — o
+  // Cross Sell (e portanto o Net Churn) fica subestimado/inflado sem aviso.
+  crossIndisponivel: boolean;
 }
 
 // Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real)
@@ -115,7 +118,7 @@ Carteira MRR
 
 💡 Legenda
 • MRR Ativo: Triagem + Onboarding + Ativo.
-• MRR Operando: Todos os status, exceto Pausado e Cancelado.
+• MRR Operando: Triagem + Onboarding + Ativo + Em Cancelamento.
 
 ━━━━━━━━━━━━━━━
 
@@ -161,11 +164,11 @@ Churn Total: ${formatarMoedaBR(m.churnTotal)}
 • MRR Adicionado e Pontual Vendido consideram apenas vendas novas, sem Cross Sell e Upsell.
 • Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de até 1 mês.
 • O percentual do Churn Pontual é calculado sobre o estoque pontual em aberto no início do mês (${formatarMoedaBR(m.estoquePontualInicioMes)}).
-• Net Churn = Churn − Cross Sell.
+• Net Churn = Churn − Cross Sell de MRR.
 • MRR Ativo = Triagem + Onboarding + Ativo.
-• MRR Operando = Todos os status, exceto Pausado e Cancelado.
+• MRR Operando = Triagem + Onboarding + Ativo + Em Cancelamento.
 
-👀 Seguimos acompanhando diariamente os indicadores e atuando rapidamente sobre os principais desvios.`;
+${m.crossIndisponivel ? "⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.\n\n" : ""}👀 Seguimos acompanhando diariamente os indicadores e atuando rapidamente sobre os principais desvios.`;
 }
 
 export function agoraSaoPaulo(date: Date = new Date()): {
@@ -338,7 +341,7 @@ export function derivarMetricas(entrada: {
   estoquePontualInicioMes: number;
   entregaPontual: number;
   vendasNovas: { mrr: number; pontual: number };
-  breakdown: { crosssell: number; crosssell_pontual: number };
+  breakdown: { crosssell: number; crosssell_pontual: number; erro?: boolean };
   churn: { total: number; ajustado: number; brutoSemAbono: number };
   churnPontual: { total: number; ajustado: number };
 }): MetricasResumo {
@@ -379,6 +382,7 @@ export function derivarMetricas(entrada: {
     netChurnBrutoPct: (netChurnBruto / mrrMesAnterior) * 100,
     churnBrutoSemAbono: churn.brutoSemAbono,
     churnBrutoSemAbonoPct: (churn.brutoSemAbono / mrrMesAnterior) * 100,
+    crossIndisponivel: breakdown.erro === true,
   };
 }
 
