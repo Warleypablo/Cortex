@@ -14,6 +14,7 @@ type FilterAbono = "todos" | "abonados" | "nao_abonados";
 interface MesSerie {
   mes: string; // "YYYY-MM"
   total: number;
+  pontual: number;
   logos: number;
   porMotivo: Record<string, number>;
 }
@@ -24,6 +25,8 @@ interface HistoricoResponse {
   ano: number;
   filterAbono: FilterAbono;
   mrrBasePorMes: Record<string, number>; // "YYYY-MM" -> MRR ativo real do mês
+  /** Falso quando a cobertura do dado pontual no ano é baixa demais (< 10% das linhas). */
+  pontualDisponivel?: boolean;
 }
 
 // Paleta por motivo (ordem = volume desc). "Outros"/"Não especificado" ficam cinza.
@@ -83,6 +86,7 @@ export function ChurnHistoricoMensal({
         mes: mesKey,
         mesLabel: isMesCorrente ? `${MESES_PT[m - 1]}*` : MESES_PT[m - 1],
         total: serie ? Math.round(serie.total) : 0,
+        pontual: serie ? Math.round(serie.pontual ?? 0) : 0,
         meta: Math.round(mrrBaseMes * metaPct),
         mrrBase: mrrBaseMes,
         isMesCorrente,
@@ -99,6 +103,9 @@ export function ChurnHistoricoMensal({
   const gridColor = isDark ? "#3f3f46" : "#e5e7eb";
   const acimaMetaColor = isDark ? "#f87171" : "#dc2626";
   const dentroMetaColor = isDark ? "#34d399" : "#059669";
+  // Âmbar: mesma família da coluna "Pontual" do drawer (DrawerContratosTable),
+  // para associar visualmente as duas telas.
+  const pontualColor = isDark ? "#fbbf24" : "#d97706";
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
@@ -108,6 +115,7 @@ export function ChurnHistoricoMensal({
     const mrrBase = Number(row?.mrrBase ?? 0);
     const isMesCorrente = Boolean(row?.isMesCorrente);
     const pctTotal = pctDaBase(total, mrrBase);
+    const pontual = Number(row?.pontual ?? 0);
     const itens = motivos
       .map((motivo, i) => ({ motivo, valor: Number(row?.[motivo] ?? 0), cor: corDoMotivo(motivo, i) }))
       .filter((x) => x.valor > 0)
@@ -135,6 +143,14 @@ export function ChurnHistoricoMensal({
                 {pctTotal !== null && ` · +${((pctTotal - metaPct) * 100).toFixed(1).replace(".", ",")}pp`})
               </span>
             )}
+          </p>
+        )}
+        {pontual > 0 && (
+          <p className="text-muted-foreground">
+            Pontual:{" "}
+            <span className="font-semibold" style={{ color: pontualColor }}>
+              {formatCurrencyNoDecimals(pontual)}
+            </span>
           </p>
         )}
         <div className="pt-1 border-t border-border/50 space-y-0.5">
@@ -172,6 +188,7 @@ export function ChurnHistoricoMensal({
             {filterAbono === "nao_abonados" && " · sem abonados"}
             {filterAbono === "abonados" && " · só abonados"}
             {" · * mês em curso"}
+            {data && !data.pontualDisponivel && " · sem dado de churn pontual neste ano"}
           </p>
         </div>
       </div>
@@ -255,10 +272,18 @@ export function ChurnHistoricoMensal({
                 )}
               </Bar>
             ))}
+            {data?.pontualDisponivel && (
+              <Bar
+                dataKey="pontual"
+                name="Pontual"
+                fill={pontualColor}
+                radius={[3, 3, 0, 0]}
+              />
+            )}
             <Line
               type="monotone"
               dataKey="meta"
-              name={`Meta ${formatPct(metaPct)}`}
+              name={`Meta ${formatPct(metaPct)} (MRR)`}
               stroke="#ef4444"
               strokeWidth={2}
               strokeDasharray="5 4"
