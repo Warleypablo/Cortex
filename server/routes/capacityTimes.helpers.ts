@@ -85,6 +85,22 @@ export function toComercialRow(raw: any): ComercialRow {
   };
 }
 
+// Preenche a Cap. FAT de quem não tem meta cadastrada em cap_mrr:
+//   Cap. FAT = ticket médio da equipe (FAT total ÷ clientes da equipe) × Cap. Clientes.
+// Quem TEM cap_mrr configurada na aba Configurar mantém o valor manual — ele vence.
+export function finalizeComercial(rows: ComercialRow[]): void {
+  const totFat = rows.reduce((s, r) => s + r.mrr_atual, 0);
+  const totClientes = rows.reduce((s, r) => s + r.clientes, 0);
+  if (totClientes === 0) return;
+  const ticketEquipe = totFat / totClientes;
+  for (const r of rows) {
+    if (r.cap_mrr !== null || r.cap_clientes === null) continue;
+    r.cap_mrr = Math.round(ticketEquipe * r.cap_clientes);
+    r.dif_mrr = diff(r.cap_mrr, r.mrr_atual);
+    r.util_mrr_pct = utilPct(r.mrr_atual, r.cap_mrr);
+  }
+}
+
 // ── Selva (designers): carteira via responsavel da subtask, régua por faturamento ──
 
 export interface SelvaRow {
@@ -201,13 +217,19 @@ export function toCsRow(raw: any): CsRow {
   };
 }
 
-// Preenche cap_fat/util por squad: Cap. FAT = ticket médio da equipe × capacity de contratos.
+// Cap. FAT por squad, mesma fórmula das demais abas:
+//   ticket médio da equipe (FAT total ÷ clientes da equipe) × Cap. Clientes da pessoa.
+// Sem cap_clientes, cai na régua antiga (ticket por contrato × capacity de contratos).
 export function finalizeSquad(group: SquadGroup): void {
-  const totMrr = group.rows.reduce((s, r) => s + r.mrr_operando, 0);
+  const totFat = group.rows.reduce((s, r) => s + r.mrr_operando, 0);
+  const totClientes = group.rows.reduce((s, r) => s + r.clientes, 0);
   const totRec = group.rows.reduce((s, r) => s + r.op_recorrente, 0);
-  const ticketMedio = totRec > 0 ? totMrr / totRec : 0;
+  const ticketCliente = totClientes > 0 ? totFat / totClientes : 0;
+  const ticketContrato = totRec > 0 ? totFat / totRec : 0;
   for (const r of group.rows) {
-    r.cap_fat = r.cap_contratos !== null ? Math.round(ticketMedio * r.cap_contratos) : null;
+    r.cap_fat = r.cap_clientes !== null
+      ? Math.round(ticketCliente * r.cap_clientes)
+      : r.cap_contratos !== null ? Math.round(ticketContrato * r.cap_contratos) : null;
     r.util_fat_pct = utilPct(r.mrr_operando, r.cap_fat);
   }
 }

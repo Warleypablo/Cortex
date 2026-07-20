@@ -54,3 +54,7 @@ export const CAP_CONTAS_ACCOUNT = 25;
 // porque só 8 dos 14 GPs têm registro em capacity_metas — assim todos entram com meta,
 // inclusive GPs novos. Override por pessoa continua valendo pela aba Configurar.
 export const CAP_CLIENTES_SQUADRA = 25;
+
+// Capacity de clientes por operador no squad Pulse. Mesmo racional da Squadra:
+// nenhum registro do Pulse tem cap_clientes preenchido, então o default cobre todos.
+export const CAP_CLIENTES_PULSE = 20;

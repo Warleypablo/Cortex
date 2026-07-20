@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { utilPct, diff, num, numOrNull, toCsRow, toComercialRow, toSelvaRow } from "./capacityTimes.helpers";
+import { utilPct, diff, num, numOrNull, finalizeComercial, toCsRow, toComercialRow, toSelvaRow } from "./capacityTimes.helpers";
 
 describe("utilPct", () => {
   it("calcula % com 1 casa decimal", () => {
@@ -168,5 +168,49 @@ describe("faturamento R+P e detalhe de clientes", () => {
     const selva = toSelvaRow({ nome: "Caio", contas_total: "9", mrr_operando: "18000", pontual_operando: "2000",
       clientes_total: "6", clientes_rec: "4", clientes_pont: "3", cap_clientes: "8" }, 12);
     expect([selva.clientes, selva.clientes_rec, selva.clientes_pont]).toEqual([6, 4, 3]);
+  });
+});
+
+describe("finalizeComercial — Cap. FAT derivada", () => {
+  const linha = (over: any) => toComercialRow({
+    nome: "X", mrr_operando: "10000", pontual_operando: "0",
+    clientes_total: "10", clientes_rec: "10", clientes_pont: "0",
+    contas_total: "10", contas_rec: "10", contas_pont: "0", ...over,
+  });
+
+  it("deriva Cap. FAT = ticket da equipe (fat/clientes) × cap_clientes", () => {
+    // equipe: 30.000 de faturamento em 20 clientes -> ticket 1.500
+    const rows = [
+      linha({ nome: "A", mrr_operando: "20000", clientes_total: "10", cap_clientes: 25 }),
+      linha({ nome: "B", mrr_operando: "10000", clientes_total: "10", cap_clientes: 25 }),
+    ];
+    finalizeComercial(rows);
+    expect(rows[0].cap_mrr).toBe(37500); // 1.500 × 25
+    expect(rows[1].cap_mrr).toBe(37500);
+    expect(rows[0].util_mrr_pct).toBe(53.3); // 20.000 / 37.500
+    expect(rows[0].dif_mrr).toBe(17500);
+  });
+
+  it("não sobrescreve Cap. FAT configurada manualmente", () => {
+    const rows = [
+      linha({ nome: "Manual", cap_mrr: "80000", cap_clientes: 25 }),
+      linha({ nome: "Derivada", cap_clientes: 25 }),
+    ];
+    finalizeComercial(rows);
+    expect(rows[0].cap_mrr).toBe(80000); // intacta
+    expect(rows[1].cap_mrr).not.toBeNull(); // derivada
+  });
+
+  it("sem cap_clientes não deriva nada (fica '—' na tela)", () => {
+    const rows = [linha({ cap_clientes: null })];
+    finalizeComercial(rows);
+    expect(rows[0].cap_mrr).toBeNull();
+    expect(rows[0].util_mrr_pct).toBeNull();
+  });
+
+  it("equipe sem clientes não divide por zero", () => {
+    const rows = [linha({ clientes_total: "0", cap_clientes: 25 })];
+    finalizeComercial(rows);
+    expect(rows[0].cap_mrr).toBeNull();
   });
 });

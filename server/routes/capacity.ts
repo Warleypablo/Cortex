@@ -1,8 +1,8 @@
 import type { Express } from "express";
 import { sql } from "drizzle-orm";
 import { z } from "zod";
-import { toComercialRow, toSelvaRow, toCsRow, finalizeSquad, type CapacityTimesResponse, type SquadGroup } from "./capacityTimes.helpers";
-import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS, CAP_CONTAS_ACCOUNT, CAP_CLIENTES_SQUADRA } from "../../shared/capacityGrupos";
+import { toComercialRow, toSelvaRow, toCsRow, finalizeSquad, finalizeComercial, type CapacityTimesResponse, type SquadGroup } from "./capacityTimes.helpers";
+import { META_CONTAS_DESIGNER, BLACK_ACCOUNTS, CAP_CONTAS_ACCOUNT, CAP_CLIENTES_SQUADRA, CAP_CLIENTES_PULSE } from "../../shared/capacityGrupos";
 
 // Tabela de referência: nível do Gestor de Performance → metas
 const GESTOR_LEVELS: Record<string, { mrr_alvo: number; ticket_alvo: number }> = {
@@ -370,7 +370,10 @@ export function registerCapacityRoutes(app: Express, db: any) {
       const squadsResult = await db.execute(sql`
         WITH m AS (
           SELECT nome, categoria, match_responsavel,
-                 COALESCE(cap_contas, cap_recorrente) AS cap_contratos, cap_clientes, ordem
+                 COALESCE(cap_contas, cap_recorrente) AS cap_contratos,
+                 -- Pulse tem meta padrão de clientes; override por pessoa continua valendo.
+                 COALESCE(cap_clientes, CASE WHEN categoria = 'Pulse' THEN ${CAP_CLIENTES_PULSE}::int END) AS cap_clientes,
+                 ordem
           FROM cortex_core.capacity_metas
           WHERE ativo = TRUE
             AND categoria NOT IN ('vendedor','account','gestor','Black','CXCS','Squadra','Selva')
@@ -409,11 +412,16 @@ export function registerCapacityRoutes(app: Express, db: any) {
       squads.forEach(finalizeSquad);
 
       const rows = result.rows as any[];
+      // Cap. FAT de quem não tem meta cadastrada = ticket médio da equipe × Cap. Clientes.
+      const comBlack = (blackResult.rows as any[]).map(toComercialRow);
+      const comSquadra = rows.filter((r) => r.grupo === "squadra").map(toComercialRow);
+      const comCxcs = (cxcsResult.rows as any[]).map(toComercialRow);
+      [comBlack, comSquadra, comCxcs].forEach(finalizeComercial);
       const response: CapacityTimesResponse = {
         selva: rows.filter((r) => r.grupo === "selva").map((r) => toSelvaRow(r, META_CONTAS_DESIGNER)),
-        black: (blackResult.rows as any[]).map(toComercialRow),
-        squadra: rows.filter((r) => r.grupo === "squadra").map(toComercialRow),
-        cxcs: (cxcsResult.rows as any[]).map(toComercialRow),
+        black: comBlack,
+        squadra: comSquadra,
+        cxcs: comCxcs,
         squads,
         metaContasDesigner: META_CONTAS_DESIGNER,
       };
