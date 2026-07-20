@@ -5,6 +5,7 @@ import {
   formatarMensagemResumo,
   agoraSaoPaulo,
   janelaAtual,
+  derivarMetricas,
   type MetricasResumo,
 } from "./resumoLideres";
 
@@ -178,6 +179,94 @@ describe("formatarMensagemResumo", () => {
     const msg = formatarMensagemResumo(METRICAS, { dataFmt: "05/01", horaFmt: "9h", hora: 9, mes: 1 });
     expect(msg).toContain("💰 Receita (Janeiro)");
     expect(msg).toContain("📌 MRR Base Dezembro: R$ 1.137.868,00");
+  });
+});
+
+describe("derivarMetricas", () => {
+  // Entrada crua equivalente ao que calcularMetricasResumo recebe das 6 queries,
+  // antes da derivação. Os valores reproduzem o modelo de referência de 18/07
+  // (mesmas bases de METRICAS acima) para que o teste de caracterização abaixo
+  // sirva de rede de segurança: qualquer regressão de fórmula quebra os dois.
+  const ENTRADA_BASE: Parameters<typeof derivarMetricas>[0] = {
+    carteira: {
+      ativo: 1069598,
+      triagemOnboarding: 150789.28,
+      emCancelamento: 96805,
+      mrrAtivo: 1220387.28, // ativo + triagemOnboarding
+      mrrOperando: 1317192.28, // mrrAtivo + emCancelamento
+    },
+    mrrMesAnterior: 1137868,
+    estoquePontualInicioMes: 2090519.35,
+    entregaPontual: 169293.45,
+    vendasNovas: { mrr: 42310, pontual: 118500 },
+    breakdown: { crosssell: 5997, crosssell_pontual: 10300 },
+    churn: { total: 67030, ajustado: 43314, brutoSemAbono: 55000 },
+    churnPontual: { total: 171272, ajustado: 91973 },
+  };
+
+  it("reproduz METRICAS a partir da entrada crua equivalente (caracterização)", () => {
+    expect(derivarMetricas(ENTRADA_BASE)).toEqual(METRICAS);
+  });
+
+  it("crossTotal é a soma cheia, sem a amortização ÷5 removida na v3", () => {
+    const r = derivarMetricas({
+      ...ENTRADA_BASE,
+      breakdown: { crosssell: 5997, crosssell_pontual: 10300 },
+    });
+    expect(r.crossTotal).toBe(16297);
+  });
+
+  it("netChurn subtrai só o cross sell de MRR (crossR), não o crossTotal", () => {
+    const r = derivarMetricas({
+      ...ENTRADA_BASE,
+      churn: { ...ENTRADA_BASE.churn, ajustado: 43314 },
+      breakdown: { crosssell: 5997, crosssell_pontual: 10300 },
+    });
+    expect(r.netChurn).toBe(37317);
+    // 43314 - crossTotal(16297) seria a régua antiga (amortizada) reintroduzida
+    expect(r.netChurn).not.toBe(27017);
+  });
+
+  it("netChurnBruto subtrai só o cross sell de MRR (crossR), não o crossTotal", () => {
+    const r = derivarMetricas({
+      ...ENTRADA_BASE,
+      churn: { ...ENTRADA_BASE.churn, total: 67030 },
+      breakdown: { crosssell: 5997, crosssell_pontual: 10300 },
+    });
+    expect(r.netChurnBruto).toBe(61033);
+  });
+
+  it("carteiraAtivo recebe o status ativo isolado; mrrAtivo recebe a soma dos três (não podem trocar)", () => {
+    const carteira = {
+      ativo: 700000,
+      triagemOnboarding: 100000,
+      emCancelamento: 50000,
+      mrrAtivo: 800000, // ativo + triagemOnboarding
+      mrrOperando: 850000, // mrrAtivo + emCancelamento
+    };
+    const r = derivarMetricas({ ...ENTRADA_BASE, carteira });
+    expect(r.carteiraAtivo).toBe(700000);
+    expect(r.mrrAtivo).toBe(800000);
+    expect(r.carteiraAtivo).not.toBe(r.mrrAtivo);
+  });
+
+  it("percentuais de MRR usam mrrMesAnterior; percentuais de pontual usam estoquePontualInicioMes", () => {
+    const r = derivarMetricas(ENTRADA_BASE);
+    expect(r.churnTotalPct).toBeCloseTo((67030 / 1137868) * 100, 10);
+    expect(r.churnAjustadoPct).toBeCloseTo((43314 / 1137868) * 100, 10);
+    expect(r.netChurnPct).toBeCloseTo((37317 / 1137868) * 100, 10);
+    expect(r.netChurnBrutoPct).toBeCloseTo((61033 / 1137868) * 100, 10);
+    expect(r.churnBrutoSemAbonoPct).toBeCloseTo((55000 / 1137868) * 100, 10);
+    expect(r.churnPontualPct).toBeCloseTo((171272 / 2090519.35) * 100, 10);
+    expect(r.churnPontualAjustadoPct).toBeCloseTo((91973 / 2090519.35) * 100, 10);
+  });
+
+  it("estoquePontualInicioMes zero não produz NaN nos percentuais de pontual", () => {
+    const r = derivarMetricas({ ...ENTRADA_BASE, estoquePontualInicioMes: 0 });
+    expect(r.churnPontualPct).toBe(0);
+    expect(r.churnPontualAjustadoPct).toBe(0);
+    expect(Number.isNaN(r.churnPontualPct)).toBe(false);
+    expect(Number.isNaN(r.churnPontualAjustadoPct)).toBe(false);
   });
 });
 

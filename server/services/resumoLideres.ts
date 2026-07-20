@@ -1,7 +1,10 @@
 // Resumo diário de métricas para líderes via WhatsApp.
-// Spec: docs/superpowers/specs/2026-07-02-resumo-lideres-whatsapp-design.md
-// Modelo v2 (2026-07-03): MRR total×ativo, churn pontual, churn com/sem motivos
-// operacionais, net churn sobre o churn ajustado. Cross R×P = campos do Bitrix.
+// Spec: docs/superpowers/specs/2026-07-20-resumo-lideres-novo-modelo-design.md
+// Modelo v3 (2026-07-20): mensagem em blocos temáticos com emojis. Três réguas
+// mudaram — cross sell (MRR+Pontual) sem a amortização ÷5 do pontual; net churn
+// (ajustado e bruto) subtrai só o cross sell de MRR (crossR), não o crossTotal;
+// MRR Ativo passou a ser triagem + onboarding + ativo (status "ativo" isolado
+// virou carteiraAtivo). Specs anteriores: 2026-07-02 (v2), 2026-07-14 (NRR Bruto).
 
 import { db } from "../db";
 import { sql } from "drizzle-orm";
@@ -323,26 +326,24 @@ async function getEstoquePontualInicioMes(): Promise<number> {
   return parseFloat((result.rows[0] as any)?.total || "0");
 }
 
-export async function calcularMetricasResumo(): Promise<MetricasResumo> {
-  const [carteira, mrrMesAnterior, vendasNovas, breakdown, churn, churnPontual, entregaPontual, estoquePontualInicioMes] =
-    await Promise.all([
-      getCarteiraMrr(),
-      getMrrInicioMes(),
-      getVendasNovasBreakdown(),
-      getVendasMrrBreakdown(),
-      getChurnMes(),
-      getChurnPontualMes(),
-      getEntregaPontualMes(),
-      getEstoquePontualInicioMes(),
-    ]);
-
-  // O metricsAdapter engole erros retornando 0; sem base de MRR a mensagem seria
-  // enganosa, então abortamos. As métricas de venda podem ser legitimamente zero.
-  if (carteira.mrrAtivo <= 0 || mrrMesAnterior <= 0) {
-    throw new Error(
-      `Métricas de MRR inválidas (mrrAtivo=${carteira.mrrAtivo}, mrrMesAnterior=${mrrMesAnterior}) — envio abortado`,
-    );
-  }
+/**
+ * Deriva as métricas expostas na mensagem a partir das entradas cruas das 6
+ * queries de `calcularMetricasResumo`. Pura (sem I/O) para poder testar as
+ * fórmulas — cross sell sem amortização, net churn sobre o cross de MRR,
+ * carteiraAtivo vs mrrAtivo — sem precisar mockar o banco.
+ */
+export function derivarMetricas(entrada: {
+  carteira: CarteiraMrr;
+  mrrMesAnterior: number;
+  estoquePontualInicioMes: number;
+  entregaPontual: number;
+  vendasNovas: { mrr: number; pontual: number };
+  breakdown: { crosssell: number; crosssell_pontual: number };
+  churn: { total: number; ajustado: number; brutoSemAbono: number };
+  churnPontual: { total: number; ajustado: number };
+}): MetricasResumo {
+  const { carteira, mrrMesAnterior, estoquePontualInicioMes, entregaPontual, vendasNovas, breakdown, churn, churnPontual } =
+    entrada;
 
   const crossR = breakdown.crosssell;
   const crossP = breakdown.crosssell_pontual;
@@ -379,6 +380,40 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
     churnBrutoSemAbono: churn.brutoSemAbono,
     churnBrutoSemAbonoPct: (churn.brutoSemAbono / mrrMesAnterior) * 100,
   };
+}
+
+export async function calcularMetricasResumo(): Promise<MetricasResumo> {
+  const [carteira, mrrMesAnterior, vendasNovas, breakdown, churn, churnPontual, entregaPontual, estoquePontualInicioMes] =
+    await Promise.all([
+      getCarteiraMrr(),
+      getMrrInicioMes(),
+      getVendasNovasBreakdown(),
+      getVendasMrrBreakdown(),
+      getChurnMes(),
+      getChurnPontualMes(),
+      getEntregaPontualMes(),
+      getEstoquePontualInicioMes(),
+    ]);
+
+  // getMrrInicioMes (metricsAdapter) engole erros retornando 0; sem base de MRR a
+  // mensagem seria enganosa, então abortamos. As métricas de venda podem ser
+  // legitimamente zero.
+  if (carteira.mrrAtivo <= 0 || mrrMesAnterior <= 0) {
+    throw new Error(
+      `Métricas de MRR inválidas (mrrAtivo=${carteira.mrrAtivo}, mrrMesAnterior=${mrrMesAnterior}) — envio abortado`,
+    );
+  }
+
+  return derivarMetricas({
+    carteira,
+    mrrMesAnterior,
+    estoquePontualInicioMes,
+    entregaPontual,
+    vendasNovas,
+    breakdown,
+    churn,
+    churnPontual,
+  });
 }
 
 // ============================================
