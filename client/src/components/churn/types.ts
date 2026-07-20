@@ -46,7 +46,8 @@ export interface ChurnPorPessoa {
   pessoa: string;
   mrr_ativo: number;
   mrr_perdido: number;
-  percentual: number;
+  /** null quando a pessoa não tem carteira no snapshot — exibir "—", nunca 0%. */
+  percentual: number | null;
 }
 
 export interface RetentionPoint {
@@ -92,6 +93,8 @@ export interface ChurnDetalhamentoData {
     periodo_referencia?: string;
     mrr_base_por_mes?: Record<string, number>;
     soma_mrr_bases?: number;
+    /** Carteira somada por operador nos meses do range. Denominador do churn% nos drawers. */
+    soma_mrr_bases_por_pessoa?: Record<string, number>;
     total_abonado?: number;
     mrr_abonado?: number;
   };

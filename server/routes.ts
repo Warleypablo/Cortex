@@ -5192,6 +5192,11 @@ Estruture sua resposta em:
         percentual: (somaMrrBasesPorSquad[squadName] || 0) > 0 ? ((mrrPerdidoPorSquad[squadName] || 0) / (somaMrrBasesPorSquad[squadName] || 1)) * 100 : 0,
       })).sort((a, b) => b.percentual - a.percentual);
 
+      // ATENÇÃO: "responsavel" aqui é o OPERADOR da subtask, não o líder da conta.
+      // cup_churn.responsavel_geral tem nome enganoso — seu conteúdo bate com
+      // cup_contratos.responsavel em 51/52 casos e com cup_clientes.responsavel_geral
+      // em 0/52. O denominador (cup_data_hist.responsavel) é a mesma dimensão.
+      // NÃO trocar por cup_clientes.responsavel_geral: quebraria o cálculo.
       // Churn por pessoa (responsavel)
       const somaMrrBasesPorPessoa: Record<string, number> = {};
       for (const mesData of Object.values(mrrBasePorMes)) {
@@ -5218,10 +5223,14 @@ Estruture sua resposta em:
         pessoa,
         mrr_ativo: mrrBasesPrimeiroPorPessoa[pessoa] || 0,
         mrr_perdido: mrrPerdidoPorPessoa[pessoa] || 0,
+        // null quando não há carteira no snapshot: exibir "—", nunca 0%.
+        // Antes isto retornava 0 e mostrava 0% para churn real — atingia 4,11%
+        // do MRR perdido de julho/2026 (operador com única linha em triagem,
+        // valorr = 0, portanto base zero).
         percentual: (somaMrrBasesPorPessoa[pessoa] || 0) > 0
           ? ((mrrPerdidoPorPessoa[pessoa] || 0) / somaMrrBasesPorPessoa[pessoa]) * 100
-          : 0,
-      })).sort((a, b) => b.percentual - a.percentual);
+          : null,
+      })).sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1));
 
       // Retention curve
       const contratosComLifetime = allContratos.filter((c: any) => c.lifetime_meses >= 0);
@@ -5323,6 +5332,10 @@ Estruture sua resposta em:
             Object.entries(mrrBasePorMes).map(([mes, data]) => [mes, data.total])
           ),
           soma_mrr_bases: somaMrrBases,
+          // Carteira por operador, somada nos meses do range. Denominador do
+          // churn% por responsável nos drawers: MRR perdido no recorte ÷ carteira
+          // total da pessoa ("quanto da carteira do X foi perdido em Performance").
+          soma_mrr_bases_por_pessoa: somaMrrBasesPorPessoa,
           // Churn abonado separado
           total_abonado: totalAbonado,
           mrr_abonado: mrrAbonado,

@@ -46,7 +46,8 @@ interface RateItem {
   label: string;
   mrr_ativo: number;
   mrr_perdido: number;
-  percentual: number;
+  /** null quando não há carteira no snapshot — exibir "—", nunca 0%. */
+  percentual: number | null;
   noBase: boolean; // mrr_ativo === 0
   contratos: ChurnContract[]; // subset from contracts for drill
 }
@@ -120,7 +121,7 @@ export function ChurnPorDimensao({
       drillMap[key].push(c);
     });
 
-    const backendArray: Array<{ label: string; mrr_ativo: number; mrr_perdido: number; percentual: number }> =
+    const backendArray: Array<{ label: string; mrr_ativo: number; mrr_perdido: number; percentual: number | null }> =
       dimensao === "squad"
         ? (churnPorSquad ?? []).map(i => ({ label: i.squad, mrr_ativo: i.mrr_ativo, mrr_perdido: i.mrr_perdido, percentual: i.percentual }))
         : (churnPorPessoa ?? []).map(i => ({ label: i.pessoa, mrr_ativo: i.mrr_ativo, mrr_perdido: i.mrr_perdido, percentual: i.percentual }));
@@ -134,7 +135,8 @@ export function ChurnPorDimensao({
     const noBase = filtered.filter(i => i.mrr_ativo === 0 && i.mrr_perdido > 0);
 
     const sorted = [
-      ...withBase.sort((a, b) => b.percentual - a.percentual),
+      // percentual null fica no fim do grupo com base — nunca tratado como 0%.
+      ...withBase.sort((a, b) => (b.percentual ?? -1) - (a.percentual ?? -1)),
       ...noBase.sort((a, b) => b.mrr_perdido - a.mrr_perdido),
     ];
 
@@ -186,9 +188,11 @@ export function ChurnPorDimensao({
   const maxMrr = grupos.length > 0 ? grupos[0].mrr : 1;
   const fallbackMaxMrr = fallbackGrupos.length > 0 ? fallbackGrupos[0].mrr : 1;
 
-  // For rate-mode bar: normalize by max rate among withBase items
+  // For rate-mode bar: normalize by max rate among withBase items (percentual conhecido)
   const maxRate = useMemo(() => {
-    const withBase = rateItems.filter(i => !i.noBase);
+    const withBase = rateItems.filter(
+      (i): i is RateItem & { percentual: number } => !i.noBase && i.percentual !== null
+    );
     return withBase.length > 0 ? Math.max(...withBase.map(i => i.percentual)) : 1;
   }, [rateItems]);
 
@@ -242,11 +246,15 @@ export function ChurnPorDimensao({
         // ── Rate mode (squad / pessoa) from backend ──
         <div className="space-y-2">
           {rateItems.map((item, idx) => {
-            const normalized = item.noBase ? 0 : (maxRate > 0 ? item.percentual / maxRate : 0);
-            const barClass = item.noBase
-              ? "bg-zinc-300 dark:bg-zinc-600"
-              : severityBarClass(normalized);
-            const barWidth = item.noBase ? 10 : normalized * 100;
+            const pct = item.percentual;
+            const semDados = item.noBase || pct === null;
+            let normalized = 0;
+            let barClass = "bg-zinc-300 dark:bg-zinc-600";
+            if (!item.noBase && pct !== null) {
+              normalized = maxRate > 0 ? pct / maxRate : 0;
+              barClass = severityBarClass(normalized);
+            }
+            const barWidth = semDados ? 10 : normalized * 100;
 
             return (
               <div
@@ -271,8 +279,8 @@ export function ChurnPorDimensao({
                       {item.label}
                     </span>
                     <div className="flex items-center gap-2 flex-shrink-0 tabular-nums">
-                      <span className={`text-xs ${item.noBase ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
-                        {item.noBase ? "s/ base" : `${item.percentual.toFixed(1)}%`}
+                      <span className={`text-xs ${semDados ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
+                        {item.noBase ? "s/ base" : pct === null ? "—" : `${pct.toFixed(1)}%`}
                       </span>
                       <span className="text-xs font-semibold text-foreground">
                         {formatCurrencyNoDecimals(item.mrr_perdido)}
