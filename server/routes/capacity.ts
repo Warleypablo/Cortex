@@ -170,7 +170,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
             )
         ),
         contratos_expanded AS (
-          SELECT c.id_subtask, TRIM(rp.part) AS responsavel_part,
+          SELECT c.id_subtask, c.id_task, TRIM(rp.part) AS responsavel_part,
                  COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.status
           FROM "Clickup".cup_contratos c
           CROSS JOIN LATERAL regexp_split_to_table(c.responsavel, ';') AS rp(part)
@@ -179,7 +179,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ),
         best AS (
           SELECT DISTINCT ON (ce.id_subtask, ce.responsavel_part)
-            p.nome AS pessoa, p.grupo, ce.id_subtask, ce.valorr, ce.valorp, ce.status
+            p.nome AS pessoa, p.grupo, ce.id_subtask, ce.id_task, ce.valorr, ce.valorp, ce.status
           FROM contratos_expanded ce
           JOIN pessoas p ON similarity(p.nome, ce.responsavel_part) > 0.4
           ORDER BY ce.id_subtask, ce.responsavel_part, similarity(p.nome, ce.responsavel_part) DESC
@@ -188,6 +188,8 @@ export function registerCapacityRoutes(app: Express, db: any) {
           SELECT pessoa, grupo,
             COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0 OR valorp > 0) AS contas_total,
             COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
+            COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0 OR valorp > 0) AS clientes_total,
+            COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0) AS clientes_rec,
             COALESCE(SUM(valorr), 0) AS mrr_operando,
             COALESCE(SUM(valorp), 0) AS pontual_operando,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
@@ -198,16 +200,18 @@ export function registerCapacityRoutes(app: Express, db: any) {
         SELECT p.nome, p.grupo,
           COALESCE(a.contas_total, 0)      AS contas_total,
           COALESCE(a.contas_rec, 0)        AS contas_rec,
+          COALESCE(a.clientes_total, 0)    AS clientes_total,
+          COALESCE(a.clientes_rec, 0)      AS clientes_rec,
           COALESCE(a.mrr_operando, 0)      AS mrr_operando,
           COALESCE(a.pontual_operando, 0)  AS pontual_operando,
           COALESCE(a.mrr_ativo, 0)         AS mrr_ativo,
           COALESCE(a.mrr_onboarding, 0)    AS mrr_onboarding,
           COALESCE(a.mrr_cancelamento, 0)  AS mrr_cancelamento,
-          cap.cap_mrr, cap.cap_contas
+          cap.cap_mrr, cap.cap_contas, cap.cap_clientes
         FROM pessoas p
         LEFT JOIN agg a ON a.pessoa = p.nome
         LEFT JOIN LATERAL (
-          SELECT m.cap_mrr, m.cap_contas
+          SELECT m.cap_mrr, m.cap_contas, m.cap_clientes
           FROM cortex_core.capacity_metas m
           WHERE m.ativo = TRUE AND similarity(m.match_responsavel, p.nome) > 0.4
           ORDER BY similarity(m.match_responsavel, p.nome) DESC
@@ -227,7 +231,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
             )
         ),
         contratos_expanded AS (
-          SELECT c.id_subtask, TRIM(rp.part) AS cs_part,
+          SELECT c.id_subtask, c.id_task, TRIM(rp.part) AS cs_part,
                  COALESCE(c.valorr, 0) AS valorr, c.status
           FROM "Clickup".cup_contratos c
           CROSS JOIN LATERAL regexp_split_to_table(c.cs_responsavel, ';') AS rp(part)
@@ -236,7 +240,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ),
         best AS (
           SELECT DISTINCT ON (ce.id_subtask, ce.cs_part)
-            p.nome AS pessoa, ce.id_subtask, ce.valorr, ce.status
+            p.nome AS pessoa, ce.id_subtask, ce.id_task, ce.valorr, ce.status
           FROM contratos_expanded ce
           JOIN pessoas p ON similarity(p.nome, ce.cs_part) > 0.4
           ORDER BY ce.id_subtask, ce.cs_part, similarity(p.nome, ce.cs_part) DESC
@@ -244,6 +248,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
         agg AS (
           SELECT pessoa,
             COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
+            COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0) AS clientes_rec,
             COALESCE(SUM(valorr), 0) AS mrr_operando,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'onboarding'), 0) AS mrr_onboarding,
@@ -252,15 +257,16 @@ export function registerCapacityRoutes(app: Express, db: any) {
         )
         SELECT p.nome,
           COALESCE(a.contas_rec, 0)       AS contas_rec,
+          COALESCE(a.clientes_rec, 0)     AS clientes_rec,
           COALESCE(a.mrr_operando, 0)     AS mrr_operando,
           COALESCE(a.mrr_ativo, 0)        AS mrr_ativo,
           COALESCE(a.mrr_onboarding, 0)   AS mrr_onboarding,
           COALESCE(a.mrr_cancelamento, 0) AS mrr_cancelamento,
-          cap.cap_mrr, cap.cap_contas
+          cap.cap_mrr, cap.cap_contas, cap.cap_clientes
         FROM pessoas p
         LEFT JOIN agg a ON a.pessoa = p.nome
         LEFT JOIN LATERAL (
-          SELECT m.cap_mrr, m.cap_contas
+          SELECT m.cap_mrr, m.cap_contas, m.cap_clientes
           FROM cortex_core.capacity_metas m
           WHERE m.ativo = TRUE AND similarity(m.match_responsavel, p.nome) > 0.4
           ORDER BY similarity(m.match_responsavel, p.nome) DESC
@@ -270,8 +276,9 @@ export function registerCapacityRoutes(app: Express, db: any) {
       `);
 
       // Black: cada account → clientes (cup_clientes.responsavel_geral) → subtasks desses
-      // clientes. Régua igual aos outros squads (MRR + contas), mas "Contas" = nº de
-      // clientes que cuida (cap = CAP_CONTAS_ACCOUNT). Status: só ativo + em cancelamento.
+      // clientes. Régua igual aos outros squads (MRR + contas). "Contas" (contas_rec) =
+      // nº de subtasks/contratos; "Clientes" (clientes_rec) = nº de clientes distintos que
+      // cuida (cap_clientes default = CAP_CONTAS_ACCOUNT). Status: só ativo + em cancelamento.
       const blackResult = await db.execute(sql`
         WITH accounts(label, match) AS (VALUES ${accountsValues}),
         clientes_do_account AS (
@@ -283,13 +290,14 @@ export function registerCapacityRoutes(app: Express, db: any) {
           )
         ),
         subs AS (
-          SELECT cda.label, COALESCE(c.valorr, 0) AS vr, c.status
+          SELECT cda.label, c.id_subtask, COALESCE(c.valorr, 0) AS vr, c.status
           FROM clientes_do_account cda
           JOIN "Clickup".cup_contratos c
             ON c.id_task = cda.task_id AND c.status IN ('ativo','em cancelamento')
         ),
         agg AS (
           SELECT label,
+            COUNT(DISTINCT id_subtask) AS contratos,
             COALESCE(SUM(vr), 0) AS mrr_operando,
             COALESCE(SUM(vr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
             COALESCE(SUM(vr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
@@ -301,15 +309,17 @@ export function registerCapacityRoutes(app: Express, db: any) {
           COALESCE(ag.mrr_ativo, 0)        AS mrr_ativo,
           0                                AS mrr_onboarding,
           COALESCE(ag.mrr_cancelamento, 0) AS mrr_cancelamento,
-          COALESCE(cli.clientes, 0)        AS contas_rec,
+          COALESCE(ag.contratos, 0)        AS contas_rec,
+          COALESCE(cli.clientes, 0)        AS clientes_rec,
           cap.cap_mrr,
-          COALESCE(cap.cap_contas, ${CAP_CONTAS_ACCOUNT}) AS cap_contas
+          cap.cap_contas,
+          COALESCE(cap.cap_clientes, ${CAP_CONTAS_ACCOUNT}) AS cap_clientes
         FROM accounts a
         LEFT JOIN agg ag ON ag.label = a.label
         LEFT JOIN cli ON cli.label = a.label
         LEFT JOIN LATERAL (
           -- Só caps configuradas na categoria 'Black' (aba Configurar) sobrescrevem o default.
-          SELECT m.cap_mrr, m.cap_contas
+          SELECT m.cap_mrr, m.cap_contas, m.cap_clientes
           FROM cortex_core.capacity_metas m
           WHERE m.ativo = TRUE AND m.categoria = 'Black'
             AND similarity(m.match_responsavel, a.label) > 0.45
@@ -325,14 +335,15 @@ export function registerCapacityRoutes(app: Express, db: any) {
       const squadsResult = await db.execute(sql`
         WITH m AS (
           SELECT nome, categoria, match_responsavel,
-                 COALESCE(cap_contas, cap_recorrente) AS cap_contratos, ordem
+                 COALESCE(cap_contas, cap_recorrente) AS cap_contratos, cap_clientes, ordem
           FROM cortex_core.capacity_metas
           WHERE ativo = TRUE
             AND categoria NOT IN ('vendedor','account','gestor','Black','CXCS','Squadra','Selva')
         ),
         agg AS (
-          SELECT m.nome, m.categoria, m.ordem, m.cap_contratos,
+          SELECT m.nome, m.categoria, m.ordem, m.cap_contratos, m.cap_clientes,
             COUNT(*) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS op_recorrente,
+            COUNT(DISTINCT c.id_task) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS clientes_rec,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')), 0) AS mrr_operando,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'ativo'), 0) AS mrr_ativo,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'onboarding'), 0) AS mrr_onboarding,
@@ -340,7 +351,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
             COUNT(*) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding')) AS op_pontual
           FROM m
           LEFT JOIN "Clickup".cup_contratos c ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
-          GROUP BY m.nome, m.categoria, m.ordem, m.cap_contratos
+          GROUP BY m.nome, m.categoria, m.ordem, m.cap_contratos, m.cap_clientes
         )
         SELECT * FROM agg ORDER BY categoria, ordem, nome
       `);
