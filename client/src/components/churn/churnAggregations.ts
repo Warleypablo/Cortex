@@ -1,5 +1,25 @@
 import { type ChurnContract } from "./types";
 
+export interface ForecastContrato {
+  contrato_id: string;
+  cliente: string;
+  servico: string;
+  valorr: number;
+  valorp: number;
+  status: string;
+  status_conta: string | null;
+  status_cancelamento: string | null;
+  possibilidade_retencao: string | null;
+  responsavel: string | null;
+  contexto_risco: string | null;
+  risco_score: number | null;
+  risco_tier: "baixo" | "moderado" | "alto" | "critico" | null;
+}
+export interface ForecastResponse {
+  contratos: ForecastContrato[];
+  riscoCalculadoEm: string | null;
+}
+
 const MESES_PT_CURTO = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 export interface MesSerieChurn {

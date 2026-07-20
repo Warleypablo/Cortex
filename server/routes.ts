@@ -4921,6 +4921,73 @@ Estruture sua resposta em:
     }
   });
 
+  // Forecast Churn — indicador antecedente: contratos em risco que AINDA NÃO
+  // pediram encerramento (data_solicitacao_encerramento IS NULL). Foto do agora,
+  // sem parâmetro de período. Fonte: Postgres (cup_contratos + cup_churn +
+  // churn_risk_scores), sem tocar na API do ClickUp.
+  app.get("/api/analytics/churn-forecast", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          ct.id_subtask                   AS contrato_id,
+          cl.nome                         AS cliente,
+          ct.servico,
+          COALESCE(ct.valorr::numeric, 0) AS valorr,
+          COALESCE(ct.valorp::numeric, 0) AS valorp,
+          ct.status,
+          ch.status_conta,
+          ch.status_cancelamento,
+          ch.possibilidade_retencao,
+          ch.responsavel_geral            AS responsavel,
+          COALESCE(
+            NULLIF(TRIM(ch.mensagem_cliente), ''),
+            NULLIF(TRIM(ch.contexto_cx), ''),
+            NULLIF(TRIM(ch.contexto_operacao), '')
+          )                               AS contexto_risco,
+          rs.score                        AS risco_score,
+          rs.tier                         AS risco_tier
+        FROM "Clickup".cup_contratos ct
+        JOIN "Clickup".cup_churn ch          ON ch.task_id = ct.id_subtask
+        LEFT JOIN "Clickup".cup_clientes cl  ON cl.task_id = ct.id_task
+        LEFT JOIN cortex_core.churn_risk_scores rs ON rs.contrato_id = ct.id_subtask
+        WHERE LOWER(ct.status) IN ('ativo','onboarding','pausado','triagem')
+          AND ct.data_solicitacao_encerramento IS NULL
+          AND (
+                COALESCE(ch.status_cancelamento, '') <> ''
+             OR ch.status_conta IN ('Requer Atenção', 'Insatisfeito')
+             OR COALESCE(ch.possibilidade_retencao, '') <> ''
+          )
+        ORDER BY ct.valorr::numeric DESC NULLS LAST
+      `);
+
+      const contratos = (result.rows as any[]).map((r) => ({
+        contrato_id: String(r.contrato_id),
+        cliente: r.cliente || "Cliente não identificado",
+        servico: r.servico || "—",
+        valorr: Number(r.valorr) || 0,
+        valorp: Number(r.valorp) || 0,
+        status: r.status || "",
+        status_conta: r.status_conta || null,
+        status_cancelamento: r.status_cancelamento || null,
+        possibilidade_retencao: r.possibilidade_retencao || null,
+        responsavel: r.responsavel || null,
+        contexto_risco: r.contexto_risco || null,
+        risco_score: r.risco_score !== null && r.risco_score !== undefined ? Number(r.risco_score) : null,
+        risco_tier: r.risco_tier || null,
+      }));
+
+      const calcResult = await db.execute(sql`
+        SELECT MAX(calculated_at) AS ultimo FROM cortex_core.churn_risk_scores
+      `);
+      const riscoCalculadoEm = (calcResult.rows[0] as any)?.ultimo ?? null;
+
+      res.json({ contratos, riscoCalculadoEm });
+    } catch (error) {
+      console.error("[api] Error fetching churn forecast:", error);
+      res.status(500).json({ error: "Failed to fetch churn forecast data" });
+    }
+  });
+
   // Churn Detalhamento - lista de contratos churned com detalhes ricos de cup_churn
   app.get("/api/analytics/churn-detalhamento", async (req, res) => {
     try {
