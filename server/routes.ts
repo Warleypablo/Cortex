@@ -8,6 +8,7 @@ import { validateBody } from "./middleware/validate";
 import { createUserSchema, updatePermissionsSchema, updateRoleSchema, updateBpTabsSchema } from "./middleware/schemas";
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser, updateUserBpTabs } from "./auth/userDb";
 import { BP2026_TAB_IDS } from "../shared/bp2026-tabs";
+import { pontualTemCobertura } from "../shared/churnPontual";
 import { db } from "./db";
 import { sql, type SQL } from "drizzle-orm";
 import { computeEvolucaoChurn } from "./investorsReport/churn";
@@ -5378,13 +5379,20 @@ Estruture sua resposta em:
 
       const result = await db.execute(sql`
         SELECT
-          TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') AS mes,
-          COALESCE(NULLIF(TRIM(motivo_cancelamento), ''), 'Não especificado') AS motivo,
-          SUM(COALESCE(valor_r, 0)) AS mrr,
-          COUNT(*) AS logos
-        FROM cortex_core.vw_cup_churn_ajustado
-        WHERE data_solicitacao_encerramento >= ${inicio}::date
-          AND data_solicitacao_encerramento <= ${fim}::date
+          TO_CHAR(c.data_solicitacao_encerramento, 'YYYY-MM') AS mes,
+          COALESCE(NULLIF(TRIM(c.motivo_cancelamento), ''), 'Não especificado') AS motivo,
+          SUM(COALESCE(c.valor_r, 0)) AS mrr,
+          SUM(COALESCE(ct.valorp, 0)) AS pontual,
+          COUNT(*) AS logos,
+          COUNT(*) FILTER (WHERE COALESCE(ct.valorp, 0) > 0) AS logos_pontual
+        FROM cortex_core.vw_cup_churn_ajustado c
+        LEFT JOIN LATERAL (
+          SELECT MAX(x.valorp::numeric) AS valorp
+          FROM "Clickup".cup_contratos x
+          WHERE x.id_subtask = c.task_id
+        ) ct ON TRUE
+        WHERE c.data_solicitacao_encerramento >= ${inicio}::date
+          AND c.data_solicitacao_encerramento <= ${fim}::date
           -- Churn BRUTO total (2026-06-30): inclui "nunca virou base" p/ bater com o card
           -- da tela (ver /api/analytics/churn-detalhamento). Abono via toggle da tela.
           ${abonoFilter}
@@ -5392,19 +5400,28 @@ Estruture sua resposta em:
         ORDER BY 1
       `);
 
-      // Pivot: mês -> { total, porMotivo }
-      const mesesMap: Record<string, { mes: string; total: number; logos: number; porMotivo: Record<string, number> }> = {};
+      // Pivot: mês -> { total, pontual, porMotivo }
+      const mesesMap: Record<string, { mes: string; total: number; pontual: number; logos: number; porMotivo: Record<string, number> }> = {};
       const motivoTotals: Record<string, number> = {};
+      let totalLinhas = 0;
+      let linhasComPontual = 0;
       for (const r of result.rows as any[]) {
         const mes = r.mes as string;
         const motivo = r.motivo as string;
         const mrr = Number(r.mrr) || 0;
+        const pontual = Number(r.pontual) || 0;
         const logos = Number(r.logos) || 0;
-        if (!mesesMap[mes]) mesesMap[mes] = { mes, total: 0, logos: 0, porMotivo: {} };
+        if (!mesesMap[mes]) mesesMap[mes] = { mes, total: 0, pontual: 0, logos: 0, porMotivo: {} };
         mesesMap[mes].porMotivo[motivo] = (mesesMap[mes].porMotivo[motivo] || 0) + mrr;
         mesesMap[mes].total += mrr;
+        // O pontual NÃO é quebrado por motivo: a barra é sólida. 3 motivos concentram
+        // 66,8% do valorp e 9 dos 21 motivos têm valorp zero — empilhar produziria uma
+        // pilha de ~4 blocos com metade da legenda sem representação.
+        mesesMap[mes].pontual += pontual;
         mesesMap[mes].logos += logos;
         motivoTotals[motivo] = (motivoTotals[motivo] || 0) + mrr;
+        totalLinhas += logos;
+        linhasComPontual += Number(r.logos_pontual) || 0;
       }
 
       const motivos = Object.entries(motivoTotals)
@@ -5459,7 +5476,8 @@ Estruture sua resposta em:
         mrrBasePorMes[mesKey] = total;
       }
 
-      res.json({ series, motivos, ano, filterAbono, mrrBasePorMes });
+      const pontualDisponivel = pontualTemCobertura(linhasComPontual, totalLinhas);
+      res.json({ series, motivos, ano, filterAbono, mrrBasePorMes, pontualDisponivel });
     } catch (error) {
       console.error("[api] Error fetching churn historico mensal:", error);
       res.status(500).json({ error: "Failed to fetch churn historico mensal data" });
