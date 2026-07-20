@@ -2,6 +2,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { formatCurrency } from "@/lib/utils";
 import { type ChurnContract } from "@/components/churn/types";
+import { NAO_ESPECIFICADO } from "@/components/churn/churnAggregations";
 import { format, parseISO } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
@@ -76,12 +77,9 @@ export function DrawerContratosTable({
                 <td className="py-2 pr-3 text-gray-900 dark:text-white font-medium max-w-[160px] truncate">
                   {c.cliente_nome}
                 </td>
-                <td
-                  className="py-2 pr-3 text-gray-600 dark:text-zinc-400 max-w-[130px] truncate"
-                  title={c.responsavel || undefined}
-                >
-                  {c.responsavel && c.responsavel !== "Não especificado" ? (
-                    c.responsavel
+                <td className="py-2 pr-3 text-gray-600 dark:text-zinc-400 max-w-[130px] truncate">
+                  {c.responsavel && c.responsavel !== NAO_ESPECIFICADO ? (
+                    <span title={c.responsavel}>{c.responsavel}</span>
                   ) : (
                     <span className="text-gray-400 dark:text-zinc-600">—</span>
                   )}

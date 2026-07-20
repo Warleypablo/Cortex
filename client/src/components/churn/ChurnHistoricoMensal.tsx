@@ -258,7 +258,7 @@ export function ChurnHistoricoMensal({
             <Line
               type="monotone"
               dataKey="meta"
-              name="Meta 8%"
+              name={`Meta ${formatPct(metaPct)}`}
               stroke="#ef4444"
               strokeWidth={2}
               strokeDasharray="5 4"

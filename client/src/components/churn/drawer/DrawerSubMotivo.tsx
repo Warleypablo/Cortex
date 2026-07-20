@@ -365,10 +365,7 @@ export function DrawerSubMotivo({
                     <td className="py-1.5 pr-2 text-right tabular-nums text-muted-foreground">
                       {linha.participacao !== null ? formatPct(linha.participacao, 0) : "—"}
                     </td>
-                    <td
-                      className="py-1.5 text-right tabular-nums font-medium"
-                      style={{ color: linha.churnPct !== null ? cor : undefined }}
-                    >
+                    <td className="py-1.5 text-right tabular-nums font-medium">
                       {linha.churnPct !== null ? (
                         formatPct(linha.churnPct)
                       ) : (
