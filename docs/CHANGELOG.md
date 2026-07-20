@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-20 | feat(resumo-lideres): novo modelo de mensagem (v3)
+
+**O que foi feito:**
+- Mensagem reorganizada em blocos temáticos separados por réguas: Receita, Churn, Cross Sell, Net Churn e Disclaimers
+- Métricas novas: MRR Adicionado e Pontual Vendido (vendas novas, sem cross sell e upsell), split da carteira em Triagem/Onboarding, Ativo e Em Cancelamento, e MRR Operando
+- Cross sell pontual passa a aparecer em valor cheio — acabou a amortização ÷5
+- Net Churn (ajustado e bruto) subtrai apenas o cross sell de MRR
+- Linha "Churn MRR sem abonos" sai do texto; a métrica segue calculada e disponível em `/api/resumo-lideres/preview`
+
+**Por que:**
+- O formato anterior era uma lista corrida sem hierarquia visual, difícil de ler no WhatsApp
+- As réguas de cross sell e net churn não eram comparáveis entre si: amortizar o pontual em 5x misturava caixa futuro com MRR corrente
+
+**Atenção:** "MRR Ativo" mudou de significado — antes era só o status ativo, agora é Triagem + Onboarding + Ativo. Comparações com mensagens anteriores à v3 não são diretas.
+
 ## 2026-07-17 | feat(dfc): agregadores XX.YY no filtro de categorias (desmarca o grupo todo)
 
 **O que foi feito:**
