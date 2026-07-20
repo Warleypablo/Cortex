@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from "react";
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { OperadorDrawer, type DrawerSelecao } from "@/components/capacity-times/OperadorDrawer";
 import { CapacityMetasConfig } from "@/components/capacity-times/CapacityMetasConfig";
@@ -9,7 +9,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Gauge, AlertTriangle, TrendingDown, Lock } from "lucide-react";
+import { Gauge, Lock } from "lucide-react";
 import { SELVA_BLOQUEADA } from "@shared/capacityGrupos";
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
@@ -164,45 +164,6 @@ function StatCards({ cards }: { cards: { label: string; value: string; tone?: st
   );
 }
 
-function AlertCard({ title, icon, tone, people, empty }: {
-  title: string; icon: ReactNode; tone: "red" | "green"; people: { nome: string; util_pct: number | null }[]; empty: string;
-}) {
-  const chip = tone === "red"
-    ? "bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-300"
-    : "bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300";
-  return (
-    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm flex items-center gap-2 text-gray-700 dark:text-zinc-300">{icon}{title}</CardTitle>
-      </CardHeader>
-      <CardContent>
-        {people.length === 0 ? (
-          <p className="text-sm text-gray-400 dark:text-zinc-500">{empty}</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {people.map((p) => (
-              <span key={p.nome} className={cn("px-2 py-1 rounded-full text-xs font-medium", chip)}>
-                {p.nome} · {pctText(p.util_pct)}
-              </span>
-            ))}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
-}
-
-function Alerts({ people }: { people: { nome: string; util_pct: number | null }[] }) {
-  const over = people.filter((p) => p.util_pct !== null && p.util_pct >= 90).sort((a, b) => (b.util_pct as number) - (a.util_pct as number));
-  const idle = people.filter((p) => p.util_pct !== null && p.util_pct < 60).sort((a, b) => (a.util_pct as number) - (b.util_pct as number));
-  return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-      <AlertCard title="Sobrecarregados (≥90%)" icon={<AlertTriangle className="h-4 w-4 text-red-500" />} tone="red" people={over} empty="Ninguém acima de 90%." />
-      <AlertCard title="Com folga (<60%)" icon={<TrendingDown className="h-4 w-4 text-green-500" />} tone="green" people={idle} empty="Ninguém abaixo de 60%." />
-    </div>
-  );
-}
-
 // ── Tabelas ──
 
 function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSelect: (s: DrawerSelecao) => void; campo?: "cs" | "geral" }) {
@@ -317,7 +278,6 @@ function ComercialTab({ title, rows, onSelect, campo }: { title: string; rows: C
   return (
     <div className="space-y-4">
       <StatCards cards={cards} />
-      <Alerts people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader><CardTitle className="text-gray-900 dark:text-white">{title}</CardTitle></CardHeader>
         <CardContent><ComercialTable rows={rows} onSelect={onSelect} campo={campo} /></CardContent>
@@ -344,7 +304,6 @@ function SelvaTab({ rows, metaContas, onSelect }: { rows: SelvaRow[]; metaContas
   return (
     <div className="space-y-4">
       <StatCards cards={cards} />
-      <Alerts people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader>
           <CardTitle className="text-gray-900 dark:text-white">Selva — Designers</CardTitle>
@@ -454,7 +413,6 @@ function SquadTab({ group, onSelect }: { group: SquadGroup; onSelect: (s: Drawer
   return (
     <div className="space-y-4">
       <StatCards cards={cards} />
-      <Alerts people={rows} />
       <UtilChart people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader><CardTitle className="text-gray-900 dark:text-white">Squad {group.squad}</CardTitle></CardHeader>
