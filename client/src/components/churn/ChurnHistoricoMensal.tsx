@@ -2,6 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
+import { pctDaBase, formatPct } from "./churnAggregations";
 import {
   ComposedChart, Bar, Line,
   XAxis, YAxis, Tooltip, Legend,
@@ -71,17 +72,20 @@ export function ChurnHistoricoMensal({
     const porMes: Record<string, MesSerie> = {};
     (data?.series ?? []).forEach((s) => { porMes[s.mes] = s; });
 
-    const linhas: Array<Record<string, number | string>> = [];
+    const linhas: Array<Record<string, number | string | boolean>> = [];
     for (let m = 1; m <= ultimoMes; m++) {
       const mesKey = `${ano}-${String(m).padStart(2, "0")}`;
       const serie = porMes[mesKey];
       // Meta = % fixo do MRR real (ativo) daquele mês
       const mrrBaseMes = data?.mrrBasePorMes?.[mesKey] ?? 0;
-      const row: Record<string, number | string> = {
+      const isMesCorrente = ano === hoje.getFullYear() && m === hoje.getMonth() + 1;
+      const row: Record<string, number | string | boolean> = {
         mes: mesKey,
-        mesLabel: MESES_PT[m - 1],
+        mesLabel: isMesCorrente ? `${MESES_PT[m - 1]}*` : MESES_PT[m - 1],
         total: serie ? Math.round(serie.total) : 0,
         meta: Math.round(mrrBaseMes * metaPct),
+        mrrBase: mrrBaseMes,
+        isMesCorrente,
       };
       motivos.forEach((motivo) => {
         row[motivo] = serie ? Math.round(serie.porMotivo[motivo] ?? 0) : 0;
@@ -96,35 +100,61 @@ export function ChurnHistoricoMensal({
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
-    const row = payload[0]?.payload as Record<string, number | string>;
+    const row = payload[0]?.payload as Record<string, number | string | boolean>;
     const total = Number(row?.total ?? 0);
     const meta = Number(row?.meta ?? 0);
+    const mrrBase = Number(row?.mrrBase ?? 0);
+    const isMesCorrente = Boolean(row?.isMesCorrente);
+    const pctTotal = pctDaBase(total, mrrBase);
     const itens = motivos
       .map((motivo, i) => ({ motivo, valor: Number(row?.[motivo] ?? 0), cor: corDoMotivo(motivo, i) }))
       .filter((x) => x.valor > 0)
       .sort((a, b) => b.valor - a.valor);
     return (
-      <div className="rounded-md border border-border bg-background px-3 py-2 shadow-lg text-xs space-y-1 min-w-[180px]">
-        <p className="font-semibold text-foreground capitalize">{label} {ano}</p>
+      <div className="rounded-md border border-border bg-background px-3 py-2 shadow-lg text-xs space-y-1 min-w-[200px]">
+        <p className="font-semibold text-foreground capitalize">
+          {label} {ano}
+          {isMesCorrente && (
+            <span className="ml-1 font-normal text-muted-foreground">· mês em curso</span>
+          )}
+        </p>
         <p className="text-muted-foreground">
           Churn: <span className="font-semibold text-foreground">{formatCurrencyNoDecimals(total)}</span>
+          {pctTotal !== null && (
+            <span className="font-semibold text-foreground"> · {formatPct(pctTotal)}</span>
+          )}
         </p>
         {meta > 0 && (
           <p className="text-muted-foreground">
-            Meta (8%): <span className="font-medium text-foreground">{formatCurrencyNoDecimals(meta)}</span>
-            {total > meta && <span className="text-red-500"> (+{formatCurrencyNoDecimals(total - meta)})</span>}
+            Meta ({formatPct(metaPct)}): <span className="font-medium text-foreground">{formatCurrencyNoDecimals(meta)}</span>
+            {total > meta && (
+              <span className="text-red-500">
+                {" "}(+{formatCurrencyNoDecimals(total - meta)}
+                {pctTotal !== null && ` · +${((pctTotal - metaPct) * 100).toFixed(1).replace(".", ",")}pp`})
+              </span>
+            )}
           </p>
         )}
         <div className="pt-1 border-t border-border/50 space-y-0.5">
-          {itens.map((x) => (
-            <div key={x.motivo} className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-1.5 text-muted-foreground">
-                <span className="inline-block w-2 h-2 rounded-sm" style={{ background: x.cor }} />
-                {x.motivo}
-              </span>
-              <span className="font-medium text-foreground tabular-nums">{formatCurrencyNoDecimals(x.valor)}</span>
-            </div>
-          ))}
+          {itens.map((x) => {
+            const pctItem = pctDaBase(x.valor, mrrBase);
+            return (
+              <div key={x.motivo} className="flex items-center justify-between gap-3">
+                <span className="flex items-center gap-1.5 text-muted-foreground">
+                  <span className="inline-block w-2 h-2 rounded-sm" style={{ background: x.cor }} />
+                  {x.motivo}
+                </span>
+                <span className="flex items-center gap-2 flex-shrink-0">
+                  <span className="font-medium text-foreground tabular-nums">{formatCurrencyNoDecimals(x.valor)}</span>
+                  {pctItem !== null && (
+                    <span className="text-muted-foreground tabular-nums w-10 text-right">
+                      {formatPct(pctItem, 2)}
+                    </span>
+                  )}
+                </span>
+              </div>
+            );
+          })}
         </div>
       </div>
     );
@@ -136,9 +166,10 @@ export function ChurnHistoricoMensal({
         <div>
           <p className="text-sm font-semibold text-foreground">Histórico de Churn {ano}</p>
           <p className="text-xs text-muted-foreground">
-            MRR perdido por mês e motivo · linha tracejada = meta 8%
+            MRR perdido por mês e motivo · % sobre o MRR ativo do mês · linha tracejada = meta {formatPct(metaPct)}
             {filterAbono === "nao_abonados" && " · sem abonados"}
             {filterAbono === "abonados" && " · só abonados"}
+            {" · * mês em curso"}
           </p>
         </div>
       </div>
@@ -153,7 +184,7 @@ export function ChurnHistoricoMensal({
         </div>
       ) : (
         <ResponsiveContainer width="100%" height={320}>
-          <ComposedChart data={chartData} margin={{ top: 24, right: 16, left: 8, bottom: 4 }}>
+          <ComposedChart data={chartData} margin={{ top: 34, right: 16, left: 8, bottom: 4 }}>
             <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false} />
             <XAxis
               dataKey="mesLabel"
@@ -183,8 +214,41 @@ export function ChurnHistoricoMensal({
                   <LabelList
                     dataKey="total"
                     position="top"
-                    formatter={(v: number) => (v > 0 ? formatCurrencyNoDecimals(v) : "")}
-                    style={{ fontSize: 10, fill: axisColor, fontWeight: 600 }}
+                    content={(props: any) => {
+                      const { x, y, width, index } = props;
+                      const row = chartData[index] as Record<string, number | string | boolean>;
+                      const total = Number(row?.total ?? 0);
+                      if (!total) return null;
+                      const pct = pctDaBase(total, Number(row?.mrrBase ?? 0));
+                      const acimaDaMeta = pct !== null && pct > metaPct;
+                      const cx = Number(x) + Number(width) / 2;
+                      return (
+                        <g>
+                          <text
+                            x={cx}
+                            y={Number(y) - 14}
+                            textAnchor="middle"
+                            style={{ fontSize: 10, fill: axisColor, fontWeight: 600 }}
+                          >
+                            {formatCurrencyNoDecimals(total)}
+                          </text>
+                          {pct !== null && (
+                            <text
+                              x={cx}
+                              y={Number(y) - 3}
+                              textAnchor="middle"
+                              style={{
+                                fontSize: 10,
+                                fill: acimaDaMeta ? "#ef4444" : "#10b981",
+                                fontWeight: 700,
+                              }}
+                            >
+                              {formatPct(pct)}
+                            </text>
+                          )}
+                        </g>
+                      );
+                    }}
                   />
                 )}
               </Bar>

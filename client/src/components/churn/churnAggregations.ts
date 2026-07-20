@@ -16,3 +16,19 @@ export function somarValoresDrawer(
   }
   return { mrr, pontual };
 }
+
+/**
+ * Fração de um valor sobre a base de MRR do mês (0.084 = 8,4%).
+ * Retorna null quando a base não permite um percentual honesto — nesses
+ * casos a UI deve omitir o percentual, nunca mostrar 0% ou Infinity%.
+ */
+export function pctDaBase(valor: number, base: number): number | null {
+  const b = Number(base);
+  if (!Number.isFinite(b) || b <= 0) return null;
+  return (Number(valor) || 0) / b;
+}
+
+/** Formata uma fração como percentual pt-BR: 0.084 -> "8,4%". */
+export function formatPct(fracao: number, casas = 1): string {
+  return `${(fracao * 100).toFixed(casas).replace(".", ",")}%`;
+}

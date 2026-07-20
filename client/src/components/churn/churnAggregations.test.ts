@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { somarValoresDrawer } from "./churnAggregations";
+import { somarValoresDrawer, pctDaBase, formatPct } from "./churnAggregations";
 import type { ChurnContract } from "./types";
 
 /** Constrói um ChurnContract mínimo; só os campos do teste importam. */
@@ -43,5 +43,42 @@ describe("somarValoresDrawer", () => {
       contrato({ valorr: -26500 }),
     ]);
     expect(r.mrr).toBe(-16500);
+  });
+});
+
+describe("pctDaBase", () => {
+  it("calcula a fração sobre a base", () => {
+    expect(pctDaBase(162431, 1930000)).toBeCloseTo(0.08416, 5);
+  });
+
+  it("retorna null quando a base é zero", () => {
+    expect(pctDaBase(1000, 0)).toBeNull();
+  });
+
+  it("retorna null quando a base é ausente", () => {
+    expect(pctDaBase(1000, undefined as unknown as number)).toBeNull();
+    expect(pctDaBase(1000, NaN)).toBeNull();
+  });
+
+  it("retorna null quando a base é negativa", () => {
+    expect(pctDaBase(1000, -500)).toBeNull();
+  });
+
+  it("aceita valor zero com base válida", () => {
+    expect(pctDaBase(0, 1000)).toBe(0);
+  });
+});
+
+describe("formatPct", () => {
+  it("formata com uma casa e vírgula decimal", () => {
+    expect(formatPct(0.084)).toBe("8,4%");
+  });
+
+  it("respeita o número de casas pedido", () => {
+    expect(formatPct(0.0169, 2)).toBe("1,69%");
+  });
+
+  it("formata zero", () => {
+    expect(formatPct(0)).toBe("0,0%");
   });
 });
