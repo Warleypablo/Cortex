@@ -37,7 +37,7 @@ export interface ReportsMensal {
 
 // churn_por_squad/pessoa/motivo: server (routes.ts, /api/analytics/churn-detalhamento) já devolve
 // ARRAYS de objetos (não Record<string,...> — confirmado lendo o handler). Nada de Object.entries aqui.
-export interface ChurnPorSquadRow { squad: string; mrr_ativo: number; mrr_perdido: number; percentual: number; }
+export interface ChurnPorSquadRow { squad: string; mrr_ativo: number; mrr_perdido: number; percentual: number | null; }
 export interface ChurnPorPessoaRow { pessoa: string; mrr_ativo: number; mrr_perdido: number; percentual: number | null; }
 export interface ChurnPorMotivoRow { motivo: string; mrr_perdido: number; quantidade: number; percentual: number; }
 

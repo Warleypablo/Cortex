@@ -225,6 +225,40 @@ describe("ordenarPorTaxaDeChurn", () => {
     expect(r.map((i) => i.label)).toEqual(["Com carteira desde o início", "José Neto"]);
   });
 
+  it("item recém-admitido: percentual calculável mas mrr_perdido zero entra na lista (antes desaparecia se mrr_ativo fosse 0)", () => {
+    // A inclusão no bucket "com base" depende só de `percentual !== null`, nunca
+    // de `mrr_ativo`/`mrr_perdido` isolados. Um item sem churn ainda (mrr_perdido
+    // === 0) mas com percentual calculável (ex.: 0%) agora aparece — antes do fix,
+    // se a filtragem dependesse de `mrr_ativo` isolado do 1º mês, esse item podia
+    // não entrar em nenhum dos dois buckets e sumir.
+    const r = ordenarPorTaxaDeChurn([
+      { label: "Recém-admitido", mrr_ativo: 15000, mrr_perdido: 0, percentual: 0 },
+      { label: "ComChurn", mrr_ativo: 40000, mrr_perdido: 3000, percentual: 7.5 },
+    ]);
+    const recemAdmitido = r.find((i) => i.label === "Recém-admitido");
+    expect(recemAdmitido).toBeDefined();
+    expect(recemAdmitido!.noBase).toBe(false);
+    expect(r.map((i) => i.label)).toEqual(["ComChurn", "Recém-admitido"]);
+  });
+
+  it("não-regressão: item com mrr_ativo > 0 e percentual calculável permanece no bucket com base, ordenado por percentual", () => {
+    const r = ordenarPorTaxaDeChurn([
+      { label: "Baixo", mrr_ativo: 50000, mrr_perdido: 2000, percentual: 4 },
+      { label: "Alto", mrr_ativo: 80000, mrr_perdido: 9000, percentual: 11.25 },
+      { label: "Medio", mrr_ativo: 60000, mrr_perdido: 4200, percentual: 7 },
+    ]);
+    expect(r.map((i) => i.label)).toEqual(["Alto", "Medio", "Baixo"]);
+    expect(r.every((i) => i.noBase === false)).toBe(true);
+  });
+
+  it("caso que some: percentual null e mrr_perdido zero não aparece (sem base e sem churn, nada a mostrar)", () => {
+    // Comportamento intencional e inalterado pelo fix — trava contra regressão futura.
+    const r = ordenarPorTaxaDeChurn([
+      { label: "SemBaseSemChurn", mrr_ativo: 0, mrr_perdido: 0, percentual: null },
+    ]);
+    expect(r).toEqual([]);
+  });
+
   it("retorna lista vazia para entrada vazia", () => {
     expect(ordenarPorTaxaDeChurn([])).toEqual([]);
   });
