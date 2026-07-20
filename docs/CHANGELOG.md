@@ -1,5 +1,21 @@
 # Changelog
 
+## 2026-07-20 | feat(ads): funil NOVO "Gestão de Comunidade" — bootstrap de campanha CBO + lote Bastidores (Lucas, TP1897-1899)
+
+**O que foi feito:**
+- **Novo script `subir-novo-funil-ads.ts`:** bootstrap de FUNIL NOVO — cria a CAMPANHA (CBO) + conjunto(s) + ads pareados quando ainda NÃO existe campanha nem conjunto-irmão pra clonar. Diferente do `subir-pareado-ads.ts`, a copy vem EXPLÍCITA do data file (`COPY`) e só a config técnica (segmentação/otimização/atribuição/promoted_object/url_tags/page/ig) é clonada de um conjunto análogo (`CONFIG_ADSET`). Idempotente por nome de campanha.
+- **Lote Bastidores Comunidade (Lucas):** `comunidade-bastidores.data.ts` — 1 body × 3 hooks pareados (9x16+4x5) = 3 criativos / 6 vídeos (~660-680MB cada). Biblioteca TP1897-1899. Upload 6/6, 0 falhas.
+- **Meta:** campanha nova `120253259883810450` `[TP] [Leads] [CBO] [Broad] [Comunidade] - Teste de criativos` (OUTCOME_LEADS, CBO daily R$50 placeholder) + **1 conjunto** `120253259884610450` (Lucas, h01-03, b1c1) + **3 ads pareados, TUDO PAUSED**. Config clonada do conjunto 174 (Areia Movediça) da camp Creators CBO Broad Teste. Copy rascunhada do roteiro do Ichino e aprovada pelo Caio.
+- **⚠️ Link placeholder** (`turbopartners.com.br`): a LP do funil ainda não está pronta. No ativar, trocar pela LP real e reapontar os 3 ads (criativo Meta é imutável → recriar).
+
+**Por que:** primeiro funil de Gestão de Comunidade a rodar em pago; não tinha campanha (confirmado — as 3 com "comunidade" na conta são legado). Task-mãe ClickUp `86aje6wyg`, subtask gatilho "(Lucas) Subir ad" `86aje6x58`.
+
+**Arquivos alterados:** `scripts/ads/subir-novo-funil-ads.ts` (novo), `scripts/ads/comunidade-bastidores.data.ts` (novo).
+
+**Impacto arquitetural:** Nenhum em runtime — scripts CLI. Novo padrão reutilizável pra bootstrap de funil novo (próximos funis sem campanha).
+
+---
+
 ## 2026-07-17 | feat(ads): lote "Cliente Novo x Base - Victor" (TP1875-1896) — 4 conjuntos + 22 ads PAUSED (+ fix matchToken)
 
 **O que foi feito:**
