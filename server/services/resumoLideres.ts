@@ -53,6 +53,9 @@ export interface MetricasResumo {
   // true quando getVendasMrrBreakdown falhou e devolveu zeros no catch — o
   // Cross Sell (e portanto o Net Churn) fica subestimado/inflado sem aviso.
   crossIndisponivel: boolean;
+  // true quando getVendasNovasBreakdown falhou e devolveu zeros no catch —
+  // mrrAdicionado/pontualVendido saem como um mês real sem vendas, sem aviso.
+  vendasIndisponivel: boolean;
 }
 
 // Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real)
@@ -88,6 +91,19 @@ export function formatarMensagemResumo(
 ): string {
   const mes = MESES[agora.mes - 1];
   const mesAnterior = MESES[(agora.mes + 10) % 12];
+
+  // Bloco de avisos (rodapé, antes do 👀): cross sell primeiro, vendas novas
+  // depois — mesmo padrão para as duas classes de falha silenciosa de query.
+  const avisos: string[] = [];
+  if (m.crossIndisponivel) {
+    avisos.push("⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.");
+  }
+  if (m.vendasIndisponivel) {
+    avisos.push(
+      "⚠️ Vendas novas indisponíveis nesta apuração — MRR Adicionado e Pontual Vendido estão zerados por falha de apuração, não por ausência de vendas.",
+    );
+  }
+  const blocoAvisos = avisos.length > 0 ? avisos.join("\n") + "\n\n" : "";
 
   return `${saudacao(agora.hora)}, líderes!
 
@@ -168,7 +184,7 @@ Churn Total: ${formatarMoedaBR(m.churnTotal)}
 • MRR Ativo = Triagem + Onboarding + Ativo.
 • MRR Operando = Triagem + Onboarding + Ativo + Em Cancelamento.
 
-${m.crossIndisponivel ? "⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.\n\n" : ""}👀 Seguimos acompanhando diariamente os indicadores e atuando rapidamente sobre os principais desvios.`;
+${blocoAvisos}👀 Seguimos acompanhando diariamente os indicadores e atuando rapidamente sobre os principais desvios.`;
 }
 
 export function agoraSaoPaulo(date: Date = new Date()): {
@@ -214,12 +230,11 @@ interface CarteiraMrr {
   ativo: number;              // status 'ativo'
   triagemOnboarding: number;  // status 'triagem' + 'onboarding'
   emCancelamento: number;     // status 'em cancelamento'
-  mrrAtivo: number;           // triagem + onboarding + ativo
-  mrrOperando: number;        // mrrAtivo + em cancelamento
 }
 
 /**
- * Carteira MRR ao vivo, nos quatro recortes do modelo v3, em uma query só.
+ * Carteira MRR ao vivo, nos três recortes crus do modelo v3, em uma query só.
+ * mrrAtivo/mrrOperando são derivados a partir destes em `derivarMetricas` (pura).
  * 'pausado', 'entregue', 'excluído', 'não usar' e 'cancelado/inativo' ficam
  * fora de todos os recortes — ver spec 2026-07-20.
  */
@@ -232,16 +247,10 @@ async function getCarteiraMrr(): Promise<CarteiraMrr> {
     FROM "Clickup".cup_contratos
   `);
   const row = result.rows[0] as any;
-  const ativo = parseFloat(row?.ativo || "0");
-  const triagemOnboarding = parseFloat(row?.triagem_onboarding || "0");
-  const emCancelamento = parseFloat(row?.em_cancelamento || "0");
-  const mrrAtivo = ativo + triagemOnboarding;
   return {
-    ativo,
-    triagemOnboarding,
-    emCancelamento,
-    mrrAtivo,
-    mrrOperando: mrrAtivo + emCancelamento,
+    ativo: parseFloat(row?.ativo || "0"),
+    triagemOnboarding: parseFloat(row?.triagem_onboarding || "0"),
+    emCancelamento: parseFloat(row?.em_cancelamento || "0"),
   };
 }
 
@@ -340,7 +349,7 @@ export function derivarMetricas(entrada: {
   mrrMesAnterior: number;
   estoquePontualInicioMes: number;
   entregaPontual: number;
-  vendasNovas: { mrr: number; pontual: number };
+  vendasNovas: { mrr: number; pontual: number; erro?: boolean };
   breakdown: { crosssell: number; crosssell_pontual: number; erro?: boolean };
   churn: { total: number; ajustado: number; brutoSemAbono: number };
   churnPontual: { total: number; ajustado: number };
@@ -353,6 +362,8 @@ export function derivarMetricas(entrada: {
   const crossTotal = crossR + crossP;
   const netChurn = churn.ajustado - crossR;
   const netChurnBruto = churn.total - crossR;
+  const mrrAtivo = carteira.ativo + carteira.triagemOnboarding;
+  const mrrOperando = mrrAtivo + carteira.emCancelamento;
 
   return {
     mrrAdicionado: vendasNovas.mrr,
@@ -360,8 +371,8 @@ export function derivarMetricas(entrada: {
     carteiraTriagemOnboarding: carteira.triagemOnboarding,
     carteiraAtivo: carteira.ativo,
     carteiraEmCancelamento: carteira.emCancelamento,
-    mrrAtivo: carteira.mrrAtivo,
-    mrrOperando: carteira.mrrOperando,
+    mrrAtivo,
+    mrrOperando,
     entregaPontual,
     mrrMesAnterior,
     estoquePontualInicioMes,
@@ -383,6 +394,7 @@ export function derivarMetricas(entrada: {
     churnBrutoSemAbono: churn.brutoSemAbono,
     churnBrutoSemAbonoPct: (churn.brutoSemAbono / mrrMesAnterior) * 100,
     crossIndisponivel: breakdown.erro === true,
+    vendasIndisponivel: vendasNovas.erro === true,
   };
 }
 
@@ -399,16 +411,7 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
       getEstoquePontualInicioMes(),
     ]);
 
-  // getMrrInicioMes (metricsAdapter) engole erros retornando 0; sem base de MRR a
-  // mensagem seria enganosa, então abortamos. As métricas de venda podem ser
-  // legitimamente zero.
-  if (carteira.mrrAtivo <= 0 || mrrMesAnterior <= 0) {
-    throw new Error(
-      `Métricas de MRR inválidas (mrrAtivo=${carteira.mrrAtivo}, mrrMesAnterior=${mrrMesAnterior}) — envio abortado`,
-    );
-  }
-
-  return derivarMetricas({
+  const metricas = derivarMetricas({
     carteira,
     mrrMesAnterior,
     estoquePontualInicioMes,
@@ -418,6 +421,17 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
     churn,
     churnPontual,
   });
+
+  // getMrrInicioMes (metricsAdapter) engole erros retornando 0; sem base de MRR a
+  // mensagem seria enganosa, então abortamos. As métricas de venda podem ser
+  // legitimamente zero.
+  if (metricas.mrrAtivo <= 0 || mrrMesAnterior <= 0) {
+    throw new Error(
+      `Métricas de MRR inválidas (mrrAtivo=${metricas.mrrAtivo}, mrrMesAnterior=${mrrMesAnterior}) — envio abortado`,
+    );
+  }
+
+  return metricas;
 }
 
 // ============================================

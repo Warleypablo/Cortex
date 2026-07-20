@@ -784,6 +784,7 @@ export async function getCrosssellMrr(): Promise<number> {
 export interface VendasNovasBreakdown {
   mrr: number;
   pontual: number;
+  erro?: boolean;
 }
 
 /**
@@ -834,7 +835,7 @@ export async function getVendasNovasBreakdown(
     };
   } catch (error) {
     console.error("[OKR] Error fetching Vendas Novas Breakdown:", error);
-    return { mrr: 0, pontual: 0 };
+    return { mrr: 0, pontual: 0, erro: true };
   }
 }
 

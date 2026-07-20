@@ -41,6 +41,7 @@ const METRICAS: MetricasResumo = {
   churnBrutoSemAbono: 55000,
   churnBrutoSemAbonoPct: (55000 / 1137868) * 100,
   crossIndisponivel: false,
+  vendasIndisponivel: false,
 };
 
 const MENSAGEM_ESPERADA = `☀️ Boa tarde, líderes!
@@ -200,6 +201,47 @@ describe("formatarMensagemResumo", () => {
     expect(msg).not.toContain("indisponível");
     expect(msg).not.toContain("⚠️");
   });
+
+  // Aviso de vendas novas indisponíveis: mesmo padrão do aviso de Cross Sell —
+  // quando getVendasNovasBreakdown falha, mrrAdicionado/pontualVendido saem
+  // zerados sem sinalização; vendasIndisponivel dispara a linha de aviso.
+  const AVISO_CROSS = "⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.";
+  const AVISO_VENDAS =
+    "⚠️ Vendas novas indisponíveis nesta apuração — MRR Adicionado e Pontual Vendido estão zerados por falha de apuração, não por ausência de vendas.";
+
+  it("nenhum aviso: mensagem sai byte a byte como hoje", () => {
+    const msg = formatarMensagemResumo(
+      { ...METRICAS, crossIndisponivel: false, vendasIndisponivel: false },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
+    );
+    expect(msg).toBe(MENSAGEM_ESPERADA);
+  });
+
+  it("só cross indisponível: só o aviso de cross, seguido de linha em branco e do 👀", () => {
+    const msg = formatarMensagemResumo(
+      { ...METRICAS, crossIndisponivel: true, vendasIndisponivel: false },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
+    );
+    expect(msg).toContain(`${AVISO_CROSS}\n\n👀 Seguimos`);
+    expect(msg).not.toContain(AVISO_VENDAS);
+  });
+
+  it("só vendas indisponível: só o aviso de vendas, seguido de linha em branco e do 👀", () => {
+    const msg = formatarMensagemResumo(
+      { ...METRICAS, crossIndisponivel: false, vendasIndisponivel: true },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
+    );
+    expect(msg).toContain(`${AVISO_VENDAS}\n\n👀 Seguimos`);
+    expect(msg).not.toContain(AVISO_CROSS);
+  });
+
+  it("ambos indisponíveis: cross primeiro, vendas depois, uma linha em branco antes do 👀", () => {
+    const msg = formatarMensagemResumo(
+      { ...METRICAS, crossIndisponivel: true, vendasIndisponivel: true },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
+    );
+    expect(msg).toContain(`${AVISO_CROSS}\n${AVISO_VENDAS}\n\n👀 Seguimos`);
+  });
 });
 
 describe("derivarMetricas", () => {
@@ -212,8 +254,6 @@ describe("derivarMetricas", () => {
       ativo: 1069598,
       triagemOnboarding: 150789.28,
       emCancelamento: 96805,
-      mrrAtivo: 1220387.28, // ativo + triagemOnboarding
-      mrrOperando: 1317192.28, // mrrAtivo + emCancelamento
     },
     mrrMesAnterior: 1137868,
     estoquePontualInicioMes: 2090519.35,
@@ -261,13 +301,26 @@ describe("derivarMetricas", () => {
       ativo: 700000,
       triagemOnboarding: 100000,
       emCancelamento: 50000,
-      mrrAtivo: 800000, // ativo + triagemOnboarding
-      mrrOperando: 850000, // mrrAtivo + emCancelamento
     };
     const r = derivarMetricas({ ...ENTRADA_BASE, carteira });
     expect(r.carteiraAtivo).toBe(700000);
     expect(r.mrrAtivo).toBe(800000);
     expect(r.carteiraAtivo).not.toBe(r.mrrAtivo);
+  });
+
+  // getCarteiraMrr faz I/O e não é exportada — mrrAtivo/mrrOperando agora são
+  // derivados aqui dentro (função pura), com valores bem distintos para que
+  // dropar uma parcela da soma quebre o teste em vez de coincidir por acaso.
+  it("mrrAtivo é ativo + triagemOnboarding", () => {
+    const carteira = { ativo: 500000, triagemOnboarding: 30000, emCancelamento: 7000 };
+    const r = derivarMetricas({ ...ENTRADA_BASE, carteira });
+    expect(r.mrrAtivo).toBe(530000);
+  });
+
+  it("mrrOperando é mrrAtivo + emCancelamento", () => {
+    const carteira = { ativo: 500000, triagemOnboarding: 30000, emCancelamento: 7000 };
+    const r = derivarMetricas({ ...ENTRADA_BASE, carteira });
+    expect(r.mrrOperando).toBe(537000);
   });
 
   it("percentuais de MRR usam mrrMesAnterior; percentuais de pontual usam estoquePontualInicioMes", () => {
@@ -298,6 +351,17 @@ describe("derivarMetricas", () => {
 
     const semErro = derivarMetricas(ENTRADA_BASE);
     expect(semErro.crossIndisponivel).toBe(false);
+  });
+
+  it("vendasNovas com erro:true produz vendasIndisponivel:true; sem o campo produz false", () => {
+    const comErro = derivarMetricas({
+      ...ENTRADA_BASE,
+      vendasNovas: { ...ENTRADA_BASE.vendasNovas, erro: true },
+    });
+    expect(comErro.vendasIndisponivel).toBe(true);
+
+    const semErro = derivarMetricas(ENTRADA_BASE);
+    expect(semErro.vendasIndisponivel).toBe(false);
   });
 });
 
