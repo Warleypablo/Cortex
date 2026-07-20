@@ -139,6 +139,39 @@ def _sanitize_line_for_text(line: str) -> str:
     return re.sub(r"\*+", "", line)
 
 
+def _join_orphan_bold_markers(lines: list[str]) -> list[str]:
+    """
+    Cola um marcador de bold "órfão" (linha que é só `**`) na linha seguinte.
+
+    O export do Google Docs às vezes quebra o `**` de ABERTURA de um header pra
+    uma linha própria, deixando o texto na linha de baixo:
+
+        **CONTAGEM REGRESSIVA**
+        **                       ← `**` de abertura sozinho
+        15 DIAS ANTES**          ← header REAL, mas `_is_post_header` exige a
+                                   linha começar com `**` e ignorava este
+
+    Sem isso o header "15 DIAS ANTES" era invisível: a seção inteira (com a
+    LEGENDA) era absorvida pelo header anterior ("CONTAGEM REGRESSIVA") e o card
+    "15 DIAS" caía em "sem match de header" (legenda vazia → agente não postava).
+    Juntar o `**` órfão reconstrói `**15 DIAS ANTES**`, que o detector reconhece.
+    Marcadores órfãos consecutivos acumulam (`****...`), e `_strip_bold` remove o
+    excesso — inofensivo. Um `**` órfão no fim do doc vira uma linha `**` solta
+    (não vira header).
+    """
+    out: list[str] = []
+    pending = ""
+    for ln in lines:
+        if ln.strip() == "**":
+            pending += "**"
+            continue
+        out.append(pending + ln)
+        pending = ""
+    if pending:
+        out.append(pending)
+    return out
+
+
 @dataclass
 class ParsedSection:
     header: str          # como aparece no doc (UPPER)
@@ -159,7 +192,7 @@ def parse_doc(content: str) -> list[ParsedSection]:
     # nbsp → space
     content = content.replace("\xa0", " ")
 
-    lines = content.splitlines()
+    lines = _join_orphan_bold_markers(content.splitlines())
     sections: list[ParsedSection] = []
 
     # Primeiro passe: acha índices das linhas que são headers de post.
