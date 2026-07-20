@@ -191,6 +191,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
             COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
             COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0 OR valorp > 0) AS clientes_total,
             COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0) AS clientes_rec,
+            COUNT(DISTINCT id_task) FILTER (WHERE valorp > 0) AS clientes_pont,
             COALESCE(SUM(valorr), 0) AS mrr_operando,
             COALESCE(SUM(valorp), 0) AS pontual_operando,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
@@ -203,6 +204,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
           COALESCE(a.contas_rec, 0)        AS contas_rec,
           COALESCE(a.clientes_total, 0)    AS clientes_total,
           COALESCE(a.clientes_rec, 0)      AS clientes_rec,
+          COALESCE(a.clientes_pont, 0)     AS clientes_pont,
           COALESCE(a.mrr_operando, 0)      AS mrr_operando,
           COALESCE(a.pontual_operando, 0)  AS pontual_operando,
           COALESCE(a.mrr_ativo, 0)         AS mrr_ativo,
@@ -233,7 +235,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ),
         contratos_expanded AS (
           SELECT c.id_subtask, c.id_task, TRIM(rp.part) AS cs_part,
-                 COALESCE(c.valorr, 0) AS valorr, c.status
+                 COALESCE(c.valorr, 0) AS valorr, COALESCE(c.valorp, 0) AS valorp, c.status
           FROM "Clickup".cup_contratos c
           CROSS JOIN LATERAL regexp_split_to_table(c.cs_responsavel, ';') AS rp(part)
           WHERE c.status IN ('ativo','onboarding','em cancelamento')
@@ -241,7 +243,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ),
         best AS (
           SELECT DISTINCT ON (ce.id_subtask, ce.cs_part)
-            p.nome AS pessoa, ce.id_subtask, ce.id_task, ce.valorr, ce.status
+            p.nome AS pessoa, ce.id_subtask, ce.id_task, ce.valorr, ce.valorp, ce.status
           FROM contratos_expanded ce
           JOIN pessoas p ON similarity(p.nome, ce.cs_part) > 0.4
           ORDER BY ce.id_subtask, ce.cs_part, similarity(p.nome, ce.cs_part) DESC
@@ -249,8 +251,11 @@ export function registerCapacityRoutes(app: Express, db: any) {
         agg AS (
           SELECT pessoa,
             COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
+            COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0 OR valorp > 0) AS clientes_total,
             COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0) AS clientes_rec,
+            COUNT(DISTINCT id_task) FILTER (WHERE valorp > 0) AS clientes_pont,
             COALESCE(SUM(valorr), 0) AS mrr_operando,
+            COALESCE(SUM(valorp), 0) AS pontual_operando,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'onboarding'), 0) AS mrr_onboarding,
             COALESCE(SUM(valorr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
@@ -258,8 +263,11 @@ export function registerCapacityRoutes(app: Express, db: any) {
         )
         SELECT p.nome,
           COALESCE(a.contas_rec, 0)       AS contas_rec,
+          COALESCE(a.clientes_total, 0)   AS clientes_total,
           COALESCE(a.clientes_rec, 0)     AS clientes_rec,
+          COALESCE(a.clientes_pont, 0)    AS clientes_pont,
           COALESCE(a.mrr_operando, 0)     AS mrr_operando,
+          COALESCE(a.pontual_operando, 0) AS pontual_operando,
           COALESCE(a.mrr_ativo, 0)        AS mrr_ativo,
           COALESCE(a.mrr_onboarding, 0)   AS mrr_onboarding,
           COALESCE(a.mrr_cancelamento, 0) AS mrr_cancelamento,
@@ -291,7 +299,8 @@ export function registerCapacityRoutes(app: Express, db: any) {
           )
         ),
         subs AS (
-          SELECT cda.label, cda.task_id, c.id_subtask, COALESCE(c.valorr, 0) AS vr, c.status
+          SELECT cda.label, cda.task_id, c.id_subtask,
+                 COALESCE(c.valorr, 0) AS vr, COALESCE(c.valorp, 0) AS vp, c.status
           FROM clientes_do_account cda
           JOIN "Clickup".cup_contratos c
             ON c.id_task = cda.task_id AND c.status IN ('ativo','em cancelamento')
@@ -300,6 +309,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
           SELECT label,
             COUNT(DISTINCT id_subtask) AS contratos,
             COALESCE(SUM(vr), 0) AS mrr_operando,
+            COALESCE(SUM(vp), 0) AS pontual_operando,
             COALESCE(SUM(vr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
             COALESCE(SUM(vr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
           FROM subs GROUP BY label
@@ -307,14 +317,23 @@ export function registerCapacityRoutes(app: Express, db: any) {
         -- cli conta sobre subs (contrato vivo), não sobre clientes_do_account
         -- (que casa por responsavel_geral sem olhar status do contrato) — senão um
         -- cliente cujos contratos estão todos cancelados ainda contaria como cliente.
-        cli AS (SELECT label, COUNT(DISTINCT task_id) AS clientes FROM subs GROUP BY label)
+        cli AS (
+          SELECT label,
+            COUNT(DISTINCT task_id) AS clientes,
+            COUNT(DISTINCT task_id) FILTER (WHERE vr > 0) AS clientes_rec,
+            COUNT(DISTINCT task_id) FILTER (WHERE vp > 0) AS clientes_pont
+          FROM subs GROUP BY label
+        )
         SELECT a.label AS nome, a.match,
           COALESCE(ag.mrr_operando, 0)     AS mrr_operando,
           COALESCE(ag.mrr_ativo, 0)        AS mrr_ativo,
           0                                AS mrr_onboarding,
           COALESCE(ag.mrr_cancelamento, 0) AS mrr_cancelamento,
+          COALESCE(ag.pontual_operando, 0) AS pontual_operando,
           COALESCE(ag.contratos, 0)        AS contas_rec,
-          COALESCE(cli.clientes, 0)        AS clientes_rec,
+          COALESCE(cli.clientes, 0)        AS clientes_total,
+          COALESCE(cli.clientes_rec, 0)    AS clientes_rec,
+          COALESCE(cli.clientes_pont, 0)   AS clientes_pont,
           cap.cap_mrr,
           cap.cap_contas,
           COALESCE(cap.cap_clientes, ${CAP_CONTAS_ACCOUNT}) AS cap_clientes
@@ -347,7 +366,9 @@ export function registerCapacityRoutes(app: Express, db: any) {
         agg AS (
           SELECT m.nome, m.categoria, m.ordem, m.cap_contratos, m.cap_clientes,
             COUNT(*) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS op_recorrente,
+            COUNT(DISTINCT c.id_task) FILTER (WHERE (COALESCE(c.valorr,0) > 0 OR COALESCE(c.valorp,0) > 0) AND c.status IN ('ativo','onboarding','em cancelamento')) AS clientes_total,
             COUNT(DISTINCT c.id_task) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS clientes_rec,
+            COUNT(DISTINCT c.id_task) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS clientes_pont,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')), 0) AS mrr_operando,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'ativo'), 0) AS mrr_ativo,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'onboarding'), 0) AS mrr_onboarding,

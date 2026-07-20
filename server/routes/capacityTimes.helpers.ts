@@ -37,7 +37,9 @@ export interface ComercialRow {
   contas_ativas: number;
   cap_contas: number | null;
   dif_contas: number | null;
-  clientes: number; // clientes distintos da carteira
+  clientes: number; // clientes distintos da carteira (recorrente OU pontual)
+  clientes_rec: number; // clientes com contrato recorrente (valorr > 0)
+  clientes_pont: number; // clientes com contrato pontual (valorp > 0)
   cap_clientes: number | null;
   dif_clientes: number | null;
   util_mrr_pct: number | null; // mrr_atual / cap_mrr
@@ -46,11 +48,12 @@ export interface ComercialRow {
 }
 
 export function toComercialRow(raw: any): ComercialRow {
-  const mrr_atual = num(raw.mrr_operando);
+  // "Faturamento (R+P)": recorrente + pontual, como a Selva já fazia.
+  const mrr_atual = num(raw.mrr_operando) + num(raw.pontual_operando);
   const cap_mrr = numOrNull(raw.cap_mrr);
   const contas_ativas = num(raw.contas_rec ?? raw.contas_ativas);
   const cap_contas = numOrNull(raw.cap_contas);
-  const clientes = num(raw.clientes_rec ?? raw.clientes);
+  const clientes = num(raw.clientes_total ?? raw.clientes_rec ?? raw.clientes);
   const cap_clientes = numOrNull(raw.cap_clientes);
   const util_mrr_pct = utilPct(mrr_atual, cap_mrr);
   return {
@@ -66,6 +69,8 @@ export function toComercialRow(raw: any): ComercialRow {
     cap_contas,
     dif_contas: diff(cap_contas, contas_ativas),
     clientes,
+    clientes_rec: num(raw.clientes_rec),
+    clientes_pont: num(raw.clientes_pont),
     cap_clientes,
     dif_clientes: diff(cap_clientes, clientes),
     util_mrr_pct,
@@ -85,6 +90,8 @@ export interface SelvaRow {
   ticket_medio: number | null; // faturamento / contas
   cap_fat: number | null; // ticket_medio * meta_contas_designer
   clientes: number;
+  clientes_rec: number;
+  clientes_pont: number;
   cap_clientes: number | null;
   dif_clientes: number | null;
   util_clientes_pct: number | null;
@@ -109,6 +116,8 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
     ticket_medio,
     cap_fat,
     clientes,
+    clientes_rec: num(raw.clientes_rec),
+    clientes_pont: num(raw.clientes_pont),
     cap_clientes,
     dif_clientes: diff(cap_clientes, clientes),
     util_clientes_pct: utilPct(clientes, cap_clientes),
@@ -123,6 +132,8 @@ export interface CsRow {
   op_recorrente: number;
   cap_contratos: number | null; // capacity de contratos (cap_contas, fallback cap_recorrente)
   clientes: number;
+  clientes_rec: number;
+  clientes_pont: number;
   cap_clientes: number | null;
   dif_clientes: number | null;
   op_pontual: number;
@@ -148,13 +159,15 @@ export function toCsRow(raw: any): CsRow {
   const op_total = op_recorrente + op_pontual;
   const cap_contratos = numOrNull(raw.cap_contratos);
   const mrr_operando = num(raw.mrr_operando);
-  const clientes = num(raw.clientes_rec);
+  const clientes = num(raw.clientes_total ?? raw.clientes_rec);
   const cap_clientes = numOrNull(raw.cap_clientes);
   return {
     nome: String(raw.nome),
     op_recorrente,
     cap_contratos,
     clientes,
+    clientes_rec: num(raw.clientes_rec),
+    clientes_pont: num(raw.clientes_pont),
     cap_clientes,
     dif_clientes: diff(cap_clientes, clientes),
     op_pontual,

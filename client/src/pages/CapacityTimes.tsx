@@ -23,6 +23,8 @@ interface ComercialRow {
   cap_mrr: number | null; dif_mrr: number | null;
   contas_ativas: number; cap_contas: number | null; dif_contas: number | null;
   clientes: number;
+  clientes_rec: number;
+  clientes_pont: number;
   cap_clientes: number | null;
   dif_clientes: number | null;
   util_mrr_pct: number | null;
@@ -37,6 +39,8 @@ interface SelvaRow {
   ticket_medio: number | null;
   cap_fat: number | null;
   clientes: number;
+  clientes_rec: number;
+  clientes_pont: number;
   cap_clientes: number | null;
   dif_clientes: number | null;
   util_clientes_pct: number | null;
@@ -52,6 +56,8 @@ interface CsRow {
   mrr_operando: number; mrr_ativo: number; mrr_onboarding: number; mrr_cancelamento: number;
   cap_fat: number | null;
   clientes: number;
+  clientes_rec: number;
+  clientes_pont: number;
   cap_clientes: number | null;
   dif_clientes: number | null;
   util_fat_pct: number | null;
@@ -187,16 +193,18 @@ function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSel
         <TableHeader>
           <TableRow className="border-gray-200 dark:border-zinc-700">
             <TableHead className={th()}>Nome</TableHead>
-            <TableHead className={th("text-right")}>MRR Atual</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento recorrente + pontual da carteira">Faturamento (R+P)</TableHead>
             <TableHead className={th("text-right")} title="Cap. Faturamento ($) configurada na aba Configurar">Cap. FAT ($)</TableHead>
             <TableHead className={th("text-right")}>Δ FAT</TableHead>
             <TableHead className={th("text-right")} title="MRR / contas ativas">Ticket Médio</TableHead>
             <TableHead className={th("text-right")} title="Participação no MRR do time">% Time</TableHead>
             <TableHead className={th("text-right")}>Contratos</TableHead>
-            <TableHead className={th("text-right")} title="Clientes distintos da carteira">Clientes</TableHead>
+            <TableHead className={th("text-right")} title="Clientes distintos da carteira (recorrente ou pontual)">Clientes</TableHead>
+            <TableHead className={th("text-right")} title="Clientes com contrato recorrente">Clientes Rec.</TableHead>
+            <TableHead className={th("text-right")} title="Clientes com contrato pontual">Clientes Pont.</TableHead>
             <TableHead className={th("text-right")} title="Meta de clientes configurada na aba Configurar">Cap. Clientes</TableHead>
             <TableHead className={th("text-right")}>Δ Clientes</TableHead>
-            <TableHead className={th("text-right")} title="MRR Atual / Cap. FAT">% FAT</TableHead>
+            <TableHead className={th("text-right")} title="Faturamento (R+P) / Cap. FAT">% FAT</TableHead>
             <TableHead className={th("text-right")} title="Clientes / Cap. Clientes">% Clientes</TableHead>
           </TableRow>
         </TableHeader>
@@ -219,6 +227,8 @@ function ComercialTable({ rows, onSelect, campo }: { rows: ComercialRow[]; onSel
               <TableCell className="text-right text-gray-700 dark:text-zinc-300">{pctText(pct(r.mrr_atual, teamMrr))}</TableCell>
               <TableCell className={td("text-right")}>{r.contas_ativas}</TableCell>
               <TableCell className={td("text-right")}>{r.clientes}</TableCell>
+              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{r.clientes_rec}</TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{r.clientes_pont}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_clientes)}</TableCell>
               <TableCell className={cn("text-right", r.dif_clientes === null ? "text-gray-400 dark:text-zinc-500" : r.dif_clientes < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_clientes)}</TableCell>
               <TableCell className="text-right"><UtilBar pct={r.util_mrr_pct} /></TableCell>
@@ -240,7 +250,9 @@ function SelvaTable({ rows, onSelect }: { rows: SelvaRow[]; onSelect: (s: Drawer
           <TableRow className="border-gray-200 dark:border-zinc-700">
             <TableHead className={th()}>Designer</TableHead>
             <TableHead className={th("text-right")} title="Contas onde o designer é responsável na subtask">Contas</TableHead>
-            <TableHead className={th("text-right")} title="Clientes distintos da carteira">Clientes</TableHead>
+            <TableHead className={th("text-right")} title="Clientes distintos da carteira (recorrente ou pontual)">Clientes</TableHead>
+            <TableHead className={th("text-right")} title="Clientes com contrato recorrente">Clientes Rec.</TableHead>
+            <TableHead className={th("text-right")} title="Clientes com contrato pontual">Clientes Pont.</TableHead>
             <TableHead className={th("text-right")} title="Meta de clientes configurada na aba Configurar">Cap. Clientes</TableHead>
             <TableHead className={th("text-right")}>Δ Clientes</TableHead>
             <TableHead className={th("text-right")} title="Faturamento recorrente + pontual da carteira">Faturamento (Rec+Pont)</TableHead>
@@ -263,6 +275,8 @@ function SelvaTable({ rows, onSelect }: { rows: SelvaRow[]; onSelect: (s: Drawer
               </TableCell>
               <TableCell className={td("text-right")}>{r.contas}</TableCell>
               <TableCell className={td("text-right")}>{r.clientes}</TableCell>
+              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{r.clientes_rec}</TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{r.clientes_pont}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_clientes)}</TableCell>
               <TableCell className={cn("text-right", r.dif_clientes === null ? "text-gray-400 dark:text-zinc-500" : r.dif_clientes < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_clientes)}</TableCell>
               <TableCell className={td("text-right")}>{formatCurrency(r.faturamento)}</TableCell>
@@ -291,7 +305,7 @@ function ComercialTab({ title, rows, onSelect, campo }: { title: string; rows: C
   const cards = [
     { label: "Pessoas", value: String(rows.length) },
     { label: "Contas (total)", value: String(totContas) },
-    { label: "MRR Atual", value: formatCurrency(totMrr) },
+    { label: "Faturamento (R+P)", value: formatCurrency(totMrr) },
     { label: "Ticket médio", value: moneyOrDash(ticket(totMrr, totContas)) },
     { label: "% em risco", value: pctText(riscoPct), tone: riscoTone(riscoPct) },
     { label: "Capacity FAT (média)", value: pctText(mediaMrr), tone: utilColor(mediaMrr) },
@@ -353,7 +367,9 @@ function CsTable({ rows, onSelect }: { rows: CsRow[]; onSelect: (s: DrawerSeleca
             <TableHead className={th()}>Nome</TableHead>
             <TableHead className={th("text-right")}>Recorrente</TableHead>
             <TableHead className={th("text-right")}>Pontual</TableHead>
-            <TableHead className={th("text-right")} title="Clientes distintos da carteira">Clientes</TableHead>
+            <TableHead className={th("text-right")} title="Clientes distintos da carteira (recorrente ou pontual)">Clientes</TableHead>
+            <TableHead className={th("text-right")} title="Clientes com contrato recorrente">Clientes Rec.</TableHead>
+            <TableHead className={th("text-right")} title="Clientes com contrato pontual">Clientes Pont.</TableHead>
             <TableHead className={th("text-right")} title="Meta de clientes configurada na aba Configurar">Cap. Clientes</TableHead>
             <TableHead className={th("text-right")}>Δ Clientes</TableHead>
             <TableHead className={th("text-right")}>MRR Operando</TableHead>
@@ -376,6 +392,8 @@ function CsTable({ rows, onSelect }: { rows: CsRow[]; onSelect: (s: DrawerSeleca
               <TableCell className={td("text-right")}>{r.op_recorrente}</TableCell>
               <TableCell className={td("text-right")}>{r.op_pontual}</TableCell>
               <TableCell className={td("text-right")}>{r.clientes}</TableCell>
+              <TableCell className="text-right text-gray-700 dark:text-zinc-300">{r.clientes_rec}</TableCell>
+              <TableCell className="text-right text-gray-500 dark:text-zinc-400">{r.clientes_pont}</TableCell>
               <TableCell className="text-right text-gray-500 dark:text-zinc-400">{numOrDash(r.cap_clientes)}</TableCell>
               <TableCell className={cn("text-right", r.dif_clientes === null ? "text-gray-400 dark:text-zinc-500" : r.dif_clientes < 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400")}>{numOrDash(r.dif_clientes)}</TableCell>
               <TableCell className={td("text-right")}>
