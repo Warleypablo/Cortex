@@ -41,10 +41,10 @@ export const BLACK_ACCOUNTS: { label: string; match: string; rhNome: string }[] 
 // Calibrar com o time de operações; valor inicial é uma estimativa.
 export const META_CONTAS_DESIGNER = 20;
 
-// Aba Selva bloqueada temporariamente: poucos designers estão setados como
-// responsável nas subtasks (carteira magra). Trocar para false quando o
-// preenchimento no ClickUp estiver maduro.
-export const SELVA_BLOQUEADA = true;
+// Aba Selva liberada em 2026-07-20. Atenção: a carteira depende de o designer
+// estar como responsável na subtask do ClickUp — quem não estiver aparece com
+// carteira vazia, o que é falta de preenchimento, não ociosidade.
+export const SELVA_BLOQUEADA = false;
 
 // Capacity de contas (clientes) por Account na Black. Default; pode ser
 // sobrescrito por pessoa via cap_clientes em cortex_core.capacity_metas (aba Configurar).
