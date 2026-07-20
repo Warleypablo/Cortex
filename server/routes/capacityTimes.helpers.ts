@@ -35,6 +35,9 @@ export interface ComercialRow {
   cap_mrr: number | null; // exibida como "Cap. FAT ($)" — mesmo campo que a Configurar grava (capacity_metas.cap_mrr)
   dif_mrr: number | null;
   contas_ativas: number;
+  contratos: number; // subtasks distintas (recorrente OU pontual)
+  contratos_rec: number; // subtasks com valorr > 0
+  contratos_pont: number; // subtasks com valorp > 0
   cap_contas: number | null;
   dif_contas: number | null;
   clientes: number; // clientes distintos da carteira (recorrente OU pontual)
@@ -66,6 +69,9 @@ export function toComercialRow(raw: any): ComercialRow {
     cap_mrr,
     dif_mrr: diff(cap_mrr, mrr_atual),
     contas_ativas,
+    contratos: num(raw.contas_total ?? raw.contas_rec),
+    contratos_rec: num(raw.contas_rec),
+    contratos_pont: num(raw.contas_pont),
     cap_contas,
     dif_contas: diff(cap_contas, contas_ativas),
     clientes,
@@ -84,6 +90,9 @@ export function toComercialRow(raw: any): ComercialRow {
 export interface SelvaRow {
   nome: string;
   contas: number; // contas (rec + pontual) onde o designer é responsável
+  contratos: number;
+  contratos_rec: number;
+  contratos_pont: number;
   fat_recorrente: number;
   fat_pontual: number;
   faturamento: number; // rec + pont
@@ -110,6 +119,9 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
   return {
     nome: String(raw.nome),
     contas,
+    contratos: contas,
+    contratos_rec: num(raw.contas_rec),
+    contratos_pont: num(raw.contas_pont),
     fat_recorrente,
     fat_pontual,
     faturamento,
@@ -130,6 +142,9 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
 export interface CsRow {
   nome: string;
   op_recorrente: number;
+  contratos: number;
+  contratos_rec: number;
+  contratos_pont: number;
   cap_contratos: number | null; // capacity de contratos (cap_contas, fallback cap_recorrente)
   clientes: number;
   clientes_rec: number;
@@ -158,12 +173,15 @@ export function toCsRow(raw: any): CsRow {
   const op_pontual = num(raw.op_pontual);
   const op_total = op_recorrente + op_pontual;
   const cap_contratos = numOrNull(raw.cap_contratos);
-  const mrr_operando = num(raw.mrr_operando);
+  const mrr_operando = num(raw.mrr_operando) + num(raw.pontual_operando); // Faturamento (R+P)
   const clientes = num(raw.clientes_total ?? raw.clientes_rec);
   const cap_clientes = numOrNull(raw.cap_clientes);
   return {
     nome: String(raw.nome),
     op_recorrente,
+    contratos: num(raw.contas_total ?? raw.op_recorrente),
+    contratos_rec: num(raw.contas_rec ?? op_recorrente),
+    contratos_pont: num(raw.contas_pont ?? op_pontual),
     cap_contratos,
     clientes,
     clientes_rec: num(raw.clientes_rec),

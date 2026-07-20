@@ -189,6 +189,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
           SELECT pessoa, grupo,
             COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0 OR valorp > 0) AS contas_total,
             COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE valorp > 0) AS contas_pont,
             COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0 OR valorp > 0) AS clientes_total,
             COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0) AS clientes_rec,
             COUNT(DISTINCT id_task) FILTER (WHERE valorp > 0) AS clientes_pont,
@@ -202,6 +203,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
         SELECT p.nome, p.grupo,
           COALESCE(a.contas_total, 0)      AS contas_total,
           COALESCE(a.contas_rec, 0)        AS contas_rec,
+          COALESCE(a.contas_pont, 0)       AS contas_pont,
           COALESCE(a.clientes_total, 0)    AS clientes_total,
           COALESCE(a.clientes_rec, 0)      AS clientes_rec,
           COALESCE(a.clientes_pont, 0)     AS clientes_pont,
@@ -250,7 +252,9 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ),
         agg AS (
           SELECT pessoa,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0 OR valorp > 0) AS contas_total,
             COUNT(DISTINCT id_subtask) FILTER (WHERE valorr > 0) AS contas_rec,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE valorp > 0) AS contas_pont,
             COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0 OR valorp > 0) AS clientes_total,
             COUNT(DISTINCT id_task) FILTER (WHERE valorr > 0) AS clientes_rec,
             COUNT(DISTINCT id_task) FILTER (WHERE valorp > 0) AS clientes_pont,
@@ -262,7 +266,9 @@ export function registerCapacityRoutes(app: Express, db: any) {
           FROM best GROUP BY pessoa
         )
         SELECT p.nome,
+          COALESCE(a.contas_total, 0)     AS contas_total,
           COALESCE(a.contas_rec, 0)       AS contas_rec,
+          COALESCE(a.contas_pont, 0)      AS contas_pont,
           COALESCE(a.clientes_total, 0)   AS clientes_total,
           COALESCE(a.clientes_rec, 0)     AS clientes_rec,
           COALESCE(a.clientes_pont, 0)    AS clientes_pont,
@@ -307,7 +313,9 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ),
         agg AS (
           SELECT label,
-            COUNT(DISTINCT id_subtask) AS contratos,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE vr > 0 OR vp > 0) AS contratos,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE vr > 0) AS contratos_rec,
+            COUNT(DISTINCT id_subtask) FILTER (WHERE vp > 0) AS contratos_pont,
             COALESCE(SUM(vr), 0) AS mrr_operando,
             COALESCE(SUM(vp), 0) AS pontual_operando,
             COALESCE(SUM(vr) FILTER (WHERE status = 'ativo'), 0) AS mrr_ativo,
@@ -330,7 +338,9 @@ export function registerCapacityRoutes(app: Express, db: any) {
           0                                AS mrr_onboarding,
           COALESCE(ag.mrr_cancelamento, 0) AS mrr_cancelamento,
           COALESCE(ag.pontual_operando, 0) AS pontual_operando,
-          COALESCE(ag.contratos, 0)        AS contas_rec,
+          COALESCE(ag.contratos, 0)        AS contas_total,
+          COALESCE(ag.contratos_rec, 0)    AS contas_rec,
+          COALESCE(ag.contratos_pont, 0)   AS contas_pont,
           COALESCE(cli.clientes, 0)        AS clientes_total,
           COALESCE(cli.clientes_rec, 0)    AS clientes_rec,
           COALESCE(cli.clientes_pont, 0)   AS clientes_pont,
@@ -365,7 +375,10 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ),
         agg AS (
           SELECT m.nome, m.categoria, m.ordem, m.cap_contratos, m.cap_clientes,
+            COUNT(DISTINCT c.id_subtask) FILTER (WHERE (COALESCE(c.valorr,0) > 0 OR COALESCE(c.valorp,0) > 0) AND c.status IN ('ativo','onboarding','em cancelamento')) AS contas_total,
             COUNT(*) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS op_recorrente,
+            COUNT(DISTINCT c.id_subtask) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS contas_rec,
+            COUNT(DISTINCT c.id_subtask) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS contas_pont,
             COUNT(DISTINCT c.id_task) FILTER (WHERE (COALESCE(c.valorr,0) > 0 OR COALESCE(c.valorp,0) > 0) AND c.status IN ('ativo','onboarding','em cancelamento')) AS clientes_total,
             COUNT(DISTINCT c.id_task) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS clientes_rec,
             COUNT(DISTINCT c.id_task) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')) AS clientes_pont,
@@ -373,7 +386,8 @@ export function registerCapacityRoutes(app: Express, db: any) {
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'ativo'), 0) AS mrr_ativo,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'onboarding'), 0) AS mrr_onboarding,
             COALESCE(SUM(c.valorr) FILTER (WHERE COALESCE(c.valorr,0) > 0 AND c.status = 'em cancelamento'), 0) AS mrr_cancelamento,
-            COUNT(*) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding')) AS op_pontual
+            COUNT(*) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding')) AS op_pontual,
+            COALESCE(SUM(c.valorp) FILTER (WHERE COALESCE(c.valorp,0) > 0 AND c.status IN ('ativo','onboarding','em cancelamento')), 0) AS pontual_operando
           FROM m
           LEFT JOIN "Clickup".cup_contratos c ON c.responsavel ILIKE '%' || m.match_responsavel || '%'
           GROUP BY m.nome, m.categoria, m.ordem, m.cap_contratos, m.cap_clientes
