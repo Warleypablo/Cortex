@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/sheet";
 import { formatCurrency } from "@/lib/utils";
 import { type ChurnContract } from "./types";
+import { somarValoresDrawer } from "./churnAggregations";
 import { DrawerSubMotivo } from "./drawer/DrawerSubMotivo";
 import { DrawerContratosTable } from "./drawer/DrawerContratosTable";
 import { DrawerVozCliente } from "./drawer/DrawerVozCliente";
@@ -21,6 +22,7 @@ export interface ChurnDrillDrawerProps {
   onToggleAbono: (taskId: string, abonar: boolean) => void;
   pendingIds: Set<string>;
   abonadoOverrides: Record<string, boolean>;
+  basePorResponsavel?: Record<string, number>;
 }
 
 type ActiveTab = "contratos" | "submotivo" | "voz" | "timing";
@@ -40,6 +42,7 @@ export function ChurnDrillDrawer({
   onToggleAbono,
   pendingIds,
   abonadoOverrides,
+  basePorResponsavel,
 }: ChurnDrillDrawerProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<ActiveTab>("contratos");
 
@@ -48,13 +51,13 @@ export function ChurnDrillDrawer({
     setActiveTab("contratos");
   }, [titulo, open]);
 
-  const totalMrr = contratos.reduce((sum, c) => sum + (c.valorr ?? 0), 0);
+  const { mrr: totalMrr, pontual: totalPontual } = somarValoresDrawer(contratos);
 
   return (
     <Sheet open={open} onOpenChange={(v) => { if (!v) onClose(); }}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-2xl overflow-y-auto bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700"
+        className="w-full sm:max-w-4xl overflow-y-auto bg-white dark:bg-zinc-900 border-l border-gray-200 dark:border-zinc-700"
       >
         <SheetHeader className="mb-4">
           <SheetTitle className="text-gray-900 dark:text-white text-lg font-semibold">
@@ -67,6 +70,15 @@ export function ChurnDrillDrawer({
             <span className="font-medium text-red-600 dark:text-red-400">
               {formatCurrency(totalMrr)}
             </span>
+            {totalPontual !== 0 && (
+              <>
+                {" · "}
+                Pontual:{" "}
+                <span className="font-medium text-amber-600 dark:text-amber-400">
+                  {formatCurrency(totalPontual)}
+                </span>
+              </>
+            )}
           </SheetDescription>
         </SheetHeader>
 
@@ -100,7 +112,7 @@ export function ChurnDrillDrawer({
         {/* Tab: Submotivo — gráficos lado a lado e, abaixo, os contratos perdidos */}
         {activeTab === "submotivo" && (
           <div className="space-y-5">
-            <DrawerSubMotivo contratos={contratos} />
+            <DrawerSubMotivo contratos={contratos} basePorResponsavel={basePorResponsavel} />
             <div>
               <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                 Contratos perdidos

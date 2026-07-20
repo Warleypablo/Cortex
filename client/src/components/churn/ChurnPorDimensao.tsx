@@ -2,13 +2,19 @@ import React, { useState, useMemo } from "react";
 import { type ChurnContract, type ChurnPorSquad, type ChurnPorPessoa } from "@/components/churn/types";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { severityBarClass } from "@/components/churn/severity";
+import { ordenarPorTaxaDeChurn } from "@/components/churn/churnAggregations";
 
-export type Dimensao = "motivo" | "produto" | "cluster" | "pessoa" | "squad";
+// "cluster" foi removido em 2026-07-20: o dado está 100% vazio na origem
+// (cup_churn, cup_clientes e cortex_core.clientes), e enriquecer via
+// Bitrix.crm_deal.bx_cluster cobriria só 33,7%. O backend segue calculando
+// churn_por_cluster e filtros.clusters — para religar, basta devolver
+// "cluster" a este type, a DIMENSAO_LABELS, a getFieldValue e a dimButtons.
+// Ver docs/superpowers/specs/2026-07-20-churn-detalhamento-melhorias-design.md
+export type Dimensao = "motivo" | "produto" | "pessoa" | "squad";
 
 const DIMENSAO_LABELS: Record<Dimensao, string> = {
   motivo: "Motivo",
   produto: "Produto",
-  cluster: "Cluster",
   pessoa: "Pessoa",
   squad: "Squad",
 };
@@ -21,8 +27,6 @@ function getFieldValue(c: ChurnContract, dim: Dimensao): string {
       return c.motivo_cancelamento || "Não especificado";
     case "produto":
       return (c.produto && c.produto.trim()) ? c.produto : (c.servico || "Não especificado");
-    case "cluster":
-      return c.cluster || "Não especificado";
     case "pessoa":
       return c.responsavel || "Não especificado";
     case "squad": {
@@ -46,8 +50,10 @@ interface RateItem {
   label: string;
   mrr_ativo: number;
   mrr_perdido: number;
-  percentual: number;
-  noBase: boolean; // mrr_ativo === 0
+  /** null quando não há carteira na soma do range — exibir "—", nunca 0%. */
+  percentual: number | null;
+  /** Deriva de `percentual === null` — mesma base do denominador do percentual (soma do range), nunca do mrr_ativo isolado do 1º mês. */
+  noBase: boolean;
   contratos: ChurnContract[]; // subset from contracts for drill
 }
 
@@ -120,7 +126,7 @@ export function ChurnPorDimensao({
       drillMap[key].push(c);
     });
 
-    const backendArray: Array<{ label: string; mrr_ativo: number; mrr_perdido: number; percentual: number }> =
+    const backendArray: Array<{ label: string; mrr_ativo: number; mrr_perdido: number; percentual: number | null }> =
       dimensao === "squad"
         ? (churnPorSquad ?? []).map(i => ({ label: i.squad, mrr_ativo: i.mrr_ativo, mrr_perdido: i.mrr_perdido, percentual: i.percentual }))
         : (churnPorPessoa ?? []).map(i => ({ label: i.pessoa, mrr_ativo: i.mrr_ativo, mrr_perdido: i.mrr_perdido, percentual: i.percentual }));
@@ -130,20 +136,18 @@ export function ChurnPorDimensao({
       ? backendArray.filter(i => !SQUADS_IRRELEVANTES.includes(i.label.trim().toLowerCase()))
       : backendArray;
 
-    const withBase = filtered.filter(i => i.mrr_ativo > 0);
-    const noBase = filtered.filter(i => i.mrr_ativo === 0 && i.mrr_perdido > 0);
-
-    const sorted = [
-      ...withBase.sort((a, b) => b.percentual - a.percentual),
-      ...noBase.sort((a, b) => b.mrr_perdido - a.mrr_perdido),
-    ];
+    // noBase deriva de percentual === null (soma das bases do range, mesmo
+    // denominador do cálculo do próprio percentual) — nunca de mrr_ativo, que
+    // é só a base do primeiro mês e pode ser 0 mesmo com carteira (e taxa
+    // calculável) nos meses seguintes do range.
+    const sorted = ordenarPorTaxaDeChurn(filtered);
 
     return sorted.map(i => ({
       label: i.label,
       mrr_ativo: i.mrr_ativo,
       mrr_perdido: i.mrr_perdido,
       percentual: i.percentual,
-      noBase: i.mrr_ativo === 0,
+      noBase: i.noBase,
       contratos: drillMap[i.label] ?? [],
     }));
   }, [contratos, dimensao, churnPorSquad, churnPorPessoa]);
@@ -186,13 +190,15 @@ export function ChurnPorDimensao({
   const maxMrr = grupos.length > 0 ? grupos[0].mrr : 1;
   const fallbackMaxMrr = fallbackGrupos.length > 0 ? fallbackGrupos[0].mrr : 1;
 
-  // For rate-mode bar: normalize by max rate among withBase items
+  // For rate-mode bar: normalize by max rate among withBase items (percentual conhecido)
   const maxRate = useMemo(() => {
-    const withBase = rateItems.filter(i => !i.noBase);
+    const withBase = rateItems.filter(
+      (i): i is RateItem & { percentual: number } => !i.noBase && i.percentual !== null
+    );
     return withBase.length > 0 ? Math.max(...withBase.map(i => i.percentual)) : 1;
   }, [rateItems]);
 
-  const dimButtons: Dimensao[] = ["motivo", "produto", "cluster", "pessoa", "squad"];
+  const dimButtons: Dimensao[] = ["motivo", "produto", "pessoa", "squad"];
 
   const isEmpty =
     isRateMode
@@ -242,11 +248,15 @@ export function ChurnPorDimensao({
         // ── Rate mode (squad / pessoa) from backend ──
         <div className="space-y-2">
           {rateItems.map((item, idx) => {
-            const normalized = item.noBase ? 0 : (maxRate > 0 ? item.percentual / maxRate : 0);
-            const barClass = item.noBase
-              ? "bg-zinc-300 dark:bg-zinc-600"
-              : severityBarClass(normalized);
-            const barWidth = item.noBase ? 10 : normalized * 100;
+            const pct = item.percentual;
+            const semDados = item.noBase || pct === null;
+            let normalized = 0;
+            let barClass = "bg-zinc-300 dark:bg-zinc-600";
+            if (!item.noBase && pct !== null) {
+              normalized = maxRate > 0 ? pct / maxRate : 0;
+              barClass = severityBarClass(normalized);
+            }
+            const barWidth = semDados ? 10 : normalized * 100;
 
             return (
               <div
@@ -271,8 +281,8 @@ export function ChurnPorDimensao({
                       {item.label}
                     </span>
                     <div className="flex items-center gap-2 flex-shrink-0 tabular-nums">
-                      <span className={`text-xs ${item.noBase ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
-                        {item.noBase ? "s/ base" : `${item.percentual.toFixed(1)}%`}
+                      <span className={`text-xs ${semDados ? "text-muted-foreground/60" : "text-muted-foreground"}`}>
+                        {item.noBase ? "s/ base" : pct === null ? "—" : `${pct.toFixed(1)}%`}
                       </span>
                       <span className="text-xs font-semibold text-foreground">
                         {formatCurrencyNoDecimals(item.mrr_perdido)}
