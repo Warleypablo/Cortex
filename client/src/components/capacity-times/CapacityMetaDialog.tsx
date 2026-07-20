@@ -23,7 +23,7 @@ export const CATEGORIA_LABELS: Record<string, string> = {
   CXCS: "CXCS (Customer Success)",
 };
 
-const CATEGORIAS_BASE = ["Black", "Squadra", "CXCS", "Pulse", "Olimpo"];
+const CATEGORIAS_BASE = ["Black", "Squadra", "CXCS", "Pulse"];
 const NOVA = "__nova__";
 
 interface FormState {
