@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Gauge, Lock } from "lucide-react";
 import { SELVA_BLOQUEADA } from "@shared/capacityGrupos";
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend,
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
 
 // Black / Squadra: carteira via responsavel (régua MRR + contas).
@@ -95,7 +95,6 @@ function utilBarColor(pct: number | null): string {
   return "bg-green-500";
 }
 const COLOR_MRR = "#3b82f6";
-const COLOR_CONTAS = "#a855f7";
 function pctText(pct: number | null): string {
   return pct === null ? "—" : `${pct}%`;
 }
@@ -351,32 +350,6 @@ function SelvaTab({ rows, metaContas, onSelect }: { rows: SelvaRow[]; metaContas
   );
 }
 
-function UtilChart({ people }: { people: { nome: string; util_fat_pct: number | null; util_contas_pct: number | null }[] }) {
-  const data = people
-    .filter((p) => p.util_fat_pct !== null || p.util_contas_pct !== null)
-    .map((p) => ({ nome: p.nome, fat: p.util_fat_pct, contas: p.util_contas_pct }))
-    .sort((a, b) => (b.fat ?? b.contas ?? 0) - (a.fat ?? a.contas ?? 0));
-  if (!data.length) return null;
-  return (
-    <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
-      <CardHeader className="pb-2"><CardTitle className="text-sm text-gray-700 dark:text-zinc-300">Utilização por pessoa — FAT × Contas</CardTitle></CardHeader>
-      <CardContent>
-        <ResponsiveContainer width="100%" height={Math.max(200, data.length * 44)}>
-          <BarChart data={data} layout="vertical" margin={{ left: 90, right: 30 }}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#374151" opacity={0.2} />
-            <XAxis type="number" domain={[0, "auto"]} tick={{ fill: "#9ca3af", fontSize: 12 }} tickFormatter={(v) => `${v}%`} />
-            <YAxis type="category" dataKey="nome" width={110} tick={{ fill: "#9ca3af", fontSize: 12 }} />
-            <Tooltip formatter={(v: number, name: string) => [`${v}%`, name]} contentStyle={{ backgroundColor: "#1f2937", border: "none", borderRadius: "8px", color: "#fff" }} />
-            <Legend wrapperStyle={{ fontSize: 12 }} />
-            <Bar dataKey="fat" name="Capacity FAT" fill={COLOR_MRR} radius={[0, 4, 4, 0]} maxBarSize={14} />
-            <Bar dataKey="contas" name="Capacity Contratos" fill={COLOR_CONTAS} radius={[0, 4, 4, 0]} maxBarSize={14} />
-          </BarChart>
-        </ResponsiveContainer>
-      </CardContent>
-    </Card>
-  );
-}
-
 function CsTable({ rows, onSelect }: { rows: CsRow[]; onSelect: (s: DrawerSelecao) => void }) {
   if (!rows.length) return <p className="text-center text-gray-500 dark:text-zinc-400 py-8">Nenhuma pessoa neste time.</p>;
   const teamMrr = sum(rows.map((r) => r.mrr_operando));
@@ -456,7 +429,6 @@ function SquadTab({ group, onSelect }: { group: SquadGroup; onSelect: (s: Drawer
   return (
     <div className="space-y-4">
       <StatCards cards={cards} />
-      <UtilChart people={rows} />
       <Card className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700">
         <CardHeader><CardTitle className="text-gray-900 dark:text-white">Squad {group.squad}</CardTitle></CardHeader>
         <CardContent><CsTable rows={rows} onSelect={onSelect} /></CardContent>
