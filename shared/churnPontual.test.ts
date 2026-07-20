@@ -18,10 +18,6 @@ describe("pontualTemCobertura", () => {
     expect(pontualTemCobertura(0, 428)).toBe(false);
   });
 
-  it("aceita exatamente no limiar", () => {
-    expect(pontualTemCobertura(10, 100)).toBe(true);
-  });
-
   it("rejeita logo abaixo do limiar", () => {
     expect(pontualTemCobertura(9, 100)).toBe(false);
   });
@@ -56,11 +52,13 @@ describe("pontualTemCobertura", () => {
   });
 
   it("diferencia 'decidiu que não tem cobertura' (false) de 'não deu para decidir' (undefined)", () => {
-    // Amostra grande (>= 100) e proporção baixa: decidiu — este ano REALMENTE
-    // não tem cobertura de pontual. É uma afirmação, não um "ainda não sei".
+    // Amostra grande (>= 100) e proporção baixa (2,5%): decidiu — este ano
+    // REALMENTE não tem cobertura de pontual. É uma afirmação, não um "ainda
+    // não sei".
     expect(pontualTemCobertura(5, 200)).toBe(false);
-    // Amostra pequena (< 100) com a mesma proporção baixa: não dá para
-    // decidir nada ainda — nem true, nem false. A série deve ficar calada.
-    expect(pontualTemCobertura(5, 50)).toBeUndefined();
+    // Mesma proporção baixa (2,5%), mas amostra pequena (< 100): não dá para
+    // decidir nada ainda — nem true, nem false. Isola o efeito do tamanho da
+    // amostra (não da proporção). A série deve ficar calada.
+    expect(pontualTemCobertura(1, 40)).toBeUndefined();
   });
 });

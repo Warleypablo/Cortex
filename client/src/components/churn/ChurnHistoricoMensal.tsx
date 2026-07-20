@@ -104,7 +104,7 @@ export function ChurnHistoricoMensal({
             )}
           </p>
         )}
-        {pontual > 0 && (
+        {data?.pontualDisponivel && pontual > 0 && (
           <p className="text-muted-foreground">
             Pontual:{" "}
             <span className="font-semibold" style={{ color: pontualColor }}>
