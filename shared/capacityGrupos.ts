@@ -47,5 +47,5 @@ export const META_CONTAS_DESIGNER = 20;
 export const SELVA_BLOQUEADA = true;
 
 // Capacity de contas (clientes) por Account na Black. Default; pode ser
-// sobrescrito por pessoa via cap_contas em cortex_core.capacity_metas (aba Configurar).
+// sobrescrito por pessoa via cap_clientes em cortex_core.capacity_metas (aba Configurar).
 export const CAP_CONTAS_ACCOUNT = 25;

@@ -27,9 +27,10 @@ function normalizeSquad(squad: string | null): string {
   return squad.replace(/^[^\p{L}]+/u, "").trim();
 }
 
-// cap_clientes é tolerante a payload legado: o form da aba Configurar ainda não
-// envia essa chave (só numa task futura). Chave AUSENTE deve virar `null` (sem meta
-// configurada) em vez de 400 — mas `null` explícito e inteiros continuam válidos.
+// cap_clientes é tolerante a payload legado: o form da aba Configurar já envia essa
+// chave, mas clientes antigos da API (scripts, integrações) podem não enviá-la. Chave
+// AUSENTE deve virar `null` (sem meta configurada) em vez de 400 — mas `null` explícito
+// e inteiros continuam válidos.
 // Cuidado: `.optional()` sozinho REJEITA `null` no Zod; por isso `.nullable().optional()`
 // + `.transform` para garantir que `undefined` nunca chega ao SQL (INSERT/UPDATE
 // interpolam `${m.cap_clientes}` direto — undefined viraria parâmetro inválido).
