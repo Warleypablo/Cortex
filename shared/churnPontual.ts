@@ -12,8 +12,20 @@
  */
 export const LIMIAR_COBERTURA_PONTUAL = 0.1;
 
+/**
+ * Nº mínimo de linhas de churn no ano para decidir cobertura.
+ *
+ * Sem esse piso, a cobertura CUMULATIVA de um ano corrente mente cedo: em
+ * 01/jan/2026 há só 4 linhas no ano (4/81 = 4,9% de cobertura acumulada até
+ * hoje), o que já reprovaria o limiar mesmo o ano fechando em 23,5%. Abaixo
+ * de 100 linhas a amostra é pequena demais para decidir — melhor esperar
+ * mais dado do que acender/apagar a série a cada início de ano.
+ */
+export const MINIMO_LINHAS_COBERTURA_PONTUAL = 100;
+
 /** Decide se o dado pontual de um ano tem cobertura suficiente para ser exibido. */
 export function pontualTemCobertura(linhasComPontual: number, totalLinhas: number): boolean {
   if (!totalLinhas || totalLinhas <= 0) return false;
+  if (totalLinhas < MINIMO_LINHAS_COBERTURA_PONTUAL) return false;
   return linhasComPontual / totalLinhas >= LIMIAR_COBERTURA_PONTUAL;
 }

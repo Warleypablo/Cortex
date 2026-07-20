@@ -5374,8 +5374,8 @@ Estruture sua resposta em:
       const fim = `${ano}-12-31`;
 
       let abonoFilter = sql``;
-      if (filterAbono === "nao_abonados") abonoFilter = sql`AND COALESCE(abonar_churn, '') <> 'Sim'`;
-      else if (filterAbono === "abonados") abonoFilter = sql`AND COALESCE(abonar_churn, '') = 'Sim'`;
+      if (filterAbono === "nao_abonados") abonoFilter = sql`AND COALESCE(c.abonar_churn, '') <> 'Sim'`;
+      else if (filterAbono === "abonados") abonoFilter = sql`AND COALESCE(c.abonar_churn, '') = 'Sim'`;
 
       const result = await db.execute(sql`
         SELECT
@@ -5400,11 +5400,30 @@ Estruture sua resposta em:
         ORDER BY 1
       `);
 
+      // Cobertura do dado pontual é propriedade do ANO, não do filtro de abono: query
+      // enxuta separada, sem abonoFilter, pra não deixar o toggle nao_abonados/abonados
+      // acender e apagar a barra pontual (medido: 21% -> 14,5% de cobertura só de alternar
+      // o filtro). Mesmo range de datas e mesmo LEFT JOIN LATERAL da query principal.
+      const coberturaResult = await db.execute(sql`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE COALESCE(ct.valorp, 0) > 0) AS com_pontual
+        FROM cortex_core.vw_cup_churn_ajustado c
+        LEFT JOIN LATERAL (
+          SELECT MAX(x.valorp::numeric) AS valorp
+          FROM "Clickup".cup_contratos x
+          WHERE x.id_subtask = c.task_id
+        ) ct ON TRUE
+        WHERE c.data_solicitacao_encerramento >= ${inicio}::date
+          AND c.data_solicitacao_encerramento <= ${fim}::date
+      `);
+      const coberturaRow = (coberturaResult.rows as any[])[0] ?? {};
+      const totalLinhas = Number(coberturaRow.total) || 0;
+      const linhasComPontual = Number(coberturaRow.com_pontual) || 0;
+
       // Pivot: mês -> { total, pontual, porMotivo }
       const mesesMap: Record<string, { mes: string; total: number; pontual: number; logos: number; porMotivo: Record<string, number> }> = {};
       const motivoTotals: Record<string, number> = {};
-      let totalLinhas = 0;
-      let linhasComPontual = 0;
       for (const r of result.rows as any[]) {
         const mes = r.mes as string;
         const motivo = r.motivo as string;
@@ -5420,8 +5439,6 @@ Estruture sua resposta em:
         mesesMap[mes].pontual += pontual;
         mesesMap[mes].logos += logos;
         motivoTotals[motivo] = (motivoTotals[motivo] || 0) + mrr;
-        totalLinhas += logos;
-        linhasComPontual += Number(r.logos_pontual) || 0;
       }
 
       const motivos = Object.entries(motivoTotals)
