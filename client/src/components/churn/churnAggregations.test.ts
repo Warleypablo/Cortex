@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { somarValoresDrawer, pctDaBase, formatPct } from "./churnAggregations";
+import { somarValoresDrawer, pctDaBase, formatPct, agregarPorResponsavel } from "./churnAggregations";
 import type { ChurnContract } from "./types";
 
 /** Constrói um ChurnContract mínimo; só os campos do teste importam. */
@@ -80,5 +80,102 @@ describe("formatPct", () => {
 
   it("formata zero", () => {
     expect(formatPct(0)).toBe("0,0%");
+  });
+});
+
+describe("agregarPorResponsavel", () => {
+  const base = { "Glauber Pereira": 98400, "Debora Mund": 210300 };
+
+  it("agrupa por responsável e ordena por MRR desc", () => {
+    const r = agregarPorResponsavel(
+      [
+        contrato({ responsavel: "Debora Mund", valorr: 1000 }),
+        contrato({ responsavel: "Glauber Pereira", valorr: 3000 }),
+        contrato({ responsavel: "Debora Mund", valorr: 500 }),
+      ],
+      base,
+    );
+    expect(r.map((l) => l.responsavel)).toEqual(["Glauber Pereira", "Debora Mund"]);
+    expect(r[0].mrr).toBe(3000);
+    expect(r[1].mrr).toBe(1500);
+    expect(r[1].contratos).toBe(2);
+  });
+
+  it("participação soma 100%", () => {
+    const r = agregarPorResponsavel(
+      [
+        contrato({ responsavel: "Glauber Pereira", valorr: 3000 }),
+        contrato({ responsavel: "Debora Mund", valorr: 1000 }),
+      ],
+      base,
+    );
+    const soma = r.reduce((s, l) => s + (l.participacao ?? 0), 0);
+    expect(soma).toBeCloseTo(1, 6);
+  });
+
+  it("calcula churn% sobre a carteira do responsável", () => {
+    const r = agregarPorResponsavel(
+      [contrato({ responsavel: "Glauber Pereira", valorr: 12988 })],
+      { "Glauber Pereira": 98400 },
+    );
+    expect(r[0].churnPct).toBeCloseTo(12988 / 98400, 6);
+  });
+
+  it("churn% é null quando não há base para o responsável", () => {
+    const r = agregarPorResponsavel(
+      [contrato({ responsavel: "Fulano Sem Base", valorr: 1000 })],
+      base,
+    );
+    expect(r[0].churnPct).toBeNull();
+  });
+
+  it("atribui nomes múltiplos ao primeiro nome", () => {
+    const r = agregarPorResponsavel(
+      [
+        contrato({ responsavel: "Glauber Pereira; Debora Mund", valorr: 1000 }),
+        contrato({ responsavel: "Glauber Pereira", valorr: 500 }),
+      ],
+      base,
+    );
+    expect(r).toHaveLength(1);
+    expect(r[0].responsavel).toBe("Glauber Pereira");
+    expect(r[0].mrr).toBe(1500);
+  });
+
+  it("joga 'Não especificado' para o fim mesmo com MRR maior", () => {
+    const r = agregarPorResponsavel(
+      [
+        contrato({ responsavel: "Não especificado", valorr: 90000 }),
+        contrato({ responsavel: "Glauber Pereira", valorr: 100 }),
+      ],
+      base,
+    );
+    expect(r[r.length - 1].responsavel).toBe("Não especificado");
+    expect(r[r.length - 1].isNaoEspecificado).toBe(true);
+    expect(r[r.length - 1].churnPct).toBeNull();
+  });
+
+  it("trata responsável vazio como Não especificado", () => {
+    const r = agregarPorResponsavel([contrato({ responsavel: "" }), contrato({ responsavel: "  " })], base);
+    expect(r).toHaveLength(1);
+    expect(r[0].responsavel).toBe("Não especificado");
+    expect(r[0].contratos).toBe(2);
+  });
+
+  it("não quebra com ajuste manual negativo e sem responsável", () => {
+    const r = agregarPorResponsavel(
+      [
+        contrato({ responsavel: "Glauber Pereira", valorr: 10000 }),
+        contrato({ responsavel: "Não especificado", valorr: -26500 }),
+      ],
+      base,
+    );
+    const naoEsp = r.find((l) => l.isNaoEspecificado)!;
+    expect(naoEsp.mrr).toBe(-26500);
+    expect(naoEsp.participacao).toBeNull();
+  });
+
+  it("retorna lista vazia para entrada vazia", () => {
+    expect(agregarPorResponsavel([], base)).toEqual([]);
   });
 });

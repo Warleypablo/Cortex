@@ -32,3 +32,76 @@ export function pctDaBase(valor: number, base: number): number | null {
 export function formatPct(fracao: number, casas = 1): string {
   return `${(fracao * 100).toFixed(casas).replace(".", ",")}%`;
 }
+
+export const NAO_ESPECIFICADO = "Não especificado";
+
+export interface LinhaResponsavel {
+  responsavel: string;
+  contratos: number;
+  mrr: number;
+  /** Fração do MRR do recorte. null para a linha "Não especificado". */
+  participacao: number | null;
+  /** MRR perdido ÷ carteira do responsável. null quando não há base. */
+  churnPct: number | null;
+  isNaoEspecificado: boolean;
+}
+
+/** "Nome A; Nome B" -> "Nome A". Rateio inventaria precisão que o dado não tem. */
+export function primeiroNome(raw: string): string {
+  return (raw || "").split(";")[0].trim();
+}
+
+/**
+ * Agrega o churn de um recorte por responsável.
+ *
+ * A linha "Não especificado" é sempre a última e não recebe participação nem
+ * churn%: ela acumula contratos sem responsável e os ajustes manuais, que
+ * entram com valor negativo e sem carteira a que atribuir.
+ */
+export function agregarPorResponsavel(
+  contratos: ChurnContract[],
+  basePorResponsavel: Record<string, number> = {},
+): LinhaResponsavel[] {
+  const grupos = new Map<string, { contratos: number; mrr: number }>();
+
+  for (const c of contratos) {
+    const nome = primeiroNome(c.responsavel) || NAO_ESPECIFICADO;
+    const chave = nome === NAO_ESPECIFICADO ? NAO_ESPECIFICADO : nome;
+    const g = grupos.get(chave) || { contratos: 0, mrr: 0 };
+    g.contratos += 1;
+    g.mrr += Number(c.valorr) || 0;
+    grupos.set(chave, g);
+  }
+
+  // Participação é sobre o MRR dos responsáveis identificados, para que
+  // a soma feche em 100% sem ser distorcida por ajustes negativos.
+  // (forEach em vez de for-of sobre o Map: o tsconfig do projeto não tem
+  // downlevelIteration/target es2015+, então iterar Map/Set com for-of
+  // dispara TS2802 — mesmo padrão já visto em ChurnConsolidadoTrimestral.tsx.)
+  let totalIdentificado = 0;
+  grupos.forEach((g, nome) => {
+    if (nome !== NAO_ESPECIFICADO) totalIdentificado += g.mrr;
+  });
+
+  const linhas: LinhaResponsavel[] = [];
+  grupos.forEach((g, nome) => {
+    const isNaoEsp = nome === NAO_ESPECIFICADO;
+    const base = basePorResponsavel[nome];
+    linhas.push({
+      responsavel: nome,
+      contratos: g.contratos,
+      mrr: g.mrr,
+      participacao: isNaoEsp || totalIdentificado <= 0 ? null : g.mrr / totalIdentificado,
+      churnPct: isNaoEsp ? null : pctDaBase(g.mrr, base),
+      isNaoEspecificado: isNaoEsp,
+    });
+  });
+
+  linhas.sort((a, b) => {
+    if (a.isNaoEspecificado) return 1;
+    if (b.isNaoEspecificado) return -1;
+    return b.mrr - a.mrr;
+  });
+
+  return linhas;
+}

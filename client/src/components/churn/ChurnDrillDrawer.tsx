@@ -22,6 +22,7 @@ export interface ChurnDrillDrawerProps {
   onToggleAbono: (taskId: string, abonar: boolean) => void;
   pendingIds: Set<string>;
   abonadoOverrides: Record<string, boolean>;
+  basePorResponsavel?: Record<string, number>;
 }
 
 type ActiveTab = "contratos" | "submotivo" | "voz" | "timing";
@@ -41,6 +42,7 @@ export function ChurnDrillDrawer({
   onToggleAbono,
   pendingIds,
   abonadoOverrides,
+  basePorResponsavel,
 }: ChurnDrillDrawerProps): JSX.Element {
   const [activeTab, setActiveTab] = useState<ActiveTab>("contratos");
 
@@ -110,7 +112,7 @@ export function ChurnDrillDrawer({
         {/* Tab: Submotivo — gráficos lado a lado e, abaixo, os contratos perdidos */}
         {activeTab === "submotivo" && (
           <div className="space-y-5">
-            <DrawerSubMotivo contratos={contratos} />
+            <DrawerSubMotivo contratos={contratos} basePorResponsavel={basePorResponsavel} />
             <div>
               <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
                 Contratos perdidos

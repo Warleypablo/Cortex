@@ -4,6 +4,7 @@ import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { type ChurnContract } from "@/components/churn/types";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { severityHex } from "@/components/churn/severity";
+import { agregarPorResponsavel, formatPct } from "@/components/churn/churnAggregations";
 
 function evitabilidadeColor(label: string): string {
   const l = label.toLowerCase();
@@ -12,7 +13,13 @@ function evitabilidadeColor(label: string): string {
   return "#94a3b8";
 }
 
-export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): JSX.Element {
+export function DrawerSubMotivo({
+  contratos,
+  basePorResponsavel,
+}: {
+  contratos: ChurnContract[];
+  basePorResponsavel?: Record<string, number>;
+}): JSX.Element {
   const [expandedMotivo, setExpandedMotivo] = useState<string | null>(null);
 
   // ── Evitabilidade breakdown ────────────────────────────────────────────────
@@ -63,6 +70,11 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
       .sort((a, b) => b.mrr - a.mrr);
   }, [contratos]);
 
+  const linhasResponsavel = useMemo(
+    () => agregarPorResponsavel(contratos, basePorResponsavel ?? {}),
+    [contratos, basePorResponsavel],
+  );
+
   // ── Empty state ───────────────────────────────────────────────────────────
   if (contratos.length === 0) {
     return (
@@ -76,7 +88,8 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
   const totalMotivoMrr = motivoSubmotivoTree.reduce((s, d) => s + d.mrr, 0);
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+    <div className="space-y-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
       {/* ── Evitabilidade donut ──────────────────────────────────────────────── */}
       {evitabilidadeData.length > 0 && (
         <div>
@@ -287,6 +300,88 @@ export function DrawerSubMotivo({ contratos }: { contratos: ChurnContract[] }): 
           </div>
         )}
       </div>
+      </div>
+
+      {/* ── Churn por responsável ────────────────────────────────────────────── */}
+      {linhasResponsavel.length > 0 && (
+        <div>
+          <p className="text-sm font-semibold text-gray-900 dark:text-white mb-2">
+            Churn por responsável
+          </p>
+          <table className="w-full text-xs border-collapse">
+            <thead>
+              <tr className="border-b border-gray-200 dark:border-zinc-700">
+                <th className="text-left py-1.5 pr-2 font-medium text-gray-600 dark:text-zinc-400">
+                  Responsável
+                </th>
+                <th className="text-right py-1.5 pr-2 font-medium text-gray-600 dark:text-zinc-400">
+                  Contratos
+                </th>
+                <th className="text-right py-1.5 pr-2 font-medium text-gray-600 dark:text-zinc-400">
+                  R$
+                </th>
+                <th className="text-right py-1.5 pr-2 font-medium text-gray-600 dark:text-zinc-400">
+                  Part.
+                </th>
+                <th className="text-right py-1.5 font-medium text-gray-600 dark:text-zinc-400">
+                  Churn%
+                </th>
+              </tr>
+            </thead>
+            <tbody>
+              {linhasResponsavel.map((linha) => {
+                const maxMrrResp = Math.max(
+                  ...linhasResponsavel.filter((l) => !l.isNaoEspecificado).map((l) => l.mrr),
+                  1,
+                );
+                const cor = linha.isNaoEspecificado
+                  ? "#94a3b8"
+                  : severityHex(maxMrrResp > 0 ? linha.mrr / maxMrrResp : 0);
+                return (
+                  <tr
+                    key={linha.responsavel}
+                    className="border-b border-gray-100 dark:border-zinc-800 last:border-0"
+                  >
+                    <td className="py-1.5 pr-2">
+                      <span className="flex items-center gap-1.5 min-w-0">
+                        <span
+                          className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ backgroundColor: cor }}
+                        />
+                        <span
+                          className="truncate text-gray-700 dark:text-zinc-300"
+                          title={linha.responsavel}
+                        >
+                          {linha.responsavel}
+                        </span>
+                      </span>
+                    </td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums text-gray-700 dark:text-zinc-300">
+                      {linha.contratos}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums font-semibold text-gray-900 dark:text-white">
+                      {formatCurrencyNoDecimals(linha.mrr)}
+                    </td>
+                    <td className="py-1.5 pr-2 text-right tabular-nums text-muted-foreground">
+                      {linha.participacao !== null ? formatPct(linha.participacao, 0) : "—"}
+                    </td>
+                    <td
+                      className="py-1.5 text-right tabular-nums font-medium"
+                      style={{ color: linha.churnPct !== null ? cor : undefined }}
+                    >
+                      {linha.churnPct !== null ? (
+                        formatPct(linha.churnPct)
+                      ) : (
+                        <span className="text-gray-400 dark:text-zinc-600 font-normal">—</span>
+                      )}
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   );
 }

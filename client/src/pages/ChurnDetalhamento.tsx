@@ -491,6 +491,7 @@ export default function ChurnDetalhamento() {
         onToggleAbono={onToggleAbono}
         pendingIds={pendingIds}
         abonadoOverrides={abonadoOverrides}
+        basePorResponsavel={data?.metricas?.soma_mrr_bases_por_pessoa}
       />
 
       <CrossSellDrillDrawer
