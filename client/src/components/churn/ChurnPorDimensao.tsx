@@ -3,12 +3,17 @@ import { type ChurnContract, type ChurnPorSquad, type ChurnPorPessoa } from "@/c
 import { formatCurrencyNoDecimals } from "@/lib/utils";
 import { severityBarClass } from "@/components/churn/severity";
 
-export type Dimensao = "motivo" | "produto" | "cluster" | "pessoa" | "squad";
+// "cluster" foi removido em 2026-07-20: o dado está 100% vazio na origem
+// (cup_churn, cup_clientes e cortex_core.clientes), e enriquecer via
+// Bitrix.crm_deal.bx_cluster cobriria só 33,7%. O backend segue calculando
+// churn_por_cluster e filtros.clusters — para religar, basta devolver
+// "cluster" a este type, a DIMENSAO_LABELS, a getFieldValue e a dimButtons.
+// Ver docs/superpowers/specs/2026-07-20-churn-detalhamento-melhorias-design.md
+export type Dimensao = "motivo" | "produto" | "pessoa" | "squad";
 
 const DIMENSAO_LABELS: Record<Dimensao, string> = {
   motivo: "Motivo",
   produto: "Produto",
-  cluster: "Cluster",
   pessoa: "Pessoa",
   squad: "Squad",
 };
@@ -21,8 +26,6 @@ function getFieldValue(c: ChurnContract, dim: Dimensao): string {
       return c.motivo_cancelamento || "Não especificado";
     case "produto":
       return (c.produto && c.produto.trim()) ? c.produto : (c.servico || "Não especificado");
-    case "cluster":
-      return c.cluster || "Não especificado";
     case "pessoa":
       return c.responsavel || "Não especificado";
     case "squad": {
@@ -196,7 +199,7 @@ export function ChurnPorDimensao({
     return withBase.length > 0 ? Math.max(...withBase.map(i => i.percentual)) : 1;
   }, [rateItems]);
 
-  const dimButtons: Dimensao[] = ["motivo", "produto", "cluster", "pessoa", "squad"];
+  const dimButtons: Dimensao[] = ["motivo", "produto", "pessoa", "squad"];
 
   const isEmpty =
     isRateMode
