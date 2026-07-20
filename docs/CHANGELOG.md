@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-07-20 | feat(ads): funil Gestão de Comunidade — 2º lote "Estratégia Peculiar" (Lucas, TP1900-1903) — conjunto 2 + 4 ads PAUSED
+
+**O que foi feito:**
+- **Lote Estratégia Peculiar (Lucas):** `comunidade-estrategia-peculiar.data.ts` — 1 body × 4 hooks pareados (9x16+4x5) = 4 criativos / 8 vídeos (~515-556MB). Biblioteca TP1900-1903. Upload 8/8, 0 falhas (47min).
+- **Meta:** entra na campanha JÁ EXISTENTE `120253259883810450` (o `subir-novo-funil-ads.ts` acha por nome e NÃO recria) como **conjunto 2** `120253262226980450` (Lucas, h01-04, b1c1) + **4 ads pareados PAUSED** (TP1900-1903). Config clonada do conjunto Bastidores `120253259884610450` (mesmo funil). Copy própria do ângulo "estratégia peculiar / marcas que mais crescem", rascunhada do roteiro do Ichino e aprovada pelo Caio.
+- **⚠️ Link placeholder** (mesma pendência do 1º lote): LP não pronta → reapontar os 4 ads no ativar.
+
+**Por que:** 2º criativo do mesmo funil (ângulo diferente do Bastidores). Valida o `subir-novo-funil-ads.ts` como reutilizável (idempotência de campanha por nome → só adiciona conjunto).
+
+**Arquivos alterados:** `scripts/ads/comunidade-estrategia-peculiar.data.ts` (novo).
+
+**Impacto arquitetural:** Nenhum em runtime — script CLI.
+
+---
+
 ## 2026-07-20 | feat(ads): funil NOVO "Gestão de Comunidade" — bootstrap de campanha CBO + lote Bastidores (Lucas, TP1897-1899)
 
 **O que foi feito:**
