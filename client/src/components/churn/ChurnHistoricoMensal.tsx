@@ -97,6 +97,8 @@ export function ChurnHistoricoMensal({
 
   const axisColor = isDark ? "#e5e7eb" : "#374151";
   const gridColor = isDark ? "#3f3f46" : "#e5e7eb";
+  const acimaMetaColor = isDark ? "#f87171" : "#dc2626";
+  const dentroMetaColor = isDark ? "#34d399" : "#059669";
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
@@ -218,7 +220,7 @@ export function ChurnHistoricoMensal({
                       const { x, y, width, index } = props;
                       const row = chartData[index] as Record<string, number | string | boolean>;
                       const total = Number(row?.total ?? 0);
-                      if (!total) return null;
+                      if (total <= 0) return null;
                       const pct = pctDaBase(total, Number(row?.mrrBase ?? 0));
                       const acimaDaMeta = pct !== null && pct > metaPct;
                       const cx = Number(x) + Number(width) / 2;
@@ -239,7 +241,7 @@ export function ChurnHistoricoMensal({
                               textAnchor="middle"
                               style={{
                                 fontSize: 10,
-                                fill: acimaDaMeta ? "#ef4444" : "#10b981",
+                                fill: acimaDaMeta ? acimaMetaColor : dentroMetaColor,
                                 fontWeight: 700,
                               }}
                             >
