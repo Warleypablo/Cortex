@@ -22,7 +22,7 @@ describe("GET /api/capacity-metas", () => {
     mockExecute.mockResolvedValueOnce({
       rows: [
         { id: 1, nome: "Brenda", match_responsavel: "Brenda Federici", categoria: "Pulse",
-          cap_recorrente: 15, cap_mrr: "45000", cap_pontual: 0, cap_contas: null, ordem: 1, ativo: true },
+          cap_recorrente: 15, cap_mrr: "45000", cap_pontual: 0, cap_contas: null, cap_clientes: 20, ordem: 1, ativo: true },
         { id: 2, nome: "Old", match_responsavel: "Old Person", categoria: "Pulse",
           cap_recorrente: null, cap_mrr: null, cap_pontual: null, cap_contas: null, ordem: 99, ativo: false },
       ],
@@ -32,10 +32,12 @@ describe("GET /api/capacity-metas", () => {
     expect(res.body).toHaveLength(2);
     expect(res.body[0]).toEqual({
       id: 1, nome: "Brenda", match_responsavel: "Brenda Federici", categoria: "Pulse",
-      cap_recorrente: 15, cap_mrr: 45000, cap_pontual: 0, cap_contas: null, ordem: 1, ativo: true,
+      cap_recorrente: 15, cap_mrr: 45000, cap_pontual: 0, cap_contas: null, cap_clientes: 20, ordem: 1, ativo: true,
     });
     expect(res.body[1].ativo).toBe(false);
     expect(res.body[1].cap_mrr).toBeNull();
+    // linha sem a coluna preenchida vira null, não undefined
+    expect(res.body[1].cap_clientes).toBeNull();
   });
 
   it("retorna 500 em erro de banco", async () => {
