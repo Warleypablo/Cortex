@@ -5383,8 +5383,7 @@ Estruture sua resposta em:
           COALESCE(NULLIF(TRIM(c.motivo_cancelamento), ''), 'Não especificado') AS motivo,
           SUM(COALESCE(c.valor_r, 0)) AS mrr,
           SUM(COALESCE(ct.valorp, 0)) AS pontual,
-          COUNT(*) AS logos,
-          COUNT(*) FILTER (WHERE COALESCE(ct.valorp, 0) > 0) AS logos_pontual
+          COUNT(*) AS logos
         FROM cortex_core.vw_cup_churn_ajustado c
         LEFT JOIN LATERAL (
           SELECT MAX(x.valorp::numeric) AS valorp
@@ -5493,6 +5492,11 @@ Estruture sua resposta em:
         mrrBasePorMes[mesKey] = total;
       }
 
+      // pontualTemCobertura pode retornar undefined (amostra < MINIMO_LINHAS_COBERTURA_PONTUAL,
+      // cedo demais pra decidir). Não converter pra null aqui: JSON.stringify (usado por
+      // res.json) já omite do corpo qualquer chave com valor undefined, então o campo
+      // simplesmente não aparece na resposta — o frontend trata a ausência do campo
+      // igual a undefined explícito (=== false / truthiness), nunca como "sem dado".
       const pontualDisponivel = pontualTemCobertura(linhasComPontual, totalLinhas);
       res.json({ series, motivos, ano, filterAbono, mrrBasePorMes, pontualDisponivel });
     } catch (error) {

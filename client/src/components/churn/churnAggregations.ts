@@ -16,7 +16,12 @@ export interface HistoricoChurnResponse {
   ano: number;
   filterAbono: "todos" | "abonados" | "nao_abonados";
   mrrBasePorMes: Record<string, number>; // "YYYY-MM" -> MRR ativo real do mês
-  /** Falso quando a cobertura do dado pontual no ano é baixa demais. */
+  /**
+   * `false` quando a cobertura do dado pontual no ano é baixa demais (amostra
+   * suficiente pra decidir, decisão é "não tem"). Ausente/`undefined` (o backend
+   * omite o campo do JSON) quando a amostra ainda é pequena demais pra decidir
+   * qualquer coisa — nunca tratar como "sem dado", só como "cedo pra saber".
+   */
   pontualDisponivel?: boolean;
 }
 

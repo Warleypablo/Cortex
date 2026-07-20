@@ -26,9 +26,9 @@ describe("pontualTemCobertura", () => {
     expect(pontualTemCobertura(9, 100)).toBe(false);
   });
 
-  it("rejeita ano sem nenhuma linha, sem dividir por zero", () => {
-    expect(pontualTemCobertura(0, 0)).toBe(false);
-    expect(pontualTemCobertura(5, 0)).toBe(false);
+  it("não decide (amostra insuficiente) ano sem nenhuma linha, sem dividir por zero", () => {
+    expect(pontualTemCobertura(0, 0)).toBeUndefined();
+    expect(pontualTemCobertura(5, 0)).toBeUndefined();
   });
 
   it("expõe o limiar como 10%", () => {
@@ -39,17 +39,28 @@ describe("pontualTemCobertura", () => {
     expect(MINIMO_LINHAS_COBERTURA_PONTUAL).toBe(100);
   });
 
-  it("rejeita amostra pequena mesmo com proporção alta (ex.: 01/jan cumulativo)", () => {
-    // Caso real: 4/81 linhas em 01/jan/2026 = 4,9% (já reprovaria por
-    // limiar), mas mesmo com proporção alta a amostra é pequena demais.
-    expect(pontualTemCobertura(90, 99)).toBe(false);
+  it("não decide amostra pequena mesmo com proporção alta (ex.: início de janeiro cumulativo)", () => {
+    // Caso real: fim de janeiro/2026 tem 4/81 = 4,9% de cobertura acumulada
+    // (já reprovaria por limiar); nos primeiros dias do ano a amostra é ainda
+    // menor que essas 81 linhas. Mesmo com proporção alta, amostra < 100
+    // linhas não é suficiente para decidir true nem false.
+    expect(pontualTemCobertura(90, 99)).toBeUndefined();
   });
 
   it("aceita exatamente no mínimo de amostra com proporção suficiente", () => {
     expect(pontualTemCobertura(10, 100)).toBe(true);
   });
 
-  it("rejeita amostra um abaixo do mínimo, mesmo com proporção suficiente", () => {
-    expect(pontualTemCobertura(99, 99)).toBe(false);
+  it("não decide amostra um abaixo do mínimo, mesmo com proporção suficiente", () => {
+    expect(pontualTemCobertura(99, 99)).toBeUndefined();
+  });
+
+  it("diferencia 'decidiu que não tem cobertura' (false) de 'não deu para decidir' (undefined)", () => {
+    // Amostra grande (>= 100) e proporção baixa: decidiu — este ano REALMENTE
+    // não tem cobertura de pontual. É uma afirmação, não um "ainda não sei".
+    expect(pontualTemCobertura(5, 200)).toBe(false);
+    // Amostra pequena (< 100) com a mesma proporção baixa: não dá para
+    // decidir nada ainda — nem true, nem false. A série deve ficar calada.
+    expect(pontualTemCobertura(5, 50)).toBeUndefined();
   });
 });

@@ -8,7 +8,7 @@ import {
   montarChartDataChurnHistorico,
 } from "./churnAggregations";
 import type { ChurnContract } from "./types";
-import type { HistoricoChurnResponse } from "./churnAggregations";
+import type { HistoricoChurnResponse, MesSerieChurn } from "./churnAggregations";
 
 /** Constrói um ChurnContract mínimo; só os campos do teste importam. */
 function contrato(over: Partial<ChurnContract>): ChurnContract {
@@ -285,9 +285,12 @@ describe("montarChartDataChurnHistorico", () => {
     };
   }
 
-  it("mês sem pontual gera pontual: 0, nunca undefined", () => {
+  it("mês sem pontual (campo ausente na série) gera pontual: 0, nunca undefined", () => {
+    // `pontual` ausente de propósito (cast) — é o caso real que `serie.pontual ?? 0`
+    // protege. Um `pontual: 0` explícito não exercitaria o `??`, já que 0 não é
+    // undefined/null e passaria direto por `Math.round(serie.pontual ?? 0)`.
     const data = historico({
-      series: [{ mes: "2026-01", total: 1000, pontual: 0, logos: 2, porMotivo: {} }],
+      series: [{ mes: "2026-01", total: 1000, logos: 2, porMotivo: {} } as MesSerieChurn],
     });
     const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 0, 15));
     expect(linhas[0].pontual).toBe(0);
