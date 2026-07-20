@@ -290,7 +290,7 @@ export function registerCapacityRoutes(app: Express, db: any) {
           )
         ),
         subs AS (
-          SELECT cda.label, c.id_subtask, COALESCE(c.valorr, 0) AS vr, c.status
+          SELECT cda.label, cda.task_id, c.id_subtask, COALESCE(c.valorr, 0) AS vr, c.status
           FROM clientes_do_account cda
           JOIN "Clickup".cup_contratos c
             ON c.id_task = cda.task_id AND c.status IN ('ativo','em cancelamento')
@@ -303,7 +303,10 @@ export function registerCapacityRoutes(app: Express, db: any) {
             COALESCE(SUM(vr) FILTER (WHERE status = 'em cancelamento'), 0) AS mrr_cancelamento
           FROM subs GROUP BY label
         ),
-        cli AS (SELECT label, COUNT(DISTINCT task_id) AS clientes FROM clientes_do_account GROUP BY label)
+        -- cli conta sobre subs (contrato vivo), não sobre clientes_do_account
+        -- (que casa por responsavel_geral sem olhar status do contrato) — senão um
+        -- cliente cujos contratos estão todos cancelados ainda contaria como cliente.
+        cli AS (SELECT label, COUNT(DISTINCT task_id) AS clientes FROM subs GROUP BY label)
         SELECT a.label AS nome, a.match,
           COALESCE(ag.mrr_operando, 0)     AS mrr_operando,
           COALESCE(ag.mrr_ativo, 0)        AS mrr_ativo,
