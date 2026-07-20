@@ -34,13 +34,14 @@ interface FormState {
   cap_mrr: number | null;
   cap_pontual: number | null;
   cap_contas: number | null;
+  cap_clientes: number | null;
   ordem: number;
   ativo: boolean;
 }
 
 const EMPTY: FormState = {
   nome: "", categoria: "", match_responsavel: "",
-  cap_recorrente: null, cap_mrr: null, cap_pontual: null, cap_contas: null,
+  cap_recorrente: null, cap_mrr: null, cap_pontual: null, cap_contas: null, cap_clientes: null,
   ordem: 0, ativo: true,
 };
 
@@ -88,6 +89,7 @@ export function CapacityMetaDialog({ open, onOpenChange, meta, existingCategoria
         nome: meta.nome, categoria: meta.categoria, match_responsavel: meta.match_responsavel,
         cap_recorrente: meta.cap_recorrente, cap_mrr: meta.cap_mrr,
         cap_pontual: meta.cap_pontual, cap_contas: meta.cap_contas,
+        cap_clientes: meta.cap_clientes,
         ordem: meta.ordem, ativo: meta.ativo,
       });
     } else {
@@ -182,6 +184,7 @@ export function CapacityMetaDialog({ open, onOpenChange, meta, existingCategoria
                 cap_recorrente/cap_pontual/ordem existentes são preservados no payload. */}
             {numField(form.cap_mrr, (n) => setForm({ ...form, cap_mrr: n }), "Cap. Faturamento ($)", "meta-cap-fat")}
             {numField(form.cap_contas, (n) => setForm({ ...form, cap_contas: n }), "Cap. Contratos", "meta-cap-contas")}
+            {numField(form.cap_clientes, (n) => setForm({ ...form, cap_clientes: n }), "Cap. Clientes", "meta-cap-clientes")}
           </div>
 
           <div className="flex items-center gap-2">
