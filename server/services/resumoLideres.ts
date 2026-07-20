@@ -56,10 +56,28 @@ export interface MetricasResumo {
   // true quando getVendasNovasBreakdown falhou e devolveu zeros no catch —
   // mrrAdicionado/pontualVendido saem como um mês real sem vendas, sem aviso.
   vendasIndisponivel: boolean;
+  // true quando mrrMesAnterior destoa >40% de mrrAtivo — sinal de snapshot
+  // parcial/corrompido na base de comparação (já ocorreu em produção). Com
+  // essa base errada, os cinco percentuais de MRR inflam sem aviso.
+  baseSuspeita: boolean;
 }
 
 // Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real)
 const MOTIVOS_EXCLUIDOS = sql`('Erro na Venda', 'Não começou', 'Inadimplente 1º Mês')`;
+
+// Tolerância da sanity check da base de comparação (mrrMesAnterior vs mrrAtivo):
+// ±40%. Já houve snapshot parcial em produção por falha de pipeline por duas
+// semanas — sem esse guard rail os 5 percentuais de MRR inflam em silêncio.
+const TOLERANCIA_BASE_COMPARACAO = 0.4;
+
+// Strings de status usadas no filtro de carteira MRR (getCarteiraMrr). Espelham
+// os valores exatos da coluna `status` em "Clickup".cup_contratos — mudar
+// qualquer uma delas muda os números da mensagem (ex.: renomear
+// STATUS_EM_CANCELAMENTO para "em_cancelamento" faz o filtro parar de casar
+// linhas e a mensagem passar a exibir "🟠 Em Cancelamento: R$ 0,00" em silêncio).
+export const STATUS_ATIVO = "ativo";
+export const STATUS_TRIAGEM_ONBOARDING = ["triagem", "onboarding"];
+export const STATUS_EM_CANCELAMENTO = "em cancelamento";
 
 const MESES = [
   "Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho",
@@ -93,7 +111,8 @@ export function formatarMensagemResumo(
   const mesAnterior = MESES[(agora.mes + 10) % 12];
 
   // Bloco de avisos (rodapé, antes do 👀): cross sell primeiro, vendas novas
-  // depois — mesmo padrão para as duas classes de falha silenciosa de query.
+  // depois, base de comparação suspeita por último — mesmo padrão para as
+  // três classes de falha silenciosa de query/dados.
   const avisos: string[] = [];
   if (m.crossIndisponivel) {
     avisos.push("⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.");
@@ -101,6 +120,11 @@ export function formatarMensagemResumo(
   if (m.vendasIndisponivel) {
     avisos.push(
       "⚠️ Vendas novas indisponíveis nesta apuração — MRR Adicionado e Pontual Vendido estão zerados por falha de apuração, não por ausência de vendas.",
+    );
+  }
+  if (m.baseSuspeita) {
+    avisos.push(
+      "⚠️ Base de comparação suspeita — o MRR do mês anterior destoa da carteira atual; os percentuais podem estar distorcidos.",
     );
   }
   const blocoAvisos = avisos.length > 0 ? avisos.join("\n") + "\n\n" : "";
@@ -118,7 +142,7 @@ Novas Vendas
 📈 MRR Adicionado: ${formatarMoedaBR(m.mrrAdicionado)}
 📦 Pontual Vendido: ${formatarMoedaBR(m.pontualVendido)}
 
-📌 Considera apenas vendas novas (sem Cross Sell e Upsell).
+📌 Considera vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido entram nesta linha, por não ser possível classificá-los.
 
 Carteira MRR
 🟡 Triagem / Onboarding: ${formatarMoedaBR(m.carteiraTriagemOnboarding)}
@@ -177,7 +201,7 @@ Churn Total: ${formatarMoedaBR(m.churnTotal)}
 
 💡 Disclaimers
 
-• MRR Adicionado e Pontual Vendido consideram apenas vendas novas, sem Cross Sell e Upsell.
+• MRR Adicionado e Pontual Vendido consideram vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido não são classificáveis e entram nessas linhas.
 • Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de até 1 mês.
 • O percentual do Churn Pontual é calculado sobre o estoque pontual em aberto no início do mês (${formatarMoedaBR(m.estoquePontualInicioMes)}).
 • Net Churn = Churn − Cross Sell de MRR.
@@ -239,11 +263,15 @@ interface CarteiraMrr {
  * fora de todos os recortes — ver spec 2026-07-20.
  */
 async function getCarteiraMrr(): Promise<CarteiraMrr> {
+  const statusTriagemOnboarding = sql.join(
+    STATUS_TRIAGEM_ONBOARDING.map((s) => sql`${s}`),
+    sql`, `,
+  );
   const result = await db.execute(sql`
     SELECT
-      COALESCE(SUM(valorr) FILTER (WHERE status = 'ativo'), 0) AS ativo,
-      COALESCE(SUM(valorr) FILTER (WHERE status IN ('triagem', 'onboarding')), 0) AS triagem_onboarding,
-      COALESCE(SUM(valorr) FILTER (WHERE status = 'em cancelamento'), 0) AS em_cancelamento
+      COALESCE(SUM(valorr) FILTER (WHERE status = ${STATUS_ATIVO}), 0) AS ativo,
+      COALESCE(SUM(valorr) FILTER (WHERE status IN (${statusTriagemOnboarding})), 0) AS triagem_onboarding,
+      COALESCE(SUM(valorr) FILTER (WHERE status = ${STATUS_EM_CANCELAMENTO}), 0) AS em_cancelamento
     FROM "Clickup".cup_contratos
   `);
   const row = result.rows[0] as any;
@@ -377,9 +405,9 @@ export function derivarMetricas(entrada: {
     mrrMesAnterior,
     estoquePontualInicioMes,
     churnTotal: churn.total,
-    churnTotalPct: (churn.total / mrrMesAnterior) * 100,
+    churnTotalPct: mrrMesAnterior > 0 ? (churn.total / mrrMesAnterior) * 100 : 0,
     churnAjustado: churn.ajustado,
-    churnAjustadoPct: (churn.ajustado / mrrMesAnterior) * 100,
+    churnAjustadoPct: mrrMesAnterior > 0 ? (churn.ajustado / mrrMesAnterior) * 100 : 0,
     churnPontual: churnPontual.total,
     churnPontualPct: estoquePontualInicioMes > 0 ? (churnPontual.total / estoquePontualInicioMes) * 100 : 0,
     churnPontualAjustado: churnPontual.ajustado,
@@ -388,13 +416,16 @@ export function derivarMetricas(entrada: {
     crossP,
     crossTotal,
     netChurn,
-    netChurnPct: (netChurn / mrrMesAnterior) * 100,
+    netChurnPct: mrrMesAnterior > 0 ? (netChurn / mrrMesAnterior) * 100 : 0,
     netChurnBruto,
-    netChurnBrutoPct: (netChurnBruto / mrrMesAnterior) * 100,
+    netChurnBrutoPct: mrrMesAnterior > 0 ? (netChurnBruto / mrrMesAnterior) * 100 : 0,
     churnBrutoSemAbono: churn.brutoSemAbono,
-    churnBrutoSemAbonoPct: (churn.brutoSemAbono / mrrMesAnterior) * 100,
+    churnBrutoSemAbonoPct: mrrMesAnterior > 0 ? (churn.brutoSemAbono / mrrMesAnterior) * 100 : 0,
     crossIndisponivel: breakdown.erro === true,
     vendasIndisponivel: vendasNovas.erro === true,
+    baseSuspeita:
+      mrrMesAnterior < mrrAtivo * (1 - TOLERANCIA_BASE_COMPARACAO) ||
+      mrrMesAnterior > mrrAtivo * (1 + TOLERANCIA_BASE_COMPARACAO),
   };
 }
 

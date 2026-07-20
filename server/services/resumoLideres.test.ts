@@ -1,4 +1,26 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+// calcularMetricasResumo faz I/O (db + metricsAdapter) — mockado só para o
+// describe do guard rail (item 5); as demais 28+ suítes deste arquivo testam
+// funções puras e não são afetadas por este mock. vi.hoisted é necessário
+// porque há duas chamadas vi.mock neste arquivo (db + metricsAdapter): sem
+// isso, os `const` que os factories referenciam não ficam disponíveis no
+// momento em que o hoisting do vi.mock os executa.
+const mocks = vi.hoisted(() => ({
+  mockExecute: vi.fn(),
+  mockGetMrrInicioMes: vi.fn(),
+  mockGetVendasNovasBreakdown: vi.fn(),
+  mockGetVendasMrrBreakdown: vi.fn(),
+}));
+const { mockExecute, mockGetMrrInicioMes, mockGetVendasNovasBreakdown, mockGetVendasMrrBreakdown } = mocks;
+
+vi.mock("../db", () => ({ db: { execute: mocks.mockExecute } }));
+vi.mock("../okr2026/metricsAdapter", () => ({
+  getMrrInicioMes: mocks.mockGetMrrInicioMes,
+  getVendasNovasBreakdown: mocks.mockGetVendasNovasBreakdown,
+  getVendasMrrBreakdown: mocks.mockGetVendasMrrBreakdown,
+}));
+
 import {
   formatarMoedaBR,
   formatarPercentBR,
@@ -6,6 +28,10 @@ import {
   agoraSaoPaulo,
   janelaAtual,
   derivarMetricas,
+  calcularMetricasResumo,
+  STATUS_ATIVO,
+  STATUS_TRIAGEM_ONBOARDING,
+  STATUS_EM_CANCELAMENTO,
   type MetricasResumo,
 } from "./resumoLideres";
 
@@ -42,6 +68,7 @@ const METRICAS: MetricasResumo = {
   churnBrutoSemAbonoPct: (55000 / 1137868) * 100,
   crossIndisponivel: false,
   vendasIndisponivel: false,
+  baseSuspeita: false,
 };
 
 const MENSAGEM_ESPERADA = `☀️ Boa tarde, líderes!
@@ -57,7 +84,7 @@ Novas Vendas
 📈 MRR Adicionado: R$ 42.310,00
 📦 Pontual Vendido: R$ 118.500,00
 
-📌 Considera apenas vendas novas (sem Cross Sell e Upsell).
+📌 Considera vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido entram nesta linha, por não ser possível classificá-los.
 
 Carteira MRR
 🟡 Triagem / Onboarding: R$ 150.789,28
@@ -116,7 +143,7 @@ Churn Total: R$ 67.030,00
 
 💡 Disclaimers
 
-• MRR Adicionado e Pontual Vendido consideram apenas vendas novas, sem Cross Sell e Upsell.
+• MRR Adicionado e Pontual Vendido consideram vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido não são classificáveis e entram nessas linhas.
 • Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de até 1 mês.
 • O percentual do Churn Pontual é calculado sobre o estoque pontual em aberto no início do mês (R$ 2.090.519,35).
 • Net Churn = Churn − Cross Sell de MRR.
@@ -242,6 +269,37 @@ describe("formatarMensagemResumo", () => {
     );
     expect(msg).toContain(`${AVISO_CROSS}\n${AVISO_VENDAS}\n\n👀 Seguimos`);
   });
+
+  // Aviso de base de comparação suspeita: terceira classe de falha silenciosa —
+  // mrrMesAnterior fora de ±40% de mrrAtivo (ex.: snapshot parcial de pipeline).
+  const AVISO_BASE =
+    "⚠️ Base de comparação suspeita — o MRR do mês anterior destoa da carteira atual; os percentuais podem estar distorcidos.";
+
+  it("só base suspeita: só o aviso de base, seguido de linha em branco e do 👀", () => {
+    const msg = formatarMensagemResumo(
+      { ...METRICAS, crossIndisponivel: false, vendasIndisponivel: false, baseSuspeita: true },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
+    );
+    expect(msg).toContain(`${AVISO_BASE}\n\n👀 Seguimos`);
+    expect(msg).not.toContain(AVISO_CROSS);
+    expect(msg).not.toContain(AVISO_VENDAS);
+  });
+
+  it("baseSuspeita false: mensagem não menciona base de comparação", () => {
+    const msg = formatarMensagemResumo(
+      { ...METRICAS, baseSuspeita: false },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
+    );
+    expect(msg).not.toContain("Base de comparação");
+  });
+
+  it("três avisos juntos: cross, depois vendas, depois base suspeita, uma linha em branco antes do 👀", () => {
+    const msg = formatarMensagemResumo(
+      { ...METRICAS, crossIndisponivel: true, vendasIndisponivel: true, baseSuspeita: true },
+      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
+    );
+    expect(msg).toContain(`${AVISO_CROSS}\n${AVISO_VENDAS}\n${AVISO_BASE}\n\n👀 Seguimos`);
+  });
 });
 
 describe("derivarMetricas", () => {
@@ -362,6 +420,92 @@ describe("derivarMetricas", () => {
 
     const semErro = derivarMetricas(ENTRADA_BASE);
     expect(semErro.vendasIndisponivel).toBe(false);
+  });
+
+  // baseSuspeita: mrrMesAnterior fora de ±40% de mrrAtivo — sinal de snapshot
+  // parcial/corrompido (já ocorreu em produção). mrrAtivo fixo em 1.000.000
+  // (ativo 1.000.000 + triagemOnboarding 0) para testar os limites exatos.
+  describe("baseSuspeita", () => {
+    const carteira = { ativo: 1000000, triagemOnboarding: 0, emCancelamento: 0 };
+
+    it("limite inferior exato (-40%, mrrMesAnterior = 600.000): dentro da faixa, false", () => {
+      const r = derivarMetricas({ ...ENTRADA_BASE, carteira, mrrMesAnterior: 600000 });
+      expect(r.baseSuspeita).toBe(false);
+    });
+
+    it("logo abaixo do limite inferior (mrrMesAnterior = 599.999): fora da faixa, true", () => {
+      const r = derivarMetricas({ ...ENTRADA_BASE, carteira, mrrMesAnterior: 599999 });
+      expect(r.baseSuspeita).toBe(true);
+    });
+
+    it("limite superior exato (+40%, mrrMesAnterior = 1.400.000): dentro da faixa, false", () => {
+      const r = derivarMetricas({ ...ENTRADA_BASE, carteira, mrrMesAnterior: 1400000 });
+      expect(r.baseSuspeita).toBe(false);
+    });
+
+    it("logo acima do limite superior (mrrMesAnterior = 1.400.001): fora da faixa, true", () => {
+      const r = derivarMetricas({ ...ENTRADA_BASE, carteira, mrrMesAnterior: 1400001 });
+      expect(r.baseSuspeita).toBe(true);
+    });
+  });
+
+  it("mrrMesAnterior zero não produz Infinity/NaN nos 5 percentuais de MRR (simetria com o tratamento do pontual)", () => {
+    const r = derivarMetricas({ ...ENTRADA_BASE, mrrMesAnterior: 0 });
+    expect(r.churnTotalPct).toBe(0);
+    expect(r.churnAjustadoPct).toBe(0);
+    expect(r.netChurnPct).toBe(0);
+    expect(r.netChurnBrutoPct).toBe(0);
+    expect(r.churnBrutoSemAbonoPct).toBe(0);
+    for (const pct of [r.churnTotalPct, r.churnAjustadoPct, r.netChurnPct, r.netChurnBrutoPct, r.churnBrutoSemAbonoPct]) {
+      expect(Number.isFinite(pct)).toBe(true);
+    }
+  });
+});
+
+// Strings de status do filtro SQL de getCarteiraMrr (item de regra de negócio,
+// sem cobertura antes desta suíte). Espelham os valores exatos da coluna
+// `status` em "Clickup".cup_contratos: mudar qualquer um deles muda os números
+// da mensagem (ex.: renomear STATUS_EM_CANCELAMENTO para "em_cancelamento" faz
+// o filtro parar de casar linhas e a mensagem exibir "🟠 Em Cancelamento: R$
+// 0,00" em silêncio, com os 28+ testes de formatação continuando verdes porque
+// eles não passam pelo SQL real).
+describe("Status da carteira MRR (regra de negócio usada no filtro SQL)", () => {
+  it("valores exatos usados em getCarteiraMrr", () => {
+    expect(STATUS_ATIVO).toBe("ativo");
+    expect(STATUS_TRIAGEM_ONBOARDING).toEqual(["triagem", "onboarding"]);
+    expect(STATUS_EM_CANCELAMENTO).toBe("em cancelamento");
+  });
+});
+
+describe("calcularMetricasResumo — guard rail de MRR inválido", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default: todas as colunas caem no fallback `row?.campo || "0"` de cada
+    // query (getChurnMes, getChurnPontualMes, getEntregaPontualMes,
+    // getEstoquePontualInicioMes, e getCarteiraMrr quando não sobrescrito
+    // com mockResolvedValueOnce) — equivalente a "mês real sem nenhum dado".
+    mockExecute.mockResolvedValue({ rows: [{}] });
+    mockGetVendasNovasBreakdown.mockResolvedValue({ mrr: 0, pontual: 0 });
+    mockGetVendasMrrBreakdown.mockResolvedValue({ total: 0, novo: 0, crosssell: 0, crosssell_pontual: 0 });
+  });
+
+  it("aborta com throw quando mrrAtivo <= 0 (carteira zerada), mesmo com mrrMesAnterior válido", async () => {
+    mockGetMrrInicioMes.mockResolvedValue(1000000);
+    // getCarteiraMrr usa o default {} -> ativo=0, triagemOnboarding=0 -> mrrAtivo=0
+    await expect(calcularMetricasResumo()).rejects.toThrow(/Métricas de MRR inválidas/);
+  });
+
+  it("aborta com throw quando mrrMesAnterior <= 0, mesmo com mrrAtivo válido", async () => {
+    mockGetMrrInicioMes.mockResolvedValue(0);
+    // 1ª chamada de db.execute em calcularMetricasResumo é sempre getCarteiraMrr
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+    await expect(calcularMetricasResumo()).rejects.toThrow(/Métricas de MRR inválidas/);
+  });
+
+  it("não aborta quando mrrAtivo e mrrMesAnterior são ambos positivos", async () => {
+    mockGetMrrInicioMes.mockResolvedValue(1000000);
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+    await expect(calcularMetricasResumo()).resolves.toBeDefined();
   });
 });
 
