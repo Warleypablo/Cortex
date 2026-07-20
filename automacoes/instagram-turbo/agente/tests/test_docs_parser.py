@@ -172,6 +172,9 @@ def run():
     print("\n=== URL de referência não vaza pra legenda (bug 4) ===")
     test_url_nao_vaza_na_legenda()
 
+    print("\n=== header com ** quebrado em 2 linhas (bug 5) ===")
+    test_header_bold_quebrado_em_duas_linhas()
+
     print("\n🎉 Todos os testes passaram.")
 
 
@@ -207,6 +210,47 @@ def test_url_nao_vaza_na_legenda():
     _assert("http" not in leg2, "URL do meio removida")
     _assert("  " not in leg2, f"sem espaço duplo onde a URL saiu (veio {leg2!r})")
     _assert("Veja mais em aqui embaixo." in leg2, "texto em volta preservado, 1 espaço")
+
+
+def test_header_bold_quebrado_em_duas_linhas():
+    # Regressão do card «15 DIAS» (Creator Summit, 19/jul/2026): no Doc o header
+    # "15 DIAS ANTES" vinha com o `**` de ABERTURA quebrado numa linha própria
+    # (artefato do export do Google Docs):
+    #     **CONTAGEM REGRESSIVA**
+    #     **
+    #     15 DIAS ANTES**
+    # `_is_post_header` exige a linha começar com `**`, então "15 DIAS ANTES" era
+    # invisível: a LEGENDA era absorvida por "CONTAGEM REGRESSIVA" e o card ficava
+    # "sem match de header" (legenda vazia → agente não publicava o reel).
+    doc = (
+        "**CONTAGEM REGRESSIVA**\n"
+        "**\n"
+        "15 DIAS ANTES**\n"
+        "**Ref: **https://www.tiktok.com/@ve.chornytsi/video/7525137713066970390\n"
+        "**Copy post-it:**\n"
+        "FALTAM\n"
+        "15 DIAS\n"
+        "**LEGENDA**\n"
+        "A contagem regressiva começou: faltam apenas 15 dias. ⏳\n"
+        "Não fique de fora desse encontro!\n"
+        'Comente "EU QUERO" e garanta seu ingresso. #turbopartners #creatorsummites\n'
+        "**7 DIAS**\n"
+        "https://www.tiktok.com/@atleticaibmecbh/video/7408223384271670534\n"
+        "**LEGENDA**\n"
+        "Faltam 7 dias para o maior evento sobre a Creator Economy!\n"
+        "**5 DIAS**\n"
+    )
+    # parse_doc reconstrói "**15 DIAS ANTES**" e cria a seção separada
+    headers = [s.header for s in parse_doc(doc)]
+    _assert("15 DIAS ANTES" in headers, f"header '15 DIAS ANTES' reconstruído (veio {headers})")
+
+    # o card "15 DIAS" casa com o header "15 DIAS ANTES" (card ⊂ header)
+    leg, hdr = find_legenda_for_task(doc, "15 DIAS")
+    _assert(hdr == "15 DIAS ANTES", f"card '15 DIAS' → header '15 DIAS ANTES' (veio {hdr!r})")
+    _assert("A contagem regressiva começou" in leg, f"legenda certa (veio {leg!r})")
+    _assert("EU QUERO" in leg, "CTA da legenda preservado")
+    _assert("http" not in leg, "sem URL vazando na legenda")
+    _assert("Faltam 7 dias" not in leg, "não invadiu a legenda do header seguinte (7 DIAS)")
 
 
 def test_header_curto_meio_nao_sequestra():
