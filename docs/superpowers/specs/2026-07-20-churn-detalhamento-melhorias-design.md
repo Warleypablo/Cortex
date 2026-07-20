@@ -78,9 +78,25 @@ A única fonte viva é `"Bitrix".crm_deal.bx_cluster`. Enriquecer por CNPJ foi m
 A view não tem coluna `responsavel`. Tem `responsavel_geral` (92,0% preenchido, escolhido),
 `cs_responsavel` (96,5%) e `vendedor` (84,5%). Ambos aceitam `"Nome A; Nome B"`.
 
-`"Clickup".cup_data_hist` **não tem** `responsavel_geral` — só `responsavel` (operador da subtask)
-e `cs_responsavel`. O campo vive em `cup_clientes.responsavel_geral`, alcançável por
-`cup_clientes.task_id = cup_data_hist.id_task`.
+**`cup_churn.responsavel_geral` tem nome enganoso: seu conteúdo é o OPERADOR da subtask, não o
+líder da conta.** Medido nos 52 contratos de churn de julho/2026:
+
+| comparação | batem |
+|---|---:|
+| `cup_churn.responsavel_geral` = `cup_contratos.responsavel` (operador) | **51/52 (98%)** |
+| `cup_churn.responsavel_geral` = `cup_clientes.responsavel_geral` (líder) | **0/52 (0%)** |
+
+São populações bem diferentes: 52 nomes de operador pulverizados (maior carteira R$ 82k) contra
+24 nomes de líder concentrados (maior carteira R$ 290k). **Decisão: usar o operador**, que é a
+dimensão que a tela já usa e para a qual o churn% já é calculado corretamente.
+
+Corolário: qualquer tentativa de trocar o denominador para `cup_clientes.responsavel_geral`
+**quebraria** o cálculo, porque o numerador é operador. Um comentário no código deve registrar
+isso — a próxima pessoa a ler `responsavel_geral` vai levantar a mesma suspeita.
+
+`"Clickup".cup_data_hist` tem `responsavel` (operador) e `cs_responsavel`, e **não** tem
+`responsavel_geral` — o que é consistente com a decisão acima, já que o denominador precisa ser
+operador.
 
 MRR base de julho/2026 por `responsavel_geral` (régua replicada de `server/routes.ts:5404-5433`,
 snapshot resolvido 2026-07-01):
@@ -101,7 +117,8 @@ dentro da base de julho: 1 linha, R$ 3.897 (0,33%).
 | Escopo MRR × Pontual | Colunas separadas **dentro dos drawers** + dois totais no header. Rankings e KPIs do topo permanecem só-MRR |
 | Percentual no histórico | **% da base MRR do mês** (mesma régua da meta de 8%), não composição do mês |
 | % por responsável | **Participação (soma 100%) + Churn% sobre a carteira**, lado a lado |
-| Campo de responsável | `responsavel_geral` |
+| Campo de responsável | `responsavel_geral` da view — que na prática é o **operador** da subtask, não o líder |
+| 0% falso por base ausente | **Corrigir junto**: campo vira `number \| null`, UI exibe `—` |
 | Cluster | **Esconder a dimensão** enquanto não houver dado. Não derivar do Bitrix |
 | Filtro de squads quebrado | Fora desta tarefa |
 
@@ -195,18 +212,27 @@ Ordenado por R$ desc. Bolinha com `severityHex`, mesma escala do bloco de motivo
 - `Part.%` = MRR do responsável ÷ MRR do recorte. Frontend puro.
 - `Churn%` = MRR perdido ÷ MRR da carteira daquele responsável no início do mês. Exige backend.
 
-**Backend para o `Churn%`**: expor MRR base por `responsavel_geral` no endpoint
-`churn-detalhamento`, replicando a régua de `routes.ts:5404-5433` (primeiro snapshot do mês entre
-dias 1-5, fallback último do mês anterior, status `ativo`/`onboarding`/`triagem`), com
-`LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task`. Validado: soma bate ao centavo
-com o total do endpoint.
+**Backend para o `Churn%`**: quase tudo já existe. O endpoint já calcula `somaMrrBasesPorPessoa`
+(`routes.ts:5188-5192`) — soma das bases mensais por operador, replicando a régua do snapshot
+(primeiro do mês dias 1-5, fallback último do mês anterior, status `ativo`/`onboarding`/`triagem`).
+Basta **expor esse objeto** como `metricas.soma_mrr_bases_por_pessoa`.
 
-**Range multi-mês**: o endpoint aceita `startDate`/`endDate` livres, mas a régua de base é mensal.
-O denominador é a **soma das bases mensais de cada mês tocado pelo range**, por responsável — mesma
-convenção que a tela já usa no agregado (`metricas.soma_mrr_bases`). Um range de 3 meses divide o
-churn dos 3 meses pela soma das 3 bases daquele responsável. Ranges parciais (meio de mês) usam a
-base do mês inteiro; o `Churn%` fica subestimado nesse caso, igual ao comportamento atual do
-agregado.
+Não reutilizar `churn_por_pessoa.percentual`: aquele é o churn **global** da pessoa e seria
+idêntico em todos os drawers. O número que responde a pergunta do drawer é
+**MRR perdido daquela pessoa naquele recorte ÷ carteira total dela** — "quanto da carteira do
+Victor foi perdido em Performance". Por isso o componente precisa da base bruta, não do
+percentual pronto.
+
+**Range multi-mês**: `somaMrrBasesPorPessoa` já soma as bases mensais de cada mês tocado pelo
+range — mesma convenção do agregado (`metricas.soma_mrr_bases`). Ranges parciais (meio de mês)
+usam a base do mês inteiro; o `Churn%` fica subestimado nesse caso, igual ao comportamento atual
+do agregado.
+
+**Correção acoplada — o 0% falso**: `churnPorPessoa` (`routes.ts:5213-5215`) usa
+`percentual: base > 0 ? ... : 0`, exibindo **0% para churn real** quando o operador não tem base
+no snapshot. Atinge 4,11% do MRR perdido de julho/2026 (Pedro Paulo, R$ 2.750: uma linha em
+triagem com `valorr = 0`). O campo passa a ser `number | null`, e tanto o bloco novo quanto a
+dimensão Pessoa em modo taxa exibem `—` em vez de `0%`.
 
 **Tratamentos exigidos pelos dados:**
 
@@ -253,7 +279,8 @@ Lógica de negócio a cobrir com teste, sem depender de banco (funções puras s
 |---|---|
 | Filtro de squads irrelevantes é no-op — compara com `'turbo interno'` mas os valores têm prefixo emoji (`🚀 Turbo Interno`). MRR base com e sem filtro é idêntico: R$ 1.197.868 | Corrigir muda o denominador do churn% e da meta de 8% em **todos** os meses. Merece validação própria |
 | `cup_clientes.cluster` 100% vazia na origem, com `catalog_clusters` já definido | Bloqueia a dimensão Cluster. Caminho de maior retorno — a view já expõe a coluna |
-| `responsavel_geral` sem histórico no banco | O `Churn%` de meses passados usa o responsável **atual**; troca de carteira atribui churn antigo a quem pegou a conta depois |
-| 7,6% do MRR base (R$ 90.901) sem `responsavel_geral` | Buraco de preenchimento no ClickUp, corrigível na origem |
+| `cup_churn.responsavel_geral` contém operador, não líder — o nome da coluna mente | Fonte recorrente de interpretação errada. Renomear na origem ou documentar; por ora, comentário no código |
+| Chaves compostas `"Nome A; Nome B"` tratadas como pessoa literal nos dois lados | Casam por coincidência de string e fragmentam a base do operador individual. 4 linhas no snapshot de julho |
+| Buraco de preenchimento de responsável no ClickUp | Contratos sem operador caem em "Não especificado", sem churn% atribuível |
 | `tipo_negocio` 80,8% nulo e sem valor que distinga recorrente de pontual | A separação MRR × Pontual depende de qual campo de valor está preenchido, não do tipo |
 | `cnpj` da view 1% preenchido em 2026 (era 45% em 2024) | Regressão de preenchimento na origem; bloqueia qualquer cruzamento por CNPJ a partir da view |
