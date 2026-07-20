@@ -487,6 +487,9 @@ describe("calcularMetricasResumo — guard rail de MRR inválido", () => {
     mockExecute.mockResolvedValue({ rows: [{}] });
     mockGetVendasNovasBreakdown.mockResolvedValue({ mrr: 0, pontual: 0 });
     mockGetVendasMrrBreakdown.mockResolvedValue({ total: 0, novo: 0, crosssell: 0, crosssell_pontual: 0 });
+    // vi.clearAllMocks() limpa as chamadas, não as implementações: sem este
+    // default, um teste novo herdaria em silêncio o valor deixado pelo anterior.
+    mockGetMrrInicioMes.mockResolvedValue(0);
   });
 
   it("aborta com throw quando mrrAtivo <= 0 (carteira zerada), mesmo com mrrMesAnterior válido", async () => {
