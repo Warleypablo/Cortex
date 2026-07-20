@@ -27,7 +27,13 @@ function normalizeSquad(squad: string | null): string {
   return squad.replace(/^[^\p{L}]+/u, "").trim();
 }
 
-const capacityMetaSchema = z.object({
+// cap_clientes é tolerante a payload legado: o form da aba Configurar ainda não
+// envia essa chave (só numa task futura). Chave AUSENTE deve virar `null` (sem meta
+// configurada) em vez de 400 — mas `null` explícito e inteiros continuam válidos.
+// Cuidado: `.optional()` sozinho REJEITA `null` no Zod; por isso `.nullable().optional()`
+// + `.transform` para garantir que `undefined` nunca chega ao SQL (INSERT/UPDATE
+// interpolam `${m.cap_clientes}` direto — undefined viraria parâmetro inválido).
+export const capacityMetaSchema = z.object({
   nome: z.string().trim().min(1, "nome é obrigatório"),
   match_responsavel: z.string().trim().min(1, "match_responsavel é obrigatório"),
   categoria: z.string().trim().min(1, "categoria é obrigatória"),
@@ -35,7 +41,7 @@ const capacityMetaSchema = z.object({
   cap_mrr: z.number().nonnegative().nullable(),
   cap_pontual: z.number().int().nonnegative().nullable(),
   cap_contas: z.number().int().nonnegative().nullable(),
-  cap_clientes: z.number().int().nonnegative().nullable(),
+  cap_clientes: z.number().int().nonnegative().nullable().optional().transform((v) => v ?? null),
   ordem: z.number().int().nonnegative().default(0),
   ativo: z.boolean().default(true),
 });
