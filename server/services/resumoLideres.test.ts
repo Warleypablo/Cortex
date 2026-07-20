@@ -498,6 +498,17 @@ describe("derivarMetricas", () => {
       expect(r.crossP).toBe(20000);
     });
 
+    it("override de ZERO prevalece sobre o Bitrix (não cai no fallback)", () => {
+      // Zero é um valor legítimo: mês sem cross sell nenhum. Com `||` no lugar
+      // de `??` na precedência, estes valores cairiam no Bitrix (5997/10300) e
+      // a mensagem mostraria um cross sell que não existe.
+      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: 0, p: 0 } });
+      expect(r.crossR).toBe(0);
+      expect(r.crossP).toBe(0);
+      expect(r.crossTotal).toBe(0);
+      expect(r.netChurn).toBe(43314); // churnAjustado inteiro, sem desconto
+    });
+
     it("crossTotal, netChurn e netChurnBruto são calculados sobre os valores efetivos (override), não sobre os do Bitrix", () => {
       // Valores do override (50000/20000) bem distintos dos do Bitrix
       // (5997/10300) — se algum cálculo usar o valor errado a asserção falha.

@@ -373,18 +373,24 @@ async function getCrossOverrideMesAtual(): Promise<CrossOverride> {
   try {
     const result = await db.execute(sql`
       SELECT metric_key, actual_value
-      FROM metric_actual_overrides_monthly
+      FROM cortex_core.metric_actual_overrides_monthly
       WHERE metric_key IN (${METRIC_KEY_CROSS_R}, ${METRIC_KEY_CROSS_P})
         AND month = TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM')
         AND dimension_key IS NULL
-      ORDER BY updated_at DESC
+      ORDER BY updated_at DESC NULLS LAST
     `);
+    // NaN não é null, então passaria pelo `??` e viraria "R$ NaN" na mensagem
+    // sem disparar nenhum aviso — descartar aqui é o que mantém o fallback.
+    const numeroOuNull = (v: unknown): number | null => {
+      const n = parseFloat(String(v));
+      return Number.isFinite(n) ? n : null;
+    };
     const override: CrossOverride = { r: null, p: null };
     for (const row of (result.rows ?? []) as any[]) {
       if (row.metric_key === METRIC_KEY_CROSS_R && override.r === null) {
-        override.r = parseFloat(row.actual_value);
+        override.r = numeroOuNull(row.actual_value);
       } else if (row.metric_key === METRIC_KEY_CROSS_P && override.p === null) {
-        override.p = parseFloat(row.actual_value);
+        override.p = numeroOuNull(row.actual_value);
       }
     }
     return override;
