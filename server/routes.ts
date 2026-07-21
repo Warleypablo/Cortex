@@ -8,6 +8,7 @@ import { validateBody } from "./middleware/validate";
 import { createUserSchema, updatePermissionsSchema, updateRoleSchema, updateBpTabsSchema } from "./middleware/schemas";
 import { getAllUsers, listAllKeys, updateUserPermissions, updateUserRole, createManualUser, updateUserBpTabs } from "./auth/userDb";
 import { BP2026_TAB_IDS } from "../shared/bp2026-tabs";
+import { pontualTemCobertura } from "../shared/churnPontual";
 import { db } from "./db";
 import { sql, type SQL } from "drizzle-orm";
 import { computeEvolucaoChurn } from "./investorsReport/churn";
@@ -4920,6 +4921,75 @@ Estruture sua resposta em:
     }
   });
 
+  // Forecast Churn — indicador antecedente: contratos em risco que AINDA NÃO
+  // pediram encerramento (data_solicitacao_encerramento IS NULL). Foto do agora,
+  // sem parâmetro de período. Fonte: Postgres (cup_contratos + cup_churn +
+  // churn_risk_scores), sem tocar na API do ClickUp.
+  app.get("/api/analytics/churn-forecast", async (_req, res) => {
+    try {
+      const result = await db.execute(sql`
+        SELECT
+          ct.id_subtask                   AS contrato_id,
+          cl.nome                         AS cliente,
+          cl.cnpj,
+          ct.servico,
+          COALESCE(ct.valorr::numeric, 0) AS valorr,
+          COALESCE(ct.valorp::numeric, 0) AS valorp,
+          ct.status,
+          ch.status_conta,
+          ch.status_cancelamento,
+          ch.possibilidade_retencao,
+          ch.responsavel_geral            AS responsavel,
+          COALESCE(
+            NULLIF(TRIM(ch.mensagem_cliente), ''),
+            NULLIF(TRIM(ch.contexto_cx), ''),
+            NULLIF(TRIM(ch.contexto_operacao), '')
+          )                               AS contexto_risco,
+          rs.score                        AS risco_score,
+          rs.tier                         AS risco_tier
+        FROM "Clickup".cup_contratos ct
+        JOIN "Clickup".cup_churn ch          ON ch.task_id = ct.id_subtask
+        LEFT JOIN "Clickup".cup_clientes cl  ON cl.task_id = ct.id_task
+        LEFT JOIN cortex_core.churn_risk_scores rs ON rs.contrato_id = ct.id_subtask
+        WHERE LOWER(ct.status) IN ('ativo','onboarding','pausado','triagem')
+          AND ct.data_solicitacao_encerramento IS NULL
+          AND (
+                COALESCE(ch.status_cancelamento, '') <> ''
+             OR ch.status_conta IN ('Requer Atenção', 'Insatisfeito')
+             OR COALESCE(ch.possibilidade_retencao, '') <> ''
+          )
+        ORDER BY ct.valorr::numeric DESC NULLS LAST
+      `);
+
+      const contratos = (result.rows as any[]).map((r) => ({
+        contrato_id: String(r.contrato_id),
+        cliente: r.cliente || "Cliente não identificado",
+        cnpj: r.cnpj || null,
+        servico: r.servico || "—",
+        valorr: Number(r.valorr) || 0,
+        valorp: Number(r.valorp) || 0,
+        status: r.status || "",
+        status_conta: r.status_conta || null,
+        status_cancelamento: r.status_cancelamento || null,
+        possibilidade_retencao: r.possibilidade_retencao || null,
+        responsavel: r.responsavel || null,
+        contexto_risco: r.contexto_risco || null,
+        risco_score: r.risco_score !== null && r.risco_score !== undefined ? Number(r.risco_score) : null,
+        risco_tier: r.risco_tier || null,
+      }));
+
+      const calcResult = await db.execute(sql`
+        SELECT MAX(calculated_at) AS ultimo FROM cortex_core.churn_risk_scores
+      `);
+      const riscoCalculadoEm = (calcResult.rows[0] as any)?.ultimo ?? null;
+
+      res.json({ contratos, riscoCalculadoEm });
+    } catch (error) {
+      console.error("[api] Error fetching churn forecast:", error);
+      res.status(500).json({ error: "Failed to fetch churn forecast data" });
+    }
+  });
+
   // Churn Detalhamento - lista de contratos churned com detalhes ricos de cup_churn
   app.get("/api/analytics/churn-detalhamento", async (req, res) => {
     try {
@@ -5373,18 +5443,24 @@ Estruture sua resposta em:
       const fim = `${ano}-12-31`;
 
       let abonoFilter = sql``;
-      if (filterAbono === "nao_abonados") abonoFilter = sql`AND COALESCE(abonar_churn, '') <> 'Sim'`;
-      else if (filterAbono === "abonados") abonoFilter = sql`AND COALESCE(abonar_churn, '') = 'Sim'`;
+      if (filterAbono === "nao_abonados") abonoFilter = sql`AND COALESCE(c.abonar_churn, '') <> 'Sim'`;
+      else if (filterAbono === "abonados") abonoFilter = sql`AND COALESCE(c.abonar_churn, '') = 'Sim'`;
 
       const result = await db.execute(sql`
         SELECT
-          TO_CHAR(data_solicitacao_encerramento, 'YYYY-MM') AS mes,
-          COALESCE(NULLIF(TRIM(motivo_cancelamento), ''), 'Não especificado') AS motivo,
-          SUM(COALESCE(valor_r, 0)) AS mrr,
+          TO_CHAR(c.data_solicitacao_encerramento, 'YYYY-MM') AS mes,
+          COALESCE(NULLIF(TRIM(c.motivo_cancelamento), ''), 'Não especificado') AS motivo,
+          SUM(COALESCE(c.valor_r, 0)) AS mrr,
+          SUM(COALESCE(ct.valorp, 0)) AS pontual,
           COUNT(*) AS logos
-        FROM cortex_core.vw_cup_churn_ajustado
-        WHERE data_solicitacao_encerramento >= ${inicio}::date
-          AND data_solicitacao_encerramento <= ${fim}::date
+        FROM cortex_core.vw_cup_churn_ajustado c
+        LEFT JOIN LATERAL (
+          SELECT MAX(x.valorp::numeric) AS valorp
+          FROM "Clickup".cup_contratos x
+          WHERE x.id_subtask = c.task_id
+        ) ct ON TRUE
+        WHERE c.data_solicitacao_encerramento >= ${inicio}::date
+          AND c.data_solicitacao_encerramento <= ${fim}::date
           -- Churn BRUTO total (2026-06-30): inclui "nunca virou base" p/ bater com o card
           -- da tela (ver /api/analytics/churn-detalhamento). Abono via toggle da tela.
           ${abonoFilter}
@@ -5392,17 +5468,43 @@ Estruture sua resposta em:
         ORDER BY 1
       `);
 
-      // Pivot: mês -> { total, porMotivo }
-      const mesesMap: Record<string, { mes: string; total: number; logos: number; porMotivo: Record<string, number> }> = {};
+      // Cobertura do dado pontual é propriedade do ANO, não do filtro de abono: query
+      // enxuta separada, sem abonoFilter, pra não deixar o toggle nao_abonados/abonados
+      // acender e apagar a barra pontual (medido: 21% -> 14,5% de cobertura só de alternar
+      // o filtro). Mesmo range de datas e mesmo LEFT JOIN LATERAL da query principal.
+      const coberturaResult = await db.execute(sql`
+        SELECT
+          COUNT(*) AS total,
+          COUNT(*) FILTER (WHERE COALESCE(ct.valorp, 0) > 0) AS com_pontual
+        FROM cortex_core.vw_cup_churn_ajustado c
+        LEFT JOIN LATERAL (
+          SELECT MAX(x.valorp::numeric) AS valorp
+          FROM "Clickup".cup_contratos x
+          WHERE x.id_subtask = c.task_id
+        ) ct ON TRUE
+        WHERE c.data_solicitacao_encerramento >= ${inicio}::date
+          AND c.data_solicitacao_encerramento <= ${fim}::date
+      `);
+      const coberturaRow = (coberturaResult.rows as any[])[0] ?? {};
+      const totalLinhas = Number(coberturaRow.total) || 0;
+      const linhasComPontual = Number(coberturaRow.com_pontual) || 0;
+
+      // Pivot: mês -> { total, pontual, porMotivo }
+      const mesesMap: Record<string, { mes: string; total: number; pontual: number; logos: number; porMotivo: Record<string, number> }> = {};
       const motivoTotals: Record<string, number> = {};
       for (const r of result.rows as any[]) {
         const mes = r.mes as string;
         const motivo = r.motivo as string;
         const mrr = Number(r.mrr) || 0;
+        const pontual = Number(r.pontual) || 0;
         const logos = Number(r.logos) || 0;
-        if (!mesesMap[mes]) mesesMap[mes] = { mes, total: 0, logos: 0, porMotivo: {} };
+        if (!mesesMap[mes]) mesesMap[mes] = { mes, total: 0, pontual: 0, logos: 0, porMotivo: {} };
         mesesMap[mes].porMotivo[motivo] = (mesesMap[mes].porMotivo[motivo] || 0) + mrr;
         mesesMap[mes].total += mrr;
+        // O pontual NÃO é quebrado por motivo: a barra é sólida. 3 motivos concentram
+        // 66,8% do valorp e 9 dos 21 motivos têm valorp zero — empilhar produziria uma
+        // pilha de ~4 blocos com metade da legenda sem representação.
+        mesesMap[mes].pontual += pontual;
         mesesMap[mes].logos += logos;
         motivoTotals[motivo] = (motivoTotals[motivo] || 0) + mrr;
       }
@@ -5459,7 +5561,13 @@ Estruture sua resposta em:
         mrrBasePorMes[mesKey] = total;
       }
 
-      res.json({ series, motivos, ano, filterAbono, mrrBasePorMes });
+      // pontualTemCobertura pode retornar undefined (amostra < MINIMO_LINHAS_COBERTURA_PONTUAL,
+      // cedo demais pra decidir). Não converter pra null aqui: JSON.stringify (usado por
+      // res.json) já omite do corpo qualquer chave com valor undefined, então o campo
+      // simplesmente não aparece na resposta — o frontend trata a ausência do campo
+      // igual a undefined explícito (=== false / truthiness), nunca como "sem dado".
+      const pontualDisponivel = pontualTemCobertura(linhasComPontual, totalLinhas);
+      res.json({ series, motivos, ano, filterAbono, mrrBasePorMes, pontualDisponivel });
     } catch (error) {
       console.error("[api] Error fetching churn historico mensal:", error);
       res.status(500).json({ error: "Failed to fetch churn historico mensal data" });

@@ -1195,7 +1195,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
                   <div className="grid grid-cols-6 gap-3">
                     <div className="flex flex-col items-center text-center p-3 rounded-lg bg-rose-50 dark:bg-rose-900/20 border border-rose-200 dark:border-rose-800/40">
                       <DollarSign className="w-4 h-4 text-rose-500 dark:text-rose-400 mb-1.5" />
-                      <span className="text-xs text-rose-600 dark:text-rose-400 mb-1">MRR Churn Total</span>
+                      <span className="text-xs text-rose-600 dark:text-rose-400 mb-1">MRR Churn Bruto</span>
                       <span className="text-lg font-bold text-rose-700 dark:text-rose-300">
                         {formatCurrencyNoDecimals(perfilChurnLocal.mrrTotal)}
                       </span>
@@ -1459,7 +1459,7 @@ export default function SquadDetalhe({ squad, mesAno, chartColors, onBack, perfi
               { label: "Ticket Médio", value: perfilChurnLocal?.ticketMedio != null ? formatCurrencyNoDecimals(perfilChurnLocal.ticketMedio) : "—" },
               { label: "Churns < 3m", value: perfilChurnLocal?.pctMenos3m != null ? `${perfilChurnLocal.pctMenos3m}%` : "—" },
               { label: "Total Churns", value: String(churnsFiltrados.length) },
-              { label: "MRR Churn Total", value: formatCurrencyNoDecimals(churnsFiltrados.reduce((s, c) => s + (parseFloat(String(c.valorr)) || 0), 0)) },
+              { label: "MRR Churn Bruto", value: formatCurrencyNoDecimals(churnsFiltrados.reduce((s, c) => s + (parseFloat(String(c.valorr)) || 0), 0)) },
               { label: "Clientes Únicos", value: String(new Set(churnsFiltrados.map(c => c.cliente)).size) },
               { label: "Churn Rate", value: data?.totais?.churnRate != null ? formatPercent(data.totais.churnRate) : "—" },
             ].map((m, i) => (

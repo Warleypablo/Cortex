@@ -1,6 +1,15 @@
 import { describe, it, expect } from "vitest";
-import { somarValoresDrawer, pctDaBase, formatPct, agregarPorResponsavel, ordenarPorTaxaDeChurn } from "./churnAggregations";
+import {
+  somarValoresDrawer,
+  pctDaBase,
+  formatPct,
+  agregarPorResponsavel,
+  ordenarPorTaxaDeChurn,
+  montarChartDataChurnHistorico,
+  agregarForecast,
+} from "./churnAggregations";
 import type { ChurnContract } from "./types";
+import type { HistoricoChurnResponse, MesSerieChurn, ForecastContrato } from "./churnAggregations";
 
 /** Constrói um ChurnContract mínimo; só os campos do teste importam. */
 function contrato(over: Partial<ChurnContract>): ChurnContract {
@@ -261,5 +270,179 @@ describe("ordenarPorTaxaDeChurn", () => {
 
   it("retorna lista vazia para entrada vazia", () => {
     expect(ordenarPorTaxaDeChurn([])).toEqual([]);
+  });
+});
+
+describe("montarChartDataChurnHistorico", () => {
+  /** Constrói uma HistoricoChurnResponse mínima; só os campos do teste importam. */
+  function historico(over: Partial<HistoricoChurnResponse> = {}): HistoricoChurnResponse {
+    return {
+      series: [],
+      motivos: [],
+      ano: 2026,
+      filterAbono: "todos",
+      mrrBasePorMes: {},
+      ...over,
+    };
+  }
+
+  it("mês sem pontual (campo ausente na série) gera pontual: 0, nunca undefined", () => {
+    // `pontual` ausente de propósito (cast) — é o caso real que `serie.pontual ?? 0`
+    // protege. Um `pontual: 0` explícito não exercitaria o `??`, já que 0 não é
+    // undefined/null e passaria direto por `Math.round(serie.pontual ?? 0)`.
+    const data = historico({
+      series: [{ mes: "2026-01", total: 1000, logos: 2, porMotivo: {} } as MesSerieChurn],
+    });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 0, 15));
+    expect(linhas[0].pontual).toBe(0);
+    expect(linhas[0].pontual).not.toBeUndefined();
+  });
+
+  it("mês sem nenhuma linha de churn (série ausente no response) também gera pontual: 0", () => {
+    const data = historico({ series: [] });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 0, 15));
+    expect(linhas[0].pontual).toBe(0);
+    expect(linhas[0].total).toBe(0);
+  });
+
+  it("o * do mês corrente é aplicado ao mês certo e só a ele", () => {
+    const data = historico();
+    // Referência em 10/jul/2026 — ano do gráfico bate com o ano da referência.
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 6, 10));
+
+    expect(linhas).toHaveLength(7); // jan..jul: eixo corta no mês corrente
+    const comAsterisco = linhas.filter((l) => String(l.mesLabel).endsWith("*"));
+    expect(comAsterisco).toHaveLength(1);
+    expect(comAsterisco[0].mes).toBe("2026-07");
+    expect(comAsterisco[0].mesLabel).toBe("jul*");
+    expect(comAsterisco[0].isMesCorrente).toBe(true);
+
+    linhas
+      .filter((l) => l.mes !== "2026-07")
+      .forEach((l) => {
+        expect(l.isMesCorrente).toBe(false);
+        expect(String(l.mesLabel).endsWith("*")).toBe(false);
+      });
+  });
+
+  it("ano do gráfico diferente do ano de referência: sem mês corrente, eixo vai até dezembro", () => {
+    const data = historico({ ano: 2025 });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2025, new Date(2026, 6, 10));
+    expect(linhas).toHaveLength(12);
+    expect(linhas.every((l) => l.isMesCorrente === false)).toBe(true);
+    expect(linhas.every((l) => !String(l.mesLabel).endsWith("*"))).toBe(true);
+  });
+
+  it("fallback sem base de MRR no mês: a linha é gerada mesmo assim, com meta: 0", () => {
+    const data = historico({
+      series: [{ mes: "2026-03", total: 5000, pontual: 0, logos: 1, porMotivo: {} }],
+      mrrBasePorMes: {}, // nenhum mês tem base de MRR
+    });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 2, 15));
+    const marco = linhas.find((l) => l.mes === "2026-03")!;
+    expect(marco).toBeDefined();
+    expect(marco.total).toBe(5000);
+    expect(marco.meta).toBe(0);
+    expect(marco.mrrBase).toBe(0);
+  });
+
+  it("resolve valor por motivo, 0 quando o mês não tem o motivo", () => {
+    const data = historico({
+      series: [
+        { mes: "2026-01", total: 1000, pontual: 0, logos: 1, porMotivo: { "Preço": 1000 } },
+      ],
+    });
+    const linhas = montarChartDataChurnHistorico(
+      data,
+      ["Preço", "Insatisfação"],
+      0.08,
+      2026,
+      new Date(2026, 0, 15),
+    );
+    expect(linhas[0]["Preço"]).toBe(1000);
+    expect(linhas[0]["Insatisfação"]).toBe(0);
+  });
+
+  it("calcula a meta como % da base de MRR do mês quando ela existe", () => {
+    const data = historico({ mrrBasePorMes: { "2026-01": 1930000 } });
+    const linhas = montarChartDataChurnHistorico(data, [], 0.08, 2026, new Date(2026, 0, 15));
+    expect(linhas[0].meta).toBe(Math.round(1930000 * 0.08));
+    expect(linhas[0].mrrBase).toBe(1930000);
+  });
+});
+
+function fc(over: Partial<ForecastContrato>): ForecastContrato {
+  return {
+    contrato_id: "c1", cliente: "Cliente", cnpj: null, servico: "S", valorr: 0, valorp: 0,
+    status: "ativo", status_conta: null, status_cancelamento: null,
+    possibilidade_retencao: null, responsavel: null, contexto_risco: null,
+    risco_score: null, risco_tier: null, ...over,
+  };
+}
+
+describe("agregarForecast", () => {
+  it("soma MRR e pontual exposto", () => {
+    const r = agregarForecast([
+      fc({ valorr: 3000, valorp: 0 }),
+      fc({ contrato_id: "c2", valorr: 2000, valorp: 500 }),
+    ]);
+    expect(r.mrr_exposto).toBe(5000);
+    expect(r.pontual_exposto).toBe(500);
+  });
+
+  it("conta clientes distintos — um cliente com 2 contratos conta 1", () => {
+    const r = agregarForecast([
+      fc({ contrato_id: "c1", cliente: "Polpa Brasil", cnpj: "11111111000111", valorr: 297 }),
+      fc({ contrato_id: "c2", cliente: "Polpa Brasil", cnpj: "11111111000111", valorr: 297 }),
+      fc({ contrato_id: "c3", cliente: "Gloryful", cnpj: "22222222000122", valorr: 2997 }),
+    ]);
+    expect(r.total_contratos).toBe(3);
+    expect(r.total_clientes).toBe(2);
+  });
+
+  it("órfãos de JOIN sem CNPJ e mesmo nome não colapsam — contam como clientes separados", () => {
+    // Contratos sem CNPJ caem no fallback "Cliente não identificado" no nome,
+    // mas a contagem usa contrato_id como chave estável — cada órfão conta 1.
+    const r = agregarForecast([
+      fc({ contrato_id: "c1", cliente: "Cliente não identificado", cnpj: null, valorr: 100 }),
+      fc({ contrato_id: "c2", cliente: "Cliente não identificado", cnpj: null, valorr: 200 }),
+    ]);
+    expect(r.total_contratos).toBe(2);
+    expect(r.total_clientes).toBe(2);
+  });
+
+  it("agrupa por tier e joga contratos sem score no bucket 'Sem score'", () => {
+    const r = agregarForecast([
+      fc({ risco_tier: "critico", valorr: 1000 }),
+      fc({ contrato_id: "c2", risco_tier: "critico", valorr: 500 }),
+      fc({ contrato_id: "c3", risco_tier: null, valorr: 200 }),
+    ]);
+    const critico = r.por_tier.find((t) => t.tier === "critico")!;
+    const semScore = r.por_tier.find((t) => t.tier === "Sem score")!;
+    expect(critico.contratos).toBe(2);
+    expect(critico.mrr).toBe(1500);
+    expect(semScore.contratos).toBe(1);
+    expect(semScore.mrr).toBe(200);
+  });
+
+  it("agrupa por status de retenção, com bucket 'Sem status' para vazio", () => {
+    const r = agregarForecast([
+      fc({ status_cancelamento: "Em negociação", valorr: 1000 }),
+      fc({ contrato_id: "c2", status_cancelamento: null, valorr: 300 }),
+    ]);
+    const emNeg = r.por_status_retencao.find((s) => s.status === "Em negociação")!;
+    const semStatus = r.por_status_retencao.find((s) => s.status === "Sem status")!;
+    expect(emNeg.contratos).toBe(1);
+    expect(emNeg.mrr).toBe(1000);
+    expect(semStatus.contratos).toBe(1);
+    expect(semStatus.mrr).toBe(300);
+  });
+
+  it("lista vazia retorna zeros sem quebrar", () => {
+    const r = agregarForecast([]);
+    expect(r).toEqual({
+      total_contratos: 0, total_clientes: 0, mrr_exposto: 0, pontual_exposto: 0,
+      por_tier: [], por_status_retencao: [],
+    });
   });
 });

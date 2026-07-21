@@ -180,16 +180,16 @@ export function ChurnKpisHero({
           onClick={makeDrill("Churn do período", churns)}
         />
         <KpiCard
-          label="Churn Total"
+          label="Churn Bruto"
           value={formatCurrencyNoDecimals(churnTotal)}
-          sub="bruto (com abonados)"
-          onClick={makeDrill("Churn Total do período", churns)}
+          sub="com abonados"
+          onClick={makeDrill("Churn Bruto do período", churns)}
         />
         <KpiCard
-          label="Churn s/ Abonados"
+          label="Churn Ajustado"
           value={formatCurrencyNoDecimals(churnSemAbonados)}
           sub="descontando abonados"
-          onClick={makeDrill("Churn sem abonados", naoAbonados)}
+          onClick={makeDrill("Churn Ajustado do período", naoAbonados)}
         />
         <KpiCard
           label="Logos Perdidos"

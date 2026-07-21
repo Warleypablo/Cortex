@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useTheme } from "@/components/ThemeProvider";
 import { formatCurrencyNoDecimals } from "@/lib/utils";
-import { pctDaBase, formatPct } from "./churnAggregations";
+import { pctDaBase, formatPct, montarChartDataChurnHistorico, type HistoricoChurnResponse } from "./churnAggregations";
 import {
   ComposedChart, Bar, Line,
   XAxis, YAxis, Tooltip, Legend,
@@ -11,30 +11,17 @@ import {
 
 type FilterAbono = "todos" | "abonados" | "nao_abonados";
 
-interface MesSerie {
-  mes: string; // "YYYY-MM"
-  total: number;
-  logos: number;
-  porMotivo: Record<string, number>;
-}
-
-interface HistoricoResponse {
-  series: MesSerie[];
-  motivos: string[]; // ordenados por volume desc
-  ano: number;
-  filterAbono: FilterAbono;
-  mrrBasePorMes: Record<string, number>; // "YYYY-MM" -> MRR ativo real do mês
-}
+type HistoricoResponse = HistoricoChurnResponse;
 
 // Paleta por motivo (ordem = volume desc). "Outros"/"Não especificado" ficam cinza.
+// Âmbar (#d97706 / #fbbf24) é reservado à série "Pontual" (ver pontualColor) —
+// não reintroduzir aqui para não colidir com a barra sólida de Pontual.
 const MOTIVO_COLORS = [
-  "#dc2626", "#2563eb", "#d97706", "#059669", "#7c3aed",
+  "#dc2626", "#2563eb", "#0d9488", "#059669", "#7c3aed",
   "#0891b2", "#db2777", "#65a30d", "#ea580c", "#4f46e5",
   "#0284c7", "#ca8a04", "#16a34a", "#e11d48",
 ];
 const COR_OUTROS = "#9ca3af";
-
-const MESES_PT = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
 
 function corDoMotivo(motivo: string, index: number): string {
   if (motivo === "Outros" || motivo === "Não especificado") return COR_OUTROS;
@@ -66,39 +53,18 @@ export function ChurnHistoricoMensal({
   const motivos = data?.motivos ?? [];
 
   // Gera meses de janeiro até o mês atual (se ano corrente) ou dezembro, garantindo eixo contínuo.
-  const chartData = useMemo(() => {
-    const hoje = new Date();
-    const ultimoMes = ano === hoje.getFullYear() ? hoje.getMonth() + 1 : 12;
-    const porMes: Record<string, MesSerie> = {};
-    (data?.series ?? []).forEach((s) => { porMes[s.mes] = s; });
-
-    const linhas: Array<Record<string, number | string | boolean>> = [];
-    for (let m = 1; m <= ultimoMes; m++) {
-      const mesKey = `${ano}-${String(m).padStart(2, "0")}`;
-      const serie = porMes[mesKey];
-      // Meta = % fixo do MRR real (ativo) daquele mês
-      const mrrBaseMes = data?.mrrBasePorMes?.[mesKey] ?? 0;
-      const isMesCorrente = ano === hoje.getFullYear() && m === hoje.getMonth() + 1;
-      const row: Record<string, number | string | boolean> = {
-        mes: mesKey,
-        mesLabel: isMesCorrente ? `${MESES_PT[m - 1]}*` : MESES_PT[m - 1],
-        total: serie ? Math.round(serie.total) : 0,
-        meta: Math.round(mrrBaseMes * metaPct),
-        mrrBase: mrrBaseMes,
-        isMesCorrente,
-      };
-      motivos.forEach((motivo) => {
-        row[motivo] = serie ? Math.round(serie.porMotivo[motivo] ?? 0) : 0;
-      });
-      linhas.push(row);
-    }
-    return linhas;
-  }, [data, motivos, metaPct, ano]);
+  const chartData = useMemo(
+    () => montarChartDataChurnHistorico(data, motivos, metaPct, ano, new Date()),
+    [data, motivos, metaPct, ano],
+  );
 
   const axisColor = isDark ? "#e5e7eb" : "#374151";
   const gridColor = isDark ? "#3f3f46" : "#e5e7eb";
   const acimaMetaColor = isDark ? "#f87171" : "#dc2626";
   const dentroMetaColor = isDark ? "#34d399" : "#059669";
+  // Âmbar: mesma família da coluna "Pontual" do drawer (DrawerContratosTable),
+  // para associar visualmente as duas telas.
+  const pontualColor = isDark ? "#fbbf24" : "#d97706";
 
   const CustomTooltip = ({ active, payload, label }: any) => {
     if (!active || !payload || payload.length === 0) return null;
@@ -108,6 +74,7 @@ export function ChurnHistoricoMensal({
     const mrrBase = Number(row?.mrrBase ?? 0);
     const isMesCorrente = Boolean(row?.isMesCorrente);
     const pctTotal = pctDaBase(total, mrrBase);
+    const pontual = Number(row?.pontual ?? 0);
     const itens = motivos
       .map((motivo, i) => ({ motivo, valor: Number(row?.[motivo] ?? 0), cor: corDoMotivo(motivo, i) }))
       .filter((x) => x.valor > 0)
@@ -135,6 +102,14 @@ export function ChurnHistoricoMensal({
                 {pctTotal !== null && ` · +${((pctTotal - metaPct) * 100).toFixed(1).replace(".", ",")}pp`})
               </span>
             )}
+          </p>
+        )}
+        {data?.pontualDisponivel && pontual > 0 && (
+          <p className="text-muted-foreground">
+            Pontual:{" "}
+            <span className="font-semibold" style={{ color: pontualColor }}>
+              {formatCurrencyNoDecimals(pontual)}
+            </span>
           </p>
         )}
         <div className="pt-1 border-t border-border/50 space-y-0.5">
@@ -172,6 +147,7 @@ export function ChurnHistoricoMensal({
             {filterAbono === "nao_abonados" && " · sem abonados"}
             {filterAbono === "abonados" && " · só abonados"}
             {" · * mês em curso"}
+            {data?.pontualDisponivel === false && " · sem dado de churn pontual neste ano"}
           </p>
         </div>
       </div>
@@ -255,10 +231,18 @@ export function ChurnHistoricoMensal({
                 )}
               </Bar>
             ))}
+            {data?.pontualDisponivel && (
+              <Bar
+                dataKey="pontual"
+                name="Pontual"
+                fill={pontualColor}
+                radius={[3, 3, 0, 0]}
+              />
+            )}
             <Line
               type="monotone"
               dataKey="meta"
-              name={`Meta ${formatPct(metaPct)}`}
+              name={`Meta ${formatPct(metaPct)} (MRR)`}
               stroke="#ef4444"
               strokeWidth={2}
               strokeDasharray="5 4"

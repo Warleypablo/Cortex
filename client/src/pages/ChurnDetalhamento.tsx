@@ -15,6 +15,7 @@ import { ChurnDrillDrawer } from "@/components/churn/ChurnDrillDrawer";
 import { RitmoDiario } from "@/components/churn/RitmoDiario";
 import { ChurnHistoricoMensal } from "@/components/churn/ChurnHistoricoMensal";
 import { ChurnPorDimensao } from "@/components/churn/ChurnPorDimensao";
+import { ChurnForecast } from "@/components/churn/ChurnForecast";
 
 import { format, parseISO, startOfMonth, endOfMonth, differenceInCalendarDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -271,7 +272,7 @@ export default function ChurnDetalhamento() {
   }, [filteredMetricas.mrr_perdido, somaMrrBases, mrrBaseReal]);
 
   // ── KPIs do topo (FIXOS — independem do toggle de abono) ────────────────────
-  // Os cards Churn Total / Churn s/ Abonados / NRR são SEMPRE sobre a população
+  // Os cards Churn Bruto / Churn Ajustado / NRR são SEMPRE sobre a população
   // do período (só filtrada por data). O toggle "Todos/Não abonados/Abonados"
   // filtra apenas a tabela e os gráficos abaixo.
   const heroContratos = useMemo(() => {
@@ -431,6 +432,9 @@ export default function ChurnDetalhamento() {
           onNrrClick={() => setNrrDrillOpen(true)}
         />
       )}
+
+      {/* Forecast Churn — indicador antecedente, foto do agora */}
+      <ChurnForecast />
 
       {/* Ritmo Diário — série por dia do período */}
       {!isLoading && (
