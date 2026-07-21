@@ -11,8 +11,7 @@ import {
   ltvAuditoriaToGrupos, ultimoDiaAnterior,
   type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao, type LtvAuditoriaRow,
 } from "./ceoDashboard.detalhe.helpers";
-import { carregarMovimentoQueries, montarMovimentoReceita, type MovimentoReceita } from "./ceoDashboard.movimentoReceita";
-import { getCrosssellDealsDetail } from "../okr2026/metricsAdapter";
+import { carregarMovimentoQueries, montarMovimentoReceita, crosssellDealsDoMes, type MovimentoReceita } from "./ceoDashboard.movimentoReceita";
 
 // Sub-linhas comerciais que compõem o CAC total (mesmos títulos da aba CAC do BP) —
 // usadas para expandir a caixa "CAC total" no drill de CAC por cliente/contrato.
@@ -523,11 +522,12 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
       grupos = [itensParaGrupo("Contratos pontuais cancelados no mês", await churnPontualDoMes(db, mesNum), base.realizado ?? 0)];
       nota = "Total = churn pontual do mês (régua da célula). A lista detalha os contratos pontuais cancelados no mês por data de encerramento — pode não somar exatamente o total.";
     } else if (kpi === "cross_mrr" || kpi === "cross_pontual") {
-      const det = await getCrosssellDealsDetail(ini, fim);
-      const itens = det.items
-        .map((d) => ({ nome: d.cliente, detalhe: d.closer && d.closer !== "—" ? `closer ${d.closer}` : "", data: d.data_fechamento, valor: kpi === "cross_mrr" ? d.recorrente : d.pontual }))
+      const deals = await crosssellDealsDoMes(db, mesNum);
+      const itens = deals
+        .map((d) => ({ nome: d.cliente, detalhe: d.closer ? `closer ${d.closer}` : "", data: d.data, valor: kpi === "cross_mrr" ? d.recorrente : d.pontual }))
         .filter((it) => it.valor > 0);
-      grupos = [itensParaGrupo("Deals de cross-sell/upsell no mês", itens, base.realizado ?? 0)];
+      grupos = [itensParaGrupo("Deals de expansão de conta no mês", itens, base.realizado ?? 0)];
+      nota = "Deals ganhos marcados como 'Expansão de Conta' no CRM (campo channel), por data de fechamento.";
     } else if (kpi === "churn_pct" || kpi === "churn_pct_pontual") { // decomposição do churn %
       const ing = mov.ingredientes;
       const base_ = kpi === "churn_pct" ? ing.mrrInicioPorMes[mesNum] ?? 0 : ing.estoquePontIniPorMes[mesNum] ?? 0;

@@ -13,36 +13,66 @@ export interface MovimentoQueries {
   mrrInicioPorMes: Record<number, number>;
 }
 
-// Cross-sell por mês (régua de buildVendasMrrQuery: source=PARTNER + cliente
-// pré-existente) e MRR-início por mês (1º snapshot do mês). Ano fixo 2026.
+// Marcação de expansão de conta no CRM — régua única do cross-sell deste bloco.
+// Definida aqui (e não em okr2026/metricsAdapter, que segue em `source='PARTNER'`) porque a
+// troca foi decidida só para o CEO Dashboard: as demais telas de cross-sell continuam na régua
+// antiga. Ao unificá-las, mover isto para um módulo compartilhado.
+const CHANNEL_EXPANSAO = "Expansão de Conta";
+
+// Deals de expansão do mês, para o drawer das células de cross-sell. MESMO filtro da série
+// mensal acima — se um mudar, mudar o outro, senão o drawer deixa de somar a célula.
+export async function crosssellDealsDoMes(
+  db: any, mesNum: number
+): Promise<Array<{ cliente: string; closer: string; data: string | null; recorrente: number; pontual: number }>> {
+  const r: any = await db.execute(sql`
+    SELECT COALESCE(NULLIF(TRIM(cl.nome),''), NULLIF(d.company_name,''), d.title, 'Sem nome') AS cliente,
+           COALESCE(NULLIF(TRIM(c.nome), ''), '') AS closer,
+           d.data_fechamento::date::text AS data,
+           COALESCE(d.valor_recorrente::numeric, 0) AS rec,
+           COALESCE(d.valor_pontual::numeric, 0) AS pont
+    FROM "Bitrix".crm_deal d
+    LEFT JOIN "Bitrix".crm_closers c
+      ON CASE WHEN d.closer ~ '^[0-9]+$' THEN d.closer::integer ELSE NULL END = c.id
+    LEFT JOIN "Clickup".cup_clientes cl
+      ON REGEXP_REPLACE(COALESCE(cl.cnpj,''),'[^0-9]','','g') = REGEXP_REPLACE(COALESCE(d.cnpj,''),'[^0-9]','','g')
+      AND COALESCE(d.cnpj,'') <> ''
+    WHERE d.stage_name='Negócio Ganho' AND d.data_fechamento IS NOT NULL
+      AND EXTRACT(YEAR FROM d.data_fechamento)=2026
+      AND EXTRACT(MONTH FROM d.data_fechamento)=${mesNum}
+      AND TRIM(d.channel)=${CHANNEL_EXPANSAO}
+    ORDER BY d.valor_recorrente::numeric DESC NULLS LAST`);
+  return (r.rows ?? []).map((x: any) => ({
+    cliente: String(x.cliente),
+    closer: String(x.closer || ""),
+    data: x.data ? String(x.data) : null,
+    recorrente: Number(x.rec) || 0,
+    pontual: Number(x.pont) || 0,
+  }));
+}
+
+// Cross-sell por mês (deals ganhos marcados como expansão de conta no CRM) e MRR-início
+// por mês (1º snapshot do mês). Ano fixo 2026.
+//
+// Régua: `channel = 'Expansão de Conta'`, a marcação que o comercial faz no deal. Substituiu
+// `source='PARTNER' + CNPJ de cliente pré-existente` (2026-07-21), que zerava a linha inteira:
+// PARTNER tem 1 deal em toda a base desde que o crm_deal virou espelho do Synapse. O guard de
+// CNPJ era muleta para PARTNER ser proxy fraco (indicação/parceiro ≠ expansão) e foi removido —
+// com marcação explícita ele só descartaria deal sem CNPJ (32 dos 106 em 2026, −51% do MRR).
+// `channel='Reativação'` NÃO entra: win-back de cliente perdido não é expansão de conta ativa.
 export async function carregarMovimentoQueries(db: any): Promise<MovimentoQueries> {
   const crossMrrPorMes: Record<number, number> = {};
   const crossPontPorMes: Record<number, number> = {};
   const mrrInicioPorMes: Record<number, number> = {};
 
   const crossRes: any = await db.execute(sql`
-    WITH cliente_inicio AS (
-      SELECT REGEXP_REPLACE(COALESCE(c.cnpj,''),'[^0-9]','','g') AS cnpj_norm,
-             MIN(ct.data_inicio)::date AS primeiro_contrato
-      FROM "Clickup".cup_clientes c
-      JOIN "Clickup".cup_contratos ct ON ct.id_task = c.task_id
-      WHERE COALESCE(c.cnpj,'') <> '' GROUP BY 1
-    ),
-    deals AS (
-      SELECT EXTRACT(MONTH FROM d.data_fechamento)::int AS mes,
-        COALESCE(d.valor_recorrente::numeric,0) AS rec,
-        COALESCE(d.valor_pontual::numeric,0) AS pont,
-        (d.source='PARTNER' AND ci.primeiro_contrato IS NOT NULL
-          AND ci.primeiro_contrato < date_trunc('month', d.data_fechamento)::date) AS is_cross
-      FROM "Bitrix".crm_deal d
-      LEFT JOIN cliente_inicio ci ON REGEXP_REPLACE(COALESCE(d.cnpj,''),'[^0-9]','','g') = ci.cnpj_norm
-      WHERE d.stage_name='Negócio Ganho' AND d.data_fechamento IS NOT NULL
-        AND EXTRACT(YEAR FROM d.data_fechamento)=2026
-    )
-    SELECT mes,
-      COALESCE(SUM(rec) FILTER (WHERE is_cross),0) AS cross_mrr,
-      COALESCE(SUM(pont) FILTER (WHERE is_cross),0) AS cross_pont
-    FROM deals GROUP BY mes`);
+    SELECT EXTRACT(MONTH FROM d.data_fechamento)::int AS mes,
+      COALESCE(SUM(COALESCE(d.valor_recorrente::numeric,0)),0) AS cross_mrr,
+      COALESCE(SUM(COALESCE(d.valor_pontual::numeric,0)),0) AS cross_pont
+    FROM "Bitrix".crm_deal d
+    WHERE d.stage_name='Negócio Ganho' AND d.data_fechamento IS NOT NULL
+      AND EXTRACT(YEAR FROM d.data_fechamento)=2026
+      AND TRIM(d.channel)=${CHANNEL_EXPANSAO}
+    GROUP BY 1`);
   for (const r of crossRes.rows ?? []) {
     const mes = Number(r.mes);
     if (!mes) continue;
