@@ -6,6 +6,7 @@
 // função pura montarMovimentoReceita — testável sem IO.
 import { sql } from "drizzle-orm";
 import type { BpLinha } from "./ceoDashboard.helpers";
+import { CHANNEL_EXPANSAO } from "../../shared/crm-channel";
 
 export interface MovimentoQueries {
   crossMrrPorMes: Record<number, number>;
@@ -13,11 +14,6 @@ export interface MovimentoQueries {
   mrrInicioPorMes: Record<number, number>;
 }
 
-// Marcação de expansão de conta no CRM — régua única do cross-sell deste bloco.
-// Definida aqui (e não em okr2026/metricsAdapter, que segue em `source='PARTNER'`) porque a
-// troca foi decidida só para o CEO Dashboard: as demais telas de cross-sell continuam na régua
-// antiga. Ao unificá-las, mover isto para um módulo compartilhado.
-const CHANNEL_EXPANSAO = "Expansão de Conta";
 
 // Deals de expansão do mês, para o drawer das células de cross-sell. MESMO filtro da série
 // mensal acima — se um mudar, mudar o outro, senão o drawer deixa de somar a célula.
