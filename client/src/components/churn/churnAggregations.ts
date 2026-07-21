@@ -289,3 +289,89 @@ export function agregarForecast(contratos: ForecastContrato[]): ForecastMetricas
       .sort((a, b) => b.mrr - a.mrr),
   };
 }
+
+/** Faixas de temperatura do forecast, da mais quente para a mais fria. */
+export type TemperaturaId = "negociando" | "insatisfeito" | "atencao" | "fraco";
+
+export interface FaixaTemperatura {
+  id: TemperaturaId;
+  titulo: string;
+  /** O que colocou os contratos nesta faixa — vira legenda embaixo do título. */
+  criterio: string;
+  contratos: ForecastContrato[];
+  mrr: number;
+  pontual: number;
+  /** Participação da faixa no MRR exposto total, 0–1. Base 0 → 0. */
+  participacaoMrr: number;
+}
+
+/**
+ * Único valor de `status_cancelamento` que NÃO significa saída em curso — o
+ * contrato foi salvo. Vira blacklist (em vez de whitelist dos valores quentes)
+ * de propósito: valor novo criado no ClickUp entra como quente por padrão, em
+ * vez de vazar silenciosamente para "Sinal fraco" e sumir do radar.
+ */
+const CANCELAMENTO_FRIO = "retido";
+
+const FAIXAS_META: Array<{ id: TemperaturaId; titulo: string; criterio: string }> = [
+  { id: "negociando", titulo: "Em negociação de saída", criterio: "CX já registrou status de cancelamento" },
+  { id: "insatisfeito", titulo: "Insatisfeito", criterio: "conta marcada como insatisfeita no ClickUp" },
+  { id: "atencao", titulo: "Requer atenção", criterio: "conta marcada como requer atenção no ClickUp" },
+  { id: "fraco", titulo: "Sinal fraco", criterio: "só possibilidade de retenção preenchida" },
+];
+
+/** Em qual faixa este contrato cai. Primeira régua que casa vence. */
+function classificarTemperatura(c: ForecastContrato): TemperaturaId {
+  const cancelamento = (c.status_cancelamento ?? "").trim();
+  if (cancelamento && cancelamento.toLowerCase() !== CANCELAMENTO_FRIO) return "negociando";
+
+  const conta = (c.status_conta ?? "").trim().toLowerCase();
+  if (conta === "insatisfeito") return "insatisfeito";
+  if (conta === "requer atenção" || conta === "requer atencao") return "atencao";
+
+  return "fraco";
+}
+
+/**
+ * Agrupa a população do forecast por temperatura — o sinal mais quente
+ * disponível em cada contrato.
+ *
+ * Não usa `risco_tier` como eixo de propósito: o score de ML só é recalculado
+ * em lote e a maioria dos contratos do forecast fica sem score entre execuções,
+ * o que colapsaria a maior parte da exposição num balde não acionável. Os
+ * campos de `cup_churn` usados aqui existem em 100% das linhas por construção
+ * (são eles que colocam o contrato no forecast). O score continua exposto como
+ * coluna, apenas não decide o agrupamento.
+ *
+ * Faixas sem contrato não são retornadas. A soma dos contratos das faixas é
+ * sempre igual ao total de entrada — todo contrato cai em exatamente uma faixa.
+ */
+export function agruparPorTemperatura(contratos: ForecastContrato[]): FaixaTemperatura[] {
+  const porFaixa = new Map<TemperaturaId, ForecastContrato[]>();
+  let mrrTotal = 0;
+
+  for (const c of contratos) {
+    mrrTotal += Number(c.valorr) || 0;
+    const id = classificarTemperatura(c);
+    const lista = porFaixa.get(id);
+    if (lista) lista.push(c);
+    else porFaixa.set(id, [c]);
+  }
+
+  return FAIXAS_META.flatMap((meta) => {
+    const lista = porFaixa.get(meta.id);
+    if (!lista || lista.length === 0) return [];
+
+    const ordenados = [...lista].sort((a, b) => (Number(b.valorr) || 0) - (Number(a.valorr) || 0));
+    const mrr = ordenados.reduce((acc, c) => acc + (Number(c.valorr) || 0), 0);
+    const pontual = ordenados.reduce((acc, c) => acc + (Number(c.valorp) || 0), 0);
+
+    return [{
+      ...meta,
+      contratos: ordenados,
+      mrr,
+      pontual,
+      participacaoMrr: mrrTotal > 0 ? mrr / mrrTotal : 0,
+    }];
+  });
+}

@@ -7,6 +7,7 @@ import {
   ordenarPorTaxaDeChurn,
   montarChartDataChurnHistorico,
   agregarForecast,
+  agruparPorTemperatura,
 } from "./churnAggregations";
 import type { ChurnContract } from "./types";
 import type { HistoricoChurnResponse, MesSerieChurn, ForecastContrato } from "./churnAggregations";
@@ -444,5 +445,79 @@ describe("agregarForecast", () => {
       total_contratos: 0, total_clientes: 0, mrr_exposto: 0, pontual_exposto: 0,
       por_tier: [], por_status_retencao: [],
     });
+  });
+});
+
+describe("agruparPorTemperatura", () => {
+  it("status de cancelamento vence status de conta — conta saudável em negociação é a faixa mais quente", () => {
+    const faixas = agruparPorTemperatura([
+      fc({ status_cancelamento: "Não retido", status_conta: "Saudável", valorr: 7500 }),
+    ]);
+    expect(faixas).toHaveLength(1);
+    expect(faixas[0].id).toBe("negociando");
+  });
+
+  it("'Retido' não é saída em curso — desce para a régua de status_conta", () => {
+    const faixas = agruparPorTemperatura([
+      fc({ status_cancelamento: "Retido", status_conta: "Requer Atenção", valorr: 2000 }),
+    ]);
+    expect(faixas.map((f) => f.id)).toEqual(["atencao"]);
+  });
+
+  it("valor novo de status_cancelamento entra como quente (blacklist, não whitelist)", () => {
+    // Se o ClickUp criar um status inédito, ele não pode vazar para "Sinal fraco".
+    const faixas = agruparPorTemperatura([
+      fc({ status_cancelamento: "Escalado para diretoria", status_conta: "Saudável", valorr: 1000 }),
+    ]);
+    expect(faixas[0].id).toBe("negociando");
+  });
+
+  it("faixas sem contrato não são retornadas", () => {
+    const faixas = agruparPorTemperatura([
+      fc({ status_conta: "Insatisfeito", valorr: 1000 }),
+    ]);
+    expect(faixas.map((f) => f.id)).toEqual(["insatisfeito"]);
+  });
+
+  it("ordena por MRR desc dentro da faixa e mantém a ordem das faixas por urgência", () => {
+    const faixas = agruparPorTemperatura([
+      fc({ contrato_id: "c1", status_conta: "Requer Atenção", valorr: 3000 }),
+      fc({ contrato_id: "c2", status_conta: "Requer Atenção", valorr: 9000 }),
+      fc({ contrato_id: "c3", status_cancelamento: "Em negociação", valorr: 500 }),
+    ]);
+    expect(faixas.map((f) => f.id)).toEqual(["negociando", "atencao"]);
+    expect(faixas[1].contratos.map((c) => c.contrato_id)).toEqual(["c2", "c1"]);
+  });
+
+  it("todo contrato cai em exatamente uma faixa — nenhum se perde", () => {
+    const entrada = [
+      fc({ contrato_id: "c1", status_cancelamento: "Não retido", valorr: 100 }),
+      fc({ contrato_id: "c2", status_conta: "Insatisfeito", valorr: 200 }),
+      fc({ contrato_id: "c3", status_conta: "Requer Atenção", valorr: 300 }),
+      fc({ contrato_id: "c4", possibilidade_retencao: "Baixa", valorr: 400 }),
+      fc({ contrato_id: "c5", status_conta: "Inadimplente", valorr: 500 }),
+    ];
+    const faixas = agruparPorTemperatura(entrada);
+    const total = faixas.reduce((acc, f) => acc + f.contratos.length, 0);
+    expect(total).toBe(entrada.length);
+    // status_conta fora da régua (Inadimplente) cai em "Sinal fraco", não some.
+    expect(faixas.find((f) => f.id === "fraco")!.contratos.map((c) => c.contrato_id)).toEqual(["c5", "c4"]);
+  });
+
+  it("participação soma 100% do MRR exposto e sobrevive a base zero", () => {
+    const faixas = agruparPorTemperatura([
+      fc({ contrato_id: "c1", status_cancelamento: "Não retido", valorr: 2500 }),
+      fc({ contrato_id: "c2", status_conta: "Requer Atenção", valorr: 7500 }),
+    ]);
+    expect(faixas.find((f) => f.id === "negociando")!.participacaoMrr).toBeCloseTo(0.25);
+    expect(faixas.find((f) => f.id === "atencao")!.participacaoMrr).toBeCloseTo(0.75);
+
+    const semMrr = agruparPorTemperatura([fc({ status_conta: "Insatisfeito", valorr: 0, valorp: 4000 })]);
+    expect(semMrr[0].participacaoMrr).toBe(0);
+    expect(semMrr[0].pontual).toBe(4000);
+  });
+
+  it("lista vazia retorna array vazio", () => {
+    expect(agruparPorTemperatura([])).toEqual([]);
   });
 });

@@ -17,3 +17,37 @@ export function forecastRiskBadgeClass(tier: string | null): string {
       return "bg-gray-100 text-gray-500 dark:bg-zinc-800 dark:text-zinc-400";
   }
 }
+
+/**
+ * Tom de cada faixa de temperatura do forecast: ponto indicador, barra de
+ * participação e texto do valor exposto. Mesma escala do badge de risco
+ * (vermelho = mais quente … cinza = sinal fraco), theme-aware.
+ */
+export function temperaturaTom(id: string): { ponto: string; barra: string; valor: string } {
+  switch (id) {
+    case "negociando":
+      return {
+        ponto: "bg-red-500 dark:bg-red-400",
+        barra: "bg-red-500 dark:bg-red-400",
+        valor: "text-red-600 dark:text-red-400",
+      };
+    case "insatisfeito":
+      return {
+        ponto: "bg-orange-500 dark:bg-orange-400",
+        barra: "bg-orange-500 dark:bg-orange-400",
+        valor: "text-orange-600 dark:text-orange-400",
+      };
+    case "atencao":
+      return {
+        ponto: "bg-amber-500 dark:bg-amber-400",
+        barra: "bg-amber-500 dark:bg-amber-400",
+        valor: "text-amber-600 dark:text-amber-400",
+      };
+    default:
+      return {
+        ponto: "bg-gray-300 dark:bg-zinc-600",
+        barra: "bg-gray-400 dark:bg-zinc-500",
+        valor: "text-gray-600 dark:text-zinc-400",
+      };
+  }
+}

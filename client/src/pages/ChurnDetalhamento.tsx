@@ -433,9 +433,6 @@ export default function ChurnDetalhamento() {
         />
       )}
 
-      {/* Forecast Churn — indicador antecedente, foto do agora */}
-      <ChurnForecast />
-
       {/* Ritmo Diário — série por dia do período */}
       {!isLoading && (
         <RitmoDiario contratos={filteredContratos} onDrill={onDrill} />
@@ -484,8 +481,12 @@ export default function ChurnDetalhamento() {
         />
       )}
 
-      {/* Histórico mensal de churn do ano (mesma régua da tela) — fim da página */}
+      {/* Histórico mensal de churn do ano (mesma régua da tela) */}
       <ChurnHistoricoMensal filterAbono={filterAbono} />
+
+      {/* Forecast Churn — indicador antecedente, foto do agora. Fica por último:
+          é a única seção que não respeita o período selecionado no topo. */}
+      <ChurnForecast />
 
       <ChurnDrillDrawer
         open={!!drill}
