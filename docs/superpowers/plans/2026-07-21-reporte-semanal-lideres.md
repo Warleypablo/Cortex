@@ -1465,7 +1465,8 @@ export function TabelaSemanal({
   onCelula,
 }: {
   semanas: SemanaMetricas[];
-  onCelula: (c: CelulaSelecionada) => void;
+  /** Sem handler, as células não são clicáveis — a tabela funciona sem o drill. */
+  onCelula?: (c: CelulaSelecionada) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-zinc-800">
@@ -1524,7 +1525,7 @@ export function TabelaSemanal({
                     {semanas.map((s) => {
                       const valor = s[linha.chave] as number;
                       const texto = linha.percentual ? fmtPct(valor) : fmtBRL(valor);
-                      const clicavel = linha.drill === true;
+                      const clicavel = linha.drill === true && onCelula !== undefined;
                       return (
                         <td
                           key={s.inicio}
@@ -1536,7 +1537,7 @@ export function TabelaSemanal({
                           onClick={
                             clicavel
                               ? () =>
-                                  onCelula({
+                                  onCelula!({
                                     metrica: linha.chave,
                                     rotulo: linha.rotulo,
                                     inicio: s.inicio,
@@ -1572,17 +1573,14 @@ export function TabelaSemanal({
 Substituir todo o conteúdo de `client/src/pages/RelatorioSemanal.tsx` por:
 
 ```tsx
-import { useState } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarRange, AlertTriangle } from "lucide-react";
 import { useReporteSemanal } from "./relatorio-semanal/useRelatorioSemanal";
 import { TabelaSemanal } from "./relatorio-semanal/TabelaSemanal";
-import type { CelulaSelecionada } from "./relatorio-semanal/types";
 
 export default function RelatorioSemanal() {
   usePageTitle("Reporte Semanal");
-  const [celula, setCelula] = useState<CelulaSelecionada | null>(null);
   const { data, isLoading, isError, error } = useReporteSemanal(12);
 
   const semanas = data?.semanas ?? [];
@@ -1620,7 +1618,7 @@ export default function RelatorioSemanal() {
           Falha ao carregar o reporte: {(error as Error)?.message}
         </p>
       ) : (
-        <TabelaSemanal semanas={semanas} onCelula={setCelula} />
+        <TabelaSemanal semanas={semanas} />
       )}
 
       <div className="space-y-1 text-xs text-gray-500 dark:text-zinc-500">
@@ -1641,13 +1639,12 @@ export default function RelatorioSemanal() {
         </p>
       </div>
 
-      {celula && <div className="hidden" data-celula={celula.metrica} />}
     </div>
   );
 }
 ```
 
-O `<div className="hidden">` no final é o ponto de ancoragem temporário do estado `celula` — a Task 7 o substitui pelo drawer de verdade. Ele existe para o TypeScript não acusar variável não usada nesta task.
+Nesta task a tabela vai sem drill: `onCelula` é opcional e a página não o passa, então as células não ficam clicáveis. A Task 7 acrescenta o estado e o handler. Não há código temporário a remover depois.
 
 - [ ] **Step 5: Typecheck**
 
@@ -1806,19 +1803,33 @@ export function DrawerDetalhe({
 
 - [ ] **Step 2: Ligar o drawer na página**
 
-Em `client/src/pages/RelatorioSemanal.tsx`, acrescentar o import:
+Em `client/src/pages/RelatorioSemanal.tsx`, acrescentar aos imports:
 
 ```tsx
+import { useState } from "react";
 import { DrawerDetalhe } from "./relatorio-semanal/DrawerDetalhe";
+import type { CelulaSelecionada } from "./relatorio-semanal/types";
 ```
 
-e trocar a âncora temporária:
+Declarar o estado como primeira linha do componente, logo após `usePageTitle`:
 
 ```tsx
-      {celula && <div className="hidden" data-celula={celula.metrica} />}
+  const [celula, setCelula] = useState<CelulaSelecionada | null>(null);
 ```
 
-por:
+Passar o handler para a tabela — de:
+
+```tsx
+        <TabelaSemanal semanas={semanas} />
+```
+
+para:
+
+```tsx
+        <TabelaSemanal semanas={semanas} onCelula={setCelula} />
+```
+
+E acrescentar o drawer como último elemento antes do `</div>` que fecha a página:
 
 ```tsx
       <DrawerDetalhe celula={celula} onClose={() => setCelula(null)} />
