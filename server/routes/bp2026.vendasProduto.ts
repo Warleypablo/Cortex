@@ -2,14 +2,12 @@
 // Sub-aba Vendas por Produto: vendas MRR/Pontual, contratos e AOV por segmento BP.
 // Realizado: "Clickup".cup_contratos por data_criado, com produto mapeado a segmento
 // (bp2026.produtoSegmento). O drill-down lista os contratos do ClickUp.
-// NOTA: carregarAtribuicaoVendas/parseMetricaProduto permanecem — a atribuição Bitrix
-// ainda é usada pelo CAC (contratosVendidosRec em bp2026.ts).
+// Também é a fonte dos denominadores de contrato do CAC (bp2026.ts), para que o CAC por
+// contrato e esta sub-aba nunca divirjam.
 import { sql } from "drizzle-orm";
 import { calcAtingimento, calcYtd } from "./bp2026.helpers";
 import {
-  aovMedioPorSegmento, parseServicosVendidos,
   agregarVendasProdutoClickup, contratosDoSegmento,
-  type DealVenda, type MixClickup, type AovMedio, type ProdutoRowMix,
   type CelulaSeg, type TotalMes, type AggVendasClickup, type ContratoRow,
 } from "./bp2026.vendasProduto.helpers";
 import {
@@ -83,106 +81,6 @@ interface Deps {
   orcado: Record<string, Record<number, number>>;
   mesCorrente: number;
   mesFechado: number;
-}
-
-// ---- Carregamento compartilhado: deals + mix ClickUp + AOV médio (usado pela
-// agregação da sub-aba E pelo drill-down, para que não divirjam) ----
-export interface AtribuicaoVendas {
-  deals: DealVenda[];
-  prMix: ProdutoRowMix;
-  mixRec: MixClickup;
-  mixPont: MixClickup;
-  aovRec: AovMedio;
-  aovPont: AovMedio;
-  meta: Map<number, { titulo: string; data: string | null; closer: string }>;
-}
-
-export async function carregarAtribuicaoVendas(db: any): Promise<AtribuicaoVendas> {
-  const dealsRows = (await db.execute(sql`
-    SELECT id,
-           EXTRACT(MONTH FROM data_fechamento)::int AS mes,
-           regexp_replace(COALESCE(cnpj,''),'\\D','','g') AS cnpj_norm,
-           COALESCE(valor_recorrente::numeric,0) AS vr,
-           COALESCE(valor_pontual::numeric,0) AS vp,
-           servicos_vendidos,
-           COALESCE(title,'(sem título)') AS title,
-           data_fechamento::date::text AS data,
-           COALESCE(closer::text,'') AS closer
-    FROM "Bitrix".crm_deal
-    WHERE stage_name = 'Negócio Ganho'
-      AND data_fechamento >= '2026-01-01' AND data_fechamento < '2027-01-01'
-      AND (COALESCE(valor_recorrente,0) > 0 OR COALESCE(valor_pontual,0) > 0)
-  `)).rows as any[];
-
-  const deals: DealVenda[] = [];
-  const meta = new Map<number, { titulo: string; data: string | null; closer: string }>();
-  for (const r of dealsRows) {
-    const id = Number(r.id);
-    deals.push({
-      id, mes: Number(r.mes),
-      cnpjNorm: r.cnpj_norm && [14, 11].includes(r.cnpj_norm.length) ? r.cnpj_norm : "",
-      valorRec: parseFloat(r.vr), valorPont: parseFloat(r.vp),
-      ids: parseServicosVendidos(r.servicos_vendidos),
-    });
-    meta.set(id, { titulo: r.title, data: r.data, closer: r.closer });
-  }
-
-  const cnpjs = Array.from(new Set(deals.map((d) => d.cnpjNorm).filter(Boolean)));
-  const cnpjsLiteral = `{${cnpjs.join(",")}}`;
-  const mixRec: MixClickup = new Map();
-  const mixPont: MixClickup = new Map();
-  if (cnpjs.length) {
-    const mixRows = (await db.execute(sql`
-      SELECT regexp_replace(COALESCE(cc.cnpj,''),'\\D','','g') AS cnpj_norm,
-             CASE
-               WHEN TRIM(COALESCE(c.produto,'')) = 'Performance' THEN 'Performance'
-               WHEN TRIM(COALESCE(c.produto,'')) IN ('Creators','Creators - Recorrente') THEN 'Creators'
-               WHEN TRIM(COALESCE(c.produto,'')) = 'Social Media' THEN 'Social'
-               WHEN TRIM(COALESCE(c.produto,'')) = 'Gestão de Comunidade' THEN 'Gestão de Comunidade'
-               WHEN TRIM(COALESCE(c.produto,'')) = 'Ecommerce' THEN 'E-commerce'
-               WHEN TRIM(COALESCE(c.produto,'')) = 'Site' THEN 'Site Institucional'
-               WHEN TRIM(COALESCE(c.produto,'')) = 'Landing Page' THEN 'Landing Page'
-               WHEN TRIM(COALESCE(c.produto,'')) = 'CRM de Vendas' THEN 'CRM'
-               ELSE 'Others'
-             END AS segmento,
-             COALESCE(SUM(c.valorr::numeric),0) AS rec,
-             COALESCE(SUM(c.valorp::numeric),0) AS pont
-      FROM "Clickup".cup_clientes cc
-      JOIN "Clickup".cup_contratos c ON c.id_task = cc.task_id
-      WHERE regexp_replace(COALESCE(cc.cnpj,''),'\\D','','g') = ANY(${cnpjsLiteral}::text[])
-      GROUP BY 1, 2
-    `)).rows as any[];
-    for (const row of mixRows) {
-      const seg = row.segmento as SegmentoBP;
-      const rec = parseFloat(row.rec), pont = parseFloat(row.pont);
-      if (rec > 0) {
-        const m = mixRec.get(row.cnpj_norm) ?? new Map<SegmentoBP, number>();
-        m.set(seg, (m.get(seg) ?? 0) + rec); mixRec.set(row.cnpj_norm, m);
-      }
-      if (pont > 0) {
-        const m = mixPont.get(row.cnpj_norm) ?? new Map<SegmentoBP, number>();
-        m.set(seg, (m.get(seg) ?? 0) + pont); mixPont.set(row.cnpj_norm, m);
-      }
-    }
-  }
-
-  // product rows do Bitrix (valor exato por serviço), sincronizadas em
-  // cortex_core.bitrix_deal_produto_valor — fonte de mix de maior prioridade
-  const prMix: ProdutoRowMix = new Map();
-  const prRows = (await db.execute(sql`
-    SELECT deal_id, segmento, valor::numeric AS valor
-    FROM cortex_core.bitrix_deal_produto_valor
-  `)).rows as any[];
-  for (const r of prRows) {
-    const id = Number(r.deal_id);
-    const m = prMix.get(id) ?? new Map<SegmentoBP, number>();
-    m.set(r.segmento as SegmentoBP, parseFloat(r.valor));
-    prMix.set(id, m);
-  }
-
-  const aovRec = aovMedioPorSegmento(deals, "recorrente");
-  const aovPont = aovMedioPorSegmento(deals, "pontual");
-  return { deals, prMix, mixRec, mixPont, aovRec, aovPont, meta };
 }
 
 export function montarVendasProduto(deps: Deps): Linha[] {

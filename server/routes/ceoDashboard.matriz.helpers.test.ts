@@ -39,7 +39,7 @@ function baseSources(overrides: Partial<CeoMatrizSources> = {}): CeoMatrizSource
     enpsSeriePorMes: { 2: 73 }, // só o mês 2 tem pesquisa (jan/mar sem onda)
     // realizado explícito (inteiros) p/ evitar ruído de float na asserção
     cacPorClienteLinha: linhaBp("cac_por_cliente", [[1, 4000, 3600], [2, 4000, 4400], [3, 4000, null]]), // CAC ÷ deals ganhos
-    cacPorContratoLinha: linhaBp("cac_por_contrato", [[1, 3000, 2700], [2, 3000, 3300], [3, 3000, null]]), // CAC ÷ serviços vendidos
+    cacPorContratoLinha: linhaBp("cac_por_contrato", [[1, 3000, 2700], [2, 3000, 3300], [3, 3000, null]]), // CAC ÷ contratos criados no ClickUp
     ...overrides,
   };
 }

@@ -40,9 +40,9 @@ interface Deps {
   ganhosPorMes: Record<number, number>; // deals ganhos (MRR ou pontual) — proxy de clientes adquiridos
   // realizado de contratos recorrentes vendidos por produto (slug -> série 12 meses, null no futuro)
   contratosVendidosRec: Record<string, (number | null)[]>;
-  // realizado do total de serviços vendidos no mês (campo servicos_vendidos do Bitrix) —
-  // denom. do CAC por contrato (régua: 1 serviço = 1 contrato)
-  servicosVendidosTotalPorMes: (number | null)[];
+  // realizado do total de contratos vendidos no mês (subtasks criadas no ClickUp, rec + pontual) —
+  // denom. do CAC por contrato
+  contratosVendidosTotalPorMes: (number | null)[];
   // faturamento recebido no mês (entradas de RECEITA quitadas, regime caixa) — denom. do % do faturamento no SG&A
   faturamentoCaixaPorMes: Record<number, number>;
   mesCorrente: number;
@@ -93,7 +93,7 @@ const SUB_SGA: DefSub[] = [
 ];
 
 export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; cac: Linha[]; outrasReceitas: Linha[] }> {
-  const { db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec, servicosVendidosTotalPorMes, faturamentoCaixaPorMes, mesCorrente, mesFechado } = deps;
+  const { db, orcado, vendasMrrPorMes, pontualPorMes, ganhosPorMes, contratosVendidosRec, contratosVendidosTotalPorMes, faturamentoCaixaPorMes, mesCorrente, mesFechado } = deps;
 
   const mensal = (porMes: Record<number, number>) =>
     Array.from({ length: 12 }, (_, i) => (i + 1 <= mesCorrente ? porMes[i + 1] ?? 0 : null));
@@ -213,17 +213,19 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
   );
 
   // CAC por contrato: despesa CAC ÷ contratos vendidos no mês.
-  // Régua de contrato = nº de serviços vendidos no deal (campo servicos_vendidos do Bitrix):
-  // cada serviço = 1 contrato (um deal com N serviços conta N). Numerador = CAC total (cobre a
-  // aquisição de rec E pontual). Como serviços ≥ deals ganhos, fica ≤ CAC por cliente — apples-
-  // to-apples com aquela linha (que usa o mesmo CAC ÷ deals). Orçado ÷ contratos orçados.
+  // Régua de contrato = subtask criada no ClickUp (cup_contratos por data_criado), recorrentes +
+  // pontuais — a mesma contagem da sub-aba Vendas por Produto. Numerador = CAC total (cobre a
+  // aquisição de rec E pontual). Como um deal costuma gerar mais de um contrato, fica ≤ CAC por
+  // cliente. Orçado ÷ contratos orçados (que o BP calibrou nesta mesma régua).
   const contratosOrcMes = (m: number) =>
     SEGMENTOS_RECORRENTES.reduce((s, seg) => s + (orcado[`contratos_vendidos_mrr_${SLUG[seg]}`]?.[m] ?? 0), 0) +
     SEGMENTOS_PONTUAIS.reduce((s, seg) => s + (orcado[`contratos_vendidos_pontual_${SLUG[seg]}`]?.[m] ?? 0), 0);
   const porContratoSerie = Array.from({ length: 12 }, (_, i) =>
-    i + 1 <= mesCorrente ? razao(cacTotalSerie[i], servicosVendidosTotalPorMes[i]) : null
+    i + 1 <= mesCorrente ? razao(cacTotalSerie[i], contratosVendidosTotalPorMes[i]) : null
   );
-  // sub-linhas por produto: CAC total ÷ contratos do produto (mesma premissa de CAC)
+  // sub-linhas por produto: CAC total ÷ contratos RECORRENTES do produto (ClickUp). Recorte
+  // deliberadamente mais estreito que o do pai (que soma rec + pontual), então os filhos NÃO
+  // reconciliam com ele — cada um responde "quanto custou um contrato deste produto".
   const cacPorContratoFilhos: Linha[] = PRODUTOS_CAC.map((p) => {
     const serie = Array.from({ length: 12 }, (_, i) => {
       if (i + 1 > mesCorrente) return null;
@@ -233,7 +235,8 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
     return {
       ...fazLinha(
         { metrica: `cac_contrato_produto_${p.slug}`, titulo: p.titulo,
-          direcao: "menor_melhor", unidade: "brl" },
+          direcao: "menor_melhor", unidade: "brl",
+          nota: "CAC total do mês ÷ contratos recorrentes deste produto criados no ClickUp. Só recorrentes: não soma com as demais sub-linhas nem com o CAC por contrato geral." },
         serie,
         (m) => {
           const cont = orcado[`contratos_vendidos_mrr_${p.slug}`]?.[m] ?? 0;
@@ -248,12 +251,12 @@ export async function montarDetalhamentos(deps: Deps): Promise<{ sga: Linha[]; c
   const cacPorContrato: Linha = {
     ...fazLinha(
       { metrica: "cac_por_contrato", titulo: "CAC por contrato", direcao: "menor_melhor", unidade: "brl",
-        nota: "Despesa CAC do mês ÷ serviços vendidos no Bitrix (campo servicos_vendidos: cada serviço do deal = 1 contrato). Comparável ao CAC por cliente: fica menor que ele quando um deal traz mais de um serviço. Orçado ÷ contratos vendidos orçados." },
+        nota: "Despesa CAC do mês ÷ contratos criados no ClickUp no mês (recorrentes + pontuais, mesma contagem da sub-aba Vendas por Produto). Comparável ao CAC por cliente: fica menor que ele porque um deal costuma gerar mais de um contrato. Numerador e denominador usam recortes de tempo distintos — CAC pela data de pagamento (caixa), contrato pela data de criação. Orçado ÷ contratos vendidos orçados." },
       porContratoSerie,
       (m) => razao(cacOrcMes(m), contratosOrcMes(m)) ?? 0,
       mesFechado === 0 ? undefined : {
         orcado: razao(somaAte(cacOrcMes), somaAte(contratosOrcMes)) ?? 0,
-        realizado: razao(cacYtdReal, somaAte((m) => servicosVendidosTotalPorMes[m - 1] ?? 0)),
+        realizado: razao(cacYtdReal, somaAte((m) => contratosVendidosTotalPorMes[m - 1] ?? 0)),
       }
     ),
     semDetalhe: true,

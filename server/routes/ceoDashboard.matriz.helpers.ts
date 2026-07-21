@@ -48,7 +48,7 @@ export interface CeoMatrizSources {
   // Linhas de eficiência de aquisição já calculadas pelo BP (bp.cacDetalhe) — CAC total ÷ unidade.
   // Trazem meses[] com orçado/realizado/atingimento (mesmo formato das linhas do BP) → têm meta.
   cacPorClienteLinha?: BpLinha; // CAC total ÷ deals ganhos no Bitrix
-  cacPorContratoLinha?: BpLinha; // CAC total ÷ serviços vendidos no Bitrix
+  cacPorContratoLinha?: BpLinha; // CAC total ÷ contratos criados no ClickUp
   movimento?: MovimentoReceita["linhas"]; // as 10 linhas do bloco de movimento de receita (opcional)
 }
 
@@ -119,10 +119,10 @@ export function montarMatrizCeo(s: CeoMatrizSources): CeoMatrizResponse {
       nota: "Sem fonte de dados de NPS de clientes ainda.", celulas: celulasDaSerie({}, mesNum) },
     bpLinha(s.bpLinhas, "cac", "cac", "CAC", "menor_melhor", "brl"),
     { key: "cac_por_cliente", label: "CAC por cliente", unidade: "brl", direcao: "menor_melhor", semMeta: false, semCompacto: true,
-      nota: "CAC total do mês ÷ deals ganhos no Bitrix (proxy de clientes adquiridos). Mesma régua da aba CAC do BP 2026.",
+      nota: "CAC total do mês ÷ deals ganhos no CRM (proxy de clientes adquiridos). Mesma régua da aba CAC do BP 2026.",
       celulas: celulasDoBp(s.cacPorClienteLinha, mesNum) },
     { key: "cac_por_contrato", label: "CAC por contrato", unidade: "brl", direcao: "menor_melhor", semMeta: false, semCompacto: true,
-      nota: "CAC total do mês ÷ serviços vendidos no Bitrix (campo servicos_vendidos: cada serviço = 1 contrato). Mesma régua da aba CAC do BP 2026.",
+      nota: "CAC total do mês ÷ contratos criados no ClickUp no mês (recorrentes + pontuais). Mesma régua da aba CAC do BP 2026 e da sub-aba Vendas por Produto.",
       celulas: celulasDoBp(s.cacPorContratoLinha, mesNum) },
     { key: "ltv_fat", label: "LTV FAT", unidade: "brl", direcao: "maior_melhor", semMeta: true,
       nota: "LTV faturável mediano dos clientes ativos no mês (ClickUp): Valor R × meses de vida + pontual entregue.",
