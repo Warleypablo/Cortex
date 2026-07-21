@@ -11,7 +11,6 @@ import {
   ltvAuditoriaToGrupos, ultimoDiaAnterior,
   type CeoGrupo, type CeoDetalheResponse, type PontoEvolucao, type LtvAuditoriaRow,
 } from "./ceoDashboard.detalhe.helpers";
-import { SERVICOS_BITRIX, parseServicosVendidos } from "../okr2026/servicosBitrix";
 import { carregarMovimentoQueries, montarMovimentoReceita, type MovimentoReceita } from "./ceoDashboard.movimentoReceita";
 import { getCrosssellDealsDetail } from "../okr2026/metricsAdapter";
 
@@ -65,17 +64,15 @@ async function pagoPorCategoria(db: any, mesNum: number): Promise<Array<{ catego
   return (r.rows ?? []).map((x: any) => ({ categoria: String(x.categoria), valor: Number(x.valor) || 0 }));
 }
 
-// Deals ganhos no Bitrix no mês — mesmo filtro de ganhosPorMes/serviços do BP:
-// stage ganho + (MRR ou pontual > 0), por data_fechamento. Traz servicos_vendidos
-// p/ expandir a caixa do denominador (deals para "cliente", serviços para "contrato").
+// Deals ganhos no CRM no mês — mesmo filtro de ganhosPorMes do BP: stage ganho +
+// (MRR ou pontual > 0), por data_fechamento. Expande a caixa do denominador do CAC por cliente.
 async function dealsGanhosDoMes(
   db: any, mesNum: number
-): Promise<Array<{ title: string; closer: string; data: string | null; ids: number[]; montante: number }>> {
+): Promise<Array<{ title: string; closer: string; data: string | null; montante: number }>> {
   const r: any = await db.execute(sql`
     SELECT COALESCE(d.title, '(sem título)') AS title,
            COALESCE(NULLIF(TRIM(c.nome), ''), '') AS closer,
            d.data_fechamento::date::text AS data,
-           d.servicos_vendidos,
            COALESCE(d.valor_recorrente::numeric, 0) AS vr,
            COALESCE(d.valor_pontual::numeric, 0) AS vp
     FROM "Bitrix".crm_deal d
@@ -90,9 +87,59 @@ async function dealsGanhosDoMes(
     title: String(x.title),
     closer: String(x.closer || ""),
     data: x.data ? String(x.data) : null,
-    ids: parseServicosVendidos(x.servicos_vendidos),
     montante: (Number(x.vr) || 0) + (Number(x.vp) || 0),
   }));
+}
+
+// Contratos criados no ClickUp no mês — denominador do CAC por contrato. Espelha a régua de
+// carregarVendasProdutoClickup (bp2026.vendasProduto.ts) para que a contagem reconcilie com a
+// célula clicada: recorrentes = 1 por subtask com valorr > 0; pontuais = 1 por subtask com
+// valorp > 0, exceto Creators, cuja jornada (id_task) é uma única decisão de compra.
+async function contratosDoMesClickup(
+  db: any, mesNum: number
+): Promise<Array<{ nome: string; detalhe: string; data: string | null }>> {
+  const r: any = await db.execute(sql`
+    WITH base AS (
+      SELECT ct.id_task, ct.id_subtask,
+             COALESCE(NULLIF(TRIM(cl.nome), ''), '(cliente não identificado)') AS cliente,
+             COALESCE(NULLIF(TRIM(ct.produto), ''), '(sem produto)') AS produto,
+             COALESCE(NULLIF(TRIM(ct.servico), ''), '') AS servico,
+             COALESCE(ct.valorr::numeric, 0) AS valorr,
+             COALESCE(ct.valorp::numeric, 0) AS valorp,
+             ct.data_criado::date::text AS data
+      FROM "Clickup".cup_contratos ct
+      LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = ct.id_task
+      WHERE EXTRACT(YEAR FROM ct.data_criado) = 2026
+        AND EXTRACT(MONTH FROM ct.data_criado) = ${mesNum}
+        AND LOWER(TRIM(ct.status)) <> 'não usar'
+    ),
+    rec AS (
+      SELECT cliente, produto, servico, valorr AS valor, data, 'Recorrente' AS natureza
+      FROM base WHERE valorr > 0
+    ),
+    pont AS (
+      SELECT cliente, produto, servico, valorp AS valor, data, 'Pontual' AS natureza
+      FROM base WHERE valorp > 0 AND TRIM(produto) <> 'Creators'
+    ),
+    creators AS (
+      -- jornada inteira do mês colapsada em 1 contrato (entregas 1ª/2ª/3ª/4ª = mesma compra)
+      SELECT MIN(cliente) AS cliente, 'Creators' AS produto,
+             COUNT(*)::text || ' entrega(s)' AS servico,
+             SUM(valorp) AS valor, MIN(data) AS data, 'Pontual' AS natureza
+      FROM base WHERE valorp > 0 AND TRIM(produto) = 'Creators'
+      GROUP BY id_task
+    )
+    SELECT * FROM rec UNION ALL SELECT * FROM pont UNION ALL SELECT * FROM creators
+    ORDER BY valor DESC`);
+  return (r.rows ?? []).map((x: any) => {
+    const valor = Number(x.valor) || 0;
+    return {
+      nome: String(x.cliente),
+      detalhe: [String(x.produto), String(x.servico || ""), String(x.natureza),
+                valor > 0 ? formatBRL(valor) : ""].filter(Boolean).join(" · "),
+      data: x.data ? String(x.data) : null,
+    };
+  });
 }
 
 // Deals ganhos do mês com valor recorrente OU pontual (conforme campo), p/ os drills de venda.
@@ -222,14 +269,14 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
     grupos = mapDetalheBpGrupos(det, { formato: "brl", sinal: "-" });
     base.orcado = det.orcado; base.realizado = det.realizado;
   } else if (kpi === "cac_por_cliente" || kpi === "cac_por_contrato") {
-    // Razão de eficiência: CAC total do mês ÷ denominador (deals ganhos | serviços vendidos).
-    // DUAS caixas expansíveis: (1) CAC total → sub-linhas comerciais; (2) denominador → itens do Bitrix.
+    // Razão de eficiência: CAC total do mês ÷ denominador (deals ganhos | contratos criados).
+    // DUAS caixas expansíveis: (1) CAC total → sub-linhas comerciais; (2) denominador → seus itens.
     const det = await montarDetalheBp(db, { metrica: "cac", mes: mesNum });
     const cacTotal = det.realizado ?? 0;
     // denominador autoritativo = o mesmo do BP (reconcilia com a célula clicada).
     const den = kpi === "cac_por_cliente"
       ? (bp.cacDenominadores?.deals?.[mesNum] ?? 0)
-      : (bp.cacDenominadores?.servicos?.[mesNum] ?? 0);
+      : (bp.cacDenominadores?.contratos?.[mesNum] ?? 0);
 
     // Caixa 1: CAC total → sub-linhas (Growth, ADs, Vendas…); soma = CAC total.
     const cacItens = (bp.cacDetalhe ?? [])
@@ -245,30 +292,22 @@ export async function buildCeoDetalhe(db: any, kpi: string, mes?: string): Promi
       itens: cacItens, aberto: true,
     };
 
-    // Caixa 2: denominador → deals ganhos (cliente) ou serviços vendidos (contrato).
-    const deals = await dealsGanhosDoMes(db, mesNum);
+    // Caixa 2: denominador → deals ganhos (cliente) ou contratos criados (contrato).
     let denItens: Array<{ nome: string; detalhe: string; data: string | null; valor: number }>;
     let tituloDen: string;
     if (kpi === "cac_por_cliente") {
-      tituloDen = "Deals ganhos (Bitrix)";
+      tituloDen = "Deals ganhos (CRM)";
+      const deals = await dealsGanhosDoMes(db, mesNum);
       denItens = deals.map((d) => ({
         nome: d.title,
         detalhe: [d.closer ? `closer ${d.closer}` : "", d.montante > 0 ? formatBRL(d.montante) : ""].filter(Boolean).join(" · "),
         data: d.data, valor: 0,
       }));
     } else {
-      // 1 item por serviço vendido; deal sem serviço mapeado conta 1 (piso, régua do BP) → soma = den.
-      tituloDen = "Serviços vendidos (Bitrix)";
-      denItens = [];
-      for (const d of deals) {
-        const contexto = d.closer ? `${d.title} · closer ${d.closer}` : d.title;
-        const mapeados = d.ids.filter((id) => SERVICOS_BITRIX[id]);
-        if (mapeados.length) {
-          for (const id of mapeados) denItens.push({ nome: SERVICOS_BITRIX[id].nome, detalhe: contexto, data: d.data, valor: 0 });
-        } else {
-          denItens.push({ nome: "(serviço não mapeado)", detalhe: contexto, data: d.data, valor: 0 });
-        }
-      }
+      // 1 item por contrato criado no mês (Creators colapsado por jornada) → soma = den.
+      tituloDen = "Contratos criados (ClickUp)";
+      const contratos = await contratosDoMesClickup(db, mesNum);
+      denItens = contratos.map((c) => ({ ...c, valor: 0 }));
     }
     const capped = denItens.slice(0, LIMITE_ITENS);
     const omit = Math.max(0, den - capped.length); // total exibido = den (reconcilia com a célula)

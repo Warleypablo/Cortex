@@ -1,112 +1,4 @@
 import { describe, it, expect } from "vitest";
-import { distribuirDeal, aovMedioPorSegmento, contarServicosPorSegmento } from "./bp2026.vendasProduto.helpers";
-
-const noPr = new Map<number, Map<any, number>>();
-const noMix = new Map<string, Map<any, number>>();
-const aovVazio = {} as Record<string, number>;
-
-describe("distribuirDeal", () => {
-  it("produto único: valor inteiro vai para o segmento", () => {
-    const r = distribuirDeal(
-      { id: 1, cnpjNorm: "X", mes: 6, valorRec: 2997, valorPont: 0, ids: [846] },
-      noPr, noMix, noMix, aovVazio, aovVazio
-    );
-    expect(r).toEqual([{ segmento: "Performance", natureza: "recorrente", valor: 2997 }]);
-  });
-
-  it("multi-produto com mix do ClickUp cobrindo todos os segmentos: usa proporção, total = deal (Badbeat)", () => {
-    const mixRec = new Map([["BAD", new Map<any, number>([["Performance", 2801], ["Social", 2501], ["Creators", 5498]])]]);
-    const r = distribuirDeal(
-      { id: 2, cnpjNorm: "BAD", mes: 5, valorRec: 10800, valorPont: 0, ids: [846, 848, 852] },
-      noPr, mixRec, noMix, aovVazio, aovVazio
-    );
-    const total = r.reduce((s, x) => s + x.valor, 0);
-    expect(Math.round(total)).toBe(10800);
-    const perf = r.find((x) => x.segmento === "Performance")!;
-    expect(Math.round(perf.valor)).toBe(2801);
-  });
-
-  it("product rows do Bitrix têm prioridade sobre o mix do ClickUp (Repeat)", () => {
-    const prMix = new Map([[27418, new Map<any, number>([["Performance", 6000], ["Creators", 8000]])]]);
-    // ClickUp com proporção bem diferente — NÃO deve ser usado quando há product rows
-    const mixRec = new Map([["RPT", new Map<any, number>([["Performance", 9000], ["Creators", 1000]])]]);
-    const r = distribuirDeal(
-      { id: 27418, cnpjNorm: "RPT", mes: 1, valorRec: 14000, valorPont: 0, ids: [846, 852] },
-      prMix, mixRec, noMix, {}, {}
-    );
-    expect(Math.round(r.find((x) => x.segmento === "Performance")!.valor)).toBe(6000);
-    expect(Math.round(r.find((x) => x.segmento === "Creators")!.valor)).toBe(8000);
-  });
-
-  it("mix parcial (ClickUp não cobre todos os segmentos) -> fallback AOV no deal todo (Flico)", () => {
-    const mixRec = new Map([["FLI", new Map<any, number>([["Social", 2734]])]]);
-    const aovRec = { Performance: 4000, Social: 2000, Creators: 6000 };
-    const r = distribuirDeal(
-      { id: 3, cnpjNorm: "FLI", mes: 5, valorRec: 11500, valorPont: 0, ids: [846, 848, 852] },
-      noPr, mixRec, noMix, aovRec, {}
-    );
-    const total = r.reduce((s, x) => s + x.valor, 0);
-    expect(Math.round(total)).toBe(11500);
-    expect(Math.round(r.find((x) => x.segmento === "Creators")!.valor)).toBe(5750);
-  });
-
-  it("rec e pont no mesmo deal: cada natureza usa seu valor (Clube45-like)", () => {
-    const r = distribuirDeal(
-      { id: 4, cnpjNorm: "Y", mes: 5, valorRec: 6000, valorPont: 7000, ids: [846, 868] },
-      noPr, noMix, noMix, aovVazio, aovVazio
-    );
-    expect(r.find((x) => x.segmento === "Performance")!.valor).toBe(6000);
-    expect(r.find((x) => x.segmento === "E-commerce")!.valor).toBe(7000);
-  });
-
-});
-
-describe("contarServicosPorSegmento (1 serviço = 1 contrato)", () => {
-  it("conta 1 contrato por serviço, agrupado por segmento×natureza", () => {
-    // 846 = Performance rec, 848 = Social rec -> 1 contrato em cada
-    const { recorrente, pontual } = contarServicosPorSegmento(
-      { id: 5, cnpjNorm: "Z", mes: 5, valorRec: 6000, valorPont: 0, ids: [846, 848] }
-    );
-    expect(recorrente.get("Performance")).toBe(1);
-    expect(recorrente.get("Social")).toBe(1);
-    expect(pontual.size).toBe(0);
-  });
-
-  it("2 serviços do MESMO segmento contam 2 (não colapsam)", () => {
-    // 850 = Creators pontual, 852 = Creators recorrente -> 1 rec + 1 pont (segmento Creators)
-    const dual = contarServicosPorSegmento(
-      { id: 6, cnpjNorm: "Z", mes: 5, valorRec: 5000, valorPont: 6000, ids: [850, 852] }
-    );
-    expect(dual.recorrente.get("Creators")).toBe(1);
-    expect(dual.pontual.get("Creators")).toBe(1);
-    // 866 = Blog Post rec (Others) duas vezes -> 2 contratos em Others recorrente
-    const repetido = contarServicosPorSegmento(
-      { id: 7, cnpjNorm: "Z", mes: 5, valorRec: 4000, valorPont: 0, ids: [866, 858] }
-    );
-    expect(repetido.recorrente.get("Others")).toBe(2);
-  });
-
-  it("deal vendido sem serviço mapeado conta 1 contrato em Others (piso)", () => {
-    const semServico = contarServicosPorSegmento(
-      { id: 8, cnpjNorm: "Z", mes: 5, valorRec: 3000, valorPont: 0, ids: [] }
-    );
-    expect(semServico.recorrente.get("Others")).toBe(1);
-    expect(semServico.pontual.size).toBe(0);
-  });
-});
-
-describe("aovMedioPorSegmento", () => {
-  it("média do valor recorrente dos deals de segmento recorrente único", () => {
-    const deals = [
-      { id: 1, cnpjNorm: "", mes: 1, valorRec: 3000, valorPont: 0, ids: [846] },
-      { id: 2, cnpjNorm: "", mes: 1, valorRec: 5000, valorPont: 0, ids: [846] },
-      { id: 3, cnpjNorm: "", mes: 1, valorRec: 9999, valorPont: 0, ids: [846, 848] },
-    ];
-    expect(aovMedioPorSegmento(deals, "recorrente").Performance).toBe(4000);
-  });
-});
-
-// ===== Task 2: agregarVendasProdutoClickup + contratosDoSegmento =====
 import {
   agregarVendasProdutoClickup, contratosDoSegmento,
   type VendaProdutoRow, type TotalMesRow, type ContratoRow,
@@ -159,9 +51,9 @@ describe("agregarVendasProdutoClickup", () => {
 
 describe("contratosDoSegmento", () => {
   const rows: ContratoRow[] = [
-    { idSubtask: "86a", cliente: "A", produto: "Performance", servico: "x", status: "ativo", valorr: 100, valorp: 0, data: null },
-    { idSubtask: "86b", cliente: "B", produto: "Ecommerce", servico: "y", status: "ativo", valorr: 50, valorp: 900, data: null },
-    { idSubtask: "86c", cliente: "C", produto: "Performance", servico: "z", status: "ativo", valorr: 0, valorp: 0, data: null },
+    { idSubtask: "86a", idTask: "t1", cliente: "A", produto: "Performance", servico: "x", status: "ativo", valorr: 100, valorp: 0, data: null },
+    { idSubtask: "86b", idTask: "t2", cliente: "B", produto: "Ecommerce", servico: "y", status: "ativo", valorr: 50, valorp: 900, data: null },
+    { idSubtask: "86c", idTask: "t3", cliente: "C", produto: "Performance", servico: "z", status: "ativo", valorr: 0, valorp: 0, data: null },
   ];
   it("filtra por natureza e reatribui Others", () => {
     expect(contratosDoSegmento(rows, "recorrente", "Performance").map((r) => r.cliente)).toEqual(["A"]);
