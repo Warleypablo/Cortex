@@ -5,7 +5,20 @@
 // Snapshots: sempre `MAX(data_snapshot) <= data`, nunca igualdade com o dia
 // exato — cup_data_hist tem semanas com 6 de 7 dias, e exigir o domingo
 // preciso zeraria a carteira dessas semanas em silêncio.
+//
+// Decisão deliberada: nenhuma query aqui tem try/catch. Uma falha transitória
+// numa semana derruba a série inteira (HTTP 500), em vez de devolver aquela
+// semana zerada em silêncio. Para uma tela cujo único valor é números que a
+// liderança confia de cabeça, um erro visível é preferível a uma linha zerada
+// plausível — o contrário do que decidimos para `vendasPorChannel`
+// (server/crm/expansao.ts), que TOLERA a própria falha e devolve zeros com
+// `erro: true` porque a mensagem diária do WhatsApp precisa sair mesmo assim,
+// com um aviso visível em vez de travar o envio inteiro. Mesma preocupação
+// (não mentir com um zero), resposta oposta, porque o produto é diferente:
+// tabela auditável vs. mensagem que precisa sair. Não "consertar" isto
+// adicionando catch silencioso.
 import { sql } from "drizzle-orm";
+import { MOTIVOS_EXCLUIDOS_CHURN_AJUSTADO } from "../../shared/churn-motivos";
 
 export interface Carteira {
   triagemOnboarding: number;
@@ -31,7 +44,12 @@ export interface LinhaDetalhe {
 }
 
 // Motivos que o "ajustado" exclui: são erro de venda/começo, não churn real.
-const MOTIVOS_EXCLUIDOS = sql`('Erro na Venda', 'Não começou', 'Inadimplente 1º Mês')`;
+// Lista em shared/churn-motivos.ts — compartilhada com server/services/resumoLideres.ts,
+// que precisa da MESMA régua. Mesmo predicado SQL de antes, só a origem da lista mudou.
+const MOTIVOS_EXCLUIDOS = sql`(${sql.join(
+  MOTIVOS_EXCLUIDOS_CHURN_AJUSTADO.map((m) => sql`${m}`),
+  sql`, `,
+)})`;
 
 function num(v: unknown): number {
   const n = parseFloat(String(v));

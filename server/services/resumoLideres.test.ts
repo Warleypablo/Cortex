@@ -67,7 +67,6 @@ const METRICAS: MetricasResumo = {
   // Calculado mas não exibido na v3 (mantido para o payload de /preview)
   churnBrutoSemAbono: 55000,
   churnBrutoSemAbonoPct: (55000 / 1137868) * 100,
-  crossIndisponivel: false,
   vendasIndisponivel: false,
   baseSuspeita: false,
 };
@@ -211,78 +210,58 @@ describe("formatarMensagemResumo", () => {
     expect(msg).toContain("📌 MRR Base Dezembro: R$ 1.137.868,00");
   });
 
-  it("crossIndisponivel true: mensagem traz o aviso, antes da linha 👀", () => {
+  // Aviso único de vendas indisponíveis: desde 2026-07-22 cobre venda nova E
+  // cross sell na mesma linha — as duas vinham de `vendas.erro` (uma apuração
+  // só) e as duas classes de aviso (crossIndisponivel/vendasIndisponivel)
+  // nunca puderam divergir na prática. Ver comentário no topo do arquivo.
+  const AVISO_VENDAS =
+    "⚠️ Apuração de vendas indisponível — MRR Adicionado, Pontual Vendido e Cross Sell estão zerados por falha de consulta, não por ausência de vendas. O Net Churn está superestimado.";
+
+  it("vendasIndisponivel true: mensagem traz o aviso, antes da linha 👀", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: true },
+      { ...METRICAS, vendasIndisponivel: true },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
-    const aviso = "⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.";
-    expect(msg).toContain(aviso);
-    expect(msg.indexOf(aviso)).toBeLessThan(msg.indexOf("👀 Seguimos"));
+    expect(msg).toContain(AVISO_VENDAS);
+    expect(msg.indexOf(AVISO_VENDAS)).toBeLessThan(msg.indexOf("👀 Seguimos"));
   });
 
-  it("crossIndisponivel false: mensagem não menciona indisponibilidade", () => {
+  it("vendasIndisponivel false: mensagem não menciona indisponibilidade", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: false },
+      { ...METRICAS, vendasIndisponivel: false },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
     expect(msg).not.toContain("indisponível");
     expect(msg).not.toContain("⚠️");
   });
 
-  // Aviso de vendas novas indisponíveis: mesmo padrão do aviso de Cross Sell —
-  // quando vendasPorChannel falha, mrrAdicionado/pontualVendido saem
-  // zerados sem sinalização; vendasIndisponivel dispara a linha de aviso.
-  const AVISO_CROSS = "⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.";
-  const AVISO_VENDAS =
-    "⚠️ Vendas novas indisponíveis nesta apuração — MRR Adicionado e Pontual Vendido estão zerados por falha de apuração, não por ausência de vendas.";
-
   it("nenhum aviso: mensagem sai byte a byte como hoje", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: false, vendasIndisponivel: false },
+      { ...METRICAS, vendasIndisponivel: false },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
     expect(msg).toBe(MENSAGEM_ESPERADA);
   });
 
-  it("só cross indisponível: só o aviso de cross, seguido de linha em branco e do 👀", () => {
+  it("vendas indisponível: aviso seguido de linha em branco e do 👀", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: true, vendasIndisponivel: false },
-      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
-    );
-    expect(msg).toContain(`${AVISO_CROSS}\n\n👀 Seguimos`);
-    expect(msg).not.toContain(AVISO_VENDAS);
-  });
-
-  it("só vendas indisponível: só o aviso de vendas, seguido de linha em branco e do 👀", () => {
-    const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: false, vendasIndisponivel: true },
+      { ...METRICAS, vendasIndisponivel: true },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
     expect(msg).toContain(`${AVISO_VENDAS}\n\n👀 Seguimos`);
-    expect(msg).not.toContain(AVISO_CROSS);
   });
 
-  it("ambos indisponíveis: cross primeiro, vendas depois, uma linha em branco antes do 👀", () => {
-    const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: true, vendasIndisponivel: true },
-      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
-    );
-    expect(msg).toContain(`${AVISO_CROSS}\n${AVISO_VENDAS}\n\n👀 Seguimos`);
-  });
-
-  // Aviso de base de comparação suspeita: terceira classe de falha silenciosa —
+  // Aviso de base de comparação suspeita: segunda classe de falha silenciosa —
   // mrrMesAnterior fora de ±40% de mrrAtivo (ex.: snapshot parcial de pipeline).
   const AVISO_BASE =
     "⚠️ Base de comparação suspeita — o MRR do mês anterior destoa da carteira atual; os percentuais podem estar distorcidos.";
 
   it("só base suspeita: só o aviso de base, seguido de linha em branco e do 👀", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: false, vendasIndisponivel: false, baseSuspeita: true },
+      { ...METRICAS, vendasIndisponivel: false, baseSuspeita: true },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
     expect(msg).toContain(`${AVISO_BASE}\n\n👀 Seguimos`);
-    expect(msg).not.toContain(AVISO_CROSS);
     expect(msg).not.toContain(AVISO_VENDAS);
   });
 
@@ -294,12 +273,12 @@ describe("formatarMensagemResumo", () => {
     expect(msg).not.toContain("Base de comparação");
   });
 
-  it("três avisos juntos: cross, depois vendas, depois base suspeita, uma linha em branco antes do 👀", () => {
+  it("dois avisos juntos: vendas indisponível primeiro, base suspeita depois, uma linha em branco antes do 👀", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: true, vendasIndisponivel: true, baseSuspeita: true },
+      { ...METRICAS, vendasIndisponivel: true, baseSuspeita: true },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
-    expect(msg).toContain(`${AVISO_CROSS}\n${AVISO_VENDAS}\n${AVISO_BASE}\n\n👀 Seguimos`);
+    expect(msg).toContain(`${AVISO_VENDAS}\n${AVISO_BASE}\n\n👀 Seguimos`);
   });
 });
 
@@ -450,12 +429,11 @@ describe("derivarMetricas", () => {
       expect(r.crossTotal).toBe(24600);
     });
 
-    it("erro na apuração marca crossIndisponivel E vendasIndisponivel", () => {
+    it("erro na apuração marca vendasIndisponivel (cobre venda nova e cross sell juntos)", () => {
       const r = derivarMetricas({
         ...ENTRADA_BASE,
         vendas: { novoMrr: 0, novoPontual: 0, crossMrr: 0, crossPontual: 0, erro: true },
       });
-      expect(r.crossIndisponivel).toBe(true);
       expect(r.vendasIndisponivel).toBe(true);
     });
   });

@@ -8,12 +8,17 @@
 // 2026-07-21: venda nova e cross sell passaram a ser classificados pela
 // marcação `channel` do CRM (server/crm/expansao.ts), a mesma régua da tela
 // /reports/semanal. Saiu o override manual mensal de cross sell.
+// 2026-07-22: `crossIndisponivel` colapsada em `vendasIndisponivel` — as duas
+// vinham de `vendas.erro` desde a mudança acima (uma apuração só), então nunca
+// puderam divergir; o aviso de rodapé agora nomeia as duas consequências
+// (venda nova + cross sell) numa linha só.
 
 import { db } from "../db";
 import { sql } from "drizzle-orm";
 import { getMrrInicioMes } from "../okr2026/metricsAdapter";
 import { vendasPorChannel } from "../crm/expansao";
 import { enviarMensagemWhatsApp } from "./turbozap";
+import { MOTIVOS_EXCLUIDOS_CHURN_AJUSTADO } from "../../shared/churn-motivos";
 
 export interface MetricasResumo {
   // Novas vendas (Bitrix, aquisição pura — sem cross sell e sem upsell)
@@ -50,11 +55,10 @@ export interface MetricasResumo {
   // Calculado e exposto em /preview, mas não exibido no texto v3
   churnBrutoSemAbono: number;
   churnBrutoSemAbonoPct: number;
-  // true quando vendasPorChannel falhou e devolveu zeros no catch — Cross
-  // Sell/Net Churn e mrrAdicionado/pontualVendido ficam subestimados/inflados
-  // sem aviso. Uma apuração só: as duas famílias de número são comprometidas
-  // juntas.
-  crossIndisponivel: boolean;
+  // true quando vendasPorChannel falhou e devolveu zeros no catch — uma
+  // apuração só cobre mrrAdicionado/pontualVendido/crossR/crossP: se ela falha,
+  // as duas famílias (venda nova e cross sell) ficam subestimadas/infladas
+  // juntas, sem aviso.
   vendasIndisponivel: boolean;
   // true quando mrrMesAnterior destoa >40% de mrrAtivo — sinal de snapshot
   // parcial/corrompido na base de comparação (já ocorreu em produção). Com
@@ -62,8 +66,13 @@ export interface MetricasResumo {
   baseSuspeita: boolean;
 }
 
-// Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real)
-const MOTIVOS_EXCLUIDOS = sql`('Erro na Venda', 'Não começou', 'Inadimplente 1º Mês')`;
+// Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real).
+// Lista em shared/churn-motivos.ts — compartilhada com server/reportsSemanal/queries.ts,
+// que precisa da MESMA régua. Mesmo predicado SQL de antes, só a origem da lista mudou.
+const MOTIVOS_EXCLUIDOS = sql`(${sql.join(
+  MOTIVOS_EXCLUIDOS_CHURN_AJUSTADO.map((m) => sql`${m}`),
+  sql`, `,
+)})`;
 
 // Tolerância da sanity check da base de comparação (mrrMesAnterior vs mrrAtivo):
 // ±40%. Já houve snapshot parcial em produção por falha de pipeline por duas
@@ -110,16 +119,13 @@ export function formatarMensagemResumo(
   const mes = MESES[agora.mes - 1];
   const mesAnterior = MESES[(agora.mes + 10) % 12];
 
-  // Bloco de avisos (rodapé, antes do 👀): cross sell primeiro, vendas novas
-  // depois, base de comparação suspeita por último — mesmo padrão para as
-  // três classes de falha silenciosa de query/dados.
+  // Bloco de avisos (rodapé, antes do 👀): vendas indisponível primeiro, base
+  // de comparação suspeita depois — mesmo padrão para as duas classes de
+  // falha silenciosa de query/dados.
   const avisos: string[] = [];
-  if (m.crossIndisponivel) {
-    avisos.push("⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.");
-  }
   if (m.vendasIndisponivel) {
     avisos.push(
-      "⚠️ Vendas novas indisponíveis nesta apuração — MRR Adicionado e Pontual Vendido estão zerados por falha de apuração, não por ausência de vendas.",
+      "⚠️ Apuração de vendas indisponível — MRR Adicionado, Pontual Vendido e Cross Sell estão zerados por falha de consulta, não por ausência de vendas. O Net Churn está superestimado.",
     );
   }
   if (m.baseSuspeita) {
@@ -431,8 +437,7 @@ export function derivarMetricas(entrada: {
     netChurnBrutoPct: mrrMesAnterior > 0 ? (netChurnBruto / mrrMesAnterior) * 100 : 0,
     churnBrutoSemAbono: churn.brutoSemAbono,
     churnBrutoSemAbonoPct: mrrMesAnterior > 0 ? (churn.brutoSemAbono / mrrMesAnterior) * 100 : 0,
-    // Uma apuração só: se ela falhou, as duas famílias de número estão comprometidas.
-    crossIndisponivel: vendas.erro === true,
+    // Uma apuração só: se ela falhou, venda nova e cross sell estão comprometidos juntos.
     vendasIndisponivel: vendas.erro === true,
     baseSuspeita:
       mrrMesAnterior < mrrAtivo * (1 - TOLERANCIA_BASE_COMPARACAO) ||
