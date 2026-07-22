@@ -231,7 +231,7 @@ describe("formatarMensagemResumo", () => {
   });
 
   // Aviso de vendas novas indisponíveis: mesmo padrão do aviso de Cross Sell —
-  // quando getVendasNovasBreakdown falha, mrrAdicionado/pontualVendido saem
+  // quando vendasPorChannel falha, mrrAdicionado/pontualVendido saem
   // zerados sem sinalização; vendasIndisponivel dispara a linha de aviso.
   const AVISO_CROSS = "⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.";
   const AVISO_VENDAS =
@@ -507,6 +507,91 @@ describe("calcularMetricasResumo — guard rail de MRR inválido", () => {
     mockGetMrrInicioMes.mockResolvedValue(1000000);
     mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
     await expect(calcularMetricasResumo()).resolves.toBeDefined();
+  });
+});
+
+describe("calcularMetricasResumo — month window with timezone handling", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default mock setup for vendasPorChannel to succeed
+    mockVendasPorChannel.mockResolvedValue({ novoMrr: 1000, novoPontual: 2000, crossMrr: 100, crossPontual: 200 });
+    // Default mock for other queries
+    mockExecute.mockResolvedValue({ rows: [{}] });
+    mockGetMrrInicioMes.mockResolvedValue(1000000);
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("virada de mês com defasagem de fuso: 2026-08-01T02:30:00Z (= 31/jul 23:30 SP)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-01T02:30:00Z"));
+
+    // Mock carteira para passar no guard rail (mrrAtivo > 0)
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+
+    await calcularMetricasResumo();
+
+    // Esperado: agosto não começou em SP, é ainda julho 31º, então a janela é de julho
+    expect(mockVendasPorChannel).toHaveBeenCalledWith(
+      expect.anything(),
+      "2026-07-01",
+      "2026-07-31",
+    );
+  });
+
+  it("dia comum em SP (mid-month, UTC e SP compartilham a data)", async () => {
+    vi.useFakeTimers();
+    // 2026-07-15 12:00 UTC = 09:00 em São Paulo (mesmo dia)
+    vi.setSystemTime(new Date("2026-07-15T12:00:00Z"));
+
+    // Mock carteira
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+
+    await calcularMetricasResumo();
+
+    // Janela: de 1º a 15º de julho
+    expect(mockVendasPorChannel).toHaveBeenCalledWith(
+      expect.anything(),
+      "2026-07-01",
+      "2026-07-15",
+    );
+  });
+
+  it("primeiro dia do mês em SP: clock em 1º → inicio === fim (ambos o 1º)", async () => {
+    vi.useFakeTimers();
+    // 2026-08-01 03:00 UTC = 2026-08-01 00:00 em SP (exatamente meia-noite local)
+    vi.setSystemTime(new Date("2026-08-01T03:00:00Z"));
+
+    // Mock carteira
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+
+    await calcularMetricasResumo();
+
+    // Janela: de 1º a 1º de agosto
+    expect(mockVendasPorChannel).toHaveBeenCalledWith(
+      expect.anything(),
+      "2026-08-01",
+      "2026-08-01",
+    );
+  });
+
+  it("virada de ano: 2027-01-01T02:30:00Z (= 2026-12-31 23:30 SP)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2027-01-01T02:30:00Z"));
+
+    // Mock carteira
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+
+    await calcularMetricasResumo();
+
+    // Esperado: ainda é dezembro em SP, não janeiro
+    expect(mockVendasPorChannel).toHaveBeenCalledWith(
+      expect.anything(),
+      "2026-12-01",
+      "2026-12-31",
+    );
   });
 });
 
