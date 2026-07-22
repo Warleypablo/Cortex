@@ -952,8 +952,21 @@ Anexar ao final de `server/reportsSemanal/queries.ts`:
 // mudar, o par TEM que mudar junto, senão o drawer deixa de somar a célula.
 // ============================================
 
-/** Gêmea de churnMrrNaSemana. */
-export async function detalheChurnMrr(db: any, inicio: string, fim: string): Promise<LinhaDetalhe[]> {
+/**
+ * Gêmea de churnMrrNaSemana — `apenasAjustado=false` é a gêmea de `.total`,
+ * `apenasAjustado=true` é a gêmea de `.ajustado` (mesmo filtro de motivo que
+ * a query de série aplica no campo `ajustado`). Sem default: quem chama
+ * declara qual célula está detalhando.
+ */
+export async function detalheChurnMrr(
+  db: any,
+  inicio: string,
+  fim: string,
+  apenasAjustado: boolean,
+): Promise<LinhaDetalhe[]> {
+  const filtroAjustado = apenasAjustado
+    ? sql`COALESCE(motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}`
+    : sql`TRUE`;
   const r: any = await db.execute(sql`
     SELECT
       COALESCE(NULLIF(TRIM(nome), ''), 'Sem nome') AS cliente,
@@ -963,6 +976,7 @@ export async function detalheChurnMrr(db: any, inicio: string, fim: string): Pro
     FROM "Clickup".cup_churn
     WHERE data_solicitacao_encerramento >= ${inicio}::date
       AND data_solicitacao_encerramento <= ${fim}::date
+      AND ${filtroAjustado}
     ORDER BY valor_r DESC NULLS LAST
   `);
   return ((r.rows ?? []) as any[]).map((x) => ({
@@ -973,8 +987,21 @@ export async function detalheChurnMrr(db: any, inicio: string, fim: string): Pro
   }));
 }
 
-/** Gêmea de churnPontualNaSemana. */
-export async function detalheChurnPontual(db: any, inicio: string, fim: string): Promise<LinhaDetalhe[]> {
+/**
+ * Gêmea de churnPontualNaSemana — `apenasAjustado=false` é a gêmea de
+ * `.total`, `apenasAjustado=true` é a gêmea de `.ajustado` (mesmo filtro de
+ * motivo que a query de série aplica no campo `ajustado`). Sem default: quem
+ * chama declara qual célula está detalhando.
+ */
+export async function detalheChurnPontual(
+  db: any,
+  inicio: string,
+  fim: string,
+  apenasAjustado: boolean,
+): Promise<LinhaDetalhe[]> {
+  const filtroAjustado = apenasAjustado
+    ? sql`COALESCE(ch.motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}`
+    : sql`TRUE`;
   const r: any = await db.execute(sql`
     SELECT
       COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
@@ -985,6 +1012,7 @@ export async function detalheChurnPontual(db: any, inicio: string, fim: string):
     JOIN "Clickup".cup_contratos ct ON ct.id_subtask = ch.task_id AND ct.valorp > 0
     WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
       AND ch.data_solicitacao_encerramento <= ${fim}::date
+      AND ${filtroAjustado}
     ORDER BY ct.valorp DESC NULLS LAST
   `);
   return ((r.rows ?? []) as any[]).map((x) => ({
@@ -1161,11 +1189,13 @@ export function registerReportsSemanalRoutes(app: Express) {
           return res.json({ tipo: "deals", linhas: deals });
         }
         case "churnMrrTotal":
+          return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim, false) });
         case "churnMrrAjustado":
-          return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim) });
+          return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim, true) });
         case "churnPontualTotal":
+          return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim, false) });
         case "churnPontualAjustado":
-          return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim) });
+          return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim, true) });
         case "entregaPontual":
           return res.json({ tipo: "churn", linhas: await detalheEntregaPontual(db, inicio, fim) });
         default:
@@ -1706,6 +1736,15 @@ import type { CelulaSelecionada, LinhaDrillDeal, LinhaDrillChurn } from "./types
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
+// Qual campo do deal compõe a célula clicada. Sem isso o total do drawer soma
+// recorrente + pontual e nunca bate com uma célula que é só um dos dois.
+const CAMPO_DA_METRICA: Record<string, "recorrente" | "pontual"> = {
+  mrrAdicionado: "recorrente",
+  pontualVendido: "pontual",
+  crossMrr: "recorrente",
+  crossPontual: "pontual",
+};
+
 export function DrawerDetalhe({
   celula,
   onClose,
@@ -1716,10 +1755,20 @@ export function DrawerDetalhe({
   const { data, isLoading, isError, error } = useDetalheSemanal(celula);
 
   const linhas = data?.linhas ?? [];
+  // Célula de deals é SEMPRE um único campo (rec OU pont), nunca os dois — ver
+  // CAMPO_DA_METRICA acima. Célula de churn/entrega é Σ valor, sem esse split.
+  const campoMetrica = celula ? CAMPO_DA_METRICA[celula.metrica] : undefined;
   const total =
     data?.tipo === "deals"
-      ? (linhas as LinhaDrillDeal[]).reduce((s, l) => s + l.recorrente + l.pontual, 0)
+      ? (linhas as LinhaDrillDeal[]).reduce(
+          (s, l) => s + (campoMetrica === "pontual" ? l.pontual : l.recorrente),
+          0,
+        )
       : (linhas as LinhaDrillChurn[]).reduce((s, l) => s + l.valor, 0);
+  // Rótulo honesto do total: para deals, deixa explícito qual campo foi somado
+  // — senão o usuário soma rec+pont na hora e estranha o número menor.
+  const sufixoTotal =
+    data?.tipo === "deals" ? (campoMetrica === "pontual" ? " em pontual" : " em recorrente") : "";
 
   return (
     <Sheet open={celula !== null} onOpenChange={(aberto) => !aberto && onClose()}>
@@ -1730,6 +1779,7 @@ export function DrawerDetalhe({
             Semana de {celula?.inicio.split("-").reverse().join("/")} a{" "}
             {celula?.fim.split("-").reverse().join("/")} · {linhas.length}{" "}
             {linhas.length === 1 ? "registro" : "registros"} · {fmtBRL(total)}
+            {sufixoTotal}
           </SheetDescription>
         </SheetHeader>
 

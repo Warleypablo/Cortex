@@ -145,8 +145,21 @@ export async function churnPontualNaSemana(db: any, inicio: string, fim: string)
 // mudar, o par TEM que mudar junto, senão o drawer deixa de somar a célula.
 // ============================================
 
-/** Gêmea de churnMrrNaSemana. */
-export async function detalheChurnMrr(db: any, inicio: string, fim: string): Promise<LinhaDetalhe[]> {
+/**
+ * Gêmea de churnMrrNaSemana — `apenasAjustado=false` é a gêmea de `.total`,
+ * `apenasAjustado=true` é a gêmea de `.ajustado` (mesmo filtro de motivo que
+ * a query de série aplica no campo `ajustado`). Sem default: quem chama
+ * declara qual célula está detalhando.
+ */
+export async function detalheChurnMrr(
+  db: any,
+  inicio: string,
+  fim: string,
+  apenasAjustado: boolean,
+): Promise<LinhaDetalhe[]> {
+  const filtroAjustado = apenasAjustado
+    ? sql`COALESCE(motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}`
+    : sql`TRUE`;
   const r: any = await db.execute(sql`
     SELECT
       COALESCE(NULLIF(TRIM(nome), ''), 'Sem nome') AS cliente,
@@ -156,6 +169,7 @@ export async function detalheChurnMrr(db: any, inicio: string, fim: string): Pro
     FROM "Clickup".cup_churn
     WHERE data_solicitacao_encerramento >= ${inicio}::date
       AND data_solicitacao_encerramento <= ${fim}::date
+      AND ${filtroAjustado}
     ORDER BY valor_r DESC NULLS LAST
   `);
   return ((r.rows ?? []) as any[]).map((x) => ({
@@ -166,8 +180,21 @@ export async function detalheChurnMrr(db: any, inicio: string, fim: string): Pro
   }));
 }
 
-/** Gêmea de churnPontualNaSemana. */
-export async function detalheChurnPontual(db: any, inicio: string, fim: string): Promise<LinhaDetalhe[]> {
+/**
+ * Gêmea de churnPontualNaSemana — `apenasAjustado=false` é a gêmea de
+ * `.total`, `apenasAjustado=true` é a gêmea de `.ajustado` (mesmo filtro de
+ * motivo que a query de série aplica no campo `ajustado`). Sem default: quem
+ * chama declara qual célula está detalhando.
+ */
+export async function detalheChurnPontual(
+  db: any,
+  inicio: string,
+  fim: string,
+  apenasAjustado: boolean,
+): Promise<LinhaDetalhe[]> {
+  const filtroAjustado = apenasAjustado
+    ? sql`COALESCE(ch.motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}`
+    : sql`TRUE`;
   const r: any = await db.execute(sql`
     SELECT
       COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
@@ -178,6 +205,7 @@ export async function detalheChurnPontual(db: any, inicio: string, fim: string):
     JOIN "Clickup".cup_contratos ct ON ct.id_subtask = ch.task_id AND ct.valorp > 0
     WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
       AND ch.data_solicitacao_encerramento <= ${fim}::date
+      AND ${filtroAjustado}
     ORDER BY ct.valorp DESC NULLS LAST
   `);
   return ((r.rows ?? []) as any[]).map((x) => ({

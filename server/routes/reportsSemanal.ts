@@ -90,11 +90,13 @@ export function registerReportsSemanalRoutes(app: Express) {
           return res.json({ tipo: "deals", linhas: deals });
         }
         case "churnMrrTotal":
+          return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim, false) });
         case "churnMrrAjustado":
-          return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim) });
+          return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim, true) });
         case "churnPontualTotal":
+          return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim, false) });
         case "churnPontualAjustado":
-          return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim) });
+          return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim, true) });
         case "entregaPontual":
           return res.json({ tipo: "churn", linhas: await detalheEntregaPontual(db, inicio, fim) });
         default:
