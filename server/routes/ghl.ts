@@ -1693,7 +1693,10 @@ async function getBroadcastsSummary(req: Request, res: Response) {
     `);
     const manual = Number((manualRes as any).rows?.[0]?.manual ?? 0);
     const nManual = (manualRes as any).rows?.[0]?.n_manual ?? 0;
-    const gastoEstimado = (entrega.total ?? 0) * unitCost;
+    // Custo = só mensagens ENVIADAS (sent/delivered/read). Meta e GHL cobram por mensagem
+    // que sai (per-message billing desde jul/2025); 'failed' e 'queued' NÃO são cobrados.
+    // Usar entrega.total inflava o gasto com as que deram erro (~17% do volume em jul/2026).
+    const gastoEstimado = (entrega.enviado ?? 0) * unitCost;
     const gastoTotal = gastoEstimado + manual;
     const reunioes = funil.reuniao_marcada ?? 0;
     const vendas = funil.venda ?? 0;
@@ -1747,6 +1750,7 @@ async function getBasesPerformance(req: Request, res: Response) {
           'wa-' || TO_CHAR(DATE_TRUNC('day', date_added), 'YYYYMMDD') || '-' || source || '-' || SUBSTR(MD5(COALESCE(body, '')), 1, 8) AS broadcast_id,
           MIN(date_added) AS dt,
           COUNT(*)::int AS total_msgs,
+          COUNT(*) FILTER (WHERE status IN ('sent','delivered','read'))::int AS enviado,
           COUNT(DISTINCT contact_id)::int AS leads,
           COUNT(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
           COUNT(*) FILTER (WHERE status = 'read')::int AS lida
@@ -1769,6 +1773,7 @@ async function getBasesPerformance(req: Request, res: Response) {
         COUNT(*)::int AS disparos,
         SUM(msg.leads)::int AS leads_totais,
         SUM(msg.total_msgs)::int AS total_msgs,
+        SUM(msg.enviado)::int AS enviado,
         SUM(msg.entregue)::int AS entregue,
         SUM(msg.lida)::int AS lida,
         COALESCE(SUM(resp.responderam), 0)::int AS responderam,
@@ -1783,7 +1788,8 @@ async function getBasesPerformance(req: Request, res: Response) {
     `);
 
     const ranking = ((rankingRes as any).rows ?? []).map((r: any) => {
-      const custo = r.total_msgs * unitCost;
+      // custo por base = só mensagens enviadas (exclui failed) — ver nota em getBroadcastsSummary
+      const custo = r.enviado * unitCost;
       return {
         base: r.base,
         disparos: r.disparos,
@@ -1840,6 +1846,7 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
   const waSource = sql`source IN ('workflow','bulk_actions','campaign')`;
   const ent = await db.execute(sql`
     SELECT count(*)::int AS total_msgs, count(DISTINCT contact_id)::int AS leads,
+      count(*) FILTER (WHERE status IN ('sent','delivered','read'))::int AS enviado,
       count(*) FILTER (WHERE status IN ('delivered','read'))::int AS entregue,
       count(*) FILTER (WHERE status = 'read')::int AS lida
     FROM cortex_core.ghl_messages
@@ -1869,7 +1876,8 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
   `);
   const e = (ent as any).rows?.[0] ?? {}, f = (fun as any).rows?.[0] ?? {};
   const d0 = (disp as any).rows?.[0] ?? {};
-  const total = e.total_msgs ?? 0;
+  // custo = só mensagens enviadas (sent/delivered/read); 'failed' não é cobrado pelo provedor
+  const enviadoMsgs = e.enviado ?? 0;
   return {
     disparos: d0.disparos ?? 0,
     enviadas: d0.enviadas ?? 0,
@@ -1880,7 +1888,7 @@ async function periodoMetrics(from: Date, to: Date, unitCost: number) {
     reunioes_direta: f.reunioes_direta ?? 0,
     compareceu: f.compareceu ?? 0,
     vendas: f.vendas ?? 0,
-    gasto: +(total * unitCost).toFixed(2),
+    gasto: +(enviadoMsgs * unitCost).toFixed(2),
   };
 }
 
