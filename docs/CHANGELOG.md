@@ -1,5 +1,23 @@
 # Changelog
 
+## 2026-07-21 | feat(reporte-semanal): tela semanal dos líderes + régua única de expansão
+
+**O que foi feito:**
+- `/reports/semanal` virou uma tabela de 12 semanas (segunda a domingo) com as métricas do Resumo dos Líderes: Novas Vendas, Carteira, Churn, Cross Sell e Net Churn. Substitui os 3 cards KPI anteriores
+- Cada célula de venda, cross sell, churn e entrega abre um drawer com as linhas por trás do número, e o total do drawer bate exatamente com a célula
+- Coluna Δ compara a última semana **fechada** com a anterior; a semana em curso aparece marcada com `*` e fica fora do cálculo
+- Venda nova e cross sell passam a ser classificados por `crm_deal.channel = 'Expansão de Conta'` — na tela **e** na mensagem diária dos líderes, a partir da mesma função (`server/crm/expansao.ts`)
+- Override manual mensal de cross sell aposentado: não é mais preciso digitar o valor todo mês
+
+**Por que:**
+- A mensagem diária responde "como o mês está andando", mas a rotina de gestão precisa de "como foi a semana"
+- A mensagem usava duas réguas incompatíveis no mesmo texto: venda nova por CNPJ sem contrato anterior e cross sell por valor digitado à mão. Medido em produção, **40 dos 106 deals de expansão de 2026 (R$ 121k de MRR) entravam nas duas linhas**, por não terem CNPJ preenchido
+- A régua automática antiga (`source='PARTNER'`) está morta desde o corte do Synapse — tem 1 deal em toda a base
+
+**Atenção:** os números da mensagem diária mudam. Venda nova de junho cai de R$ 296.282 para R$ 242.791 (era cross sell sem CNPJ contado como aquisição) e o cross sell de julho vai de R$ 28.797 (digitado à mão) para R$ 24.600 apurado. Avisar os líderes antes do primeiro envio pós-deploy.
+
+**Ordem de deploy:** as linhas de override em `cortex_core.metric_actual_overrides_monthly` (`resumo_lideres_cross_r` / `resumo_lideres_cross_p`) só devem ser apagadas **depois** que o código novo estiver em produção. Apagá-las antes faz a mensagem sair com Cross Sell R$ 0, porque o código antigo cairia na régua morta.
+
 ## 2026-07-20 | feat(resumo-lideres): novo modelo de mensagem (v3)
 
 **O que foi feito:**

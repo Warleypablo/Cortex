@@ -952,8 +952,21 @@ Anexar ao final de `server/reportsSemanal/queries.ts`:
 // mudar, o par TEM que mudar junto, senão o drawer deixa de somar a célula.
 // ============================================
 
-/** Gêmea de churnMrrNaSemana. */
-export async function detalheChurnMrr(db: any, inicio: string, fim: string): Promise<LinhaDetalhe[]> {
+/**
+ * Gêmea de churnMrrNaSemana — `apenasAjustado=false` é a gêmea de `.total`,
+ * `apenasAjustado=true` é a gêmea de `.ajustado` (mesmo filtro de motivo que
+ * a query de série aplica no campo `ajustado`). Sem default: quem chama
+ * declara qual célula está detalhando.
+ */
+export async function detalheChurnMrr(
+  db: any,
+  inicio: string,
+  fim: string,
+  apenasAjustado: boolean,
+): Promise<LinhaDetalhe[]> {
+  const filtroAjustado = apenasAjustado
+    ? sql`COALESCE(motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}`
+    : sql`TRUE`;
   const r: any = await db.execute(sql`
     SELECT
       COALESCE(NULLIF(TRIM(nome), ''), 'Sem nome') AS cliente,
@@ -963,6 +976,7 @@ export async function detalheChurnMrr(db: any, inicio: string, fim: string): Pro
     FROM "Clickup".cup_churn
     WHERE data_solicitacao_encerramento >= ${inicio}::date
       AND data_solicitacao_encerramento <= ${fim}::date
+      AND ${filtroAjustado}
     ORDER BY valor_r DESC NULLS LAST
   `);
   return ((r.rows ?? []) as any[]).map((x) => ({
@@ -973,8 +987,21 @@ export async function detalheChurnMrr(db: any, inicio: string, fim: string): Pro
   }));
 }
 
-/** Gêmea de churnPontualNaSemana. */
-export async function detalheChurnPontual(db: any, inicio: string, fim: string): Promise<LinhaDetalhe[]> {
+/**
+ * Gêmea de churnPontualNaSemana — `apenasAjustado=false` é a gêmea de
+ * `.total`, `apenasAjustado=true` é a gêmea de `.ajustado` (mesmo filtro de
+ * motivo que a query de série aplica no campo `ajustado`). Sem default: quem
+ * chama declara qual célula está detalhando.
+ */
+export async function detalheChurnPontual(
+  db: any,
+  inicio: string,
+  fim: string,
+  apenasAjustado: boolean,
+): Promise<LinhaDetalhe[]> {
+  const filtroAjustado = apenasAjustado
+    ? sql`COALESCE(ch.motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}`
+    : sql`TRUE`;
   const r: any = await db.execute(sql`
     SELECT
       COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
@@ -985,6 +1012,7 @@ export async function detalheChurnPontual(db: any, inicio: string, fim: string):
     JOIN "Clickup".cup_contratos ct ON ct.id_subtask = ch.task_id AND ct.valorp > 0
     WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
       AND ch.data_solicitacao_encerramento <= ${fim}::date
+      AND ${filtroAjustado}
     ORDER BY ct.valorp DESC NULLS LAST
   `);
   return ((r.rows ?? []) as any[]).map((x) => ({
@@ -1005,17 +1033,17 @@ export async function detalheEntregaPontual(db: any, inicio: string, fim: string
       SELECT MAX(data_snapshot) AS d FROM "Clickup".cup_data_hist WHERE data_snapshot < ${inicio}::date
     ),
     entregue_fim AS (
-      SELECT h.id_subtask, h.valorp
+      SELECT h.id_subtask, h.id_task, h.valorp
       FROM "Clickup".cup_data_hist h, snap_fim
       WHERE h.data_snapshot = snap_fim.d AND h.status = 'entregue' AND h.valorp > 0
     )
     SELECT
-      COALESCE(NULLIF(TRIM(ct.nome), ''), 'Sem nome') AS cliente,
+      COALESCE(NULLIF(TRIM(cl.nome), ''), 'Sem nome') AS cliente,
       COALESCE(e.valorp, 0) AS valor
     FROM entregue_fim e
     LEFT JOIN "Clickup".cup_data_hist i
       ON i.id_subtask = e.id_subtask AND i.data_snapshot = (SELECT d FROM snap_ini)
-    LEFT JOIN "Clickup".cup_contratos ct ON ct.id_subtask = e.id_subtask
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = e.id_task
     WHERE i.status IS DISTINCT FROM 'entregue'
     ORDER BY e.valorp DESC NULLS LAST
   `);
@@ -1092,7 +1120,7 @@ import {
 } from "../reportsSemanal/queries";
 
 const SEMANAS_PADRAO = 12;
-const SEMANAS_MAX = 52;
+const SEMANAS_MAX = 26;
 
 export function registerReportsSemanalRoutes(app: Express) {
   app.get("/api/reports/semanal", async (req, res) => {
@@ -1104,30 +1132,32 @@ export function registerReportsSemanalRoutes(app: Express) {
 
       const semanas = gerarSemanas(hojeSP(), quantidade);
 
-      // As semanas são independentes entre si: uma rodada de Promise.all por
-      // semana, e todas as semanas em paralelo.
-      const metricas: SemanaMetricas[] = await Promise.all(
-        semanas.map(async (semana) => {
-          const [vendas, carteira, base, entregaPontual, churnMrr, churnPontual] = await Promise.all([
-            vendasPorChannel(db, semana.inicio, semana.fim),
-            carteiraNoFim(db, semana.fim),
-            baseNaAbertura(db, semana.inicio),
-            entregaPontualNaSemana(db, semana.inicio, semana.fim),
-            churnMrrNaSemana(db, semana.inicio, semana.fim),
-            churnPontualNaSemana(db, semana.inicio, semana.fim),
-          ]);
-          return derivarSemana({
-            semana,
-            vendas,
-            carteira,
-            baseMrr: base.mrr,
-            basePontual: base.pontual,
-            entregaPontual,
-            churnMrr,
-            churnPontual,
-          });
-        }),
-      );
+      // Semanas em SÉRIE, de propósito. As 6 queries de uma semana rodam em
+      // paralelo, mas as semanas não: o pool da aplicação é max: 5
+      // (server/db.ts) e é compartilhado com todos os outros endpoints.
+      // Paralelizar 12 semanas dispararia 72 queries concorrentes e deixaria
+      // o resto do app esperando conexão enquanto esta tela carrega.
+      const metricas: SemanaMetricas[] = [];
+      for (const semana of semanas) {
+        const [vendas, carteira, base, entregaPontual, churnMrr, churnPontual] = await Promise.all([
+          vendasPorChannel(db, semana.inicio, semana.fim),
+          carteiraNoFim(db, semana.fim),
+          baseNaAbertura(db, semana.inicio),
+          entregaPontualNaSemana(db, semana.inicio, semana.fim),
+          churnMrrNaSemana(db, semana.inicio, semana.fim),
+          churnPontualNaSemana(db, semana.inicio, semana.fim),
+        ]);
+        metricas.push(derivarSemana({
+          semana,
+          vendas,
+          carteira,
+          baseMrr: base.mrr,
+          basePontual: base.pontual,
+          entregaPontual,
+          churnMrr,
+          churnPontual,
+        }));
+      }
 
       res.json({ semanas: metricas });
     } catch (e: any) {
@@ -1159,11 +1189,13 @@ export function registerReportsSemanalRoutes(app: Express) {
           return res.json({ tipo: "deals", linhas: deals });
         }
         case "churnMrrTotal":
+          return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim, false) });
         case "churnMrrAjustado":
-          return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim) });
+          return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim, true) });
         case "churnPontualTotal":
+          return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim, false) });
         case "churnPontualAjustado":
-          return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim) });
+          return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim, true) });
         case "entregaPontual":
           return res.json({ tipo: "churn", linhas: await detalheEntregaPontual(db, inicio, fim) });
         default:
@@ -1239,7 +1271,7 @@ EOF
 
 **Interfaces:**
 - Consumes: `GET /api/reports/semanal` (Task 5).
-- Produces: `SemanaMetricas` (espelho do tipo do server), `useReporteSemanal(semanas?: number)`, `<TabelaSemanal semanas={...} onCelula={...} />`, `LINHAS` e `MetricaChave`.
+- Produces: `SemanaMetricas` (espelho do tipo do server), `useReporteSemanal(semanas?: number)`, `<TabelaSemanal semanas={...} onCelula={...} />`, `SECOES` e `MetricaChave`.
 
 - [ ] **Step 1: Reescrever os tipos**
 
@@ -1465,7 +1497,8 @@ export function TabelaSemanal({
   onCelula,
 }: {
   semanas: SemanaMetricas[];
-  onCelula: (c: CelulaSelecionada) => void;
+  /** Sem handler, as células não são clicáveis — a tabela funciona sem o drill. */
+  onCelula?: (c: CelulaSelecionada) => void;
 }) {
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-zinc-800">
@@ -1524,7 +1557,7 @@ export function TabelaSemanal({
                     {semanas.map((s) => {
                       const valor = s[linha.chave] as number;
                       const texto = linha.percentual ? fmtPct(valor) : fmtBRL(valor);
-                      const clicavel = linha.drill === true;
+                      const clicavel = linha.drill === true && onCelula !== undefined;
                       return (
                         <td
                           key={s.inicio}
@@ -1536,7 +1569,7 @@ export function TabelaSemanal({
                           onClick={
                             clicavel
                               ? () =>
-                                  onCelula({
+                                  onCelula!({
                                     metrica: linha.chave,
                                     rotulo: linha.rotulo,
                                     inicio: s.inicio,
@@ -1572,17 +1605,14 @@ export function TabelaSemanal({
 Substituir todo o conteúdo de `client/src/pages/RelatorioSemanal.tsx` por:
 
 ```tsx
-import { useState } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarRange, AlertTriangle } from "lucide-react";
 import { useReporteSemanal } from "./relatorio-semanal/useRelatorioSemanal";
 import { TabelaSemanal } from "./relatorio-semanal/TabelaSemanal";
-import type { CelulaSelecionada } from "./relatorio-semanal/types";
 
 export default function RelatorioSemanal() {
   usePageTitle("Reporte Semanal");
-  const [celula, setCelula] = useState<CelulaSelecionada | null>(null);
   const { data, isLoading, isError, error } = useReporteSemanal(12);
 
   const semanas = data?.semanas ?? [];
@@ -1620,7 +1650,7 @@ export default function RelatorioSemanal() {
           Falha ao carregar o reporte: {(error as Error)?.message}
         </p>
       ) : (
-        <TabelaSemanal semanas={semanas} onCelula={setCelula} />
+        <TabelaSemanal semanas={semanas} />
       )}
 
       <div className="space-y-1 text-xs text-gray-500 dark:text-zinc-500">
@@ -1641,13 +1671,12 @@ export default function RelatorioSemanal() {
         </p>
       </div>
 
-      {celula && <div className="hidden" data-celula={celula.metrica} />}
     </div>
   );
 }
 ```
 
-O `<div className="hidden">` no final é o ponto de ancoragem temporário do estado `celula` — a Task 7 o substitui pelo drawer de verdade. Ele existe para o TypeScript não acusar variável não usada nesta task.
+Nesta task a tabela vai sem drill: `onCelula` é opcional e a página não o passa, então as células não ficam clicáveis. A Task 7 acrescenta o estado e o handler. Não há código temporário a remover depois.
 
 - [ ] **Step 5: Typecheck**
 
@@ -1707,6 +1736,15 @@ import type { CelulaSelecionada, LinhaDrillDeal, LinhaDrillChurn } from "./types
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
+// Qual campo do deal compõe a célula clicada. Sem isso o total do drawer soma
+// recorrente + pontual e nunca bate com uma célula que é só um dos dois.
+const CAMPO_DA_METRICA: Record<string, "recorrente" | "pontual"> = {
+  mrrAdicionado: "recorrente",
+  pontualVendido: "pontual",
+  crossMrr: "recorrente",
+  crossPontual: "pontual",
+};
+
 export function DrawerDetalhe({
   celula,
   onClose,
@@ -1717,10 +1755,20 @@ export function DrawerDetalhe({
   const { data, isLoading, isError, error } = useDetalheSemanal(celula);
 
   const linhas = data?.linhas ?? [];
+  // Célula de deals é SEMPRE um único campo (rec OU pont), nunca os dois — ver
+  // CAMPO_DA_METRICA acima. Célula de churn/entrega é Σ valor, sem esse split.
+  const campoMetrica = celula ? CAMPO_DA_METRICA[celula.metrica] : undefined;
   const total =
     data?.tipo === "deals"
-      ? (linhas as LinhaDrillDeal[]).reduce((s, l) => s + l.recorrente + l.pontual, 0)
+      ? (linhas as LinhaDrillDeal[]).reduce(
+          (s, l) => s + (campoMetrica === "pontual" ? l.pontual : l.recorrente),
+          0,
+        )
       : (linhas as LinhaDrillChurn[]).reduce((s, l) => s + l.valor, 0);
+  // Rótulo honesto do total: para deals, deixa explícito qual campo foi somado
+  // — senão o usuário soma rec+pont na hora e estranha o número menor.
+  const sufixoTotal =
+    data?.tipo === "deals" ? (campoMetrica === "pontual" ? " em pontual" : " em recorrente") : "";
 
   return (
     <Sheet open={celula !== null} onOpenChange={(aberto) => !aberto && onClose()}>
@@ -1731,6 +1779,7 @@ export function DrawerDetalhe({
             Semana de {celula?.inicio.split("-").reverse().join("/")} a{" "}
             {celula?.fim.split("-").reverse().join("/")} · {linhas.length}{" "}
             {linhas.length === 1 ? "registro" : "registros"} · {fmtBRL(total)}
+            {sufixoTotal}
           </SheetDescription>
         </SheetHeader>
 
@@ -1806,19 +1855,33 @@ export function DrawerDetalhe({
 
 - [ ] **Step 2: Ligar o drawer na página**
 
-Em `client/src/pages/RelatorioSemanal.tsx`, acrescentar o import:
+Em `client/src/pages/RelatorioSemanal.tsx`, acrescentar aos imports:
 
 ```tsx
+import { useState } from "react";
 import { DrawerDetalhe } from "./relatorio-semanal/DrawerDetalhe";
+import type { CelulaSelecionada } from "./relatorio-semanal/types";
 ```
 
-e trocar a âncora temporária:
+Declarar o estado como primeira linha do componente, logo após `usePageTitle`:
 
 ```tsx
-      {celula && <div className="hidden" data-celula={celula.metrica} />}
+  const [celula, setCelula] = useState<CelulaSelecionada | null>(null);
 ```
 
-por:
+Passar o handler para a tabela — de:
+
+```tsx
+        <TabelaSemanal semanas={semanas} />
+```
+
+para:
+
+```tsx
+        <TabelaSemanal semanas={semanas} onCelula={setCelula} />
+```
+
+E acrescentar o drawer como último elemento antes do `</div>` que fecha a página:
 
 ```tsx
       <DrawerDetalhe celula={celula} onClose={() => setCelula(null)} />

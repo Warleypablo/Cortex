@@ -1,149 +1,74 @@
-import { TrendingUp, TrendingDown, Package, AlertTriangle, ArrowUp, ArrowDown } from "lucide-react";
-import { useRelatorioSemanal } from "./relatorio-semanal/useRelatorioSemanal";
-import type { KpiData } from "./relatorio-semanal/types";
-
-const fmtBRL = (v: number | null) =>
-  v == null
-    ? "—"
-    : v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
-
-const fmtDiaMes = (iso: string) => {
-  const [, m, d] = iso.split("-");
-  return `${d}/${m}`;
-};
-
-// Cor semântica: positivo é bom quando betterDirection==="up"; ruim quando "down".
-function corVariacao(pct: number | null, dir: "up" | "down"): string {
-  if (pct == null || pct === 0) return "text-gray-400 dark:text-zinc-500";
-  const positivo = pct > 0;
-  const bom = dir === "up" ? positivo : !positivo;
-  return bom ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
-}
-
-function KpiCard({
-  label,
-  icon: Icon,
-  valorFormatado,
-  kpi,
-  refFormatado,
-  subValor,
-}: {
-  label: string;
-  icon: typeof TrendingUp;
-  valorFormatado: string;
-  kpi: KpiData;
-  refFormatado: string;
-  subValor?: string;
-}) {
-  const pct = kpi.variacaoPct;
-  const Seta = pct != null && pct < 0 ? ArrowDown : ArrowUp;
-  const pctTxt =
-    pct == null ? "—" : `${pct > 0 ? "+" : ""}${pct.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
-  return (
-    <div className="rounded-2xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6 shadow-sm">
-      <div className="flex items-center gap-2 text-sm font-medium text-gray-500 dark:text-zinc-400">
-        <Icon className="h-4 w-4" />
-        <span className="uppercase tracking-wide">{label}</span>
-      </div>
-      <div className="mt-3 text-3xl font-bold text-gray-900 dark:text-white">{valorFormatado}</div>
-      {subValor && <div className="mt-0.5 text-sm text-gray-500 dark:text-zinc-400">{subValor}</div>}
-      <div className="mt-2 flex items-center gap-2 text-sm">
-        <span className={`flex items-center gap-0.5 font-semibold ${corVariacao(pct, kpi.betterDirection)}`}>
-          {pct != null && <Seta className="h-3.5 w-3.5" />}
-          {pctTxt}
-        </span>
-        <span className="text-gray-400 dark:text-zinc-500">vs {refFormatado}</span>
-      </div>
-    </div>
-  );
-}
-
-function CardSkeleton() {
-  return (
-    <div className="rounded-2xl border border-gray-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 p-6">
-      <div className="h-4 w-28 animate-pulse rounded bg-gray-200 dark:bg-zinc-800" />
-      <div className="mt-4 h-8 w-40 animate-pulse rounded bg-gray-200 dark:bg-zinc-800" />
-      <div className="mt-3 h-4 w-32 animate-pulse rounded bg-gray-200 dark:bg-zinc-800" />
-    </div>
-  );
-}
+import { useState } from "react";
+import { usePageTitle } from "@/hooks/use-page-title";
+import { Skeleton } from "@/components/ui/skeleton";
+import { CalendarRange, AlertTriangle } from "lucide-react";
+import { useReporteSemanal } from "./relatorio-semanal/useRelatorioSemanal";
+import { TabelaSemanal } from "./relatorio-semanal/TabelaSemanal";
+import { DrawerDetalhe } from "./relatorio-semanal/DrawerDetalhe";
+import type { CelulaSelecionada } from "./relatorio-semanal/types";
 
 export default function RelatorioSemanal() {
-  const { data, isLoading, error } = useRelatorioSemanal();
+  usePageTitle("Reporte Semanal");
+  const [celula, setCelula] = useState<CelulaSelecionada | null>(null);
+  const { data, isLoading, isError, error } = useReporteSemanal(12);
+
+  const semanas = data?.semanas ?? [];
+  const algumaVendaIndisponivel = semanas.some((s) => s.vendasIndisponivel);
 
   return (
-    <div className="mx-auto max-w-5xl p-6">
-      <div className="mb-6 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Reporte Semanal</h1>
-          <p className="text-sm text-gray-500 dark:text-zinc-400">Desempenho da empresa na semana</p>
-        </div>
-        {data && (
-          <div className="text-sm text-gray-500 dark:text-zinc-400">
-            Semana {fmtDiaMes(data.periodo.atual.inicio)}–{fmtDiaMes(data.periodo.atual.fim)}
-            <span className="mx-1">·</span>
-            vs {fmtDiaMes(data.periodo.anterior.inicio)}–{fmtDiaMes(data.periodo.anterior.fim)}
-          </div>
-        )}
+    <div className="p-6 space-y-6">
+      <div>
+        <p className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.16em] text-orange-500">
+          <CalendarRange className="h-3.5 w-3.5" /> Reportes
+        </p>
+        <h1 className="mt-1 text-2xl font-bold tracking-tight text-gray-900 dark:text-white">
+          Reporte Semanal
+        </h1>
+        <p className="mt-1 text-sm text-gray-500 dark:text-zinc-400">
+          As métricas do Resumo dos Líderes semana a semana (segunda a domingo), nas últimas 12 semanas.
+        </p>
       </div>
 
-      {error && (
-        <div className="rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-700 dark:border-rose-900 dark:bg-rose-950 dark:text-rose-300">
-          Não foi possível carregar o reporte: {error.message}
+      {algumaVendaIndisponivel && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            A apuração de vendas falhou em pelo menos uma semana. As linhas de MRR Adicionado,
+            Pontual Vendido e Cross Sell podem estar zeradas por erro de consulta, não por ausência
+            de vendas.
+          </span>
         </div>
       )}
 
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-        {isLoading || !data ? (
-          <>
-            <CardSkeleton />
-            <CardSkeleton />
-            <CardSkeleton />
-            <CardSkeleton />
-          </>
-        ) : (
-          <>
-            <KpiCard
-              label="MRR Ativo"
-              icon={TrendingUp}
-              valorFormatado={fmtBRL(data.kpis.mrrAtivo.atual)}
-              kpi={data.kpis.mrrAtivo}
-              refFormatado={fmtBRL(data.kpis.mrrAtivo.anterior)}
-            />
-            <KpiCard
-              label="Churn"
-              icon={TrendingDown}
-              valorFormatado={fmtBRL(data.kpis.churn.atual)}
-              kpi={data.kpis.churn}
-              refFormatado={fmtBRL(data.kpis.churn.anterior)}
-            />
-            <KpiCard
-              label="Entregas Pontuais"
-              icon={Package}
-              valorFormatado={fmtBRL(data.kpis.entregasPontuais.atual)}
-              kpi={data.kpis.entregasPontuais}
-              refFormatado={fmtBRL(data.kpis.entregasPontuais.anterior)}
-              subValor={
-                data.kpis.entregasPontuais.qtdAtual != null
-                  ? `${data.kpis.entregasPontuais.qtdAtual} entregas`
-                  : undefined
-              }
-            />
-            <KpiCard
-              label="Churn Pontual"
-              icon={AlertTriangle}
-              valorFormatado={fmtBRL(data.kpis.churnPontual.atual)}
-              kpi={data.kpis.churnPontual}
-              refFormatado={fmtBRL(data.kpis.churnPontual.anterior)}
-              subValor={
-                data.kpis.churnPontual.qtdAtual != null
-                  ? `${data.kpis.churnPontual.qtdAtual} cancelamentos`
-                  : undefined
-              }
-            />
-          </>
-        )}
+      {isLoading ? (
+        <Skeleton className="h-96 w-full" />
+      ) : isError ? (
+        <p className="text-sm text-rose-600 dark:text-rose-400">
+          Falha ao carregar o reporte: {(error as Error)?.message}
+        </p>
+      ) : (
+        <TabelaSemanal semanas={semanas} onCelula={setCelula} />
+      )}
+
+      <div className="space-y-1 text-xs text-gray-500 dark:text-zinc-500">
+        <p>
+          <strong>*</strong> Semana em curso — dados parciais. Fica de fora do cálculo da coluna Δ.
+        </p>
+        <p>
+          Δ compara a última semana fechada com a anterior.
+        </p>
+        <p>
+          Cross Sell = deals ganhos marcados como <strong>Expansão de Conta</strong> no CRM. Novas
+          Vendas = todo o resto dos deals ganhos. Mesma régua da mensagem diária dos líderes.
+        </p>
+        <p>
+          Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de
+          até 1 mês. Percentuais de MRR usam a carteira no fechamento da semana anterior; os de
+          pontual, o estoque em aberto na mesma data.
+        </p>
       </div>
+
+      <DrawerDetalhe celula={celula} onClose={() => setCelula(null)} />
     </div>
   );
 }

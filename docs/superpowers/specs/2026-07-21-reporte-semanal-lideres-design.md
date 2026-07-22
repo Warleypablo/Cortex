@@ -225,9 +225,12 @@ Somente funções puras, sem mockar banco:
   garantia de que venda nova e cross-sell não se sobrepõem.
 - `resumoLideres.test.ts` — atualizado para a régua nova; testes de override removidos.
 
-**Reconciliação manual antes do merge:** conferir que a soma das semanas de um mês fechado bate com
-o valor mensal da mensagem para MRR Adicionado, Cross Sell e Churn. Divergência aqui significa que
-uma das duas superfícies não está usando `vendasPorChannel`.
+**Reconciliação manual antes do merge:** conferir que o mesmo intervalo agregado de duas formas bate
+— soma das N semanas que o cobrem vs. um único agregado sobre `[primeira segunda, último domingo]`
+desse intervalo — para MRR Adicionado, Cross Sell e Churn. (A soma de semanas contra o valor
+*mensal* da mensagem não serve de checagem: semanas atravessam virada de mês, então as duas nunca
+cobrem o mesmo intervalo.) Divergência aqui significa que uma das duas superfícies não está usando
+`vendasPorChannel`.
 
 ## 6. Riscos
 

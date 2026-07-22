@@ -5,15 +5,20 @@
 // (ajustado e bruto) subtrai só o cross sell de MRR (crossR), não o crossTotal;
 // MRR Ativo passou a ser triagem + onboarding + ativo (status "ativo" isolado
 // virou carteiraAtivo). Specs anteriores: 2026-07-02 (v2), 2026-07-14 (NRR Bruto).
+// 2026-07-21: venda nova e cross sell passaram a ser classificados pela
+// marcação `channel` do CRM (server/crm/expansao.ts), a mesma régua da tela
+// /reports/semanal. Saiu o override manual mensal de cross sell.
+// 2026-07-22: `crossIndisponivel` colapsada em `vendasIndisponivel` — as duas
+// vinham de `vendas.erro` desde a mudança acima (uma apuração só), então nunca
+// puderam divergir; o aviso de rodapé agora nomeia as duas consequências
+// (venda nova + cross sell) numa linha só.
 
 import { db } from "../db";
 import { sql } from "drizzle-orm";
-import {
-  getMrrInicioMes,
-  getVendasMrrBreakdown,
-  getVendasNovasBreakdown,
-} from "../okr2026/metricsAdapter";
+import { getMrrInicioMes } from "../okr2026/metricsAdapter";
+import { vendasPorChannel } from "../crm/expansao";
 import { enviarMensagemWhatsApp } from "./turbozap";
+import { MOTIVOS_EXCLUIDOS_CHURN_AJUSTADO } from "../../shared/churn-motivos";
 
 export interface MetricasResumo {
   // Novas vendas (Bitrix, aquisição pura — sem cross sell e sem upsell)
@@ -50,11 +55,10 @@ export interface MetricasResumo {
   // Calculado e exposto em /preview, mas não exibido no texto v3
   churnBrutoSemAbono: number;
   churnBrutoSemAbonoPct: number;
-  // true quando getVendasMrrBreakdown falhou e devolveu zeros no catch — o
-  // Cross Sell (e portanto o Net Churn) fica subestimado/inflado sem aviso.
-  crossIndisponivel: boolean;
-  // true quando getVendasNovasBreakdown falhou e devolveu zeros no catch —
-  // mrrAdicionado/pontualVendido saem como um mês real sem vendas, sem aviso.
+  // true quando vendasPorChannel falhou e devolveu zeros no catch — uma
+  // apuração só cobre mrrAdicionado/pontualVendido/crossR/crossP: se ela falha,
+  // as duas famílias (venda nova e cross sell) ficam subestimadas/infladas
+  // juntas, sem aviso.
   vendasIndisponivel: boolean;
   // true quando mrrMesAnterior destoa >40% de mrrAtivo — sinal de snapshot
   // parcial/corrompido na base de comparação (já ocorreu em produção). Com
@@ -62,8 +66,13 @@ export interface MetricasResumo {
   baseSuspeita: boolean;
 }
 
-// Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real)
-const MOTIVOS_EXCLUIDOS = sql`('Erro na Venda', 'Não começou', 'Inadimplente 1º Mês')`;
+// Motivos excluídos das versões "ajustadas" (erros de venda/começo, não churn real).
+// Lista em shared/churn-motivos.ts — compartilhada com server/reportsSemanal/queries.ts,
+// que precisa da MESMA régua. Mesmo predicado SQL de antes, só a origem da lista mudou.
+const MOTIVOS_EXCLUIDOS = sql`(${sql.join(
+  MOTIVOS_EXCLUIDOS_CHURN_AJUSTADO.map((m) => sql`${m}`),
+  sql`, `,
+)})`;
 
 // Tolerância da sanity check da base de comparação (mrrMesAnterior vs mrrAtivo):
 // ±40%. Já houve snapshot parcial em produção por falha de pipeline por duas
@@ -110,16 +119,13 @@ export function formatarMensagemResumo(
   const mes = MESES[agora.mes - 1];
   const mesAnterior = MESES[(agora.mes + 10) % 12];
 
-  // Bloco de avisos (rodapé, antes do 👀): cross sell primeiro, vendas novas
-  // depois, base de comparação suspeita por último — mesmo padrão para as
-  // três classes de falha silenciosa de query/dados.
+  // Bloco de avisos (rodapé, antes do 👀): vendas indisponível primeiro, base
+  // de comparação suspeita depois — mesmo padrão para as duas classes de
+  // falha silenciosa de query/dados.
   const avisos: string[] = [];
-  if (m.crossIndisponivel) {
-    avisos.push("⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.");
-  }
   if (m.vendasIndisponivel) {
     avisos.push(
-      "⚠️ Vendas novas indisponíveis nesta apuração — MRR Adicionado e Pontual Vendido estão zerados por falha de apuração, não por ausência de vendas.",
+      "⚠️ Apuração de vendas indisponível — MRR Adicionado, Pontual Vendido e Cross Sell estão zerados por falha de consulta, não por ausência de vendas. O Net Churn está superestimado.",
     );
   }
   if (m.baseSuspeita) {
@@ -142,7 +148,7 @@ Novas Vendas
 📈 MRR Adicionado: ${formatarMoedaBR(m.mrrAdicionado)}
 📦 Pontual Vendido: ${formatarMoedaBR(m.pontualVendido)}
 
-📌 Considera vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido entram nesta linha, por não ser possível classificá-los.
+📌 Considera os deals ganhos que não foram marcados como Expansão de Conta no CRM.
 
 Carteira MRR
 🟡 Triagem / Onboarding: ${formatarMoedaBR(m.carteiraTriagemOnboarding)}
@@ -201,7 +207,7 @@ Churn Total: ${formatarMoedaBR(m.churnTotal)}
 
 💡 Disclaimers
 
-• MRR Adicionado e Pontual Vendido consideram vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido não são classificáveis e entram nessas linhas.
+• MRR Adicionado e Pontual Vendido são os deals ganhos não marcados como Expansão de Conta no CRM; Cross Sell são os marcados. As duas linhas não se sobrepõem.
 • Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de até 1 mês.
 • O percentual do Churn Pontual é calculado sobre o estoque pontual em aberto no início do mês (${formatarMoedaBR(m.estoquePontualInicioMes)}).
 • Net Churn = Churn − Cross Sell de MRR.
@@ -346,60 +352,6 @@ async function getEntregaPontualMes(): Promise<number> {
   return parseFloat((result.rows[0] as any)?.total || "0");
 }
 
-// Chaves usadas em metric_actual_overrides_monthly para o override manual de
-// Cross Sell — ver getCrossOverrideMesAtual.
-const METRIC_KEY_CROSS_R = "resumo_lideres_cross_r";
-const METRIC_KEY_CROSS_P = "resumo_lideres_cross_p";
-
-interface CrossOverride {
-  r: number | null;
-  p: number | null;
-}
-
-/**
- * Override manual de Cross Sell (R e P) do mês corrente, lido de
- * metric_actual_overrides_monthly (tabela existente, reutilizada — sem
- * migration nova). A régua automática do Bitrix (source='PARTNER' + cliente
- * pré-existente) não pega cross sell de verdade: há um único deal PARTNER em
- * toda a base de produção. Até isso ser corrigido na origem, o cliente
- * informa os valores manualmente por essa tabela. Filtra por mês corrente em
- * America/Sao_Paulo (mesmo padrão de getEntregaPontualMes/
- * getEstoquePontualInicioMes) para que um override de julho nunca valha em
- * agosto. Tolerante a falha: se a tabela não existir ou a query falhar,
- * devolve "sem override" (null, null) — a mensagem nunca deve deixar de sair
- * por causa disso.
- */
-async function getCrossOverrideMesAtual(): Promise<CrossOverride> {
-  try {
-    const result = await db.execute(sql`
-      SELECT metric_key, actual_value
-      FROM cortex_core.metric_actual_overrides_monthly
-      WHERE metric_key IN (${METRIC_KEY_CROSS_R}, ${METRIC_KEY_CROSS_P})
-        AND month = TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM')
-        AND dimension_key IS NULL
-      ORDER BY updated_at DESC NULLS LAST
-    `);
-    // NaN não é null, então passaria pelo `??` e viraria "R$ NaN" na mensagem
-    // sem disparar nenhum aviso — descartar aqui é o que mantém o fallback.
-    const numeroOuNull = (v: unknown): number | null => {
-      const n = parseFloat(String(v));
-      return Number.isFinite(n) ? n : null;
-    };
-    const override: CrossOverride = { r: null, p: null };
-    for (const row of (result.rows ?? []) as any[]) {
-      if (row.metric_key === METRIC_KEY_CROSS_R && override.r === null) {
-        override.r = numeroOuNull(row.actual_value);
-      } else if (row.metric_key === METRIC_KEY_CROSS_P && override.p === null) {
-        override.p = numeroOuNull(row.actual_value);
-      }
-    }
-    return override;
-  } catch (err: any) {
-    console.error("[resumo-lideres] Falha ao ler override de Cross Sell:", err.message);
-    return { r: null, p: null };
-  }
-}
-
 async function getEstoquePontualInicioMes(): Promise<number> {
   // Estoque pontual em aberto no 1º snapshot do mês (= fechamento do mês anterior).
   // Base do % de churn pontual, análogo ao mrrMesAnterior usado no churn recorrente.
@@ -431,25 +383,26 @@ export function derivarMetricas(entrada: {
   mrrMesAnterior: number;
   estoquePontualInicioMes: number;
   entregaPontual: number;
-  vendasNovas: { mrr: number; pontual: number; erro?: boolean };
-  breakdown: { crosssell: number; crosssell_pontual: number; erro?: boolean };
+  // Venda nova e cross-sell da MESMA apuração (server/crm/expansao.ts),
+  // classificados pela marcação `channel` do CRM. Antes vinham de duas
+  // funções com réguas incompatíveis: CNPJ sem contrato anterior para venda
+  // nova e override manual mensal para cross-sell — 40 dos 106 deals de
+  // expansão de 2026 (R$ 121k de MRR) contavam nas duas linhas.
+  vendas: {
+    novoMrr: number;
+    novoPontual: number;
+    crossMrr: number;
+    crossPontual: number;
+    erro?: boolean;
+  };
   churn: { total: number; ajustado: number; brutoSemAbono: number };
   churnPontual: { total: number; ajustado: number };
-  // Override manual de Cross Sell (metric_actual_overrides_monthly), lido em
-  // calcularMetricasResumo. Cada métrica é independente: quem não tem
-  // override para o mês passa null e o valor do Bitrix prevalece.
-  crossOverride?: { r: number | null; p: number | null };
 }): MetricasResumo {
-  const { carteira, mrrMesAnterior, estoquePontualInicioMes, entregaPontual, vendasNovas, breakdown, churn, churnPontual } =
+  const { carteira, mrrMesAnterior, estoquePontualInicioMes, entregaPontual, vendas, churn, churnPontual } =
     entrada;
 
-  const overrideR = entrada.crossOverride?.r ?? null;
-  const overrideP = entrada.crossOverride?.p ?? null;
-
-  // Cross sell efetivo: override manual quando existir para o mês, senão o
-  // valor apurado do Bitrix — por métrica, independentemente.
-  const crossR = overrideR ?? breakdown.crosssell;
-  const crossP = overrideP ?? breakdown.crosssell_pontual;
+  const crossR = vendas.crossMrr;
+  const crossP = vendas.crossPontual;
   const crossTotal = crossR + crossP;
   const netChurn = churn.ajustado - crossR;
   const netChurnBruto = churn.total - crossR;
@@ -457,8 +410,8 @@ export function derivarMetricas(entrada: {
   const mrrOperando = mrrAtivo + carteira.emCancelamento;
 
   return {
-    mrrAdicionado: vendasNovas.mrr,
-    pontualVendido: vendasNovas.pontual,
+    mrrAdicionado: vendas.novoMrr,
+    pontualVendido: vendas.novoPontual,
     carteiraTriagemOnboarding: carteira.triagemOnboarding,
     carteiraAtivo: carteira.ativo,
     carteiraEmCancelamento: carteira.emCancelamento,
@@ -484,11 +437,8 @@ export function derivarMetricas(entrada: {
     netChurnBrutoPct: mrrMesAnterior > 0 ? (netChurnBruto / mrrMesAnterior) * 100 : 0,
     churnBrutoSemAbono: churn.brutoSemAbono,
     churnBrutoSemAbonoPct: mrrMesAnterior > 0 ? (churn.brutoSemAbono / mrrMesAnterior) * 100 : 0,
-    // Só é "indisponível" se o Bitrix falhou E o override não cobre os dois
-    // valores — se o número foi informado à mão, não está indisponível,
-    // mesmo com a query do Bitrix quebrada.
-    crossIndisponivel: breakdown.erro === true && !(overrideR !== null && overrideP !== null),
-    vendasIndisponivel: vendasNovas.erro === true,
+    // Uma apuração só: se ela falhou, venda nova e cross sell estão comprometidos juntos.
+    vendasIndisponivel: vendas.erro === true,
     baseSuspeita:
       mrrMesAnterior < mrrAtivo * (1 - TOLERANCIA_BASE_COMPARACAO) ||
       mrrMesAnterior > mrrAtivo * (1 + TOLERANCIA_BASE_COMPARACAO),
@@ -496,26 +446,26 @@ export function derivarMetricas(entrada: {
 }
 
 export async function calcularMetricasResumo(): Promise<MetricasResumo> {
+  // Mês corrente em America/Sao_Paulo, no formato que vendasPorChannel espera.
+  const hojeSP = new Date().toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" });
+  const primeiroDiaDoMes = `${hojeSP.slice(0, 7)}-01`;
+
   const [
     carteira,
     mrrMesAnterior,
-    vendasNovas,
-    breakdown,
+    vendas,
     churn,
     churnPontual,
     entregaPontual,
     estoquePontualInicioMes,
-    crossOverride,
   ] = await Promise.all([
     getCarteiraMrr(),
     getMrrInicioMes(),
-    getVendasNovasBreakdown(),
-    getVendasMrrBreakdown(),
+    vendasPorChannel(db, primeiroDiaDoMes, hojeSP),
     getChurnMes(),
     getChurnPontualMes(),
     getEntregaPontualMes(),
     getEstoquePontualInicioMes(),
-    getCrossOverrideMesAtual(),
   ]);
 
   const metricas = derivarMetricas({
@@ -523,11 +473,9 @@ export async function calcularMetricasResumo(): Promise<MetricasResumo> {
     mrrMesAnterior,
     estoquePontualInicioMes,
     entregaPontual,
-    vendasNovas,
-    breakdown,
+    vendas,
     churn,
     churnPontual,
-    crossOverride,
   });
 
   // getMrrInicioMes (metricsAdapter) engole erros retornando 0; sem base de MRR a

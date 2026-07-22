@@ -1,24 +1,25 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
-// calcularMetricasResumo faz I/O (db + metricsAdapter) — mockado só para o
-// describe do guard rail (item 5); as demais 28+ suítes deste arquivo testam
-// funções puras e não são afetadas por este mock. vi.hoisted é necessário
-// porque há duas chamadas vi.mock neste arquivo (db + metricsAdapter): sem
-// isso, os `const` que os factories referenciam não ficam disponíveis no
-// momento em que o hoisting do vi.mock os executa.
+// calcularMetricasResumo faz I/O (db + metricsAdapter + crm/expansao) —
+// mockado só para o describe do guard rail (item 5); as demais 28+ suítes
+// deste arquivo testam funções puras e não são afetadas por este mock.
+// vi.hoisted é necessário porque há três chamadas vi.mock neste arquivo (db +
+// metricsAdapter + crm/expansao): sem isso, os `const` que os factories
+// referenciam não ficam disponíveis no momento em que o hoisting do vi.mock
+// os executa.
 const mocks = vi.hoisted(() => ({
   mockExecute: vi.fn(),
   mockGetMrrInicioMes: vi.fn(),
-  mockGetVendasNovasBreakdown: vi.fn(),
-  mockGetVendasMrrBreakdown: vi.fn(),
+  mockVendasPorChannel: vi.fn(),
 }));
-const { mockExecute, mockGetMrrInicioMes, mockGetVendasNovasBreakdown, mockGetVendasMrrBreakdown } = mocks;
+const { mockExecute, mockGetMrrInicioMes, mockVendasPorChannel } = mocks;
 
 vi.mock("../db", () => ({ db: { execute: mocks.mockExecute } }));
 vi.mock("../okr2026/metricsAdapter", () => ({
   getMrrInicioMes: mocks.mockGetMrrInicioMes,
-  getVendasNovasBreakdown: mocks.mockGetVendasNovasBreakdown,
-  getVendasMrrBreakdown: mocks.mockGetVendasMrrBreakdown,
+}));
+vi.mock("../crm/expansao", () => ({
+  vendasPorChannel: mocks.mockVendasPorChannel,
 }));
 
 import {
@@ -66,7 +67,6 @@ const METRICAS: MetricasResumo = {
   // Calculado mas não exibido na v3 (mantido para o payload de /preview)
   churnBrutoSemAbono: 55000,
   churnBrutoSemAbonoPct: (55000 / 1137868) * 100,
-  crossIndisponivel: false,
   vendasIndisponivel: false,
   baseSuspeita: false,
 };
@@ -84,7 +84,7 @@ Novas Vendas
 📈 MRR Adicionado: R$ 42.310,00
 📦 Pontual Vendido: R$ 118.500,00
 
-📌 Considera vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido entram nesta linha, por não ser possível classificá-los.
+📌 Considera os deals ganhos que não foram marcados como Expansão de Conta no CRM.
 
 Carteira MRR
 🟡 Triagem / Onboarding: R$ 150.789,28
@@ -143,7 +143,7 @@ Churn Total: R$ 67.030,00
 
 💡 Disclaimers
 
-• MRR Adicionado e Pontual Vendido consideram vendas para clientes sem contrato anterior. Deals sem CNPJ preenchido não são classificáveis e entram nessas linhas.
+• MRR Adicionado e Pontual Vendido são os deals ganhos não marcados como Expansão de Conta no CRM; Cross Sell são os marcados. As duas linhas não se sobrepõem.
 • Churn Ajustado desconsidera erro de venda, clientes que não iniciaram e inadimplência de até 1 mês.
 • O percentual do Churn Pontual é calculado sobre o estoque pontual em aberto no início do mês (R$ 2.090.519,35).
 • Net Churn = Churn − Cross Sell de MRR.
@@ -210,78 +210,58 @@ describe("formatarMensagemResumo", () => {
     expect(msg).toContain("📌 MRR Base Dezembro: R$ 1.137.868,00");
   });
 
-  it("crossIndisponivel true: mensagem traz o aviso, antes da linha 👀", () => {
+  // Aviso único de vendas indisponíveis: desde 2026-07-22 cobre venda nova E
+  // cross sell na mesma linha — as duas vinham de `vendas.erro` (uma apuração
+  // só) e as duas classes de aviso (crossIndisponivel/vendasIndisponivel)
+  // nunca puderam divergir na prática. Ver comentário no topo do arquivo.
+  const AVISO_VENDAS =
+    "⚠️ Apuração de vendas indisponível — MRR Adicionado, Pontual Vendido e Cross Sell estão zerados por falha de consulta, não por ausência de vendas. O Net Churn está superestimado.";
+
+  it("vendasIndisponivel true: mensagem traz o aviso, antes da linha 👀", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: true },
+      { ...METRICAS, vendasIndisponivel: true },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
-    const aviso = "⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.";
-    expect(msg).toContain(aviso);
-    expect(msg.indexOf(aviso)).toBeLessThan(msg.indexOf("👀 Seguimos"));
+    expect(msg).toContain(AVISO_VENDAS);
+    expect(msg.indexOf(AVISO_VENDAS)).toBeLessThan(msg.indexOf("👀 Seguimos"));
   });
 
-  it("crossIndisponivel false: mensagem não menciona indisponibilidade", () => {
+  it("vendasIndisponivel false: mensagem não menciona indisponibilidade", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: false },
+      { ...METRICAS, vendasIndisponivel: false },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
     expect(msg).not.toContain("indisponível");
     expect(msg).not.toContain("⚠️");
   });
 
-  // Aviso de vendas novas indisponíveis: mesmo padrão do aviso de Cross Sell —
-  // quando getVendasNovasBreakdown falha, mrrAdicionado/pontualVendido saem
-  // zerados sem sinalização; vendasIndisponivel dispara a linha de aviso.
-  const AVISO_CROSS = "⚠️ Cross Sell indisponível nesta apuração — o Net Churn está superestimado.";
-  const AVISO_VENDAS =
-    "⚠️ Vendas novas indisponíveis nesta apuração — MRR Adicionado e Pontual Vendido estão zerados por falha de apuração, não por ausência de vendas.";
-
   it("nenhum aviso: mensagem sai byte a byte como hoje", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: false, vendasIndisponivel: false },
+      { ...METRICAS, vendasIndisponivel: false },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
     expect(msg).toBe(MENSAGEM_ESPERADA);
   });
 
-  it("só cross indisponível: só o aviso de cross, seguido de linha em branco e do 👀", () => {
+  it("vendas indisponível: aviso seguido de linha em branco e do 👀", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: true, vendasIndisponivel: false },
-      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
-    );
-    expect(msg).toContain(`${AVISO_CROSS}\n\n👀 Seguimos`);
-    expect(msg).not.toContain(AVISO_VENDAS);
-  });
-
-  it("só vendas indisponível: só o aviso de vendas, seguido de linha em branco e do 👀", () => {
-    const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: false, vendasIndisponivel: true },
+      { ...METRICAS, vendasIndisponivel: true },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
     expect(msg).toContain(`${AVISO_VENDAS}\n\n👀 Seguimos`);
-    expect(msg).not.toContain(AVISO_CROSS);
   });
 
-  it("ambos indisponíveis: cross primeiro, vendas depois, uma linha em branco antes do 👀", () => {
-    const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: true, vendasIndisponivel: true },
-      { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
-    );
-    expect(msg).toContain(`${AVISO_CROSS}\n${AVISO_VENDAS}\n\n👀 Seguimos`);
-  });
-
-  // Aviso de base de comparação suspeita: terceira classe de falha silenciosa —
+  // Aviso de base de comparação suspeita: segunda classe de falha silenciosa —
   // mrrMesAnterior fora de ±40% de mrrAtivo (ex.: snapshot parcial de pipeline).
   const AVISO_BASE =
     "⚠️ Base de comparação suspeita — o MRR do mês anterior destoa da carteira atual; os percentuais podem estar distorcidos.";
 
   it("só base suspeita: só o aviso de base, seguido de linha em branco e do 👀", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: false, vendasIndisponivel: false, baseSuspeita: true },
+      { ...METRICAS, vendasIndisponivel: false, baseSuspeita: true },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
     expect(msg).toContain(`${AVISO_BASE}\n\n👀 Seguimos`);
-    expect(msg).not.toContain(AVISO_CROSS);
     expect(msg).not.toContain(AVISO_VENDAS);
   });
 
@@ -293,12 +273,12 @@ describe("formatarMensagemResumo", () => {
     expect(msg).not.toContain("Base de comparação");
   });
 
-  it("três avisos juntos: cross, depois vendas, depois base suspeita, uma linha em branco antes do 👀", () => {
+  it("dois avisos juntos: vendas indisponível primeiro, base suspeita depois, uma linha em branco antes do 👀", () => {
     const msg = formatarMensagemResumo(
-      { ...METRICAS, crossIndisponivel: true, vendasIndisponivel: true, baseSuspeita: true },
+      { ...METRICAS, vendasIndisponivel: true, baseSuspeita: true },
       { dataFmt: "18/07", horaFmt: "13h", hora: 13, mes: 7 },
     );
-    expect(msg).toContain(`${AVISO_CROSS}\n${AVISO_VENDAS}\n${AVISO_BASE}\n\n👀 Seguimos`);
+    expect(msg).toContain(`${AVISO_VENDAS}\n${AVISO_BASE}\n\n👀 Seguimos`);
   });
 });
 
@@ -316,8 +296,7 @@ describe("derivarMetricas", () => {
     mrrMesAnterior: 1137868,
     estoquePontualInicioMes: 2090519.35,
     entregaPontual: 169293.45,
-    vendasNovas: { mrr: 42310, pontual: 118500 },
-    breakdown: { crosssell: 5997, crosssell_pontual: 10300 },
+    vendas: { novoMrr: 42310, novoPontual: 118500, crossMrr: 5997, crossPontual: 10300 },
     churn: { total: 67030, ajustado: 43314, brutoSemAbono: 55000 },
     churnPontual: { total: 171272, ajustado: 91973 },
   };
@@ -329,7 +308,7 @@ describe("derivarMetricas", () => {
   it("crossTotal é a soma cheia, sem a amortização ÷5 removida na v3", () => {
     const r = derivarMetricas({
       ...ENTRADA_BASE,
-      breakdown: { crosssell: 5997, crosssell_pontual: 10300 },
+      vendas: { ...ENTRADA_BASE.vendas, crossMrr: 5997, crossPontual: 10300 },
     });
     expect(r.crossTotal).toBe(16297);
   });
@@ -338,7 +317,7 @@ describe("derivarMetricas", () => {
     const r = derivarMetricas({
       ...ENTRADA_BASE,
       churn: { ...ENTRADA_BASE.churn, ajustado: 43314 },
-      breakdown: { crosssell: 5997, crosssell_pontual: 10300 },
+      vendas: { ...ENTRADA_BASE.vendas, crossMrr: 5997, crossPontual: 10300 },
     });
     expect(r.netChurn).toBe(37317);
     // 43314 - crossTotal(16297) seria a régua antiga (amortizada) reintroduzida
@@ -349,7 +328,7 @@ describe("derivarMetricas", () => {
     const r = derivarMetricas({
       ...ENTRADA_BASE,
       churn: { ...ENTRADA_BASE.churn, total: 67030 },
-      breakdown: { crosssell: 5997, crosssell_pontual: 10300 },
+      vendas: { ...ENTRADA_BASE.vendas, crossMrr: 5997, crossPontual: 10300 },
     });
     expect(r.netChurnBruto).toBe(61033);
   });
@@ -400,28 +379,6 @@ describe("derivarMetricas", () => {
     expect(Number.isNaN(r.churnPontualAjustadoPct)).toBe(false);
   });
 
-  it("breakdown com erro:true produz crossIndisponivel:true; sem o campo produz false", () => {
-    const comErro = derivarMetricas({
-      ...ENTRADA_BASE,
-      breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
-    });
-    expect(comErro.crossIndisponivel).toBe(true);
-
-    const semErro = derivarMetricas(ENTRADA_BASE);
-    expect(semErro.crossIndisponivel).toBe(false);
-  });
-
-  it("vendasNovas com erro:true produz vendasIndisponivel:true; sem o campo produz false", () => {
-    const comErro = derivarMetricas({
-      ...ENTRADA_BASE,
-      vendasNovas: { ...ENTRADA_BASE.vendasNovas, erro: true },
-    });
-    expect(comErro.vendasIndisponivel).toBe(true);
-
-    const semErro = derivarMetricas(ENTRADA_BASE);
-    expect(semErro.vendasIndisponivel).toBe(false);
-  });
-
   // baseSuspeita: mrrMesAnterior fora de ±40% de mrrAtivo — sinal de snapshot
   // parcial/corrompido (já ocorreu em produção). mrrAtivo fixo em 1.000.000
   // (ativo 1.000.000 + triagemOnboarding 0) para testar os limites exatos.
@@ -461,99 +418,23 @@ describe("derivarMetricas", () => {
     }
   });
 
-  // Override manual de Cross Sell (metric_actual_overrides_monthly), lido em
-  // calcularMetricasResumo e injetado aqui como `crossOverride: { r, p }` —
-  // I/O fica fora de derivarMetricas, só a decisão de qual valor prevalece.
-  // Enquanto a régua automática do Bitrix não pega cross sell de verdade (só
-  // 1 deal PARTNER em produção), o cliente informa R e/ou P manualmente; cada
-  // métrica é independente (uma pode vir do override e a outra do Bitrix).
-  describe("crossOverride (override manual de Cross Sell)", () => {
-    it("sem crossOverride (campo ausente): crossR/crossP vêm do Bitrix, idêntico ao comportamento atual", () => {
-      const r = derivarMetricas(ENTRADA_BASE);
-      expect(r.crossR).toBe(5997);
-      expect(r.crossP).toBe(10300);
-      expect(r).toEqual(METRICAS);
-    });
-
-    it("crossOverride explícito { r: null, p: null }: mesmo resultado de não ter override", () => {
-      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: null, p: null } });
-      expect(r).toEqual(METRICAS);
-    });
-
-    it("override só do recorrente (R): crossR vem do override, crossP continua do Bitrix", () => {
-      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: 50000, p: null } });
-      expect(r.crossR).toBe(50000);
-      expect(r.crossP).toBe(10300); // Bitrix, não mexeu
-    });
-
-    it("override só do pontual (P): crossP vem do override, crossR continua do Bitrix", () => {
-      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: null, p: 20000 } });
-      expect(r.crossP).toBe(20000);
-      expect(r.crossR).toBe(5997); // Bitrix, não mexeu
-    });
-
-    it("override dos dois: R e P vêm ambos do override", () => {
-      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: 50000, p: 20000 } });
-      expect(r.crossR).toBe(50000);
-      expect(r.crossP).toBe(20000);
-    });
-
-    it("override de ZERO prevalece sobre o Bitrix (não cai no fallback)", () => {
-      // Zero é um valor legítimo: mês sem cross sell nenhum. Com `||` no lugar
-      // de `??` na precedência, estes valores cairiam no Bitrix (5997/10300) e
-      // a mensagem mostraria um cross sell que não existe.
-      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: 0, p: 0 } });
-      expect(r.crossR).toBe(0);
-      expect(r.crossP).toBe(0);
-      expect(r.crossTotal).toBe(0);
-      expect(r.netChurn).toBe(43314); // churnAjustado inteiro, sem desconto
-    });
-
-    it("crossTotal, netChurn e netChurnBruto são calculados sobre os valores efetivos (override), não sobre os do Bitrix", () => {
-      // Valores do override (50000/20000) bem distintos dos do Bitrix
-      // (5997/10300) — se algum cálculo usar o valor errado a asserção falha.
-      const r = derivarMetricas({ ...ENTRADA_BASE, crossOverride: { r: 50000, p: 20000 } });
-      expect(r.crossTotal).toBe(70000); // 50000 + 20000
-      expect(r.crossTotal).not.toBe(16297); // valor com Bitrix (régua antiga)
-      expect(r.netChurn).toBe(43314 - 50000); // churnAjustado - crossR efetivo
-      expect(r.netChurn).not.toBe(37317); // netChurn calculado com crossR do Bitrix
-      expect(r.netChurnBruto).toBe(67030 - 50000); // churnTotal - crossR efetivo
-      expect(r.netChurnBruto).not.toBe(61033); // netChurnBruto calculado com crossR do Bitrix
-    });
-
-    it("crossIndisponivel false quando o Bitrix falhou mas o override cobre R e P", () => {
+  describe("régua channel: venda nova e cross-sell não se sobrepõem", () => {
+    it("mrrAdicionado e crossR vêm de campos distintos da mesma apuração", () => {
       const r = derivarMetricas({
         ...ENTRADA_BASE,
-        breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
-        crossOverride: { r: 50000, p: 20000 },
+        vendas: { novoMrr: 180339, novoPontual: 383267, crossMrr: 9300, crossPontual: 15300 },
       });
-      expect(r.crossIndisponivel).toBe(false);
+      expect(r.mrrAdicionado).toBe(180339);
+      expect(r.crossR).toBe(9300);
+      expect(r.crossTotal).toBe(24600);
     });
 
-    it("crossIndisponivel true quando o Bitrix falhou e o override cobre só R", () => {
+    it("erro na apuração marca vendasIndisponivel (cobre venda nova e cross sell juntos)", () => {
       const r = derivarMetricas({
         ...ENTRADA_BASE,
-        breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
-        crossOverride: { r: 50000, p: null },
+        vendas: { novoMrr: 0, novoPontual: 0, crossMrr: 0, crossPontual: 0, erro: true },
       });
-      expect(r.crossIndisponivel).toBe(true);
-    });
-
-    it("crossIndisponivel true quando o Bitrix falhou e o override cobre só P", () => {
-      const r = derivarMetricas({
-        ...ENTRADA_BASE,
-        breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
-        crossOverride: { r: null, p: 20000 },
-      });
-      expect(r.crossIndisponivel).toBe(true);
-    });
-
-    it("crossIndisponivel continua true quando o Bitrix falhou e não há override nenhum (comportamento atual preservado)", () => {
-      const r = derivarMetricas({
-        ...ENTRADA_BASE,
-        breakdown: { ...ENTRADA_BASE.breakdown, erro: true },
-      });
-      expect(r.crossIndisponivel).toBe(true);
+      expect(r.vendasIndisponivel).toBe(true);
     });
   });
 });
@@ -581,8 +462,7 @@ describe("calcularMetricasResumo — guard rail de MRR inválido", () => {
     // getEstoquePontualInicioMes, e getCarteiraMrr quando não sobrescrito
     // com mockResolvedValueOnce) — equivalente a "mês real sem nenhum dado".
     mockExecute.mockResolvedValue({ rows: [{}] });
-    mockGetVendasNovasBreakdown.mockResolvedValue({ mrr: 0, pontual: 0 });
-    mockGetVendasMrrBreakdown.mockResolvedValue({ total: 0, novo: 0, crosssell: 0, crosssell_pontual: 0 });
+    mockVendasPorChannel.mockResolvedValue({ novoMrr: 0, novoPontual: 0, crossMrr: 0, crossPontual: 0 });
     // vi.clearAllMocks() limpa as chamadas, não as implementações: sem este
     // default, um teste novo herdaria em silêncio o valor deixado pelo anterior.
     mockGetMrrInicioMes.mockResolvedValue(0);
@@ -608,56 +488,88 @@ describe("calcularMetricasResumo — guard rail de MRR inválido", () => {
   });
 });
 
-// Leitura do override de Cross Sell (I/O, dentro de calcularMetricasResumo).
-// Ordem das chamadas de db.execute em calcularMetricasResumo: 1) getCarteiraMrr,
-// 2) getChurnMes, 3) getChurnPontualMes, 4) getEntregaPontualMes,
-// 5) getEstoquePontualInicioMes, 6) leitura do override de Cross Sell (última
-// do Promise.all). getMrrInicioMes/getVendasNovasBreakdown/getVendasMrrBreakdown
-// não usam db.execute — são mockadas via metricsAdapter.
-describe("calcularMetricasResumo — override de Cross Sell (leitura por mês)", () => {
+describe("calcularMetricasResumo — month window with timezone handling", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default mock setup for vendasPorChannel to succeed
+    mockVendasPorChannel.mockResolvedValue({ novoMrr: 1000, novoPontual: 2000, crossMrr: 100, crossPontual: 200 });
+    // Default mock for other queries
     mockExecute.mockResolvedValue({ rows: [{}] });
-    mockGetVendasNovasBreakdown.mockResolvedValue({ mrr: 0, pontual: 0 });
-    // crosssell/crosssell_pontual do Bitrix — bem distintos de qualquer valor
-    // de override usado abaixo, para que uma troca indevida falhe o teste.
-    mockGetVendasMrrBreakdown.mockResolvedValue({ total: 0, novo: 0, crosssell: 5997, crosssell_pontual: 10300 });
     mockGetMrrInicioMes.mockResolvedValue(1000000);
-    // 1ª chamada de db.execute é sempre getCarteiraMrr — mrrAtivo > 0 pro guard rail não abortar
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  it("virada de mês com defasagem de fuso: 2026-08-01T02:30:00Z (= 31/jul 23:30 SP)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2026-08-01T02:30:00Z"));
+
+    // Mock carteira para passar no guard rail (mrrAtivo > 0)
     mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
-  });
 
-  it("a query do override filtra por mês corrente via TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM'), não por mês fixo", async () => {
     await calcularMetricasResumo();
-    const call = mockExecute.mock.calls[5][0] as any; // 6ª chamada = override
-    const texto = call.queryChunks
-      .map((c: any) => (typeof c === "string" ? c : c.value.join("")))
-      .join("");
-    expect(texto).toContain("metric_actual_overrides_monthly");
-    expect(texto).toContain("TO_CHAR(NOW() AT TIME ZONE 'America/Sao_Paulo', 'YYYY-MM')");
-    expect(call.queryChunks).toContain("resumo_lideres_cross_r");
-    expect(call.queryChunks).toContain("resumo_lideres_cross_p");
+
+    // Esperado: agosto não começou em SP, é ainda julho 31º, então a janela é de julho
+    expect(mockVendasPorChannel).toHaveBeenCalledWith(
+      expect.anything(),
+      "2026-07-01",
+      "2026-07-31",
+    );
   });
 
-  it("sem linha retornada pela query (ex.: só existe override de um mês diferente do atual, filtrado fora pelo WHERE month=...) — usa o valor do Bitrix", async () => {
-    // mockExecute default (rows:[{}]) já cobre a 6ª chamada: simula a query
-    // real não achando nenhuma linha para o mês corrente.
-    const m = await calcularMetricasResumo();
-    expect(m.crossR).toBe(5997); // Bitrix, sem override aplicado
-    expect(m.crossP).toBe(10300); // Bitrix, sem override aplicado
+  it("dia comum em SP (mid-month, UTC e SP compartilham a data)", async () => {
+    vi.useFakeTimers();
+    // 2026-07-15 12:00 UTC = 09:00 em São Paulo (mesmo dia)
+    vi.setSystemTime(new Date("2026-07-15T12:00:00Z"));
+
+    // Mock carteira
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+
+    await calcularMetricasResumo();
+
+    // Janela: de 1º a 15º de julho
+    expect(mockVendasPorChannel).toHaveBeenCalledWith(
+      expect.anything(),
+      "2026-07-01",
+      "2026-07-15",
+    );
   });
 
-  it("com linha de override do mês corrente para R: aplica no crossR e mantém crossP do Bitrix", async () => {
-    mockExecute.mockResolvedValueOnce({ rows: [{}] }); // getChurnMes
-    mockExecute.mockResolvedValueOnce({ rows: [{}] }); // getChurnPontualMes
-    mockExecute.mockResolvedValueOnce({ rows: [{}] }); // getEntregaPontualMes
-    mockExecute.mockResolvedValueOnce({ rows: [{}] }); // getEstoquePontualInicioMes
-    mockExecute.mockResolvedValueOnce({
-      rows: [{ metric_key: "resumo_lideres_cross_r", actual_value: "77777" }],
-    }); // override do mês corrente
-    const m = await calcularMetricasResumo();
-    expect(m.crossR).toBe(77777);
-    expect(m.crossP).toBe(10300); // Bitrix, não tinha override de P
+  it("primeiro dia do mês em SP: clock em 1º → inicio === fim (ambos o 1º)", async () => {
+    vi.useFakeTimers();
+    // 2026-08-01 03:00 UTC = 2026-08-01 00:00 em SP (exatamente meia-noite local)
+    vi.setSystemTime(new Date("2026-08-01T03:00:00Z"));
+
+    // Mock carteira
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+
+    await calcularMetricasResumo();
+
+    // Janela: de 1º a 1º de agosto
+    expect(mockVendasPorChannel).toHaveBeenCalledWith(
+      expect.anything(),
+      "2026-08-01",
+      "2026-08-01",
+    );
+  });
+
+  it("virada de ano: 2027-01-01T02:30:00Z (= 2026-12-31 23:30 SP)", async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date("2027-01-01T02:30:00Z"));
+
+    // Mock carteira
+    mockExecute.mockResolvedValueOnce({ rows: [{ ativo: "500000" }] });
+
+    await calcularMetricasResumo();
+
+    // Esperado: ainda é dezembro em SP, não janeiro
+    expect(mockVendasPorChannel).toHaveBeenCalledWith(
+      expect.anything(),
+      "2026-12-01",
+      "2026-12-31",
+    );
   });
 });
 
