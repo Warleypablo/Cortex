@@ -1092,7 +1092,7 @@ import {
 } from "../reportsSemanal/queries";
 
 const SEMANAS_PADRAO = 12;
-const SEMANAS_MAX = 52;
+const SEMANAS_MAX = 26;
 
 export function registerReportsSemanalRoutes(app: Express) {
   app.get("/api/reports/semanal", async (req, res) => {
@@ -1104,30 +1104,32 @@ export function registerReportsSemanalRoutes(app: Express) {
 
       const semanas = gerarSemanas(hojeSP(), quantidade);
 
-      // As semanas são independentes entre si: uma rodada de Promise.all por
-      // semana, e todas as semanas em paralelo.
-      const metricas: SemanaMetricas[] = await Promise.all(
-        semanas.map(async (semana) => {
-          const [vendas, carteira, base, entregaPontual, churnMrr, churnPontual] = await Promise.all([
-            vendasPorChannel(db, semana.inicio, semana.fim),
-            carteiraNoFim(db, semana.fim),
-            baseNaAbertura(db, semana.inicio),
-            entregaPontualNaSemana(db, semana.inicio, semana.fim),
-            churnMrrNaSemana(db, semana.inicio, semana.fim),
-            churnPontualNaSemana(db, semana.inicio, semana.fim),
-          ]);
-          return derivarSemana({
-            semana,
-            vendas,
-            carteira,
-            baseMrr: base.mrr,
-            basePontual: base.pontual,
-            entregaPontual,
-            churnMrr,
-            churnPontual,
-          });
-        }),
-      );
+      // Semanas em SÉRIE, de propósito. As 6 queries de uma semana rodam em
+      // paralelo, mas as semanas não: o pool da aplicação é max: 5
+      // (server/db.ts) e é compartilhado com todos os outros endpoints.
+      // Paralelizar 12 semanas dispararia 72 queries concorrentes e deixaria
+      // o resto do app esperando conexão enquanto esta tela carrega.
+      const metricas: SemanaMetricas[] = [];
+      for (const semana of semanas) {
+        const [vendas, carteira, base, entregaPontual, churnMrr, churnPontual] = await Promise.all([
+          vendasPorChannel(db, semana.inicio, semana.fim),
+          carteiraNoFim(db, semana.fim),
+          baseNaAbertura(db, semana.inicio),
+          entregaPontualNaSemana(db, semana.inicio, semana.fim),
+          churnMrrNaSemana(db, semana.inicio, semana.fim),
+          churnPontualNaSemana(db, semana.inicio, semana.fim),
+        ]);
+        metricas.push(derivarSemana({
+          semana,
+          vendas,
+          carteira,
+          baseMrr: base.mrr,
+          basePontual: base.pontual,
+          entregaPontual,
+          churnMrr,
+          churnPontual,
+        }));
+      }
 
       res.json({ semanas: metricas });
     } catch (e: any) {
