@@ -2,14 +2,17 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "
 import { Skeleton } from "@/components/ui/skeleton";
 import { Badge } from "@/components/ui/badge";
 import { useDetalheSemanal } from "./useRelatorioSemanal";
-import type { CelulaSelecionada, LinhaDrillDeal, LinhaDrillChurn } from "./types";
+import type { CelulaSelecionada, LinhaDrillDeal, LinhaDrillChurn, MetricaChave } from "./types";
 
 const fmtBRL = (v: number) =>
   v.toLocaleString("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 // Qual campo do deal compõe a célula clicada. Sem isso o total do drawer soma
 // recorrente + pontual e nunca bate com uma célula que é só um dos dois.
-const CAMPO_DA_METRICA: Record<string, "recorrente" | "pontual"> = {
+// Partial (não Record<string, ...>): uma chave de MetricaChave sem entrada aqui
+// deve virar `undefined` explícito, não cair em "recorrente" por acaso — um
+// typo numa métrica nova precisa quebrar visivelmente, não silenciosamente.
+const CAMPO_DA_METRICA: Partial<Record<MetricaChave, "recorrente" | "pontual">> = {
   mrrAdicionado: "recorrente",
   pontualVendido: "pontual",
   crossMrr: "recorrente",

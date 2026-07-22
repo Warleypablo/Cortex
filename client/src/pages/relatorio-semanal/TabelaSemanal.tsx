@@ -54,6 +54,7 @@ export const SECOES: Secao[] = [
       { chave: "churnPontualTotal", rotulo: "Churn Pontual Total", drill: true, melhor: "down" },
       { chave: "churnPontualTotalPct", rotulo: "% do estoque", percentual: true, indentada: true, melhor: "down" },
       { chave: "churnPontualAjustado", rotulo: "Churn Pontual Ajustado", drill: true, melhor: "down" },
+      { chave: "churnPontualAjustadoPct", rotulo: "% do estoque", percentual: true, indentada: true, melhor: "down" },
     ],
   },
   {
@@ -70,6 +71,7 @@ export const SECOES: Secao[] = [
       { chave: "netChurnAjustado", rotulo: "Net Churn Ajustado", melhor: "down" },
       { chave: "netChurnAjustadoPct", rotulo: "% da base", percentual: true, indentada: true, melhor: "down" },
       { chave: "netChurnBruto", rotulo: "Net Churn Bruto", melhor: "down" },
+      { chave: "netChurnBrutoPct", rotulo: "% da base", percentual: true, indentada: true, melhor: "down" },
     ],
   },
 ];
@@ -78,13 +80,22 @@ export const SECOES: Secao[] = [
  * Δ da última semana FECHADA contra a anterior. A semana em curso fica de fora:
  * comparar uma semana pela metade com uma inteira produz sempre uma queda
  * fantasma na segunda-feira.
+ *
+ * Linhas de moeda usam variação RELATIVA (%), como sempre. Linhas percentuais
+ * (`percentual: true`) usam diferença em PONTOS PERCENTUAIS (atual − anterior,
+ * sem divisão): churn indo de 2% para 3% é "+1,0 p.p.", não "+50%" — que um
+ * leitor lê como o churn tendo subido pela metade. Por não haver divisão, essa
+ * conta continua definida com `anterior = 0`; o guard `anterior === 0 → null`
+ * existe só para não dividir por zero nas linhas de moeda e não se aplica aqui.
  */
-function calcularDelta(semanas: SemanaMetricas[], chave: MetricaChave): number | null {
+function calcularDelta(semanas: SemanaMetricas[], linha: Linha): number | null {
   const fechadas = semanas.filter((s) => !s.parcial);
   if (fechadas.length < 2) return null;
-  const atual = fechadas[fechadas.length - 1][chave];
-  const anterior = fechadas[fechadas.length - 2][chave];
-  if (typeof atual !== "number" || typeof anterior !== "number" || anterior === 0) return null;
+  const atual = fechadas[fechadas.length - 1][linha.chave];
+  const anterior = fechadas[fechadas.length - 2][linha.chave];
+  if (typeof atual !== "number" || typeof anterior !== "number") return null;
+  if (linha.percentual) return atual - anterior;
+  if (anterior === 0) return null;
   return ((atual - anterior) / Math.abs(anterior)) * 100;
 }
 
@@ -144,7 +155,7 @@ export function TabelaSemanal({
                 </td>
               </tr>
               {secao.linhas.map((linha) => {
-                const delta = calcularDelta(semanas, linha.chave);
+                const delta = calcularDelta(semanas, linha);
                 return (
                   <tr
                     key={linha.chave}
@@ -189,6 +200,8 @@ export function TabelaSemanal({
                     <td className={`px-3 py-2 text-right tabular-nums whitespace-nowrap font-medium ${corDelta(delta, linha.melhor)}`}>
                       {delta == null
                         ? "—"
+                        : linha.percentual
+                        ? `${delta > 0 ? "+" : ""}${delta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} p.p.`
                         : `${delta > 0 ? "+" : ""}${delta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
                     </td>
                   </tr>
