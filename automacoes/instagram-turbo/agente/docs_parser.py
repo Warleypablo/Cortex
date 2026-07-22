@@ -68,6 +68,40 @@ def _normalize(s: str) -> str:
     return s
 
 
+def _strip_header_annotation(content: str) -> str:
+    """
+    Remove a anotação de TIPO que o copywriter cola no fim do header com '>':
+
+        "QUER SER UMA DE NOSSAS CREATORS? > aquisição de creators"
+                                          └── anotação (só p/ o time)
+
+    Sem tirar, a parte minúscula ("aquisição de creators") derrubava a razão
+    "≥85% maiúsculas" e o header nem era reconhecido (a LEGENDA sumia). Só corta
+    quando o que vem DEPOIS do '>' começa em MINÚSCULA — assim preserva o '>'
+    legítimo de título ("IMPREVISTOS > TRANSFERÊNCIA DE INGRESSO", maiúsculo dos
+    dois lados, é o NOME real do card).
+    """
+    m = re.match(r"^(.*?)\s*>\s*(\S.*)$", content)
+    if m and m.group(2)[:1].islower():
+        return m.group(1).strip()
+    return content
+
+
+def _is_label_line(raw: str) -> bool:
+    """
+    Linha de RÓTULO de metadados DENTRO de um post — não é título de post:
+
+        **Copy: **DESEJOS DE QUEM TRABALHA...   **Post-it: **Ingresso...
+        **CONTEÚDO - **  BK, Petlove...         **HEADLINE - ** A marca...
+
+    Padrão: `**` + rótulo curto + separador (':' ou ' - ') + `**` fechando, e o
+    conteúdo vem FORA do bold. Sem barrar, o texto MAIÚSCULO depois do rótulo
+    (ex.: "**Copy: **DESEJOS...") fazia a linha ser detectada como header e
+    roubava a LEGENDA da seção real (card "5 desejos" ficou sem legenda).
+    """
+    return bool(re.match(r"^\*\*[^*\n]{1,40}?(?::|\s-\s)\s*\*\*", raw))
+
+
 def _is_post_header(line: str) -> bool:
     """
     Linha candidata a header de post:
@@ -86,7 +120,9 @@ def _is_post_header(line: str) -> bool:
         return False
     if not raw.startswith("**"):
         return False
-    content = _strip_bold(raw)
+    if _is_label_line(raw):
+        return False
+    content = _strip_header_annotation(_strip_bold(raw))
     if not content:
         return False
     # tem que ter ao menos algumas letras maiúsculas e ser ≥85% upper
@@ -172,6 +208,21 @@ def _join_orphan_bold_markers(lines: list[str]) -> list[str]:
     return out
 
 
+def _next_nonblank_is_subheader(lines: list[str], i: int) -> bool:
+    """A PRÓXIMA linha não-vazia depois de `i` é um subheader interno (**IMG 1**...)?
+
+    Sinal de que um bold-UPPER mid-slides ABRE um post novo (segue com a estrutura
+    de slides dele) em vez de ser placeholder de métrica. Só a 1ª não-vazia: um
+    placeholder (**LTV**) pode ter um **IMG** algumas linhas depois, mas nunca como
+    a PRÓXIMA — ele é seguido de outro placeholder/prosa.
+    """
+    for j in range(i + 1, len(lines)):
+        if not lines[j].strip():
+            continue
+        return _is_internal_subheader(lines[j])
+    return False
+
+
 @dataclass
 class ParsedSection:
     header: str          # como aparece no doc (UPPER)
@@ -213,8 +264,16 @@ def parse_doc(content: str) -> list[ParsedSection]:
             saw_internal = True
             continue
         if _is_post_header(line):
-            if header_indices and saw_internal and not saw_marker:
-                continue  # bold no meio dos slides de um post ainda aberto
+            if (header_indices and saw_internal and not saw_marker
+                    and not _next_nonblank_is_subheader(lines, i)):
+                # bold no meio dos slides de um post ainda aberto (placeholder
+                # tipo **XPTO**/**LTV**) → demote. EXCEÇÃO: se a próxima linha
+                # não-vazia é um subheader interno (**IMG 1**), este bold ABRE um
+                # post novo (o post anterior não tinha **LEGENDA** — ex.: uma
+                # edição de Turbo News engolia o "POST COLLAB COFFEEMUSIC" logo
+                # abaixo). Placeholder é seguido de outro placeholder/prosa, nunca
+                # de um IMG 1 — por isso o teste do XPTO segue passando.
+                continue
             header_indices.append(i)
             saw_internal = False
             saw_marker = False
@@ -230,7 +289,7 @@ def parse_doc(content: str) -> list[ParsedSection]:
 
     for idx, hdr_line in enumerate(header_indices):
         next_hdr = header_indices[idx + 1] if idx + 1 < len(header_indices) else len(lines)
-        header_raw = _strip_bold(lines[hdr_line].strip())
+        header_raw = _strip_header_annotation(_strip_bold(lines[hdr_line].strip()))
         body_lines = lines[hdr_line + 1 : next_hdr]
         body = "\n".join(body_lines)
 

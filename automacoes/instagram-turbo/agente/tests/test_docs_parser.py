@@ -175,6 +175,9 @@ def run():
     print("\n=== header com ** quebrado em 2 linhas (bug 5) ===")
     test_header_bold_quebrado_em_duas_linhas()
 
+    print("\n=== anotação '>' / rótulo Copy: / seção engolida (bugs 6-8) ===")
+    test_header_anotacao_rotulo_e_secao_engolida()
+
     print("\n🎉 Todos os testes passaram.")
 
 
@@ -251,6 +254,57 @@ def test_header_bold_quebrado_em_duas_linhas():
     _assert("EU QUERO" in leg, "CTA da legenda preservado")
     _assert("http" not in leg, "sem URL vazando na legenda")
     _assert("Faltam 7 dias" not in leg, "não invadiu a legenda do header seguinte (7 DIAS)")
+
+
+def test_header_anotacao_rotulo_e_secao_engolida():
+    # 3 modos de falha do parser (22/jul/2026), todos "seção real fica sem a
+    # LEGENDA → agente não publica" (posts das 11h30 e 12h perderam o slot):
+
+    # (bug 6) HEADER COM ANOTAÇÃO MINÚSCULA '>': o copywriter cola o tipo do post
+    # no fim ("...CREATORS? > aquisição de creators"). A parte minúscula derrubava
+    # a razão ≥85% maiúsculas e o header nem era reconhecido.
+    doc_anot = (
+        "**QUER SER UMA DE NOSSAS CREATORS? > aquisição de creators**\n"
+        "**IMG 1**\nQuer ser uma de nossas Creators?\n"
+        "**LEGENDA**\nSer creator vai muito além de gravar vídeos. #turbopartners\n"
+        "**5 DICAS QUE TODO CRIADOR PRECISA SABER > educacional**\n"
+    )
+    leg, hdr = find_legenda_for_task(doc_anot, "Quer ser uma de nossas creators?")
+    _assert(hdr == "QUER SER UMA DE NOSSAS CREATORS?", f"header sem a anotação '>' (veio {hdr!r})")
+    _assert("Ser creator vai muito além" in leg, "legenda achada apesar da anotação minúscula")
+
+    # CONTROLE: '>' com MAIÚSCULA dos dois lados é NOME real do card, não anotação
+    # — não pode cortar.
+    doc_ctrl = "**IMPREVISTOS > TRANSFERÊNCIA DE INGRESSO**\n**LEGENDA**\nAtenção ao prazo. #turbo\n**FIM**\n"
+    _, hdr_c = find_legenda_for_task(doc_ctrl, "IMPREVISTOS > TRANSFERÊNCIA DE INGRESSO")
+    _assert(hdr_c == "IMPREVISTOS > TRANSFERÊNCIA DE INGRESSO", "'>' maiúsculo preservado (nome do card)")
+
+    # (bug 7) LINHA DE RÓTULO '**Copy: **TEXTO': o rótulo em negrito seguido de
+    # texto maiúsculo virava header e cortava a seção antes do **LEGENDA**.
+    doc_rotulo = (
+        "**5 DESEJOS DE QUEM TRABALHA NO DIGITAL**\n"
+        "**Copy: **DESEJOS DE QUEM TRABALHA NO DIGITAL\n"
+        "**Post-it: **Ingresso p/ Creator Summit ES\n"
+        "**LEGENDA**\nA lista de desejos resumida nesse vídeo. #creatorsummites\n**PRÓXIMO**\n"
+    )
+    leg2, hdr2 = find_legenda_for_task(doc_rotulo, "5 desejos de quem trabalha no digital")
+    _assert(hdr2 == "5 DESEJOS DE QUEM TRABALHA NO DIGITAL", "rótulo Copy: não roubou o header")
+    _assert("A lista de desejos" in leg2, "legenda achada apesar do rótulo **Copy:**")
+
+    # (bug 8) SEÇÃO ENGOLIDA: um post real ("POST COLLAB COFFEEMUSIC") vinha logo
+    # depois de uma edição de Turbo News SEM **LEGENDA** própria → a regra de
+    # demoção o tratava como placeholder de slide e engolia a seção. Sinal de que
+    # ABRE post novo: a próxima linha não-vazia é um subheader interno (**IMG 1**).
+    doc_engolida = (
+        "**TURBO NEWS - 14/07**\n**IMG 1**\nNotícia um.\n**IMG 6 - PARA REFLETIR**\n"
+        "Reflexão sem legenda.\n"
+        "**POST COLLAB COFFEEMUSIC**\n**IMG 1**\nNem todo tesouro está enterrado.\n"
+        "**LEGENDA**\nAqui, nenhuma experiência termina na linha de chegada! #coffeemusicand\n"
+        "**AUTOMAÇÃO META**\n"
+    )
+    leg3, hdr3 = find_legenda_for_task(doc_engolida, "Post Collab Coffeemusic")
+    _assert(hdr3 == "POST COLLAB COFFEEMUSIC", f"post real não foi engolido pela News (veio {hdr3!r})")
+    _assert("nenhuma experiência termina" in leg3, "legenda do Coffeemusic veio certa")
 
 
 def test_header_curto_meio_nao_sequestra():
