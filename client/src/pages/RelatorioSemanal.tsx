@@ -1,11 +1,15 @@
+import { useState } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Skeleton } from "@/components/ui/skeleton";
 import { CalendarRange, AlertTriangle } from "lucide-react";
 import { useReporteSemanal } from "./relatorio-semanal/useRelatorioSemanal";
 import { TabelaSemanal } from "./relatorio-semanal/TabelaSemanal";
+import { DrawerDetalhe } from "./relatorio-semanal/DrawerDetalhe";
+import type { CelulaSelecionada } from "./relatorio-semanal/types";
 
 export default function RelatorioSemanal() {
   usePageTitle("Reporte Semanal");
+  const [celula, setCelula] = useState<CelulaSelecionada | null>(null);
   const { data, isLoading, isError, error } = useReporteSemanal(12);
 
   const semanas = data?.semanas ?? [];
@@ -43,7 +47,7 @@ export default function RelatorioSemanal() {
           Falha ao carregar o reporte: {(error as Error)?.message}
         </p>
       ) : (
-        <TabelaSemanal semanas={semanas} />
+        <TabelaSemanal semanas={semanas} onCelula={setCelula} />
       )}
 
       <div className="space-y-1 text-xs text-gray-500 dark:text-zinc-500">
@@ -64,6 +68,7 @@ export default function RelatorioSemanal() {
         </p>
       </div>
 
+      <DrawerDetalhe celula={celula} onClose={() => setCelula(null)} />
     </div>
   );
 }
