@@ -125,11 +125,27 @@ def verify_token() -> IgAccount:
 
 # ── Container creation ─────────────────────────────────────────────────────
 
+# WORD JOINER (U+2060): invisível, largura zero. O Instagram COLAPSA linhas em
+# branco (\n\n) das legendas na EXIBIÇÃO — os parágrafos saem grudados, mesmo o
+# caption tendo as quebras (confirmado via API: as \n\n estão lá, o IG que achata).
+# Prepender um WORD JOINER a cada \n deixa toda linha (inclusive as em branco) com
+# um caractere não-branco, e aí o IG preserva TODAS as quebras. Padrão confirmado
+# num post manual da Turbo (17/jul) que exibe certo: "...2026?⁠\n⁠\n...".
+_IG_LINE_BREAK_GUARD = "\u2060"
+
+
+def _ig_safe_caption(caption: str) -> str:
+    """Protege as quebras de linha da legenda contra o colapso do IG (ver nota acima)."""
+    if not caption:
+        return caption
+    return caption.replace("\n", _IG_LINE_BREAK_GUARD + "\n")
+
+
 def _create_image_container(image_url: str, caption: str,
                             is_carousel_item: bool = False) -> str:
     params: dict = {"image_url": image_url}
     if caption:
-        params["caption"] = caption
+        params["caption"] = _ig_safe_caption(caption)
     if is_carousel_item:
         params["is_carousel_item"] = "true"
     r = _graph("POST", f"/{CONFIG.ig_business_account_id}/media", params)
@@ -145,7 +161,7 @@ def _create_video_container(video_url: str, caption: str, media_type: str,
     """
     params: dict = {"video_url": video_url, "media_type": media_type}
     if caption:
-        params["caption"] = caption
+        params["caption"] = _ig_safe_caption(caption)
     if is_carousel_item:
         params["is_carousel_item"] = "true"
     r = _graph("POST", f"/{CONFIG.ig_business_account_id}/media", params)
@@ -158,7 +174,7 @@ def _create_carousel_container(children_ids: list[str], caption: str) -> str:
         "children": ",".join(children_ids),
     }
     if caption:
-        params["caption"] = caption
+        params["caption"] = _ig_safe_caption(caption)
     r = _graph("POST", f"/{CONFIG.ig_business_account_id}/media", params)
     return r["id"]
 
