@@ -1241,7 +1241,7 @@ EOF
 
 **Interfaces:**
 - Consumes: `GET /api/reports/semanal` (Task 5).
-- Produces: `SemanaMetricas` (espelho do tipo do server), `useReporteSemanal(semanas?: number)`, `<TabelaSemanal semanas={...} onCelula={...} />`, `LINHAS` e `MetricaChave`.
+- Produces: `SemanaMetricas` (espelho do tipo do server), `useReporteSemanal(semanas?: number)`, `<TabelaSemanal semanas={...} onCelula={...} />`, `SECOES` e `MetricaChave`.
 
 - [ ] **Step 1: Reescrever os tipos**
 
