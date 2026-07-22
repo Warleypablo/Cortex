@@ -14,7 +14,6 @@ export interface MovimentoQueries {
   mrrInicioPorMes: Record<number, number>;
 }
 
-
 // Deals de expansão do mês, para o drawer das células de cross-sell. MESMO filtro da série
 // mensal acima — se um mudar, mudar o outro, senão o drawer deixa de somar a célula.
 export async function crosssellDealsDoMes(
