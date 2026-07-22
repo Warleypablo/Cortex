@@ -1005,17 +1005,17 @@ export async function detalheEntregaPontual(db: any, inicio: string, fim: string
       SELECT MAX(data_snapshot) AS d FROM "Clickup".cup_data_hist WHERE data_snapshot < ${inicio}::date
     ),
     entregue_fim AS (
-      SELECT h.id_subtask, h.valorp
+      SELECT h.id_subtask, h.id_task, h.valorp
       FROM "Clickup".cup_data_hist h, snap_fim
       WHERE h.data_snapshot = snap_fim.d AND h.status = 'entregue' AND h.valorp > 0
     )
     SELECT
-      COALESCE(NULLIF(TRIM(ct.nome), ''), 'Sem nome') AS cliente,
+      COALESCE(NULLIF(TRIM(cl.nome), ''), 'Sem nome') AS cliente,
       COALESCE(e.valorp, 0) AS valor
     FROM entregue_fim e
     LEFT JOIN "Clickup".cup_data_hist i
       ON i.id_subtask = e.id_subtask AND i.data_snapshot = (SELECT d FROM snap_ini)
-    LEFT JOIN "Clickup".cup_contratos ct ON ct.id_subtask = e.id_subtask
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = e.id_task
     WHERE i.status IS DISTINCT FROM 'entregue'
     ORDER BY e.valorp DESC NULLS LAST
   `);
