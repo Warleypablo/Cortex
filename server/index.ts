@@ -923,10 +923,21 @@ app.use((req, res, next) => {
         console.error("[crm-instagram-hiker] erro:", e.message);
       }
     };
-    setTimeout(() => runCrmIgHikerJob(), 7 * 60 * 1000); // 7min após boot
-    setInterval(() => runCrmIgHikerJob(), 24 * 60 * 60 * 1000); // 1x/dia
+    // Agenda 1×/dia em HORÁRIO FIXO e NÃO roda no boot — cada deploy/restart do Render
+    // apenas re-agenda pro próximo horário, sem disparar rodada extra (evita consumir
+    // requests da HikerAPI à toa). Hora local do servidor, configurável (default 8h).
+    const HIKER_RUN_HOUR = Number(process.env.HIKERAPI_RUN_HOUR) || 8;
+    const scheduleNextHikerRun = () => {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(HIKER_RUN_HOUR, 0, 0, 0);
+      if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1); // hoje já passou → amanhã
+      setTimeout(() => { runCrmIgHikerJob().finally(scheduleNextHikerRun); }, next.getTime() - now.getTime());
+      console.log(`[crm-instagram-hiker] Próxima rodada agendada para ${next.toISOString()}`);
+    };
+    scheduleNextHikerRun();
     console.log(
-      `[crm-instagram-hiker] Scheduled daily (likes${process.env.HIKERAPI_FOLLOWERS_ENABLED === "true" ? " + followers" : ""})`,
+      `[crm-instagram-hiker] Scheduled once/day @${HIKER_RUN_HOUR}h (likes${process.env.HIKERAPI_FOLLOWERS_ENABLED === "true" ? " + followers" : ""})`,
     );
   }
 
