@@ -908,24 +908,9 @@ app.use((req, res, next) => {
   setInterval(() => runCrmIgGhlIngestJob(), GHL_SYNC_INTERVAL);
   console.log(`[crm-instagram-ghl-ingest] Scheduled every ${GHL_SYNC_INTERVAL / 60000} min`);
 
-  // CRM Instagram — ingestão de curtidas via Apify (1x/dia). No-op sem APIFY_TOKEN.
-  if (process.env.APIFY_TOKEN && process.env.APIFY_POST_LIKERS_ACTOR_ID) {
-    const runCrmIgApifyLikesJob = async () => {
-      try {
-        const { ingestApifyPostLikers } = await import("./services/crmInstagramApifyIngest");
-        await ingestApifyPostLikers();
-      } catch (e: any) {
-        console.error("[crm-instagram-apify] erro:", e.message);
-      }
-    };
-    setTimeout(() => runCrmIgApifyLikesJob(), 6 * 60 * 1000); // 6min após boot
-    setInterval(() => runCrmIgApifyLikesJob(), 24 * 60 * 60 * 1000); // 1x/dia
-    console.log("[crm-instagram-apify] Scheduled daily (likes scraper)");
-  }
-
-  // CRM Instagram — ingestão via HikerAPI (curtidas + seguidores). ~280× mais barato
-  // que o Apify. No-op sem HIKERAPI_TOKEN. Seguidores extra-gated (LGPD) por
-  // HIKERAPI_FOLLOWERS_ENABLED — ver crmInstagramHikerIngest.ts.
+  // CRM Instagram — ingestão de curtidas + seguidores via HikerAPI (1x/dia). ~280× mais
+  // barato que o Apify (via antiga, removida). No-op sem HIKERAPI_TOKEN. Seguidores
+  // extra-gated (LGPD) por HIKERAPI_FOLLOWERS_ENABLED — ver crmInstagramHikerIngest.ts.
   if (process.env.HIKERAPI_TOKEN) {
     const runCrmIgHikerJob = async () => {
       try {
@@ -938,10 +923,21 @@ app.use((req, res, next) => {
         console.error("[crm-instagram-hiker] erro:", e.message);
       }
     };
-    setTimeout(() => runCrmIgHikerJob(), 7 * 60 * 1000); // 7min após boot (depois do Apify)
-    setInterval(() => runCrmIgHikerJob(), 24 * 60 * 60 * 1000); // 1x/dia
+    // Agenda 1×/dia em HORÁRIO FIXO e NÃO roda no boot — cada deploy/restart do Render
+    // apenas re-agenda pro próximo horário, sem disparar rodada extra (evita consumir
+    // requests da HikerAPI à toa). Hora local do servidor, configurável (default 8h).
+    const HIKER_RUN_HOUR = Number(process.env.HIKERAPI_RUN_HOUR) || 8;
+    const scheduleNextHikerRun = () => {
+      const now = new Date();
+      const next = new Date(now);
+      next.setHours(HIKER_RUN_HOUR, 0, 0, 0);
+      if (next.getTime() <= now.getTime()) next.setDate(next.getDate() + 1); // hoje já passou → amanhã
+      setTimeout(() => { runCrmIgHikerJob().finally(scheduleNextHikerRun); }, next.getTime() - now.getTime());
+      console.log(`[crm-instagram-hiker] Próxima rodada agendada para ${next.toISOString()}`);
+    };
+    scheduleNextHikerRun();
     console.log(
-      `[crm-instagram-hiker] Scheduled daily (likes${process.env.HIKERAPI_FOLLOWERS_ENABLED === "true" ? " + followers" : ""})`,
+      `[crm-instagram-hiker] Scheduled once/day @${HIKER_RUN_HOUR}h (likes${process.env.HIKERAPI_FOLLOWERS_ENABLED === "true" ? " + followers" : ""})`,
     );
   }
 
