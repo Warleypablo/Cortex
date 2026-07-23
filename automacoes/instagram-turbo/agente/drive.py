@@ -371,13 +371,43 @@ def _content_key(name: str) -> str:
     return re.sub(r"\s+", " ", n).strip().upper()
 
 
+def _folder_key_covered_by_card_words(fk_ns: str, card_words: set[str]) -> bool:
+    """A chave sem-espaço da pasta é uma CONCATENAÇÃO de palavras do card (qualquer
+    ordem)?
+
+    Ex.: pasta 'imperiomanucit' = 'imperio'+'manu'+'cit', todas palavras do card
+    'Como Manu Cit está construindo um império'. O slug vem com as palavras coladas
+    E reordenadas, então igualdade/substring/subset não pegam (substring exige
+    sequência contígua; subset compara a chave-blob 'IMPERIOMANUCIT' como 1 token).
+
+    Word-break (DP): fk_ns tem que ser TOTALMENTE segmentável em palavras do card,
+    cada uma com 3+ chars (evita casar por 'um'/'o'/'e' à toa). Deliberadamente
+    estrito — casar a pasta ERRADA publica conteúdo errado (pior que não publicar).
+    """
+    toks = {w for w in card_words if len(w) >= 3}
+    if not toks:
+        return False
+    n = len(fk_ns)
+    reach = [False] * (n + 1)
+    reach[0] = True
+    for i in range(n):
+        if not reach[i]:
+            continue
+        for t in toks:
+            if fk_ns.startswith(t, i):
+                reach[i + len(t)] = True
+    return reach[n]
+
+
 def _matching_folder_names(card_name: str, folder_names: list[str]) -> list[str]:
     """Núcleo PURO: nomes de pasta que casam o card, TODOS empatados no topo.
 
     Casa por `_content_key` com tolerância: igualdade, substring sem-espaço em
-    qualquer direção, ou o conjunto de palavras da pasta contido no do card
+    qualquer direção, o conjunto de palavras da pasta contido no do card
     (as pastas têm um nome abreviado do começo do card: 'TURBO_seucliente'
-    p/ 'Seu cliente...'). Guarda de 5+ chars evita chave curta casar à toa.
+    p/ 'Seu cliente...'), OU a chave-blob da pasta ser uma concatenação de
+    palavras do card em outra ordem ('imperiomanucit' p/ 'Manu Cit... império').
+    Guarda de 5+ chars evita chave curta casar à toa.
     Em múltiplos matches, mantém só os de chave mais longa (mais específica).
 
     Retorna [] se nenhuma casa, [nome] se há um vencedor claro, ou [n1, n2, ...]
@@ -396,7 +426,8 @@ def _matching_folder_names(card_name: str, folder_names: list[str]) -> list[str]
             continue
         if (fk == ck
                 or fk_ns in ck_ns or ck_ns in fk_ns
-                or set(fk.split()) <= set(ck.split())):
+                or set(fk.split()) <= set(ck.split())
+                or _folder_key_covered_by_card_words(fk_ns, set(ck.split()))):
             cand.append((name, len(fk_ns)))
     if not cand:
         return []

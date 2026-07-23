@@ -78,6 +78,21 @@ def run():
     print("\n=== pasta duplicada: desempate por ATIVO (16/jul/2026) ===")
     test_pasta_duplicada_desempata_por_ativo()
 
+    print("\n=== slug com palavras coladas + reordenadas (word-break, 23/jul) ===")
+    # Regressão do card «Como Manu Cit está construindo um império» (post 15h15
+    # não saía): pasta 'TURBO_imperiomanucit' = 'imperio'+'manu'+'cit' — palavras
+    # do card coladas e em outra ordem. Igualdade/substring/subset não pegam
+    # (substring exige contígua; subset vê a chave-blob como 1 token).
+    JUL2 = JULHO + ["TURBO_imperiomanucit"]
+    _assert(_pick_folder_for_card("(Esther) Como Manu Cit está construindo um império ", JUL2)
+            == "TURBO_imperiomanucit", "word-break casa 'Manu Cit... império' → imperiomanucit")
+    # Falso-positivo: card SEM essas palavras não pode cair no imperiomanucit
+    _assert(_pick_folder_for_card("Datas sazonais para você aproveitar no mês de julho", JUL2)
+            == "TURBO_datassazonais", "card de outro tema não é sequestrado pelo imperiomanucit")
+    # Guarda de token curto: palavras <3 chars ('um','o','e') não formam match
+    _assert(_pick_folder_for_card("um e o", ["TURBO_umeo"]) is None,
+            "tokens <3 chars não casam por word-break")
+
     print("\n🎉 Todos os testes do matcher passaram.")
 
 
