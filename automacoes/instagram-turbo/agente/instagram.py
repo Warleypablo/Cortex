@@ -132,13 +132,21 @@ def verify_token() -> IgAccount:
 # um caractere não-branco, e aí o IG preserva TODAS as quebras. Padrão confirmado
 # num post manual da Turbo (17/jul) que exibe certo: "...2026?⁠\n⁠\n...".
 _IG_LINE_BREAK_GUARD = "\u2060"
+_IG_PARA_SEP = _IG_LINE_BREAK_GUARD + "\n" + _IG_LINE_BREAK_GUARD + "\n"
 
 
 def _ig_safe_caption(caption: str) -> str:
-    """Protege as quebras de linha da legenda contra o colapso do IG (ver nota acima)."""
+    """
+    Separa os par\u00e1grafos da legenda com LINHA EM BRANCO GUARDADA \u2014 o formato que o
+    IG exibe certo. Dois motivos: (1) o IG COLAPSA \\n\\n cru na exibi\u00e7\u00e3o; (2) o Doc
+    costuma vir com \\n SIMPLES entre par\u00e1grafos (o time d\u00e1 1 Enter s\u00f3), ent\u00e3o nem
+    linha em branco existe. Cada quebra do Doc vira "<para>WJ\\nWJ\\n<para>" (o WORD
+    JOINER em cada linha, inclusive a em branco, impede o colapso do IG).
+    """
     if not caption:
         return caption
-    return caption.replace("\n", _IG_LINE_BREAK_GUARD + "\n")
+    paras = [p.strip() for p in caption.split("\n") if p.strip()]
+    return _IG_PARA_SEP.join(paras)
 
 
 def _create_image_container(image_url: str, caption: str,
