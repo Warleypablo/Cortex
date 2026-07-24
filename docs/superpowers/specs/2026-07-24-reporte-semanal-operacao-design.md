@@ -175,9 +175,12 @@ abrem: MRR e as linhas por cabeça, que são agregados de carteira e de RH.
 (espelho comentado dos tipos do server, seguindo a convenção de
 `relatorio-semanal/types.ts`). Dark e light em todos.
 
-**Acesso.** Rota nova exige entrada em `auth_users.allowed_routes`. Liberar por
-padrão para quem já tem `/reports/semanal`, via SQL idempotente com
-`array_append` — a API sobrescreve o array inteiro, então não serve para isso.
+**Acesso.** Não precisa de SQL nem de mexer em `auth_users`. O gate real é
+`ROUTE_TO_PERMISSION` em `shared/nav-config.ts`: `hasAccess()` resolve a rota
+para uma *permission key* e libera quem tiver aquela chave. Mapeando
+`/reports/operacao` → `PERMISSION_KEYS.REPORTS.MENSAL` — a mesma chave de
+`/reports/semanal` e `/reports/mensal` — todo mundo que já vê os reportes ganha
+a tela nova no mesmo deploy, e admin passa direto.
 
 ## Testes
 
