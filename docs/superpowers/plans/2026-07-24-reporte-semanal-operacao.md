@@ -1650,7 +1650,8 @@ git commit -m "$(cat <<'EOF'
 feat(reporte-operacao): endpoints de série e de drill
 
 Queries em lotes de 4 e semanas em série: o pool é max 5 e é do app
-inteiro. Líquido não tem drill de propósito — é subtração, não conjunto.
+inteiro. Abonado e Líquido são as duas pernas de uma partição do Total, e
+cada uma abre seu próprio drawer.
 
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 EOF
