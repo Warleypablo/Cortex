@@ -34,6 +34,7 @@
 - `client/src/pages/RelatorioOperacao.tsx` — página
 - `client/src/pages/relatorio-operacao/types.ts` — espelho dos tipos do server
 - `client/src/pages/relatorio-operacao/useRelatorioOperacao.ts` — hooks de fetch
+- `client/src/pages/relatorio-operacao/CelulaDelta.tsx` — célula de Δ (cor por direção), usada pelas três tabelas
 - `client/src/pages/relatorio-operacao/TabelaComparativa.tsx` — blocos MRR / Churn / Pontual / Produtividade
 - `client/src/pages/relatorio-operacao/TabelaChurnMotivo.tsx`
 - `client/src/pages/relatorio-operacao/TabelaEstoqueProduto.tsx`
@@ -817,7 +818,7 @@ Cada uma repete o filtro da query de série correspondente. Se um filtro mudar, 
 **Interfaces:**
 - Consumes: `LinhaDetalhe` de `./queries`
 - Produces:
-  - `detalheChurnAbonado(db: any, inicio: string, fim: string, pontual: boolean): Promise<LinhaDetalhe[]>`
+  - `detalheChurnPorAbono(db: any, inicio: string, fim: string, opcoes: { pontual: boolean; abonados: boolean }): Promise<LinhaDetalhe[]>`
   - `detalheChurnDoMotivo(db: any, inicio: string, fim: string, motivo: string): Promise<LinhaDetalhe[]>`
   - `detalheEstoquePontual(db: any, fim: string, produto: string | null): Promise<LinhaDetalhe[]>`
 
@@ -833,15 +834,25 @@ Acrescentar ao topo do arquivo o import de tipo: `import type { LinhaDetalhe } f
 // ============================================
 
 /**
- * Gêmea da parcela `abonado` de churnMrrNaSemana (pontual = false) e de
- * churnPontualNaSemana (pontual = true).
+ * Gêmea das células de Churn Abonado (`abonados: true`) e Churn Líquido
+ * (`abonados: false`), em MRR (`pontual: false`) ou pontual (`pontual: true`).
+ *
+ * O par de filtros é uma PARTIÇÃO EXAUSTIVA do churn da semana: o que sai de
+ * `abonados: true` mais o que sai de `abonados: false` reproduz Churn Total,
+ * sem sobra e sem repetição. O `COALESCE` é o que garante isso — escrever
+ * `abonar_churn <> 'Sim'` sem ele avaliaria NULL para as linhas não marcadas
+ * (que são a maioria) e elas desapareceriam das DUAS pernas em silêncio.
  */
-export async function detalheChurnAbonado(
+export async function detalheChurnPorAbono(
   db: any,
   inicio: string,
   fim: string,
-  pontual: boolean,
+  opcoes: { pontual: boolean; abonados: boolean },
 ): Promise<LinhaDetalhe[]> {
+  const { pontual, abonados } = opcoes;
+  const filtroAbono = abonados
+    ? sql`COALESCE(ch.abonar_churn, '') = 'Sim'`
+    : sql`COALESCE(ch.abonar_churn, '') <> 'Sim'`;
   const r: any = pontual
     ? await db.execute(sql`
         SELECT
@@ -852,25 +863,25 @@ export async function detalheChurnAbonado(
         JOIN "Clickup".cup_contratos ct ON ct.id_subtask = ch.task_id AND ct.valorp > 0
         WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
           AND ch.data_solicitacao_encerramento <= ${fim}::date
-          AND COALESCE(ch.abonar_churn, '') = 'Sim'
+          AND ${filtroAbono}
         ORDER BY ct.valorp DESC NULLS LAST
       `)
     : await db.execute(sql`
         SELECT
-          COALESCE(NULLIF(TRIM(nome), ''), 'Sem nome') AS cliente,
-          COALESCE(valor_r, 0) AS valor,
-          NULLIF(TRIM(COALESCE(motivo_cancelamento, '')), '') AS motivo
-        FROM "Clickup".cup_churn
-        WHERE data_solicitacao_encerramento >= ${inicio}::date
-          AND data_solicitacao_encerramento <= ${fim}::date
-          AND COALESCE(abonar_churn, '') = 'Sim'
-        ORDER BY valor_r DESC NULLS LAST
+          COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
+          COALESCE(ch.valor_r, 0) AS valor,
+          NULLIF(TRIM(COALESCE(ch.motivo_cancelamento, '')), '') AS motivo
+        FROM "Clickup".cup_churn ch
+        WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
+          AND ch.data_solicitacao_encerramento <= ${fim}::date
+          AND ${filtroAbono}
+        ORDER BY ch.valor_r DESC NULLS LAST
       `);
   return ((r.rows ?? []) as any[]).map((x) => ({
     cliente: String(x.cliente),
     valor: num(x.valor),
     motivo: x.motivo ? String(x.motivo) : null,
-    abonado: true,
+    abonado: abonados,
   }));
 }
 
@@ -965,10 +976,12 @@ Expected: sem saída
 ```bash
 git add server/reportsSemanal/queriesOperacao.ts
 git commit -m "$(cat <<'EOF'
-feat(reporte-operacao): gêmeas de drill para churn abonado, motivo e estoque
+feat(reporte-operacao): gêmeas de drill para abono, motivo e estoque
 
-Cada gêmea repete o filtro da série, incluindo o COALESCE que cria
-'(sem motivo)' e 'Sem produto' — sem isso o drawer dessas linhas viria vazio.
+Abonado e líquido são as duas pernas de uma partição exaustiva; o COALESCE
+no filtro é o que impede as linhas sem marcação de sumirem das duas. Cada
+gêmea repete o filtro da série, incluindo o COALESCE que cria '(sem motivo)'
+e 'Sem produto' — sem isso o drawer dessas linhas viria vazio.
 
 Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
 EOF
@@ -1002,10 +1015,13 @@ const ENTRADA: EntradaOperacao = {
   carteira: { triagemOnboarding: 120000, ativo: 1023674, emCancelamento: 106874 },
   base: { mrr: 1150000, pontual: 1950000 },
   entregaPontual: 142800,
+  // A soma de estoquePorProduto TEM que dar estoquePontual — a fixture respeita
+  // a invariante que o último teste deste bloco verifica.
   estoquePontual: 1903200,
   estoquePorProduto: [
     { produto: "Creators", valor: 1024543, qtd: 140 },
     { produto: "Ecommerce", valor: 340500, qtd: 19 },
+    { produto: "Performance", valor: 321928, qtd: 38 },
     { produto: "Sem produto", valor: 216229, qtd: 19 },
   ],
   churnMrr: { total: 38400, ajustado: 30000, abonado: 6900 },
@@ -1095,6 +1111,7 @@ describe("compararOperacao", () => {
   const anterior = derivarOperacao({
     ...ENTRADA,
     semana: { inicio: "2026-07-06", fim: "2026-07-12", label: "06/07", parcial: false },
+    estoquePontual: 1060750,
     estoquePorProduto: [
       { produto: "Creators", valor: 1000000, qtd: 138 },
       { produto: "Landing Page", valor: 60750, qtd: 11 },
@@ -1119,11 +1136,12 @@ describe("compararOperacao", () => {
     expect(lp).toMatchObject({ atual: 0, anterior: 60750 });
   });
 
-  it("produtos saem ordenados pelo valor atual, desc", () => {
+  it("produtos saem ordenados pelo valor atual, desc; os que só existem no anterior vão para o fim", () => {
     const c = compararOperacao(atual, anterior);
     expect(c.produtos.map((p) => p.chave)).toEqual([
       "Creators",
       "Ecommerce",
+      "Performance",
       "Sem produto",
       "Landing Page",
     ]);
@@ -1422,7 +1440,7 @@ import {
   churnPorMotivoNaSemana,
   headcountOperacao,
   faturavelDoMes,
-  detalheChurnAbonado,
+  detalheChurnPorAbono,
   detalheChurnDoMotivo,
   detalheEstoquePontual,
 } from "../reportsSemanal/queriesOperacao";
@@ -1504,11 +1522,27 @@ export function registerReportsOperacaoRoutes(app: Express) {
         case "churnMrrTotal":
           return res.json({ tipo: "churn", linhas: await detalheChurnMrr(db, inicio, fim, false) });
         case "churnMrrAbonado":
-          return res.json({ tipo: "churn", linhas: await detalheChurnAbonado(db, inicio, fim, false) });
+          return res.json({
+            tipo: "churn",
+            linhas: await detalheChurnPorAbono(db, inicio, fim, { pontual: false, abonados: true }),
+          });
+        case "churnMrrLiquido":
+          return res.json({
+            tipo: "churn",
+            linhas: await detalheChurnPorAbono(db, inicio, fim, { pontual: false, abonados: false }),
+          });
         case "churnPontualTotal":
           return res.json({ tipo: "churn", linhas: await detalheChurnPontual(db, inicio, fim, false) });
         case "churnPontualAbonado":
-          return res.json({ tipo: "churn", linhas: await detalheChurnAbonado(db, inicio, fim, true) });
+          return res.json({
+            tipo: "churn",
+            linhas: await detalheChurnPorAbono(db, inicio, fim, { pontual: true, abonados: true }),
+          });
+        case "churnPontualLiquido":
+          return res.json({
+            tipo: "churn",
+            linhas: await detalheChurnPorAbono(db, inicio, fim, { pontual: true, abonados: false }),
+          });
         case "entregaPontual":
           return res.json({ tipo: "churn", linhas: await detalheEntregaPontual(db, inicio, fim) });
         case "estoquePontual":
@@ -1530,7 +1564,7 @@ export function registerReportsOperacaoRoutes(app: Express) {
 }
 ```
 
-**Nota sobre o líquido:** `churnMrrLiquido` e `churnPontualLiquido` **não** têm drill. O líquido é uma subtração (total − abonado), não um conjunto de linhas: um drawer dele teria que listar "todos menos os abonados", o que a tela já entrega clicando em Total e em Abonado separadamente. A Task 10 não marca essas linhas como clicáveis.
+**Nota sobre reconciliação do drill:** para uma mesma semana e um mesmo lado (MRR ou pontual), o drawer de Abonado e o de Líquido são disjuntos e, somados, reproduzem o drawer de Total. A Task 13 confere isso célula a célula — é o teste real de que o `COALESCE` no filtro de abono está fazendo seu trabalho.
 
 - [ ] **Step 2: Registrar a rota**
 
@@ -1667,8 +1701,10 @@ export type MetricaChave = Extract<
 export type MetricaDrill =
   | "churnMrrTotal"
   | "churnMrrAbonado"
+  | "churnMrrLiquido"
   | "churnPontualTotal"
   | "churnPontualAbonado"
+  | "churnPontualLiquido"
   | "entregaPontual"
   | "estoquePontual"
   | "churnMotivo";
@@ -1765,23 +1801,70 @@ EOF
 ### Task 11: Tabela comparativa e tabelas quebradas
 
 **Files:**
-- Create: `client/src/pages/relatorio-operacao/TabelaComparativa.tsx`, `client/src/pages/relatorio-operacao/TabelaChurnMotivo.tsx`, `client/src/pages/relatorio-operacao/TabelaEstoqueProduto.tsx`
+- Create: `client/src/pages/relatorio-operacao/CelulaDelta.tsx`, `client/src/pages/relatorio-operacao/TabelaComparativa.tsx`, `client/src/pages/relatorio-operacao/TabelaChurnMotivo.tsx`, `client/src/pages/relatorio-operacao/TabelaEstoqueProduto.tsx`
 
 **Interfaces:**
 - Consumes: `Comparativo`, `MetricaChave`, `MetricaDrill`, `CelulaSelecionada` de `./types`; `calcularDelta` de `@shared/delta`
-- Produces: `<TabelaComparativa dados onCelula? />`, `<TabelaChurnMotivo dados onCelula? />`, `<TabelaEstoqueProduto dados onCelula? />`
+- Produces: `<CelulaDelta delta melhor percentual? />`, `classesDelta`, `textoDelta`, `Direcao`; `<TabelaComparativa dados onCelula? />`, `<TabelaChurnMotivo dados onCelula? />`, `<TabelaEstoqueProduto dados onCelula? />`
 
 - [ ] **Step 1: Confirmar o alias de import de `shared/`**
 
 Run: `grep -n '"@shared' tsconfig.json vite.config.ts`
 Expected: um alias `@shared/*` → `shared/*`. Se não existir, usar caminho relativo nos imports abaixo em vez de `@shared/delta`.
 
-- [ ] **Step 2: Escrever a tabela comparativa**
+- [ ] **Step 2: Escrever a célula de Δ compartilhada**
+
+As três tabelas mostram Δ com a mesma regra de cor. Um arquivo só, porque "qual direção conta como melhora" é lógica: repetida em três componentes, ela fica livre para divergir — e Δ com cor invertida numa tabela e não na outra é o tipo de erro que ninguém percebe olhando a tela.
+
+```tsx
+// client/src/pages/relatorio-operacao/CelulaDelta.tsx
+
+/** Direção que conta como melhora. Churn e estoque melhoram caindo. */
+export type Direcao = "up" | "down";
+
+export function classesDelta(delta: number | null, melhor: Direcao | undefined): string {
+  if (delta == null || delta === 0 || !melhor) return "text-gray-400 dark:text-zinc-500";
+  const bom = melhor === "up" ? delta > 0 : delta < 0;
+  return bom ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
+}
+
+export function textoDelta(delta: number | null, percentual = false): string {
+  if (delta == null) return "—";
+  const sinal = delta > 0 ? "+" : "";
+  const n = delta.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+  return percentual ? `${sinal}${n} p.p.` : `${sinal}${n}%`;
+}
+
+export function CelulaDelta({
+  delta,
+  melhor,
+  percentual = false,
+}: {
+  delta: number | null;
+  melhor: Direcao | undefined;
+  /** true quando a linha já é um percentual: o Δ vira p.p. */
+  percentual?: boolean;
+}) {
+  return (
+    <td
+      className={`px-3 py-2 text-right tabular-nums whitespace-nowrap font-medium ${classesDelta(
+        delta,
+        melhor,
+      )}`}
+    >
+      {textoDelta(delta, percentual)}
+    </td>
+  );
+}
+```
+
+- [ ] **Step 3: Escrever a tabela comparativa**
 
 ```tsx
 // client/src/pages/relatorio-operacao/TabelaComparativa.tsx
 import { Fragment } from "react";
 import { calcularDelta } from "@shared/delta";
+import { CelulaDelta, type Direcao } from "./CelulaDelta";
 import type { Comparativo, MetricaChave, MetricaDrill, CelulaSelecionada } from "./types";
 
 const fmtBRL = (v: number) =>
@@ -1798,7 +1881,7 @@ interface Linha {
   /** métrica do drill; sem ela a célula não é clicável */
   drill?: MetricaDrill;
   /** direção que conta como melhora, para a cor do Δ */
-  melhor?: "up" | "down";
+  melhor?: Direcao;
 }
 
 interface Secao {
@@ -1819,7 +1902,7 @@ export const SECOES: Secao[] = [
     linhas: [
       { chave: "churnMrrTotal", rotulo: "Churn Total", drill: "churnMrrTotal", melhor: "down" },
       { chave: "churnMrrAbonado", rotulo: "Churn Abonado", drill: "churnMrrAbonado", melhor: "up" },
-      { chave: "churnMrrLiquido", rotulo: "Churn Líquido", melhor: "down" },
+      { chave: "churnMrrLiquido", rotulo: "Churn Líquido", drill: "churnMrrLiquido", melhor: "down" },
       { chave: "churnMrrLiquidoPct", rotulo: "% da base", formato: "percentual", indentada: true, melhor: "down" },
     ],
   },
@@ -1828,7 +1911,7 @@ export const SECOES: Secao[] = [
     linhas: [
       { chave: "churnPontualTotal", rotulo: "Churn Total", drill: "churnPontualTotal", melhor: "down" },
       { chave: "churnPontualAbonado", rotulo: "Churn Abonado", drill: "churnPontualAbonado", melhor: "up" },
-      { chave: "churnPontualLiquido", rotulo: "Churn Líquido", melhor: "down" },
+      { chave: "churnPontualLiquido", rotulo: "Churn Líquido", drill: "churnPontualLiquido", melhor: "down" },
       { chave: "churnPontualLiquidoPct", rotulo: "% do estoque", formato: "percentual", indentada: true, melhor: "down" },
     ],
   },
@@ -1854,19 +1937,6 @@ function formatar(valor: number | null, formato: Linha["formato"]): string {
   if (formato === "percentual") return fmtPct(valor);
   if (formato === "inteiro") return fmtNum(valor);
   return fmtBRL(valor);
-}
-
-function corDelta(delta: number | null, melhor: "up" | "down" | undefined): string {
-  if (delta == null || delta === 0 || !melhor) return "text-gray-400 dark:text-zinc-500";
-  const bom = melhor === "up" ? delta > 0 : delta < 0;
-  return bom ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400";
-}
-
-function textoDelta(delta: number | null, percentual: boolean): string {
-  if (delta == null) return "—";
-  const sinal = delta > 0 ? "+" : "";
-  const n = delta.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
-  return percentual ? `${sinal}${n} p.p.` : `${sinal}${n}%`;
 }
 
 export function TabelaComparativa({
@@ -1962,14 +2032,7 @@ export function TabelaComparativa({
                     >
                       {formatar(anterior, linha.formato)}
                     </td>
-                    <td
-                      className={`px-3 py-2 text-right tabular-nums whitespace-nowrap font-medium ${corDelta(
-                        delta,
-                        linha.melhor,
-                      )}`}
-                    >
-                      {textoDelta(delta, percentual)}
-                    </td>
+                    <CelulaDelta delta={delta} melhor={linha.melhor} percentual={percentual} />
                   </tr>
                 );
               })}
@@ -1989,6 +2052,7 @@ export function TabelaComparativa({
 ```tsx
 // client/src/pages/relatorio-operacao/TabelaChurnMotivo.tsx
 import { calcularDelta } from "@shared/delta";
+import { CelulaDelta } from "./CelulaDelta";
 import type { Comparativo, CelulaSelecionada } from "./types";
 
 const fmtBRL = (v: number) =>
@@ -2063,19 +2127,8 @@ export function TabelaChurnMotivo({
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500 dark:text-zinc-400">
                   {fmtBRL(m.anterior)}
                 </td>
-                <td
-                  className={`px-3 py-2 text-right tabular-nums font-medium ${
-                    delta == null || delta === 0
-                      ? "text-gray-400 dark:text-zinc-500"
-                      : delta > 0
-                      ? "text-rose-600 dark:text-rose-400"
-                      : "text-emerald-600 dark:text-emerald-400"
-                  }`}
-                >
-                  {delta == null
-                    ? "—"
-                    : `${delta > 0 ? "+" : ""}${delta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
-                </td>
+                {/* churn melhora caindo */}
+                <CelulaDelta delta={delta} melhor="down" />
                 <td className="px-3 py-2 text-right tabular-nums text-gray-900 dark:text-zinc-100">
                   {fmtBRL(m.pontualAtual)}
                 </td>
@@ -2113,6 +2166,7 @@ export function TabelaChurnMotivo({
 ```tsx
 // client/src/pages/relatorio-operacao/TabelaEstoqueProduto.tsx
 import { calcularDelta } from "@shared/delta";
+import { CelulaDelta } from "./CelulaDelta";
 import type { Comparativo, CelulaSelecionada } from "./types";
 
 const fmtBRL = (v: number) =>
@@ -2179,19 +2233,8 @@ export function TabelaEstoqueProduto({
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500 dark:text-zinc-400">
                   {fmtBRL(p.anterior)}
                 </td>
-                <td
-                  className={`px-3 py-2 text-right tabular-nums font-medium ${
-                    delta == null || delta === 0
-                      ? "text-gray-400 dark:text-zinc-500"
-                      : delta > 0
-                      ? "text-rose-600 dark:text-rose-400"
-                      : "text-emerald-600 dark:text-emerald-400"
-                  }`}
-                >
-                  {delta == null
-                    ? "—"
-                    : `${delta > 0 ? "+" : ""}${delta.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`}
-                </td>
+                {/* estoque parado melhora caindo: entregar reduz o estoque */}
+                <CelulaDelta delta={delta} melhor="down" />
               </tr>
             );
           })}
@@ -2586,10 +2629,12 @@ Qualquer diferença aqui é bug de query, não de arredondamento: as três somas
 
 - [ ] **Step 5: Conferir o drill célula a célula**
 
-Abrir o drawer em cada uma das 7 células com drill e verificar que o total do cabeçalho do drawer bate com a célula clicada:
-`Churn Total` (MRR), `Churn Abonado` (MRR), `Churn Total` (Pontual), `Churn Abonado` (Pontual), `Pontual Entregue`, `Estoque Pontual`, e uma linha qualquer da tabela de motivos.
+Abrir o drawer em cada uma das 9 células com drill e verificar que o total do cabeçalho do drawer bate com a célula clicada:
+`Churn Total`, `Churn Abonado` e `Churn Líquido` de MRR; os mesmos três de Pontual; `Pontual Entregue`; `Estoque Pontual`; e uma linha qualquer da tabela de motivos.
 
-O drawer de um motivo soma MRR + pontual do cliente, então bate com a soma das duas colunas daquela linha — não só com a de MRR. Conferir assim.
+Duas conferências extras que só este conjunto permite:
+- **Partição do abono:** contagem de registros de `Churn Abonado` + de `Churn Líquido` = a de `Churn Total`, no mesmo lado (MRR ou pontual). Se faltar registro, o `COALESCE` do filtro de abono não está fazendo seu trabalho e as linhas sem marcação estão sumindo das duas pernas.
+- **Drawer de motivo:** soma MRR + pontual do mesmo cliente, então bate com a soma das duas colunas daquela linha da tabela — não só com a coluna de MRR.
 
 - [ ] **Step 6: Testar a navegação de semanas**
 
