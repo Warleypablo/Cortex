@@ -34,6 +34,14 @@ export interface Base {
 export interface ChurnValores {
   total: number;
   ajustado: number;
+  /**
+   * Parcela relevada pela operação (`abonar_churn = 'Sim'`). NÃO é o mesmo
+   * conjunto que `total - ajustado`: ajustado exclui três motivos operacionais,
+   * abonado depende da marcação caso a caso. Nos 120 dias até 24/07/2026, dos
+   * 78 casos de 'Erro na Venda' só 49 estavam abonados. A tela /reports/operacao
+   * usa `abonado`; o BP 2026 e /reports/semanal usam `ajustado`.
+   */
+  abonado: number;
 }
 
 export interface LinhaDetalhe {
@@ -131,13 +139,14 @@ export async function churnMrrNaSemana(db: any, inicio: string, fim: string): Pr
       COALESCE(SUM(valor_r), 0) AS total,
       COALESCE(SUM(valor_r) FILTER (
         WHERE COALESCE(motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}
-      ), 0) AS ajustado
+      ), 0) AS ajustado,
+      COALESCE(SUM(valor_r) FILTER (WHERE COALESCE(abonar_churn, '') = 'Sim'), 0) AS abonado
     FROM "Clickup".cup_churn
     WHERE data_solicitacao_encerramento >= ${inicio}::date
       AND data_solicitacao_encerramento <= ${fim}::date
   `);
   const row = (r.rows ?? [])[0] as any;
-  return { total: num(row?.total), ajustado: num(row?.ajustado) };
+  return { total: num(row?.total), ajustado: num(row?.ajustado), abonado: num(row?.abonado) };
 }
 
 /** Churn pontual: cup_churn não tem valor_p, ele vem do contrato via id_subtask. */
@@ -147,14 +156,15 @@ export async function churnPontualNaSemana(db: any, inicio: string, fim: string)
       COALESCE(SUM(ct.valorp), 0) AS total,
       COALESCE(SUM(ct.valorp) FILTER (
         WHERE COALESCE(ch.motivo_cancelamento, '') NOT IN ${MOTIVOS_EXCLUIDOS}
-      ), 0) AS ajustado
+      ), 0) AS ajustado,
+      COALESCE(SUM(ct.valorp) FILTER (WHERE COALESCE(ch.abonar_churn, '') = 'Sim'), 0) AS abonado
     FROM "Clickup".cup_churn ch
     JOIN "Clickup".cup_contratos ct ON ct.id_subtask = ch.task_id AND ct.valorp > 0
     WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
       AND ch.data_solicitacao_encerramento <= ${fim}::date
   `);
   const row = (r.rows ?? [])[0] as any;
-  return { total: num(row?.total), ajustado: num(row?.ajustado) };
+  return { total: num(row?.total), ajustado: num(row?.ajustado), abonado: num(row?.abonado) };
 }
 
 // ============================================
