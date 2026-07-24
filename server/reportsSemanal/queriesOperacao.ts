@@ -9,6 +9,7 @@
 import { sql } from "drizzle-orm";
 import { ehOperacao } from "../../shared/headcount-operacao";
 import { computarBpReceitas } from "../routes/bp2026";
+import type { LinhaDetalhe } from "./queries";
 
 export interface LinhaProduto {
   produto: string;
@@ -157,4 +158,142 @@ export async function faturavelDoMes(db: any, fimDaSemana: string): Promise<numb
   const doMes = (linha?.meses ?? []).find((m: any) => m.mes === mes);
   const realizado = doMes?.realizado;
   return typeof realizado === "number" ? realizado : null;
+}
+
+// ============================================
+// Queries GÊMEAS do drill.
+// Cada uma repete o filtro da query de série correspondente. ⚠️ Se um filtro
+// mudar, o par TEM que mudar junto, senão o drawer deixa de somar a célula.
+// ============================================
+
+/**
+ * Gêmea das células de Churn Abonado (`abonados: true`) e Churn Líquido
+ * (`abonados: false`), em MRR (`pontual: false`) ou pontual (`pontual: true`).
+ *
+ * O par de filtros é uma PARTIÇÃO EXAUSTIVA do churn da semana: o que sai de
+ * `abonados: true` mais o que sai de `abonados: false` reproduz Churn Total,
+ * sem sobra e sem repetição. O `COALESCE` é o que garante isso — escrever
+ * `abonar_churn <> 'Sim'` sem ele avaliaria NULL para as linhas não marcadas
+ * (que são a maioria) e elas desapareceriam das DUAS pernas em silêncio.
+ */
+export async function detalheChurnPorAbono(
+  db: any,
+  inicio: string,
+  fim: string,
+  opcoes: { pontual: boolean; abonados: boolean },
+): Promise<LinhaDetalhe[]> {
+  const { pontual, abonados } = opcoes;
+  const filtroAbono = abonados
+    ? sql`COALESCE(ch.abonar_churn, '') = 'Sim'`
+    : sql`COALESCE(ch.abonar_churn, '') <> 'Sim'`;
+  const r: any = pontual
+    ? await db.execute(sql`
+        SELECT
+          COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
+          COALESCE(ct.valorp, 0) AS valor,
+          NULLIF(TRIM(COALESCE(ch.motivo_cancelamento, '')), '') AS motivo
+        FROM "Clickup".cup_churn ch
+        JOIN "Clickup".cup_contratos ct ON ct.id_subtask = ch.task_id AND ct.valorp > 0
+        WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
+          AND ch.data_solicitacao_encerramento <= ${fim}::date
+          AND ${filtroAbono}
+        ORDER BY ct.valorp DESC NULLS LAST
+      `)
+    : await db.execute(sql`
+        SELECT
+          COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
+          COALESCE(ch.valor_r, 0) AS valor,
+          NULLIF(TRIM(COALESCE(ch.motivo_cancelamento, '')), '') AS motivo
+        FROM "Clickup".cup_churn ch
+        WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
+          AND ch.data_solicitacao_encerramento <= ${fim}::date
+          AND ${filtroAbono}
+        ORDER BY ch.valor_r DESC NULLS LAST
+      `);
+  return ((r.rows ?? []) as any[]).map((x) => ({
+    cliente: String(x.cliente),
+    valor: num(x.valor),
+    motivo: x.motivo ? String(x.motivo) : null,
+    abonado: abonados,
+  }));
+}
+
+/**
+ * Gêmea de uma LINHA de churnPorMotivoNaSemana. Traz MRR e pontual do mesmo
+ * cliente na mesma linha — o drawer soma o campo que a célula clicada mostra.
+ * '(sem motivo)' casa com motivo nulo ou vazio, espelhando o COALESCE da série.
+ */
+export async function detalheChurnDoMotivo(
+  db: any,
+  inicio: string,
+  fim: string,
+  motivo: string,
+): Promise<LinhaDetalhe[]> {
+  const filtroMotivo =
+    motivo === "(sem motivo)"
+      ? sql`COALESCE(NULLIF(TRIM(ch.motivo_cancelamento), ''), '') = ''`
+      : sql`TRIM(ch.motivo_cancelamento) = ${motivo}`;
+  const r: any = await db.execute(sql`
+    SELECT
+      COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
+      COALESCE(ch.valor_r, 0) + COALESCE(ct.valorp, 0) AS valor,
+      NULLIF(TRIM(COALESCE(ch.motivo_cancelamento, '')), '') AS motivo,
+      (COALESCE(ch.abonar_churn, '') = 'Sim') AS abonado
+    FROM "Clickup".cup_churn ch
+    LEFT JOIN "Clickup".cup_contratos ct
+      ON ct.id_subtask = ch.task_id AND ct.valorp > 0
+    WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
+      AND ch.data_solicitacao_encerramento <= ${fim}::date
+      AND ${filtroMotivo}
+    ORDER BY 2 DESC NULLS LAST
+  `);
+  return ((r.rows ?? []) as any[]).map((x) => ({
+    cliente: String(x.cliente),
+    valor: num(x.valor),
+    motivo: x.motivo ? String(x.motivo) : null,
+    abonado: x.abonado === true,
+  }));
+}
+
+/**
+ * Gêmea de estoquePontualNoFim (produto = null) e de uma linha de
+ * estoquePontualPorProduto (produto preenchido). 'Sem produto' casa com produto
+ * nulo ou vazio, espelhando o COALESCE da série.
+ */
+export async function detalheEstoquePontual(
+  db: any,
+  fim: string,
+  produto: string | null,
+): Promise<LinhaDetalhe[]> {
+  const filtroProduto =
+    produto === null
+      ? sql`TRUE`
+      : produto === "Sem produto"
+      ? sql`COALESCE(NULLIF(TRIM(h.produto), ''), '') = ''`
+      : sql`TRIM(h.produto) = ${produto}`;
+  const r: any = await db.execute(sql`
+    WITH snap AS (
+      SELECT MAX(data_snapshot) AS d FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${fim}::date
+    )
+    SELECT
+      COALESCE(NULLIF(TRIM(cl.nome), ''), 'Sem nome') AS cliente,
+      COALESCE(h.valorp, 0) AS valor,
+      COALESCE(NULLIF(TRIM(h.produto), ''), 'Sem produto') AS motivo
+    -- CROSS JOIN explícito, não vírgula: 'FROM a, b LEFT JOIN c ON c.x = a.y'
+    -- é erro no Postgres ("invalid reference to FROM-clause entry"), porque o
+    -- LEFT JOIN se liga ao item imediatamente anterior e 'a' fica fora do
+    -- escopo do ON. As queries de série acima podem usar vírgula porque não
+    -- têm JOIN nenhum.
+    FROM "Clickup".cup_data_hist h
+    CROSS JOIN snap
+    LEFT JOIN "Clickup".cup_clientes cl ON cl.task_id = h.id_task
+    WHERE h.data_snapshot = snap.d AND ${FILTRO_ESTOQUE} AND ${filtroProduto}
+    ORDER BY h.valorp DESC NULLS LAST
+  `);
+  return ((r.rows ?? []) as any[]).map((x) => ({
+    cliente: String(x.cliente),
+    valor: num(x.valor),
+    motivo: x.motivo ? String(x.motivo) : null,
+    abonado: false,
+  }));
 }
