@@ -63,6 +63,7 @@ import { registerComercialRoutes } from "./routes/comercial";
 import { registerGestaoReceitaRoutes } from "./routes/gestaoReceita";
 import { registerFechamentoSemanalRoutes } from "./routes/fechamentoSemanal";
 import { registerReportsSemanalRoutes } from "./routes/reportsSemanal";
+import { registerReportsOperacaoRoutes } from "./routes/reportsOperacao";
 import { registerReportsTrimestralRoutes } from "./routes/reportsTrimestral";
 import { registerCrossSellRoutes } from "./routes/crosssell";
 import { registerOKR2026Routes } from "./routes/okr2026";
@@ -8717,6 +8718,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Reporte Semanal - 4 KPIs de desempenho semanal
   registerReportsSemanalRoutes(app);
+
+  // Reporte Operação - comparativo semanal da operação (MRR, churn, estoque)
+  registerReportsOperacaoRoutes(app);
 
   // Reporte Trimestral - variante trimestral do reporte mensal
   registerReportsTrimestralRoutes(app);
