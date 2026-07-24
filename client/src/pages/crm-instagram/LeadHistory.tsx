@@ -9,7 +9,6 @@ export type Interaction = {
   source: string | null;
   occurredAt: string;
   postCaption: string | null;
-  intent?: boolean;
   points: number;
 };
 
@@ -57,11 +56,6 @@ export function HistoryPanel({ id }: { id: number }) {
           <div key={it.id} className="flex items-center gap-2 text-xs">
             <Icon className={`h-3.5 w-3.5 shrink-0 ${isDm ? "text-blue-500" : "text-gray-400"}`} />
             <span className="min-w-0 flex-1 truncate text-gray-700 dark:text-zinc-300">{label}</span>
-            {it.intent && (
-              <span className="shrink-0 rounded bg-purple-100 dark:bg-purple-950/40 px-1 text-[10px] font-semibold text-purple-600 dark:text-purple-300" title="Comentário com intenção de compra">
-                intenção
-              </span>
-            )}
             {it.source && (
               <span className="shrink-0 rounded bg-gray-100 dark:bg-zinc-800 px-1 text-[10px] text-gray-500 dark:text-zinc-400">
                 {it.source === "dm" ? "DM" : "orgânico"}

@@ -27,7 +27,6 @@ type Lead = {
   likeAdCount?: number;
   followCount?: number;
   distinctPosts?: number;
-  intentComments?: number;
   score: number;
 };
 
@@ -43,10 +42,11 @@ const POINT_FIELDS: { key: InteractionType; emoji: string; label: string; captur
   { key: "spontaneous_dm", emoji: "💌", label: "DM espontânea", captured: true },
 ];
 
-// Bônus (não são interações; somam por cima). Capturáveis hoje.
-const BONUS_FIELDS: { key: "recurrenceBonus" | "intentBonus"; emoji: string; label: string; hint: string }[] = [
-  { key: "intentBonus", emoji: "🎯", label: "Comentário com intenção", hint: "comentário com palavra-chave de compra (preço, quero, contato…)" },
-  { key: "recurrenceBonus", emoji: "🔁", label: "Bônus por recorrência", hint: "por post distinto engajado além do 1º" },
+// Bônus (não são interações; somam por cima).
+// Só a curtida grava ig_media_id — DM e follow entram sem post, então na prática
+// a recorrência mede "curtiu N posts diferentes". O hint diz isso explicitamente.
+const BONUS_FIELDS: { key: "recurrenceBonus"; emoji: string; label: string; hint: string }[] = [
+  { key: "recurrenceBonus", emoji: "🔁", label: "Bônus por recorrência", hint: "por post distinto curtido além do 1º (só curtida conta — DM e follow não têm post)" },
 ];
 
 export default function LeadScoring() {
@@ -100,7 +100,6 @@ export default function LeadScoring() {
             follow: l.followCount || 0,
           },
           distinctPosts: l.distinctPosts || 0,
-          intentComments: l.intentComments || 0,
         }, cfg),
       }))
       .sort((a, b) => b.novo - a.novo)
@@ -111,7 +110,7 @@ export default function LeadScoring() {
 
   const setPoint = (k: InteractionType, v: number) =>
     setCfg((c) => ({ ...c, points: { ...c.points, [k]: v } }));
-  const setBonus = (k: "recurrenceBonus" | "intentBonus", v: number) =>
+  const setBonus = (k: "recurrenceBonus", v: number) =>
     setCfg((c) => ({ ...c, [k]: v }));
   const setDecay = (k: "hotDays" | "warmDays", v: number) =>
     setCfg((c) => ({ ...c, [k]: v }));

@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import {
-  temperatureFrom, leadScore, interactionPoints, normalizeScoringConfig, hasPurchaseIntent,
+  temperatureFrom, leadScore, interactionPoints, normalizeScoringConfig,
   DEFAULT_SCORING_CONFIG, type ScoringConfig,
 } from "./crmInstagramScoring";
 
@@ -37,7 +37,7 @@ describe("leadScore (aditivo)", () => {
   it("usa pesos do config customizado", () => {
     const cfg: ScoringConfig = {
       points: { spontaneous_dm: 10, comment: 1, like: 0, like_ad: 5, follow: 2 },
-      recurrenceBonus: 0, intentBonus: 0, hotDays: 7, warmDays: 14,
+      recurrenceBonus: 0, hotDays: 7, warmDays: 14,
     };
     expect(leadScore({ counts: { spontaneous_dm: 2, comment: 5, like: 9, like_ad: 1, follow: 1 } }, cfg)).toBe(20 + 5 + 0 + 5 + 2);
   });
@@ -49,20 +49,6 @@ describe("leadScore (aditivo)", () => {
     expect(leadScore({ counts: { comment: 1 }, distinctPosts: 1 })).toBe(3);
   });
 
-  it("bônus de intenção: por comentário com intenção", () => {
-    // 1 comentário(3) que tem intenção → +3 intenção = 6
-    expect(leadScore({ counts: { comment: 1 }, intentComments: 1 })).toBe(3 + 3);
-  });
-});
-
-describe("hasPurchaseIntent", () => {
-  it("detecta palavras-chave de compra", () => {
-    expect(hasPurchaseIntent("Qual o preço disso?")).toBe(true);
-    expect(hasPurchaseIntent("QUERO comprar agora")).toBe(true);
-    expect(hasPurchaseIntent("me chama no dm")).toBe(true);
-    expect(hasPurchaseIntent("que post lindo")).toBe(false);
-    expect(hasPurchaseIntent(null)).toBe(false);
-  });
 });
 
 describe("interactionPoints", () => {
