@@ -72,8 +72,7 @@ export default function Documentacao() {
         </p>
         <ul className="list-disc pl-5 space-y-1">
           <li>💌 DM espontânea: <strong>+5</strong> · 💬 Comentário: <strong>+3</strong> · ❤️ Curtida: <strong>+1</strong> · 👥 Seguiu: <strong>+1</strong></li>
-          <li>🎯 Bônus por <strong>comentário com intenção</strong> de compra (preço, quero, contato…): <strong>+3</strong></li>
-          <li>🔁 Bônus por <strong>recorrência</strong> (engajou em vários posts): <strong>+2</strong> por post extra</li>
+          <li>🔁 Bônus por <strong>recorrência</strong> (curtiu vários posts distintos): <strong>+2</strong> por post extra</li>
         </ul>
         <p className="mt-2">
           A <strong>temperatura</strong> é separada do número (não pontua): mede há quanto tempo o lead
@@ -212,7 +211,7 @@ export default function Documentacao() {
           <li>Pipeline de DMs (via espelho do GHL) com lead score, temperatura, Pegar/Soltar e trava.</li>
           <li>Histórico de Interações por lead (com pontos por interação).</li>
           <li>Card de detalhe do lead na Qualificação (sempre visível) + busca compacta e filtros (estágio/tag).</li>
-          <li>Tab Lead Scoring (modelo aditivo, sliders, decay, bônus de intenção e recorrência).</li>
+          <li>Tab Lead Scoring (modelo aditivo, sliders, decay, bônus de recorrência).</li>
           <li>Auto-criação no Bitrix (Responsável + SDR) e blocklist de tags.</li>
           <li>Ingestão de <strong>curtidas e seguidores via HikerAPI</strong> — código pronto (cliente + job diário + botões de sync), ~280× mais barato que o Apify; token validado.</li>
         </ul>

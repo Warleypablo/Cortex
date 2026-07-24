@@ -6,14 +6,9 @@ import { bitrixDealAdd, bitrixFindUserIdByEmail } from "../services/bitrixClient
 // Campo customizado "SDR" no Bitrix (tipo employee). Responsável = ASSIGNED_BY_ID.
 const BITRIX_SDR_FIELD = "UF_CRM_1752257983";
 import {
-  temperatureFrom, leadScore, interactionPoints, hasPurchaseIntent, PURCHASE_INTENT_KEYWORDS,
+  temperatureFrom, leadScore, interactionPoints,
   DEFAULT_SCORING_CONFIG, normalizeScoringConfig, type ScoringConfig,
 } from "../../shared/crmInstagramScoring";
-
-// Regex (case-insensitive) das palavras-chave de intenção, p/ filtro no SQL.
-const INTENT_REGEX = PURCHASE_INTENT_KEYWORDS
-  .map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-  .join("|");
 import { BLOCKING_TAGS, isQualificationTag } from "../../shared/crmInstagramTags";
 
 const STAGES = ["engajador", "oportunidade", "negocio"] as const;
@@ -75,7 +70,6 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
                  COUNT(*) FILTER (WHERE type = 'like_ad') AS like_ad_count,
                  COUNT(*) FILTER (WHERE type = 'follow') AS follow_count,
                  COUNT(DISTINCT ig_media_id) AS distinct_posts,
-                 COUNT(*) FILTER (WHERE type = 'comment' AND text ~* ${INTENT_REGEX}) AS intent_count,
                  (ARRAY_AGG(text ORDER BY occurred_at DESC) FILTER (WHERE text IS NOT NULL))[1] AS last_text
           FROM cortex_core.prospecting_interactions
           GROUP BY profile_id
@@ -95,7 +89,6 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
         const likeAdCount = Number(r.like_ad_count) || 0;
         const followCount = Number(r.follow_count) || 0;
         const distinctPosts = Number(r.distinct_posts) || 0;
-        const intentComments = Number(r.intent_count) || 0;
         return {
           id: r.id,
           igUsername: r.ig_username,
@@ -128,13 +121,11 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
           likeAdCount,
           followCount,
           distinctPosts,
-          intentComments,
           lastText: r.last_text,
           temperature: temperatureFrom(r.last_interaction_at, now, cfg.hotDays, cfg.warmDays),
           score: leadScore({
             counts: { spontaneous_dm: dmCount, comment: commentCount, like: likeCount, like_ad: likeAdCount, follow: followCount },
             distinctPosts,
-            intentComments,
           }, cfg),
         };
       });
@@ -170,20 +161,16 @@ export function registerCrmInstagramRoutes(app: Express, db: any, _storage: ISto
       `)).rows;
 
       const cfg = await loadScoringConfig();
-      const interactions = (interactionRows as any[]).map((r) => {
-        const intent = r.type === "comment" && hasPurchaseIntent(r.text);
-        return {
-          id: r.id,
-          type: r.type,
-          igMediaId: r.ig_media_id,
-          text: r.text,
-          source: r.source,
-          occurredAt: r.occurred_at,
-          postCaption: r.post_caption,
-          intent,
-          points: interactionPoints(r.type, cfg) + (intent ? cfg.intentBonus : 0),
-        };
-      });
+      const interactions = (interactionRows as any[]).map((r) => ({
+        id: r.id,
+        type: r.type,
+        igMediaId: r.ig_media_id,
+        text: r.text,
+        source: r.source,
+        occurredAt: r.occurred_at,
+        postCaption: r.post_caption,
+        points: interactionPoints(r.type, cfg),
+      }));
 
       const log = (await db.execute(sql`
         SELECT from_stage, to_stage, by_user, at
