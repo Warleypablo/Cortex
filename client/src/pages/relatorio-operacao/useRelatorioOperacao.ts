@@ -26,6 +26,7 @@ export function useDetalheOperacao(celula: CelulaSelecionada | null) {
       celula?.inicio,
       celula?.fim,
       celula?.chave ?? null,
+      celula?.campo ?? null,
     ],
     queryFn: () => {
       const p = new URLSearchParams({
@@ -34,6 +35,7 @@ export function useDetalheOperacao(celula: CelulaSelecionada | null) {
         fim: celula!.fim,
       });
       if (celula!.chave) p.set("chave", celula!.chave);
+      if (celula!.campo) p.set("campo", celula!.campo);
       return buscar(`/api/reports/operacao/detalhe?${p.toString()}`);
     },
     enabled: celula !== null,

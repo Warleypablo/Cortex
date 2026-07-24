@@ -84,6 +84,8 @@ export interface CelulaSelecionada {
   fim: string;
   /** produto ou motivo, quando a célula vem de uma tabela quebrada */
   chave?: string;
+  /** campo detalhado no drill de churn por motivo — mrr ou pontual, default mrr */
+  campo?: "mrr" | "pontual";
 }
 
 export interface LinhaDrill {

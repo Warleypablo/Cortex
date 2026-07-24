@@ -229,8 +229,16 @@ export async function detalheChurnPorAbono(
 }
 
 /**
- * Gêmea de uma LINHA de churnPorMotivoNaSemana. Traz MRR e pontual do mesmo
- * cliente na mesma linha — o drawer soma o campo que a célula clicada mostra.
+ * Gêmea de uma CÉLULA de churnPorMotivoNaSemana — MRR ou pontual, nunca os
+ * dois somados: a tabela mostra as duas colunas separadas, e o drawer tem
+ * que somar exatamente o número que a célula clicada exibe (ver o comentário
+ * em ./queries.ts sobre o princípio das gêmeas de drill).
+ *
+ * `campo: "mrr"` não precisa de `cup_contratos` — nem join. `campo: "pontual"`
+ * usa JOIN (não LEFT JOIN) com `ct.valorp > 0`, mesmo ON de
+ * churnPorMotivoNaSemana: sem o match de contrato pontual a linha não tem o
+ * que mostrar, então ela sai da lista em vez de aparecer com valor 0.
+ *
  * '(sem motivo)' casa com motivo nulo ou vazio, espelhando o COALESCE da série.
  */
 export async function detalheChurnDoMotivo(
@@ -238,25 +246,39 @@ export async function detalheChurnDoMotivo(
   inicio: string,
   fim: string,
   motivo: string,
+  campo: "mrr" | "pontual",
 ): Promise<LinhaDetalhe[]> {
   const filtroMotivo =
     motivo === "(sem motivo)"
       ? sql`COALESCE(NULLIF(TRIM(ch.motivo_cancelamento), ''), '') = ''`
       : sql`TRIM(ch.motivo_cancelamento) = ${motivo}`;
-  const r: any = await db.execute(sql`
-    SELECT
-      COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
-      COALESCE(ch.valor_r, 0) + COALESCE(ct.valorp, 0) AS valor,
-      NULLIF(TRIM(COALESCE(ch.motivo_cancelamento, '')), '') AS motivo,
-      (COALESCE(ch.abonar_churn, '') = 'Sim') AS abonado
-    FROM "Clickup".cup_churn ch
-    LEFT JOIN "Clickup".cup_contratos ct
-      ON ct.id_subtask = ch.task_id AND ct.valorp > 0
-    WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
-      AND ch.data_solicitacao_encerramento <= ${fim}::date
-      AND ${filtroMotivo}
-    ORDER BY 2 DESC NULLS LAST
-  `);
+  const r: any =
+    campo === "pontual"
+      ? await db.execute(sql`
+          SELECT
+            COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
+            COALESCE(ct.valorp, 0) AS valor,
+            NULLIF(TRIM(COALESCE(ch.motivo_cancelamento, '')), '') AS motivo,
+            (COALESCE(ch.abonar_churn, '') = 'Sim') AS abonado
+          FROM "Clickup".cup_churn ch
+          JOIN "Clickup".cup_contratos ct ON ct.id_subtask = ch.task_id AND ct.valorp > 0
+          WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
+            AND ch.data_solicitacao_encerramento <= ${fim}::date
+            AND ${filtroMotivo}
+          ORDER BY 2 DESC NULLS LAST
+        `)
+      : await db.execute(sql`
+          SELECT
+            COALESCE(NULLIF(TRIM(ch.nome), ''), 'Sem nome') AS cliente,
+            COALESCE(ch.valor_r, 0) AS valor,
+            NULLIF(TRIM(COALESCE(ch.motivo_cancelamento, '')), '') AS motivo,
+            (COALESCE(ch.abonar_churn, '') = 'Sim') AS abonado
+          FROM "Clickup".cup_churn ch
+          WHERE ch.data_solicitacao_encerramento >= ${inicio}::date
+            AND ch.data_solicitacao_encerramento <= ${fim}::date
+            AND ${filtroMotivo}
+          ORDER BY 2 DESC NULLS LAST
+        `);
   return ((r.rows ?? []) as any[]).map((x) => ({
     cliente: String(x.cliente),
     valor: num(x.valor),

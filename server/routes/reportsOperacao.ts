@@ -139,7 +139,14 @@ export function registerReportsOperacaoRoutes(app: Express) {
           if (!chave) {
             return res.status(400).json({ error: "Métrica 'churnMotivo' exige o parâmetro 'chave'" });
           }
-          return res.json({ tipo: "churn", linhas: await detalheChurnDoMotivo(db, inicio, fim, chave) });
+          const campo = req.query.campo ? String(req.query.campo) : "mrr";
+          if (campo !== "mrr" && campo !== "pontual") {
+            return res.status(400).json({ error: "Parâmetro 'campo' deve ser 'mrr' ou 'pontual'" });
+          }
+          return res.json({
+            tipo: "churn",
+            linhas: await detalheChurnDoMotivo(db, inicio, fim, chave, campo),
+          });
         }
         default:
           return res.status(400).json({ error: `Métrica '${metrica}' não tem drill` });

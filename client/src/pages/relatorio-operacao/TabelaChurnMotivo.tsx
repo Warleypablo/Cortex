@@ -49,8 +49,9 @@ export function TabelaChurnMotivo({
                 key={m.chave}
                 className="border-t border-gray-100 dark:border-zinc-800 hover:bg-gray-50 dark:hover:bg-zinc-800/40"
               >
+                <td className="px-4 py-2 text-gray-700 dark:text-zinc-300">{m.chave}</td>
                 <td
-                  className={`px-4 py-2 text-gray-700 dark:text-zinc-300 ${
+                  className={`px-3 py-2 text-right tabular-nums text-gray-900 dark:text-zinc-100 ${
                     clicavel ? "cursor-pointer hover:underline decoration-dotted" : ""
                   }`}
                   onClick={
@@ -58,17 +59,15 @@ export function TabelaChurnMotivo({
                       ? () =>
                           onCelula!({
                             metrica: "churnMotivo",
-                            rotulo: `Churn · ${m.chave}`,
+                            rotulo: `Churn MRR · ${m.chave}`,
                             inicio: dados.atual.inicio,
                             fim: dados.atual.fim,
                             chave: m.chave,
+                            campo: "mrr",
                           })
                       : undefined
                   }
                 >
-                  {m.chave}
-                </td>
-                <td className="px-3 py-2 text-right tabular-nums text-gray-900 dark:text-zinc-100">
                   {fmtBRL(m.atual)}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500 dark:text-zinc-400">
@@ -76,7 +75,24 @@ export function TabelaChurnMotivo({
                 </td>
                 {/* churn melhora caindo */}
                 <CelulaDelta delta={delta} melhor="down" />
-                <td className="px-3 py-2 text-right tabular-nums text-gray-900 dark:text-zinc-100">
+                <td
+                  className={`px-3 py-2 text-right tabular-nums text-gray-900 dark:text-zinc-100 ${
+                    clicavel ? "cursor-pointer hover:underline decoration-dotted" : ""
+                  }`}
+                  onClick={
+                    clicavel
+                      ? () =>
+                          onCelula!({
+                            metrica: "churnMotivo",
+                            rotulo: `Churn Pontual · ${m.chave}`,
+                            inicio: dados.atual.inicio,
+                            fim: dados.atual.fim,
+                            chave: m.chave,
+                            campo: "pontual",
+                          })
+                      : undefined
+                  }
+                >
                   {fmtBRL(m.pontualAtual)}
                 </td>
                 <td className="px-3 py-2 text-right tabular-nums text-gray-500 dark:text-zinc-400">
