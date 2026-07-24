@@ -142,6 +142,7 @@ const PagamentoFreelancers = lazyWithRetry(() => import("@/pages/PagamentoFreela
 const InvestorsReport = lazyWithRetry(() => import("@/pages/InvestorsReport"));
 const RelatorioMensal = lazyWithRetry(() => import("@/pages/RelatorioMensal"));
 const RelatorioSemanal = lazyWithRetry(() => import("@/pages/RelatorioSemanal"));
+const RelatorioOperacao = lazyWithRetry(() => import("@/pages/RelatorioOperacao"));
 const RelatorioTrimestral = lazyWithRetry(() => import("@/pages/RelatorioTrimestral"));
 const Acessos = lazyWithRetry(() => import("@/pages/Acessos"));
 const Conhecimentos = lazyWithRetry(() => import("@/pages/Conhecimentos"));
@@ -452,6 +453,7 @@ function ProtectedRouter() {
       <Route path="/investors-report">{() => <ProtectedRoute path="/investors-report" component={InvestorsReport} />}</Route>
       <Route path="/reports/mensal">{() => <ProtectedRoute path="/reports/mensal" component={RelatorioMensal} />}</Route>
       <Route path="/reports/semanal">{() => <ProtectedRoute path="/reports/semanal" component={RelatorioSemanal} />}</Route>
+      <Route path="/reports/operacao">{() => <ProtectedRoute path="/reports/operacao" component={RelatorioOperacao} />}</Route>
       <Route path="/reports/trimestral">{() => <ProtectedRoute path="/reports/trimestral" component={RelatorioTrimestral} />}</Route>
 
       {/* CEO Dashboard */}
