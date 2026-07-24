@@ -57,3 +57,51 @@ export function gerarSemanas(hoje: string, quantidade: number): Semana[] {
   }
   return semanas;
 }
+
+/**
+ * O par que a tela /reports/operacao compara: a última semana FECHADA e a
+ * imediatamente anterior, ambas com `parcial: false`.
+ *
+ * A semana em curso nunca entra — nem no domingo, porque o dia ainda não
+ * terminou e o snapshot de fechamento pode não existir. Comparar meia semana
+ * com uma inteira produz queda fantasma toda segunda.
+ *
+ * `ate` (opcional, 'YYYY-MM-DD') ancora o par na semana que contém aquela
+ * data, para navegar o histórico:
+ * - se `ate` cai na semana em curso (ou no futuro), é ignorado — a tela
+ *   nunca mostra semana em curso, então o par volta a ser o default (última
+ *   fechada + a anterior a ela);
+ * - se `ate` cai exatamente na última semana fechada, o par recua mais uma
+ *   semana. É o contrato de que depende o botão "semana anterior" do front:
+ *   ele passa uma data de dentro da semana exibida para pedir a anterior;
+ * - se `ate` cai numa semana mais antiga que essa, o par ancora ali mesmo
+ *   (a semana que contém `ate` vira `atual`).
+ */
+export function parSemanas(hoje: string, ate?: string): { atual: Semana; anterior: Semana } {
+  const [anteriorDefault, ultimaFechada, corrente] = gerarSemanas(hoje, 3);
+
+  if (!ate || ate >= corrente.inicio) {
+    return { atual: ultimaFechada, anterior: anteriorDefault };
+  }
+
+  // Amplia a janela até achar a semana que contém `ate`, com folga de pelo
+  // menos duas posições antes dela. Sempre ancorada em `hoje` real — nunca em
+  // `ate` — senão a própria semana de `ate` seria tratada como "em curso" e
+  // descartada, quebrando o caso de `ate` cair numa semana mais antiga que a
+  // última fechada.
+  let quantidade = 3;
+  let semanas = gerarSemanas(hoje, quantidade);
+  let idx = semanas.findIndex((s) => ate >= s.inicio && ate <= s.fim);
+  while (idx < 2) {
+    quantidade += 10;
+    semanas = gerarSemanas(hoje, quantidade);
+    idx = semanas.findIndex((s) => ate >= s.inicio && ate <= s.fim);
+  }
+  const semanaDoAte = semanas[idx];
+
+  if (semanaDoAte.inicio === ultimaFechada.inicio) {
+    // "ate" caiu na última fechada: contrato do botão "semana anterior", recua mais uma.
+    return { atual: semanas[idx - 1], anterior: semanas[idx - 2] };
+  }
+  return { atual: semanaDoAte, anterior: semanas[idx - 1] };
+}
