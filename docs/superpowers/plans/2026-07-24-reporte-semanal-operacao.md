@@ -730,11 +730,21 @@ import { computarBpReceitas } from "../routes/bp2026";
 ```typescript
 /**
  * Pessoas de operação ativas na data. A query traz todo mundo que estava na
- * casa (~110 linhas) e o recorte de operação acontece em TypeScript, com
+ * casa (~110 linhas) e o recorte de setor/squad acontece em TypeScript, com
  * `ehOperacao` — a régua tem teste, e teste de normalização de string em SQL
  * seria caro. Volume não justifica filtrar no banco.
  *
- * Validado em produção: 75 em 2026-07-19, 76 em 2026-07-12.
+ * A janela histórica é governada por `admissao`/`demissao`. A exclusão de
+ * `status = 'Dispensado'` é condicionada a `demissao IS NULL` e trata um erro
+ * de cadastro real: 3 pessoas em Commerce foram dispensadas sem receber data de
+ * saída e, sem isto, contariam como operação em TODA data (~4% de inflação no
+ * denominador da receita por cabeça). Quem tem data de saída continua governado
+ * por ela, então a série histórica fica intacta.
+ *
+ * Não filtrar por `status = 'Ativo'` puro: `status` é foto do agora, e quem saiu
+ * em junho sumiria também das semanas de abril — a série chega a inverter.
+ *
+ * Validado em produção: 72 em 2026-07-19, 73 em 2026-07-12, 71 em 2026-07-24.
  */
 export async function headcountOperacao(db: any, data: string): Promise<number> {
   const r: any = await db.execute(sql`
@@ -743,6 +753,7 @@ export async function headcountOperacao(db: any, data: string): Promise<number> 
     WHERE admissao IS NOT NULL
       AND admissao <= ${data}::date
       AND (demissao IS NULL OR demissao > ${data}::date)
+      AND NOT (demissao IS NULL AND TRIM(COALESCE(status, '')) = 'Dispensado')
   `);
   return ((r.rows ?? []) as any[]).filter((p) => ehOperacao(p.setor, p.squad)).length;
 }
@@ -784,11 +795,22 @@ PGPASSWORD="$PROD_PASS" psql -h 34.95.249.110 -U postgres -d dados_turbo -c "
 SELECT COUNT(*) FROM \"Inhire\".rh_pessoal
 WHERE admissao IS NOT NULL AND admissao <= '2026-07-19'::date
   AND (demissao IS NULL OR demissao > '2026-07-19'::date)
+  AND NOT (demissao IS NULL AND TRIM(COALESCE(status,'')) = 'Dispensado')
   AND TRIM(setor) IN ('Commerce','Tech Sites')
   AND LOWER(TRIM(REGEXP_REPLACE(COALESCE(squad,''), '[^[:alnum:] &]', '', 'g'))) NOT LIKE '%vendas%';"
 ```
 
-Expected: `75`. Se divergir, a régua em `ehOperacao` e a do SQL de conferência não estão dizendo a mesma coisa — investigar antes de seguir.
+Expected: `72`. Se divergir, a régua em `ehOperacao` e a do SQL de conferência não estão dizendo a mesma coisa — investigar antes de seguir.
+
+Conferir também que a exclusão do dispensado-sem-data está mordendo exatamente 3 pessoas, e não mais:
+
+```bash
+PGPASSWORD="$PROD_PASS" psql -h 34.95.249.110 -U postgres -d dados_turbo -c "
+SELECT nome, setor, squad, status FROM \"Inhire\".rh_pessoal
+WHERE demissao IS NULL AND TRIM(COALESCE(status,'')) = 'Dispensado';"
+```
+
+Expected: 4 linhas no total, das quais 3 em Commerce (as que a régua exclui). Se aparecerem muitas mais, o RH mudou a forma de cadastrar e a régua precisa ser reavaliada antes de seguir.
 
 - [ ] **Step 4: Commit**
 

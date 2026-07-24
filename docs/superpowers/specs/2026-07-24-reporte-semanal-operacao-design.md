@@ -105,13 +105,26 @@ O estoque é foto de **fim de semana** (não de abertura, como o `basePontual` d
 
 | Linha | Régua |
 |---|---|
-| Headcount Operação | `admissao <= data AND (demissao IS NULL OR demissao > data)`, `setor ∈ {Commerce, Tech Sites}`, squad normalizado ≠ Vendas |
+| Headcount Operação | `admissao <= data AND (demissao IS NULL OR demissao > data)`, `setor ∈ {Commerce, Tech Sites}`, squad normalizado ≠ Vendas, e **não** `status = 'Dispensado'` com `demissao` vazia |
 | MRR por cabeça | MRR Ativo (fim da semana) ÷ headcount naquela data |
 | Faturamento por cabeça | Receita Faturável do mês ÷ headcount. Numerador via `computarBpReceitas()` |
 
-Headcount valida contra produção: 75 em 2026-07-19, 76 em 2026-07-12, 72 hoje.
-`admissao` está 100% preenchida em `rh_pessoal` (0 nulos em 344 linhas), então a
-régua histórica é confiável.
+Headcount valida contra produção: **72 em 2026-07-19, 73 em 2026-07-12, 71 em
+2026-07-24**. `admissao` está 100% preenchida em `rh_pessoal` (0 nulos em 344
+linhas), então a régua histórica é confiável.
+
+**Por que a exclusão de `status = 'Dispensado'` com `demissao` vazia:** há 3
+pessoas em Commerce nessa situação — dispensadas cujo cadastro nunca recebeu a
+data de saída. Sem a exclusão elas contam como operação em *toda* data e inflam
+o denominador em ~4%. A exclusão é condicionada à `demissao` vazia de propósito:
+quem tem data de saída continua governado por ela, e a série histórica fica
+intacta. Filtrar por `status = 'Ativo'` puro seria errado — `status` é foto do
+agora, então quem saiu em junho sumiria também das semanas de abril, e a série
+chega a inverter (68 em 12/07 e 19/07 contra 69 em 24/07).
+
+Squads com sufixo `(OFF)` (times desativados) **não** são excluídas: só 1 pessoa
+ativa está numa delas, e é justamente uma das 3 acima — excluir por `(OFF)` a
+pegaria por coincidência e deixaria as outras duas passarem.
 
 A normalização de squad remove emoji e *variation selectors* antes de comparar —
 o campo tem `🪖 Selva` e `Selva` como valores distintos, além de sufixos
@@ -193,8 +206,9 @@ a tela nova no mesmo deploy, e admin passa direto.
 - semana sem churn → tabela de motivos vazia, não quebra
 - motivo presente só na semana anterior aparece na tabela com atual = 0
 
-`headcount-operacao.test.ts`: a normalização de squad casa `🪖 Selva` e `Selva`,
-e exclui `💰 Vendas`, `Vendas` e `Hunters (OFF)` corretamente.
+`headcount-operacao.test.ts`: a normalização de squad casa `🪖 Selva` com
+`Selva`, preserva o `&` de `CX&CS`, e exclui `💰 Vendas` e `Vendas` em qualquer
+grafia.
 
 **Validação contra produção.** Diferente de `/reports/semanal`, esta tela não
 usa `channel` do CRM — a coluna não existe no banco local, o que impedia
