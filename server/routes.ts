@@ -76,6 +76,7 @@ import { registerGrowthAiRoutes } from "./routes/growth-ai";
 import { registerSdrAssistantRoutes } from "./routes/sdr-assistant";
 import { registerBpCopilotRoutes } from "./routes/bp-copilot";
 import { registerAdsCreationRoutes } from "./routes/ads-creation";
+import { registerAdsOptimizationRoutes } from "./routes/adsOptimization";
 import { registerCreativesRoutes } from "./routes/creatives";
 import { registerClientesRoutes } from "./routes/clientes";
 import { registerColaboradoresRoutes } from "./routes/colaboradores";
@@ -8636,6 +8637,9 @@ IMPORTANTE: Responda APENAS com JSON válido (sem markdown, sem \`\`\`). Estrutu
 
   // Growth — Criação de Campanhas (briefing → Meta API → PAUSED)
   registerAdsCreationRoutes(app);
+
+  // Growth — Otimização de Campanhas (Google Ads + TikTok Ads: status/orçamento/lance)
+  registerAdsOptimizationRoutes(app);
 
   // Growth — Biblioteca de Criativos (cortex_core.creatives_library)
   registerCreativesRoutes(app);
