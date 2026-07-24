@@ -37,4 +37,17 @@ describe("calcularDelta", () => {
     expect(calcularDelta(100, 100)).toBe(0);
     expect(calcularDelta(0, 0, true)).toBe(0);
   });
+
+  it("moeda com atual zero é queda total de -100%", () => {
+    expect(calcularDelta(0, 100)).toBe(-100);
+  });
+
+  it("percentual com ambos negativos calcula diferença em p.p.", () => {
+    expect(calcularDelta(-50, -100, true)).toBe(50);
+  });
+
+  it("modo relativo vs modo percentual sobre mesma entrada são diferentes", () => {
+    expect(calcularDelta(3, 2)).toBe(50);
+    expect(calcularDelta(3, 2, true)).toBe(1);
+  });
 });
