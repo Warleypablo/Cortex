@@ -1,5 +1,31 @@
 # Changelog
 
+## 2026-07-24 | feat(ads): camada de escrita de otimização para Google Ads e TikTok Ads
+
+**O que foi feito:**
+- `server/services/googleAdsWrite.ts` — mutação de status (campaign/adGroup/adGroupAd), orçamento diário e lance de CPC. Usa o `validateOnly` nativo da API do Google, então o preview roda o mesmo caminho de código do execute e é fiel de verdade
+- `server/services/tiktokWrite.ts` — mesmas três operações via Marketing API (`Access-Token`), reusando a credencial de advertiser já existente em `tiktok.credentials`. O TikTok não tem `validateOnly`, então o dry-run resolve o estado e as travas locais sem POST
+- `server/routes/adsOptimization.ts` — `preview` / `execute` / `history` / `undo/:batchId`, com o MESMO formato de ação nos dois canais. Restrito a `APPROVER_EMAILS`
+- Migration `2026-07-24-ads-optimization-audit-log.sql` → `ads_ops.action_log`, **já aplicada em produção**. Registra toda ação, inclusive previews e falhas, guardando `before_state` em JSONB — é o que viabiliza o `undo`
+- `scripts/smoke-ads-optimization.ts` e `scripts/probe-google-ads-version.ts`
+
+**Travas de segurança:**
+- Allowlist de contas graváveis: as credenciais alcançam ~centenas de contas de **clientes** via MCC, então mutação só é liberada na conta da própria Turbo (`3795436039`)
+- Aumento de orçamento/lance acima de 5x o valor atual, ou acima de R$ 5.000/dia, é barrado — libera com `force: true`
+- Orçamento **compartilhado** no Google exige `force: true` (alterar afeta todas as campanhas ligadas a ele)
+- `REMOVED` (Google) e `DELETE` (TikTok) não são expostos: irreversíveis
+- Máximo de 50 ações por lote
+
+**Descobertas na investigação (dry-run ao vivo, nada alterado):**
+- **A API do Google na v18 está morta** (404). `googleAdsSync.ts` e `autoreport/googleAds.ts` ainda apontam pra ela — o sync do Google está quebrado. Não foi corrigido aqui porque as queries deles usam campos que sumiram (`campaign.start_date`, `campaign.end_date`, `metrics.video_views`): é correção à parte
+- Versões novas rejeitam `pageSize` (`PAGE_SIZE_NOT_SUPPORTED`)
+- `GOOGLE_ADS_LOGIN_CUSTOMER_ID` (5156174278) é a **MCC**, não tem campanhas próprias. A conta operacional da Turbo é `3795436039` (74 campanhas)
+- Escrita no Google **validada**: o developer token tem nível suficiente. Campanhas `VIDEO` (12 das 74) recusam mutação via API por restrição do próprio Google; SEARCH, DEMAND_GEN, DISPLAY e PERFORMANCE_MAX aceitam
+- TikTok lê e monta payload corretamente, mas o POST real depende do app sair de Sandbox
+
+**Por que:**
+- Otimização (pausar, ajustar orçamento e lance) concentra a maior parte do valor recorrente e tem blast radius muito menor que criação de campanha do zero — uma campanha pausada por engano se desfaz, uma criada errada gasta dinheiro
+
 ## 2026-07-24 | fix(capacity): Olimpo sai de /capacity-times e as 4 pessoas entram no Pulse
 
 **O que foi feito:**
