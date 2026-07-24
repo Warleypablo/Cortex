@@ -608,7 +608,7 @@ export const NAV_CONFIG = {
         { title: 'Auto Report', url: '/growth/auto-report', icon: 'FileText', permissionKey: PERMISSION_KEYS.REPORTS.AUTO_REPORT },
         { title: 'Reporte Mensal', url: '/reports/mensal', icon: 'Presentation', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
         { title: 'Reporte Semanal', url: '/reports/semanal', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
-        { title: 'Reporte de Operação', url: '/reports/operacao', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
+        { title: 'Reporte Semanal de Operação', url: '/reports/operacao', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
         { title: 'Reporte Trimestral', url: '/reports/trimestral', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
       ],
     },

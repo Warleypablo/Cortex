@@ -36,8 +36,8 @@ import {
 const DATA_ISO = /^\d{4}-\d{2}-\d{2}$/;
 
 /**
- * As queries de UMA semana. Em dois lotes de no máximo 4: o pool é max: 5
- * (server/db.ts) e é compartilhado com o app inteiro — disparar as 8 de uma vez
+ * As queries de UMA semana. Em três lotes de no máximo 4: o pool é max: 5
+ * (server/db.ts) e é compartilhado com o app inteiro — disparar as 9 de uma vez
  * deixaria o resto do app esperando conexão enquanto esta tela carrega.
  */
 async function apurarSemana(semana: Semana): Promise<SemanaOperacao> {

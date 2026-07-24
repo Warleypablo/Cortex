@@ -22,9 +22,13 @@ const SQUADS_FORA_DA_OPERACAO = ["vendas"];
  * Mantém letras, números, espaço e '&' (o time 'CX&CS' depende disso).
  *
  * Construído via `new RegExp(...)` (não regex literal): o `tsconfig.json`
- * do projeto não define `target`, então o `tsc` cai no default pré-ES6 e
- * recusa a flag `u` em literais (`TS1501`) — mesmo padrão já usado em
- * server/routes.ts e server/storage.ts. Via string o parser não reclama.
+ * deste projeto não define `target`, então o `tsc` cai no default pré-ES6 e
+ * recusa a flag `u` num literal (`/.../gu`), com `TS1501`. server/routes.ts
+ * (linha 6461) e server/storage.ts (linha 13004) usam essa flag em literal e
+ * têm esse mesmo erro no `npm run check` — não é um padrão validado a
+ * seguir, é um erro pré-existente que passou despercebido porque o
+ * `tsx`/esbuild que roda o server não faz esse tipo de checagem. Aqui o
+ * construtor evita repetir o erro.
  */
 const CARACTERES_NAO_NOME = new RegExp("[^\\p{L}\\p{N} &]", "gu");
 
