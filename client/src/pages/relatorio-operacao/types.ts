@@ -26,6 +26,7 @@ export interface SemanaOperacao {
   headcountOperacao: number;
   mrrPorCabeca: number | null;
   faturamentoPorCabeca: number | null;
+  faturamentoPorCabecaParcial: boolean;
 
   estoquePorProduto: { produto: string; valor: number; qtd: number }[];
   churnPorMotivo: { motivo: string; mrr: number; pontual: number }[];

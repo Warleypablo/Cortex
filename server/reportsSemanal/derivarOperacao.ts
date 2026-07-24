@@ -22,6 +22,8 @@ export interface EntradaOperacao {
   headcountOperacao: number;
   /** Receita Total Faturável do mês; null quando indisponível */
   faturavelMes: number | null;
+  /** true quando o mês da semana ainda está aberto (payload.mesFechado < mês pedido) */
+  faturavelMesParcial: boolean;
 }
 
 export interface SemanaOperacao {
@@ -52,6 +54,8 @@ export interface SemanaOperacao {
   mrrPorCabeca: number | null;
   /** null quando o faturável do mês está indisponível: zero se leria como 'faturou nada' */
   faturamentoPorCabeca: number | null;
+  /** true quando o mês da semana ainda está em curso: valor incompleto, não comparável */
+  faturamentoPorCabecaParcial: boolean;
 
   estoquePorProduto: LinhaProduto[];
   churnPorMotivo: LinhaMotivo[];
@@ -129,6 +133,7 @@ export function derivarOperacao(e: EntradaOperacao): SemanaOperacao {
     headcountOperacao: e.headcountOperacao,
     mrrPorCabeca: porCabeca(mrrAtivo, e.headcountOperacao),
     faturamentoPorCabeca: porCabeca(e.faturavelMes, e.headcountOperacao),
+    faturamentoPorCabecaParcial: e.faturavelMesParcial,
 
     estoquePorProduto: e.estoquePorProduto,
     churnPorMotivo: e.churnPorMotivo,

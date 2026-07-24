@@ -52,7 +52,7 @@ async function apurarSemana(semana: Semana): Promise<SemanaOperacao> {
     estoquePontualPorProduto(db, semana.fim),
     churnPorMotivoNaSemana(db, semana.inicio, semana.fim),
   ]);
-  const [headcount, faturavelMes] = await Promise.all([
+  const [headcount, faturavel] = await Promise.all([
     headcountOperacao(db, semana.fim),
     faturavelDoMes(db, semana.fim),
   ]);
@@ -68,7 +68,8 @@ async function apurarSemana(semana: Semana): Promise<SemanaOperacao> {
     churnPontual,
     churnPorMotivo: porMotivo,
     headcountOperacao: headcount,
-    faturavelMes,
+    faturavelMes: faturavel.valor,
+    faturavelMesParcial: faturavel.parcial,
   });
 }
 

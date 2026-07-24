@@ -146,18 +146,28 @@ export async function headcountOperacao(db: any, data: string): Promise<number> 
  * compartilhado com /bp-2026. `receita_total_faturavel` = MRR Ativo + Venda
  * Pontual + Outras Receitas.
  *
- * Devolve `null` quando o mês não é de 2026 (o BP é um modelo anual de 2026) ou
- * quando o mês ainda não tem realizado. A tela mostra '—'; nunca zero, que se
- * leria como 'faturou nada'.
+ * `computarBpReceitas` preenche `realizado` para todo mês `<= mesCorrente`,
+ * incluindo o mês corrente ainda em curso — só `payload.mesFechado` diz qual
+ * mês já fechou de verdade. Por isso devolvemos `parcial` junto do valor: sem
+ * ele, a primeira semana de cada mês compara (poucos dias do mês novo) com
+ * (o mês anterior inteiro) e o Δ sai enorme sem que nada tenha mudado.
+ *
+ * `valor` vem `null` quando o mês não é de 2026 (o BP é um modelo anual de
+ * 2026) ou quando o mês ainda não tem realizado nenhum. A tela mostra '—';
+ * nunca zero, que se leria como 'faturou nada'.
  */
-export async function faturavelDoMes(db: any, fimDaSemana: string): Promise<number | null> {
+export async function faturavelDoMes(
+  db: any,
+  fimDaSemana: string,
+): Promise<{ valor: number | null; parcial: boolean }> {
   const [ano, mes] = fimDaSemana.split("-").map(Number);
   const payload: any = await computarBpReceitas(db);
-  if (ano !== payload?.ano) return null;
+  const parcial = mes > (payload?.mesFechado ?? 0);
+  if (ano !== payload?.ano) return { valor: null, parcial };
   const linha = (payload?.linhas ?? []).find((l: any) => l.metrica === "receita_total_faturavel");
   const doMes = (linha?.meses ?? []).find((m: any) => m.mes === mes);
   const realizado = doMes?.realizado;
-  return typeof realizado === "number" ? realizado : null;
+  return { valor: typeof realizado === "number" ? realizado : null, parcial };
 }
 
 // ============================================

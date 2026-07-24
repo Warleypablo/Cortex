@@ -24,6 +24,7 @@ const ENTRADA: EntradaOperacao = {
   ],
   headcountOperacao: 75,
   faturavelMes: 1380000,
+  faturavelMesParcial: false,
 };
 
 describe("derivarOperacao", () => {
@@ -90,6 +91,16 @@ describe("derivarOperacao", () => {
     const r = derivarOperacao({ ...ENTRADA, faturavelMes: null });
     expect(r.faturamentoPorCabeca).toBeNull();
     expect(r.mrrPorCabeca).not.toBeNull();
+  });
+
+  it("propaga faturavelMesParcial=true para faturamentoPorCabecaParcial", () => {
+    const r = derivarOperacao({ ...ENTRADA, faturavelMesParcial: true });
+    expect(r.faturamentoPorCabecaParcial).toBe(true);
+  });
+
+  it("propaga faturavelMesParcial=false para faturamentoPorCabecaParcial", () => {
+    const r = derivarOperacao({ ...ENTRADA, faturavelMesParcial: false });
+    expect(r.faturamentoPorCabecaParcial).toBe(false);
   });
 
   it("a soma do estoque por produto reproduz o estoque total", () => {

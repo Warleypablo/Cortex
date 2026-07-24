@@ -116,6 +116,10 @@ export default function RelatorioOperacao() {
           pela empresa inteira. Faturamento por cabeça tem numerador mensal: dentro do mês só se
           move pelo headcount.
         </p>
+        <p>
+          <strong>*</strong> ao lado do Faturamento por cabeça marca um mês ainda em curso: o
+          faturável usado no cálculo está incompleto, não é o mês fechado.
+        </p>
       </div>
 
       <DrawerDetalhe celula={celula} onClose={() => setCelula(null)} />

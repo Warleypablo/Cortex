@@ -120,6 +120,12 @@ export function TabelaComparativa({
                 const percentual = linha.formato === "percentual";
                 const delta = calcularDelta(atual, anterior, percentual);
                 const clicavel = linha.drill !== undefined && onCelula !== undefined;
+                // Faturamento por cabeça herda o aviso de mês em curso de
+                // faturamentoPorCabecaParcial — cada coluna carrega o seu.
+                const ehFaturamentoPorCabeca = linha.chave === "faturamentoPorCabeca";
+                const atualParcial = ehFaturamentoPorCabeca && dados.atual.faturamentoPorCabecaParcial;
+                const anteriorParcial =
+                  ehFaturamentoPorCabeca && dados.anterior.faturamentoPorCabecaParcial;
                 return (
                   <tr
                     key={linha.chave}
@@ -149,6 +155,7 @@ export function TabelaComparativa({
                       }
                     >
                       {formatar(atual, linha.formato)}
+                      {atualParcial ? " *" : ""}
                     </td>
                     <td
                       className={`px-3 py-2 text-right tabular-nums whitespace-nowrap text-gray-500 dark:text-zinc-400 ${
@@ -167,6 +174,7 @@ export function TabelaComparativa({
                       }
                     >
                       {formatar(anterior, linha.formato)}
+                      {anteriorParcial ? " *" : ""}
                     </td>
                     <CelulaDelta delta={delta} melhor={linha.melhor} percentual={percentual} />
                   </tr>
