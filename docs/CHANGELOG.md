@@ -1,5 +1,17 @@
 # Changelog
 
+## 2026-07-24 | fix(capacity): Olimpo sai de /capacity-times e as 4 pessoas entram no Pulse
+
+**O que foi feito:**
+- Migração `scripts/migrar-olimpo-para-pulse.sql` rodada em **produção** (4 linhas): Geiziele, Debora, Larissa e Ana passam de `categoria='Olimpo'` para `'Pulse'` em `cortex_core.capacity_metas`. A aba "Olimpo" some da tela — as abas de squad são montadas a partir dessa coluna, sem lista de squads no código
+- As 4 herdam a régua do Pulse: `CAP_CLIENTES_PULSE` (20) passa a valer como Cap. Clientes (antes a coluna mostrava "—") e a Cap. FAT passa a usar o ticket médio da **equipe unificada**, que é calculado por grupo (`finalizeSquad`). O cap de contratos individual de cada uma é preservado
+- Geiziele tinha `ordem = 0` (foi cadastrada pela UI direto em prod) e apareceria antes da Brenda dentro do Pulse — foi para o fim da lista (ordem 12) e entrou no seed `CAPACITY_METAS_SEED`, que ainda não a listava
+
+**Por que:**
+- O squad Olimpo foi descontinuado e as pessoas passaram para o Pulse. O código já tinha sido ajustado em 2026-07-20 (commit `3cf65b62`), mas a migração só havia rodado no banco local — em produção a aba continuava aparecendo com as 4 pessoas
+
+**Atenção:** `"Inhire".rh_pessoal` ainda tem 5 pessoas com `squad = 'Olimpo'` (as 4 acima + Isabela Samara, Designer). Isso não afeta `/capacity-times` (que lê `capacity_metas`), mas afeta telas que agrupam pelo squad do RH. Ajuste no RH pendente.
+
 ## 2026-07-21 | feat(reporte-semanal): tela semanal dos líderes + régua única de expansão
 
 **O que foi feito:**

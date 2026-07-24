@@ -153,7 +153,7 @@ export function toSelvaRow(raw: any, metaContasDesigner: number): SelvaRow {
   };
 }
 
-// ── Squads de comunicação (Pulse, Olimpo): CS via capacity_metas, régua rec+pontual ──
+// ── Squads de comunicação (hoje só o Pulse): CS via capacity_metas, régua rec+pontual ──
 
 export interface CsRow {
   nome: string;

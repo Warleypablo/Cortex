@@ -16,13 +16,13 @@ beforeEach(() => vi.clearAllMocks());
 describe("CAPACITY_METAS_SEED", () => {
   it("tem a contagem esperada por categoria", () => {
     const byCat = (c: string) => CAPACITY_METAS_SEED.filter((m) => m.categoria === c).length;
-    expect(byCat("Pulse")).toBe(11); // inclui 3 ex-Aura + 3 ex-Olimpo (ambas descontinuadas)
+    expect(byCat("Pulse")).toBe(12); // inclui 3 ex-Aura + 4 ex-Olimpo (ambas descontinuadas)
     expect(byCat("Aura")).toBe(0);
     expect(byCat("Olimpo")).toBe(0);
     expect(byCat("vendedor")).toBe(6);
     expect(byCat("account")).toBe(4);
     expect(byCat("gestor")).toBe(7);
-    expect(CAPACITY_METAS_SEED).toHaveLength(28);
+    expect(CAPACITY_METAS_SEED).toHaveLength(29);
   });
 
   it("não tem (match_responsavel, categoria) duplicado", () => {
@@ -30,9 +30,9 @@ describe("CAPACITY_METAS_SEED", () => {
     expect(new Set(keys).size).toBe(keys.length);
   });
 
-  it("ordem é global e única (1..28)", () => {
+  it("ordem é global e única (1..29)", () => {
     const ordens = CAPACITY_METAS_SEED.map((m) => m.ordem).sort((a, b) => a - b);
-    expect(ordens).toEqual(Array.from({ length: 28 }, (_, i) => i + 1));
+    expect(ordens).toEqual(Array.from({ length: 29 }, (_, i) => i + 1));
   });
 
   it("squads operacionais têm cap_recorrente; comerciais têm cap_mrr e cap_contas", () => {

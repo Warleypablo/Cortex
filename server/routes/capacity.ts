@@ -364,7 +364,8 @@ export function registerCapacityRoutes(app: Express, db: any) {
         ORDER BY COALESCE(ag.mrr_operando, 0) DESC
       `);
 
-      // Squads de comunicação (Pulse, Olimpo): operadores de CS em capacity_metas,
+      // Squads de comunicação (hoje só o Pulse; Olimpo descontinuada em 2026-07-20):
+      // operadores de CS em capacity_metas,
       // carteira via `responsavel ILIKE match_responsavel`. Capacity de contratos =
       // cap_contas (editável na Configurar), com fallback p/ o cap_recorrente legado.
       const squadsResult = await db.execute(sql`

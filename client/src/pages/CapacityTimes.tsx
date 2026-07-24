@@ -48,7 +48,7 @@ interface SelvaRow {
   util_clientes_pct: number | null;
   util_pct: number | null;
 }
-// Squads de comunicação (Pulse, Olimpo): CS via capacity_metas.
+// Squads de comunicação (hoje só o Pulse): CS via capacity_metas.
 // Cap. FAT ($) = ticket médio da equipe × capacity de contratos (cap_contas).
 interface CsRow {
   nome: string;
