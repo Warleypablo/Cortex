@@ -108,6 +108,26 @@ export async function churnPorMotivoNaSemana(
 }
 
 /**
+ * Data do snapshot efetivamente usado para "até `ate`" — o mesmo
+ * `MAX(data_snapshot) <= ate` que `carteiraNoFim` (./queries.ts),
+ * `estoquePontualNoFim` e `estoquePontualPorProduto` usam por baixo dos panos.
+ *
+ * `"Clickup".cup_data_hist` tem buracos de semanas inteiras sem snapshot
+ * algum. Quando isso acontece, a foto usada é a do buraco anterior, e a tela
+ * inteira (MRR, estoque, estoque por produto) sai idêntica à semana passada
+ * sem que nada tenha realmente ficado parado — expor essa data é o que
+ * permite avisar quando isso aconteceu, em vez de deixar o número plausível
+ * enganar.
+ */
+export async function snapshotUsado(db: any, ate: string): Promise<string | null> {
+  const r: any = await db.execute(sql`
+    SELECT MAX(data_snapshot)::text AS d FROM "Clickup".cup_data_hist WHERE data_snapshot <= ${ate}::date
+  `);
+  const d = (r.rows ?? [])[0]?.d;
+  return d ? String(d) : null;
+}
+
+/**
  * Pessoas de operação ativas na data. A query traz todo mundo que estava na
  * casa (~110 linhas) e o recorte de setor/squad acontece em TypeScript, com
  * `ehOperacao` — a régua tem teste, e teste de normalização de string em SQL

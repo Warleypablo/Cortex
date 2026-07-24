@@ -24,6 +24,8 @@ export interface EntradaOperacao {
   faturavelMes: number | null;
   /** true quando o mês da semana ainda está aberto (payload.mesFechado < mês pedido) */
   faturavelMesParcial: boolean;
+  /** data do snapshot de cup_data_hist efetivamente usado como foto do fim da semana */
+  snapshotFim: string | null;
 }
 
 export interface SemanaOperacao {
@@ -59,6 +61,8 @@ export interface SemanaOperacao {
 
   estoquePorProduto: LinhaProduto[];
   churnPorMotivo: LinhaMotivo[];
+  /** data do snapshot de cup_data_hist usado na foto do fim da semana; null se não houver nenhum */
+  snapshotFim: string | null;
 }
 
 export interface ProdutoComparado {
@@ -137,6 +141,7 @@ export function derivarOperacao(e: EntradaOperacao): SemanaOperacao {
 
     estoquePorProduto: e.estoquePorProduto,
     churnPorMotivo: e.churnPorMotivo,
+    snapshotFim: e.snapshotFim,
   };
 }
 

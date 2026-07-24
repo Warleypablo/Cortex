@@ -15,6 +15,14 @@ export function TabelaEstoqueProduto({
   const totalAtual = dados.produtos.reduce((s, p) => s + p.atual, 0);
   const totalAnterior = dados.produtos.reduce((s, p) => s + p.anterior, 0);
 
+  if (dados.produtos.length === 0) {
+    return (
+      <p className="rounded-xl border border-gray-200 dark:border-zinc-800 px-4 py-8 text-center text-sm text-gray-500 dark:text-zinc-500">
+        Nenhum estoque pontual registrado nas duas semanas.
+      </p>
+    );
+  }
+
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-zinc-800">
       <table className="w-full border-collapse text-sm">

@@ -25,6 +25,7 @@ const ENTRADA: EntradaOperacao = {
   headcountOperacao: 75,
   faturavelMes: 1380000,
   faturavelMesParcial: false,
+  snapshotFim: "2026-07-19",
 };
 
 describe("derivarOperacao", () => {
@@ -101,6 +102,11 @@ describe("derivarOperacao", () => {
   it("propaga faturavelMesParcial=false para faturamentoPorCabecaParcial", () => {
     const r = derivarOperacao({ ...ENTRADA, faturavelMesParcial: false });
     expect(r.faturamentoPorCabecaParcial).toBe(false);
+  });
+
+  it("repassa snapshotFim, inclusive quando não há snapshot algum", () => {
+    expect(derivarOperacao(ENTRADA).snapshotFim).toBe("2026-07-19");
+    expect(derivarOperacao({ ...ENTRADA, snapshotFim: null }).snapshotFim).toBeNull();
   });
 
   it("a soma do estoque por produto reproduz o estoque total", () => {

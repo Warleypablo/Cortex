@@ -85,6 +85,7 @@ export function TabelaComparativa({
 }) {
   const periodo = (s: { inicio: string; fim: string }) =>
     `${s.inicio.slice(8, 10)}/${s.inicio.slice(5, 7)} – ${s.fim.slice(8, 10)}/${s.fim.slice(5, 7)}`;
+  const dataCurta = (d: string) => `${d.slice(8, 10)}/${d.slice(5, 7)}`;
 
   return (
     <div className="overflow-x-auto rounded-xl border border-gray-200 dark:border-zinc-800">
@@ -95,10 +96,20 @@ export function TabelaComparativa({
               Métrica
             </th>
             <th className="px-3 py-3 text-right font-semibold text-gray-700 dark:text-zinc-200 whitespace-nowrap">
-              {periodo(dados.atual)}
+              <div>{periodo(dados.atual)}</div>
+              {dados.atual.snapshotFim && (
+                <div className="mt-0.5 text-[10px] font-normal normal-case text-gray-400 dark:text-zinc-500">
+                  foto de {dataCurta(dados.atual.snapshotFim)}
+                </div>
+              )}
             </th>
             <th className="px-3 py-3 text-right font-semibold text-gray-500 dark:text-zinc-400 whitespace-nowrap">
-              {periodo(dados.anterior)}
+              <div>{periodo(dados.anterior)}</div>
+              {dados.anterior.snapshotFim && (
+                <div className="mt-0.5 text-[10px] font-normal normal-case text-gray-400 dark:text-zinc-500">
+                  foto de {dataCurta(dados.anterior.snapshotFim)}
+                </div>
+              )}
             </th>
             <th className="px-3 py-3 text-right font-semibold text-gray-700 dark:text-zinc-200">Δ</th>
           </tr>

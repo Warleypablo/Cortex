@@ -30,6 +30,7 @@ export interface SemanaOperacao {
 
   estoquePorProduto: { produto: string; valor: number; qtd: number }[];
   churnPorMotivo: { motivo: string; mrr: number; pontual: number }[];
+  snapshotFim: string | null;
 }
 
 export interface ProdutoComparado {

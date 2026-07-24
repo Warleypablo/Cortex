@@ -2,7 +2,7 @@ import { useState } from "react";
 import { usePageTitle } from "@/hooks/use-page-title";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Button } from "@/components/ui/button";
-import { CalendarRange, ChevronLeft, ChevronRight } from "lucide-react";
+import { CalendarRange, ChevronLeft, ChevronRight, AlertTriangle } from "lucide-react";
 import { useReporteOperacao } from "./relatorio-operacao/useRelatorioOperacao";
 import { TabelaComparativa } from "./relatorio-operacao/TabelaComparativa";
 import { TabelaChurnMotivo } from "./relatorio-operacao/TabelaChurnMotivo";
@@ -42,6 +42,16 @@ export default function RelatorioOperacao() {
   const voltar = () => data && setAte(ancoraPara(deslocarDias(data.atual.fim, -7)));
   const avancar = () => data && setAte(ancoraPara(deslocarDias(data.atual.fim, 7)));
 
+  // Snapshot anterior ao início da semana = nenhum snapshot caiu dentro dela
+  // inteira ("Clickup".cup_data_hist tem buracos de até 32 dias): carteira,
+  // estoque e estoque por produto daquela coluna são, na prática, a foto da
+  // semana anterior repetida — comparação de string funciona porque as duas
+  // datas são 'YYYY-MM-DD'.
+  const semFotoPropria = (s: { inicio: string; snapshotFim: string | null }) =>
+    s.snapshotFim !== null && s.snapshotFim < s.inicio;
+  const atualSemFoto = data ? semFotoPropria(data.atual) : false;
+  const anteriorSemFoto = data ? semFotoPropria(data.anterior) : false;
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
@@ -70,6 +80,21 @@ export default function RelatorioOperacao() {
           )}
         </div>
       </div>
+
+      {(atualSemFoto || anteriorSemFoto) && (
+        <div className="flex items-start gap-2 rounded-lg border border-amber-200 dark:border-amber-900/50 bg-amber-50 dark:bg-amber-950/30 px-4 py-3 text-xs text-amber-700 dark:text-amber-300">
+          <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" />
+          <span>
+            {atualSemFoto && anteriorSemFoto
+              ? "A semana atual e a anterior não têm foto própria: nenhum snapshot de carteira caiu dentro delas."
+              : atualSemFoto
+              ? "A semana atual não tem foto própria: nenhum snapshot de carteira caiu dentro dela."
+              : "A semana anterior não tem foto própria: nenhum snapshot de carteira caiu dentro dela."}{" "}
+            Os números de carteira, estoque e estoque por produto daquela coluna repetem os da foto
+            anterior disponível.
+          </span>
+        </div>
+      )}
 
       {isLoading ? (
         <Skeleton className="h-96 w-full" />
