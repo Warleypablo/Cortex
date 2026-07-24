@@ -39,6 +39,8 @@ async function main() {
     detalheChurnPorAbono,
     detalheEstoquePontual,
     detalheChurnDoMotivo,
+    faturavelDoMes,
+    snapshotUsado,
   } = await import("../server/reportsSemanal/queriesOperacao");
   const { derivarOperacao, compararOperacao } = await import("../server/reportsSemanal/derivarOperacao");
 
@@ -80,6 +82,8 @@ async function main() {
         churnPorMotivoNaSemana(db, semana.inicio, semana.fim),
         headcountOperacao(db, semana.fim),
       ]);
+    const fat = await faturavelDoMes(db, semana.fim);
+    const snap = await snapshotUsado(db, semana.fim);
 
     const m = derivarOperacao({
       semana,
@@ -92,7 +96,9 @@ async function main() {
       churnPontual,
       churnPorMotivo: porMotivo,
       headcountOperacao: headcount,
-      faturavelMes: null, // fora do escopo desta reconciliação (vem do BP, com cache)
+      faturavelMes: fat.valor,
+      faturavelMesParcial: fat.parcial,
+      snapshotFim: snap,
     });
 
     // SQL independente, escrito do zero
@@ -146,6 +152,13 @@ async function main() {
     conferir("Churn Pontual Líquido", m.churnPontualLiquido, num(e.churn_pont_total) - num(e.churn_pont_abonado));
     conferir("Headcount Operação", m.headcountOperacao, num(e.headcount), 0);
     conferir("MRR por cabeça", m.mrrPorCabeca, num(e.mrr_ativo) / num(e.headcount), 1);
+    console.log(
+      `  INFO snapshot usado=${m.snapshotFim ?? "—"} (semana ${semana.inicio}..${semana.fim})` +
+        `  faturamento/cabeça=${brl(m.faturamentoPorCabeca)}${m.faturamentoPorCabecaParcial ? " * (mês parcial)" : ""}`,
+    );
+    if (m.snapshotFim && m.snapshotFim < semana.inicio) {
+      console.log("  ALERTA: a semana não tem foto própria — carteira e estoque repetem a foto anterior.");
+    }
 
     // Invariantes internas da tela
     const somaProduto = m.estoquePorProduto.reduce((s, p) => s + p.valor, 0);
@@ -176,11 +189,17 @@ async function main() {
       const d = await detalheEstoquePontual(db, semana.fim, maiorProduto.produto);
       conferir(`drill produto "${maiorProduto.produto}"`, soma(d), maiorProduto.valor);
     }
-    const maiorMotivo = [...m.churnPorMotivo].sort((a, b) => b.mrr - a.mrr)[0];
-    if (maiorMotivo) {
-      const d = await detalheChurnDoMotivo(db, semana.inicio, semana.fim, maiorMotivo.motivo);
-      // a gêmea de motivo soma MRR + pontual do mesmo cliente
-      conferir(`drill motivo "${maiorMotivo.motivo}"`, soma(d), maiorMotivo.mrr + maiorMotivo.pontual);
+    // Desde o fix do review final, o drill de motivo é por CAMPO: cada célula
+    // (MRR e Pontual) abre o seu próprio drawer e tem que somar exatamente a
+    // célula clicada. Confere os DOIS campos, em TODOS os motivos da semana —
+    // é a regra que o drawer combinado violava.
+    for (const mot of m.churnPorMotivo) {
+      const [dMrr, dPont] = await Promise.all([
+        detalheChurnDoMotivo(db, semana.inicio, semana.fim, mot.motivo, "mrr"),
+        detalheChurnDoMotivo(db, semana.inicio, semana.fim, mot.motivo, "pontual"),
+      ]);
+      conferir(`drill motivo MRR "${mot.motivo}"`, soma(dMrr), mot.mrr);
+      conferir(`drill motivo pontual "${mot.motivo}"`, soma(dPont), mot.pontual);
     }
     console.log("");
   }
@@ -224,6 +243,8 @@ async function main() {
         churnPorMotivoNaSemana(db, semana.inicio, semana.fim),
         headcountOperacao(db, semana.fim),
       ]);
+    const fat = await faturavelDoMes(db, semana.fim);
+    const snap = await snapshotUsado(db, semana.fim);
     return derivarOperacao({
       semana,
       carteira,
@@ -235,7 +256,9 @@ async function main() {
       churnPontual,
       churnPorMotivo: porMotivo,
       headcountOperacao: headcount,
-      faturavelMes: null,
+      faturavelMes: fat.valor,
+      faturavelMesParcial: fat.parcial,
+      snapshotFim: snap,
     });
   }
 
