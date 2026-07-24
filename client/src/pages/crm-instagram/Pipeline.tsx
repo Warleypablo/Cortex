@@ -14,6 +14,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import {
   MessageCircle, Mail, Lock, ExternalLink, CheckCircle2, Tag, StickyNote, History,
+  Heart, UserPlus,
 } from "lucide-react";
 import { QUALIFICATION_TAGS, TAG_LABELS, BLOCKING_TAGS, type QualificationTag } from "@shared/crmInstagramTags";
 import { HistoryPanel } from "./LeadHistory";
@@ -41,6 +42,9 @@ type Profile = {
   lastInteractionAt: string | null;
   commentCount: number;
   dmCount: number;
+  likeCount: number;
+  likeAdCount: number;
+  followCount: number;
   lastText: string | null;
   temperature: "hot" | "warm" | "cold";
   score: number;
@@ -238,6 +242,18 @@ function ProfileCard({
         {p.commentCount > 0 && (
           <Badge variant="secondary" className="gap-1" title={`${p.commentCount} comentário(s)`}>
             <MessageCircle className="h-3 w-3" />{p.commentCount} {p.commentCount === 1 ? "coment." : "coments."}
+          </Badge>
+        )}
+        {/* Sinais do scraper (HikerAPI). Sem estes badges, um lead que só curtiu
+            ou só seguiu renderizava um card SEM nenhum badge — parecia vazio. */}
+        {(p.likeCount > 0 || p.likeAdCount > 0) && (
+          <Badge variant="secondary" className="gap-1" title={`${p.likeCount + p.likeAdCount} curtida(s)`}>
+            <Heart className="h-3 w-3" />{p.likeCount + p.likeAdCount} {p.likeCount + p.likeAdCount === 1 ? "curtida" : "curtidas"}
+          </Badge>
+        )}
+        {p.followCount > 0 && (
+          <Badge variant="secondary" className="gap-1" title="Passou a seguir a conta">
+            <UserPlus className="h-3 w-3" />seguiu
           </Badge>
         )}
         {p.isExistingContact && (
