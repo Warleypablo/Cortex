@@ -7,6 +7,8 @@
 // com 500 em vez de devolver zero plausível numa tela cujo valor é número
 // auditável.
 import { sql } from "drizzle-orm";
+import { ehOperacao } from "../../shared/headcount-operacao";
+import { computarBpReceitas } from "../routes/bp2026";
 
 export interface LinhaProduto {
   produto: string;
@@ -102,4 +104,57 @@ export async function churnPorMotivoNaSemana(
     mrr: num(x.mrr),
     pontual: num(x.pontual),
   }));
+}
+
+/**
+ * Pessoas de operação ativas na data. A query traz todo mundo que estava na
+ * casa (~110 linhas) e o recorte de setor/squad acontece em TypeScript, com
+ * `ehOperacao` — a régua tem teste, e teste de normalização de string em SQL
+ * seria caro. Volume não justifica filtrar no banco.
+ *
+ * A janela histórica é governada por `admissao`/`demissao`. A exclusão de
+ * `status = 'Dispensado'` é condicionada a `demissao IS NULL` e trata um erro
+ * de cadastro real: 3 pessoas em Commerce foram dispensadas sem receber data de
+ * saída e, sem isto, contariam como operação em TODA data (~4% de inflação no
+ * denominador da receita por cabeça). Quem tem data de saída continua governado
+ * por ela, então a série histórica fica intacta.
+ *
+ * Não filtrar por `status = 'Ativo'` puro: `status` é foto do agora, e quem saiu
+ * em junho sumiria também das semanas de abril — a série chega a inverter.
+ *
+ * Validado em produção: 72 em 2026-07-19, 73 em 2026-07-12, 71 em 2026-07-24.
+ */
+export async function headcountOperacao(db: any, data: string): Promise<number> {
+  const r: any = await db.execute(sql`
+    SELECT setor, squad
+    FROM "Inhire".rh_pessoal
+    WHERE admissao IS NOT NULL
+      AND admissao <= ${data}::date
+      AND (demissao IS NULL OR demissao > ${data}::date)
+      AND NOT (demissao IS NULL AND TRIM(COALESCE(status, '')) = 'Dispensado')
+  `);
+  return ((r.rows ?? []) as any[]).filter((p) => ehOperacao(p.setor, p.squad)).length;
+}
+
+/**
+ * Receita Total Faturável do mês em que a semana FECHA (o domingo manda: uma
+ * semana que cruza a virada de mês conta no mês do domingo).
+ *
+ * Reusa `computarBpReceitas` em vez de uma query nova para não criar a terceira
+ * régua de faturamento do repositório — ela já tem cache de 10 minutos
+ * compartilhado com /bp-2026. `receita_total_faturavel` = MRR Ativo + Venda
+ * Pontual + Outras Receitas.
+ *
+ * Devolve `null` quando o mês não é de 2026 (o BP é um modelo anual de 2026) ou
+ * quando o mês ainda não tem realizado. A tela mostra '—'; nunca zero, que se
+ * leria como 'faturou nada'.
+ */
+export async function faturavelDoMes(db: any, fimDaSemana: string): Promise<number | null> {
+  const [ano, mes] = fimDaSemana.split("-").map(Number);
+  const payload: any = await computarBpReceitas(db);
+  if (ano !== payload?.ano) return null;
+  const linha = (payload?.linhas ?? []).find((l: any) => l.metrica === "receita_total_faturavel");
+  const doMes = (linha?.meses ?? []).find((m: any) => m.mes === mes);
+  const realizado = doMes?.realizado;
+  return typeof realizado === "number" ? realizado : null;
 }
