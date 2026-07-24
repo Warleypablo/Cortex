@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { gerarSemanas } from "./semanas";
+import { gerarSemanas, parSemanas } from "./semanas";
 
 describe("gerarSemanas", () => {
   it("devolve a quantidade pedida, em ordem cronológica", () => {
@@ -55,5 +55,69 @@ describe("gerarSemanas", () => {
 
   it("quantidade 1 devolve só a semana corrente", () => {
     expect(gerarSemanas("2026-07-21", 1)).toHaveLength(1);
+  });
+});
+
+describe("parSemanas", () => {
+  it("sem 'ate', devolve a última semana FECHADA e a anterior", () => {
+    // 2026-07-24 é sexta. A semana corrente (20–26/07) está em curso e não entra.
+    const { atual, anterior } = parSemanas("2026-07-24");
+    expect(atual).toMatchObject({ inicio: "2026-07-13", fim: "2026-07-19" });
+    expect(anterior).toMatchObject({ inicio: "2026-07-06", fim: "2026-07-12" });
+  });
+
+  it("no domingo, a semana que termina hoje ainda NÃO é a fechada", () => {
+    // o dia ainda não acabou: a foto do snapshot de domingo pode não existir
+    const { atual } = parSemanas("2026-07-19");
+    expect(atual).toMatchObject({ inicio: "2026-07-06", fim: "2026-07-12" });
+  });
+
+  it("na segunda, a semana recém-encerrada já é a fechada", () => {
+    const { atual } = parSemanas("2026-07-20");
+    expect(atual).toMatchObject({ inicio: "2026-07-13", fim: "2026-07-19" });
+  });
+
+  it("'ate' é um 'hoje simulado': a semana que o contém é descartada como em curso", () => {
+    // 2026-06-24 é quarta, dentro de 22–28/06. Essa semana sai (é a "corrente"
+    // do ponto de vista da âncora) e o par é o das duas fechadas antes dela.
+    // MESMA regra do teste CONTRATO DE ÂNCORA abaixo — há uma semântica só.
+    const { atual, anterior } = parSemanas("2026-07-24", "2026-06-24");
+    expect(atual).toMatchObject({ inicio: "2026-06-15", fim: "2026-06-21" });
+    expect(anterior).toMatchObject({ inicio: "2026-06-08", fim: "2026-06-14" });
+  });
+
+  it("nenhuma das duas semanas do par vem marcada como parcial", () => {
+    const { atual, anterior } = parSemanas("2026-07-24");
+    expect(atual.parcial).toBe(false);
+    expect(anterior.parcial).toBe(false);
+  });
+
+  it("'ate' na semana corrente cai para a última fechada, nunca devolve semana em curso", () => {
+    const { atual } = parSemanas("2026-07-24", "2026-07-22");
+    expect(atual).toMatchObject({ inicio: "2026-07-13", fim: "2026-07-19" });
+  });
+
+  it("'ate' futuro é ignorado: não dá para navegar para o futuro", () => {
+    const { atual } = parSemanas("2026-07-24", "2026-12-01");
+    expect(atual).toMatchObject({ inicio: "2026-07-13", fim: "2026-07-19" });
+  });
+
+  it("CONTRATO DE ÂNCORA: 'ate' em um dia da semana X devolve a semana ANTERIOR a X", () => {
+    // É o que o botão 'Semana anterior' do front depende. Passar o domingo da
+    // semana que se quer ver NÃO funciona: aquela semana vira a 'corrente' e é
+    // descartada. Para ver 06–12/07, a âncora tem que cair em 13–19/07.
+    const { atual } = parSemanas("2026-07-24", "2026-07-13");
+    expect(atual).toMatchObject({ inicio: "2026-07-06", fim: "2026-07-12" });
+  });
+
+  it("a regra da âncora não depende de quão antiga a data é", () => {
+    // Trava a semântica ÚNICA: 'a semana de ate sai' vale igual para uma data
+    // da semana passada e para uma de dois meses atrás. Uma implementação com
+    // regra condicional ('se for recente recua, se for antiga ancora ali')
+    // passa nos outros casos e falha aqui.
+    const recente = parSemanas("2026-07-24", "2026-07-13").atual;
+    const antiga = parSemanas("2026-07-24", "2026-05-13").atual;
+    expect(recente).toMatchObject({ inicio: "2026-07-06" }); // semana de ate menos uma
+    expect(antiga).toMatchObject({ inicio: "2026-05-04" }); // idem: 11–17/05 sai, sobra 04–10/05
   });
 });

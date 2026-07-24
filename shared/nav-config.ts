@@ -333,6 +333,7 @@ export const ROUTE_TO_PERMISSION: Record<string, string> = {
   '/investors-report': PERMISSION_KEYS.REPORTS.INVESTORS,
   '/reports/mensal': PERMISSION_KEYS.REPORTS.MENSAL,
   '/reports/semanal': PERMISSION_KEYS.REPORTS.MENSAL,
+  '/reports/operacao': PERMISSION_KEYS.REPORTS.MENSAL,
   '/reports/trimestral': PERMISSION_KEYS.REPORTS.MENSAL,
   // Administração
   '/admin/usuarios': PERMISSION_KEYS.ADMIN.USUARIOS,
@@ -607,6 +608,7 @@ export const NAV_CONFIG = {
         { title: 'Auto Report', url: '/growth/auto-report', icon: 'FileText', permissionKey: PERMISSION_KEYS.REPORTS.AUTO_REPORT },
         { title: 'Reporte Mensal', url: '/reports/mensal', icon: 'Presentation', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
         { title: 'Reporte Semanal', url: '/reports/semanal', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
+        { title: 'Reporte Semanal de Operação', url: '/reports/operacao', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
         { title: 'Reporte Trimestral', url: '/reports/trimestral', icon: 'CalendarRange', permissionKey: PERMISSION_KEYS.REPORTS.MENSAL },
       ],
     },
