@@ -346,10 +346,13 @@ describe("parSemanas", () => {
     expect(atual).toMatchObject({ inicio: "2026-07-13", fim: "2026-07-19" });
   });
 
-  it("com 'ate', ancora o par na semana que contém aquela data", () => {
+  it("'ate' é um 'hoje simulado': a semana que o contém é descartada como em curso", () => {
+    // 2026-06-24 é quarta, dentro de 22–28/06. Essa semana sai (é a "corrente"
+    // do ponto de vista da âncora) e o par é o das duas fechadas antes dela.
+    // MESMA regra do teste CONTRATO DE ÂNCORA abaixo — há uma semântica só.
     const { atual, anterior } = parSemanas("2026-07-24", "2026-06-24");
-    expect(atual).toMatchObject({ inicio: "2026-06-22", fim: "2026-06-28" });
-    expect(anterior).toMatchObject({ inicio: "2026-06-15", fim: "2026-06-21" });
+    expect(atual).toMatchObject({ inicio: "2026-06-15", fim: "2026-06-21" });
+    expect(anterior).toMatchObject({ inicio: "2026-06-08", fim: "2026-06-14" });
   });
 
   it("nenhuma das duas semanas do par vem marcada como parcial", () => {
@@ -375,6 +378,17 @@ describe("parSemanas", () => {
     const { atual } = parSemanas("2026-07-24", "2026-07-13");
     expect(atual).toMatchObject({ inicio: "2026-07-06", fim: "2026-07-12" });
   });
+
+  it("a regra da âncora não depende de quão antiga a data é", () => {
+    // Trava a semântica ÚNICA: 'a semana de ate sai' vale igual para uma data
+    // da semana passada e para uma de dois meses atrás. Uma implementação com
+    // regra condicional ('se for recente recua, se for antiga ancora ali')
+    // passa nos outros casos e falha aqui.
+    const recente = parSemanas("2026-07-24", "2026-07-13").atual;
+    const antiga = parSemanas("2026-07-24", "2026-05-13").atual;
+    expect(recente).toMatchObject({ inicio: "2026-07-06" }); // semana de ate menos uma
+    expect(antiga).toMatchObject({ inicio: "2026-05-04" }); // idem: 11–17/05 sai, sobra 04–10/05
+  });
 });
 ```
 
@@ -396,9 +410,14 @@ Anexar ao final de `server/reportsSemanal/semanas.ts`:
  * terminou e o snapshot de fechamento pode não existir. Comparar meia semana
  * com uma inteira produz queda fantasma toda segunda.
  *
- * `ate` (opcional, 'YYYY-MM-DD') ancora o par na semana que contém aquela
- * data, para navegar o histórico. Se a data cair na semana corrente, o par
- * volta para a última fechada: a tela nunca mostra semana em curso.
+ * `ate` (opcional, 'YYYY-MM-DD') é um "hoje simulado", para navegar o
+ * histórico: a semana que CONTÉM `ate` é descartada como em curso, exatamente
+ * como acontece com `hoje`, e o par são as duas fechadas anteriores a ela.
+ *
+ * Uma semântica só, sem casos especiais — vale igual para uma data da semana
+ * passada e para uma de dois meses atrás. É dela que depende o botão "semana
+ * anterior" do front, que passa um dia da semana SEGUINTE à que quer exibir.
+ * Data futura é ignorada: não se navega para frente do presente.
  */
 export function parSemanas(hoje: string, ate?: string): { atual: Semana; anterior: Semana } {
   const ancora = ate && ate < hoje ? ate : hoje;
